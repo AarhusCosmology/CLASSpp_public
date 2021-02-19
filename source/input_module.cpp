@@ -1014,8 +1014,27 @@ int InputModule::input_read_parameters() {
     if (flag2 == _TRUE_)
       pba->Omega_ini_dcdm = param2/pba->h/pba->h;
 
+    /** - Read Gamma_dcdm or log10_Gamma_dcdm */
+    class_call(parser_read_double(pfc,"Gamma_dcdm",&param1,&flag1,errmsg),
+               errmsg,
+               errmsg);
+    class_call(parser_read_double(pfc,"log10_Gamma_dcdm",&param2,&flag2,errmsg),
+               errmsg,
+               errmsg);
+    class_call(parser_read_double(pfc,"log10_Gamma_dcdm_Gyr",&param3,&flag3,errmsg),
+               errmsg,
+               errmsg);
+    class_test(class_at_least_two_of_three(flag1,flag2,flag3),
+               errmsg,
+               "In input file, you can only enter one of Gamma_dcdm, log10_Gamma_dcdmor log10_Gamma_dcdm_Gyr, choose one");
+    if (flag1 == _TRUE_)
+      pba->Gamma_dcdm = param1;
+    if (flag2 == _TRUE_)
+      pba->Gamma_dcdm = pow(10,param2);
+    if (flag3 == _TRUE_)
+      pba->Gamma_dcdm = pow(10,param3)*978.5;
     /** - Read Gamma in same units as H0, i.e. km/(s Mpc)*/
-    class_read_double("Gamma_dcdm",pba->Gamma_dcdm);
+    //class_read_double("Gamma_dcdm",pba->Gamma_dcdm);                                                                                                                                                              
     /* Convert to Mpc */
     pba->Gamma_dcdm *= (1.e3 / _c_);
 
