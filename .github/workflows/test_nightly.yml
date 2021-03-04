@@ -25,13 +25,26 @@ jobs:
     runs-on: [self-hosted, linux]
     needs: [nose_tests_lvl3, valgrind-wide-and-shallow, valgrind-narrow-and-deep]
     steps:
-    - name: SetSecret
+    - name: Store current SHA as secret
       uses: hmanzur/actions-set-secret@v2.0.0
       with:
         name: 'SHA_LAST_SUCCESS'
         value: ${{ github.sha }}
         repository: AarhusCosmology/CLASSpp
         token: ${{ secrets.REPO_ACCESS_TOKEN }}
+    - name: Checkout master 🛎
+      uses: actions/checkout@v2
+      with:
+        path: main_class
+        ref: master
+        persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
+        fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
+    - name: Push to public master
+      env:
+        TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
+      run: |
+        cd main_class
+        git push https://AarhusCosmology:"$TOKEN"@github.com/AarhusCosmology/CLASSpp_public master:master
 
   nose_tests_lvl3:
     runs-on: [self-hosted, linux, heavy]
