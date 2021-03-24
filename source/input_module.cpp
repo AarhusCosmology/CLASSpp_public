@@ -3676,8 +3676,9 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
 }
 
 int InputModule::input_find_root(double* xzero, int* fevals, fzerofun_workspace* pfzw, ErrorMsg errmsg){
-  double x1, x2, f1, f2, dxdy, dx;
-  int iter, iter2;
+  double x1, f1, f2, dxdy;
+  int max_iter_outer = 150;
+  int max_iter_inner = 30;
   int return_function;
   /** Summary: */
 
@@ -3695,42 +3696,53 @@ int InputModule::input_find_root(double* xzero, int* fevals, fzerofun_workspace*
   (*fevals)++;
   //printf("x1= %g, f1= %g\n",x1,f1);
 
-  dx = 1.5*f1*dxdy;
-
+  double dx = 1.5*f1*dxdy;
+  double x2 = x1 - dx;
+  int direction = 1;
   /** - Then we do a linear hunt for the boundaries */
-  for (iter=1; iter<=15; iter++){
-    //x2 = x1 + search_dir*dx;
-    x2 = x1 - dx;
+  for (int iter_outer = 1; iter_outer <= max_iter_outer; ++iter_outer) {
 
-    for (iter2=1; iter2 <= 3; iter2++) {
-      return_function = input_fzerofun_1d(x2,pfzw,&f2,errmsg);
-      (*fevals)++;
-      //printf("x2= %g, f2= %g\n",x2,f2);
-      //fprintf(stderr,"iter2=%d\n",iter2);
+    // Loop for getting new output value
+    bool got_new_output_value = false;
+    for (int iter_inner = 1; iter_inner <= max_iter_inner; ++iter_inner) {
+      x2 = x1 - direction*dx;
 
-      if (return_function ==_SUCCESS_) {
+      try {
+        return_function = input_fzerofun_1d(x2, pfzw, &f2, errmsg);
+        (*fevals)++;
+      }
+      catch (...) {
+        return_function = _FAILURE_;
+      }
+
+      if (return_function == _SUCCESS_) {
+        got_new_output_value = true;
         break;
       }
-      else if (iter2 < 3) {
-        dx*=0.5;
-        x2 = x1-dx;
-      }
-      else {
-        //fprintf(stderr,"get here\n");
-        class_stop(errmsg,errmsg);
-      }
+
+      dx *= 0.5;
+    }
+    if (!got_new_output_value) {
+      throw(std::runtime_error(errmsg));
     }
 
-    if (f1*f2<0.0){
+    if (f1*f2 < 0.0) {
       /** - root has been bracketed */
-      if (0==1){
-        printf("Root has been bracketed after %d iterations: [%g, %g].\n",iter,x1,x2);
-      }
       break;
     }
 
-    x1 = x2;
-    f1 = f2;
+    // x2 still on the wrong side of root, continue search.
+    const double local_minima_tolerance = 5.0;
+    if (fabs(f2) > local_minima_tolerance*fabs(f1)) {
+      // We are moving in the wrong direction, dydx estimate must have wrong sign or there is a really nasty local minimum. Try reversing direction.
+      direction *= -1;
+    }
+    else {
+      // Choose new point as boundary and double dx.
+      x1 = x2;
+      f1 = f2;
+      dx *= 2;
+    }
   }
 
   /** - Find root using Ridders method. (Exchange for bisection if you are old-school.)*/
