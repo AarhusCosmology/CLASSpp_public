@@ -759,6 +759,12 @@ cdef class PyCosmology:
         thm = deref(self._thisptr).GetThermodynamicsModule()
         return 100.*deref(thm).rs_star_/deref(thm).ra_star_
 
+    cpdef theta_d_100(self):
+        if (self.th.compute_damping_scale == _FALSE_):
+            raise CosmoSevereError(r"Photon damping scale has not been computed - you must add 'compute damping scale':'yes'.")
+        thm = deref(self._thisptr).GetThermodynamicsModule()
+        return 100.*deref(thm).rd_rec_/deref(thm).ra_rec_
+
     cpdef Omega_Lambda(self):
         return self.ba.Omega0_lambda
 
@@ -1505,6 +1511,8 @@ cdef class PyCosmology:
                 value = self.theta_s_100()
             elif name == '100*theta_star':
                 value = self.theta_star_100()
+            elif name == '100*theta_d':
+                value = self.theta_d_100()
             elif name == 'YHe':
                 thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).YHe_
