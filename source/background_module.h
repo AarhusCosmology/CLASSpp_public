@@ -3,6 +3,7 @@
 
 #include "input_module.h"
 #include "base_module.h"
+#include "quadrature.h"
 
 class BackgroundModule : public BaseModule {
 public:
@@ -15,6 +16,7 @@ public:
   int background_w_fld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
   int background_free_noinput() const;
   double dV_scf(double phi) const;
+  const int GetNCDMqsize(int n_ncdm);
 
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
 
@@ -36,7 +38,13 @@ public:
   int index_bg_rho_idm_dr_;    /**< density of dark matter interacting with dark radiation */
   int index_bg_rho_idr_;       /**< density of interacting dark radiation */
   int index_bg_rho_dcdm_;      /**< dcdm density */
-  int index_bg_rho_dr_;        /**< dr density */
+  
+  int index_bg_f_ncdm_decay_dr1_; /**< dncdm background distribution function> index of first q-bin of first species */
+  int index_bg_dlnfdlnq_ncdm_decay_dr1_;
+  int index_bg_f_dr1_;         /**< total distribution function of DR */
+  int index_bg_rho_dr_species_;/**< dr density for individual species */
+  int index_bg_rho_dr_;        /**< total dr density */
+  int index_bg_rho_dr_integrated_;        /**< total dr density */
 
   int index_bg_phi_scf_;       /**< scalar field value */
   int index_bg_phi_prime_scf_; /**< scalar field derivative wrt conformal time */
@@ -47,7 +55,8 @@ public:
   int index_bg_p_scf_;         /**< scalar field pressure */
   int index_bg_p_prime_scf_;         /**< scalar field pressure */
 
-  int index_bg_rho_ncdm1_;     /**< density of first ncdm species (others contiguous) */
+  int index_bg_number_ncdm1_;  /**< number density of first ncdm species (others contiguous) */
+  int index_bg_rho_ncdm1_;     /**< energy density of first ncdm species (others contiguous) */
   int index_bg_p_ncdm1_;       /**< pressure of first ncdm species (others contiguous) */
   int index_bg_pseudo_p_ncdm1_;/**< another statistical momentum useful in ncdma approximation */
 
@@ -108,6 +117,8 @@ private:
   static int background_derivs_loga(double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
   int background_add_line_to_bg_table_member(double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace, ErrorMsg error_message);
   static int background_add_line_to_bg_table(double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace, ErrorMsg error_message);
+  static int background_timescale(double x, void* parameters_and_workspace, double* timescale, ErrorMsg error_message) ;
+  static int background_print_variables(double x, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) ;
   double V_scf(double phi) const;
   double ddV_scf(double phi) const;
   double Q_scf(double phi, double phi_prime);
@@ -134,7 +145,14 @@ private:
 
   int index_bi_a_;       /**< {B} scale factor */
   int index_bi_rho_dcdm_;/**< {B} dcdm density */
-  int index_bi_rho_dr_;  /**< {B} dr density */
+  
+  int index_bi_f_ncdm_decay_dr1_;/**< {B} dncdm distribution function*/
+  int index_bi_lnf_ncdm_decay_dr1_;
+  int index_bi_dlnfdlnq_ncdm_decay_dr1_;
+  int index_bi_f_dr1_species_;
+  int index_bi_rho_dr_from_dcdm_;
+  
+  int index_bi_rho_dr_from_dncdm_;
   int index_bi_rho_fld_; /**< {B} fluid density */
   int index_bi_phi_scf_;       /**< {B} scalar field value */
   int index_bi_phi_prime_scf_; /**< {B} scalar field derivative wrt conformal time */

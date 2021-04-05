@@ -30,7 +30,7 @@ public:
   int* ic_size_;     /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
   //@}
   /** @name - flags and indices running on types (temperature, polarization, lensing, ...) */
-
+  int steps = 0;
   //@{
 
   /* remember that the temperature source function includes three

@@ -6,6 +6,7 @@
 #include "input_module.h"
 #include "cosmology.h"
 #include "non_cold_dark_matter.h"
+#include "dark_radiation.h"
 #include "background_module.h"
 #include "thermodynamics_module.h"
 #include "perturbations_module.h"
@@ -13,8 +14,10 @@
 #include "nonlinear_module.h"
 #include "lensing_module.h"
 #include "spectra_module.h"
+#include <iostream>
 
 #include <thread>
+
 /**
  * Use this routine to extract initial parameters from files 'xxx.ini'
  * and/or 'xxx.pre'. They can be the arguments of the main() routine.
@@ -31,7 +34,12 @@ const std::vector<std::string> InputModule::kTargetNamestrings_{
   "Omega_scf",
   "Omega_ini_dcdm",
   "omega_ini_dcdm",
-  "sigma8"};
+  "sigma8",
+  "Omega_dncdmdr",
+  "omega_dncdmdr",
+  "deg_ncdm_decay_dr",
+  "Omega_ini_dncdm",
+  "omega_ini_dncdm"};
 const std::vector<std::string> InputModule::kUnknownNamestrings_{
   "h",
   "Omega_ini_dcdm",
@@ -39,7 +47,12 @@ const std::vector<std::string> InputModule::kUnknownNamestrings_{
   "scf_shooting_parameter",
   "Omega_dcdmdr",
   "omega_dcdmdr",
-  "A_s"};
+  "A_s",
+  "deg_ncdm_decay_dr",
+  "deg_ncdm_decay_dr",
+  "Omega_dncdmdr",
+  "Omega_dncdmdr",
+  "omega_dncdmdr"};
 
 int InputModule::file_content_from_arguments(int argc, char **argv, FileContent& fc, ErrorMsg errmsg) {
 
@@ -197,42 +210,63 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
   class_alloc(shooting_workspace_.unknown_parameters_index,
               unknown_parameters_size*sizeof(int),
               error_message_);
-  shooting_workspace_.target_size = unknown_parameters_size;
   class_alloc(shooting_workspace_.target_name,
-              shooting_workspace_.target_size*sizeof(enum target_names),
+              unknown_parameters_size*sizeof(enum target_names),
               error_message_);
-  class_alloc(shooting_workspace_.target_value,
-              shooting_workspace_.target_size*sizeof(double),
+  class_alloc(shooting_workspace_.target_sizes,
+              unknown_parameters_size*sizeof(int),
               error_message_);
+  shooting_workspace_.unknown_parameters_size = unknown_parameters_size;
+  std::vector<double> target_values;
 
   /** - --> go through all cases with unknown parameters: */
   for (int counter = 0; counter < unknown_parameters_size; counter++){
     int index_target = target_indices[counter];
     int flag1;
-    double param1;
-    class_call(parser_read_double(&file_content_,
-                                  kTargetNamestrings_[index_target].c_str(),
-                                  &param1,
-                                  &flag1,
-                                  error_message_),
+    int params_size;
+    double* params = nullptr;
+    class_call(parser_read_list_of_doubles(&file_content_,
+                                           kTargetNamestrings_[index_target].c_str(),
+                                           &params_size,
+                                           &params,
+                                           &flag1,
+                                           error_message_),
                error_message_,
                error_message_);
 
+
     // store name of target parameter
     shooting_workspace_.target_name[counter] = (enum target_names)index_target;
-    // store target value of target parameter
-    shooting_workspace_.target_value[counter] = param1;
+    shooting_workspace_.target_sizes[counter] = params_size;
     shooting_workspace_.unknown_parameters_index[counter] = file_content_.size - unknown_parameters_size + counter;
-    // Set the name and value of the unknown parameter. The value will be overwritten in get_guess().
+    std::string comma_separated_list_of_values = "1.0";
+    for (int j = 0; j < params_size; ++j) {
+      // store target value of target parameter
+      target_values.push_back(params[j]);
+      if (j > 0) {
+        comma_separated_list_of_values.append(", 1.0");
+      }
+      //shooting_workspace_.target_value[counter] = param1;
+      //shooting_workspace_.unknown_parameters_index[counter] = file_content_.size - unknown_parameters_size + counter;
+      // Set the name and value of the unknown parameter. The value will be overwritten in get_guess().
+    }
+    free(params);
     strcpy(file_content_.name[shooting_workspace_.unknown_parameters_index[counter]], kUnknownNamestrings_[index_target].c_str());
-    strcpy(file_content_.value[shooting_workspace_.unknown_parameters_index[counter]], "1234.56789");
+    strcpy(file_content_.value[shooting_workspace_.unknown_parameters_index[counter]], comma_separated_list_of_values.c_str());
 
     //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
+    class_alloc(shooting_workspace_.target_values,
+                target_values.size()*sizeof(double),
+                error_message_);
+    for (int j = 0; j < target_values.size(); ++j) {
+      shooting_workspace_.target_values[j] = target_values[j];
+    }
+
   }
 
   int fevals = 0;
   int status = _SUCCESS_;
-  if (unknown_parameters_size == 1){
+  if (target_values.size() == 1){
     // 1d root finding
     if (input_verbose > 0) {
       fprintf(
@@ -266,10 +300,10 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     double* x_inout;
     double* dxdF;
     class_alloc(x_inout,
-                sizeof(double)*unknown_parameters_size,
+                sizeof(double)*target_values.size(),
                 error_message_);
     class_alloc(dxdF,
-                sizeof(double)*unknown_parameters_size,
+                sizeof(double)*target_values.size(),
                 error_message_);
     class_call(input_get_guess(x_inout,
                                dxdF,
@@ -280,7 +314,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     class_call(fzero_Newton(input_try_unknown_parameters,
                             x_inout,
                             dxdF,
-                            unknown_parameters_size,
+                            target_values.size(),
                             1e-4,
                             1e-6,
                             &shooting_workspace_,
@@ -289,9 +323,14 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
                error_message_, error_message_);
 
     /* Store xzero */
-    for (int counter = 0; counter < unknown_parameters_size; counter++){
-      sprintf(file_content_.value[shooting_workspace_.unknown_parameters_index[counter]],
-              "%e",x_inout[counter]);
+    int x_inout_index = 0;
+    for (int counter = 0; counter < unknown_parameters_size; counter++) {
+      char* value = file_content_.value[shooting_workspace_.unknown_parameters_index[counter]];
+      for (int j = 0; j < shooting_workspace_.target_sizes[counter]; ++j) {
+        const char* format_string = j > 0 ? ",%.17g" : "%.17g";
+        int bytes_written = sprintf(value, format_string, x_inout[x_inout_index++]);
+        value += bytes_written;
+      }
       if (input_verbose > 0) {
         fprintf(stdout," -> found '%s = %s'\n",
                 file_content_.name [shooting_workspace_.unknown_parameters_index[counter]],
@@ -384,20 +423,25 @@ int InputModule::input_init() {
   /** - Do we need to fix unknown parameters? */
   unknown_parameters_size = 0;
   for (index_target = 0; index_target < _NUM_TARGETS_; index_target++){
-    class_call(parser_read_double(pfc,
-                                  kTargetNamestrings_[index_target].c_str(),
-                                  &param1,
-                                  &flag1,
-                                  errmsg),
-               errmsg,
-               errmsg);
-    if (flag1 == _TRUE_){
+    int flag1;
+    int params_size;
+    double* params = nullptr;
+    class_call(parser_read_list_of_doubles(&file_content_,
+                                           kTargetNamestrings_[index_target].c_str(),
+                                           &params_size,
+                                           &params,
+                                           &flag1,
+                                           error_message_),
+               error_message_,
+               error_message_);
+    if (flag1 == _TRUE_) {
       /** - --> input_auxillary_target_conditions() takes care of the case where for
           instance Omega_dcdmdr is set to 0.0.
       */
       class_call(input_auxillary_target_conditions(pfc,
                                                    (enum target_names)index_target,
-                                                   param1,
+                                                   params,
+                                                   params_size,
                                                    &aux_flag,
                                                    errmsg),
                  errmsg, errmsg);
@@ -407,6 +451,7 @@ int InputModule::input_init() {
         unknown_parameters_size++;
       }
     }
+    free(params);
   }
 
   /**
@@ -981,6 +1026,8 @@ int InputModule::input_read_parameters() {
   }
 
   /** - Omega_0_dcdmdr (DCDM) */
+  std::vector<DarkRadiation::SourceType> dr_sources;
+  
   class_call(parser_read_double(pfc,"Omega_dcdmdr",&param1,&flag1,errmsg),
              errmsg,
              errmsg);
@@ -997,6 +1044,7 @@ int InputModule::input_read_parameters() {
 
   if (pba->Omega0_dcdmdr > 0) {
 
+    dr_sources.push_back(DarkRadiation::SourceType::dcdm);
     Omega_tot += pba->Omega0_dcdmdr;
 
     /** - Read Omega_ini_dcdm or omega_ini_dcdm */
@@ -1018,8 +1066,9 @@ int InputModule::input_read_parameters() {
     class_read_double("Gamma_dcdm",pba->Gamma_dcdm);
     /* Convert to Mpc */
     pba->Gamma_dcdm *= (1.e3 / _c_);
-
   }
+  
+  class_read_int("Inverse decay term", pba->has_inv);
 
   /** - non-cold relics (ncdm) */
   NcdmSettings ncdm_settings;
@@ -1031,10 +1080,77 @@ int InputModule::input_read_parameters() {
   pba->ncdm = NonColdDarkMatter::Create(pfc, ncdm_settings);
   if (pba->ncdm) {
     pba->N_ncdm = pba->ncdm->N_ncdm_;
+    pba->N_dncdm = pba->ncdm->N_ncdm_decay_dr_;
+    
+    for (int n_dncdm = 0; n_dncdm < pba->ncdm->N_ncdm_decay_dr_; n_dncdm++) {
+      dr_sources.push_back(DarkRadiation::SourceType::dncdm);
+    }
+    
+    if (pba->ncdm->N_ncdm_decay_dr_ > 0) {
+      double *Omega_dncdmdr_list, *omega_dncdmdr_list, *deg_list, *Omega_ini_dncdm_list, *omega_ini_dncdm_list;
+      int flag4, flag5, temp_size; // temp_size will always be N_ncdm_decay_dr_, the sizes are checked elsewhere
+      
+      class_alloc(pba->ncdm->Omega_dncdmdr_, pba->ncdm->N_ncdm_decay_dr_*sizeof(double), errmsg);
+      class_call(parser_read_list_of_doubles(pfc,"Omega_dncdmdr",&temp_size,&Omega_dncdmdr_list,&flag1,errmsg),
+                 errmsg, errmsg);
+      class_call(parser_read_list_of_doubles(pfc,"omega_dncdmdr",&temp_size,&omega_dncdmdr_list,&flag2,errmsg),
+                 errmsg, errmsg);
+      class_call(parser_read_list_of_doubles(pfc,"deg_ncdm_decay_dr",&temp_size,&deg_list,&flag3,errmsg),
+                 errmsg, errmsg);
+      class_call(parser_read_list_of_doubles(pfc,"Omega_ini_dncdm",&temp_size,&Omega_ini_dncdm_list,&flag4,errmsg),
+                 errmsg, errmsg);
+      class_call(parser_read_list_of_doubles(pfc,"omega_ini_dncdm",&temp_size,&omega_ini_dncdm_list,&flag5,errmsg),
+                 errmsg, errmsg);
+      
+      class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
+                   errmsg,
+                   "In input file, you can only enter one of Omega_dncdmdr or omega_dncdmdr, choose one");
+      class_test(((flag3 == _TRUE_) && (flag4 == _TRUE_)),
+                   errmsg,
+                   "In input file, you can only enter one of deg_ncdm_decay_dr or Omega_ini_dncdm, choose one");
+      
+      if (flag1 == _TRUE_) {
+        for (int n = 0; n < pba->ncdm->N_ncdm_decay_dr_; n++) {
+          if (not pba->has_curvature) {
+            class_test((Omega_dncdmdr_list[n] > 1.0), errmsg, "Your input requires Omega_dncdmdr > 1 which is not allowed in a flat Universe. Either lower your input deg_ncdm_decay_dr, Omega_ini_ncdm_decay_dr, m_ncdm_decay_dr, increase Gamma_ncdm_decay_dr, or add positive curvature to allow this energy density.");
+          }
+          pba->ncdm->Omega_dncdmdr_[n] = Omega_dncdmdr_list[n];
+          pba->ncdm->SetOmega0(pba->ncdm->N_ncdm_standard_ + n, Omega_dncdmdr_list[n], pba->h);
+        }
+      } else if (flag2 == _TRUE_) {
+        for (int n = 0; n < pba->ncdm->N_ncdm_decay_dr_; n++) {
+          pba->ncdm->Omega_dncdmdr_[n] = omega_dncdmdr_list[n]/pba->h/pba->h;
+          pba->ncdm->SetOmega0(pba->ncdm->N_ncdm_standard_ + n, omega_dncdmdr_list[n]/pba->h/pba->h, pba->h);
+        }
+      }
+      if (flag3 == _TRUE_) {
+        for (int n = 0; n < pba->ncdm->N_ncdm_decay_dr_; n++) {
+          // class_test((deg_list[n] > 25.0), errmsg, "You have either chosen an unphysically large degeneracy parameter for the decaying ncdm species, or your input mass and energy density require it to be too large for consistency");
+          pba->ncdm->SetDegAndFactor(pba->ncdm->N_ncdm_standard_ + n, deg_list[n], pba->T_cmb);
+        }
+      } else if (flag4 == _TRUE_) {
+        double a_ini = pba->ncdm->GetIni(ppr->a_ini_over_a_today_default*pba->a_today, pba->a_today, ppr->tol_ncdm_initial_w);
+        double z_ini = 1.0/a_ini - 1.0;
+        for (int n = 0; n < pba->ncdm->N_ncdm_decay_dr_; n++) {
+          pba->ncdm->SetDeg_from_Omega_ini(pba->ncdm->N_ncdm_standard_ + n, z_ini, pba->H0, Omega_ini_dncdm_list[n], pba->T_cmb);
+        }
+      } else if (flag5 == _TRUE_) {
+        double a_ini = pba->ncdm->GetIni(ppr->a_ini_over_a_today_default*pba->a_today, pba->a_today, ppr->tol_ncdm_initial_w);
+        double z_ini = 1.0/a_ini - 1.0;
+        for (int n = 0; n < pba->ncdm->N_ncdm_decay_dr_; n++) {
+          pba->ncdm->SetDeg_from_Omega_ini(pba->ncdm->N_ncdm_standard_ + n, z_ini, pba->H0, omega_ini_dncdm_list[n]/pba->h/pba->h, pba->T_cmb);
+        }
+      }
+    }
+
     pba->Omega0_ncdm_tot = pba->ncdm->GetOmega0();
   }
   Omega_tot += pba->Omega0_ncdm_tot;
-
+  
+  /** - Dark radiation */
+  pba->dr = DarkRadiation::Create(pfc, dr_sources, pba->T_cmb);
+  pba->N_decay_dr = dr_sources.size();
+  
   /** - Omega_0_k (effective fractional density of curvature) */
   class_read_double("Omega_k",pba->Omega0_k);
   /** - Set curvature parameter K */
@@ -2895,6 +3011,7 @@ int InputModule::input_read_parameters() {
   pba->has_cdm = _FALSE_;
   pba->has_ncdm = _FALSE_;
   pba->has_dcdm = _FALSE_;
+  pba->has_dncdm = _FALSE_;
   pba->has_dr = _FALSE_;
   pba->has_scf = _FALSE_;
   pba->has_lambda = _FALSE_;
@@ -2915,7 +3032,12 @@ int InputModule::input_read_parameters() {
     if (pba->Gamma_dcdm != 0.)
       pba->has_dr = _TRUE_;
   }
-
+  
+  if ((pba->has_ncdm) && (pba->ncdm->N_ncdm_decay_dr_ != 0.)){
+    pba->has_dncdm = _TRUE_;
+    pba->has_dr = _TRUE_;
+  }
+  
   if (pba->Omega0_scf != 0.)
     pba->has_scf = _TRUE_;
 
@@ -3426,11 +3548,10 @@ int InputModule::class_fzero_ridder(int (*func)(double x, void* param, double* y
   class_stop(error_message,"Failure in int.");
 }
 
-int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unknown_parameters_size, void* voidpfzw, double* output, ErrorMsg errmsg) {
+int InputModule::input_try_unknown_parameters(double* unknown_values, int unknown_values_size, void* voidpfzw, double* output, ErrorMsg errmsg) {
   /** Summary:
    * - Call the structures*/
 
-  int i;
   double rho_dcdm_today, rho_dr_today;
   struct fzerofun_workspace * pfzw;
   int input_verbose;
@@ -3440,9 +3561,14 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
 
   pfzw = (struct fzerofun_workspace *) voidpfzw;
   /** - Read input parameters */
-  for (i=0; i < unknown_parameters_size; i++) {
-    sprintf(pfzw->fc.value[pfzw->unknown_parameters_index[i]],
-            "%e",unknown_parameter[i]);
+  int x_inout_index = 0;
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
+    char* value = pfzw->fc.value[pfzw->unknown_parameters_index[counter]];
+    for (int j = 0; j < pfzw->target_sizes[counter]; ++j) {
+      const char* format_string = j > 0 ? ",%.17g" : "%.17g";
+      int bytes_written = sprintf(value, format_string, unknown_values[x_inout_index++]);
+      value += bytes_written;
+    }
   }
 
   std::unique_ptr<InputModule> input_module{new InputModule(pfzw->fc)};
@@ -3470,8 +3596,8 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
     input_verbose = 0;
 
   /** - Optimise flags for sigma8 calculation.*/
-  for (i=0; i < unknown_parameters_size; i++) {
-    if (pfzw->target_name[i] == sigma8) {
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
+    if (pfzw->target_name[counter] == sigma8) {
       compute_sigma8 = _TRUE_;
     }
   }
@@ -3506,37 +3632,38 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
   Cosmology cosmology{std::move(input_module)};
 
   /** - Get the corresponding shoot variable and put into output */
-  for (i=0; i < pfzw->target_size; i++) {
-    switch (pfzw->target_name[i]) {
+  int idx = 0;
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; ++counter) {
+    switch (pfzw->target_name[counter]) {
     case theta_s: {
       ThermodynamicsModulePtr thm = cosmology.GetThermodynamicsModule();
-      output[i] = 100.*thm->rs_rec_/thm->ra_rec_ - pfzw->target_value[i];
+      output[idx] = 100.*thm->rs_rec_/thm->ra_rec_ - pfzw->target_values[idx];
       break;
     }
     case Omega_dcdmdr: {
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
       rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
       if (ba.has_dr == _TRUE_)
-        rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_];
+        rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_];
       else
         rho_dr_today = 0.;
-      output[i] = (rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)-pfzw->target_value[i];
+      output[idx] = (rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)-pfzw->target_values[idx];
       break;
     }
     case omega_dcdmdr: {
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
       rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
       if (ba.has_dr == _TRUE_)
-        rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_];
+        rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_];
       else
         rho_dr_today = 0.;
-      output[i] = (rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)-pfzw->target_value[i]/ba.h/ba.h;
+      output[idx] = (rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)-pfzw->target_values[idx]/ba.h/ba.h;
       break;
     }
     case Omega_scf: {
     BackgroundModulePtr bam = cosmology.GetBackgroundModule();
       /** - In case scalar field is used to fill, pba->Omega0_scf is not equal to pfzw->target_value[i].*/
-      output[i] = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_scf_]/(ba.H0*ba.H0) - ba.Omega0_scf;
+      output[idx] = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_scf_]/(ba.H0*ba.H0) - ba.Omega0_scf;
       break;
     }
     case Omega_ini_dcdm:
@@ -3544,47 +3671,85 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
       rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
       if (ba.has_dr == _TRUE_)
-        rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_];
+        rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_];
       else
         rho_dr_today = 0.;
-      output[i] = -(rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)+ba.Omega0_dcdmdr;
+      output[idx] = -(rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)+ba.Omega0_dcdmdr;
       break;
     }
     case sigma8: {
       NonlinearModulePtr nl = cosmology.GetNonlinearModule();
-      output[i] = nl->sigma8_[nl->index_pk_m_] - pfzw->target_value[i];
+      output[idx] = nl->sigma8_[nl->index_pk_m_] - pfzw->target_values[idx];
+      break;
+    }
+    case omega_dncdmdr:
+    case Omega_dncdmdr: {
+      BackgroundModulePtr bam = cosmology.GetBackgroundModule();
+      int dcdm_offset = (ba.has_dcdm == _TRUE_) ? 1 : 0;
+      for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
+        // Here, pfzw->target_sizes[counter] will always equal N_ncdm_decay_dr, so we can loop over decay_dr_map_
+        double rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id + dcdm_offset];
+        double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_ncdm1_ + ncdm_id];
+
+        if (input_verbose > 0) {
+          printf(" -> deg_ncdm_decay_dr guess: %g, calculates into Omega_dncdmdr: %g, compared with input Omega_dncdmdr: %g \n", ba.ncdm->GetDeg(ncdm_id), (rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0, ba.ncdm->Omega_dncdmdr_[dncdm_properties.dr_id]);
+        }
+        // For some reason requires different sign than below
+        output[idx + dncdm_properties.dr_id] = (rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0 - ba.ncdm->Omega_dncdmdr_[dncdm_properties.dr_id];
+      }
+      break;
+    }
+    case deg_ncdm_decay_dr:
+    case omega_ini_dncdm:
+    case Omega_ini_dncdm: {
+      BackgroundModulePtr bam = cosmology.GetBackgroundModule();
+      int dcdm_offset = (ba.has_dcdm == _TRUE_) ? 1 : 0;
+      for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
+        double rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id + dcdm_offset];
+        double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_ncdm1_ + ncdm_id];
+        
+        if (input_verbose > 0) {
+          if ((pfzw->target_name[counter] == omega_dcdmdr) || (pfzw->target_name[counter] == Omega_dcdmdr)) {
+            printf(" -> Omega_dncdmdr guess: %g calculates into: %g \n",ba.ncdm->Omega_dncdmdr_[dncdm_properties.dr_id],(rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0);
+          }
+          else {
+            printf(" -> deg_ncdm_decay_dr guess: %g, calculates into Omega_dncdmdr: %g, compared with input Omega_dncdmdr: %g \n", ba.ncdm->GetDeg(ncdm_id), (rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0, ba.ncdm->Omega_dncdmdr_[dncdm_properties.dr_id]);
+          }
+        }
+        
+        output[idx + dncdm_properties.dr_id] = -(rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0 + ba.ncdm->Omega_dncdmdr_[dncdm_properties.dr_id];
+      }
       break;
     }
     }
+    idx += pfzw->target_sizes[counter];
   }
 
   return _SUCCESS_;
 }
 
 int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspace* pfzw, ErrorMsg errmsg) {
-
-  int i;
-
-  double Omega_M, a_decay, gamma, Omega0_dcdmdr=1.0;
-  int index_guess;
+  double Omega_M, a_decay, gamma, Omega0_dcdmdr = 1.0, Omega0_dncdmdr = 1.0;
 
   std::shared_ptr<InputModule> input_module = std::make_shared<InputModule>(pfzw->fc);
   background& ba = input_module->background_;    /* for cosmological background */
+  precision& pr = input_module->precision_;
   /** Summary: */
   /** - Here we should write reasonable guesses for the unknown parameters.
       Also estimate dxdy, i.e. how the unknown parameter responds to the known.
       This can simply be estimated as the derivative of the guess formula.*/
-
-  for (index_guess=0; index_guess < pfzw->target_size; index_guess++) {
-    switch (pfzw->target_name[index_guess]) {
-    case theta_s:
-      xguess[index_guess] = 3.54*pow(pfzw->target_value[index_guess],2)-5.455*pfzw->target_value[index_guess]+2.548;
-      dxdy[index_guess] = (7.08*pfzw->target_value[index_guess]-5.455);
+  int index_guess = 0;
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
+    switch (pfzw->target_name[counter]) {
+    case theta_s: {
+      xguess[index_guess] = 3.54*pow(pfzw->target_values[index_guess],2)-5.455*pfzw->target_values[index_guess]+2.548;
+      dxdy[index_guess] = (7.08*pfzw->target_values[index_guess]-5.455);
       /** - Update pb to reflect guess */
       ba.h = xguess[index_guess];
       ba.H0 = ba.h *  1.e5 / _c_;
       break;
-    case Omega_dcdmdr:
+    }
+    case Omega_dcdmdr: {
       Omega_M = ba.Omega0_cdm+ba.Omega0_idm_dr+ba.Omega0_dcdmdr+ba.Omega0_b;
       /* This formula is exact in a Matter + Lambda Universe, but only
          for Omega_dcdm, not the combined.
@@ -3599,11 +3764,12 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         a_decay = 1.0;
       else
         a_decay = pow(1+(gamma*gamma-1.)/Omega_M,-1./3.);
-      xguess[index_guess] = pfzw->target_value[index_guess]/a_decay;
+      xguess[index_guess] = pfzw->target_values[index_guess]/a_decay;
       dxdy[index_guess] = 1./a_decay;
       //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
       break;
-    case omega_dcdmdr:
+    }
+    case omega_dcdmdr: {
       Omega_M = ba.Omega0_cdm+ba.Omega0_idm_dr+ba.Omega0_dcdmdr+ba.Omega0_b;
       /* This formula is exact in a Matter + Lambda Universe, but only
          for Omega_dcdm, not the combined.
@@ -3618,11 +3784,12 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         a_decay = 1.0;
       else
         a_decay = pow(1+(gamma*gamma-1.)/Omega_M,-1./3.);
-      xguess[index_guess] = pfzw->target_value[index_guess]/ba.h/ba.h/a_decay;
+      xguess[index_guess] = pfzw->target_values[index_guess]/ba.h/ba.h/a_decay;
       dxdy[index_guess] = 1./a_decay/ba.h/ba.h;
       //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
       break;
-    case Omega_scf:
+    }
+    case Omega_scf: {
 
       /** - This guess is arbitrary, something nice using WKB should be implemented.
        *
@@ -3641,34 +3808,206 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         dxdy[index_guess] = 1.;
       }
       break;
-    case omega_ini_dcdm:
+    }
+    case omega_ini_dcdm: {
       Omega0_dcdmdr = 1./(ba.h*ba.h);
-    case Omega_ini_dcdm:
+    }
+    case Omega_ini_dcdm: {
       /** - This works since correspondence is
           Omega_ini_dcdm -> Omega_dcdmdr and
           omega_ini_dcdm -> omega_dcdmdr */
-      Omega0_dcdmdr *=pfzw->target_value[index_guess];
+      Omega0_dcdmdr *=pfzw->target_values[index_guess];
       Omega_M = ba.Omega0_cdm+ba.Omega0_idm_dr+Omega0_dcdmdr+ba.Omega0_b;
       gamma = ba.Gamma_dcdm/ba.H0;
       if (gamma < 1)
         a_decay = 1.0;
       else
         a_decay = pow(1+(gamma*gamma-1.)/Omega_M,-1./3.);
-      xguess[index_guess] = pfzw->target_value[index_guess]*a_decay;
+      xguess[index_guess] = pfzw->target_values[index_guess]*a_decay;
       dxdy[index_guess] = a_decay;
       if (gamma > 100)
         dxdy[index_guess] *= gamma/100;
 
       //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
       break;
+    }
 
-    case sigma8:
+    case sigma8: {
       /* Assume linear relationship between A_s and sigma8 and fix coefficient
          according to vanilla LambdaCDM. Should be good enough... */
-      xguess[index_guess] = 2.43e-9/0.87659*pfzw->target_value[index_guess];
+      xguess[index_guess] = 2.43e-9/0.87659*pfzw->target_values[index_guess];
       dxdy[index_guess] = 2.43e-9/0.87659;
       break;
     }
+    case Omega_dncdmdr: {
+      // deg_ncdm_decay_dr unknown, make a guess
+      double a_ini = ba.ncdm->GetIni(pr.a_ini_over_a_today_default*ba.a_today, ba.a_today, pr.tol_ncdm_initial_w);
+      double z_ini = 1.0/a_ini - 1.0;
+      
+      for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
+        /* Omega_ini = Omega_dncdmdr: This guess corresponds to instantaneous decay when DWDM becomes NR */
+        // double Omega_ini = pfzw->target_values[index_guess];
+        /*
+        double Omega_ini;
+        // Numerical fit
+        if (dncdm_properties.Gamma > 1.0) {
+          Omega_ini = (pfzw->target_values[index_guess] + 1.207e-19*dncdm_properties.Gamma - 1.207e-5)/1.289;
+        } else {
+          Omega_ini = pfzw->target_values[index_guess]/100;
+        }
+        */
+        // Get deg from Omega_ini
+        double rho_deg1;
+        ba.ncdm->background_ncdm_momenta_deg(ncdm_id, 1.0, z_ini, ba.T_cmb, NULL, &rho_deg1, NULL, NULL, NULL);
+        double Omega_deg1 = rho_deg1*pow(1+z_ini, -4.0)/ba.H0/ba.H0;
+        
+//        xguess[index_guess] = Omega_ini/Omega_deg1;
+//        dxdy[index_guess] = 1/Omega_deg1;
+
+        if (dncdm_properties.Gamma > 1.0) {
+          xguess[index_guess] = pfzw->target_values[index_guess]/Omega_deg1;
+          dxdy[index_guess] = 1.;
+        }
+        else {
+          xguess[index_guess] = 100*pfzw->target_values[index_guess]/Omega_deg1;
+          dxdy[index_guess] = 100.;
+        }
+        
+        // dxdy[index_guess] *= 0.1;
+        // At Gamma >~ 1, Omega_dncdmdr is ~ Omega_ini_dncdm.
+        // At Gamma <~ 1, Omega_dncdmdr is some orders of magnitude larger than Omega_ini_dncdm.
+        if (dncdm_properties.Gamma <= 1.0) {
+          dxdy[index_guess] *= 0.0001;
+        }
+        
+        index_guess++;
+      }
+      break;
+    }
+    case omega_dncdmdr: {
+      // deg_ncdm_decay_dr unknown, make a guess
+      double a_ini = ba.ncdm->GetIni(pr.a_ini_over_a_today_default*ba.a_today, ba.a_today, pr.tol_ncdm_initial_w);
+      double z_ini = 1.0/a_ini - 1.0;
+      
+      for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
+        /* Omega_ini = Omega_dncdmdr: This guess corresponds to instantaneous decay when DWDM becomes NR */
+        // double Omega_ini = pfzw->target_values[index_guess];
+        /*
+        double Omega_ini;
+        // Numerical fit
+        if (dncdm_properties.Gamma > 1.0) {
+          Omega_ini = (pfzw->target_values[index_guess]/(ba.h*ba.h) + 1.207e-19*dncdm_properties.Gamma - 1.207e-5)/1.289;
+        } else {
+          Omega_ini = pfzw->target_values[index_guess]/(ba.h*ba.h)/100;
+        }
+        */
+        // Get deg from Omega_ini
+        double rho_deg1;
+        ba.ncdm->background_ncdm_momenta_deg(ncdm_id, 1.0, z_ini, ba.T_cmb, NULL, &rho_deg1, NULL, NULL, NULL);
+        double Omega_deg1 = rho_deg1*pow(1+z_ini, -4.0)/ba.H0/ba.H0;
+        
+//        xguess[index_guess] = Omega_ini/Omega_deg1;
+//        dxdy[index_guess] = 1/Omega_deg1;
+
+        if (dncdm_properties.Gamma > 1.0) {
+          xguess[index_guess] = pfzw->target_values[index_guess]/Omega_deg1;
+          dxdy[index_guess] = 1./Omega_deg1/100.;
+        }
+        else {
+          xguess[index_guess] = 100*pfzw->target_values[index_guess]/Omega_deg1;
+          dxdy[index_guess] = 100.;
+        }
+        
+        
+        // dxdy[index_guess] *= 0.1;
+        // At Gamma >~ 1, Omega_dncdmdr is ~ Omega_ini_dncdm.
+        // At Gamma <~ 1, Omega_dncdmdr is some orders of magnitude larger than Omega_ini_dncdm.
+        if (dncdm_properties.Gamma <= 1.0) {
+          dxdy[index_guess] *= 0.0001;
+        }
+        
+        index_guess++;
+      }
+      break;
+    }
+    case deg_ncdm_decay_dr: {
+      // Omega_dncdmdr unknown, make a guess
+      double a_ini = ba.ncdm->GetIni(pr.a_ini_over_a_today_default*ba.a_today, ba.a_today, pr.tol_ncdm_initial_w);
+      double z_ini = 1.0/a_ini - 1.0;
+      
+      for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
+        double rho_dncdm;
+        ba.ncdm->background_ncdm_momenta_deg(ncdm_id, pfzw->target_values[index_guess], z_ini, ba.T_cmb, NULL, &rho_dncdm, NULL, NULL, NULL);
+        double Omega_ini_guess = rho_dncdm*pow(1 + z_ini, -4.)/ba.H0/ba.H0;
+        
+        /*
+        // Omega_ini = Omega_dncdmdr: This guess corresponds to instantaneous decay when DWDM becomes NR
+        xguess[index_guess] = Omega_ini_guess;
+        dxdy[index_guess] = Omega_ini_guess/pfzw->target_values[index_guess];
+      
+        // For some reason, this is necessary to ever get close to convergence. Why?
+        dxdy[index_guess] *= 10000;
+        */
+        
+        // Numerical fit
+        if (dncdm_properties.Gamma > 1.0) {
+          xguess[index_guess] = -1.207e-19*dncdm_properties.Gamma + 1.289*Omega_ini_guess + 1.207e-5;
+          dxdy[index_guess] = 1.289*Omega_ini_guess/pfzw->target_values[index_guess];
+        } else if (dncdm_properties.Gamma <= 1.0) {
+          xguess[index_guess] = -2.619e-6*dncdm_properties.Gamma + 1.152*Omega_ini_guess + 1.604e-5;
+          dxdy[index_guess] = 1.152*Omega_ini_guess/pfzw->target_values[index_guess];
+        }
+        // This is necessary to ever get convergence
+        dxdy[index_guess] *= 10000;
+        
+        index_guess++;
+      }
+      break;
+    }
+    case omega_ini_dncdm: {
+      // omega_dncdmdr unknown, make a guess
+      for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
+        /*
+        // Omega_ini = Omega_dncdmdr: This guess corresponds to instantaneous decay when DWDM becomes NR
+        xguess[index_guess] = pfzw->target_values[index_guess];
+        dxdy[index_guess] = 1;
+        */
+        
+        // Numerical fit
+        if (dncdm_properties.Gamma > 1.0) {
+          xguess[index_guess] = -1.207e-19*dncdm_properties.Gamma + 1.289*pfzw->target_values[index_guess] + 1.207e-5;
+          dxdy[index_guess] = 1.289;
+        } else if (dncdm_properties.Gamma <= 1.0) {
+          xguess[index_guess] = -2.619e-6*dncdm_properties.Gamma*ba.h*ba.h + 1.152*pfzw->target_values[index_guess] + 1.604e-5*ba.h*ba.h;
+          dxdy[index_guess] = 1.152;
+        }
+        index_guess++;
+      }
+      break;
+    }
+    case Omega_ini_dncdm: {
+      // Omega_dncdmdr unknown, make a guess
+      for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
+        /*
+        // Omega_ini = Omega_dncdmdr: This guess corresponds to instantaneous decay when DWDM becomes NR
+        xguess[index_guess] = pfzw->target_values[index_guess];
+        dxdy[index_guess] = 1;
+        */
+        
+        // Numerical fit
+        if (dncdm_properties.Gamma > 1.0) {
+          xguess[index_guess] = -1.207e-19*dncdm_properties.Gamma + 1.289*pfzw->target_values[index_guess] + 1.207e-5;
+          dxdy[index_guess] = 1.289;
+        } else if (dncdm_properties.Gamma <= 1.0) {
+          xguess[index_guess] = -2.619e-6*dncdm_properties.Gamma + 1.152*pfzw->target_values[index_guess] + 1.604e-5;
+          dxdy[index_guess] = 1.152;
+        }
+        index_guess++;
+      }
+      break;
+    }
+    }
+    index_guess += pfzw->target_sizes[counter];
     //printf("xguess = %g\n",xguess[index_guess]);
   }
 
@@ -3770,22 +4109,33 @@ int InputModule::file_exists(const char *fname){
   return _FALSE_;
 }
 
-int InputModule::input_auxillary_target_conditions(FileContent* pfc, enum target_names target_name, double target_value, int* aux_flag, ErrorMsg errmsg) {
+int InputModule::input_auxillary_target_conditions(FileContent* pfc, enum target_names target_name, double* target_values, int target_values_size, int* aux_flag, ErrorMsg errmsg) {
   *aux_flag = _TRUE_;
-  switch (target_name){
-  case Omega_dcdmdr:
-  case omega_dcdmdr:
-  case Omega_scf:
-  case Omega_ini_dcdm:
-  case omega_ini_dcdm:
-    /* Check that Omega's or omega's are nonzero: */
-    if (target_value == 0.)
-      *aux_flag = _FALSE_;
-    break;
-  default:
-    /* Default is no additional checks */
-    *aux_flag = _TRUE_;
-    break;
+  switch (target_name) {
+    case Omega_dcdmdr:
+    case omega_dcdmdr:
+    case Omega_scf:
+    case Omega_ini_dcdm:
+    case omega_ini_dcdm:
+      /* Check that Omega's or omega's are nonzero: */
+      if (target_values[0] == 0.)
+        *aux_flag = _FALSE_;
+      break;
+    case Omega_dncdmdr:
+    case deg_ncdm_decay_dr:
+    case Omega_ini_dncdm: {
+      int N_ncdm_decay_dr = 0;
+      int flag1;
+      class_call(parser_read_int(pfc, "N_ncdm_decay_dr", &N_ncdm_decay_dr, &flag1, errmsg), errmsg, errmsg);
+      if ((flag1 == _FALSE_) || N_ncdm_decay_dr <= 0) {
+        *aux_flag = _FALSE_;
+      }
+      break;
+    }
+    default:
+      /* Default is no additional checks */
+      *aux_flag = _TRUE_;
+      break;
   }
   return _SUCCESS_;
 }

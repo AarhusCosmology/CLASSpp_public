@@ -14,6 +14,7 @@
 #include <vector>
 
 class NonColdDarkMatter;
+class DarkRadiation;
 
 //The name for this macro can be at most 30 characters total
 #define _class_print_species_(name,type) \
@@ -113,10 +114,16 @@ struct background
   
   double Omega0_k; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
 
-  int N_ncdm;                            /**< Number of distinguishable ncdm species */
-  double Omega0_ncdm_tot; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
 
   std::shared_ptr<NonColdDarkMatter> ncdm;
+  std::shared_ptr<DarkRadiation> dr;
+  
+  // using N_ncdm = ncdm->N_ncdm_;
+  int N_ncdm;                            /**< Number of distinguishable ncdm species */
+  int N_dncdm;                            /**< Number of distinguishable dncdm species */
+  double Omega0_ncdm_tot; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
+  int N_decay_dr = 0;
+  
   /** @name - related parameters */
 
   //@{
@@ -149,7 +156,9 @@ struct background
 
   short has_cdm;       /**< presence of cold dark matter? */
   short has_dcdm;      /**< presence of decaying cold dark matter? */
+  short has_dncdm;     /**< presence of decaying non-cold dark matter? */
   short has_dr;        /**< presence of relativistic decay radiation? */
+  short has_inv;       /**< include inverse decay term from dncdm->dr? */
   short has_scf;       /**< presence of a scalar field? */
   short has_ncdm;      /**< presence of non-cold dark matter? */
   short has_lambda;    /**< presence of cosmological constant? */

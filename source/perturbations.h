@@ -270,7 +270,8 @@ struct perturb_vector
   /** The index to the first Legendre multipole of the DR expansion. Not
       that this is not exactly the usual delta, see Kaplinghat et al.,
       astro-ph/9907388. */
-  int index_pt_F0_dr;
+  int index_pt_F0_dr_sum;
+  int index_pt_F0_dr_species;
   int l_max_dr;          /**< max momentum in Boltzmann hierarchy for dr) */
   int index_pt_psi0_ncdm1; /**< first multipole of perturbation of first ncdm species, Psi_0 */
   int N_ncdm;		/**< number of distinct non-cold-dark-matter (ncdm) species */

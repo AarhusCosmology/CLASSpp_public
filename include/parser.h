@@ -90,7 +90,7 @@ int parser_read_string(
 
 int parser_read_list_of_doubles(
 				FileContent* pfc,
-				char * name,
+				const char* name,
 				int * size,
 				double ** pointer_to_list,
 				int * found,
