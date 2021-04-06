@@ -874,7 +874,7 @@ int BackgroundModule::background_init() {
       class_call(background_solve_evolver(), error_message_, error_message_);
       break;
   default:
-    printf("No background evolution method selected!\n");
+    printf("Invalid background method selected. Please set it to 0 or 1 or omit it from your input.\n");
   }
 
   /** - this function finds and stores a few derived parameters at radiation-matter equality */
@@ -2188,7 +2188,7 @@ int BackgroundModule::background_derivs_member(
         dy[index_bi_rho_dr_from_dncdm_] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_from_dncdm_]+
         2*y[index_bi_a_]*Gamma*M_1*pvecback[index_bg_number_ncdm1_ + ncdm_id];
         if (y[index_bi_rho_dr_from_dncdm_] < 0) {
-          printf("Warning: Negative rho_dr_from_dncdm: %g \n", y[index_bi_rho_dr_from_dncdm_]);
+          // printf("Warning: Negative rho_dr_from_dncdm: %g \n", y[index_bi_rho_dr_from_dncdm_]);
         }
 
         for (int index_q_2 = 0; index_q_2 < pba->dr->N_q_; index_q_2++) {

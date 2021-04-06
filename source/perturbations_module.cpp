@@ -8531,6 +8531,8 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
 
           // Catch the case where f(q)=0 for all q, in this case it factors out and cancels with the numerator
           if (integral_denom == 0.) {
+            return 0.;
+            /*
             for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
             double dq = dncdm_properties.dq[index_q];
             double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
@@ -8539,6 +8541,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
             integral_num += dq*q*q*Psi0*FL[l*q_size + index_q];
             integral_denom += dq*q*q;
             }
+            */
           }
           
           return rprime_dr*integral_num/integral_denom;

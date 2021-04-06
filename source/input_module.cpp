@@ -3914,8 +3914,11 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
           dxdy[index_guess] = 1./Omega_deg1/100.;
         }
         else {
-          xguess[index_guess] = 100*pfzw->target_values[index_guess]/Omega_deg1;
-          dxdy[index_guess] = 100.;
+          // xguess[index_guess] = 100*pfzw->target_values[index_guess]/Omega_deg1;
+          // dxdy[index_guess] = 100./Omega_deg1;
+
+          xguess[index_guess] = 1.0*pfzw->target_values[index_guess]/Omega_deg1;
+          dxdy[index_guess] = 0.01/Omega_deg1;
         }
         
         
@@ -3923,7 +3926,7 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         // At Gamma >~ 1, Omega_dncdmdr is ~ Omega_ini_dncdm.
         // At Gamma <~ 1, Omega_dncdmdr is some orders of magnitude larger than Omega_ini_dncdm.
         if (dncdm_properties.Gamma <= 1.0) {
-          dxdy[index_guess] *= 0.0001;
+          // dxdy[index_guess] *= 0.0001;
         }
         
         index_guess++;
