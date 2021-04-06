@@ -146,9 +146,7 @@ private:
   int index_bi_a_;       /**< {B} scale factor */
   int index_bi_rho_dcdm_;/**< {B} dcdm density */
   
-  int index_bi_f_ncdm_decay_dr1_;/**< {B} dncdm distribution function*/
-  int index_bi_lnf_ncdm_decay_dr1_;
-  int index_bi_dlnfdlnq_ncdm_decay_dr1_;
+  int index_bi_lnf_ncdm_decay_dr1_; /**< {B} dncdm distribution function*/
   int index_bi_f_dr1_species_;
   int index_bi_rho_dr_from_dcdm_;
   
