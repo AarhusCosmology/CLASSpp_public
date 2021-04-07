@@ -378,6 +378,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
           // Update distribution function in ncdm module
           pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = f_dncdm;
           pba->ncdm->SetBackgroundWeight(ncdm_id, i, f_dncdm*dncdm_properties.dq[i]);
+          pvecback[index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
         }
       }
     }
@@ -927,6 +928,7 @@ int BackgroundModule::background_indices() {
 
   /* - index for time-dependent distribution function in DNCDM for each q-bin */
   class_define_index(index_bg_f_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
+  class_define_index(index_bg_lnf_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
 
   /* - index for dcdm */

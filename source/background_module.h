@@ -40,6 +40,7 @@ public:
   int index_bg_rho_dcdm_;      /**< dcdm density */
   
   int index_bg_f_ncdm_decay_dr1_; /**< dncdm background distribution function> index of first q-bin of first species */
+  int index_bg_lnf_ncdm_decay_dr1_;
   int index_bg_dlnfdlnq_ncdm_decay_dr1_;
   int index_bg_f_dr1_;         /**< total distribution function of DR */
   int index_bg_rho_dr_species_;/**< dr density for individual species */
