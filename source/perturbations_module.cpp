@@ -534,9 +534,11 @@ int PerturbationsModule::perturb_init() {
     }
     
   if (pba->has_dncdm == _TRUE_) {
+    /*
     class_test((ppr->ncdm_fluid_approximation != ncdmfa_none),
                 error_message_,
                 "Decaying NCDM cannot be run with the NCDM fluid approximation, please disable it by writing ncdm_fluid_approximation = 3 in your input.\n");
+    */
   }
 
   }
@@ -5229,7 +5231,7 @@ int PerturbationsModule::perturb_initial_conditions(int index_md, int index_ic, 
         if (pba->has_dncdm == _TRUE_) {
           // Copied from dcdm; not sure if OK
           for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
-            delta_dr += (-4.*a_prime_over_a + a*dncdm_properties.Gamma*ppw->pvecback[background_module_->index_bg_rho_ncdm1_]/ppw->pvecback[background_module_->index_bg_rho_dr_species_ + dncdm_properties.dr_id])*alpha;
+            delta_dr += (-4.*a_prime_over_a + a*dncdm_properties.Gamma*ppw->pvecback[background_module_->index_bg_rho_ncdm1_ + ncdm_id]/ppw->pvecback[background_module_->index_bg_rho_dr_species_ + dncdm_properties.dr_id])*alpha;
           }
         }
       }
@@ -5269,14 +5271,24 @@ int PerturbationsModule::perturb_initial_conditions(int index_md, int index_ic, 
       for (n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++){
 
         for (index_q=0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
-
           q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
           epsilon = sqrt(q*q + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
-
-          ppw->pv->y[idx + 0] = -0.25*delta_ur*pba->ncdm->dlnf0_dlnq_ncdm_[n_ncdm][index_q];
-          ppw->pv->y[idx + 1] = -epsilon/3./q/k*theta_ur*pba->ncdm->dlnf0_dlnq_ncdm_[n_ncdm][index_q];
-          ppw->pv->y[idx + 2] = -0.5*shear_ur*pba->ncdm->dlnf0_dlnq_ncdm_[n_ncdm][index_q];
-          ppw->pv->y[idx + 3] = -0.25*l3_ur*pba->ncdm->dlnf0_dlnq_ncdm_[n_ncdm][index_q];
+          double dlnf0_dlnq;
+          switch (pba->ncdm->ncdm_types_[n_ncdm]) {
+            case NonColdDarkMatter::NCDMType::standard: {
+              dlnf0_dlnq = pba->ncdm->dlnf0_dlnq_ncdm_[n_ncdm][index_q];
+              break;
+            }
+            case NonColdDarkMatter::NCDMType::decay_dr: {
+              // If the current species can decay, make sure to get the time-dependent distribution function
+              dlnf0_dlnq = ppw->pvecback[background_module_->index_bg_dlnfdlnq_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+              break;
+            }
+          }
+          ppw->pv->y[idx + 0] = -0.25*delta_ur*dlnf0_dlnq;
+          ppw->pv->y[idx + 1] = -epsilon/3./q/k*theta_ur*dlnf0_dlnq;
+          ppw->pv->y[idx + 2] = -0.5*shear_ur*dlnf0_dlnq;
+          ppw->pv->y[idx + 3] = -0.25*l3_ur*dlnf0_dlnq;
 
           //Jump to next momentum bin:
           idx += (ppw->pv->l_max_ncdm[n_ncdm]+1);
@@ -6363,10 +6375,42 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
           rho_ncdm_bg = ppw->pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm];
           p_ncdm_bg = ppw->pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm];
           pseudo_p_ncdm = ppw->pvecback[background_module_->index_bg_pseudo_p_ncdm1_ + n_ncdm];
-
           rho_plus_p_ncdm = rho_ncdm_bg + p_ncdm_bg;
-          w_ncdm = p_ncdm_bg/rho_ncdm_bg;
-          cg2_ncdm = w_ncdm*(1.0-1.0/(3.0+3.0*w_ncdm)*(3.0*w_ncdm-2.0+pseudo_p_ncdm/p_ncdm_bg));
+          
+          switch (pba->ncdm->ncdm_types_[n_ncdm]) {
+            case NonColdDarkMatter::NCDMType::standard:
+              w_ncdm = p_ncdm_bg/rho_ncdm_bg;
+              cg2_ncdm = w_ncdm*(1.0-1.0/(3.0+3.0*w_ncdm)*(3.0*w_ncdm-2.0+pseudo_p_ncdm/p_ncdm_bg));
+              break;
+            case NonColdDarkMatter::NCDMType::decay_dr:
+              // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
+              double rho_scaled = 0.;
+              double p_scaled = 0.;
+              double pseudo_p_scaled = 0.;
+
+              double lnN = 50.;
+              for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                if (lnN < -lnf) {
+                  lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                }
+              }
+
+              for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                double dq = pba->ncdm->decay_dr_map_[n_ncdm].dq[index_q];
+                double q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                double epsilon = sqrt(q*q + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
+
+                rho_scaled += dq*q*q*epsilon*exp(lnN + lnf);
+                p_scaled += dq*pow(q, 4)/3./epsilon*exp(lnN + lnf);
+                pseudo_p_scaled += dq*pow(q*q/epsilon, 3)/3.*exp(lnN + lnf);
+              }
+              w_ncdm = p_scaled/rho_scaled;
+              cg2_ncdm = w_ncdm*(1.0-1.0/(3.0+3.0*w_ncdm)*(3.0*w_ncdm-2.0+pseudo_p_scaled/p_scaled));
+              break;
+          }
+
           if ((has_source_delta_ncdm_ == _TRUE_) || (has_source_theta_ncdm_ == _TRUE_) || (has_source_delta_m_ == _TRUE_)) {
             ppw->delta_ncdm[n_ncdm] = y[idx];
             ppw->theta_ncdm[n_ncdm] = y[idx+1];
@@ -6438,7 +6482,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
               idx = ppw->pv->index_pt_psi0_ncdm1;
 
               // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
-              double lnN = 500.;
+              double lnN = 50.;
               for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                 double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
                 if (lnN < -lnf) {
@@ -7589,13 +7633,47 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
           rho_ncdm_bg = pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm];
           p_ncdm_bg = pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm];
           pseudo_p_ncdm = pvecback[background_module_->index_bg_pseudo_p_ncdm1_ + n_ncdm];
-          w_ncdm = p_ncdm_bg/rho_ncdm_bg;
+
+          double pseudo_p_over_p;
+          switch (pba->ncdm->ncdm_types_[n_ncdm]) {
+            case NonColdDarkMatter::NCDMType::standard:
+              pseudo_p_over_p = pseudo_p_ncdm/p_ncdm_bg;
+              w_ncdm = p_ncdm_bg/rho_ncdm_bg;
+              break;
+            case NonColdDarkMatter::NCDMType::decay_dr:
+              // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
+              double rho_scaled = 0.;
+              double p_scaled = 0.;
+              double pseudo_p_scaled = 0.;
+
+              double lnN = 50.;
+              for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                if (lnN < -lnf) {
+                  lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                }
+              }
+
+              for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                double dq = pba->ncdm->decay_dr_map_[n_ncdm].dq[index_q];
+                double q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                double epsilon = sqrt(q*q + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
+
+                rho_scaled += dq*q*q*epsilon*exp(lnN + lnf);
+                p_scaled += dq*pow(q, 4)/3./epsilon*exp(lnN + lnf);
+                pseudo_p_scaled += dq*pow(q*q/epsilon, 3)/3.*exp(lnN + lnf);
+              }
+              pseudo_p_over_p = pseudo_p_scaled/p_scaled;
+              w_ncdm = p_scaled/rho_scaled; /* equation of state parameter */
+              break;
+          }
 
           delta_ncdm[n_ncdm] = y[idx];
           theta_ncdm[n_ncdm] = y[idx+1];
           shear_ncdm[n_ncdm] = y[idx+2];
           //This is the adiabatic sound speed:
-          delta_p_over_delta_rho_ncdm[n_ncdm] = w_ncdm*(1.0-1.0/(3.0+3.0*w_ncdm)*(3.0*w_ncdm-2.0+pseudo_p_ncdm/p_ncdm_bg));
+          delta_p_over_delta_rho_ncdm[n_ncdm] = w_ncdm*(1.0-1.0/(3.0+3.0*w_ncdm)*(3.0*w_ncdm-2.0+pseudo_p_over_p));
           idx += ppw->pv->l_max_ncdm[n_ncdm]+1;
         }
       }
@@ -7652,7 +7730,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
             idx = ppw->pv->index_pt_psi0_ncdm1;
 
             // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
-            double lnN = 500.;
+            double lnN = 50.;
             for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
               double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
               if (lnN < -lnf) {
@@ -8892,8 +8970,45 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
           rho_ncdm_bg = pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm]; /* background density */
           p_ncdm_bg = pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm]; /* background pressure */
           pseudo_p_ncdm = pvecback[background_module_->index_bg_pseudo_p_ncdm1_ + n_ncdm]; /* pseudo-pressure (see CLASS IV paper) */
-          w_ncdm = p_ncdm_bg/rho_ncdm_bg; /* equation of state parameter */
-          ca2_ncdm = w_ncdm/3.0/(1.0+w_ncdm)*(5.0-pseudo_p_ncdm/p_ncdm_bg); /* adiabatic sound speed */
+
+          double pseudo_p_over_p;
+          switch (pba->ncdm->ncdm_types_[n_ncdm]) {
+            case NonColdDarkMatter::NCDMType::standard:
+              pseudo_p_over_p = pseudo_p_ncdm/p_ncdm_bg;
+              w_ncdm = p_ncdm_bg/rho_ncdm_bg; /* equation of state parameter */
+              ca2_ncdm = w_ncdm/3.0/(1.0+w_ncdm)*(5.0-pseudo_p_ncdm/p_ncdm_bg); /* adiabatic sound speed */
+              break;
+            case NonColdDarkMatter::NCDMType::decay_dr:
+              // The fluid approximation possibly need additional terms in the decaying scenario; to be implemented
+
+              // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
+              double rho_scaled = 0.;
+              double p_scaled = 0.;
+              double pseudo_p_scaled = 0.;
+
+              double lnN = 50.;
+              for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                if (lnN < -lnf) {
+                  lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                }
+              }
+
+              for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                double dq = pba->ncdm->decay_dr_map_[n_ncdm].dq[index_q];
+                double q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                double epsilon = sqrt(q*q + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
+
+                rho_scaled += dq*q*q*epsilon*exp(lnN + lnf);
+                p_scaled += dq*pow(q, 4)/3./epsilon*exp(lnN + lnf);
+                pseudo_p_scaled += dq*pow(q*q/epsilon, 3)/3.*exp(lnN + lnf);
+              }
+              pseudo_p_over_p = pseudo_p_scaled/p_scaled;
+              w_ncdm = p_scaled/rho_scaled; /* equation of state parameter */
+              ca2_ncdm = w_ncdm/3.0/(1.0+w_ncdm)*(5.0-pseudo_p_scaled/p_scaled); /* adiabatic sound speed */
+              break;
+          }
 
           /* c_eff is (delta p / delta rho) in the gauge under
              consideration (not in the gauge comoving with the
