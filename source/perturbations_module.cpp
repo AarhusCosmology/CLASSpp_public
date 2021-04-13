@@ -4511,50 +4511,83 @@ int PerturbationsModule::perturb_vector_init(
 
           a = ppw->pvecback[background_module_->index_bg_a_];
           index_pt = ppw->pv->index_pt_psi0_ncdm1;
-          for(n_ncdm = 0; n_ncdm < ppv->N_ncdm; n_ncdm++){
+          for (n_ncdm = 0; n_ncdm < ppv->N_ncdm; n_ncdm++) {
             // We are in the fluid approximation, so ncdm_l_size is always 3.
-            ncdm_l_size = ppv->l_max_ncdm[n_ncdm]+1;
-            rho_plus_p_ncdm = ppw->pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm] +
-              ppw->pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm];
-            for(l=0; l<=2; l++){
+            ncdm_l_size = ppv->l_max_ncdm[n_ncdm] + 1;
+            rho_plus_p_ncdm = ppw->pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm] + ppw->pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm];
+            for (l = 0; l <= 2; l++) {
               ppv->y[ppv->index_pt_psi0_ncdm1+ncdm_l_size*n_ncdm+l] = 0.0;
             }
             factor = pba->ncdm->factor_ncdm_[n_ncdm]*pow(pba->a_today/a, 4);
-            for(index_q=0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++){
-              // Integrate over distributions:
-              double w0;
-              switch (pba->ncdm->ncdm_types_[n_ncdm]) {
-                case NonColdDarkMatter::NCDMType::standard:
-                  w0 = pba->ncdm->w_ncdm_[n_ncdm][index_q];
-                  break;
-                case NonColdDarkMatter::NCDMType::decay_dr:
+
+            double delta = 0.;
+            double theta = 0.;
+            double shear = 0.;
+
+            switch (pba->ncdm->ncdm_types_[n_ncdm]) {
+              case NonColdDarkMatter::NCDMType::standard:
+                for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                  double w0 = pba->ncdm->w_ncdm_[n_ncdm][index_q];
+                  q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
+                  epsilon = sqrt(q*q + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
+
+                  delta += w0*pow(q, 2)*epsilon*ppw->pv->y[index_pt];
+                  theta += w0*pow(q, 3)*ppw->pv->y[index_pt + 1];
+                  shear += w0*pow(q, 4)/epsilon*ppw->pv->y[index_pt + 2];
+
+                  // Jump to next momentum bin in ppw->pv->y:
+                  index_pt += (ppw->pv->l_max_ncdm[n_ncdm] + 1);
+                }
+                delta *= factor/ppw->pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm];
+                theta *=k*factor/rho_plus_p_ncdm;
+                shear *=2./3.*factor/rho_plus_p_ncdm;
+                break;
+              case NonColdDarkMatter::NCDMType::decay_dr:
+                // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
+                double rho_scaled = 0.;
+                double rho_plus_p_scaled = 0.;
+                double rho_delta_scaled = 0.;
+                double rho_plus_p_theta_scaled = 0.;
+                double rho_plus_p_shear_scaled = 0.;
+
+                double lnN = 50.;
+                for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+                  double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                  if (lnN < -lnf) {
+                    lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                  }
+                }
+
+                for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                   double dq = pba->ncdm->decay_dr_map_[n_ncdm].dq[index_q];
-                  double f_q = ppw->pvecback[background_module_->index_bg_f_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
-                  w0 = dq*f_q;
-                  break;
-              }
-              q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
-              q2 = q*q;
-              epsilon = sqrt(q2 + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
-              
-              ppv->y[ppv->index_pt_psi0_ncdm1+ncdm_l_size*n_ncdm] +=
-                w0*q2*epsilon*
-                ppw->pv->y[index_pt];
+                  double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                  q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
+                  q2 = q*q;
+                  epsilon = sqrt(q2 + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
 
-              ppv->y[ppv->index_pt_psi0_ncdm1+ncdm_l_size*n_ncdm+1] +=
-                w0*q2*q*
-                ppw->pv->y[index_pt+1];
+                  rho_scaled += dq*pow(q, 2)*epsilon*exp(lnN + lnf);
+                  rho_plus_p_scaled += dq*pow(q, 2)*(epsilon + q2/3./epsilon)*exp(lnN + lnf);
+                  rho_delta_scaled += dq*pow(q, 2)*epsilon*exp(lnN + lnf)*ppw->pv->y[index_pt];
+                  rho_plus_p_theta_scaled += dq*pow(q, 3)*exp(lnN + lnf)*ppw->pv->y[index_pt + 1];
+                  rho_plus_p_shear_scaled += dq*pow(q, 4)/epsilon*exp(lnN + lnf)*ppw->pv->y[index_pt + 2];
 
-              ppv->y[ppv->index_pt_psi0_ncdm1+ncdm_l_size*n_ncdm+2] +=
-                w0*q2*q2/epsilon*
-                ppw->pv->y[index_pt+2];
+                  // Jump to next momentum bin in ppw->pv->y:
+                  index_pt += (ppw->pv->l_max_ncdm[n_ncdm] + 1);
+                }
+                rho_delta_scaled *= 1;
+                rho_plus_p_theta_scaled *= k;
+                rho_plus_p_shear_scaled *= 2./3.;
 
-              //Jump to next momentum bin in ppw->pv->y:
-              index_pt += (ppw->pv->l_max_ncdm[n_ncdm]+1);
+                // Here, the scale factor dependent front factors get divided out directly
+                delta = rho_delta_scaled/rho_scaled;
+                theta = rho_plus_p_theta_scaled/rho_plus_p_scaled;
+                shear = rho_plus_p_shear_scaled/rho_plus_p_scaled;
+                break;
             }
-            ppv->y[ppv->index_pt_psi0_ncdm1 + ncdm_l_size*n_ncdm] *= factor/ppw->pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm];
-            ppv->y[ppv->index_pt_psi0_ncdm1+ncdm_l_size*n_ncdm+1] *=k*factor/rho_plus_p_ncdm;
-            ppv->y[ppv->index_pt_psi0_ncdm1+ncdm_l_size*n_ncdm+2] *=2.0/3.0*factor/rho_plus_p_ncdm;
+
+            ppv->y[ppv->index_pt_psi0_ncdm1 + ncdm_l_size*n_ncdm] = delta;
+            ppv->y[ppv->index_pt_psi0_ncdm1 + ncdm_l_size*n_ncdm + 1] = theta;
+            ppv->y[ppv->index_pt_psi0_ncdm1 + ncdm_l_size*n_ncdm + 2] = shear;
           }
         }
       }
@@ -6376,7 +6409,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
           p_ncdm_bg = ppw->pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm];
           pseudo_p_ncdm = ppw->pvecback[background_module_->index_bg_pseudo_p_ncdm1_ + n_ncdm];
           rho_plus_p_ncdm = rho_ncdm_bg + p_ncdm_bg;
-          
+
           switch (pba->ncdm->ncdm_types_[n_ncdm]) {
             case NonColdDarkMatter::NCDMType::standard:
               w_ncdm = p_ncdm_bg/rho_ncdm_bg;
@@ -6450,9 +6483,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
                 double f_q = ppw->pvecback[background_module_->index_bg_f_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
                 w0 = dq*f_q;
                 break;
-            }
-            if (w0 == 0.) {
-              must_rescale = true;
             }
             q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
             q2 = q*q;
@@ -8669,48 +8699,61 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
         auto compute_collision_integral = [&](int l) {
           double integral_num = 0.;
           double integral_denom = 0.;
-          bool must_rescale = false;
-          for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
-            // Compute collision term integral contribution at q
-            double dq = dncdm_properties.dq[index_q];
-            double w0 = dq*pvecback[background_module_->index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
-            double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
 
-            if (w0 == 0.) {
-              must_rescale = true;
-              break;
-            }
-
-            // Indexation of Psi0 is of the form [index_q][index_l]
-            int psi_ind = pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(pv->l_max_ncdm[ncdm_id] + 1) + l;
-            double Psi0 = y[psi_ind];
-
-            integral_num += w0*q*q*Psi0*FL[l*q_size + index_q];
-            integral_denom += w0*q*q;
-          }
-          if (must_rescale) {
-            integral_num = 0.;
-            integral_denom = 0.;
-            // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
-            double lnN = 50.;
-            for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
-              double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
-              if (lnN < -lnf) {
-                lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
-              }
-            }
+          if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
+            bool must_rescale = false;
             for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
+              // Compute collision term integral contribution at q
               double dq = dncdm_properties.dq[index_q];
-              double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+              double w0 = dq*pvecback[background_module_->index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
               double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+
+              if (w0 == 0.) {
+                must_rescale = true;
+                break;
+              }
+
+              // Indexation of Psi0 is of the form [index_q][index_l]
               int psi_ind = pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(pv->l_max_ncdm[ncdm_id] + 1) + l;
               double Psi0 = y[psi_ind];
 
-              integral_num += dq*q*q*exp(lnN + lnf)*Psi0*FL[l*q_size + index_q];
-              integral_denom += dq*q*q*exp(lnN + lnf);
+              integral_num += w0*q*q*Psi0*FL[l*q_size + index_q];
+              integral_denom += w0*q*q;
+            }
+            if (must_rescale) {
+              integral_num = 0.;
+              integral_denom = 0.;
+              // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
+              double lnN = 50.;
+              for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
+                double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                if (lnN < -lnf) {
+                  lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                }
+              }
+              for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
+                double dq = dncdm_properties.dq[index_q];
+                double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+                int psi_ind = pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(pv->l_max_ncdm[ncdm_id] + 1) + l;
+                double Psi0 = y[psi_ind];
+
+                integral_num += dq*q*q*exp(lnN + lnf)*Psi0*FL[l*q_size + index_q];
+                integral_denom += dq*q*q*exp(lnN + lnf);
+              }
+            }
+            return rprime_dr*integral_num/integral_denom;
+          }
+          else {
+            // Fluid approximation is on; now idx~delta, idx+1~theta, idx+2~shear and q_size = 1
+            // DCDM approximation since exact solution is unavailable because ncdmfa forgets Psi-information
+            if (l < 2) {
+              return y[pv->index_pt_psi0_ncdm1 + l];
+            }
+            else {
+              return 0.;
             }
           }
-          return rprime_dr*integral_num/integral_denom;
         };
         
         // l = 0 explicit update
@@ -9045,7 +9088,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
 
           if (ppr->ncdm_fluid_approximation == ncdmfa_mb) {
 
-            dy[idx+2] = -3.0*(a_prime_over_a*(2./3.-ca2_ncdm-pseudo_p_ncdm/p_ncdm_bg/3.)+1./tau)*y[idx+2]
+            dy[idx+2] = -3.0*(a_prime_over_a*(2./3.-ca2_ncdm-pseudo_p_over_p/3.)+1./tau)*y[idx+2]
               +8.0/3.0*cvis2_ncdm/(1.0+w_ncdm)*s_l[2]*(y[idx+1]+metric_shear);
 
           }
@@ -9059,7 +9102,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
 
           if (ppr->ncdm_fluid_approximation == ncdmfa_CLASS) {
 
-            dy[idx+2] = -3.0*(a_prime_over_a*(2./3.-ca2_ncdm-pseudo_p_ncdm/p_ncdm_bg/3.)+1./tau)*y[idx+2]
+            dy[idx+2] = -3.0*(a_prime_over_a*(2./3.-ca2_ncdm-pseudo_p_over_p/3.)+1./tau)*y[idx+2]
               +8.0/3.0*cvis2_ncdm/(1.0+w_ncdm)*s_l[2]*(y[idx+1]+metric_ufa_class);
 
           }
