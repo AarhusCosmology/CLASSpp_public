@@ -8746,9 +8746,12 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
           }
           else {
             // Fluid approximation is on; now idx~delta, idx+1~theta, idx+2~shear and q_size = 1
-            // DCDM approximation since exact solution is unavailable because ncdmfa forgets Psi-information
-            if (l < 2) {
-              return y[pv->index_pt_psi0_ncdm1 + l];
+            // Use DCDM approximation since exact solution is unavailable because ncdmfa forgets Psi-information
+            if (l == 0) {
+              return rprime_dr*y[pv->index_pt_psi0_ncdm1];
+            }
+            else if (l == 1) {
+              return rprime_dr*y[pv->index_pt_psi0_ncdm1 + 1]/k;
             }
             else {
               return 0.;
