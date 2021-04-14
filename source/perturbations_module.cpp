@@ -2894,7 +2894,7 @@ int PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(scalar_titles_, "shear_dr", pba->has_dr);
       /* Momentum averaged DR perturbations */
       if (pba->has_dncdm) {
-        for (int l = 0; l < ppr->l_max_dr; l++) {
+        for (int l = 0; l <= ppr->l_max_dr; l++) {
           sprintf(tmp, "F_dr[%d]", l);
           class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
         }
@@ -7963,7 +7963,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
     class_store_double(dataptr, shear_dr, pba->has_dr, storeidx);
     /* Momentum averaged DR perturbations */
       if (pba->has_dncdm) {
-        for (int l = 0; l < ppr->l_max_dr; l++) {
+        for (int l = 0; l <= ppr->l_max_dr; l++) {
           class_store_double(dataptr, y[ppw->pv->index_pt_F0_dr_sum + l], pba->has_dr, storeidx);
         }
       }
@@ -9124,19 +9124,6 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
         
         for (n_ncdm=0; n_ncdm<pv->N_ncdm; n_ncdm++) {
 
-          /** - -----> Set pointer to logarithmic derivative */
-          double* dlnf0_dlnq_vector;
-          switch (pba->ncdm->ncdm_types_[n_ncdm]) {
-            case NonColdDarkMatter::NCDMType::standard: {
-              dlnf0_dlnq_vector = pba->ncdm->dlnf0_dlnq_ncdm_[n_ncdm];
-              break;
-            }
-            case NonColdDarkMatter::NCDMType::decay_dr: {
-              // If the current species can decay, make sure to get the time-dependent distribution function
-              dlnf0_dlnq_vector = pvecback + background_module_->index_bg_dlnfdlnq_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset;
-              break;
-            }
-          }
           /** - -----> loop over momentum */
 
           for (index_q=0; index_q < pv->q_size_ncdm[n_ncdm]; index_q++) {
@@ -9144,7 +9131,19 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
             /** - -----> define intermediate quantities */
 
             q = pba->ncdm->q_ncdm_[n_ncdm][index_q];
-            double dlnf0_dlnq = dlnf0_dlnq_vector[index_q];
+            double dlnf0_dlnq;
+            switch (pba->ncdm->ncdm_types_[n_ncdm]) {
+              case NonColdDarkMatter::NCDMType::standard: {
+                dlnf0_dlnq = pba->ncdm->dlnf0_dlnq_ncdm_[n_ncdm][index_q];
+                break;
+              }
+              case NonColdDarkMatter::NCDMType::decay_dr: {
+                // If the current species can decay, make sure to get the time-dependent distribution function
+                dlnf0_dlnq = pvecback[background_module_->index_bg_dlnfdlnq_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                break;
+              }
+            }
+
             epsilon = sqrt(q*q + a2*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
             qk_div_epsilon = k*q/epsilon;
 
