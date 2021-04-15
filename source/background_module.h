@@ -42,6 +42,7 @@ public:
   int index_bg_f_ncdm_decay_dr1_; /**< dncdm background distribution function> index of first q-bin of first species */
   int index_bg_lnf_ncdm_decay_dr1_;
   int index_bg_dlnfdlnq_ncdm_decay_dr1_;
+  int index_bg_dlnfdlnq_separate_ncdm_decay_dr1_;
   int index_bg_q_mean_;
   int index_bg_f_dr1_;         /**< total distribution function of DR */
   int index_bg_rho_dr_species_;/**< dr density for individual species */
@@ -150,6 +151,7 @@ private:
 
   int index_bi_f_ncdm_decay_dr1_; /**< {B} dncdm distribution function*/
   int index_bi_lnf_ncdm_decay_dr1_; /**< {B} dncdm distribution function*/
+  int index_bi_dlnfdlnq_separate_ncdm_decay_dr1_;
   int index_bi_f_dr1_species_;
   int index_bi_rho_dr_from_dcdm_;
   

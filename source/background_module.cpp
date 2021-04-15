@@ -951,6 +951,7 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_f_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_lnf_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
+  class_define_index(index_bg_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_q_mean_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
 
   /* - index for dcdm */
@@ -1059,7 +1060,7 @@ int BackgroundModule::background_indices() {
   /* -> time-dependent distribution function in DNCDM for each q-bin */
   class_define_index(index_bi_f_ncdm_decay_dr1_, pba->has_dncdm, index_bi, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bi_lnf_ncdm_decay_dr1_, pba->has_dncdm, index_bi, pba->ncdm->q_total_size_dncdm_);
-
+  class_define_index(index_bi_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_dncdm, index_bi, pba->ncdm->q_total_size_dncdm_);
   /* -> dark radiation distribution function and energy density */
   class_define_index(index_bi_f_dr1_species_, pba->has_dr, index_bi, pba->dr->cumulative_q_index_.back());
   class_define_index(index_bi_rho_dr_from_dcdm_, pba->has_dcdm, index_bi, 1);
@@ -1692,8 +1693,10 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
     for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
       for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
         double f0 = pba->ncdm->w_ncdm_[ncdm_id][index_q]/dncdm_properties.dq[index_q];
+        double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
         pvecback_integration[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = f0;
         pvecback_integration[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = log(f0);
+        pvecback_integration[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = -q*exp(q)/(exp(q) + 1); // Fermi-Dirac
       }
     }
   }
@@ -1923,6 +1926,9 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
 
           sprintf(tmp,"dlnfdlnq_dncdm[%d][%d]",n,i);
           class_store_columntitle(titles,tmp,_TRUE_);
+
+          sprintf(tmp,"dlnfdlnq_separate_dncdm[%d][%d]",n,i);
+          class_store_columntitle(titles,tmp,_TRUE_);
           
           sprintf(tmp,"q_dncdm[%d][%d]",n,i);
           class_store_columntitle(titles,tmp,_TRUE_);
@@ -2009,6 +2015,7 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
             class_store_double(dataptr, pvecback[index_bg_f_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pba->ncdm->q_ncdm_[n][i], _TRUE_, storeidx);
           }
           if (pba->compute_mean_q) {
@@ -2147,7 +2154,7 @@ int BackgroundModule::background_derivs_member(
         double q = pba->ncdm->q_ncdm_[ncdm_id][i];
         double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
         dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -a*a*M_ncdm*Gamma/epsilon;
-
+        dy[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = a*a*M_ncdm*Gamma*q*q/pow(epsilon, 3);
         double f_q = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
         if (f_q >= 1e-20) {
           dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -a*a*M_ncdm*Gamma*f_q/epsilon;
