@@ -1069,6 +1069,7 @@ int InputModule::input_read_parameters() {
   }
   
   class_read_int("Inverse decay term", pba->has_inv);
+  class_read_int("compute mean q", pba->compute_mean_q);
 
   /** - non-cold relics (ncdm) */
   NcdmSettings ncdm_settings;

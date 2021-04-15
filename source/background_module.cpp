@@ -376,11 +376,31 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
           double f_from_lnf = exp(pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
           double f_dncdm = pvecback_B[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
 
-
           // Update distribution function in ncdm module
           pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = f_dncdm;
           pba->ncdm->SetBackgroundWeight(ncdm_id, i, f_from_lnf*dncdm_properties.dq[i]);
           pvecback[index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+          pvecback[index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+        }
+        if (pba->compute_mean_q) {
+          // Calculate mean q for plotting; remember eventual rescaling
+          double num = 0.;
+          double denom = 0.;
+          // Always rescale; there is little computation time to be won anyway...
+          double lnN = 1.;
+          for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
+            double lnf = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+            if (lnN < -lnf) {
+              lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+            }
+          }
+          for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
+            double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+            double lnf = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+            num += dncdm_properties.dq[index_q]*pow(q, 3)*exp(lnN + lnf);
+            denom += dncdm_properties.dq[index_q]*pow(q, 2)*exp(lnN + lnf);
+          }
+          pvecback[index_bg_q_mean_ + ncdm_id] = num/denom;
         }
       }
     }
@@ -931,6 +951,7 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_f_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_lnf_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
+  class_define_index(index_bg_q_mean_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
 
   /* - index for dcdm */
   class_define_index(index_bg_rho_dcdm_, pba->has_dcdm, index_bg, 1);
@@ -1906,6 +1927,10 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
           sprintf(tmp,"q_dncdm[%d][%d]",n,i);
           class_store_columntitle(titles,tmp,_TRUE_);
         }
+        if (pba->compute_mean_q) {
+          sprintf(tmp,"q_mean[%d]",n);
+          class_store_columntitle(titles,tmp,_TRUE_);
+        }
       }
     }
   }
@@ -1985,6 +2010,9 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
             class_store_double(dataptr, pvecback[index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pba->ncdm->q_ncdm_[n][i], _TRUE_, storeidx);
+          }
+          if (pba->compute_mean_q) {
+            class_store_double(dataptr, pvecback[index_bg_q_mean_ + n], _TRUE_, storeidx);
           }
         }
       }
