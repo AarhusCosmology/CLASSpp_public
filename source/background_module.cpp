@@ -373,11 +373,13 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     if (pba->has_dncdm) {
       for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
         for (int i = 0; i < pba->ncdm->q_size_ncdm_[ncdm_id]; i++) {
-          double f_dncdm = exp(pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
+          double f_from_lnf = exp(pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
+          double f_dncdm = pvecback_B[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+
 
           // Update distribution function in ncdm module
           pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = f_dncdm;
-          pba->ncdm->SetBackgroundWeight(ncdm_id, i, f_dncdm*dncdm_properties.dq[i]);
+          pba->ncdm->SetBackgroundWeight(ncdm_id, i, f_from_lnf*dncdm_properties.dq[i]);
           pvecback[index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
         }
       }
@@ -446,7 +448,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
         }
         else {
           for (int i = 0; i < q_size; i++) {
-            // lnf_dlnf_array[i] = log(pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
             lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
             lnq[i] = log(pba->ncdm->q_ncdm_[ncdm_id][i]);
             if (isnan(pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i])) {
@@ -477,7 +478,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
         for (int i = 0; i < q_size; i++) {
           pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = lnf_dlnf_array[q_size + i];
-          pba->ncdm->dlnf0_dlnq_ncdm_[ncdm_id][i] = lnf_dlnf_array[q_size + i];
+          // pba->ncdm->dlnf0_dlnq_ncdm_[ncdm_id][i] = lnf_dlnf_array[q_size + i];
         }
       }
     }
@@ -1035,7 +1036,9 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bi_rho_dcdm_, pba->has_dcdm, index_bi, 1);
 
   /* -> time-dependent distribution function in DNCDM for each q-bin */
+  class_define_index(index_bi_f_ncdm_decay_dr1_, pba->has_dncdm, index_bi, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bi_lnf_ncdm_decay_dr1_, pba->has_dncdm, index_bi, pba->ncdm->q_total_size_dncdm_);
+
   /* -> dark radiation distribution function and energy density */
   class_define_index(index_bi_f_dr1_species_, pba->has_dr, index_bi, pba->dr->cumulative_q_index_.back());
   class_define_index(index_bi_rho_dr_from_dcdm_, pba->has_dcdm, index_bi, 1);
@@ -1664,11 +1667,11 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
       double f = 1./3.*pow(a/pba->a_today,6)*pvecback_integration[index_bi_rho_dcdm_]*pba->Gamma_dcdm/pow(pba->H0,3)/sqrt(Omega_rad);
       pvecback_integration[index_bi_rho_dr_from_dcdm_] = f*pba->H0*pba->H0/pow(a/pba->a_today,4);
     }
-  
-    // Loop over dncdm species
+
     for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
       for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
         double f0 = pba->ncdm->w_ncdm_[ncdm_id][index_q]/dncdm_properties.dq[index_q];
+        pvecback_integration[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = f0;
         pvecback_integration[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = log(f0);
       }
     }
@@ -1894,6 +1897,9 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
           sprintf(tmp,"f_dncdm[%d][%d]",n,i);
           class_store_columntitle(titles,tmp,_TRUE_);
 
+          sprintf(tmp,"lnf_dncdm[%d][%d]",n,i);
+          class_store_columntitle(titles,tmp,_TRUE_);
+
           sprintf(tmp,"dlnfdlnq_dncdm[%d][%d]",n,i);
           class_store_columntitle(titles,tmp,_TRUE_);
           
@@ -1976,6 +1982,7 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
           // For each decaying species, print the distribution function at each point of q-grid
           for (int i = 0; i < pba->ncdm->q_size_ncdm_[n]; i++) {
             class_store_double(dataptr, pvecback[index_bg_f_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pba->ncdm->q_ncdm_[n][i], _TRUE_, storeidx);
           }
@@ -2112,6 +2119,14 @@ int BackgroundModule::background_derivs_member(
         double q = pba->ncdm->q_ncdm_[ncdm_id][i];
         double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
         dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -a*a*M_ncdm*Gamma/epsilon;
+
+        double f_q = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+        if (f_q >= 1e-20) {
+          dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -a*a*M_ncdm*Gamma*f_q/epsilon;
+        }
+        else {
+          dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = 0.;
+        }
       }
     }
   }
