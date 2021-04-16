@@ -23,7 +23,8 @@ public:
 
   static std::shared_ptr<DarkRadiation> Create(FileContent* pfc, std::vector<SourceType> source_types, double T_cmb);
   void IntegrateDistribution(double z, double* number, double* rho, double* p, int index_dr = 42);
-  
+  double ComputeMeanMomentum(double z, int index_dr = 42);
+
   std::vector<double> q_;
   std::vector<double> dq_;
   std::vector<double> w_; /* Total weights */

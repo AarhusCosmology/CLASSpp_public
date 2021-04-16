@@ -189,3 +189,40 @@ void DarkRadiation::IntegrateDistribution(double z, double* number, double* rho,
   if (rho != NULL) *rho *= integral_factor;
   if (p != NULL) *p *= integral_factor;
 }
+
+/**
+ *
+ *
+ *
+ *
+ *
+*/
+
+double DarkRadiation::ComputeMeanMomentum(double z, int index_dr) {
+  std::vector<double> w_vec(N_q_);
+  double zero_test = 0.;
+  // Which species to sum over?
+  if (index_dr == 42) { // Sum over total distribution function, this is default
+    for (int index_q = 0; index_q < N_q_; index_q++) {
+      w_vec[index_q] = w_[index_q];
+      zero_test += w_[index_q];
+    }
+  } else {
+    for (int index_q = 0; index_q < N_q_; index_q++) {
+      w_vec[index_q] = w_species_[index_dr][index_q];
+      zero_test += w_species_[index_dr][index_q];
+    }
+  }
+  if (zero_test == 0.) {
+    // No DR particles, possibly since no decay has occurred yet
+    return 0.;
+  }
+  double num = 0.;
+  double denom = 0.;
+  for (int index_q = 0; index_q < N_q_; index_q++) {
+    double q = q_[index_q];
+    num += w_vec[index_q]*pow(q, 3);
+    denom += w_vec[index_q]*pow(q, 2);
+  }
+  return num/denom;
+}

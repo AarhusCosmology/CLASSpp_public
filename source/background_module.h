@@ -44,6 +44,7 @@ public:
   int index_bg_dlnfdlnq_ncdm_decay_dr1_;
   int index_bg_dlnfdlnq_separate_ncdm_decay_dr1_;
   int index_bg_q_mean_;
+  int index_bg_q_mean_dr_;
   int index_bg_f_dr1_;         /**< total distribution function of DR */
   int index_bg_rho_dr_species_;/**< dr density for individual species */
   int index_bg_rho_dr_;        /**< total dr density */

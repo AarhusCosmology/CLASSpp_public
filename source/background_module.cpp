@@ -401,6 +401,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
             denom += dncdm_properties.dq[index_q]*pow(q, 2)*exp(lnN + lnf);
           }
           pvecback[index_bg_q_mean_ + ncdm_id] = num/denom;
+          pvecback[index_bg_q_mean_dr_ + ncdm_id] = pba->dr->ComputeMeanMomentum(a, ncdm_id);
         }
       }
     }
@@ -953,6 +954,7 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_q_mean_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
+  class_define_index(index_bg_q_mean_dr_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
 
   /* - index for dcdm */
   class_define_index(index_bg_rho_dcdm_, pba->has_dcdm, index_bg, 1);
@@ -1936,6 +1938,9 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
         if (pba->compute_mean_q) {
           sprintf(tmp,"q_mean[%d]",n);
           class_store_columntitle(titles,tmp,_TRUE_);
+
+          sprintf(tmp,"q_mean_dr[%d]",n);
+          class_store_columntitle(titles,tmp,_TRUE_);
         }
       }
     }
@@ -2020,6 +2025,7 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
           }
           if (pba->compute_mean_q) {
             class_store_double(dataptr, pvecback[index_bg_q_mean_ + n], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_q_mean_dr_ + n], _TRUE_, storeidx);
           }
         }
       }
