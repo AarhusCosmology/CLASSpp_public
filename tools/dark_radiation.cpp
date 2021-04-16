@@ -198,7 +198,7 @@ void DarkRadiation::IntegrateDistribution(double z, double* number, double* rho,
  *
 */
 
-double DarkRadiation::ComputeMeanMomentum(double z, int index_dr) {
+double DarkRadiation::ComputeMeanMomentum(int index_dr) {
   std::vector<double> w_vec(N_q_);
   double zero_test = 0.;
   // Which species to sum over?

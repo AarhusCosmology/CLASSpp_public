@@ -3913,6 +3913,9 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         if (dncdm_properties.Gamma > 1.0) {
           xguess[index_guess] = pfzw->target_values[index_guess]/Omega_deg1;
           dxdy[index_guess] = 1./Omega_deg1/100.;
+          if (ba.ncdm->m_ncdm_in_eV_[ncdm_id] >= 20) {
+            dxdy[index_guess] = 1./Omega_deg1/1000.;
+          }
         }
         else {
           // xguess[index_guess] = 100*pfzw->target_values[index_guess]/Omega_deg1;

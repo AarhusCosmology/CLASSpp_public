@@ -387,13 +387,18 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
           double num = 0.;
           double denom = 0.;
           // Always rescale; there is little computation time to be won anyway...
-          double lnN = 1.;
+          // Choose rescaling factor lnN such as the average of the lnf
+          double lnN = 0.;
           for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
             double lnf = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+            /*
             if (lnN < -lnf) {
-              lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+              lnN = -lnf;
             }
+            */
+            lnN += -lnf;
           }
+          lnN /= pba->ncdm->q_size_ncdm_[ncdm_id];
           for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
             double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
             double lnf = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
