@@ -6421,13 +6421,18 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
               double p_scaled = 0.;
               double pseudo_p_scaled = 0.;
 
-              double lnN = 50.;
+              // double lnN = 50.;
+              double lnN = 0.;
               for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                 double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                /*
                 if (lnN < -lnf) {
                   lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
                 }
+                */
+                lnN += -lnf;
               }
+              lnN /= ppw->pv->q_size_ncdm[n_ncdm];
 
               for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                 double dq = pba->ncdm->decay_dr_map_[n_ncdm].dq[index_q];
@@ -6512,13 +6517,18 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
               idx = ppw->pv->index_pt_psi0_ncdm1;
 
               // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
-              double lnN = 50.;
+              // double lnN = 50.;
+              double lnN = 0.;
               for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                 double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                /*
                 if (lnN < -lnf) {
                   lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
                 }
+                */
+                lnN += -lnf;
               }
+              lnN /= ppw->pv->q_size_ncdm[n_ncdm];
 
               for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                 // Only happens in decaying scenarios
@@ -7760,13 +7770,18 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
             idx = ppw->pv->index_pt_psi0_ncdm1;
 
             // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
-            double lnN = 50.;
+            // double lnN = 50.;
+            double lnN = 0.;
             for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
               double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+              /*
               if (lnN < -lnf) {
                 lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
               }
+              */
+              lnN += -lnf;
             }
+            lnN /= ppw->pv->q_size_ncdm[n_ncdm];
 
             for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
               // Only happens in decaying scenarios
@@ -8724,13 +8739,18 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
               integral_num = 0.;
               integral_denom = 0.;
               // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
-              double lnN = 50.;
+              // double lnN = 50.;
+              double lnN = 0.;
               for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
                 double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                /*
                 if (lnN < -lnf) {
                   lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
                 }
+                */
+                lnN += -lnf;
               }
+              lnN /= pba->ncdm->q_size_ncdm_[ncdm_id];
               for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
                 double dq = dncdm_properties.dq[index_q];
                 double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
@@ -9032,13 +9052,18 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
               double p_scaled = 0.;
               double pseudo_p_scaled = 0.;
 
-              double lnN = 50.;
+              // double lnN = 50.;
+              double lnN = 0.;
               for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                 double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n_ncdm].q_offset + index_q];
+                /*
                 if (lnN < -lnf) {
                   lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
                 }
+                */
+                lnN += -lnf;
               }
+              lnN /= ppw->pv->q_size_ncdm[n_ncdm];
 
               for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
                 double dq = pba->ncdm->decay_dr_map_[n_ncdm].dq[index_q];

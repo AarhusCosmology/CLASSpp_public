@@ -406,7 +406,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
             denom += dncdm_properties.dq[index_q]*pow(q, 2)*exp(lnN + lnf);
           }
           pvecback[index_bg_q_mean_ + ncdm_id] = num/denom;
-          pvecback[index_bg_q_mean_dr_ + ncdm_id] = pba->dr->ComputeMeanMomentum(a, ncdm_id);
+          pvecback[index_bg_q_mean_dr_ + ncdm_id] = pba->dr->ComputeMeanMomentum(ncdm_id);
         }
       }
     }
