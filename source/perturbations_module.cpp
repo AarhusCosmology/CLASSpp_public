@@ -7951,11 +7951,11 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
           for (int l = 0; l < pba->l_max_col_plot; l++) {
             if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
               double new_col = compute_collision_integral(l);
-              col_terms.push_back(compute_collision_integral(l));
+              col_terms.push_back(new_col);
             }
             else {
               // Cannot compute collision terms in fluid approximation
-              col_terms[l] = 0.;
+              col_terms.push_back(0.);
             }
           }
         }
@@ -8111,7 +8111,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
       }
       for (int l = 0; l < pba->l_max_col_plot; l++) {
         double term = col_terms[l];
-        class_store_double(dataptr, col_terms[l], pba->has_dr, storeidx);
+        class_store_double(dataptr, term, pba->has_dr, storeidx);
       }
       for (int l = 0; l < pba->l_max_col_plot; l++) {
         for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[0]; index_q++) {

@@ -272,7 +272,6 @@ struct perturb_vector
       astro-ph/9907388. */
   int index_pt_F0_dr_sum;
   int index_pt_F0_dr_species;
-  int index_pt_dr_col_term; // Collision terms; currently only prints for 1 species
   int l_max_dr;          /**< max momentum in Boltzmann hierarchy for dr) */
   int index_pt_psi0_ncdm1; /**< first multipole of perturbation of first ncdm species, Psi_0 */
   int N_ncdm;		/**< number of distinct non-cold-dark-matter (ncdm) species */
