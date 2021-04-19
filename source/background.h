@@ -158,8 +158,9 @@ struct background
   short has_cdm;       /**< presence of cold dark matter? */
   short has_dcdm;      /**< presence of decaying cold dark matter? */
   short has_dncdm;     /**< presence of decaying non-cold dark matter? */
-  short has_dr;        /**< presence of relativistic decay radiation? */
   short has_inv;       /**< include inverse decay term from dncdm->dr? */
+  short has_qs;        /**< include quantum statistics terms from dncdm->dr? */
+  short has_dr;        /**< presence of relativistic decay radiation? */
   short has_scf;       /**< presence of a scalar field? */
   short has_ncdm;      /**< presence of non-cold dark matter? */
   short has_lambda;    /**< presence of cosmological constant? */

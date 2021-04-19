@@ -1085,6 +1085,16 @@ int InputModule::input_read_parameters() {
     }
     
     if (pba->ncdm->N_ncdm_decay_dr_ > 0) {
+      class_read_int("Inverse decay", pba->has_inv);
+      class_read_int("Quantum statistics", pba->has_qs);
+      class_test(((pba->has_qs == _TRUE_) && (pba->has_inv == _FALSE_)),
+                 errmsg,
+                 "Decaying NCDM cannot have quantum statistics terms without also including inverse decay terms.");
+      if ((pba->has_inv == _TRUE_) || (pba->has_qs == _TRUE_)) {
+        // For inverse and QS terms we need a DR species for each daughter
+        // For simplicity, we take the first species as the fermion and the second species as the boson
+        dr_sources.push_back(DarkRadiation::SourceType::dncdm);
+      }
 
       class_read_int("compute mean q", pba->compute_mean_q);
 

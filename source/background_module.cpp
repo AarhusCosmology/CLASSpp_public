@@ -2206,30 +2206,36 @@ int BackgroundModule::background_derivs_member(
           double q_min = fabs(0.25*a*a*M_1*M_1/q_2 - q_2); // Lower integral bound
           double q_max = q_1_vec[q_1_size - 1]; // Upper bound = ∞
           int index_min, index_max;
-          if (dncdm_properties.quadrature_strategy == 3) {
-            class_call(get_limits_and_weights(q_min, q_max, q_1_vec, q_1_size, dq, &index_min, &index_max, error_message),
-                     error_message, error_message);
-          }
-          else {
+          if (dncdm_properties.quadrature_strategy != 3) {
             throw std::runtime_error("DNCDM currently only admits quadrature strategy 3. Please change your input accordingly.\n");
           }
 
           /*
-          printf("index_min = %d, index_max = %d \n", index_min, index_max);
-          for (int idx = index_min; idx < index_max; idx++) {
-            printf("dq[%d] = %g, original dq = %g \n ", idx, dq[idx], dncdm_properties.dq[idx]);
-          }
-            */
+            Fortunately, in the massless case the respective integration bounds of the two daughter particles are identical.
+           */
 
-
+          class_call(get_limits_and_weights(q_min, q_max, q_1_vec, q_1_size, dq, &index_min, &index_max, error_message),
+                     error_message, error_message);
+          // Decay terms
           for (int index_q_1 = index_min; index_q_1 <= index_max; index_q_1++) {
-            if (pba->ncdm->evolve_flag_[index_q_1]) {
-              double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
-              double epsilon_1 = sqrt(q_1*q_1 + M_1*M_1*a*a);
-              double w_1 = dq[index_q_1]*pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1];
-              decay_term += q_1/epsilon_1*w_1;
-            }
+            double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
+            double epsilon_1 = sqrt(q_1*q_1 + M_1*M_1*a*a);
+            double w_1 = dq[index_q_1]*pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1];
+            decay_term += q_1/epsilon_1*w_1;
           }
+
+          // Inverse terms
+          if (pba->has_inv) {
+            q_min = 0.;
+
+            class_call(get_limits_and_weights(q_min, q_max, q_1_vec, q_1_size, dq, &index_min, &index_max, error_message),
+                     error_message, error_message);
+            
+
+          }
+
+
+
             
             /* DR Distribution function equation of motion from (4.13) in 2011.01502 with m_vl -> 0
                Front factor, see (4.13) in 2011.01502
