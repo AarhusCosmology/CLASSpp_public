@@ -1067,9 +1067,6 @@ int InputModule::input_read_parameters() {
     /* Convert to Mpc */
     pba->Gamma_dcdm *= (1.e3 / _c_);
   }
-  
-  class_read_int("Inverse decay term", pba->has_inv);
-  class_read_int("compute mean q", pba->compute_mean_q);
 
   /** - non-cold relics (ncdm) */
   NcdmSettings ncdm_settings;
@@ -1088,6 +1085,9 @@ int InputModule::input_read_parameters() {
     }
     
     if (pba->ncdm->N_ncdm_decay_dr_ > 0) {
+
+      class_read_int("compute mean q", pba->compute_mean_q);
+
       double *Omega_dncdmdr_list, *omega_dncdmdr_list, *deg_list, *Omega_ini_dncdm_list, *omega_ini_dncdm_list;
       int flag4, flag5, temp_size; // temp_size will always be N_ncdm_decay_dr_, the sizes are checked elsewhere
       

@@ -8644,170 +8644,173 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
       // Contribution from DNCDM
       if (pba->has_dncdm) {
         for (const auto& id_and_properties : pba->ncdm->decay_dr_map_) {
-        // We need to capture dncdm_properties in a Lambda, so we cannot use structured bindings.
-        int ncdm_id = id_and_properties.first;
-        const DecayDRProperties& dncdm_properties = id_and_properties.second;
-        // Note: It is assumed that all DR species have the same l_max
-        int l_skip = index_dr*(pv->l_max_dr + 1);
+          // We need to capture dncdm_properties in a Lambda, so we cannot use structured bindings.
+          int ncdm_id = id_and_properties.first;
+          const DecayDRProperties& dncdm_properties = id_and_properties.second;
+          // Note: It is assumed that all DR species have the same l_max
+          int l_skip = index_dr*(pv->l_max_dr + 1);
 
-        double M_ncdm = pba->ncdm->M_ncdm_[ncdm_id];
-        double Gamma = dncdm_properties.Gamma;
-        double r_dr = pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]*pow(a,4)/pba->H0/pba->H0;
-        double rprime_dr = 2*r_dr*a*M_ncdm*Gamma*pvecback[background_module_->index_bg_number_ncdm1_ + ncdm_id]/pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]; // Factor 2 comes from two daughter species 
-        
-        int q_size = pba->ncdm->q_size_ncdm_[ncdm_id];
-        
-        // We need to do forwards recurrence for 0.95 < x < 1 and backwards otherwise
-        auto ComputeFl = [&](int index_q, int lmax, std::vector<double>& output) {
-          double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
-          double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
+          double M_ncdm = pba->ncdm->M_ncdm_[ncdm_id];
+          double Gamma = dncdm_properties.Gamma;
+          double r_dr = pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]*pow(a,4)/pba->H0/pba->H0;
+          double rprime_dr = 2*r_dr*a*M_ncdm*Gamma*pvecback[background_module_->index_bg_number_ncdm1_ + ncdm_id]/pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]; // Factor 2 comes from two daughter species
 
-          // Input x to scattering kernel is defined as q/epsilon
-          double x = q/epsilon;
+          int q_size = pba->ncdm->q_size_ncdm_[ncdm_id];
 
-          if (x < 0.9999) {
-            int km = 42 + lmax;
-            if (x > 0.9) {
-                km *= int(-1.0 - 1.8*log(1./x - 1.0));
-            }
-            double Fp2 = 0.;
-            double Fp1 = 1.;
-            for (int l = km; l >= 0; --l) {
-              double Fp = ((2*l + 3)*Fp1/x - l*Fp2)/(l + 3.);
-              if ((Fp > 1e200) || (l == 0)) {
-                // Overflow, renormalise!
-                Fp1 /= Fp;
-                for (int ll = l + 1; ll <= lmax; ++ll) {
-                  output[ll*q_size + index_q] /= Fp;
+          // We need to do forwards recurrence for 0.95 < x < 1 and backwards otherwise
+          auto ComputeFl = [&](int index_q, int lmax, std::vector<double>& output) {
+            double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+            double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
+
+            // Input x to scattering kernel is defined as q/epsilon
+            double x = q/epsilon;
+
+            if (x < 0.9999) {
+              int km = 42 + lmax;
+              if (x > 0.9) {
+                  km *= int(-1.0 - 1.8*log(1./x - 1.0));
+              }
+              double Fp2 = 0.;
+              double Fp1 = 1.;
+              for (int l = km; l >= 0; --l) {
+                double Fp = ((2*l + 3)*Fp1/x - l*Fp2)/(l + 3.);
+                if ((Fp > 1e200) || (l == 0)) {
+                  // Overflow, renormalise!
+                  Fp1 /= Fp;
+                  for (int ll = l + 1; ll <= lmax; ++ll) {
+                    output[ll*q_size + index_q] /= Fp;
+                  }
+                  Fp = 1.0;
                 }
-                Fp = 1.0;
-              }
-              if (l <= lmax) {
-                output[l*q_size + index_q] = Fp;
-              }
-              Fp2 = Fp1;
-              Fp1 = Fp;
-            }
-          }
-          else {
-            // Forwards recurrence:
-            output[0*q_size + index_q] = 1.;
-            if (lmax > 0) {
-              output[1*q_size + index_q] = x;
-            }
-            if (lmax > 1) {
-              output[2*q_size + index_q] = (x*(5.*x*x - 3.) + 3.*pow(x*x - 1.,2.)*atanh(x))/(2.*x*x*x);
-            }
-            for (int l = 3; l <= lmax; ++l) {
-              double Fm2 = output[(l - 2)*q_size + index_q];
-              double Fm1 = output[(l - 1)*q_size + index_q];
-              output[l*q_size + index_q] = ((2.*l - 1.)*Fm1/x - (l + 1.)*Fm2)/(l - 2.);
-            }
-          }
-        };
-        // Note that Fl is not the momentum-averaged perturbation, but the scattering kernel, which is usually typeset as curly F!
-        std::vector<double> FL(q_size*(pv->l_max_dr + 1));
-        for (int index_q = 0; index_q < q_size; ++index_q) {
-          ComputeFl(index_q, pv->l_max_dr, FL);
-        }
-        // Utility function that carries out the integral part of the decay term given l and scattering kernel Fl
-        auto compute_collision_integral = [&](int l) {
-          double integral_num = 0.;
-          double integral_denom = 0.;
-
-          if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
-            bool must_rescale = false;
-            for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
-              // Compute collision term integral contribution at q
-              double dq = dncdm_properties.dq[index_q];
-              double w0 = dq*pvecback[background_module_->index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
-              double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
-
-              if (w0 == 0.) {
-                must_rescale = true;
-                break;
-              }
-
-              // Indexation of Psi0 is of the form [index_q][index_l]
-              int psi_ind = pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(pv->l_max_ncdm[ncdm_id] + 1) + l;
-              double Psi0 = y[psi_ind];
-
-              integral_num += w0*q*q*Psi0*FL[l*q_size + index_q];
-              integral_denom += w0*q*q;
-            }
-            if (must_rescale) {
-              integral_num = 0.;
-              integral_denom = 0.;
-              // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
-              // double lnN = 50.;
-              double lnN = 0.;
-              for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
-                double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
-                /*
-                if (lnN < -lnf) {
-                  lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                if (l <= lmax) {
+                  output[l*q_size + index_q] = Fp;
                 }
-                */
-                lnN += -lnf;
+                Fp2 = Fp1;
+                Fp1 = Fp;
               }
-              lnN /= pba->ncdm->q_size_ncdm_[ncdm_id];
+            }
+            else {
+              // Forwards recurrence:
+              output[0*q_size + index_q] = 1.;
+              if (lmax > 0) {
+                output[1*q_size + index_q] = x;
+              }
+              if (lmax > 1) {
+                output[2*q_size + index_q] = (x*(5.*x*x - 3.) + 3.*pow(x*x - 1.,2.)*atanh(x))/(2.*x*x*x);
+              }
+              for (int l = 3; l <= lmax; ++l) {
+                double Fm2 = output[(l - 2)*q_size + index_q];
+                double Fm1 = output[(l - 1)*q_size + index_q];
+                output[l*q_size + index_q] = ((2.*l - 1.)*Fm1/x - (l + 1.)*Fm2)/(l - 2.);
+              }
+            }
+          };
+          // Note that Fl is not the momentum-averaged perturbation, but the scattering kernel, which is usually typeset as curly F!
+          std::vector<double> FL(q_size*(pv->l_max_dr + 1));
+          for (int index_q = 0; index_q < q_size; ++index_q) {
+            ComputeFl(index_q, pv->l_max_dr, FL);
+          }
+          // Utility function that carries out the integral part of the decay term given l and scattering kernel Fl
+          auto compute_collision_integral = [&](int l) {
+            double integral_num = 0.;
+            double integral_denom = 0.;
+            if (l >= 4) {
+              return 0.;
+            }
+
+            if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
+              bool must_rescale = false;
               for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
+                // Compute collision term integral contribution at q
                 double dq = dncdm_properties.dq[index_q];
-                double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                double w0 = dq*pvecback[background_module_->index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
                 double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+
+                if (w0 == 0.) {
+                  must_rescale = true;
+                  break;
+                }
+
+                // Indexation of Psi0 is of the form [index_q][index_l]
                 int psi_ind = pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(pv->l_max_ncdm[ncdm_id] + 1) + l;
                 double Psi0 = y[psi_ind];
 
-                integral_num += dq*q*q*exp(lnN + lnf)*Psi0*FL[l*q_size + index_q];
-                integral_denom += dq*q*q*exp(lnN + lnf);
+                integral_num += w0*q*q*Psi0*FL[l*q_size + index_q];
+                integral_denom += w0*q*q;
               }
-            }
-            return rprime_dr*integral_num/integral_denom;
-          }
-          else {
-            // Fluid approximation is on; now idx~delta, idx+1~theta, idx+2~shear and q_size = 1
-            // Use DCDM approximation since exact solution is unavailable because ncdmfa forgets Psi-information
-            if (l == 0) {
-              return rprime_dr*y[pv->index_pt_psi0_ncdm1];
-            }
-            else if (l == 1) {
-              return rprime_dr*y[pv->index_pt_psi0_ncdm1 + 1]/k;
+              if (must_rescale) {
+                integral_num = 0.;
+                integral_denom = 0.;
+                // Pick a scaling factor N; now exp(lnN + lnf) is a reasonable order of magnitude and exp(lnN) gets divided out when taking the ratio
+                // double lnN = 50.;
+                double lnN = 0.;
+                for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
+                  double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                  /*
+                  if (lnN < -lnf) {
+                    lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                  }
+                  */
+                  lnN += -lnf;
+                }
+                lnN /= pba->ncdm->q_size_ncdm_[ncdm_id];
+                for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
+                  double dq = dncdm_properties.dq[index_q];
+                  double lnf = pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                  double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+                  int psi_ind = pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(pv->l_max_ncdm[ncdm_id] + 1) + l;
+                  double Psi0 = y[psi_ind];
+
+                  integral_num += dq*q*q*exp(lnN + lnf)*Psi0*FL[l*q_size + index_q];
+                  integral_denom += dq*q*q*exp(lnN + lnf);
+                }
+              }
+              return rprime_dr*integral_num/integral_denom;
             }
             else {
-              return 0.;
+              // Fluid approximation is on; now idx~delta, idx+1~theta, idx+2~shear and q_size = 1
+              // Use DCDM approximation since exact solution is unavailable because ncdmfa forgets Psi-information
+              if (l == 0) {
+                return rprime_dr*y[pv->index_pt_psi0_ncdm1];
+              }
+              else if (l == 1) {
+                return rprime_dr*y[pv->index_pt_psi0_ncdm1 + 1]/k;
+              }
+              else {
+                return 0.;
+              }
+            }
+          };
+
+          // l = 0 explicit update
+          double collision_term = compute_collision_integral(0);
+          dy[pv->index_pt_F0_dr_species + l_skip + 0] = -k*y[pv->index_pt_F0_dr_species + l_skip + 1] - 4./3.*r_dr*metric_continuity + collision_term;
+
+          // l = 1 explicit update
+          collision_term = compute_collision_integral(1);
+          dy[pv->index_pt_F0_dr_species + l_skip + 1] = k/3.*y[pv->index_pt_F0_dr_species + l_skip + 0] - 2.*k/3.*y[pv->index_pt_F0_dr_species + l_skip + 2] + collision_term;
+
+          // l = 2 explicit update
+          collision_term = compute_collision_integral(2);
+          dy[pv->index_pt_F0_dr_species + l_skip + 2] = 2.*k/5.*y[pv->index_pt_F0_dr_species + l_skip + 1] - 3.*k/5*y[pv->index_pt_F0_dr_species + l_skip + 3] + 8./15.*r_dr*metric_shear + collision_term;
+
+          // l > 2 updates by recursion
+          for (int l = 3; l <= pv->l_max_dr; ++l) {
+            if (l < 800) {
+              collision_term = compute_collision_integral(l);
+            }
+            else {
+              collision_term = 0.;
+            }
+            if (l < pv->l_max_dr) {
+              dy[pv->index_pt_F0_dr_species + l_skip + l] = k/(2.*l + 1.)*(l*y[pv->index_pt_F0_dr_species + l_skip + l-1] - (l+1)*y[pv->index_pt_F0_dr_species + l_skip + l+1]) + collision_term;
+            }
+            else {
+              dy[pv->index_pt_F0_dr_species + l_skip + l] = k*(s_l[l]*y[pv->index_pt_F0_dr_species + l_skip + l-1]-(1.+l)*cotKgen*y[pv->index_pt_F0_dr_species + l_skip + l]) + collision_term;
             }
           }
-        };
-        
-        // l = 0 explicit update
-        double collision_term = compute_collision_integral(0);
-        dy[pv->index_pt_F0_dr_species + l_skip + 0] = -k*y[pv->index_pt_F0_dr_species + l_skip + 1] - 4./3.*r_dr*metric_continuity + collision_term;
-        
-        // l = 1 explicit update
-        collision_term = compute_collision_integral(1);
-        dy[pv->index_pt_F0_dr_species + l_skip + 1] = k/3.*y[pv->index_pt_F0_dr_species + l_skip + 0] - 2.*k/3.*y[pv->index_pt_F0_dr_species + l_skip + 2] + collision_term;
-        
-        // l = 2 explicit update
-        collision_term = compute_collision_integral(2);
-        dy[pv->index_pt_F0_dr_species + l_skip + 2] = 2.*k/5.*y[pv->index_pt_F0_dr_species + l_skip + 1] - 3.*k/5*y[pv->index_pt_F0_dr_species + l_skip + 3] + 8./15.*r_dr*metric_shear + collision_term;
-
-        // l > 2 updates by recursion
-        for (int l = 3; l <= pv->l_max_dr; ++l) {
-          if (l < 800) {
-            collision_term = compute_collision_integral(l);
-          }
-          else {
-            collision_term = 0.;
-          }
-          if (l < pv->l_max_dr) {
-            dy[pv->index_pt_F0_dr_species + l_skip + l] = k/(2.*l + 1.)*(l*y[pv->index_pt_F0_dr_species + l_skip + l-1] - (l+1)*y[pv->index_pt_F0_dr_species + l_skip + l+1]) + collision_term;
-          }
-          else {
-            dy[pv->index_pt_F0_dr_species + l_skip + l] = k*(s_l[l]*y[pv->index_pt_F0_dr_species + l_skip + l-1]-(1.+l)*cotKgen*y[pv->index_pt_F0_dr_species + l_skip + l]) + collision_term;
-          }
-        }
-        // Update the total F's
-        for (int l = 0; l <= pv->l_max_dr; ++l) {
+          // Update the total F's
+          for (int l = 0; l <= pv->l_max_dr; ++l) {
             dy[pv->index_pt_F0_dr_sum + l] += dy[pv->index_pt_F0_dr_species + l_skip + l];
             /*
             if (l == 1) {
@@ -8822,12 +8825,11 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
               printf("NAN IN PERTURB_DERIVS_MEMBER \n");
               int asdf = 1;
             }
+          }
+          ++index_dr;
         }
-        
-        ++index_dr;
       }
     }
-  }
       
 
     /** - ---> fluid (fld) */

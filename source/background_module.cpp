@@ -662,7 +662,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
   
   for (int idx = 0; idx < bg_size_; idx++) {
     if (isnan(pvecback[idx])) {
-      printf("WARNING: NAN VARIABLE IN BACKGROUND FUNCTIONS \n");
+      // printf("WARNING: NAN VARIABLE IN BACKGROUND FUNCTIONS \n");
       int asdf = 1;
     }
   }
