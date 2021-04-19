@@ -544,7 +544,11 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
         pba->dr->IntegrateDistribution(1./a_rel - 1, NULL, &rho_temp, NULL, n_dr);
         pba->dr->rho_species_[index_dr] = rho_temp;
         pvecback[index_bg_rho_dr_species_ + index_dr] = rho_temp;
-        
+
+        if (pba->compute_mean_q) {
+          pvecback[index_bg_q_mean_dr_ + n_dr] = pba->dr->ComputeMeanMomentum(n_dr);
+        }
+
         ++index_dr;
       }
     }

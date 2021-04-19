@@ -2898,6 +2898,16 @@ int PerturbationsModule::perturb_prepare_k_output() {
           sprintf(tmp, "F_dr[%d]", l);
           class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
         }
+        for (int l = 0; l < pba->l_max_col_plot; l++) {
+          sprintf(tmp, "Col_dr[%d]", l);
+          class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
+        }
+        for (int l = 0; l < pba->l_max_col_plot; l++) {
+          for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[0]; index_q++) {
+            sprintf(tmp, "Psi_l_q[%d][%d]", l, index_q);
+            class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
+          }
+        }
       }
       /* Scalar field scf */
       class_store_columntitle(scalar_titles_, "delta_scf", pba->has_scf);
@@ -7830,11 +7840,129 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
     }
 
 
+    std::vector<double> col_terms(pba->l_max_col_plot);
     if (pba->has_dr == _TRUE_) {
       r_dr = pow(pvecback[background_module_->index_bg_a_]*pvecback[background_module_->index_bg_a_]/pba->H0, 2)*pvecback[background_module_->index_bg_rho_dr_];
       delta_dr = y[ppw->pv->index_pt_F0_dr_sum]/r_dr;
       theta_dr = y[ppw->pv->index_pt_F0_dr_sum+1]*3./4.*k/r_dr;
       shear_dr = y[ppw->pv->index_pt_F0_dr_sum+2]*0.5/r_dr;
+
+      if ((pba->has_dncdm == _TRUE_) && (pba->has_dcdm == _FALSE_)) {
+        // Plot collision terms; calculation copied from perturb_derivs_member
+        // Plotting collision terms with both DNCDM and DCDM not implemented!
+        for (const auto& id_and_properties : pba->ncdm->decay_dr_map_) {
+          int ncdm_id = id_and_properties.first;
+          int index_dr = ncdm_id;
+          if (ncdm_id != 0) {
+            // Currently we only plot for one species
+            continue;;
+          }
+          const DecayDRProperties& dncdm_properties = id_and_properties.second;
+          double M_ncdm = pba->ncdm->M_ncdm_[ncdm_id];
+          double Gamma = dncdm_properties.Gamma;
+          double r_dr = ppw->pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]*pow(a,4)/pba->H0/pba->H0;
+          double rprime_dr = 2*r_dr*a*M_ncdm*Gamma*ppw->pvecback[background_module_->index_bg_number_ncdm1_ + ncdm_id]/ppw->pvecback[background_module_->index_bg_rho_dr_species_ + index_dr];
+          int q_size = pba->ncdm->q_size_ncdm_[ncdm_id];
+          auto ComputeFl = [&](int index_q, int lmax, std::vector<double>& output) {
+            double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+            double epsilon = sqrt(q*q + a2*M_ncdm*M_ncdm);
+            double x = q/epsilon;
+            if (x < 0.9999) {
+              int km = 42 + lmax;
+              if (x > 0.9) {
+                  km *= int(-1.0 - 1.8*log(1./x - 1.0));
+              }
+              double Fp2 = 0.;
+              double Fp1 = 1.;
+              for (int l = km; l >= 0; --l) {
+                double Fp = ((2*l + 3)*Fp1/x - l*Fp2)/(l + 3.);
+                if ((Fp > 1e200) || (l == 0)) {
+                  Fp1 /= Fp;
+                  for (int ll = l + 1; ll <= lmax; ++ll) {
+                    output[ll*q_size + index_q] /= Fp;
+                  }
+                  Fp = 1.0;
+                }
+                if (l <= lmax) {
+                  output[l*q_size + index_q] = Fp;
+                }
+                Fp2 = Fp1;
+                Fp1 = Fp;
+              }
+            }
+            else {
+              output[0*q_size + index_q] = 1.;
+              if (lmax > 0) {
+                output[1*q_size + index_q] = x;
+              }
+              if (lmax > 1) {
+                output[2*q_size + index_q] = (x*(5.*x*x - 3.) + 3.*pow(x*x - 1.,2.)*atanh(x))/(2.*x*x*x);
+              }
+              for (int l = 3; l <= lmax; ++l) {
+                double Fm2 = output[(l - 2)*q_size + index_q];
+                double Fm1 = output[(l - 1)*q_size + index_q];
+                output[l*q_size + index_q] = ((2.*l - 1.)*Fm1/x - (l + 1.)*Fm2)/(l - 2.);
+              }
+            }
+          };
+          std::vector<double> FL(q_size*(pba->l_max_col_plot));
+          for (int index_q = 0; index_q < q_size; ++index_q) {
+            ComputeFl(index_q, pba->l_max_col_plot, FL);
+          }
+          auto compute_collision_integral = [&](int l) {
+            double integral_num = 0.;
+            double integral_denom = 0.;
+            bool must_rescale = false;
+            for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
+              double dq = dncdm_properties.dq[index_q];
+              double w0 = dq*ppw->pvecback[background_module_->index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+              double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+              if (w0 == 0.) {
+                must_rescale = true;
+                break;
+              }
+              int psi_ind = ppw->pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(ppw->pv->l_max_ncdm[ncdm_id] + 1) + l;
+              double Psi0 = y[psi_ind];
+              integral_num += w0*q*q*Psi0*FL[l*q_size + index_q];
+              integral_denom += w0*q*q;
+            }
+            if (must_rescale) {
+              integral_num = 0.;
+              integral_denom = 0.;
+              double lnN = 50.;
+              for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                if (lnN < -lnf) {
+                  lnN = -lnf; // Make sure lnN = - max(lnf) to get a safe rescaling
+                }
+              }
+              for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; ++index_q) {
+                double dq = dncdm_properties.dq[index_q];
+                double lnf = ppw->pvecback[background_module_->index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+                double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+                int psi_ind = ppw->pv->index_pt_psi0_ncdm1 + (dncdm_properties.q_offset + index_q)*(ppw->pv->l_max_ncdm[ncdm_id] + 1) + l;
+                double Psi0 = y[psi_ind];
+                integral_num += dq*q*q*exp(lnN + lnf)*Psi0*FL[l*q_size + index_q];
+                integral_denom += dq*q*q*exp(lnN + lnf);
+              }
+            }
+            return rprime_dr*integral_num/integral_denom;
+          };
+          for (int l = 0; l < pba->l_max_col_plot; l++) {
+            if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
+              double new_col = compute_collision_integral(l);
+              col_terms.push_back(compute_collision_integral(l));
+            }
+            else {
+              // Cannot compute collision terms in fluid approximation
+              col_terms[l] = 0.;
+            }
+          }
+        }
+      }
+      else if ((pba->has_dncdm == _TRUE_) && (pba->has_dcdm == _TRUE_) && (pba->l_max_col_plot != 0)) {
+        throw std::runtime_error("DR Collision terms may only be plotted with a single DNCDM species and no DCDM species.\n");
+      }
     }
 
     if (pba->has_scf == _TRUE_){
@@ -7977,11 +8105,20 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
     class_store_double(dataptr, theta_dr, pba->has_dr, storeidx);
     class_store_double(dataptr, shear_dr, pba->has_dr, storeidx);
     /* Momentum averaged DR perturbations */
-      if (pba->has_dncdm) {
-        for (int l = 0; l <= ppr->l_max_dr; l++) {
-          class_store_double(dataptr, y[ppw->pv->index_pt_F0_dr_sum + l], pba->has_dr, storeidx);
+    if (pba->has_dncdm) {
+      for (int l = 0; l <= ppr->l_max_dr; l++) {
+        class_store_double(dataptr, y[ppw->pv->index_pt_F0_dr_sum + l], pba->has_dr, storeidx);
+      }
+      for (int l = 0; l < pba->l_max_col_plot; l++) {
+        double term = col_terms[l];
+        class_store_double(dataptr, col_terms[l], pba->has_dr, storeidx);
+      }
+      for (int l = 0; l < pba->l_max_col_plot; l++) {
+        for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[0]; index_q++) {
+          class_store_double(dataptr, y[ppw->pv->index_pt_psi0_ncdm1 + index_q*(ppr->l_max_ncdm + 1) + l], pba->has_dr, storeidx);
         }
       }
+    }
     /* Scalar field scf*/
     class_store_double(dataptr, delta_scf, pba->has_scf, storeidx);
     class_store_double(dataptr, theta_scf, pba->has_scf, storeidx);

@@ -1067,6 +1067,8 @@ int InputModule::input_read_parameters() {
     /* Convert to Mpc */
     pba->Gamma_dcdm *= (1.e3 / _c_);
   }
+  
+  class_read_int("l_max_col_plot", pba->l_max_col_plot);
 
   /** - non-cold relics (ncdm) */
   NcdmSettings ncdm_settings;

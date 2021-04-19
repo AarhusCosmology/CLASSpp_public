@@ -123,6 +123,7 @@ struct background
   int N_dncdm;                            /**< Number of distinguishable dncdm species */
   double Omega0_ncdm_tot; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
   int N_decay_dr = 0;
+  int l_max_col_plot = 0;
   int compute_mean_q = 0;
   
   /** @name - related parameters */

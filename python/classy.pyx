@@ -1421,6 +1421,10 @@ cdef class PyCosmology:
                 value = self.ba.Omega0_ncdm_tot*self.ba.h*self.ba.h*93.14
             elif name == 'Neff':
                 value = self.Neff()
+            elif name == 'Omega0_g':
+                value = self.ba.Omega0_g
+            elif name == 'Omega0_m':
+                value = self.ba.Omega0_b + self.ba.Omega0_cdm
             elif name == 'Omega_m':
                 value = self.Omega_m()
             elif name == 'omega_m':
