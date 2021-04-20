@@ -8794,7 +8794,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
           double M_ncdm = pba->ncdm->M_ncdm_[ncdm_id];
           double Gamma = dncdm_properties.Gamma;
           double r_dr = pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]*pow(a,4)/pba->H0/pba->H0;
-          double rprime_dr = 2*r_dr*a*M_ncdm*Gamma*pvecback[background_module_->index_bg_number_ncdm1_ + ncdm_id]/pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]; // Factor 2 comes from two daughter species
+          double rprime_dr = r_dr*a*M_ncdm*Gamma*pvecback[background_module_->index_bg_number_ncdm1_ + ncdm_id]/pvecback[background_module_->index_bg_rho_dr_species_ + index_dr]; // Factor 2 comes from two daughter species
 
           int q_size = pba->ncdm->q_size_ncdm_[ncdm_id];
 

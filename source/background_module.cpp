@@ -2194,7 +2194,7 @@ int BackgroundModule::background_derivs_member(
 
         // Integrated density for self-consistency checks
         dy[index_bi_rho_dr_from_dncdm_] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_from_dncdm_]+
-        2*y[index_bi_a_]*Gamma*M_1*pvecback[index_bg_number_ncdm1_ + ncdm_id];
+        y[index_bi_a_]*Gamma*M_1*pvecback[index_bg_number_ncdm1_ + ncdm_id];
         if (y[index_bi_rho_dr_from_dncdm_] < 0) {
           // printf("Warning: Negative rho_dr_from_dncdm: %g \n", y[index_bi_rho_dr_from_dncdm_]);
         }
@@ -2246,8 +2246,9 @@ int BackgroundModule::background_derivs_member(
                Note that Gamma = g^2 m_vH / 4pi.
                Factor 4 comes from both vl and phi contributions (we have defined f_dr = f_vl + f_phi).
             */
-          decay_term *= 4*pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
-          
+          decay_term *= 2*pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
+          // decay_term *= 4*pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
+
           dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[index_dr] + index_q_2] = decay_term;
         }
         index_dr++;
