@@ -7840,7 +7840,9 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
     }
 
 
-    std::vector<double> col_terms(pba->l_max_col_plot);
+    // std::vector<double> col_terms(pba->l_max_col_plot);
+    double* col_terms;
+    class_alloc(col_terms, pba->l_max_col_plot*sizeof(double), "asdf")
     if (pba->has_dr == _TRUE_) {
       r_dr = pow(pvecback[background_module_->index_bg_a_]*pvecback[background_module_->index_bg_a_]/pba->H0, 2)*pvecback[background_module_->index_bg_rho_dr_];
       delta_dr = y[ppw->pv->index_pt_F0_dr_sum]/r_dr;
@@ -7855,7 +7857,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
           int index_dr = ncdm_id;
           if (ncdm_id != 0) {
             // Currently we only plot for one species
-            continue;;
+            continue;
           }
           const DecayDRProperties& dncdm_properties = id_and_properties.second;
           double M_ncdm = pba->ncdm->M_ncdm_[ncdm_id];
@@ -7905,7 +7907,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
               }
             }
           };
-          std::vector<double> FL(q_size*(pba->l_max_col_plot));
+          std::vector<double> FL(q_size*(pba->l_max_col_plot + 1));
           for (int index_q = 0; index_q < q_size; ++index_q) {
             ComputeFl(index_q, pba->l_max_col_plot, FL);
           }
@@ -7951,11 +7953,13 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
           for (int l = 0; l < pba->l_max_col_plot; l++) {
             if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
               double new_col = compute_collision_integral(l);
-              col_terms.push_back(new_col);
+              // col_terms.push_back(new_col);
+              col_terms[l] = new_col;
             }
             else {
               // Cannot compute collision terms in fluid approximation
-              col_terms.push_back(0.);
+              // col_terms.push_back(0.);
+              col_terms[l] = 0.;
             }
           }
         }
