@@ -428,7 +428,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   else if (log10lifetime_read == _TRUE_) {
     class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
     for (int n = 0; n < N_ncdm_decay_dr_; n++) {
-      Gamma_list[n] = pow(10., 1./lifetime_list[n]/(365*24*60*60)*_Mpc_over_m_*1e-3);
+      Gamma_list[n] = pow(10., 1./log10lifetime_list[n]/(365*24*60*60)*_Mpc_over_m_*1e-3);
     }
   }
 
