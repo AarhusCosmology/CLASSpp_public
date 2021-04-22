@@ -388,8 +388,49 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
   int dncdm_count = 0;
   int cumulative_q_index = 0;
+
+  /* Lifetime takes different kinds of input */
   double* Gamma_list;
-  class_read_list_of_doubles_or_default("Gamma_ncdm_decay_dr", Gamma_list, 0.0, N_ncdm_decay_dr_);
+  double* log10Gamma_list;
+  double* lifetime_list;
+  double* log10lifetime_list;
+  int Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read;
+  int size;
+  class_call(parser_read_list_of_doubles(pfc, "Gamma_ncdm_decay_dr", &size, &(Gamma_list), &Gamma_read, errmsg), errmsg, errmsg);
+  class_call(parser_read_list_of_doubles(pfc, "log10Gamma_ncdm_decay_dr", &size, &(log10Gamma_list), &log10Gamma_read, errmsg), errmsg, errmsg);
+  class_call(parser_read_list_of_doubles(pfc, "lifetime_ncdm_decay_dr", &size, &(lifetime_list), &lifetime_read, errmsg), errmsg, errmsg);
+  class_call(parser_read_list_of_doubles(pfc, "log10lifetime_ncdm_decay_dr", &size, &(log10lifetime_list), &log10lifetime_read, errmsg), errmsg, errmsg);
+
+  if (class_at_least_two_of_four(Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read)) {
+    throw std::runtime_error("More than two of the following inputs are given. Choose one! \nGamma_ncdm_decay_dr, log10Gamma_ncdm_decay_dr, lifetime_ncdm_decay_dr, log10lifetime_ncdm_decay_dr.");
+  }
+
+  if (class_none_of_three(Gamma_read, log10Gamma_read, lifetime_read) && (log10lifetime_read == _FALSE_)) {
+    // Assign default value
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      Gamma_list[n] = 0.;
+    }
+  }
+  if (log10Gamma_read == _TRUE_) {
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      Gamma_list[n] = pow(10., log10Gamma_list[n]);
+    }
+  }
+  else if (lifetime_read == _TRUE_) {
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    // Lifetimes are input in yrs
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      Gamma_list[n] = 1./lifetime_list[n]/(365*24*60*60)*_Mpc_over_m_*1e-3; // Conversion from yr^-1 to km/s/Mpc
+    }
+  }
+  else if (log10lifetime_read == _TRUE_) {
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      Gamma_list[n] = pow(10., 1./lifetime_list[n]/(365*24*60*60)*_Mpc_over_m_*1e-3);
+    }
+  }
 
   int filenum = 0;
   for(int k = 0; k < N_ncdm_; k++){

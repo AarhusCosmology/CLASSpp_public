@@ -8960,10 +8960,10 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
             }
             */
             if (abs(y[pv->index_pt_F0_dr_species + l_skip + l]) > 1e+50) {
-              printf("LARGE F_dr = %g \n", y[pv->index_pt_F0_dr_species + l_skip + l]);
+              // printf("LARGE F_dr = %g \n", y[pv->index_pt_F0_dr_species + l_skip + l]);
             }
             if (isnan(dy[pv->index_pt_F0_dr_sum + l])) {
-              printf("NAN IN PERTURB_DERIVS_MEMBER \n");
+              // printf("NAN IN PERTURB_DERIVS_MEMBER \n");
               int asdf = 1;
             }
           }
