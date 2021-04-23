@@ -94,6 +94,7 @@ public:
 
   double conformal_age_; /**< conformal age in Mpc */
   double Neff_; /**< so-called "effective neutrino number", computed at earliest time in interpolation table */
+  double Neff_dr_; /**< contribution to deltaNeff today from decay radiation in DNCDM scenarios */
   double a_eq_;      /**< scale factor at radiation/matter equality */
   double H_eq_;      /**< Hubble rate at radiation/matter equality [Mpc^-1] */
   double Omega0_m_;  /**< total non-relativistic matter today */

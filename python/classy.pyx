@@ -765,6 +765,12 @@ cdef class PyCosmology:
         thm = deref(self._thisptr).GetThermodynamicsModule()
         return 100.*deref(thm).rd_rec_/deref(thm).ra_rec_
 
+    cpdef Neff_dr(self):
+        if (self.ba.has_dncdm == _FALSE_):
+            raise CosmoSevereError(r"You have asked for the effective Neff from decay radiation from decaying NCDM, but there is no decaying NCDM in your run!")
+        bam = deref(self._thisptr).GetBackgroundModule()
+        return deref(bam).Neff_dr_
+
     cpdef Omega_Lambda(self):
         return self.ba.Omega0_lambda
 
@@ -1421,6 +1427,8 @@ cdef class PyCosmology:
                 value = self.ba.Omega0_ncdm_tot*self.ba.h*self.ba.h*93.14
             elif name == 'Neff':
                 value = self.Neff()
+            elif name == 'Neff_dr':
+                value = self.Neff_dr()
             elif name == 'Omega0_g':
                 value = self.ba.Omega0_g
             elif name == 'Omega0_m':

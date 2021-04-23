@@ -1377,6 +1377,9 @@ int BackgroundModule::background_solve() {
   Neff_ = (background_table_[index_bg_Omega_r_]*background_table_[index_bg_rho_crit_] - background_table_[index_bg_rho_g_])
     /(7./8.*pow(4./11.,4./3.)*background_table_[index_bg_rho_g_]);
 
+  // Contribution to Neff from DR today
+  Neff_dr_ = background_table_[index_bg_rho_dr_]/(7./8.*pow(4./11., 4./3.)*background_table_[index_bg_rho_g_]);
+
   /** - done */
   if (pba->background_verbose > 0) {
     printf(" -> age = %f Gyr\n", age_);
