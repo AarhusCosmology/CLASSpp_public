@@ -406,7 +406,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
             denom += dncdm_properties.dq[index_q]*pow(q, 2)*exp(lnN + lnf);
           }
           pvecback[index_bg_q_mean_ + ncdm_id] = num/denom;
-          pvecback[index_bg_q_mean_dr_ + ncdm_id] = pba->dr->ComputeMeanMomentum(ncdm_id);
         }
       }
     }
@@ -512,12 +511,13 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
   /* dr */
   if (pba->has_dr == _TRUE_) {
-    int index_dr = 0;
+    int dcdm_offset = 0;
     
     if (pba->has_dcdm) {
-      pba->dr->rho_species_[index_dr] = pvecback_B[index_bi_rho_dr_from_dcdm_];
+      // Zeroth index always reserved for dcdm
+      pba->dr->rho_species_[0] = pvecback_B[index_bi_rho_dr_from_dcdm_];
       pvecback[index_bg_rho_dr_species_ + 0] = pvecback_B[index_bi_rho_dr_from_dcdm_];
-      ++index_dr;
+      dcdm_offset = 1;
     }
   
     if (pba->has_dncdm) {
@@ -526,30 +526,48 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
       for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
         // Reset total distribution function before taking new values
         pba->dr->w_[index_q] = 0.;
-        pvecback[index_bg_f_dr1_ + index_q] = 0.;
+        // pvecback[index_bg_f_dr1_species_ + index_q] = 0.;
       }
-      
-      for (int n_dr = 0; n_dr < pba->dr->N_dncdm_; n_dr++) {
+
+      for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
         // Update the bg distribution function variables from the bi variables
         for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
-          double f_q = pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[n_dr] + index_q];
-          pba->dr->w_species_[n_dr][index_q] = f_q*pba->dr->dq_[index_q];
-          
-          pvecback[index_bg_f_dr1_ + index_q] += f_q;
-          pba->dr->w_[index_q] += pba->dr->w_species_[n_dr][index_q];
+          double f_q = pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q];
+          pba->dr->w_species_[dncdm_properties.dr_id][index_q] = f_q*pba->dr->dq_[index_q];
+
+          pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q] = f_q;
+          pba->dr->w_[index_q] += pba->dr->w_species_[dncdm_properties.dr_id][index_q];
         }
-      
+
+        if (pba->has_inv == _TRUE_) {
+          // With inv, we have two species; here update the second
+          for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
+            double f_q = pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q];
+            pba->dr->w_species_[dncdm_properties.dr_id + 1][index_q] = f_q*pba->dr->dq_[index_q];
+
+            pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q] = f_q;
+            pba->dr->w_[index_q] += pba->dr->w_species_[dncdm_properties.dr_id + 1][index_q];
+          }
+        }
+
         // Update energy density by integration over the distribution function
         double rho_temp;
-        pba->dr->IntegrateDistribution(1./a_rel - 1, NULL, &rho_temp, NULL, n_dr);
-        pba->dr->rho_species_[index_dr] = rho_temp;
-        pvecback[index_bg_rho_dr_species_ + index_dr] = rho_temp;
-
-        if (pba->compute_mean_q) {
-          pvecback[index_bg_q_mean_dr_ + n_dr] = pba->dr->ComputeMeanMomentum(n_dr);
+        pba->dr->IntegrateDistribution(1./a_rel - 1, NULL, &rho_temp, NULL, dncdm_properties.dr_id);
+        pba->dr->rho_species_[dcdm_offset + dncdm_properties.dr_id] = rho_temp;
+        pvecback[index_bg_rho_dr_species_ + dcdm_offset + dncdm_properties.dr_id] = rho_temp;
+        if (pba->has_inv == _TRUE_) {
+          double rho_temp1;
+          pba->dr->IntegrateDistribution(1./a_rel - 1, NULL, &rho_temp1, NULL, dncdm_properties.dr_id + 1);
+          pba->dr->rho_species_[dcdm_offset + dncdm_properties.dr_id + 1] = rho_temp1;
+          pvecback[index_bg_rho_dr_species_ + dcdm_offset + dncdm_properties.dr_id + 1] = rho_temp1;
         }
 
-        ++index_dr;
+        if (pba->compute_mean_q) {
+          pvecback[index_bg_q_mean_dr_ + dncdm_properties.dr_id] = pba->dr->ComputeMeanMomentum(dncdm_properties.dr_id);
+          if (pba->has_inv == _TRUE_) {
+            pvecback[index_bg_q_mean_dr_ + dncdm_properties.dr_id + 1] = pba->dr->ComputeMeanMomentum(dncdm_properties.dr_id + 1);
+          }
+        }
       }
     }
     
@@ -963,17 +981,16 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_q_mean_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
-  class_define_index(index_bg_q_mean_dr_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
 
   /* - index for dcdm */
   class_define_index(index_bg_rho_dcdm_, pba->has_dcdm, index_bg, 1);
 
   /* - indices for dr */
-  class_define_index(index_bg_f_dr1_, pba->has_dr, index_bg, pba->dr->N_q_);
+  class_define_index(index_bg_f_dr1_species_, pba->has_dr, index_bg, pba->dr->cumulative_q_index_.back());
   class_define_index(index_bg_rho_dr_species_, pba->has_dr, index_bg, pba->N_decay_dr);
   class_define_index(index_bg_rho_dr_, pba->has_dr, index_bg, 1);
   class_define_index(index_bg_rho_dr_integrated_, pba->has_dncdm, index_bg, 1);
-  class_define_index(index_bg_rho_dr_species_, pba->has_dr, index_bg, pba->N_decay_dr);
+  class_define_index(index_bg_q_mean_dr_, pba->compute_mean_q, index_bg, pba->N_decay_dr);
 
   /* - indices for scalar field */
   class_define_index(index_bg_phi_scf_, pba->has_scf, index_bg, 1);
@@ -1721,7 +1738,7 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
     }
 
     // Get initial values established by the DarkRadiation class
-    for (int n_dr = 0; n_dr < pba->dr->N_dncdm_; n_dr++) {
+    for (int n_dr = 0; n_dr < pba->N_decay_dr; n_dr++) {
       for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
         pvecback_integration[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[n_dr] + index_q] = pba->dr->w_species_[n_dr][index_q]/pba->dr->dq_[index_q];
       }
@@ -1953,6 +1970,11 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
 
           sprintf(tmp,"q_mean_dr[%d]",n);
           class_store_columntitle(titles,tmp,_TRUE_);
+
+          if (pba->has_inv == _TRUE_) {
+            sprintf(tmp,"q_mean_dr[%d]",n + 1);
+            class_store_columntitle(titles,tmp,_TRUE_);
+          }
         }
       }
     }
@@ -1967,12 +1989,19 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles,"(.)rho_dcdm",pba->has_dcdm);
   class_store_columntitle(titles,"(.)rho_dr",pba->has_dr);
   if (pba->has_dr == _TRUE_) {
-    for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
-      sprintf(tmp,"q_dr[%d]", index_q);
-      class_store_columntitle(titles,tmp,_TRUE_);
-      
-      sprintf(tmp,"f_dr[%d]", index_q);
-      class_store_columntitle(titles,tmp,_TRUE_);
+    for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+      for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
+        sprintf(tmp,"q_dr[%d]", index_q);
+        class_store_columntitle(titles,tmp,_TRUE_);
+
+        sprintf(tmp,"f_dr[%d][%d]", dncdm_properties.dr_id, index_q);
+        class_store_columntitle(titles,tmp,_TRUE_);
+
+        if (pba->has_inv == _TRUE_) {
+          sprintf(tmp,"f_dr[%d][%d]", dncdm_properties.dr_id + 1, index_q);
+          class_store_columntitle(titles,tmp,_TRUE_);
+        }
+      }
     }
     for (int j = 0; j < pba->N_decay_dr; ++j) {
       sprintf(tmp, "(.)rho_dr[%d]", j);
@@ -2038,6 +2067,9 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
           if (pba->compute_mean_q) {
             class_store_double(dataptr, pvecback[index_bg_q_mean_ + n], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[index_bg_q_mean_dr_ + n], _TRUE_, storeidx);
+            if (pba->has_inv == _TRUE_) {
+              class_store_double(dataptr, pvecback[index_bg_q_mean_dr_ + n + 1], _TRUE_, storeidx);
+            }
           }
         }
       }
@@ -2052,9 +2084,14 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rho_dcdm_], pba->has_dcdm, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_dr_], pba->has_dr, storeidx);
     if (pba->has_dr == _TRUE_) {
-      for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
-        class_store_double(dataptr, pba->dr->q_[index_q], _TRUE_, storeidx);
-        class_store_double(dataptr, pvecback[index_bg_f_dr1_ + index_q], _TRUE_, storeidx);
+      for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+        for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
+          class_store_double(dataptr, pba->dr->q_[index_q], _TRUE_, storeidx);
+          class_store_double(dataptr, pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q], _TRUE_, storeidx);
+          if (pba->has_inv == _TRUE_) {
+            class_store_double(dataptr, pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q], _TRUE_, storeidx);
+          }
+        }
       }
       for (int j = 0; j < pba->N_decay_dr; ++j) {
         class_store_double(dataptr, pvecback[index_bg_rho_dr_species_ + j], _TRUE_, storeidx);
@@ -2171,15 +2208,61 @@ int BackgroundModule::background_derivs_member(
       for (int i = 0; i < pba->ncdm->q_size_ncdm_[ncdm_id]; i++) { // Loop over q grid points
         double q = pba->ncdm->q_ncdm_[ncdm_id][i];
         double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
-        dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -a*a*M_ncdm*Gamma/epsilon;
+        double decay_term = -a*a*M_ncdm*Gamma/epsilon;
         dy[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = a*a*M_ncdm*Gamma*q*q/pow(epsilon, 3);
+
         double f_q = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
         if (f_q >= 1e-20) {
-          dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -a*a*M_ncdm*Gamma*f_q/epsilon;
+          dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -decay_term*f_q;
         }
         else {
           dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = 0.;
         }
+
+        // Currently, inverse and QS terms only implemented on the lnf calculation
+        double inverse_term = 0.;
+        double qs_term = 0.;
+
+        if (pba->has_inv == _TRUE_) {
+          // Get limits
+          double q_min = fabs(epsilon - q)/2;
+          double q_max = fabs(epsilon + q)/2;
+          double* q_2_vec = pba->dr->q_.data();
+          int q_2_size = pba->dr->q_.size();
+          double dq[q_2_size];
+          int index_min, index_max;
+          class_call(get_limits_and_weights(q_min, q_max, q_2_vec, q_2_size, dq, &index_min, &index_max, error_message), error_message, error_message);
+
+          double* f_phi_vec;
+          class_alloc(f_phi_vec, q_2_size*sizeof(double), error_message);
+          for (int i = 0; i < q_2_size; i++) {
+            f_phi_vec[i] = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + i];
+          }
+          for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
+            double q_2 = q_2_vec[index_q_2];
+            double f_vl = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
+            double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec, q_2_size);
+            inverse_term += dq[index_q_2]*f_vl*f_phi;
+          }
+          f_q = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
+          if (f_q < 1e-20) {
+            inverse_term = 0.;
+          }
+          else {
+            inverse_term *= a*a*M_ncdm*Gamma/(f_q*epsilon*q);
+          }
+          if (pba->has_qs == _TRUE_) {
+            // With massless daughters, all vH integral bounds are the same
+            for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
+              double f_vl = pba->dr->w_species_[dncdm_properties.dr_id][index_q_2]/pba->dr->dq_[index_q_2];
+              double f_phi = pba->dr->w_species_[dncdm_properties.dr_id + 1][index_q_2]/pba->dr->dq_[index_q_2];
+              qs_term += dq[index_q_2]*(f_vl - f_phi);
+            }
+            qs_term *= a*a*M_ncdm*Gamma/(epsilon*q);
+          }
+        }
+        dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term + inverse_term + qs_term;
+        // dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term;
       }
     }
   }
@@ -2190,7 +2273,6 @@ int BackgroundModule::background_derivs_member(
       y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
     }
     if (pba->has_dncdm) {
-      int index_dr = 0;
       for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
         double M_1 = pba->ncdm->M_ncdm_[ncdm_id];
         double Gamma = dncdm_properties.Gamma;
@@ -2208,11 +2290,11 @@ int BackgroundModule::background_derivs_member(
 
           double* q_1_vec = pba->ncdm->q_ncdm_[ncdm_id];
           int q_1_size = pba->ncdm->q_size_ncdm_[ncdm_id];
-          double dq[q_1_size];
+          double dq_dec[q_1_size];
 
           double q_min = fabs(0.25*a*a*M_1*M_1/q_2 - q_2); // Lower integral bound
           double q_max = q_1_vec[q_1_size - 1]; // Upper bound = ∞
-          int index_min, index_max;
+          int index_min_dec, index_max_dec;
           if (dncdm_properties.quadrature_strategy != 3) {
             throw std::runtime_error("DNCDM currently only admits quadrature strategy 3. Please change your input accordingly.\n");
           }
@@ -2221,40 +2303,85 @@ int BackgroundModule::background_derivs_member(
             Fortunately, in the massless case the respective integration bounds of the two daughter particles are identical.
            */
 
-          class_call(get_limits_and_weights(q_min, q_max, q_1_vec, q_1_size, dq, &index_min, &index_max, error_message),
+          class_call(get_limits_and_weights(q_min, q_max, q_1_vec, q_1_size, dq_dec, &index_min_dec, &index_max_dec, error_message),
                      error_message, error_message);
           // Decay terms
-          for (int index_q_1 = index_min; index_q_1 <= index_max; index_q_1++) {
+          for (int index_q_1 = index_min_dec; index_q_1 <= index_max_dec; index_q_1++) {
             double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
             double epsilon_1 = sqrt(q_1*q_1 + M_1*M_1*a*a);
-            double w_1 = dq[index_q_1]*pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1];
-            decay_term += q_1/epsilon_1*w_1;
+            double f = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1]);
+            decay_term += dq_dec[index_q_1]*f*q_1/epsilon_1;
           }
 
-          // Inverse terms
-          if (pba->has_inv) {
-            q_min = 0.;
+          /* DR Distribution function equation of motion from (4.13) in 2011.01502 with m_vl -> 0
+             Front factor, see (4.13) in 2011.01502
+             Note that Gamma = g^2 m_vH / 4pi.
+             Factor 4 comes from both vl and phi contributions (we have defined f_dr = f_vl + f_phi).
+          */
+          decay_term *= pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
+          dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] = 2*decay_term;
+          if (pba->has_inv == _TRUE_) {
+            // There are two daughters; in the massless limit their decay terms are equal up to a deg factor
+            dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] = decay_term;
+            dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2] = decay_term;
+            dy[index_bi_f_dr1_species_dec_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] = decay_term;
+            dy[index_bi_f_dr1_species_dec_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2] = decay_term;
 
-            class_call(get_limits_and_weights(q_min, q_max, q_1_vec, q_1_size, dq, &index_min, &index_max, error_message),
-                     error_message, error_message);
+            double inverse_term_vl = 0.;
+            double qs_term_vl = 0.;
+            double inverse_term_phi = 0.;
+            double qs_term_phi = 0.;
+
+            double* q_3_vec = pba->dr->q_.data();
+            int q_3_size = pba->dr->q_.size();
+            double dq_inv[q_3_size];
+
+            double q_min_inv = fabs(0.25*a*a*M_1*M_1/q_2);
+            double q_max_inv = q_3_vec[q_3_size - 1];
+            // printf("dec: qmin = %g, qmax = %g (a=%g)\n", q_min, q_max, a);
+            // printf("inv: qmin = %g, qmax = %g (a=%g)\n", q_min_inv, q_max_inv, a);
+            int index_min_inv, index_max_inv;
+            class_call(get_limits_and_weights(q_min_inv, q_max_inv, q_3_vec, q_3_size, dq_inv, &index_min_inv, &index_max_inv, error_message), error_message, error_message);
+
+            // In massless case, bounds on inv integral are the same
+            for (int index_q_3 = index_min_inv; index_q_3 <= index_max_inv; index_q_3++) {
+              double f_vl = y[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_3];
+              double f_phi = y[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_3];
+
+              inverse_term_vl += dq_inv[index_q_3]*f_phi;
+              inverse_term_phi += dq_inv[index_q_3]*f_vl;
+            }
+            double f_vl_q2 = y[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
+            double f_phi_q2 = y[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2];
             
+            // Only dec and qs terms are proportional to f_vH, hence inv terms don't get a factor deg_ncdm
+            // (needs verification!)
+            inverse_term_vl *= -pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma*f_vl_q2/(q_2*q_2);
+            inverse_term_phi *= -pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma*f_phi_q2/(q_2*q_2);
 
+            if (pba->has_qs == _TRUE_) {
+              // Again, the bounds are the same, and actually the same as the dec terms
+              for (int index_q_1 = index_min_dec; index_q_1 <= index_max_dec; index_q_2++) {
+                double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
+                double epsilon_1 = sqrt(q_1*q_1 + a*a*M_1*M_1);
+                double f_vH = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1]);
+
+                double f_phi_at_eps = 0.;
+                double f_vl_at_eps = 0.;
+
+                qs_term_vl += dq_dec[index_q_1]*q_1/epsilon_1*f_vH*(f_phi_at_eps - f_vl_q2);
+                qs_term_phi += dq_dec[index_q_1]*q_1/epsilon_1*f_vH*(f_phi_q2 - f_vl_at_eps);
+              }
+              qs_term_vl *= pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
+              qs_term_phi *= pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
+            }
+            // Here, they get the same factor, but in Barenboim the boson has a factor 2.
+            // Giving the same factors allows comparison with Blinov
+
+            dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] += inverse_term_vl + qs_term_vl;
+            dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2] += inverse_term_phi + qs_term_phi;
           }
-
-
-
-            
-            /* DR Distribution function equation of motion from (4.13) in 2011.01502 with m_vl -> 0
-               Front factor, see (4.13) in 2011.01502
-               Note that Gamma = g^2 m_vH / 4pi.
-               Factor 4 comes from both vl and phi contributions (we have defined f_dr = f_vl + f_phi).
-            */
-          decay_term *= 2*pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
-          // decay_term *= 4*pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
-
-          dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[index_dr] + index_q_2] = decay_term;
         }
-        index_dr++;
       }
     }
   }

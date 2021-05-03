@@ -970,4 +970,29 @@ int get_limits_and_weights(double qmin, double qmax, double * qvec, int qvec_siz
   return _SUCCESS_;
 }
 
-
+double f_ncdm_interp(double q_interp, double *qvec, double *fvec, int qvec_size){
+  // NTS: Fix low and high end bounds; interpolate it properly since f is not always zero at ends!
+  /** Assume uniform grid */
+  double dq;
+  int index_l, index_r;
+  double ql, qr, fl, fr;
+  dq = qvec[1]-qvec[0];
+  index_r = q_interp/dq;
+  index_l = index_r-1;
+  if (index_l>=qvec_size-1)
+    //return 0.;
+    return fvec[qvec_size-1]; // Joe: to avoid dividing by zero in the perturbation equations.
+ else if (index_r<1)
+ // return fvec[qvec_size-1];
+   return fvec[0];
+  //  return fvec[0]+(fvec[0]-fvec[1])*(qvec[0]-q_interp)/dq;
+  //    return fvec[0]*1./2.*(exp(qvec[0])+1.);
+  else{
+    fl = fvec[index_l];
+    ql = qvec[index_l];
+  }
+  qr = qvec[index_r];
+  fr = fvec[index_r];
+//  printf("q_interp= %g, fl= %g, fr= %g, ql= %g, qr= %g, f_interp= %g, index_l= %d, index_r= %d\n", q_interp, fl, fr, ql, qr, fl+(fr-fl)*(q_interp-ql)/(qr-ql), index_l, index_r);
+  return fl+(fr-fl)*(q_interp-ql)/(qr-ql);
+}

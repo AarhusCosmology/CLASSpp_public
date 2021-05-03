@@ -8,10 +8,10 @@
 
 #include "dark_radiation.h"
 
-std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc, std::vector<SourceType> source_types, double T_cmb) {
+std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, double T_cmb) {
   if (source_types.size() > 0) {
     try {
-        return std::shared_ptr<DarkRadiation>(new DarkRadiation(pfc, source_types, T_cmb));
+        return std::shared_ptr<DarkRadiation>(new DarkRadiation(pfc, source_types, dr_types, T_cmb));
     }
     catch (std::exception& error) {
       printf("Could not create DarkRadiation class:\n %s", error.what());
@@ -31,8 +31,8 @@ std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc, std::vect
  *
 */
 
-DarkRadiation::DarkRadiation(FileContent* pfc, std::vector<SourceType> source_types, double T_cmb)
-: N_species_(source_types.size()), source_types_(source_types) {
+DarkRadiation::DarkRadiation(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, double T_cmb)
+: N_species_(source_types.size()), source_types_(source_types), dr_types_(dr_types) {
   if (this->Init(pfc, T_cmb) == _FAILURE_) {
     throw std::runtime_error(error_message_);
   }
@@ -126,7 +126,6 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
   double T_dr_over_T_cmb = 0.71611; // Same as T_ncdm_default
   
   // Conventions copied from the NonColdDarkMatter factor
-  // TO-DO: Double check!
   factor_ = 4*_PI_*pow(T_dr_over_T_cmb*T_cmb*_k_B_, 4)*8*_PI_*_G_/3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_;
   
   return _SUCCESS_;

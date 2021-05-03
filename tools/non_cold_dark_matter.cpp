@@ -234,7 +234,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   // Currently, if both N_ncdm and N_ncdm_standard are specified, the N_ncdm value will be stored
   class_read_int("N_ncdm", N_ncdm_standard_);
   if (N_ncdm_standard_ != 0) { // 0 is the default value
-    printf("You gave a deprecated input variable, N_ncdm; interpreting it as N_ncdm_standard.\n");
+    // printf("You gave a deprecated input variable, N_ncdm; interpreting it as N_ncdm_standard.\n");
   }
   else {
     class_read_int("N_ncdm_standard", N_ncdm_standard_);
@@ -610,16 +610,22 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
     factor_ncdm_[k] = deg_ncdm_[k]*4*_PI_*pow(ncdm_settings.T_cmb*T_ncdm_[k]*_k_B_, 4)*8*_PI_*_G_
       /3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_;
+
+    int has_inv = 0;
+    class_read_int("Inverse decay", has_inv);
       
     if (ncdm_types_[k] == NCDMType::decay_dr) {
       decay_dr_map_[k].q_offset = cumulative_q_index;
       cumulative_q_index += q_size_ncdm_[k];
-      
-      decay_dr_map_[k].Gamma = Gamma_list[dncdm_count]*(1.e3 / _c_); // Convert to Mpc
-      
-      decay_dr_map_[k].dr_id = dncdm_count;
       decay_dr_map_[k].quadrature_strategy = ncdm_quadrature_strategy_[k];
+      decay_dr_map_[k].Gamma = Gamma_list[dncdm_count]*(1.e3 / _c_); // Convert to Mpc
+
+      decay_dr_map_[k].dr_id = dncdm_count; // dr_id always points to the fermionic daughter, if there are two then dr_id + 1 points to the bosonic daughter
+
       dncdm_count++;
+      if (has_inv == _TRUE_) {
+        dncdm_count++;
+      }
     }
     q_total_size_dncdm_ = cumulative_q_index;
 

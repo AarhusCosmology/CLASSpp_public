@@ -1027,6 +1027,7 @@ int InputModule::input_read_parameters() {
 
   /** - Omega_0_dcdmdr (DCDM) */
   std::vector<DarkRadiation::SourceType> dr_sources;
+  std::vector<DarkRadiation::DRType> dr_types;
   
   class_call(parser_read_double(pfc,"Omega_dcdmdr",&param1,&flag1,errmsg),
              errmsg,
@@ -1045,6 +1046,7 @@ int InputModule::input_read_parameters() {
   if (pba->Omega0_dcdmdr > 0) {
 
     dr_sources.push_back(DarkRadiation::SourceType::dcdm);
+    dr_types.push_back(DarkRadiation::DRType::fermion);
     Omega_tot += pba->Omega0_dcdmdr;
 
     /** - Read Omega_ini_dcdm or omega_ini_dcdm */
@@ -1081,23 +1083,51 @@ int InputModule::input_read_parameters() {
   if (pba->ncdm) {
     pba->N_ncdm = pba->ncdm->N_ncdm_;
     pba->N_dncdm = pba->ncdm->N_ncdm_decay_dr_;
-    
-    for (int n_dncdm = 0; n_dncdm < pba->ncdm->N_ncdm_decay_dr_; n_dncdm++) {
-      dr_sources.push_back(DarkRadiation::SourceType::dncdm);
-    }
-    
+
     if (pba->ncdm->N_ncdm_decay_dr_ > 0) {
-      class_read_int("Inverse decay", pba->has_inv);
-      class_read_int("Quantum statistics", pba->has_qs);
+      int read, val;
+      class_call(parser_read_int(pfc, "Inverse decay", &val, &read, errmsg),
+                 errmsg,errmsg);
+      if (read == 0) {
+        pba->has_inv = _FALSE_;
+      }
+      else if (val != 0) {
+        pba->has_inv = _TRUE_;
+      }
+      else {
+        pba->has_inv = _FALSE_;
+      }
+      class_call(parser_read_int(pfc, "Quantum statistics", &val, &read, errmsg),
+                 errmsg,errmsg);
+      if (read == 0) {
+        pba->has_qs = _FALSE_;
+      }
+      else if (val != 0){
+        pba->has_qs = _TRUE_;
+      }
+      else {
+        pba->has_qs = _FALSE_;
+      }
       class_test(((pba->has_qs == _TRUE_) && (pba->has_inv == _FALSE_)),
                  errmsg,
                  "Decaying NCDM cannot have quantum statistics terms without also including inverse decay terms.");
+    }
+    
+    for (int n_dncdm = 0; n_dncdm < pba->ncdm->N_ncdm_decay_dr_; n_dncdm++) {
       if ((pba->has_inv == _TRUE_) || (pba->has_qs == _TRUE_)) {
         // For inverse and QS terms we need a DR species for each daughter
         // For simplicity, we take the first species as the fermion and the second species as the boson
         dr_sources.push_back(DarkRadiation::SourceType::dncdm);
+        dr_sources.push_back(DarkRadiation::SourceType::dncdm);
+        dr_types.push_back(DarkRadiation::DRType::fermion);
+        dr_types.push_back(DarkRadiation::DRType::boson);
       }
-
+      else {
+        dr_sources.push_back(DarkRadiation::SourceType::dncdm);
+        dr_types.push_back(DarkRadiation::DRType::fermion);
+      }
+    }
+    if (pba->ncdm->N_ncdm_decay_dr_ > 0) {
       class_read_int("compute mean q", pba->compute_mean_q);
 
       double *Omega_dncdmdr_list, *omega_dncdmdr_list, *deg_list, *Omega_ini_dncdm_list, *omega_ini_dncdm_list;
@@ -1161,7 +1191,7 @@ int InputModule::input_read_parameters() {
   Omega_tot += pba->Omega0_ncdm_tot;
   
   /** - Dark radiation */
-  pba->dr = DarkRadiation::Create(pfc, dr_sources, pba->T_cmb);
+  pba->dr = DarkRadiation::Create(pfc, dr_sources, dr_types, pba->T_cmb);
   pba->N_decay_dr = dr_sources.size();
   
   /** - Omega_0_k (effective fractional density of curvature) */
@@ -3702,13 +3732,16 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
       for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
         // Here, pfzw->target_sizes[counter] will always equal N_ncdm_decay_dr, so we can loop over decay_dr_map_
         double rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id + dcdm_offset];
+
+        if (ba.has_inv == _TRUE_) {
+          rho_dr_today += bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id + 1 + dcdm_offset];
+        }
         double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_ncdm1_ + ncdm_id];
 
         if (input_verbose > 0) {
           printf(" -> deg_ncdm_decay_dr guess: %g, calculates into Omega_dncdmdr: %g, compared with input Omega_dncdmdr: %g \n", ba.ncdm->GetDeg(ncdm_id), (rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0, ba.ncdm->Omega_dncdmdr_[dncdm_properties.dr_id]);
         }
-        // For some reason requires different sign than below
-        output[idx + dncdm_properties.dr_id] = (rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0 - ba.ncdm->Omega_dncdmdr_[dncdm_properties.dr_id];
+        output[idx + ncdm_id] = (rho_dr_today + rho_dncdm_today)/ba.H0/ba.H0 - ba.ncdm->Omega_dncdmdr_[ncdm_id];
       }
       break;
     }
