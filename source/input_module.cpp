@@ -3752,6 +3752,9 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
       int dcdm_offset = (ba.has_dcdm == _TRUE_) ? 1 : 0;
       for (const auto& [ncdm_id, dncdm_properties] : ba.ncdm->decay_dr_map_) {
         double rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id + dcdm_offset];
+        if (ba.has_inv == _TRUE_) {
+          rho_dr_today += bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id + 1 + dcdm_offset];
+        }
         double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_ncdm1_ + ncdm_id];
         
         if (input_verbose > 0) {

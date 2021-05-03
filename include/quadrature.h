@@ -107,6 +107,8 @@ typedef struct adaptive_integration_tree_node{
 
 int get_limits_and_weights(double qmin, double qmax, double * qvec, int qvec_size, double * w_out, int * index_min, int * index_max, ErrorMsg error_message);
 
+double f_ncdm_interp(double q_interp, double *qvec, double *fvec, int qvec_size);
+
 #ifdef __cplusplus
     }
 #endif
