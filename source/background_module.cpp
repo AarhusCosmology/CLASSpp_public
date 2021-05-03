@@ -2324,8 +2324,8 @@ int BackgroundModule::background_derivs_member(
             // There are two daughters; in the massless limit their decay terms are equal up to a deg factor
             dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] = decay_term;
             dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2] = decay_term;
-            dy[index_bi_f_dr1_species_dec_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] = decay_term;
-            dy[index_bi_f_dr1_species_dec_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2] = decay_term;
+            // dy[index_bi_f_dr1_species_dec_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] = decay_term;
+            // dy[index_bi_f_dr1_species_dec_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2] = decay_term;
 
             double inverse_term_vl = 0.;
             double qs_term_vl = 0.;
