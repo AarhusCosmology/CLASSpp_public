@@ -49,6 +49,7 @@ public:
   int index_bg_rho_dr_species_;/**< dr density for individual species */
   int index_bg_rho_dr_;        /**< total dr density */
   int index_bg_rho_dr_integrated_;        /**< total dr density */
+  int index_bg_number_dr_species_;   /**< total dr number density for each species */
 
   int index_bg_phi_scf_;       /**< scalar field value */
   int index_bg_phi_prime_scf_; /**< scalar field derivative wrt conformal time */

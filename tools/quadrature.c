@@ -976,18 +976,22 @@ double f_ncdm_interp(double q_interp, double *qvec, double *fvec, int qvec_size)
   double dq;
   int index_l, index_r;
   double ql, qr, fl, fr;
-  dq = qvec[1]-qvec[0];
+  dq = qvec[1] - qvec[0];
   index_r = q_interp/dq;
-  index_l = index_r-1;
-  if (index_l>=qvec_size-1)
+  index_l = index_r - 1;
+  if (index_l >= qvec_size - 1) {
     //return 0.;
-    return fvec[qvec_size-1]; // Joe: to avoid dividing by zero in the perturbation equations.
- else if (index_r<1)
- // return fvec[qvec_size-1];
-   return fvec[0];
+    // return fvec[qvec_size-1]; // Joe: to avoid dividing by zero in the perturbation equations.
+    return fvec[qvec_size - 1]*q_interp/qvec[qvec_size - 1]; // Emil: Linear interpolation fix to Joe's correction
+  }
+  else if (index_r < 1) {
+  // return fvec[qvec_size-1];
+    // return fvec[0];
+    return fvec[0]*q_interp/qvec[0];
   //  return fvec[0]+(fvec[0]-fvec[1])*(qvec[0]-q_interp)/dq;
   //    return fvec[0]*1./2.*(exp(qvec[0])+1.);
-  else{
+  }
+  else {
     fl = fvec[index_l];
     ql = qvec[index_l];
   }
