@@ -1408,6 +1408,9 @@ int BackgroundModule::background_solve() {
   if (pba->has_dncdm == _TRUE_) {
     Neff_dr_ = background_table_[(bt_size_ - 1)*bg_size_ + index_bg_rho_dr_]/(7./8.*pow(4./11., 4./3.)*background_table_[(bt_size_ - 1)*bg_size_ + index_bg_rho_g_]);
   }
+  else {
+    Neff_dr_ = 0.;
+  }
   
   /** - done */
   if (pba->background_verbose > 0) {
