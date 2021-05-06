@@ -22,7 +22,7 @@ public:
   enum class SourceType { dcdm, dncdm };
   enum class DRType { fermion, boson };
 
-  static std::shared_ptr<DarkRadiation> Create(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, double T_cmb);
+  static std::shared_ptr<DarkRadiation> Create(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, std::vector<double> deg, double T_cmb);
   void IntegrateDistribution(double z, double* number, double* rho, double* p, int index_dr = 42);
   double ComputeMeanMomentum(int index_dr = 42);
 
@@ -36,8 +36,9 @@ public:
   
   std::vector<int> cumulative_q_index_;
   std::vector<double> rho_species_; /* Energy from each source channel */
-  
-  double factor_; /* Factor multiplying integrals over distribution functions */
+
+  std::vector<double> deg_; /* Degeneracy factor applying to all species */
+  std::vector<double> factor_; /* Factor multiplying integrals over distribution functions */
   int N_species_; /* Amount of channels that source DR */
   int N_dcdm_;
   int N_dncdm_; /* Amount of dncdm sources */
@@ -46,7 +47,7 @@ public:
   mutable ErrorMsg error_message_;
 
 private:
-  DarkRadiation(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, double T_cmb);
+  DarkRadiation(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, std::vector<double> deg, double T_cmb);
   int Init(FileContent* pfc, double T_cmb);
   static int InitialDistribution(void * params, double q, double* f0);
   

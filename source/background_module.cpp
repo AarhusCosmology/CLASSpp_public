@@ -379,6 +379,11 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
           // Update distribution function in ncdm module
           pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = f_dncdm;
           pba->ncdm->SetBackgroundWeight(ncdm_id, i, f_from_lnf*dncdm_properties.dq[i]);
+          // pba->ncdm->SetBackgroundWeight(ncdm_id, i, f_dncdm*dncdm_properties.dq[i]);
+          if (pba->has_inv == _TRUE_) {
+            pba->ncdm->SetBackgroundWeight(ncdm_id, i, f_dncdm*dncdm_properties.dq[i]);
+          }
+
           pvecback[index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
           pvecback[index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
         }
@@ -442,8 +447,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
          to rho_ncdm1 */
       rho_m += rho_ncdm - 3.* p_ncdm;
     }
-    
-    // Copy over distribution function from bi variable to a bg variable
+
     if (pba->has_dncdm) {
       for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
         int q_size = pba->ncdm->q_size_ncdm_[ncdm_id];
@@ -993,8 +997,8 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_rho_dr_species_, pba->has_dr, index_bg, pba->N_decay_dr);
   class_define_index(index_bg_rho_dr_, pba->has_dr, index_bg, 1);
   class_define_index(index_bg_rho_dr_integrated_, pba->has_dncdm, index_bg, 1);
-  class_define_index(index_bg_number_dr_species_, pba->has_dncdm, index_bg, pba->N_decay_dr);
-  class_define_index(index_bg_q_mean_dr_, pba->compute_mean_q, index_bg, pba->N_decay_dr);
+  class_define_index(index_bg_number_dr_species_, pba->has_dr, index_bg, pba->N_decay_dr);
+  class_define_index(index_bg_q_mean_dr_, ((pba->compute_mean_q) && (pba->has_dncdm)), index_bg, pba->N_decay_dr - pba->dr->N_dcdm_);
 
   /* - indices for scalar field */
   class_define_index(index_bg_phi_scf_, pba->has_scf, index_bg, 1);
@@ -1298,8 +1302,10 @@ int BackgroundModule::background_solve() {
     Omega0_dcdm_ = pvecback_integration[index_bi_rho_dcdm_]/pba->H0/pba->H0;
   }
   if (pba->has_dr == _TRUE_){
-    double rho_temp;
-    pba->dr->IntegrateDistribution(0., NULL, &rho_temp, NULL);
+    double rho_temp = 0.;
+    for (double rho_species : pba->dr->rho_species_) {
+      rho_temp += rho_species;
+    }
     Omega0_dr_ = rho_temp/pba->H0/pba->H0;
   }
 
@@ -1399,7 +1405,9 @@ int BackgroundModule::background_solve() {
     /(7./8.*pow(4./11.,4./3.)*background_table_[index_bg_rho_g_]);
 
   // Contribution to Neff from DR today
-  Neff_dr_ = background_table_[(bt_size_ - 1)*bg_size_ + index_bg_rho_dr_]/(7./8.*pow(4./11., 4./3.)*background_table_[(bt_size_ - 1)*bg_size_ + index_bg_rho_g_]);
+  if (pba->has_dncdm == _TRUE_) {
+    Neff_dr_ = background_table_[(bt_size_ - 1)*bg_size_ + index_bg_rho_dr_]/(7./8.*pow(4./11., 4./3.)*background_table_[(bt_size_ - 1)*bg_size_ + index_bg_rho_g_]);
+  }
   
   /** - done */
   if (pba->background_verbose > 0) {
@@ -1542,8 +1550,10 @@ int BackgroundModule::background_solve_evolver() {
     Omega0_dcdm_ = pvecback_integration[index_bi_rho_dcdm_]/pba->H0/pba->H0;
   }
   if (pba->has_dr == _TRUE_){
-    double rho_temp;
-    pba->dr->IntegrateDistribution(0., NULL, &rho_temp, NULL);
+    double rho_temp = 0.;
+    for (double rho_species : pba->dr->rho_species_) {
+      rho_temp += rho_species;
+    }
     Omega0_dr_ = rho_temp/pba->H0/pba->H0;
   }
 
@@ -1742,7 +1752,7 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
     }
 
     // Get initial values established by the DarkRadiation class
-    for (int n_dr = 0; n_dr < pba->N_decay_dr; n_dr++) {
+    for (int n_dr = 0; n_dr < pba->N_decay_dr - pba->dr->N_dcdm_; n_dr++) {
       for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
         pvecback_integration[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[n_dr] + index_q] = pba->dr->w_species_[n_dr][index_q]/pba->dr->dq_[index_q];
       }
@@ -2217,24 +2227,19 @@ int BackgroundModule::background_derivs_member(
         double q = pba->ncdm->q_ncdm_[ncdm_id][i];
         double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
         double decay_term = -a*a*M_ncdm*Gamma/epsilon;
+
+        // Only dec term; we cannot calculate inv or qs terms analytically
         dy[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = a*a*M_ncdm*Gamma*q*q/pow(epsilon, 3);
 
-        double f_q = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
-        if (f_q >= 1e-20) {
-          dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = -decay_term*f_q;
-        }
-        else {
-          dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = 0.;
-        }
-
-        // Currently, inverse and QS terms only implemented on the lnf calculation
-        double inverse_term = 0.;
-        double qs_term = 0.;
+        // The lnf inverse term gives divergence issues, so we calculate it for lnf and f separately
+        double inverse_term = 0.;   // lnf term
+        double qs_term = 0.;        // lnf term
+        double inverse_term_f_q = 0;    // f_q term
 
         if (pba->has_inv == _TRUE_) {
           // Get limits
-          double q_min = fabs(epsilon - q)/2;
-          double q_max = fabs(epsilon + q)/2;
+          double q_min = 0.5*(epsilon - q);
+          double q_max = 0.5*(epsilon + q);
           double* q_2_vec = pba->dr->q_.data();
           int q_2_size = pba->dr->q_.size();
           double dq[q_2_size];
@@ -2246,21 +2251,40 @@ int BackgroundModule::background_derivs_member(
           for (int i = 0; i < q_2_size; i++) {
             f_phi_vec[i] = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + i];
           }
+
           for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
             double q_2 = q_2_vec[index_q_2];
             double f_vl = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
             double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec, q_2_size);
             inverse_term += dq[index_q_2]*f_vl*f_phi;
+            inverse_term_f_q += dq[index_q_2]*f_vl*f_phi;
           }
 
           // Fix when the integral bounds do not cancel f going to zero
-          f_q = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
-          if (f_q < 1e-20) {
-            inverse_term = 0.;
+          double lnf = y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+          double f_from_lnf = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
+          if (lnf < -20.) {
+            // Too small for machine precision, rescale!
+            double lnN = -y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+            double f_rescaled = exp(lnN + y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
+            double wfefe = exp(lnN);
+            // printf("exp(%g) = %g , 1/exp = %g\n", lnN, exp(lnN), exp(-lnN));
+            double wfewf = a;
+            for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
+              double q_2 = q_2_vec[index_q_2];
+              double f_vl = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
+              double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec, q_2_size);
+              // printf("f_vl[%d] = %g, f_phi[%d] = %g\n", index_q_2, f_vl, index_q_2, f_phi);
+              // printf("q_2[%d] = %g, eps-q_2[%d] = %g\n", index_q_2, q_2, index_q_2, epsilon - q_2);
+            }
+            int ertertert = 1;
+            inverse_term *= a*a*M_ncdm*Gamma*exp(lnN)/(f_rescaled*epsilon*q);
+            int awef = 1;
           }
           else {
-            inverse_term *= a*a*M_ncdm*Gamma/(f_q*epsilon*q);
+            inverse_term *= a*a*M_ncdm*Gamma/(f_from_lnf*epsilon*q);
           }
+          inverse_term_f_q *= a*a*M_ncdm*Gamma/(epsilon*q);
 
           if (pba->has_qs == _TRUE_) {
             // With massless daughters, all vH integral bounds are the same
@@ -2273,25 +2297,47 @@ int BackgroundModule::background_derivs_member(
             qs_term *= a*a*M_ncdm*Gamma/(epsilon*q);
           }
         }
-        dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term + inverse_term + qs_term;
+        // dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term + inverse_term + qs_term;
+        if (pba->has_inv == _TRUE_) {
+          dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = 0.; // Evolving inverse terms for lnf gives divergence problems
+          double f_q = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+          if ((f_q >= 1e-20) || (pba->background_method == bgevo_evolver)) {
+            dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term*f_q + inverse_term_f_q + qs_term*f_q;
+          }
+          else {
+            dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = 0.;
+          }
+        }
+        else {
+          dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term;
+          double f_q = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+          if ((f_q >= 1e-20) || (pba->background_method == bgevo_evolver)) {
+            dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term*f_q;
+          }
+          else {
+            dy[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = 0.;
+          }
+        }
       }
     }
   }
   
   if (pba->has_dr == _TRUE_){
     if (pba->has_dcdm) {
-      dy[index_bi_rho_dr_from_dcdm_] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_from_dcdm_]+
-      y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
+      dy[index_bi_rho_dr_from_dcdm_] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_from_dcdm_] + y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
     }
     if (pba->has_dncdm) {
       for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
         double M_1 = pba->ncdm->M_ncdm_[ncdm_id];
         double Gamma = dncdm_properties.Gamma;
 
-        // Integrated density for self-consistency checks
-        dy[index_bi_rho_dr_from_dncdm_] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_from_dncdm_]+
-        y[index_bi_a_]*Gamma*M_1*pvecback[index_bg_number_ncdm1_ + ncdm_id];
-        if (y[index_bi_rho_dr_from_dncdm_] < 0) {
+        // Integrated density for self-consistency checks; only computes for ncdm_id = 0
+        dy[index_bi_rho_dr_from_dncdm_] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_from_dncdm_] + y[index_bi_a_]*Gamma*M_1*pvecback[index_bg_number_ncdm1_];
+        if (isnan(dy[index_bi_rho_dr_from_dncdm_])) {
+          double erferf = y[index_bi_a_];
+          double wafwf = pvecback[index_bg_H_];
+          double trertg = y[index_bi_rho_dr_from_dncdm_];
+          double fwefawef = pvecback[index_bg_number_ncdm1_ + ncdm_id];
           // printf("Warning: Negative rho_dr_from_dncdm: %g \n", y[index_bi_rho_dr_from_dncdm_]);
         }
 
@@ -2320,8 +2366,14 @@ int BackgroundModule::background_derivs_member(
           for (int index_q_1 = index_min_dec; index_q_1 <= index_max_dec; index_q_1++) {
             double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
             double epsilon_1 = sqrt(q_1*q_1 + M_1*M_1*a*a);
-            double f = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1]);
-            decay_term += dq_dec[index_q_1]*f*q_1/epsilon_1;
+            double f_from_lnf = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1]);
+            double f_dncdm = y[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1];
+            if (pba->has_inv) {
+              decay_term += dq_dec[index_q_1]*f_dncdm*q_1/epsilon_1;
+            }
+            else {
+              decay_term += dq_dec[index_q_1]*f_from_lnf*q_1/epsilon_1;
+            }
           }
 
           /* DR Distribution function equation of motion from (4.13) in 2011.01502 with m_vl -> 0
@@ -2329,7 +2381,7 @@ int BackgroundModule::background_derivs_member(
              Note that Gamma = g^2 m_vH / 4pi.
              Factor 4 comes from both vl and phi contributions (we have defined f_dr = f_vl + f_phi).
           */
-          decay_term *= pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
+          decay_term *= a*a*M_1*Gamma/(q_2*q_2);
           dy[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2] = 2*decay_term;
           if (pba->has_inv == _TRUE_) {
             // There are two daughters; in the massless limit their decay terms are equal up to a deg factor
@@ -2367,8 +2419,8 @@ int BackgroundModule::background_derivs_member(
             
             // Only dec and qs terms are proportional to f_vH, hence inv terms don't get a factor deg_ncdm
             // (needs verification!)
-            inverse_term_vl *= -pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma*f_vl_q2/(q_2*q_2);
-            inverse_term_phi *= -pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma*f_phi_q2/(q_2*q_2);
+            inverse_term_vl *= -a*a*M_1*Gamma*f_vl_q2/(q_2*q_2);
+            inverse_term_phi *= -a*a*M_1*Gamma*f_phi_q2/(q_2*q_2);
 
             if (pba->has_qs == _TRUE_) {
               // We need these for interpolation; this can probably be optimized..
@@ -2383,7 +2435,8 @@ int BackgroundModule::background_derivs_member(
               for (int index_q_1 = index_min_dec; index_q_1 <= index_max_dec; index_q_1++) {
                 double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
                 double epsilon_1 = sqrt(q_1*q_1 + a*a*M_1*M_1);
-                double f_vH = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1]);
+                // double f_vH = exp(y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1]);
+                double f_vH = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1];
 
                 double f_phi_interped = f_ncdm_interp(epsilon_1 - q_2, q_3_vec, f_phi_vec.data(), q_3_size);
                 double f_vl_interped = f_ncdm_interp(epsilon_1 - q_2, q_3_vec, f_vl_vec.data(), q_3_size);
@@ -2391,8 +2444,8 @@ int BackgroundModule::background_derivs_member(
                 qs_term_vl += dq_dec[index_q_1]*q_1/epsilon_1*f_vH*(f_phi_interped - f_vl_q2);
                 qs_term_phi += dq_dec[index_q_1]*q_1/epsilon_1*f_vH*(f_phi_q2 - f_vl_interped);
               }
-              qs_term_vl *= pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
-              qs_term_phi *= pba->ncdm->GetDeg(ncdm_id)*a*a*M_1*Gamma/(q_2*q_2);
+              qs_term_vl *= a*a*M_1*Gamma/(q_2*q_2);
+              qs_term_phi *= a*a*M_1*Gamma/(q_2*q_2);
             }
 
             // Here, they get the same factor, but in Barenboim the boson has a factor 2.

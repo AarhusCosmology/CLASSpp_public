@@ -1025,9 +1025,12 @@ int InputModule::input_read_parameters() {
     }
   }
 
-  /** - Omega_0_dcdmdr (DCDM) */
+  // Initialize quantities for creating DR species
   std::vector<DarkRadiation::SourceType> dr_sources;
   std::vector<DarkRadiation::DRType> dr_types;
+  std::vector<double> dr_deg;
+
+  /** - Omega_0_dcdmdr (DCDM) */
   
   class_call(parser_read_double(pfc,"Omega_dcdmdr",&param1,&flag1,errmsg),
              errmsg,
@@ -1043,31 +1046,36 @@ int InputModule::input_read_parameters() {
   if (flag2 == _TRUE_)
     pba->Omega0_dcdmdr = param2/pba->h/pba->h;
 
+  int flag7, flag8;
   if (pba->Omega0_dcdmdr > 0) {
 
-    dr_sources.push_back(DarkRadiation::SourceType::dcdm);
-    dr_types.push_back(DarkRadiation::DRType::fermion);
     Omega_tot += pba->Omega0_dcdmdr;
 
     /** - Read Omega_ini_dcdm or omega_ini_dcdm */
-    class_call(parser_read_double(pfc,"Omega_ini_dcdm",&param1,&flag1,errmsg),
+    class_call(parser_read_double(pfc,"Omega_ini_dcdm",&param1,&flag7,errmsg),
                errmsg,
                errmsg);
-    class_call(parser_read_double(pfc,"omega_ini_dcdm",&param2,&flag2,errmsg),
+    class_call(parser_read_double(pfc,"omega_ini_dcdm",&param2,&flag8,errmsg),
                errmsg,
                errmsg);
-    class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
+    class_test(((flag7 == _TRUE_) && (flag8 == _TRUE_)),
                errmsg,
                "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, choose one");
-    if (flag1 == _TRUE_)
+    if (flag7 == _TRUE_)
       pba->Omega_ini_dcdm = param1;
-    if (flag2 == _TRUE_)
+    if (flag8 == _TRUE_)
       pba->Omega_ini_dcdm = param2/pba->h/pba->h;
 
     /** - Read Gamma in same units as H0, i.e. km/(s Mpc)*/
     class_read_double("Gamma_dcdm",pba->Gamma_dcdm);
     /* Convert to Mpc */
     pba->Gamma_dcdm *= (1.e3 / _c_);
+  }
+
+  if ((flag1 == _TRUE_) || (flag2 == _TRUE_) || (flag7 == _TRUE_) || (flag8 == _TRUE_)) {
+    dr_sources.push_back(DarkRadiation::SourceType::dcdm);
+    dr_types.push_back(DarkRadiation::DRType::fermion);
+    dr_deg.push_back(1.);
   }
   
   class_read_int("l_max_col_plot", pba->l_max_col_plot);
@@ -1191,7 +1199,13 @@ int InputModule::input_read_parameters() {
   Omega_tot += pba->Omega0_ncdm_tot;
   
   /** - Dark radiation */
-  pba->dr = DarkRadiation::Create(pfc, dr_sources, dr_types, pba->T_cmb);
+  for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+    dr_deg.push_back(pba->ncdm->GetDeg(ncdm_id));
+    if (pba->has_inv == _TRUE_) {
+      dr_deg.push_back(pba->ncdm->GetDeg(ncdm_id)); // Give the two daughter species the same deg factor
+    }
+  }
+  pba->dr = DarkRadiation::Create(pfc, dr_sources, dr_types, dr_deg, pba->T_cmb);
   pba->N_decay_dr = dr_sources.size();
   
   /** - Omega_0_k (effective fractional density of curvature) */
@@ -1712,6 +1726,9 @@ int InputModule::input_read_parameters() {
   }
 
   if (ppt->has_perturbations == _TRUE_) {
+
+    // Perturbations are not coded for inverse decaying ncdm terms
+    class_test(pba->has_inv == _TRUE_, errmsg, "Perturbations with inverse terms not coded yet.")
 
     /* perturbed recombination */
     class_call(parser_read_string(pfc,
