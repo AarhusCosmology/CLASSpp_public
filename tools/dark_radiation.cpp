@@ -118,9 +118,10 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
       //   with all other initial distribution being zero. Thus, we currently don't use InitialDistribution for anything.
       int has_inv = 0;
       class_read_int("Inverse decay", has_inv);
+      int initial_fermionic_pop = 0;
+      class_read_int("Initial daughter population", initial_fermionic_pop);
+
       if (has_inv == _TRUE_) {
-        int initial_fermionic_pop = 0;
-        class_read_int("Initial daughter population", initial_fermionic_pop);
         if (dr_types_[n_dr] == DRType::fermion) {
           // With inv, the fermionic daughter either has Fermi-Dirac or zero initial population
           std::vector<double> w_temp(N_q_);
@@ -147,13 +148,20 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
         }
       }
       else {
-        // If no inv, we have one species with zero initial population
+        // If no inv, we have one species
         std::vector<double> w_temp(N_q_);
-        for (int index_q = 0; index_q < N_q_; index_q++) {
-          w_temp[index_q] = 0.;
-          w_[index_q] = 0.;
-        }
-        w_species_.push_back(w_temp);
+          for (int index_q = 0; index_q < N_q_; index_q++) {
+            if (initial_fermionic_pop == _FALSE_) {
+              w_temp[index_q] = 0.;
+            }
+            else if (initial_fermionic_pop == _TRUE_) {
+              double q = q_[index_q];
+              double f0;
+              int temp = InitialDistribution(NULL, q, &f0);
+              w_temp[index_q] = f0*dq_[index_q];
+            }
+          }
+          w_species_.push_back(w_temp);
       }
 
       /*

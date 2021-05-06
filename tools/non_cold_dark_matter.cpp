@@ -303,8 +303,8 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     extend_list_of_doubles("T_ncdm_decay_dr", T_ncdm_, T_dncdm_default_);
     extend_list_of_doubles("m_ncdm_decay_dr", m_ncdm_in_eV_, 1.0);
     extend_list_of_doubles("ksi_ncdm_decay_dr", ksi_ncdm_, 0.0);
-    extend_list_of_doubles("Omega_ncdm", Omega0_ncdm_, 0.0);
-    extend_list_of_doubles("omega_ncdm", omega0_ncdm_, 0.0);
+    // extend_list_of_doubles("Omega_ncdm", Omega0_ncdm_, 0.0);
+    // extend_list_of_doubles("omega_ncdm", omega0_ncdm_, 0.0);
     extend_list_of_doubles("deg_ncdm_decay_dr", deg_ncdm_, 1.0);
   }
 
@@ -312,7 +312,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
      update Omega0_ncdm_:*/
   for (int n = 0; n < N_ncdm_; n++){
     if (omega0_ncdm_[n] != 0.0){
-      class_test(Omega0_ncdm_[n] != 0,errmsg,
+      class_test(Omega0_ncdm_[n] != 0.0,errmsg,
                  "Nonzero values for both Omega and omega for ncdm species %d are specified!", n);
       Omega0_ncdm_[n] = omega0_ncdm_[n]/ncdm_settings.h/ncdm_settings.h;
     }

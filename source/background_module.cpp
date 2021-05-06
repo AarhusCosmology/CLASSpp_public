@@ -2246,16 +2246,15 @@ int BackgroundModule::background_derivs_member(
           int index_min, index_max;
           class_call(get_limits_and_weights(q_min, q_max, q_2_vec, q_2_size, dq, &index_min, &index_max, error_message), error_message, error_message);
 
-          double* f_phi_vec;
-          class_alloc(f_phi_vec, q_2_size*sizeof(double), error_message);
+          std::vector<double> f_phi_vec;
           for (int i = 0; i < q_2_size; i++) {
-            f_phi_vec[i] = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + i];
+            f_phi_vec.push_back(pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + i]);
           }
 
           for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
             double q_2 = q_2_vec[index_q_2];
             double f_vl = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
-            double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec, q_2_size);
+            double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec.data(), q_2_size);
             inverse_term += dq[index_q_2]*f_vl*f_phi;
             inverse_term_f_q += dq[index_q_2]*f_vl*f_phi;
           }
@@ -2273,7 +2272,7 @@ int BackgroundModule::background_derivs_member(
             for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
               double q_2 = q_2_vec[index_q_2];
               double f_vl = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
-              double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec, q_2_size);
+              // double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec, q_2_size);
               // printf("f_vl[%d] = %g, f_phi[%d] = %g\n", index_q_2, f_vl, index_q_2, f_phi);
               // printf("q_2[%d] = %g, eps-q_2[%d] = %g\n", index_q_2, q_2, index_q_2, epsilon - q_2);
             }
@@ -2297,7 +2296,6 @@ int BackgroundModule::background_derivs_member(
             qs_term *= a*a*M_ncdm*Gamma/(epsilon*q);
           }
         }
-        // dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term + inverse_term + qs_term;
         if (pba->has_inv == _TRUE_) {
           dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = 0.; // Evolving inverse terms for lnf gives divergence problems
           double f_q = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];

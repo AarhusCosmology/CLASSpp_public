@@ -1093,6 +1093,8 @@ int InputModule::input_read_parameters() {
     pba->N_dncdm = pba->ncdm->N_ncdm_decay_dr_;
 
     if (pba->ncdm->N_ncdm_decay_dr_ > 0) {
+      pba->has_dncdm = _TRUE_;
+
       int read, val;
       class_call(parser_read_int(pfc, "Inverse decay", &val, &read, errmsg),
                  errmsg,errmsg);
@@ -1199,10 +1201,12 @@ int InputModule::input_read_parameters() {
   Omega_tot += pba->Omega0_ncdm_tot;
   
   /** - Dark radiation */
-  for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
-    dr_deg.push_back(pba->ncdm->GetDeg(ncdm_id));
-    if (pba->has_inv == _TRUE_) {
-      dr_deg.push_back(pba->ncdm->GetDeg(ncdm_id)); // Give the two daughter species the same deg factor
+  if (pba->has_dncdm == _TRUE_) {
+    for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+      dr_deg.push_back(pba->ncdm->GetDeg(ncdm_id));
+      if (pba->has_inv == _TRUE_) {
+        dr_deg.push_back(pba->ncdm->GetDeg(ncdm_id)); // Give the two daughter species the same deg factor
+      }
     }
   }
   pba->dr = DarkRadiation::Create(pfc, dr_sources, dr_types, dr_deg, pba->T_cmb);
