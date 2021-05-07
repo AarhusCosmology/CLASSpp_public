@@ -161,7 +161,7 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
               w_temp[index_q] = f0*dq_[index_q];
             }
           }
-          w_species_.push_back(w_temp);
+        w_species_.push_back(w_temp);
       }
 
       /*
