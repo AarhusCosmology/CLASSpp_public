@@ -704,7 +704,8 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
         double rho_temp, n_temp;
         pba->dr->IntegrateDistribution(1./a_rel - 1, &n_temp, &rho_temp, NULL, dncdm_properties.dr_id);
         pba->dr->rho_species_[dcdm_offset + dncdm_properties.dr_id] = rho_temp;
-        pvecback[index_bg_rho_dr_species_ + dcdm_offset + dncdm_properties.dr_id] = rho_temp;
+        //pvecback[index_bg_rho_dr_species_ + dcdm_offset + dncdm_properties.dr_id] = rho_temp;
+        pvecback[index_bg_rho_dr_species_ + dcdm_offset + dncdm_properties.dr_id] = pvecback[index_bg_rho_dr_integrated_];
         pvecback[index_bg_number_dr_species_ + dcdm_offset + dncdm_properties.dr_id] = n_temp;
         if (pba->has_inv == _TRUE_) {
           double rho_temp1, n_temp1;
@@ -728,7 +729,9 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     for (double rho_dr : pba->dr->rho_species_) {
       pvecback[index_bg_rho_dr_] += rho_dr;
     }
-    
+    if (pba->has_dncdm == _TRUE_) {
+      pvecback[index_bg_rho_dr_] = pvecback[index_bg_rho_dr_integrated_];
+    }
     rho_tot += pvecback[index_bg_rho_dr_];
     p_tot += 1./3.*pvecback[index_bg_rho_dr_];
     dp_dloga += -4./3.*pvecback[index_bg_rho_dr_];
