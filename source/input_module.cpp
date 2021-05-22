@@ -1121,7 +1121,31 @@ int InputModule::input_read_parameters() {
       class_test(((pba->has_qs == _TRUE_) && (pba->has_inv == _FALSE_)),
                  errmsg,
                  "Decaying NCDM cannot have quantum statistics terms without also including inverse decay terms.");
+
+      class_call(parser_read_int(pfc, "Plot terms", &val, &read, errmsg),
+                 errmsg,errmsg);
+      if ((read == _TRUE_) && (val != 0)) {
+        pba->plot_terms = 1;
+        class_call(parser_read_int(pfc, "Plot terms at q", &val, &read, errmsg),errmsg,errmsg);
+        if (read == _TRUE_) {
+          pba->plot_terms_at_q = val;
+        }
+        else {
+          pba->plot_terms_at_q = 0;
+        }
+        if ((pba->plot_terms == _TRUE_) && (pba->ncdm->N_ncdm_decay_dr_ > 1)) {
+          throw std::runtime_error("Cannot plot derivative terms with more than 1 decaying ncdm species.");
+        }
+        if ((pba->plot_terms == _TRUE_) && (pba->has_qs == _FALSE_)) {
+          throw std::runtime_error("Must enable both inverse and quantum statistics terms before plotting them.");
+        }
+      }
+      else {
+        pba->plot_terms = 0;
+        pba->plot_terms_at_q = 0;
+      }
     }
+
     
     for (int n_dncdm = 0; n_dncdm < pba->ncdm->N_ncdm_decay_dr_; n_dncdm++) {
       if ((pba->has_inv == _TRUE_) || (pba->has_qs == _TRUE_)) {

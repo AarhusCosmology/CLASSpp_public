@@ -411,7 +411,56 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
             denom += dncdm_properties.dq[index_q]*pow(q, 2)*exp(lnN + lnf);
           }
           pvecback[index_bg_q_mean_ + ncdm_id] = num/denom;
+
+    if (pba->plot_terms == _TRUE_) {
+      // Recompute derivative terms for plotting; we sum the terms over momentum
+      int index_q = pba->plot_terms_at_q;
+
+      for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+        // An error has already been thrown if N_dncdm > 1, so there is only one species here
+        double M_ncdm = pba->ncdm->M_ncdm_[ncdm_id];
+        double Gamma = dncdm_properties.Gamma;
+        double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
+        double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
+        double f_dncdm = pvecback_B[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
+
+        double decay_term = 0.;
+        double inverse_term = 0.;
+        double qs_term = 0.;
+
+        decay_term = -a*a*M_ncdm*Gamma*f_dncdm/epsilon;
+
+        double q_min = 0.5*(epsilon - q);
+        double q_max = 0.5*(epsilon + q);
+        double* q_2_vec = pba->dr->q_.data();
+        int q_2_size = pba->dr->q_.size();
+        double dq[q_2_size];
+        int index_min, index_max;
+        class_call(get_limits_and_weights(q_min, q_max, q_2_vec, q_2_size, dq, &index_min, &index_max, error_message_), error_message_, error_message_);
+
+        std::vector<double> f_phi_vec;
+        for (int i = 0; i < q_2_size; i++) {
+          f_phi_vec.push_back(pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + i]);
         }
+
+        for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
+          double q_2 = q_2_vec[index_q_2];
+          double f_vl = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
+          double f_phi = f_ncdm_interp(epsilon - q_2, q_2_vec, f_phi_vec.data(), q_2_size);
+          inverse_term += dq[index_q_2]*f_vl*f_phi;
+        }
+        inverse_term *= a*a*M_ncdm*Gamma/(epsilon*q);
+
+        for (int index_q_2 = index_min; index_q_2 <= index_max; index_q_2++) {
+          double f_vl = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_2];
+          double f_phi = pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_2];
+          qs_term += dq[index_q_2]*(f_vl - f_phi);
+        }
+        qs_term *= a*a*M_ncdm*Gamma*f_dncdm/(epsilon*q);
+
+        pvecback[index_bg_dec_dncdm_] = decay_term;
+        pvecback[index_bg_inv_dncdm_] = inverse_term;
+        pvecback[index_bg_qs_dncdm_] = qs_term;
       }
     }
 
@@ -552,6 +601,90 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
             pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q] = f_q;
             pba->dr->w_[index_q] += pba->dr->w_species_[dncdm_properties.dr_id + 1][index_q];
+          }
+
+          if (pba->plot_terms == _TRUE_) {
+            // Recompute derivative terms for plotting
+            int index_q = pba->plot_terms_at_q;
+
+            for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+              double M_1 = pba->ncdm->M_ncdm_[ncdm_id];
+              double Gamma = dncdm_properties.Gamma;
+
+              double decay_term = 0.;
+              double inverse_term_vl = 0.;
+              double qs_term_vl = 0.;
+              double inverse_term_phi = 0.;
+              double qs_term_phi = 0.;
+
+              double q_2 = pba->dr->q_[index_q];
+              double* q_1_vec = pba->ncdm->q_ncdm_[ncdm_id];
+              int q_1_size = pba->ncdm->q_size_ncdm_[ncdm_id];
+              double dq_dec[q_1_size];
+
+              double q_min = fabs(0.25*a*a*M_1*M_1/q_2 - q_2); // Lower integral bound
+              double q_max = q_1_vec[q_1_size - 1]; // Upper bound = ∞
+              int index_min_dec, index_max_dec;
+              class_call(get_limits_and_weights(q_min, q_max, q_1_vec, q_1_size, dq_dec, &index_min_dec, &index_max_dec, error_message_), error_message_, error_message_);
+
+              for (int index_q_1 = index_min_dec; index_q_1 <= index_max_dec; index_q_1++) {
+                double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
+                double epsilon_1 = sqrt(q_1*q_1 + M_1*M_1*a*a);
+                double f_dncdm = pvecback_B[index_bi_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1];
+                decay_term += dq_dec[index_q_1]*f_dncdm*q_1/epsilon_1;
+              }
+              decay_term *= a*a*M_1*Gamma/(q_2*q_2);
+
+
+              double* q_3_vec = pba->dr->q_.data();
+              int q_3_size = pba->dr->q_.size();
+              double dq_inv[q_3_size];
+
+              double q_min_inv = fabs(0.25*a*a*M_1*M_1/q_2);
+              double q_max_inv = q_3_vec[q_3_size - 1];
+              int index_min_inv, index_max_inv;
+              class_call(get_limits_and_weights(q_min_inv, q_max_inv, q_3_vec, q_3_size, dq_inv, &index_min_inv, &index_max_inv, error_message_), error_message_, error_message_);
+
+              for (int index_q_3 = index_min_inv; index_q_3 <= index_max_inv; index_q_3++) {
+                double f_vl = pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q_3];
+                double f_phi = pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q_3];
+
+                inverse_term_vl += dq_inv[index_q_3]*f_phi;
+                inverse_term_phi += dq_inv[index_q_3]*f_vl;
+              }
+              double f_vl_q2 = pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q];
+              double f_phi_q2 = pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q];
+
+              inverse_term_vl *= -a*a*M_1*Gamma*f_vl_q2/(q_2*q_2);
+              inverse_term_phi *= -a*a*M_1*Gamma*f_phi_q2/(q_2*q_2);
+
+              std::vector<double> f_phi_vec;
+              std::vector<double> f_vl_vec;
+              for (int id = 0; id < pba->dr->N_q_; id++) {
+                f_phi_vec.push_back(pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + id]);
+                f_vl_vec.push_back(pvecback_B[index_bi_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + id]);
+              }
+              for (int index_q_1 = index_min_dec; index_q_1 <= index_max_dec; index_q_1++) {
+                double q_1 = pba->ncdm->q_ncdm_[ncdm_id][index_q_1];
+                double epsilon_1 = sqrt(q_1*q_1 + a*a*M_1*M_1);
+                double f_vH = pvecback[index_bg_f_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q_1];
+
+                double f_phi_interped = f_ncdm_interp(epsilon_1 - q_2, q_3_vec, f_phi_vec.data(), q_3_size);
+                double f_vl_interped = f_ncdm_interp(epsilon_1 - q_2, q_3_vec, f_vl_vec.data(), q_3_size);
+
+                qs_term_vl += dq_dec[index_q_1]*q_1/epsilon_1*f_vH*(f_phi_interped - f_vl_q2);
+                qs_term_phi += dq_dec[index_q_1]*q_1/epsilon_1*f_vH*(f_phi_q2 - f_vl_interped);
+              }
+              qs_term_vl *= a*a*M_1*Gamma/(q_2*q_2);
+              qs_term_phi *= a*a*M_1*Gamma/(q_2*q_2);
+
+              pvecback[index_bg_dec_dr_] = decay_term;
+              pvecback[index_bg_inv_dr_] = inverse_term_vl;
+              pvecback[index_bg_qs_dr_] = qs_term_vl;
+              pvecback[index_bg_dec_dr_ + 1] = decay_term;
+              pvecback[index_bg_inv_dr_ + 1] = inverse_term_vl;
+              pvecback[index_bg_qs_dr_ + 1] = qs_term_vl;
+            }
           }
         }
 
@@ -998,7 +1131,13 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_rho_dr_, pba->has_dr, index_bg, 1);
   class_define_index(index_bg_rho_dr_integrated_, pba->has_dncdm, index_bg, 1);
   class_define_index(index_bg_number_dr_species_, pba->has_dr, index_bg, pba->N_decay_dr);
-  class_define_index(index_bg_q_mean_dr_, ((pba->compute_mean_q) && (pba->has_dncdm)), index_bg, pba->N_decay_dr - pba->dr->N_dcdm_);
+
+  class_define_index(index_bg_dec_dncdm_, pba->plot_terms, index_bg, 1);
+  class_define_index(index_bg_inv_dncdm_, pba->plot_terms, index_bg, 1);
+  class_define_index(index_bg_qs_dncdm_, pba->plot_terms, index_bg, 1);
+  class_define_index(index_bg_dec_dr_, pba->plot_terms, index_bg, 2);
+  class_define_index(index_bg_inv_dr_, pba->plot_terms, index_bg, 2);
+  class_define_index(index_bg_qs_dr_, pba->plot_terms, index_bg, 2);
 
   /* - indices for scalar field */
   class_define_index(index_bg_phi_scf_, pba->has_scf, index_bg, 1);
@@ -2006,17 +2145,34 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles,"(.)rho_dcdm",pba->has_dcdm);
   class_store_columntitle(titles,"(.)rho_dr",pba->has_dr);
   if (pba->has_dr == _TRUE_) {
-    for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
-      for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
-        sprintf(tmp,"q_dr[%d]", index_q);
-        class_store_columntitle(titles,tmp,_TRUE_);
-
-        sprintf(tmp,"f_dr[%d][%d]", dncdm_properties.dr_id, index_q);
-        class_store_columntitle(titles,tmp,_TRUE_);
-
-        if (pba->has_inv == _TRUE_) {
-          sprintf(tmp,"f_dr[%d][%d]", dncdm_properties.dr_id + 1, index_q);
+    if (pba->has_dncdm == _TRUE_) {
+      for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+        for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
+          sprintf(tmp,"q_dr[%d]", index_q);
           class_store_columntitle(titles,tmp,_TRUE_);
+
+          sprintf(tmp,"f_dr[%d][%d]", dncdm_properties.dr_id, index_q);
+          class_store_columntitle(titles,tmp,_TRUE_);
+
+          if (pba->has_inv == _TRUE_) {
+            sprintf(tmp,"f_dr[%d][%d]", dncdm_properties.dr_id + 1, index_q);
+            class_store_columntitle(titles,tmp,_TRUE_);
+          }
+        }
+        if (pba->plot_terms == _TRUE_) {
+          class_store_columntitle(titles,"dec_dncdm",_TRUE_);
+          class_store_columntitle(titles,"inv_dncdm",_TRUE_);
+          class_store_columntitle(titles,"qs_dncdm",_TRUE_);
+          for (int i = 0; i <= 1; i++) {
+            sprintf(tmp,"dec_dr[%d]", i);
+            class_store_columntitle(titles,tmp,_TRUE_);
+
+            sprintf(tmp,"inv_dr[%d]", i);
+            class_store_columntitle(titles,tmp,_TRUE_);
+
+            sprintf(tmp,"qs_dr[%d]", i);
+            class_store_columntitle(titles,tmp,_TRUE_);
+          }
         }
       }
     }
@@ -2104,12 +2260,24 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rho_dcdm_], pba->has_dcdm, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_dr_], pba->has_dr, storeidx);
     if (pba->has_dr == _TRUE_) {
-      for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
-        for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
-          class_store_double(dataptr, pba->dr->q_[index_q], _TRUE_, storeidx);
-          class_store_double(dataptr, pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q], _TRUE_, storeidx);
-          if (pba->has_inv == _TRUE_) {
-            class_store_double(dataptr, pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q], _TRUE_, storeidx);
+      if (pba->has_dncdm == _TRUE_) {
+        for (const auto& [ncdm_id, dncdm_properties] : pba->ncdm->decay_dr_map_) {
+          for (int index_q = 0; index_q < pba->dr->N_q_; index_q++) {
+            class_store_double(dataptr, pba->dr->q_[index_q], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id] + index_q], _TRUE_, storeidx);
+            if (pba->has_inv == _TRUE_) {
+              class_store_double(dataptr, pvecback[index_bg_f_dr1_species_ + pba->dr->cumulative_q_index_[dncdm_properties.dr_id + 1] + index_q], _TRUE_, storeidx);
+            }
+          }
+          if (pba->plot_terms == _TRUE_) {
+            class_store_double(dataptr, pvecback[index_bg_dec_dncdm_], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_inv_dncdm_], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_qs_dncdm_], _TRUE_, storeidx);
+            for (int i = 0; i <= 1; i++) {
+              class_store_double(dataptr, pvecback[index_bg_dec_dr_ + i], _TRUE_, storeidx);
+              class_store_double(dataptr, pvecback[index_bg_inv_dr_ + i], _TRUE_, storeidx);
+              class_store_double(dataptr, pvecback[index_bg_qs_dr_ + i], _TRUE_, storeidx);
+            }
           }
         }
       }

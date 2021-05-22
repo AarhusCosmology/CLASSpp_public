@@ -161,6 +161,8 @@ struct background
   short has_dncdm;     /**< presence of decaying non-cold dark matter? */
   short has_inv;       /**< include inverse decay term from dncdm->dr? */
   short has_qs;        /**< include quantum statistics terms from dncdm->dr? */
+  short plot_terms;   /** < output dec, inv and qs terms for dncdm species */
+  int plot_terms_at_q; /** < momentum index at which to plot the dec, inv and qs terms */
   short has_dr;        /**< presence of relativistic decay radiation? */
   short has_scf;       /**< presence of a scalar field? */
   short has_ncdm;      /**< presence of non-cold dark matter? */
