@@ -404,13 +404,25 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
             lnN += -lnf;
           }
           lnN /= pba->ncdm->q_size_ncdm_[ncdm_id];
+          double p_scaled = 0;
+          double rho_scaled = 0;
+
           for (int index_q = 0; index_q < pba->ncdm->q_size_ncdm_[ncdm_id]; index_q++) {
             double q = pba->ncdm->q_ncdm_[ncdm_id][index_q];
             double lnf = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q];
             num += dncdm_properties.dq[index_q]*pow(q, 3)*exp(lnN + lnf);
             denom += dncdm_properties.dq[index_q]*pow(q, 2)*exp(lnN + lnf);
+
+            double dq = dncdm_properties.dq[index_q];
+            double epsilon = sqrt(q*q + a*a*pba->ncdm->M_ncdm_[n_ncdm]*pba->ncdm->M_ncdm_[n_ncdm]);
+            rho_scaled += dq*pow(q, 2)*epsilon*exp(lnN + lnf);
+            p_scaled += dq*pow(q, 4)/3./epsilon*exp(lnN + lnf);
           }
           pvecback[index_bg_q_mean_ + ncdm_id] = num/denom;
+          pvecback[index_bg_w_dncdm_ + ncdm_id] = p_scaled/rho_scaled;
+        }
+      }
+    }
 
     if (pba->plot_terms == _TRUE_) {
       // Recompute derivative terms for plotting; we sum the terms over momentum
@@ -1115,15 +1127,18 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_p_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
   class_define_index(index_bg_pseudo_p_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
 
+  /* - index for dcdm */
+  class_define_index(index_bg_rho_dcdm_, pba->has_dcdm, index_bg, 1);
+
   /* - index for time-dependent distribution function in DNCDM for each q-bin */
   class_define_index(index_bg_f_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_lnf_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
   class_define_index(index_bg_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_dncdm, index_bg, pba->ncdm->q_total_size_dncdm_);
-  class_define_index(index_bg_q_mean_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
 
-  /* - index for dcdm */
-  class_define_index(index_bg_rho_dcdm_, pba->has_dcdm, index_bg, 1);
+  class_define_index(index_bg_w_dncdm_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
+  class_define_index(index_bg_q_mean_, pba->compute_mean_q, index_bg, pba->ncdm->N_ncdm_decay_dr_);
+  class_define_index(index_bg_q_mean_dr_, ((pba->compute_mean_q) && (pba->has_dncdm)), index_bg, pba->N_decay_dr - pba->dr->N_dcdm_);
 
   /* - indices for dr */
   class_define_index(index_bg_f_dr1_species_, pba->has_dr, index_bg, pba->dr->cumulative_q_index_.back());
@@ -2120,7 +2135,10 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
           sprintf(tmp,"q_dncdm[%d][%d]",n,i);
           class_store_columntitle(titles,tmp,_TRUE_);
         }
-        if (pba->compute_mean_q) {
+        if (pba->compute_mean_q == _TRUE_) {
+          sprintf(tmp,"w_dncdm[%d]",n);
+          class_store_columntitle(titles,tmp,_TRUE_);
+
           sprintf(tmp,"q_mean[%d]",n);
           class_store_columntitle(titles,tmp,_TRUE_);
 
@@ -2240,7 +2258,8 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
             class_store_double(dataptr, pvecback[index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ + pba->ncdm->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
             class_store_double(dataptr, pba->ncdm->q_ncdm_[n][i], _TRUE_, storeidx);
           }
-          if (pba->compute_mean_q) {
+          if (pba->compute_mean_q == _TRUE_) {
+            class_store_double(dataptr, pvecback[index_bg_w_dncdm_ + n], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[index_bg_q_mean_ + n], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[index_bg_q_mean_dr_ + n], _TRUE_, storeidx);
             if (pba->has_inv == _TRUE_) {

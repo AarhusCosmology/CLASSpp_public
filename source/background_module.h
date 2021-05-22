@@ -43,6 +43,8 @@ public:
   int index_bg_lnf_ncdm_decay_dr1_;
   int index_bg_dlnfdlnq_ncdm_decay_dr1_;
   int index_bg_dlnfdlnq_separate_ncdm_decay_dr1_;
+
+  int index_bg_w_dncdm_;
   int index_bg_q_mean_;
   int index_bg_q_mean_dr_;
 
