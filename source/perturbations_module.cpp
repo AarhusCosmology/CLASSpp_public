@@ -9278,6 +9278,16 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
 
           }
 
+          if (pba->ncdm->ncdm_types_[n_ncdm] == NonColdDarkMatter::NCDMType::decay_dr) {
+            const DecayDRProperties& dncdm_properties = pba->ncdm->decay_dr_map_[n_ncdm];
+
+            double r_dr = pvecback[background_module_->index_bg_rho_dr_species_ + dncdm_properties.dr_id]*pow(a,4)/pba->H0/pba->H0;
+            double rprime_dr = r_dr*a*pba->ncdm->M_ncdm_[n_ncdm]*dncdm_properties.Gamma*pvecback[background_module_->index_bg_number_ncdm1_ +  n_ncdm]/pvecback[background_module_->index_bg_rho_dr_species_ + dncdm_properties.dr_id];
+
+            dy[idx] += -rprime_dr*y[idx];
+            dy[idx + 1] += -rprime_dr*y[idx + 1]/k;
+          }
+
           /** - -----> jump to next species */
 
           idx += pv->l_max_ncdm[n_ncdm]+1;

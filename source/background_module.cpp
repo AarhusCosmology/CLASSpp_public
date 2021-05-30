@@ -694,8 +694,8 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
               pvecback[index_bg_inv_dr_] = inverse_term_vl;
               pvecback[index_bg_qs_dr_] = qs_term_vl;
               pvecback[index_bg_dec_dr_ + 1] = decay_term;
-              pvecback[index_bg_inv_dr_ + 1] = inverse_term_vl;
-              pvecback[index_bg_qs_dr_ + 1] = qs_term_vl;
+              pvecback[index_bg_inv_dr_ + 1] = inverse_term_phi;
+              pvecback[index_bg_qs_dr_ + 1] = qs_term_phi;
             }
           }
         }
