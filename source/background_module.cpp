@@ -2451,6 +2451,7 @@ int BackgroundModule::background_derivs_member(
             inverse_term += dq[index_q_2]*f_vl*f_phi;
             inverse_term_f_q += dq[index_q_2]*f_vl*f_phi;
           }
+          inverse_term_f_q *= a*a*M_ncdm*Gamma/(epsilon*q);
 
           // Fix when the integral bounds do not cancel f going to zero
           double lnf = y[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
@@ -2476,7 +2477,6 @@ int BackgroundModule::background_derivs_member(
           else {
             inverse_term *= a*a*M_ncdm*Gamma/(f_from_lnf*epsilon*q);
           }
-          inverse_term_f_q *= a*a*M_ncdm*Gamma/(epsilon*q);
 
           if (pba->has_qs == _TRUE_) {
             // With massless daughters, all vH integral bounds are the same
