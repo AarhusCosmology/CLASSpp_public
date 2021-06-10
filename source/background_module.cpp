@@ -1245,27 +1245,17 @@ int BackgroundModule::background_solve_evolver() {
 
   /** - define local variables */
 
-  /* contains all quantities relevant for the integration algorithm */
-  struct generic_integrator_workspace gi;
   /* parameters and workspace for the background_derivs function */
   struct background_parameters_and_workspace bpaw{this};
   /* vector of quantities to be integrated */
   double* pvecback_integration;
   /* vector of all background quantities */
   double* pvecback;
-  /* necessary for calling array_interpolate(), but never used */
-  int last_index = 0;
-  /* comoving radius coordinate in Mpc (equal to conformal distance in flat case) */
-  double comoving_radius = 0.;
 
   class_alloc(pvecback, bg_size_*sizeof(double), error_message_);
   bpaw.pvecback = pvecback;
   /** - allocate vector of quantities to be integrated */
   class_alloc(pvecback_integration, bi_size_*sizeof(double), error_message_);
-
-  /* Size of vector to integrate is (bi_size_-1) rather than
-   * (bi_size_), since a is not integrated.
-   */
 
   /** - impose initial conditions with background_initial_conditions() */
   class_call(background_initial_conditions(pvecback, pvecback_integration),
@@ -1300,6 +1290,9 @@ int BackgroundModule::background_solve_evolver() {
       generic_evolver = &evolver_rk;
   }
 
+  /* Size of vector to integrate is (bi_size_-1) rather than
+   * (bi_size_), since a is not integrated.
+   */
   class_call(generic_evolver(background_derivs_loga,
            loga_ini,
            loga_final,
@@ -1333,40 +1326,25 @@ int BackgroundModule::background_solve_evolver() {
     Omega0_dr_ = pvecback_integration[index_bi_rho_dr_]/pba->H0/pba->H0;
   }
 
-  /** - In a loop over lines, fill rest of background table using the result of the integration plus background_functions() */
   /** Recover some quantities today */
   double D_today = pvecback_integration[index_bi_D_];
   for (int i = 0; i < bt_size_; i++) {
     double* bg_table_row = background_table_ + i*bg_size_;
-    /** Recover integration vector at this time */
-    for (int index_bi = 0; index_bi < bi_size_; index_bi++) {
-      pvecback_integration[index_bi] = bg_table_row[index_bi];
+    /** Set cosmological distances */
+    double conformal_distance = conformal_age_ - tau_table_[i];
+    bg_table_row[index_bg_conf_distance_] = conformal_distance;
+    double comoving_radius = conformal_distance;
+    if (pba->sgnK > 0) {
+      comoving_radius = sin(sqrt(pba->K)*conformal_distance)/sqrt(pba->K);
     }
-    /** bg_table_row is the row in the background table, pvecback_integration holds the contents of the integrated vector
-  at the current time */
-
-    /* -> establish correspondence between the integrated variable and the bg variables */
-    bg_table_row[index_bg_time_] = pvecback_integration[index_bi_time_];
-    bg_table_row[index_bg_conf_distance_] = conformal_age_ - pvecback_integration[index_bi_tau_];
-
-    if (pba->sgnK == 0) comoving_radius = bg_table_row[index_bg_conf_distance_];
-    else if (pba->sgnK == 1) comoving_radius = sin(sqrt(pba->K)*bg_table_row[index_bg_conf_distance_])/sqrt(pba->K);
-    else if (pba->sgnK == -1) comoving_radius = sinh(sqrt(-pba->K)*bg_table_row[index_bg_conf_distance_])/sqrt(-pba->K);
+    else if (pba->sgnK < 0) {
+      comoving_radius = sinh(sqrt(-pba->K)*conformal_distance)/sqrt(-pba->K);
+    }
 
     bg_table_row[index_bg_ang_distance_] = pba->a_today*comoving_radius/(1. + z_table_[i]);
     bg_table_row[index_bg_lum_distance_] = pba->a_today*comoving_radius*(1. + z_table_[i]);
-    bg_table_row[index_bg_rs_] = pvecback_integration[index_bi_rs_];
-
-    /* -> compute all other quantities depending only on {B} variables.
-       The value of {B} variables in pData are also copied to bg_table_row.*/
-    class_call(background_functions(pvecback_integration, pba->long_info, bg_table_row),
-               error_message_,
-               error_message_);
-
-    /* Normalise D(z=0)=1 and construct f = D_prime/(aHD) */
-    bg_table_row[index_bg_D_] = pvecback_integration[index_bi_D_]/D_today;
-    bg_table_row[index_bg_f_] = pvecback_integration[index_bi_D_prime_]/
-      (pvecback_integration[index_bi_D_]*bg_table_row[index_bg_a_]*bg_table_row[index_bg_H_]);
+    /** Normalise D(z=0)=1 */
+    bg_table_row[index_bg_D_] /= D_today;
   }
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
@@ -2215,16 +2193,27 @@ int BackgroundModule::background_add_line_to_bg_table_member(
                                                              void* parameters_and_workspace,
                                                              ErrorMsg error_message) {
 
+  double a = exp(loga);
+  double tau = y[index_bi_a_];
+  y[index_bi_a_] = a;
+
   z_table_[index_loga] = MAX(0., pba->a_today/exp(loga) - 1.);
-  tau_table_[index_loga] = y[index_bi_a_]; /* tau at a's spot..*/
+  tau_table_[index_loga] = tau;
 
-  /* -> write in the table. We are only storing the integration vector at this point. */
-  for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++) {
-    background_table_[index_loga*bg_size_ + index_bi] = y[index_bi];
-  }
+  double *pvecback = background_table_ + index_loga*bg_size_;
 
-  /* tau is evolved at a's spot...*/
-  background_table_[index_loga*bg_size_ + index_bi_tau_] = y[index_bi_a_];
-  background_table_[index_loga*bg_size_ + index_bi_a_] = pba->a_today*1./(1. + z_table_[index_loga]);
+  // compute quantities depending only on {B} variables.
+  class_call(background_functions(y, pba->long_info, pvecback),
+             error_message_,
+             error_message_);
+
+  pvecback[index_bg_time_] = y[index_bi_time_];
+  pvecback[index_bg_rs_] = y[index_bi_rs_];
+  pvecback[index_bg_D_] = y[index_bi_D_];
+  pvecback[index_bg_f_] = y[index_bi_D_prime_]/(y[index_bi_D_]*a*pvecback[index_bg_H_]);
+
+  //Swap a and tau again
+  y[index_bi_a_] = tau;
+
   return _SUCCESS_;
 }
