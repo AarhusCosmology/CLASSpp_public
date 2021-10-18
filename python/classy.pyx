@@ -375,6 +375,21 @@ cdef class PyCosmology:
     cpdef lensed_cl(self, int lmax=-1):
         return self.general_cl(lmax, True)
 
+    cpdef lensed_cl_computed(self):
+        cdef:
+            dict out_dict
+            map[string, vector[double]] cl_data
+
+        le = deref(self._thisptr).GetLensingModule()
+        cl_data = deref(le).cl_output_computed()
+        out_dict = {}
+        for element in cl_data:
+            key = <bytes> element.first
+            key = str(key.decode())
+            out_dict[key] = np.asarray(<double[:element.second.size()]> &element.second[0]).copy()
+        out_dict['ell'] = out_dict['ell'].astype(int)
+        return out_dict
+
     cpdef z_of_r (self, double[::1] z_array):
         cdef:
             double tau

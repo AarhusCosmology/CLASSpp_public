@@ -17,6 +17,7 @@
 
 #include "spectra_module.h"
 #include "lensing_module.h"
+#include <numeric>
 
 /**
  * Anisotropy power spectra \f$ C_l\f$'s for all types, modes and initial conditions.
@@ -49,9 +50,27 @@ LensingModule::~LensingModule() {
 }
 
 std::map<std::string, std::vector<double>> LensingModule::cl_output(int lmax) const {
+  ThrowRuntimeErrorIf((lmax > l_lensed_max_) || (lmax < 0), "Error: lmax = %d is outside the allowed range [0, %d]\n", lmax, l_lensed_max_);
+std::vector<int> l_values(lmax + 1 - 2);
+  std::iota(l_values.begin(), l_values.end(), 2);
+  return cl_output_at_l_values(l_values);
+}
+
+std::map<std::string, std::vector<double>> LensingModule::cl_output_computed() const {
+  std::vector<int> l_values;
+  for (int index_l = 0; index_l < l_size_; ++index_l) {
+    double ell = l_[index_l];
+    if (ell > l_lensed_max_) {
+      break;
+    }
+    l_values.push_back(ell);
+  }
+  return cl_output_at_l_values(l_values);
+}
+
+std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(const std::vector<int>& l_values) const {
 
   ThrowRuntimeErrorIf(ple->has_lensed_cls == _FALSE_, "No lensed Cls was computed, adjust your inputs.\n");
-  ThrowRuntimeErrorIf((lmax > l_lensed_max_) || (lmax < 0), "Error: lmax = %d is outside the allowed range [0, %d]\n", lmax, l_lensed_max_);
 
   std::map<std::string, int> index_map;
 
@@ -68,17 +87,17 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output(int lmax) co
   std::vector<std::string> keys;
 
   for (const auto& element : index_map) {
-    data_vectors.push_back(std::vector<double>(lmax + 1, 0.0));
+    data_vectors.push_back(std::vector<double>(l_values.size() + 2, 0.0));
     indices.push_back(element.second);
     keys.push_back(element.first);
   }
 
   double cl_lensed[lt_size_];
-  for (int l = 2; l <= lmax; l++) {
-    int status = lensing_cl_at_l(l, cl_lensed);
+  for (int index_l = 0; index_l < l_values.size(); ++index_l) {
+    int status = lensing_cl_at_l(l_values[index_l], cl_lensed);
     ThrowRuntimeErrorIf(status != _SUCCESS_, "Error in LensingModule::cl_output: %s", error_message_);
     for (int i = 0; i < data_vectors.size(); ++i) {
-      data_vectors[i][l] = cl_lensed[indices[i]];
+      data_vectors[i][index_l + 2] = cl_lensed[indices[i]];
     }
   }
   // Now move vectors into map. We could have created the vectors inside the map directly, but that would
@@ -87,7 +106,9 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output(int lmax) co
   for (int i = 0; i < data_vectors.size(); ++i) {
     output[keys[i]] = std::move(data_vectors[i]);
   }
-
+  std::vector<double> ell = {0.0, 1.0};
+  ell.insert(ell.end(), l_values.begin(), l_values.end());
+  output["ell"] = std::move(ell);
   return output;
 }
 

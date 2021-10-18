@@ -13,6 +13,7 @@ public:
   LensingModule(InputModulePtr input_module, SpectraModulePtr spectra_module);
   ~LensingModule();
   std::map<std::string, std::vector<double>> cl_output(int lmax) const;
+  std::map<std::string, std::vector<double>> cl_output_computed() const;
   int lensing_cl_at_l(int l, double * cl_lensed) const;
 
   int l_unlensed_max_;    /**< last multipole in all calculations (same as in spectra module)*/
@@ -22,6 +23,7 @@ private:
   int lensing_init();
   int lensing_free();
   int lensing_indices();
+  std::map<std::string, std::vector<double>> cl_output_at_l_values(const std::vector<int>& l_values) const;
   int lensing_lensed_cl_tt(double *ksi, double **d00, double *w8, int nmu);
   int lensing_lensed_cl_te(double *ksiX, double **d20, double *w8, int nmu);
   int lensing_lensed_cl_ee_bb(double *ksip, double *ksim, double **d22, double **d2m2, double *w8, int nmu);
