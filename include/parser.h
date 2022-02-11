@@ -35,7 +35,7 @@ extern "C" {
 #endif
 
 int parser_read_file(
-		     char * filename,
+		     const char* filename,
 		     FileContent* pfc,
 		     ErrorMsg errmsg
 		     );
@@ -43,7 +43,7 @@ int parser_read_file(
 int parser_init(
 		FileContent* pfc,
 		int size,
-        char * filename,
+    const char* filename,
 		ErrorMsg errmsg
 		);
 
@@ -57,7 +57,7 @@ int parser_read_line(
 
 int parser_read_int(
 		    FileContent* pfc,
-		    char * name,
+		    const char* name,
 		    int * value,
 		    int * found,
 		    ErrorMsg errmsg
@@ -73,7 +73,7 @@ int parser_read_double(
 
   int parser_read_double_and_position(
                                       FileContent* pfc,
-                                      char * name,
+                                      const char* name,
                                       double * value,
                                       int * position,
                                       int * found,
@@ -82,7 +82,7 @@ int parser_read_double(
 
 int parser_read_string(
 		       FileContent* pfc,
-		       char * name,
+		       const char* name,
 		       FileArg * value,
 		       int * found,
 		       ErrorMsg errmsg
@@ -90,7 +90,7 @@ int parser_read_string(
 
 int parser_read_list_of_doubles(
 				FileContent* pfc,
-				char * name,
+				const char* name,
 				int * size,
 				double ** pointer_to_list,
 				int * found,
@@ -99,7 +99,7 @@ int parser_read_list_of_doubles(
 
 int parser_read_list_of_integers(
 				FileContent* pfc,
-				char * name,
+				const char* name,
 				int * size,
 				int ** pointer_to_list,
 				int * found,
@@ -108,7 +108,7 @@ int parser_read_list_of_integers(
 
 int parser_read_list_of_strings(
 				FileContent* pfc,
-				char * name,
+				const char* name,
 				int * size,
 				char ** pointer_to_list,
 				int * found,

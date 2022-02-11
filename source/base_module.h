@@ -18,7 +18,8 @@
 class BaseModule {
 public:
   BaseModule(InputModulePtr input_module)
-  : ppr(&input_module->precision_)
+  : ncdm_(input_module->ncdm_)
+  , ppr(&input_module->precision_)
   , pba(&input_module->background_)
   , pth(&input_module->thermodynamics_)
   , ppt(&input_module->perturbations_)
@@ -34,6 +35,8 @@ public:
   BaseModule(const BaseModule&) = delete;
   
   mutable ErrorMsg error_message_;
+public:
+  const std::shared_ptr<NonColdDarkMatter> ncdm_;
 protected:
   InputModulePtr input_module_;
 

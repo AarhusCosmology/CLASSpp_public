@@ -197,42 +197,60 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
   class_alloc(shooting_workspace_.unknown_parameters_index,
               unknown_parameters_size*sizeof(int),
               error_message_);
-  shooting_workspace_.target_size = unknown_parameters_size;
   class_alloc(shooting_workspace_.target_name,
-              shooting_workspace_.target_size*sizeof(enum target_names),
+              unknown_parameters_size*sizeof(enum target_names),
               error_message_);
-  class_alloc(shooting_workspace_.target_value,
-              shooting_workspace_.target_size*sizeof(double),
+  class_alloc(shooting_workspace_.target_sizes,
+              unknown_parameters_size*sizeof(int),
               error_message_);
+  shooting_workspace_.unknown_parameters_size = unknown_parameters_size;
+  std::vector<double> target_values;
 
   /** - --> go through all cases with unknown parameters: */
   for (int counter = 0; counter < unknown_parameters_size; counter++){
     int index_target = target_indices[counter];
     int flag1;
-    double param1;
-    class_call(parser_read_double(&file_content_,
-                                  kTargetNamestrings_[index_target].c_str(),
-                                  &param1,
-                                  &flag1,
-                                  error_message_),
+    int params_size;
+    double* params = nullptr;
+    class_call(parser_read_list_of_doubles(&file_content_,
+                                           kTargetNamestrings_[index_target].c_str(),
+                                           &params_size,
+                                           &params,
+                                           &flag1,
+                                           error_message_),
                error_message_,
                error_message_);
 
+
     // store name of target parameter
     shooting_workspace_.target_name[counter] = (enum target_names)index_target;
-    // store target value of target parameter
-    shooting_workspace_.target_value[counter] = param1;
+    shooting_workspace_.target_sizes[counter] = params_size;
     shooting_workspace_.unknown_parameters_index[counter] = file_content_.size - unknown_parameters_size + counter;
-    // Set the name and value of the unknown parameter. The value will be overwritten in get_guess().
+    std::string comma_separated_list_of_values = "1.0";
+    for (int j = 0; j < params_size; ++j) {
+      // store target value of target parameter
+      target_values.push_back(params[j]);
+      if (j > 0) {
+        comma_separated_list_of_values.append(",1.0");
+      }
+    }
+    free(params);
     strcpy(file_content_.name[shooting_workspace_.unknown_parameters_index[counter]], kUnknownNamestrings_[index_target].c_str());
-    strcpy(file_content_.value[shooting_workspace_.unknown_parameters_index[counter]], "1234.56789");
+    strcpy(file_content_.value[shooting_workspace_.unknown_parameters_index[counter]], comma_separated_list_of_values.c_str());
 
     //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
+    class_alloc(shooting_workspace_.target_values,
+                target_values.size()*sizeof(double),
+                error_message_);
+    for (int j = 0; j < target_values.size(); ++j) {
+      shooting_workspace_.target_values[j] = target_values[j];
+    }
+
   }
 
   int fevals = 0;
   int status = _SUCCESS_;
-  if (unknown_parameters_size == 1){
+  if (target_values.size() == 1) {
     // 1d root finding
     if (input_verbose > 0) {
       fprintf(
@@ -266,10 +284,10 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     double* x_inout;
     double* dxdF;
     class_alloc(x_inout,
-                sizeof(double)*unknown_parameters_size,
+                sizeof(double)*target_values.size(),
                 error_message_);
     class_alloc(dxdF,
-                sizeof(double)*unknown_parameters_size,
+                sizeof(double)*target_values.size(),
                 error_message_);
     class_call(input_get_guess(x_inout,
                                dxdF,
@@ -280,7 +298,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     class_call(fzero_Newton(input_try_unknown_parameters,
                             x_inout,
                             dxdF,
-                            unknown_parameters_size,
+                            target_values.size(),
                             1e-4,
                             1e-6,
                             &shooting_workspace_,
@@ -289,9 +307,14 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
                error_message_, error_message_);
 
     /* Store xzero */
-    for (int counter = 0; counter < unknown_parameters_size; counter++){
-      sprintf(file_content_.value[shooting_workspace_.unknown_parameters_index[counter]],
-              "%e",x_inout[counter]);
+    int x_inout_index = 0;
+    for (int counter = 0; counter < unknown_parameters_size; counter++) {
+      char* value = file_content_.value[shooting_workspace_.unknown_parameters_index[counter]];
+      for (int j = 0; j < shooting_workspace_.target_sizes[counter]; ++j) {
+        const char* format_string = j > 0 ? ",%.17g" : "%.17g";
+        int bytes_written = sprintf(value, format_string, x_inout[x_inout_index++]);
+        value += bytes_written;
+      }
       if (input_verbose > 0) {
         fprintf(stdout," -> found '%s = %s'\n",
                 file_content_.name [shooting_workspace_.unknown_parameters_index[counter]],
@@ -384,20 +407,25 @@ int InputModule::input_init() {
   /** - Do we need to fix unknown parameters? */
   unknown_parameters_size = 0;
   for (index_target = 0; index_target < _NUM_TARGETS_; index_target++){
-    class_call(parser_read_double(pfc,
-                                  kTargetNamestrings_[index_target].c_str(),
-                                  &param1,
-                                  &flag1,
-                                  errmsg),
-               errmsg,
-               errmsg);
-    if (flag1 == _TRUE_){
+    int flag1;
+    int params_size;
+    double* params = nullptr;
+    class_call(parser_read_list_of_doubles(&file_content_,
+                                           kTargetNamestrings_[index_target].c_str(),
+                                           &params_size,
+                                           &params,
+                                           &flag1,
+                                           error_message_),
+               error_message_,
+               error_message_);
+    if (flag1 == _TRUE_) {
       /** - --> input_auxillary_target_conditions() takes care of the case where for
           instance Omega_dcdmdr is set to 0.0.
       */
       class_call(input_auxillary_target_conditions(pfc,
                                                    (enum target_names)index_target,
-                                                   param1,
+                                                   params,
+                                                   params_size,
                                                    &aux_flag,
                                                    errmsg),
                  errmsg, errmsg);
@@ -407,6 +435,7 @@ int InputModule::input_init() {
         unknown_parameters_size++;
       }
     }
+    free(params);
   }
 
   /**
@@ -1028,10 +1057,10 @@ int InputModule::input_read_parameters() {
   ncdm_settings.tol_ncdm = ppr->tol_ncdm;
   ncdm_settings.tol_ncdm_bg = ppr->tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm = ppr->tol_M_ncdm;
-  pba->ncdm = NonColdDarkMatter::Create(pfc, ncdm_settings);
-  if (pba->ncdm) {
-    pba->N_ncdm = pba->ncdm->N_ncdm_;
-    pba->Omega0_ncdm_tot = pba->ncdm->GetOmega0();
+  ncdm_ = NonColdDarkMatter::Create(pfc, ncdm_settings);
+  if (ncdm_ != nullptr) {
+    pba->N_ncdm = ncdm_->N_ncdm_;
+    pba->Omega0_ncdm_tot = ncdm_->GetOmega0();
   }
   Omega_tot += pba->Omega0_ncdm_tot;
 
@@ -3426,11 +3455,10 @@ int InputModule::class_fzero_ridder(int (*func)(double x, void* param, double* y
   class_stop(error_message,"Failure in int.");
 }
 
-int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unknown_parameters_size, void* voidpfzw, double* output, ErrorMsg errmsg) {
+int InputModule::input_try_unknown_parameters(double* unknown_values, int unknown_values_size, void* voidpfzw, double* output, ErrorMsg errmsg) {
   /** Summary:
    * - Call the structures*/
 
-  int i;
   double rho_dcdm_today, rho_dr_today;
   struct fzerofun_workspace * pfzw;
   int input_verbose;
@@ -3440,9 +3468,14 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
 
   pfzw = (struct fzerofun_workspace *) voidpfzw;
   /** - Read input parameters */
-  for (i=0; i < unknown_parameters_size; i++) {
-    sprintf(pfzw->fc.value[pfzw->unknown_parameters_index[i]],
-            "%e",unknown_parameter[i]);
+  int x_inout_index = 0;
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
+    char* value = pfzw->fc.value[pfzw->unknown_parameters_index[counter]];
+    for (int j = 0; j < pfzw->target_sizes[counter]; ++j) {
+      const char* format_string = j > 0 ? ",%.17g" : "%.17g";
+      int bytes_written = sprintf(value, format_string, unknown_values[x_inout_index++]);
+      value += bytes_written;
+    }
   }
 
   std::unique_ptr<InputModule> input_module{new InputModule(pfzw->fc)};
@@ -3470,8 +3503,8 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
     input_verbose = 0;
 
   /** - Optimise flags for sigma8 calculation.*/
-  for (i=0; i < unknown_parameters_size; i++) {
-    if (pfzw->target_name[i] == sigma8) {
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
+    if (pfzw->target_name[counter] == sigma8) {
       compute_sigma8 = _TRUE_;
     }
   }
@@ -3506,11 +3539,12 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
   Cosmology cosmology{std::move(input_module)};
 
   /** - Get the corresponding shoot variable and put into output */
-  for (i=0; i < pfzw->target_size; i++) {
-    switch (pfzw->target_name[i]) {
+  int idx = 0;
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; ++counter) {
+    switch (pfzw->target_name[counter]) {
     case theta_s: {
       ThermodynamicsModulePtr thm = cosmology.GetThermodynamicsModule();
-      output[i] = 100.*thm->rs_rec_/thm->ra_rec_ - pfzw->target_value[i];
+      output[idx] = 100.*thm->rs_rec_/thm->ra_rec_ - pfzw->target_values[idx];
       break;
     }
     case Omega_dcdmdr: {
@@ -3520,7 +3554,7 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
         rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_];
       else
         rho_dr_today = 0.;
-      output[i] = (rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)-pfzw->target_value[i];
+      output[idx] = (rho_dcdm_today + rho_dr_today)/(ba.H0*ba.H0) - pfzw->target_values[idx];
       break;
     }
     case omega_dcdmdr: {
@@ -3530,13 +3564,13 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
         rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_];
       else
         rho_dr_today = 0.;
-      output[i] = (rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)-pfzw->target_value[i]/ba.h/ba.h;
+      output[idx] = (rho_dcdm_today + rho_dr_today)/(ba.H0*ba.H0) - pfzw->target_values[idx]/ba.h/ba.h;
       break;
     }
     case Omega_scf: {
     BackgroundModulePtr bam = cosmology.GetBackgroundModule();
       /** - In case scalar field is used to fill, pba->Omega0_scf is not equal to pfzw->target_value[i].*/
-      output[i] = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_scf_]/(ba.H0*ba.H0) - ba.Omega0_scf;
+      output[idx] = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_scf_]/(ba.H0*ba.H0) - ba.Omega0_scf;
       break;
     }
     case Omega_ini_dcdm:
@@ -3547,44 +3581,44 @@ int InputModule::input_try_unknown_parameters(double* unknown_parameter, int unk
         rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_];
       else
         rho_dr_today = 0.;
-      output[i] = -(rho_dcdm_today+rho_dr_today)/(ba.H0*ba.H0)+ba.Omega0_dcdmdr;
+      output[idx] = -(rho_dcdm_today + rho_dr_today)/(ba.H0*ba.H0) + ba.Omega0_dcdmdr;
       break;
     }
     case sigma8: {
       NonlinearModulePtr nl = cosmology.GetNonlinearModule();
-      output[i] = nl->sigma8_[nl->index_pk_m_] - pfzw->target_value[i];
+      output[idx] = nl->sigma8_[nl->index_pk_m_] - pfzw->target_values[idx];
       break;
     }
     }
+    idx += pfzw->target_sizes[counter];
   }
 
   return _SUCCESS_;
 }
 
 int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspace* pfzw, ErrorMsg errmsg) {
-
-  int i;
-
   double Omega_M, a_decay, gamma, Omega0_dcdmdr=1.0;
-  int index_guess;
 
   std::shared_ptr<InputModule> input_module = std::make_shared<InputModule>(pfzw->fc);
+  std::shared_ptr<NonColdDarkMatter> ncdm = input_module->ncdm_;
   background& ba = input_module->background_;    /* for cosmological background */
+  precision& pr = input_module->precision_;
   /** Summary: */
   /** - Here we should write reasonable guesses for the unknown parameters.
       Also estimate dxdy, i.e. how the unknown parameter responds to the known.
       This can simply be estimated as the derivative of the guess formula.*/
-
-  for (index_guess=0; index_guess < pfzw->target_size; index_guess++) {
-    switch (pfzw->target_name[index_guess]) {
-    case theta_s:
-      xguess[index_guess] = 3.54*pow(pfzw->target_value[index_guess],2)-5.455*pfzw->target_value[index_guess]+2.548;
-      dxdy[index_guess] = (7.08*pfzw->target_value[index_guess]-5.455);
+  int index_guess = 0;
+  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
+    switch (pfzw->target_name[counter]) {
+    case theta_s: {
+      xguess[index_guess] = 3.54*pow(pfzw->target_values[index_guess], 2) - 5.455*pfzw->target_values[index_guess] + 2.548;
+      dxdy[index_guess] = (7.08*pfzw->target_values[index_guess] - 5.455);
       /** - Update pb to reflect guess */
       ba.h = xguess[index_guess];
       ba.H0 = ba.h *  1.e5 / _c_;
       break;
-    case Omega_dcdmdr:
+    }
+    case Omega_dcdmdr: {
       Omega_M = ba.Omega0_cdm+ba.Omega0_idm_dr+ba.Omega0_dcdmdr+ba.Omega0_b;
       /* This formula is exact in a Matter + Lambda Universe, but only
          for Omega_dcdm, not the combined.
@@ -3599,11 +3633,12 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         a_decay = 1.0;
       else
         a_decay = pow(1+(gamma*gamma-1.)/Omega_M,-1./3.);
-      xguess[index_guess] = pfzw->target_value[index_guess]/a_decay;
+      xguess[index_guess] = pfzw->target_values[index_guess]/a_decay;
       dxdy[index_guess] = 1./a_decay;
       //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
       break;
-    case omega_dcdmdr:
+    }
+    case omega_dcdmdr: {
       Omega_M = ba.Omega0_cdm+ba.Omega0_idm_dr+ba.Omega0_dcdmdr+ba.Omega0_b;
       /* This formula is exact in a Matter + Lambda Universe, but only
          for Omega_dcdm, not the combined.
@@ -3618,11 +3653,12 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         a_decay = 1.0;
       else
         a_decay = pow(1+(gamma*gamma-1.)/Omega_M,-1./3.);
-      xguess[index_guess] = pfzw->target_value[index_guess]/ba.h/ba.h/a_decay;
+      xguess[index_guess] = pfzw->target_values[index_guess]/ba.h/ba.h/a_decay;
       dxdy[index_guess] = 1./a_decay/ba.h/ba.h;
       //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
       break;
-    case Omega_scf:
+    }
+    case Omega_scf: {
 
       /** - This guess is arbitrary, something nice using WKB should be implemented.
        *
@@ -3641,34 +3677,39 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
         dxdy[index_guess] = 1.;
       }
       break;
-    case omega_ini_dcdm:
+    }
+    case omega_ini_dcdm: {
       Omega0_dcdmdr = 1./(ba.h*ba.h);
-    case Omega_ini_dcdm:
+    }
+    case Omega_ini_dcdm: {
       /** - This works since correspondence is
           Omega_ini_dcdm -> Omega_dcdmdr and
           omega_ini_dcdm -> omega_dcdmdr */
-      Omega0_dcdmdr *=pfzw->target_value[index_guess];
+      Omega0_dcdmdr *= pfzw->target_values[index_guess];
       Omega_M = ba.Omega0_cdm+ba.Omega0_idm_dr+Omega0_dcdmdr+ba.Omega0_b;
       gamma = ba.Gamma_dcdm/ba.H0;
       if (gamma < 1)
         a_decay = 1.0;
       else
         a_decay = pow(1+(gamma*gamma-1.)/Omega_M,-1./3.);
-      xguess[index_guess] = pfzw->target_value[index_guess]*a_decay;
+      xguess[index_guess] = pfzw->target_values[index_guess]*a_decay;
       dxdy[index_guess] = a_decay;
       if (gamma > 100)
         dxdy[index_guess] *= gamma/100;
 
       //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
       break;
+    }
 
-    case sigma8:
+    case sigma8: {
       /* Assume linear relationship between A_s and sigma8 and fix coefficient
          according to vanilla LambdaCDM. Should be good enough... */
-      xguess[index_guess] = 2.43e-9/0.87659*pfzw->target_value[index_guess];
+      xguess[index_guess] = 2.43e-9/0.87659*pfzw->target_values[index_guess];
       dxdy[index_guess] = 2.43e-9/0.87659;
       break;
     }
+    }
+    index_guess += pfzw->target_sizes[counter];
     //printf("xguess = %g\n",xguess[index_guess]);
   }
 
@@ -3770,22 +3811,22 @@ int InputModule::file_exists(const char *fname){
   return _FALSE_;
 }
 
-int InputModule::input_auxillary_target_conditions(FileContent* pfc, enum target_names target_name, double target_value, int* aux_flag, ErrorMsg errmsg) {
+int InputModule::input_auxillary_target_conditions(FileContent* pfc, enum target_names target_name, double* target_values, int target_values_size, int* aux_flag, ErrorMsg errmsg) {
   *aux_flag = _TRUE_;
-  switch (target_name){
-  case Omega_dcdmdr:
-  case omega_dcdmdr:
-  case Omega_scf:
-  case Omega_ini_dcdm:
-  case omega_ini_dcdm:
-    /* Check that Omega's or omega's are nonzero: */
-    if (target_value == 0.)
-      *aux_flag = _FALSE_;
-    break;
-  default:
-    /* Default is no additional checks */
-    *aux_flag = _TRUE_;
-    break;
+  switch (target_name) {
+    case Omega_dcdmdr:
+    case omega_dcdmdr:
+    case Omega_scf:
+    case Omega_ini_dcdm:
+    case omega_ini_dcdm:
+      /* Check that Omega's or omega's are nonzero: */
+      if (target_values[0] == 0.)
+        *aux_flag = _FALSE_;
+      break;
+    default:
+      /* Default is no additional checks */
+      *aux_flag = _TRUE_;
+      break;
   }
   return _SUCCESS_;
 }

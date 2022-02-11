@@ -1,25 +1,15 @@
 #include "non_cold_dark_matter.h"
 
 std::shared_ptr<NonColdDarkMatter> NonColdDarkMatter::Create(FileContent* pfc, const NcdmSettings& ncdm_settings) {
-  int flag1;
-  int N_ncdm;
-  ErrorMsg error_message;
-  parser_read_int(pfc, "N_ncdm", &N_ncdm, &flag1, error_message);
-  if ((flag1 == _TRUE_) && (N_ncdm > 0)) {
-    try {
-      return std::shared_ptr<NonColdDarkMatter>(new NonColdDarkMatter(pfc, ncdm_settings));
-    }
-    catch (...) {
-      return nullptr;
-    }
+  try {
+    return std::shared_ptr<NonColdDarkMatter>(new NonColdDarkMatter(pfc, ncdm_settings));
   }
-  else {
+  catch (NoNcdmRequested& error) {
     return nullptr;
   }
 }
 
 NonColdDarkMatter::NonColdDarkMatter(FileContent* pfc, const NcdmSettings& ncdm_settings) {
-  rho_nu_rel_ = 56.0/45.0*pow(_PI_, 6)*pow(4.0/11.0, 4.0/3.0)*_G_/pow(_h_P_, 3)/pow(_c_, 7)*pow(_Mpc_over_m_, 2)*pow(ncdm_settings.T_cmb*_k_B_, 4);
   if (background_ncdm_init(pfc, ncdm_settings) == _FAILURE_) {
     throw std::runtime_error(error_message_);
   }
@@ -213,37 +203,171 @@ int NonColdDarkMatter::background_ncdm_test_function(
 
 int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings& ncdm_settings) {
   int n;
-  int int1;
-  int flag1;
+  int int1, int2;
+  int flag1, flag2;
   int entries_read;
   char* errmsg = error_message_;
-  class_read_int("N_ncdm", N_ncdm_);
+   
+  /* Number of distinct standard ncdm species */
+  class_call(parser_read_int(pfc, "N_ncdm_standard", &int1, &flag1, errmsg),
+             errmsg,
+             errmsg);
+  class_call(parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg),
+             errmsg,
+             errmsg);
+  if ((flag1 == _TRUE_) && (flag2 == _TRUE_)) {
+    throw std::invalid_argument("In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
+  }
+  if (flag1 == _TRUE_) {
+    N_ncdm_standard_ = int1;
+  }
+  else if (flag2 == _TRUE_) {
+    N_ncdm_standard_ = int2;
+  }
 
-  /* Quadrature modes, 0 is qm_auto. */
-  class_read_list_of_integers_or_default("Quadrature strategy", ncdm_quadrature_strategy_, 0, N_ncdm_);
+  for (int n = 0; n < N_ncdm_standard_; n++) {
+    ncdm_types_.push_back(NCDMType::standard);
+  }
+  // N_ncdm_ is the total amount of ncdm species of all types
+  N_ncdm_ = N_ncdm_standard_ + N_ncdm_decay_dr_;
+  
+  if (N_ncdm_ == 0) {
+    // Throw error to let NonColdDarkMatter::Create know to continue with no ncdm module
+    throw NoNcdmRequested("No ncdm species requested; continuing without an ncdm module.");
+  }
+  
+  if ((N_ncdm_standard_ < 0) || (N_ncdm_decay_dr_ < 0)) {
+    throw std::invalid_argument("Amount of ncdm species must be positive, please check the N_ncdm variables in your input file.");
+  }
+  
+  auto read_list_of_ints_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, int*& output, int expected_size, int default_value) {
+    int flg1, flg2, entries_read;
+    class_call(parser_read_list_of_integers(pfc,
+                                              varname.c_str(),
+                                              &entries_read,
+                                              &output,
+                                              &flg1,
+                                              error_message_),
+                 error_message_,
+                 error_message_);
+      class_call(parser_read_list_of_integers(pfc,
+                                              varname_deprec.c_str(),
+                                              &entries_read,
+                                              &output,
+                                              &flg2,
+                                              error_message_),
+                 error_message_,
+                 error_message_);
+    if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
+      throw std::invalid_argument(std::string("In input file, you can only enter one of ") + varname + std::string(" and ") + varname_deprec + std::string(", choose one"));
+    } else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
+      if (entries_read != expected_size) {
+        throw std::invalid_argument(std::string("Number of entries in ") + varname + std::string(" does not match the expected number: ") + std::to_string(expected_size));
+      }
+    } else {
+      class_alloc(output, expected_size*sizeof(int), error_message_);
+      for (int j = 0; j < expected_size; ++j) {
+        output[j] = default_value;
+      }
+    }
+    return 0;
+  };
+  
+  auto read_list_of_doubles_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, double*& output, int expected_size, double default_value) {
+    int flg1, flg2, entries_read;
+    class_call(parser_read_list_of_doubles(pfc,
+                                              varname.c_str(),
+                                              &entries_read,
+                                              &output,
+                                              &flg1,
+                                              error_message_),
+                 error_message_,
+                 error_message_);
+      class_call(parser_read_list_of_doubles(pfc,
+                                              varname_deprec.c_str(),
+                                              &entries_read,
+                                              &output,
+                                              &flg2,
+                                              error_message_),
+                 error_message_,
+                 error_message_);
+    if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
+      throw std::invalid_argument(std::string("In input file, you can only enter one of ") + varname + std::string(" and ") + varname_deprec + std::string(", choose one"));
+    } else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
+      if (entries_read != expected_size) {
+        throw std::invalid_argument(std::string("Number of entries in ") + varname + std::string(" does not match the expected number: ") + std::to_string(expected_size));
+      }
+    } else {
+      class_alloc(output, expected_size*sizeof(double), error_message_);
+      for (int j = 0; j < expected_size; ++j) {
+        output[j] = default_value;
+      }
+    }
+    return 0;
+  };
+  
+  /* Quadrature modes, 0 is qm_auto */
+  read_list_of_ints_with_deprecated("Quadrature strategy standard",
+                                    "Quadrature strategy",
+                                    ncdm_quadrature_strategy_,
+                                    N_ncdm_standard_,
+                                    0);
+  
   /* Number of momentum bins */
-  class_read_list_of_integers_or_default("Number of momentum bins", ncdm_input_q_size_, -1, N_ncdm_);
+  read_list_of_ints_with_deprecated("Number of momentum bins standard",
+                                    "Number of momentum bins",
+                                    ncdm_input_q_size_,
+                                    N_ncdm_standard_,
+                                    5);
+  
+  /* q-value of the highest momentum bin */
+  read_list_of_doubles_with_deprecated("Maximum q standard",
+                                       "Maximum q",
+                                       ncdm_qmax_,
+                                       N_ncdm_standard_,
+                                       15.0);
+  
+  /* Temperatures, default is LambdaCDM neutrino temperature */
+  read_list_of_doubles_with_deprecated("T_ncdm_standard",
+                                       "T_ncdm",
+                                       T_ncdm_,
+                                       N_ncdm_standard_,
+                                       T_ncdm_default_);
 
-  /* qmax, if relevant */
-  class_read_list_of_doubles_or_default("Maximum q", ncdm_qmax_, 15, N_ncdm_);
+  /* Chemical potentials */
+  read_list_of_doubles_with_deprecated("ksi_ncdm_standard",
+                                       "ksi_ncdm",
+                                       ksi_ncdm_,
+                                       N_ncdm_standard_,
+                                       ksi_ncdm_default);
+  
+  /* Degeneracy of each ncdm species */
+  read_list_of_doubles_with_deprecated("deg_ncdm_standard",
+                                       "deg_ncdm",
+                                       deg_ncdm_,
+                                       N_ncdm_standard_,
+                                       deg_ncdm_default_);
+  
+  /* Mass of each ncdm species */
+  read_list_of_doubles_with_deprecated("m_ncdm_standard",
+                                       "m_ncdm",
+                                       m_ncdm_in_eV_,
+                                       N_ncdm_standard_,
+                                       0.0);
+  
+  /* Omega of each ncdm species */
+  read_list_of_doubles_with_deprecated("Omega_ncdm_standard",
+                                       "Omega_ncdm",
+                                       Omega0_ncdm_,
+                                       N_ncdm_standard_,
+                                       0.0);
 
-  /* Read temperatures: */
-  class_read_list_of_doubles_or_default("T_ncdm", T_ncdm_, T_ncdm_default_, N_ncdm_);
-
-  /* Read chemical potentials: */
-  class_read_list_of_doubles_or_default("ksi_ncdm", ksi_ncdm_, ksi_ncdm_default, N_ncdm_);
-
-  /* Read degeneracy of each ncdm species: */
-  class_read_list_of_doubles_or_default("deg_ncdm", deg_ncdm_, deg_ncdm_default_, N_ncdm_);
-
-  /* Read mass of each ncdm species: */
-  class_read_list_of_doubles_or_default("m_ncdm", m_ncdm_in_eV_, 0.0, N_ncdm_);
-
-  /* Read Omega of each ncdm species: */
-  class_read_list_of_doubles_or_default("Omega_ncdm", Omega0_ncdm_, 0.0, N_ncdm_);
-
-  /* Read omega of each ncdm species: */
-  class_read_list_of_doubles_or_default("omega_ncdm", omega0_ncdm_, 0.0, N_ncdm_);
+  /* omega of each ncdm species */
+  read_list_of_doubles_with_deprecated("omega_ncdm_standard",
+                                       "omega_ncdm",
+                                       omega0_ncdm_,
+                                       N_ncdm_standard_,
+                                       0.0);
 
   /* Check for duplicate Omega/omega entries, missing mass definition and
      update Omega0_ncdm_:*/
@@ -413,15 +537,19 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
       /** Manual q-sampling for this species. Same sampling used for both perturbation and background sampling, since this will usually be a high precision setting anyway */
       q_size_ncdm_bg_[k] = ncdm_input_q_size_[k];
       q_size_ncdm_[k] = ncdm_input_q_size_[k];
+      
       class_alloc(q_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double), error_message_);
       class_alloc(w_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double), error_message_);
       class_alloc(q_ncdm_[k], q_size_ncdm_[k]*sizeof(double), error_message_);
       class_alloc(w_ncdm_[k], q_size_ncdm_[k]*sizeof(double), error_message_);
+      double* dq;
+      class_alloc(dq, q_size_ncdm_bg_[k]*sizeof(double), error_message_);
       class_call(get_qsampling_manual(q_ncdm_[k],
                                       w_ncdm_[k],
+                                      dq,
                                       q_size_ncdm_[k],
                                       ncdm_qmax_[k],
-                                      (enum ncdm_quadrature_method)ncdm_quadrature_strategy_[k],
+                                      (enum quadrature_method)ncdm_quadrature_strategy_[k],
                                       pbadist.q,
                                       pbadist.tablesize,
                                       background_ncdm_distribution,
@@ -483,6 +611,8 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
     factor_ncdm_[k] = deg_ncdm_[k]*4*_PI_*pow(ncdm_settings.T_cmb*T_ncdm_[k]*_k_B_, 4)*8*_PI_*_G_
       /3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_;
+    
+    rho_nu_rel_ = 56.0/45.0*pow(_PI_, 6)*pow(4.0/11.0, 4.0/3.0)*_G_/pow(_h_P_, 3)/pow(_c_, 7)*pow(_Mpc_over_m_, 2)*pow(ncdm_settings.T_cmb*_k_B_, 4);
 
     /* If allocated, deallocate interpolation table:  */
   }
@@ -730,4 +860,32 @@ double NonColdDarkMatter::GetMassInElectronvolt(int n_ncdm) const {
   else {
     return m_ncdm_in_eV_[n_ncdm];
   }
+}
+/** Checks whether scale factor a_start is early enough and returns one that is */
+double NonColdDarkMatter::GetIni(double a, double a_today, double tol_ncdm_initial_w) {
+  double rho_ncdm, p_ncdm;
+  int counter;
+  for (counter = 0; counter < _MAX_IT_; counter++) {
+
+      int is_early_enough = _TRUE_;
+      double rho_ncdm_rel_tot = 0.;
+
+      for (int n_ncdm = 0; n_ncdm < N_ncdm_; n_ncdm++) {
+
+        class_call(background_ncdm_momenta(n_ncdm, a_today/a - 1.0, NULL, &rho_ncdm, &p_ncdm, NULL, NULL),
+                   error_message_,
+                   error_message_);
+        rho_ncdm_rel_tot += 3.*p_ncdm;
+        if (fabs(p_ncdm/rho_ncdm - 1./3.) > tol_ncdm_initial_w)
+          is_early_enough = _FALSE_;
+      }
+      if (is_early_enough == _TRUE_)
+        break;
+      else
+        a *= _SCALE_BACK_;
+    }
+    class_test(counter == _MAX_IT_,
+               error_message_,
+               "Search for initial scale factor a such that all ncdm species are relativistic failed.");
+  return a;
 }

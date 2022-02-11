@@ -383,12 +383,13 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
     /* Loop over species: */
     for(n_ncdm=0; n_ncdm<pba->N_ncdm; n_ncdm++){
+      double number_ncdm; // ncdm number density
 
       /* function returning background ncdm[n_ncdm] quantities (only
          those for which non-NULL pointers are passed) */
-      class_call(pba->ncdm->background_ncdm_momenta(n_ncdm,
+      class_call(ncdm_->background_ncdm_momenta(n_ncdm,
                                                     1./a_rel - 1.,
-                                                    NULL,
+                                                    &number_ncdm,
                                                     &rho_ncdm,
                                                     &p_ncdm,
                                                     NULL,
@@ -396,6 +397,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
                  error_message_,
                  error_message_);
 
+      pvecback[index_bg_number_ncdm1_ + n_ncdm] = number_ncdm;
       pvecback[index_bg_rho_ncdm1_ + n_ncdm] = rho_ncdm;
       rho_tot += rho_ncdm;
       pvecback[index_bg_p_ncdm1_ + n_ncdm] = p_ncdm;
@@ -644,8 +646,8 @@ int BackgroundModule::background_init() {
 
       /* contribution of ncdm species to N_eff*/
       if (pba->N_ncdm > 0){
-        Neff += pba->ncdm->GetNeff(0.);
-        pba->ncdm->PrintNeffInfo();
+        Neff += ncdm_->GetNeff(0.);
+        ncdm_->PrintNeffInfo();
       }
 
       /* contribution of interacting dark radiation _idr to N_eff */
@@ -680,7 +682,7 @@ int BackgroundModule::background_init() {
      masses in eV and about the ratio [m/omega_ncdm] in eV (the usual
      93 point something)*/
   if ((pba->background_verbose > 0) && (pba->has_ncdm == _TRUE_)) {
-    pba->ncdm->PrintMassInfo();
+    ncdm_->PrintMassInfo();
   }
 
   /* check other quantities which would lead to segmentation fault if zero */
@@ -702,7 +704,7 @@ int BackgroundModule::background_init() {
       class_call(background_solve_evolver(), error_message_, error_message_);
       break;
   default:
-    printf("No background evolution method selected!\n");
+    printf("Invalid background method selected. Please set it to 0 or 1 or omit it from your input.\n");
   }
 
   /** - this function finds and stores a few derived parameters at radiation-matter equality */
@@ -793,7 +795,8 @@ int BackgroundModule::background_indices() {
   /* - indices for ncdm. We only define the indices for ncdm1
      (density, pressure, pseudo-pressure), the other ncdm indices
      are contiguous */
-  class_define_index(index_bg_rho_ncdm1_ ,pba->has_ncdm, index_bg, pba->N_ncdm);
+  class_define_index(index_bg_number_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
+  class_define_index(index_bg_rho_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
   class_define_index(index_bg_p_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
   class_define_index(index_bg_pseudo_p_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
 
@@ -1020,15 +1023,14 @@ int BackgroundModule::background_solve() {
     if ((pvecback_integration[index_bi_a_]*(1. + ppr->back_integration_stepsize)) < pba->a_today) {
       tau_end = tau_start + ppr->back_integration_stepsize/(pvecback_integration[index_bi_a_]*pvecback[index_bg_H_]);
       /* no possible segmentation fault here: non-zeroness of "a" has been checked in background_functions() */
+      class_test((tau_end-tau_start)/tau_start < ppr->smallest_allowed_variation,
+                 error_message_,
+                 "integration step: relative change in time =%e < machine precision : leads either to numerical error or infinite loop",(tau_end-tau_start)/tau_start);
     }
     else {
       tau_end = tau_start + (pba->a_today/pvecback_integration[index_bi_a_] - 1.)/(pvecback_integration[index_bi_a_]*pvecback[index_bg_H_]);
       /* no possible segmentation fault here: non-zeroness of "a" has been checked in background_functions() */
     }
-
-    class_test((tau_end-tau_start)/tau_start < ppr->smallest_allowed_variation,
-               error_message_,
-               "integration step: relative change in time =%e < machine precision : leads either to numerical error or infinite loop",(tau_end-tau_start)/tau_start);
 
     /* -> save data in growTable */
     class_call(gt_add(&gTable,_GT_END_, (void*) pvecback_integration, sizeof(double)*bi_size_),
@@ -1459,29 +1461,7 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
   */
 
   if (pba->has_ncdm == _TRUE_) {
-
-    for (counter=0; counter < _MAX_IT_; counter++) {
-
-      is_early_enough = _TRUE_;
-      rho_ncdm_rel_tot = 0.;
-
-      for (n_ncdm=0; n_ncdm<pba->N_ncdm; n_ncdm++) {
-
-        class_call(pba->ncdm->background_ncdm_momenta(n_ncdm, pba->a_today/a - 1.0, NULL, &rho_ncdm, &p_ncdm, NULL, NULL),
-                   error_message_,
-                   error_message_);
-        rho_ncdm_rel_tot += 3.*p_ncdm;
-        if (fabs(p_ncdm/rho_ncdm-1./3.)>ppr->tol_ncdm_initial_w)
-          is_early_enough = _FALSE_;
-      }
-      if (is_early_enough == _TRUE_)
-        break;
-      else
-        a *= _SCALE_BACK_;
-    }
-    class_test(counter == _MAX_IT_,
-               error_message_,
-               "Search for initial scale factor a such that all ncdm species are relativistic failed.");
+    a = ncdm_->GetIni(a, pba->a_today, ppr->tol_ncdm_initial_w);
   }
 
   pvecback_integration[index_bi_a_] = a;
@@ -1716,6 +1696,8 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles,"(.)rho_cdm",pba->has_cdm);
   if (pba->has_ncdm == _TRUE_){
     for (n=0; n<pba->N_ncdm; n++){
+      sprintf(tmp,"(.)number_ncdm[%d]",n);
+      class_store_columntitle(titles,tmp,_TRUE_);
       sprintf(tmp,"(.)rho_ncdm[%d]",n);
       class_store_columntitle(titles,tmp,_TRUE_);
       sprintf(tmp,"(.)p_ncdm[%d]",n);
@@ -1774,6 +1756,7 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rho_cdm_], pba->has_cdm, storeidx);
     if (pba->has_ncdm == _TRUE_){
       for (n=0; n<pba->N_ncdm; n++){
+        class_store_double(dataptr, pvecback[index_bg_number_ncdm1_+n], _TRUE_, storeidx);
         class_store_double(dataptr, pvecback[index_bg_rho_ncdm1_+n], _TRUE_, storeidx);
         class_store_double(dataptr, pvecback[index_bg_p_ncdm1_+n], _TRUE_, storeidx);
       }
@@ -2080,8 +2063,8 @@ int BackgroundModule::background_output_budget() {
       printf(" ---> Massive Neutrino Species \n");
     }
     if(pba->N_ncdm > 0){
-      pba->ncdm->PrintOmegaInfo();
-      budget_neutrino += pba->ncdm->GetOmega0();
+      ncdm_->PrintOmegaInfo();
+      budget_neutrino += ncdm_->GetOmega0();
     }
 
     if(pba->has_lambda || pba->has_fld || pba->has_scf || pba->has_curvature){

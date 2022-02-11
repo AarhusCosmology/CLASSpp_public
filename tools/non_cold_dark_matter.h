@@ -6,6 +6,7 @@
 #include "input_module.h"
 #include "arrays.h"
 #include "quadrature.h"
+#include <exception>
 
 #include <memory>
 
@@ -22,6 +23,8 @@ struct NcdmSettings {
   double tol_M_ncdm;
 };
 
+enum class NCDMType { standard, decay_dr }; /** Contains implemented ncdm types */
+
 class NonColdDarkMatter {
 public:
   static std::shared_ptr<NonColdDarkMatter> Create(FileContent* pfc, const NcdmSettings&);
@@ -33,8 +36,14 @@ public:
   void PrintNeffInfo() const;
   void PrintMassInfo() const;
   void PrintOmegaInfo() const;
+  double GetIni(double a, double a_today, double tol_ncdm_initial_w);
 
+  std::vector<NCDMType> ncdm_types_; /** Contains information about the types of each ncdm species */
+  
   int N_ncdm_ = 0;
+  int N_ncdm_standard_ = 0;
+  int N_ncdm_decay_dr_ = 0;
+  double* m_ncdm_in_eV_ = nullptr;
   double* M_ncdm_ = nullptr;
   int* q_size_ncdm_ = nullptr;    /**< Size of the q_ncdm arrays */
   double* factor_ncdm_ = nullptr; /**< List of normalization factors for calculating energy density etc.*/
@@ -76,7 +85,6 @@ private:
   double* ncdm_qmax_ = nullptr;   /**< Vector of maximum value of q */
   double* Omega0_ncdm_ = nullptr;
   double* omega0_ncdm_ = nullptr;
-  double* m_ncdm_in_eV_ = nullptr;
 
   int* q_size_ncdm_bg_ = nullptr; /**< Size of the q_ncdm_bg arrays */
   double** q_ncdm_bg_ = nullptr;  /**< Pointers to vectors of background sampling in q */
@@ -109,6 +117,15 @@ struct background_parameters_for_distributions {
   double* d2f0 = nullptr;
   int last_index = 0;
 
+};
+
+class NoNcdmRequested : public std::exception {
+  std::string message;
+public:
+  NoNcdmRequested(const char* error) : message(error) {}
+  virtual const char* what() const throw () {
+         return message.c_str();
+  }
 };
 
 

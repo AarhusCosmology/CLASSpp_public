@@ -39,7 +39,7 @@ OPTFLAG = -O3 -ffast-math #-march=native
 
 # all other compilation flags
 CCFLAG = -g -fPIC
-CXXFLAG = $(CCFLAG) -std=c++11 -Wno-write-strings
+CXXFLAG = $(CCFLAG) -std=c++17 -Wno-write-strings
 LDFLAG = -g -fPIC
 LIBRARIES = -lm -lpthread
 

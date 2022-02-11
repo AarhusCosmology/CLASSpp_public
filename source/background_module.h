@@ -47,7 +47,8 @@ public:
   int index_bg_p_scf_;         /**< scalar field pressure */
   int index_bg_p_prime_scf_;         /**< scalar field pressure */
 
-  int index_bg_rho_ncdm1_;     /**< density of first ncdm species (others contiguous) */
+  int index_bg_number_ncdm1_;  /**< number density of first ncdm species (others contiguous) */
+  int index_bg_rho_ncdm1_;     /**< energy density of first ncdm species (others contiguous) */
   int index_bg_p_ncdm1_;       /**< pressure of first ncdm species (others contiguous) */
   int index_bg_pseudo_p_ncdm1_;/**< another statistical momentum useful in ncdma approximation */
 

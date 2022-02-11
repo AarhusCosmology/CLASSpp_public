@@ -39,6 +39,7 @@ public:
   nonlinear nonlinear_;
   lensing lensing_;
   output output_;
+  std::shared_ptr<NonColdDarkMatter> ncdm_;
   ErrorMsg error_message_;
 
 private:
@@ -47,13 +48,15 @@ private:
     ~fzerofun_workspace() {
       if (unknown_parameters_index) free(unknown_parameters_index);
       if (target_name) free(target_name);
-      if (target_value) free(target_value);
+      if (target_values) free(target_values);
+      free(target_sizes);
     }
     int* unknown_parameters_index = nullptr;
     FileContent& fc;
     enum target_names* target_name = nullptr;
-    double* target_value = nullptr;
-    int target_size;
+    double* target_values = nullptr;
+    int* target_sizes = nullptr;
+    int unknown_parameters_size;
   };
   static const std::vector<std::string> kTargetNamestrings_;
   static const std::vector<std::string> kUnknownNamestrings_;
@@ -66,7 +69,7 @@ private:
   int input_read_precisions();
   int input_default_params();
   int input_default_precision();
-  static int input_auxillary_target_conditions(FileContent* pfc, enum target_names target_name, double target_value, int* aux_flag, ErrorMsg error_message);
+  static int input_auxillary_target_conditions(FileContent* pfc, enum target_names target_name, double* target_values, int target_values_size, int* aux_flag, ErrorMsg error_message);
   static int compare_doubles(const void* a, const void* b);
   static int file_exists(const char* fname);
   static int class_fzero_ridder(int (*func)(double x, void* param, double* y, ErrorMsg error_message),

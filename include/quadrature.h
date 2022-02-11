@@ -10,7 +10,7 @@
 /******************************************/
 #include "common.h"
 
-enum ncdm_quadrature_method {qm_auto, qm_Laguerre, qm_trapz_indefinite, qm_trapz};
+enum quadrature_method {qm_auto, qm_Laguerre, qm_trapz_indefinite, qm_trapz};
 
 /* Structures for QSS */
 
@@ -41,17 +41,7 @@ typedef struct adaptive_integration_tree_node{
 			int (*function)(void * params_for_function, double q, double *f0),
 			void * params_for_function,
 			ErrorMsg errmsg);
-       int get_qsampling_manual(double *x,
-				double *w,
-				int N,
-				double qmax,
-				enum ncdm_quadrature_method method,
-				double *qvec,
-				int qsiz,
-				int (*function)(void * params_for_function, double q, double *f0),
-				void * params_for_function,
-				ErrorMsg errmsg);
-
+      int get_qsampling_manual(double* x, double* w, double* dq, int N, double qmax, enum quadrature_method method, double* qvec, int qsiz, int (*function)(void* params_for_function, double q, double* f0), void* params_for_function, ErrorMsg errmsg);
       int sort_x_and_w(double *x, double *w, double *workx, double *workw, int startidx, int endidx);
       int get_leaf_x_and_w(qss_node *node, int *ind, double *x, double *w,int isindefinite);
       int reduce_tree(qss_node *node, int level);

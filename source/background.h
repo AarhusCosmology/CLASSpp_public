@@ -115,8 +115,6 @@ struct background
 
   int N_ncdm;                            /**< Number of distinguishable ncdm species */
   double Omega0_ncdm_tot; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
-
-  std::shared_ptr<NonColdDarkMatter> ncdm;
   /** @name - related parameters */
 
   //@{
