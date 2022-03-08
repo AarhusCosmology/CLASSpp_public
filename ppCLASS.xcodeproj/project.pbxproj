@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		20FFA740259B1876003CAF13 /* dark_radiation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 20FFA73E259B1876003CAF13 /* dark_radiation.cpp */; };
 		AF1078DF241D1F3B00A369F7 /* history.c in Sources */ = {isa = PBXBuildFile; fileRef = AF1078D0241D1F3B00A369F7 /* history.c */; };
 		AF1078E0241D1F3B00A369F7 /* hyrectools.c in Sources */ = {isa = PBXBuildFile; fileRef = AF1078D3241D1F3B00A369F7 /* hyrectools.c */; };
 		AF1078E3241D1F3B00A369F7 /* helium.c in Sources */ = {isa = PBXBuildFile; fileRef = AF1078D8241D1F3B00A369F7 /* helium.c */; };
@@ -51,6 +52,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		20FFA73E259B1876003CAF13 /* dark_radiation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dark_radiation.cpp; sourceTree = "<group>"; };
+		20FFA73F259B1876003CAF13 /* dark_radiation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = dark_radiation.h; sourceTree = "<group>"; };
 		AF1078D0241D1F3B00A369F7 /* history.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = history.c; sourceTree = "<group>"; };
 		AF1078D2241D1F3B00A369F7 /* helium.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = helium.h; sourceTree = "<group>"; };
 		AF1078D3241D1F3B00A369F7 /* hyrectools.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = hyrectools.c; sourceTree = "<group>"; };
@@ -244,6 +247,8 @@
 				AFDC68AA240D9F6B0044B5A3 /* hyperspherical.c */,
 				AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */,
 				AFEAF07C2449CC6300A3F4A2 /* non_cold_dark_matter.h */,
+				20FFA73E259B1876003CAF13 /* dark_radiation.cpp */,
+				20FFA73F259B1876003CAF13 /* dark_radiation.h */,
 				AFDC68B3240D9F6B0044B5A3 /* parser.cpp */,
 				AFDC68AF240D9F6B0044B5A3 /* quadrature.c */,
 				AFDC68AB240D9F6B0044B5A3 /* sparse.c */,
@@ -352,6 +357,7 @@
 				AFDC68BE240D9F6B0044B5A3 /* parser.cpp in Sources */,
 				AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.c in Sources */,
 				AFDC68BD240D9F6B0044B5A3 /* evolver_ndf15.c in Sources */,
+				20FFA740259B1876003CAF13 /* dark_radiation.cpp in Sources */,
 				AF1078E3241D1F3B00A369F7 /* helium.c in Sources */,
 				AF1078E4241D1F3B00A369F7 /* hydrogen.c in Sources */,
 				AFDC68B9240D9F6B0044B5A3 /* dei_rkck.c in Sources */,
@@ -384,7 +390,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -448,7 +454,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;

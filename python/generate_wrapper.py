@@ -179,11 +179,12 @@ for file in h_files:
 
 classes = []
 
-class_names = ['FileContent','InputModule', 'BackgroundModule', 'ThermodynamicsModule', 'PerturbationsModule',
+class_names = ['FileContent', 'NonColdDarkMatter', 'InputModule', 'BackgroundModule',
+                'ThermodynamicsModule', 'PerturbationsModule',
                 'PrimordialModule', 'NonlinearModule', 'TransferModule', 'SpectraModule', 'LensingModule']
 allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', 'FileArg',
                  'std::map<std::string, std::vector<double>>',
-                 'std::map<std::string, int>'] + struct_names
+                 'std::map<std::string, int>', 'std::shared_ptr<NonColdDarkMatter>'] + struct_names
 
 for file in h_files:
     with open(file) as fid:

@@ -14,6 +14,7 @@
 #include <vector>
 
 class NonColdDarkMatter;
+class DarkRadiation;
 
 //The name for this macro can be at most 30 characters total
 #define _class_print_species_(name,type) \
@@ -115,6 +116,7 @@ struct background
 
   int N_ncdm;                            /**< Number of distinguishable ncdm species */
   double Omega0_ncdm_tot; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
+  int N_decay_dr = 0;
   /** @name - related parameters */
 
   //@{
@@ -147,6 +149,7 @@ struct background
 
   short has_cdm;       /**< presence of cold dark matter? */
   short has_dcdm;      /**< presence of decaying cold dark matter? */
+  short has_ncdm_decay_dr;     /**< presence of decaying non-cold dark matter? */
   short has_dr;        /**< presence of relativistic decay radiation? */
   short has_scf;       /**< presence of a scalar field? */
   short has_ncdm;      /**< presence of non-cold dark matter? */

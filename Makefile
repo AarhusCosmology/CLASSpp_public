@@ -84,7 +84,7 @@ H_ALL = $(notdir $(wildcard include/*.h) $(wildcard tools/*.h) $(wildcard source
 
 TOOLS_O = growTable.o dei_rkck.o sparse.o evolver_rkck.o evolver_ndf15.o arrays.o parser.opp quadrature.o hyperspherical.o common.o trigonometric_integrals.o
 
-TOOLS_OPP = non_cold_dark_matter.opp exceptions.opp
+TOOLS_OPP = non_cold_dark_matter.opp dark_radiation.opp exceptions.opp
 
 TOOLS = $(TOOLS_O) $(TOOLS_OPP)
 

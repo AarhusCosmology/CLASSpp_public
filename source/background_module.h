@@ -36,8 +36,12 @@ public:
   int index_bg_rho_idm_dr_;    /**< density of dark matter interacting with dark radiation */
   int index_bg_rho_idr_;       /**< density of interacting dark radiation */
   int index_bg_rho_dcdm_;      /**< dcdm density */
-  int index_bg_rho_dr_;        /**< dr density */
+  int index_bg_lnf_ncdm_decay_dr1_;
+  int index_bg_dlnfdlnq_ncdm_decay_dr1_;
+  int index_bg_dlnfdlnq_separate_ncdm_decay_dr1_;
 
+  int index_bg_rho_dr_species_;/**< dr density for individual species */
+  int index_bg_rho_dr_;        /**< total dr density */
   int index_bg_phi_scf_;       /**< scalar field value */
   int index_bg_phi_prime_scf_; /**< scalar field derivative wrt conformal time */
   int index_bg_V_scf_;         /**< scalar field potential V */
@@ -119,6 +123,7 @@ private:
   double dV_p_scf(double phi) const;
   double ddV_p_scf(double phi) const;
   int background_output_budget();
+  static int background_print_variables(double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
 
   /** @name - all indices for the vector of background quantities to be integrated (=bi)
    *
@@ -135,7 +140,10 @@ private:
 
   int index_bi_a_;       /**< {B} scale factor */
   int index_bi_rho_dcdm_;/**< {B} dcdm density */
-  int index_bi_rho_dr_;  /**< {B} dr density */
+  int index_bi_lnf_ncdm_decay_dr1_; /**< {B} dncdm distribution function*/
+  int index_bi_dlnfdlnq_separate_ncdm_decay_dr1_;
+  int index_bi_rho_dr_species_;
+  
   int index_bi_rho_fld_; /**< {B} fluid density */
   int index_bi_phi_scf_;       /**< {B} scalar field value */
   int index_bi_phi_prime_scf_; /**< {B} scalar field derivative wrt conformal time */

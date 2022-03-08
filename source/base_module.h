@@ -19,6 +19,7 @@ class BaseModule {
 public:
   BaseModule(InputModulePtr input_module)
   : ncdm_(input_module->ncdm_)
+  , dr_(input_module->dr_)
   , ppr(&input_module->precision_)
   , pba(&input_module->background_)
   , pth(&input_module->thermodynamics_)
@@ -37,6 +38,7 @@ public:
   mutable ErrorMsg error_message_;
 public:
   const std::shared_ptr<NonColdDarkMatter> ncdm_;
+  const std::shared_ptr<DarkRadiation> dr_;
 protected:
   InputModulePtr input_module_;
 

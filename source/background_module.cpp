@@ -80,6 +80,7 @@
 
 #include "background_module.h"
 #include "non_cold_dark_matter.h"
+#include "dark_radiation.h"
 
 BackgroundModule::BackgroundModule(InputModulePtr input_module)
 : BaseModule(input_module) {
@@ -348,16 +349,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     rho_m += pvecback[index_bg_rho_dcdm_];
   }
 
-  /* dr */
-  if (pba->has_dr == _TRUE_) {
-    /* Pass value of rho_dr to output */
-    pvecback[index_bg_rho_dr_] = pvecback_B[index_bi_rho_dr_];
-    rho_tot += pvecback[index_bg_rho_dr_];
-    p_tot += 1./3.*pvecback[index_bg_rho_dr_];
-    dp_dloga += -4./3.*pvecback[index_bg_rho_dr_];
-    rho_r += pvecback[index_bg_rho_dr_];
-  }
-
   /* Scalar field */
   if (pba->has_scf == _TRUE_) {
     phi = pvecback_B[index_bi_phi_scf_];
@@ -381,6 +372,18 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
   /* ncdm */
   if (pba->has_ncdm == _TRUE_) {
 
+    if (pba->has_ncdm_decay_dr) {
+      for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
+        for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id]; i++) {
+          double f_from_lnf = exp(pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i]);
+
+          // Update distribution function in ncdm module
+          ncdm_->SetBackgroundWeight(ncdm_id, i, f_from_lnf*dncdm_properties.dq[i]);
+          pvecback[index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+          pvecback[index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = pvecback_B[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+        }
+      }
+    }
     /* Loop over species: */
     for(n_ncdm=0; n_ncdm<pba->N_ncdm; n_ncdm++){
       double number_ncdm; // ncdm number density
@@ -413,6 +416,84 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
          to rho_ncdm1 */
       rho_m += rho_ncdm - 3.* p_ncdm;
     }
+
+    if (pba->has_ncdm_decay_dr) {
+      for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
+        int q_size = ncdm_->q_size_ncdm_[ncdm_id];
+        std::vector<double> lnf_dlnf_array(2*q_size);
+        std::vector<double> ddlnf_array(q_size);
+        std::vector<double> lnq(q_size);
+
+        if (pba->background_method == bgevo_evolver) {
+          bool has_problem = false;
+          for (int i = 0; i < q_size; i++) {
+            if (pvecback[index_bg_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] <= -460) {
+              has_problem = true;
+              break;
+            }
+            lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+            lnq[i] = log(ncdm_->q_ncdm_[ncdm_id][i]);
+          }
+          if (has_problem) {
+            // Use Fermi-Dirac approximation when f becomes static
+            // FD has dlnf/dlnq = -q e^q / (e^q + 1) ≈ -q
+            for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id]; i++) {
+              double q = ncdm_->q_ncdm_[ncdm_id][i];
+              lnf_dlnf_array[i] = -log(1. + exp(q));
+              lnq[i] = log(q);
+            }
+          }
+        }
+        else {
+          for (int i = 0; i < q_size; i++) {
+            lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i];
+            lnq[i] = log(ncdm_->q_ncdm_[ncdm_id][i]);
+          }
+        }
+
+        // Find df/dq by first splining and then calculating the derivative
+        class_call(array_spline_table_lines(lnq.data(),
+                                            q_size,
+                                            lnf_dlnf_array.data(),
+                                            1,
+                                            ddlnf_array.data(),
+                                            _SPLINE_EST_DERIV_,
+                                            error_message_),
+                   error_message_, error_message_);
+
+        class_call(array_derive_spline(lnq.data(),
+                                       q_size,
+                                       lnf_dlnf_array.data(),
+                                       ddlnf_array.data(),
+                                       1,
+                                       0,
+                                       q_size,
+                                       error_message_),
+                   error_message_, error_message_);
+
+        for (int i = 0; i < q_size; i++) {
+          pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = lnf_dlnf_array[q_size + i];
+        }
+      }
+    }
+  }
+
+  /* dr */
+  if (pba->has_dr == _TRUE_) {
+    for (int n = 0; n < pba->N_decay_dr; n++) {
+      dr_->rho_species_[n] = pvecback_B[index_bi_rho_dr_species_ + n];
+      pvecback[index_bg_rho_dr_species_ + n] = pvecback_B[index_bi_rho_dr_species_ + n];
+    }
+
+    // Calculate total energy density from all sources
+    pvecback[index_bg_rho_dr_] = 0.;
+    for (double rho_dr : dr_->rho_species_) {
+      pvecback[index_bg_rho_dr_] += rho_dr;
+    }
+    rho_tot += pvecback[index_bg_rho_dr_];
+    p_tot += 1./3.*pvecback[index_bg_rho_dr_];
+    dp_dloga += -4./3.*pvecback[index_bg_rho_dr_];
+    rho_r += pvecback[index_bg_rho_dr_];
   }
 
   /* Lambda */
@@ -803,7 +884,13 @@ int BackgroundModule::background_indices() {
   /* - index for dcdm */
   class_define_index(index_bg_rho_dcdm_, pba->has_dcdm, index_bg, 1);
 
-  /* - index for dr */
+  /* - index for time-dependent distribution function in DNCDM for each q-bin */
+  class_define_index(index_bg_lnf_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
+  class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
+  class_define_index(index_bg_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
+
+  /* - indices for dr */
+  class_define_index(index_bg_rho_dr_species_, pba->has_dr, index_bg, pba->N_decay_dr);
   class_define_index(index_bg_rho_dr_, pba->has_dr, index_bg, 1);
 
   /* - indices for scalar field */
@@ -899,9 +986,12 @@ int BackgroundModule::background_indices() {
   /* -> energy density in DCDM */
   class_define_index(index_bi_rho_dcdm_, pba->has_dcdm, index_bi, 1);
 
-  /* -> energy density in DR */
-  class_define_index(index_bi_rho_dr_, pba->has_dr, index_bi, 1);
-
+  /* -> time-dependent distribution function in DNCDM for each q-bin */
+  class_define_index(index_bi_lnf_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
+  class_define_index(index_bi_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
+  
+  class_define_index(index_bi_rho_dr_species_, pba->has_dr, index_bi, pba->N_decay_dr);
+  
   /* -> energy density in fluid */
   class_define_index(index_bi_rho_fld_, pba->has_fld, index_bi, 1);
 
@@ -1102,7 +1192,11 @@ int BackgroundModule::background_solve() {
     Omega0_dcdm_ = pvecback_integration[index_bi_rho_dcdm_]/pba->H0/pba->H0;
   }
   if (pba->has_dr == _TRUE_){
-    Omega0_dr_ = pvecback_integration[index_bi_rho_dr_]/pba->H0/pba->H0;
+    double rho_temp = 0.;
+    for (double rho_species : dr_->rho_species_) {
+      rho_temp += rho_species;
+    }
+    Omega0_dr_ = rho_temp/pba->H0/pba->H0;
   }
 
   /** - allocate background tables */
@@ -1325,7 +1419,11 @@ int BackgroundModule::background_solve_evolver() {
     Omega0_dcdm_ = pvecback_integration[index_bi_rho_dcdm_]/pba->H0/pba->H0;
   }
   if (pba->has_dr == _TRUE_){
-    Omega0_dr_ = pvecback_integration[index_bi_rho_dr_]/pba->H0/pba->H0;
+    double rho_temp = 0.;
+    for (double rho_species : dr_->rho_species_) {
+      rho_temp += rho_species;
+    }
+    Omega0_dr_ = rho_temp/pba->H0/pba->H0;
   }
 
   /** Recover some quantities today */
@@ -1446,7 +1544,7 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
   double a;
 
   double rho_ncdm, p_ncdm, rho_ncdm_rel_tot=0.;
-  double f,Omega_rad, rho_rad;
+  double Omega_rad, rho_rad;
   int counter,is_early_enough,n_ncdm;
   double scf_lambda;
   double rho_fld_today;
@@ -1485,22 +1583,22 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
       printf("Density is %g. a_today=%g. Omega_ini=%g\n", pvecback_integration[index_bi_rho_dcdm_], pba->a_today, pba->Omega_ini_dcdm);
   }
 
-  if (pba->has_dr == _TRUE_){
-    if (pba->has_dcdm == _TRUE_){
-      /**  - f is the critical density fraction of DR. The exact solution is:
-       *
-       * `f = -Omega_rad+pow(pow(Omega_rad,3./2.)+0.5*pow(a/pba->a_today,6)*pvecback_integration[index_bi_rho_dcdm_]*pba->Gamma_dcdm/pow(pba->H0,3),2./3.);`
-       *
-       * but it is not numerically stable for very small f which is always the case.
-       * Instead we use the Taylor expansion of this equation, which is equivalent to
-       * ignoring f(a) in the Hubble rate.
-       */
-      f = 1./3.*pow(a/pba->a_today,6)*pvecback_integration[index_bi_rho_dcdm_]*pba->Gamma_dcdm/pow(pba->H0,3)/sqrt(Omega_rad);
-      pvecback_integration[index_bi_rho_dr_] = f*pba->H0*pba->H0/pow(a/pba->a_today,4);
+  if (pba->has_ncdm_decay_dr == _TRUE_) {
+    if (pba->has_dcdm) {
+      double f = 1./3.*pow(a/pba->a_today,6)*pvecback_integration[index_bi_rho_dcdm_]*pba->Gamma_dcdm/pow(pba->H0,3)/sqrt(Omega_rad);
+      pvecback_integration[index_bi_rho_dr_species_ + 0] = f*pba->H0*pba->H0/pow(a/pba->a_today,4);
     }
-    else{
-      /** There is also a space reserved for a future case where dr is not sourced by dcdm */
-      pvecback_integration[index_bi_rho_dr_] = 0.0;
+    for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
+      pvecback_integration[index_bi_rho_dr_species_ + dncdm_properties.dr_id] = 0.;
+    }
+
+    for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
+      for (int index_q = 0; index_q < ncdm_->q_size_ncdm_[ncdm_id]; index_q++) {
+        double f0 = ncdm_->w_ncdm_[ncdm_id][index_q]/dncdm_properties.dq[index_q];
+        double q = ncdm_->q_ncdm_[ncdm_id][index_q];
+        pvecback_integration[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = log(f0);
+        pvecback_integration[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = -q*exp(q)/(exp(q) + 1); // Fermi-Dirac
+      }
     }
   }
 
@@ -1702,6 +1800,19 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
       class_store_columntitle(titles,tmp,_TRUE_);
       sprintf(tmp,"(.)p_ncdm[%d]",n);
       class_store_columntitle(titles,tmp,_TRUE_);
+      if (ncdm_->ncdm_types_[n] == NCDMType::decay_dr) {
+        // For each decaying species, print the distribution function, its derivative and its q-grid
+        for (int i = 0; i < ncdm_->q_size_ncdm_[n]; i++) {
+          sprintf(tmp,"lnf_dncdm[%d][%d]",n,i);
+          class_store_columntitle(titles,tmp,_TRUE_);
+
+          sprintf(tmp,"dlnfdlnq_dncdm[%d][%d]",n,i);
+          class_store_columntitle(titles,tmp,_TRUE_);
+
+          sprintf(tmp,"dlnfdlnq_separate_dncdm[%d][%d]",n,i);
+          class_store_columntitle(titles,tmp,_TRUE_);
+        }
+      }
     }
   }
   class_store_columntitle(titles,"(.)rho_lambda",pba->has_lambda);
@@ -1713,7 +1824,13 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles,"(.)rho_crit",_TRUE_);
   class_store_columntitle(titles,"(.)rho_dcdm",pba->has_dcdm);
   class_store_columntitle(titles,"(.)rho_dr",pba->has_dr);
+  if (pba->has_dr == _TRUE_) {
 
+    for (int j = 0; j < pba->N_decay_dr; ++j) {
+      sprintf(tmp, "(.)rho_dr[%d]", j);
+      class_store_columntitle(titles, tmp, _TRUE_);
+    }
+  }
   class_store_columntitle(titles,"(.)rho_scf",pba->has_scf);
   class_store_columntitle(titles,"(.)p_scf",pba->has_scf);
   class_store_columntitle(titles,"(.)p_prime_scf",pba->has_scf);
@@ -1759,6 +1876,14 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
         class_store_double(dataptr, pvecback[index_bg_number_ncdm1_+n], _TRUE_, storeidx);
         class_store_double(dataptr, pvecback[index_bg_rho_ncdm1_+n], _TRUE_, storeidx);
         class_store_double(dataptr, pvecback[index_bg_p_ncdm1_+n], _TRUE_, storeidx);
+        if (ncdm_->ncdm_types_[n] == NCDMType::decay_dr) {
+          // For each decaying species, print the distribution function at each point of q-grid
+          for (int i = 0; i < ncdm_->q_size_ncdm_[n]; i++) {
+            class_store_double(dataptr, pvecback[index_bg_lnf_ncdm_decay_dr1_ + ncdm_->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + ncdm_->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
+            class_store_double(dataptr, pvecback[index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ + ncdm_->decay_dr_map_[n].q_offset + i], _TRUE_, storeidx);
+          }
+        }
       }
     }
     class_store_double(dataptr, pvecback[index_bg_rho_lambda_], pba->has_lambda, storeidx);
@@ -1770,6 +1895,11 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rho_crit_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_dcdm_], pba->has_dcdm, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_dr_], pba->has_dr, storeidx);
+    if (pba->has_dr == _TRUE_) {
+      for (int j = 0; j < pba->N_decay_dr; ++j) {
+        class_store_double(dataptr, pvecback[index_bg_rho_dr_species_ + j], _TRUE_, storeidx);
+      }
+    }
 
     class_store_double(dataptr, pvecback[index_bg_rho_scf_], pba->has_scf, storeidx);
     class_store_double(dataptr, pvecback[index_bg_p_scf_], pba->has_scf, storeidx);
@@ -1873,10 +2003,37 @@ int BackgroundModule::background_derivs_member(
       y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
   }
 
-  if ((pba->has_dcdm == _TRUE_) && (pba->has_dr == _TRUE_)){
-    /** - Compute dr density \f$ \rho' = -4aH \rho - a \Gamma \rho \f$ */
-    dy[index_bi_rho_dr_] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_]+
-      y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
+  if (pba->has_ncdm_decay_dr == _TRUE_){
+    for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
+      double M_ncdm = ncdm_->M_ncdm_[ncdm_id];
+      double Gamma = dncdm_properties.Gamma;
+
+      for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id]; i++) { // Loop over q grid points
+        double q = ncdm_->q_ncdm_[ncdm_id][i];
+        double epsilon = sqrt(q*q + a*a*M_ncdm*M_ncdm);
+        double decay_term = -a*a*M_ncdm*Gamma/epsilon;
+
+        // Only dec term; we cannot calculate inv or qs terms analytically
+        dy[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = a*a*M_ncdm*Gamma*q*q/pow(epsilon, 3);
+
+        // The lnf inverse term gives divergence issues, so we calculate it for lnf and f separately
+        dy[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + i] = decay_term;
+      }
+    }
+  }
+  if (pba->has_dr == _TRUE_){
+    if (pba->has_dcdm) {
+      dy[index_bi_rho_dr_species_ + 0] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_species_ + 0] + y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
+    }
+    if (pba->has_ncdm_decay_dr) {
+      for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
+        double M_1 = ncdm_->M_ncdm_[ncdm_id];
+        double Gamma = dncdm_properties.Gamma;
+
+        // Integrated density for self-consistency checks; only computes for ncdm_id = 0
+        dy[index_bi_rho_dr_species_ + dncdm_properties.dr_id] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_species_ + dncdm_properties.dr_id] + y[index_bi_a_]*Gamma*M_1*pvecback[index_bg_number_ncdm1_ + ncdm_id];
+      }
+    }
   }
 
   if (pba->has_fld == _TRUE_) {
@@ -2198,5 +2355,27 @@ int BackgroundModule::background_add_line_to_bg_table_member(
   //Swap a and tau again
   y[index_bi_a_] = tau;
 
+  return _SUCCESS_;
+}
+
+int BackgroundModule::background_print_variables(double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+  background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
+  double* pvecback = pbpaw->pvecback;
+  BackgroundModule& bm = *(pbpaw->background_module);
+
+  double a = exp(loga);
+  double tau = y[bm.index_bi_a_];
+  y[bm.index_bi_a_] = a;
+
+  /** - calculate functions of \f$ a \f$ with background_functions() */
+  class_call(bm.background_functions(y, bm.pba->normal_info, pvecback),
+             error_message,
+             error_message);
+
+  /** Swap a and tau again */
+  y[bm.index_bi_a_] = tau;
+  //FILE* fid = fopen("tmp.dat", "a");
+  //fprintf(fid, "%.3e %.3e %.3e %.3e %.3e %.3e\n", exp(loga), tau, pvecback[bm.index_bg_rho_ncdm1_], pvecback[bm.index_bg_rho_dr_species_], y[bm.index_bi_rho_dr_species_], pvecback[bm.index_bg_lnf_ncdm_decay_dr1_ + 2]);
+  //fclose(fid);
   return _SUCCESS_;
 }

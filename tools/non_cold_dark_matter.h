@@ -23,6 +23,22 @@ struct NcdmSettings {
   double tol_M_ncdm;
 };
 
+/**
+ * Extra properties needed for decaying species
+ * Currently only works with NCDM->DR; a different type of struct should be made for the future NCDM->NCDM (or they can be derived from a common struct)
+ */
+
+struct DecayDRProperties {
+  std::vector<double> dq;
+  double Gamma;
+  
+  int dr_id;     // Index of DR species that this DNCDM species is sourcing
+  int dncdm_id;  // Index of ncdm_decay_dr species that this instance describes
+  int q_offset;
+
+  int quadrature_strategy;
+};
+
 enum class NCDMType { standard, decay_dr }; /** Contains implemented ncdm types */
 
 class NonColdDarkMatter {
@@ -30,13 +46,19 @@ public:
   static std::shared_ptr<NonColdDarkMatter> Create(FileContent* pfc, const NcdmSettings&);
   ~NonColdDarkMatter();
   int background_ncdm_momenta(int n_ncdm, double z, double* n, double* rho, double* p, double* drho_dM, double* pseudo_p) const;
+  int background_ncdm_momenta_deg(int n_ncdm, double deg, double z, double T_cmb, double* n, double* rho, double* p, double* drho_ddeg, double* pseudo_p) const;
   double GetOmega0() const;
   double GetNeff(double z) const;
   double GetMassInElectronvolt(int n_ncdm) const;
   void PrintNeffInfo() const;
   void PrintMassInfo() const;
   void PrintOmegaInfo() const;
-  double GetIni(double a, double a_today, double tol_ncdm_initial_w);
+  void SetBackgroundWeight(int n_ncdm, int q_index, double weight);
+  void SetOmega0(int n_ncdm, double Omega0, double h);
+  void SetDegAndFactor(int n_ncdm, double deg, double T_cmb);
+  void SetDeg_from_Omega_ini(int n_ncdm, double z_ini, double H0, double Omega_ini, double T_cmb);
+  double GetIni(double a, double a_today, double tol_ncdm_initial_w) const;
+  double GetDeg(int n_ncdm) const;
 
   std::vector<NCDMType> ncdm_types_; /** Contains information about the types of each ncdm species */
   
@@ -50,7 +72,11 @@ public:
   double** q_ncdm_ = nullptr;     /**< Pointers to vectors of perturbation sampling in q */
   double** w_ncdm_ = nullptr;     /**< Pointers to vectors of corresponding quadrature weights w */
   double** dlnf0_dlnq_ncdm_ = nullptr; /**< Pointers to vectors of logarithmic derivatives of p-s-d */
-
+  double* Omega_dncdmdr_ = nullptr;
+  
+  std::map<int, DecayDRProperties> decay_dr_map_; /**< Map holding decay-wdm-to-dr-specific properties */
+  int q_total_size_dncdm_; /**< Total amount of q-bins in DNCDM species */
+  
   mutable ErrorMsg error_message_;
 
 private:
@@ -69,6 +95,7 @@ private:
 
   const double deg_ncdm_default_ = 1.0;
   const double T_ncdm_default_ = 0.71611; /* this value gives m/omega = 93.14 eV b*/
+  const double T_dncdm_default_ = T_ncdm_default_;
   const double ksi_ncdm_default = 0.;
 
   double rho_nu_rel_;

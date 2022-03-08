@@ -207,7 +207,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   int flag1, flag2;
   int entries_read;
   char* errmsg = error_message_;
-   
+
   /* Number of distinct standard ncdm species */
   class_call(parser_read_int(pfc, "N_ncdm_standard", &int1, &flag1, errmsg),
              errmsg,
@@ -228,18 +228,24 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   for (int n = 0; n < N_ncdm_standard_; n++) {
     ncdm_types_.push_back(NCDMType::standard);
   }
+
+  class_read_int("N_ncdm_decay_dr", N_ncdm_decay_dr_);
+  for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+    ncdm_types_.push_back(NCDMType::decay_dr);
+  }
+
   // N_ncdm_ is the total amount of ncdm species of all types
   N_ncdm_ = N_ncdm_standard_ + N_ncdm_decay_dr_;
-  
+
   if (N_ncdm_ == 0) {
     // Throw error to let NonColdDarkMatter::Create know to continue with no ncdm module
     throw NoNcdmRequested("No ncdm species requested; continuing without an ncdm module.");
   }
-  
+
   if ((N_ncdm_standard_ < 0) || (N_ncdm_decay_dr_ < 0)) {
     throw std::invalid_argument("Amount of ncdm species must be positive, please check the N_ncdm variables in your input file.");
   }
-  
+
   auto read_list_of_ints_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, int*& output, int expected_size, int default_value) {
     int flg1, flg2, entries_read;
     class_call(parser_read_list_of_integers(pfc,
@@ -272,7 +278,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     }
     return 0;
   };
-  
+
   auto read_list_of_doubles_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, double*& output, int expected_size, double default_value) {
     int flg1, flg2, entries_read;
     class_call(parser_read_list_of_doubles(pfc,
@@ -305,28 +311,28 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     }
     return 0;
   };
-  
+
   /* Quadrature modes, 0 is qm_auto */
-  read_list_of_ints_with_deprecated("Quadrature strategy standard",
+  read_list_of_ints_with_deprecated("quadrature_strategy_ncdm_standard",
                                     "Quadrature strategy",
                                     ncdm_quadrature_strategy_,
                                     N_ncdm_standard_,
                                     0);
-  
+
   /* Number of momentum bins */
-  read_list_of_ints_with_deprecated("Number of momentum bins standard",
+  read_list_of_ints_with_deprecated("N_momentum_bins_ncdm_standard",
                                     "Number of momentum bins",
                                     ncdm_input_q_size_,
                                     N_ncdm_standard_,
                                     5);
-  
+
   /* q-value of the highest momentum bin */
-  read_list_of_doubles_with_deprecated("Maximum q standard",
+  read_list_of_doubles_with_deprecated("maximum_q_ncdm_standard",
                                        "Maximum q",
                                        ncdm_qmax_,
                                        N_ncdm_standard_,
                                        15.0);
-  
+
   /* Temperatures, default is LambdaCDM neutrino temperature */
   read_list_of_doubles_with_deprecated("T_ncdm_standard",
                                        "T_ncdm",
@@ -340,21 +346,21 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
                                        ksi_ncdm_,
                                        N_ncdm_standard_,
                                        ksi_ncdm_default);
-  
+
   /* Degeneracy of each ncdm species */
   read_list_of_doubles_with_deprecated("deg_ncdm_standard",
                                        "deg_ncdm",
                                        deg_ncdm_,
                                        N_ncdm_standard_,
                                        deg_ncdm_default_);
-  
+
   /* Mass of each ncdm species */
   read_list_of_doubles_with_deprecated("m_ncdm_standard",
                                        "m_ncdm",
                                        m_ncdm_in_eV_,
                                        N_ncdm_standard_,
                                        0.0);
-  
+
   /* Omega of each ncdm species */
   read_list_of_doubles_with_deprecated("Omega_ncdm_standard",
                                        "Omega_ncdm",
@@ -369,11 +375,51 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
                                        N_ncdm_standard_,
                                        0.0);
 
+  /** The last N_ncdm_decay_dr_ ncdm-species are reserved for dncdm; here, insert the dncdm inputs at the end of the ncdm species vector */
+  if (N_ncdm_decay_dr_ > 0) {
+    auto extend_list_of_integers = [&](const std::string& key, int*& output, int default_value = 0) {
+      output = static_cast<int*>(realloc(output, sizeof(int)*(N_ncdm_standard_ + N_ncdm_decay_dr_)));
+      int* tmp;
+      // class_read_list_of_integers_or_default macro uses "pfc" as FileContent input
+      class_read_list_of_integers_or_default(key.c_str(), tmp, default_value, N_ncdm_decay_dr_);
+      for (int i = 0; i < N_ncdm_decay_dr_; i++) {
+        output[N_ncdm_standard_ + i] = tmp[i];
+      }
+      free(tmp);
+      return 0;
+    };
+    auto extend_list_of_doubles = [&](const std::string& key, double*& output, double default_value = 0.0) {
+      output = static_cast<double*>(realloc(output, sizeof(double)*(N_ncdm_standard_ + N_ncdm_decay_dr_)));
+      double* tmp;
+      // class_read_list_of_doubles_or_default macro uses "pfc" as FileContent input
+      class_read_list_of_doubles_or_default(key.c_str(), tmp, default_value, N_ncdm_decay_dr_);
+      for (int i = 0; i < N_ncdm_decay_dr_; i++) {
+        output[N_ncdm_standard_ + i] = tmp[i];
+      }
+      free(tmp);
+      return 0;
+    };
+
+    extend_list_of_integers("quadrature_strategy_ncdm_decay_dr", ncdm_quadrature_strategy_, 0);
+    extend_list_of_integers("N_momentum_bins_ncdm_decay_dr", ncdm_input_q_size_, 5);
+    extend_list_of_doubles("maximum_q_ncdm_decay_dr", ncdm_qmax_, 15.0);
+    extend_list_of_doubles("T_ncdm_decay_dr", T_ncdm_, T_dncdm_default_);
+    extend_list_of_doubles("m_ncdm_decay_dr", m_ncdm_in_eV_, 1.0);
+    extend_list_of_doubles("ksi_ncdm_decay_dr", ksi_ncdm_, 0.0);
+    extend_list_of_doubles("Omega_ncdm", Omega0_ncdm_, 0.0);     // Will be set later,
+    extend_list_of_doubles("omega_ncdm", omega0_ncdm_, 0.0);     // calling this now just to reallocate
+    extend_list_of_doubles("deg_ncdm_decay_dr", deg_ncdm_, 1.0);
+    
+    for (int n = 0; n < N_ncdm_; n ++) {
+      class_test((ncdm_input_q_size_[n] > 95) && (ncdm_quadrature_strategy_[n] == 0), errmsg, "Currently, only quadrature strategy 3 is compatible with Number of momentum bins larger than 95.");
+    }
+  }
+
   /* Check for duplicate Omega/omega entries, missing mass definition and
      update Omega0_ncdm_:*/
   for (int n = 0; n < N_ncdm_; n++){
     if (omega0_ncdm_[n] != 0.0){
-      class_test(Omega0_ncdm_[n] != 0,errmsg,
+      class_test(Omega0_ncdm_[n] != 0.0,errmsg,
                  "Nonzero values for both Omega and omega for ncdm species %d are specified!", n);
       Omega0_ncdm_[n] = omega0_ncdm_[n]/ncdm_settings.h/ncdm_settings.h;
     }
@@ -446,6 +492,66 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   class_alloc(q_size_ncdm_bg_, sizeof(int)*N_ncdm_, error_message_);
   class_alloc(factor_ncdm_, sizeof(double)*N_ncdm_, error_message_);
   class_alloc(M_ncdm_, sizeof(double)*N_ncdm_, error_message_);
+
+  int dncdm_count = 0;
+  int cumulative_q_index = 0;
+  
+  // Check for DCDM species to set correct dr_id; pba->has_dcdm is not set yet, so we check manually
+  int dcdm_offset = 0;
+  int flag3, flag4;
+  double temp;
+  class_call(parser_read_double(pfc, "Omega_dcdmdr", &temp, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "omega_dcdmdr", &temp, &flag2, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "Omega_ini_dcdm", &temp, &flag3, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "omega_ini_dcdm", &temp, &flag4, errmsg), errmsg, errmsg);
+  if (((flag1 == _TRUE_) || (flag2 == _TRUE_)) || ((flag3 == _TRUE_) || (flag4 == _TRUE_))) {
+    dcdm_offset++;
+  }
+  
+  
+  /* Lifetime takes different kinds of input */
+  double* Gamma_list;
+  double* log10Gamma_list;
+  double* lifetime_list;
+  double* log10lifetime_list;
+  int Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read;
+  int size;
+  class_call(parser_read_list_of_doubles(pfc, "Gamma_ncdm_decay_dr", &size, &(Gamma_list), &Gamma_read, errmsg), errmsg, errmsg);
+  class_call(parser_read_list_of_doubles(pfc, "log10Gamma_ncdm_decay_dr", &size, &(log10Gamma_list), &log10Gamma_read, errmsg), errmsg, errmsg);
+  class_call(parser_read_list_of_doubles(pfc, "lifetime_ncdm_decay_dr", &size, &(lifetime_list), &lifetime_read, errmsg), errmsg, errmsg);
+  class_call(parser_read_list_of_doubles(pfc, "log10lifetime_ncdm_decay_dr", &size, &(log10lifetime_list), &log10lifetime_read, errmsg), errmsg, errmsg);
+
+  if (class_at_least_two_of_four(Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read)) {
+    throw std::runtime_error("More than two of the following inputs are given. Choose one! \nGamma_ncdm_decay_dr, log10Gamma_ncdm_decay_dr, lifetime_ncdm_decay_dr, log10lifetime_ncdm_decay_dr.");
+  }
+
+  if (class_none_of_three(Gamma_read, log10Gamma_read, lifetime_read) && (log10lifetime_read == _FALSE_)) {
+    // Assign default value
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      Gamma_list[n] = 0.;
+    }
+  }
+  if (log10Gamma_read == _TRUE_) {
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      Gamma_list[n] = pow(10., log10Gamma_list[n]);
+    }
+  }
+  else if (lifetime_read == _TRUE_) {
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    // Lifetimes are input in yrs
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      Gamma_list[n] = 1./lifetime_list[n]/(365*24*60*60)*_Mpc_over_m_*1e-3; // Conversion from yr^-1 to km/s/Mpc
+    }
+  }
+  else if (log10lifetime_read == _TRUE_) {
+    class_alloc(Gamma_list, N_ncdm_decay_dr_*sizeof(double), errmsg);
+    for (int n = 0; n < N_ncdm_decay_dr_; n++) {
+      double lifetime = pow(10., log10lifetime_list[n]);
+      Gamma_list[n] = 1./lifetime/(365*24*60*60)*_Mpc_over_m_*1e-3;
+    }
+  }
 
   int filenum = 0;
   for(int k = 0; k < N_ncdm_; k++){
@@ -532,12 +638,21 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
       q_ncdm_bg_[k] = (double*)realloc(q_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double));
       w_ncdm_bg_[k] = (double*)realloc(w_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double));
+
+      if (ncdm_types_[k] == NCDMType::decay_dr) {
+        for (int index_q = 0; index_q < q_size_ncdm_bg_[k]; index_q++) {
+          double f0;
+          class_call(background_ncdm_distribution(&pbadist, q_ncdm_bg_[k][index_q], &f0), error_message_, error_message_);
+          decay_dr_map_[k].dq.push_back(w_ncdm_bg_[k][index_q]/f0);
+        }
+      }
+
     }
     else{
       /** Manual q-sampling for this species. Same sampling used for both perturbation and background sampling, since this will usually be a high precision setting anyway */
       q_size_ncdm_bg_[k] = ncdm_input_q_size_[k];
       q_size_ncdm_[k] = ncdm_input_q_size_[k];
-      
+
       class_alloc(q_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double), error_message_);
       class_alloc(w_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double), error_message_);
       class_alloc(q_ncdm_[k], q_size_ncdm_[k]*sizeof(double), error_message_);
@@ -560,6 +675,9 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
       for (index_q = 0; index_q < q_size_ncdm_[k]; index_q++) {
         q_ncdm_bg_[k][index_q] = q_ncdm_[k][index_q];
         w_ncdm_bg_[k][index_q] = w_ncdm_[k][index_q];
+        if (ncdm_types_[k] == NCDMType::decay_dr) {
+          decay_dr_map_[k].dq.push_back(dq[index_q]);
+        }
       }
 
     }
@@ -611,15 +729,36 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
     factor_ncdm_[k] = deg_ncdm_[k]*4*_PI_*pow(ncdm_settings.T_cmb*T_ncdm_[k]*_k_B_, 4)*8*_PI_*_G_
       /3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_;
-    
+
     rho_nu_rel_ = 56.0/45.0*pow(_PI_, 6)*pow(4.0/11.0, 4.0/3.0)*_G_/pow(_h_P_, 3)/pow(_c_, 7)*pow(_Mpc_over_m_, 2)*pow(ncdm_settings.T_cmb*_k_B_, 4);
+
+    if (ncdm_types_[k] == NCDMType::decay_dr) {
+      decay_dr_map_[k].q_offset = cumulative_q_index;
+      cumulative_q_index += q_size_ncdm_[k];
+      if (ncdm_quadrature_strategy_[k] != 3) {
+        throw std::invalid_argument("DNCDM currently only admits quadrature strategy 3. Please change your input accordingly.\n");
+      }
+      else {
+        decay_dr_map_[k].quadrature_strategy = ncdm_quadrature_strategy_[k];
+      }
+      decay_dr_map_[k].Gamma = Gamma_list[dncdm_count]*(1.e3 / _c_); // Convert to Mpc
+
+      decay_dr_map_[k].dr_id    = dncdm_count + dcdm_offset;
+      decay_dr_map_[k].dncdm_id = dncdm_count;
+
+      dncdm_count++;
+    }
+    q_total_size_dncdm_ = cumulative_q_index;
 
     /* If allocated, deallocate interpolation table:  */
   }
 
   /* We must calculate M from omega or vice versa if one of them is missing.
      If both are present, we must update the degeneracy parameter to
-     reflect the implicit normalization of the distribution function.*/
+     reflect the implicit normalization of the distribution function.
+
+     For decaying species, the degeneracy parameter is found from shooting instead.
+     */
   double H0 = ncdm_settings.h*1.e5/_c_;
   for (n=0; n < N_ncdm_; n++){
     if (m_ncdm_in_eV_[n] != 0.0){
@@ -629,7 +768,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
       class_call(background_ncdm_momenta(n, 0., NULL, &rho_ncdm, NULL, NULL, NULL),
                  error_message_,
                  errmsg);
-      if (Omega0_ncdm_[n] == 0.0){
+      if ((Omega0_ncdm_[n] == 0.0) || (ncdm_types_[n] == NCDMType::decay_dr)) {
         Omega0_ncdm_[n] = rho_ncdm/H0/H0;
         omega0_ncdm_[n] = Omega0_ncdm_[n]*ncdm_settings.h*ncdm_settings.h;
       }
@@ -717,12 +856,48 @@ int NonColdDarkMatter::background_ncdm_momenta_mass(int n_ncdm, double M, double
 }
 
 /**
+ * Same functionality as background_ncdm_momenta_mass, but with the degeneracy parameter as variable instead
+ * The mass is taken to be the stored member variable mass
+ * For documentation, see background_ncdm_momenta_mass
+*/
+int NonColdDarkMatter::background_ncdm_momenta_deg(int n_ncdm, double deg, double z, double T_cmb, double* n, double* rho, double* p, double* drho_ddeg, double* pseudo_p) const {
+  double M = M_ncdm_[n_ncdm];
+  double factor2 = deg*4*_PI_*pow(T_cmb*T_ncdm_[n_ncdm]*_k_B_, 4)*8*_PI_*_G_
+      /3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_*pow(1 + z, 4);
+  double* qvec = q_ncdm_bg_[n_ncdm];
+  double* wvec = w_ncdm_bg_[n_ncdm];
+  double qsize = q_size_ncdm_bg_[n_ncdm];
+
+  if (n != NULL) *n = 0.;
+  if (rho != NULL) *rho = 0.;
+  if (p != NULL) *p = 0.;
+  if (pseudo_p != NULL) *pseudo_p = 0.;
+
+  for (int index_q = 0; index_q < qsize; index_q++) {
+    double q2 = qvec[index_q]*qvec[index_q];
+    double epsilon = sqrt(q2 + M*M/(1. + z)/(1. + z));
+
+    if (n != NULL) *n += q2*wvec[index_q];
+    if (rho != NULL) *rho += q2*epsilon*wvec[index_q];
+    if (p != NULL) *p += q2*q2/3./epsilon*wvec[index_q];
+    if (pseudo_p != NULL) *pseudo_p += pow(q2/epsilon, 3)/3.0*wvec[index_q];
+  }
+  if (n != NULL) *n *= factor2/(1. + z);
+  if (rho != NULL) *rho *= factor2;
+  if (p != NULL) *p *= factor2;
+  if (pseudo_p != NULL) *pseudo_p *= factor2;
+
+  // Only deg-dependence is in the front factor; rho is linear in deg
+  if (drho_ddeg != NULL) {
+    *drho_ddeg = *rho/deg;
+  }
+
+  return _SUCCESS_;
+}
+
+/**
  * When the user passed the density fraction Omega_ncdm or
  * omega_ncdm in input but not the mass, infer the mass with Newton iteration method.
- *
- * @param ppr    Input: precision structure
- * @param pba    Input/Output: background structure
- * @param n_ncdm Input: index of ncdm species
  */
 
 double NonColdDarkMatter::background_ncdm_M_from_Omega(int n_ncdm, double H0, double Omega0, double tol_M_ncdm) {
@@ -861,8 +1036,34 @@ double NonColdDarkMatter::GetMassInElectronvolt(int n_ncdm) const {
     return m_ncdm_in_eV_[n_ncdm];
   }
 }
+
+void NonColdDarkMatter::SetBackgroundWeight(int n_ncdm, int q_index, double weight) {
+  w_ncdm_bg_[n_ncdm][q_index] = weight;
+}
+
+void NonColdDarkMatter::SetOmega0(int n_ncdm, double Omega0, double h) {
+  Omega0_ncdm_[n_ncdm] = Omega0;
+  omega0_ncdm_[n_ncdm] = Omega0*h*h;
+}
+
+void NonColdDarkMatter::SetDegAndFactor(int n_ncdm, double deg, double T_cmb) {
+  deg_ncdm_[n_ncdm] = deg;
+  factor_ncdm_[n_ncdm] = deg_ncdm_[n_ncdm]*4*_PI_*pow(T_cmb*T_ncdm_[n_ncdm]*_k_B_, 4)*8*_PI_*_G_
+      /3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_;
+}
+
+void NonColdDarkMatter::SetDeg_from_Omega_ini(int n_ncdm, double z_ini, double H0, double Omega_ini, double T_cmb) {
+  double rho_deg1;
+  background_ncdm_momenta_deg(n_ncdm, 1.0, z_ini, T_cmb, NULL, &rho_deg1, NULL, NULL, NULL);
+  double Omega_deg1 = rho_deg1*pow(1 + z_ini, -4.0)/H0/H0;
+  /* Since the energy density scales linearly with the degeneracy parameter, we can take a simple ratio */
+  deg_ncdm_[n_ncdm] = Omega_ini/Omega_deg1;
+  factor_ncdm_[n_ncdm] = deg_ncdm_[n_ncdm]*4*_PI_*pow(T_cmb*T_ncdm_[n_ncdm]*_k_B_, 4)*8*_PI_*_G_
+      /3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_;
+}
+
 /** Checks whether scale factor a_start is early enough and returns one that is */
-double NonColdDarkMatter::GetIni(double a, double a_today, double tol_ncdm_initial_w) {
+double NonColdDarkMatter::GetIni(double a, double a_today, double tol_ncdm_initial_w) const {
   double rho_ncdm, p_ncdm;
   int counter;
   for (counter = 0; counter < _MAX_IT_; counter++) {
@@ -888,4 +1089,8 @@ double NonColdDarkMatter::GetIni(double a, double a_today, double tol_ncdm_initi
                error_message_,
                "Search for initial scale factor a such that all ncdm species are relativistic failed.");
   return a;
+}
+
+double NonColdDarkMatter::GetDeg(int n_ncdm) const {
+  return deg_ncdm_[n_ncdm];
 }

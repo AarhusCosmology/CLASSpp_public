@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
-enum target_names {theta_s, Omega_dcdmdr, omega_dcdmdr, Omega_scf, Omega_ini_dcdm, omega_ini_dcdm, sigma8};
-#define _NUM_TARGETS_ 7 //Keep this number as number of target_names
+enum target_names {theta_s, Omega_dcdmdr, omega_dcdmdr, Omega_scf, Omega_ini_dcdm, omega_ini_dcdm, sigma8, Omega_dncdmdr, omega_dncdmdr, deg_ncdm_decay_dr, Omega_ini_dncdm, omega_ini_dncdm};
+#define _NUM_TARGETS_ 12 //Keep this number as number of target_names
 
 
 class InputModule {
@@ -40,6 +40,7 @@ public:
   lensing lensing_;
   output output_;
   std::shared_ptr<NonColdDarkMatter> ncdm_;
+  std::shared_ptr<DarkRadiation> dr_;
   ErrorMsg error_message_;
 
 private:
@@ -133,6 +134,14 @@ private:
   ((a == _TRUE_) && (b == _TRUE_)) ||		\
   ((a == _TRUE_) && (c == _TRUE_)) ||		\
   ((b == _TRUE_) && (c == _TRUE_))
+
+#define class_at_least_two_of_four(a, b, c, d)		\
+  ((a == _TRUE_) && (b == _TRUE_)) ||		\
+  ((a == _TRUE_) && (c == _TRUE_)) ||		\
+  ((a == _TRUE_) && (d == _TRUE_)) ||		\
+  ((b == _TRUE_) && (c == _TRUE_)) ||   \
+  ((b == _TRUE_) && (d == _TRUE_)) ||   \
+  ((c == _TRUE_) && (d == _TRUE_))
 
 #define class_none_of_three(a, b, c)				\
   (a == _FALSE_) && (b == _FALSE_) && (c == _FALSE_)

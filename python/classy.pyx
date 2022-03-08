@@ -888,6 +888,39 @@ cdef class PyCosmology:
         output_value = pvecthermo[index_th]
         return output_value
 
+    cpdef get_ncdm(self):
+        """
+        Return an array of data related to the NonColdDarkMatter module.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        ncdm : dictionary containing the following quantities related to the NonColdDarkMatter module:
+        -> q : list of vectors of q-values
+        -> q_size : list of sizes of the corresponding q-vectors
+        -> deg : list of degeneracy parameters
+        """
+        cdef:
+            dict ncdm_dict
+            vector[double] q_list
+            int q_size
+
+        inm = deref(self._thisptr).GetInputModule()
+        ncdm_module_ptr = deref(inm).ncdm_
+
+        ncdm_dict = {}
+        for ncdm_id in range(deref(ncdm_module_ptr).N_ncdm_):
+            q_size = deref(ncdm_module_ptr).q_size_ncdm_[ncdm_id]
+            ncdm_dict[f"deg[{ncdm_id}]"]    = deref(ncdm_module_ptr).GetDeg(ncdm_id)
+            ncdm_dict[f"m_ncdm[{ncdm_id}]"] = deref(ncdm_module_ptr).m_ncdm_in_eV_[ncdm_id]
+            ncdm_dict[f"q_size[{ncdm_id}]"]   = q_size
+            for q_id in range(q_size):
+                ncdm_dict[f"q[{ncdm_id}{q_id}]"] = deref(ncdm_module_ptr).q_ncdm_[ncdm_id][q_id]
+
+        return ncdm_dict
+
     cpdef angular_distance(self, double z):
         """
         angular_distance(z)
@@ -1440,6 +1473,8 @@ cdef class PyCosmology:
                 value = self.Omega_m()
             elif name == 'omega_m':
                 value = self.Omega_m()/self.ba.h/self.ba.h
+            elif name == 'Omega_g':
+                value = self.ba.Omega0_g
             elif name == 'xi_idr':
                 value = self.ba.T_idr/self.ba.T_cmb
             elif name == 'N_dg':
