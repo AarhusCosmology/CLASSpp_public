@@ -1083,7 +1083,7 @@ int fzero_Newton(int (*func)(double *x,
   int k,i,j,*indx, ntrial=20;
   double errx,errf,d,*F0,*Fdel,**Fjac,*p, *lu_work;
   int has_converged = _FALSE_;
-  double toljac = 1e-3;
+  double toljac = 1e-1;
   double *delx;
 
   /** All arrays are indexed as [0, n-1] with the exception of p, indx,
@@ -1102,18 +1102,13 @@ int fzero_Newton(int (*func)(double *x,
   class_alloc(delx, sizeof(double)*x_size, error_message);
   class_alloc(Fdel, sizeof(double)*x_size, error_message);
 
-  for (i=1; i<=x_size; i++){
-    delx[i-1] = toljac*dxdF[i-1];
-  }
-
   for (k=1;k<=ntrial;k++) {
-    /** Compute F(x): */
-    /**printf("x = [%f, %f], delx = [%e, %e]\n",
-       x_inout[0],x_inout[1],delx[0],delx[1]);*/
+    //printf("x = [%f, %f], delx = [%e, %e]\n", x_inout[0],x_inout[1],delx[0],delx[1]);
     class_call(func(x_inout, x_size, param, F0, error_message),
                error_message, error_message);
-    /**    printf("F0 = [%f, %f]\n",F0[0],F0[1]);*/
+    //printf("F0 = [%f, %f]\n",F0[0],F0[1]);
     *fevals = *fevals + 1;
+
     errf=0.0; //fvec and Jacobian matrix in fjac.
     for (i=1; i<=x_size; i++)
       errf += fabs(F0[i-1]); //Check function convergence.
@@ -1122,30 +1117,60 @@ int fzero_Newton(int (*func)(double *x,
       break;
     }
 
-    /**
-    if (k==1){
-      for (i=1; i<=x_size; i++){
-        delx[i-1] *= F0[i-1];
-      }
+    for (int i = 0; i < x_size; ++i){
+        if (k == 1) {
+          delx[i] = -dxdF[i]*F0[i];
+        }
+        else {
+            delx[i] = -toljac*p[i + 1];
+        }
     }
-    */
-
     /** Compute the jacobian of F: */
+    //printf("Jacobian computation: \n ======================== \n");
+    std::vector<double> x_inout_backup;
+    for (int j = 0; j < x_size; ++j) {
+      x_inout_backup.push_back(x_inout[j]);
+    }
     for (i=1; i<=x_size; i++){
-      if (F0[i-1]<0.0)
-        delx[i-1] *= -1;
-      x_inout[i-1] += delx[i-1];
 
-      /**      printf("x = [%f, %f], delx = [%e, %e]\n",
-               x_inout[0],x_inout[1],delx[0],delx[1]);*/
-      class_call(func(x_inout, x_size, param, Fdel, error_message),
-                 error_message, error_message);
-      /**      printf("F = [%f, %f]\n",Fdel[0],Fdel[1]);*/
+      //printf("x = [%f, %f], delx = [%e, %e]\n",x_inout[0],x_inout[1],delx[0],delx[1]);
+      int return_function = _FAILURE_;
+      for (int func_iter = 0; func_iter < 10; ++func_iter) {
+        x_inout[i - 1] = x_inout_backup[i - 1] + delx[i - 1];
+        try {
+          return_function = func(x_inout, x_size, param, Fdel, error_message);
+          (*fevals)++;
+        }
+        catch (...) {
+          return_function = _FAILURE_;
+        }
+        if (return_function == _SUCCESS_) {
+          double max_y_diff = 0.;
+          for (int j = 0; j < x_size; ++j) {
+            double yscal = std::max(1e-50, 0.5*(fabs(Fdel[j]) + fabs(F0[j])));
+            max_y_diff = std::max(max_y_diff, fabs((Fdel[j] - F0[j])/yscal));
+          }
+          if (max_y_diff > tolF*tolF) {
+            //Significant difference
+            break;
+          }
+          else {
+            delx[i - 1] *= 2;
+          }
+        }
+        else {
+          delx[i - 1] *= -0.5;
+        }
+      }
+      if (return_function == _FAILURE_) {
+        throw(std::runtime_error("Jacobian computation in Newtons method failed during shooting"));
+      }
+      //printf("F = [%f, %f]\n",Fdel[0],Fdel[1]);
       for (j=1; j<=x_size; j++)
         Fjac[j][i] = (Fdel[j-1]-F0[j-1])/delx[i-1];
       x_inout[i-1] -= delx[i-1];
     }
-    *fevals = *fevals + x_size;
+    //printf(" ======================== \n");
 
     for (i=1; i<=x_size; i++)
       p[i] = -F0[i-1]; //Right-hand side of linear equations.
@@ -1172,6 +1197,7 @@ int fzero_Newton(int (*func)(double *x,
   free(Fdel);
 
   if (has_converged == _TRUE_){
+    //fprintf(stderr, "Newton converged after %d iterations\n", k);
     return _SUCCESS_;
   }
   else{

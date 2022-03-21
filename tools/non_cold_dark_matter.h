@@ -59,6 +59,8 @@ public:
   void SetDeg_from_Omega_ini(int n_ncdm, double z_ini, double H0, double Omega_ini, double T_cmb);
   double GetIni(double a, double a_today, double tol_ncdm_initial_w) const;
   double GetDeg(int n_ncdm) const;
+  double GetRescalingFactor(int n_ncdm, double* pvecback_begin) const;
+  std::tuple<double, double> GetRescaledParameters(int n_ncdm, double a, double* pvecback_begin);
 
   std::vector<NCDMType> ncdm_types_; /** Contains information about the types of each ncdm species */
   

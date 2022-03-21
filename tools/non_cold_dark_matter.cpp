@@ -409,7 +409,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     extend_list_of_doubles("Omega_ncdm", Omega0_ncdm_, 0.0);     // Will be set later,
     extend_list_of_doubles("omega_ncdm", omega0_ncdm_, 0.0);     // calling this now just to reallocate
     extend_list_of_doubles("deg_ncdm_decay_dr", deg_ncdm_, 1.0);
-    
+
     for (int n = 0; n < N_ncdm_; n ++) {
       class_test((ncdm_input_q_size_[n] > 95) && (ncdm_quadrature_strategy_[n] == 0), errmsg, "Currently, only quadrature strategy 3 is compatible with Number of momentum bins larger than 95.");
     }
@@ -495,7 +495,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
   int dncdm_count = 0;
   int cumulative_q_index = 0;
-  
+
   // Check for DCDM species to set correct dr_id; pba->has_dcdm is not set yet, so we check manually
   int dcdm_offset = 0;
   int flag3, flag4;
@@ -507,7 +507,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   if (((flag1 == _TRUE_) || (flag2 == _TRUE_)) || ((flag3 == _TRUE_) || (flag4 == _TRUE_))) {
     dcdm_offset++;
   }
-  
+
   std::vector<double> Gamma_input(N_ncdm_decay_dr_, 0.0);
   if (N_ncdm_decay_dr_ > 0) {
     /* Lifetime takes different kinds of input */
@@ -677,7 +677,6 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
           decay_dr_map_[k].dq.push_back(dq[index_q]);
         }
       }
-
     }
 
     class_alloc(dlnf0_dlnq_ncdm_[k],
@@ -1026,6 +1025,30 @@ double NonColdDarkMatter::GetNeff(double z) const {
   return Neff;
 }
 
+std::tuple<double, double> NonColdDarkMatter::GetRescaledParameters(int n_ncdm, double a, double* pvecback_begin) {
+  // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
+  double rho_scaled = 0.;
+  double p_scaled = 0.;
+  double pseudo_p_scaled = 0.;
+
+  double* lnf_ptr = pvecback_begin + decay_dr_map_.at(n_ncdm).q_offset;
+  const double lnN = GetRescalingFactor(n_ncdm, pvecback_begin);
+  for (int index_q = 0; index_q < q_size_ncdm_[n_ncdm]; index_q++) {
+    double dq = decay_dr_map_[n_ncdm].dq[index_q];
+    double q = q_ncdm_[n_ncdm][index_q];
+    double lnf = lnf_ptr[index_q];
+    double epsilon = sqrt(q*q + a*a*M_ncdm_[n_ncdm]*M_ncdm_[n_ncdm]);
+
+    rho_scaled += dq*q*q*epsilon*exp(lnN + lnf);
+    p_scaled += dq*pow(q, 4)/3./epsilon*exp(lnN + lnf);
+    pseudo_p_scaled += dq*pow(q*q/epsilon, 3)/3.*exp(lnN + lnf);
+  }
+  double pseudo_p_over_p = pseudo_p_scaled/p_scaled;
+  double w = p_scaled/rho_scaled; /* equation of state parameter */
+
+  return std::make_tuple(w, pseudo_p_over_p);
+}
+
 double NonColdDarkMatter::GetMassInElectronvolt(int n_ncdm) const {
   if ((n_ncdm < 0) || (n_ncdm >= N_ncdm_)) {
     return 0.;
@@ -1091,4 +1114,15 @@ double NonColdDarkMatter::GetIni(double a, double a_today, double tol_ncdm_initi
 
 double NonColdDarkMatter::GetDeg(int n_ncdm) const {
   return deg_ncdm_[n_ncdm];
+}
+
+double NonColdDarkMatter::GetRescalingFactor(int n_ncdm, double* pvecback_begin) const {
+  double lnN = DBL_MAX;
+  double* lnf_ptr = pvecback_begin + decay_dr_map_.at(n_ncdm).q_offset;
+  for (int index_q = 0; index_q < q_size_ncdm_[n_ncdm]; index_q++) {
+    double lnf = lnf_ptr[index_q];
+    lnN = std::min(lnN, -lnf);
+  }
+  const double factor = lnN + 400;
+  return factor;
 }

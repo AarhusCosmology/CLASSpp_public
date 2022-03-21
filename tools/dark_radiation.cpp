@@ -107,7 +107,6 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
   // Prepare member vectors
   cumulative_q_index_.push_back(0);
   for (int n_dr = 0; n_dr < N_species_; n_dr++) {
-    
     if (source_types_[n_dr] == SourceType::dncdm) {
       // Assume all dncdm sourced DRs have inverse decays if has_inv is true
       // Here, we make custom initial conditions that allow the fermionic daughter to have a Fermi-Dirac initial distribution

@@ -107,27 +107,9 @@ public:
     queues_[i % count_].Push(std::forward<F>(f));
   }
 
-  template<typename F>
-  std::future<typename std::result_of<F()>::type> AsyncTask(F&& f) {
-    using return_type = typename std::result_of<F()>::type;
-    auto task = std::make_shared<std::packaged_task<return_type()>>(f);
-    std::future<return_type> res = task->get_future();
-
-    auto work = [task](){ (*task)(); };
-    unsigned int i = index_++;
-    for(unsigned int n = 0; n < count_; ++n) {
-      if(queues_[(i + n) % count_].TryPush(work)){
-        return res;
-      }
-    }
-    queues_[i % count_].Push(work);
-
-    return res;
-  }
-
   template<typename F, typename... Args>
-  std::future<typename std::result_of<F(Args...)>::type> AsyncTask(F&& f, Args&&... args) {
-    using return_type = typename std::result_of<F(Args...)>::type;
+  auto AsyncTask(F&& f, Args&&... args) {
+    using return_type = std::invoke_result_t<F, Args...>;
     auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
     std::future<return_type> res = task->get_future();
 

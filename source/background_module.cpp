@@ -1583,11 +1583,12 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
       printf("Density is %g. a_today=%g. Omega_ini=%g\n", pvecback_integration[index_bi_rho_dcdm_], pba->a_today, pba->Omega_ini_dcdm);
   }
 
+  if (pba->has_dcdm) {
+    double f = 1./3.*pow(a/pba->a_today,6)*pvecback_integration[index_bi_rho_dcdm_]*pba->Gamma_dcdm/pow(pba->H0,3)/sqrt(Omega_rad);
+    pvecback_integration[index_bi_rho_dr_species_ + 0] = f*pba->H0*pba->H0/pow(a/pba->a_today,4);
+  }
+
   if (pba->has_ncdm_decay_dr == _TRUE_) {
-    if (pba->has_dcdm) {
-      double f = 1./3.*pow(a/pba->a_today,6)*pvecback_integration[index_bi_rho_dcdm_]*pba->Gamma_dcdm/pow(pba->H0,3)/sqrt(Omega_rad);
-      pvecback_integration[index_bi_rho_dr_species_ + 0] = f*pba->H0*pba->H0/pow(a/pba->a_today,4);
-    }
     for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
       pvecback_integration[index_bi_rho_dr_species_ + dncdm_properties.dr_id] = 0.;
     }

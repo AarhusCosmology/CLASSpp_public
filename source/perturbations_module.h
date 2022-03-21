@@ -208,6 +208,8 @@ private:
   int perturb_tca_slip_and_shear(double* y, void * parameters_and_workspace, ErrorMsg error_message);
   int perturb_rsa_delta_and_theta(double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
   int perturb_rsa_idr_delta_and_theta(double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
+  
+  std::tuple<double, double, double> RescaledNCDMPerturbations(int n_ncdm, double a, double k, perturb_workspace* ppw);
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;

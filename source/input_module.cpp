@@ -3036,8 +3036,7 @@ int InputModule::input_read_parameters() {
 
   if (pba->Omega0_dcdmdr != 0.){
     pba->has_dcdm = _TRUE_;
-    if (pba->Gamma_dcdm != 0.)
-      pba->has_dr = _TRUE_;
+    pba->has_dr = _TRUE_;
   }
 
   if ((pba->has_ncdm) && (ncdm_ != nullptr) && (ncdm_->N_ncdm_decay_dr_ != 0.)) {
