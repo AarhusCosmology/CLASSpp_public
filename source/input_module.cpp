@@ -37,6 +37,7 @@ const std::vector<std::string> InputModule::kTargetNamestrings_{
   "omega_dncdmdr",
   "deg_ncdm_decay_dr",
   "Omega_ini_dncdm",
+  "Neff_ini_dncdm",
   "omega_ini_dncdm"};
 const std::vector<std::string> InputModule::kUnknownNamestrings_{
   "h",
@@ -48,6 +49,7 @@ const std::vector<std::string> InputModule::kUnknownNamestrings_{
   "A_s",
   "deg_ncdm_decay_dr",
   "deg_ncdm_decay_dr",
+  "Omega_dncdmdr",
   "Omega_dncdmdr",
   "Omega_dncdmdr",
   "omega_dncdmdr"};
@@ -1089,8 +1091,8 @@ int InputModule::input_read_parameters() {
     }
     if (ncdm_->N_ncdm_decay_dr_ > 0) {
 
-      double *Omega_dncdmdr_list, *omega_dncdmdr_list, *deg_list, *Omega_ini_dncdm_list, *omega_ini_dncdm_list;
-      int flag4, flag5, temp_size; // temp_size will always be N_ncdm_decay_dr_, the sizes are checked elsewhere
+      double *Omega_dncdmdr_list, *omega_dncdmdr_list, *deg_list, *Omega_ini_dncdm_list, *omega_ini_dncdm_list, *Neff_ini_dncdm_list;
+      int flag4, flag5, flag6, temp_size; // temp_size will always be N_ncdm_decay_dr_, the sizes are checked elsewhere
       
       class_alloc(ncdm_->Omega_dncdmdr_, ncdm_->N_ncdm_decay_dr_*sizeof(double), errmsg);
       class_call(parser_read_list_of_doubles(pfc,"Omega_dncdmdr",&temp_size,&Omega_dncdmdr_list,&flag1,errmsg),
@@ -1103,6 +1105,8 @@ int InputModule::input_read_parameters() {
                  errmsg, errmsg);
       class_call(parser_read_list_of_doubles(pfc,"omega_ini_dncdm",&temp_size,&omega_ini_dncdm_list,&flag5,errmsg),
                  errmsg, errmsg);
+      class_call(parser_read_list_of_doubles(pfc,"Neff_ini_dncdm",&temp_size,&Neff_ini_dncdm_list,&flag6,errmsg),
+                 errmsg, errmsg);
       
       class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
                    errmsg,
@@ -1112,6 +1116,7 @@ int InputModule::input_read_parameters() {
                    "In input file, you can only enter one of deg_ncdm_decay_dr or Omega_ini_dncdm, choose one");
       
       if (flag1 == _TRUE_) {
+        // Omega_dncdmdr read
         for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
           if (not pba->has_curvature) {
             class_test((Omega_dncdmdr_list[n] > 1.0), errmsg, "Your input requires Omega_dncdmdr > 1 which is not allowed in a flat Universe. Either lower your input deg_ncdm_decay_dr, Omega_ini_ncdm_decay_dr, m_ncdm_decay_dr, increase Gamma_ncdm_decay_dr, or add positive curvature to allow this energy density.");
@@ -1120,27 +1125,39 @@ int InputModule::input_read_parameters() {
           ncdm_->SetOmega0(ncdm_->N_ncdm_standard_ + n, Omega_dncdmdr_list[n], pba->h);
         }
       } else if (flag2 == _TRUE_) {
+        // omega_dncdmdr read
         for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
           ncdm_->Omega_dncdmdr_[n] = omega_dncdmdr_list[n]/pba->h/pba->h;
           ncdm_->SetOmega0(ncdm_->N_ncdm_standard_ + n, omega_dncdmdr_list[n]/pba->h/pba->h, pba->h);
         }
       }
       if (flag3 == _TRUE_) {
+        // deg_ncdm_decay_dr read
         for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
           // class_test((deg_list[n] > 25.0), errmsg, "You have either chosen an unphysically large degeneracy parameter for the decaying ncdm species, or your input mass and energy density require it to be too large for consistency");
           ncdm_->SetDegAndFactor(ncdm_->N_ncdm_standard_ + n, deg_list[n], pba->T_cmb);
         }
       } else if (flag4 == _TRUE_) {
+        // Omega_ini_dncdm read
         double a_ini = ncdm_->GetIni(ppr->a_ini_over_a_today_default*pba->a_today, pba->a_today, ppr->tol_ncdm_initial_w);
         double z_ini = 1.0/a_ini - 1.0;
         for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
           ncdm_->SetDeg_from_Omega_ini(ncdm_->N_ncdm_standard_ + n, z_ini, pba->H0, Omega_ini_dncdm_list[n], pba->T_cmb);
         }
       } else if (flag5 == _TRUE_) {
+        // omega_ini_dncdm read
         double a_ini = ncdm_->GetIni(ppr->a_ini_over_a_today_default*pba->a_today, pba->a_today, ppr->tol_ncdm_initial_w);
         double z_ini = 1.0/a_ini - 1.0;
         for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
           ncdm_->SetDeg_from_Omega_ini(ncdm_->N_ncdm_standard_ + n, z_ini, pba->H0, omega_ini_dncdm_list[n]/pba->h/pba->h, pba->T_cmb);
+        }
+      } else if (flag6 == _TRUE_) {
+        // Neff_ini_dncdm read
+        double a_ini = ncdm_->GetIni(ppr->a_ini_over_a_today_default*pba->a_today, pba->a_today, ppr->tol_ncdm_initial_w);
+        double z_ini = 1.0/a_ini - 1.0;
+        for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
+          double Omega_ini_dncdm = Neff_ini_dncdm_list[n]*7./8.*pow(4./11.,4./3.)*pba->Omega0_g;
+          ncdm_->SetDeg_from_Omega_ini(ncdm_->N_ncdm_standard_ + n, z_ini, pba->H0, Omega_ini_dncdm, pba->T_cmb);
         }
       }
     }
@@ -3690,6 +3707,7 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
     }
     case omega_dncdmdr:
     case Omega_dncdmdr:
+    case Neff_ini_dncdm:
     case deg_ncdm_decay_dr:
     case omega_ini_dncdm:
     case Omega_ini_dncdm: {
@@ -3847,6 +3865,7 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
       }
       break;
     }
+    case Neff_ini_dncdm:
     case deg_ncdm_decay_dr:
     case omega_ini_dncdm:
     case Omega_ini_dncdm: {
@@ -3861,6 +3880,8 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
           double rho_dncdm;
           ncdm->background_ncdm_momenta_deg(ncdm_id, pfzw->target_values[index_guess_local], z_ini, ba.T_cmb, NULL, &rho_dncdm, NULL, NULL, NULL);
           Omega_or_omega_ini_dncdm_target = rho_dncdm*pow(a_ini, 4.)/ba.H0/ba.H0;
+        } else if (pfzw->target_name[counter] == Neff_ini_dncdm) {
+          Omega_or_omega_ini_dncdm_target = pfzw->target_values[index_guess_local]*7./8.*pow(4./11., 4./3.)*ba.Omega0_g;
         }
         double Omega_or_omega_dncdmdr = Omega_or_omega_ini_dncdm_target;
         if (dncdm_properties.Gamma/ba.H0 > 1.0) {

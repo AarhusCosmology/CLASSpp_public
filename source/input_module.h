@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
-enum target_names {theta_s, Omega_dcdmdr, omega_dcdmdr, Omega_scf, Omega_ini_dcdm, omega_ini_dcdm, sigma8, Omega_dncdmdr, omega_dncdmdr, deg_ncdm_decay_dr, Omega_ini_dncdm, omega_ini_dncdm};
-#define _NUM_TARGETS_ 12 //Keep this number as number of target_names
+enum target_names {theta_s, Omega_dcdmdr, omega_dcdmdr, Omega_scf, Omega_ini_dcdm, omega_ini_dcdm, sigma8, Omega_dncdmdr, omega_dncdmdr, deg_ncdm_decay_dr, Omega_ini_dncdm, Neff_ini_dncdm, omega_ini_dncdm};
+#define _NUM_TARGETS_ 13 //Keep this number as number of target_names
 
 
 class InputModule {
