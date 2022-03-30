@@ -273,6 +273,7 @@ struct perturb_vector
   int index_pt_F0_dr_sum;
   int index_pt_F0_dr_species;
   int l_max_dr;          /**< max momentum in Boltzmann hierarchy for dr) */
+  int l_max_dr_col;      /**< max collision term in Boltzmann hierarchy for dr) */
   int index_pt_psi0_ncdm1; /**< first multipole of perturbation of first ncdm species, Psi_0 */
   int N_ncdm;		/**< number of distinct non-cold-dark-matter (ncdm) species */
   int* l_max_ncdm;	/**< mutipole l at which Boltzmann hierarchy is truncated (for each ncdm species) */

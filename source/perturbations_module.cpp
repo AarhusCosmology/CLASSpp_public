@@ -577,6 +577,14 @@ int PerturbationsModule::perturb_init() {
                error_message_,
                "Non-adiabatic initial conditions not coded in presence of decaying dark matter");
 
+    class_test(ppr->l_max_dr_col > ppr->l_max_dr,
+               error_message_,
+               "l_max_dr_col must be <= l_max_dr. Change your input accordingly.");
+    
+    class_test(ppr->l_max_dr_col > ppr->l_max_ncdm,
+               error_message_,
+               "l_max_dr_col must be <= l_max_ncdm. Change your input accordingly.");
+    
   }
 
   class_test(ppt->has_vectors == _TRUE_,
@@ -8474,9 +8482,6 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
           auto compute_collision_integral = [&](int l) {
             double integral_num = 0.;
             double integral_denom = 0.;
-            if (l >= 4) {
-              return 0.;
-            }
 
             if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
               bool must_rescale = false;
@@ -8545,7 +8550,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
 
           // l > 2 updates by recursion
           for (int l = 3; l <= pv->l_max_dr; ++l) {
-            if (l < 800) {
+            if ((l <= ppr->l_max_dr_col) && (l < 800)) {
               collision_term = compute_collision_integral(l);
             }
             else {

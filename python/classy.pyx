@@ -917,7 +917,7 @@ cdef class PyCosmology:
             ncdm_dict[f"m_ncdm[{ncdm_id}]"] = deref(ncdm_module_ptr).m_ncdm_in_eV_[ncdm_id]
             ncdm_dict[f"q_size[{ncdm_id}]"]   = q_size
             for q_id in range(q_size):
-                ncdm_dict[f"q[{ncdm_id}{q_id}]"] = deref(ncdm_module_ptr).q_ncdm_[ncdm_id][q_id]
+                ncdm_dict[f"q[{ncdm_id}][{q_id}]"] = deref(ncdm_module_ptr).q_ncdm_[ncdm_id][q_id]
 
         return ncdm_dict
 

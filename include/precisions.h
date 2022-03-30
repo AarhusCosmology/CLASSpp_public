@@ -209,6 +209,7 @@ class_precision_parameter(idm_dr_tight_coupling_trigger_tau_c_over_tau_h,double,
 class_precision_parameter(l_max_g,int,12)     /**< number of momenta in Boltzmann hierarchy for photon temperature (scalar), at least 4 */
 class_precision_parameter(l_max_pol_g,int,10) /**< number of momenta in Boltzmann hierarchy for photon polarization (scalar), at least 4 */
 class_precision_parameter(l_max_dr,int,17)   /**< number of momenta in Boltzmann hierarchy for decay radiation, at least 4 */
+class_precision_parameter(l_max_dr_col,int,17) /**< number of collision terms in Boltzmann hierarchy for decay radiation, at least 2 */
 class_precision_parameter(l_max_ur,int,17)   /**< number of momenta in Boltzmann hierarchy for relativistic neutrino/relics (scalar), at least 4 */
 class_precision_parameter(l_max_idr,int,17)   /**< number of momenta in Boltzmann hierarchy for interacting dark radiation */
 class_precision_parameter(l_max_ncdm,int,17)   /**< number of momenta in Boltzmann hierarchy for relativistic neutrino/relics (scalar), at least 4 */
