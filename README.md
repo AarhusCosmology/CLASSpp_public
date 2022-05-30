@@ -1,3 +1,15 @@
+CLASS++ Implementation of decaying warm dark matter  {#mainpage}
+==============================================
+
+Authors: Emil Brinch Holm and Thomas Tram
+
+This branch contains the numerical implementation of an NCDM species decaying non-relativistically to dark radiation, detailed in the preprint 2205.13628.
+
+For instructions on how to run the code, see the explanatory.ini file for the input structure.
+
+Any questions or comments may be directed to ebholm@phys.au.dk, or alternatively as issues on this repository.
+
+
 CLASS: Cosmic Linear Anisotropy Solving System  {#mainpage}
 ==============================================
 
