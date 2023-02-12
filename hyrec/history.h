@@ -41,7 +41,7 @@ typedef struct {
    double fHe;                  /* Helium fraction by number */
 
    double zstart, zend, dlna;   /* initial and final redshift and step size in log a */
-   long nz;                     /* total number of redshift steps */
+   int nz;                      /* total number of redshift steps */
 
    /** parameters for energy injection */
 

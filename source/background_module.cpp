@@ -114,7 +114,6 @@ int BackgroundModule::background_add_line_to_bg_table(double loga, double* y, do
  * Evaluates all background quantities at a given value of
  * conformal time by reading the pre-computed table and interpolating.
  *
- * @param pba           Input: pointer to background structure (containing pre-computed table)
  * @param tau           Input: value of conformal time
  * @param return_format Input: format of output vector (short, normal, long)
  * @param intermode     Input: interpolation mode (normal or closeby)
@@ -204,7 +203,6 @@ int BackgroundModule::background_at_tau(double tau,
  *
  * Returns tau(z) by interpolation from pre-computed table.
  *
- * @param pba Input: pointer to background structure
  * @param z   Input: redshift
  * @param tau Output: conformal time
  * @return the error status
@@ -256,7 +254,6 @@ int BackgroundModule::background_tau_of_z(double z, double* tau) const {
  * just 'a', e.g. (phi, phidot) for quintessence, some temperature of
  * exotic relics, etc...
  *
- * @param pba           Input: pointer to background structure
  * @param pvecback_B    Input: vector containing all {B} type quantities (scale factor, ...)
  * @param return_format Input: format of output vector
  * @param pvecback      Output: vector of background quantities (assumed to be already allocated)
@@ -605,7 +602,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
  * background structure. Generalisation to arbitrary functions should
  * be simple.
  *
- * @param pba            Input: pointer to background structure
  * @param a              Input: current value of scale factor
  * @param w_fld          Output: equation of state parameter w_fld(a)
  * @param dw_over_da_fld Output: function dw_fld/da
@@ -618,7 +614,7 @@ int BackgroundModule::background_w_fld(double a, double* w_fld, double* dw_over_
   double Omega_ede = 0.;
   double dOmega_ede_over_da = 0.;
   double d2Omega_ede_over_da2 = 0.;
-  double a_eq, Omega_r, Omega_m;
+  double a_eq = 0.0, Omega_r, Omega_m;
 
   /** - first, define the function w(a) */
   switch (pba->fluid_equation_of_state) {
@@ -700,8 +696,6 @@ int BackgroundModule::background_w_fld(double a, double* w_fld, double* dw_over_
  * Initialize the background structure, and in particular the
  * background interpolation table.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input/Output: pointer to initialized background structure
  * @return the error status
  */
 
@@ -710,7 +704,6 @@ int BackgroundModule::background_init() {
   /** Summary: */
 
   /** - define local variables */
-  double rho_nu_rel;
   double Neff, N_dark;
   double w_fld, dw_over_da, integral_fld;
 
@@ -801,7 +794,6 @@ int BackgroundModule::background_init() {
  * Free all memory space allocated by background_init().
  *
  *
- * @param pba Input: pointer to background structure (to be freed)
  * @return the error status
  */
 
@@ -817,7 +809,6 @@ int BackgroundModule::background_free() {
 /**
  * Free only the memory space NOT allocated through input_read_parameters()
  *
- * @param pba Input: pointer to background structure (to be freed)
  * @return the error status
  */
 
@@ -835,7 +826,6 @@ int BackgroundModule::background_free_noinput() const {
 /**
  * Assign value to each relevant index in vectors of background quantities.
  *
- * @param pba Input: pointer to background structure
  * @return the error status
  */
 
@@ -1032,8 +1022,6 @@ int BackgroundModule::background_indices() {
  *  This function integrates the background over time, allocates and
  *  fills the background table
  *
- * @param ppr Input: precision structure
- * @param pba Input/Output: background structure
  */
 
 int BackgroundModule::background_solve() {
@@ -1525,8 +1513,6 @@ int BackgroundModule::background_solve_evolver() {
 /**
  * Assign initial values to background integrated variables.
  *
- * @param ppr                  Input: pointer to precision structure
- * @param pba                  Input: pointer to background structure
  * @param pvecback             Input: vector of background quantities used as workspace
  * @param pvecback_integration Output: vector of background quantities to be integrated, returned with proper initial values
  * @return the error status
@@ -1543,9 +1529,8 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
   /* scale factor */
   double a;
 
-  double rho_ncdm, p_ncdm, rho_ncdm_rel_tot=0.;
+  double rho_ncdm_rel_tot=0.;
   double Omega_rad, rho_rad;
-  int counter,is_early_enough,n_ncdm;
   double scf_lambda;
   double rho_fld_today;
   double w_fld,dw_over_da_fld,integral_fld;
@@ -1700,8 +1685,6 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
  * Find the time of radiation/matter equality and store characteristic
  * quantitites at that time in the background structure..
  *
- * @param ppr                  Input: pointer to precision structure
- * @param pba                  Input/Output: pointer to background structure
  * @return the error status
  */
 
@@ -1780,7 +1763,8 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   /** - Length of the column title should be less than _OUTPUTPRECISION_+6
       to be indented correctly, but it can be as long as . */
   int n;
-  char tmp[40];
+  const size_t max_title_length = 40;
+  char tmp[max_title_length];
 
   class_store_columntitle(titles,"z",_TRUE_);
   class_store_columntitle(titles,"proper time [Gyr]",_TRUE_);
@@ -1795,22 +1779,22 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles,"(.)rho_cdm",pba->has_cdm);
   if (pba->has_ncdm == _TRUE_){
     for (n=0; n<pba->N_ncdm; n++){
-      sprintf(tmp,"(.)number_ncdm[%d]",n);
+      snprintf(tmp, max_title_length, "(.)number_ncdm[%d]", n);
       class_store_columntitle(titles,tmp,_TRUE_);
-      sprintf(tmp,"(.)rho_ncdm[%d]",n);
+      snprintf(tmp, max_title_length, "(.)rho_ncdm[%d]", n);
       class_store_columntitle(titles,tmp,_TRUE_);
-      sprintf(tmp,"(.)p_ncdm[%d]",n);
+      snprintf(tmp, max_title_length, "(.)p_ncdm[%d]", n);
       class_store_columntitle(titles,tmp,_TRUE_);
       if (ncdm_->ncdm_types_[n] == NCDMType::decay_dr) {
         // For each decaying species, print the distribution function, its derivative and its q-grid
         for (int i = 0; i < ncdm_->q_size_ncdm_[n]; i++) {
-          sprintf(tmp,"lnf_dncdm[%d][%d]",n,i);
+          snprintf(tmp, max_title_length, "lnf_dncdm[%d][%d]", n, i);
           class_store_columntitle(titles,tmp,_TRUE_);
 
-          sprintf(tmp,"dlnfdlnq_dncdm[%d][%d]",n,i);
+          snprintf(tmp, max_title_length, "dlnfdlnq_dncdm[%d][%d]", n, i);
           class_store_columntitle(titles,tmp,_TRUE_);
 
-          sprintf(tmp,"dlnfdlnq_separate_dncdm[%d][%d]",n,i);
+          snprintf(tmp, max_title_length, "dlnfdlnq_separate_dncdm[%d][%d]", n, i);
           class_store_columntitle(titles,tmp,_TRUE_);
         }
       }
@@ -1828,7 +1812,7 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   if (pba->has_dr == _TRUE_) {
 
     for (int j = 0; j < pba->N_decay_dr; ++j) {
-      sprintf(tmp, "(.)rho_dr[%d]", j);
+      snprintf(tmp, max_title_length, "(.)rho_dr[%d]", j);
       class_store_columntitle(titles, tmp, _TRUE_);
     }
   }
@@ -2166,7 +2150,6 @@ double BackgroundModule::ddV_scf(double phi) const {
  * It also prints the total budgets of non-relativistic, relativistic,
  * and other contents, and of the total
  *
- * @param pba                      Input: Pointer to background structure
  * @return the error status
  */
 

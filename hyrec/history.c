@@ -56,7 +56,7 @@ void rec_get_cosmoparam(FILE *fin, FILE *fout, REC_COSMOPARAMS *param) {
   param->zstart = 8000.;
   param->zend = 0.;
   param->dlna = 8.49e-5;
-  param->nz = (long) floor(2+log((1.+param->zstart)/(1.+param->zend))/param->dlna);
+  param->nz = floor(2+log((1.+param->zstart)/(1.+param->zend))/param->dlna);
 
   if (fout!=NULL && PROMPT==1) fprintf(fout, "\n");
 }
@@ -243,7 +243,7 @@ void rec_build_history(REC_COSMOPARAMS *param, HRATEEFF *rate_table, TWO_PHOTON_
                        double *xe_output, double *Tm_output) {
 
 
-   long iz;
+   int iz;
    double **logfminus_hist;
    double *logfminus_Ly_hist[3];
    double H, z, z_prev, dxedlna_prev, z_prev2, dxedlna_prev2, dTmdlna_prev, dTmdlna_prev2;

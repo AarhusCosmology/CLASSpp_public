@@ -197,8 +197,6 @@ int NonColdDarkMatter::background_ncdm_test_function(
  * This function finds optimal quadrature weights for each ncdm
  * species
  *
- * @param ppr Input: precision structure
- * @param pba Input/Output: background structure
  */
 
 int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings& ncdm_settings) {
@@ -470,7 +468,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
 
   int index_q,tolexp;
-  double f0m2,f0m1,f0,f0p1,f0p2,q,df0dq;
+  double f0m2 = 0.0,f0m1,f0,f0p1,f0p2 = 0.0,q,df0dq;
 
   /* Allocate pointer arrays: */
   class_alloc(q_ncdm_, sizeof(double*)*N_ncdm_, error_message_);
@@ -791,11 +789,6 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
  * sum over.  Input parameters passed as NULL pointers are not
  * evaluated for speed-up
  *
- * @param qvec     Input: sampled momenta
- * @param wvec     Input: quadrature weights
- * @param qsize    Input: number of momenta/weights
- * @param M        Input: mass
- * @param factor   Input: normalization factor for the p.s.d.
  * @param z        Input: redshift
  * @param n        Output: number density
  * @param rho      Output: energy density

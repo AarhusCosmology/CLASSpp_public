@@ -18,9 +18,9 @@ private:
   int output_perturbations();
   int output_primordial();
   int output_print_data(FILE *out, const char titles[_MAXTITLESTRINGLENGTH_], double *dataptr, int tau_size);
-  int output_open_cl_file(FILE ** clfile, FileName filename, char * first_line, int lmax);
+  int output_open_cl_file(FILE ** clfile, FileName filename, const char* first_line, int lmax);
   int output_one_line_of_cl(FILE * clfile, double l, double * cl, int ct_size);
-  int output_open_pk_file(FILE ** pkfile, FileName filename, char * first_line, double z);
+  int output_open_pk_file(FILE ** pkfile, FileName filename, const char* first_line, double z);
   int output_one_line_of_pk(FILE * tkfile, double one_k, double one_pk);
 
   BackgroundModulePtr background_module_;

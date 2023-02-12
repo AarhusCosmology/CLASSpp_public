@@ -26,7 +26,7 @@ std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc, std::vect
 */
 
 DarkRadiation::DarkRadiation(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, std::vector<double> deg, double T_cmb)
-: N_species_(source_types.size()), source_types_(source_types), dr_types_(dr_types), deg_(deg) {
+: N_species_(static_cast<int>(source_types.size())), source_types_(source_types), dr_types_(dr_types), deg_(deg) {
   if (this->Init(pfc, T_cmb) == _FAILURE_) {
     throw std::runtime_error(error_message_);
   }
@@ -125,7 +125,7 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
             else if (initial_fermionic_pop == _TRUE_) {
               double q = q_[index_q];
               double f0;
-              int temp = InitialDistribution(NULL, q, &f0);
+              InitialDistribution(NULL, q, &f0);
               w_temp[index_q] = f0*dq_[index_q];
             }
           }

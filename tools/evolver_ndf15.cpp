@@ -1465,7 +1465,7 @@ int numjac(
 
   if ((jac->use_sparse)&&(jac->repeated_pattern < jac->trust_sparse)){
     nz=0; /*Number of non-zeros */
-    Ap[0]=0; /*<-Always is.. */
+    Ap[0]=0;
     pattern_broken = _FALSE_;
     for(j=1;j<=neq;j++){
       for(i=1;i<=neq;i++){

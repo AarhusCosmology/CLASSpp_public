@@ -54,7 +54,6 @@ PrimordialModule::~PrimordialModule() {
  * primordial_init() has been called before, and primordial_free() has not
  * been called yet.
  *
- * @param ppm        Input: pointer to primordial structure containing tabulated primordial spectrum
  * @param index_md   Input: index of mode (scalar, tensor, ...)
  * @param mode       Input: linear or logarithmic
  * @param input      Input: wavenumber in 1/Mpc (linear mode) or its logarithm (logarithmic mode)
@@ -188,9 +187,6 @@ int PrimordialModule::primordial_spectrum_at_k(
 /**
  * This routine initializes the primordial structure (in particular, it computes table of primordial spectrum values)
  *
- * @param ppr Input: pointer to precision structure (defines method and precision for all computations)
- * @param ppt Input: pointer to perturbation structure (useful for knowing k_min, k_max, etc.)
- * @param ppm Output: pointer to initialized primordial structure
  * @return the error status
  */
 
@@ -544,7 +540,6 @@ int PrimordialModule::primordial_init() {
  *
  * To be called at the end of each run.
  *
- * @param ppm Input: pointer to primordial structure (which fields must be freed)
  * @return the error status
  */
 
@@ -590,8 +585,6 @@ int PrimordialModule::primordial_free() {
 /**
  * This routine defines indices and allocates tables in the primordial structure
  *
- * @param ppt  Input: pointer to perturbation structure
- * @param ppm  Input/output: pointer to primordial structure
  * @return the error status
  */
 
@@ -640,7 +633,6 @@ int PrimordialModule::primordial_indices() {
  * This routine allocates and fills the list of wavenumbers k
  *
  *
- * @param ppm  Input/output: pointer to primordial structure
  * @param kmin Input: first value
  * @param kmax Input: last value that we should encompass
  * @param k_per_decade Input: number of k per decade
@@ -672,8 +664,6 @@ int PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k
  * in such way that later on, the spectrum can be obtained by a quick call to
  * the routine primordial_analytic_spectrum(()
  *
- * @param ppt  Input: pointer to perturbation structure
- * @param ppm  Input/output: pointer to primordial structure
  * @return the error status
  */
 
@@ -906,7 +896,6 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
  * amplitudes, tilts, runnings, for each mode (scalar/tensor...),
  * pair of initial conditions, and wavenumber.
  *
- * @param ppm            Input/output: pointer to primordial structure
  * @param index_md     Input: index of mode (scalar, tensor, ...)
  * @param index_ic1_ic2  Input: pair of initial conditions (ic1, ic2)
  * @param k              Input: wavenumber in same units as pivot scale, i.e. in 1/Mpc
@@ -933,7 +922,6 @@ int PrimordialModule::primordial_analytic_spectrum(int index_md, int index_ic1_i
 /**
  * This routine encodes the inflaton scalar potential
  *
- * @param ppm            Input: pointer to primordial structure
  * @param phi            Input: background inflaton field value in units of Mp
  * @param V              Output: inflaton potential in units of \f$ Mp^4\f$
  * @param dV             Output: first derivative of inflaton potential wrt the field
@@ -1016,8 +1004,6 @@ int PrimordialModule::primordial_inflation_potential(
 /**
  * This routine encodes the function \f$ H(\phi)\f$
  *
- * @param ppm            Input: pointer to primordial structure
- * @param phi            Input: background inflaton field value in units of Mp
  * @param H              Output: Hubble parameters in units of Mp
  * @param dH             Output: \f$ dH / d\phi \f$
  * @param ddH            Output: \f$ d^2H / d\phi^2 \f$
@@ -1039,7 +1025,6 @@ int PrimordialModule::primordial_inflation_hubble(double phi, double * H, double
 /**
  * This routine defines indices used by the inflation simulator
  *
- * @param ppm  Input/output: pointer to primordial structure
  * @return the error status
  */
 int PrimordialModule::primordial_inflation_indices() {
@@ -1091,9 +1076,6 @@ int PrimordialModule::primordial_inflation_indices() {
  * phi=phi_pivot, and then, if this evolution is suitable, to call the
  * routine primordial_inflation_spectra().
  *
- * @param ppt  Input: pointer to perturbation structure
- * @param ppm  Input/output: pointer to primordial structure
- * @param ppr  Input: pointer to precision structure
  * @return the error status
  */
 
@@ -1108,7 +1090,7 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
   double H_pivot;
   double H_try;
   double phi_try;
-  double dphidt_pivot;
+  double dphidt_pivot = 0.0;
   double dphidt_try;
   double aH_ini,aH_end;
   double k_max,k_min;
@@ -1446,9 +1428,6 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
  * comparing with exact numerical computation performed by
  * primordial_inflation_spectra().
  *
- * @param ppt   Input: pointer to perturbation structure
- * @param ppm   Input/output: pointer to primordial structure
- * @param ppr   Input: pointer to precision structure
  * @param y_ini Input: initial conditions for the vector of background/perturbations, already allocated and filled
  * @return the error status
  */
@@ -1515,9 +1494,6 @@ int PrimordialModule::primordial_inflation_analytic_spectra(double * y_ini) {
  * Routine with a loop over wavenumbers for the computation of the primordial
  * spectrum. For each wavenumber it calls primordial_inflation_one_wavenumber()
  *
- * @param ppt   Input: pointer to perturbation structure
- * @param ppm   Input/output: pointer to primordial structure
- * @param ppr   Input: pointer to precision structure
  * @param y_ini Input: initial conditions for the vector of background/perturbations, already allocated and filled
  * @return the error status
  */
@@ -1555,9 +1531,6 @@ int PrimordialModule::primordial_inflation_spectra(double * y_ini) {
  * integrate the perturbation equations, and then it stores the result
  * for the scalar/tensor spectra.
  *
- * @param ppt     Input: pointer to perturbation structure
- * @param ppm     Input/output: pointer to primordial structure
- * @param ppr     Input: pointer to precision structure
  * @param y_ini   Input: initial conditions for the vector of background/perturbations, already allocated and filled
  * @param index_k Input: index of wavenumber to be considered
  * @return the error status
@@ -1632,8 +1605,6 @@ int PrimordialModule::primordial_inflation_one_wavenumber(double * y_ini, int in
  * Routine integrating the background plus perturbation equations for
  * each wavenumber, and returning the scalar and tensor spectrum.
  *
- * @param ppm   Input: pointer to primordial structure
- * @param ppr   Input: pointer to precision structure
  * @param k     Input: Fourier wavenumber
  * @param y     Input: running vector of background/perturbations, already allocated and initialized
  * @param dy    Input: running vector of background/perturbation derivatives, already allocated
@@ -1784,8 +1755,6 @@ int PrimordialModule::primordial_inflation_one_k(double k, double * y, double * 
  * attractor, and stops iterating. If this process does not converge,
  * it returns an error message.
  *
- * @param ppm       Input: pointer to primordial structure
- * @param ppr       Input: pointer to precision structure
  * @param phi_0     Input: field value at which we wish to find the solution
  * @param precision Input: tolerance on output values (if too large, an attractor will always considered to be found)
  * @param y         Input: running vector of background variables, already allocated and initialized
@@ -1915,8 +1884,6 @@ int PrimordialModule::primordial_inflation_find_attractor(double phi_0,
  * that after using this approximation, the code always computes (and
  * relies on) the exact forward solution.
  *
- * @param ppm           Input: pointer to primordial structure
- * @param ppr           Input: pointer to precision structure
  * @param y             Input/output: running vector of background variables, already allocated and initialized
  * @param dy            Input: running vector of background derivatives, already allocated
  * @param target        Input: whether the goal is to reach a given aH or \f$ \phi \f$
@@ -1940,7 +1907,7 @@ int PrimordialModule::primordial_inflation_evolve_background(double * y,
   struct generic_integrator_workspace gi;
   double tau_start,tau_end,dtau=0.;
   double H,dH,ddH,dddH;
-  double epsilon,epsilon_old;
+  double epsilon = 0.0,epsilon_old;
   double quantity=0.;
   double V,dV,ddV;
   double sign_dtau=0.;
@@ -2236,7 +2203,6 @@ int PrimordialModule::primordial_inflation_evolve_background(double * y,
  * the slope had to be always negative or always positive... we took
  * the first option.
  *
- * @param ppm       Input: pointer to primordial structure
  * @param phi       Input: field value where to perform the check
  * @param V              Output: inflaton potential in units of \f$ Mp^4\f$
  * @param dV             Output: first derivative of inflaton potential wrt the field
@@ -2271,7 +2237,6 @@ int PrimordialModule::primordial_inflation_check_potential(double phi, double * 
  * has to be always negative or always positive... we took the first
  * option: phi increases, H decreases.
  *
- * @param ppm       Input: pointer to primordial structure
  * @param phi       Input: field value where to perform the check
  * @param H         Output: Hubble parameters in units of Mp
  * @param dH        Output: \f$ dH / d\phi \f$
@@ -2303,7 +2268,6 @@ int PrimordialModule::primordial_inflation_check_hubble(double phi, double * H, 
 /**
  * Routine computing the first slow-roll parameter epsilon
  *
- * @param ppm       Input: pointer to primordial structure
  * @param phi       Input: field value where to compute epsilon
  * @param epsilon   Output: result
  * @return the error status
@@ -2347,8 +2311,6 @@ int PrimordialModule::primordial_inflation_get_epsilon(double phi, double * epsi
 /**
  * Routine searching phi_pivot when a given amount of inflation is requested.
  *
- * @param ppm       Input/output: pointer to primordial structure
- * @param ppr       Input: pointer to precision structure
  * @param y         Input: running vector of background variables, already allocated and initialized
  * @param dy        Input: running vector of background derivatives, already allocated
  * @return the error status
@@ -2864,7 +2826,6 @@ int PrimordialModule::primordial_inflation_derivs_member(
   struct primordial_inflation_parameters_and_workspace * ppipaw;
 
   ppipaw = (struct primordial_inflation_parameters_and_workspace *) parameters_and_workspace;
-  const PrimordialModule& primordial_module = *(ppipaw->primordial_module);
 
   // a2
   ppipaw->a2=y[index_in_a_]*y[index_in_a_];
@@ -3050,8 +3011,6 @@ int PrimordialModule::primordial_inflation_derivs_member(
  * Author: Jesus Torrado (torradocacho@lorentz.leidenuniv.nl)
  * Date:   2013-12-20
  *
- * @param ppt  Input/output: pointer to perturbation structure
- * @param ppm  Input/output: pointer to primordial structure
  * @return the error status
  */
 
@@ -3064,7 +3023,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
   FILE *process;
   int n_data_guess, n_data = 0;
   double *k = NULL, *pks = NULL, *pkt = NULL, *tmp = NULL;
-  double this_k, this_pks, this_pkt;
+  double this_k, this_pks, this_pkt = 0.0;
   int status;
   int index_k;
 
@@ -3078,16 +3037,16 @@ int PrimordialModule::primordial_external_spectrum_init() {
   /* Prepare the command */
   /* If the command is just a "cat", no arguments need to be passed */
   if(strncmp("cat ", ppm->command, 4) == 0) {
-    sprintf(arguments, " ");
+    snprintf(arguments, _ARGUMENT_LENGTH_MAX_, " ");
   }
   /* otherwise pass the list of arguments */
   else {
-    sprintf(arguments, " %g %g %g %g %g %g %g %g %g %g",
+    snprintf(arguments, _ARGUMENT_LENGTH_MAX_, " %g %g %g %g %g %g %g %g %g %g",
             ppm->custom1, ppm->custom2, ppm->custom3, ppm->custom4, ppm->custom5,
             ppm->custom6, ppm->custom7, ppm->custom8, ppm->custom9, ppm->custom10);
   }
   /* write the actual command in a string */
-  sprintf(command_with_arguments, "%s %s", ppm->command, arguments);
+  snprintf(command_with_arguments, 2*_ARGUMENT_LENGTH_MAX_, "%s %s", ppm->command, arguments);
   if (ppm->primordial_verbose > 0)
     printf(" -> running: %s\n",command_with_arguments);
 

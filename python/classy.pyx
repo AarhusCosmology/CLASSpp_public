@@ -14,10 +14,11 @@ extract cosmological parameters.
 DEF _FALSE_ = 0
 DEF _FAILURE_ = 1
 DEF _MAXTITLESTRINGLENGTH_ = 8000
+DEF _ARGUMENT_LENGTH_MAX_ = 1024
 
 from libc.math cimport exp, log
 from libc.stdlib cimport malloc, calloc, free
-from libc.stdio cimport sprintf
+from libc.stdio cimport snprintf
 
 from libcpp cimport bool
 from libcpp.memory cimport nullptr
@@ -221,11 +222,11 @@ cdef class PyCosmology:
         for i, (name, value) in enumerate(self._pars.items()):
             dumcp = name.encode()
             dumc = dumcp
-            sprintf(self._fc.name[i], "%s", dumc)
+            snprintf(self._fc.name[i], _ARGUMENT_LENGTH_MAX_, "%s", dumc)
 
             dumcp = str(value).encode()
             dumc = dumcp
-            sprintf(self._fc.value[i], "%s", dumc)
+            snprintf(self._fc.value[i], _ARGUMENT_LENGTH_MAX_, "%s", dumc)
             self._fc.read[i] = 0
         return self
 

@@ -522,7 +522,7 @@ int hyperspherical_backwards_recurrence(int K,
                                         double * __restrict__ sqrtK,
                                         double * __restrict__ one_over_sqrtK,
                                         double * __restrict__ PhiL){
-  double phi0, phi1, phipr1, phi, phi_plus_1_times_sqrtK, phi_minus_1, scaling;
+  double phi0, phi1, phipr1 = 0.0, phi, phi_plus_1_times_sqrtK, phi_minus_1, scaling;
   int l, k, isign;
   int funcreturn = _FAILURE_;
   phi0 = sin(beta*x)/(beta*sinK);
@@ -611,7 +611,7 @@ int hyperspherical_backwards_recurrence_chunk(int K,
                                               double * __restrict__ sqrtK,
                                               double * __restrict__ one_over_sqrtK,
                                               double * __restrict__ PhiL){
-  double phi0, phi1, phipr1;
+  double phi0, phi1, phipr1 = 0.0;
   int l, k, isign;
   int funcreturn = _FAILURE_;
   int index_x;
@@ -823,7 +823,7 @@ int CF1_from_Gegenbauer(int l,
 
 int hyperspherical_WKB(int K,int l,double beta,double y, double *Phi){
   double e, w, w2, alpha, alpha2, CscK, ytp, t;
-  double S, Q, C, argu, Ai;
+  double S = 0.0, Q, C, argu, Ai;
   int airy_sign = 1, phisign = 1, dphisign = 1, intbeta;
   double ldbl = l;
 
@@ -1276,7 +1276,6 @@ int fzero_ridder(double (*func)(double, void *),
       fprintf(stderr,"root must be bracketed in zriddr.");
       return _FAILURE_;
     }
-    fprintf(stderr,"Failure in Ridder\n");
     return _FAILURE_;
   }
 

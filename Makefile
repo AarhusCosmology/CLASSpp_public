@@ -35,11 +35,11 @@ AR        = ar rv
 PYTHON ?= python
 
 # your optimization flag
-OPTFLAG = -O3 -ffast-math #-march=native
+OPTFLAG = -O3 #-ffast-math -march=native
 
 # all other compilation flags
 CCFLAG = -g -fPIC
-CXXFLAG = $(CCFLAG) -std=c++17 -Wno-write-strings
+CXXFLAG = $(CCFLAG) -std=c++17
 LDFLAG = -g -fPIC
 LIBRARIES = -lm -lpthread
 

@@ -31,10 +31,6 @@
  * provided that lensing_init() has been called before, and
  * lensing_free() has not been called yet.
  *
- * @param ple        Input: pointer to lensing structure
- * @param l          Input: multipole number
- * @param cl_lensed  Output: lensed \f$ C_l\f$'s for all types (TT, TE, EE, etc..)
- * @return the error status
  */
 
 LensingModule::LensingModule(InputModulePtr input_module, SpectraModulePtr spectra_module)
@@ -147,11 +143,6 @@ int LensingModule::lensing_cl_at_l(int l, double * cl_lensed) const {
  * This routine initializes the lensing structure (in particular,
  * computes table of lensed anisotropy spectra \f$ C_l^{X} \f$)
  *
- * @param ppr Input: pointer to precision structure
- * @param ppt Input: pointer to perturbation structure (just in case, not used in current version...)
- * @param psp Input: pointer to spectra structure
- * @param pnl Input: pointer to nonlinear structure
- * @param ple Output: pointer to initialized lensing structure
  * @return the error status
  */
 
@@ -868,7 +859,6 @@ int LensingModule::lensing_init() {
  * To be called at the end of each run, only when no further calls to
  * lensing_cl_at_l() are needed.
  *
- * @param ple Input: pointer to lensing structure (which fields must be freed)
  * @return the error status
  */
 
@@ -890,9 +880,6 @@ int LensingModule::lensing_free() {
 /**
  * This routine defines indices and allocates tables in the lensing structure
  *
- * @param ppr  Input: pointer to precision structure
- * @param psp  Input: pointer to spectra structure
- * @param ple  Input/output: pointer to lensing structure
  * @return the error status
  */
 
@@ -1100,7 +1087,6 @@ int LensingModule::lensing_indices(){
  * @param d00  Input: Legendre polynomials (\f$ d^l_{00}\f$[l][index_mu])
  * @param w8   Input: Legendre quadrature weights (w8[index_mu])
  * @param nmu  Input: Number of quadrature points (0<=index_mu<=nmu)
- * @param ple  Input/output: Pointer to the lensing structure
  * @return the error status
  */
 
@@ -1132,8 +1118,6 @@ int LensingModule::lensing_lensed_cl_tt(double *ksi, double **d00, double *w8, i
  * Used in case of fast (and BB inaccurate) integration of
  * correlation functions.
  *
- * @param ple   Input/output: Pointer to the lensing structure
- * @param cl_tt Input: Array of unlensed power spectrum
  * @return the error status
  */
 
@@ -1155,7 +1139,6 @@ int LensingModule::lensing_addback_cl_tt(double *cl_tt) {
  * @param d20  Input: Wigner d-function (\f$ d^l_{20}\f$[l][index_mu])
  * @param w8   Input: Legendre quadrature weights (w8[index_mu])
  * @param nmu  Input: Number of quadrature points (0<=index_mu<=nmu)
- * @param ple  Input/output: Pointer to the lensing structure
  * @return the error status
  */
 
@@ -1187,7 +1170,6 @@ int LensingModule::lensing_lensed_cl_te(double *ksiX, double **d20, double *w8, 
  * Used in case of fast (and BB inaccurate) integration of
  * correlation functions.
  *
- * @param ple   Input/output: Pointer to the lensing structure
  * @param cl_te Input: Array of unlensed power spectrum
  * @return the error status
  */
@@ -1212,7 +1194,6 @@ int LensingModule::lensing_addback_cl_te(double *cl_te) {
  * @param d2m2 Input: Wigner d-function (\f$ d^l_{2-2}\f$[l][index_mu])
  * @param w8   Input: Legendre quadrature weights (w8[index_mu])
  * @param nmu  Input: Number of quadrature points (0<=index_mu<=nmu)
- * @param ple  Input/output: Pointer to the lensing structure
  * @return the error status
  */
 
@@ -1246,7 +1227,6 @@ int LensingModule::lensing_lensed_cl_ee_bb(double *ksip, double *ksim, double **
  * Used in case of fast (and BB inaccurate) integration of
  * correlation functions.
  *
- * @param ple   Input/output: Pointer to the lensing structure
  * @param cl_ee Input: Array of unlensed power spectrum
  * @param cl_bb Input: Array of unlensed power spectrum
  * @return the error status

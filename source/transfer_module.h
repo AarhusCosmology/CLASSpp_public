@@ -44,7 +44,7 @@ public:
 
   /** @name - number and list of wavenumbers */
   //@{
-  size_t q_size_; /**< number of wavenumber values */
+  int q_size_; /**< number of wavenumber values */
   double * q_;  /**< list of wavenumber values, q[index_q] */
   double ** k_; /**< list of wavenumber values for each requested mode, k[index_md][index_q]. In flat universes k=q. In non-flat universes q and k differ through q2 = k2 + K(1+m), where m=0,1,2 for scalar, vector, tensor. q should be used throughout the transfer module, excepted when interpolating or manipulating the source functions S(k,tau): for a given value of q this should be done in k(q). */
   int index_q_flat_approximation_; /**< index of the first q value using the flat rescaling approximation */

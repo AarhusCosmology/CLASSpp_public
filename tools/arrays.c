@@ -78,10 +78,9 @@ int array_derive_spline(
   for (i=0; i<n_lines-1; i++) {
 
     h = x_array[i+1] - x_array[i];
-    if (h == 0) {
-      sprintf(errmsg,"%s(L:%d) h=0, stop to avoid division by zero",__func__,__LINE__);
-      return _FAILURE_;
-    }
+    class_test(h == 0,
+               errmsg,
+               "h=0, stop to avoid division by zero");
 
     array[i*n_columns+index_dydx] =
       (array[(i+1)*n_columns+index_y] - array[i*n_columns+index_y])/h
@@ -131,10 +130,7 @@ int array_derive_spline_table_line_to_line(
   for (i=0; i<n_lines-1; i++) {
 
     h = x_array[i+1] - x_array[i];
-    if (h == 0) {
-      sprintf(errmsg,"%s(L:%d) h=0, stop to avoid division by zero",__func__,__LINE__);
-      return _FAILURE_;
-    }
+    class_test(h == 0, errmsg, "h=0, stop to avoid division by zero")
 
     array[i*n_columns+index_dy] =
       (array[(i+1)*n_columns+index_y] - array[i*n_columns+index_y])/h
@@ -163,20 +159,14 @@ int array_derive1_order2_table_line_to_line(
   int i=1;
   double dxp,dxm,dyp,dym;
 
-  if (n_lines < 2) {
-    sprintf(errmsg,"%s(L:%d) routine called with n_lines=%d, should be at least 2",__func__,__LINE__,n_lines);
-    return _FAILURE_;
-  }
+  class_test(n_lines < 2, errmsg, "routine called with n_lines=%d, should be at least 2");
 
   dxp = x_array[2] - x_array[1];
   dxm = x_array[0] - x_array[1];
   dyp = *(array+2*n_columns+index_y) - *(array+1*n_columns+index_y);
   dym = *(array+0*n_columns+index_y) - *(array+1*n_columns+index_y);
 
-  if ((dxp*dxm*(dxm-dxp)) == 0.) {
-    sprintf(errmsg,"%s(L:%d) stop to avoid division by zero",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test((dxp*dxm*(dxm-dxp)) == 0., errmsg, "stop to avoid division by zero");
 
   *(array+1*n_columns+index_dy) = (dyp*dxm*dxm-dym*dxp*dxp)/(dxp*dxm*(dxm-dxp));
 
@@ -190,10 +180,7 @@ int array_derive1_order2_table_line_to_line(
     dyp = *(array+(i+1)*n_columns+index_y) - *(array+i*n_columns+index_y);
     dym = *(array+(i-1)*n_columns+index_y) - *(array+i*n_columns+index_y);
 
-    if ((dxp*dxm*(dxm-dxp)) == 0.) {
-      sprintf(errmsg,"%s(L:%d) stop to avoid division by zero",__func__,__LINE__);
-      return _FAILURE_;
-    }
+    class_test((dxp*dxm*(dxm-dxp)) == 0., errmsg, "stop to avoid division by zero");
 
     *(array+i*n_columns+index_dy) = (dyp*dxm*dxm-dym*dxp*dxp)/(dxp*dxm*(dxm-dxp));
 
@@ -226,10 +213,7 @@ int array_derive2_order2_table_line_to_line(
     dyp = *(array+(i+1)*n_columns+index_y) - *(array+i*n_columns+index_y);
     dym = *(array+(i-1)*n_columns+index_y) - *(array+i*n_columns+index_y);
 
-    if ((dxp*dxm*(dxm-dxp)) == 0.) {
-      sprintf(errmsg,"%s(L:%d) stop to avoid division by zero",__func__,__LINE__);
-      return _FAILURE_;
-    }
+    class_test((dxp*dxm*(dxm-dxp)) == 0., errmsg, "stop to avoid division by zero");
 
     *(array+i*n_columns+index_dy) = (dyp*dxm*dxm-dym*dxp*dxp)/(dxp*dxm*(dxm-dxp));
     *(array+i*n_columns+index_ddy) = 2.*(dyp*dxm-dym*dxp)/(dxp*dxm*(dxp-dxm));
@@ -295,10 +279,7 @@ int array_derive_two(
 
   double dx1,dx2,dy1,dy2,weight1,weight2;
 
-  if ((index_dydx == index_x) || (index_dydx == index_y)) {
-    sprintf(errmsg,"%s(L:%d) : Output column %d must differ from input columns %d and %d",__func__,__LINE__,index_dydx,index_x,index_y);
-    return _FAILURE_;
-  }
+  class_test((index_dydx == index_x) || (index_dydx == index_y), errmsg, "Output column %d must differ from input columns %d and %d", index_dydx,index_x,index_y);
 
   dx2=*(array+1*n_columns+index_x)-*(array+0*n_columns+index_x);
   dy2=*(array+1*n_columns+index_y)-*(array+0*n_columns+index_y);
@@ -312,10 +293,7 @@ int array_derive_two(
     weight1 = dx2*dx2;
     weight2 = dx1*dx1;
 
-    if ((dx1 == 0.) && (dx2 == 0.)) {
-      sprintf(errmsg,"%s(L:%d) stop to avoid division by zero",__func__,__LINE__);
-      return _FAILURE_;
-    }
+    class_test((dx1 == 0.) && (dx2 == 0.), errmsg, "stop to avoid division by zero");
 
     *(array+i*n_columns+index_dydx) = (weight1*dy1+weight2*dy2) / (weight1*dx1+weight2*dx2);
     *(array+i*n_columns+index_ddydxdx) = (dx2*dy1-dx1*dy2) / (weight1*dx1+weight2*dx2);
@@ -350,16 +328,10 @@ int array_spline(
   double dy_first;
   double dy_last;
 
-  if (n_lines < 3) {
-    sprintf(errmsg,"%s(L:%d) n_lines=%d, while routine needs n_lines >= 3",__func__,__LINE__,n_lines);
-    return _FAILURE_;
-  }
+  class_test(n_lines < 3, errmsg, "n_lines=%d, while routine needs n_lines >= 3");
 
   u = malloc((n_lines-1) * sizeof(double));
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (spline_mode == _SPLINE_NATURAL_) {
     *(array+0*n_columns+index_ddydx2) = u[0] = 0.0;
@@ -386,8 +358,7 @@ int array_spline(
 	 -dy_first);
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d",spline_mode);
     }
   }
 
@@ -432,8 +403,7 @@ int array_spline(
 	 (*(array+(n_lines-1)*n_columns+index_x) -  *(array+(n_lines-2)*n_columns+index_x)));
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d",spline_mode);
     }
   }
 
@@ -466,10 +436,7 @@ int array_spline_table_line_to_line(
   double dy_last;
 
   u = malloc((n_lines-1) * sizeof(double));
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (spline_mode == _SPLINE_NATURAL_) {
     *(array+0*n_columns+index_ddydx2) = u[0] = 0.0;
@@ -489,8 +456,7 @@ int array_spline_table_line_to_line(
 	 (x[1] - x[0])-dy_first);
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d",spline_mode);
     }
   }
 
@@ -529,8 +495,7 @@ int array_spline_table_line_to_line(
 	 (x[n_lines-1] - x[n_lines-2]));
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d",spline_mode);
     }
   }
 
@@ -572,22 +537,10 @@ int array_spline_table_lines(
   qn = malloc(y_size * sizeof(double));
   un = malloc(y_size * sizeof(double));
 
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (p == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate p",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (qn == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate qn",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (un == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate un",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
+  class_test(p == NULL, errmsg, "Cannot allocate p");
+  class_test(qn == NULL, errmsg, "Cannot allocate qn");
+  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -620,8 +573,7 @@ int array_spline_table_lines(
       }
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d",spline_mode);
     }
   }
 
@@ -678,8 +630,7 @@ int array_spline_table_lines(
       }
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d",spline_mode);
     }
   }
 
@@ -733,22 +684,10 @@ int array_logspline_table_lines(
   p = malloc(y_size * sizeof(double));
   qn = malloc(y_size * sizeof(double));
   un = malloc(y_size * sizeof(double));
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (p == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate p",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (qn == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate qn",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (un == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate un",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
+  class_test(p == NULL, errmsg, "Cannot allocate p");
+  class_test(qn == NULL, errmsg, "Cannot allocate qn");
+  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -781,8 +720,7 @@ int array_logspline_table_lines(
       }
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -839,8 +777,7 @@ int array_logspline_table_lines(
       }
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d",spline_mode);
     }
   }
 
@@ -895,22 +832,10 @@ int array_spline_table_columns(
   p = malloc(y_size * sizeof(double));
   qn = malloc(y_size * sizeof(double));
   un = malloc(y_size * sizeof(double));
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (p == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate p",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (qn == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate qn",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (un == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate un",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
+  class_test(p == NULL, errmsg, "Cannot allocate p");
+  class_test(qn == NULL, errmsg, "Cannot allocate qn");
+  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -954,8 +879,7 @@ int array_spline_table_columns(
       }
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1011,8 +935,7 @@ int array_spline_table_columns(
       }
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1066,22 +989,10 @@ int array_spline_table_columns2(
   p = malloc(y_size * sizeof(double));
   qn = malloc(y_size * sizeof(double));
   un = malloc(y_size * sizeof(double));
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (p == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate p",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (qn == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate qn",__func__,__LINE__);
-    return _FAILURE_;
-  }
-  if (un == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate un",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
+  class_test(p == NULL, errmsg, "Cannot allocate p");
+  class_test(qn == NULL, errmsg, "Cannot allocate qn");
+  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ 3 x-values are needed.
 
@@ -1202,10 +1113,7 @@ int array_spline_table_one_column(
   double dy_last;
 
   u = malloc((x_size-1) * sizeof(double));
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -1236,8 +1144,7 @@ int array_spline_table_one_column(
 
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1289,8 +1196,7 @@ int array_spline_table_one_column(
 
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1337,10 +1243,7 @@ int array_logspline_table_one_column(
   double dy_last;
 
   u = malloc((x_stop-1) * sizeof(double));
-  if (u == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate u",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -1371,8 +1274,7 @@ int array_logspline_table_one_column(
 
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1425,8 +1327,7 @@ int array_logspline_table_one_column(
 
     }
     else {
-      sprintf(errmsg,"%s(L:%d) Spline mode not identified: %d",__func__,__LINE__,spline_mode);
-      return _FAILURE_;
+      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1492,10 +1393,7 @@ int array_integrate_all_trapzd_or_spline(
   int i;
   double h;
 
-  if ((index_start_spline<0) || (index_start_spline>=n_lines)) {
-    sprintf(errmsg,"%s(L:%d) index_start_spline outside of range",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test((index_start_spline<0) || (index_start_spline>=n_lines), errmsg, "index_start_spline outside of range");
 
   *result = 0;
 
@@ -1540,10 +1438,7 @@ int array_integrate(
   int i;
   double sum;
 
-  if ((index_int_y_dx == index_x) || (index_int_y_dx == index_y)) {
-    sprintf(errmsg,"%s(L:%d) : Output column %d must differ from input columns %d and %d",__func__,__LINE__,index_int_y_dx,index_x,index_y);
-    return _FAILURE_;
-  }
+  class_test((index_int_y_dx == index_x) || (index_int_y_dx == index_y), errmsg, "Output column %d must differ from input columns %d and %d", index_int_y_dx, index_x, index_y);
 
   sum=0.;
   *(array+0*n_columns+index_int_y_dx)=sum;
@@ -1576,10 +1471,7 @@ int array_integrate_ratio(
   int i;
   double sum;
 
-  if ((index_int_y1_over_y2_dx == index_x) || (index_int_y1_over_y2_dx == index_y1) || (index_int_y1_over_y2_dx == index_y2)) {
-    sprintf(errmsg,"%s(L:%d) : Output column %d must differ from input columns %d, %d and %d",__func__,__LINE__,index_int_y1_over_y2_dx,index_x,index_y1,index_y2);
-    return _FAILURE_;
-  }
+  class_test((index_int_y1_over_y2_dx == index_x) || (index_int_y1_over_y2_dx == index_y1) || (index_int_y1_over_y2_dx == index_y2), errmsg, "Output column %d must differ from input columns %d, %d and %d", index_int_y1_over_y2_dx, index_x, index_y1, index_y2);
 
   sum=0.;
 
@@ -1622,15 +1514,9 @@ int array_interpolate(
 
   if (*(array+inf*n_columns+index_x) < *(array+sup*n_columns+index_x)){
 
-    if (x < *(array+inf*n_columns+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,*(array+inf*n_columns+index_x));
-      return _FAILURE_;
-    }
+    class_test(x < *(array+inf*n_columns+index_x), errmsg, "x=%e < x_min=%e", x, *(array+inf*n_columns+index_x));
 
-    if (x > *(array+sup*n_columns+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,*(array+sup*n_columns+index_x));
-      return _FAILURE_;
-    }
+    class_test(x > *(array+sup*n_columns+index_x), errmsg, "x=%e > x_max=%e", x, *(array+sup*n_columns+index_x));
 
     while (sup-inf > 1) {
 
@@ -1644,15 +1530,9 @@ int array_interpolate(
 
   else {
 
-    if (x < *(array+sup*n_columns+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,*(array+sup*n_columns+index_x));
-      return _FAILURE_;
-    }
+    class_test(x < *(array+sup*n_columns+index_x), errmsg, "x=%e < x_min=%e", x, *(array+sup*n_columns+index_x));
 
-    if (x > *(array+inf*n_columns+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,*(array+inf*n_columns+index_x));
-      return _FAILURE_;
-    }
+    class_test(x > *(array+inf*n_columns+index_x), errmsg, "x=%e > x_max=%e", x, *(array+inf*n_columns+index_x));
 
     while (sup-inf > 1) {
 
@@ -1702,15 +1582,9 @@ int array_interpolate_spline(
 
   if (x_array[inf] < x_array[sup]){
 
-    if (x < x_array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[inf]);
-      return _FAILURE_;
-    }
+    class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
 
-    if (x > x_array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[sup]);
-      return _FAILURE_;
-    }
+    class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
 
     while (sup-inf > 1) {
 
@@ -1724,15 +1598,9 @@ int array_interpolate_spline(
 
   else {
 
-    if (x < x_array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[sup]);
-      return _FAILURE_;
-    }
+    class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
 
-    if (x > x_array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[inf]);
-      return _FAILURE_;
-    }
+    class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
 
     while (sup-inf > 1) {
 
@@ -1779,15 +1647,9 @@ int array_search_bisect(
 
   if (array[inf] < array[sup]){
 
-    if (c < array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : c=%e < y_min=%e",__func__,__LINE__,c,array[inf]);
-      return _FAILURE_;
-    }
+    class_test(c < array[inf], errmsg, "c=%e < y_min=%e", c, array[inf]);
 
-    if (c > array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : c=%e > y_max=%e",__func__,__LINE__,c,array[sup]);
-      return _FAILURE_;
-    }
+    class_test(c > array[sup], errmsg, "c=%e > y_max=%e", c, array[sup]);
 
     while (sup-inf > 1) {
 
@@ -1801,15 +1663,9 @@ int array_search_bisect(
 
   else {
 
-    if (c < array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,c,array[sup]);
-      return _FAILURE_;
-    }
+    class_test(c < array[sup], errmsg, "x=%e < x_min=%e", c, array[sup]);
 
-    if (c > array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,c,array[inf]);
-      return _FAILURE_;
-    }
+    class_test(c > array[inf], errmsg, "x=%e > x_max=%e", c, array[inf]);
 
     while (sup-inf > 1) {
 
@@ -1850,15 +1706,9 @@ int array_interpolate_linear(
 
   if (x_array[inf] < x_array[sup]){
 
-    if (x < x_array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[inf]);
-      return _FAILURE_;
-    }
+    class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
 
-    if (x > x_array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[sup]);
-      return _FAILURE_;
-    }
+    class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
 
     while (sup-inf > 1) {
 
@@ -1872,15 +1722,9 @@ int array_interpolate_linear(
 
   else {
 
-    if (x < x_array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[sup]);
-      return _FAILURE_;
-    }
+    class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
 
-    if (x > x_array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[inf]);
-      return _FAILURE_;
-    }
+    class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
 
     while (sup-inf > 1) {
 
@@ -1932,15 +1776,9 @@ int array_interpolate_logspline(
 
 	if (x_array[inf] < x_array[sup]){
 
-		if (x < x_array[inf]) {
-			sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[inf]);
-			return _FAILURE_;
-		}
+		class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
 
-		if (x > x_array[sup]) {
-			sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[sup]);
-			return _FAILURE_;
-		}
+		class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
 
 		while (sup-inf > 1) {
 
@@ -1954,15 +1792,9 @@ int array_interpolate_logspline(
 
 	else {
 
-		if (x < x_array[sup]) {
-			sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[sup]);
-			return _FAILURE_;
-		}
+		class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
 
-		if (x > x_array[inf]) {
-			sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[inf]);
-			return _FAILURE_;
-		}
+		class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
 
 		while (sup-inf > 1) {
 
@@ -2017,15 +1849,9 @@ int array_interpolate_spline_one_column(
 
   if (x_array[inf] < x_array[sup]){
 
-    if (x < x_array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[inf]);
-      return _FAILURE_;
-    }
+    class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
 
-    if (x > x_array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[sup]);
-      return _FAILURE_;
-    }
+    class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
 
     while (sup-inf > 1) {
 
@@ -2039,15 +1865,9 @@ int array_interpolate_spline_one_column(
 
   else {
 
-    if (x < x_array[sup]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[sup]);
-      return _FAILURE_;
-    }
+    class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
 
-    if (x > x_array[inf]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[inf]);
-      return _FAILURE_;
-    }
+    class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
 
     while (sup-inf > 1) {
 
@@ -2117,15 +1937,9 @@ int array_interpolate_extrapolate_spline_one_column(
 
     if (x_array[inf] < x_array[sup]){
 
-      if (x < x_array[inf]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[inf]);
-	return _FAILURE_;
-      }
+      class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
 
-      if (x > x_array[sup]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[sup]);
-	return _FAILURE_;
-      }
+      class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
 
       while (sup-inf > 1) {
 
@@ -2139,15 +1953,9 @@ int array_interpolate_extrapolate_spline_one_column(
 
     else {
 
-      if (x < x_array[sup]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[sup]);
-	return _FAILURE_;
-      }
+      class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
 
-      if (x > x_array[inf]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[inf]);
-	return _FAILURE_;
-      }
+      class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
 
       while (sup-inf > 1) {
 
@@ -2225,15 +2033,9 @@ int array_interpolate_extrapolate_logspline_loglinear_one_column(
 
     if (x_array[inf] < x_array[sup]){
 
-      if (x < x_array[inf]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[inf]);
-	return _FAILURE_;
-      }
+      class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
 
-      if (x > x_array[sup]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[sup]);
-	return _FAILURE_;
-      }
+      class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
 
       while (sup-inf > 1) {
 
@@ -2247,15 +2049,9 @@ int array_interpolate_extrapolate_logspline_loglinear_one_column(
 
     else {
 
-      if (x < x_array[sup]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,x_array[sup]);
-	return _FAILURE_;
-      }
+      class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
 
-      if (x > x_array[inf]) {
-	sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,x_array[inf]);
-	return _FAILURE_;
-      }
+      class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
 
       while (sup-inf > 1) {
 
@@ -2305,20 +2101,12 @@ int array_interpolate_growing_closeby(
 
   while (x < *(array+inf*n_columns+index_x)) {
     inf--;
-    if (inf < 0) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,
-	      x,array[index_x]);
-      return _FAILURE_;
-    }
+    class_test(inf < 0, errmsg, "x=%e < x_min=%e", x, array[index_x]);
   }
   sup = inf+1;
   while (x > *(array+sup*n_columns+index_x)) {
     sup++;
-    if (sup > (n_lines-1)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,
-	      x,array[(n_lines-1)*n_columns+index_x]);
-      return _FAILURE_;
-    }
+    class_test(sup > (n_lines-1), errmsg, "x=%e > x_max=%e", x, array[(n_lines-1)*n_columns+index_x]);
   }
   inf = sup-1;
 
@@ -2359,20 +2147,12 @@ int array_interpolate_one_growing_closeby(
 
   while (x < *(array+inf*n_columns+index_x)) {
     inf--;
-    if (inf < 0) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,
-	      x,array[index_x]);
-      return _FAILURE_;
-    }
+    class_test(inf < 0, errmsg, "x=%e < x_min=%e", x, array[index_x]);
   }
   sup = inf+1;
   while (x > *(array+sup*n_columns+index_x)) {
     sup++;
-    if (sup > (n_lines-1)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,
-	      x,array[(n_lines-1)*n_columns+index_x]);
-      return _FAILURE_;
-    }
+    class_test(sup > (n_lines-1), errmsg, "x=%e > x_max=%e", x, array[(n_lines-1)*n_columns+index_x]);
   }
   inf = sup-1;
 
@@ -2407,12 +2187,10 @@ int array_interpolate_spline_growing_closeby(
 
   /*
   if (*last_index < 0) {
-    sprintf(errmsg,"%s(L:%d) problem with last_index =%d < 0",__func__,__LINE__,*last_index);
-    return _FAILURE_;
+    class_stop(errmsg, "problem with last_index =%d < 0", *last_index);
   }
   if (*last_index > (n_lines-1)) {
-    sprintf(errmsg,"%s(L:%d) problem with last_index =%d > %d",__func__,__LINE__,*last_index,n_lines-1);
-    return _FAILURE_;
+    class_stop(errmsg, "problem with last_index =%d > %d", *last_index,n_lines-1);
   }
   */
 
@@ -2422,20 +2200,12 @@ int array_interpolate_spline_growing_closeby(
 	     "*lastindex=%d out of range [0:%d]\n",inf,n_lines-1);
   while (x < x_array[inf]) {
     inf--;
-    if (inf < 0) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,
-	      x,x_array[0]);
-      return _FAILURE_;
-    }
+    class_test(inf < 0, errmsg, "x=%e < x_min=%e", x, x_array[0]);
   }
   sup = inf+1;
   while (x > x_array[sup]) {
     sup++;
-    if (sup > (n_lines-1)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,
-	      x,x_array[n_lines-1]);
-      return _FAILURE_;
-    }
+    class_test(sup > (n_lines-1), errmsg, "x=%e > x_max=%e", x, x_array[n_lines-1]);
   }
   inf = sup-1;
 
@@ -2478,11 +2248,7 @@ int array_interpolate_spline_growing_hunt(
   inc=1;
 
   if (x >= x_array[*last_index]) {
-    if (x > x_array[n_lines-1]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,
-	      x,x_array[n_lines-1]);
-      return _FAILURE_;
-    }
+    class_test(x > x_array[n_lines-1], errmsg, "x=%e > x_max=%e", x, x_array[n_lines-1]);
     /* try closest neighboor upward */
     inf = *last_index;
     sup = inf + inc;
@@ -2505,11 +2271,7 @@ int array_interpolate_spline_growing_hunt(
     }
    }
   else {
-    if (x < x_array[0]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,
-	      x,x_array[0]);
-      return _FAILURE_;
-    }
+    class_test(x < x_array[0], errmsg, "x=%e < x_min=%e", x, x_array[0]);
     /* try closest neighboor downward */
     sup = *last_index;
     inf = sup - inc;
@@ -2573,16 +2335,9 @@ int array_interpolate_two(
 
   if (array_x[inf*n_columns_x+index_x] < array_x[sup*n_columns_x+index_x]){
 
-    if (x < array_x[inf*n_columns_x+index_x]) {
+    class_test(x < array_x[inf*n_columns_x+index_x], errmsg, "x=%e < x_min=%e", x, array_x[inf*n_columns_x+index_x]);
 
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,array_x[inf*n_columns_x+index_x]);
-      return _FAILURE_;
-    }
-
-    if (x > array_x[sup*n_columns_x+index_x]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,array_x[sup*n_columns_x+index_x]);
-      return _FAILURE_;
-    }
+    class_test(x > array_x[sup*n_columns_x+index_x], errmsg, "x=%e > x_max=%e", x, array_x[sup*n_columns_x+index_x]);
 
     while (sup-inf > 1) {
 
@@ -2596,15 +2351,9 @@ int array_interpolate_two(
 
   else {
 
-    if (x < *(array_x+sup*n_columns_x+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,*(array_x+sup*n_columns_x+index_x));
-      return _FAILURE_;
-    }
+    class_test(x < *(array_x+sup*n_columns_x+index_x), errmsg, "x=%e < x_min=%e", x, *(array_x+sup*n_columns_x+index_x));
 
-    if (x > *(array_x+inf*n_columns_x+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,*(array_x+inf*n_columns_x+index_x));
-      return _FAILURE_;
-    }
+    class_test(x > *(array_x+inf*n_columns_x+index_x), errmsg, "x=%e > x_max=%e", x, *(array_x+inf*n_columns_x+index_x));
 
     while (sup-inf > 1) {
 
@@ -2648,16 +2397,9 @@ int array_interpolate_two_bis(
 
   if (array_x[inf*n_columns_x+index_x] < array_x[sup*n_columns_x+index_x]){
 
-    if (x < array_x[inf*n_columns_x+index_x]) {
+    class_test(x < array_x[inf*n_columns_x+index_x], errmsg, "x=%e < x_min=%e", x, array_x[inf*n_columns_x+index_x]);
 
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,array_x[inf*n_columns_x+index_x]);
-      return _FAILURE_;
-    }
-
-    if (x > array_x[sup*n_columns_x+index_x]) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,array_x[sup*n_columns_x+index_x]);
-      return _FAILURE_;
-    }
+    class_test(x > array_x[sup*n_columns_x+index_x], errmsg, "x=%e > x_max=%e", x, array_x[sup*n_columns_x+index_x]);
 
     while (sup-inf > 1) {
 
@@ -2671,15 +2413,9 @@ int array_interpolate_two_bis(
 
   else {
 
-    if (x < *(array_x+sup*n_columns_x+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,x,*(array_x+sup*n_columns_x+index_x));
-      return _FAILURE_;
-    }
+    class_test(x < *(array_x+sup*n_columns_x+index_x), errmsg, "x=%e < x_min=%e", x, *(array_x+sup*n_columns_x+index_x));
 
-    if (x > *(array_x+inf*n_columns_x+index_x)) {
-      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,x,*(array_x+inf*n_columns_x+index_x));
-      return _FAILURE_;
-    }
+    class_test(x > *(array_x+inf*n_columns_x+index_x), errmsg, "x=%e > x_max=%e", x, *(array_x+inf*n_columns_x+index_x));
 
     while (sup-inf > 1) {
 
@@ -2787,15 +2523,9 @@ int array_interpolate_equal(
   int index_minus,i;
   double x_step,x_minus,weight;
 
-  if (x < x_min) {
-    sprintf(errmsg,"%s(L:%d) : x out of bounds: x=%e,x_min=%e",__func__,__LINE__,x,x_min);
-    return _FAILURE_;
-  }
+  class_test(x < x_min, errmsg, "x out of bounds: x=%e,x_min=%e", x, x_min);
 
-  if (x > x_max) {
-    sprintf(errmsg,"%s(L:%d) : x out of bounds: x=%e,x_max=%e",__func__,__LINE__,x,x_max);
-    return _FAILURE_;
-  }
+  class_test(x > x_max, errmsg, "x out of bounds: x=%e,x_max=%e", x, x_max);
 
   x_step = (x_max-x_min)/(n_lines-1);
   index_minus = (int)((x-x_min)/x_step);
@@ -2932,10 +2662,7 @@ int array_smooth_trg(double * array,
   double *coeff;
 
   smooth=malloc(k_size*sizeof(double));
-  if (smooth == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate smooth",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(smooth == NULL, errmsg, "Cannot allocate smooth");
 
   class_calloc(coeff,2*radius+1,sizeof(double),errmsg);
 
@@ -3026,7 +2753,6 @@ int array_smooth_trg(double * array,
 
   default:
     class_stop(errmsg,"Non valid radius %d: please chose between 3 4 5 or 6\n",radius);
-    weigth=0;
     break;
   }
 
@@ -3062,10 +2788,7 @@ int array_smooth(double * array,
   double weigth;
 
   smooth=malloc(n_lines*sizeof(double));
-  if (smooth == NULL) {
-    sprintf(errmsg,"%s(L:%d) Cannot allocate smooth",__func__,__LINE__);
-    return _FAILURE_;
-  }
+  class_test(smooth == NULL, errmsg, "Cannot allocate smooth");
 
   for (i=0; i<n_lines; i++) {
     smooth[i]=0.;

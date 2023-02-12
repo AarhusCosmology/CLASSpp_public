@@ -9,8 +9,9 @@ void ThrowRuntimeErrorIf(bool condition, std::string string_for_printf, ...) {
   if (condition) {
     va_list args;
     va_start(args, string_for_printf);
-    char error_message[2048];
-    vsprintf(error_message, string_for_printf.c_str(), args);
+    const size_t error_message_size = 2048;
+    char error_message[error_message_size];
+    vsnprintf(error_message, error_message_size, string_for_printf.c_str(), args);
     throw std::runtime_error(error_message);
   }
 }
@@ -18,8 +19,9 @@ void ThrowRuntimeErrorIf(bool condition, std::string string_for_printf, ...) {
 void ThrowRuntimeError(std::string string_for_printf, ...) {
   va_list args;
   va_start(args, string_for_printf);
-  char error_message[2048];
-  vsprintf(error_message, string_for_printf.c_str(), args);
+  const size_t error_message_size = 2048;
+  char error_message[error_message_size];
+  vsnprintf(error_message, error_message_size, string_for_printf.c_str(), args);
   throw std::runtime_error(error_message);
 }
 

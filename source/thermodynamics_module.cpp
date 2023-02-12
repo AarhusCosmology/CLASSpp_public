@@ -103,8 +103,6 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast(double z, double* y
  * Evaluates all thermodynamics quantities at a given value of
  * the redshift by reading the pre-computed table and interpolating.
  *
- * @param pba        Input: pointer to background structure
- * @param pth        Input: pointer to the thermodynamics structure (containing pre-computed table)
  * @param z          Input: redshift
  * @param inter_mode Input: interpolation mode (normal or growing_closeby)
  * @param last_index Input/Output: index of the previous/current point in the interpolation array (input only for closeby mode, output for both)
@@ -290,9 +288,6 @@ int ThermodynamicsModule::thermodynamics_at_z(double z, short inter_mode, int* l
  * Initialize the thermo structure, and in particular the
  * thermodynamics interpolation table.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input/Output: pointer to initialized thermo structure
  * @return the error status
  */
 int ThermodynamicsModule::thermodynamics_init() {
@@ -329,7 +324,7 @@ int ThermodynamicsModule::thermodynamics_init() {
   int index_tau_max;
   double dkappa_ini;
 
-  double z_idm_dr, z_idr, tau_idm_dr, tau_idr, Gamma_heat_idm_dr, dTdz_idm_dr, T_idm_dr, z, T_idr, dz, T_adia, z_adia;
+  double z_idm_dr, z_idr, tau_idm_dr = 0.0, tau_idr = 0.0, Gamma_heat_idm_dr, dTdz_idm_dr, T_idm_dr, z, T_idr, dz, T_adia, z_adia;
 
   double tau_idm_dr_fs=0.;
   int index_tau_fs;
@@ -1298,7 +1293,6 @@ int ThermodynamicsModule::thermodynamics_init() {
  * Free all memory space allocated by thermodynamics_init().
  *
  *
- * @param pth Input/Output: pointer to thermo structure (to be freed)
  * @return the error status
  */
 
@@ -1316,8 +1310,6 @@ int ThermodynamicsModule::thermodynamics_free() {
  * as well as in vector containing reionization parameters.
  *
  *
- * @param pba   Input: pointer to background structure
- * @param pth   Input/Output: pointer to thermo structure
  * @param preco Input/Output: pointer to recombination structure
  * @param preio Input/Output: pointer to reionization structure
  * @return the error status
@@ -1538,9 +1530,6 @@ int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionizat
  * potentials for electron neutrinos. The full code with xi_nu_e could
  * be introduced here later.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input/Output: pointer to initialized thermo structure
  * @return the error status
  */
 int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
@@ -1756,8 +1745,6 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
  * annihilation). This energy injection may come e.g. from dark matter
  * annihilation or decay.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
  * @param preco Input: pointer to recombination structure
  * @param z Input: redshift
  * @param energy_rate Output: energy density injection rate
@@ -1813,8 +1800,6 @@ int ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombinatio
  * (beyond the on-the-spot annihilation). This energy injection may
  * come e.g. from dark matter annihilation or decay.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
  * @param preco Input: pointer to recombination structure
  * @param z Input: redshift
  * @param energy_rate Output: energy density injection rate
@@ -1901,7 +1886,6 @@ int ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco, 
  * the reio_camb scheme is coded)
  *
  * @param z     Input: redshift
- * @param pth   Input: pointer to thermo structure, to know which scheme is used
  * @param preio Input: pointer to reionization structure, containing the parameters of the function \f$ X_e(z) \f$
  * @param xe    Output: \f$ X_e(z) \f$
  */
@@ -2133,8 +2117,6 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z, reioniz
  * the time at which reionization starts. Hence it provides correct
  * initial conditions for the reionization function.
  *
- * @param ppr   Input: pointer to precision structure
- * @param pth   Input: pointer to thermo structure
  * @param preco Input: pointer to recombination structure
  * @param z     Input: redshift z_reio_start
  * @param xe    Output: \f$ X_e(z) \f$ at z
@@ -2168,9 +2150,6 @@ int ThermodynamicsModule::thermodynamics_get_xe_before_reionization(recombinatio
  * find z_reio by dichotomy (trying several z_reio until the correct
  * tau_reio is approached).
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input: pointer to thermo structure
  * @param preco Input: pointer to filled recombination structure
  * @param preio Input/Output: pointer to reionization structure (to be filled)
  * @param pvecback   Input: vector of background quantities (used as workspace: must be already allocated, with format short_info or larger, but does not need to be filled)
@@ -2680,9 +2659,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco, reio
  * For fixed input reionization parameters, this routine computes the
  * reionization history and fills the reionization table.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input: pointer to thermo structure
  * @param preco Input: pointer to filled recombination structure
  * @param preio Input/Output: pointer to reionization structure (to be filled)
  * @param pvecback   Input: vector of background quantities (used as workspace: must be already allocated, with format short_info or larger, but does not need to be filled)
@@ -3048,9 +3024,6 @@ int ThermodynamicsModule::thermodynamics_recombination(recombination* preco, dou
  *************************************************************************************************
  *
  *
- * @param ppr      Input: pointer to precision structure
- * @param pba      Input: pointer to background structure
- * @param pth      Input: pointer to thermodynamics structure
  * @param preco    Output: pointer to recombination structure
  * @param pvecback Input: pointer to an allocated (but empty) vector of background variables
  */
@@ -3091,7 +3064,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
   param.zstart = ppr->recfast_z_initial; /* Redshift range */
   param.zend = 0.;
   param.dlna = 8.49e-5;
-  param.nz = (long) floor(2+log((1.+param.zstart)/(1.+param.zend))/param.dlna);
+  param.nz = floor(2+log((1.+param.zstart)/(1.+param.zend))/param.dlna);
   param.annihilation = pth->annihilation;
   param.has_on_the_spot = pth->has_on_the_spot;
   param.decay = pth->decay;
@@ -3354,9 +3327,6 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
  * Version 1.5: includes extra fitting function from
  *              Rubino-Martin et al. arXiv:0910.4383v1 [astro-ph.CO]
  *
- * @param ppr      Input: pointer to precision structure
- * @param pba      Input: pointer to background structure
- * @param pth      Input: pointer to thermodynamics structure
  * @param preco    Output: pointer to recombination structure
  * @param pvecback Input: pointer to an allocated (but empty) vector of background variables
  * @return the error status
@@ -3999,8 +3969,6 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(double z, do
  * 'reionization_table' inside the table 'thermodynamics_table', and
  * frees the temporary structures 'recombination' and 'reionization'.
  *
- * @param ppr   Input: pointer to precision structure
- * @param pth   Input/Output: pointer to thermo structure
  * @param preco Input: pointer to filled recombination structure
  * @param preio Input: pointer to reionization structure
  * @return the error status

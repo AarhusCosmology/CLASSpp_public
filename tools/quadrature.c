@@ -87,13 +87,15 @@ int get_qsampling(double *x,
   int i, NL=2,NR,level,Nadapt=0,NLag,NLag_max,Nold=NL;
   int adapt_converging=_FALSE_,Laguerre_converging=_FALSE_,combined_converging=_FALSE_;
   double y,y1,y2,I,Igk,err,ILag,*b,*c;
-  qss_node *root,*root_comb;
+  qss_node *root = NULL;
+  qss_node *root_comb = NULL;
   double I_comb,I_atzero,I_atinf,I_comb2;
   int N_comb=0,N_comb_lag=16,N_comb_leg=4;
   double a_comb,b_comb;
   double q_leg[4],w_leg[4];
   double q_lag[N_comb_lag],w_lag[N_comb_lag];
-  char method_chosen[40];
+  const size_t method_chosen_size = 40;
+  char method_chosen[method_chosen_size];
   double qmin=0., qmax=0., qmaxm1=0.;
   double *wcomb2=NULL,delq;
   double Itot=0.0;
@@ -309,17 +311,17 @@ int get_qsampling(double *x,
   }
   //printf("N_adapt=%d, N_combined=%d at level=%d, Nlag=%d\n",Nadapt,N_comb,level,NLag);
   if (adapt_converging==_TRUE_){
-    sprintf(method_chosen,"Adaptive Gauss-Kronrod Quadrature");
+    snprintf(method_chosen, method_chosen_size, "Adaptive Gauss-Kronrod Quadrature");
     /* Gather weights and xvalues from tree: */
     i = Nadapt-1;
     get_leaf_x_and_w(root,&i,x,w,_TRUE_);
   }
   else if (Laguerre_converging==_TRUE_){
-    sprintf(method_chosen,"Gauss-Laguerre Quadrature");
+    snprintf(method_chosen, method_chosen_size, "Gauss-Laguerre Quadrature");
     /* x and w is already populated in this case. */
   }
   else if (combined_converging == _TRUE_){
-    sprintf(method_chosen,"Combined Quadrature");
+    snprintf(method_chosen, method_chosen_size, "Combined Quadrature");
     for(i=0; i<N_comb_leg; i++){
       x[i] = q_leg[i];
       w[i] = w_leg[i];
@@ -579,7 +581,7 @@ int compute_Hermite(double *x, double *w, int N, int alpha, double *b, double *c
 int compute_Laguerre(double *x, double *w, int N, double alpha, double *b, double *c,int totalweight){
   int i,j,iter,maxiter=10;
   double x0=0.,r1,r2,ratio,d,logprod,logcc;
-  double p0,p1,p2,dp0,dp1,dp2;
+  double p0,p1 = 0.0,p2,dp0,dp1,dp2 = 0.0;
   double eps=1e-14;
   /* Initialise recursion coefficients: */
   for(i=0; i<N; i++){

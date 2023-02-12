@@ -56,7 +56,7 @@ int parser_init(
 
   if (size > 0) {
     pfc->size=size;
-    class_alloc(pfc->filename,(strlen(filename)+1)*sizeof(char),errmsg);
+    class_alloc(pfc->filename, static_cast<int>((strlen(filename) + 1)*sizeof(char)), errmsg);
     strcpy(pfc->filename,filename);
     class_alloc(pfc->name,size*sizeof(FileArg),errmsg);
     class_alloc(pfc->value,size*sizeof(FileArg),errmsg);
@@ -641,16 +641,19 @@ int parser_cat(
 	     "size of file_content structure probably not initialized properly\n");
 
   if (pfc1->size == 0) {
-    class_alloc(pfc3->filename,(strlen(pfc2->filename)+1)*sizeof(char),errmsg);
-    sprintf(pfc3->filename,"%s",pfc2->filename);
+    int filename_size = static_cast<int>((strlen(pfc2->filename)+1)*sizeof(char));
+    class_alloc(pfc3->filename, filename_size, errmsg);
+    snprintf(pfc3->filename, filename_size, "%s", pfc2->filename);
   }
   if (pfc2->size == 0) {
-    class_alloc(pfc3->filename,(strlen(pfc1->filename)+1)*sizeof(char),errmsg);
-    sprintf(pfc3->filename,"%s",pfc1->filename);
+    int filename_size = static_cast<int>((strlen(pfc1->filename)+1)*sizeof(char));
+    class_alloc(pfc3->filename, filename_size, errmsg);
+    snprintf(pfc3->filename, filename_size, "%s", pfc1->filename);
   }
   if ((pfc1->size !=0) && (pfc2->size != 0)) {
-    class_alloc(pfc3->filename,(strlen(pfc1->filename)+strlen(pfc2->filename)+5)*sizeof(char),errmsg);
-    sprintf(pfc3->filename,"%s or %s",pfc1->filename,pfc2->filename);
+    int filename_size = static_cast<int>((strlen(pfc1->filename)+strlen(pfc2->filename)+5)*sizeof(char));
+    class_alloc(pfc3->filename, filename_size, errmsg);
+    snprintf(pfc3->filename, filename_size, "%s or %s", pfc1->filename, pfc2->filename);
   }
 
   pfc3->size = pfc1->size + pfc2->size;

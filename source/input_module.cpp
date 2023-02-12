@@ -67,8 +67,8 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
 
   char input_file[_ARGUMENT_LENGTH_MAX_];
   char precision_file[_ARGUMENT_LENGTH_MAX_];
-  char tmp_file[_ARGUMENT_LENGTH_MAX_+26]; // 26 is enough to extend the file name [...] with the characters "output/[...]%02d_parameters.ini" (as done below)
-
+  const size_t tmp_file_size = _ARGUMENT_LENGTH_MAX_ + 26;// 26 is enough to extend the file name [...] with the characters "output/[...]%02d_parameters.ini" (as done below)
+  char tmp_file[tmp_file_size];
   int i;
   char extension[5];
   FileArg stringoutput, inifilename;
@@ -132,16 +132,16 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
       strncpy(inifilename, input_file, strlen(input_file)-4);
       inifilename[strlen(input_file)-4] = '\0';
       for (filenum = 0; filenum < 100; filenum++){
-        sprintf(tmp_file,"output/%s%02d_cl.dat", inifilename, filenum);
+        snprintf(tmp_file, tmp_file_size, "output/%s%02d_cl.dat", inifilename, filenum);
         if (file_exists(tmp_file) == _TRUE_)
           continue;
-        sprintf(tmp_file,"output/%s%02d_pk.dat", inifilename, filenum);
+        snprintf(tmp_file, tmp_file_size, "output/%s%02d_pk.dat", inifilename, filenum);
         if (file_exists(tmp_file) == _TRUE_)
           continue;
-        sprintf(tmp_file,"output/%s%02d_tk.dat", inifilename, filenum);
+        snprintf(tmp_file, tmp_file_size, "output/%s%02d_tk.dat", inifilename, filenum);
         if (file_exists(tmp_file) == _TRUE_)
           continue;
-        sprintf(tmp_file,"output/%s%02d_parameters.ini", inifilename, filenum);
+        snprintf(tmp_file, tmp_file_size, "output/%s%02d_parameters.ini", inifilename, filenum);
         if (file_exists(tmp_file) == _TRUE_)
           continue;
         break;
@@ -151,8 +151,8 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
                              fc_input.filename,
                              errmsg),
                  errmsg,errmsg);
-      sprintf(fc_root.name[0],"root");
-      sprintf(fc_root.value[0],"output/%s%02d_",inifilename,filenum);
+      snprintf(fc_root.name[0], _ARGUMENT_LENGTH_MAX_, "root");
+      snprintf(fc_root.value[0], _ARGUMENT_LENGTH_MAX_, "output/%s%02d_", inifilename, filenum);
       fc_root.read[0] = _FALSE_;
       class_call(parser_cat(&fc_input,&fc_root,&fc_inputroot,errmsg),
                  errmsg,
@@ -253,7 +253,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
 
     //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
     class_alloc(shooting_workspace_.target_values,
-                target_values.size()*sizeof(double),
+                static_cast<int>(target_values.size())*sizeof(double),
                 error_message_);
     for (int j = 0; j < target_values.size(); ++j) {
       shooting_workspace_.target_values[j] = target_values[j];
@@ -262,7 +262,6 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
   }
 
   int fevals = 0;
-  int status = _SUCCESS_;
   if (target_values.size() == 1) {
     // 1d root finding
     if (input_verbose > 0) {
@@ -278,7 +277,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
                error_message_, error_message_);
 
     /* Store xzero */
-    sprintf(file_content_.value[shooting_workspace_.unknown_parameters_index[0]],"%e",xzero);
+    snprintf(file_content_.value[shooting_workspace_.unknown_parameters_index[0]], _ARGUMENT_LENGTH_MAX_, "%e", xzero);
     double fzero_value;
     input_fzerofun_1d(xzero, (void*)(&shooting_workspace_), &fzero_value, error_message_);
 
@@ -297,10 +296,10 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     double* x_inout;
     double* dxdF;
     class_alloc(x_inout,
-                sizeof(double)*target_values.size(),
+                sizeof(double)*static_cast<int>(target_values.size()),
                 error_message_);
     class_alloc(dxdF,
-                sizeof(double)*target_values.size(),
+                sizeof(double)*static_cast<int>(target_values.size()),
                 error_message_);
     class_call(input_get_guess(x_inout,
                                dxdF,
@@ -311,7 +310,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     class_call(fzero_Newton(input_try_unknown_parameters,
                             x_inout,
                             dxdF,
-                            target_values.size(),
+                            static_cast<int>(target_values.size()),
                             1e-3,
                             1e-3,
                             &shooting_workspace_,
@@ -325,7 +324,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
       char* value = file_content_.value[shooting_workspace_.unknown_parameters_index[counter]];
       for (int j = 0; j < shooting_workspace_.target_sizes[counter]; ++j) {
         const char* format_string = j > 0 ? ",%.17g" : "%.17g";
-        int bytes_written = sprintf(value, format_string, x_inout[x_inout_index++]);
+        int bytes_written = snprintf(value, _ARGUMENT_LENGTH_MAX_, format_string, x_inout[x_inout_index++]);
         value += bytes_written;
       }
       if (input_verbose > 0) {
@@ -358,13 +357,9 @@ int InputModule::input_init() {
   FileContent* pfc = &file_content_;
 
   int flag1;
-  double param1;
-  int counter, index_target, i;
+  int index_target, i;
   int unknown_parameters_size;
-  int fevals=0;
-  double xzero;
   int target_indices[_NUM_TARGETS_];
-  double *dxdF, *x_inout;
 
   char string1[_ARGUMENT_LENGTH_MAX_];
   FILE * param_output;
@@ -475,8 +470,8 @@ int InputModule::input_init() {
   if ((flag1 == _TRUE_) && ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL))) {
 
     output* pop = &output_;
-    sprintf(param_output_name,"%s%s",pop->root,"parameters.ini");
-    sprintf(param_unused_name,"%s%s",pop->root,"unused_parameters");
+    snprintf(param_output_name, _LINE_LENGTH_MAX_, "%s%s", pop->root, "parameters.ini");
+    snprintf(param_unused_name, _LINE_LENGTH_MAX_, "%s%s", pop->root, "unused_parameters");
 
     class_open(param_output,param_output_name,"w",errmsg);
     class_open(param_unused,param_unused_name,"w",errmsg);
@@ -1173,7 +1168,7 @@ int InputModule::input_read_parameters() {
     }
   }
   dr_ = DarkRadiation::Create(pfc, dr_sources, dr_types, dr_deg, pba->T_cmb);
-  pba->N_decay_dr = dr_sources.size();
+  pba->N_decay_dr = static_cast<int>(dr_sources.size());
   
   /** - Omega_0_k (effective fractional density of curvature) */
   class_read_double("Omega_k",pba->Omega0_k);
@@ -3114,20 +3109,10 @@ int InputModule::input_read_parameters() {
 /**
  * All default parameter values (for input parameters)
  *
- * @param pba Input: pointer to background structure
- * @param pth Input: pointer to thermodynamics structure
- * @param ppt Input: pointer to perturbation structure
- * @param ptr Input: pointer to transfer structure
- * @param ppm Input: pointer to primordial structure
- * @param psp Input: pointer to spectra structure
- * @param pnl Input: pointer to nonlinear structure
- * @param ple Input: pointer to lensing structure
- * @param pop Input: pointer to output structure
  * @return the error status
  */
 
 int InputModule::input_default_params() {
-  precision* ppr = &precision_;      /* for precision parameters */
   background* pba = &background_;    /* for cosmological background */
   thermo* pth = &thermodynamics_;    /* for thermodynamics */
   perturbs* ppt = &perturbations_;   /* for source functions */
@@ -3369,7 +3354,7 @@ int InputModule::input_default_params() {
   ppm->H3=0.;
   ppm->H4=0.;
   ppm->behavior=numerical;
-  ppm->command="write here your command for the external Pk";
+  ppm->command=nullptr;
   ppm->custom1=0.;
   ppm->custom2=0.;
   ppm->custom3=0.;
@@ -3416,7 +3401,7 @@ int InputModule::input_default_params() {
 
   pop->z_pk_num = 1;
   pop->z_pk[0] = 0.;
-  sprintf(pop->root,"output/");
+  snprintf(pop->root, _FILENAMESIZE_-32, "output/");
   pop->write_header = _TRUE_;
   pop->output_format = class_format;
   pop->write_background = _FALSE_;
@@ -3446,7 +3431,6 @@ int InputModule::input_default_params() {
  * All precision parameters used in the other modules are listed here
  * and assigned here a default value.
  *
- * @param ppr Input/Output: a precision_params structure pointer
  * @return the error status
  *
  */
@@ -3477,7 +3461,7 @@ int class_version(
                   char * version
                   ) {
 
-  sprintf(version,"%s",_VERSION_);
+  snprintf(version, 12, "%s", _VERSION_);
   return _SUCCESS_;
 }
 
@@ -3589,7 +3573,7 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
     char* value = pfzw->fc.value[pfzw->unknown_parameters_index[counter]];
     for (int j = 0; j < pfzw->target_sizes[counter]; ++j) {
       const char* format_string = j > 0 ? ",%.17g" : "%.17g";
-      int bytes_written = sprintf(value, format_string, unknown_values[x_inout_index++]);
+      int bytes_written = snprintf(value, _ARGUMENT_LENGTH_MAX_, format_string, unknown_values[x_inout_index++]);
       value += bytes_written;
     }
   }
@@ -3856,8 +3840,6 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
           double t_nr = pow(a_nr/k_rad, 2.0);
           double x = dncdm_properties.Gamma*t_nr;
           double experfcsqrtx = (x < 20.) ? exp(x)*erfc(sqrt(x)) : 1./sqrt(x*M_PI);
-          double Omega_ini_old = 0.8*pow(dncdm_properties.Gamma/ba.H0, 0.5)*pow(ba.Omega0_g, -0.25)*Omega0_dncdmdr_target*a_nr;
-
           Omega_ini = sqrt(2.)*a_nr*sqrt(dncdm_properties.Gamma)*Omega0_dncdmdr_target/k_rad/(2*sqrt(x) + sqrt(_PI_)*experfcsqrtx);
         }
         xguess[index_guess_local] = Omega_ini/Omega_deg1;
@@ -3907,7 +3889,7 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
 }
 
 int InputModule::input_find_root(double* xzero, int* fevals, fzerofun_workspace* pfzw, ErrorMsg errmsg){
-  double x1, f1, f2, dxdy;
+  double x1, f1, f2 = 0.0, dxdy;
   int max_iter_outer = 150;
   int max_iter_inner = 30;
   int return_function;

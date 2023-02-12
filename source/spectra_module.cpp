@@ -206,7 +206,6 @@ std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) co
  * spectra_init() has been called before, and spectra_free() has not
  * been called yet.
  *
- * @param psp        Input: pointer to spectra structure (containing pre-computed table)
  * @param l          Input: multipole number
  * @param cl_tot     Output: total \f$C_l\f$'s for all types (TT, TE, EE, etc..)
  * @param cl_md      Output: \f$C_l\f$'s for all types (TT, TE, EE, etc..) decomposed mode by mode (scalar, tensor, ...) when relevant
@@ -427,13 +426,6 @@ int SpectraModule::spectra_cl_at_l(double l,
  * This routine initializes the spectra structure (in particular,
  * computes table of anisotropy and Fourier spectra \f$ C_l^{X}, P(k), ... \f$)
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure (will provide H, Omega_m at redshift of interest)
- * @param ppt Input: pointer to perturbation structure
- * @param ptr Input: pointer to transfer structure
- * @param ppm Input: pointer to primordial structure
- * @param pnl Input: pointer to nonlinear structure
- * @param psp Output: pointer to initialized spectra structure
  * @return the error status
  */
 
@@ -483,7 +475,6 @@ int SpectraModule::spectra_init() {
  * To be called at the end of each run, only when no further calls to
  * spectra_cls_at_l(), spectra_pk_at_z(), spectra_pk_at_k_and_z() are needed.
  *
- * @param psp Input: pointer to spectra structure (which fields must be freed)
  * @return the error status
  */
 
@@ -526,11 +517,6 @@ int SpectraModule::spectra_free() {
 /**
  * This routine defines indices and allocates tables in the spectra structure
  *
- * @param pba  Input: pointer to background structure
- * @param ppt  Input: pointer to perturbation structure
- * @param ptr  Input: pointer to transfers structure
- * @param ppm  Input: pointer to primordial structure
- * @param psp  Input/output: pointer to spectra structure
  * @return the error status
  */
 
@@ -808,11 +794,6 @@ int SpectraModule::spectra_indices() {
  * This routine computes a table of values for all harmonic spectra \f$ C_l \f$'s,
  * given the transfer functions and primordial spectra.
  *
- * @param pba Input: pointer to background structure
- * @param ppt Input: pointer to perturbation structure
- * @param ptr Input: pointer to transfers structure
- * @param ppm Input: pointer to primordial structure
- * @param psp Input/Output: pointer to spectra structure
  * @return the error status
  */
 
@@ -958,11 +939,6 @@ int SpectraModule::spectra_cls() {
  * and multipole, but for all types (TT, TE...), by convolving the
  * transfer functions with the primordial spectra.
  *
- * @param pba           Input: pointer to background structure
- * @param ppt           Input: pointer to perturbation structure
- * @param ptr           Input: pointer to transfers structure
- * @param ppm           Input: pointer to primordial structure
- * @param psp           Input/Output: pointer to spectra structure (result stored here)
  * @param index_md      Input: index of mode under consideration
  * @param index_ic1     Input: index of first initial condition in the correlator
  * @param index_ic2     Input: index of second initial condition in the correlator
@@ -1379,8 +1355,6 @@ int SpectraModule::spectra_compute_cl(int index_md,
  *
  * This function is deprecated since v2.8. Try using nonlinear_pk_at_z() instead.
  *
- * @param pba           Input: pointer to background structure (used for converting z into tau)
- * @param psp           Input: pointer to spectra structure (containing pre-computed table)
  * @param mode          Input: linear or logarithmic
  * @param z             Input: redshift
  * @param output_tot    Output: total matter power spectrum P(k) in \f$ Mpc^3 \f$ (linear mode), or its logarithms (logarithmic mode)
@@ -1420,9 +1394,6 @@ int SpectraModule::spectra_pk_at_z(enum linear_or_logarithmic mode,
  *
  * This function is deprecated since v2.8. Try using nonlinear_pk_linear_at_k_and_z() instead.
  *
- * @param pba        Input: pointer to background structure (used for converting z into tau)
- * @param ppm        Input: pointer to primordial structure (used only in the case 0 < k < kmin)
- * @param psp        Input: pointer to spectra structure (containing pre-computed table)
  * @param k          Input: wavenumber in 1/Mpc
  * @param z          Input: redshift
  * @param pk_tot     Output: total matter power spectrum P(k) in \f$ Mpc^3 \f$
@@ -1461,8 +1432,6 @@ int SpectraModule::spectra_pk_at_k_and_z(
  *
  * This function is deprecated since v2.8. Try using nonlinear_pk_at_z() instead.
  *
- * @param pba           Input: pointer to background structure (used for converting z into tau)
- * @param psp           Input: pointer to spectra structure (containing pre-computed table)
  * @param mode          Input: linear or logarithmic
  * @param z             Input: redshift
  * @param output_tot    Output: total matter power spectrum P(k) in \f$ Mpc^3\f$ (linear mode), or its logarithms (logarithmic mode)
@@ -1499,9 +1468,6 @@ int SpectraModule::spectra_pk_nl_at_z(
  *
  * This function is deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.
  *
- * @param pba        Input: pointer to background structure (used for converting z into tau)
- * @param ppm        Input: pointer to primordial structure (used only in the case 0 < k < kmin)
- * @param psp        Input: pointer to spectra structure (containing pre-computed table)
  * @param k          Input: wavenumber in 1/Mpc
  * @param z          Input: redshift
  * @param pk_tot     Output: total matter power spectrum P(k) in \f$ Mpc^3\f$
@@ -1533,8 +1499,6 @@ int SpectraModule::spectra_pk_nl_at_k_and_z(
  *
  * This function is deprecated since v2.8. Try using nonlinear_pks_at_kvec_and_zvec() instead.
  *
- * @param pba            Input: pointer to background structure
- * @param psp            Input: pointer to spectra structure
  * @param kvec           Input: array of wavenumbers in ascending order (in 1/Mpc)
  * @param kvec_size      Input: size of array of wavenumbers
  * @param zvec           Input: array of redshifts in arbitrary order
@@ -1584,9 +1548,6 @@ int SpectraModule::spectra_fast_pk_at_kvec_and_zvec(
  *
  * This function is deprecated since v2.8. Try using nonlinear_sigmas_at_z() instead.
  *
- * @param pba   Input: pointer to background structure
- * @param ppm   Input: pointer to primordial structure
- * @param psp   Input: pointer to spectra structure
  * @param R     Input: radius in Mpc
  * @param z     Input: redshift
  * @param sigma Output: variance in a sphere of radius R (dimensionless)
@@ -1618,9 +1579,6 @@ int SpectraModule::spectra_sigma(double R, double z, double * sigma) {
  *
  * This function is deprecated since v2.8. Try using nonlinear_sigmas_at_z() instead.
  *
- * @param pba      Input: pointer to background structure
- * @param ppm      Input: pointer to primordial structure
- * @param psp      Input: pointer to spectra structure
  * @param R        Input: radius in Mpc
  * @param z        Input: redshift
  * @param sigma_cb Output: variance in a sphere of radius R (dimensionless)
@@ -1651,8 +1609,6 @@ int SpectraModule::spectra_sigma_cb(double R, double z, double * sigma_cb) {
  * Obsolete function, superseeded by perturb_sources_at_tau()
  * (at the time of the switch, this function was anyway never used anywhere)
  *
- * @param pba        Input: pointer to background structure (used for converting z into tau)
- * @param psp        Input: pointer to spectra structure (containing pre-computed table)
  * @param z          Input: redshift
  * @param output     Output: matter transfer functions
  * @return the error status
@@ -1674,8 +1630,6 @@ int SpectraModule::spectra_tk_at_z(
  * Obsolete function, superseeded by perturb_sources_at_tau()
  * (at the time of the switch, this function was anyway never used anywhere)
  *
- * @param pba        Input: pointer to background structure (used for converting z into tau)
- * @param psp        Input: pointer to spectra structure (containing pre-computed table)
  * @param k          Input: wavenumber in 1/Mpc
  * @param z          Input: redshift
  * @param output     Output: matter transfer functions

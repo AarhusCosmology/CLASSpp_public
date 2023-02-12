@@ -68,7 +68,6 @@ int PerturbationsModule::perturb_derivs(double tau, double* y, double* dy, void*
  * Evaluate source functions at given conformal time tau by reading
  * the pre-computed table and interpolating.
  *
- * @param ppt        Input: pointer to perturbation structure containing interpolation tables
  * @param index_md   Input: index of requested mode
  * @param index_ic   Input: index of requested initial condition
  * @param index_tp   Input: index of requested source function type
@@ -137,8 +136,6 @@ int PerturbationsModule::perturb_sources_at_tau(int index_md, int index_ic, int 
  * the source functions \f$ S^{X} (k, \tau) \f$ at a given conformal
  * time tau corresponding to the input redshift z.
  *
- * @param pba              Input: pointer to background structure
- * @param ppt              Input: pointer to perturbation structure
  * @param output_format    Input: choice of ordering and normalisation for the output quantities
  * @param z                Input: redshift
  * @param number_of_titles Input: number of requested source functions (found in perturb_output_titles)
@@ -196,8 +193,8 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
                error_message_);
 
     class_test(log(tau) < ln_tau_[0],
-               "Asking sources at a z bigger than z_max_pk, something probably went wrong\n",
-               error_message_);
+               error_message_,
+               "Asking sources at a z bigger than z_max_pk, something probably went wrong\n");
 
     class_alloc(pvecsources,
                 k_size_[index_md]*sizeof(double),
@@ -315,8 +312,6 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
  * Fill array of strings with the name of the requested 'mTk, vTk' functions
  * (transfer functions as a function of wavenumber for fixed times).
  *
- * @param pba           Input: pointer to the background structure
- * @param ppt           Input: pointer to the perturbation structure
  * @param output_format Input: flag for the format
  * @param titles        Output: name strings
  * @return the error status
@@ -324,7 +319,8 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
 
 int PerturbationsModule::perturb_output_titles(enum file_format output_format, char titles[_MAXTITLESTRINGLENGTH_]) const {
   int n_ncdm;
-  char tmp[40];
+  const size_t tmp_size = 40;
+  char tmp[tmp_size];
 
   if (output_format == class_format) {
     class_store_columntitle(titles, "k (h/Mpc)", _TRUE_);
@@ -338,7 +334,7 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format, c
       class_store_columntitle(titles, "d_idr", pba->has_idr);
       if (pba->has_ncdm == _TRUE_) {
         for (n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++) {
-          sprintf(tmp, "d_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "d_ncdm[%d]", n_ncdm);
           class_store_columntitle(titles, tmp, _TRUE_);
         }
       }
@@ -367,7 +363,7 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format, c
       class_store_columntitle(titles, "t_idr", pba->has_idr);
       if (pba->has_ncdm == _TRUE_) {
         for (n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++) {
-          sprintf(tmp, "t_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "t_ncdm[%d]", n_ncdm);
           class_store_columntitle(titles, tmp, _TRUE_);
         }
       }
@@ -399,7 +395,6 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format, c
  * Fill strings that will be used when writing the transfer functions
  * and the spectra in files (in the file names and in the comment at the beginning of each file).
  *
- * @param ppt        Input: pointer to the perturbation structure
  * @param index_ic   Input: index of the initial condition
  * @param first_line Output: line of comment
  * @param ic_suffix  Output: suffix for the output file name
@@ -455,10 +450,6 @@ int PerturbationsModule::perturb_output_firstline_and_ic_suffix(int index_ic, ch
  *   relevant perturbations, integrate the differential system,
  *   compute and store the source functions.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input: pointer to thermodynamics structure
- * @param ppt Output: Initialized perturbation structure
  * @return the error status
  */
 
@@ -767,7 +758,6 @@ int PerturbationsModule::perturb_init() {
  * To be called at the end of each run, only when no further calls to
  * perturb_sources_at_tau() are needed.
  *
- * @param ppt Input: perturbation structure to be freed
  * @return the error status
  */
 
@@ -847,10 +837,6 @@ int PerturbationsModule::perturb_free() {
 /**
  * Initialize all indices and allocate most arrays in perturbs structure.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input: pointer to thermodynamics structure
- * @param ppt Input/Output: Initialized perturbation structure
  * @return the error status
  */
 
@@ -1255,10 +1241,6 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
  * will be sampled.  Knowing the number of tau values, allocate all
  * arrays of source functions.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input: pointer to thermodynamics structure
- * @param ppt Input/Output: Initialized perturbation structure
  * @return the error status
  */
 
@@ -1640,10 +1622,6 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
  * Define the number of comoving wavenumbers using the information
  * passed in the precision structure.
  *
- * @param ppr        Input: pointer to precision structure
- * @param pba        Input: pointer to background structure
- * @param pth        Input: pointer to thermodynamics structure
- * @param ppt        Input: pointer to perturbation structure
  * @return the error status
  */
 
@@ -2267,10 +2245,6 @@ int PerturbationsModule::perturb_get_k_list() {
  * (scalar/../tensor). Then, for each thread, all initial conditions
  * and wavenumbers will use the same workspace.
  *
- * @param ppr        Input: pointer to precision structure
- * @param pba        Input: pointer to background structure
- * @param pth        Input: pointer to the thermodynamics structure
- * @param ppt        Input: pointer to the perturbation structure
  * @param index_md Input: index of mode under consideration (scalar/.../tensor)
  * @param ppw        Input/Output: pointer to perturb_workspace structure which fields are allocated or filled here
  * @return the error status
@@ -2440,7 +2414,6 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
  * perturb_vector '-->pv' field, which is freed separately in
  * perturb_vector_free).
  *
- * @param ppt        Input: pointer to the perturbation structure
  * @param index_md Input: index of mode under consideration (scalar/.../tensor)
  * @param ppw        Input: pointer to perturb_workspace structure to be freed
  * @return the error status
@@ -2480,10 +2453,6 @@ int PerturbationsModule::perturb_workspace_free (int index_md, perturb_workspace
  * the source terms are computed and stored in the source table using
  * perturb_sources().
  *
- * @param ppr        Input: pointer to precision structure
- * @param pba        Input: pointer to background structure
- * @param pth        Input: pointer to the thermodynamics structure
- * @param ppt        Input/Output: pointer to the perturbation structure (output source functions S(k,tau) written here)
  * @param index_md Input: index of mode under consideration (scalar/.../tensor)
  * @param index_ic   Input: index of initial condition under consideration (ad, iso...)
  * @param index_k    Input: index of wavenumber
@@ -2822,14 +2791,13 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
  * functions (transfer functions as a function of time, for fixed
  * values of k).
  *
- * @param pba  Input: pointer to the background structure
- * @param ppt  Input/Output: pointer to the perturbation structure
  * @return the error status
  */
 
 int PerturbationsModule::perturb_prepare_k_output() {
   int n_ncdm;
-  char tmp[40];
+  size_t tmp_size = 40;
+  char tmp[tmp_size];
 
   scalar_titles_[0]='\0';
   vector_titles_[0]='\0';
@@ -2874,13 +2842,13 @@ int PerturbationsModule::perturb_prepare_k_output() {
       /* Non-cold dark matter */
       if ((pba->has_ncdm == _TRUE_) && ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_) || (has_source_delta_m_ == _TRUE_))) {
         for(n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++){
-          sprintf(tmp, "delta_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "delta_ncdm[%d]", n_ncdm);
           class_store_columntitle(scalar_titles_, tmp, _TRUE_);
-          sprintf(tmp, "theta_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "theta_ncdm[%d]", n_ncdm);
           class_store_columntitle(scalar_titles_, tmp, _TRUE_);
-          sprintf(tmp, "shear_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "shear_ncdm[%d]", n_ncdm);
           class_store_columntitle(scalar_titles_, tmp, _TRUE_);
-          sprintf(tmp, "cs2_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "cs2_ncdm[%d]", n_ncdm);
           class_store_columntitle(scalar_titles_, tmp, _TRUE_);
         }
       }
@@ -2890,17 +2858,17 @@ int PerturbationsModule::perturb_prepare_k_output() {
       /* Decay radiation */
       if (pba->has_dr) {
         for (int n_dr = 0; n_dr < pba->N_decay_dr; n_dr++) {
-          sprintf(tmp, "delta_dr[%d]", n_dr);
+          snprintf(tmp, tmp_size, "delta_dr[%d]", n_dr);
           class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
-          sprintf(tmp, "theta_dr[%d]", n_dr);
+          snprintf(tmp, tmp_size, "theta_dr[%d]", n_dr);
           class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
-          sprintf(tmp, "shear_dr[%d]", n_dr);
+          snprintf(tmp, tmp_size, "shear_dr[%d]", n_dr);
           class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
         }
         // Print F_dr for all species
         for (int n = 0; n < pba->N_decay_dr; n++) {
           for (int l = 0; l <= ppr->l_max_dr; l++) {
-            sprintf(tmp, "F_dr[%d][%d]", n, l);
+            snprintf(tmp, tmp_size, "F_dr[%d][%d]", n, l);
             class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
           }
         }
@@ -2936,11 +2904,11 @@ int PerturbationsModule::perturb_prepare_k_output() {
 
       if (evolve_tensor_ncdm_ == _TRUE_) {
         for(n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++){
-          sprintf(tmp, "delta_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "delta_ncdm[%d]", n_ncdm);
           class_store_columntitle(tensor_titles_, tmp, _TRUE_);
-          sprintf(tmp, "theta_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "theta_ncdm[%d]", n_ncdm);
           class_store_columntitle(tensor_titles_, tmp, _TRUE_);
-          sprintf(tmp, "shear_ncdm[%d]", n_ncdm);
+          snprintf(tmp, tmp_size, "shear_ncdm[%d]", n_ncdm);
           class_store_columntitle(tensor_titles_, tmp, _TRUE_);
         }
       }
@@ -2959,10 +2927,6 @@ int PerturbationsModule::perturb_prepare_k_output() {
  * time between tau_ini and tau_end such that the approximation
  * scheme (and the number of perturbation equations) is uniform.
  *
- * @param ppr                Input: pointer to precision structure
- * @param pba                Input: pointer to background structure
- * @param pth                Input: pointer to the thermodynamics structure
- * @param ppt                Input: pointer to the perturbation structure
  * @param index_md           Input: index of mode under consideration (scalar/.../tensor)
  * @param k                  Input: index of wavenumber
  * @param ppw                Input: pointer to perturb_workspace structure containing index values and workspaces
@@ -3026,10 +2990,6 @@ int PerturbationsModule::perturb_find_approximation_number(int index_md,
  * For a given mode and wavenumber, find the values of time at which
  * the approximation changes.
  *
- * @param ppr                Input: pointer to precision structure
- * @param pba                Input: pointer to background structure
- * @param pth                Input: pointer to the thermodynamics structure
- * @param ppt                Input: pointer to the perturbation structure
  * @param index_md           Input: index of mode under consideration (scalar/.../tensor)
  * @param k                  Input: index of wavenumber
  * @param ppw                Input: pointer to perturb_workspace structure containing index values and workspaces
@@ -3299,10 +3259,6 @@ int PerturbationsModule::perturb_find_approximation_switches(
  * this time; then the new vector comes in replacement of the old one,
  * which is freed.
  *
- * @param ppr        Input: pointer to precision structure
- * @param pba        Input: pointer to background structure
- * @param pth        Input: pointer to the thermodynamics structure
- * @param ppt        Input: pointer to the perturbation structure
  * @param index_md Input: index of mode under consideration (scalar/.../tensor)
  * @param index_ic   Input: index of initial condition under consideration (ad, iso...)
  * @param k          Input: wavenumber
@@ -3328,7 +3284,7 @@ int PerturbationsModule::perturb_vector_init(
   int index_pt;
   int l;
   int n_ncdm,index_q,ncdm_l_size;
-  double rho_plus_p_ncdm,q,q2,epsilon,a,factor;
+  double rho_plus_p_ncdm,q,epsilon,a,factor;
 
   /** - allocate a new perturb_vector structure to which ppw-->pv will point at the end of the routine */
 
@@ -4756,9 +4712,6 @@ int PerturbationsModule::perturb_vector_free(perturb_vector* pv) {
  * given gauge). It is assumed here that all values have previously been
  * set to zero, only non-zero values are set here.
  *
- * @param ppr        Input: pointer to precision structure
- * @param pba        Input: pointer to background structure
- * @param ppt        Input: pointer to the perturbation structure
  * @param index_md   Input: index of mode under consideration (scalar/.../tensor)
  * @param index_ic   Input: index of initial condition under consideration (ad, iso...)
  * @param k          Input: wavenumber
@@ -5480,10 +5433,6 @@ int PerturbationsModule::perturb_initial_conditions(int index_md, int index_ic, 
  * the free-streaming approximation) and then the smallest scale is
  * simply \f$ \tau_h \f$.
  *
- * @param ppr        Input: pointer to precision structure
- * @param pba        Input: pointer to background structure
- * @param pth        Input: pointer to thermodynamics structure
- * @param ppt        Input: pointer to the perturbation structure
  * @param index_md   Input: index of mode under consideration (scalar/.../tensor)
  * @param k          Input: wavenumber
  * @param tau        Input: conformal time
@@ -5880,10 +5829,6 @@ int PerturbationsModule::perturb_timescale_member(double tau, void* parameters_a
 /**
  * Compute metric perturbations (those not integrated over time) using Einstein equations
  *
- * @param ppr        Input: pointer to precision structure
- * @param pba        Input: pointer to background structure
- * @param pth        Input: pointer to thermodynamics structure
- * @param ppt        Input: pointer to the perturbation structure
  * @param index_md   Input: index of mode under consideration (scalar/.../tensor)
  * @param k          Input: wavenumber
  * @param tau        Input: conformal time
@@ -9558,16 +9503,11 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters_
  * ultra-relativistic neutrinos in the radiation streaming
  * approximation
  *
- * @param ppr                      Input: pointer to precision structure
- * @param pba                      Input: pointer to background structure
- * @param pth                      Input: pointer to thermodynamics structure
- * @param ppt                      Input: pointer to perturbation structure
  * @param k                        Input: wavenumber
  * @param y                        Input: vector of perturbations
  * @param a_prime_over_a           Input: a'/a
  * @param pvecthermo               Input: vector of thermodynamics quantites
  * @param ppw                      Input/Output: in input, fixed parameters (e.g. indices); in output, delta and theta
- * @param error_message            Output: error message
  */
 
 int PerturbationsModule::perturb_rsa_delta_and_theta(double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {
@@ -9578,9 +9518,8 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(double k, double* y, double
   k2 = k*k;
 
   class_test(ppw->approx[ppw->index_ap_rsa] == (int)rsa_off,
-             "this function should not have been called now, bug was introduced",
              error_message_,
-             error_message_);
+             "this function should not have been called now, bug was introduced");
 
   // formulas below TBC for curvaturema
 
@@ -9683,16 +9622,11 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(double k, double* y, double
  * Compute the density delta and velocity theta of interacting dark
  * radiation in its streaming approximation
  *
- * @param ppr                      Input: pointer to precision structure
- * @param pba                      Input: pointer to background structure
- * @param pth                      Input: pointer to thermodynamics structure
- * @param ppt                      Input: pointer to perturbation structure
  * @param k                        Input: wavenumber
  * @param y                        Input: vector of perturbations
  * @param a_prime_over_a           Input: a'/a
  * @param pvecthermo               Input: vector of thermodynamics quantites
  * @param ppw                      Input/Output: in input, fixed parameters (e.g. indices); in output, delta and theta
- * @param error_message            Output: error message
  */
 
 int PerturbationsModule::perturb_rsa_idr_delta_and_theta(double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {

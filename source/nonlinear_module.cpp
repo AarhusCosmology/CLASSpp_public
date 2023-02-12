@@ -69,8 +69,6 @@ NonlinearModule::~NonlinearModule() {
  *     out_pk_ic[diagonal] = P_ic(k)
  *     out_pk_ic[non-diagonal] = P_icxic(k)
  *
- * @param pba         Input: pointer to background structure
- * @param pnl         Input: pointer to nonlinear structure
  * @param mode        Input: linear or logarithmic
  * @param pk_output   Input: linear or nonlinear
  * @param z           Input: redshift
@@ -373,9 +371,6 @@ int NonlinearModule::nonlinear_pks_at_z(
  *     out_pk_ic[diagonal] = P_ic(k)
  *     out_pk_ic[non-diagonal] = P_icxic(k)
  *
- * @param pba         Input: pointer to background structure
- * @param ppm         Input: pointer to primordial structure
- * @param pnl         Input: pointer to nonlinear structure
  * @param pk_output   Input: linear or nonlinear
  * @param k           Input: wavenumber in 1/Mpc
  * @param z           Input: redshift
@@ -670,9 +665,6 @@ int NonlinearModule::nonlinear_pks_at_k_and_z(
  * input k_i falls outside the pre-computed range [kmin,kmax]: in that
  * case, it just returns P(k,z)=0 for such a k_i
  *
- * @param pba            Input: pointer to background structure
- * @param pnl            Input: pointer to nonlinear structure
- * @param pk_output      Input: pk_linear or pk_nonlinear
  * @param kvec           Input: array of wavenumbers in ascending order (in 1/Mpc)
  * @param kvec_size      Input: size of array of wavenumbers
  * @param zvec           Input: array of redshifts in arbitrary order
@@ -869,14 +861,10 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
  * Return the logarithmic slope of P(k,z) for a given (k,z), a given pk type (_m, _cb)
  * (computed with linear P_L if pk_output = pk_linear, nonlinear P_NL if pk_output = pk_nonlinear)
  *
- * @param pba         Input: pointer to background structure
- * @param ppm         Input: pointer to primordial structure
- * @param pnl         Input: pointer to nonlinear structure
  * @param pk_output   Input: linear or nonlinear
  * @param k           Input: wavenumber in 1/Mpc
  * @param z           Input: redshift
  * @param index_pk    Input: index of pk type (_m, _cb)
- * @param n_eff       Output: logarithmic slope of P(k,z)
  * @return the error status
  */
 
@@ -928,9 +916,6 @@ int NonlinearModule::nonlinear_pk_tilt_at_k_and_z(enum pk_outputs pk_output, dou
  * converged. E.g. to get an accurate sigma8 at R = 8 Mpc/h, the user
  * should pass at least about P_k_max_h/Mpc = 1.
  *
- * @param ppr          Input: pointer to precision structure
- * @param pba          Input: pointer to background structure
- * @param pnl          Input: pointer to nonlinear structure
  * @param R            Input: radius in Mpc
  * @param z            Input: redshift
  * @param index_pk     Input: type of pk (_m, _cb)
@@ -990,8 +975,6 @@ int NonlinearModule::nonlinear_sigmas_at_z(double R, double z, int index_pk, enu
 /**
  * Return the value of the non-linearity wavenumber k_nl for a given redshift z
  *
- * @param pba     Input: pointer to background structure
- * @param pnl     Input: pointer to nonlinear structure
  * @param z       Input: redshift
  * @param k_nl    Output: k_nl value
  * @param k_nl_cb Ouput: k_nl value of the cdm+baryon part only, if there is ncdm
@@ -1067,12 +1050,6 @@ int NonlinearModule::nonlinear_k_nl_at_z(double z, double * k_nl, double * k_nl_
  * Initialize the nonlinear structure, and in particular the
  * nl_corr_density and k_nl interpolation tables.
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pth Input: pointer to therodynamics structure
- * @param ppt Input: pointer to perturbation structure
- * @param ppm Input: pointer to primordial structure
- * @param pnl Input/Output: pointer to initialized nonlinear structure
  * @return the error status
  */
 
@@ -1096,7 +1073,7 @@ int NonlinearModule::nonlinear_init() {
   double a,z;
 
   struct nonlinear_workspace nw;
-  struct nonlinear_workspace * pnw;
+  struct nonlinear_workspace * pnw = &nw;
 
   /** - preliminary tests */
 
@@ -1285,8 +1262,6 @@ int NonlinearModule::nonlinear_init() {
     /** --> Then go through preliminary steps specific to HMcode */
 
     if (pnl->method == nl_HMcode){
-
-      pnw = &nw;
 
       class_call(nonlinear_hmcode_workspace_init(pnw),
                  error_message_,
@@ -1490,7 +1465,6 @@ int NonlinearModule::nonlinear_init() {
  * Free all memory space allocated by nonlinear_init().
  *
  *
- * @param pnl Input: pointer to nonlineard structure (to be freed)
  * @return the error status
  */
 
@@ -1555,11 +1529,6 @@ int NonlinearModule::nonlinear_free() {
  * Define indices in the nonlinear array, and when possible, allocate
  * arrays in this structure given the index sizes found here
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param ppt Input: pointer to perturbation structure
- * @param ppm Input: pointer to primordial structure
- * @param pnl Input/Output: pointer to nonlinear structure
  * @return the error status
 */
 
@@ -1675,9 +1644,6 @@ int NonlinearModule::nonlinear_indices() {
  * necessary to larger k for extrapolation (currently this
  * extrapolation is required only by HMcode)
  *
- * @param ppr Input: pointer to precision structure
- * @param ppt Input: pointer to perturbation structure
- * @param pnl Input/Output: pointer to nonlinear structure
  * @return the error status
 */
 
@@ -1733,8 +1699,6 @@ int NonlinearModule::nonlinear_get_k_list() {
 /**
  * Copy list of tau from perturbation module
  *
- * @param ppt Input: pointer to perturbation structure
- * @param pnl Input/Output: pointer to nonlinear structure
  * @return the error status
 */
 
@@ -1773,9 +1737,6 @@ int NonlinearModule::nonlinear_get_tau_list() {
  * mode...) either directly from precomputed valkues (computed ain
  * perturbation module), or by analytic extrapolation
  *
- * @param pba             Input: pointer to background structure
- * @param ppt             Input: pointer to perturbation structure
- * @param pnl             Input: pointer to nonlinear structure
  * @param index_k         Input: index of required k value
  * @param index_ic        Input: index of required ic value
  * @param index_tp        Input: index of required tp value
@@ -1916,12 +1877,6 @@ int NonlinearModule::nonlinear_get_source(int index_k, int index_ic, int index_t
  * correlated or anti-correlated initial conditions, this non-diagonal
  * element is independent on k, and equal to +1 or -1.
  *
- * @param pba           Input: pointer to background structure
- * @param ppt           Input: pointer to perturbation structure
- * @param ppm           Input: pointer to primordial structure
- * @param pnl           Input: pointer to nonlinear structure
- * @param index_pk      Input: index of required P(k) type (_m, _cb)
- * @param index_tau     Input: index of time
  * @param k_size        Input: wavenumber array size
  * @param lnpk         Output: log of matter power spectrum for given type/time, for all wavenumbers
  * @param lnpk_ic      Output: log of matter power spectrum for given type/time, for all wavenumbers and initial conditions
@@ -2075,9 +2030,6 @@ int NonlinearModule::nonlinear_pk_linear(
  * stepsize, management of extrapolation at large k, ...) and is
  * overall more precise for sigma(R).
  *
- * @param pnl          Input: pointer to nonlinear structure
- * @param R            Input: scale at which to compute sigma
- * @param lnpk_l       Input: array of ln(P(k))
  * @param ddlnpk_l     Input: its spline along k
  * @param k_size       Input: dimension of array lnpk_l, normally k_size_, but inside hmcode it its increased by extrapolation to pnl->k_extra_size
  * @param k_per_decade Input: logarithmic step for the integral (recommended: pass ppr->sigma_k_per_decade)
@@ -2251,9 +2203,6 @@ int NonlinearModule::nonlinear_sigmas(
  * converged. E.g. to get an accurate sigma8 at R = 8 Mpc/h, the user
  * should pass at least about P_k_max_h/Mpc = 1.
  *
- * @param pba          Input: pointer to background structure
- * @param pnl          Input: pointer to nonlinear structure
- * @param R            Input: radius in Mpc
  * @param z            Input: redshift
  * @param index_pk     Input: type of pk (_m, _cb)
  * @param k_per_decade Input: logarithmic step for the integral (recommended: pass ppr->sigma_k_per_decade)
@@ -2330,12 +2279,6 @@ int NonlinearModule::nonlinear_sigma_at_z(
  * calculation is not possible. In this case a _FALSE_ will be
  * returned in the flag halofit_found_k_max.
  *
- * @param ppr         Input: pointer to precision structure
- * @param pba         Input: pointer to background structure
- * @param ppt         Input: pointer to perturbation structure
- * @param ppm         Input: pointer to primordial structure
- * @param pnl         Input: pointer to nonlinear structure
- * @param index_pk    Input: index of component are we looking at (total matter or cdm+baryons?)
  * @param tau         Input: conformal time at which we want to do the calculation
  * @param pk_nl       Output: non linear spectrum at the relevant time
  * @param lnpk_l      Input: array of log(P(k)_linear)
@@ -2782,8 +2725,6 @@ int NonlinearModule::nonlinear_halofit(
  * equivalent to the function wint(). It performs convolutions of the
  * linear spectrum with two window functions.
  *
- * @param pnl             Input: pointer to non linear structure
- * @param integrand_array Input: array with k, P_L(k) values
  * @param integrand_size  Input: one dimension of that array
  * @param ia_size         Input: other dimension of that array
  * @param index_ia_k      Input: index for k
@@ -2856,12 +2797,6 @@ int NonlinearModule::nonlinear_halofit_integrate(
  * Computes the nonlinear correction on the linear power spectrum via
  * the method presented in Mead et al. 1505.07833
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param ppt Input: pointer to perturbation structure
- * @param ppm Input: pointer to primordial structure
- * @param pnl Input: pointer to nonlinear structure
- * @param index_pk   Input: index of the pk type, either index_m or index_cb
  * @param index_tau  Input: index of tau, at which to compute the nl correction
  * @param tau        Input: tau, at which to compute the nl correction
  * @param pk_nl      Output:nonlinear power spectrum
@@ -3356,9 +3291,6 @@ int NonlinearModule::nonlinear_hmcode(
 /**
  * allocate and fill arrays of nonlinear workspace (currently used only by HMcode)
  *
- * @param ppr         Input: pointer to precision structure
- * @param pba         Input: pointer to background structure
- * @param pnl         Input: pointer to nonlinear structure
  * @param pnw         Output: pointer to nonlinear workspace
  * @return the error status
  */
@@ -3405,7 +3337,6 @@ int NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace 
  * deallocate arrays in the nonlinear worksapce (currently used only
  * by HMcode)
  *
- * @param pnl Input: pointer to nonlinear structure
  * @param pnw Input: pointer to nonlinear workspace
  * @return the error status
  */
@@ -3439,9 +3370,6 @@ int NonlinearModule::nonlinear_hmcode_workspace_free(struct nonlinear_workspace 
 /**
  * set the HMcode dark energy correction (if w is not -1)
  *
- * @param ppr         Input: pointer to precision structure
- * @param pba         Input: pointer to background structure
- * @param pnl         Input: pointer to nonlinear structure
  * @param pnw         Output: pointer to nonlinear workspace
  * @return the error status
  */
@@ -3496,7 +3424,6 @@ int NonlinearModule::nonlinear_hmcode_dark_energy_correction(struct nonlinear_wo
 /**
  * set the HMcode baryonic feedback parameters according to the chosen feedback model
  *
- * @param pnl   Output: pointer to nonlinear structure
  * @return the error status
  */
 
@@ -3556,11 +3483,6 @@ int NonlinearModule::nonlinear_hmcode_baryonic_feedback() {
  * nonlinear_init at for all tau to account for scale-dependant growth
  * before nonlinear_hmcode is called
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param ppt Input: pointer to perturbation structure
- * @param ppm Input: pointer to primordial structure
- * @param pnl Input: pointer to nonlinear structure
  * @param index_tau  Input: index of tau, at which to compute the nl correction
  * @param lnpk_l   Input: logarithm of the linear power spectrum for either index_m or index_cb
  * @param ddlnpk_l Input: spline of the logarithm of the linear power spectrum for either index_m or index_cb
@@ -3643,9 +3565,6 @@ int NonlinearModule::nonlinear_hmcode_fill_sigtab(int index_tau, double *lnpk_l,
  * linearly spaced in scalefactor a.
  * Called by nonlinear_init at before the loop over tau
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure (will provide the scale independent growth factor)
- * @param pnl Input/Output: pointer to nonlinear structure
  * @param pnw Output: pointer to nonlinear workspace
  * @return the error status
  */
@@ -3693,9 +3612,6 @@ int NonlinearModule::nonlinear_hmcode_fill_growtab(struct nonlinear_workspace * 
  * integrating the approximate relation d(lnD)/d(lna) =
  * Omega_m(z)^gamma by Linder & Cahn 2007
  *
- * @param ppr Input: pointer to precision structure
- * @param pba Input: pointer to background structure
- * @param pnl Input: pointer to nonlinear structure
  * @param a   Input: scalefactor
  * @param w0  Input: dark energy equation of state today
  * @param wa  Input: dark energy equation of state varying with a: w=w0+(1-a)wa
@@ -3794,7 +3710,6 @@ int NonlinearModule::nonlinear_hmcode_growint(double a, double w0, double wa, do
 /**
  * This is the fourier transform of the NFW density profile.
  *
- * @param pnl Input: pointer to nonlinear structure
  * @param k   Input: wave vector
  * @param rv  Input: virial radius
  * @param c   Input: concentration = rv/rs (with scale radius rs)
@@ -3873,8 +3788,6 @@ int NonlinearModule::nonlinear_hmcode_halomassfunction(
 /**
  * Compute sigma8(z)
  *
- * @param pba        Input: pointer to background structure
- * @param pnl        Input: pointer to nonlinear structure
  * @param z          Input: redshift
  * @param sigma_8    Output: sigma8(z)
  * @param sigma_8_cb Output: sigma8_cb(z)
@@ -3942,8 +3855,6 @@ int NonlinearModule::nonlinear_hmcode_sigma8_at_z(double z, double * sigma_8, do
 /**
  * Compute sigmadisp(z)
  *
- * @param pba           Input: pointer to background structure
- * @param pnl           Input: pointer to nonlinear structure
  * @param z             Input: redshift
  * @param sigma_disp    Output: sigmadisp(z)
  * @param sigma_disp_cb Output: sigmadisp_cb(z)
@@ -4010,8 +3921,6 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp_at_z(double z, double * sigma_di
 /**
  * Compute sigmadisp100(z)
  *
- * @param pba               Input: pointer to background structure
- * @param pnl               Input: pointer to nonlinear structure
  * @param z                 Input: redshift
  * @param sigma_disp_100    Output: sigmadisp100(z)
  * @param sigma_disp_100_cb Output: sigmadisp100_cb(z)
@@ -4077,8 +3986,6 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp100_at_z(double z, double * sigma
 /**
  * Compute sigma'(z)
  *
- * @param pba            Input: pointer to background structure
- * @param pnl            Input: pointer to nonlinear structure
  * @param z              Input: redshift
  * @param sigma_prime    Output: sigma'(z)
  * @param sigma_prime_cb Output: sigma'_cb(z)
@@ -4152,12 +4059,6 @@ int NonlinearModule::nonlinear_hmcode_sigmaprime_at_z(double z, double * sigma_p
  * Returns table of values [z_i, tau_i, w0_eff_i, Omega_m_eff_i]
  * stored in nonlinear structure.
  *
- * @param ppr           Input: pointer to precision structure
- * @param pba           Input: pointer to background structure
- * @param pth           Input: pointer to thermodynamics structure
- * @param pnl    Input/Output: pointer to nonlinear structure
- * @param input_verbose Input: verbosity of this input module
- * @param errmsg  Input/Ouput: error message
  */
 
 int NonlinearModule::prepare_pk_eq() {
