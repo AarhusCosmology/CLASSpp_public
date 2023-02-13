@@ -2,7 +2,7 @@ name: Nosetests and Valgrind
 
 on:
   schedule:
-    - cron: '0 16 * * *'  # Daily at UTC 16:00
+    - cron: '0 17 * * *'  # Daily at UTC 17:00
 
 jobs:
   iftest:
@@ -15,10 +15,8 @@ jobs:
       env:
         SHA_LAST_SUCCESS: ${{ secrets.SHA_LAST_SUCCESS }}
       run: |
-        if [ "$SHA_LAST_SUCCESS" == "${{ github.sha }}" ]; then
-          echo "::set-output name=SHOULD_RUN::0"
-        else
-          echo "::set-output name=SHOULD_RUN::1"
+        if [ "$SHA_LAST_SUCCESS" != "${{ github.sha }}" ]; then
+          echo "SHOULD_RUN=1" >> "$GITHUB_OUTPUT"
         fi
 
   conclude:
@@ -32,8 +30,8 @@ jobs:
         value: ${{ github.sha }}
         repository: AarhusCosmology/CLASSpp
         token: ${{ secrets.REPO_ACCESS_TOKEN }}
-    - name: Checkout master 🛎
-      uses: actions/checkout@v2
+    - name: Checkout master 🛎️
+      uses: actions/checkout@v3
       with:
         path: main_class
         ref: master
@@ -49,24 +47,25 @@ jobs:
   nose_tests_lvl3:
     runs-on: [self-hosted, linux, heavy]
     needs: iftest
-    if: needs.iftest.outputs.should_run > 0
+    if: needs.iftest.outputs.should_run
     steps:
-    - name: Checkout 🛎
-      uses: actions/checkout@v2
+    - name: Checkout 🛎️
+      uses: actions/checkout@v3
       with:
         path: main_class
     - name: Create virtual Python environment
       run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: cd main_class && make -j
+      run: source venv/bin/activate && cd main_class && make -j && deactivate
     - name: Testing 🤖
       run: |
         source venv/bin/activate
         cd main_class/python
-        COMPARE_OUTPUT_GAUGE=1 TEST_LEVEL=3 nosetests -v -a test_scenario test_class.py
+        COMPARE_OUTPUT_GAUGE=1 TEST_LEVEL=3 python "$(which nosetests)" -v -a test_scenario test_class.py
+        deactivate
     - name: Upload plots 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ComparePlots
         path: main_class/python/faulty_figs
@@ -77,22 +76,23 @@ jobs:
   valgrind-wide-and-shallow:
     runs-on: [self-hosted, linux, heavy]
     needs: iftest
-    if: needs.iftest.outputs.should_run > 0
+    if: needs.iftest.outputs.should_run
     timeout-minutes: 1440
     steps:
-    - name: Checkout 🛎
-      uses: actions/checkout@v2
+    - name: Checkout 🛎️
+      uses: actions/checkout@v3
       with:
         path: main_class
     - name: Create virtual Python environment
       run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: cd main_class && make -j
+      run: source venv/bin/activate && cd main_class && make -j && deactivate
     - name: Generate input files
       run: |
         source venv/bin/activate
         cd main_class/python
-        TEST_LEVEL=3 CLASS_VERBOSE=1 nosetests -a dump_ini_files test_class.py
+        TEST_LEVEL=3 CLASS_VERBOSE=1 python "$(which nosetests)" -a dump_ini_files test_class.py
+        deactivate
     - name: Remove virtual Python environment
       if: success() || failure()
       run: rm -rf venv
@@ -109,7 +109,7 @@ jobs:
           || (echo {} "...fail" && cp {}* valgrind_output && exit 3)'
     - name: Upload errors 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ValgrindOutputWideShallow
         path: main_class/python/faulty_figs/valgrind_output
@@ -117,22 +117,23 @@ jobs:
   valgrind-narrow-and-deep:
     runs-on: [self-hosted, linux, heavy]
     needs: iftest
-    if: needs.iftest.outputs.should_run > 0
+    if: needs.iftest.outputs.should_run
     timeout-minutes: 1440
     steps:
-    - name: Checkout 🛎
-      uses: actions/checkout@v2
+    - name: Checkout 🛎️
+      uses: actions/checkout@v3
       with:
         path: main_class
     - name: Create virtual Python environment
       run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: cd main_class && make -j
+      run: source venv/bin/activate && cd main_class && make -j && deactivate
     - name: Generate input files
       run: |
         source venv/bin/activate
         cd main_class/python
         TEST_LEVEL=1 CLASS_VERBOSE=1 nosetests -a dump_ini_files test_class.py
+        deactivate
     - name: Remove virtual Python environment
       if: success() || failure()
       run: rm -rf venv
@@ -147,7 +148,7 @@ jobs:
           || (echo {} "...fail" && cp {}* valgrind_output && exit 3)'
     - name: Upload errors 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ValgrindOutputNarrowDeep
         path: main_class/python/faulty_figs/valgrind_output

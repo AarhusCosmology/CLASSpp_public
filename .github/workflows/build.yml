@@ -7,8 +7,8 @@ jobs:
     runs-on: [self-hosted, linux, light]
 
     steps:
-    - name: Checkout 🛎
-      uses: actions/checkout@v2
+    - name: Checkout 🛎️
+      uses: actions/checkout@v3
       with:
         path: main_class
     - name: make
@@ -20,8 +20,8 @@ jobs:
     runs-on: [self-hosted, linux, light]
 
     steps:
-      - name: Checkout 🛎
-        uses: actions/checkout@v2
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
         with:
           path: main_class
       - name: Run test 🤖
@@ -42,19 +42,20 @@ jobs:
     runs-on: [self-hosted, linux, heavy]
 
     steps:
-    - name: Checkout 🛎
-      uses: actions/checkout@v2
+    - name: Checkout 🛎️
+      uses: actions/checkout@v3
       with:
         path: main_class
     - name: Create virtual Python environment
-      run: rm -rf venv && virtualenv venv --system-site-packages
+      run: rm -rf venv && virtualenv venv --system-site-packages && deactivate
     - name: make
-      run: cd main_class && make -j
+      run: source venv/bin/activate && cd main_class && make -j && deactivate
     - name: Testing 🤖
       run: |
         source venv/bin/activate
         cd main_class/python
-        TEST_LEVEL=1 COMPARE_OUTPUT_REF=1 nosetests -v -a test_scenario test_class.py
+        TEST_LEVEL=1 COMPARE_OUTPUT_REF=0 python "$(which nosetests)" -v -a test_scenario test_class.py
+        deactivate
     - name: Remove virtual Python environment
       if: success() || failure()
       run: rm -rf venv

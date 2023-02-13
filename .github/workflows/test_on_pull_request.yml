@@ -7,19 +7,19 @@ jobs:
     runs-on: [self-hosted, linux, heavy]
 
     steps:
-    - name: Checkout 🛎
-      uses: actions/checkout@v2
+    - name: Checkout 🛎️
+      uses: actions/checkout@v3
       with:
         path: main_class
-    - name: Checkout reference 🛎
-      uses: actions/checkout@v2
+    - name: Checkout reference 🛎️
+      uses: actions/checkout@v3
       with:
         ref: master
         path: ref_class
     - name: Create virtual Python environment
       run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: source venv/bin/activate && cd main_class && make -j
+      run: source venv/bin/activate && cd main_class && make -j && deactivate
     - name: make reference
       run: |
         source venv/bin/activate
@@ -27,17 +27,19 @@ jobs:
         sed -i.bak "s/'classy'/'classyref'/g" python/setup.py
         sed -i.bak 's/"classy"/"classyref"/g' python/setup.py
         make -j
+        deactivate
     - name: Testing 🤖
       run: |
         source venv/bin/activate
         cd main_class/python
-        COMPARE_OUTPUT_REF=1 TEST_LEVEL=2 nosetests -v -a test_scenario test_class.py
+        COMPARE_OUTPUT_REF=1 TEST_LEVEL=2 python "$(which nosetests)" -v -a test_scenario test_class.py
+        deactivate
     - name: Remove virtual Python environment
       if: success() || failure()
       run: rm -rf venv
     - name: Upload plots 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
           name: NewtonianVsSynchronousPlots
           path: python/faulty_figs
