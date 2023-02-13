@@ -132,7 +132,7 @@ jobs:
       run: |
         source venv/bin/activate
         cd main_class/python
-        TEST_LEVEL=1 CLASS_VERBOSE=1 nosetests -a dump_ini_files test_class.py
+        TEST_LEVEL=1 CLASS_VERBOSE=1 python "$(which nosetests)" -a dump_ini_files test_class.py
         deactivate
     - name: Remove virtual Python environment
       if: success() || failure()
