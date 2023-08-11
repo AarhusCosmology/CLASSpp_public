@@ -48,7 +48,7 @@ definition_names = [
     '_SUCCESS_',
     '_FAILURE_',
 ]
-definitions = []
+definitions_dict = {}
 for file in h_files:
     with open(file) as fid:
         for line in fid:
@@ -57,13 +57,10 @@ for file in h_files:
             words = line.split()
             if len(words) < 3:
                 continue
-            if words[0].strip() != "#define":
+            if words[0] != "#define":
                 continue
-            for d in definition_names:
-                if d == words[1].strip():
-                    definitions.append("DEF " + d + " = " + words[2])
-                    continue
-
+            if words[1] in definition_names:
+                definitions_dict[words[1]] = words[2]
 
 # In[4]:
 
@@ -181,10 +178,13 @@ classes = []
 
 class_names = ['FileContent', 'NonColdDarkMatter', 'InputModule', 'BackgroundModule',
                 'ThermodynamicsModule', 'PerturbationsModule',
-                'PrimordialModule', 'NonlinearModule', 'TransferModule', 'SpectraModule', 'LensingModule']
+                'PrimordialModule', 'NonlinearModule', 'TransferModule', 'SpectraModule', 'LensingModule',
+                'ClassConstants', 'NcdmSettings',]
 allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', 'FileArg',
                  'std::map<std::string, std::vector<double>>',
                  'std::map<std::string, int>', 'std::shared_ptr<NonColdDarkMatter>'] + struct_names
+
+keywords_to_be_ignored = ['static', 'constexpr', 'const']
 
 for file in h_files:
     with open(file) as fid:
@@ -209,6 +209,14 @@ for file in h_files:
                 classes.append('')
             else:
                 line = line.strip()
+                # Cython does not like keywords
+                removed_keyword = True
+                while removed_keyword:
+                    removed_keyword = False
+                    for keyword in keywords_to_be_ignored:
+                        if line.startswith(keyword):
+                            line = line[len(keyword):].strip()
+                            removed_keyword = True
                 typename = ''
                 for sometype in allowed_types:
                     if line.startswith(sometype):
@@ -274,6 +282,10 @@ for m in modules:
 
 with open(rootdir + '/python/cclassy.pxd', 'w') as fid:
     fid.write(preample)
-    for lines in [definitions, enums, structs, classes]:
+    for lines in [enums, structs, classes]:
+        # Replace defined variables:
+        for index_line in range(len(lines)):
+            for key, val in definitions_dict.items():
+                lines[index_line] = lines[index_line].replace(key, val)
         fid.write("\n".join(lines))
         fid.write("\n\n")
