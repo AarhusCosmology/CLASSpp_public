@@ -6,7 +6,9 @@
 
 import os
 import subprocess
-rootdir = os.path.dirname(os.path.abspath(__file__)) + '/..'
+import pathlib
+
+rootdir = pathlib.Path(__file__).parent
 
 h_files = []
 for subdir, dirs, files in os.walk(rootdir):
@@ -279,8 +281,7 @@ for m in modules:
 
 # In[8]:
 
-
-with open(rootdir + '/python/cclassy.pxd', 'w') as fid:
+with open(rootdir / 'cclassy.pxd', 'w') as fid:
     fid.write(preample)
     for lines in [enums, structs, classes]:
         # Replace defined variables:

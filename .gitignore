@@ -23,3 +23,5 @@ python/classy.cpp
 python/cclassy.pxd
 python/faulty_figs
 .ipynb_checkpoints
+CLASS.xcodeproj/project.xcworkspace/xcuserdata
+CLASS.xcodeproj/project.xcworkspace/contents.xcworkspacedata

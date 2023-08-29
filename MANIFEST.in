@@ -1,0 +1,9 @@
+include bbn/*.dat
+include hyrec/*.dat
+include main/class.h
+include include/*.h
+include source/*.h
+include tools/*.h
+include hyrec/*.h
+include generate_wrapper.py
+include classy.pyx

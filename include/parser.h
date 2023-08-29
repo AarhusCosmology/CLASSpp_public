@@ -3,11 +3,6 @@
 
 #include "common.h"
 
-#define _LINE_LENGTH_MAX_ 1024 /**< size of the string read in each line of the file (extra characters not taken into account) */
-#define _ARGUMENT_LENGTH_MAX_ 1024 /**< maximum size of each argument (name or value), including the final null character */
-
-typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
-
 /* after reading a given file, all relevant information stored in this structure, in view of being processed later*/
 struct FileContent {
   FileContent() {}

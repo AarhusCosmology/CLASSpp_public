@@ -518,6 +518,16 @@ int InputModule::input_read_precisions() {
   FileContent* pfc = &file_content_;
   precision* ppr = &precision_;
   char* errmsg = error_message_;
+  int int1;
+  int flag1;
+  double param1;
+  char string1[_ARGUMENT_LENGTH_MAX_];
+
+  class_call(parser_read_string(pfc, "class_dir", &(ppr->class_dir), &flag1, error_message_),
+             error_message_, error_message_);
+  if (flag1 == _FALSE_) {
+    strncpy(ppr->class_dir, __CLASSDIR__, _ARGUMENT_LENGTH_MAX_);
+  }
   /** - set all precision parameters to default values */
 
   /**
@@ -526,11 +536,6 @@ int InputModule::input_read_precisions() {
   class_call(input_default_precision(),
              errmsg,
              errmsg);
-
-  int int1;
-  int flag1;
-  double param1;
-  char string1[_ARGUMENT_LENGTH_MAX_];
 
   /**
    * Parse all precision parameters

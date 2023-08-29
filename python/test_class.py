@@ -362,8 +362,7 @@ class TestClass(unittest.TestCase):
 
         if COMPARE_OUTPUT_REF or COMPARE_OUTPUT_GAUGE:
             # Now compute same scenario in Newtonian gauge
-            self.cosmo_newt.set(
-                dict(list(self.verbose.items())+list(self.scenario.items())))
+            self.cosmo_newt.set(dict(self.verbose, **self.scenario))
             self.cosmo_newt.set({'gauge': 'newtonian'})
             self.cosmo_newt.compute()
 
@@ -378,13 +377,14 @@ class TestClass(unittest.TestCase):
         if COMPARE_OUTPUT_REF:
             # Compute reference models in both gauges and compare
             cosmo_ref = classyref.Class()
-            cosmo_ref.set(self.cosmo.pars)
+            cosmo_ref.set(dict(self.verbose, **self.scenario))
             cosmo_ref.compute()
             status = self.compare_output(cosmo_ref, "Reference", self.cosmo, 'Synchronous', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
             assert status, 'Reference comparison failed in Synchronous gauge!'
 
             cosmo_ref = classyref.Class()
-            cosmo_ref.set(self.cosmo_newt.pars)
+            cosmo_ref.set(dict(self.verbose, **self.scenario))
+            cosmo_ref.set({'gauge': 'newtonian'})
             cosmo_ref.compute()
             self.compare_output(cosmo_ref, "Reference", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
             assert status, 'Reference comparison failed in Newtonian gauge!'
@@ -529,7 +529,7 @@ class TestClass(unittest.TestCase):
         return status_pass
 
     def store_ini_file(self, path):
-        parameters = dict(list(self.verbose.items()) + list(self.scenario.items()))
+        parameters = dict(self.verbose, **self.scenario)
         with open(path + '.ini', 'w') as param_file:
             param_file.write('# ' + str(parameters) + '\n')
             if len(parameters) == 0:

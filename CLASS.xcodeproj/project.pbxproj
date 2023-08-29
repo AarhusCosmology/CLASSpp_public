@@ -81,7 +81,7 @@
 		AFB5F165241D17B6001B9B9C /* primordial.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = primordial.h; sourceTree = "<group>"; };
 		AFB5F166241D17B6001B9B9C /* spectra.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = spectra.h; sourceTree = "<group>"; };
 		AFB5F167241D17B6001B9B9C /* thermodynamics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = thermodynamics.h; sourceTree = "<group>"; };
-		AFDC6886240D9EA00044B5A3 /* ppCLASS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ppCLASS; sourceTree = BUILT_PRODUCTS_DIR; };
+		AFDC6886240D9EA00044B5A3 /* class */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = class; sourceTree = BUILT_PRODUCTS_DIR; };
 		AFDC6892240D9F500044B5A3 /* lensing_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = lensing_module.cpp; sourceTree = "<group>"; };
 		AFDC6893240D9F500044B5A3 /* perturbations_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = perturbations_module.cpp; sourceTree = "<group>"; };
 		AFDC6894240D9F500044B5A3 /* transfer_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = transfer_module.cpp; sourceTree = "<group>"; };
@@ -179,7 +179,7 @@
 		AFDC6887240D9EA00044B5A3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				AFDC6886240D9EA00044B5A3 /* ppCLASS */,
+				AFDC6886240D9EA00044B5A3 /* class */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -294,9 +294,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AFDC6885240D9EA00044B5A3 /* ppCLASS */ = {
+		AFDC6885240D9EA00044B5A3 /* class */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AFDC688D240D9EA00044B5A3 /* Build configuration list for PBXNativeTarget "ppCLASS" */;
+			buildConfigurationList = AFDC688D240D9EA00044B5A3 /* Build configuration list for PBXNativeTarget "class" */;
 			buildPhases = (
 				AFDC6882240D9EA00044B5A3 /* Sources */,
 				AFDC6883240D9EA00044B5A3 /* Frameworks */,
@@ -306,9 +306,9 @@
 			);
 			dependencies = (
 			);
-			name = ppCLASS;
+			name = class;
 			productName = ppCLASS;
-			productReference = AFDC6886240D9EA00044B5A3 /* ppCLASS */;
+			productReference = AFDC6886240D9EA00044B5A3 /* class */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -325,7 +325,7 @@
 					};
 				};
 			};
-			buildConfigurationList = AFDC6881240D9EA00044B5A3 /* Build configuration list for PBXProject "ppCLASS" */;
+			buildConfigurationList = AFDC6881240D9EA00044B5A3 /* Build configuration list for PBXProject "CLASS" */;
 			compatibilityVersion = "Xcode 9.3";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -338,7 +338,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AFDC6885240D9EA00044B5A3 /* ppCLASS */,
+				AFDC6885240D9EA00044B5A3 /* class */,
 			);
 		};
 /* End PBXProject section */
@@ -531,7 +531,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AFDC6881240D9EA00044B5A3 /* Build configuration list for PBXProject "ppCLASS" */ = {
+		AFDC6881240D9EA00044B5A3 /* Build configuration list for PBXProject "CLASS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AFDC688B240D9EA00044B5A3 /* Debug */,
@@ -540,7 +540,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AFDC688D240D9EA00044B5A3 /* Build configuration list for PBXNativeTarget "ppCLASS" */ = {
+		AFDC688D240D9EA00044B5A3 /* Build configuration list for PBXNativeTarget "class" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AFDC688E240D9EA00044B5A3 /* Debug */,

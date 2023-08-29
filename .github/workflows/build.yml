@@ -29,12 +29,9 @@ jobs:
           docker run --rm \
           -v "${GITHUB_WORKSPACE}"/main_class:/github \
           python:latest bash -c ': \
-            && pip install cython six numpy \
-            && cp -rf /github /class_tmp \
-            && cd /class_tmp \
-            && make -j class \
-            && ./class explanatory \
-            && make -j \
+            && pip install numpy \
+            && cd github \
+            && pip install . \
             && python -c "import classy" \
           '
 
@@ -47,9 +44,9 @@ jobs:
       with:
         path: main_class
     - name: Create virtual Python environment
-      run: rm -rf venv && virtualenv venv --system-site-packages && deactivate
+      run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: source venv/bin/activate && cd main_class && make -j && deactivate
+      run: source venv/bin/activate && cd main_class && pip install . && deactivate
     - name: Testing 🤖
       run: |
         source venv/bin/activate

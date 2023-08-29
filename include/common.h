@@ -99,6 +99,11 @@ typedef char FileName[_FILENAMESIZE_];
 #define __CLASSDIR__ "." /**< The directory of CLASS. This is set to the absolute path to the CLASS directory so this is just a failsafe. */
 #endif
 
+#define _LINE_LENGTH_MAX_ 1024 /**< size of the string read in each line of the file (extra characters not taken into account) */
+#define _ARGUMENT_LENGTH_MAX_ 1024 /**< maximum size of each argument (name or value), including the final null character */
+
+typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
+
 /**
  * @name Some conversion factors and fundamental constants needed by background module:
  */
@@ -399,6 +404,7 @@ struct precision
    * Define (allocate) all precision parameters
    *
    */
+  FileArg class_dir;
 
   #define __ALLOCATE_PRECISION_PARAMETER__
   #include "precisions.h"

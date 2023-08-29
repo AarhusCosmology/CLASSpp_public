@@ -56,7 +56,7 @@ jobs:
     - name: Create virtual Python environment
       run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: source venv/bin/activate && cd main_class && make -j && deactivate
+      run: source venv/bin/activate && cd main_class && pip install . && deactivate
     - name: Testing 🤖
       run: |
         source venv/bin/activate
@@ -86,7 +86,7 @@ jobs:
     - name: Create virtual Python environment
       run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: source venv/bin/activate && cd main_class && make -j && deactivate
+      run: source venv/bin/activate && cd main_class && make class -j && pip install . && deactivate
     - name: Generate input files
       run: |
         source venv/bin/activate
@@ -127,7 +127,7 @@ jobs:
     - name: Create virtual Python environment
       run: rm -rf venv && virtualenv venv --system-site-packages
     - name: make
-      run: source venv/bin/activate && cd main_class && make -j && deactivate
+      run: source venv/bin/activate && cd main_class && make class -j && pip install . && deactivate
     - name: Generate input files
       run: |
         source venv/bin/activate

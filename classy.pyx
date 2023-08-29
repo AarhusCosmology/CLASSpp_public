@@ -32,6 +32,7 @@ from cython.operator cimport dereference as deref
 
 import numpy as np
 cimport numpy as np
+import os
 import sys
 from cclassy cimport *
 
@@ -164,6 +165,8 @@ cdef class PyCosmology:
     def __init__(self, input_parameters=None):
         if input_parameters is None:
             input_parameters = {}
+        if 'class_dir' not in input_parameters:
+            input_parameters['class_dir'] = os.path.join(os.path.dirname(__file__), 'classy')
         self._pars = input_parameters
         self.reset()
 
