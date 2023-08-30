@@ -24,9 +24,9 @@ jobs:
       run: |
         source venv/bin/activate
         cd ref_class
-        sed -i.bak "s/'classy'/'classyref'/g" python/setup.py
-        sed -i.bak 's/"classy"/"classyref"/g' python/setup.py
-        make -j
+        sed -i.bak "s/Extension('classy'/Extension('classyref'/g" setup.py
+        sed -i.bak 's/"classy-community"/"classy-community-ref"/g' pyproject.toml
+        pip install .
         deactivate
     - name: Testing 🤖
       run: |
