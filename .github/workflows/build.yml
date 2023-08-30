@@ -17,7 +17,9 @@ jobs:
       run: cd main_class && ./class explanatory.ini
 
   test_classy:
-    runs-on: [self-hosted, linux, light]
+    runs-on:
+      group: private
+      labels: [self-hosted, light]
 
     steps:
       - name: Checkout 🛎️
