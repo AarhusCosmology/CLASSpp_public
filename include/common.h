@@ -7,13 +7,15 @@
 #include "float.h"
 #include "svnversion.h"
 #include <stdarg.h>
-#ifdef __cplusplus
-#include "exceptions.h"
+
+#ifdef _WIN32
+#define __restrict__ _restrict
 #endif
 
 #ifdef __cplusplus
-#define typeof(a) __typeof__(a)
-
+#include "exceptions.h"
+#include <type_traits>
+#define typeof(x) std::remove_reference<decltype((x))>::type
 #include <memory>
 #include <string>
 #include <sstream>
@@ -185,9 +187,10 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 #define class_alloc_message(err_out,extra,sz)                                                                    \
   class_build_error_string(err_out,"could not allocate %s with size %d",extra,sz);
 
+#if (defined(_WIN32) && !defined(__cplusplus))
 /* macro for allocating memory and returning error if it failed */
 #define class_alloc(pointer, size, error_message_output)  {                                                      \
-  pointer= (typeof(pointer)) malloc(size);                                                                       \
+  pointer= malloc(size);                                                                       \
   if (pointer == NULL) {                                                                                         \
     int size_int;                                                                                                \
     size_int = size;                                                                                             \
@@ -196,17 +199,36 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
   }                                                                                                              \
 }
 
-/* same inside parallel structure */
-#define class_alloc_parallel(pointer, size, error_message_output)  {                                             \
-  pointer=NULL;                                                                                                  \
-  if (abort == _FALSE_) {                                                                                        \
-    pointer=(typeof(pointer)) malloc(size);                                                                      \
-    if (pointer == NULL) {                                                                                       \
-      int size_int;                                                                                              \
-      size_int = size;                                                                                           \
-      class_alloc_message(error_message_output,#pointer, size_int);                                              \
-      abort=_TRUE_;                                                                                              \
-    }                                                                                                            \
+/* macro for allocating memory, initializing it with zeros/ and returning error if it failed */
+#define class_calloc(pointer, init,size, error_message_output)  {                                                \
+  pointer = calloc(init,size);                                                                  \
+  if (pointer == NULL) {                                                                                         \
+    int size_int;                                                                                                \
+    size_int = size;                                                                                             \
+    class_alloc_message(error_message_output,#pointer, size_int);                                                \
+    return _FAILURE_;                                                                                            \
+  }                                                                                                              \
+}
+
+/* macro for re-allocating memory, returning error if it failed */
+#define class_realloc(pointer, newname, size, error_message_output)  {                                           \
+    pointer = realloc(newname, size);                                                           \
+  if (pointer == NULL) {                                                                                         \
+    int size_int;                                                                                                \
+    size_int = size;                                                                                             \
+    class_alloc_message(error_message_output,#pointer, size_int);                                                \
+    return _FAILURE_;                                                                                            \
+  }                                                                                                              \
+}
+#else
+/* macro for allocating memory and returning error if it failed */
+#define class_alloc(pointer, size, error_message_output)  {                                                      \
+  pointer= (typeof(pointer)) malloc(size);                                                                       \
+  if (pointer == NULL) {                                                                                         \
+    int size_int;                                                                                                \
+    size_int = size;                                                                                             \
+    class_alloc_message((char*)error_message_output,#pointer, size_int);                                         \
+    return _FAILURE_;                                                                                            \
   }                                                                                                              \
 }
 
@@ -231,10 +253,10 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
     return _FAILURE_;                                                                                            \
   }                                                                                                              \
 }
-
+#endif
 // Testing
 
-#define class_test_message(err_out,extra,args...) {                                                              \
+#define class_test_message(err_out,extra,args, ...) {                                                              \
   ErrorMsg Optional_arguments;                                                                                   \
   class_protect_sprintf(Optional_arguments,args);                                                                \
   class_build_error_string(err_out,"condition (%s) is true; %s",extra,Optional_arguments);                       \
@@ -243,7 +265,7 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 /* macro for testing condition and returning error if condition is true;
    args is a variable list of optional arguments, e.g.: args="x=%d",x
    args cannot be empty, if there is nothing to pass use args="" */
-#define class_test_except(condition, error_message_output,list_of_commands, args...) {                           \
+#define class_test_except(condition, error_message_output,list_of_commands, args, ...) {                           \
   if (condition) {                                                                                               \
     class_test_message(error_message_output,#condition, args);                                                   \
     list_of_commands;                                                                                            \
@@ -251,14 +273,14 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
   }                                                                                                              \
 }
 
-#define class_test(condition, error_message_output, args...) {                                                   \
+#define class_test(condition, error_message_output, args, ...) {                                                   \
   if (condition) {                                                                                               \
     class_test_message(error_message_output,#condition, args);                                                   \
     return _FAILURE_;                                                                                            \
   }                                                                                                              \
 }
 
-#define class_test_parallel(condition, error_message_output, args...) {                                          \
+#define class_test_parallel(condition, error_message_output, args, ...) {                                          \
   if (abort == _FALSE_) {                                                                                        \
     if (condition) {                                                                                             \
       class_test_message(error_message_output,#condition, args);                                                 \
@@ -270,7 +292,7 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 /* macro for returning error message;
    args is a variable list of optional arguments, e.g.: args="x=%d",x
    args cannot be empty, if there is nothing to pass use args="" */
-#define class_stop(error_message_output,args...) {                                                               \
+#define class_stop(error_message_output,args, ...) {                                                               \
   ErrorMsg Optional_arguments;                                                                                   \
   class_protect_sprintf(Optional_arguments,args);                                                                \
   class_build_error_string(error_message_output,"error; %s",Optional_arguments);                                 \

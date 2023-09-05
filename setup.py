@@ -40,7 +40,7 @@ source_files = (
         'dei_rkck.c',
         'evolver_ndf15.cpp',
         'evolver_rkck.c',
-        'exceptions.cpp', 
+        'exceptions.cpp',
         'growTable.c',
         'hyperspherical.c',
         'non_cold_dark_matter.cpp',
@@ -62,12 +62,11 @@ for sub_folder in ['include', 'main', 'source', 'tools']:
 # Define cython extension and fix Python version
 classy_ext = Extension('classy', ['classy.pyx'] + cpp_source_files,
                            include_dirs=include_dirs,
-                           libraries=['m'],
+                           libraries=['m'] if not os.name == 'nt' else [],
                            library_dirs=[root_folder],
                            language="c++",
-                           extra_compile_args=['-std=c++17'],
+                           extra_compile_args=(['-std=c++17'] if os.name != 'nt' else ['/std:c++17']),
                            define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],)
-
 myclib = ('myclib', {'sources': c_source_files,
                      'include_dirs':include_dirs})
 

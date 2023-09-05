@@ -1118,7 +1118,7 @@ int InputModule::input_read_parameters() {
       if (flag1 == _TRUE_) {
         // Omega_dncdmdr read
         for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
-          if (not pba->has_curvature) {
+          if (pba->has_curvature == _FALSE_) {
             class_test((Omega_dncdmdr_list[n] > 1.0), errmsg, "Your input requires Omega_dncdmdr > 1 which is not allowed in a flat Universe. Either lower your input deg_ncdm_decay_dr, Omega_ini_ncdm_decay_dr, m_ncdm_decay_dr, increase Gamma_ncdm_decay_dr, or add positive curvature to allow this energy density.");
           }
           ncdm_->Omega_dncdmdr_[n] = Omega_dncdmdr_list[n];
@@ -3844,7 +3844,7 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
           double k_rad = sqrt(2*ba.H0*sqrt(ba.Omega0_g + ba.Omega0_ur));
           double t_nr = pow(a_nr/k_rad, 2.0);
           double x = dncdm_properties.Gamma*t_nr;
-          double experfcsqrtx = (x < 20.) ? exp(x)*erfc(sqrt(x)) : 1./sqrt(x*M_PI);
+          double experfcsqrtx = (x < 20.) ? exp(x)*erfc(sqrt(x)) : 1./sqrt(x*_PI_);
           Omega_ini = sqrt(2.)*a_nr*sqrt(dncdm_properties.Gamma)*Omega0_dncdmdr_target/k_rad/(2*sqrt(x) + sqrt(_PI_)*experfcsqrtx);
         }
         xguess[index_guess_local] = Omega_ini/Omega_deg1;
@@ -3877,7 +3877,7 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
           double k_rad = sqrt(2*ba.H0*sqrt(ba.Omega0_g + ba.Omega0_ur));
           double t_nr = pow(a_nr/k_rad, 2.0);
           double x = dncdm_properties.Gamma*t_nr;
-          double experfcsqrtx = (x < 20.) ? exp(x)*erfc(sqrt(x)) : 1./sqrt(x*M_PI);
+          double experfcsqrtx = (x < 20.) ? exp(x)*erfc(sqrt(x)) : 1./sqrt(x*_PI_);
           Omega_or_omega_dncdmdr = (k_rad*Omega_or_omega_ini_dncdm_target*(2*sqrt(x) + sqrt(_PI_)*experfcsqrtx))/(sqrt(2.)*a_nr*sqrt(dncdm_properties.Gamma));
         }
         xguess[index_guess_local] = Omega_or_omega_dncdmdr;

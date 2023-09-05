@@ -54,7 +54,12 @@ jobs:
       with:
         path: main_class
     - name: Create virtual Python environment
-      run: rm -rf venv && virtualenv venv --system-site-packages
+      run: |
+        rm -rf venv
+        DEB_PYTHON_INSTALL_LAYOUT='deb' virtualenv venv --system-site-packages
+        source venv/bin/activate
+        pip install --upgrade setuptools
+        deactivate
     - name: make
       run: source venv/bin/activate && cd main_class && pip install . && deactivate
     - name: Testing 🤖
@@ -84,7 +89,12 @@ jobs:
       with:
         path: main_class
     - name: Create virtual Python environment
-      run: rm -rf venv && virtualenv venv --system-site-packages
+      run: |
+        rm -rf venv
+        DEB_PYTHON_INSTALL_LAYOUT='deb' virtualenv venv --system-site-packages
+        source venv/bin/activate
+        pip install --upgrade setuptools
+        deactivate
     - name: make
       run: source venv/bin/activate && cd main_class && make class -j && pip install . && deactivate
     - name: Generate input files
@@ -125,7 +135,12 @@ jobs:
       with:
         path: main_class
     - name: Create virtual Python environment
-      run: rm -rf venv && virtualenv venv --system-site-packages
+      run: |
+        rm -rf venv
+        DEB_PYTHON_INSTALL_LAYOUT='deb' virtualenv venv --system-site-packages
+        source venv/bin/activate
+        pip install --upgrade setuptools
+        deactivate
     - name: make
       run: source venv/bin/activate && cd main_class && make class -j && pip install . && deactivate
     - name: Generate input files

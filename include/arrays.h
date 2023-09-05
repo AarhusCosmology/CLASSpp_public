@@ -7,6 +7,10 @@
 
 #include "common.h"
 
+#ifdef _WIN32
+#define __restrict__ _restrict
+#endif
+
 #define _SPLINE_NATURAL_ 0 /**< natural spline: ddy0=ddyn=0 */
 #define _SPLINE_EST_DERIV_ 1 /**< spline with estimation of first derivative on both edges */
 

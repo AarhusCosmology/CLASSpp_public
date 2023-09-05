@@ -2795,9 +2795,6 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
  */
 
 int PerturbationsModule::perturb_prepare_k_output() {
-  int n_ncdm;
-  size_t tmp_size = 40;
-  char tmp[tmp_size];
 
   scalar_titles_[0]='\0';
   vector_titles_[0]='\0';
@@ -2841,15 +2838,16 @@ int PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(scalar_titles_, "theta_cdm", pba->has_cdm);
       /* Non-cold dark matter */
       if ((pba->has_ncdm == _TRUE_) && ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_) || (has_source_delta_m_ == _TRUE_))) {
-        for(n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++){
-          snprintf(tmp, tmp_size, "delta_ncdm[%d]", n_ncdm);
-          class_store_columntitle(scalar_titles_, tmp, _TRUE_);
-          snprintf(tmp, tmp_size, "theta_ncdm[%d]", n_ncdm);
-          class_store_columntitle(scalar_titles_, tmp, _TRUE_);
-          snprintf(tmp, tmp_size, "shear_ncdm[%d]", n_ncdm);
-          class_store_columntitle(scalar_titles_, tmp, _TRUE_);
-          snprintf(tmp, tmp_size, "cs2_ncdm[%d]", n_ncdm);
-          class_store_columntitle(scalar_titles_, tmp, _TRUE_);
+        for (int n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++){
+          std::string title;
+          title = "delta_ncdm[" + std::to_string(n_ncdm) + "]";
+          class_store_columntitle(scalar_titles_, title.c_str(), _TRUE_);
+          title = "theta_ncdm[" + std::to_string(n_ncdm) + "]";
+          class_store_columntitle(scalar_titles_, title.c_str(), _TRUE_);
+          title = "shear_ncdm[" + std::to_string(n_ncdm) + "]";
+          class_store_columntitle(scalar_titles_, title.c_str(), _TRUE_);
+          title = "cs2_ncdm[" + std::to_string(n_ncdm) + "]";
+          class_store_columntitle(scalar_titles_, title.c_str(), _TRUE_);
         }
       }
       /* Decaying cold dark matter */
@@ -2858,18 +2856,19 @@ int PerturbationsModule::perturb_prepare_k_output() {
       /* Decay radiation */
       if (pba->has_dr) {
         for (int n_dr = 0; n_dr < pba->N_decay_dr; n_dr++) {
-          snprintf(tmp, tmp_size, "delta_dr[%d]", n_dr);
-          class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
-          snprintf(tmp, tmp_size, "theta_dr[%d]", n_dr);
-          class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
-          snprintf(tmp, tmp_size, "shear_dr[%d]", n_dr);
-          class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
+          std::string title;
+          title = "delta_ncdm[" + std::to_string(n_dr) + "]";
+          class_store_columntitle(scalar_titles_, title.c_str(), pba->has_dr);
+          title = "theta_ncdm[" + std::to_string(n_dr) + "]";
+          class_store_columntitle(scalar_titles_, title.c_str(), pba->has_dr);
+          title = "shear_ncdm[" + std::to_string(n_dr) + "]";
+          class_store_columntitle(scalar_titles_, title.c_str(), pba->has_dr);
         }
         // Print F_dr for all species
         for (int n = 0; n < pba->N_decay_dr; n++) {
           for (int l = 0; l <= ppr->l_max_dr; l++) {
-            snprintf(tmp, tmp_size, "F_dr[%d][%d]", n, l);
-            class_store_columntitle(scalar_titles_, tmp, pba->has_dr);
+            std::string title = "F_dr[" + std::to_string(n) + "][" + std::to_string(l) + "]";
+            class_store_columntitle(scalar_titles_, title.c_str(), pba->has_dr);
           }
         }
       }
@@ -2903,13 +2902,14 @@ int PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(tensor_titles_, "l4_ur", evolve_tensor_ur_);
 
       if (evolve_tensor_ncdm_ == _TRUE_) {
-        for(n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++){
-          snprintf(tmp, tmp_size, "delta_ncdm[%d]", n_ncdm);
-          class_store_columntitle(tensor_titles_, tmp, _TRUE_);
-          snprintf(tmp, tmp_size, "theta_ncdm[%d]", n_ncdm);
-          class_store_columntitle(tensor_titles_, tmp, _TRUE_);
-          snprintf(tmp, tmp_size, "shear_ncdm[%d]", n_ncdm);
-          class_store_columntitle(tensor_titles_, tmp, _TRUE_);
+        for(int n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++){
+          std::string title;
+          title = "delta_ncdm[" + std::to_string(n_ncdm) + "]";
+          class_store_columntitle(tensor_titles_, title.c_str(), _TRUE_);
+          title = "theta_ncdm[" + std::to_string(n_ncdm) + "]";
+          class_store_columntitle(tensor_titles_, title.c_str(), _TRUE_);
+          title = "shear_ncdm[" + std::to_string(n_ncdm) + "]";
+          class_store_columntitle(tensor_titles_, title.c_str(), _TRUE_);
         }
       }
 

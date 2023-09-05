@@ -88,9 +88,9 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
     keys.push_back(element.first);
   }
 
-  double cl_lensed[lt_size_];
+  std::vector<double> cl_lensed(lt_size_);
   for (int index_l = 0; index_l < l_values.size(); ++index_l) {
-    int status = lensing_cl_at_l(l_values[index_l], cl_lensed);
+    int status = lensing_cl_at_l(l_values[index_l], cl_lensed.data());
     ThrowRuntimeErrorIf(status != _SUCCESS_, "Error in LensingModule::cl_output: %s", error_message_);
     for (int i = 0; i < data_vectors.size(); ++i) {
       data_vectors[i][index_l + 2] = cl_lensed[indices[i]];

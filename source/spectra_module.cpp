@@ -98,10 +98,12 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
 
  cl_output_index_map();
 
-  double* cl_md[md_size_];
-  double cl_md_data[md_size_][ct_size_];
+  //double* cl_md[md_size_];
+  std::vector<double*> cl_md(md_size_);
+  std::vector<double> cl_md_data(md_size_*ct_size_);
+  //double cl_md_data[md_size_][ct_size_];
   for (int index_md = 0; index_md < md_size_; index_md++) {
-    cl_md[index_md] = &(cl_md_data[index_md][0]);
+    cl_md[index_md] = &(cl_md_data[index_md*ct_size_]);
   }
 
   int cl_md_ic_size = 0;
@@ -113,7 +115,8 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
     }
   }
   std::vector<double> cl_md_ic_data(cl_md_ic_size, 0.0);
-  double* cl_md_ic[md_size_];
+  //double* cl_md_ic[md_size_];
+  std::vector<double*> cl_md_ic(md_size_);
   int cl_md_ic_index = 0;
   for (int index_md = 0; index_md < md_size_; index_md++) {
     cl_md_ic[index_md] = &cl_md_ic_data[cl_md_ic_index];
@@ -122,7 +125,8 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
     }
   }
 
-  double cl_tot[ct_size_];
+  std::vector<double> cl_tot(ct_size_);
+  //double cl_tot[ct_size_];
   for (int l = 0; l <= lmax; l++) {
     if (l < 2) {
       for (auto& output_pointer : output_pointers) {
@@ -130,7 +134,7 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
       }
     }
     else {
-      int status = spectra_cl_at_l(l, cl_tot, cl_md, cl_md_ic);
+      int status = spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
       ThrowRuntimeErrorIf(status != _SUCCESS_, "Error in SpectraModule::cl_output: %s", error_message_);
       for (int index_ct = 0; index_ct < ct_size_; ++index_ct) {
         output_pointers[index_ct][l] = cl_tot[index_ct];
@@ -144,10 +148,10 @@ std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) co
   ThrowRuntimeErrorIf((lmax > l_max_tot_) || (lmax < 0), "Error: lmax = %d is outside the allowed range [0, %d]\n", lmax, l_max_tot_);
   std::map<std::string, int> index_map = cl_output_index_map();
 
-  double* cl_md[md_size_];
-  double cl_md_data[md_size_][ct_size_];
+  std::vector<double*> cl_md(md_size_);
+  std::vector<double> cl_md_data(md_size_*ct_size_);
   for (int index_md = 0; index_md < md_size_; index_md++) {
-    cl_md[index_md] = &(cl_md_data[index_md][0]);
+    cl_md[index_md] = &(cl_md_data[index_md*ct_size_]);
   }
 
   int cl_md_ic_size = 0;
@@ -158,7 +162,7 @@ std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) co
       }
     }
   }
-  double* cl_md_ic[md_size_];
+  std::vector<double*> cl_md_ic(md_size_);
   std::vector<double> cl_md_ic_data;
   if (cl_md_ic_size > 0) {
     cl_md_ic_data.resize(cl_md_ic_size);
@@ -171,13 +175,13 @@ std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) co
     }
   }
 
-  std::vector<double> data_vectors[ct_size_];
+  std::vector<std::vector<double>> data_vectors(ct_size_);
   for (int i = 0; i < ct_size_; ++i) {
-    data_vectors[i] = std::vector<double>(lmax + 1, 0.0);
+    data_vectors[i].resize(lmax + 1, 0.0);
   }
-  double cl_tot[ct_size_];
+  std::vector<double> cl_tot(ct_size_);
   for (int l = 2; l <= lmax; l++) {
-    int status = spectra_cl_at_l(l, cl_tot, cl_md, cl_md_ic);
+    int status = spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
     ThrowRuntimeErrorIf(status != _SUCCESS_, "Error in SpectraModule::cl_output: %s", error_message_);
     for (int i = 0; i < ct_size_; ++i) {
       data_vectors[i][l] = cl_tot[i];

@@ -17,6 +17,11 @@
 #include "primordial_module.h"
 #include "thread_pool.h"
 
+#ifdef _WIN32
+#define popen(a,b) _popen(a,b)
+#define pclose(a) _pclose(a)
+#endif
+
 PrimordialModule::PrimordialModule(InputModulePtr input_module, PerturbationsModulePtr perturbation_module)
 : BaseModule(std::move(input_module))
 , perturbations_module_(perturbation_module) {

@@ -68,8 +68,6 @@ rerun CLASS for each case under Newtonian gauge and then compare Cl's and
 matter power spectrum. If the two are not close enough, it will generate a
 PDF plot of this and save it in the 'fail' folder.
 """
-from __future__ import print_function
-from future.utils import iteritems
 import matplotlib as mpl
 mpl.use('Agg')
 
@@ -175,14 +173,12 @@ if TEST_LEVEL > 2:
     #     'normal')
 
 if POWER_ALL:
-    for k, v in iteritems(CLASS_INPUT):
-        models, state = v
-        CLASS_INPUT[k] = (models, 'power')
+    for key, (models, state) in CLASS_INPUT.items():
+        CLASS_INPUT[key] = (models, 'power')
 
 INPUTPOWER = []
 INPUTNORMAL = [{}]
-for key, value in list(CLASS_INPUT.items()):
-    models, state = value
+for key, (models, state) in CLASS_INPUT.items():
     if state == 'power':
         INPUTPOWER.append([{}]+models)
     else:

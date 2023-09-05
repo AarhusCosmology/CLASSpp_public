@@ -15,7 +15,7 @@
  * growTable structure.
  */
 typedef struct {
-  void* buffer; /**< stack of data */
+  char* buffer; /**< stack of data */
   long sz;      /**< total size */
   long csz;     /**< real size */
   int freeze;   /**< if set to _TRUE_ no data can be added */

@@ -6,6 +6,7 @@
  */
 
 #include "hyperspherical.h"
+#define REFINE 10
 
 int hyperspherical_HIS_create(int K,
                               double beta,
@@ -139,7 +140,7 @@ int hyperspherical_HIS_create(int K,
   private(j,PhiL,k,l,current_chunk,index_x)                           \
   firstprivate(lmax)
   {
-    class_alloc_parallel(PhiL,(lmax+2)*sizeof(double)*_HYPER_CHUNK_,error_message);
+    class_alloc(PhiL,(lmax+2)*sizeof(double)*_HYPER_CHUNK_,error_message);
 
     if ((K == 1) && ((int)(beta+0.2) == (lmax+1))) {
       /** Take care of special case lmax = beta-1.
@@ -802,7 +803,7 @@ int CF1_from_Gegenbauer(int l,
     w2 = w*w;
     if (alpha > cscK){
       S = alpha*log((sqrt(w2-1.0)+sqrt(w2+alpha2))*one_over_sqrt_one_plus_alpha2)+
-        atan(one_over_alpha*sqrt((w2+alpha2)/(w2-1.0)))-M_PI_2;
+        atan(one_over_alpha*sqrt((w2+alpha2)/(w2-1.0)))- _PI_/2;
       airy_sign = -1;
     }
     else{
@@ -1057,7 +1058,6 @@ int hyperspherical_get_xmin(HyperInterpStruct *pHIS,
   int left_index, right_index, index_l, j;
   int nl = pHIS->l_size;
   int nx = pHIS->x_size;
-  int REFINE=10;
   double x[REFINE];
   double Phi[REFINE];
   double *phivec = pHIS->phi;

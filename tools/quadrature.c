@@ -4,6 +4,8 @@
 /* Thomas Tram                            */
 /******************************************/
 #include "quadrature.h"
+#define _METHOD_CHOSEN_SIZE_ 40
+#define _N_COMB_LAG_ 16
 
 int get_qsampling_manual(double* x,
                          double* w,
@@ -90,12 +92,11 @@ int get_qsampling(double *x,
   qss_node *root = NULL;
   qss_node *root_comb = NULL;
   double I_comb,I_atzero,I_atinf,I_comb2;
-  int N_comb=0,N_comb_lag=16,N_comb_leg=4;
+  int N_comb=0,N_comb_leg=4;
   double a_comb,b_comb;
   double q_leg[4],w_leg[4];
-  double q_lag[N_comb_lag],w_lag[N_comb_lag];
-  const size_t method_chosen_size = 40;
-  char method_chosen[method_chosen_size];
+  double q_lag[_N_COMB_LAG_],w_lag[_N_COMB_LAG_];
+  char method_chosen[_METHOD_CHOSEN_SIZE_];
   double qmin=0., qmax=0., qmaxm1=0.;
   double *wcomb2=NULL,delq;
   double Itot=0.0;
@@ -178,8 +179,8 @@ int get_qsampling(double *x,
     //printf("f(100) = %e ?= %e\n",y2,a_comb*exp(-b_comb*100));
 
     /* Evaluate tail using 6 point Laguerre: */
-    compute_Laguerre(q_lag,w_lag,N_comb_lag,0.0,b,c,_TRUE_);
-    for (i=0,I_atinf=0.0; i<N_comb_lag; i++){
+    compute_Laguerre(q_lag, w_lag, _N_COMB_LAG_, 0.0, b, c, _TRUE_);
+    for (i=0, I_atinf=0.0; i<_N_COMB_LAG_; i++){
       w_lag[i] *= exp(-q_lag[i]);
       q_lag[i] = qmax + q_lag[i]/b_comb;
       w_lag[i] = a_comb/b_comb*exp(-b_comb*qmax)*w_lag[i];
@@ -206,7 +207,7 @@ int get_qsampling(double *x,
       reduce_tree(root_comb,level);
       /* Count the new leafs: */
       leaf_count(root_comb);
-      N_comb = 15*root_comb->leaf_childs+N_comb_lag+N_comb_leg;
+      N_comb = 15*root_comb->leaf_childs + _N_COMB_LAG_ + N_comb_leg;
       if (N_comb <= N_max) combined_converging = _TRUE_;
     }
 
@@ -311,17 +312,17 @@ int get_qsampling(double *x,
   }
   //printf("N_adapt=%d, N_combined=%d at level=%d, Nlag=%d\n",Nadapt,N_comb,level,NLag);
   if (adapt_converging==_TRUE_){
-    snprintf(method_chosen, method_chosen_size, "Adaptive Gauss-Kronrod Quadrature");
+    snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Adaptive Gauss-Kronrod Quadrature");
     /* Gather weights and xvalues from tree: */
     i = Nadapt-1;
     get_leaf_x_and_w(root,&i,x,w,_TRUE_);
   }
   else if (Laguerre_converging==_TRUE_){
-    snprintf(method_chosen, method_chosen_size, "Gauss-Laguerre Quadrature");
+    snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Gauss-Laguerre Quadrature");
     /* x and w is already populated in this case. */
   }
   else if (combined_converging == _TRUE_){
-    snprintf(method_chosen, method_chosen_size, "Combined Quadrature");
+    snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Combined Quadrature");
     for(i=0; i<N_comb_leg; i++){
       x[i] = q_leg[i];
       w[i] = w_leg[i];
@@ -330,9 +331,9 @@ int get_qsampling(double *x,
     get_leaf_x_and_w(root_comb,&i,x,w,_FALSE_);
     //printf("from %d to %d\n",N_comb_leg,i);
 
-    for(i=0; i<N_comb_lag; i++){
-      x[N_comb-N_comb_lag+i] = q_lag[i];
-      w[N_comb-N_comb_lag+i] = w_lag[i];
+    for(i=0; i<_N_COMB_LAG_; i++){
+      x[N_comb-_N_COMB_LAG_+i] = q_lag[i];
+      w[N_comb-_N_COMB_LAG_+i] = w_lag[i];
     }
   }
   else{

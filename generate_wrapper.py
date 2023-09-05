@@ -200,7 +200,7 @@ for file in h_files:
                     if (('struct ' + s + ' ' in line or 'struct ' + s + '\n' in line) or
                         ('class ' + s + ' ' in line or 'class ' + s + '\n' in line)):
                         class_name = s
-                        classes.append('cdef extern from "' + file + '":')
+                        classes.append('cdef extern from "' + os.path.basename(file) + '":')
                         classes.append('    cdef cppclass ' + s + ':')
             elif 'private:' in line or '};' in line:
                 # Class just ended ended or we have reached the private section of the class

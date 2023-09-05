@@ -20,10 +20,6 @@ class DarkRadiation;
 #define _class_print_species_(name,type) \
 printf("-> %-30s Omega = %-15g , omega = %-15g\n",name,pba->Omega0_##type,pba->Omega0_##type*pba->h*pba->h);
 
-/** list of possible types of spatial curvature */
-
-enum spatial_curvature {flat,open,closed};
-
 /** list of possible parametrisations of the DE equation of state */
 
 enum equation_of_state {CLP,EDE};
