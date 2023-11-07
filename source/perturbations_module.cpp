@@ -8669,6 +8669,18 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
           dy[pv->index_pt_delta_ur+l] =
             k*(s_l[l]*y[pv->index_pt_delta_ur+l-1]-(1.+l)*cotKgen*y[pv->index_pt_delta_ur+l]);
 
+          // See equation 2.9 of https://arxiv.org/pdf/1706.02123.pdf
+          double taudot = pow(a,-4)*pow(pow(4./11., 1./3.)*pba->T_cmb*_k_B_,5)*pow(ppt->G_eff_ur/(1e12*_eV_*_eV_),2)*(2.*_PI_/_h_P_)/_c_*_Mpc_over_m_;
+          double alpha_RTA[5] = {0.40, 0.43, 0.46, 0.47, 0.48};
+
+          if (taudot > 0.) {
+            for (l = 2; l <= pv->l_max_ur; l++) {
+              int alpha_index = std::min(4, l - 2);
+              double alpha = alpha_RTA[alpha_index];
+              dy[pv->index_pt_delta_ur+l] -= alpha*taudot*y[pv->index_pt_delta_ur+l];
+            }
+          }
+
         }
 
         else {
@@ -8701,6 +8713,9 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
               +2./3.*(y[pv->index_pt_theta_ur]+metric_ufa_class);
 
           }
+          // See equation 2.9 of https://arxiv.org/pdf/1706.02123.pdf
+          double taudot = pow(a,-4)*pow(pow(4./11., 1./3.)*pba->T_cmb*_k_B_,5)*pow(ppt->G_eff_ur/(1e12*_eV_*_eV_),2)*(2.*_PI_/_h_P_)/_c_*_Mpc_over_m_;
+          dy[pv->index_pt_shear_ur] -= 0.40*taudot*y[pv->index_pt_shear_ur];
         }
       }
     }

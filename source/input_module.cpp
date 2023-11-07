@@ -804,6 +804,10 @@ int InputModule::input_read_parameters() {
              errmsg);
   if (flag1 == _TRUE_) ppt->three_cvis2_ur = 3.*param1;
 
+  class_call(parser_read_double(pfc,"G_eff_ur",&ppt->G_eff_ur,&flag1,errmsg),
+             errmsg,
+             errmsg);
+
   Omega_tot += pba->Omega0_ur;
 
   /** - Omega_0_idr (interacting dark radiation) */
@@ -3284,6 +3288,7 @@ int InputModule::input_default_params() {
 
   ppt->three_ceff2_ur=1.;
   ppt->three_cvis2_ur=1.;
+  ppt->G_eff_ur=0.;
 
   ppt->z_max_pk=0.;
 
