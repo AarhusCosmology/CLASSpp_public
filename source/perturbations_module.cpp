@@ -8671,6 +8671,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
 
           // See equation 2.9 of https://arxiv.org/pdf/1706.02123.pdf
           double taudot = pow(a,-4)*pow(pow(4./11., 1./3.)*pba->T_cmb*_k_B_,5)*pow(ppt->G_eff_ur/(1e12*_eV_*_eV_),2)*(2.*_PI_/_h_P_)/_c_*_Mpc_over_m_;
+          taudot = std::min(taudot, a_prime_over_a*1e9);
           double alpha_RTA[5] = {0.40, 0.43, 0.46, 0.47, 0.48};
 
           if (taudot > 0.) {
@@ -8715,6 +8716,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
           }
           // See equation 2.9 of https://arxiv.org/pdf/1706.02123.pdf
           double taudot = pow(a,-4)*pow(pow(4./11., 1./3.)*pba->T_cmb*_k_B_,5)*pow(ppt->G_eff_ur/(1e12*_eV_*_eV_),2)*(2.*_PI_/_h_P_)/_c_*_Mpc_over_m_;
+          taudot = std::min(taudot, a_prime_over_a*1e9);
           dy[pv->index_pt_shear_ur] -= 0.40*taudot*y[pv->index_pt_shear_ur];
         }
       }
