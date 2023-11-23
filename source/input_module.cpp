@@ -807,6 +807,13 @@ int InputModule::input_read_parameters() {
   class_call(parser_read_double(pfc,"G_eff_ur",&ppt->G_eff_ur,&flag1,errmsg),
              errmsg,
              errmsg);
+  class_call(parser_read_double(pfc,"log10_G_eff_ur",&ppt->G_eff_ur,&flag2,errmsg),
+             errmsg,
+             errmsg);
+  if (flag2 == _TRUE_) {
+    class_test(flag1 == _TRUE_, errmsg, "In input file, you cannot enter both log10_G_eff_ur and G_eff_ur, choose one");
+    ppt->G_eff_ur = pow(10.0, ppt->G_eff_ur);
+  }
 
   Omega_tot += pba->Omega0_ur;
 
