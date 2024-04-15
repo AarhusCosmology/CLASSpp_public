@@ -195,6 +195,7 @@ struct primordial {
   double custom9;  /**< one parameter of the primordial computed in 'external_Pk' */
   double custom10; /**< one parameter of the primordial computed in 'external_Pk' */
 
+  double sigma8_input; /**< input value of sigma8 */
   //@}
 
 

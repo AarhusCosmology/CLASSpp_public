@@ -39,6 +39,7 @@ public:
   double r_;
   double n_t_;
   double alpha_t_;
+  double sigma8_input_; 
 
 
 private:
