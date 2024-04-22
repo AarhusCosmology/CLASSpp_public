@@ -91,6 +91,7 @@ struct primordial {
   /* - parameters describing the case primordial_spec_type = analytic_Pk : amplitudes, tilts, runnings, cross-correlations, ... */
 
   double A_s;  /**< usual scalar amplitude = curvature power spectrum at pivot scale */
+  double sigma8; /**< Mass dispersion at the scale 8 h  Mpc^-1*/
   double n_s;  /**< usual scalar tilt = [curvature power spectrum tilt at pivot scale -1] */
   double alpha_s; /**< usual scalar running */
   

@@ -32,7 +32,6 @@ const std::vector<std::string> InputModule::kTargetNamestrings_{
   "Omega_scf",
   "Omega_ini_dcdm",
   "omega_ini_dcdm",
-  "sigma8",
   "Omega_dncdmdr",
   "omega_dncdmdr",
   "deg_ncdm_decay_dr",
@@ -1971,21 +1970,41 @@ int InputModule::input_read_parameters() {
   else if (ppm->primordial_spec_type == analytic_Pk) {
 
     if (ppt->has_scalars == _TRUE_) {
-
+      
+      int flag4;
+      double param4;
       class_call(parser_read_double(pfc,"A_s",&param1,&flag1,errmsg),
                  errmsg,
                  errmsg);
       class_call(parser_read_double(pfc,"ln10^{10}A_s",&param2,&flag2,errmsg),
                  errmsg,
                  errmsg);
-      class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
+      class_call(parser_read_double(pfc,"sigma8",&param3,&flag3,errmsg),
                  errmsg,
-                 "In input file, you cannot enter both A_s and ln10^{10}A_s, choose one");
+                 errmsg);
+      class_call(parser_read_double(pfc,"S8",&param4,&flag4,errmsg),
+                 errmsg,
+                 errmsg);
+      class_test(class_at_least_two_of_four(flag1,flag2,flag3,flag4),
+                 errmsg,
+                 "In input file, you can only enter one of A_s, ln10^{10}A_s, sigma8 and S8, choose one");
       if (flag1 == _TRUE_)
         ppm->A_s = param1;
       else if (flag2 == _TRUE_)
         ppm->A_s = exp(param2)*1.e-10;
-
+      else if (flag3 == _TRUE_){
+        ppm->sigma8 = param3;
+        class_test(param3 < 0.,
+                errmsg, 
+                "sigma8 should be non-negative");
+      }
+      else if (flag4 == _TRUE_){
+        ppm->sigma8 = param4 / pow((pba->Omega0_b + pba->Omega0_cdm)/0.3, 0.5);
+        class_test(param4 < 0.,
+                errmsg, 
+                "S8 should be non-negative");
+      }
+      
       if (ppt->has_ad == _TRUE_) {
 
         class_read_double("n_s",ppm->n_s);
@@ -3382,9 +3401,9 @@ int InputModule::input_default_params() {
   ppm->custom8=0.;
   ppm->custom9=0.;
   ppm->custom10=0.;
-
+  ppm->sigma8=0.;
+  
   /** - nonlinear structure */
-
   pnl->method = nl_none;
   pnl->extrapolation_method = extrap_max_scaled;
   pnl->has_pk_eq = _FALSE_;
@@ -3619,27 +3638,6 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
   else
     input_verbose = 0;
 
-  /** - Optimise flags for sigma8 calculation.*/
-  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
-    if (pfzw->target_name[counter] == sigma8) {
-      compute_sigma8 = _TRUE_;
-    }
-  }
-  if (compute_sigma8 == _TRUE_) {
-    pt.k_max_for_pk=1.0;
-    pt.has_pk_matter=_TRUE_;
-    pt.has_perturbations = _TRUE_;
-    pt.has_cl_cmb_temperature = _FALSE_;
-    pt.has_cls = _FALSE_;
-    pt.has_cl_cmb_polarization = _FALSE_;
-    pt.has_cl_cmb_lensing_potential = _FALSE_;
-    pt.has_cl_number_count = _FALSE_;
-    pt.has_cl_lensing_potential=_FALSE_;
-    pt.has_density_transfers=_FALSE_;
-    pt.has_velocity_transfers=_FALSE_;
-
-  }
-
   // Zero the verbose flags
   ba.background_verbose = 0;
   th.thermodynamics_verbose = 0;
@@ -3701,11 +3699,7 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
       output[idx] = -(rho_dcdm_today + rho_dr_today)/(ba.H0*ba.H0) + ba.Omega0_dcdmdr;
       break;
     }
-    case sigma8: {
-      NonlinearModulePtr nl = cosmology.GetNonlinearModule();
-      output[idx] = nl->sigma8_[nl->index_pk_m_] - pfzw->target_values[idx];
-      break;
-    }
+   
     case omega_dncdmdr:
     case Omega_dncdmdr:
     case Neff_ini_dncdm:
@@ -3825,14 +3819,7 @@ int InputModule::input_get_guess(double* xguess, double* dxdy, fzerofun_workspac
       //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
       break;
     }
-
-    case sigma8: {
-      /* Assume linear relationship between A_s and sigma8 and fix coefficient
-         according to vanilla LambdaCDM. Should be good enough... */
-      xguess[index_guess] = 2.43e-9/0.87659*pfzw->target_values[index_guess];
-      dxdy[index_guess] = 2.43e-9/0.87659;
-      break;
-    }
+    
     case omega_dncdmdr:
     case Omega_dncdmdr: {
       // deg_ncdm_decay_dr unknown, make a guess
