@@ -31,7 +31,7 @@ jobs:
         repository: AarhusCosmology/CLASSpp
         token: ${{ secrets.REPO_ACCESS_TOKEN }}
     - name: Checkout master 🛎️
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: main_class
         ref: master
@@ -50,7 +50,7 @@ jobs:
     if: needs.iftest.outputs.should_run
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: main_class
     - name: Create virtual Python environment
@@ -70,7 +70,7 @@ jobs:
         deactivate
     - name: Upload plots 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ComparePlots
         path: main_class/python/faulty_figs
@@ -85,7 +85,7 @@ jobs:
     timeout-minutes: 1440
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: main_class
     - name: Create virtual Python environment
@@ -119,7 +119,7 @@ jobs:
           || (echo {} "...fail" && cp {}* valgrind_output && exit 3)'
     - name: Upload errors 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ValgrindOutputWideShallow
         path: main_class/python/faulty_figs/valgrind_output
@@ -131,7 +131,7 @@ jobs:
     timeout-minutes: 1440
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: main_class
     - name: Create virtual Python environment
@@ -163,7 +163,7 @@ jobs:
           || (echo {} "...fail" && cp {}* valgrind_output && exit 3)'
     - name: Upload errors 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ValgrindOutputNarrowDeep
         path: main_class/python/faulty_figs/valgrind_output

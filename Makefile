@@ -83,6 +83,22 @@ OUTPUT = output_module.opp
 
 CLASS = class.opp
 
+all: class classy
+
+# Use following line for faster installation if build dependencies (Cython, setuptools, numpy,..) are already installed:
+# pip install --no-build-isolation 
+# The Python one-liner below renames the compiled library to include the Python version number. This is neccessary
+# due to bug introduced in MontePython 3.6, see https://github.com/brinckmann/montepython_public/issues/371
+
+classy:
+	rm -rf python/build && mkdir python/build
+	pip install .
+	cp -r build/lib* python/build
+	python -c 'import sys; import os; import glob; \
+file=glob.glob(os.path.join("python/build", "lib.*"))[0]; \
+new_file=file.replace("lib.", "lib." + sys.version + "."); \
+os.rename(file, new_file)'
+
 class: $(TOOLS) $(SOURCE) $(EXTERNAL) $(OUTPUT) $(CLASS)
 	$(CXX) $(OPTFLAG) $(LDFLAG) -o class $(addprefix build/,$(notdir $^)) $(LIBRARIES)
 
