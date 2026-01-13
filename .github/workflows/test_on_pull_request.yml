@@ -19,9 +19,9 @@ jobs:
     - name: Create virtual Python environment
       run: |
         rm -rf venv
-        DEB_PYTHON_INSTALL_LAYOUT='deb' virtualenv venv --system-site-packages
+        DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv --system-site-packages
         source venv/bin/activate
-        pip install --upgrade setuptools
+        pip install --upgrade setuptools pytest
         deactivate
     - name: make
       run: source venv/bin/activate && cd main_class && pip install . && deactivate
@@ -37,7 +37,7 @@ jobs:
       run: |
         source venv/bin/activate
         cd main_class/python
-        COMPARE_OUTPUT_REF=1 TEST_LEVEL=2 python "$(which nosetests)" -v -a test_scenario test_class.py
+        COMPARE_OUTPUT_REF=1 TEST_LEVEL=2 python -m pytest -v -m test_scenario test_class.py
         deactivate
     - name: Remove virtual Python environment
       if: success() || failure()

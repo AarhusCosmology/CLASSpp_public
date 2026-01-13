@@ -75,6 +75,7 @@ import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pytest
 import shutil
 import unittest
 
@@ -82,7 +83,6 @@ from classy import Class
 from classy import CosmoSevereError
 from math import log10
 from matplotlib.offsetbox import AnchoredText
-from nose.plugins.attrib import attr
 from parameterized import parameterized
 
 # Customise test by reading environment variables
@@ -292,99 +292,7 @@ class TestClass(unittest.TestCase):
         string = string.replace(',', '')
         string = string.replace(' ', '')
         return string
-
-    @parameterized.expand(TUPLE_ARRAY, doc_func=custom_name_func, custom_name_func=custom_name_func)
-    @attr('dump_ini_files')
-    def test_Valgrind(self, inputdict):
-        """Dump files"""
-        self.scenario.update(inputdict)
-        self.name = self._testMethodName
-        if self.has_incompatible_input():
-            return
-        path = os.path.join(self.faulty_figs_path, self.name)
-        self.store_ini_file(path)
-        self.scenario.update({'gauge':'Newtonian'})
-        self.store_ini_file(path + 'N')
-
-    @parameterized.expand(TUPLE_ARRAY, doc_func=custom_name_func, custom_name_func=custom_name_func)
-    @attr('test_scenario')
-    def test_scenario(self, inputdict):
-        """Test scenario"""
-        self.scenario.update(inputdict)
-        self.name = self._testMethodName
-        self.cosmo.set(dict(itertools.chain(self.verbose.items(), self.scenario.items())))
-
-        cl_dict = {
-            'tCl': ['tt'],
-            'lCl': ['pp'],
-            'pCl': ['ee', 'bb'],
-            'nCl': ['dens[1]-dens[1]'],
-            'sCl': ['lens[1]-lens[1]'],
-        }
-
-        # 'lensing' is always set to yes. Therefore, trying to compute 'tCl' or
-        # 'pCl' will fail except if we also ask for 'lCl'.
-        if self.has_incompatible_input():
-            self.assertRaises(CosmoSevereError, self.cosmo.compute)
-            return
-        else:
-            self.cosmo.compute()
-
-        self.assertTrue(
-            self.cosmo.state,
-            "Class failed to go through all __init__ methods")
-        # Depending
-        if 'output' in self.scenario.keys():
-            # Positive tests of raw cls
-            output = self.scenario['output']
-            for elem in output.split():
-                if elem in cl_dict.keys():
-                    for cl_type in cl_dict[elem]:
-                        cl = self.cosmo.raw_cl(100)
-                        self.assertIsNotNone(cl, "raw_cl returned nothing")
-                        self.assertEqual(
-                            np.shape(cl[cl_type])[0], 101,
-                            "raw_cl returned wrong size")
-                if elem == 'mPk':
-                    pk = self.cosmo.pk(0.1, 0)
-                    self.assertIsNotNone(pk, "pk returned nothing")
-            # Negative tests of output functions
-            if not any([elem in list(cl_dict.keys()) for elem in output.split()]):
-                # testing absence of any Cl
-                self.assertRaises(CosmoSevereError, self.cosmo.raw_cl, 100)
-            if 'mPk' not in output.split():
-                # testing absence of mPk
-                self.assertRaises(CosmoSevereError, self.cosmo.pk, 0.1, 0)
-
-        if COMPARE_OUTPUT_REF or COMPARE_OUTPUT_GAUGE:
-            # Now compute same scenario in Newtonian gauge
-            self.cosmo_newt.set(dict(self.verbose, **self.scenario))
-            self.cosmo_newt.set({'gauge': 'newtonian'})
-            self.cosmo_newt.compute()
-
-        if COMPARE_OUTPUT_GAUGE:
-            # Compare synchronous and Newtonian gauge
-            self.assertTrue(
-                self.cosmo_newt.state,
-                "Class failed to go through all __init__ methods in Newtonian gauge")
-
-            self.compare_output(self.cosmo, "Synchronous", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR_GAUGE, COMPARE_PK_RELATIVE_ERROR_GAUGE)
-
-        if COMPARE_OUTPUT_REF:
-            # Compute reference models in both gauges and compare
-            cosmo_ref = classyref.Class()
-            cosmo_ref.set(dict(self.verbose, **self.scenario))
-            cosmo_ref.compute()
-            status = self.compare_output(cosmo_ref, "Reference", self.cosmo, 'Synchronous', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
-            assert status, 'Reference comparison failed in Synchronous gauge!'
-
-            cosmo_ref = classyref.Class()
-            cosmo_ref.set(dict(self.verbose, **self.scenario))
-            cosmo_ref.set({'gauge': 'newtonian'})
-            cosmo_ref.compute()
-            self.compare_output(cosmo_ref, "Reference", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
-            assert status, 'Reference comparison failed in Newtonian gauge!'
-
+    
     def has_incompatible_input(self):
 
         should_fail = False
@@ -592,6 +500,102 @@ def has_tensor(input_dict):
     else:
         return False
     return False
+
+@pytest.mark.dump_ini_files
+class DumpIniFiles(TestClass):
+    @parameterized.expand(TUPLE_ARRAY, doc_func=custom_name_func, custom_name_func=custom_name_func)
+    def test_Valgrind(self, inputdict):
+        """Dump files"""
+        self.scenario.update(inputdict)
+        self.name = self._testMethodName
+        if self.has_incompatible_input():
+            return
+        path = os.path.join(self.faulty_figs_path, self.name)
+        self.store_ini_file(path)
+        self.scenario.update({'gauge':'Newtonian'})
+        self.store_ini_file(path + 'N')
+
+
+@pytest.mark.test_scenario
+class TestScenario(TestClass):
+    @parameterized.expand(TUPLE_ARRAY, doc_func=custom_name_func, custom_name_func=custom_name_func)
+    def test_scenario(self, inputdict):
+        """Test scenario"""
+        self.scenario.update(inputdict)
+        self.name = self._testMethodName
+        self.cosmo.set(dict(itertools.chain(self.verbose.items(), self.scenario.items())))
+
+        cl_dict = {
+            'tCl': ['tt'],
+            'lCl': ['pp'],
+            'pCl': ['ee', 'bb'],
+            'nCl': ['dens[1]-dens[1]'],
+            'sCl': ['lens[1]-lens[1]'],
+        }
+
+        # 'lensing' is always set to yes. Therefore, trying to compute 'tCl' or
+        # 'pCl' will fail except if we also ask for 'lCl'.
+        if self.has_incompatible_input():
+            self.assertRaises(CosmoSevereError, self.cosmo.compute)
+            return
+        else:
+            self.cosmo.compute()
+
+        self.assertTrue(
+            self.cosmo.state,
+            "Class failed to go through all __init__ methods")
+        # Depending
+        if 'output' in self.scenario.keys():
+            # Positive tests of raw cls
+            output = self.scenario['output']
+            for elem in output.split():
+                if elem in cl_dict.keys():
+                    for cl_type in cl_dict[elem]:
+                        cl = self.cosmo.raw_cl(100)
+                        self.assertIsNotNone(cl, "raw_cl returned nothing")
+                        self.assertEqual(
+                            np.shape(cl[cl_type])[0], 101,
+                            "raw_cl returned wrong size")
+                if elem == 'mPk':
+                    pk = self.cosmo.pk(0.1, 0)
+                    self.assertIsNotNone(pk, "pk returned nothing")
+            # Negative tests of output functions
+            if not any([elem in list(cl_dict.keys()) for elem in output.split()]):
+                # testing absence of any Cl
+                self.assertRaises(CosmoSevereError, self.cosmo.raw_cl, 100)
+            if 'mPk' not in output.split():
+                # testing absence of mPk
+                self.assertRaises(CosmoSevereError, self.cosmo.pk, 0.1, 0)
+
+        if COMPARE_OUTPUT_REF or COMPARE_OUTPUT_GAUGE:
+            # Now compute same scenario in Newtonian gauge
+            self.cosmo_newt.set(dict(self.verbose, **self.scenario))
+            self.cosmo_newt.set({'gauge': 'newtonian'})
+            self.cosmo_newt.compute()
+
+        if COMPARE_OUTPUT_GAUGE:
+            # Compare synchronous and Newtonian gauge
+            self.assertTrue(
+                self.cosmo_newt.state,
+                "Class failed to go through all __init__ methods in Newtonian gauge")
+
+            self.compare_output(self.cosmo, "Synchronous", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR_GAUGE, COMPARE_PK_RELATIVE_ERROR_GAUGE)
+
+        if COMPARE_OUTPUT_REF:
+            # Compute reference models in both gauges and compare
+            cosmo_ref = classyref.Class()
+            cosmo_ref.set(dict(self.verbose, **self.scenario))
+            cosmo_ref.compute()
+            status = self.compare_output(cosmo_ref, "Reference", self.cosmo, 'Synchronous', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
+            assert status, 'Reference comparison failed in Synchronous gauge!'
+
+            cosmo_ref = classyref.Class()
+            cosmo_ref.set(dict(self.verbose, **self.scenario))
+            cosmo_ref.set({'gauge': 'newtonian'})
+            cosmo_ref.compute()
+            self.compare_output(cosmo_ref, "Reference", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
+            assert status, 'Reference comparison failed in Newtonian gauge!'
+
 
 if __name__ == '__main__':
     toto = TestClass()
