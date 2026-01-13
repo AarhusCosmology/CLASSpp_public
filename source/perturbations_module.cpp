@@ -350,7 +350,6 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format, c
       class_store_columntitle(titles, "eta", has_source_eta_);
       class_store_columntitle(titles, "eta_prime", has_source_eta_prime_);
       class_store_columntitle(titles, "H_T_Nb_prime", has_source_H_T_Nb_prime_);
-      class_store_columntitle(titles, "H_T_Nb_prime", has_source_k2gamma_Nb_);
       class_store_columntitle(titles, "k2gamma_Nb", has_source_k2gamma_Nb_);
     }
     if (ppt->has_velocity_transfers == _TRUE_) {
@@ -6922,10 +6921,6 @@ int PerturbationsModule::perturb_sources_member(double tau, double* y, double* d
 
     }
 
-    if (has_source_k2gamma_Nb_ == _TRUE_) {
-	  class_stop(error_message_, "We need to compute the derivative of H_T_Nb_prime numerically. Written by T. Tram but not yet propagated here. See devel branch prior to merging with hmcode branch");
-    }
-
     /* Bardeen potential -PHI_H = phi in Newtonian gauge */
     if (has_source_phi_ == _TRUE_) {
 
@@ -9624,10 +9619,12 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(double k, double* y, double
   /* update total delta and theta given rsa approximation results */
 
   ppw->delta_rho += ppw->pvecback[background_module_->index_bg_rho_g_]*ppw->rsa_delta_g;
+  ppw->delta_p += 1./3.*ppw->pvecback[background_module_->index_bg_rho_g_]*ppw->rsa_delta_g;
   ppw->rho_plus_p_theta += 4./3.*ppw->pvecback[background_module_->index_bg_rho_g_]*ppw->rsa_theta_g;
 
   if (pba->has_ur == _TRUE_) {
     ppw->delta_rho += ppw->pvecback[background_module_->index_bg_rho_ur_]*ppw->rsa_delta_ur;
+    ppw->delta_p += 1./3.*ppw->pvecback[background_module_->index_bg_rho_ur_]*ppw->rsa_delta_ur;
     ppw->rho_plus_p_theta += 4./3.*ppw->pvecback[background_module_->index_bg_rho_ur_]*ppw->rsa_theta_ur;
   }
 
