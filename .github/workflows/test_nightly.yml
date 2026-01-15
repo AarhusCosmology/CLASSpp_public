@@ -79,7 +79,7 @@ jobs:
       run: rm -rf venv
 
   valgrind-wide-and-shallow:
-    runs-on: [self-hosted, linux, heavy]
+    runs-on: [self-hosted, linux, heavy, private]
     needs: iftest
     if: needs.iftest.outputs.should_run
     timeout-minutes: 1440
@@ -125,7 +125,7 @@ jobs:
         path: main_class/python/faulty_figs/valgrind_output
 
   valgrind-narrow-and-deep:
-    runs-on: [self-hosted, linux, heavy]
+    runs-on: [self-hosted, linux, heavy, private]
     needs: iftest
     if: needs.iftest.outputs.should_run
     timeout-minutes: 1440
@@ -139,7 +139,7 @@ jobs:
         rm -rf venv
         DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv --system-site-packages
         source venv/bin/activate
-        pip install --upgrade setuptools
+        pip install --upgrade setuptools pytest
         deactivate
     - name: make
       run: source venv/bin/activate && cd main_class && make class -j && pip install . && deactivate
