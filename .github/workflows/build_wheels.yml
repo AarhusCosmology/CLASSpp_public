@@ -1,6 +1,6 @@
 name: Build sdist and wheels
 env:
-  CIBW_BUILD: cp3{7,8,9,10,11,12}-*
+  CIBW_BUILD: cp3{10,11,12,13,14}-*
 
 on:
   push:
@@ -13,14 +13,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-11]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
-
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.17.0
-
+        uses: pypa/cibuildwheel@v3.3.1
       - uses: actions/upload-artifact@v4
         with:
           name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
