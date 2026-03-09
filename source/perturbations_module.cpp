@@ -4563,11 +4563,11 @@ int PerturbationsModule::perturb_vector_init(
         if (ppt->perturbations_verbose>2)
           fprintf(stdout,"Mode k=%e: switch off tight-coupling approximation at tau=%e\n",k,tau);
 
-        ppv->y[ppv->index_pt_delta_g] = 0.0; //TBC
-        //-4./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        /* Tight-coupling relation F_0^(2) = sqrt(6)*4/3 * H'/kappa' (C. Pitrou, class_public v3.3.0) */
+        ppv->y[ppv->index_pt_delta_g] = _SQRT6_*4./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
-        ppv->y[ppv->index_pt_pol0_g] = 0.0; //TBC
-        //1./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        /* Tight-coupling relation G_0^(2) = -sqrt(2/3) * H'/kappa' (C. Pitrou, class_public v3.3.0) */
+        ppv->y[ppv->index_pt_pol0_g] = -_SQRT6_/3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
       }
 
       /* -- case of switching on radiation streaming
@@ -4653,9 +4653,11 @@ int PerturbationsModule::perturb_vector_init(
         if (ppt->perturbations_verbose>2)
           fprintf(stdout,"Mode k=%e: switch off tight-coupling approximation at tau=%e\n",k,tau);
 
-        ppv->y[ppv->index_pt_delta_g] = -4./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        /* Tight-coupling relation F_0^(2) = sqrt(6)*4/3 * H'/kappa' (C. Pitrou, class_public v3.3.0) */
+        ppv->y[ppv->index_pt_delta_g] = _SQRT6_*4./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
-        ppv->y[ppv->index_pt_pol0_g] = 1./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        /* Tight-coupling relation G_0^(2) = -sqrt(2/3) * H'/kappa' (C. Pitrou, class_public v3.3.0) */
+        ppv->y[ppv->index_pt_pol0_g] = -_SQRT6_/3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
       }
 
       /* -- case of switching on radiation streaming
