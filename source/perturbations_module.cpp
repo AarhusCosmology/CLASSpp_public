@@ -4739,6 +4739,7 @@ int PerturbationsModule::perturb_initial_conditions(int index_md, int index_ic, 
   double delta_tot;
   double velocity_tot;
   double s2_squared;
+  double h_corr_2, rho_fs; /* Corrections to tensor mode initial conditions (C. Pitrou, class_public v3.3.0) */
 
   /** --> For scalars */
 
@@ -5400,6 +5401,49 @@ int PerturbationsModule::perturb_initial_conditions(int index_md, int index_ic, 
       }
       else {
         ppw->pv->y[ppw->pv->index_pt_gw] = 0.;
+      }
+    }
+
+    /**
+     * Corrections of order (k*tau)^2 for h, order (k*tau) for h'.
+     * Not including them results in 0.2-0.3% errors on final tensor Cl.
+     * (Credits C. Pitrou, class_public v3.3.0)
+     *
+     * h = h0 + const*(k*tau)^2
+     * const = -(1+2K/k^2)/(6 + 8/5 * sum_fs(3*P_fs)/rho_r) * h0
+     *
+     * where the sum is over free-streaming species (ur and ncdm).
+     */
+
+    /* Build energy density of free-streaming particles (3*P_fs) */
+    rho_fs = 0.;
+
+    if (pba->has_ur == _TRUE_)
+      rho_fs += ppw->pvecback[background_module_->index_bg_rho_ur_];
+
+    if (pba->has_ncdm == _TRUE_) {
+      for (n_ncdm = 0; n_ncdm < pba->N_ncdm; n_ncdm++) {
+        rho_fs += 3.*ppw->pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm];
+      }
+    }
+
+    /* Correct h and h' */
+    h_corr_2 = -ppw->pv->y[ppw->pv->index_pt_gw]*(k2 + 2.*pba->K)/(6. + 8./5.*rho_fs/rho_r)*tau*tau;
+    ppw->pv->y[ppw->pv->index_pt_gw] += h_corr_2;
+    ppw->pv->y[ppw->pv->index_pt_gwdot] = 2.*h_corr_2/tau;
+
+    /* Set ur quadrupole F_0^(2) to order tau^2 value */
+    if (evolve_tensor_ur_ == _TRUE_)
+      ppw->pv->y[ppw->pv->index_pt_delta_ur] = _SQRT6_*h_corr_2;
+
+    /* Set ncdm psi0 to order tau^2 value */
+    if (evolve_tensor_ncdm_ == _TRUE_) {
+      idx = ppw->pv->index_pt_psi0_ncdm1;
+      for (n_ncdm = 0; n_ncdm < pba->N_ncdm; n_ncdm++) {
+        for (index_q = 0; index_q < ppw->pv->q_size_ncdm[n_ncdm]; index_q++) {
+          ppw->pv->y[idx] = _SQRT6_*h_corr_2*(-0.25*ncdm_->dlnf0_dlnq_ncdm_[n_ncdm][index_q]);
+          idx += (ppw->pv->l_max_ncdm[n_ncdm] + 1);
+        }
       }
     }
 
