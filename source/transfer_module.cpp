@@ -171,6 +171,7 @@ int TransferModule::transfer_init() {
 
   if (ppt->has_cls == _FALSE_) {
     has_cls_ = _FALSE_;
+    do_lcmb_full_limber_ = _FALSE_;
     if (ptr->transfer_verbose > 0)
       printf("No harmonic space transfer functions to compute. Transfer module skipped.\n");
     return _SUCCESS_;
