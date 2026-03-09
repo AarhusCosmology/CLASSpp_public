@@ -367,6 +367,16 @@ int TransferModule::transfer_free() {
     free(k_);
     free(transfer_);
 
+    if (do_lcmb_full_limber_ == _TRUE_) {
+      for (index_md = 0; index_md < md_size_; index_md++) {
+        free(transfer_limber_[index_md]);
+        free(k_limber_[index_md]);
+      }
+      free(q_limber_);
+      free(k_limber_);
+      free(transfer_limber_);
+    }
+
     if (nz_size_ > 0) {
       free(nz_z_);
       free(nz_nz_);
@@ -498,6 +508,42 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
   class_call(transfer_get_k_list(K),
              error_message_,
              error_message_);
+
+  /** - check whether full Limber scheme is needed */
+  if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (ppt->want_lcmb_full_limber == _TRUE_)) {
+    do_lcmb_full_limber_ = _TRUE_;
+  } else {
+    do_lcmb_full_limber_ = _FALSE_;
+  }
+
+  /** - if full Limber, build the Limber q-grid and allocate arrays */
+  if (do_lcmb_full_limber_ == _TRUE_) {
+    class_call(transfer_get_q_limber_list(K, sgnK), error_message_, error_message_);
+
+    /* Allocate k_limber arrays */
+    class_alloc(k_limber_, md_size_*sizeof(double*), error_message_);
+    for (int im = 0; im < md_size_; im++) {
+      class_alloc(k_limber_[im], q_size_limber_*sizeof(double), error_message_);
+      for (int iq = 0; iq < q_size_limber_; iq++) {
+        if (sgnK == 0)
+          k_limber_[im][iq] = q_limber_[iq];
+        else
+          k_limber_[im][iq] = sqrt(q_limber_[iq]*q_limber_[iq] - K);
+      }
+    }
+
+    /* Allocate transfer_limber array */
+    class_alloc(transfer_limber_, md_size_*sizeof(double*), error_message_);
+    for (int im = 0; im < md_size_; im++) {
+      class_alloc(transfer_limber_[im],
+                  perturbations_module_->ic_size_[im]
+                  * tt_size_[im]
+                  * l_size_[im]
+                  * q_size_limber_
+                  * sizeof(double),
+                  error_message_);
+    }
+  }
 
   /* for testing, it can be useful to print the q list in a file: */
 
@@ -1164,6 +1210,44 @@ int TransferModule::transfer_get_k_list(double K) {
 
   return _SUCCESS_;
 
+}
+
+/**
+ * Build logarithmically-spaced q grid for the full Limber scheme.
+ *
+ * @param K    Input: spatial curvature (absolute value)
+ * @param sgnK Input: sign of curvature
+ * @return the error status
+ */
+
+int TransferModule::transfer_get_q_limber_list(double K, int sgnK) {
+
+  double q_min, q_max;
+  int index_q;
+
+  /* q_max is determined by k_max for the full limber scheme */
+  q_max = perturbations_module_->k_[perturbations_module_->index_md_scalars_]
+          [perturbations_module_->k_size_[perturbations_module_->index_md_scalars_] - 1];
+  if (sgnK != 0)
+    q_max = sqrt(q_max*q_max + K); /* q^2 = k^2 + K for scalars */
+
+  /* q_min same as standard grid */
+  q_min = q_[0];
+
+  /* Number of q values in logarithmic spacing */
+  q_size_limber_ = (int)(log(q_max/q_min)/log(ppr->q_logstep_limber)) + 1;
+
+  class_alloc(q_limber_, q_size_limber_*sizeof(double), error_message_);
+
+  for (index_q = 0; index_q < q_size_limber_; index_q++) {
+    q_limber_[index_q] = q_min*pow(ppr->q_logstep_limber, index_q);
+  }
+
+  /* Ensure last q value doesn't exceed q_max */
+  if (q_limber_[q_size_limber_ - 1] > q_max)
+    q_limber_[q_size_limber_ - 1] = q_max;
+
+  return _SUCCESS_;
 }
 
 /**
