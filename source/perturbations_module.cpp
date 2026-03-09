@@ -1448,6 +1448,11 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     /* compute inverse rate */
     timescale_source = 1./timescale_source;
 
+    /* Boost time sampling at late times for lensing accuracy (class_public v3.2.2) */
+    if (tau > background_module_->conformal_age_ * ppr->perturbations_sampling_boost_above_age_fraction) {
+      timescale_source /= 2.;
+    }
+
     class_test(fabs(ppr->perturb_sampling_stepsize*timescale_source/tau) < ppr->smallest_allowed_variation,
                error_message_,
                "integration step =%e < machine precision : leads either to numerical error or infinite loop",ppr->perturb_sampling_stepsize*timescale_source);
@@ -1520,6 +1525,11 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
     /* compute inverse rate */
     timescale_source = 1./timescale_source;
+
+    /* Boost time sampling at late times for lensing accuracy (class_public v3.2.2) */
+    if (tau > background_module_->conformal_age_ * ppr->perturbations_sampling_boost_above_age_fraction) {
+      timescale_source /= 2.;
+    }
 
     class_test(fabs(ppr->perturb_sampling_stepsize*timescale_source/tau) < ppr->smallest_allowed_variation,
                error_message_,
@@ -1730,6 +1740,12 @@ int PerturbationsModule::perturb_get_k_list() {
 
         k_max_cl[index_md_scalars_] = MAX(k_max_cl[index_md_scalars_], ppr->k_max_tau0_over_l_max*ppt->l_lss_max/(background_module_->conformal_age_ - tau1)); // to be very accurate we should use angular diameter distance to given redshift instead of comoving radius: would implement corrections depending on curvature
         k_max = k_max_cl[index_md_scalars_];
+      }
+
+      /* extend k_max when full Limber scheme is enabled for CMB lensing (class_public v3.2.2) */
+      if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (ppt->want_lcmb_full_limber == _TRUE_)) {
+        k_max = MAX(k_max, ppr->k_max_limber_over_l_max_scalars * ppt->l_scalar_max);
+        k_max_cl[index_md_scalars_] = k_max;
       }
     }
 
