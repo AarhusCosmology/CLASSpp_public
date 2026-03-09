@@ -161,7 +161,7 @@ class_string_parameter(hyrec_two_photon_tables_file,"/hyrec/two_photon_tables.da
 
 class_precision_parameter(k_min_tau0,double,0.1) /**< number defining k_min for the computation of Cl's and P(k)'s (dimensionless): (k_min tau_0), usually chosen much smaller than one */
 
-class_precision_parameter(k_max_tau0_over_l_max,double,2.4) /**< number defining k_max for the computation of Cl's (dimensionless): (k_max tau_0)/l_max, usually chosen around two */
+class_precision_parameter(k_max_tau0_over_l_max,double,1.8) /**< number defining k_max for the computation of Cl's (dimensionless): (k_max tau_0)/l_max, compensated by full Limber scheme */
 class_precision_parameter(k_step_sub,double,0.05) /**< step in k space, in units of one period of acoustic oscillation at decoupling, for scales inside sound horizon at decoupling */
 class_precision_parameter(k_step_super,double,0.002) /**< step in k space, in units of one period of acoustic oscillation at decoupling, for scales above sound horizon at decoupling */
 class_precision_parameter(k_step_transition,double,0.2) /**< dimensionless number regulating the transition from 'sub' steps to 'super' steps. Decrease for more precision. */
@@ -404,6 +404,10 @@ class_precision_parameter(l_switch_limber_for_nc_local_over_z,double,100.0) /**<
 // only. But if you have wide and smooth selection functions you may
 // reduce to e.g. 30.
 class_precision_parameter(l_switch_limber_for_nc_los_over_z,double,30.0) /**< when to use the Limber approximation for number count contributions to cl's integrated along the line-of-sight (relative to central redshift of each bin) */
+
+class_precision_parameter(q_logstep_limber,double,1.025) /**< logarithmic step for q-grid in full Limber scheme */
+class_precision_parameter(k_max_limber_over_l_max_scalars,double,0.001) /**< ratio k_max/l_max_scalars for full Limber scheme */
+class_precision_parameter(perturbations_sampling_boost_above_age_fraction,double,0.9) /**< time fraction above which source sampling is boosted for lensing accuracy */
 
 class_precision_parameter(selection_cut_at_sigma,double,5.0)/**< in sigma units, where to cut gaussian selection functions */
 class_precision_parameter(selection_sampling,double,50.0) /**< controls sampling of integral over time when selection functions vary quicker than Bessel functions. Increase for better sampling. */
