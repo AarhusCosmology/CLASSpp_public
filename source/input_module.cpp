@@ -3261,6 +3261,7 @@ int InputModule::input_default_params() {
   ppt->has_cl_cmb_temperature = _FALSE_;
   ppt->has_cl_cmb_polarization = _FALSE_;
   ppt->has_cl_cmb_lensing_potential = _FALSE_;
+  ppt->want_lcmb_full_limber = _TRUE_;
   ppt->has_cl_number_count = _FALSE_;
   ppt->has_cl_lensing_potential = _FALSE_;
   ppt->has_pk_matter = _FALSE_;

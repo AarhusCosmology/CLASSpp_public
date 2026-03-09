@@ -303,7 +303,7 @@ int TransferModule::transfer_init() {
                           error_message_,
                           error_message_);
 
-      class_call(transfer_compute_for_each_q(tp_of_tt, index_q, tau_size_max, tau_rec, sources, sources_spline, window, ptw),
+      class_call(transfer_compute_for_each_q(tp_of_tt, index_q, tau_size_max, tau_rec, sources, sources_spline, window, ptw, _FALSE_),
                           error_message_,
                           error_message_);
       /* free workspace allocated inside parallel zone */
@@ -1485,7 +1485,7 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, int tau_size_max, double tau_rec, double *** pert_sources, double *** pert_sources_spline, double * window, struct transfer_workspace * ptw) {
+int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, int tau_size_max, double tau_rec, double *** pert_sources, double *** pert_sources_spline, double * window, struct transfer_workspace * ptw, short use_full_limber) {
 
   /** Summary: */
 
@@ -1679,7 +1679,8 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
                                                      index_l,
                                                      l,
                                                      q_max_bessel,
-                                                     radial_type
+                                                     radial_type,
+                                                     use_full_limber
                                                      ),
                          error_message_,
                          error_message_);
@@ -2583,7 +2584,7 @@ int TransferModule::transfer_selection_compute(double * selection, double * tau0
  * @return the error status
  */
 
-int TransferModule::transfer_compute_for_each_l(struct transfer_workspace * ptw, int index_q, int index_md, int index_ic, int index_tt, int index_l, double l, double q_max_bessel, radial_function_type radial_type ){
+int TransferModule::transfer_compute_for_each_l(struct transfer_workspace * ptw, int index_q, int index_md, int index_ic, int index_tt, int index_l, double l, double q_max_bessel, radial_function_type radial_type, short use_full_limber) {
 
   /** Summary: */
 

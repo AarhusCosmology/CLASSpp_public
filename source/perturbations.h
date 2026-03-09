@@ -134,6 +134,7 @@ struct perturbs
   short has_cl_cmb_temperature;       /**< do we need \f$ C_l \f$'s for CMB temperature? */
   short has_cl_cmb_polarization;      /**< do we need \f$ C_l \f$'s for CMB polarization? */
   short has_cl_cmb_lensing_potential; /**< do we need \f$ C_l \f$'s for CMB lensing potential? */
+  short want_lcmb_full_limber;       /**< flag to enable full Limber scheme for CMB lensing (default: _TRUE_) */
   short has_cl_lensing_potential;     /**< do we need \f$ C_l \f$'s for galaxy lensing potential? */
   short has_cl_number_count;          /**< do we need \f$ C_l \f$'s for density number count? */
   short has_pk_matter;                /**< do we need matter Fourier spectrum? */
