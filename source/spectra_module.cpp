@@ -1343,6 +1343,73 @@ int SpectraModule::spectra_compute_cl(int index_md,
     }
   }
 
+  /* Override C_l^pp with full Limber integration at high l */
+  if (transfer_module_->do_lcmb_full_limber_ == _TRUE_
+      && _scalarsEXT_
+      && has_pp_ == _TRUE_
+      && l_[index_l] > ppr->l_switch_limber) {
+
+    double * cl_integrand_limber;
+    int limber_num_columns = 3; /* k, integrand, second derivative */
+
+    class_alloc(cl_integrand_limber,
+                transfer_module_->q_size_limber_ * limber_num_columns * sizeof(double),
+                error_message_);
+
+    for (int iq = 0; iq < transfer_module_->q_size_limber_; iq++) {
+
+      double k_l = transfer_module_->k_limber_[index_md][iq];
+      cl_integrand_limber[iq * limber_num_columns + 0] = k_l;
+
+      class_call(primordial_module_->primordial_spectrum_at_k(index_md, linear, k_l, primordial_pk),
+                 primordial_module_->error_message_,
+                 error_message_);
+
+      double trsf1 = transfer_module_->transfer_limber_[index_md]
+        [((index_ic1 * transfer_module_->tt_size_[index_md] + transfer_module_->index_tt_lcmb_)
+          * transfer_module_->l_size_[index_md] + index_l)
+         * transfer_module_->q_size_limber_ + iq];
+
+      double trsf2 = (index_ic1 == index_ic2) ? trsf1 :
+        transfer_module_->transfer_limber_[index_md]
+        [((index_ic2 * transfer_module_->tt_size_[index_md] + transfer_module_->index_tt_lcmb_)
+          * transfer_module_->l_size_[index_md] + index_l)
+         * transfer_module_->q_size_limber_ + iq];
+
+      cl_integrand_limber[iq * limber_num_columns + 1] =
+        primordial_pk[index_ic1_ic2] * trsf1 * trsf2 * 4. * _PI_ / k_l;
+    }
+
+    /* Spline and integrate the Limber integrand */
+    class_call(array_spline(cl_integrand_limber,
+                            limber_num_columns,
+                            transfer_module_->q_size_limber_,
+                            0,
+                            1,
+                            2,
+                            _SPLINE_EST_DERIV_,
+                            error_message_),
+               error_message_,
+               error_message_);
+
+    double clvalue_limber;
+    class_call(array_integrate_all_trapzd_or_spline(cl_integrand_limber,
+                                                    limber_num_columns,
+                                                    transfer_module_->q_size_limber_,
+                                                    0,
+                                                    0,
+                                                    1,
+                                                    2,
+                                                    &clvalue_limber,
+                                                    error_message_),
+               error_message_,
+               error_message_);
+
+    cl_[index_md][(index_l*ic_ic_size_[index_md] + index_ic1_ic2)*ct_size_ + index_ct_pp_] = clvalue_limber;
+
+    free(cl_integrand_limber);
+  }
+
   if (ppt->has_cl_number_count == _TRUE_) {
     free(transfer_ic1_nc);
     free(transfer_ic2_nc);
