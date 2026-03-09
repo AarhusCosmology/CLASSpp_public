@@ -13,13 +13,14 @@ The module rename PR (spectra -> harmonic, nonlinear -> fourier, matching class_
 
 ## Approach
 
-Three independent PRs, one per fix, in order of complexity:
+Two independent PRs, one per fix, in order of complexity:
 
 1. `fix/tensor-tca-initial-conditions`
-2. `fix/cubic-pk-interpolation`
-3. `fix/full-limber-scheme`
+2. `fix/full-limber-scheme`
 
 Each PR includes its own validation against class_public v3.3.4 reference data.
+
+**Note:** The cubic P(k) interpolation fix (class_public issue #142) was investigated and found to be unnecessary. CLASSpp already uses cubic spline interpolation of ln(P(k)) in ln(k) space at the C++ level (`nonlinear_module.cpp:810-817`), and the Python wrapper delegates directly to C++ without scipy interpolation. The class_public fix was Python-wrapper-only.
 
 ---
 
@@ -56,30 +57,7 @@ Match corrected coefficients in debug output.
 
 ---
 
-## PR2: Cubic P(k) Interpolation
-
-**Origin:** class_public commit `d355601b` (v3.2.2), fixing issue #142.
-**Impact:** Eliminates interpolation artifacts in matter power spectrum.
-
-### Changes
-
-#### Python wrapper (`classy.pyx`)
-
-Audit `get_pk_array()`, `get_pk_array_general()`, and any other functions using scipy `interp1d`:
-- Interpolate `np.log(pk)` instead of `pk`
-- Use `kind='cubic'` instead of `kind='linear'`
-- Exponentiate the result
-- Add `interpolation_kind='cubic'` optional parameter
-
-#### C++ level
-
-Audit spectra and nonlinear module interpolation routines:
-- Check whether `array_interpolate_*` calls on `ln_pk` arrays use linear or cubic splines
-- If linear interpolation on P(k) rather than ln(P(k)), fix to match class_public
-
----
-
-## PR3: Full Limber Scheme
+## PR2: Full Limber Scheme
 
 **Origin:** class_public commit `a7304a5e` (v3.2.2).
 **Impact:** Improved accuracy for CMB lensing C_l^phiphi at high l.
@@ -152,7 +130,6 @@ Generated from class_public v3.3.4 with fixed LCDM parameters (r=0.01 for tensor
 | Test | Comparison | Criterion |
 |------|-----------|-----------|
 | `--tensor-tca` | Tensor B-mode C_l, l=2..500 | Relative diff to class_public < 0.05% |
-| `--cubic-pk` | P(k) at 50 interpolated k-points | Relative diff to class_public < 0.1% |
 | `--limber` | C_l^phiphi, l=2..3000 | Relative diff to class_public < 0.1% at l>500 |
 
 ### Output
