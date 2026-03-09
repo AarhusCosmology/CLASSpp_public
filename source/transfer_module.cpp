@@ -317,6 +317,32 @@ int TransferModule::transfer_init() {
       if (future.get() != _SUCCESS_) return _FAILURE_;
   }
   future_output.clear();
+
+  /** - if full Limber, loop over Limber q-grid (parallelized) */
+  if (do_lcmb_full_limber_ == _TRUE_) {
+    for (index_q = 0; index_q < q_size_limber_; index_q++) {
+      future_output.push_back(task_system.AsyncTask([this, tau_size_max, tp_of_tt, tau_rec, sources_spline, &BIS, tau0, index_q, sources, window] () {
+        struct transfer_workspace* ptw = NULL;
+        class_call(transfer_workspace_init(&ptw, perturbations_module_->tau_size_, tau_size_max, pba->K, pba->sgnK, tau0 - thermodynamics_module_->tau_cut_, &BIS),
+          error_message_,
+          error_message_);
+
+        class_call(transfer_compute_for_each_q(tp_of_tt, index_q, tau_size_max, tau_rec, sources, sources_spline, window, ptw, _TRUE_),
+                            error_message_,
+                            error_message_);
+
+        class_call(transfer_workspace_free(ptw),
+                             error_message_,
+                             error_message_);
+        return _SUCCESS_;
+      }));
+    }
+    for (std::future<int>& future : future_output) {
+        if (future.get() != _SUCCESS_) return _FAILURE_;
+    }
+    future_output.clear();
+  }
+
   /** - finally, free arrays allocated outside parallel zone */
   free(window);
 
@@ -1617,6 +1643,9 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
 
   radial_function_type radial_type;
 
+  /* effective q and k values (from standard or Limber grid) */
+  double q_eff, k_eff;
+
   /** - store the sources in the workspace and define all
       fields in this workspace */
   interpolated_sources = ptw->interpolated_sources;
@@ -1629,9 +1658,18 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
 
   for (index_md = 0; index_md < md_size_; index_md++) {
 
+    /* select q and k from appropriate grid */
+    if (use_full_limber == _FALSE_) {
+      q_eff = q_[index_q];
+      k_eff = k_[index_md][index_q];
+    } else {
+      q_eff = q_limber_[index_q];
+      k_eff = k_limber_[index_md][index_q];
+    }
+
     /* if we reached q_max for this mode, there is nothing to be done */
 
-    if (k_[index_md][index_q] <= perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]) {
+    if (k_eff <= perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]) {
 
       /** - loop over initial conditions. */
       /* For each of them: */
@@ -1645,6 +1683,10 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
 
         for (index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
 
+          /* In full Limber mode, only compute CMB lensing transfer type */
+          if (use_full_limber == _TRUE_ && index_tt != index_tt_lcmb_)
+            continue;
+
           /** - check if we must now deal with a new source with a
               new index ppt->index_type. If yes, interpolate it at the
               right values of k. */
@@ -1657,7 +1699,8 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
                                                     tp_of_tt[index_md][index_tt],
                                                     pert_sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + tp_of_tt[index_md][index_tt]],
                                                     pert_sources_spline[index_md][index_ic*perturbations_module_->tp_size_[index_md] + tp_of_tt[index_md][index_tt]],
-                                                    interpolated_sources),
+                                                    interpolated_sources,
+                                                    k_eff),
                        error_message_,
                        error_message_);
           }
@@ -1684,17 +1727,21 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
                                       tau_size_max,
                                       tau0_minus_tau,
                                       w_trapz,
-                                      tau_size),
+                                      tau_size,
+                                      k_eff),
                      error_message_,
                      error_message_);
 
           /* now that the array of times tau0_minus_tau is known, we can
              infer the array of radial coordinates r(tau0_minus_tau) as well as a
-             few other quantities related by trigonometric functions */
+             few other quantities related by trigonometric functions.
+             Skip in full Limber mode (not needed for Limber approximation). */
 
-          class_call(transfer_radial_coordinates(ptw, index_md, index_q),
-                     error_message_,
-                     error_message_);
+          if (use_full_limber == _FALSE_) {
+            class_call(transfer_radial_coordinates(ptw, index_md, index_q),
+                       error_message_,
+                       error_message_);
+          }
 
           /** - Select radial function type */
           class_call(transfer_select_radial_function(index_md, index_tt, &radial_type),
@@ -1710,26 +1757,33 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
                                                  index_ic,
                                                  index_tt,
                                                  (background_module_->conformal_age_ - tau_rec)*thermodynamics_module_->angular_rescaling_,
-                                                 q_[index_q],
+                                                 q_eff,
                                                  l,
                                                  &neglect),
                        error_message_,
                        error_message_);
 
             /* for K>0 (closed), transfer functions only defined for l<nu */
-            if ((ptw->sgnK == 1) && (l_[index_l] >= (int)(q_[index_q]/sqrt(ptw->K) + 0.2))) {
+            if ((ptw->sgnK == 1) && (l_[index_l] >= (int)(q_eff/sqrt(ptw->K) + 0.2))) {
               neglect = _TRUE_;
             }
             /* This would maybe go into transfer_can_be_neglected later: */
-            if ((ptw->sgnK != 0) && (index_l >= ptw->HIS.l_size) && (index_q < index_q_flat_approximation_)) {
+            if ((ptw->sgnK != 0) && (index_l >= ptw->HIS.l_size) && (use_full_limber == _FALSE_) && (index_q < index_q_flat_approximation_)) {
               neglect = _TRUE_;
             }
             if (neglect == _TRUE_) {
 
-              transfer_[index_md][
-                + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
-                + index_q
-              ] = 0.;
+              if (use_full_limber == _FALSE_) {
+                transfer_[index_md][
+                  + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
+                  + index_q
+                ] = 0.;
+              } else {
+                transfer_limber_[index_md][
+                  + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_limber_
+                  + index_q
+                ] = 0.;
+              }
             }
             else {
 
@@ -1782,12 +1836,21 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
 
       for (index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
         for (index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
+          /* In full Limber mode, only handle CMB lensing */
+          if (use_full_limber == _TRUE_ && index_tt != index_tt_lcmb_)
+            continue;
           for (index_l = 0; index_l < l_size_[index_md]; index_l++) {
-
-            transfer_[index_md][
-              + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
-              + index_q
-            ] = 0.;
+            if (use_full_limber == _FALSE_) {
+              transfer_[index_md][
+                + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
+                + index_q
+              ] = 0.;
+            } else {
+              transfer_limber_[index_md][
+                + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_limber_
+                + index_q
+              ] = 0.;
+            }
           }
         }
       }
@@ -1855,7 +1918,8 @@ int TransferModule::transfer_interpolate_sources(int index_q,
                                  int index_type,
                                  double* pert_source,       /* array with argument pert_source[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
                                  double* pert_source_spline, /* array with argument pert_source_spline[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
-                                 double* interpolated_sources /* array with argument interpolated_sources[index_q*perturbations_module_->tau_size_+index_tau] (must be allocated) */
+                                 double* interpolated_sources, /* array with argument interpolated_sources[index_q*perturbations_module_->tau_size_+index_tau] (must be allocated) */
+                                 double k_transfer /* wavenumber at which to interpolate */
                                  ) {
 
   /** Summary: */
@@ -1878,7 +1942,7 @@ int TransferModule::transfer_interpolate_sources(int index_q,
   h = perturbations_module_->k_[index_md][index_k + 1] - perturbations_module_->k_[index_md][index_k];
 
   while (((index_k + 1) < perturbations_module_->k_size_[index_md]) &&
-         (perturbations_module_->k_[index_md][index_k + 1] < k_[index_md][index_q])) {
+         (perturbations_module_->k_[index_md][index_k + 1] < k_transfer)) {
     index_k++;
     h = perturbations_module_->k_[index_md][index_k + 1] - perturbations_module_->k_[index_md][index_k];
   }
@@ -1887,7 +1951,7 @@ int TransferModule::transfer_interpolate_sources(int index_q,
              error_message_,
              "stop to avoid division by zero");
 
-  b = (k_[index_md][index_q] - perturbations_module_->k_[index_md][index_k])/h;
+  b = (k_transfer - perturbations_module_->k_[index_md][index_k])/h;
   a = 1.-b;
 
   for (index_tau = 0; index_tau < perturbations_module_->tau_size_; index_tau++) {
@@ -1927,7 +1991,7 @@ int TransferModule::transfer_interpolate_sources(int index_q,
  * @return the error status
  */
 
-int TransferModule::transfer_sources(double * interpolated_sources, double tau_rec, int index_q, int index_md, int index_tt, double * sources, double * window, int tau_size_max, double * tau0_minus_tau, double * w_trapz, int * tau_size_out)  {
+int TransferModule::transfer_sources(double * interpolated_sources, double tau_rec, int index_q, int index_md, int index_tt, double * sources, double * window, int tau_size_max, double * tau0_minus_tau, double * w_trapz, int * tau_size_out, double k_val)  {
 
   /** Summary: */
 
@@ -2041,7 +2105,7 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
             interpolated_sources[index_tau]
             * rescaling
             * ptr->lcmb_rescale
-            *pow(k_[index_md][index_q]/ptr->lcmb_pivot, ptr->lcmb_tilt);
+            *pow(k_val/ptr->lcmb_pivot, ptr->lcmb_tilt);
 
           /* store value of (tau0-tau) */
           tau0_minus_tau[index_tau-index_tau_min] = tau0 - tau;
@@ -2101,10 +2165,10 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
           rescaling = window[index_tt*tau_size_max+index_tau];
 
           if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
-            rescaling *= 1./k_[index_md][index_q]/k_[index_md][index_q]; // Factor from original ClassGAL paper ( arXiv 1307.1459 )
+            rescaling *= 1./k_val/k_val; // Factor from original ClassGAL paper ( arXiv 1307.1459 )
 
           if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
-            rescaling *= 1./k_[index_md][index_q]; // Factor from original ClassGAL paper ( arXiv 1307.1459 )
+            rescaling *= 1./k_val; // Factor from original ClassGAL paper ( arXiv 1307.1459 )
 
           sources[index_tau] *= rescaling;
         }
@@ -2151,7 +2215,7 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
           sources[index_tau] *= window[index_tt*tau_size_max+index_tau];
 
           if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
-            sources[index_tau] *= k_[index_md][index_q]; // Factor from chi derivative of d/dchi j_ell(k*chi)= d/d(kchi) j_ell(k chi) * k = k * j_ell'(kchi)
+            sources[index_tau] *= k_val; // Factor from chi derivative of d/dchi j_ell(k*chi)= d/d(kchi) j_ell(k chi) * k = k * j_ell'(kchi)
         }
       }
       /* End integrated contributions */
@@ -2686,27 +2750,45 @@ int TransferModule::transfer_compute_for_each_l(struct transfer_workspace * ptw,
   /** - return zero transfer function if l is above l_max */
   if (index_l >= l_size_tt_[index_md][index_tt]) {
 
-    transfer_[index_md][
-      + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
-      + index_q
-    ] = 0.;
+    if (use_full_limber == _FALSE_) {
+      transfer_[index_md][
+        + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
+        + index_q
+      ] = 0.;
+    } else {
+      transfer_limber_[index_md][
+        + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_limber_
+        + index_q
+      ] = 0.;
+    }
     return _SUCCESS_;
   }
 
-  q = q_[index_q];
-  k = k_[index_md][index_q];
+  /* Select q and k from appropriate grid */
+  if (use_full_limber == _FALSE_) {
+    q = q_[index_q];
+    k = k_[index_md][index_q];
+  } else {
+    q = q_limber_[index_q];
+    k = k_limber_[index_md][index_q];
+  }
 
   if (ptr->transfer_verbose > 3)
     printf("Compute transfer for l=%d type=%d\n",(int)l,index_tt);
 
-  class_call(transfer_use_limber(q_max_bessel,
-                                 index_md,
-                                 index_tt,
-                                 q,
-                                 l,
-                                 &use_limber),
-             error_message_,
-             error_message_);
+  /* In full Limber mode, always use Limber approximation */
+  if (use_full_limber == _TRUE_) {
+    use_limber = _TRUE_;
+  } else {
+    class_call(transfer_use_limber(q_max_bessel,
+                                   index_md,
+                                   index_tt,
+                                   q,
+                                   l,
+                                   &use_limber),
+               error_message_,
+               error_message_);
+  }
 
   if (use_limber == _TRUE_) {
 
@@ -2737,7 +2819,11 @@ int TransferModule::transfer_compute_for_each_l(struct transfer_workspace * ptw,
   }
 
   /** - store transfer function in transfer structure */
-  transfer_[index_md][((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_ + index_q] = transfer_function;
+  if (use_full_limber == _FALSE_) {
+    transfer_[index_md][((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_ + index_q] = transfer_function;
+  } else {
+    transfer_limber_[index_md][((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_limber_ + index_q] = transfer_function;
+  }
 
   return _SUCCESS_;
 

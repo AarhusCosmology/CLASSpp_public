@@ -84,8 +84,8 @@ private:
   int transfer_source_tau_size(double tau_rec, double tau0, int index_md, int index_tt, int * tau_size);
   int transfer_compute_for_each_q(int ** tp_of_tt, int index_q, int tau_size_max, double tau_rec, double *** sources, double *** sources_spline, double * window, struct transfer_workspace * ptw, short use_full_limber);
   int transfer_radial_coordinates(struct transfer_workspace * ptw, int index_md, int index_q);
-  int transfer_interpolate_sources(int index_q, int index_md, int index_ic, int index_type, double * sources, double * source_spline, double * interpolated_sources);
-  int transfer_sources(double * interpolated_sources, double tau_rec, int index_q, int index_md, int index_tt, double * sources, double * window, int tau_size_max, double * tau0_minus_tau, double * delta_tau, int * tau_size_out);
+  int transfer_interpolate_sources(int index_q, int index_md, int index_ic, int index_type, double * sources, double * source_spline, double * interpolated_sources, double k_transfer);
+  int transfer_sources(double * interpolated_sources, double tau_rec, int index_q, int index_md, int index_tt, double * sources, double * window, int tau_size_max, double * tau0_minus_tau, double * delta_tau, int * tau_size_out, double k_val);
   int transfer_selection_function(int bin, double z, double * selection);
   int transfer_dNdz_analytic(double z, double * dNdz, double * dln_dNdz_dz);
   int transfer_selection_sampling(int bin, double * tau0_minus_tau, int tau_size);
