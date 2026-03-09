@@ -54,6 +54,14 @@ public:
   double ** transfer_; /**< table of transfer functions for each mode, initial condition, type, multipole and wavenumber, with argument transfer[index_md][((index_ic * transfer_module_->tt_size_[index_md] + index_tt) * transfer_module_->l_size_[index_md] + index_l) * transfer_module_->q_size_ + index_q] */
   //@}
 
+  /** @name - full Limber scheme for CMB lensing */
+  //@{
+  short do_lcmb_full_limber_; /**< flag: use full Limber scheme for CMB lensing? */
+  int q_size_limber_;         /**< number of q values for full Limber scheme */
+  double * q_limber_;         /**< q-grid for full Limber scheme */
+  double ** k_limber_;        /**< k-grid for full Limber scheme, per mode */
+  double ** transfer_limber_; /**< transfer functions on the Limber grid */
+  //@}
 
 
 private:
@@ -69,11 +77,12 @@ private:
   int transfer_get_q_list(double q_period, double K, int sgnK);
   int transfer_get_q_list_v1(double q_period, double K, int sgnK);
   int transfer_get_k_list(double K);
+  int transfer_get_q_limber_list(double K, int sgnK);
   int transfer_get_source_correspondence(int ** tp_of_tt);
   int transfer_free_source_correspondence(int ** tp_of_tt);
   int transfer_source_tau_size_max(double tau_rec, double tau0, int * tau_size_max);
   int transfer_source_tau_size(double tau_rec, double tau0, int index_md, int index_tt, int * tau_size);
-  int transfer_compute_for_each_q(int ** tp_of_tt, int index_q, int tau_size_max, double tau_rec, double *** sources, double *** sources_spline, double * window, struct transfer_workspace * ptw);
+  int transfer_compute_for_each_q(int ** tp_of_tt, int index_q, int tau_size_max, double tau_rec, double *** sources, double *** sources_spline, double * window, struct transfer_workspace * ptw, short use_full_limber);
   int transfer_radial_coordinates(struct transfer_workspace * ptw, int index_md, int index_q);
   int transfer_interpolate_sources(int index_q, int index_md, int index_ic, int index_type, double * sources, double * source_spline, double * interpolated_sources);
   int transfer_sources(double * interpolated_sources, double tau_rec, int index_q, int index_md, int index_tt, double * sources, double * window, int tau_size_max, double * tau0_minus_tau, double * delta_tau, int * tau_size_out);
@@ -84,7 +93,7 @@ private:
   int transfer_source_resample(int bin, double * tau0_minus_tau, int tau_size, int index_md, double tau0, double * interpolated_sources, double * sources);
   int transfer_selection_times(int bin, double * tau_min, double * tau_mean, double * tau_max);
   int transfer_selection_compute(double * selection, double * tau0_minus_tau, double * delta_tau, int tau_size, double * pvecback, double tau0, int bin);
-  int transfer_compute_for_each_l(struct transfer_workspace * ptw, int index_q, int index_md, int index_ic, int index_tt, int index_l, double l, double q_max_bessel, radial_function_type radial_type);
+  int transfer_compute_for_each_l(struct transfer_workspace * ptw, int index_q, int index_md, int index_ic, int index_tt, int index_l, double l, double q_max_bessel, radial_function_type radial_type, short use_full_limber);
   int transfer_use_limber(double q_max_bessel, int index_md, int index_tt, double q, double l, short * use_limber);
   int transfer_integrate(struct transfer_workspace *ptw, int index_q, int index_md, int index_tt, double l, int index_l, double q, radial_function_type radial_type, double * trsf);
   int transfer_limber(struct transfer_workspace * ptw, int index_md, int index_q, double l, double q, radial_function_type radial_type, double * trsf);
