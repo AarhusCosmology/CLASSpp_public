@@ -7297,7 +7297,8 @@ int PerturbationsModule::perturb_sources_member(double tau, double* y, double* d
 
       }
       else {
-        P = 2./5.*_SQRT6_*y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_]; //TBC
+        /* TCA solution P^(2) = -1/3 * H'/kappa', valid in both hierarchies (C. Pitrou, class_public v3.3.0) */
+        P = -1./3.*y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
       }
     }
     else {
@@ -7767,10 +7768,11 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
         pol4_g = y[ppw->pv->index_pt_pol0_g+4];
       }
       else {
-        delta_g = -4./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/pvecthermo[thermodynamics_module_->index_th_dkappa_]; //TBC
+        /* Corrected TCA relations (C. Pitrou, class_public v3.3.0) */
+        delta_g = 4./3.*_SQRT6_*ppw->pv->y[ppw->pv->index_pt_gwdot]/pvecthermo[thermodynamics_module_->index_th_dkappa_];
         shear_g = 0.;
         l4_g = 0.;
-        pol0_g = 1./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/pvecthermo[thermodynamics_module_->index_th_dkappa_]; //TBC
+        pol0_g = -_SQRT6_/3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/pvecthermo[thermodynamics_module_->index_th_dkappa_];
         pol2_g = 0.;
         pol4_g = 0.;
       }
