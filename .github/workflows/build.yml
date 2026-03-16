@@ -29,13 +29,18 @@ jobs:
       - name: Run test 🤖
         run: |
           docker run --rm \
-          -v "${GITHUB_WORKSPACE}"/main_class:/github \
-          python:latest bash -c ': \
-            && pip install numpy \
-            && cd github \
-            && pip install . \
-            && python -c "import classy" \
-          '
+            -u $(id -u):$(id -g) \
+            -e HOME=/tmp \
+            -v "${GITHUB_WORKSPACE}"/main_class:/github \
+            python:latest bash -c '
+              python -m venv /tmp/venv &&
+              source /tmp/venv/bin/activate &&
+              pip install numpy &&
+              cd /github &&
+              pip install . &&
+              python -c "import classy"
+            '
+
 
   nose_tests_lvl1:
     runs-on: [self-hosted, linux, heavy]
