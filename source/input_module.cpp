@@ -80,9 +80,9 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
       arguments are passed, they will remain null and inform
       init_params() that all parameters take default values. */
 
-  fc.size = 0;
-  fc_input.size = 0;
-  fc_precision.size = 0;
+  fc = FileContent();
+  fc_input = FileContent();
+  fc_precision = FileContent();
   input_file[0]='\0';
   precision_file[0]='\0';
 
@@ -145,17 +145,10 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
           continue;
         break;
       }
-      class_call(parser_init(&fc_root,
-                             1,
-                             fc_input.filename,
-                             errmsg),
-                 errmsg,errmsg);
-      snprintf(fc_root.name[0], _ARGUMENT_LENGTH_MAX_, "root");
-      snprintf(fc_root.value[0], _ARGUMENT_LENGTH_MAX_, "output/%s%02d_", inifilename, filenum);
-      fc_root.read[0] = _FALSE_;
-      class_call(parser_cat(&fc_input,&fc_root,&fc_inputroot,errmsg),
-                 errmsg,
-                 errmsg);
+      snprintf(tmp_file, tmp_file_size, "output/%s%02d_", inifilename, filenum);
+      fc_root.set("root", tmp_file);
+      class_call(parser_cat(&fc_input, &fc_root, &fc_inputroot, errmsg),
+                 errmsg, errmsg);
       pfc_input = &fc_inputroot;
     }
   }
@@ -183,9 +176,7 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
 InputModule::InputModule(FileContent& fc)
 : file_content_(fc)
 , shooting_workspace_(file_content_) {
-  for (int i = 0; i < file_content_.size; ++i) {
-    file_content_.read[i] = _FALSE_;
-  }
+  file_content_.mark_all_unread();
   int status = input_init();
   if (status == _FAILURE_) {
     throw std::invalid_argument(error_message_);
@@ -194,21 +185,8 @@ InputModule::InputModule(FileContent& fc)
 
 int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_size, int* target_indices) {
 
-  // Push unknown parameters to the end of file_content_
-  file_content_.size += unknown_parameters_size;
-  file_content_.name = (FileArg*) realloc(file_content_.name, file_content_.size*sizeof(FileArg));
-  file_content_.value = (FileArg*) realloc(file_content_.value, file_content_.size*sizeof(FileArg));
-  file_content_.read = (short*) realloc(file_content_.read, file_content_.size*sizeof(short));
   file_content_.is_shooting = true;
-  for (int i = file_content_.size - unknown_parameters_size; i < file_content_.size; ++i) {
-    file_content_.name[i][0] = '\n';
-    file_content_.value[i][0] = '\n';
-    file_content_.read[i] = _FALSE_;
-  }
 
-  class_alloc(shooting_workspace_.unknown_parameters_index,
-              unknown_parameters_size*sizeof(int),
-              error_message_);
   class_alloc(shooting_workspace_.target_name,
               unknown_parameters_size*sizeof(enum target_names),
               error_message_);
@@ -216,6 +194,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
               unknown_parameters_size*sizeof(int),
               error_message_);
   shooting_workspace_.unknown_parameters_size = unknown_parameters_size;
+  shooting_workspace_.unknown_parameter_names.resize(unknown_parameters_size);
   std::vector<double> target_values;
 
   /** - --> go through all cases with unknown parameters: */
@@ -237,7 +216,8 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     // store name of target parameter
     shooting_workspace_.target_name[counter] = (enum target_names)index_target;
     shooting_workspace_.target_sizes[counter] = params_size;
-    shooting_workspace_.unknown_parameters_index[counter] = file_content_.size - unknown_parameters_size + counter;
+    const std::string& param_name = kUnknownNamestrings_[index_target];
+    shooting_workspace_.unknown_parameter_names[counter] = param_name;
     std::string comma_separated_list_of_values = "1.0";
     for (int j = 0; j < params_size; ++j) {
       // store target value of target parameter
@@ -247,8 +227,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
       }
     }
     free(params);
-    strcpy(file_content_.name[shooting_workspace_.unknown_parameters_index[counter]], kUnknownNamestrings_[index_target].c_str());
-    strcpy(file_content_.value[shooting_workspace_.unknown_parameters_index[counter]], comma_separated_list_of_values.c_str());
+    file_content_.set(param_name, comma_separated_list_of_values);
 
     //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
     class_alloc(shooting_workspace_.target_values,
@@ -263,11 +242,12 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
   int fevals = 0;
   if (target_values.size() == 1) {
     // 1d root finding
+    const std::string& param_name0 = shooting_workspace_.unknown_parameter_names[0];
     if (input_verbose > 0) {
       fprintf(
               stdout,
               "Computing unknown input parameter '%s' using input parameter '%s'\n",
-              file_content_.name[shooting_workspace_.unknown_parameters_index[0]],
+              param_name0.c_str(),
               kTargetNamestrings_[shooting_workspace_.target_name[0]].c_str()
               );
     }
@@ -276,14 +256,14 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
                error_message_, error_message_);
 
     /* Store xzero */
-    snprintf(file_content_.value[shooting_workspace_.unknown_parameters_index[0]], _ARGUMENT_LENGTH_MAX_, "%e", xzero);
+    char xzero_buf[64];
+    snprintf(xzero_buf, sizeof(xzero_buf), "%e", xzero);
+    file_content_.set(param_name0, xzero_buf);
     double fzero_value;
     input_fzerofun_1d(xzero, (void*)(&shooting_workspace_), &fzero_value, error_message_);
 
     if (input_verbose > 0) {
-      fprintf(stdout, " -> found '%s = %s'\n",
-              file_content_.name [shooting_workspace_.unknown_parameters_index[0]],
-              file_content_.value[shooting_workspace_.unknown_parameters_index[0]]);
+      fprintf(stdout, " -> found '%s = %s'\n", param_name0.c_str(), xzero_buf);
     }
   }
   else{
@@ -320,16 +300,16 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     /* Store xzero */
     int x_inout_index = 0;
     for (int counter = 0; counter < unknown_parameters_size; counter++) {
-      char* value = file_content_.value[shooting_workspace_.unknown_parameters_index[counter]];
+      const std::string& param_name = shooting_workspace_.unknown_parameter_names[counter];
+      std::string new_value;
       for (int j = 0; j < shooting_workspace_.target_sizes[counter]; ++j) {
-        const char* format_string = j > 0 ? ",%.17g" : "%.17g";
-        int bytes_written = snprintf(value, _ARGUMENT_LENGTH_MAX_, format_string, x_inout[x_inout_index++]);
-        value += bytes_written;
+        char buf[32];
+        snprintf(buf, sizeof(buf), j > 0 ? ",%.17g" : "%.17g", x_inout[x_inout_index++]);
+        new_value += buf;
       }
+      file_content_.set(param_name, new_value);
       if (input_verbose > 0) {
-        fprintf(stdout," -> found '%s = %s'\n",
-                file_content_.name [shooting_workspace_.unknown_parameters_index[counter]],
-                file_content_.value[shooting_workspace_.unknown_parameters_index[counter]]);
+        fprintf(stdout," -> found '%s = %s'\n", param_name.c_str(), new_value.c_str());
       }
     }
 
@@ -486,12 +466,12 @@ int InputModule::input_init() {
     fprintf(param_unused,"# but not used (just for info)\n");
     fprintf(param_unused,"#\n");
 
-    for (i=0; i<pfc->size; i++) {
-      if (pfc->read[i] == _TRUE_)
-        fprintf(param_output,"%s = %s\n",pfc->name[i],pfc->value[i]);
+    pfc->for_each([&](const std::string& name, const std::string& value, bool read) {
+      if (read)
+        fprintf(param_output, "%s = %s\n", name.c_str(), value.c_str());
       else
-        fprintf(param_unused,"%s = %s\n",pfc->name[i],pfc->value[i]);
-    }
+        fprintf(param_unused, "%s = %s\n", name.c_str(), value.c_str());
+    });
     fprintf(param_output,"#\n");
 
     fclose(param_output);
@@ -503,11 +483,11 @@ int InputModule::input_init() {
              errmsg);
 
   if ((flag1 == _TRUE_) && ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL))) {
-
-    for (i=0; i<pfc->size; i++) {
-      if (pfc->read[i] == _FALSE_)
-        fprintf(stdout,"[WARNING: input line not recognized and not taken into account: '%s=%s']\n",pfc->name[i],pfc->value[i]);
-    }
+    pfc->for_each([](const std::string& name, const std::string& value, bool read) {
+      if (!read)
+        fprintf(stdout, "[WARNING: input line not recognized and not taken into account: '%s=%s']\n",
+                name.c_str(), value.c_str());
+    });
   }
 
   return _SUCCESS_;
@@ -3701,12 +3681,14 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
   /** - Read input parameters */
   int x_inout_index = 0;
   for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
-    char* value = pfzw->fc.value[pfzw->unknown_parameters_index[counter]];
+    const std::string& param_name = pfzw->unknown_parameter_names[counter];
+    std::string new_value;
     for (int j = 0; j < pfzw->target_sizes[counter]; ++j) {
-      const char* format_string = j > 0 ? ",%.17g" : "%.17g";
-      int bytes_written = snprintf(value, _ARGUMENT_LENGTH_MAX_, format_string, unknown_values[x_inout_index++]);
-      value += bytes_written;
+      char buf[32];
+      snprintf(buf, sizeof(buf), j > 0 ? ",%.17g" : "%.17g", unknown_values[x_inout_index++]);
+      new_value += buf;
     }
+    pfzw->fc.set(param_name, new_value);
   }
 
   std::unique_ptr<InputModule> input_module{new InputModule(pfzw->fc)};

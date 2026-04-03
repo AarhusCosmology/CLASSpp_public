@@ -184,13 +184,15 @@ class_names = ['FileContent', 'NonColdDarkMatter', 'InputModule', 'BackgroundMod
                 'ClassConstants', 'NcdmSettings',]
 allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', 'FileArg',
                  'std::map<std::string, std::vector<double>>',
-                 'std::map<std::string, int>', 'std::shared_ptr<NonColdDarkMatter>'] + struct_names
+                 'std::map<std::string, int>', 'std::shared_ptr<NonColdDarkMatter>',
+                 'std::vector<std::string>'] + struct_names
 
 keywords_to_be_ignored = ['static', 'constexpr', 'const']
 
 for file in h_files:
     with open(file) as fid:
         class_name = ''
+        error_message_added = False
         for line in fid:
             if not class_name:
                 # Check for struct
@@ -200,11 +202,12 @@ for file in h_files:
                     if (('struct ' + s + ' ' in line or 'struct ' + s + '\n' in line) or
                         ('class ' + s + ' ' in line or 'class ' + s + '\n' in line)):
                         class_name = s
+                        error_message_added = False
                         classes.append('cdef extern from "' + os.path.basename(file) + '":')
                         classes.append('    cdef cppclass ' + s + ':')
             elif 'private:' in line or '};' in line:
                 # Class just ended ended or we have reached the private section of the class
-                if 'Module' in class_name:
+                if 'Module' in class_name and not error_message_added:
                     # If module, add the inherited variable error_message_
                     classes.append('        ErrorMsg error_message_')
                 class_name = ''
@@ -262,6 +265,8 @@ for file in h_files:
                 out_line = '        ' + typename + ' ' + variable_name
                 out_line = out_line.replace('std::','').replace('<', '[').replace('>',']')
                 classes.append(out_line)
+                if typename == 'ErrorMsg' and variable_name == 'error_message_':
+                    error_message_added = True
 
 
 # In[7]:

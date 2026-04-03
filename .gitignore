@@ -26,3 +26,5 @@ python/faulty_figs
 CLASS.xcodeproj/project.xcworkspace/xcuserdata
 CLASS.xcodeproj/project.xcworkspace/contents.xcworkspacedata
 CLASS.xcodeproj/xcshareddata/xcschemes/CLASS.xcscheme
+classy.cpp
+classy_community.egg-info/

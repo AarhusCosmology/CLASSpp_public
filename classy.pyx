@@ -180,10 +180,9 @@ cdef class PyCosmology:
         # This part is done to list all the unread parameters, for debugging
         problem_flag = False
         problematic_parameters = []
-        for i in range(self._fc.size):
-            if self._fc.read[i] == constvals.sFALSE:
-                problem_flag = True
-                problematic_parameters.append(self._fc.name[i].decode())
+        for param_name in self._fc.unread_parameters():
+            problem_flag = True
+            problematic_parameters.append(param_name.decode())
         if problem_flag:
             raise CosmoSevereError(
                 "Class did not read input parameter(s): {}\n"
@@ -207,28 +206,17 @@ cdef class PyCosmology:
         cdef:
             FileContent new_file_content
             char* dumc
-            int i
+            char* dumv
 
         # _fc will be cleaned up by its destructor
         self._fc = new_file_content
-        self._fc.size = len(self._pars)
-        self._fc.name = <FileArg*> malloc(sizeof(FileArg)*self._fc.size)
-        assert(self._fc.name != nullptr)
-        self._fc.value = <FileArg*> malloc(sizeof(FileArg)*self._fc.size)
-        assert(self._fc.value != nullptr)
-        self._fc.read = <short*> malloc(sizeof(short)*self._fc.size)
-        assert(self._fc.read != nullptr)
 
-        # fill parameter file
-        for i, (name, value) in enumerate(self._pars.items()):
+        for name, value in self._pars.items():
             dumcp = name.encode()
             dumc = dumcp
-            snprintf(self._fc.name[i], constvals.sARGUMENT_LENGTH_MAX, "%s", dumc)
-
-            dumcp = str(value).encode()
-            dumc = dumcp
-            snprintf(self._fc.value[i], constvals.sARGUMENT_LENGTH_MAX, "%s", dumc)
-            self._fc.read[i] = 0
+            dumvp = str(value).encode()
+            dumv = dumvp
+            self._fc.set(dumc, dumv)
         return self
 
     # The functions struct_cleanup(), empty(), set() and compute() are not neccessary, but they are here to support

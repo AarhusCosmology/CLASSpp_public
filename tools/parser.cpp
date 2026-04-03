@@ -1,678 +1,356 @@
 #include "parser.h"
 
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <sstream>
+#include <stdexcept>
+
+/*****************************************************************************
+ * FileContent – C++ implementation
+ *****************************************************************************/
+
+/* static */ FileContent FileContent::from_file(const std::string& filename) {
+  FILE* fp = std::fopen(filename.c_str(), "r");
+  if (!fp) {
+    throw std::invalid_argument("Cannot open file '" + filename + "': " + std::strerror(errno));
+  }
+
+  FileContent fc;
+  fc.filename_ = filename;
+
+  char line_buf[_LINE_LENGTH_MAX_];
+  while (std::fgets(line_buf, _LINE_LENGTH_MAX_, fp) != nullptr) {
+    std::string name, value;
+    if (!parse_line(line_buf, name, value)) continue;
+
+    if (fc.params_.count(name)) {
+      std::fclose(fp);
+      throw std::invalid_argument(
+          "Multiple entries of parameter '" + name + "' in file '" + filename + "'");
+    }
+    fc.keys_.push_back(name);
+    fc.params_[name] = value;
+  }
+
+  if (fc.params_.empty()) {
+    std::fclose(fp);
+    throw std::invalid_argument("No readable input in file '" + filename + "'");
+  }
+
+  std::fclose(fp);
+  return fc;
+}
+
+void FileContent::set(const std::string& name, const std::string& value) {
+  if (!params_.count(name)) {
+    keys_.push_back(name);
+  }
+  params_[name] = value;
+  read_params_.erase(name);
+}
+
+FileContent& FileContent::operator+=(const FileContent& other) {
+  for (const auto& key : other.keys_) {
+    if (params_.count(key)) {
+      throw std::invalid_argument(
+          "Multiple entries of parameter '" + key + "' in files '" +
+          filename_ + "' and '" + other.filename_ + "'");
+    }
+    keys_.push_back(key);
+    params_[key] = other.params_.at(key);
+  }
+  if (filename_.empty()) {
+    filename_ = other.filename_;
+  } else if (!other.filename_.empty()) {
+    filename_ += " or " + other.filename_;
+  }
+  return *this;
+}
+
+std::vector<std::string> FileContent::unread_parameters() const {
+  std::vector<std::string> unread;
+  for (const auto& key : keys_) {
+    if (!read_params_.count(key)) unread.push_back(key);
+  }
+  return unread;
+}
+
+void FileContent::for_each(
+    const std::function<void(const std::string&, const std::string&, bool)>& fn) const {
+  for (const auto& key : keys_) {
+    fn(key, params_.at(key), read_params_.count(key) > 0);
+  }
+}
+
+bool FileContent::read_int(const std::string& name, int& value) const {
+  auto it = params_.find(name);
+  if (it == params_.end()) return false;
+  if (std::sscanf(it->second.c_str(), "%d", &value) != 1) {
+    throw std::invalid_argument(
+        "Cannot read integer value of parameter '" + name + "' in file '" + filename_ + "'");
+  }
+  read_params_.insert(name);
+  return true;
+}
+
+bool FileContent::read_double(const std::string& name, double& value) const {
+  auto it = params_.find(name);
+  if (it == params_.end()) return false;
+  if (std::sscanf(it->second.c_str(), "%lg", &value) != 1) {
+    throw std::invalid_argument(
+        "Cannot read double value of parameter '" + name + "' in file '" + filename_ + "'");
+  }
+  read_params_.insert(name);
+  return true;
+}
+
+bool FileContent::read_string(const std::string& name, std::string& value) const {
+  auto it = params_.find(name);
+  if (it == params_.end()) return false;
+  value = it->second;
+  read_params_.insert(name);
+  return true;
+}
+
+bool FileContent::read_list_of_doubles(const std::string& name, std::vector<double>& values) const {
+  auto it = params_.find(name);
+  if (it == params_.end()) return false;
+
+  const auto parts = split_csv(it->second);
+  values.resize(parts.size());
+  for (std::size_t i = 0; i < parts.size(); ++i) {
+    if (std::sscanf(parts[i].c_str(), "%lg", &values[i]) != 1) {
+      throw std::invalid_argument(
+          "Cannot read double entry " + std::to_string(i + 1) +
+          " of parameter '" + name + "' in file '" + filename_ + "'");
+    }
+  }
+  read_params_.insert(name);
+  return true;
+}
+
+bool FileContent::read_list_of_integers(const std::string& name, std::vector<int>& values) const {
+  auto it = params_.find(name);
+  if (it == params_.end()) return false;
+
+  const auto parts = split_csv(it->second);
+  values.resize(parts.size());
+  for (std::size_t i = 0; i < parts.size(); ++i) {
+    if (std::sscanf(parts[i].c_str(), "%d", &values[i]) != 1) {
+      throw std::invalid_argument(
+          "Cannot read integer entry " + std::to_string(i + 1) +
+          " of parameter '" + name + "' in file '" + filename_ + "'");
+    }
+  }
+  read_params_.insert(name);
+  return true;
+}
+
+bool FileContent::read_list_of_strings(const std::string& name, std::vector<std::string>& values) const {
+  auto it = params_.find(name);
+  if (it == params_.end()) return false;
+  values = split_csv(it->second);
+  read_params_.insert(name);
+  return true;
+}
+
+/* static */ bool FileContent::parse_line(
+    const std::string& line, std::string& name, std::string& value) {
+  /* A valid data line must contain '=' */
+  const auto eq_pos = line.find('=');
+  if (eq_pos == std::string::npos) return false;
+
+  /* Ignore the line if '#' appears before (or immediately after) '=' */
+  const auto hash_pos = line.find('#');
+  if (hash_pos != std::string::npos && hash_pos < eq_pos + 2) return false;
+
+  /* Extract the name: trim whitespace and optional surrounding quotes */
+  auto trim_quotes = [](std::string s) -> std::string {
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\'' || s.front() == '"')) s.erase(s.begin());
+    while (!s.empty() && (s.back()  == ' ' || s.back()  == '\'' || s.back()  == '"')) s.pop_back();
+    return s;
+  };
+
+  name = trim_quotes(line.substr(0, eq_pos));
+  if (name.empty()) return false;
+
+  /* Extract the value: text after '=', up to '#' or end of line, trimmed */
+  const auto value_end = (hash_pos != std::string::npos) ? hash_pos : line.size();
+  std::string raw_value = line.substr(eq_pos + 1, value_end - eq_pos - 1);
+
+  /* Trim trailing whitespace / newline */
+  while (!raw_value.empty() && (unsigned char)raw_value.back() <= ' ') raw_value.pop_back();
+  /* Trim leading whitespace */
+  std::size_t start = 0;
+  while (start < raw_value.size() && raw_value[start] == ' ') ++start;
+  raw_value = raw_value.substr(start);
+
+  if (raw_value.empty()) return false;
+
+  value = std::move(raw_value);
+  return true;
+}
+
+/* static */ std::vector<std::string> FileContent::split_csv(const std::string& s) {
+  std::vector<std::string> parts;
+  std::istringstream ss(s);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    /* trim whitespace */
+    std::size_t start = token.find_first_not_of(' ');
+    std::size_t end   = token.find_last_not_of(' ');
+    if (start != std::string::npos) {
+      parts.push_back(token.substr(start, end - start + 1));
+    }
+  }
+  return parts;
+}
+
+/*****************************************************************************
+ * Legacy C-style wrapper functions
+ * These delegate to the FileContent class so that existing call-sites in
+ * input_module.cpp (which use the class_call / class_test macros) keep working
+ * without modification.
+ *****************************************************************************/
+
 int parser_read_file(
 		     const char* filename,
 		     FileContent* pfc,
 		     ErrorMsg errmsg
 		     ){
-  FILE * inputfile;
-  char line[_LINE_LENGTH_MAX_];
-  int counter;
-  int is_data;
-  FileArg name;
-  FileArg value;
-
-  class_open(inputfile,filename,"r",errmsg);
-
-  counter = 0;
-  while (fgets(line,_LINE_LENGTH_MAX_,inputfile) != NULL) {
-    class_call(parser_read_line(line,&is_data,name,value,errmsg),errmsg,errmsg);
-    if (is_data == _TRUE_) counter++;
+  try {
+    *pfc = FileContent::from_file(filename);
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-
-  class_test(counter == 0,
-	     errmsg,
-	     "No readable input in file %s",filename);
-
-  class_call(parser_init(pfc,counter,filename,errmsg),
-	     errmsg,
-	     errmsg);
-
-  rewind(inputfile);
-
-  counter = 0;
-  while (fgets(line,_LINE_LENGTH_MAX_,inputfile) != NULL) {
-    class_call(parser_read_line(line,&is_data,name,value,errmsg),errmsg,errmsg);
-    if (is_data == _TRUE_) {
-      strcpy(pfc->name[counter],name);
-      strcpy(pfc->value[counter],value);
-      pfc->read[counter]=_FALSE_;
-      counter++;
-    }
-  }
-
-  fclose(inputfile);
-
-  return _SUCCESS_;
-
-}
-
-int parser_init(
-		FileContent* pfc,
-		int size,
-    const char* filename,
-		ErrorMsg errmsg
-		) {
-
-  if (size > 0) {
-    pfc->size=size;
-    class_alloc(pfc->filename, static_cast<int>((strlen(filename) + 1)*sizeof(char)), errmsg);
-    strcpy(pfc->filename,filename);
-    class_alloc(pfc->name,size*sizeof(FileArg),errmsg);
-    class_alloc(pfc->value,size*sizeof(FileArg),errmsg);
-    class_alloc(pfc->read,size*sizeof(short),errmsg);
-  }
-
   return _SUCCESS_;
 }
 
-int parser_read_line(
-		     char * line,
-		     int * is_data,
-		     char * name,
-		     char * value,
-		     ErrorMsg errmsg
-		     ) {
+int parser_init(FileContent* pfc, int /*size*/, const char* /*filename*/, ErrorMsg /*errmsg*/) {
+  /* With the new FileContent class the size is managed dynamically.
+   * Reset to a fresh instance without inserting any placeholder parameter,
+   * so the parameter map remains empty until real values are added. */
+  *pfc = FileContent();
+  return _SUCCESS_;
+}
 
-  char * phash;
-  char * pequal;
-  char * left;
-  char * right;
-
-  /* check that there is an '=' (if you want the role of '=' to be
-     played by ':' you only need to substitute it in the next line and
-     recompile) */
-
-  pequal=strchr(line,'=');
-  if (pequal == NULL) {*is_data = _FALSE_; return _SUCCESS_;}
-
-  /* if yes, check that there is not an '#' before the '=' */
-
-  phash=strchr(line,'#');
-  if ((phash != NULL) && (phash-pequal<2)) {*is_data = _FALSE_; return _SUCCESS_;}
-
-  /* get the name, i.e. the block before the '=' */
-
-  left=line;
-  while (left[0]==' ') {
-    left++;
+int parser_read_line(char* line, int* is_data, char* name, char* value, ErrorMsg errmsg) {
+  std::string sname, svalue;
+  if (!FileContent::parse_line(line, sname, svalue)) {
+    *is_data = _FALSE_;
+    return _SUCCESS_;
   }
-  /* Ignore any of " ' */
-  if(left[0]=='\'' || left[0]=='\"'){
-    left++;
-  }
-
-  right=pequal-1;
-  while (right[0]==' ') {
-    right--;
-  }
-  if(right[0]=='\'' || right[0]=='\"'){
-    right--;
-  }
-
-  /* deal with missing variable names */
-
-  class_test(right-left < 0,
-             errmsg,
-             "Syntax error in the input line '%s': no name passed on the left of the '=' sign",line);
-
-  class_test(right-left+1 >= _ARGUMENT_LENGTH_MAX_,
-	     errmsg,
-	     "name starting by '%s' too long; shorten it or increase _ARGUMENT_LENGTH_MAX_",strncpy(name,left,(_ARGUMENT_LENGTH_MAX_-1)));
-
-  strncpy(name,left,right-left+1);
-  name[right-left+1]='\0';
-
-  /* get the value, i.e. the block after the '=' */
-
-  left = pequal+1;
-  while (left[0]==' ') {
-    left++;
-  }
-
-  if (phash == NULL)
-    right = line+strlen(line)-1;
-  else
-    right = phash-1;
-
-  while (right[0]<=' ') {
-    right--;
-  }
-
-  if (right-left < 0) {*is_data = _FALSE_; return _SUCCESS_;}
-
-  class_test(right-left+1 >= _ARGUMENT_LENGTH_MAX_,
-	     errmsg,
-	     "value starting by '%s' too long; shorten it or increase _ARGUMENT_LENGTH_MAX_",strncpy(value,left,(_ARGUMENT_LENGTH_MAX_-1)));
-
-  strncpy(value,left,right-left+1);
-  value[right-left+1]='\0';
-
+  class_test(sname.size() >= _ARGUMENT_LENGTH_MAX_, errmsg,
+             "name starting by '%s' too long; shorten it or increase _ARGUMENT_LENGTH_MAX_",
+             sname.c_str());
+  class_test(svalue.size() >= _ARGUMENT_LENGTH_MAX_, errmsg,
+             "value starting by '%s' too long; shorten it or increase _ARGUMENT_LENGTH_MAX_",
+             svalue.c_str());
+  std::strncpy(name,  sname.c_str(),  _ARGUMENT_LENGTH_MAX_ - 1); name[_ARGUMENT_LENGTH_MAX_ - 1]  = '\0';
+  std::strncpy(value, svalue.c_str(), _ARGUMENT_LENGTH_MAX_ - 1); value[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
   *is_data = _TRUE_;
-
   return _SUCCESS_;
-
 }
 
-int parser_read_int(
-		    FileContent* pfc,
-		    const char* name,
-		    int * value,
-		    int * found,
-		    ErrorMsg errmsg
-		    ) {
-  int index;
-  int i;
-
-  /* intialize the 'found' flag to false */
-
-  * found = _FALSE_;
-
-  /* search parameter */
-
-  index=0;
-  while ((index < pfc->size) && (strcmp(pfc->name[index],name) != 0))
-    index++;
-
-  /* if parameter not found, return with 'found' flag still equal to false */
-
-  if (index == pfc->size)
-    return _SUCCESS_;
-
-  /* read parameter value. If this fails, return an error */
-
-  class_test(sscanf(pfc->value[index],"%d",value) != 1,
-	     errmsg,
-	     "could not read value of parameter '%s' in file '%s'\n",name,pfc->filename);
-
-  /* if parameter read correctly, set 'found' flag to true, as well as the flag
-     associated with this parameter in the file_content structure */
-
-  * found = _TRUE_;
-  pfc->read[index] = _TRUE_;
-
-  /* check for multiple entries of the same parameter. If another occurence is found,
-     return an error. */
-
-  for (i=index+1; i < pfc->size; i++) {
-    class_test(strcmp(pfc->name[i],name) == 0,
-	       errmsg,
-	       "multiple entry of parameter '%s' in file '%s'\n",name,pfc->filename);
+int parser_read_int(FileContent* pfc, const char* name, int* value, int* found, ErrorMsg errmsg) {
+  try {
+    *found = pfc->read_int(name, *value) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-
-  /* if everything proceeded normally, return with 'found' flag equal to true */
-
   return _SUCCESS_;
-
 }
 
-int parser_read_double(
-                       FileContent* pfc,
-                       const char* name,
-                       double * value,
-                       int * found,
-                       ErrorMsg errmsg
-                       ) {
-  int i;
-
-  /* intialize the 'found' flag to false */
-
-  * found = _FALSE_;
-
-  /* search parameter */
-
-  int index = 0;
-  while ((index < pfc->size) && (strcmp(pfc->name[index],name) != 0))
-    index++;
-
-  /* if parameter not found, return with 'found' flag still equal to false */
-
-  if (index == pfc->size)
-    return _SUCCESS_;
-
-  /* read parameter value. If this fails, return an error */
-
-  class_test(sscanf(pfc->value[index],"%lg",value) != 1,
-	     errmsg,
-	     "could not read value of parameter '%s' in file '%s'\n",name,pfc->filename);
-
-  /* if parameter read correctly, set 'found' flag to true, as well as the flag
-     associated with this parameter in the file_content structure */
-
-  * found = _TRUE_;
-  pfc->read[index] = _TRUE_;
-
-  /* check for multiple entries of the same parameter. If another occurence is found,
-     return an error. */
-
-  for (i=index+1; i < pfc->size; i++) {
-    class_test(strcmp(pfc->name[i],name) == 0,
-	       errmsg,
-	       "multiple entry of parameter '%s' in file '%s'\n",name,pfc->filename);
+int parser_read_double(FileContent* pfc, const char* name, double* value, int* found, ErrorMsg errmsg) {
+  try {
+    *found = pfc->read_double(name, *value) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-
-  /* if everything proceeded normally, return with 'found' flag equal to true */
-
   return _SUCCESS_;
-
 }
 
-int parser_read_double_and_position(
-		       FileContent* pfc,
-		       char * name,
-		       double * value,
-               int * position,
-		       int * found,
-		       ErrorMsg errmsg
-		       ) {
-  int index;
-  int i;
-
-  /* intialize the 'found' flag to false */
-
-  * found = _FALSE_;
-
-  /* search parameter */
-
-  index=0;
-  while ((index < pfc->size) && (strcmp(pfc->name[index],name) != 0))
-    index++;
-
-  /* if parameter not found, return with 'found' flag still equal to false */
-
-  if (index == pfc->size)
-    return _SUCCESS_;
-
-  /* read parameter value. If this fails, return an error */
-
-  class_test(sscanf(pfc->value[index],"%lg",value) != 1,
-	     errmsg,
-	     "could not read value of parameter '%s' in file '%s'\n",name,pfc->filename);
-
-  /* if parameter read correctly, set 'found' flag to true, as well as the flag
-     associated with this parameter in the file_content structure */
-
-  * found = _TRUE_;
-  pfc->read[index] = _TRUE_;
-
-  /* check for multiple entries of the same parameter. If another occurence is found,
-     return an error. */
-
-  for (i=index+1; i < pfc->size; i++) {
-    class_test(strcmp(pfc->name[i],name) == 0,
-	       errmsg,
-	       "multiple entry of parameter '%s' in file '%s'\n",name,pfc->filename);
+int parser_read_string(FileContent* pfc, const char* name, FileArg* value, int* found, ErrorMsg errmsg) {
+  std::string s;
+  try {
+    *found = pfc->read_string(name, s) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-
-  /* if everything proceeded normally, return with 'found' flag equal to true */
-
-  * position = index;
-
-  return _SUCCESS_;
-
-}
-
-int parser_read_string(
-		       FileContent* pfc,
-		       const char* name,
-		       FileArg * value,
-		       int * found,
-		       ErrorMsg errmsg
-		       ) {
-  int index;
-  int i;
-
-  /* intialize the 'found' flag to false */
-
-  * found = _FALSE_;
-
-  /* search parameter */
-
-  index=0;
-  while ((index < pfc->size) && (strcmp(pfc->name[index],name) != 0))
-    index++;
-
-  /* if parameter not found, return with 'found' flag still equal to false */
-
-  if (index == pfc->size)
-    return _SUCCESS_;
-
-  /* read parameter value. */
-
-  strcpy(*value,pfc->value[index]);
-
-  /* Set 'found' flag to true, as well as the flag
-     associated with this parameter in the file_content structure */
-
-  * found = _TRUE_;
-  pfc->read[index] = _TRUE_;
-
-  /* check for multiple entries of the same parameter. If another occurence is found,
-     return an error. */
-
-  for (i=index+1; i < pfc->size; i++) {
-    class_test(strcmp(pfc->name[i],name) == 0,
-	       errmsg,
-	       "multiple entry of parameter '%s' in file '%s'\n",name,pfc->filename);
+  if (*found == _TRUE_) {
+    class_test(s.size() >= _ARGUMENT_LENGTH_MAX_, errmsg,
+               "value of '%s' too long; increase _ARGUMENT_LENGTH_MAX_", name);
+    std::strncpy(*value, s.c_str(), _ARGUMENT_LENGTH_MAX_ - 1);
+    (*value)[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
   }
-
-  /* if everything proceeded normally, return with 'found' flag equal to true */
-
   return _SUCCESS_;
-
 }
 
 int parser_read_list_of_doubles(
-				FileContent* pfc,
-				const char* name,
-				int * size,
-				double ** pointer_to_list,
-				int * found,
-				ErrorMsg errmsg
-				) {
-  int index;
-  int i;
-
-  char * string;
-  char * substring;
-  FileArg string_with_one_value;
-
-  double * list;
-
-  /* intialize the 'found' flag to false */
-
-  * found = _FALSE_;
-
-  /* search parameter */
-
-  index=0;
-  while ((index < pfc->size) && (strcmp(pfc->name[index],name) != 0))
-    index++;
-
-  /* if parameter not found, return with 'found' flag still equal to false */
-
-  if (index == pfc->size)
-    return _SUCCESS_;
-
-  /* count number of comas and compute size = number of comas + 1 */
-  i = 0;
-  string = pfc->value[index];
-  do {
-    i ++;
-    substring = strchr(string,',');
-    string = substring+1;
-  } while(substring != NULL);
-
-  *size = i;
-
-  /* free and re-allocate array of values */
-  class_alloc(list,*size*sizeof(double),errmsg);
-  *pointer_to_list = list;
-
-  /* read one double between each comas */
-  i = 0;
-  string = pfc->value[index];
-  do {
-    i ++;
-    substring = strchr(string,',');
-    if (substring == NULL) {
-      strcpy(string_with_one_value,string);
-    }
-    else {
-      strncpy(string_with_one_value,string,(substring-string));
-      string_with_one_value[substring-string]='\0';
-    }
-    class_test(sscanf(string_with_one_value,"%lg",&(list[i-1])) != 1,
-	       errmsg,
-	       "could not read %dth value of list of parameters '%s' in file '%s'\n",
-	       i,
-	       name,
-	       pfc->filename);
-    string = substring+1;
-  } while(substring != NULL);
-
-  /* if parameter read correctly, set 'found' flag to true, as well as the flag
-     associated with this parameter in the file_content structure */
-
-  * found = _TRUE_;
-  pfc->read[index] = _TRUE_;
-
-  /* check for multiple entries of the same parameter. If another occurence is found,
-     return an error. */
-
-  for (i=index+1; i < pfc->size; i++) {
-    class_test(strcmp(pfc->name[i],name) == 0,
-	       errmsg,
-	       "multiple entry of parameter '%s' in file '%s'\n",name,pfc->filename);
+    FileContent* pfc, const char* name, int* size,
+    double** pointer_to_list, int* found, ErrorMsg errmsg) {
+  std::vector<double> v;
+  try {
+    *found = pfc->read_list_of_doubles(name, v) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-
-  /* if everything proceeded normally, return with 'found' flag equal to true */
-
+  if (*found == _TRUE_) {
+    *size = static_cast<int>(v.size());
+    class_alloc(*pointer_to_list, *size * sizeof(double), errmsg);
+    std::copy(v.begin(), v.end(), *pointer_to_list);
+  }
   return _SUCCESS_;
-
 }
 
 int parser_read_list_of_integers(
-				 FileContent* pfc,
-				 const char* name,
-				 int * size,
-				 int ** pointer_to_list,
-				 int * found,
-				 ErrorMsg errmsg
-				 ) {
-  int index;
-  int i;
-
-  char * string;
-  char * substring;
-  FileArg string_with_one_value;
-
-  int * list;
-
-  /* intialize the 'found' flag to false */
-
-  * found = _FALSE_;
-
-  /* search parameter */
-
-  index=0;
-  while ((index < pfc->size) && (strcmp(pfc->name[index],name) != 0))
-    index++;
-
-  /* if parameter not found, return with 'found' flag still equal to false */
-
-  if (index == pfc->size)
-    return _SUCCESS_;
-
-  /* count number of comas and compute size = number of comas + 1 */
-  i = 0;
-  string = pfc->value[index];
-  do {
-    i ++;
-    substring = strchr(string,',');
-    string = substring+1;
-  } while(substring != NULL);
-
-  *size = i;
-
-  /* free and re-allocate array of values */
-  class_alloc(list,*size*sizeof(int),errmsg);
-  *pointer_to_list = list;
-
-  /* read one integer between each comas */
-  i = 0;
-  string = pfc->value[index];
-  do {
-    i ++;
-    substring = strchr(string,',');
-    if (substring == NULL) {
-      strcpy(string_with_one_value,string);
-    }
-    else {
-      strncpy(string_with_one_value,string,(substring-string));
-      string_with_one_value[substring-string]='\0';
-    }
-    class_test(sscanf(string_with_one_value,"%d",&(list[i-1])) != 1,
-	       errmsg,
-	       "could not read %dth value of list of parameters '%s' in file '%s'\n",
-	       i,
-	       name,
-	       pfc->filename);
-    string = substring+1;
-  } while(substring != NULL);
-
-  /* if parameter read correctly, set 'found' flag to true, as well as the flag
-     associated with this parameter in the file_content structure */
-
-  * found = _TRUE_;
-  pfc->read[index] = _TRUE_;
-
-  /* check for multiple entries of the same parameter. If another occurence is found,
-     return an error. */
-
-  for (i=index+1; i < pfc->size; i++) {
-    class_test(strcmp(pfc->name[i],name) == 0,
-	       errmsg,
-	       "multiple entry of parameter '%s' in file '%s'\n",name,pfc->filename);
+    FileContent* pfc, const char* name, int* size,
+    int** pointer_to_list, int* found, ErrorMsg errmsg) {
+  std::vector<int> v;
+  try {
+    *found = pfc->read_list_of_integers(name, v) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-
-  /* if everything proceeded normally, return with 'found' flag equal to true */
-
+  if (*found == _TRUE_) {
+    *size = static_cast<int>(v.size());
+    class_alloc(*pointer_to_list, *size * sizeof(int), errmsg);
+    std::copy(v.begin(), v.end(), *pointer_to_list);
+  }
   return _SUCCESS_;
-
 }
 
 int parser_read_list_of_strings(
-				FileContent* pfc,
-				const char* name,
-				int * size,
-				char ** pointer_to_list,
-				int * found,
-				ErrorMsg errmsg
-				) {
-  int index;
-  int i;
-
-  char * string;
-  char * substring;
-  FileArg string_with_one_value;
-
-  char * list;
-
-  /* intialize the 'found' flag to false */
-
-  * found = _FALSE_;
-
-  /* search parameter */
-
-  index=0;
-  while ((index < pfc->size) && (strcmp(pfc->name[index],name) != 0))
-    index++;
-
-  /* if parameter not found, return with 'found' flag still equal to false */
-
-  if (index == pfc->size)
-    return _SUCCESS_;
-
-  /* count number of comas and compute size = number of comas + 1 */
-  i = 0;
-  string = pfc->value[index];
-  do {
-    i ++;
-    substring = strchr(string,',');
-    string = substring+1;
-  } while(substring != NULL);
-
-  *size = i;
-
-  /* free and re-allocate array of values */
-  class_alloc(list,*size*sizeof(FileArg),errmsg);
-  *pointer_to_list = list;
-
-  /* read one string between each comas */
-  i = 0;
-  string = pfc->value[index];
-  do {
-    i ++;
-    substring = strchr(string,',');
-    if (substring == NULL) {
-      strcpy(string_with_one_value,string);
-    }
-    else {
-      strncpy(string_with_one_value,string,(substring-string));
-      string_with_one_value[substring-string]='\0';
-    }
-    strcpy(list+(i-1)*_ARGUMENT_LENGTH_MAX_,string_with_one_value);
-    //Insert EOL character:
-    *(list+i*_ARGUMENT_LENGTH_MAX_-1) = '\n';
-    string = substring+1;
-  } while(substring != NULL);
-  /* if parameter read correctly, set 'found' flag to true, as well as the flag
-     associated with this parameter in the file_content structure */
-  * found = _TRUE_;
-  pfc->read[index] = _TRUE_;
-  /* check for multiple entries of the same parameter. If another occurence is
-     found,
-     return an error. */
-  for (i=index+1; i < pfc->size; i++) {
-    class_test(strcmp(pfc->name[i],name) == 0,
-	       errmsg,
-	       "multiple entry of parameter '%s' in file '%s'\n",name,pfc->filename);
+    FileContent* pfc, const char* name, int* size,
+    char** pointer_to_list, int* found, ErrorMsg errmsg) {
+  std::vector<std::string> v;
+  try {
+    *found = pfc->read_list_of_strings(name, v) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-  /* if everything proceeded normally, return with 'found' flag equal to true */
+  if (*found == _TRUE_) {
+    *size = static_cast<int>(v.size());
+    class_alloc(*pointer_to_list, *size * sizeof(FileArg), errmsg);
+    for (int i = 0; i < *size; ++i) {
+      class_test(v[i].size() >= _ARGUMENT_LENGTH_MAX_, errmsg,
+                 "string entry %d of '%s' too long; increase _ARGUMENT_LENGTH_MAX_", i, name);
+      std::strncpy(*pointer_to_list + i * _ARGUMENT_LENGTH_MAX_,
+                   v[i].c_str(), _ARGUMENT_LENGTH_MAX_ - 1);
+      (*pointer_to_list + i * _ARGUMENT_LENGTH_MAX_)[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
+      /* legacy: terminate with '\n' */
+      (*pointer_to_list)[(i + 1) * _ARGUMENT_LENGTH_MAX_ - 1] = '\n';
+    }
+  }
   return _SUCCESS_;
 }
 
-int parser_cat(
-	       const FileContent* pfc1,
-	       const FileContent* pfc2,
-	       FileContent* pfc3,
-	       ErrorMsg errmsg
-	       ) {
-
-  int i;
-
-  class_test(pfc1->size < 0.,
-	     errmsg,
-	     "size of file_content structure probably not initialized properly\n");
-
-  class_test(pfc2->size < 0.,
-	     errmsg,
-	     "size of file_content structure probably not initialized properly\n");
-
-  if (pfc1->size == 0) {
-    int filename_size = static_cast<int>((strlen(pfc2->filename)+1)*sizeof(char));
-    class_alloc(pfc3->filename, filename_size, errmsg);
-    snprintf(pfc3->filename, filename_size, "%s", pfc2->filename);
+int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3, ErrorMsg errmsg) {
+  try {
+    *pfc3 = *pfc1 + *pfc2;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
   }
-  if (pfc2->size == 0) {
-    int filename_size = static_cast<int>((strlen(pfc1->filename)+1)*sizeof(char));
-    class_alloc(pfc3->filename, filename_size, errmsg);
-    snprintf(pfc3->filename, filename_size, "%s", pfc1->filename);
-  }
-  if ((pfc1->size !=0) && (pfc2->size != 0)) {
-    int filename_size = static_cast<int>((strlen(pfc1->filename)+strlen(pfc2->filename)+5)*sizeof(char));
-    class_alloc(pfc3->filename, filename_size, errmsg);
-    snprintf(pfc3->filename, filename_size, "%s or %s", pfc1->filename, pfc2->filename);
-  }
-
-  pfc3->size = pfc1->size + pfc2->size;
-  class_alloc(pfc3->value,pfc3->size*sizeof(FileArg),errmsg);
-  class_alloc(pfc3->name,pfc3->size*sizeof(FileArg),errmsg);
-  class_alloc(pfc3->read,pfc3->size*sizeof(short),errmsg);
-
-  for (i=0; i < pfc1->size; i++) {
-    strcpy(pfc3->value[i],pfc1->value[i]);
-    strcpy(pfc3->name[i],pfc1->name[i]);
-    pfc3->read[i]=pfc1->read[i];
-  }
-
-  for (i=0; i < pfc2->size; i++) {
-    strcpy(pfc3->value[i+pfc1->size],pfc2->value[i]);
-    strcpy(pfc3->name[i+pfc1->size],pfc2->name[i]);
-    pfc3->read[i+pfc1->size]=pfc2->read[i];
-  }
-
   return _SUCCESS_;
-
 }

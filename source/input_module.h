@@ -47,13 +47,12 @@ private:
   struct fzerofun_workspace {
     fzerofun_workspace(FileContent& fc_ref) : fc(fc_ref) {}
     ~fzerofun_workspace() {
-      if (unknown_parameters_index) free(unknown_parameters_index);
       if (target_name) free(target_name);
       if (target_values) free(target_values);
       free(target_sizes);
     }
-    int* unknown_parameters_index = nullptr;
     FileContent& fc;
+    std::vector<std::string> unknown_parameter_names;
     enum target_names* target_name = nullptr;
     double* target_values = nullptr;
     int* target_sizes = nullptr;
