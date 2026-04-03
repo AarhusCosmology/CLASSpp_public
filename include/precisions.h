@@ -206,6 +206,7 @@ class_precision_parameter(tight_coupling_approximation,int,(int)compromise_CLASS
 class_precision_parameter(idm_dr_tight_coupling_trigger_tau_c_over_tau_k,double,0.01)  /**< when to switch off the dark-tight-coupling approximation, first condition (see normal tca for full definition) */
 class_precision_parameter(idm_dr_tight_coupling_trigger_tau_c_over_tau_h,double,0.015) /**< when to switch off the dark-tight-coupling approximation, second condition (see normal tca for full definition) */
 
+class_precision_parameter(idm_drmd_tight_coupling_trigger_G_over_aH,double,100000) /**< when to switch off the dark-tight-coupling approximation in DRMD, should be larger than at least 100 (currently set to a very high number as the code runs perfectly fine without the approximation.) */
 class_precision_parameter(l_max_g,int,12)     /**< number of momenta in Boltzmann hierarchy for photon temperature (scalar), at least 4 */
 class_precision_parameter(l_max_pol_g,int,10) /**< number of momenta in Boltzmann hierarchy for photon polarization (scalar), at least 4 */
 class_precision_parameter(l_max_dr,int,17)   /**< number of momenta in Boltzmann hierarchy for decay radiation, at least 4 */

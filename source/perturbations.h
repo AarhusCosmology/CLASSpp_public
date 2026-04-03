@@ -35,6 +35,7 @@
 enum tca_flags {tca_on, tca_off};
 enum rsa_flags {rsa_off, rsa_on};
 enum tca_idm_dr_flags {tca_idm_dr_on, tca_idm_dr_off};
+enum tca_idm_drmd_flags {tca_idm_drmd_on, tca_idm_drmd_off};
 enum rsa_idr_flags {rsa_idr_off, rsa_idr_on};
 enum ufa_flags {ufa_off, ufa_on};
 enum ncdmfa_flags {ncdmfa_off, ncdmfa_on};
@@ -246,6 +247,8 @@ struct perturb_vector
   int index_pt_theta_cdm; /**< cdm velocity */
   int index_pt_delta_idm_dr;/**< idm_dr density */
   int index_pt_theta_idm_dr;/**< idm_dr velocity */
+  int index_pt_delta_idm_drmd;/**< idm_drmd density */
+  int index_pt_theta_idm_drmd;/**< idm_drmd velocity */
   int index_pt_delta_dcdm; /**< dcdm density */
   int index_pt_theta_dcdm; /**< dcdm velocity */
   int index_pt_delta_fld;  /**< dark energy density in true fluid case */
@@ -260,6 +263,8 @@ struct perturb_vector
   int l_max_ur;          /**< max momentum in Boltzmann hierarchy (at least 3) */
   int index_pt_delta_idr; /**< density of interacting dark radiation */
   int index_pt_theta_idr; /**< velocity of interacting dark radiation */
+  int index_pt_delta_idr_drmd; /**< density of interacting dark radiation */
+  int index_pt_theta_idr_drmd; /**< velocity of interacting dark radiation */
   int index_pt_shear_idr; /**< shear of interacting dark radiation */
   int index_pt_l3_idr;    /**< l=3 of interacting dark radiation */
   int l_max_idr;          /**< max momentum in Boltzmann hierarchy (at least 3) for interacting dark radiation */
@@ -364,6 +369,9 @@ struct perturb_workspace
   double rsa_delta_idr; /**< interacting dark radiation density in dark radiation streaming approximation */
   double rsa_theta_idr; /**< interacting dark radiation velocity in dark radiation streaming approximation */
 
+  double theta_idm_drmd; /**< interacting dark matter velocity (DRMD)*/
+  double theta_idm_prime_drmd; /**< derivative of interacting dark matter velocity in regard to conformal time (DRMD) */
+
   double * delta_ncdm;	/**< relative density perturbation of each ncdm species */
   double * theta_ncdm;	/**< velocity divergence theta of each ncdm species */
   double * shear_ncdm;	/**< shear for each ncdm species */
@@ -403,6 +411,7 @@ struct perturb_workspace
   int index_ap_tca; /**< index for tight-coupling approximation */
   int index_ap_rsa; /**< index for radiation streaming approximation */
   int index_ap_tca_idm_dr; /**< index for dark tight-coupling approximation (idm-idr) */
+  int index_ap_tca_idm_drmd; /**< index for dark tight-coupling approximation (DRMD) */
   int index_ap_rsa_idr; /**< index for dark radiation streaming approximation */
   int index_ap_ufa; /**< index for ur fluid approximation */
   int index_ap_ncdmfa; /**< index for ncdm fluid approximation */

@@ -1193,6 +1193,82 @@ int InputModule::input_read_parameters() {
   if (pba->K > 0.) pba->sgnK = 1;
   else if (pba->K < 0.) pba->sgnK = -1;
 
+  /*DRMD*/
+  double param4;
+  int flag4;
+  /* Here, we read in the model parameters. */
+  class_call(parser_read_double(pfc,"z_stop",&param1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  if (flag1 == _TRUE_) 
+    pba->z_stop = param1;
+  class_call(parser_read_double(pfc,"G_over_aH_drmd_ini",&param2,&flag2,errmsg),
+             errmsg,
+             errmsg);
+  if (flag2 == _TRUE_) 
+    pba->G_over_aH_drmd = param2;
+  class_call(parser_read_double(pfc,"f_idm_drmd",&param3,&flag3,errmsg),
+             errmsg,
+             errmsg);
+  if (flag3 == _TRUE_) 
+    pba->f_idm_drmd = param3;
+  class_call(parser_read_double(pfc,"delta_Neff_drmd",&param4,&flag4,errmsg),
+             errmsg,
+             errmsg);
+  if (flag4 == _TRUE_) 
+    pba->delta_Neff_drmd = param4;
+  
+  
+  int any_flag = (flag1 == _TRUE_) || (flag2 == _TRUE_) || (flag3 == _TRUE_) || (flag4 == _TRUE_);
+  int all_flag = (flag1 == _TRUE_) && (flag2 == _TRUE_) && (flag3 == _TRUE_) && (flag4 == _TRUE_);
+
+  class_test(any_flag && !all_flag,
+            errmsg,
+            "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters are 'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
+
+  if (pba->delta_Neff_drmd > 0.)
+  {
+    pba->Omega0_idr_drmd = pba->delta_Neff_drmd*7./8.*pow(4./11., 4./3.)*pba->Omega0_g;
+    
+
+    if (pba->f_idm_drmd > 0)
+    {
+    class_test((pba->z_stop > 200000.),
+    errmsg,
+    "z_stop is chosen too large. If you want to probe z_stop > 1000000 you need to start evolving perturbations earlier in CLASS by changing the precision settings. Also you should check that the exponential suppression factor does not lead to numerical problems.");    
+    } 
+  }
+
+  if (pba->f_idm_drmd > 0)
+  {
+    class_test((pba->f_idm_drmd > 1.),
+               errmsg,
+               "The fraction of interacting DM with DR must be between 0 and 1, you asked for f_idm_drmd=%e", pba->f_idm_drmd);
+
+    class_test((pba->Omega0_cdm == 0.),
+               errmsg,
+               "If you want a fraction of interacting DM with DRMD, to be consistent, you should not set the fraction of CDM to zero");
+
+    pba->Omega0_idm_drmd = pba->f_idm_drmd*pba->Omega0_cdm;
+    
+    /* readjust Omega0_cdm */
+    pba->Omega0_cdm -= pba->Omega0_idm_drmd;
+
+    /* to be consistent, remove same amount from Omega_tot */
+    Omega_tot -= pba->Omega0_idm_drmd;
+    
+    /* avoid Omega0_cdm =0 in synchronous gauge */
+    if ((ppt->gauge == synchronous) && (pba->Omega0_cdm == 0))
+    {
+      pba->Omega0_cdm += ppr->Omega0_cdm_min_synchronous;
+      Omega_tot += ppr->Omega0_cdm_min_synchronous;
+      pba->Omega0_idm_drmd -= ppr->Omega0_cdm_min_synchronous;
+    }
+    
+  }
+  Omega_tot += pba->Omega0_idr_drmd;
+  Omega_tot += pba->Omega0_idm_drmd;
+
   /** - Omega_0_lambda (cosmological constant), Omega0_fld (dark energy fluid), Omega0_scf (scalar field) */
 
   class_call(parser_read_double(pfc,"Omega_Lambda",&param1,&flag1,errmsg),
@@ -3074,6 +3150,8 @@ int InputModule::input_read_parameters() {
   pba->has_idr = _FALSE_;
   pba->has_idm_dr = _FALSE_;
   pba->has_curvature = _FALSE_;
+  pba->has_idr_drmd = _FALSE_;
+  pba->has_idm_drmd = _FALSE_;
 
   if (pba->Omega0_cdm != 0.)
     pba->has_cdm = _TRUE_;
@@ -3111,6 +3189,13 @@ int InputModule::input_read_parameters() {
 
   if (pba->sgnK != 0)
     pba->has_curvature = _TRUE_;
+
+  if ((pba->Omega0_idm_drmd != 0.) && (pba->f_idm_drmd != 0.))
+    pba->has_idm_drmd = _TRUE_;
+
+  if (pba->Omega0_idr_drmd != 0.){
+    pba->has_idr_drmd = _TRUE_;
+  }
 
   /* flags for calling the interpolation routine */
   pba->short_info=0;
@@ -3216,7 +3301,17 @@ int InputModule::input_default_params() {
   pba->Omega_EDE = 0.;
   pba->cs2_fld = 1.;
 
+  pba->Omega0_idm_drmd = 0.; // DRMD defaults
+  pba->Omega0_idr_drmd = 0.;
+  pba->z_stop = 0.;
+  pba->G_over_aH_drmd = 0.;
+  pba->delta_Neff_drmd = 0.;
+  pba->f_idm_drmd = 0.;
+
   pba->background_method = bgevo_evolver;
+
+
+ 
 
   /** - thermodynamics structure */
 

@@ -346,6 +346,16 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     rho_m += pvecback[index_bg_rho_dcdm_];
   }
 
+  /* DRMD  */
+  if (pba->has_idm_drmd == _TRUE_)
+  {
+    pvecback[index_bg_rho_idm_drmd_] = pba->Omega0_idm_drmd*pow(pba->H0, 2)/pow(a_rel, 3);
+    rho_tot += pvecback[index_bg_rho_idm_drmd_];
+    p_tot += 0.;
+    rho_m += pvecback[index_bg_rho_idm_drmd_];
+  }
+
+  
   /* Scalar field */
   if (pba->has_scf == _TRUE_) {
     phi = pvecback_B[index_bi_phi_scf_];
@@ -544,6 +554,17 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     rho_r += pvecback[index_bg_rho_idr_];
   }
 
+  /* interacting dark radiation (drmd) */
+  if (pba->has_idr_drmd == _TRUE_)
+  {
+    pvecback[index_bg_rho_idr_drmd_] = pba->Omega0_idr_drmd*pow(pba->H0, 2)/pow(a_rel, 4);
+    
+    
+    rho_tot += pvecback[index_bg_rho_idr_drmd_];
+    p_tot += (1. / 3.)*pvecback[index_bg_rho_idr_drmd_];
+    rho_r += pvecback[index_bg_rho_idr_drmd_];
+  }
+
   /** - compute expansion rate H from Friedmann equation: this is the
       only place where the Friedmann equation is assumed. Remember
       that densities are all expressed in units of \f$ [3c^2/8\pi G] \f$, ie
@@ -568,6 +589,14 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     pvecback[index_bg_p_tot_prime_] += pvecback[index_bg_p_prime_scf_];
   }
 
+  if ((pba->has_idm_drmd == _TRUE_) && (pba->has_idr_drmd == _TRUE_))
+  {
+    double Rint, csp2, Gint;
+    class_call(background_idm_drmd(a, pvecback[index_bg_rho_idm_drmd_] / pvecback[index_bg_rho_idr_drmd_], &Rint, &csp2, &Gint), error_message_, error_message_);
+    pvecback[index_bg_G_over_aH_drmd_]=Gint / (pvecback[index_bg_H_] * a_rel);
+    
+    
+  }
   /** - compute critical density */
   rho_crit = rho_tot-pba->K/a/a;
   class_test(rho_crit <= 0.,
@@ -637,6 +666,7 @@ int BackgroundModule::background_w_fld(double a, double* w_fld, double* dw_over_
     Omega_m = pba->Omega0_b;
     if (pba->has_cdm == _TRUE_) Omega_m += pba->Omega0_cdm;
     if (pba->has_idm_dr == _TRUE_) Omega_m += pba->Omega0_idm_dr;
+    if (pba->has_idm_drmd == _TRUE_) Omega_m += pba->Omega0_idm_drmd;
     if (pba->has_dcdm == _TRUE_)
       class_stop(error_message_, "Early Dark Energy not compatible with decaying Dark Matter because we omitted to code the calculation of a_eq in that case, but it would not be difficult to add it if necessary, should be a matter of 5 minutes");
     a_eq = Omega_r/Omega_m; // assumes a flat universe with a=1 today
@@ -691,6 +721,27 @@ int BackgroundModule::background_w_fld(double a, double* w_fld, double* dw_over_
 
   return _SUCCESS_;
 }
+
+int BackgroundModule::background_idm_drmd(
+    double a,
+    double rho_idm_over_rho_idr,
+    double *Rint,
+    double *csp2,
+    double *Gint) const
+{
+  double z = 1.0/a - 1.0; 
+  double R_int_tmp = 3.0/4.0*rho_idm_over_rho_idr;
+  *Rint = R_int_tmp;
+  *csp2 = 1.0/3.0/(1.0 + R_int_tmp);
+
+  if ((1.0 + pba->z_stop) / (1 + z) > 100) // To avoid numerical problems in exp()
+    *Gint = 0;
+  else
+    *Gint = Gamma0_drmd_ / R_int_tmp * exp(-(1.0 + pba->z_stop) / (1 + z));
+
+  return _SUCCESS_;
+}
+
 
 /**
  * Initialize the background structure, and in particular the
@@ -862,6 +913,14 @@ int BackgroundModule::background_indices() {
 
   /* - index for rho_cdm */
   class_define_index(index_bg_rho_cdm_, pba->has_cdm, index_bg, 1);
+
+
+  /* - index for rho_idm_drmd and rho_idr_drmd */
+  class_define_index(index_bg_rho_idm_drmd_, pba->has_idm_drmd, index_bg, 1);
+  class_define_index(index_bg_rho_idr_drmd_, pba->has_idr_drmd, index_bg, 1);
+  class_define_index(index_bg_G_over_aH_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
+  class_define_index(index_bg_Gamma0_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
+
 
   /* - indices for ncdm. We only define the indices for ncdm1
      (density, pressure, pseudo-pressure), the other ncdm indices
@@ -1433,6 +1492,18 @@ int BackgroundModule::background_solve_evolver() {
     bg_table_row[index_bg_lum_distance_] = pba->a_today*comoving_radius*(1. + z_table_[i]);
     /** Normalise D(z=0)=1 */
     bg_table_row[index_bg_D_] /= D_today;
+  
+  /* DRMD -- Find the decoupling redshift where Gint = aH */
+
+  if ((pba->has_idr_drmd) && (pba->has_idm_drmd))
+    {
+      double G_over_aH_local = background_table_[i*bg_size_ + index_bg_G_over_aH_drmd_];
+      if (pow(G_over_aH_local - 1.0, 2.0) < pow(G_over_aH_tmp_ - 1.0, 2.0))
+      {
+        G_over_aH_tmp_ = G_over_aH_local;
+        z_dec_drmd_ = z_table_[i];
+      }
+    }
   }
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
@@ -1481,6 +1552,17 @@ int BackgroundModule::background_solve_evolver() {
       printf("     -> Omega0_dr+Omega0_dcdm = %f, input value = %f\n",
               Omega0_dr_ + Omega0_dcdm_, pba->Omega0_dcdmdr);
       printf("     -> Omega_ini_dcdm/Omega_b = %f\n", pba->Omega_ini_dcdm/pba->Omega0_b);
+    }
+    if ((pba->has_idr_drmd) && (pba->has_idm_drmd))
+    {
+      printf(" -> Dark Radiation Matter Decoupling details: (DRMD)\n");
+      printf("     -> values: (initial) Gamma0 = %f 1/Mpc, zstop= %e,f_idr_drmd=%e, and f_idm= %e \n", Gamma0_drmd_, pba->z_stop,f_idr_drmd_, pba->f_idm_drmd);
+      printf("     -> dark radiation Delta N_eff (DRMD) %e\n", pba->delta_Neff_drmd);
+
+      if (z_dec_drmd_ > 0)
+        printf("     -> decoupling occurred at z=%f \n", z_dec_drmd_);
+      else
+        printf("     -> no decoupling occurred.\n");
     }
     if (pba->has_scf == _TRUE_){
       printf("    Scalar field details:\n");
@@ -1555,6 +1637,8 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
     Omega_rad += pba->Omega0_ur;
   if (pba->has_idr == _TRUE_)
     Omega_rad += pba->Omega0_idr;
+  if (pba->has_idr_drmd == _TRUE_)
+    Omega_rad += pba->Omega0_idr_drmd;
   rho_rad = Omega_rad*pow(pba->H0,2)/pow(a/pba->a_today,4);
   if (pba->has_ncdm == _TRUE_){
     /** - We must add the relativistic contribution from NCDM species */
@@ -1663,6 +1747,18 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
              error_message_,
              "H = %e instead of strictly positive",pvecback[index_bg_H_]);
 
+  /** - compute Gamma0 andf_idr_drmd for the DRMD scenario */
+  if (pba->has_idr_drmd == _TRUE_)
+  {
+   f_idr_drmd_ = pvecback[index_bg_rho_idr_drmd_]/pvecback[index_bg_rho_tot_];
+    
+    if (pba->has_idm_drmd == _TRUE_)
+    {
+      Gamma0_drmd_ = 3. / 4. * pba->G_over_aH_drmd * pvecback[index_bg_rho_idm_drmd_] / pvecback[index_bg_rho_idr_drmd_]*a/pba->a_today * pvecback[index_bg_H_]; 
+    }
+    // Recall that Gamma0 = G * R =const with our conventions (for z >> zstop where the exponential can be set to unity )
+  }
+
   pvecback_integration[index_bi_time_] = 1./(2.* pvecback[index_bg_H_]);
 
   /** - compute initial conformal time, assuming radiation-dominated
@@ -1674,8 +1770,8 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
   pvecback_integration[index_bi_rs_] = pvecback_integration[index_bi_tau_]/sqrt(3.);
 
   /** - set initial value of D and D' in RD. D will be renormalised later, but D' must be correct. */
-  pvecback_integration[index_bi_D_] = a;
-  pvecback_integration[index_bi_D_prime_] = 2*pvecback_integration[index_bi_D_]*pvecback[index_bg_H_];
+  pvecback_integration[index_bi_D_] = 1;
+  pvecback_integration[index_bi_D_prime_] = 2*a*pvecback[index_bg_H_];
 
   return _SUCCESS_;
 
@@ -1806,6 +1902,9 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles,"(.)rho_ur",pba->has_ur);
   class_store_columntitle(titles,"(.)rho_idr",pba->has_idr);
   class_store_columntitle(titles,"(.)rho_idm_dr",pba->has_idm_dr);
+  class_store_columntitle(titles,"(.)rho_idr_drmd", pba->has_idr_drmd);
+  class_store_columntitle(titles,"(.)rho_idm_drmd", pba->has_idm_drmd);
+  class_store_columntitle(titles,"G_over_aH_drmd", pba->has_idr_drmd && pba->has_idm_drmd);
   class_store_columntitle(titles,"(.)rho_crit",_TRUE_);
   class_store_columntitle(titles,"(.)rho_dcdm",pba->has_dcdm);
   class_store_columntitle(titles,"(.)rho_dr",pba->has_dr);
@@ -1877,6 +1976,9 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rho_ur_], pba->has_ur, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_idr_], pba->has_idr, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_idm_dr_], pba->has_idm_dr, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_idr_drmd_], pba->has_idr_drmd, storeidx); 
+    class_store_double(dataptr, pvecback[index_bg_rho_idm_drmd_], pba->has_idm_drmd, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_G_over_aH_drmd_], pba->has_idr_drmd && pba->has_idm_drmd, storeidx); 
     class_store_double(dataptr, pvecback[index_bg_rho_crit_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_dcdm_], pba->has_dcdm, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_dr_], pba->has_dr, storeidx);
@@ -1978,6 +2080,11 @@ int BackgroundModule::background_derivs_member(
     rho_M += pvecback[index_bg_rho_cdm_];
   if (pba->has_idm_dr)
     rho_M += pvecback[index_bg_rho_idm_dr_];
+    
+  if (pba->has_idm_drmd == _TRUE_)
+  {
+    rho_M += pvecback[index_bg_rho_idm_drmd_];
+  }
 
   dy[index_bi_D_] = y[index_bi_D_prime_];
   dy[index_bi_D_prime_] = -a*H*y[index_bi_D_prime_] + 1.5*a*a*rho_M*y[index_bi_D_];
@@ -2178,6 +2285,11 @@ int BackgroundModule::background_output_budget() {
       _class_print_species_("Interacting Dark Matter - DR ",idm_dr);
       budget_matter+=pba->Omega0_idm_dr;
     }
+    if (pba->has_idm_drmd == _TRUE_)
+    {
+      _class_print_species_("Interacting DM (DRMD)", idm_drmd);
+      budget_matter += pba->Omega0_idm_drmd;
+    }
     if(pba->has_dcdm){
       printf("-> %-30s Omega = %-15g , omega = %-15g\n", "Decaying Cold Dark Matter", Omega0_dcdm_, Omega0_dcdm_*pba->h*pba->h);
       budget_matter += Omega0_dcdm_;
@@ -2198,6 +2310,11 @@ int BackgroundModule::background_output_budget() {
     if(pba->has_idr){
       _class_print_species_("Interacting Dark Radiation",idr);
       budget_radiation+=pba->Omega0_idr;
+    }
+    if (pba->has_idr_drmd == _TRUE_)
+    {
+      _class_print_species_("Dark Radiation (DRMD)", idr_drmd);
+      budget_radiation += pba->Omega0_idr_drmd;
     }
 
     if(pba->N_ncdm > 0){

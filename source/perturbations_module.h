@@ -52,6 +52,8 @@ public:
   int index_tp_delta_ur_; /**< index value for delta of ultra-relativistic neutrinos/relics */
   int index_tp_delta_idr_; /**< index value for delta of interacting dark radiation */
   int index_tp_delta_idm_dr_;/**< index value for delta of interacting dark matter (with dr)*/
+  int index_tp_delta_idr_drmd_; /**< index value for delta of interacting dark radiation (with drmd) */
+  int index_tp_delta_idm_drmd_;/**< index value for delta of interacting dark matter (with drmd)*/
   int index_tp_delta_ncdm1_; /**< index value for delta of first non-cold dark matter species (e.g. massive neutrinos) */
   int index_tp_perturbed_recombination_delta_temp_;    /**< Gas temperature perturbation */
   int index_tp_perturbed_recombination_delta_chi_;    /**< Inionization fraction perturbation */
@@ -68,6 +70,8 @@ public:
   int index_tp_theta_ur_;    /**< index value for theta of ultra-relativistic neutrinos/relics */
   int index_tp_theta_idr_;   /**< index value for theta of interacting dark radiation */
   int index_tp_theta_idm_dr_;/**< index value for theta of interacting dark matter (with dr)*/
+  int index_tp_theta_idr_drmd_;/**< index value for delta of interacting dark radiation (DRMD) */
+  int index_tp_theta_idm_drmd_;/**< index value for theta of interacting dark matter (with drmd)*/
   int index_tp_theta_dr_;    /**< index value for F1 of decay radiation */
   int index_tp_theta_ncdm1_; /**< index value for theta of first non-cold dark matter species (e.g. massive neutrinos) */
 
@@ -101,6 +105,8 @@ public:
   short has_source_delta_ur_;    /**< do we need source for delta of ultra-relativistic neutrinos/relics? */
   short has_source_delta_idr_;   /**< do we need source for delta of interacting dark radiation? */
   short has_source_delta_idm_dr_;/**< do we need source for delta of interacting dark matter (with dr)? */
+  short has_source_delta_idr_drmd_; /**< do we need source for delta of interacting dark radiation? (with drmd) */
+  short has_source_delta_idm_drmd_; /**< do we need source for delta of interacting dark matter (with drmd)? */
   short has_source_delta_ncdm_;  /**< do we need source for delta of all non-cold dark matter species (e.g. massive neutrinos)? */
   short has_source_theta_m_;     /**< do we need source for theta of total matter? */
   short has_source_theta_cb_;    /**< do we ALSO need source for theta of ONLY cdm and baryon? */
@@ -115,6 +121,8 @@ public:
   short has_source_theta_ur_;    /**< do we need source for theta of ultra-relativistic neutrinos/relics? */
   short has_source_theta_idr_;   /**< do we need source for theta of interacting dark radiation? */
   short has_source_theta_idm_dr_;/**< do we need source for theta of interacting dark matter (with dr)? */
+  short has_source_theta_idr_drmd_;/**< do we need source for theta of interacting dark radiation (with drmd)? */
+  short has_source_theta_idm_drmd_;/**< do we need source for theta of interacting dark matter (with drmd)? */
   short has_source_theta_ncdm_;  /**< do we need source for theta of all non-cold dark matter species (e.g. massive neutrinos)? */
   short has_source_phi_;         /**< do we need source for metric fluctuation phi? */
   short has_source_phi_prime_;   /**< do we need source for metric fluctuation phi'? */

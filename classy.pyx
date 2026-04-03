@@ -798,6 +798,14 @@ cdef class PyCosmology:
         bam = deref(self._thisptr).GetBackgroundModule()
         return deref(bam).Neff_
 
+    cpdef f_idr_drmd(self):
+        bam = deref(self._thisptr).GetBackgroundModule()
+        return deref(bam).f_idr_drmd_
+
+    cpdef z_dec_drmd(self):
+        bam = deref(self._thisptr).GetBackgroundModule()
+        return deref(bam).z_dec_drmd_
+
     cpdef k_eq(self):
         bam = deref(self._thisptr).GetBackgroundModule()
         return deref(bam).a_eq_*deref(bam).H_eq_
@@ -1638,6 +1646,10 @@ cdef class PyCosmology:
                 value = self.sigma8_cb()
             elif name == 'k_eq':
                 value = self.k_eq()
+            elif name == 'z_dec_drmd':
+                value = self.z_dec_drmd()
+            elif name == 'f_idr_drmd':
+                value = self.f_idr_drmd()
             else:
                 raise CosmoSevereError("%s was not recognized as a derived parameter" % name)
             derived[name] = value

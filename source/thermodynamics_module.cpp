@@ -1578,6 +1578,11 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
               - pvecback[background_module_->index_bg_rho_g_])
     /(7./8.*pow(4./11.,4./3.)*pvecback[background_module_->index_bg_rho_g_]);
 
+  /**DRMD**/
+  if(pba->has_idr_drmd == _TRUE_){
+    Neff_bbn -= (pvecback[background_module_->index_bg_rho_idr_drmd_])/(7./8.*pow(4./11.,4./3.)*pvecback[background_module_->index_bg_rho_g_]);
+  }
+
   free(pvecback);
 
   //  printf("Neff early = %g, Neff at bbn: %g\n", background_module_->Neff_, Neff_bbn);

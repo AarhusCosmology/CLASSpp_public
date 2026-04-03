@@ -15,6 +15,7 @@ public:
   int background_w_fld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
   int background_free_noinput() const;
   double dV_scf(double phi) const;
+  int background_idm_drmd(double a, double rho_idm_over_rho_idr, double *Rint, double *csp2, double *Gint) const;
 
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
 
@@ -40,6 +41,11 @@ public:
   int index_bg_dlnfdlnq_ncdm_decay_dr1_;
   int index_bg_dlnfdlnq_separate_ncdm_decay_dr1_;
 
+  int index_bg_rho_idm_drmd_; //**idm dark matter in drmd model */
+  int index_bg_G_over_aH_drmd_; //**G/(aH) in drmd model */
+  int index_bg_rho_idr_drmd_; //**idr dark radiation in drmd model */
+  int index_bg_Gamma0_drmd_; //**interaction rate today in drmd model */
+  
   int index_bg_rho_dr_species_;/**< dr density for individual species */
   int index_bg_rho_dr_;        /**< total dr density */
   int index_bg_phi_scf_;       /**< scalar field value */
@@ -98,6 +104,13 @@ public:
   double Omega0_dcdm_; /**< \f$ \Omega_{0 dcdm} \f$: decaying cold dark matter */
   double Omega0_dr_; /**< \f$ \Omega_{0 dr} \f$: decay radiation */
 
+  double Omega0_idr_drmd_;
+  double Omega0_idm_drmd_;
+  double Omega0_idm_;
+  double G_over_aH_tmp_;
+  double Gamma0_drmd_;
+  double f_idr_drmd_;
+  double z_dec_drmd_;
 private:
   int background_functions(double* pvecback_B, short return_format, double* pvecback);
   int background_init();

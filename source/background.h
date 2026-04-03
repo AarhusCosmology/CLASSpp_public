@@ -156,6 +156,17 @@ struct background
   short has_idm_dr;    /**< presence of dark matter interacting with dark radiation? */
   short has_curvature; /**< presence of global spatial curvature? */
 
+  /*DRMD*/
+  short has_idm_drmd;
+  short has_idr_drmd;
+  short has_idm;
+
+  double Omega0_idr_drmd;
+  double Omega0_idm_drmd;
+  double f_idm_drmd;
+  double G_over_aH_drmd;
+  double delta_Neff_drmd;
+  double z_stop;
   //@}
 
   /**
