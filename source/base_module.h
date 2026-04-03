@@ -14,12 +14,19 @@
 #include "lensing.h"
 #include "output.h"
 
+#include "../species/base_species.h"
+
+#include <map>
+#include <memory>
+#include <string>
+
 
 class BaseModule {
 public:
   BaseModule(InputModulePtr input_module)
   : ncdm_(input_module->ncdm_)
   , dr_(input_module->dr_)
+  , all_species_(input_module->all_species_)
   , ppr(&input_module->precision_)
   , pba(&input_module->background_)
   , pth(&input_module->thermodynamics_)
@@ -39,6 +46,11 @@ public:
 public:
   const std::shared_ptr<NonColdDarkMatter> ncdm_;
   const std::shared_ptr<DarkRadiation> dr_;
+
+  /** Const map of all cosmological species, keyed by name.
+   *  Use .at("CDM") — never operator[] — to preserve const safety. */
+  const std::map<std::string, std::unique_ptr<BaseSpecies>>& all_species_;
+
 protected:
   InputModulePtr input_module_;
 

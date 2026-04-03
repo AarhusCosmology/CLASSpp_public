@@ -37,6 +37,16 @@
 		AFDC68C2240D9FB80044B5A3 /* class.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68C1240D9FB80044B5A3 /* class.cpp */; };
 		AFDE3E01242DF6290061A4DE /* output_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDE3E00242DF6290061A4DE /* output_module.cpp */; };
 		AFEAF07E2449CC6400A3F4A2 /* non_cold_dark_matter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */; };
+		CC000011000000000000001B /* baryons.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000010000000000000001A /* baryons.cpp */; };
+		CC000013000000000000001D /* cdm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000012000000000000001C /* cdm.cpp */; };
+		CC000015000000000000001F /* dark_radiation_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000014000000000000001E /* dark_radiation_species.cpp */; };
+		CC000017000000000000002B /* dcdm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000016000000000000002A /* dcdm.cpp */; };
+		CC000019000000000000002D /* fluid.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000018000000000000002C /* fluid.cpp */; };
+		CC00001B000000000000002F /* lambda.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC00001A000000000000002E /* lambda.cpp */; };
+		CC00001D0000000000000031 /* ncdm_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC00001C0000000000000030 /* ncdm_species.cpp */; };
+		CC00001F0000000000000033 /* photons.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC00001E0000000000000032 /* photons.cpp */; };
+		CC0000210000000000000035 /* scalar_field.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC0000200000000000000034 /* scalar_field.cpp */; };
+		CC0000230000000000000037 /* ultra_relativistic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC0000220000000000000036 /* ultra_relativistic.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -133,6 +143,28 @@
 		AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = non_cold_dark_matter.cpp; sourceTree = "<group>"; };
 		AFF6F6B5243F3F8700BEF31A /* thermodynamics_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = thermodynamics_module.h; sourceTree = "<group>"; };
 		AFF6F6B6244742C300BEF31A /* background_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = background_module.h; sourceTree = "<group>"; };
+		CC000001000000000000001A /* base_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = base_species.h; sourceTree = "<group>"; };
+		CC000002000000000000001B /* perturb_context.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = perturb_context.h; sourceTree = "<group>"; };
+		CC000003000000000000001C /* baryons.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = baryons.h; sourceTree = "<group>"; };
+		CC000004000000000000001D /* cdm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = cdm.h; sourceTree = "<group>"; };
+		CC000005000000000000001E /* dark_radiation_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = dark_radiation_species.h; sourceTree = "<group>"; };
+		CC000006000000000000001F /* dcdm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = dcdm.h; sourceTree = "<group>"; };
+		CC000007000000000000002A /* fluid.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fluid.h; sourceTree = "<group>"; };
+		CC000008000000000000002B /* lambda.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = lambda.h; sourceTree = "<group>"; };
+		CC000009000000000000002C /* ncdm_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ncdm_species.h; sourceTree = "<group>"; };
+		CC00000A000000000000002D /* photons.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = photons.h; sourceTree = "<group>"; };
+		CC00000B000000000000002E /* scalar_field.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = scalar_field.h; sourceTree = "<group>"; };
+		CC00000C000000000000002F /* ultra_relativistic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ultra_relativistic.h; sourceTree = "<group>"; };
+		CC000010000000000000001A /* baryons.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = baryons.cpp; sourceTree = "<group>"; };
+		CC000012000000000000001C /* cdm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cdm.cpp; sourceTree = "<group>"; };
+		CC000014000000000000001E /* dark_radiation_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dark_radiation_species.cpp; sourceTree = "<group>"; };
+		CC000016000000000000002A /* dcdm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dcdm.cpp; sourceTree = "<group>"; };
+		CC000018000000000000002C /* fluid.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = fluid.cpp; sourceTree = "<group>"; };
+		CC00001A000000000000002E /* lambda.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = lambda.cpp; sourceTree = "<group>"; };
+		CC00001C0000000000000030 /* ncdm_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ncdm_species.cpp; sourceTree = "<group>"; };
+		CC00001E0000000000000032 /* photons.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = photons.cpp; sourceTree = "<group>"; };
+		CC0000200000000000000034 /* scalar_field.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = scalar_field.cpp; sourceTree = "<group>"; };
+		CC0000220000000000000036 /* ultra_relativistic.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ultra_relativistic.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -168,6 +200,7 @@
 				AFE305512429FA06005CB56C /* include */,
 				AFDC68C0240D9FB80044B5A3 /* main */,
 				AFDC6891240D9F500044B5A3 /* source */,
+				CC000030000000000000003A /* species */,
 				AFDC68A6240D9F6B0044B5A3 /* tools */,
 				AFDC6888240D9EA00044B5A3 /* ppCLASS */,
 				AFDC6887240D9EA00044B5A3 /* Products */,
@@ -293,6 +326,37 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXGroup section (species) - appended */
+		CC000030000000000000003A /* species */ = {
+			isa = PBXGroup;
+			children = (
+				CC000001000000000000001A /* base_species.h */,
+				CC000002000000000000001B /* perturb_context.h */,
+				CC000003000000000000001C /* baryons.h */,
+				CC000010000000000000001A /* baryons.cpp */,
+				CC000004000000000000001D /* cdm.h */,
+				CC000012000000000000001C /* cdm.cpp */,
+				CC000005000000000000001E /* dark_radiation_species.h */,
+				CC000014000000000000001E /* dark_radiation_species.cpp */,
+				CC000006000000000000001F /* dcdm.h */,
+				CC000016000000000000002A /* dcdm.cpp */,
+				CC000007000000000000002A /* fluid.h */,
+				CC000018000000000000002C /* fluid.cpp */,
+				CC000008000000000000002B /* lambda.h */,
+				CC00001A000000000000002E /* lambda.cpp */,
+				CC000009000000000000002C /* ncdm_species.h */,
+				CC00001C0000000000000030 /* ncdm_species.cpp */,
+				CC00000A000000000000002D /* photons.h */,
+				CC00001E0000000000000032 /* photons.cpp */,
+				CC00000B000000000000002E /* scalar_field.h */,
+				CC0000200000000000000034 /* scalar_field.cpp */,
+				CC00000C000000000000002F /* ultra_relativistic.h */,
+				CC0000220000000000000036 /* ultra_relativistic.cpp */,
+			);
+			path = species;
+			sourceTree = "<group>";
+		};
+
 /* Begin PBXNativeTarget section */
 		AFDC6885240D9EA00044B5A3 /* class */ = {
 			isa = PBXNativeTarget;
@@ -378,6 +442,16 @@
 				AFEAF07E2449CC6400A3F4A2 /* non_cold_dark_matter.cpp in Sources */,
 				AF14AFE924337B11005D2DE9 /* cosmology.cpp in Sources */,
 				AFDC68A4240D9F500044B5A3 /* background_module.cpp in Sources */,
+				CC000011000000000000001B /* baryons.cpp in Sources */,
+				CC000013000000000000001D /* cdm.cpp in Sources */,
+				CC000015000000000000001F /* dark_radiation_species.cpp in Sources */,
+				CC000017000000000000002B /* dcdm.cpp in Sources */,
+				CC000019000000000000002D /* fluid.cpp in Sources */,
+				CC00001B000000000000002F /* lambda.cpp in Sources */,
+				CC00001D0000000000000031 /* ncdm_species.cpp in Sources */,
+				CC00001F0000000000000033 /* photons.cpp in Sources */,
+				CC0000210000000000000035 /* scalar_field.cpp in Sources */,
+				CC0000230000000000000037 /* ultra_relativistic.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -439,6 +513,8 @@
 					"$(PROJECT_DIR)/include",
 					"$(PROJECT_DIR)/source",
 					"$(PROJECT_DIR)/tools",
+					"$(PROJECT_DIR)/species",
+					"$(PROJECT_DIR)",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -501,6 +577,8 @@
 					"$(PROJECT_DIR)/include",
 					"$(PROJECT_DIR)/source",
 					"$(PROJECT_DIR)/tools",
+					"$(PROJECT_DIR)/species",
+					"$(PROJECT_DIR)",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = NO;

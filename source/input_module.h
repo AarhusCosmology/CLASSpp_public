@@ -16,6 +16,10 @@
 #include "lensing.h"
 #include "output.h"
 
+#include "../species/base_species.h"
+
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -41,6 +45,8 @@ public:
   output output_;
   std::shared_ptr<NonColdDarkMatter> ncdm_;
   std::shared_ptr<DarkRadiation> dr_;
+  /** All cosmological species, constructed at end of InputModule ctor. */
+  std::map<std::string, std::unique_ptr<BaseSpecies>> all_species_;
   ErrorMsg error_message_;
 
 private:
@@ -63,6 +69,7 @@ private:
 
 
   int FixUnknownParameters(int input_verbose, int unknown_parameters_size, int* target_indices);
+  void ConstructSpecies();
     
   int input_init();
   int input_read_parameters();

@@ -15,6 +15,18 @@
 #include "lensing_module.h"
 #include "spectra_module.h"
 
+// Species implementations
+#include "../species/cdm.h"
+#include "../species/photons.h"
+#include "../species/baryons.h"
+#include "../species/lambda.h"
+#include "../species/ultra_relativistic.h"
+#include "../species/fluid.h"
+#include "../species/dcdm.h"
+#include "../species/dark_radiation_species.h"
+#include "../species/ncdm_species.h"
+#include "../species/scalar_field.h"
+
 #include <thread>
 /**
  * Use this routine to extract initial parameters from files 'xxx.ini'
@@ -181,6 +193,39 @@ InputModule::InputModule(FileContent& fc)
   if (status == _FAILURE_) {
     throw std::invalid_argument(error_message_);
   }
+  ConstructSpecies();
+}
+
+void InputModule::ConstructSpecies() {
+  const background* pba = &background_;
+  if (pba->has_cdm == _TRUE_) {
+    all_species_["CDM"] = std::make_unique<CDMSpecies>(*pba);
+  }
+  if (pba->has_lambda == _TRUE_) {
+    all_species_["Lambda"] = std::make_unique<LambdaSpecies>(*pba);
+  }
+  if (pba->has_ur == _TRUE_) {
+    all_species_["UR"] = std::make_unique<UltraRelativisticSpecies>(*pba);
+  }
+  if (pba->has_fld == _TRUE_) {
+    all_species_["Fluid"] = std::make_unique<FluidSpecies>(*pba);
+  }
+  if (pba->has_dcdm == _TRUE_) {
+    all_species_["DCDM"] = std::make_unique<DCDMSpecies>(*pba);
+  }
+  if (pba->has_dr == _TRUE_) {
+    all_species_["DR"] = std::make_unique<DarkRadiationSpecies>(dr_, pba, nullptr);
+  }
+  if (pba->has_ncdm == _TRUE_ && ncdm_ != nullptr) {
+    all_species_["NCDM"] = std::make_unique<NCDMSpecies>(ncdm_, pba, nullptr);
+  }
+  if (pba->has_scf == _TRUE_) {
+    all_species_["ScalarField"] = std::make_unique<ScalarFieldSpecies>(*pba);
+  }
+  // Photons and baryons are always present once there is a radiation background.
+  // They are always added; the background module already guards has_ur/has_g etc.
+  all_species_["Photons"] = std::make_unique<PhotonsSpecies>(*pba);
+  all_species_["Baryons"] = std::make_unique<BaryonsSpecies>(*pba);
 }
 
 int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_size, int* target_indices) {

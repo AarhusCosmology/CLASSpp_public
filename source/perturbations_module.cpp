@@ -3372,40 +3372,17 @@ int PerturbationsModule::perturb_vector_init(
 
     /* photons */
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) { /* if radiation streaming approximation is off */
-
-      /* temperature */
-
-      ppv->l_max_g = ppr->l_max_g;
-
-      class_define_index(ppv->index_pt_delta_g,_TRUE_,index_pt,1); /* photon density */
-      class_define_index(ppv->index_pt_theta_g,_TRUE_,index_pt,1); /* photon velocity */
-
-      if (ppw->approx[ppw->index_ap_tca] == (int)tca_off) {
-
-        class_define_index(ppv->index_pt_shear_g,_TRUE_,index_pt,1); /* photon shear */
-        class_define_index(ppv->index_pt_l3_g,_TRUE_,index_pt,ppv->l_max_g-2); /* higher momenta */
-
-        /* polarization */
-
-        ppv->l_max_pol_g = ppr->l_max_pol_g;
-
-        class_define_index(ppv->index_pt_pol0_g,_TRUE_,index_pt,1);
-        class_define_index(ppv->index_pt_pol1_g,_TRUE_,index_pt,1);
-        class_define_index(ppv->index_pt_pol2_g,_TRUE_,index_pt,1);
-        class_define_index(ppv->index_pt_pol3_g,_TRUE_,index_pt,ppv->l_max_pol_g-2);
-      }
-    }
+    /* photons: set l_max fields before calling species (species reads them) */
+    ppv->l_max_g     = ppr->l_max_g;
+    ppv->l_max_pol_g = ppr->l_max_pol_g;
+    all_species_.at("Photons")->RegisterPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /* baryons */
-
-    class_define_index(ppv->index_pt_delta_b,_TRUE_,index_pt,1); /* baryon density */
-    class_define_index(ppv->index_pt_theta_b,_TRUE_,index_pt,1); /* baryon velocity */
+    all_species_.at("Baryons")->RegisterPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /* cdm */
-
-    class_define_index(ppv->index_pt_delta_cdm,pba->has_cdm,index_pt,1); /* cdm density */
-    class_define_index(ppv->index_pt_theta_cdm,pba->has_cdm && (ppt->gauge == newtonian),index_pt,1); /* cdm velocity */
+    if (pba->has_cdm == _TRUE_)
+      all_species_.at("CDM")->RegisterPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /* idm_dr */
     class_define_index(ppv->index_pt_delta_idm_dr,pba->has_idm_dr,index_pt,1); /* idm_dr density */
@@ -3416,11 +3393,10 @@ int PerturbationsModule::perturb_vector_init(
     class_define_index(ppv->index_pt_theta_idm_drmd,pba->has_idm_drmd,index_pt,1); /*idm_drmd velocity*/
 
     /* dcdm */
+    if (pba->has_dcdm == _TRUE_)
+      all_species_.at("DCDM")->RegisterPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
-    class_define_index(ppv->index_pt_delta_dcdm,pba->has_dcdm,index_pt,1); /* dcdm density */
-    class_define_index(ppv->index_pt_theta_dcdm,pba->has_dcdm,index_pt,1); /* dcdm velocity */
-
-    /* ultra relativistic decay radiation */
+    /* ultra relativistic decay radiation (DR coupling too complex for species, kept as-is) */
     if (pba->has_dr==_TRUE_){
       ppv->l_max_dr = ppr->l_max_dr;
       class_define_index(ppv->index_pt_F0_dr_sum,_TRUE_,index_pt,ppv->l_max_dr+1);
@@ -3428,19 +3404,12 @@ int PerturbationsModule::perturb_vector_init(
     }
 
     /* fluid */
-
-    if (pba->use_ppf == _FALSE_) {
-      class_define_index(ppv->index_pt_delta_fld,pba->has_fld,index_pt,1); /* fluid density */
-      class_define_index(ppv->index_pt_theta_fld,pba->has_fld,index_pt,1); /* fluid velocity */
-    }
-    else {
-      class_define_index(ppv->index_pt_Gamma_fld,pba->has_fld,index_pt,1); /* Gamma variable of PPF scheme */
-    }
+    if (pba->has_fld == _TRUE_)
+      all_species_.at("Fluid")->RegisterPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /* scalar field */
-
-    class_define_index(ppv->index_pt_phi_scf,pba->has_scf,index_pt,1); /* scalar field density */
-    class_define_index(ppv->index_pt_phi_prime_scf,pba->has_scf,index_pt,1); /* scalar field velocity */
+    if (pba->has_scf == _TRUE_)
+      all_species_.at("ScalarField")->RegisterPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /* perturbed recombination: the indices are defined once tca is off. */
     if ( (ppt->has_perturbed_recombination == _TRUE_) && (ppw->approx[ppw->index_ap_tca] == (int)tca_off) ){
@@ -3448,18 +3417,10 @@ int PerturbationsModule::perturb_vector_init(
       class_define_index(ppv->index_pt_perturbed_recombination_delta_chi,_TRUE_,index_pt,1);
     }
 
-    /* ultra relativistic neutrinos */
-
-    if (pba->has_ur && (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off)) {
-
-      class_define_index(ppv->index_pt_delta_ur,_TRUE_,index_pt,1); /* density of ultra-relativistic neutrinos/relics */
-      class_define_index(ppv->index_pt_theta_ur,_TRUE_,index_pt,1); /* velocity of ultra-relativistic neutrinos/relics */
-      class_define_index(ppv->index_pt_shear_ur,_TRUE_,index_pt,1); /* shear of ultra-relativistic neutrinos/relics */
-
-      if (ppw->approx[ppw->index_ap_ufa] == (int)ufa_off) {
-        ppv->l_max_ur = ppr->l_max_ur;
-        class_define_index(ppv->index_pt_l3_ur,_TRUE_,index_pt,ppv->l_max_ur-2); /* additional momenta in Boltzmann hierarchy (beyond l=0,1,2,3) */
-      }
+    /* ultra relativistic neutrinos: set l_max_ur before calling species */
+    if (pba->has_ur == _TRUE_) {
+      ppv->l_max_ur = ppr->l_max_ur;
+      all_species_.at("UR")->RegisterPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
     }
 
     /* interacting dark radiation */
@@ -6461,9 +6422,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
   double delta_g=0.;
   double theta_g=0.;
   double shear_g=0.;
-  double delta_ur=0.;
-  double theta_ur=0.;
-  double shear_ur=0.;
   double delta_idr=0.;
   double theta_idr=0.;
   double shear_idr=0.;
@@ -6550,29 +6508,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
       }
     }
 
-    /** - ---> (a.2.) ur */
-
-    if (pba->has_ur == _TRUE_) {
-
-      if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) {
-
-        delta_ur = y[ppw->pv->index_pt_delta_ur];
-        theta_ur = y[ppw->pv->index_pt_theta_ur];
-        shear_ur = y[ppw->pv->index_pt_shear_ur];
-
-      }
-
-      else {
-
-        delta_ur = 0.; /* actual free streaming approximation imposed after evaluation of 1st einstein equation */
-        theta_ur = 0.; /* actual free streaming approximation imposed after evaluation of 1st einstein equation */
-        shear_ur = 0.; /* shear always neglected in free streaming approximation */
-
-      }
-
-    }
-
-    /** - ---> (a.3.) baryon pressure perturbation */
+    /** - ---> (a.2.) baryon pressure perturbation */
 
     if ((ppt->has_perturbed_recombination == _TRUE_) &&(ppw->approx[ppw->index_ap_tca] == (int)tca_off)) {
       delta_p_b_over_rho_b = ppw->pvecthermo[thermodynamics_module_->index_th_wb_]*(y[ppw->pv->index_pt_delta_b] + y[ppw->pv->index_pt_perturbed_recombination_delta_temp]);
@@ -6630,20 +6566,22 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
 
     /* cdm contribution */
     if (pba->has_cdm == _TRUE_) {
-      ppw->delta_rho += ppw->pvecback[background_module_->index_bg_rho_cdm_]*y[ppw->pv->index_pt_delta_cdm]; // contribution to total perturbed stress-energy
-      if (ppt->gauge == newtonian)
-        ppw->rho_plus_p_theta = ppw->rho_plus_p_theta + ppw->pvecback[background_module_->index_bg_rho_cdm_]*y[ppw->pv->index_pt_theta_cdm]; // contribution to total perturbed stress-energy
+      const auto& CDM = all_species_.at("CDM");
+      const double rho_cdm   = CDM->Rho(ppw->pvecback);
+      const double delta_cdm = CDM->Delta(ppw->pv, y, ppw->pvecback);
+      const double theta_cdm = CDM->Theta(ppw->pv, y, ppw->pvecback); // 0 in synchronous gauge
 
-      ppw->rho_plus_p_tot += ppw->pvecback[background_module_->index_bg_rho_cdm_];
+      ppw->delta_rho        += rho_cdm * delta_cdm;
+      ppw->rho_plus_p_theta += rho_cdm * theta_cdm; // p_cdm = 0, so rho+p = rho
+      ppw->rho_plus_p_tot   += rho_cdm;
 
       if (has_source_delta_m_ == _TRUE_) {
-        delta_rho_m += ppw->pvecback[background_module_->index_bg_rho_cdm_]*y[ppw->pv->index_pt_delta_cdm]; // contribution to delta rho_matter
-        rho_m += ppw->pvecback[background_module_->index_bg_rho_cdm_];
+        delta_rho_m += rho_cdm * delta_cdm;
+        rho_m       += rho_cdm;
       }
       if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
-        if (ppt->gauge == newtonian)
-          rho_plus_p_theta_m += ppw->pvecback[background_module_->index_bg_rho_cdm_]*y[ppw->pv->index_pt_theta_cdm]; // contribution to [(rho+p)theta]_matter
-        rho_plus_p_m += ppw->pvecback[background_module_->index_bg_rho_cdm_];
+        rho_plus_p_theta_m += rho_cdm * theta_cdm;
+        rho_plus_p_m       += rho_cdm;
       }
     }
 
@@ -6675,18 +6613,22 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
 
     /* dcdm contribution */
     if (pba->has_dcdm == _TRUE_) {
-      ppw->delta_rho += ppw->pvecback[background_module_->index_bg_rho_dcdm_]*y[ppw->pv->index_pt_delta_dcdm];
-      ppw->rho_plus_p_theta += ppw->pvecback[background_module_->index_bg_rho_dcdm_]*y[ppw->pv->index_pt_theta_dcdm];
+      const auto& DCDM = all_species_.at("DCDM");
+      const double rho_dcdm   = DCDM->Rho(ppw->pvecback);
+      const double delta_dcdm = DCDM->Delta(ppw->pv, y, ppw->pvecback);
+      const double theta_dcdm = DCDM->Theta(ppw->pv, y, ppw->pvecback);
 
-      ppw->rho_plus_p_tot += ppw->pvecback[background_module_->index_bg_rho_dcdm_];
+      ppw->delta_rho        += rho_dcdm * delta_dcdm;
+      ppw->rho_plus_p_theta += rho_dcdm * theta_dcdm; // p_dcdm = 0
+      ppw->rho_plus_p_tot   += rho_dcdm;
 
       if (has_source_delta_m_ == _TRUE_) {
-        delta_rho_m += ppw->pvecback[background_module_->index_bg_rho_dcdm_]*y[ppw->pv->index_pt_delta_dcdm]; // contribution to delta rho_matter
-        rho_m += ppw->pvecback[background_module_->index_bg_rho_dcdm_];
+        delta_rho_m += rho_dcdm * delta_dcdm;
+        rho_m       += rho_dcdm;
       }
       if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
-        rho_plus_p_theta_m += ppw->pvecback[background_module_->index_bg_rho_dcdm_]*y[ppw->pv->index_pt_theta_dcdm]; // contribution to [(rho+p)theta]_matter
-        rho_plus_p_m += ppw->pvecback[background_module_->index_bg_rho_dcdm_];
+        rho_plus_p_theta_m += rho_dcdm * theta_dcdm;
+        rho_plus_p_m       += rho_dcdm;
       }
     }
 
@@ -6710,12 +6652,13 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
     /* ultra-relativistic neutrino/relics contribution */
 
     if (pba->has_ur == _TRUE_) {
-      ppw->delta_rho = ppw->delta_rho + ppw->pvecback[background_module_->index_bg_rho_ur_]*delta_ur;
-      ppw->rho_plus_p_theta = ppw->rho_plus_p_theta + 4./3.*ppw->pvecback[background_module_->index_bg_rho_ur_]*theta_ur;
-      ppw->rho_plus_p_shear = ppw->rho_plus_p_shear + 4./3.*ppw->pvecback[background_module_->index_bg_rho_ur_]*shear_ur;
-      ppw->delta_p += 1./3.*ppw->pvecback[background_module_->index_bg_rho_ur_]*delta_ur;
-
-      ppw->rho_plus_p_tot += 4./3.*ppw->pvecback[background_module_->index_bg_rho_ur_];
+      const auto& UR = all_species_.at("UR");
+      const double rho_plus_p_ur = UR->Rho(ppw->pvecback) + UR->P(ppw->pvecback); // 4/3 * rho_ur
+      ppw->delta_rho        += UR->Rho(ppw->pvecback) * UR->Delta(ppw->pv, y, ppw->pvecback);
+      ppw->rho_plus_p_theta += rho_plus_p_ur * UR->Theta(ppw->pv, y, ppw->pvecback);
+      ppw->rho_plus_p_shear += UR->RhoPlusPShear(ppw->pv, y, ppw->pvecback);
+      ppw->delta_p          += UR->DeltaP(ppw->pv, y, ppw->pvecback);
+      ppw->rho_plus_p_tot   += rho_plus_p_ur;
     }
 
     /* interacting dark radiation */
@@ -8624,160 +8567,48 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
       }
     }
 
+    /** - --> (e-pre) populate scalar context for species PerturbDerivs */
+    {
+      auto& ctx            = ppw->scalar_ctx;
+      ctx.k                = k;
+      ctx.k2               = k2;
+      ctx.a                = a;
+      ctx.a2               = a2;
+      ctx.a_prime_over_a   = a_prime_over_a;
+      ctx.metric_continuity = metric_continuity;
+      ctx.metric_euler      = metric_euler;
+      ctx.metric_shear      = metric_shear;
+      ctx.metric_ufa_class  = metric_ufa_class;
+      ctx.cotKgen    = cotKgen;
+      ctx.s2_squared = s2_squared;
+      ctx.delta_g    = delta_g;
+      ctx.theta_g    = theta_g;
+      ctx.delta_idr  = delta_idr;
+      ctx.theta_idr  = theta_idr;
+      ctx.delta_b    = delta_b;
+      ctx.theta_b    = theta_b;
+      ctx.R          = R;
+      ctx.cb2        = cb2;
+      ctx.delta_p_b_over_rho_b = delta_p_b_over_rho_b;
+    }
+
     /** - --> (e) BEGINNING OF ACTUAL SYSTEM OF EQUATIONS OF EVOLUTION */
 
-    /** - ---> photon temperature density */
+    /** - ---> photon temperature and baryon (species-delegated) */
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) {
-
-      dy[pv->index_pt_delta_g] = -4./3.*(theta_g+metric_continuity);
-
-    }
-
-    /** - ---> baryon density */
-
-    dy[pv->index_pt_delta_b] = -(theta_b+metric_continuity);
-
-    /** - ---> baryon velocity (depends on tight-coupling approximation=tca) */
-
-    if (ppw->approx[ppw->index_ap_tca] == (int)tca_off) {
-
-      /* without tca */
-
-      /** - ----> perturbed recombination has an impact **/
-      dy[pv->index_pt_theta_b] =
-        - a_prime_over_a*theta_b
-        + metric_euler
-        + k2*delta_p_b_over_rho_b
-        + R*pvecthermo[thermodynamics_module_->index_th_dkappa_]*(theta_g - theta_b);
-
-    }
-
-    else {
-
-      /* with tca */
-      class_call(perturb_tca_slip_and_shear(y,pppaw,error_message),
+    if (ppw->approx[ppw->index_ap_tca] == (int)tca_on) {
+      class_call(perturb_tca_slip_and_shear(y, pppaw, error_message),
                  error_message,
                  error_message);
-
-      /* perturbed recombination has an impact **/
-      dy[pv->index_pt_theta_b] =
-        (-a_prime_over_a*theta_b
-         +k2*(delta_p_b_over_rho_b+R*(delta_g/4.-s2_squared*ppw->tca_shear_g))
-         +R*ppw->tca_slip)/(1.+R)
-        +metric_euler;
-
     }
 
-    /** - ---> photon temperature higher momenta and photon polarization (depend on tight-coupling approximation) */
-
-    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) {
-
-      /** - ----> if photon tight-coupling is off */
-      if (ppw->approx[ppw->index_ap_tca] == (int)tca_off) {
-
-        /** - -----> define \f$ \Pi = G_{\gamma 0} + G_{\gamma 2} + F_{\gamma 2} \f$ */
-        P0 = (y[pv->index_pt_pol0_g] + y[pv->index_pt_pol2_g] + 2.*s_l[2]*y[pv->index_pt_shear_g])/8.;
-
-        /** - -----> photon temperature velocity */
-
-        dy[pv->index_pt_theta_g] =
-          k2*(delta_g/4.-s2_squared*y[pv->index_pt_shear_g])
-          + metric_euler
-          + pvecthermo[thermodynamics_module_->index_th_dkappa_]*(theta_b - theta_g);
-
-        /** - -----> photon temperature shear */
-        dy[pv->index_pt_shear_g] =
-          0.5*(8./15.*(theta_g + metric_shear)
-               - 3./5.*k*s_l[3]/s_l[2]*y[pv->index_pt_l3_g]
-               - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(2.*y[pv->index_pt_shear_g] - 4./5./s_l[2]*P0));
-
-        /** - -----> photon temperature l=3 */
-
-        l = 3;
-        dy[pv->index_pt_l3_g] = k/(2.0*l+1.0)*
-          (l*s_l[l]*2.*s_l[2]*y[pv->index_pt_shear_g]-(l+1.)*s_l[l+1]*y[pv->index_pt_l3_g+1])
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_l3_g];
-
-        /** - -----> photon temperature l>3 */
-        for (l = 4; l < pv->l_max_g; l++) {
-
-          dy[pv->index_pt_delta_g+l] = k/(2.0*l+1.0)*
-            (l*s_l[l]*y[pv->index_pt_delta_g+l-1]-(l+1)*s_l[l+1]*y[pv->index_pt_delta_g+l+1])
-            - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_delta_g + l];
-        }
-
-        /** - -----> photon temperature lmax */
-        l = pv->l_max_g; /* l=lmax */
-        dy[pv->index_pt_delta_g+l] =
-          k*(s_l[l]*y[pv->index_pt_delta_g+l-1]-(1.+l)*cotKgen*y[pv->index_pt_delta_g+l])
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_delta_g + l];
-
-        /** - -----> photon polarization l=0 */
-
-        dy[pv->index_pt_pol0_g] =
-          -k*y[pv->index_pt_pol0_g+1]
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(y[pv->index_pt_pol0_g] - 4.*P0);
-
-        /** - -----> photon polarization l=1 */
-
-        dy[pv->index_pt_pol1_g] =
-          k/3.*(y[pv->index_pt_pol1_g-1]-2.*s_l[2]*y[pv->index_pt_pol1_g+1])
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_pol1_g];
-
-        /** - -----> photon polarization l=2 */
-
-        dy[pv->index_pt_pol2_g] =
-          k/5.*(2.*s_l[2]*y[pv->index_pt_pol2_g-1]-3.*s_l[3]*y[pv->index_pt_pol2_g+1])
-          -pvecthermo[thermodynamics_module_->index_th_dkappa_]*(y[pv->index_pt_pol2_g] - 4./5.*P0);
-
-        /** - -----> photon polarization l>2 */
-
-        for (l=3; l < pv->l_max_pol_g; l++)
-          dy[pv->index_pt_pol0_g+l] = k/(2.*l+1)*
-            (l*s_l[l]*y[pv->index_pt_pol0_g+l-1]-(l+1.)*s_l[l+1]*y[pv->index_pt_pol0_g+l+1])
-            - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_pol0_g + l];
-
-        /** - -----> photon polarization lmax_pol */
-
-        l = pv->l_max_pol_g;
-        dy[pv->index_pt_pol0_g+l] =
-          k*(s_l[l]*y[pv->index_pt_pol0_g+l-1]-(l+1)*cotKgen*y[pv->index_pt_pol0_g+l])
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_pol0_g + l];
-
-      }
-
-      /** - ----> if photon tight-coupling is on: */
-
-      else {
-
-        /** - -----> in that case, only need photon velocity */
-
-
-        /* perturbed recombination has an impact **/
-        dy[pv->index_pt_theta_g] =
-          -(dy[pv->index_pt_theta_b]+a_prime_over_a*theta_b-k2*delta_p_b_over_rho_b)/R
-          +k2*(0.25*delta_g-s2_squared*ppw->tca_shear_g)+(1.+R)/R*metric_euler;
-      }
-    }
+    all_species_.at("Baryons")->PerturbDerivs(tau, y, dy, *pppaw);
+    all_species_.at("Photons")->PerturbDerivs(tau, y, dy, *pppaw);
 
     /** - ---> cdm */
 
     if (pba->has_cdm == _TRUE_) {
-
-      /** - ----> newtonian gauge: cdm density and velocity */
-
-      if (ppt->gauge == newtonian) {
-        dy[pv->index_pt_delta_cdm] = -(y[pv->index_pt_theta_cdm]+metric_continuity); /* cdm density */
-
-        dy[pv->index_pt_theta_cdm] = - a_prime_over_a*y[pv->index_pt_theta_cdm] + metric_euler; /* cdm velocity */
-      }
-
-      /** - ----> synchronous gauge: cdm density only (velocity set to zero by definition of the gauge) */
-
-      if (ppt->gauge == synchronous) {
-        dy[pv->index_pt_delta_cdm] = -metric_continuity; /* cdm density */
-      }
+      all_species_.at("CDM")->PerturbDerivs(tau, y, dy, *pppaw);
     }
 
     /** - ---> idr */
@@ -8867,13 +8698,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
     /** - ---> dcdm and dr */
 
     if (pba->has_dcdm == _TRUE_) {
-
-      /** - ----> dcdm */
-
-      dy[pv->index_pt_delta_dcdm] = -(y[pv->index_pt_theta_dcdm]+metric_continuity)
-        - a * pba->Gamma_dcdm / k2 * metric_euler; /* dcdm density */
-
-      dy[pv->index_pt_theta_dcdm] = - a_prime_over_a*y[pv->index_pt_theta_dcdm] + metric_euler; /* dcdm velocity */
+      all_species_.at("DCDM")->PerturbDerivs(tau, y, dy, *pppaw);
     }
 
     /** - ---> dr */
@@ -9098,53 +8923,15 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
     /** - ---> fluid (fld) */
 
     if (pba->has_fld == _TRUE_) {
-
-      if (pba->use_ppf == _FALSE_){
-
-        /** - ----> factors w, w_prime, adiabatic sound speed ca2 (all three background-related),
-            plus actual sound speed in the fluid rest frame cs2 */
-
-        class_call(background_module_->background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld), background_module_->error_message_, error_message_);
-        w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
-
-        ca2 = w_fld - w_prime_fld / 3. / (1.+w_fld) / a_prime_over_a;
-        cs2 = pba->cs2_fld;
-
-        /** - ----> fluid density */
-
-        dy[pv->index_pt_delta_fld] =
-          -(1+w_fld)*(y[pv->index_pt_theta_fld]+metric_continuity)
-          -3.*(cs2-w_fld)*a_prime_over_a*y[pv->index_pt_delta_fld]
-          -9.*(1+w_fld)*(cs2-ca2)*a_prime_over_a*a_prime_over_a*y[pv->index_pt_theta_fld]/k2;
-
-        /** - ----> fluid velocity */
-
-        dy[pv->index_pt_theta_fld] = /* fluid velocity */
-          -(1.-3.*cs2)*a_prime_over_a*y[pv->index_pt_theta_fld]
-          +cs2*k2/(1.+w_fld)*y[pv->index_pt_delta_fld]
-          +metric_euler;
-      }
-      else {
-        dy[pv->index_pt_Gamma_fld] = ppw->Gamma_prime_fld; /* Gamma variable of PPF formalism */
-      }
-
+      all_species_.at("Fluid")->PerturbDerivs(tau, y, dy, *pppaw);
     }
 
     /** - ---> scalar field (scf) */
 
     if (pba->has_scf == _TRUE_) {
-
-      /** - ----> field value */
-
-      dy[pv->index_pt_phi_scf] = y[pv->index_pt_phi_prime_scf];
-
-      /** - ----> Klein Gordon equation */
-
-      dy[pv->index_pt_phi_prime_scf] =  - 2.*a_prime_over_a*y[pv->index_pt_phi_prime_scf]
-        - metric_continuity*pvecback[background_module_->index_bg_phi_prime_scf_] //  metric_continuity = h'/2
-        - (k2 + a2*pvecback[background_module_->index_bg_ddV_scf_])*y[pv->index_pt_phi_scf]; //checked
-
+      all_species_.at("ScalarField")->PerturbDerivs(tau, y, dy, *pppaw);
     }
+
     /** - ---> interacting dark radiation */
     if (pba->has_idr == _TRUE_){
 
@@ -9201,102 +8988,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
     /** - ---> ultra-relativistic neutrino/relics (ur) */
 
     if (pba->has_ur == _TRUE_) {
-
-      /** - ----> if radiation streaming approximation is off */
-
-      if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) {
-
-        /** - -----> ur density */
-        dy[pv->index_pt_delta_ur] =
-          // standard term
-          -4./3.*(y[pv->index_pt_theta_ur] + metric_continuity)
-          // non-standard term, non-zero if if ceff2_ur not 1/3
-          +(1.-ppt->three_ceff2_ur)*a_prime_over_a*(y[pv->index_pt_delta_ur] + 4.*a_prime_over_a*y[pv->index_pt_theta_ur]/k/k);
-
-        /** - -----> ur velocity */
-        dy[pv->index_pt_theta_ur] =
-          // standard term with extra coefficient (3 ceff2_ur), normally equal to one
-          k2*(ppt->three_ceff2_ur*y[pv->index_pt_delta_ur]/4.-s2_squared*y[pv->index_pt_shear_ur]) + metric_euler
-          // non-standard term, non-zero if ceff2_ur not 1/3
-          -(1.-ppt->three_ceff2_ur)*a_prime_over_a*y[pv->index_pt_theta_ur];
-
-        if(ppw->approx[ppw->index_ap_ufa] == (int)ufa_off) {
-
-          /** - -----> exact ur shear */
-          dy[pv->index_pt_shear_ur] =
-            0.5*(
-                 // standard term
-                 8./15.*(y[pv->index_pt_theta_ur]+metric_shear)-3./5.*k*s_l[3]/s_l[2]*y[pv->index_pt_shear_ur+1]
-                 // non-standard term, non-zero if cvis2_ur not 1/3
-                 -(1.-ppt->three_cvis2_ur)*(8./15.*(y[pv->index_pt_theta_ur]+metric_shear)));
-
-          /** - -----> exact ur l=3 */
-          l = 3;
-          dy[pv->index_pt_l3_ur] = k/(2.*l+1.)*
-            (l*2.*s_l[l]*s_l[2]*y[pv->index_pt_shear_ur]-(l+1.)*s_l[l+1]*y[pv->index_pt_l3_ur+1]);
-
-          /** - -----> exact ur l>3 */
-          for (l = 4; l < pv->l_max_ur; l++) {
-            dy[pv->index_pt_delta_ur+l] = k/(2.*l+1)*
-              (l*s_l[l]*y[pv->index_pt_delta_ur+l-1]-(l+1.)*s_l[l+1]*y[pv->index_pt_delta_ur+l+1]);
-          }
-
-          /** - -----> exact ur lmax_ur */
-          l = pv->l_max_ur;
-          dy[pv->index_pt_delta_ur+l] =
-            k*(s_l[l]*y[pv->index_pt_delta_ur+l-1]-(1.+l)*cotKgen*y[pv->index_pt_delta_ur+l]);
-
-          // See equation 2.9 of https://arxiv.org/pdf/1706.02123.pdf
-          double taudot = pow(a,-4)*pow(pow(4./11., 1./3.)*pba->T_cmb*_k_B_,5)*pow(ppt->G_eff_ur/(1e12*_eV_*_eV_),2)*(2.*_PI_/_h_P_)/_c_*_Mpc_over_m_;
-          taudot = std::min(taudot, a_prime_over_a*1e9);
-          double alpha_RTA[5] = {0.40, 0.43, 0.46, 0.47, 0.48};
-
-          if (taudot > 0.) {
-            for (l = 2; l <= pv->l_max_ur; l++) {
-              int alpha_index = std::min(4, l - 2);
-              double alpha = alpha_RTA[alpha_index];
-              dy[pv->index_pt_delta_ur+l] -= alpha*taudot*y[pv->index_pt_delta_ur+l];
-            }
-          }
-
-        }
-
-        else {
-
-          /** - -----> in fluid approximation (ufa): only ur shear needed */
-          //TBC: curvature?
-          /* a la Ma & Bertschinger */
-          if (ppr->ur_fluid_approximation == ufa_mb) {
-
-            dy[pv->index_pt_shear_ur] =
-              -3./tau*y[pv->index_pt_shear_ur]
-              +2./3.*(y[pv->index_pt_theta_ur]+metric_shear);
-
-          }
-
-          /* a la Hu */
-          if (ppr->ur_fluid_approximation == ufa_hu) {
-
-            dy[pv->index_pt_shear_ur] =
-              -3.*a_prime_over_a*y[pv->index_pt_shear_ur]
-              +2./3.*(y[pv->index_pt_theta_ur]+metric_shear);
-
-          }
-
-          /* a la CLASS */
-          if (ppr->ur_fluid_approximation == ufa_CLASS) {
-
-            dy[pv->index_pt_shear_ur] =
-              -3./tau*y[pv->index_pt_shear_ur]
-              +2./3.*(y[pv->index_pt_theta_ur]+metric_ufa_class);
-
-          }
-          // See equation 2.9 of https://arxiv.org/pdf/1706.02123.pdf
-          double taudot = pow(a,-4)*pow(pow(4./11., 1./3.)*pba->T_cmb*_k_B_,5)*pow(ppt->G_eff_ur/(1e12*_eV_*_eV_),2)*(2.*_PI_/_h_P_)/_c_*_Mpc_over_m_;
-          taudot = std::min(taudot, a_prime_over_a*1e9);
-          dy[pv->index_pt_shear_ur] -= 0.40*taudot*y[pv->index_pt_shear_ur];
-        }
-      }
+      all_species_.at("UR")->PerturbDerivs(tau, y, dy, *pppaw);
     }
 
     /** - ---> non-cold dark matter (ncdm): massive neutrinos, WDM, etc. */

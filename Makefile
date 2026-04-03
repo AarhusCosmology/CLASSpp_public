@@ -8,9 +8,9 @@ WRKDIR = $(MDIR)/build
 	if ! [ -e $(WRKDIR) ]; then mkdir $(WRKDIR) ; mkdir $(WRKDIR)/lib; fi;
 	touch build/.base
 
-vpath %.h source:tools:main:include
+vpath %.h source:tools:main:include:species
 vpath %.c source:tools:main
-vpath %.cpp source:tools:main
+vpath %.cpp source:tools:main:species
 vpath %.o build
 vpath %.opp build
 vpath .base build
@@ -44,7 +44,7 @@ HYREC = hyrec
 CCFLAG += -D__CLASSDIR__='"$(MDIR)"'
 
 # where to find include files *.h
-INCLUDES = -I../include -I../tools -I../source
+INCLUDES = -I../include -I../tools -I../source -I../
 
 # automatically add external programs if needed. First, initialize to blank.
 EXTERNAL =
@@ -63,7 +63,7 @@ endif
 # https://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 # However, a clean build of CLASS is so fast that we just rebuild everything if *any*
 # .h-file changed.
-H_ALL = $(notdir $(wildcard include/*.h) $(wildcard tools/*.h) $(wildcard source/*.h))
+H_ALL = $(notdir $(wildcard include/*.h) $(wildcard tools/*.h) $(wildcard source/*.h) $(wildcard species/*.h))
 
 %.o: %.c .base $(H_ALL)
 	cd $(WRKDIR);$(CC) $(OPTFLAG) $(CCFLAG) $(INCLUDES) -c ../$< -o $*.o
@@ -76,6 +76,8 @@ TOOLS_O = growTable.o dei_rkck.o sparse.o evolver_rkck.o arrays.o parser.opp qua
 TOOLS_OPP = non_cold_dark_matter.opp dark_radiation.opp exceptions.opp evolver_ndf15.opp
 
 TOOLS = $(TOOLS_O) $(TOOLS_OPP)
+
+SPECIES_OPP = cdm.opp photons.opp baryons.opp lambda.opp ultra_relativistic.opp fluid.opp dcdm.opp dark_radiation_species.opp ncdm_species.opp scalar_field.opp
 
 SOURCE = input_module.opp background_module.opp thermodynamics_module.opp perturbations_module.opp primordial_module.opp nonlinear_module.opp transfer_module.opp spectra_module.opp lensing_module.opp cosmology.opp
 
@@ -99,7 +101,7 @@ file=glob.glob(os.path.join("python/build", "lib.*"))[0]; \
 new_file=file.replace("lib.", "lib." + sys.version + "."); \
 os.rename(file, new_file)'
 
-class: $(TOOLS) $(SOURCE) $(EXTERNAL) $(OUTPUT) $(CLASS)
+class: $(TOOLS) $(SPECIES_OPP) $(SOURCE) $(EXTERNAL) $(OUTPUT) $(CLASS)
 	$(CXX) $(OPTFLAG) $(LDFLAG) -o class $(addprefix build/,$(notdir $^)) $(LIBRARIES)
 
 clean: .base

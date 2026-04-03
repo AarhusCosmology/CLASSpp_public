@@ -6,6 +6,7 @@
 #include "thermodynamics.h"
 #include "evolver_ndf15.h"
 #include "evolver_rkck.h"
+#include "../species/base_species.h"
 
 #define _scalars_ ((ppt->has_scalars == _TRUE_) && (index_md == index_md_scalars_))
 #define _vectors_ ((ppt->has_vectors == _TRUE_) && (index_md == index_md_vectors_))
@@ -391,6 +392,12 @@ struct perturb_workspace
   FILE * perturb_output_file; /**< filepointer to output file*/
   int index_ikout;            /**< index for output k value (when k_output_values is set) */
 
+  //@}
+
+  /** @name - pre-computed scalar perturbation context, populated by
+   *  perturb_derivs_member() before calling species::PerturbDerivs(). */
+  //@{
+  PerturbScalarContext scalar_ctx;
   //@}
 
   /** @name - indices useful for searching background/thermo quantities in tables */

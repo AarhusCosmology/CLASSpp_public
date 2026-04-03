@@ -15,6 +15,8 @@ public:
   int background_w_fld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
   int background_free_noinput() const;
   double dV_scf(double phi) const;
+  double V_scf(double phi) const;
+  double ddV_scf(double phi) const;
   int background_idm_drmd(double a, double rho_idm_over_rho_idr, double *Rint, double *csp2, double *Gint) const;
 
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
@@ -126,8 +128,6 @@ private:
   static int background_derivs_loga(double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
   int background_add_line_to_bg_table_member(double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace, ErrorMsg error_message);
   static int background_add_line_to_bg_table(double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace, ErrorMsg error_message);
-  double V_scf(double phi) const;
-  double ddV_scf(double phi) const;
   double Q_scf(double phi, double phi_prime);
   double V_e_scf(double phi) const;
   double dV_e_scf(double phi) const;

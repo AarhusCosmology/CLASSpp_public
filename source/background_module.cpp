@@ -316,37 +316,42 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
   /** - compute each component's density and pressure */
 
+  /* Helper: accumulate rho/p/dp into totals and into rho_r or rho_m based on species type. */
+  auto accumulate = [&](const BaseSpecies& sp) {
+    const double rho = sp.Rho(pvecback);
+    const double p   = sp.P(pvecback);
+    rho_tot  += rho;
+    p_tot    += p;
+    dp_dloga += sp.DpDloga(pvecback);
+    switch (sp.energy_type()) {
+      case BaseSpecies::EnergyType::Radiation: rho_r += rho; break;
+      case BaseSpecies::EnergyType::Matter:    rho_m += rho; break;
+      case BaseSpecies::EnergyType::Other:     rho_r += 3.*p; rho_m += rho - 3.*p; break;
+      default: break; /* DarkEnergy: no rho_r / rho_m contribution */
+    }
+  };
+
   /* photons */
-  pvecback[index_bg_rho_g_] = pba->Omega0_g*pow(pba->H0, 2)/pow(a_rel, 4);
-  rho_tot += pvecback[index_bg_rho_g_];
-  p_tot += 1./3.*pvecback[index_bg_rho_g_];
-  dp_dloga += -4./3.*pvecback[index_bg_rho_g_];
-  rho_r += pvecback[index_bg_rho_g_];
+  all_species_.at("Photons")->ComputeBackground(a_rel, pvecback_B, pvecback);
+  accumulate(*all_species_.at("Photons"));
 
   /* baryons */
-  pvecback[index_bg_rho_b_] = pba->Omega0_b*pow(pba->H0, 2)/pow(a_rel, 3);
-  rho_tot += pvecback[index_bg_rho_b_];
-  p_tot += 0;
-  rho_m += pvecback[index_bg_rho_b_];
+  all_species_.at("Baryons")->ComputeBackground(a_rel, pvecback_B, pvecback);
+  accumulate(*all_species_.at("Baryons"));
 
   /* cdm */
   if (pba->has_cdm == _TRUE_) {
-    pvecback[index_bg_rho_cdm_] = pba->Omega0_cdm*pow(pba->H0, 2)/pow(a_rel, 3);
-    rho_tot += pvecback[index_bg_rho_cdm_];
-    p_tot += 0.;
-    rho_m += pvecback[index_bg_rho_cdm_];
+    all_species_.at("CDM")->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*all_species_.at("CDM"));
   }
 
   /* dcdm */
   if (pba->has_dcdm == _TRUE_) {
-    /* Pass value of rho_dcdm to output */
-    pvecback[index_bg_rho_dcdm_] = pvecback_B[index_bi_rho_dcdm_];
-    rho_tot += pvecback[index_bg_rho_dcdm_];
-    p_tot += 0.;
-    rho_m += pvecback[index_bg_rho_dcdm_];
+    all_species_.at("DCDM")->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*all_species_.at("DCDM"));
   }
 
-  /* DRMD  */
+  /* DRMD (interacting DM/DR — not yet in species map, kept as-is) */
   if (pba->has_idm_drmd == _TRUE_)
   {
     pvecback[index_bg_rho_idm_drmd_] = pba->Omega0_idm_drmd*pow(pba->H0, 2)/pow(a_rel, 3);
@@ -356,24 +361,11 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
   }
 
   
-  /* Scalar field */
+  /* Scalar field (ComputeBackground sets phi, phi_prime, V, dV, ddV, rho, p;
+     DpDloga=0 is correct here — p_prime correction added after H is known below) */
   if (pba->has_scf == _TRUE_) {
-    phi = pvecback_B[index_bi_phi_scf_];
-    phi_prime = pvecback_B[index_bi_phi_prime_scf_];
-    pvecback[index_bg_phi_scf_] = phi; // value of the scalar field phi
-    pvecback[index_bg_phi_prime_scf_] = phi_prime; // value of the scalar field phi derivative wrt conformal time
-    pvecback[index_bg_V_scf_] = V_scf(phi); //V_scf(phi); //write here potential as function of phi
-    pvecback[index_bg_dV_scf_] = dV_scf(phi); // dV_scf(phi); //potential' as function of phi
-    pvecback[index_bg_ddV_scf_] = ddV_scf(phi); // ddV_scf(phi); //potential'' as function of phi
-    pvecback[index_bg_rho_scf_] = (phi_prime*phi_prime/(2*a*a) + V_scf(phi))/3.; // energy of the scalar field. The field units are set automatically by setting the initial conditions
-    pvecback[index_bg_p_scf_] =(phi_prime*phi_prime/(2*a*a) - V_scf(phi))/3.; // pressure of the scalar field
-    rho_tot += pvecback[index_bg_rho_scf_];
-    p_tot += pvecback[index_bg_p_scf_];
-    dp_dloga += 0.0; /** <-- This depends on a_prime_over_a, so we cannot add it now! */
-    //divide relativistic & nonrelativistic (not very meaningful for oscillatory models)
-    rho_r += 3.*pvecback[index_bg_p_scf_]; //field pressure contributes radiation
-    rho_m += pvecback[index_bg_rho_scf_] - 3.*pvecback[index_bg_p_scf_]; //the rest contributes matter
-    //printf(" a= %e, Omega_scf = %f, \n ",a_rel, pvecback[index_bg_rho_scf_]/rho_tot );
+    all_species_.at("ScalarField")->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*all_species_.at("ScalarField"));
   }
 
   /* ncdm */
@@ -487,27 +479,14 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
   /* dr */
   if (pba->has_dr == _TRUE_) {
-    for (int n = 0; n < pba->N_decay_dr; n++) {
-      dr_->rho_species_[n] = pvecback_B[index_bi_rho_dr_species_ + n];
-      pvecback[index_bg_rho_dr_species_ + n] = pvecback_B[index_bi_rho_dr_species_ + n];
-    }
-
-    // Calculate total energy density from all sources
-    pvecback[index_bg_rho_dr_] = 0.;
-    for (double rho_dr : dr_->rho_species_) {
-      pvecback[index_bg_rho_dr_] += rho_dr;
-    }
-    rho_tot += pvecback[index_bg_rho_dr_];
-    p_tot += 1./3.*pvecback[index_bg_rho_dr_];
-    dp_dloga += -4./3.*pvecback[index_bg_rho_dr_];
-    rho_r += pvecback[index_bg_rho_dr_];
+    all_species_.at("DR")->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*all_species_.at("DR"));
   }
 
   /* Lambda */
   if (pba->has_lambda == _TRUE_) {
-    pvecback[index_bg_rho_lambda_] = pba->Omega0_lambda*pow(pba->H0, 2);
-    rho_tot += pvecback[index_bg_rho_lambda_];
-    p_tot -= pvecback[index_bg_rho_lambda_];
+    all_species_.at("Lambda")->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*all_species_.at("Lambda"));
   }
 
   /* fluid with w(a) and constant cs2 */
@@ -531,11 +510,8 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
   /* relativistic neutrinos (and all relativistic relics) */
   if (pba->has_ur == _TRUE_) {
-    pvecback[index_bg_rho_ur_] = pba->Omega0_ur*pow(pba->H0, 2)/pow(a_rel, 4);
-    rho_tot += pvecback[index_bg_rho_ur_];
-    p_tot += 1./3.*pvecback[index_bg_rho_ur_];
-    dp_dloga += -4./3.*pvecback[index_bg_rho_ur_];
-    rho_r += pvecback[index_bg_rho_ur_];
+    all_species_.at("UR")->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*all_species_.at("UR"));
   }
 
   /* interacting dark matter */
@@ -906,13 +882,20 @@ int BackgroundModule::background_indices() {
   bg_size_short_ = index_bg;
 
   /* - index for rho_g (photon density) */
-  class_define_index(index_bg_rho_g_, _TRUE_, index_bg, 1);
+  index_bg_rho_g_ = index_bg;
+  all_species_.at("Photons")->RegisterBackgroundIndices(index_bg);
 
   /* - index for rho_b (baryon density) */
-  class_define_index(index_bg_rho_b_, _TRUE_, index_bg, 1);
+  index_bg_rho_b_ = index_bg;
+  all_species_.at("Baryons")->RegisterBackgroundIndices(index_bg);
 
   /* - index for rho_cdm */
-  class_define_index(index_bg_rho_cdm_, pba->has_cdm, index_bg, 1);
+  if (pba->has_cdm == _TRUE_) {
+    index_bg_rho_cdm_ = index_bg;
+    all_species_.at("CDM")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_cdm_ = -1;
+  }
 
 
   /* - index for rho_idm_drmd and rho_idr_drmd */
@@ -925,13 +908,24 @@ int BackgroundModule::background_indices() {
   /* - indices for ncdm. We only define the indices for ncdm1
      (density, pressure, pseudo-pressure), the other ncdm indices
      are contiguous */
-  class_define_index(index_bg_number_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
-  class_define_index(index_bg_rho_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
-  class_define_index(index_bg_p_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
-  class_define_index(index_bg_pseudo_p_ncdm1_, pba->has_ncdm, index_bg, pba->N_ncdm);
+  if (pba->has_ncdm == _TRUE_) {
+    index_bg_number_ncdm1_ = index_bg;
+    all_species_.at("NCDM")->RegisterBackgroundIndices(index_bg);
+    /* derive the series offsets from number_ncdm1 */
+    index_bg_rho_ncdm1_      = index_bg_number_ncdm1_ + pba->N_ncdm;
+    index_bg_p_ncdm1_        = index_bg_rho_ncdm1_    + pba->N_ncdm;
+    index_bg_pseudo_p_ncdm1_ = index_bg_p_ncdm1_      + pba->N_ncdm;
+  } else {
+    index_bg_number_ncdm1_ = index_bg_rho_ncdm1_ = index_bg_p_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
+  }
 
   /* - index for dcdm */
-  class_define_index(index_bg_rho_dcdm_, pba->has_dcdm, index_bg, 1);
+  if (pba->has_dcdm == _TRUE_) {
+    index_bg_rho_dcdm_ = index_bg;
+    all_species_.at("DCDM")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_dcdm_ = -1;
+  }
 
   /* - index for time-dependent distribution function in DNCDM for each q-bin */
   class_define_index(index_bg_lnf_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
@@ -939,28 +933,54 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
 
   /* - indices for dr */
-  class_define_index(index_bg_rho_dr_species_, pba->has_dr, index_bg, pba->N_decay_dr);
-  class_define_index(index_bg_rho_dr_, pba->has_dr, index_bg, 1);
+  if (pba->has_dr == _TRUE_) {
+    index_bg_rho_dr_species_ = index_bg;
+    all_species_.at("DR")->RegisterBackgroundIndices(index_bg);
+    index_bg_rho_dr_ = index_bg_rho_dr_species_ + pba->N_decay_dr;
+  } else {
+    index_bg_rho_dr_species_ = index_bg_rho_dr_ = -1;
+  }
 
   /* - indices for scalar field */
-  class_define_index(index_bg_phi_scf_, pba->has_scf, index_bg, 1);
-  class_define_index(index_bg_phi_prime_scf_, pba->has_scf, index_bg, 1);
-  class_define_index(index_bg_V_scf_, pba->has_scf, index_bg, 1);
-  class_define_index(index_bg_dV_scf_, pba->has_scf,index_bg, 1);
-  class_define_index(index_bg_ddV_scf_, pba->has_scf,index_bg, 1);
-  class_define_index(index_bg_rho_scf_, pba->has_scf,index_bg, 1);
-  class_define_index(index_bg_p_scf_, pba->has_scf, index_bg, 1);
-  class_define_index(index_bg_p_prime_scf_, pba->has_scf, index_bg, 1);
+  if (pba->has_scf == _TRUE_) {
+    index_bg_phi_scf_ = index_bg;
+    all_species_.at("ScalarField")->RegisterBackgroundIndices(index_bg);
+    index_bg_phi_prime_scf_ = index_bg_phi_scf_ + 1;
+    index_bg_V_scf_         = index_bg_phi_scf_ + 2;
+    index_bg_dV_scf_        = index_bg_phi_scf_ + 3;
+    index_bg_ddV_scf_       = index_bg_phi_scf_ + 4;
+    index_bg_rho_scf_       = index_bg_phi_scf_ + 5;
+    index_bg_p_scf_         = index_bg_phi_scf_ + 6;
+    index_bg_p_prime_scf_   = index_bg_phi_scf_ + 7;
+  } else {
+    index_bg_phi_scf_ = index_bg_phi_prime_scf_ = index_bg_V_scf_ = index_bg_dV_scf_ =
+      index_bg_ddV_scf_ = index_bg_rho_scf_ = index_bg_p_scf_ = index_bg_p_prime_scf_ = -1;
+  }
 
   /* - index for Lambda */
-  class_define_index(index_bg_rho_lambda_, pba->has_lambda,index_bg, 1);
+  if (pba->has_lambda == _TRUE_) {
+    index_bg_rho_lambda_ = index_bg;
+    all_species_.at("Lambda")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_lambda_ = -1;
+  }
 
   /* - index for fluid */
-  class_define_index(index_bg_rho_fld_, pba->has_fld, index_bg, 1);
-  class_define_index(index_bg_w_fld_, pba->has_fld, index_bg, 1);
+  if (pba->has_fld == _TRUE_) {
+    index_bg_rho_fld_ = index_bg;
+    all_species_.at("Fluid")->RegisterBackgroundIndices(index_bg);
+    index_bg_w_fld_ = index_bg_rho_fld_ + 1;
+  } else {
+    index_bg_rho_fld_ = index_bg_w_fld_ = -1;
+  }
 
   /* - index for ultra-relativistic neutrinos/species */
-  class_define_index(index_bg_rho_ur_, pba->has_ur, index_bg, 1);
+  if (pba->has_ur == _TRUE_) {
+    index_bg_rho_ur_ = index_bg;
+    all_species_.at("UR")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_ur_ = -1;
+  }
 
   /* - index for total density */
   class_define_index(index_bg_rho_tot_, _TRUE_, index_bg, 1);
@@ -1033,20 +1053,40 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bi_a_, _TRUE_, index_bi, 1);
 
   /* -> energy density in DCDM */
-  class_define_index(index_bi_rho_dcdm_, pba->has_dcdm, index_bi, 1);
+  if (pba->has_dcdm == _TRUE_) {
+    index_bi_rho_dcdm_ = index_bi;
+    all_species_.at("DCDM")->RegisterIntegrationIndices(index_bi);
+  } else {
+    index_bi_rho_dcdm_ = -1;
+  }
 
   /* -> time-dependent distribution function in DNCDM for each q-bin */
   class_define_index(index_bi_lnf_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
   class_define_index(index_bi_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
   
-  class_define_index(index_bi_rho_dr_species_, pba->has_dr, index_bi, pba->N_decay_dr);
-  
-  /* -> energy density in fluid */
-  class_define_index(index_bi_rho_fld_, pba->has_fld, index_bi, 1);
+  if (pba->has_dr == _TRUE_) {
+    index_bi_rho_dr_species_ = index_bi;
+    all_species_.at("DR")->RegisterIntegrationIndices(index_bi);
+  } else {
+    index_bi_rho_dr_species_ = -1;
+  }
 
-  /* -> scalar field and its derivative wrt conformal time (Zuma) */
-  class_define_index(index_bi_phi_scf_, pba->has_scf, index_bi, 1);
-  class_define_index(index_bi_phi_prime_scf_, pba->has_scf, index_bi, 1);
+  /* -> energy density in fluid */
+  if (pba->has_fld == _TRUE_) {
+    index_bi_rho_fld_ = index_bi;
+    all_species_.at("Fluid")->RegisterIntegrationIndices(index_bi);
+  } else {
+    index_bi_rho_fld_ = -1;
+  }
+
+  /* -> scalar field and its derivative wrt conformal time */
+  if (pba->has_scf == _TRUE_) {
+    index_bi_phi_scf_ = index_bi;
+    all_species_.at("ScalarField")->RegisterIntegrationIndices(index_bi);
+    index_bi_phi_prime_scf_ = index_bi_phi_scf_ + 1;
+  } else {
+    index_bi_phi_scf_ = index_bi_phi_prime_scf_ = -1;
+  }
 
   /* End of {B} variables, now continue with {C} variables */
   bi_B_size_ = index_bi;
@@ -1073,15 +1113,16 @@ int BackgroundModule::background_indices() {
              error_message_,
              "background integration requires index_bi_tau to be the last of all index_bi's");
 
+  /* Set BackgroundModule pointer on species that need it for BackgroundDerivs */
+  if (pba->has_dcdm == _TRUE_)    all_species_.at("DCDM")->SetBackgroundModule(this);
+  if (pba->has_fld  == _TRUE_)    all_species_.at("Fluid")->SetBackgroundModule(this);
+  if (pba->has_scf  == _TRUE_)    all_species_.at("ScalarField")->SetBackgroundModule(this);
+  if (pba->has_dr   == _TRUE_)    all_species_.at("DR")->SetBackgroundModule(this);
+  if (pba->has_ncdm == _TRUE_)    all_species_.at("NCDM")->SetBackgroundModule(this);
+
   return _SUCCESS_;
 
 }
-
-/**
- *  This function integrates the background over time, allocates and
- *  fills the background table
- *
- */
 
 int BackgroundModule::background_solve() {
 
@@ -2090,9 +2131,7 @@ int BackgroundModule::background_derivs_member(
   dy[index_bi_D_prime_] = -a*H*y[index_bi_D_prime_] + 1.5*a*a*rho_M*y[index_bi_D_];
 
   if (pba->has_dcdm == _TRUE_){
-    /** - compute dcdm density \f$ \rho' = -3aH \rho - a \Gamma \rho \f$*/
-    dy[index_bi_rho_dcdm_] = -3.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dcdm_]-
-      y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
+    all_species_.at("DCDM")->BackgroundDerivs(tau, y, dy, pvecback);
   }
 
   if (pba->has_ncdm_decay_dr == _TRUE_){
@@ -2129,14 +2168,11 @@ int BackgroundModule::background_derivs_member(
   }
 
   if (pba->has_fld == _TRUE_) {
-    /** - Compute fld density \f$ \rho' = -3aH (1+w_{fld}(a)) \rho \f$ */
-    dy[index_bi_rho_fld_] = -3.*y[index_bi_a_]*pvecback[index_bg_H_]*(1. + pvecback[index_bg_w_fld_])*y[index_bi_rho_fld_];
+    all_species_.at("Fluid")->BackgroundDerivs(tau, y, dy, pvecback);
   }
 
   if (pba->has_scf == _TRUE_){
-    /** - Scalar field equation: \f$ \phi'' + 2 a H \phi' + a^2 dV = 0 \f$  (note H is wrt cosmic time) */
-    dy[index_bi_phi_scf_] = y[index_bi_phi_prime_scf_];
-    dy[index_bi_phi_prime_scf_] = -y[index_bi_a_]*(2*pvecback[index_bg_H_]*y[index_bi_phi_prime_scf_] + y[index_bi_a_]*dV_scf(y[index_bi_phi_scf_]));
+    all_species_.at("ScalarField")->BackgroundDerivs(tau, y, dy, pvecback);
   }
 
   return _SUCCESS_;

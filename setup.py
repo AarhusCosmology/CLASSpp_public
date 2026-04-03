@@ -33,6 +33,19 @@ source_files = (
         'transfer_module.cpp',
     )
     + prepend(
+        'species',
+        'baryons.cpp',
+        'cdm.cpp',
+        'dark_radiation_species.cpp',
+        'dcdm.cpp',
+        'fluid.cpp',
+        'lambda.cpp',
+        'ncdm_species.cpp',
+        'photons.cpp',
+        'scalar_field.cpp',
+        'ultra_relativistic.cpp',
+    )
+    + prepend(
         'tools',
         'arrays.c',
         'common.c',
@@ -56,7 +69,7 @@ cpp_source_files = [s for s in source_files if s.endswith('.cpp')]
 
 include_dirs = [numpy.get_include()]
 root_folder = '.'
-for sub_folder in ['include', 'main', 'source', 'tools']:
+for sub_folder in ['include', 'main', 'source', 'tools', 'species', '.']:
     include_dirs.append(os.path.join(root_folder, sub_folder))
 
 # Define cython extension and fix Python version
@@ -66,7 +79,8 @@ classy_ext = Extension('classy', ['classy.pyx'] + cpp_source_files,
                            library_dirs=[root_folder],
                            language="c++",
                            extra_compile_args=(['-std=c++17'] if os.name != 'nt' else ['/std:c++17']),
-                           define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],)
+                           define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION"),
+                                          ("__CLASSDIR__", '"{}"'.format(os.path.abspath(root_folder)))]);
 myclib = ('myclib', {'sources': c_source_files,
                      'include_dirs':include_dirs})
 

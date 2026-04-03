@@ -12,6 +12,13 @@ public:
   int perturb_output_titles(enum file_format output_format, char titles[_MAXTITLESTRINGLENGTH_]) const;
   int perturb_output_firstline_and_ic_suffix(int index_ic, char first_line[_LINE_LENGTH_MAX_], FileName ic_suffix) const;
 
+  /** Accessors that expose protected BaseModule pointers to species code. */
+  const background* GetBackground() const noexcept { return pba; }
+  const perturbs*   GetPerturbs()   const noexcept { return ppt; }
+  const precision*  GetPrecision()  const noexcept { return ppr; }
+  BackgroundModulePtr GetBackgroundModule() const { return background_module_; }
+  ThermodynamicsModulePtr GetThermodynamicsModule() const { return thermodynamics_module_; }
+
   /** @name - indices running on modes (scalar, vector, tensor) */
   //@{
   int index_md_scalars_; /**< index value for scalars */
