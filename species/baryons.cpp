@@ -52,3 +52,8 @@ void BaryonsSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
         + metric_euler;
   }
 }
+
+double BaryonsSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/,
+                               const double* pvecback, const perturb_workspace* ppw) const {
+  return pvecback[index_bg_rho_] * ppw->scalar_ctx.delta_p_b_over_rho_b;
+}

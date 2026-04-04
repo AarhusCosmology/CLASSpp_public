@@ -30,14 +30,15 @@ public:
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  double Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const override {
+  double Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {
     return y[pv->index_pt_delta_b];
   }
-  double Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const override {
+  double Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {
     return y[pv->index_pt_theta_b];
   }
-  double DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const override { return 0.; }
-  double RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const override { return 0.; }
+  /** Baryon pressure perturbation: rho_b * (delta_p_b / rho_b) from pre-computed context. */
+  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override { return 0.; }
 
 private:
   const background& pba_;

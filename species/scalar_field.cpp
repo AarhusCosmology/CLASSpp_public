@@ -94,27 +94,53 @@ void ScalarFieldSpecies::PerturbDerivs(double /*tau*/, const double* y, double* 
 }
 
 double ScalarFieldSpecies::Delta(const perturb_vector* pv, const double* y,
-                                  const double* pvecback) const {
+                                  const double* pvecback, const perturb_workspace* ppw) const {
   const double rho = pvecback[index_bg_rho_];
   if (rho == 0.) return 0.;
-  const double phi       = pvecback[index_bg_phi_scf_];
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
-  const double V         = pvecback[index_bg_V_scf_];
   const double dV        = pvecback[index_bg_dV_scf_];
-  (void)phi_prime; (void)V; (void)dV;
-  return (phi != 0.) ? y[pv->index_pt_phi_scf] / phi : 0.;
+  const double a2        = ppw->scalar_ctx.a2;
+  const double k2        = ppw->scalar_ctx.k2;
+
+  double delta_rho = (1./3.) *
+    (1./a2 * phi_prime * y[pv->index_pt_phi_prime_scf]
+     + dV * y[pv->index_pt_phi_scf]);
+
+  if (ppw->scalar_ctx.gauge == newtonian) {
+    double psi = y[pv->index_pt_phi] - 4.5 * (a2/k2) * ppw->rho_plus_p_shear;
+    delta_rho -= (1./3.) * (1./a2) * phi_prime * phi_prime * psi;
+  }
+
+  return delta_rho / rho;
 }
 
 double ScalarFieldSpecies::Theta(const perturb_vector* pv, const double* y,
-                                  const double* pvecback) const {
+                                  const double* pvecback, const perturb_workspace* ppw) const {
+  const double rho = pvecback[index_bg_rho_];
+  const double p   = pvecback[index_bg_p_];
+  const double rho_plus_p = rho + p;
+  if (rho_plus_p == 0.) return 0.;
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
-  return (phi_prime != 0.) ? y[pv->index_pt_phi_prime_scf] / phi_prime : 0.;
+  const double a2        = ppw->scalar_ctx.a2;
+  const double k2        = ppw->scalar_ctx.k2;
+  return (1./3.) * k2 / a2 * phi_prime * y[pv->index_pt_phi_scf] / rho_plus_p;
 }
 
-double ScalarFieldSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/,
-                                   const double* pvecback) const {
+double ScalarFieldSpecies::DeltaP(const perturb_vector* pv, const double* y,
+                                   const double* pvecback, const perturb_workspace* ppw) const {
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
   const double dV        = pvecback[index_bg_dV_scf_];
-  (void)phi_prime; (void)dV;
-  return 0.;
+  const double a2        = ppw->scalar_ctx.a2;
+  const double k2        = ppw->scalar_ctx.k2;
+
+  double delta_p = (1./3.) *
+    (1./a2 * phi_prime * y[pv->index_pt_phi_prime_scf]
+     - dV * y[pv->index_pt_phi_scf]);
+
+  if (ppw->scalar_ctx.gauge == newtonian) {
+    double psi = y[pv->index_pt_phi] - 4.5 * (a2/k2) * ppw->rho_plus_p_shear;
+    delta_p -= (1./3.) * (1./a2) * phi_prime * phi_prime * psi;
+  }
+
+  return delta_p;
 }

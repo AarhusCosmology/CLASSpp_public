@@ -52,18 +52,18 @@ void CDMSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
   }
 }
 
-double CDMSpecies::Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const {
+double CDMSpecies::Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return y[pv->index_pt_delta_cdm];
 }
 
-double CDMSpecies::Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const {
+double CDMSpecies::Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return (pv->index_pt_theta_cdm >= 0) ? y[pv->index_pt_theta_cdm] : 0.;
 }
 
-double CDMSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const {
+double CDMSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return 0.;
 }
 
-double CDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const {
+double CDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return 0.;
 }

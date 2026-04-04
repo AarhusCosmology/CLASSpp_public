@@ -180,23 +180,23 @@ void UltraRelativisticSpecies::PerturbDerivs(
 }
 
 double UltraRelativisticSpecies::Delta(const perturb_vector* pv, const double* y,
-                                        const double* /*pvecback*/) const {
+                                        const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return (pv->index_pt_delta_ur >= 0) ? y[pv->index_pt_delta_ur] : 0.;
 }
 
 double UltraRelativisticSpecies::Theta(const perturb_vector* pv, const double* y,
-                                        const double* /*pvecback*/) const {
+                                        const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return (pv->index_pt_theta_ur >= 0) ? y[pv->index_pt_theta_ur] : 0.;
 }
 
 double UltraRelativisticSpecies::DeltaP(const perturb_vector* pv, const double* y,
-                                         const double* pvecback) const {
+                                         const double* pvecback, const perturb_workspace* /*ppw*/) const {
   /* delta_p = c_s^2 * delta_rho = (1/3) * rho * delta */
   return (pv->index_pt_delta_ur >= 0) ? Rho(pvecback) * y[pv->index_pt_delta_ur] / 3. : 0.;
 }
 
 double UltraRelativisticSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,
-                                                const double* pvecback) const {
+                                                const double* pvecback, const perturb_workspace* /*ppw*/) const {
   /* (rho + p) * sigma = 4/3 * rho_ur * shear_ur */
   return (pv->index_pt_shear_ur >= 0) ? 4./3. * Rho(pvecback) * y[pv->index_pt_shear_ur] : 0.;
 }

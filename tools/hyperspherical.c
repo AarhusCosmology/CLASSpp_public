@@ -142,14 +142,17 @@ int hyperspherical_HIS_create(int K,
   {
     class_alloc(PhiL,(lmax+2)*sizeof(double)*_HYPER_CHUNK_,error_message);
 
-    if ((K == 1) && ((int)(beta+0.2) == (lmax+1))) {
+    int hit_the_ceiling = ((K == 1) && ((int)(beta+0.2) == (lmax+1)));
+    if (hit_the_ceiling) {
       /** Take care of special case lmax = beta-1.
           The routine below will try to compute
           Phi_{lmax+1} which is not allowed. However,
           the purpose is to calculate the derivative
           Phi'_{lmax}, and the formula is correct if we set Phi_{lmax+1} = 0.
+          Since PhiL uses a chunked layout PhiL[l*chunk + index_x], we
+          cannot simply set PhiL[lmax+1] = 0 (that was a scalar index).
+          Instead we substitute 0.0 at the point of use in the dphi formula.
       */
-      PhiL[lmax+1] = 0.0;
       lmax--;
     }
 
@@ -174,9 +177,10 @@ int hyperspherical_HIS_create(int K,
         l = lvec[k];
         for (index_x=0; index_x<current_chunk; index_x++){
           pHIS->phi[k*nx+j+index_x] = PhiL[l*current_chunk+index_x];
+          double PhiL_plus_one = ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l+1)*current_chunk+index_x]);
           pHIS->dphi[k*nx+j+index_x] = l*pHIS->cotK[j+index_x]*
             PhiL[l*current_chunk+index_x]-
-            sqrtK[l+1]*PhiL[(l+1)*current_chunk+index_x];
+            sqrtK[l+1]*PhiL_plus_one;
         }
       }
     }
@@ -202,9 +206,10 @@ int hyperspherical_HIS_create(int K,
         l = lvec[k];
         for (index_x=0; index_x<current_chunk; index_x++){
           pHIS->phi[k*nx+j+index_x] = PhiL[l*current_chunk+index_x];
+          double PhiL_plus_one = ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l+1)*current_chunk+index_x]);
           pHIS->dphi[k*nx+j+index_x] = l*pHIS->cotK[j+index_x]*
             PhiL[l*current_chunk+index_x]-
-            sqrtK[l+1]*PhiL[(l+1)*current_chunk+index_x];
+            sqrtK[l+1]*PhiL_plus_one;
         }
       }
     }

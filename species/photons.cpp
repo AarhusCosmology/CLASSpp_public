@@ -149,9 +149,11 @@ void PhotonsSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
 }
 
 double PhotonsSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,
-                                     const double* pvecback) const {
-  /* shear_g is -1 in RSA or TCA modes; only valid in the full hierarchy. */
-  if (pv->index_pt_shear_g < 0) return 0.;
+                                     const double* pvecback, const perturb_workspace* ppw) const {
   const double rho_g = pvecback[index_bg_rho_];
+  /* Use TCA-corrected shear_g from the pre-computed context when the shear
+     perturbation is not independently evolved (TCA or RSA modes). */
+  if (pv->index_pt_shear_g < 0)
+    return 4./3. * rho_g * ppw->scalar_ctx.shear_g;
   return 4./3. * rho_g * y[pv->index_pt_shear_g];
 }

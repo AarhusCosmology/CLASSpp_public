@@ -195,21 +195,21 @@ void NCDMSpecies::PerturbDerivs(double tau, const double* y, double* dy,
 
 // ── Integrated observables ──────────────────────────────────────────────────
 
-double NCDMSpecies::Delta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const {
+double NCDMSpecies::Delta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   // Detailed delta requires summing over q-bins with rho_ncdm weights, which requires
   // the full perturb_workspace context. Return 0 here; the perturbations module computes
   // the NCDM source terms directly using pv->index_ncdm_.
   return 0.;
 }
 
-double NCDMSpecies::Theta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const {
+double NCDMSpecies::Theta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return 0.;
 }
 
-double NCDMSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const {
+double NCDMSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return 0.;
 }
 
-double NCDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const {
+double NCDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return 0.;
 }

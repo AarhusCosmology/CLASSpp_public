@@ -30,10 +30,10 @@ public:
                                    int /*gauge*/) override {}
   void PerturbDerivs(double /*tau*/, const double* /*y*/, double* /*dy*/,
                      const perturb_parameters_and_workspace& /*ppaw*/) override {}
-  double Delta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const override { return 0.; }
-  double Theta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const override { return 0.; }
-  double DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const override { return 0.; }
-  double RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const override { return 0.; }
+  double Delta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override { return 0.; }
+  double Theta(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override { return 0.; }
+  double DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override { return 0.; }
+  double RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override { return 0.; }
 
 private:
   double Omega0_lambda_;

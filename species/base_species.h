@@ -135,21 +135,23 @@ public:
    * @param pv       Per-thread perturbation vector; read index_pt_* from here (NOT from species members).
    * @param y        Current ODE state vector (ppw->pv->y).
    * @param pvecback Per-thread background vector (ppw->pvecback).
+   * @param ppw      Per-thread workspace; provides scalar_ctx, accumulated stress-energy,
+   *                 pvecthermo, and approximation flags for species that need them.
    */
   virtual double Delta(const perturb_vector* pv, const double* y,
-                       const double* pvecback) const = 0;
+                       const double* pvecback, const perturb_workspace* ppw) const = 0;
 
   /** Velocity divergence theta. */
   virtual double Theta(const perturb_vector* pv, const double* y,
-                       const double* pvecback) const = 0;
+                       const double* pvecback, const perturb_workspace* ppw) const = 0;
 
   /** Pressure perturbation delta_p. */
   virtual double DeltaP(const perturb_vector* pv, const double* y,
-                        const double* pvecback) const = 0;
+                        const double* pvecback, const perturb_workspace* ppw) const = 0;
 
   /** (rho + p) * sigma: anisotropic stress contribution to Einstein equations. */
   virtual double RhoPlusPShear(const perturb_vector* pv, const double* y,
-                               const double* pvecback) const = 0;
+                               const double* pvecback, const perturb_workspace* ppw) const = 0;
 
 protected:
   BaseSpecies(std::string name, EnergyType energy_type)

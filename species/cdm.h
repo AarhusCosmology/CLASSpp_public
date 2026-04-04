@@ -30,10 +30,10 @@ public:
                                    int gauge) override;
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
-  double Delta(const perturb_vector* pv, const double* y, const double* pvecback) const override;
-  double Theta(const perturb_vector* pv, const double* y, const double* pvecback) const override;
-  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback) const override;
-  double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback) const override;
+  double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double Theta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
 
 private:
   double Omega0_cdm_;

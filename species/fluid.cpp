@@ -98,11 +98,11 @@ void FluidSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
   }
 }
 
-double FluidSpecies::Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const {
+double FluidSpecies::Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return (pv->index_pt_delta_fld >= 0) ? y[pv->index_pt_delta_fld] : 0.;
 }
-double FluidSpecies::Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const {
+double FluidSpecies::Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return (pv->index_pt_theta_fld >= 0) ? y[pv->index_pt_theta_fld] : 0.;
 }
-double FluidSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const { return 0.; }
-double FluidSpecies::RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const { return 0.; }
+double FluidSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const { return 0.; }
+double FluidSpecies::RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const { return 0.; }

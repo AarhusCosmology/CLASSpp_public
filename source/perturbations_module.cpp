@@ -6414,7 +6414,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
   /** - define local variables */
 
   double a,a2,a_prime_over_a,k2;
-  double rho_plus_p_tot=0.;
   double rho_m=0.;
   double delta_rho_m=0.;
   double rho_plus_p_m=0.;
@@ -6437,7 +6436,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
   double gwncdm;
   double rho_relativistic;
   double rho_dr_over_f;
-  double delta_rho_scf, delta_p_scf, psi;
   /** Variables used for FLD and PPF */
   double c_gamma_k_H_square;
   double Gamma_prime_plus_a_prime_over_a_Gamma, s2sq=1.;
@@ -6543,33 +6541,57 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
       }
     }
 
-    /** - --> (b) compute the total density, velocity and shear perturbations */
+    /** - --> (b) store pre-computed approximation-corrected values for species dispatch */
 
-    /* photon and baryon contribution */
-    ppw->delta_rho = ppw->pvecback[background_module_->index_bg_rho_g_]*delta_g
-      + ppw->pvecback[background_module_->index_bg_rho_b_]*y[ppw->pv->index_pt_delta_b]; // contribution to total perturbed stress-energy
-    ppw->rho_plus_p_theta = 4./3.*ppw->pvecback[background_module_->index_bg_rho_g_]*theta_g
-      + ppw->pvecback[background_module_->index_bg_rho_b_]*y[ppw->pv->index_pt_theta_b]; // contribution to total perturbed stress-energy
-    ppw->rho_plus_p_shear = 4./3.*ppw->pvecback[background_module_->index_bg_rho_g_]*shear_g; // contribution to total perturbed stress-energy
-    ppw->delta_p = 1./3.*ppw->pvecback[background_module_->index_bg_rho_g_]*delta_g
-      + ppw->pvecback[background_module_->index_bg_rho_b_]*delta_p_b_over_rho_b; // contribution to total perturbed stress-energy
-    ppw->rho_plus_p_tot = 4./3.*ppw->pvecback[background_module_->index_bg_rho_g_] + ppw->pvecback[background_module_->index_bg_rho_b_];
+    ppw->scalar_ctx.shear_g = shear_g;
+    ppw->scalar_ctx.delta_p_b_over_rho_b = delta_p_b_over_rho_b;
+    ppw->scalar_ctx.k  = k;
+    ppw->scalar_ctx.k2 = k2;
+    ppw->scalar_ctx.a  = a;
+    ppw->scalar_ctx.a2 = a2;
+    ppw->scalar_ctx.gauge = ppt->gauge;
 
-    if (has_source_delta_m_ == _TRUE_) {
-      delta_rho_m = ppw->pvecback[background_module_->index_bg_rho_b_]*y[ppw->pv->index_pt_delta_b]; // contribution to delta rho_matter
-      rho_m = ppw->pvecback[background_module_->index_bg_rho_b_];
-    }
-    if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
-      rho_plus_p_theta_m = ppw->pvecback[background_module_->index_bg_rho_b_]*y[ppw->pv->index_pt_theta_b]; // contribution to [(rho+p)theta]_matter
-      rho_plus_p_m = ppw->pvecback[background_module_->index_bg_rho_b_];
+    /** - --> (c) compute the total density, velocity and shear perturbations */
+
+    /* photon and baryon contribution via species dispatch.
+       Retrieve perturbation variables through virtual dispatch (handles
+       RSA/TCA approximation logic), then use arithmetic identical to
+       the original inline code so the compiler can apply FMA
+       contractions identically across platforms. */
+    {
+      const auto& PH = all_species_.at("Photons");
+      const auto& BA = all_species_.at("Baryons");
+      const double rho_g = ppw->pvecback[background_module_->index_bg_rho_g_];
+      const double rho_b = ppw->pvecback[background_module_->index_bg_rho_b_];
+
+      const double delta_g = PH->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_g = PH->Theta(ppw->pv, y, ppw->pvecback, ppw);
+      const double delta_b = BA->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_b = BA->Theta(ppw->pv, y, ppw->pvecback, ppw);
+
+      ppw->delta_rho        = rho_g * delta_g + rho_b * delta_b;
+      ppw->rho_plus_p_theta = 4./3. * rho_g * theta_g + rho_b * theta_b;
+      ppw->rho_plus_p_shear = 4./3. * rho_g * ppw->scalar_ctx.shear_g;
+      ppw->delta_p          = 1./3. * rho_g * delta_g
+                            + rho_b * ppw->scalar_ctx.delta_p_b_over_rho_b;
+      ppw->rho_plus_p_tot   = 4./3. * rho_g + rho_b;
+
+      if (has_source_delta_m_ == _TRUE_) {
+        delta_rho_m = rho_b * delta_b;
+        rho_m = rho_b;
+      }
+      if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
+        rho_plus_p_theta_m = rho_b * theta_b;
+        rho_plus_p_m = rho_b;
+      }
     }
 
     /* cdm contribution */
     if (pba->has_cdm == _TRUE_) {
       const auto& CDM = all_species_.at("CDM");
       const double rho_cdm   = CDM->Rho(ppw->pvecback);
-      const double delta_cdm = CDM->Delta(ppw->pv, y, ppw->pvecback);
-      const double theta_cdm = CDM->Theta(ppw->pv, y, ppw->pvecback); // 0 in synchronous gauge
+      const double delta_cdm = CDM->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_cdm = CDM->Theta(ppw->pv, y, ppw->pvecback, ppw); // 0 in synchronous gauge
 
       ppw->delta_rho        += rho_cdm * delta_cdm;
       ppw->rho_plus_p_theta += rho_cdm * theta_cdm; // p_cdm = 0, so rho+p = rho
@@ -6589,7 +6611,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
     if (pba->has_idm_dr == _TRUE_) {
       ppw->delta_rho += ppw->pvecback[background_module_->index_bg_rho_idm_dr_]*y[ppw->pv->index_pt_delta_idm_dr];
       ppw->rho_plus_p_theta += ppw->pvecback[background_module_->index_bg_rho_idm_dr_]*y[ppw->pv->index_pt_theta_idm_dr];
-      rho_plus_p_tot += ppw->pvecback[background_module_->index_bg_rho_idm_dr_];
+      ppw->rho_plus_p_tot += ppw->pvecback[background_module_->index_bg_rho_idm_dr_];
     }
 
     /* idm_drmd contribution */
@@ -6615,8 +6637,8 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
     if (pba->has_dcdm == _TRUE_) {
       const auto& DCDM = all_species_.at("DCDM");
       const double rho_dcdm   = DCDM->Rho(ppw->pvecback);
-      const double delta_dcdm = DCDM->Delta(ppw->pv, y, ppw->pvecback);
-      const double theta_dcdm = DCDM->Theta(ppw->pv, y, ppw->pvecback);
+      const double delta_dcdm = DCDM->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_dcdm = DCDM->Theta(ppw->pv, y, ppw->pvecback, ppw);
 
       ppw->delta_rho        += rho_dcdm * delta_dcdm;
       ppw->rho_plus_p_theta += rho_dcdm * theta_dcdm; // p_dcdm = 0
@@ -6654,10 +6676,10 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
     if (pba->has_ur == _TRUE_) {
       const auto& UR = all_species_.at("UR");
       const double rho_plus_p_ur = UR->Rho(ppw->pvecback) + UR->P(ppw->pvecback); // 4/3 * rho_ur
-      ppw->delta_rho        += UR->Rho(ppw->pvecback) * UR->Delta(ppw->pv, y, ppw->pvecback);
-      ppw->rho_plus_p_theta += rho_plus_p_ur * UR->Theta(ppw->pv, y, ppw->pvecback);
-      ppw->rho_plus_p_shear += UR->RhoPlusPShear(ppw->pv, y, ppw->pvecback);
-      ppw->delta_p          += UR->DeltaP(ppw->pv, y, ppw->pvecback);
+      ppw->delta_rho        += UR->Rho(ppw->pvecback) * UR->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_theta += rho_plus_p_ur * UR->Theta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_shear += UR->RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->delta_p          += UR->DeltaP(ppw->pv, y, ppw->pvecback, ppw);
       ppw->rho_plus_p_tot   += rho_plus_p_ur;
     }
 
@@ -6668,7 +6690,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
       if (ppt->idr_nature==idr_free_streaming)
         ppw->rho_plus_p_shear += 4./3.*ppw->pvecback[background_module_->index_bg_rho_idr_]*shear_idr;
       ppw->delta_p += 1./3.*ppw->pvecback[background_module_->index_bg_rho_idr_]*delta_idr;
-      rho_plus_p_tot += 4./3.*ppw->pvecback[background_module_->index_bg_rho_idr_];
+      ppw->rho_plus_p_tot += 4./3.*ppw->pvecback[background_module_->index_bg_rho_idr_];
     }
 
     /* interacting dark radiation (DRMD) */
@@ -6808,43 +6830,20 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
       }
     }
 
-    /* scalar field contribution.
+    /* scalar field contribution via species dispatch.
        In Newtonian gauge, delta_scf depends on the metric perturbation psi which is inferred
        from rho_plus_p_shear. So the contribution from the scalar field must be below all
        species with non-zero shear.
     */
     if (pba->has_scf == _TRUE_) {
+      const auto& SCF = all_species_.at("ScalarField");
+      const double rho_scf = SCF->Rho(ppw->pvecback);
+      const double p_scf   = SCF->P(ppw->pvecback);
 
-      if (ppt->gauge == synchronous){
-        delta_rho_scf =  1./3.*
-          (1./a2*ppw->pvecback[background_module_->index_bg_phi_prime_scf_]*y[ppw->pv->index_pt_phi_prime_scf]
-           + ppw->pvecback[background_module_->index_bg_dV_scf_]*y[ppw->pv->index_pt_phi_scf]);
-        delta_p_scf = 1./3.*
-          (1./a2*ppw->pvecback[background_module_->index_bg_phi_prime_scf_]*y[ppw->pv->index_pt_phi_prime_scf]
-           - ppw->pvecback[background_module_->index_bg_dV_scf_]*y[ppw->pv->index_pt_phi_scf]);
-      }
-      else{
-        /* equation for psi */
-        psi = y[ppw->pv->index_pt_phi] - 4.5 * (a2/k/k) * ppw->rho_plus_p_shear;
-
-        delta_rho_scf =  1./3.*
-          (1./a2*ppw->pvecback[background_module_->index_bg_phi_prime_scf_]*y[ppw->pv->index_pt_phi_prime_scf]
-           + ppw->pvecback[background_module_->index_bg_dV_scf_]*y[ppw->pv->index_pt_phi_scf]
-           - 1./a2*pow(ppw->pvecback[background_module_->index_bg_phi_prime_scf_], 2)*psi);
-        delta_p_scf =  1./3.*
-          (1./a2*ppw->pvecback[background_module_->index_bg_phi_prime_scf_]*y[ppw->pv->index_pt_phi_prime_scf]
-           - ppw->pvecback[background_module_->index_bg_dV_scf_]*y[ppw->pv->index_pt_phi_scf]
-           - 1./a2*pow(ppw->pvecback[background_module_->index_bg_phi_prime_scf_], 2)*psi);
-      }
-
-      ppw->delta_rho += delta_rho_scf;
-
-      ppw->rho_plus_p_theta += 1./3.*k*k/a2*ppw->pvecback[background_module_->index_bg_phi_prime_scf_]*y[ppw->pv->index_pt_phi_scf];
-
-      ppw->delta_p += delta_p_scf;
-
-      ppw->rho_plus_p_tot += ppw->pvecback[background_module_->index_bg_rho_scf_] + ppw->pvecback[background_module_->index_bg_p_scf_];
-
+      ppw->delta_rho        += rho_scf * SCF->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_theta += (rho_scf + p_scf) * SCF->Theta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->delta_p          += SCF->DeltaP(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_tot   += rho_scf + p_scf;
     }
 
     /* add your extra species here */
@@ -6918,8 +6917,8 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
 	Z = 2./3.*k2*ppw->pvecback[background_module_->index_bg_H_]/a;
 	Z_prime = Z*(ppw->pvecback[background_module_->index_bg_H_prime_]/ppw->pvecback[background_module_->index_bg_H_] - a_prime_over_a);
 	/** Construct theta_t and its derivative from the Euler equation */
-	theta_t = ppw->rho_plus_p_theta/rho_plus_p_tot;
-	theta_t_prime = -a_prime_over_a*theta_t-(p_t_prime*theta_t-k2*ppw->delta_p +k2*ppw->rho_plus_p_shear)/rho_plus_p_tot+metric_euler;
+	theta_t = ppw->rho_plus_p_theta/ppw->rho_plus_p_tot;
+	theta_t_prime = -a_prime_over_a*theta_t-(p_t_prime*theta_t-k2*ppw->delta_p +k2*ppw->rho_plus_p_shear)/ppw->rho_plus_p_tot+metric_euler;
 	S = ppw->S_fld;
 	S_prime = -Z_prime/Z*S+1./Z*(rho_fld_prime+p_fld_prime)*(theta_t+k2*alpha)+1./Z*(rho_fld+p_fld)*(theta_t_prime+k2*alpha_prime);
 	/** Analytic derivative of the equation for ppw->rho_plus_p_theta_fld above. */

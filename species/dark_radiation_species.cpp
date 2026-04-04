@@ -138,7 +138,7 @@ void DarkRadiationSpecies::PerturbDerivs(double /*tau*/, const double* y, double
 }
 
 double DarkRadiationSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,
-                                            const double* pvecback) const {
+                                            const double* pvecback, const perturb_workspace* /*ppw*/) const {
   if (pv->index_pt_F0_dr_sum < 0) return 0.;
   double rho = pvecback[index_bg_rho_];
   return (rho + rho / 3.) * y[pv->index_pt_F0_dr_sum + 2];

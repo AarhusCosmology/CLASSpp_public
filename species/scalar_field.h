@@ -50,15 +50,14 @@ public:
                      const perturb_parameters_and_workspace& ppaw) override;
 
   /**
-   * @note These are approximations for informational use. ScalarField stress-energy
-   *       is not yet dispatched via the species interface in perturb_total_stress_energy;
-   *       the full expressions (using phi', dV, metric terms) remain in the original
-   *       perturbations module code. Migrate to species dispatch in a future PR.
+   * Gauge-dependent fractional density perturbation delta_rho_scf / rho_scf.
+   * In Newtonian gauge, includes the metric perturbation psi computed from
+   * the accumulated rho_plus_p_shear available in ppw.
    */
-  double Delta(const perturb_vector* pv, const double* y, const double* pvecback) const override;
-  double Theta(const perturb_vector* pv, const double* y, const double* pvecback) const override;
-  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback) const override;
-  double RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/) const override { return 0.; }
+  double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double Theta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override { return 0.; }
 
   int bi_phi_index()       const { return index_bi_phi_scf_; }
   int bi_phi_prime_index() const { return index_bi_phi_prime_scf_; }

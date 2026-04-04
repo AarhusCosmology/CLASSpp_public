@@ -33,17 +33,21 @@ public:
                      const perturb_parameters_and_workspace& ppaw) override;
 
   /** RSA/TCA active when pv->index_pt_delta_g == -1 (sentinel set by RegisterPerturbationIndices). */
-  double Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const override {
+  double Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {
     return (pv->index_pt_delta_g >= 0) ? y[pv->index_pt_delta_g] : 0.;
   }
-  double Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/) const override {
+  double Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {
     return (pv->index_pt_theta_g >= 0) ? y[pv->index_pt_theta_g] : 0.;
   }
   /** δp_g = δρ_g / 3 = ρ_g * δ_g / 3. Returns 0 when RSA is active. */
-  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback) const override {
+  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* /*ppw*/) const override {
     return (pv->index_pt_delta_g >= 0) ? pvecback[index_bg_rho_] * y[pv->index_pt_delta_g] / 3. : 0.;
   }
-  double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback) const override;
+  /**
+   * (rho+p)*shear for photons. Uses the TCA-corrected shear_g stored in
+   * ppw->scalar_ctx when the shear perturbation index is not evolved.
+   */
+  double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
 
 private:
   const background& pba_;
