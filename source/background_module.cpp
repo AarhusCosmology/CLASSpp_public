@@ -285,8 +285,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
   double rho_ncdm,p_ncdm,pseudo_p_ncdm;
   /* index for n_ncdm species */
   int n_ncdm;
-  /* fluid's time-dependent equation of state parameter */
-  double w_fld, dw_over_da, integral_fld;
   /* scale factor */
   double a;
   /* scalar field quantities */
@@ -491,21 +489,14 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
 
   /* fluid with w(a) and constant cs2 */
   if (pba->has_fld == _TRUE_) {
-
-    /* get rho_fld from vector of integrated variables */
-    pvecback[index_bg_rho_fld_] = pvecback_B[index_bi_rho_fld_];
-
-    /* get w_fld from dedicated function */
-    class_call(background_w_fld(a, &w_fld, &dw_over_da, &integral_fld), error_message_, error_message_);
+    double w_fld, dw_over_da_fld, integral_fld;
+    class_call(background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld),
+               error_message_,
+               error_message_);
     pvecback[index_bg_w_fld_] = w_fld;
-
-    // Obsolete: at the beginning, we had here the analytic integral solution corresponding to the case w=w0+w1(1-a/a0):
-    // pvecback[index_bg_rho_fld_] = pba->Omega0_fld * pow(pba->H0,2) / pow(a_rel,3.*(1.+pba->w0_fld+pba->wa_fld)) * exp(3.*pba->wa_fld*(a_rel-1.));
-    // But now everthing is integrated numerically for a given w_fld(a) defined in the function background_w_fld.
-
-    rho_tot += pvecback[index_bg_rho_fld_];
-    p_tot += w_fld*pvecback[index_bg_rho_fld_];
-    dp_dloga += (a*dw_over_da - 3*(1 + w_fld)*w_fld)*pvecback[index_bg_rho_fld_];
+    pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
+    all_species_.at("Fluid")->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*all_species_.at("Fluid"));
   }
 
   /* relativistic neutrinos (and all relativistic relics) */
@@ -970,8 +961,9 @@ int BackgroundModule::background_indices() {
     index_bg_rho_fld_ = index_bg;
     all_species_.at("Fluid")->RegisterBackgroundIndices(index_bg);
     index_bg_w_fld_ = index_bg_rho_fld_ + 1;
+    index_bg_dw_over_da_fld_ = index_bg_rho_fld_ + 2;
   } else {
-    index_bg_rho_fld_ = index_bg_w_fld_ = -1;
+    index_bg_rho_fld_ = index_bg_w_fld_ = index_bg_dw_over_da_fld_ = -1;
   }
 
   /* - index for ultra-relativistic neutrinos/species */

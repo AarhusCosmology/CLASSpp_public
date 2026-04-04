@@ -35,6 +35,7 @@ public:
   int index_bg_rho_lambda_;    /**< cosmological constant density */
   int index_bg_rho_fld_;       /**< fluid density */
   int index_bg_w_fld_;         /**< fluid equation of state */
+  int index_bg_dw_over_da_fld_; /**< fluid dw/da (cached for DpDloga, perturbations) */
   int index_bg_rho_ur_;        /**< relativistic neutrinos/relics density */
   int index_bg_rho_idm_dr_;    /**< density of dark matter interacting with dark radiation */
   int index_bg_rho_idr_;       /**< density of interacting dark radiation */

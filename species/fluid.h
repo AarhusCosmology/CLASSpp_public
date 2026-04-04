@@ -45,12 +45,14 @@ public:
 
   int bi_rho_index() const { return index_bi_rho_fld_; }
   int bg_w_index()   const { return index_bg_w_fld_; }
+  int bg_dw_over_da_index() const { return index_bg_dw_over_da_fld_; }
 
 private:
   const background& pba_;
   const BackgroundModule* bgm_ = nullptr;
 
-  int index_bg_rho_fld_ = -1;
-  int index_bg_w_fld_   = -1;
-  int index_bi_rho_fld_ = -1;
+  int index_bg_rho_fld_          = -1;
+  int index_bg_w_fld_            = -1;
+  int index_bg_dw_over_da_fld_   = -1;
+  int index_bi_rho_fld_          = -1;
 };
