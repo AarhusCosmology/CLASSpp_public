@@ -23,8 +23,14 @@ vpath .base build
 CC        = gcc
 CXX       = g++
 
-# your optimization flag
-OPTFLAG = -O3 #-ffast-math -march=native
+# Optimization flag. The default uses -O3 which auto-vectorizes using the
+# baseline SIMD for your architecture (SSE2 on x86-64, NEON on ARM64).
+# On heterogeneous clusters where the build host may differ from the compute
+# nodes, avoid -march=native to prevent illegal-instruction crashes.
+# To enable AVX2+FMA (available on all x86 nodes since ~2015, 256-bit SIMD):
+#   make SIMD_FLAGS="-mavx2 -mfma"
+SIMD_FLAGS ?=
+OPTFLAG = -O3 $(SIMD_FLAGS) #-ffast-math
 
 # all other compilation flags
 CCFLAG = -g -fPIC

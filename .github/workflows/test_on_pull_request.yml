@@ -47,4 +47,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
           name: NewtonianVsSynchronousPlots
-          path: python/faulty_figs
+          path: main_class/python/faulty_figs

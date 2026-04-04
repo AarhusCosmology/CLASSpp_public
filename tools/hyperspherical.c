@@ -156,28 +156,9 @@ int hyperspherical_HIS_create(int K,
 #pragma omp for schedule (dynamic)              \
 
 
-    for (j=0; j<MIN(nx,xfwdidx); j++){
-      //Use backwards method:
-      hyperspherical_backwards_recurrence(K,
-                                          MIN(l_recurrence_max,lmax)+1,
-                                          beta,
-                                          pHIS->x[j],
-                                          pHIS->sinK[j],
-                                          pHIS->cotK[j],
-                                          sqrtK,
-                                          one_over_sqrtK,
-                                          PhiL);
-      //We have now populated PhiL at x, assign Phi and dPhi for all l in lvec:
-      for (k=0; k<=index_recurrence_max; k++){
-        l = lvec[k];
-        pHIS->phi[k*nx+j] = PhiL[l];
-        pHIS->dphi[k*nx+j] = l*pHIS->cotK[j]*PhiL[l]-sqrtK[l+1]*PhiL[l+1];
-      }
-    }
-    /**
     for (j=0; j<MIN(nx,xfwdidx); j+= _HYPER_CHUNK_){
       current_chunk = MIN(_HYPER_CHUNK_,MIN(nx,xfwdidx)-j);
-      //Use backwards method:
+      //Use backwards method (chunk version for better SIMD utilization):
       hyperspherical_backwards_recurrence_chunk(K,
                                                 MIN(l_recurrence_max,lmax)+1,
                                                 beta,
@@ -199,8 +180,6 @@ int hyperspherical_HIS_create(int K,
         }
       }
     }
-
-    */
 
 #pragma omp for schedule (dynamic)              \
 
@@ -647,7 +626,14 @@ int hyperspherical_backwards_recurrence_chunk(int K,
          sqrtK[l+2]*PhiL[(l+2)*chunk+index_x]);
     }
 
-    if (fabs(PhiL[l*chunk])>_HYPER_OVERFLOW_){
+    /* Check if any entry in the chunk has overflowed — the original code only
+       checked index_x=0 which caused NaN in closed-model Cl spectra. */
+    double maxabs = 0.0;
+    for (index_x=0; index_x<chunk; index_x++) {
+      double v = fabs(PhiL[l*chunk+index_x]);
+      if (v > maxabs) maxabs = v;
+    }
+    if (maxabs > _HYPER_OVERFLOW_){
       //Rescale whole Phi vector until this point.
       //Create scale vector:
       for (index_x=0; index_x<chunk; index_x++)

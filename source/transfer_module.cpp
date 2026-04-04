@@ -2763,7 +2763,7 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
   /* index in the source's tau list corresponding to the last point in the overlapping region between sources and bessels. Also the index of possible Bessel truncation. */
   int index_tau_max, index_tau_max_Bessel;
 
-  double bessel, *radial_function;
+  double bessel;
 
   double x_turning_point;
 
@@ -2851,7 +2851,7 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
   }
 
   /** - Compute the radial function: */
-  class_alloc(radial_function, sizeof(double)*(index_tau_max + 1), error_message_);
+  double* radial_function = ptw->radial_function;
 
   class_call(transfer_radial_function(ptw,
                                       k,
@@ -2886,8 +2886,6 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
       radial_function[index_tau_max]*sources[index_tau_max];
   }
 
-
-  free(radial_function);
   return _SUCCESS_;
 }
 
@@ -3278,7 +3276,11 @@ int TransferModule::transfer_radial_function(struct transfer_workspace * ptw, do
   double *cscKgen = ptw->cscKgen;
   double *cotKgen = ptw->cotKgen;
   int j;
-  double *Phi, *dPhi, *d2Phi, *chireverse;
+  double *Phi = ptw->Phi;
+  double *dPhi = ptw->dPhi;
+  double *d2Phi = ptw->d2Phi;
+  double *chireverse = ptw->chireverse;
+  double * rescale_function = ptw->rescale_function;
   double K=0.,k2=1.0;
   double sqrt_absK_over_k;
   double absK_over_k2;
@@ -3287,7 +3289,6 @@ int TransferModule::transfer_radial_function(struct transfer_workspace * ptw, do
   double l = (double)l_[index_l];
   double rescale_argument;
   double rescale_amplitude;
-  double * rescale_function;
   int (*interpolate_Phi)(HyperInterpStruct *, int, int, double *, double *, char *);
   int (*interpolate_dPhi)(HyperInterpStruct *, int, int, double *, double *, char *);
   int (*interpolate_Phid2Phi)(HyperInterpStruct *, int, int, double *, double *, double *, char *);
@@ -3307,12 +3308,6 @@ int TransferModule::transfer_radial_function(struct transfer_workspace * ptw, do
     sqrt_absK_over_k = sqrt(ptw->sgnK*K)/k;
   }
   absK_over_k2 =sqrt_absK_over_k*sqrt_absK_over_k;
-
-  class_alloc(Phi, sizeof(double)*x_size, error_message_);
-  class_alloc(dPhi, sizeof(double)*x_size, error_message_);
-  class_alloc(d2Phi, sizeof(double)*x_size, error_message_);
-  class_alloc(chireverse, sizeof(double)*x_size, error_message_);
-  class_alloc(rescale_function, sizeof(double)*x_size, error_message_);
 
   if (ptw->sgnK == 0) {
     pHIS = ptw->pBIS;
@@ -3527,12 +3522,6 @@ int TransferModule::transfer_radial_function(struct transfer_workspace * ptw, do
     // Note: in previous line there was a missing factor absK_over_k2 until version 2.4.3. Credits Francesco Montanari.
     break;
   }
-
-  free(Phi);
-  free(dPhi);
-  free(d2Phi);
-  free(chireverse);
-  free(rescale_function);
 
   return _SUCCESS_;
 }
@@ -3750,6 +3739,12 @@ int TransferModule::transfer_workspace_init(struct transfer_workspace **ptw, int
   class_alloc((*ptw)->chi, tau_size_max*sizeof(double), error_message_);
   class_alloc((*ptw)->cscKgen ,tau_size_max*sizeof(double), error_message_);
   class_alloc((*ptw)->cotKgen, tau_size_max*sizeof(double), error_message_);
+  class_alloc((*ptw)->Phi, tau_size_max*sizeof(double), error_message_);
+  class_alloc((*ptw)->dPhi, tau_size_max*sizeof(double), error_message_);
+  class_alloc((*ptw)->d2Phi, tau_size_max*sizeof(double), error_message_);
+  class_alloc((*ptw)->chireverse, tau_size_max*sizeof(double), error_message_);
+  class_alloc((*ptw)->rescale_function, tau_size_max*sizeof(double), error_message_);
+  class_alloc((*ptw)->radial_function, tau_size_max*sizeof(double), error_message_);
 
   return _SUCCESS_;
 }
@@ -3769,6 +3764,12 @@ int TransferModule::transfer_workspace_free(struct transfer_workspace *ptw) {
   free(ptw->chi);
   free(ptw->cscKgen);
   free(ptw->cotKgen);
+  free(ptw->Phi);
+  free(ptw->dPhi);
+  free(ptw->d2Phi);
+  free(ptw->chireverse);
+  free(ptw->rescale_function);
+  free(ptw->radial_function);
 
   free(ptw);
   return _SUCCESS_;

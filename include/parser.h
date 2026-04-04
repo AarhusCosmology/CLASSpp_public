@@ -96,7 +96,7 @@ class FileContent {
 };
 
 /**************************************************************/
-/* Legacy C-style free functions – thin wrappers kept for     */
+/* Legacy C-style free functions - thin wrappers kept for     */
 /* backward compatibility with existing call-sites.           */
 /**************************************************************/
 

@@ -4,7 +4,7 @@ import numpy
 import os
 
 def my_cythonize(*args, **kwargs):
-    with open('generate_wrapper.py', 'r') as f:
+    with open('generate_wrapper.py', 'r', encoding='utf-8') as f:
         exec(f.read())
     return cythonize(*args, **kwargs)
 

@@ -160,6 +160,15 @@ struct transfer_workspace {
   double * cscKgen;              /**< cscKgen[index_tau]: useful trigonometric function */
   double * cotKgen;              /**< cotKgen[index_tau]: useful trigonometric function */
 
+  /** Pre-allocated temporary buffers for transfer_radial_function and transfer_integrate.
+   *  Size tau_size_max. Avoids repeated malloc/free in the hot per-(k,l) loop. */
+  double * Phi;             /**< Phi[index_tau]: Bessel function values */
+  double * dPhi;            /**< dPhi[index_tau]: first derivative of Bessel function */
+  double * d2Phi;           /**< d2Phi[index_tau]: second derivative of Bessel function */
+  double * chireverse;      /**< chireverse[index_tau]: reversed chi grid */
+  double * rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
+  double * radial_function; /**< radial_function[index_tau]: output of transfer_radial_function */
+
   //@}
 
   /** @name - parameters defining the spatial curvature (copied from background structure) */

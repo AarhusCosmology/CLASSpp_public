@@ -52,7 +52,7 @@ definition_names = [
 ]
 definitions_dict = {}
 for file in h_files:
-    with open(file) as fid:
+    with open(file, encoding='utf-8') as fid:
         for line in fid:
             if "#define" not in line:
                 continue
@@ -91,7 +91,7 @@ enum_names = [
 ]
 
 for file in h_files:
-    with open(file) as fid:
+    with open(file, encoding='utf-8') as fid:
         enum_found = False
         for line in fid:
             if not enum_found:
@@ -145,7 +145,7 @@ for file in h_files:
     if file == 'common.h':
         subprocess.run(['gcc', '-E', rootdir+'/include/common.h','-o', rootdir+'/include/tmp'])
         file = rootdir+'/include/tmp'
-    with open(file) as fid:
+    with open(file, encoding='utf-8') as fid:
         struct_found = False
         for line in fid:
             if not struct_found:
@@ -190,7 +190,7 @@ allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', '
 keywords_to_be_ignored = ['static', 'constexpr', 'const']
 
 for file in h_files:
-    with open(file) as fid:
+    with open(file, encoding='utf-8') as fid:
         class_name = ''
         error_message_added = False
         for line in fid:
@@ -286,7 +286,7 @@ for m in modules:
 
 # In[8]:
 
-with open(rootdir / 'cclassy.pxd', 'w') as fid:
+with open(rootdir / 'cclassy.pxd', 'w', encoding='utf-8') as fid:
     fid.write(preample)
     for lines in [enums, structs, classes]:
         # Replace defined variables:

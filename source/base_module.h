@@ -48,7 +48,7 @@ public:
   const std::shared_ptr<DarkRadiation> dr_;
 
   /** Const map of all cosmological species, keyed by name.
-   *  Use .at("CDM") — never operator[] — to preserve const safety. */
+   *  Use .at("CDM") -- never operator[] -- to preserve const safety. */
   const std::map<std::string, std::unique_ptr<BaseSpecies>>& all_species_;
 
 protected:
