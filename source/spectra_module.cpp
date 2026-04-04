@@ -1307,7 +1307,8 @@ int SpectraModule::spectra_compute_cl(int index_md,
          integration everywhere. */
 
       if (pba->sgnK == 1) {
-        index_q_spline = transfer_module_->index_q_flat_approximation_;
+        index_q_spline = MIN(transfer_module_->index_q_flat_approximation_,
+                             transfer_module_->q_size_ - 1);
       }
 
       class_call(array_integrate_all_trapzd_or_spline(cl_integrand,

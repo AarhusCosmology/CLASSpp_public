@@ -244,8 +244,8 @@ int TransferModule::transfer_init() {
   /** - compute flat spherical bessel functions */
 
   xmax = q_[q_size_ - 1]*tau0;
-  if (pba->sgnK == -1)
-    xmax *= (l_[l_size_max_ - 1]/ppr->hyper_flat_approximation_nu)/asinh(l_[l_size_max_ - 1]/ppr->hyper_flat_approximation_nu)*1.01;
+  if (pba->sgnK == -1 && index_q_flat_approximation_ < q_size_)
+    xmax *= sqrt(pba->sgnK*pba->K)/q_[q_size_ - 1]*(l_[l_size_max_ - 1] + 1)/asinh((l_[l_size_max_ - 1] + 1)/q_[q_size_ - 1]*sqrt(pba->sgnK*pba->K))*1.01;
 
   class_call(hyperspherical_HIS_create(0,
                                        1.,
@@ -888,6 +888,7 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
   int nu, nu_min, nu_proposed;
   int q_size_max;
   double q_approximation;
+  double q_threshold;
   double last_step=0.;
   int last_index=0;
   double q_logstep_spline;
@@ -941,35 +942,44 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
   q_logstep_spline = ppr->q_logstep_spline/pow(thermodynamics_module_->angular_rescaling_, ppr->q_logstep_open);
   q_logstep_trapzd = ppr->q_logstep_trapzd;
 
-  /* very conservative estimate of number of values */
+  /* slightly conservative estimate of number of values */
 
   if (sgnK == 1) {
 
-    q_approximation = MIN(ppr->hyper_flat_approximation_nu,(q_max/sqrt(K)));
+    q_approximation = MIN(ppr->hyper_flat_approximation_nu,(q_max/sqrt(K)))*sqrt(K);
 
     /* max contribution from integer nu values */
-    q_step = 1.+q_period*ppr->q_logstep_trapzd;
-    q_size_max = 2*(int)(log(q_approximation/q_min)/log(q_step));
+    q_threshold = ppr->q_linstep/q_logstep_trapzd;
 
-    q_step = q_period*ppr->q_linstep;
-    q_size_max += 2*(int)((q_approximation-q_min)/q_step);
+    q_step = 1.+0.5*q_period*q_logstep_trapzd;
+    q_size_max = (int)(log(MIN(q_approximation,q_threshold)/q_min)/log(q_step)+1);
+
+    q_step = MAX(q_period*ppr->q_linstep, 1*sqrt(K));
+    q_size_max += (int)(1.1*(q_approximation-MIN(q_min,10*q_threshold))/q_step+18*q_threshold/q_step+1);
 
     /* max contribution from non-integer nu values */
-    q_step = 1.+q_period*ppr->q_logstep_spline;
-    q_size_max += 2*(int)(log(q_max/q_approximation)/log(q_step));
+    q_threshold = ppr->q_linstep/q_logstep_spline;
+
+    q_step = 1.+0.5*q_period*q_logstep_spline;
+    q_size_max += (int)(log(MIN(q_max, q_threshold)/q_approximation)/log(q_step)+1);
 
     q_step = q_period*ppr->q_linstep;
-    q_size_max += 2*(int)((q_max-q_approximation)/q_step);
+    q_size_max += (int)(1.1*(q_max-MIN(q_max, 10*q_threshold))/q_step+18*q_threshold/q_step+1);
+
+    /* cap at 2^25 (~3*10^7) to prevent runaway allocations */
+    q_size_max = MIN(q_size_max, 1<<25);
 
   }
   else {
 
     /* max contribution from non-integer nu values */
-    q_step = 1.+q_period*ppr->q_logstep_spline;
-    q_size_max = 5*(int)(log(q_max/q_min)/log(q_step));
+    q_threshold = ppr->q_linstep/q_logstep_spline;
+
+    q_step = 1.+0.5*q_period*q_logstep_spline;
+    q_size_max = (int)(log(MIN(q_max, q_threshold)/q_min)/log(q_step)+1);
 
     q_step = q_period*ppr->q_linstep;
-    q_size_max += 5*(int)((q_max-q_min)/q_step);
+    q_size_max += (int)(1.1*(q_max-MIN(q_max, 10*q_threshold))/q_step+18*q_threshold/q_step+1);
 
   }
 
@@ -991,7 +1001,7 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
   while (q_[index_q-1] < q_max) {
 
-    class_test(index_q >= q_size_max, error_message_, "buggy q-list definition");
+    class_test(index_q >= q_size_max, error_message_, "buggy q-list definition (q_size=%d)", q_size_max);
 
     /* step size formula in flat/open case. Step goes gradually from
        logarithmic to linear:
@@ -1081,14 +1091,27 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
   if (sgnK != 0) {
 
     q_approximation = ppr->hyper_flat_approximation_nu * sqrt(sgnK*K);
-    for (index_q_flat_approximation_ = 0;
-         index_q_flat_approximation_ < q_size_ - 1;
-         index_q_flat_approximation_++) {
-      if (q_[index_q_flat_approximation_] > q_approximation) break;
+    if (q_approximation < q_[q_size_ - 1]) {
+      for (index_q_flat_approximation_ = 0;
+           index_q_flat_approximation_ < q_size_ - 1;
+           index_q_flat_approximation_++) {
+        if (q_[index_q_flat_approximation_] > q_approximation) break;
+      }
+      if (ptr->transfer_verbose > 1)
+        printf("Flat bessel approximation spares hyperspherical bessel computations for %d wavenumbers over a total of %d\n",
+               q_size_ - index_q_flat_approximation_, q_size_);
     }
-    if (ptr->transfer_verbose > 1)
-      printf("Flat bessel approximation spares hyperspherical bessel computations for %d wavenumebrs over a total of %d\n",
-             q_size_ - index_q_flat_approximation_, q_size_);
+    else {
+      /* All q values are below the flat approximation threshold, so
+         no flat Bessel approximation is used for any q point. Set
+         index past the end of the q grid so no valid q index enters
+         the flat-approximation branch. Note: consumers that use this
+         as an array index (e.g. spectra_compute_cl) must clamp to
+         < q_size_. */
+      index_q_flat_approximation_ = q_size_;
+      if (ptr->transfer_verbose > 1)
+        printf("Cannot use flat bessel approximation, since q_max = %.5e < q_start_approximation = %.5e\n", q_[q_size_ - 1], q_approximation);
+    }
   }
 
   return _SUCCESS_;

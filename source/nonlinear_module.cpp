@@ -141,7 +141,7 @@ int NonlinearModule::nonlinear_pk_at_z(
     if (ln_tau <= ln_tau_[0]) {
 
       /** --> if ln(tau) much too small, raise an error */
-      class_test(ln_tau < ln_tau_[0] - _EPSILON_,
+      class_test(ln_tau < ln_tau_[0] - 100.*_EPSILON_,
                  error_message_,
                  "requested z was not inside of tau tabulation range (Requested ln(tau_=%.10e, Min %.10e). Solution might be to increase input parameter z_max_pk (see explanatory.ini)",ln_tau,ln_tau_[0]);
 
@@ -166,7 +166,7 @@ int NonlinearModule::nonlinear_pk_at_z(
     else if (ln_tau >= ln_tau_[ln_tau_size_ - 1]) {
 
       /** --> if ln(tau) much too large, raise an error */
-      class_test(ln_tau > ln_tau_[ln_tau_size_ - 1] + _EPSILON_,
+      class_test(ln_tau > ln_tau_[ln_tau_size_ - 1] + 100.*_EPSILON_,
                  error_message_,
                  "requested z was not inside of tau tabulation range (Requested ln(tau_=%.10e, Max %.10e) ",
                  ln_tau,

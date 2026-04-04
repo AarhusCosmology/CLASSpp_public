@@ -8098,6 +8098,40 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
         delta_scf += alpha*(-3.0*H*(1.0 + pvecback[background_module_->index_bg_p_scf_]/pvecback[background_module_->index_bg_rho_scf_]));
         theta_scf += k*k*alpha;
       }
+
+      if (pba->has_ncdm == _TRUE_) {
+        for (n_ncdm = 0; n_ncdm < pba->N_ncdm; n_ncdm++) {
+          rho_ncdm_bg = pvecback[background_module_->index_bg_rho_ncdm1_ + n_ncdm];
+          p_ncdm_bg = pvecback[background_module_->index_bg_p_ncdm1_ + n_ncdm];
+          pseudo_p_ncdm = pvecback[background_module_->index_bg_pseudo_p_ncdm1_ + n_ncdm];
+
+          double pseudo_p_over_p_ncdm;
+          w_ncdm = p_ncdm_bg/rho_ncdm_bg;
+          pseudo_p_over_p_ncdm = pseudo_p_ncdm/p_ncdm_bg;
+
+          switch (ncdm_->ncdm_types_[n_ncdm]) {
+            case NCDMType::decay_dr: {
+              const auto& rescaled_parameters = ncdm_->GetRescaledParameters(n_ncdm, a, ppw->pvecback + background_module_->index_bg_lnf_ncdm_decay_dr1_);
+              w_ncdm = std::get<0>(rescaled_parameters);
+              pseudo_p_over_p_ncdm = std::get<1>(rescaled_parameters);
+              break;
+            }
+            case NCDMType::standard:
+            default:
+              break;
+          }
+
+          /* p'/rho from energy conservation combined with eq. (3.3) of arxiv:1104.2935 */
+          double p_prime_over_rho_ncdm = -a*H*w_ncdm*(5. - pseudo_p_over_p_ncdm);
+
+          double delta_ncdm_syn = delta_ncdm[n_ncdm];
+
+          delta_ncdm[n_ncdm] -= 3.*a*H*(1. + w_ncdm)*alpha;
+          theta_ncdm[n_ncdm] += k*k*alpha;
+          delta_p_over_delta_rho_ncdm[n_ncdm] = (delta_p_over_delta_rho_ncdm[n_ncdm]*delta_ncdm_syn + p_prime_over_rho_ncdm*alpha)
+            /(delta_ncdm_syn - 3.*a*H*(1. + w_ncdm)*alpha);
+        }
+      }
     }
 
     //    fprintf(ppw->perturb_output_file," ");
