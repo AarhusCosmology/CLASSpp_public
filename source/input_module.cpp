@@ -189,9 +189,10 @@ InputModule::InputModule(FileContent& fc)
 : file_content_(fc)
 , shooting_workspace_(file_content_) {
   file_content_.mark_all_unread();
-  int status = input_init();
-  if (status == _FAILURE_) {
-    throw std::invalid_argument(error_message_);
+  try {
+    input_init();
+  } catch (const std::runtime_error& e) {
+    throw std::invalid_argument(e.what());
   }
   ConstructSpecies();
 }
@@ -3694,7 +3695,9 @@ int InputModule::class_fzero_ridder(int (*func)(double x, void* param, double* y
       } else if (NRSIGN(fh,fnew) != fh) {
         xl=ans;
         fl=fnew;
-      } else return _FAILURE_;
+      } else {
+        class_stop(error_message, "unexpected sign change in zriddr");
+      }
       if (fabs(xh-xl) <= xtol) {
         *xzero = ans;
         //        printf("Success 3\n");

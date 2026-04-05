@@ -25,9 +25,7 @@
 PrimordialModule::PrimordialModule(InputModulePtr input_module, PerturbationsModulePtr perturbation_module)
 : BaseModule(std::move(input_module))
 , perturbations_module_(perturbation_module) {
-  if (primordial_init() != _SUCCESS_) {
-    throw std::runtime_error(error_message_);
-  }
+  primordial_init();
 }
 
 PrimordialModule::~PrimordialModule() {
@@ -1518,7 +1516,7 @@ int PrimordialModule::primordial_inflation_spectra(double * y_ini) {
     }));
   }
   for (std::future<int>& future : future_output) {
-      if (future.get() != _SUCCESS_) return _FAILURE_;
+      future.get();
   }
   future_output.clear();
 

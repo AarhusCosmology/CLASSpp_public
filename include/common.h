@@ -258,7 +258,7 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 
 #define class_test_message(err_out,extra,args, ...) {                                                              \
   ErrorMsg Optional_arguments;                                                                                   \
-  class_protect_sprintf(Optional_arguments,args);                                                                \
+  class_protect_sprintf(Optional_arguments,args, ##__VA_ARGS__);                                                 \
   class_build_error_string(err_out,"condition (%s) is true; %s",extra,Optional_arguments);                       \
 }
 
@@ -294,7 +294,7 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
    args cannot be empty, if there is nothing to pass use args="" */
 #define class_stop(error_message_output,args, ...) {                                                               \
   ErrorMsg Optional_arguments;                                                                                   \
-  class_protect_sprintf(Optional_arguments,args);                                                                \
+  class_protect_sprintf(Optional_arguments,args, ##__VA_ARGS__);                                                 \
   class_build_error_string(error_message_output,"error; %s",Optional_arguments);                                 \
   return _FAILURE_;                                                                                              \
 }
@@ -308,6 +308,116 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
     return _FAILURE_;                                                                                            \
   }                                                                                                              \
 }
+
+/**
+ * C++ exception-throwing overrides.
+ *
+ * In C++ compilation units, the error macros throw std::runtime_error
+ * instead of returning _FAILURE_. This enables natural exception
+ * propagation through the call chain:
+ *
+ * - class_test / class_stop / class_alloc: throw at the error origin.
+ * - class_call: if the callee returns _FAILURE_ (C function), builds
+ *   the error chain and throws. If the callee itself throws (C++
+ *   function), the exception propagates naturally.
+ * - class_call_except / class_test_except: execute cleanup commands
+ *   before re-throwing.
+ * - class_open: throws on file open failure.
+ *
+ * The C definitions above remain active for .c utility files
+ * (arrays.c, hyperspherical.c, etc.).
+ */
+#ifdef __cplusplus
+
+#undef class_call_except
+#define class_call_except(function, error_message_from_function, error_message_output, list_of_commands) {        \
+  try {                                                                                                          \
+    if ((function) == _FAILURE_) {                                                                               \
+      class_call_message(error_message_output, #function, error_message_from_function);                          \
+      throw std::runtime_error(error_message_output);                                                            \
+    }                                                                                                            \
+  } catch (...) {                                                                                                \
+    list_of_commands;                                                                                            \
+    throw;                                                                                                       \
+  }                                                                                                              \
+}
+
+#undef class_call
+#define class_call(function, error_message_from_function, error_message_output) {                                 \
+  if ((function) == _FAILURE_) {                                                                                 \
+    class_call_message(error_message_output, #function, error_message_from_function);                            \
+    throw std::runtime_error(error_message_output);                                                              \
+  }                                                                                                              \
+}
+
+#undef class_test_except
+#define class_test_except(condition, error_message_output, list_of_commands, args, ...) {                         \
+  if (condition) {                                                                                               \
+    class_test_message(error_message_output, #condition, args, ##__VA_ARGS__);                                   \
+    list_of_commands;                                                                                            \
+    throw std::runtime_error(error_message_output);                                                              \
+  }                                                                                                              \
+}
+
+#undef class_test
+#define class_test(condition, error_message_output, args, ...) {                                                  \
+  if (condition) {                                                                                               \
+    class_test_message(error_message_output, #condition, args, ##__VA_ARGS__);                                   \
+    throw std::runtime_error(error_message_output);                                                              \
+  }                                                                                                              \
+}
+
+#undef class_stop
+#define class_stop(error_message_output, args, ...) {                                                            \
+  ErrorMsg Optional_arguments;                                                                                   \
+  class_protect_sprintf(Optional_arguments, args, ##__VA_ARGS__);                                                \
+  class_build_error_string(error_message_output, "error; %s", Optional_arguments);                               \
+  throw std::runtime_error(error_message_output);                                                                \
+}
+
+#undef class_alloc
+#define class_alloc(pointer, size, error_message_output) {                                                       \
+  pointer = (typeof(pointer)) malloc(size);                                                                      \
+  if (pointer == NULL) {                                                                                         \
+    int size_int;                                                                                                \
+    size_int = size;                                                                                             \
+    class_alloc_message((char*)error_message_output, #pointer, size_int);                                        \
+    throw std::runtime_error(error_message_output);                                                              \
+  }                                                                                                              \
+}
+
+#undef class_calloc
+#define class_calloc(pointer, init, size, error_message_output) {                                                \
+  pointer = (typeof(pointer)) calloc(init, size);                                                                \
+  if (pointer == NULL) {                                                                                         \
+    int size_int;                                                                                                \
+    size_int = size;                                                                                             \
+    class_alloc_message(error_message_output, #pointer, size_int);                                               \
+    throw std::runtime_error(error_message_output);                                                              \
+  }                                                                                                              \
+}
+
+#undef class_realloc
+#define class_realloc(pointer, newname, size, error_message_output) {                                            \
+  pointer = (typeof(pointer)) realloc(newname, size);                                                            \
+  if (pointer == NULL) {                                                                                         \
+    int size_int;                                                                                                \
+    size_int = size;                                                                                             \
+    class_alloc_message(error_message_output, #pointer, size_int);                                               \
+    throw std::runtime_error(error_message_output);                                                              \
+  }                                                                                                              \
+}
+
+#undef class_open
+#define class_open(pointer, filename, mode, error_output) {                                                      \
+  pointer = fopen(filename, mode);                                                                               \
+  if (pointer == NULL) {                                                                                         \
+    class_build_error_string(error_output, "could not open %s with name %s and mode %s", #pointer, filename, #mode); \
+    throw std::runtime_error(error_output);                                                                      \
+  }                                                                                                              \
+}
+
+#endif /* __cplusplus exception overrides */
 
 /* macro for defining indices (usually one, sometimes a block) */
 #define class_define_index(index,                                       \

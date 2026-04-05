@@ -25,9 +25,7 @@ SpectraModule::SpectraModule(InputModulePtr input_module, PerturbationsModulePtr
 , primordial_module_(std::move(primordial_module))
 , nonlinear_module_(std::move(nonlinear_module))
 , transfer_module_(std::move(transfer_module)) {
-  if (spectra_init() != _SUCCESS_) {
-    throw std::runtime_error(error_message_);
-  }
+  spectra_init();
 }
 
 SpectraModule::~SpectraModule() {
@@ -915,7 +913,7 @@ int SpectraModule::spectra_cls() {
     }
 
     for (std::future<int>& future : future_output) {
-        if (future.get() != _SUCCESS_) return _FAILURE_;
+        future.get();
     }
     future_output.clear();
 

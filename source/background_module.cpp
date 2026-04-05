@@ -84,9 +84,7 @@
 
 BackgroundModule::BackgroundModule(InputModulePtr input_module)
 : BaseModule(input_module) {
-  if (background_init() != _SUCCESS_) {
-    throw std::runtime_error(error_message_);
-  }
+  background_init();
 }
 
 BackgroundModule::~BackgroundModule() {

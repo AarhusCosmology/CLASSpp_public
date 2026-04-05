@@ -40,9 +40,7 @@ TransferModule::TransferModule(InputModulePtr input_module, BackgroundModulePtr 
 , thermodynamics_module_(std::move(thermodynamics_module))
 , perturbations_module_(std::move(perturbations_module))
 , nonlinear_module_(std::move(nonlinear_module)) {
-  if (transfer_init() != _SUCCESS_) {
-    throw std::runtime_error(error_message_);
-  }
+  transfer_init();
 }
 
 TransferModule::~TransferModule() {
@@ -314,7 +312,7 @@ int TransferModule::transfer_init() {
     }));
   } /* end of loop over wavenumber */
   for (std::future<int>& future : future_output) {
-      if (future.get() != _SUCCESS_) return _FAILURE_;
+      future.get();
   }
   future_output.clear();
   /** - finally, free arrays allocated outside parallel zone */

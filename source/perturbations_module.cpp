@@ -34,9 +34,7 @@ PerturbationsModule::PerturbationsModule(InputModulePtr input_module, Background
 : BaseModule(std::move(input_module))
 , background_module_(std::move(background_module))
 , thermodynamics_module_(std::move(thermodynamics_module)) {
-  if (perturb_init() != _SUCCESS_) {
-    throw std::runtime_error(error_message_);
-  }
+  perturb_init();
 }
 
 PerturbationsModule::~PerturbationsModule() {
@@ -720,7 +718,7 @@ int PerturbationsModule::perturb_init() {
   /** - spline the source array with respect to the time variable */
 
   for (std::future<int>& future : future_output) {
-      if (future.get() != _SUCCESS_) return _FAILURE_;
+      future.get();
   }
   future_output.clear();
 
@@ -751,7 +749,7 @@ int PerturbationsModule::perturb_init() {
     } /* end of loop over mode */
 
     for (std::future<int>& future : future_output) {
-        if (future.get() != _SUCCESS_) return _FAILURE_;
+        future.get();
     }
 
   }
