@@ -90,9 +90,10 @@ void DarkRadiationSpecies::PerturbDerivs(double /*tau*/, const double* y, double
   if (pba_->has_dcdm == _TRUE_) {
     const int base = pv->index_pt_F0_dr_species + index_dr * (pv->l_max_dr + 1);
     // r_dr = rho_dr * a^4 / H0^2  (dimensionless)
-    double r_dr = pvecback[bgm->index_bg_rho_dr_species_] * std::pow(a, 4) / pba_->H0 / pba_->H0;
+    double r_dr = pvecback[bgm->index_bg_rho_dr_species_]
+                  * (a * a) * (a * a) / (pba_->H0 * pba_->H0);
     double rprime_dr = pba_->Gamma_dcdm * pvecback[bgm->index_bg_rho_dcdm_]
-                       * std::pow(a, 5) / pba_->H0 / pba_->H0;
+                       * std::pow(a, 5) / (pba_->H0 * pba_->H0);
 
     // delta_dcdm and theta_dcdm come from the pv
     double delta_dcdm = 0., theta_dcdm = 0.;
@@ -137,9 +138,46 @@ void DarkRadiationSpecies::PerturbDerivs(double /*tau*/, const double* y, double
   }
 }
 
+/**
+ * DR perturbation variables F_l follow the convention of astro-ph/9907388:
+ *   delta_rho_dr = rho_dr * F0 / f,  where f = rho_dr * a^4 / H0^2
+ * so delta_rho_dr = (H0/a^2)^2 * F0 = rho_dr_over_f * F0.
+ * The factor rho_dr_over_f = H0^2/a^4 converts F_l to physical quantities.
+ */
+double DarkRadiationSpecies::Delta(const perturb_vector* pv, const double* y,
+                                    const double* pvecback, const perturb_workspace* /*ppw*/) const {
+  if (pv->index_pt_F0_dr_sum < 0 || pvecback[index_bg_rho_] <= 0.) return 0.;
+  double a = pvecback[bgm_->index_bg_a_];
+  double a2 = a * a;
+  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
+  return rho_dr_over_f * y[pv->index_pt_F0_dr_sum] / pvecback[index_bg_rho_];
+}
+
+double DarkRadiationSpecies::Theta(const perturb_vector* pv, const double* y,
+                                    const double* pvecback, const perturb_workspace* ppw) const {
+  if (pv->index_pt_F0_dr_sum < 0 || pvecback[index_bg_rho_] <= 0.) return 0.;
+  double a = pvecback[bgm_->index_bg_a_];
+  double a2 = a * a;
+  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
+  double k = ppw->scalar_ctx.k;
+  // (rho+p)*theta = k * rho_dr_over_f * F1, and (rho+p) = (4/3)*rho_dr
+  return 0.75 * k * rho_dr_over_f * y[pv->index_pt_F0_dr_sum + 1] / pvecback[index_bg_rho_];
+}
+
+double DarkRadiationSpecies::DeltaP(const perturb_vector* pv, const double* y,
+                                     const double* pvecback, const perturb_workspace* /*ppw*/) const {
+  if (pv->index_pt_F0_dr_sum < 0) return 0.;
+  double a = pvecback[bgm_->index_bg_a_];
+  double a2 = a * a;
+  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
+  return rho_dr_over_f * y[pv->index_pt_F0_dr_sum] / 3.;
+}
+
 double DarkRadiationSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,
                                             const double* pvecback, const perturb_workspace* /*ppw*/) const {
   if (pv->index_pt_F0_dr_sum < 0) return 0.;
-  double rho = pvecback[index_bg_rho_];
-  return (rho + rho / 3.) * y[pv->index_pt_F0_dr_sum + 2];
+  double a = pvecback[bgm_->index_bg_a_];
+  double a2 = a * a;
+  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
+  return 2./3. * rho_dr_over_f * y[pv->index_pt_F0_dr_sum + 2];
 }

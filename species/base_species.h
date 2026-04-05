@@ -46,6 +46,7 @@ public:
    */
   virtual void SetBackgroundModule(const BackgroundModule* /*bgm*/) {}
 
+
   // ── Background ────────────────────────────────────────────────────────────
 
   /**
@@ -109,7 +110,7 @@ public:
   // ── Perturbations ─────────────────────────────────────────────────────────
 
   /**
-   * Claim consecutive slots in the perturbation integration vector.
+   * Claim consecutive slots in the perturbation integration vector (scalar mode).
    * Also writes the species' indices into the corresponding fields of pv
    * (which other code still uses for e.g. initial conditions and sources).
    * @param ppw   Current workspace; use approx[] flags and curvature info.
@@ -119,9 +120,18 @@ public:
                                             const perturb_workspace* ppw,
                                             int gauge) = 0;
 
+  /** Claim perturbation slots for vector modes. Default: no-op (most species are scalar-only). */
+  virtual void RegisterVectorPerturbationIndices(perturb_vector* /*pv*/, int& /*index_pt*/,
+                                                  const perturb_workspace* /*ppw*/,
+                                                  int /*gauge*/) {}
+
+  /** Claim perturbation slots for tensor modes. Default: no-op (most species are scalar-only). */
+  virtual void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/, int& /*index_pt*/,
+                                                  const perturb_workspace* /*ppw*/,
+                                                  int /*gauge*/) {}
+
   /**
-   * Contribute to dy for the perturbation ODE at conformal time tau.
-   * y and dy are the integration vector and its time derivative.
+   * Contribute to dy for the scalar perturbation ODE at conformal time tau.
    * The PerturbScalarContext inside ppaw->ppw has pre-computed metric terms,
    * cross-species state (delta_g, theta_g, theta_b, ...), and approximation flags.
    */
@@ -129,6 +139,14 @@ public:
                                const double* y,
                                double* dy,
                                const perturb_parameters_and_workspace& ppaw) = 0;
+
+  /** Contribute to dy for the vector perturbation ODE. Default: no-op. */
+  virtual void PerturbVectorDerivs(double /*tau*/, const double* /*y*/, double* /*dy*/,
+                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
+
+  /** Contribute to dy for the tensor perturbation ODE. Default: no-op. */
+  virtual void PerturbTensorDerivs(double /*tau*/, const double* /*y*/, double* /*dy*/,
+                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
 
   /**
    * Fractional density perturbation delta = delta_rho / rho.

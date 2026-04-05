@@ -3323,29 +3323,23 @@ int PerturbationsModule::perturb_vector_init(
 
   if (_vectors_) {
 
+    /* reject inconsistent values of the number of mutipoles in photon temperature hierarchy */
+    class_test(ppr->l_max_g_ten < 4,
+               error_message_,
+               "ppr->l_max_g_ten should be at least 4, i.e. we must integrate at least over photon density, velocity, shear, third momentum");
+
+    /* reject inconsistent values of the number of mutipoles in photon polarization hierarchy */
+    class_test(ppr->l_max_pol_g_ten < 4,
+               error_message_,
+               "ppr->l_max_pol_g_ten should be at least 4");
+
     /* Vector baryon velocity: v_b^{(1)}. */
     class_define_index(ppv->index_pt_theta_b,_TRUE_,index_pt,1);
 
-    /* eventually reject inconsistent values of the number of mutipoles in photon temperature hierarchy and polarization*/
-
-    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) { /* if radiation streaming approximation is off */
-      if (ppw->approx[ppw->index_ap_tca] == (int)tca_off) { /* if tight-coupling approximation is off */
-
-        ppv->l_max_g = ppr->l_max_g_ten;
-
-        class_define_index(ppv->index_pt_delta_g,_TRUE_,index_pt,1); /* photon density */
-        class_define_index(ppv->index_pt_theta_g,_TRUE_,index_pt,1); /* photon velocity */
-        class_define_index(ppv->index_pt_shear_g,_TRUE_,index_pt,1); /* photon shear */
-        class_define_index(ppv->index_pt_l3_g,_TRUE_,index_pt,ppv->l_max_g-2); /* photon l=3 */
-
-        ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
-
-        class_define_index(ppv->index_pt_pol0_g,_TRUE_,index_pt,1); /* photon polarization, l=0 */
-        class_define_index(ppv->index_pt_pol1_g,_TRUE_,index_pt,1); /* photon polarization, l=1 */
-        class_define_index(ppv->index_pt_pol2_g,_TRUE_,index_pt,1); /* photon polarization, l=2 */
-        class_define_index(ppv->index_pt_pol3_g,_TRUE_,index_pt,ppv->l_max_pol_g-2); /* photon polarization, l=3 */
-      }
-    }
+    /* photons: set l_max fields before calling species (species reads them) */
+    ppv->l_max_g     = ppr->l_max_g_ten;
+    ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
+    all_species_.at("Photons")->RegisterVectorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /** - (a) metric perturbations V or \f$ h_v \f$ depending on gauge */
     if (ppt->gauge == synchronous){
@@ -3369,24 +3363,10 @@ int PerturbationsModule::perturb_vector_init(
                error_message_,
                "ppr->l_max_pol_g_ten should be at least 4");
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) { /* if radiation streaming approximation is off */
-      if (ppw->approx[ppw->index_ap_tca] == (int)tca_off) { /* if tight-coupling approximation is off */
-
-        ppv->l_max_g = ppr->l_max_g_ten;
-
-        class_define_index(ppv->index_pt_delta_g,_TRUE_,index_pt,1); /* photon density */
-        class_define_index(ppv->index_pt_theta_g,_TRUE_,index_pt,1); /* photon velocity */
-        class_define_index(ppv->index_pt_shear_g,_TRUE_,index_pt,1); /* photon shear */
-        class_define_index(ppv->index_pt_l3_g,_TRUE_,index_pt,ppv->l_max_g-2); /* photon l=3 */
-
-        ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
-
-        class_define_index(ppv->index_pt_pol0_g,_TRUE_,index_pt,1); /* photon polarization, l=0 */
-        class_define_index(ppv->index_pt_pol1_g,_TRUE_,index_pt,1); /* photon polarization, l=1 */
-        class_define_index(ppv->index_pt_pol2_g,_TRUE_,index_pt,1); /* photon polarization, l=2 */
-        class_define_index(ppv->index_pt_pol3_g,_TRUE_,index_pt,ppv->l_max_pol_g-2); /* photon polarization, l=3 */
-      }
-    }
+    /* photons: set l_max fields before calling species (species reads them) */
+    ppv->l_max_g     = ppr->l_max_g_ten;
+    ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
+    all_species_.at("Photons")->RegisterTensorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /* ultra relativistic neutrinos */
 
@@ -6450,18 +6430,13 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
     /* ultra-relativistic decay radiation */
 
     if (pba->has_dr == _TRUE_) {
-      /* We have delta_rho_dr = rho_dr * F0_dr / f, where F follows the
-         convention in astro-ph/9907388 and f is defined as
-         f = rho_dr*a^4/rho_crit_today. In CLASS density units
-         rho_crit_today = H0^2.
-      */
-      double rho_dr_over_f = pow(pba->H0/a2,2);
-      ppw->delta_rho += rho_dr_over_f*y[ppw->pv->index_pt_F0_dr_sum];
-      ppw->rho_plus_p_theta += 4./3.*3./4*k*rho_dr_over_f*y[ppw->pv->index_pt_F0_dr_sum + 1];
-      ppw->rho_plus_p_shear += 2./3.*rho_dr_over_f*y[ppw->pv->index_pt_F0_dr_sum + 2];
-      ppw->delta_p += 1./3.*rho_dr_over_f*y[ppw->pv->index_pt_F0_dr_sum];
-
-      ppw->rho_plus_p_tot += 4./3.*ppw->pvecback[background_module_->index_bg_rho_dr_];
+      const auto& DR = all_species_.at("DR");
+      const double rho_plus_p_dr = DR->Rho(ppw->pvecback) + DR->P(ppw->pvecback); // 4/3 * rho_dr
+      ppw->delta_rho        += DR->Rho(ppw->pvecback) * DR->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_theta += rho_plus_p_dr * DR->Theta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_shear += DR->RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->delta_p          += DR->DeltaP(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_tot   += rho_plus_p_dr;
     }
 
     /* ultra-relativistic neutrino/relics contribution */
@@ -8195,6 +8170,8 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
       cotKgen = sqrt_absK/k/tan(sqrt_absK*tau);
   }
 
+  ppw->cotKgen = cotKgen;
+
   double s2_squared = 1.-3.*pba->K/k2;
 
   /** - for scalar modes: */
@@ -8454,58 +8431,12 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
 
     if (pba->has_dr == _TRUE_) {
 
+      /* DCDM-sourced DR: zeros the sum and adds the DCDM->DR channel */
+      all_species_.at("DR")->PerturbDerivs(tau, y, dy, *pppaw);
 
-      /* r_dr = rho_dr*a^4/rho_crit_today. In CLASS density units
-         rho_crit_today = H0^2.
-      */
-      
-      for (int l = 0; l <= pv->l_max_dr; ++l) {
-        dy[pv->index_pt_F0_dr_sum + l] = 0.;
-      }
-      
-      // Index that handles DCDM having index 0 if present
-      int index_dr = 0;
-      
-      // Contribution from DCDM
-      if (pba->has_dcdm) {
-        double r_dr = pow(pow(a/pba->a_today, 2)/pba->H0, 2)*pvecback[background_module_->index_bg_rho_dr_species_];
-        double rprime_dr = pba->Gamma_dcdm*pvecback[background_module_->index_bg_rho_dcdm_]*pow(a, 5)/pow(pba->H0, 2);
-        
-        /** - ----> dr F0 */
-        dy[pv->index_pt_F0_dr_species] = -k*y[pv->index_pt_F0_dr_species+1]-4./3.*metric_continuity*r_dr+
-        rprime_dr*(y[pv->index_pt_delta_dcdm]+metric_euler/k2);
+      /* index_dr tracks which DR channel we're on (DCDM is 0 if present) */
+      int index_dr = (pba->has_dcdm == _TRUE_) ? 1 : 0;
 
-        /** - ----> dr F1 */
-        dy[pv->index_pt_F0_dr_species+1] = k/3.*y[pv->index_pt_F0_dr_species]-2./3.*k*y[pv->index_pt_F0_dr_species+2]*s2_squared +
-          4*metric_euler/(3.*k)*r_dr + rprime_dr/k*y[pv->index_pt_theta_dcdm];
-
-        /** - ----> exact dr F2 */
-        dy[pv->index_pt_F0_dr_species+2] = 8./15.*(3./4.*k*y[pv->index_pt_F0_dr_species+1]+metric_shear*r_dr) -3./5.*k*s_l[3]/s_l[2]*y[pv->index_pt_F0_dr_species+3];
-
-        /** - ----> exact dr l=3 */
-        l = 3;
-        dy[pv->index_pt_F0_dr_species+3] = k/(2.*l+1.)*
-          (l*s_l[l]*s_l[2]*y[pv->index_pt_F0_dr_species+2]-(l+1.)*s_l[l+1]*y[pv->index_pt_F0_dr_species+4]);
-
-        /** - ----> exact dr l>3 */
-        for (l = 4; l < pv->l_max_dr; l++) {
-          dy[pv->index_pt_F0_dr_species+l] = k/(2.*l+1)*
-            (l*s_l[l]*y[pv->index_pt_F0_dr_species+l-1]-(l+1.)*s_l[l+1]*y[pv->index_pt_F0_dr_species+l+1]);
-        }
-
-        /** - ----> exact dr lmax_dr */
-        l = pv->l_max_dr;
-        dy[pv->index_pt_F0_dr_species+l] =
-          k*(s_l[l]*y[pv->index_pt_F0_dr_species+l-1]-(1.+l)*cotKgen*y[pv->index_pt_F0_dr_species+l]);
-        
-        // Update the total F's
-        for (int l = 0; l <= pv->l_max_dr; ++l) {
-          dy[pv->index_pt_F0_dr_sum + l] += dy[pv->index_pt_F0_dr_species + l];
-        }
-        
-        ++index_dr;
-      }
-      
       // Contribution from DNCDM
       if (pba->has_ncdm_decay_dr) {
         for (const auto& id_and_properties : ncdm_->decay_dr_map_) {
@@ -8926,124 +8857,31 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
   /** - vector mode */
   if (_vectors_) {
 
-    fprintf(stderr,"we are in vectors\n");
-
-    double ssqrt3 = sqrt(1.-2.*pba->K/k2);
     double cb2 = pvecthermo[thermodynamics_module_->index_th_cb2_];
 
     /** - --> baryon velocity */
 
+    /* delta_g is needed by the baryon theta equation; use sentinel-safe read */
+    const double delta_g_vec = (pv->index_pt_delta_g >= 0) ? y[pv->index_pt_delta_g] : 0.;
+
     if (ppt->gauge == synchronous) {
 
       dy[pv->index_pt_theta_b] = -(1-3.*cb2)*a_prime_over_a*y[pv->index_pt_theta_b]
-        - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(_SQRT2_/4.*delta_g + y[pv->index_pt_theta_b]);
+        - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(_SQRT2_/4.*delta_g_vec + y[pv->index_pt_theta_b]);
 
     }
 
     else if (ppt->gauge == newtonian) {
 
       dy[pv->index_pt_theta_b] = -(1-3.*cb2)*a_prime_over_a*y[pv->index_pt_theta_b]
-        - _SQRT2_/4.*pvecthermo[thermodynamics_module_->index_th_dkappa_]*(delta_g + 2.*_SQRT2_*y[pv->index_pt_theta_b])
+        - _SQRT2_/4.*pvecthermo[thermodynamics_module_->index_th_dkappa_]*(delta_g_vec + 2.*_SQRT2_*y[pv->index_pt_theta_b])
         + pvecmetric[ppw->index_mt_V_prime]+(1.-3.*cb2)*a_prime_over_a*y[pv->index_pt_V];
 
     }
 
-    /*
-      if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) {
-      if (ppw->approx[ppw->index_ap_tca]==(int)tca_off) {
-    */
-
-    /* short-cut notations for the tensor perturbations */
-    delta_g = y[pv->index_pt_delta_g];
-    theta_g = y[pv->index_pt_theta_g];
-    double shear_g = y[pv->index_pt_shear_g];
-
-
-    /* (P^{(1)}) (see Eq. B.23 in 1305.3261)*/
-    double P1 = -_SQRT6_/40.*(
-                       4./(3.*k)*theta_g //F1
-                       +y[pv->index_pt_delta_g+3]
-                       +2.*y[pv->index_pt_pol0_g]
-                       +10./7.*y[pv->index_pt_pol2_g]
-                       -4./7.*y[pv->index_pt_pol0_g+4]);
-
-    if (ppt->gauge == synchronous) {
-
-      /* photon density (delta_g = F_0) */
-      dy[pv->index_pt_delta_g] =
-        -4./3.*theta_g
-        - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(delta_g + 2.*_SQRT2_*y[pv->index_pt_theta_b]);
-
-      /* photon velocity (theta_g = (3k/4)*F_1) */
-      dy[pv->index_pt_theta_g] =
-        k2*(delta_g/4.-s_l[2]*shear_g)
-        - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(theta_g + 4.0/_SQRT6_*P1)
-        +4.0/(3.0*_SQRT2_)*ssqrt3*y[pv->index_pt_hv_prime];
-
-    }
-
-    else if (ppt->gauge == newtonian) {
-
-      /* photon density (delta_g = F_0) */
-      dy[pv->index_pt_delta_g] =
-        -4./3.*theta_g
-        -pvecthermo[thermodynamics_module_->index_th_dkappa_]*(delta_g + 2.*_SQRT2_*y[pv->index_pt_theta_b])
-        -2.*_SQRT2_*pvecmetric[ppw->index_mt_V_prime];
-
-      /* photon velocity (theta_g = (3k/4)*F_1) */
-      dy[pv->index_pt_theta_g] =
-        k2*(delta_g/4.-s_l[2]*shear_g)
-        - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(theta_g + 4.0/_SQRT6_*P1);
-
-    }
-
-    /* photon shear (shear_g = F_2/2) */
-    dy[pv->index_pt_shear_g] =
-      4./15.*s_l[2]*theta_g-3./10.*k*s_l[3]*y[pv->index_pt_shear_g+1]
-      -pvecthermo[thermodynamics_module_->index_th_dkappa_]*shear_g;
-
-    /* photon l=3 */
-    dy[pv->index_pt_l3_g] =
-      k/7.*(6.*s_l[3]*shear_g-4.*s_l[4]*y[pv->index_pt_l3_g+1])
-      -pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_l3_g];
-
-    /* additional momenta in Boltzmann hierarchy (beyond l=0,1,2,3,4) */
-    for (l=4; l < pv->l_max_g; l++)
-      dy[pv->index_pt_delta_g+l] =
-        k/(2.*l+1.)*(l*s_l[l]*y[pv->index_pt_delta_g+l-1]
-                     -(l+1.)*s_l[l+1]*y[pv->index_pt_delta_g+l+1])
-        -pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_delta_g + l];
-
-    /* l=lmax */
-    l = pv->l_max_g;
-    dy[pv->index_pt_delta_g+l] =
-      k*(s_l[l]*y[pv->index_pt_delta_g+l-1]
-         -(1.+l)*cotKgen*y[pv->index_pt_delta_g+l])
-      - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_delta_g + l];
-
-    /* photon polarization, l=0 (pol0_g = G_0)*/
-    dy[pv->index_pt_pol0_g] =
-      -k*y[pv->index_pt_pol0_g+1]
-      - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(y[pv->index_pt_pol0_g] - _SQRT6_*P1);
-
-    /* additional momenta in Boltzmann hierarchy (beyond l=0,1,2,3,4) */
-    for (l=1; l < pv->l_max_pol_g; l++)
-      dy[pv->index_pt_pol0_g+l] =
-        k/(2.*l+1.)*(l*s_l[l]*y[pv->index_pt_pol0_g+l-1]
-                     -(l+1.)*s_l[l+1]*y[pv->index_pt_pol0_g+l+1])
-        - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_pol0_g + l];
-
-    /* l=lmax */
-    l = pv->l_max_pol_g;
-    dy[pv->index_pt_pol0_g+l] =
-      k*(s_l[l]*y[pv->index_pt_pol0_g+l-1]
-         -(l+1.)*cotKgen*y[pv->index_pt_pol0_g+l])
-      - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_pol0_g + l];
-
-    /*
-      }
-      }
-    */
+    /** - --> species Boltzmann hierarchies (vector modes) */
+    for (const auto& [name, sp] : all_species_)
+      sp->PerturbVectorDerivs(tau, y, dy, *pppaw);
 
     if (ppt->gauge == synchronous) {
 
@@ -9064,92 +8902,9 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
   /** - tensor modes: */
   if (_tensors_) {
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) {
-      if (ppw->approx[ppw->index_ap_tca]==(int)tca_off) {
-
-        /* short-cut notations for the tensor perturbations */
-        delta_g = y[pv->index_pt_delta_g];
-        theta_g = y[pv->index_pt_theta_g];
-        double shear_g = y[pv->index_pt_shear_g];
-
-
-        /* (P^{(2)}) */
-        double P2 =-1.0/_SQRT6_*(
-                          1./10.*delta_g
-                          +2./7.*shear_g
-                          +3./70.*y[pv->index_pt_delta_g+4]
-                          -3./5.*y[pv->index_pt_pol0_g]
-                          +6./7.*y[pv->index_pt_pol2_g]
-                          -3./70.*y[pv->index_pt_pol0_g+4]);
-
-        /* above expression from paper, expression below matches old class but is not correct
-           P2 = -1.0/_SQRT6_*(
-           1./10.*delta_g
-           +2./35.*shear_g
-           +1./210.*y[pv->index_pt_delta_g+4]
-           -3./5.*y[pv->index_pt_pol0_g]
-           +6./35.*y[pv->index_pt_pol2_g]
-           -1./210.*y[pv->index_pt_pol0_g+4]
-           );
-        */
-
-        /* photon density (delta_g = F_0) */
-        dy[pv->index_pt_delta_g] =
-          -4./3.*theta_g
-          -pvecthermo[thermodynamics_module_->index_th_dkappa_]*(delta_g + _SQRT6_*P2)
-          //+y[pv->index_pt_gwdot];
-          +_SQRT6_*y[pv->index_pt_gwdot];  //TBC
-
-        /* photon velocity (theta_g = (3k/4)*F_1) */
-        dy[pv->index_pt_theta_g] =
-          k2*(delta_g/4.-s_l[2]*shear_g)
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*theta_g;
-
-        /* photon shear (shear_g = F_2/2) */
-        dy[pv->index_pt_shear_g] =
-          4./15.*s_l[2]*theta_g-3./10.*k*s_l[3]*y[pv->index_pt_shear_g+1]
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*shear_g;
-
-        /* photon l=3 */
-        dy[pv->index_pt_l3_g] =
-          k/7.*(6.*s_l[3]*shear_g-4.*s_l[4]*y[pv->index_pt_l3_g+1])
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_l3_g];
-
-        /* additional momenta in Boltzmann hierarchy (beyond l=0,1,2,3,4) */
-        for (l=4; l < pv->l_max_g; l++)
-          dy[pv->index_pt_delta_g+l] =
-            k/(2.*l+1.)*(l*s_l[l]*y[pv->index_pt_delta_g+l-1]
-                         -(l+1.)*s_l[l+1]*y[pv->index_pt_delta_g+l+1])
-            - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_delta_g + l];
-
-        /* l=lmax */
-        l = pv->l_max_g;
-        dy[pv->index_pt_delta_g+l] =
-          k*(s_l[l]*y[pv->index_pt_delta_g+l-1]
-             -(1.+l)*cotKgen*y[pv->index_pt_delta_g+l])
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_delta_g + l];
-
-        /* photon polarization, l=0 (pol0_g = G_0)*/
-        dy[pv->index_pt_pol0_g] =
-          -k*y[pv->index_pt_pol0_g+1]
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(y[pv->index_pt_pol0_g] - _SQRT6_*P2);
-
-        /* additional momenta in Boltzmann hierarchy (beyond l=0,1,2,3,4) */
-        for (l=1; l < pv->l_max_pol_g; l++)
-          dy[pv->index_pt_pol0_g+l] =
-            k/(2.*l+1.)*(l*s_l[l]*y[pv->index_pt_pol0_g+l-1]
-                         -(l+1.)*s_l[l+1]*y[pv->index_pt_pol0_g+l+1])
-            - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_pol0_g + l];
-
-        /* l=lmax */
-        l = pv->l_max_pol_g;
-        dy[pv->index_pt_pol0_g+l] =
-          k*(s_l[l]*y[pv->index_pt_pol0_g+l-1]
-             -(l+1.)*cotKgen*y[pv->index_pt_pol0_g+l])
-          - pvecthermo[thermodynamics_module_->index_th_dkappa_]*y[pv->index_pt_pol0_g + l];
-
-      }
-    }
+    /** - --> species Boltzmann hierarchies (tensor modes) */
+    for (const auto& [name, sp] : all_species_)
+      sp->PerturbTensorDerivs(tau, y, dy, *pppaw);
 
     if (evolve_tensor_ur_ == _TRUE_) {
 

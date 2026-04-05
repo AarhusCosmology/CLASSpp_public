@@ -29,8 +29,22 @@ public:
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
+  void RegisterVectorPerturbationIndices(perturb_vector* pv, int& index_pt,
+                                          const perturb_workspace* ppw,
+                                          int gauge) override;
+
+  void RegisterTensorPerturbationIndices(perturb_vector* pv, int& index_pt,
+                                          const perturb_workspace* ppw,
+                                          int gauge) override;
+
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+
+  void PerturbVectorDerivs(double tau, const double* y, double* dy,
+                            const perturb_parameters_and_workspace& ppaw) override;
+
+  void PerturbTensorDerivs(double tau, const double* y, double* dy,
+                            const perturb_parameters_and_workspace& ppaw) override;
 
   /** RSA/TCA active when pv->index_pt_delta_g == -1 (sentinel set by RegisterPerturbationIndices). */
   double Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {

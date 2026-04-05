@@ -303,24 +303,13 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     }
   };
 
-  /* photons */
-  all_species_.at("Photons")->ComputeBackground(a_rel, pvecback_B, pvecback);
-  accumulate(*all_species_.at("Photons"));
-
-  /* baryons */
-  all_species_.at("Baryons")->ComputeBackground(a_rel, pvecback_B, pvecback);
-  accumulate(*all_species_.at("Baryons"));
-
-  /* cdm */
-  if (pba->has_cdm == _TRUE_) {
-    all_species_.at("CDM")->ComputeBackground(a_rel, pvecback_B, pvecback);
-    accumulate(*all_species_.at("CDM"));
-  }
-
-  /* dcdm */
-  if (pba->has_dcdm == _TRUE_) {
-    all_species_.at("DCDM")->ComputeBackground(a_rel, pvecback_B, pvecback);
-    accumulate(*all_species_.at("DCDM"));
+  /* Compute background for all species in the map, except NCDM (complex
+     pre-processing) and Fluid (needs w_fld setup). Each species writes to
+     its own pvecback slots; accumulation order is irrelevant. */
+  for (const auto& [name, sp] : all_species_) {
+    if (name == "NCDM" || name == "Fluid") continue;
+    sp->ComputeBackground(a_rel, pvecback_B, pvecback);
+    accumulate(*sp);
   }
 
   /* DRMD (interacting DM/DR — not yet in species map, kept as-is) */
@@ -330,14 +319,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     rho_tot += pvecback[index_bg_rho_idm_drmd_];
     p_tot += 0.;
     rho_m += pvecback[index_bg_rho_idm_drmd_];
-  }
-
-  
-  /* Scalar field (ComputeBackground sets phi, phi_prime, V, dV, ddV, rho, p;
-     DpDloga=0 is correct here — p_prime correction added after H is known below) */
-  if (pba->has_scf == _TRUE_) {
-    all_species_.at("ScalarField")->ComputeBackground(a_rel, pvecback_B, pvecback);
-    accumulate(*all_species_.at("ScalarField"));
   }
 
   /* ncdm */
@@ -450,19 +431,7 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     }
   }
 
-  /* dr */
-  if (pba->has_dr == _TRUE_) {
-    all_species_.at("DR")->ComputeBackground(a_rel, pvecback_B, pvecback);
-    accumulate(*all_species_.at("DR"));
-  }
-
-  /* Lambda */
-  if (pba->has_lambda == _TRUE_) {
-    all_species_.at("Lambda")->ComputeBackground(a_rel, pvecback_B, pvecback);
-    accumulate(*all_species_.at("Lambda"));
-  }
-
-  /* fluid with w(a) and constant cs2 */
+  /* Fluid needs w_fld computed before calling ComputeBackground */
   if (pba->has_fld == _TRUE_) {
     double w_fld, dw_over_da_fld, integral_fld;
     class_call(background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld),
@@ -472,12 +441,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
     all_species_.at("Fluid")->ComputeBackground(a_rel, pvecback_B, pvecback);
     accumulate(*all_species_.at("Fluid"));
-  }
-
-  /* relativistic neutrinos (and all relativistic relics) */
-  if (pba->has_ur == _TRUE_) {
-    all_species_.at("UR")->ComputeBackground(a_rel, pvecback_B, pvecback);
-    accumulate(*all_species_.at("UR"));
   }
 
   /* interacting dark matter */
@@ -1074,12 +1037,9 @@ int BackgroundModule::background_indices() {
              error_message_,
              "background integration requires index_bi_tau to be the last of all index_bi's");
 
-  /* Set BackgroundModule pointer on species that need it for BackgroundDerivs */
-  if (pba->has_dcdm == _TRUE_)    all_species_.at("DCDM")->SetBackgroundModule(this);
-  if (pba->has_fld  == _TRUE_)    all_species_.at("Fluid")->SetBackgroundModule(this);
-  if (pba->has_scf  == _TRUE_)    all_species_.at("ScalarField")->SetBackgroundModule(this);
-  if (pba->has_dr   == _TRUE_)    all_species_.at("DR")->SetBackgroundModule(this);
-  if (pba->has_ncdm == _TRUE_)    all_species_.at("NCDM")->SetBackgroundModule(this);
+  /* Set BackgroundModule pointer on all active species (default is no-op) */
+  for (const auto& [name, sp] : all_species_)
+    sp->SetBackgroundModule(this);
 
   return _SUCCESS_;
 
@@ -2050,8 +2010,11 @@ int BackgroundModule::background_derivs_member(
   dy[index_bi_D_] = y[index_bi_D_prime_];
   dy[index_bi_D_prime_] = -a*H*y[index_bi_D_prime_] + 1.5*a*a*rho_M*y[index_bi_D_];
 
-  if (pba->has_dcdm == _TRUE_){
-    all_species_.at("DCDM")->BackgroundDerivs(tau, y, dy, pvecback);
+  /* Species background ODE contributions. DR and NCDM are excluded: their
+     evolution (including DNCDM→DR sources) is handled inline below. */
+  for (const auto& [name, sp] : all_species_) {
+    if (name == "DR" || name == "NCDM") continue;
+    sp->BackgroundDerivs(tau, y, dy, pvecback); // default is no-op
   }
 
   if (pba->has_ncdm_decay_dr == _TRUE_){
@@ -2087,13 +2050,6 @@ int BackgroundModule::background_derivs_member(
     }
   }
 
-  if (pba->has_fld == _TRUE_) {
-    all_species_.at("Fluid")->BackgroundDerivs(tau, y, dy, pvecback);
-  }
-
-  if (pba->has_scf == _TRUE_){
-    all_species_.at("ScalarField")->BackgroundDerivs(tau, y, dy, pvecback);
-  }
 
   return _SUCCESS_;
 

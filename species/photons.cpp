@@ -41,6 +41,59 @@ void PhotonsSpecies::RegisterPerturbationIndices(
   class_define_index(pv->index_pt_pol3_g, (pv->l_max_pol_g >= 3), index_pt, pv->l_max_pol_g - 2);
 }
 
+void PhotonsSpecies::RegisterVectorPerturbationIndices(
+    perturb_vector* pv, int& index_pt,
+    const perturb_workspace* ppw, int /*gauge*/) {
+
+  pv->index_pt_delta_g = -1;
+  pv->index_pt_theta_g = -1;
+  pv->index_pt_shear_g = -1;
+  pv->index_pt_l3_g    = -1;
+  pv->index_pt_pol0_g  = -1;
+  pv->index_pt_pol1_g  = -1;
+  pv->index_pt_pol2_g  = -1;
+  pv->index_pt_pol3_g  = -1;
+
+  /* In vector mode there is no TCA shortcut: either full hierarchy or nothing. */
+  if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_on) return;
+  if (ppw->approx[ppw->index_ap_tca] == (int)tca_on) return;
+
+  class_define_index(pv->index_pt_delta_g, _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_theta_g, _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_shear_g, _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_l3_g,    _TRUE_, index_pt, pv->l_max_g - 2);
+  class_define_index(pv->index_pt_pol0_g,  _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_pol1_g,  _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_pol2_g,  _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_pol3_g,  _TRUE_, index_pt, pv->l_max_pol_g - 2);
+}
+
+void PhotonsSpecies::RegisterTensorPerturbationIndices(
+    perturb_vector* pv, int& index_pt,
+    const perturb_workspace* ppw, int /*gauge*/) {
+
+  pv->index_pt_delta_g = -1;
+  pv->index_pt_theta_g = -1;
+  pv->index_pt_shear_g = -1;
+  pv->index_pt_l3_g    = -1;
+  pv->index_pt_pol0_g  = -1;
+  pv->index_pt_pol1_g  = -1;
+  pv->index_pt_pol2_g  = -1;
+  pv->index_pt_pol3_g  = -1;
+
+  if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_on) return;
+  if (ppw->approx[ppw->index_ap_tca] == (int)tca_on) return;
+
+  class_define_index(pv->index_pt_delta_g, _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_theta_g, _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_shear_g, _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_l3_g,    _TRUE_, index_pt, pv->l_max_g - 2);
+  class_define_index(pv->index_pt_pol0_g,  _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_pol1_g,  _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_pol2_g,  _TRUE_, index_pt, 1);
+  class_define_index(pv->index_pt_pol3_g,  _TRUE_, index_pt, pv->l_max_pol_g - 2);
+}
+
 void PhotonsSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
                                     const perturb_parameters_and_workspace& ppaw) {
   const perturb_workspace* ppw    = ppaw.ppw;
@@ -146,6 +199,195 @@ void PhotonsSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
       k*(s_l[l]*y[pv->index_pt_pol0_g + l - 1]
          - (1. + l)*cotKgen*y[pv->index_pt_pol0_g + l])
       - dkappa*y[pv->index_pt_pol0_g + l];
+}
+
+void PhotonsSpecies::PerturbVectorDerivs(double /*tau*/, const double* y, double* dy,
+                                          const perturb_parameters_and_workspace& ppaw) {
+  const perturb_workspace* ppw = ppaw.ppw;
+  const perturb_vector*    pv  = ppw->pv;
+  const double* s_l            = ppw->s_l;
+
+  /* Nothing to do when RSA or TCA is active (indices not registered). */
+  if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_on) return;
+  if (ppw->approx[ppw->index_ap_tca] == (int)tca_on) return;
+
+  const int    gauge   = ppaw.perturbations_module->GetPerturbs()->gauge;
+  const double k       = ppaw.k;
+  const double k2      = k*k;
+  const double cotKgen = ppw->cotKgen;
+  const double ssqrt3  = sqrt(1. - 2.*pba_.K/k2);
+
+  const double dkappa = ppw->pvecthermo[
+      ppaw.perturbations_module->GetThermodynamicsModule()->index_th_dkappa_];
+
+  const double delta_g = y[pv->index_pt_delta_g];
+  const double theta_g = y[pv->index_pt_theta_g];
+  const double shear_g = y[pv->index_pt_shear_g];
+
+  /* P^{(1)}: polarization combination (Eq. B.23 in arXiv:1305.3261) */
+  const double P1 = -_SQRT6_/40.*(
+      4./(3.*k)*theta_g
+      + y[pv->index_pt_delta_g + 3]
+      + 2.*y[pv->index_pt_pol0_g]
+      + 10./7.*y[pv->index_pt_pol2_g]
+      - 4./7.*y[pv->index_pt_pol0_g + 4]);
+
+  if (gauge == synchronous) {
+
+    dy[pv->index_pt_delta_g] =
+        -4./3.*theta_g
+        - dkappa*(delta_g + 2.*_SQRT2_*y[pv->index_pt_theta_b]);
+
+    dy[pv->index_pt_theta_g] =
+        k2*(delta_g/4. - s_l[2]*shear_g)
+        - dkappa*(theta_g + 4.0/_SQRT6_*P1)
+        + 4.0/(3.0*_SQRT2_)*ssqrt3*y[pv->index_pt_hv_prime];
+
+  } else {  /* newtonian */
+
+    dy[pv->index_pt_delta_g] =
+        -4./3.*theta_g
+        - dkappa*(delta_g + 2.*_SQRT2_*y[pv->index_pt_theta_b])
+        - 2.*_SQRT2_*ppw->pvecmetric[ppw->index_mt_V_prime];
+
+    dy[pv->index_pt_theta_g] =
+        k2*(delta_g/4. - s_l[2]*shear_g)
+        - dkappa*(theta_g + 4.0/_SQRT6_*P1);
+
+  }
+
+  /* photon shear (F_2/2) */
+  dy[pv->index_pt_shear_g] =
+      4./15.*s_l[2]*theta_g - 3./10.*k*s_l[3]*y[pv->index_pt_shear_g + 1]
+      - dkappa*shear_g;
+
+  /* l = 3 */
+  dy[pv->index_pt_l3_g] =
+      k/7.*(6.*s_l[3]*shear_g - 4.*s_l[4]*y[pv->index_pt_l3_g + 1])
+      - dkappa*y[pv->index_pt_l3_g];
+
+  /* l = 4 .. l_max_g - 1 */
+  for (int l = 4; l < pv->l_max_g; l++)
+    dy[pv->index_pt_delta_g + l] =
+        k/(2.*l + 1.)*(l*s_l[l]*y[pv->index_pt_delta_g + l - 1]
+                       - (l + 1.)*s_l[l + 1]*y[pv->index_pt_delta_g + l + 1])
+        - dkappa*y[pv->index_pt_delta_g + l];
+
+  /* l = l_max_g (truncation) */
+  {
+    const int l = pv->l_max_g;
+    dy[pv->index_pt_delta_g + l] =
+        k*(s_l[l]*y[pv->index_pt_delta_g + l - 1]
+           - (1. + l)*cotKgen*y[pv->index_pt_delta_g + l])
+        - dkappa*y[pv->index_pt_delta_g + l];
+  }
+
+  /* Polarization l = 0 (G_0) */
+  dy[pv->index_pt_pol0_g] =
+      -k*y[pv->index_pt_pol0_g + 1]
+      - dkappa*(y[pv->index_pt_pol0_g] - _SQRT6_*P1);
+
+  /* Polarization l = 1 .. l_max_pol_g - 1 */
+  for (int l = 1; l < pv->l_max_pol_g; l++)
+    dy[pv->index_pt_pol0_g + l] =
+        k/(2.*l + 1.)*(l*s_l[l]*y[pv->index_pt_pol0_g + l - 1]
+                       - (l + 1.)*s_l[l + 1]*y[pv->index_pt_pol0_g + l + 1])
+        - dkappa*y[pv->index_pt_pol0_g + l];
+
+  /* Polarization l = l_max_pol_g (truncation) */
+  {
+    const int l = pv->l_max_pol_g;
+    dy[pv->index_pt_pol0_g + l] =
+        k*(s_l[l]*y[pv->index_pt_pol0_g + l - 1]
+           - (1. + l)*cotKgen*y[pv->index_pt_pol0_g + l])
+        - dkappa*y[pv->index_pt_pol0_g + l];
+  }
+}
+
+void PhotonsSpecies::PerturbTensorDerivs(double /*tau*/, const double* y, double* dy,
+                                          const perturb_parameters_and_workspace& ppaw) {
+  const perturb_workspace* ppw = ppaw.ppw;
+  const perturb_vector*    pv  = ppw->pv;
+  const double* s_l            = ppw->s_l;
+
+  /* Nothing to do when RSA or TCA is active (indices not registered). */
+  if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_on) return;
+  if (ppw->approx[ppw->index_ap_tca] == (int)tca_on) return;
+
+  const double k       = ppaw.k;
+  const double k2      = k*k;
+  const double cotKgen = ppw->cotKgen;
+
+  const double dkappa = ppw->pvecthermo[
+      ppaw.perturbations_module->GetThermodynamicsModule()->index_th_dkappa_];
+
+  const double delta_g = y[pv->index_pt_delta_g];
+  const double theta_g = y[pv->index_pt_theta_g];
+  const double shear_g = y[pv->index_pt_shear_g];
+
+  /* P^{(2)}: polarization combination */
+  const double P2 = -1.0/_SQRT6_*(
+       1./10.*delta_g
+      + 2./7.*shear_g
+      + 3./70.*y[pv->index_pt_delta_g + 4]
+      - 3./5.*y[pv->index_pt_pol0_g]
+      + 6./7.*y[pv->index_pt_pol2_g]
+      - 3./70.*y[pv->index_pt_pol0_g + 4]);
+
+  dy[pv->index_pt_delta_g] =
+      -4./3.*theta_g
+      - dkappa*(delta_g + _SQRT6_*P2)
+      + _SQRT6_*y[pv->index_pt_gwdot];  /* gravitational wave source */
+
+  dy[pv->index_pt_theta_g] =
+      k2*(delta_g/4. - s_l[2]*shear_g)
+      - dkappa*theta_g;
+
+  dy[pv->index_pt_shear_g] =
+      4./15.*s_l[2]*theta_g - 3./10.*k*s_l[3]*y[pv->index_pt_shear_g + 1]
+      - dkappa*shear_g;
+
+  /* l = 3 */
+  dy[pv->index_pt_l3_g] =
+      k/7.*(6.*s_l[3]*shear_g - 4.*s_l[4]*y[pv->index_pt_l3_g + 1])
+      - dkappa*y[pv->index_pt_l3_g];
+
+  /* l = 4 .. l_max_g - 1 */
+  for (int l = 4; l < pv->l_max_g; l++)
+    dy[pv->index_pt_delta_g + l] =
+        k/(2.*l + 1.)*(l*s_l[l]*y[pv->index_pt_delta_g + l - 1]
+                       - (l + 1.)*s_l[l + 1]*y[pv->index_pt_delta_g + l + 1])
+        - dkappa*y[pv->index_pt_delta_g + l];
+
+  /* l = l_max_g (truncation) */
+  {
+    const int l = pv->l_max_g;
+    dy[pv->index_pt_delta_g + l] =
+        k*(s_l[l]*y[pv->index_pt_delta_g + l - 1]
+           - (1. + l)*cotKgen*y[pv->index_pt_delta_g + l])
+        - dkappa*y[pv->index_pt_delta_g + l];
+  }
+
+  /* Polarization l = 0 (G_0) */
+  dy[pv->index_pt_pol0_g] =
+      -k*y[pv->index_pt_pol0_g + 1]
+      - dkappa*(y[pv->index_pt_pol0_g] - _SQRT6_*P2);
+
+  /* Polarization l = 1 .. l_max_pol_g - 1 */
+  for (int l = 1; l < pv->l_max_pol_g; l++)
+    dy[pv->index_pt_pol0_g + l] =
+        k/(2.*l + 1.)*(l*s_l[l]*y[pv->index_pt_pol0_g + l - 1]
+                       - (l + 1.)*s_l[l + 1]*y[pv->index_pt_pol0_g + l + 1])
+        - dkappa*y[pv->index_pt_pol0_g + l];
+
+  /* Polarization l = l_max_pol_g (truncation) */
+  {
+    const int l = pv->l_max_pol_g;
+    dy[pv->index_pt_pol0_g + l] =
+        k*(s_l[l]*y[pv->index_pt_pol0_g + l - 1]
+           - (1. + l)*cotKgen*y[pv->index_pt_pol0_g + l])
+        - dkappa*y[pv->index_pt_pol0_g + l];
+  }
 }
 
 double PhotonsSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,

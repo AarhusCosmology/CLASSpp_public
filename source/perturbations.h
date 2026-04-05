@@ -429,6 +429,7 @@ struct perturb_workspace
 
   int max_l_max;    /**< maximum l_max for any multipole */
   double * s_l;     /**< array of freestreaming coefficients \f$ s_l = \sqrt{1-K*(l^2-1)/k^2} \f$*/
+  double cotKgen;   /**< generalised cot(sqrt(|K|)*tau)/k, for closing free-streaming hierarchies; valid for all modes */
 
   //@}
 

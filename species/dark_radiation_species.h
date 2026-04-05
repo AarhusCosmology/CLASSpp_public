@@ -38,13 +38,9 @@ public:
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  double Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {
-    return (pv->index_pt_F0_dr_sum >= 0) ? y[pv->index_pt_F0_dr_sum] : 0.;
-  }
-  double Theta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {
-    return (pv->index_pt_F0_dr_sum >= 0) ? y[pv->index_pt_F0_dr_sum + 1] : 0.;
-  }
-  double DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override { return 0.; }
+  double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double Theta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
 
   int bg_rho_dr_species_index() const { return index_bg_rho_dr_species_; }
