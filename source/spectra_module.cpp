@@ -499,8 +499,6 @@ int SpectraModule::spectra_free() {
 int SpectraModule::spectra_indices() {
 
   int index_ct;
-  int index_md;
-  int index_ic1_ic2;
 
   md_size_ = perturbations_module_->md_size_;
   if (ppt->has_scalars == _TRUE_)
@@ -512,11 +510,11 @@ int SpectraModule::spectra_indices() {
 
   is_non_zero_.resize(md_size_);
 
-  for (index_md = 0; index_md < md_size_; index_md++) {
+  for (int index_md = 0; index_md < md_size_; index_md++) {
     ic_size_[index_md] = primordial_module_->ic_size_[index_md];
     ic_ic_size_[index_md] = primordial_module_->ic_ic_size_[index_md];
     is_non_zero_[index_md].resize(ic_ic_size_[index_md]);
-    for (index_ic1_ic2=0; index_ic1_ic2 < ic_ic_size_[index_md]; index_ic1_ic2++)
+    for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_[index_md]; index_ic1_ic2++)
       is_non_zero_[index_md][index_ic1_ic2] = primordial_module_->is_non_zero_[index_md][index_ic1_ic2];
   }
 
@@ -680,7 +678,7 @@ int SpectraModule::spectra_indices() {
 
     l_max_.resize(md_size_);
     l_max_ct_.resize(md_size_);
-    for (index_md = 0; index_md < md_size_; index_md++) {
+    for (int index_md = 0; index_md < md_size_; index_md++) {
       l_max_ct_[index_md].assign(ct_size_, 0);
     }
 
@@ -746,7 +744,7 @@ int SpectraModule::spectra_indices() {
 
     /* maximizations */
     l_max_tot_ = 0.;
-    for (index_md = 0; index_md < md_size_; index_md++) {
+    for (int index_md = 0; index_md < md_size_; index_md++) {
       l_max_[index_md] = 0.;
       for (index_ct = 0.; index_ct < ct_size_; index_ct++)
         l_max_[index_md] = MAX(l_max_[index_md], l_max_ct_[index_md][index_ct]);
@@ -773,7 +771,6 @@ int SpectraModule::spectra_cls() {
 
   int index_md;
   int index_ic1,index_ic2,index_ic1_ic2;
-  int index_l;
   int index_ct;
   int cl_integrand_num_columns;
 
@@ -787,7 +784,7 @@ int SpectraModule::spectra_cls() {
   l_.resize(l_size_max_);
 
   /** - store values of l */
-  for (index_l = 0; index_l < l_size_max_; index_l++) {
+  for (int index_l = 0; index_l < l_size_max_; index_l++) {
     l_[index_l] = (double)transfer_module_->l_[index_l];
   }
 
@@ -830,8 +827,6 @@ int SpectraModule::spectra_cls() {
 
             for (int index_l = 0; index_l < transfer_module_->l_size_[index_md]; index_l++) {
 
-#pragma omp flush(abort)
-
               class_call(spectra_compute_cl(
                                             index_md,
                                             index_ic1,
@@ -855,7 +850,7 @@ int SpectraModule::spectra_cls() {
 
           /* set non-diagonal coefficients to zero if pair of ic's uncorrelated */
 
-          for (index_l = 0; index_l < transfer_module_->l_size_[index_md]; index_l++) {
+          for (int index_l = 0; index_l < transfer_module_->l_size_[index_md]; index_l++) {
             for (index_ct = 0; index_ct < ct_size_; index_ct++) {
               cl_[index_md][(index_l*ic_ic_size_[index_md] + index_ic1_ic2)*ct_size_ + index_ct] = 0.;
             }

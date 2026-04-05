@@ -167,7 +167,7 @@ private:
 		name,entries_read, siz);				\
     }else{								\
 	class_alloc(destination, siz*sizeof(double), errmsg);		\
-	for (n = 0; n < siz; n++) destination[n] = default;		\
+	for (int n = 0; n < siz; n++) destination[n] = default;		\
     }									\
   } while(0);
 
@@ -183,7 +183,7 @@ private:
 		name, entries_read, siz);				\
     }else{								\
 	class_alloc(destination, siz*sizeof(int), errmsg);		\
-	for (n = 0; n < siz; n++) destination[n] = default;		\
+	for (int n = 0; n < siz; n++) destination[n] = default;		\
     }									\
   } while(0);
 

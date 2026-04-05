@@ -86,12 +86,10 @@ int NonlinearModule::nonlinear_pk_at_z(
                                        ) const {
   double tau;
   double ln_tau;
-  int index_k;
   int index_ic1;
   int index_ic2;
   int index_ic1_ic1;
   int index_ic2_ic2;
-  int index_ic1_ic2;
   int last_index;
   short do_ic = _FALSE_;
 
@@ -103,13 +101,13 @@ int NonlinearModule::nonlinear_pk_at_z(
   /** - case z=0 requiring no interpolation in z */
   if (z == 0) {
 
-    for (index_k = 0; index_k < k_size_; index_k++) {
+    for (int index_k = 0; index_k < k_size_; index_k++) {
 
       if (pk_output == pk_linear) {
         out_pk[index_k] = ln_pk_l_[index_pk][(ln_tau_size_ - 1)*k_size_ + index_k];
 
         if (do_ic == _TRUE_) {
-          for (index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
+          for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
             out_pk_ic[index_k*ic_ic_size_ + index_ic1_ic2] =
               ln_pk_ic_l_[index_pk][((ln_tau_size_ - 1)*k_size_ + index_k)*ic_ic_size_ + index_ic1_ic2];
           }
@@ -146,11 +144,11 @@ int NonlinearModule::nonlinear_pk_at_z(
       /** --> if ln(tau) too small but within tolerance, round it and get right values without interpolating */
       ln_tau = ln_tau_[0];
 
-      for (index_k = 0; index_k < k_size_; index_k++) {
+      for (int index_k = 0; index_k < k_size_; index_k++) {
         if (pk_output == pk_linear) {
           out_pk[index_k] = ln_pk_l_[index_pk][index_k];
           if (do_ic == _TRUE_) {
-            for (index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
+            for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
               out_pk_ic[index_k*ic_ic_size_ + index_ic1_ic2] = ln_pk_ic_l_[index_pk][index_k*ic_ic_size_ + index_ic1_ic2];
             }
           }
@@ -173,11 +171,11 @@ int NonlinearModule::nonlinear_pk_at_z(
       /** --> if ln(tau) too large but within tolerance, round it and get right values without interpolating */
       ln_tau = ln_tau_[ln_tau_size_ - 1];
 
-      for (index_k = 0; index_k < k_size_; index_k++) {
+      for (int index_k = 0; index_k < k_size_; index_k++) {
         if (pk_output == pk_linear) {
           out_pk[index_k] = ln_pk_l_[index_pk][(ln_tau_size_ - 1)*k_size_ + index_k];
           if (do_ic == _TRUE_) {
-            for (index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
+            for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
               out_pk_ic[index_k*ic_ic_size_ + index_ic1_ic2] = ln_pk_ic_l_[index_pk][((ln_tau_size_ - 1)*k_size_ + index_k)*ic_ic_size_ + index_ic1_ic2];
             }
           }
@@ -247,7 +245,7 @@ int NonlinearModule::nonlinear_pk_at_z(
   if (mode == linear) {
 
     /** --> loop over k */
-    for (index_k = 0; index_k < k_size_; index_k++) {
+    for (int index_k = 0; index_k < k_size_; index_k++) {
 
       /** --> convert total spectrum */
       out_pk[index_k] = exp(out_pk[index_k]);
@@ -265,7 +263,7 @@ int NonlinearModule::nonlinear_pk_at_z(
           for (index_ic2 = index_ic1 + 1; index_ic2 < ic_size_; index_ic2++) {
             index_ic1_ic1 = index_symmetric_matrix(index_ic1, index_ic1, ic_size_);
             index_ic2_ic2 = index_symmetric_matrix(index_ic2, index_ic2, ic_size_);
-            index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_);
+            int index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_);
 
             /* P_ic1xic2 = cos(angle) * sqrt(P_ic1 * P_ic2) */
             out_pk_ic[index_k*ic_ic_size_ + index_ic1_ic2]
@@ -389,13 +387,6 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(
 
   std::vector<double> out_pk_at_z;
   std::vector<double> out_pk_ic_at_z;
-  std::vector<double> ddout_pk_at_z;
-  std::vector<double> ddout_pk_ic_at_z;
-  int last_index;
-  int index_ic_ic;
-  double kmin;
-  std::vector<double> pk_primordial_k;
-  std::vector<double> pk_primordial_kmin;
   short do_ic = _FALSE_;
 
   /** - preliminary: check whether we need the decomposition into contributions from each initial condition */
@@ -417,7 +408,7 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(
     *out_pk = 0.;
 
     if (do_ic == _TRUE_) {
-      for (index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
+      for (int index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
         out_pk_ic[index_ic_ic] = 0.;
       }
     }
@@ -450,6 +441,9 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(
 
     if (k > exp(ln_k_[0])) {
 
+      std::vector<double> ddout_pk_at_z;
+      int last_index;
+
       ddout_pk_at_z.resize(k_size_);
 
       class_call(array_spline_table_lines(const_cast<double*>(ln_k_.data()),
@@ -477,6 +471,7 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(
 
       if (do_ic == _TRUE_) {
 
+        std::vector<double> ddout_pk_ic_at_z;
         ddout_pk_ic_at_z.resize(k_size_*ic_ic_size_);
 
         class_call(array_spline_table_lines(const_cast<double*>(ln_k_.data()),
@@ -523,13 +518,14 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(
       *out_pk = out_pk_at_z[0];
 
       if (do_ic == _TRUE_) {
-        for (index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
+        for (int index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
           out_pk_ic[index_ic_ic] = out_pk_ic_at_z[index_ic_ic];
         }
       }
 
       /* compute P_primordial(k) */
 
+      std::vector<double> pk_primordial_k;
       pk_primordial_k.resize(ic_ic_size_);
 
       class_call(primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
@@ -541,8 +537,9 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(
 
       /* compute P_primordial(kmin) */
 
-      kmin = exp(ln_k_[0]);
+      double kmin = exp(ln_k_[0]);
 
+      std::vector<double> pk_primordial_kmin;
       pk_primordial_kmin.resize(ic_ic_size_);
 
       class_call(primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
@@ -557,7 +554,7 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(
       *out_pk *= (k*pk_primordial_k[0]/kmin/pk_primordial_kmin[0]);
 
       if (do_ic == _TRUE_) {
-        for (index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
+        for (int index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
           out_pk_ic[index_ic_ic] *= (k*pk_primordial_k[index_ic_ic]
                                      /kmin/pk_primordial_kmin[index_ic_ic]);
         }
@@ -667,7 +664,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
 
   /** - define local variables */
 
-  int index_k, index_kvec, index_zvec;
+  int index_kvec;
   std::vector<double> ln_kvec;
   std::vector<double> ln_pk_table;
   std::vector<double> ddln_pk_table;
@@ -690,7 +687,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
 
   /** - Construct table of log(P(k_n,z_j)) for pre-computed wavenumbers but requested redshifts: */
 
-  for (index_zvec=0; index_zvec<zvec_size; index_zvec++){
+  for (int index_zvec=0; index_zvec<zvec_size; index_zvec++){
 
     if (has_pk_m_) {
       class_call(nonlinear_pk_at_z(logarithmic,
@@ -755,7 +752,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
       break;
 
     /* deal with k<k_min */
-    for (index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
+    for (int index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
       if (has_pk_m_)  out_pk   [index_zvec*kvec_size + index_kvec] = 0.;
       if (has_pk_cb_) out_pk_cb[index_zvec*kvec_size + index_kvec] = 0.;
       /* (If needed, one could add instead some extrapolation here) */
@@ -765,7 +762,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
   /** - Deal with case kmin<=k<=kmax. For better performance, do not
       loop through kvec, but through pre-computed k values. */
 
-  for (index_k = 0; index_k < (k_size_ - 1); index_k++){
+  for (int index_k = 0; index_k < (k_size_ - 1); index_k++){
 
     /** --> Loop through k_i's that fall in interval [k_n,k_n+1] */
 
@@ -777,7 +774,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
       b = (ln_kvec[index_kvec] - ln_k_[index_k])/h;
       a = 1. - b;
 
-      for (index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
+      for (int index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
 
         if (has_pk_m_) {
 
@@ -810,7 +807,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
 
   while (index_kvec < kvec_size) {
 
-    for (index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
+    for (int index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
       if (has_pk_m_)  out_pk   [index_zvec*kvec_size + index_kvec] = 0.;
       if (has_pk_cb_) out_pk_cb[index_zvec*kvec_size + index_kvec] = 0.;
       /* (If needed, one could add instead some extrapolation here) */
@@ -1010,8 +1007,6 @@ int NonlinearModule::nonlinear_k_nl_at_z(double z, double * k_nl, double * k_nl_
 int NonlinearModule::nonlinear_init() {
 
   int index_ncdm;
-  int index_k;
-  int index_tau;
   int index_tau_sources;
   int index_tau_late;
   int index_pk;
@@ -1087,7 +1082,7 @@ int NonlinearModule::nonlinear_init() {
 
   /** - get the linear power spectrum at each time */
 
-  for (index_tau = 0; index_tau < ln_tau_size_; index_tau++) {
+  for (int index_tau = 0; index_tau < ln_tau_size_; index_tau++) {
 
     /* If the user only wants z=0, then ln_tau_size_=1 and we go
        only through index_tau=0. However we must pick up the last
@@ -1236,7 +1231,7 @@ int NonlinearModule::nonlinear_init() {
        that redhsift */
     index_tau_min_nl_ = 0;
 
-    for (index_tau = tau_size_ - 1; index_tau >= 0; index_tau--) {
+    for (int index_tau = tau_size_ - 1; index_tau >= 0; index_tau--) {
 
       /* loop over index_pk, defined such that it is ensured
        * that index_pk starts at index_pk_cb when neutrinos are
@@ -1302,7 +1297,7 @@ int NonlinearModule::nonlinear_init() {
 
           /* infer and store R_NL=(P_NL/P_L)^1/2 */
           if (nl_corr_not_computable_at_this_k == _FALSE_) {
-            for (index_k = 0; index_k < k_size_; index_k++) {
+            for (int index_k = 0; index_k < k_size_; index_k++) {
               nl_corr_density_[index_pk][index_tau*k_size_ + index_k] = sqrt(pk_nl[index_pk][index_k]/exp(lnpk_l[index_pk][index_k]));
             }
           }
@@ -1314,7 +1309,7 @@ int NonlinearModule::nonlinear_init() {
             index_tau_min_nl_ = MIN(tau_size_ - 1, index_tau + 1); //this MIN() ensures that index_tau_min_nl is never out of bounds
 
             /* store R_NL=1 for that time */
-            for (index_k = 0; index_k < k_size_; index_k++) {
+            for (int index_k = 0; index_k < k_size_; index_k++) {
               nl_corr_density_[index_pk][index_tau*k_size_ + index_k] = 1.;
             }
 
@@ -1336,7 +1331,7 @@ int NonlinearModule::nonlinear_init() {
         /* if we are still in a range of time where P_NL(k) should NOT be computable */
         else {
           /* store R_NL=1 for that time */
-          for (index_k = 0; index_k < k_size_; index_k++) {
+          for (int index_k = 0; index_k < k_size_; index_k++) {
             nl_corr_density_[index_pk][index_tau*k_size_ + index_k] = 1.;
           }
 
@@ -1350,7 +1345,7 @@ int NonlinearModule::nonlinear_init() {
 
           index_tau_late = index_tau - (tau_size_ - ln_tau_size_);
 
-          for (index_k = 0; index_k < k_size_; index_k++) {
+          for (int index_k = 0; index_k < k_size_; index_k++) {
             ln_pk_nl_[index_pk][index_tau_late*k_size_ + index_k] =
               ln_pk_l_[index_pk][index_tau_late*k_size_ + index_k] + 2.*log(nl_corr_density_[index_pk][index_tau*k_size_ + index_k]);
           }
@@ -1419,7 +1414,6 @@ int NonlinearModule::nonlinear_free() {
 
 int NonlinearModule::nonlinear_indices() {
 
-  int index_ic1_ic2;
   int index_pk;
 
   /** - define indices for initial conditions (and allocate related arrays) */
@@ -1427,7 +1421,7 @@ int NonlinearModule::nonlinear_indices() {
   ic_size_ = primordial_module_->ic_size_[index_md_scalars_];
   ic_ic_size_ = primordial_module_->ic_ic_size_[index_md_scalars_];
   is_non_zero_.resize(ic_ic_size_);
-  for (index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++)
+  for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++)
     is_non_zero_[index_ic1_ic2] = primordial_module_->is_non_zero_[index_md_scalars_][index_ic1_ic2];
 
   /** - define flags indices for pk types (_m, _cb). Note: due to some
@@ -1589,8 +1583,6 @@ int NonlinearModule::nonlinear_get_k_list() {
 
 int NonlinearModule::nonlinear_get_tau_list() {
 
-  int index_tau;
-
   /** -> for linear calculations: only late times are considered, given the value z_max_pk inferred from the ionput */
   ln_tau_size_ = perturbations_module_->ln_tau_size_;
 
@@ -1598,7 +1590,7 @@ int NonlinearModule::nonlinear_get_tau_list() {
 
     ln_tau_.resize(ln_tau_size_);
 
-    for (index_tau = 0; index_tau < ln_tau_size_; index_tau++) {
+    for (int index_tau = 0; index_tau < ln_tau_size_; index_tau++) {
       ln_tau_[index_tau] = perturbations_module_->ln_tau_[index_tau];
     }
   }
@@ -1610,7 +1602,7 @@ int NonlinearModule::nonlinear_get_tau_list() {
 
     tau_.resize(tau_size_);
 
-    for (index_tau = 0; index_tau < tau_size_; index_tau++) {
+    for (int index_tau = 0; index_tau < tau_size_; index_tau++) {
       tau_[index_tau] = perturbations_module_->tau_sampling_[index_tau];
     }
   }
@@ -1776,15 +1768,12 @@ int NonlinearModule::nonlinear_pk_linear(
                                          double * lnpk_ic  //lnpk[index_k * ic_ic_size_ + index_ic1_ic2]
                                          ) {
 
-  int index_k;
   int index_tp;
-  int index_ic1,index_ic2,index_ic1_ic1,index_ic1_ic2,index_ic2_ic2;
+  int index_ic1_ic1,index_ic1_ic2,index_ic2_ic2;
   std::vector<double> primordial_pk;
   double pk;
   std::vector<double> pk_ic;
   double source_ic1;
-  double source_ic2;
-  double cosine_correlation;
 
   /** - allocate temporary vector where the primordial spectrum will be stored */
 
@@ -1804,7 +1793,7 @@ int NonlinearModule::nonlinear_pk_linear(
 
   /** - loop over k values */
 
-  for (index_k=0; index_k<k_size; index_k++) {
+  for (int index_k=0; index_k<k_size; index_k++) {
 
     /** --> get primordial spectrum */
     class_call(primordial_module_->primordial_spectrum_at_k(index_md_scalars_, logarithmic, ln_k_[index_k], primordial_pk.data()),
@@ -1826,7 +1815,7 @@ int NonlinearModule::nonlinear_pk_linear(
         one would just replace one or two 'R' by 'S_i's */
 
     /** --> get contributions to P(k) diagonal in the initial conditions */
-    for (index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
+    for (int index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
 
       index_ic1_ic1 = index_symmetric_matrix(index_ic1, index_ic1, ic_size_);
 
@@ -1851,14 +1840,16 @@ int NonlinearModule::nonlinear_pk_linear(
     }
 
     /** --> get contributions to P(k) non-diagonal in the initial conditions */
-    for (index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
-      for (index_ic2 = index_ic1 + 1; index_ic2 < ic_size_; index_ic2++) {
+    for (int index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
+      for (int index_ic2 = index_ic1 + 1; index_ic2 < ic_size_; index_ic2++) {
 
         index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_);
         index_ic1_ic1 = index_symmetric_matrix(index_ic1, index_ic1, ic_size_);
         index_ic2_ic2 = index_symmetric_matrix(index_ic2, index_ic2, ic_size_);
 
         if (is_non_zero_[index_ic1_ic2] == _TRUE_) {
+
+          double source_ic2;
 
           class_call(nonlinear_get_source(index_k,
                                           index_ic1,
@@ -1878,7 +1869,7 @@ int NonlinearModule::nonlinear_pk_linear(
                      error_message_,
                      error_message_);
 
-          cosine_correlation = primordial_pk[index_ic1_ic2]*SIGN(source_ic1)*SIGN(source_ic2);
+          double cosine_correlation = primordial_pk[index_ic1_ic2]*SIGN(source_ic1)*SIGN(source_ic2);
 
           pk_ic[index_ic1_ic2] = cosine_correlation * sqrt(pk_ic[index_ic1_ic1]*pk_ic[index_ic2_ic2]);
 
@@ -2170,7 +2161,6 @@ int NonlinearModule::nonlinear_halofit(
 
   /** Determine non linear ratios (from pk) **/
 
-  int index_k;
   double pk_lin,pk_quasi,pk_halo,rk;
   double sigma,rknl,rneff,rncur,d1,d2;
   double diff,xlogr1,xlogr2,rmid;
@@ -2183,8 +2173,7 @@ int NonlinearModule::nonlinear_halofit(
   std::vector<double> pvecback;
 
   int last_index=0;
-  int counter;
-  double sum1,sum2,sum3;
+  double sum1;
   double anorm;
 
   std::vector<double> integrand_array;
@@ -2297,7 +2286,7 @@ int NonlinearModule::nonlinear_halofit(
 
   last_index=0;
 
-  for (index_k=0; index_k < integrand_size; index_k++) {
+  for (int index_k=0; index_k < integrand_size; index_k++) {
 
     k_integrand = k_[0]*pow(10., index_k/ppr->halofit_k_per_decade);
 
@@ -2432,7 +2421,7 @@ int NonlinearModule::nonlinear_halofit(
 
   xlogr2 = log(R)/log(10.);
 
-  counter = 0;
+  int counter = 0;
   do {
     rmid = pow(10,(xlogr2+xlogr1)/2.0);
     counter ++;
@@ -2479,6 +2468,9 @@ int NonlinearModule::nonlinear_halofit(
 
   /* evaluate all the other integrals at R=rmid */
 
+  double sum2;
+  double sum3;
+
   class_call(nonlinear_halofit_integrate(
                                          integrand_array.data(),
                                          integrand_size,
@@ -2519,7 +2511,7 @@ int NonlinearModule::nonlinear_halofit(
 
   *k_nl = rknl;
 
-  for (index_k = 0; index_k < k_size_; index_k++){
+  for (int index_k = 0; index_k < k_size_; index_k++){
 
     rk = k_[index_k];
 
@@ -2614,10 +2606,9 @@ int NonlinearModule::nonlinear_halofit_integrate(
                                                  ) {
 
   double k,pk,x2,integrand;
-  int index_k;
   double anorm = 1./(2*pow(_PI_,2));
 
-  for (index_k=0; index_k < integrand_size; index_k++) {
+  for (int index_k=0; index_k < integrand_size; index_k++) {
     k = integrand_array[index_k*ia_size + index_ia_k];
     pk = integrand_array[index_k*ia_size + index_ia_pk];
     x2 = k*k*R*R;
@@ -2685,7 +2676,7 @@ int NonlinearModule::nonlinear_hmcode(
 
   /* integers */
   int index_mass, i, ng, nsig;
-  int index_k, index_ncol;
+  int index_ncol;
   int last_index=0;
   int index_pk_cb;
   int counter, index_nl;
@@ -3027,7 +3018,7 @@ int NonlinearModule::nonlinear_hmcode(
   i++;
   index_ncol=i;
 
-  for (index_k = 0; index_k < k_size_; index_k++){
+  for (int index_k = 0; index_k < k_size_; index_k++){
 
     p1h_integrand.resize(index_cut*index_ncol);
 
@@ -3139,7 +3130,6 @@ int NonlinearModule::nonlinear_hmcode(
 int NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace * pnw){
 
   int ng;
-  int index_pk;
 
   /** - allocate arrays of the nonlinear workspace */
 
@@ -3158,7 +3148,7 @@ int NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace 
   class_alloc(pnw->sigma_disp_100, pk_size_*sizeof(double*), error_message_);
   class_alloc(pnw->sigma_prime,    pk_size_*sizeof(double*), error_message_);
 
-  for (index_pk = 0; index_pk < pk_size_; index_pk++){
+  for (int index_pk = 0; index_pk < pk_size_; index_pk++){
     class_alloc(pnw->sigma_8       [index_pk], tau_size_*sizeof(double), error_message_);
     class_alloc(pnw->sigma_disp    [index_pk], tau_size_*sizeof(double), error_message_);
     class_alloc(pnw->sigma_disp_100[index_pk], tau_size_*sizeof(double), error_message_);
@@ -3183,7 +3173,6 @@ int NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace 
  */
 
 int NonlinearModule::nonlinear_hmcode_workspace_free(struct nonlinear_workspace * pnw) {
-  int index_pk;
 
   free(pnw->rtab);
   free(pnw->stab);
@@ -3193,7 +3182,7 @@ int NonlinearModule::nonlinear_hmcode_workspace_free(struct nonlinear_workspace 
   free(pnw->ztable);
   free(pnw->tautable);
 
-  for (index_pk = 0; index_pk < pk_size_; index_pk++){
+  for (int index_pk = 0; index_pk < pk_size_; index_pk++){
     free(pnw->sigma_8[index_pk]);
     free(pnw->sigma_disp[index_pk]);
     free(pnw->sigma_disp_100[index_pk]);
@@ -3408,24 +3397,22 @@ int NonlinearModule::nonlinear_hmcode_fill_sigtab(int index_tau, double *lnpk_l,
 
 int NonlinearModule::nonlinear_hmcode_fill_growtab(struct nonlinear_workspace * pnw){
 
-  double z, ainit, amax, scalefactor, tau_growth;
-  int index_scalefactor, last_index, ng;
+  int ng = ppr->n_hmcode_tables;
+  double ainit = ppr->ainit_for_growtab;
+  double amax = ppr->amax_for_growtab;
+
+  int last_index = 0;
+
   std::vector<double> pvecback;
-
-  ng = ppr->n_hmcode_tables;
-  ainit = ppr->ainit_for_growtab;
-  amax = ppr->amax_for_growtab;
-
-  last_index = 0;
-
   pvecback.resize(background_module_->bg_size_);
 
-  for (index_scalefactor=0;index_scalefactor<ng;index_scalefactor++){
-    scalefactor = ainit+(amax-ainit)*(index_scalefactor)/(ng-1);
-    z = 1./scalefactor-1.;
+  for (int index_scalefactor=0;index_scalefactor<ng;index_scalefactor++){
+    double scalefactor = ainit+(amax-ainit)*(index_scalefactor)/(ng-1);
+    double z = 1./scalefactor-1.;
 
     pnw->ztable[index_scalefactor] = z;
 
+    double tau_growth;
     class_call(background_module_->background_tau_of_z(z, &tau_growth),
                background_module_->error_message_, error_message_);
 
@@ -3456,23 +3443,21 @@ int NonlinearModule::nonlinear_hmcode_fill_growtab(struct nonlinear_workspace * 
 
 int NonlinearModule::nonlinear_hmcode_growint(double a, double w0, double wa, double * growth){
 
-  double z, ainit, amax, scalefactor, gamma, X_de, Hubble2, Omega_m;
-  int i, index_scalefactor, index_a, index_growth, index_ddgrowth, index_gcol, ng; // index_scalefactor is a running index while index_a is a column index
   std::vector<double> pvecback;
   std::vector<double> integrand;
 
-  ng = 1024; // number of growth values (stepsize of the integral), should not be hardcoded and replaced by a precision parameter
-  ainit = a;
-  amax = 1.;
+  int ng = 1024; // number of growth values (stepsize of the integral), should not be hardcoded and replaced by a precision parameter
+  double ainit = a;
+  double amax = 1.;
 
-  i=0;
-  index_a = i;
+  int i=0;
+  int index_a = i;
   i++;
-  index_growth = i;
+  int index_growth = i;
   i++;
-  index_ddgrowth = i;
+  int index_ddgrowth = i;
   i++;
-  index_gcol = i;
+  int index_gcol = i;
 
   integrand.resize(ng*index_gcol);
   pvecback.resize(background_module_->bg_size_);
@@ -3482,20 +3467,21 @@ int NonlinearModule::nonlinear_hmcode_growint(double a, double w0, double wa, do
   }
   else {
 
-    for (index_scalefactor=0;index_scalefactor<ng;index_scalefactor++){
+    for (int index_scalefactor=0;index_scalefactor<ng;index_scalefactor++){
 
-      scalefactor = ainit+(amax-ainit)*(index_scalefactor)/(ng-1);
-      z = 1./scalefactor-1.;
+      double scalefactor = ainit+(amax-ainit)*(index_scalefactor)/(ng-1);
+      double z = 1./scalefactor-1.;
 
       /* This will compute Omega_m(z) for the input values of w0 and wa, to let the user compare the wCDM and LCDM cases. This is why we cannot extract Omega_m(z) fromn the background module in this place. */
-      X_de = pow(scalefactor, -3.*(1.+w0+wa))*exp(-3.*wa*(1.-scalefactor));
-      Hubble2 = background_module_->Omega0_m_*pow((1. + z), 3) + pba->Omega0_k*pow((1. + z), 2) + background_module_->Omega0_de_*X_de;
-      Omega_m = background_module_->Omega0_m_*pow((1. + z), 3)/Hubble2;
+      double X_de = pow(scalefactor, -3.*(1.+w0+wa))*exp(-3.*wa*(1.-scalefactor));
+      double Hubble2 = background_module_->Omega0_m_*pow((1. + z), 3) + pba->Omega0_k*pow((1. + z), 2) + background_module_->Omega0_de_*X_de;
+      double Omega_m = background_module_->Omega0_m_*pow((1. + z), 3)/Hubble2;
       /* Samuel brieden: TBC: check that the matching between the
          background quantity and this fitting formula improves by
          using Omega_cb (as it is done in background). Carefull:
          Hubble remains with Omega0_m */
 
+      double gamma = 0.;
       if (w0 == -1.){
         gamma = 0.55;
       }
@@ -3551,11 +3537,9 @@ int NonlinearModule::nonlinear_hmcode_growint(double a, double w0, double wa, do
  */
 
 int NonlinearModule::nonlinear_hmcode_window_nfw(double k, double rv, double c, double *window_nfw){
-  double si1, si2, ci1, ci2, ks;
-  double p1, p2, p3;
+  double ks = k*rv/c;
 
-  ks = k*rv/c;
-
+  double si2;
   class_call(sine_integral(
                            ks*(1.+c),
                            &si2,
@@ -3563,6 +3547,7 @@ int NonlinearModule::nonlinear_hmcode_window_nfw(double k, double rv, double c, 
                            ),
              error_message_, error_message_);
 
+  double si1;
   class_call(sine_integral(
                            ks,
                            &si1,
@@ -3570,6 +3555,7 @@ int NonlinearModule::nonlinear_hmcode_window_nfw(double k, double rv, double c, 
                            ),
              error_message_, error_message_);
 
+  double ci2;
   class_call(cosine_integral(
                              ks*(1.+c),
                              &ci2,
@@ -3577,6 +3563,7 @@ int NonlinearModule::nonlinear_hmcode_window_nfw(double k, double rv, double c, 
                              ),
              error_message_, error_message_);
 
+  double ci1;
   class_call(cosine_integral(
                              ks,
                              &ci1,
@@ -3584,9 +3571,9 @@ int NonlinearModule::nonlinear_hmcode_window_nfw(double k, double rv, double c, 
                              ),
              error_message_, error_message_);
 
-  p1=cos(ks)*(ci2-ci1);
-  p2=sin(ks)*(si2-si1);
-  p3=sin(ks*c)/(ks*(1.+c));
+  double p1=cos(ks)*(ci2-ci1);
+  double p2=sin(ks)*(si2-si1);
+  double p3=sin(ks*c)/(ks*(1.+c));
 
   *window_nfw=p1+p2-p3;
   *window_nfw=*window_nfw/(log(1.+c)-c/(1.+c));
@@ -3607,11 +3594,9 @@ int NonlinearModule::nonlinear_hmcode_halomassfunction(
                                       double * hmf
                                       ){
 
-  double p, q, A;
-
-  p=0.3;
-  q=0.707;
-  A=0.21616;
+  double p=0.3;
+  double q=0.707;
+  double A=0.21616;
 
   *hmf=A*(1.+(pow(q*nu*nu, -p)))*exp(-q*nu*nu/2.);
 

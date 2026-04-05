@@ -80,7 +80,6 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
   char precision_file[_ARGUMENT_LENGTH_MAX_];
   const size_t tmp_file_size = _ARGUMENT_LENGTH_MAX_ + 26;// 26 is enough to extend the file name [...] with the characters "output/[...]%02d_parameters.ini" (as done below)
   char tmp_file[tmp_file_size];
-  int i;
   char extension[5];
   FileArg stringoutput, inifilename;
   int flag1, filenum;
@@ -102,7 +101,7 @@ int InputModule::file_content_from_arguments(int argc, char **argv, FileContent&
       and 'xxx.pre' files, and store their name. */
 
   if (argc > 1) {
-    for (i=1; i<argc; i++) {
+    for (int i=1; i<argc; i++) {
       strncpy(extension,(argv[i]+strlen(argv[i])-4),4);
       extension[4]='\0';
       if (strcmp(extension,".ini") == 0) {
@@ -365,15 +364,10 @@ int InputModule::input_init() {
   FileContent* pfc = &file_content_;
 
   int flag1;
-  int index_target, i;
   int unknown_parameters_size;
   int target_indices[_NUM_TARGETS_];
 
   char string1[_ARGUMENT_LENGTH_MAX_];
-  FILE * param_output;
-  FILE * param_unused;
-  char param_output_name[_LINE_LENGTH_MAX_];
-  char param_unused_name[_LINE_LENGTH_MAX_];
 
   /**
    * Before getting into the assignment of parameters,
@@ -422,7 +416,7 @@ int InputModule::input_init() {
 
   /** - Do we need to fix unknown parameters? */
   unknown_parameters_size = 0;
-  for (index_target = 0; index_target < _NUM_TARGETS_; index_target++){
+  for (int index_target = 0; index_target < _NUM_TARGETS_; index_target++){
     int flag1;
     int params_size;
     double* params = nullptr;
@@ -478,9 +472,13 @@ int InputModule::input_init() {
   if ((flag1 == _TRUE_) && ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL))) {
 
     output* pop = &output_;
+    char param_output_name[_LINE_LENGTH_MAX_];
+    char param_unused_name[_LINE_LENGTH_MAX_];
     snprintf(param_output_name, _LINE_LENGTH_MAX_, "%s%s", pop->root, "parameters.ini");
     snprintf(param_unused_name, _LINE_LENGTH_MAX_, "%s%s", pop->root, "unused_parameters");
 
+    FILE * param_output;
+    FILE * param_unused;
     class_open(param_output,param_output_name,"w",errmsg);
     class_open(param_unused,param_unused_name,"w",errmsg);
 
@@ -575,7 +573,7 @@ int InputModule::input_read_parameters() {
 
   int flag1,flag2,flag3;
   double param1,param2,param3;
-  int n, entries_read;
+  int entries_read;
   int int1;
   double scf_lambda;
   double * pointer1;
@@ -601,12 +599,7 @@ int InputModule::input_read_parameters() {
 
   double sigma_B; /* Stefan-Boltzmann constant in \f$ W/m^2/K^4 = Kg/K^4/s^3 \f$*/
 
-  double R0,R1,R2,R3,R4;
-  double PSR0,PSR1,PSR2,PSR3,PSR4;
-  double HSR0,HSR1,HSR2,HSR3,HSR4;
-
   double z_max=0.;
-  int bin;
   int input_verbose=0;
 
   sigma_B = 2. * pow(_PI_,5) * pow(_k_B_,4) / 15. / pow(_h_P_,3) / pow(_c_,2);
@@ -1008,12 +1001,12 @@ int InputModule::input_read_parameters() {
     if(flag1 == _TRUE_){
       if(entries_read != (ppr->l_max_idr-1)){
         class_realloc(ppt->alpha_idm_dr,ppt->alpha_idm_dr,(ppr->l_max_idr-1)*sizeof(double),errmsg);
-        for(n=entries_read; n<(ppr->l_max_idr-1); n++) ppt->alpha_idm_dr[n] = ppt->alpha_idm_dr[entries_read-1];
+        for(int n=entries_read; n<(ppr->l_max_idr-1); n++) ppt->alpha_idm_dr[n] = ppt->alpha_idm_dr[entries_read-1];
       }
     }
     else{
       class_alloc(ppt->alpha_idm_dr,(ppr->l_max_idr-1)*sizeof(double),errmsg);
-      for(n=0; n<(ppr->l_max_idr-1); n++) ppt->alpha_idm_dr[n] = 1.5;
+      for(int n=0; n<(ppr->l_max_idr-1); n++) ppt->alpha_idm_dr[n] = 1.5;
     }
 
     /* Read alpha_idm_dr or alpha_dark */
@@ -1032,12 +1025,12 @@ int InputModule::input_read_parameters() {
     if(flag1 == _TRUE_){
       if(entries_read != (ppr->l_max_idr-1)){
         class_realloc(ppt->beta_idr,ppt->beta_idr,(ppr->l_max_idr-1)*sizeof(double),errmsg);
-        for(n=entries_read; n<(ppr->l_max_idr-1); n++) ppt->beta_idr[n] = ppt->beta_idr[entries_read-1];
+        for(int n=entries_read; n<(ppr->l_max_idr-1); n++) ppt->beta_idr[n] = ppt->beta_idr[entries_read-1];
       }
     }
     else{
       class_alloc(ppt->beta_idr,(ppr->l_max_idr-1)*sizeof(double),errmsg);
-      for(n=0; n<(ppr->l_max_idr-1); n++) ppt->beta_idr[n] = 1.5;
+      for(int n=0; n<(ppr->l_max_idr-1); n++) ppt->beta_idr[n] = 1.5;
     }
   }
 
@@ -2233,6 +2226,10 @@ int InputModule::input_read_parameters() {
 
   else if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_H)) {
 
+    double R0,R1,R2,R3,R4;
+    double PSR0,PSR1,PSR2,PSR3,PSR4;
+    double HSR0,HSR1,HSR2,HSR3,HSR4;
+
     if (ppm->primordial_spec_type == inflation_V) {
 
       class_call(parser_read_string(pfc,"potential",&string1,&flag1,errmsg),
@@ -2815,7 +2812,7 @@ int InputModule::input_read_parameters() {
 
       if ((ppt->has_cl_number_count == _TRUE_) || (ppt->has_cl_lensing_potential == _TRUE_)) {
 
-        for (bin=0; bin<ppt->selection_num; bin++) {
+        for (int bin=0; bin<ppt->selection_num; bin++) {
 
           /* the few lines below should be consistent with their counterpart in transfer.c, in transfer_selection_times() */
           if (ppt->selection==gaussian) {
@@ -3624,8 +3621,8 @@ int InputModule::class_fzero_ridder(int (*func)(double x, void* param, double* y
      lie between x1 and x2. The root, returned as zriddr, will be found to
      an approximate accuracy xtol.
   */
-  int j,MAXIT=1000;
-  double ans,fh,fl,fm,fnew,s,xh,xl,xm,xnew;
+  int MAXIT=1000;
+  double fl = 0., fh = 0.;
   if ((Fx1!=NULL)&&(Fx2!=NULL)){
     fl = *Fx1;
     fh = *Fx2;
@@ -3639,26 +3636,28 @@ int InputModule::class_fzero_ridder(int (*func)(double x, void* param, double* y
     *fevals = (*fevals)+2;
   }
   if ((fl > 0.0 && fh < 0.0) || (fl < 0.0 && fh > 0.0)) {
-    xl=x1;
-    xh=x2;
-    ans=-1.11e11;
-    for (j=1;j<=MAXIT;j++) {
-      xm=0.5*(xl+xh);
+    double xl=x1;
+    double xh=x2;
+    double ans=-1.11e11;
+    for (int j=1;j<=MAXIT;j++) {
+      double xm=0.5*(xl+xh);
+      double fm;
       class_call((*func)(xm, param, &fm, error_message),
                  error_message, error_message);
       *fevals = (*fevals)+1;
-      s=sqrt(fm*fm-fl*fh);
+      double s=sqrt(fm*fm-fl*fh);
       if (s == 0.0){
         *xzero = ans;
         //printf("Success 1\n");
         return _SUCCESS_;
       }
-      xnew=xm+(xm-xl)*((fl >= fh ? 1.0 : -1.0)*fm/s);
+      double xnew=xm+(xm-xl)*((fl >= fh ? 1.0 : -1.0)*fm/s);
       if (fabs(xnew-ans) <= xtol) {
         *xzero = ans;
         return _SUCCESS_;
       }
       ans=xnew;
+      double fnew;
       class_call((*func)(ans, param, &fnew, error_message),
                  error_message, error_message);
       *fevals = (*fevals)+1;
@@ -3701,7 +3700,6 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
   /** Summary:
    * - Call the structures*/
 
-  double rho_dcdm_today, rho_dr_today;
   struct fzerofun_workspace * pfzw;
   int input_verbose;
   int flag;
@@ -3772,7 +3770,8 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
     }
     case Omega_dcdmdr: {
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-      rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
+      double rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
+      double rho_dr_today;
       if (ba.has_dr == _TRUE_)
         rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_];
       else
@@ -3782,7 +3781,8 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
     }
     case omega_dcdmdr: {
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-      rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
+      double rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
+      double rho_dr_today;
       if (ba.has_dr == _TRUE_)
         rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_];
       else
@@ -3799,7 +3799,8 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
     case Omega_ini_dcdm:
     case omega_ini_dcdm: {
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-      rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
+      double rho_dcdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dcdm_];
+      double rho_dr_today;
       if (ba.has_dr == _TRUE_)
         rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_];
       else

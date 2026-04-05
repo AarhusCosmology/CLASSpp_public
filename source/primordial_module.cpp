@@ -200,9 +200,8 @@ int PrimordialModule::primordial_init() {
   /** - define local variables */
 
   double k,k_min,k_max;
-  int index_md,index_ic1,index_ic2,index_ic1_ic2,index_k;
+  int index_ic1_ic2;
   double pk,pk1,pk2;
-  double dlnk,lnpk_pivot,lnpk_minus,lnpk_plus,lnpk_minusminus,lnpk_plusplus;
   /* uncomment if you use optional test below
      (for correlated isocurvature modes) */
   //double cos_delta_k;
@@ -280,13 +279,13 @@ int PrimordialModule::primordial_init() {
                       error_message_,
                       primordial_free());
 
-    for (index_k = 0; index_k < lnk_size_; index_k++) {
+    for (int index_k = 0; index_k < lnk_size_; index_k++) {
 
       k=exp(lnk_[index_k]);
 
-      for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-        for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
-          for (index_ic2 = index_ic1; index_ic2 < ic_size_[index_md]; index_ic2++) {
+      for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+        for (int index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
+          for (int index_ic2 = index_ic1; index_ic2 < ic_size_[index_md]; index_ic2++) {
 
             index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
 
@@ -411,7 +410,7 @@ int PrimordialModule::primordial_init() {
 
   /** - compute second derivative of each \f$ \ln{P_k} \f$ versus lnk with spline, in view of interpolation */
 
-  for (index_md = 0; index_md < md_size_; index_md++) {
+  for (int index_md = 0; index_md < md_size_; index_md++) {
 
     class_call(array_spline_table_lines(lnk_.data(),
                                         lnk_size_,
@@ -430,7 +429,8 @@ int PrimordialModule::primordial_init() {
 
   if (ppm->primordial_spec_type != analytic_Pk) {
 
-    dlnk = log(10.)/ppr->k_per_decade_primordial;
+    double dlnk = log(10.)/ppr->k_per_decade_primordial;
+    double lnpk_pivot, lnpk_minus, lnpk_plus, lnpk_minusminus, lnpk_plusplus;
 
     if (ppt->has_scalars == _TRUE_) {
 
@@ -567,8 +567,6 @@ int PrimordialModule::primordial_free() {
 
 int PrimordialModule::primordial_indices() {
 
-  int index_md;
-
   md_size_ = perturbations_module_->md_size_;
 
   lnpk_.resize(perturbations_module_->md_size_);
@@ -581,7 +579,7 @@ int PrimordialModule::primordial_indices() {
 
   is_non_zero_.resize(md_size_);
 
-  for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+  for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
 
     ic_size_[index_md] = perturbations_module_->ic_size_[index_md];
 
@@ -612,8 +610,6 @@ int PrimordialModule::primordial_indices() {
 
 int PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k_per_decade) {
 
-  int i;
-
   class_test((kmin <= 0.) || (kmax <= kmin),
              error_message_,
              "inconsistent values of kmin=%e, kmax=%e",kmin,kmax);
@@ -622,7 +618,7 @@ int PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k
 
   lnk_.resize(lnk_size_);
 
-  for (i = 0; i < lnk_size_; i++)
+  for (int i = 0; i < lnk_size_; i++)
     lnk_[i] = log(kmin) + i*log(10.)/k_per_decade;
 
   return _SUCCESS_;
@@ -1047,14 +1043,10 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
   double a_pivot;
   double a_try;
   double H_pivot;
-  double H_try;
-  double phi_try;
   double dphidt_pivot = 0.0;
   double dphidt_try;
   double aH_ini,aH_end;
   double k_max,k_min;
-  int counter;
-  double dH,ddH,dddH;
 
   /** - eventually, needs first to find phi_pivot */
   if (ppm->primordial_spec_type == inflation_V_end) {
@@ -1109,10 +1101,12 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
                       error_message_);
     break;
 
-  case inflation_H:
+  case inflation_H: {
 
     /** - check positivity and negative slope of \f$ H(\phi)\f$ in field pivot
         value, and get H_pivot */
+
+    double dH, ddH, dddH;
 
     class_call(primordial_inflation_check_hubble(phi_pivot_,
                                                         &H_pivot,
@@ -1122,6 +1116,7 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
                       error_message_,
                       error_message_);
     break;
+  }
 
   default:
     class_stop(error_message_, "ppm->primordial_spec_type=%d different from possible relevant cases", ppm->primordial_spec_type);
@@ -1185,9 +1180,11 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
   switch (ppm->primordial_spec_type) {
 
   case inflation_V:
-  case inflation_V_end:
+  case inflation_V_end: {
 
-    counter = 0;
+    int counter = 0;
+    double phi_try;
+    double H_try;
 
     y[index_in_a_] = a_pivot;
     y[index_in_phi_] = phi_pivot_;
@@ -1268,6 +1265,7 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
     y_ini[index_in_dphi_] = y_ini[index_in_a_]*dphidt_try; // dphi/dtau = a dphi/dt
 
     break;
+  }
 
   case inflation_H:
 
@@ -1369,10 +1367,6 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
 int PrimordialModule::primordial_inflation_analytic_spectra(double * y_ini) {
   std::vector<double> y(in_size_);
   std::vector<double> dy(in_size_);
-  int index_k;
-  double k,phi_k;
-  double curvature,tensors;
-  double V,dV,ddV;
 
   /** Summary */
   /** - initialize the background part of the running vector */
@@ -1382,9 +1376,9 @@ int PrimordialModule::primordial_inflation_analytic_spectra(double * y_ini) {
     y[index_in_dphi_] = y_ini[index_in_dphi_];
 
   /** - loop over Fourier wavenumbers */
-  for (index_k=0; index_k < lnk_size_; index_k++) {
+  for (int index_k=0; index_k < lnk_size_; index_k++) {
 
-    k = exp(lnk_[index_k]);
+    double k = exp(lnk_[index_k]);
 
     /* evolve background until k=aH is reached */
     class_call(primordial_inflation_evolve_background(y.data(),
@@ -1398,16 +1392,17 @@ int PrimordialModule::primordial_inflation_analytic_spectra(double * y_ini) {
                error_message_);
 
     /** - read value of phi at time when k=aH */
-    phi_k = y[index_in_phi_];
+    double phi_k = y[index_in_phi_];
 
     /** - get potential (and its derivatives) at this value */
+    double V, dV, ddV;
     class_call(primordial_inflation_check_potential(phi_k, &V, &dV, &ddV),
                error_message_,
                error_message_);
 
     /** - calculate the analytic slow-roll formula for the spectra */
-    curvature = 128.*_PI_/3.*pow(V,3)/pow(dV,2);
-    tensors = pow(dV/V,2)/_PI_*128.*_PI_/3.*pow(V,3)/pow(dV,2);
+    double curvature = 128.*_PI_/3.*pow(V,3)/pow(dV,2);
+    double tensors = pow(dV/V,2)/_PI_*128.*_PI_/3.*pow(V,3)/pow(dV,2);
 
     /** - store the obtained result for curvature and tensor perturbations */
     lnpk_[perturbations_module_->index_md_scalars_][index_k] = log(curvature);
@@ -1429,12 +1424,11 @@ int PrimordialModule::primordial_inflation_analytic_spectra(double * y_ini) {
  */
 
 int PrimordialModule::primordial_inflation_spectra(double * y_ini) {
-  int index_k;
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<int>> future_output;
 
   /* loop over Fourier wavenumbers */
-  for (index_k=0; index_k < lnk_size_; index_k++) {
+  for (int index_k = 0; index_k < lnk_size_; index_k++) {
     future_output.push_back(task_system.AsyncTask([this, y_ini, index_k] () {
       class_call(primordial_inflation_one_wavenumber(y_ini, index_k),
                         error_message_,
@@ -2948,7 +2942,6 @@ int PrimordialModule::primordial_external_spectrum_init() {
   std::vector<double> k, pks, pkt;
   double this_k, this_pks, this_pkt = 0.0;
   int status;
-  int index_k;
 
   /** - Initialization */
   /* Prepare the data (with some initial size) */
@@ -3031,7 +3024,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
     ddlnpk_[perturbations_module_->index_md_tensors_].resize(lnk_size_);
   };
   /** - Store values */
-  for (index_k = 0; index_k < lnk_size_; index_k++) {
+  for (int index_k = 0; index_k < lnk_size_; index_k++) {
     lnk_[index_k] = log(k[index_k]);
     lnpk_[perturbations_module_->index_md_scalars_][index_k] = log(pks[index_k]);
     if (ppt->has_tensors == _TRUE_)

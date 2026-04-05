@@ -120,7 +120,6 @@ int NonColdDarkMatter::background_ncdm_distribution(void* pbadist, double q, dou
 
       /* infer mixing matrix */
       double mixing_matrix[3][3];
-      int i;
 
       mixing_matrix[0][0] = pow(fabs(sqrt((1 - square_s12)*(1 - square_s13))), 2);
       mixing_matrix[0][1] = pow(fabs(sqrt(square_s12*(1 - square_s13))), 2);
@@ -134,7 +133,7 @@ int NonColdDarkMatter::background_ncdm_distribution(void* pbadist, double q, dou
 
       /* loop over flavor eigenstates and compute psd of mass eigenstates */
       *f0=0.0;
-      for(i = 0; i < 3; i++){
+      for(int i = 0; i < 3; i++){
         *f0 += mixing_matrix[i][n_ncdm]*1.0/pow(2*_PI_, 3)*(1./(exp(q - pbadist_local->ncdm->ksi_ncdm_[i]) + 1.) + 1./(exp(q + pbadist_local->ncdm->ksi_ncdm_[i]) + 1.));
       }
     } /* end of region not used, but shown as an example */
@@ -178,7 +177,6 @@ int NonColdDarkMatter::background_ncdm_test_function(
  */
 
 int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings& ncdm_settings) {
-  int n;
   int int1, int2;
   int flag1, flag2;
   int entries_read;
@@ -433,7 +431,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
   if (flag1 == _TRUE_){
     int fileentries = 0;
-    for (n = 0; n < N_ncdm_; n++){
+    for (int n = 0; n < N_ncdm_; n++){
       if (got_files_[n] == _TRUE_) fileentries++;
     }
 
@@ -470,9 +468,6 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   }
 
 
-  int index_q,tolexp;
-  double f0m2 = 0.0,f0m1,f0,f0p1,f0p2 = 0.0,q,df0dq;
-
   /* Allocate vector arrays: */
   q_ncdm_.resize(N_ncdm_);
   w_ncdm_.resize(N_ncdm_);
@@ -485,9 +480,6 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   q_size_ncdm_bg_.resize(N_ncdm_);
   factor_ncdm_.resize(N_ncdm_);
   M_ncdm_.resize(N_ncdm_);
-
-  int dncdm_count = 0;
-  int cumulative_q_index = 0;
 
   // Check for DCDM species to set correct dr_id; pba->has_dcdm is not set yet, so we check manually
   int dcdm_offset = 0;
@@ -545,6 +537,8 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
 
   int filenum = 0;
+  int dncdm_count = 0;
+  int cumulative_q_index = 0;
   for(int k = 0; k < N_ncdm_; k++){
     background_parameters_for_distributions pbadist(this, k);
     pbadist.n_ncdm = k;
@@ -661,7 +655,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
                                       error_message_),
                  error_message_,
                  error_message_);
-      for (index_q = 0; index_q < q_size_ncdm_[k]; index_q++) {
+      for (int index_q = 0; index_q < q_size_ncdm_[k]; index_q++) {
         q_ncdm_bg_[k][index_q] = q_ncdm_[k][index_q];
         w_ncdm_bg_[k][index_q] = w_ncdm_[k][index_q];
         if (ncdm_types_[k] == NCDMType::decay_dr) {
@@ -673,14 +667,16 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     dlnf0_dlnq_ncdm_[k].resize(q_size_ncdm_[k]);
 
 
-    for (index_q = 0; index_q < q_size_ncdm_[k]; index_q++) {
-      q = q_ncdm_[k][index_q];
+    for (int index_q = 0; index_q < q_size_ncdm_[k]; index_q++) {
+      double q = q_ncdm_[k][index_q];
+      double f0;
       class_call(background_ncdm_distribution(&pbadist, q, &f0),
                  error_message_, error_message_);
 
       //Loop to find appropriate dq:
       double dq = 1.;
-      for(tolexp = _PSD_DERIVATIVE_EXP_MIN_; tolexp<_PSD_DERIVATIVE_EXP_MAX_; tolexp++){
+      double f0m2, f0p2;
+      for(int tolexp = _PSD_DERIVATIVE_EXP_MIN_; tolexp<_PSD_DERIVATIVE_EXP_MAX_; tolexp++){
 
         if (index_q == 0){
           dq = MIN((0.5 - DBL_EPSILON)*q, 2*exp(tolexp)*(q_ncdm_[k][index_q + 1] - q));
@@ -700,12 +696,13 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
         if (fabs((f0p2 - f0m2)/f0) > sqrt(DBL_EPSILON)) break;
       }
 
+      double f0m1, f0p1;
       class_call(background_ncdm_distribution(&pbadist, q - dq, &f0m1),
                  error_message_, error_message_);
       class_call(background_ncdm_distribution(&pbadist, q + dq, &f0p1),
                  error_message_, error_message_);
       //5 point estimate of the derivative:
-      df0dq = (+f0m2 - 8*f0m1 + 8*f0p1 - f0p2)/12.0/dq;
+      double df0dq = (+f0m2 - 8*f0m1 + 8*f0p1 - f0p2)/12.0/dq;
       //Avoid underflow in extreme tail:
       if (fabs(f0) == 0.)
         dlnf0_dlnq_ncdm_[k][index_q] = -q; /* valid for whatever f0 with exponential tail in exp(-q) */
@@ -746,7 +743,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
      For decaying species, the degeneracy parameter is found from shooting instead.
      */
   double H0 = ncdm_settings.h*1.e5/_c_;
-  for (n=0; n < N_ncdm_; n++){
+  for (int n=0; n < N_ncdm_; n++){
     if (m_ncdm_in_eV_[n] != 0.0){
       /* Case of only mass or mass and Omega/omega: */
       M_ncdm_[n] = m_ncdm_in_eV_[n]/_k_B_*_eV_/T_ncdm_[n]/ncdm_settings.T_cmb;

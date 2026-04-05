@@ -107,8 +107,6 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
 }
 
 int LensingModule::lensing_cl_at_l(int l, double * cl_lensed) const {
-  int last_index;
-  int index_lt;
 
   class_test(l > l_lensed_max_,
              error_message_,
@@ -116,6 +114,7 @@ int LensingModule::lensing_cl_at_l(int l, double * cl_lensed) const {
              l,
              l_lensed_max_);
 
+  int last_index;
   class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
                                       l_size_,
                                       const_cast<double*>(cl_lens_.data()),
@@ -130,7 +129,7 @@ int LensingModule::lensing_cl_at_l(int l, double * cl_lensed) const {
              error_message_);
 
   /* set to zero for the types such that l<l_max */
-  for (index_lt=0; index_lt<lt_size_; index_lt++)
+  for (int index_lt=0; index_lt<lt_size_; index_lt++)
     if ((int)l > l_max_lt_[index_lt])
       cl_lensed[index_lt]=0.;
 
@@ -149,36 +148,11 @@ int LensingModule::lensing_init() {
   /** Summary: */
   /** - Define local variables */
 
-  double theta,delta_theta;
-
   double * sqrt1;
   double * sqrt2;
   double * sqrt3;
   double * sqrt4;
   double * sqrt5;
-
-  double fac,fac1;
-  double X_000;
-  double X_p000;
-  double X_220;
-  double X_022;
-  double X_p022;
-  double X_121;
-  double X_132;
-  double X_242;
-
-  int num_mu,index_mu,icount;
-  int l;
-  double ll;
-
-  double res,resX,lens;
-  double resp, resm, lensp, lensm;
-
-  int index_md;
-
-  /* Timing */
-  //double debut, fin;
-  //double cpu_time;
 
   /** - check that we really want to compute at least one spectrum */
 
@@ -208,6 +182,7 @@ int LensingModule::lensing_init() {
   /** - Last element in \f$ \mu \f$ will be for \f$ \mu=1 \f$, needed for sigma2.
       The rest will be chosen as roots of a Gauss-Legendre quadrature **/
 
+  int num_mu;
   if (ppr->accurate_lensing == _TRUE_) {
     num_mu = (l_unlensed_max_ + ppr->num_mu_minus_lmax); /* Must be even ?? CHECK */
     num_mu += num_mu%2; /* Force it to be even */
@@ -224,8 +199,6 @@ int LensingModule::lensing_init() {
   std::vector<double> w8(num_mu-1);
 
   if (ppr->accurate_lensing == _TRUE_) {
-
-    //debut = omp_get_wtime();
     class_call(quadrature_gauss_legendre(mu.data(),
                                          w8.data(),
                                          num_mu-1,
@@ -233,15 +206,12 @@ int LensingModule::lensing_init() {
                                          error_message_),
                error_message_,
                error_message_);
-    //fin = omp_get_wtime();
-    //cpu_time = (fin-debut);
-    //printf("time in quadrature_gauss_legendre=%4.3f s\n",cpu_time);
 
   } else { /* Crude integration on [0,pi/16]: Riemann sum on theta */
 
-    delta_theta = _PI_/16. / (double)(num_mu-1);
-    for (index_mu=0;index_mu<num_mu-1;index_mu++) {
-      theta = (index_mu+1)*delta_theta;
+    double delta_theta = _PI_/16. / (double)(num_mu-1);
+    for (int index_mu=0;index_mu<num_mu-1;index_mu++) {
+      double theta = (index_mu+1)*delta_theta;
       mu[index_mu] = cos(theta);
       w8[index_mu] = sin(theta)*delta_theta; /* We integrate on mu */
     }
@@ -249,7 +219,7 @@ int LensingModule::lensing_init() {
 
   /** - Compute \f$ d^l_{mm'} (\mu) \f$*/
 
-  icount = 0;
+  int icount = 0;
   std::vector<double*> d00(num_mu);
   std::vector<double*> d11(num_mu);
   std::vector<double*> d1m1(num_mu);
@@ -280,7 +250,7 @@ int LensingModule::lensing_init() {
   std::vector<double> buf_dxx(icount);
 
   icount = 0;
-  for (index_mu=0; index_mu<num_mu; index_mu++) {
+  for (int index_mu=0; index_mu<num_mu; index_mu++) {
 
     d00 [index_mu] = &(buf_dxx[icount + (index_mu + 0*num_mu)*(l_unlensed_max_ + 1)]);
     d11 [index_mu] = &(buf_dxx[icount + (index_mu + 1*num_mu)*(l_unlensed_max_ + 1)]);
@@ -290,7 +260,7 @@ int LensingModule::lensing_init() {
   icount += 4*num_mu*(l_unlensed_max_ + 1);
 
   if (has_te_ == _TRUE_) {
-    for (index_mu=0; index_mu<num_mu; index_mu++) {
+    for (int index_mu=0; index_mu<num_mu; index_mu++) {
       d20 [index_mu] = &(buf_dxx[icount + (index_mu + 0*num_mu)*(l_unlensed_max_ + 1)]);
       d3m1[index_mu] = &(buf_dxx[icount + (index_mu + 1*num_mu)*(l_unlensed_max_ + 1)]);
       d4m2[index_mu] = &(buf_dxx[icount + (index_mu + 2*num_mu)*(l_unlensed_max_ + 1)]);
@@ -300,7 +270,7 @@ int LensingModule::lensing_init() {
 
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
 
-    for (index_mu=0; index_mu<num_mu; index_mu++) {
+    for (int index_mu=0; index_mu<num_mu; index_mu++) {
       d22 [index_mu] = &(buf_dxx[icount + (index_mu + 0*num_mu)*(l_unlensed_max_ + 1)]);
       d31 [index_mu] = &(buf_dxx[icount + (index_mu + 1*num_mu)*(l_unlensed_max_ + 1)]);
       d3m3[index_mu] = &(buf_dxx[icount + (index_mu + 2*num_mu)*(l_unlensed_max_ + 1)]);
@@ -320,8 +290,6 @@ int LensingModule::lensing_init() {
   icount += l_unlensed_max_ + 1;
   sqrt5 = &(buf_dxx[icount]);
   icount += l_unlensed_max_ + 1;
-
-  //debut = omp_get_wtime();
   class_call(lensing_d00(mu.data(), num_mu, l_unlensed_max_, d00.data()),
              error_message_,
              error_message_);
@@ -337,9 +305,6 @@ int LensingModule::lensing_init() {
   class_call(lensing_d2m2(mu.data(), num_mu, l_unlensed_max_, d2m2.data()),
              error_message_,
              error_message_);
-  //fin = omp_get_wtime();
-  //cpu_time = (fin-debut);
-  //printf("time in lensing_dxx=%4.3f s\n",cpu_time);
 
 
   if (has_te_ == _TRUE_) {
@@ -410,7 +375,7 @@ int LensingModule::lensing_init() {
   std::vector<double*> cl_md(spectra_module_->md_size_, nullptr);
   std::vector<double*> cl_md_ic(spectra_module_->md_size_, nullptr);
 
-  for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
+  for (int index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
 
     if (spectra_module_->md_size_ > 1) {
       cl_md_storage[index_md].resize(spectra_module_->ct_size_);
@@ -423,7 +388,7 @@ int LensingModule::lensing_init() {
     }
   }
 
-  for (l=2; l<=l_unlensed_max_; l++) {
+  for (int l=2; l<=l_unlensed_max_; l++) {
     class_call(spectra_module_->spectra_cl_at_l(l, cl_unlensed.data(), cl_md.data(), cl_md_ic.data()),
                psp->error_message,
                error_message_);
@@ -439,17 +404,12 @@ int LensingModule::lensing_init() {
   }
 
   /** - Compute sigma2\f$(\mu)\f$ and Cgl2(\f$\mu\f$) **/
-
-  //debut = omp_get_wtime();
-#pragma omp parallel for                        \
-  private (index_mu,l)                          \
-  schedule (static)
-  for (index_mu=0; index_mu<num_mu; index_mu++) {
+  for (int index_mu=0; index_mu<num_mu; index_mu++) {
 
     Cgl[index_mu]=0;
     Cgl2[index_mu]=0;
 
-    for (l=2; l<=l_unlensed_max_; l++) {
+    for (int l=2; l<=l_unlensed_max_; l++) {
 
       Cgl[index_mu] += (2.*l+1.)*l*(l+1.)*
         cl_pp[l]*d11[index_mu][l];
@@ -464,13 +424,10 @@ int LensingModule::lensing_init() {
 
   }
 
-  for (index_mu=0; index_mu<num_mu-1; index_mu++) {
+  for (int index_mu=0; index_mu<num_mu-1; index_mu++) {
     /* Cgl(1.0) - Cgl(mu) */
     sigma2[index_mu] = Cgl[num_mu-1] - Cgl[index_mu];
   }
-  //fin = omp_get_wtime();
-  //cpu_time = (fin-debut);
-  //printf("time in Cgl,Cgl2,sigma2=%4.3f s\n",cpu_time);
 
 
   /** - compute ksi, ksi+, ksi-, ksiX */
@@ -494,9 +451,9 @@ int LensingModule::lensing_init() {
     ksim.assign(num_mu-1, 0.0);
   }
 
-  for (l=2; l<=l_unlensed_max_; l++) {
+  for (int l=2; l<=l_unlensed_max_; l++) {
 
-    ll = (double)l;
+    double ll = (double)l;
     sqrt1[l]=sqrt((ll+2)*(ll+1)*ll*(ll-1));
     sqrt2[l]=sqrt((ll+2)*(ll-1));
     sqrt3[l]=sqrt((ll+3)*(ll-2));
@@ -504,35 +461,28 @@ int LensingModule::lensing_init() {
     sqrt5[l]=sqrt(ll*(ll+1));
   }
 
+  for (int index_mu=0;index_mu<num_mu-1;index_mu++) {
 
-  //debut = omp_get_wtime();
-#pragma omp parallel for                                                \
-  private (index_mu,l,ll,res,resX,resp,resm,lens,lensp,lensm,           \
-           fac,fac1,X_000,X_p000,X_220,X_022,X_p022,X_121,X_132,X_242)	\
-  schedule (static)
+    for (int l=2; l<=l_unlensed_max_; l++) {
 
-  for (index_mu=0;index_mu<num_mu-1;index_mu++) {
+      double ll = (double)l;
 
-    for (l=2; l<=l_unlensed_max_; l++) {
-
-      ll = (double)l;
-
-      fac = ll*(ll+1)/4.;
-      fac1 = (2*ll+1)/(4.*_PI_);
+      double fac = ll*(ll+1)/4.;
+      double fac1 = (2*ll+1)/(4.*_PI_);
 
       /* In the following we will keep terms of the form (sigma2)^k*(Cgl2)^m
          with k+m <= 2 */
 
-      X_000 = exp(-fac*sigma2[index_mu]);
-      X_p000 = -fac*X_000;
+      double X_000 = exp(-fac*sigma2[index_mu]);
+      double X_p000 = -fac*X_000;
       /* X_220 = 0.25*sqrt1[l] * exp(-(fac-0.5)*sigma2[index_mu]); */
-      X_220 = 0.25*sqrt1[l] * X_000; /* Order 0 */
+      double X_220 = 0.25*sqrt1[l] * X_000; /* Order 0 */
       /* next 5 lines useless, but avoid compiler warning 'may be used uninitialized' */
-      X_242=0.;
-      X_132=0.;
-      X_121=0.;
-      X_p022=0.;
-      X_022=0.;
+      double X_242=0.;
+      double X_132=0.;
+      double X_121=0.;
+      double X_p022=0.;
+      double X_022=0.;
 
       if (has_te_ == _TRUE_ || has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
         /* X_022 = exp(-(fac-1.)*sigma2[index_mu]); */
@@ -556,9 +506,9 @@ int LensingModule::lensing_init() {
 
       if (has_tt_ == _TRUE_) {
 
-        res = fac1*cl_tt[l];
+        double res = fac1*cl_tt[l];
 
-        lens = (X_000*X_000*d00[index_mu][l] +
+        double lens = (X_000*X_000*d00[index_mu][l] +
                 X_p000*X_p000*d1m1[index_mu][l]
                 *Cgl2[index_mu]*8./(ll*(ll+1)) +
                 (X_p000*X_p000*d00[index_mu][l] +
@@ -574,10 +524,10 @@ int LensingModule::lensing_init() {
 
       if (has_te_ == _TRUE_) {
 
-        resX = fac1*cl_te[l];
+        double resX = fac1*cl_te[l];
 
 
-        lens = ( X_022*X_000*d20[index_mu][l] +
+        double lens = ( X_022*X_000*d20[index_mu][l] +
                  Cgl2[index_mu]*2.*X_p000/sqrt5[l] *
                  (X_121*d11[index_mu][l] + X_132*d3m1[index_mu][l]) +
                  0.5 * Cgl2[index_mu] * Cgl2[index_mu] *
@@ -592,16 +542,16 @@ int LensingModule::lensing_init() {
 
       if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
 
-        resp = fac1*(cl_ee[l]+cl_bb[l]);
-        resm = fac1*(cl_ee[l]-cl_bb[l]);
+        double resp = fac1*(cl_ee[l]+cl_bb[l]);
+        double resm = fac1*(cl_ee[l]-cl_bb[l]);
 
-        lensp = ( X_022*X_022*d22[index_mu][l] +
+        double lensp = ( X_022*X_022*d22[index_mu][l] +
                   2.*Cgl2[index_mu]*X_132*X_121*d31[index_mu][l] +
                   Cgl2[index_mu]*Cgl2[index_mu] *
                   ( X_p022*X_p022*d22[index_mu][l] +
                     X_242*X_220*d40[index_mu][l] ) );
 
-        lensm = ( X_022*X_022*d2m2[index_mu][l] +
+        double lensm = ( X_022*X_022*d2m2[index_mu][l] +
                   Cgl2[index_mu] *
                   ( X_121*X_121*d1m1[index_mu][l] +
                     X_132*X_132*d3m3[index_mu][l] ) +
@@ -620,13 +570,9 @@ int LensingModule::lensing_init() {
       }
     }
   }
-  //fin = omp_get_wtime();
-  //cpu_time = (fin-debut);
-  //printf("time in ksi=%4.3f s\n",cpu_time);
 
 
   /** - compute lensed \f$ C_l\f$'s by integration */
-  //debut = omp_get_wtime();
   if (has_tt_ == _TRUE_) {
     class_call(lensing_lensed_cl_tt(ksi.data(), d00.data(), w8.data(), num_mu - 1),
                error_message_,
@@ -660,9 +606,6 @@ int LensingModule::lensing_init() {
                  error_message_);
     }
   }
-  //fin=omp_get_wtime();
-  //cpu_time = (fin-debut);
-  //printf("time in final lensing computation=%4.3f s\n",cpu_time);
 
   /** - spline computed \f$ C_l\f$'s in view of interpolation */
 
@@ -704,11 +647,6 @@ int LensingModule::lensing_free() {
  */
 
 int LensingModule::lensing_indices(){
-
-  int index_l;
-
-  int index_md;
-  int index_lt;
 
   /* indices of all Cl types (lensed and unlensed) */
 
@@ -800,6 +738,7 @@ int LensingModule::lensing_indices(){
 
   l_lensed_max_ = l_unlensed_max_ - ppr->delta_l_max;
 
+  int index_l;
   for (index_l = 0; (index_l < spectra_module_->l_size_max_) && (spectra_module_->l_[index_l] <= l_lensed_max_); index_l++);
 
   if (index_l < spectra_module_->l_size_max_) index_l++; /* one more point in order to be able to interpolate till l_lensed_max_ */
@@ -827,7 +766,7 @@ int LensingModule::lensing_indices(){
   std::vector<double*> cl_md_ptrs(spectra_module_->md_size_, nullptr);
   std::vector<double*> cl_md_ic_ptrs(spectra_module_->md_size_, nullptr);
 
-  for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
+  for (int index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
 
     if (spectra_module_->md_size_ > 1) {
       cl_md_storage[index_md].resize(spectra_module_->ct_size_);
@@ -856,9 +795,9 @@ int LensingModule::lensing_indices(){
   */
 
   l_max_lt_.resize(lt_size_);
-  for (index_lt = 0; index_lt < lt_size_; index_lt++) {
+  for (int index_lt = 0; index_lt < lt_size_; index_lt++) {
     l_max_lt_[index_lt] = 0;
-    for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
+    for (int index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
       l_max_lt_[index_lt] = MAX(l_max_lt_[index_lt], spectra_module_->l_max_ct_[index_md][index_lt]);
 
       if ((has_bb_ == _TRUE_) && (has_ee_ == _TRUE_) && (index_lt == index_lt_bb_)) {
@@ -885,18 +824,11 @@ int LensingModule::lensing_indices(){
 
 int LensingModule::lensing_lensed_cl_tt(double *ksi, double **d00, double *w8, int nmu) {
 
-  double cle;
-  int imu;
-  int index_l;
-
   /** Integration by Gauss-Legendre quadrature. **/
-#pragma omp parallel for                        \
-  private (imu,index_l,cle)                     \
-  schedule (static)
 
-  for(index_l=0; index_l<l_size_; index_l++){
-    cle=0;
-    for (imu=0;imu<nmu;imu++) {
+  for(int index_l=0; index_l<l_size_; index_l++){
+    double cle=0;
+    for (int imu=0;imu<nmu;imu++) {
       cle += ksi[imu]*d00[imu][(int)l_[index_l]]*w8[imu]; /* loop could be optimized */
     }
     cl_lens_[index_l*lt_size_ + index_lt_tt_] = cle*2.0*_PI_;
@@ -914,10 +846,9 @@ int LensingModule::lensing_lensed_cl_tt(double *ksi, double **d00, double *w8, i
  */
 
 int LensingModule::lensing_addback_cl_tt(double *cl_tt) {
-  int index_l, l;
 
-  for (index_l=0; index_l<l_size_; index_l++) {
-    l = (int)l_[index_l];
+  for (int index_l=0; index_l<l_size_; index_l++) {
+    int l = (int)l_[index_l];
     cl_lens_[index_l*lt_size_ + index_lt_tt_] += cl_tt[l];
   }
   return _SUCCESS_;
@@ -937,18 +868,11 @@ int LensingModule::lensing_addback_cl_tt(double *cl_tt) {
 
 int LensingModule::lensing_lensed_cl_te(double *ksiX, double **d20, double *w8, int nmu) {
 
-  double clte;
-  int imu;
-  int index_l;
-
   /** Integration by Gauss-Legendre quadrature. **/
-#pragma omp parallel for                        \
-  private (imu,index_l,clte)                    \
-  schedule (static)
 
-  for(index_l=0; index_l < l_size_; index_l++){
-    clte=0;
-    for (imu=0;imu<nmu;imu++) {
+  for(int index_l=0; index_l < l_size_; index_l++){
+    double clte=0;
+    for (int imu=0;imu<nmu;imu++) {
       clte += ksiX[imu]*d20[imu][(int)l_[index_l]]*w8[imu]; /* loop could be optimized */
     }
     cl_lens_[index_l*lt_size_ + index_lt_te_] = clte*2.0*_PI_;
@@ -967,10 +891,9 @@ int LensingModule::lensing_lensed_cl_te(double *ksiX, double **d20, double *w8, 
  */
 
 int LensingModule::lensing_addback_cl_te(double *cl_te) {
-  int index_l, l;
 
-  for (index_l=0; index_l<l_size_; index_l++) {
-    l = (int)l_[index_l];
+  for (int index_l=0; index_l<l_size_; index_l++) {
+    int l = (int)l_[index_l];
     cl_lens_[index_l*lt_size_ + index_lt_te_] += cl_te[l];
   }
   return _SUCCESS_;
@@ -992,18 +915,11 @@ int LensingModule::lensing_addback_cl_te(double *cl_te) {
 
 int LensingModule::lensing_lensed_cl_ee_bb(double *ksip, double *ksim, double **d22, double **d2m2, double *w8, int nmu) {
 
-  double clp, clm;
-  int imu;
-  int index_l;
-
   /** Integration by Gauss-Legendre quadrature. **/
-#pragma omp parallel for                        \
-  private (imu,index_l,clp,clm)                 \
-  schedule (static)
 
-  for(index_l=0; index_l < l_size_; index_l++){
-    clp=0; clm=0;
-    for (imu=0;imu<nmu;imu++) {
+  for(int index_l=0; index_l < l_size_; index_l++){
+    double clp=0, clm=0;
+    for (int imu=0;imu<nmu;imu++) {
       clp += ksip[imu]*d22[imu][(int)l_[index_l]]*w8[imu]; /* loop could be optimized */
       clm += ksim[imu]*d2m2[imu][(int)l_[index_l]]*w8[imu]; /* loop could be optimized */
     }
@@ -1026,10 +942,8 @@ int LensingModule::lensing_lensed_cl_ee_bb(double *ksip, double *ksim, double **
 
 int LensingModule::lensing_addback_cl_ee_bb(double * cl_ee, double * cl_bb) {
 
-  int index_l, l;
-
-  for (index_l=0; index_l<l_size_; index_l++) {
-    l = (int)l_[index_l];
+  for (int index_l=0; index_l<l_size_; index_l++) {
+    int l = (int)l_[index_l];
     cl_lens_[index_l*lt_size_ + index_lt_ee_] += cl_ee[l];
     cl_lens_[index_l*lt_size_ + index_lt_bb_] += cl_bb[l];
   }
@@ -1056,30 +970,25 @@ int LensingModule::lensing_d00(
                 int lmax,
                 double ** d00
                 ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax);
 
-  for (l=1; l<lmax; l++) {
-    ll = (double) l;
+  for (int l=1; l<lmax; l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(2*ll+1)/(ll+1);
     fac2[l] = sqrt((2*ll+3)/(2*ll-1))*ll/(ll+1);
     fac3[l] = sqrt(2./(2*ll+3));
   }
 
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
-    dlm1=1.0/sqrt(2.); /* l=0 */
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
+    double dlm1=1.0/sqrt(2.); /* l=0 */
     d00[index_mu][0]=dlm1*sqrt(2.);
-    dl=mu[index_mu] * sqrt(3./2.); /*l=1*/
+    double dl=mu[index_mu] * sqrt(3./2.); /*l=1*/
     d00[index_mu][1]=dl*sqrt(2./3.);
-    for(l=1;l<lmax;l++){
-      ll=(double) l;
+    for(int l=1;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d00 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*mu[index_mu]*dl - fac2[l]*dlm1;
+      double dlp1 = fac1[l]*mu[index_mu]*dl - fac2[l]*dlm1;
       d00[index_mu][l+1] = dlp1 * fac3[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1108,30 +1017,25 @@ int LensingModule::lensing_d11(
                 int lmax,
                 double ** d11
                 ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=2;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=2;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/(ll*(ll+2));
     fac2[l] = 1.0/(ll*(ll+1.));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1))*(ll-1)*(ll+1)/(ll*(ll+2))*(ll+1)/ll;
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d11[index_mu][0]=0;
-    dlm1=(1.0+mu[index_mu])/2. * sqrt(3./2.); /*l=1*/
+    double dlm1=(1.0+mu[index_mu])/2. * sqrt(3./2.); /*l=1*/
     d11[index_mu][1]=dlm1 * sqrt(2./3.);
-    dl=(1.0+mu[index_mu])/2.*(2.0*mu[index_mu]-1.0) * sqrt(5./2.); /*l=2*/
+    double dl=(1.0+mu[index_mu])/2.*(2.0*mu[index_mu]-1.0) * sqrt(5./2.); /*l=2*/
     d11[index_mu][2] = dl * sqrt(2./5.);
-    for(l=2;l<lmax;l++){
-      ll=(double) l;
+    for(int l=2;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d11 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
       d11[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1159,30 +1063,25 @@ int LensingModule::lensing_d1m1(
                  int lmax,
                  double ** d1m1
                  ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=2;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=2;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/(ll*(ll+2));
     fac2[l] = 1.0/(ll*(ll+1.));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1))*(ll-1)*(ll+1)/(ll*(ll+2))*(ll+1)/ll;
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d1m1[index_mu][0]=0;
-    dlm1=(1.0-mu[index_mu])/2. * sqrt(3./2.); /*l=1*/
+    double dlm1=(1.0-mu[index_mu])/2. * sqrt(3./2.); /*l=1*/
     d1m1[index_mu][1]=dlm1 * sqrt(2./3.);
-    dl=(1.0-mu[index_mu])/2.*(2.0*mu[index_mu]+1.0) * sqrt(5./2.); /*l=2*/
+    double dl=(1.0-mu[index_mu])/2.*(2.0*mu[index_mu]+1.0) * sqrt(5./2.); /*l=2*/
     d1m1[index_mu][2] = dl * sqrt(2./5.);
-    for(l=2;l<lmax;l++){
-      ll=(double) l;
+    for(int l=2;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d1m1 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d1m1[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1210,30 +1109,25 @@ int LensingModule::lensing_d2m2(
                  int lmax,
                  double ** d2m2
                  ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=2;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=2;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/((ll-1)*(ll+3));
     fac2[l] = 4.0/(ll*(ll+1));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1))*(ll-2)*(ll+2)/((ll-1)*(ll+3))*(ll+1)/ll;
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d2m2[index_mu][0]=0;
-    dlm1=0.; /*l=1*/
+    double dlm1=0.; /*l=1*/
     d2m2[index_mu][1]=0;
-    dl=(1.0-mu[index_mu])*(1.0-mu[index_mu])/4. * sqrt(5./2.); /*l=2*/
+    double dl=(1.0-mu[index_mu])*(1.0-mu[index_mu])/4. * sqrt(5./2.); /*l=2*/
     d2m2[index_mu][2] = dl * sqrt(2./5.);
-    for(l=2;l<lmax;l++){
-      ll=(double) l;
+    for(int l=2;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d2m2 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d2m2[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1261,30 +1155,25 @@ int LensingModule::lensing_d22(
                 int lmax,
                 double ** d22
                 ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=2;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=2;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/((ll-1)*(ll+3));
     fac2[l] = 4.0/(ll*(ll+1));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1))*(ll-2)*(ll+2)/((ll-1)*(ll+3))*(ll+1)/ll;
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d22[index_mu][0]=0;
-    dlm1=0.; /*l=1*/
+    double dlm1=0.; /*l=1*/
     d22[index_mu][1]=0;
-    dl=(1.0+mu[index_mu])*(1.0+mu[index_mu])/4. * sqrt(5./2.); /*l=2*/
+    double dl=(1.0+mu[index_mu])*(1.0+mu[index_mu])/4. * sqrt(5./2.); /*l=2*/
     d22[index_mu][2] = dl * sqrt(2./5.);
-    for(l=2;l<lmax;l++){
-      ll=(double) l;
+    for(int l=2;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
       d22[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1312,29 +1201,24 @@ int LensingModule::lensing_d20(
                 int lmax,
                 double ** d20
                 ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
-  for (l=2;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=2;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-1)*(ll+3)));
     fac3[l] = sqrt((2*ll+3)*(ll-2)*(ll+2)/((2*ll-1)*(ll-1)*(ll+3)));
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d20[index_mu][0]=0;
-    dlm1=0.; /*l=1*/
+    double dlm1=0.; /*l=1*/
     d20[index_mu][1]=0;
-    dl=sqrt(15.)/4.*(1-mu[index_mu]*mu[index_mu]); /*l=2*/
+    double dl=sqrt(15.)/4.*(1-mu[index_mu]*mu[index_mu]); /*l=2*/
     d20[index_mu][2] = dl * sqrt(2./5.);
-    for(l=2;l<lmax;l++){
-      ll=(double) l;
+    for(int l=2;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*mu[index_mu]*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*mu[index_mu]*dl - fac3[l]*dlm1;
       d20[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1362,31 +1246,26 @@ int LensingModule::lensing_d31(
                 int lmax,
                 double ** d31
                 ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=3;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=3;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-2)*(ll+4)*ll*(ll+2))) * (ll+1);
     fac2[l] = 3.0/(ll*(ll+1));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1)*(ll-3)*(ll+3)*(ll-1)*(ll+1)/((ll-2)*(ll+4)*ll*(ll+2)))*(ll+1)/ll;
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d31[index_mu][0]=0;
     d31[index_mu][1]=0;
-    dlm1=0.; /*l=2*/
+    double dlm1=0.; /*l=2*/
     d31[index_mu][2]=0;
-    dl=sqrt(105./2.)*(1+mu[index_mu])*(1+mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
+    double dl=sqrt(105./2.)*(1+mu[index_mu])*(1+mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
     d31[index_mu][3] = dl * sqrt(2./7.);
-    for(l=3;l<lmax;l++){
-      ll=(double) l;
+    for(int l=3;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
       d31[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1414,31 +1293,26 @@ int LensingModule::lensing_d3m1(
                  int lmax,
                  double ** d3m1
                  ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=3;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=3;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-2)*(ll+4)*ll*(ll+2))) * (ll+1);
     fac2[l] = 3.0/(ll*(ll+1));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1)*(ll-3)*(ll+3)*(ll-1)*(ll+1)/((ll-2)*(ll+4)*ll*(ll+2)))*(ll+1)/ll;
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d3m1[index_mu][0]=0;
     d3m1[index_mu][1]=0;
-    dlm1=0.; /*l=2*/
+    double dlm1=0.; /*l=2*/
     d3m1[index_mu][2]=0;
-    dl=sqrt(105./2.)*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
+    double dl=sqrt(105./2.)*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
     d3m1[index_mu][3] = dl * sqrt(2./7.);
-    for(l=3;l<lmax;l++){
-      ll=(double) l;
+    for(int l=3;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d3m1[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1466,31 +1340,26 @@ int LensingModule::lensing_d3m3(
                  int lmax,
                  double ** d3m3
                  ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=3;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=3;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1))*(ll+1)/((ll-2)*(ll+4));
     fac2[l] = 9.0/(ll*(ll+1));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1))*(ll-3)*(ll+3)*(l+1)/((ll-2)*(ll+4)*ll);
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d3m3[index_mu][0]=0;
     d3m3[index_mu][1]=0;
-    dlm1=0.; /*l=2*/
+    double dlm1=0.; /*l=2*/
     d3m3[index_mu][2]=0;
-    dl=sqrt(7./2.)*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
+    double dl=sqrt(7./2.)*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
     d3m3[index_mu][3] = dl * sqrt(2./7.);
-    for(l=3;l<lmax;l++){
-      ll=(double) l;
+    for(int l=3;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d3m3[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1518,31 +1387,26 @@ int LensingModule::lensing_d40(
                 int lmax,
                 double ** d40
                 ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
-  for (l=4;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=4;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-3)*(ll+5)));
     fac3[l] = sqrt((2*ll+3)*(ll-4)*(ll+4)/((2*ll-1)*(ll-3)*(ll+5)));
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d40[index_mu][0]=0;
     d40[index_mu][1]=0;
     d40[index_mu][2]=0;
-    dlm1=0.; /*l=3*/
+    double dlm1=0.; /*l=3*/
     d40[index_mu][3]=0;
-    dl=sqrt(315.)*(1+mu[index_mu])*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
+    double dl=sqrt(315.)*(1+mu[index_mu])*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
     d40[index_mu][4] = dl * sqrt(2./9.);
-    for(l=4;l<lmax;l++){
-      ll=(double) l;
+    for(int l=4;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*mu[index_mu]*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*mu[index_mu]*dl - fac3[l]*dlm1;
       d40[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1570,32 +1434,27 @@ int LensingModule::lensing_d4m2(
                  int lmax,
                  double ** d4m2
                  ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=4;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=4;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-3)*(ll+5)*(ll-1)*(ll+3))) * (ll+1.);
     fac2[l] = 8./(ll*(ll+1));
     fac3[l] = sqrt((2*ll+3)*(ll-4)*(ll+4)*(ll-2)*(ll+2)/((2*ll-1)*(ll-3)*(ll+5)*(ll-1)*(ll+3)))*(ll+1)/ll;
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d4m2[index_mu][0]=0;
     d4m2[index_mu][1]=0;
     d4m2[index_mu][2]=0;
-    dlm1=0.; /*l=3*/
+    double dlm1=0.; /*l=3*/
     d4m2[index_mu][3]=0;
-    dl=sqrt(126.)*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
+    double dl=sqrt(126.)*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
     d4m2[index_mu][4] = dl * sqrt(2./9.);
-    for(l=4;l<lmax;l++){
-      ll=(double) l;
+    for(int l=4;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d4m2[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;
@@ -1623,32 +1482,27 @@ int LensingModule::lensing_d4m4(
                  int lmax,
                  double ** d4m4
                  ) {
-  double ll, dlm1, dl, dlp1;
-  int index_mu, l;
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
-  for (l=4;l<lmax;l++) {
-    ll = (double) l;
+  for (int l=4;l<lmax;l++) {
+    double ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1))*(ll+1)/((ll-3)*(ll+5));
     fac2[l] = 16./(ll*(ll+1));
     fac3[l] = sqrt((2*ll+3)/(2*ll-1))*(ll-4)*(ll+4)*(ll+1)/((ll-3)*(ll+5)*ll);
     fac4[l] = sqrt(2./(2*ll+3));
   }
-#pragma omp parallel for                        \
-  private (index_mu,dlm1,dl,dlp1,l,ll)          \
-  schedule (static)
 
-  for (index_mu=0;index_mu<num_mu;index_mu++) {
+  for (int index_mu=0;index_mu<num_mu;index_mu++) {
     d4m4[index_mu][0]=0;
     d4m4[index_mu][1]=0;
     d4m4[index_mu][2]=0;
-    dlm1=0.; /*l=3*/
+    double dlm1=0.; /*l=3*/
     d4m4[index_mu][3]=0;
-    dl=sqrt(9./2.)*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
+    double dl=sqrt(9./2.)*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
     d4m4[index_mu][4] = dl * sqrt(2./9.);
-    for(l=4;l<lmax;l++){
-      ll=(double) l;
+    for(int l=4;l<lmax;l++){
+      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
+      double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d4m4[index_mu][l+1] = dlp1 * fac4[l];
       dlm1 = dl;
       dl = dlp1;

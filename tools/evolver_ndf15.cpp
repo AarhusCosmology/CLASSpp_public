@@ -661,14 +661,13 @@ int evolver_ndf15(
 /**********************************************************************/
 
 void eqvec(double *datavec,double *emptyvec, int n){
-  int i;
-  for(i=1;i<=n;i++){
+  for(int i=1;i<=n;i++){
     emptyvec[i] = datavec[i];
   }
 }
 
 int calc_C(struct jacobian *jac){
-  int nz, i, j, k, n, col, row;
+  int nz, j, k, n, col, row;
   int duplicate;
   int *Ci, *Cp, *Ai, *Ap;
   n = jac->Numerical->n;Ci = jac->Ci;Cp = jac->Cp;
@@ -679,7 +678,7 @@ int calc_C(struct jacobian *jac){
   for (j=0;j<=n;j++) Cp[j] = 0; /* Clear Cp */
   for (j=0;j<n;j++){
     /* Loop over columns */
-    for (i=Ap[j];i<Ap[j+1];i++){
+    for (int i=Ap[j];i<Ap[j+1];i++){
       /* Loop over rows */
       if(Ai[i]!=j){
 	/*Don't consider diagonal entries..*/
@@ -730,7 +729,7 @@ int calc_C(struct jacobian *jac){
 int interp_from_difold(double tinterp,double tnew,double *ynew,double h,double **dif,int k, double *yinterp,
 		    double *ypinterp, double *yppinterp, int* index, int neq, int output){
   /* Output=1: only y_vector. Output=2: y and y prime. Output=3: y, yp and ypp*/
-  int i,j,m,l,p,factor;
+  int i,j,m,l,factor;
   double sumj,suml,sump,prodm,s;
   s = (tinterp - tnew)/h;
   if (k==1){
@@ -783,7 +782,7 @@ int interp_from_difold(double tinterp,double tnew,double *ynew,double h,double *
 	    factor*=j;
 	    for(l=0;l<j;l++){
 	      sump=0.0;
-	      for(p=0;p<j;p++){
+	      for(int p=0;p<j;p++){
 		if(p!=l){
 		  prodm=1.0;
 		  for(m=0;m<j;m++){
@@ -823,7 +822,6 @@ int interp_from_dif(double tinterp,
   double fact,prod,sumfrac;
   double vecy[5]={0.,0.,0.,0.,0.};
   double vecdy[5]={0.,0.,0.,0.,0.};
-  int j, index_x;
   double s, sumtmp, sumtmp2;
 
   s = (tinterp - tnew)/h;
@@ -831,7 +829,7 @@ int interp_from_dif(double tinterp,
   prod = 1.0;
   sumfrac = 0.;
   fact = 1.0;
-  for (j=0; j<k; j++){
+  for (int j=0; j<k; j++){
     prod *= (s+j);
     fact *= (j+1);
     sumfrac += 1.0/(s+j);
@@ -839,11 +837,11 @@ int interp_from_dif(double tinterp,
     vecdy[j] = prod*sumfrac/(h*fact);
   }
 
-  for (index_x=1; index_x<=neq; index_x++){
+  for (int index_x=1; index_x<=neq; index_x++){
     if (mask[index_x]==_TRUE_){
       sumtmp = 0;
       sumtmp2 = 0;
-      for (j=0; j<k; j++){
+      for (int j=0; j<k; j++){
         sumtmp += vecy[j]*dif[index_x][j+1];
         sumtmp2 += vecdy[j]*dif[index_x][j+1];
       }
@@ -949,19 +947,19 @@ int new_linearisation(struct jacobian *jac,double hinvGak,int neq,ErrorMsg error
 
 /** Helper functions */
 int lubksb(double **a, int n, int *indx, double b[]){
-  int i,ii=0,ip,j;
+  int i,ii=0,ip;
   double sum;
   for (i=1;i<=n;i++) {
     ip=indx[i];
     sum=b[ip];
     b[ip]=b[i];
-    if (ii) for (j=ii;j<=i-1;j++) sum -= a[i][j]*b[j];
+    if (ii) for (int j=ii;j<=i-1;j++) sum -= a[i][j]*b[j];
     else if (sum) ii=i;
     b[i]=sum;
   }
   for (i=n;i>=1;i--) {
     sum=b[i];
-    for (j=i+1;j<=n;j++) sum -= a[i][j]*b[j];
+    for (int j=i+1;j<=n;j++) sum -= a[i][j]*b[j];
     b[i]=sum/a[i][i];
   }
   return _SUCCESS_;
@@ -1030,7 +1028,7 @@ int fzero_Newton(int (*func)(double *x,
      take ntrial Newton-Raphson steps to improve the root.
      Stop if the root converges in either summed absolute
      variable increments tolx or summed absolute function values tolf.*/
-  int k,i,j,*indx, ntrial=20;
+  int i,*indx, ntrial=20;
   double errx,errf,d,*F0,*Fdel,**Fjac,*p, *lu_work;
   int has_converged = _FALSE_;
   double toljac = 1e-1;
@@ -1061,7 +1059,7 @@ int fzero_Newton(int (*func)(double *x,
   delx = delx_vec.data();
   Fdel = Fdel_vec.data();
 
-  for (k=1;k<=ntrial;k++) {
+  for (int k=1;k<=ntrial;k++) {
     //printf("x = [%f, %f], delx = [%e, %e]\n", x_inout[0],x_inout[1],delx[0],delx[1]);
     class_call(func(x_inout, x_size, param, F0, error_message),
                error_message, error_message);
@@ -1125,7 +1123,7 @@ int fzero_Newton(int (*func)(double *x,
         throw(std::runtime_error("Jacobian computation in Newtons method failed during shooting"));
       }
       //printf("F = [%f, %f]\n",Fdel[0],Fdel[1]);
-      for (j=1; j<=x_size; j++)
+      for (int j=1; j<=x_size; j++)
         Fjac[j][i] = (Fdel[j-1]-F0[j-1])/delx[i-1];
       x_inout[i-1] -= delx[i-1];
     }
@@ -1177,7 +1175,7 @@ int numjac(
   double facmin=pow(eps,0.78),facmax=0.1;
   int logjpos, pattern_broken;
   double tmpfac,difmax2=0.,del2,ffscale;
-  int i,j,rowmax2;
+  int i,j;
   double maxval1,maxval2;
   int colmax,group,row,nz,nz2;
   double Fdiff_absrm,Fdiff_new;
@@ -1369,7 +1367,7 @@ int numjac(
 		     error_message,error_message);
 	  *nfe+=1;
 	  nj_ws->yydel[j] = y[j];
-	  rowmax2 = 1;
+	  int rowmax2 = 1;
 	  Fdiff_new=0.0;
 	  Fdiff_absrm = 0.0;
 	  for(i=1;i<=neq;i++){
@@ -1573,7 +1571,7 @@ int uninitialize_jacobian(struct jacobian *jac){
 }
 
 int initialize_numjac_workspace(struct numjac_workspace * nj_ws,int neq, ErrorMsg error_message){
-  int i,neqp=neq+1;
+  int neqp=neq+1;
   /* Allocate vectors and matrices using RAII backing storage: */
 
   nj_ws->yscale_vec.resize(neqp);
@@ -1602,7 +1600,7 @@ int initialize_numjac_workspace(struct numjac_workspace * nj_ws,int neq, ErrorMs
   nj_ws->ydel_Fdel = nj_ws->ydel_Fdel_rows_vec.data();
   nj_ws->ydel_Fdel[0] = NULL;
   nj_ws->ydel_Fdel[1] = nj_ws->ydel_Fdel_data_vec.data();
-  for(i=2;i<=neq;i++) nj_ws->ydel_Fdel[i] = nj_ws->ydel_Fdel[i-1]+neq; /* Set row pointers... */
+  for(int i=2;i<=neq;i++) nj_ws->ydel_Fdel[i] = nj_ws->ydel_Fdel[i-1]+neq; /* Set row pointers... */
 
   nj_ws->logj_vec.resize(neqp);
   nj_ws->logj = nj_ws->logj_vec.data();

@@ -41,8 +41,6 @@ int OutputModule::output_total_cl_at_l(
                          double * cl
                          ){
 
-  int index_md;
-
   if (ple->has_lensed_cls == _TRUE_) {
     class_call(lensing_module_->lensing_cl_at_l(l, cl),
                lensing_module_->error_message_,
@@ -56,7 +54,7 @@ int OutputModule::output_total_cl_at_l(
     std::vector<std::vector<double>> cl_md_storage(spectra_module_->md_size_);
     std::vector<double*> cl_md(spectra_module_->md_size_, nullptr);
 
-    for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
+    for (int index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
 
       if (spectra_module_->md_size_ > 1) {
         cl_md_storage[index_md].resize(spectra_module_->ct_size_);
@@ -192,17 +190,6 @@ int OutputModule::output_cl() {
 
   /** - define local variables */
 
-  FILE * out;         /* (will contain total cl's, summed eventually over modes and ic's) */
-
-  FILE * out_lensed = nullptr;         /* (will contain total lensed cl's) */
-
-  int index_md;
-  int index_ic1,index_ic2,index_ic1_ic2;
-  int l;
-
-  FileName file_name;
-  char first_line[_LINE_LENGTH_MAX_];
-
   /** - first, allocate all arrays of files and \f$ C_l\f$'s */
 
   std::vector<std::vector<FILE*>> out_md_ic_storage(spectra_module_->md_size_);
@@ -216,7 +203,7 @@ int OutputModule::output_cl() {
   std::vector<std::vector<double>> cl_md_storage(spectra_module_->md_size_);
   std::vector<double*> cl_md(spectra_module_->md_size_, nullptr);
 
-  for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+  for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
 
     out_md_ic_storage[index_md].resize(spectra_module_->ic_ic_size_[index_md], nullptr);
     out_md_ic[index_md] = out_md_ic_storage[index_md].data();
@@ -225,8 +212,10 @@ int OutputModule::output_cl() {
 
   /** - second, open only the relevant files, and write a heading in each of them */
 
+  FileName file_name;
   snprintf(file_name, _FILENAMESIZE_-32, "%s%s", pop->root, "cl.dat");
 
+  FILE * out;
   class_call(output_open_cl_file(&out,
                                  file_name,
                                  "total [l(l+1)/2pi] C_l's",
@@ -238,6 +227,7 @@ int OutputModule::output_cl() {
   std::vector<double> cl_tot(spectra_module_->ct_size_);
 
 
+  FILE * out_lensed = nullptr;
   if (ple->has_lensed_cls == _TRUE_) {
 
     snprintf(file_name, _FILENAMESIZE_-32, "%s%s",pop->root,"cl_lensed.dat");
@@ -251,9 +241,11 @@ int OutputModule::output_cl() {
                error_message_);
   }
 
+  char first_line[_LINE_LENGTH_MAX_];
+
   if (perturbations_module_->md_size_ > 1) {
 
-    for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+    for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
 
       if (_scalarsEXT_) {
 
@@ -283,13 +275,13 @@ int OutputModule::output_cl() {
     }
   }
 
-  for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+  for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
 
     if (perturbations_module_->ic_size_[index_md] > 1) {
 
-      for (index_ic1 = 0; index_ic1 < perturbations_module_->ic_size_[index_md]; index_ic1++) {
+      for (int index_ic1 = 0; index_ic1 < perturbations_module_->ic_size_[index_md]; index_ic1++) {
 
-        for (index_ic2 = index_ic1; index_ic2 < perturbations_module_->ic_size_[index_md]; index_ic2++) {
+        for (int index_ic2 = index_ic1; index_ic2 < perturbations_module_->ic_size_[index_md]; index_ic2++) {
 
           if (_scalarsEXT_) {
 
@@ -408,7 +400,7 @@ int OutputModule::output_cl() {
 
           }
 
-          index_ic1_ic2 = index_symmetric_matrix(index_ic1,index_ic2,spectra_module_->ic_size_[index_md]);
+          int index_ic1_ic2 = index_symmetric_matrix(index_ic1,index_ic2,spectra_module_->ic_size_[index_md]);
 
           if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
 
@@ -433,7 +425,7 @@ int OutputModule::output_cl() {
       by calling spectra_cl_at_l() and distribute the results to
       relevant files */
 
-  for (l = 2; l <= spectra_module_->l_max_tot_; l++) {
+  for (int l = 2; l <= spectra_module_->l_max_tot_; l++) {
 
     class_call(spectra_module_->spectra_cl_at_l((double)l, cl_tot.data(), cl_md.data(), cl_md_ic.data()),
                psp->error_message,
@@ -455,7 +447,7 @@ int OutputModule::output_cl() {
     }
 
     if (perturbations_module_->md_size_ > 1) {
-      for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+      for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
         if (l <= spectra_module_->l_max_[index_md]) {
 
           class_call(output_one_line_of_cl(out_md[index_md], l, cl_md[index_md], spectra_module_->ct_size_),
@@ -465,9 +457,9 @@ int OutputModule::output_cl() {
       }
     }
 
-    for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+    for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
       if ((perturbations_module_->ic_size_[index_md] > 1) && (l <= spectra_module_->l_max_[index_md])) {
-        for (index_ic1_ic2 = 0; index_ic1_ic2 < spectra_module_->ic_ic_size_[index_md]; index_ic1_ic2++) {
+        for (int index_ic1_ic2 = 0; index_ic1_ic2 < spectra_module_->ic_ic_size_[index_md]; index_ic1_ic2++) {
           if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
 
             class_call(output_one_line_of_cl(out_md_ic[index_md][index_ic1_ic2], l, &(cl_md_ic[index_md][index_ic1_ic2*spectra_module_->ct_size_]), spectra_module_->ct_size_),
@@ -481,9 +473,9 @@ int OutputModule::output_cl() {
 
   /** - finally, close files and free arrays of files and \f$ C_l\f$'s */
 
-  for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+  for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
     if (perturbations_module_->ic_size_[index_md] > 1) {
-      for (index_ic1_ic2 = 0; index_ic1_ic2 < spectra_module_->ic_ic_size_[index_md]; index_ic1_ic2++) {
+      for (int index_ic1_ic2 = 0; index_ic1_ic2 < spectra_module_->ic_ic_size_[index_md]; index_ic1_ic2++) {
         if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
           fclose(out_md_ic[index_md][index_ic1_ic2]);
         }
@@ -491,7 +483,7 @@ int OutputModule::output_cl() {
     }
   }
   if (perturbations_module_->md_size_ > 1) {
-    for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
+    for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
       fclose(out_md[index_md]);
     }
   }
@@ -517,21 +509,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
   /** - define local variables */
 
-  FILE * out_pk;             /* out_pk[index_pk] is a pointer to a file with total P(k) summed over ic */
-
-  int index_ic1,index_ic2;
-  int index_ic1_ic2=0;
-  int index_k;
-  int index_z;
-  int index_pk;
-
   FileName file_name;
-
-  const size_t redshift_suffix_size = 7;
-  char redshift_suffix[redshift_suffix_size]; // 7 is enough to write "z%d_" as long as there are at most 10'000 bins
-  const size_t type_suffix_size = 9;
-  char type_suffix[type_suffix_size];     // 6 is enough to write "pk_cb_nl" plus closing character \0
-  char first_line[_LINE_LENGTH_MAX_];
   short do_ic = _FALSE_;
 
   /** - preliminary: check whether we need to output the decomposition into contributions from each initial condition */
@@ -557,8 +535,10 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
   /** - loop over pk type (_cb, _m) */
 
-  for (index_pk = 0; index_pk < nonlinear_module_->pk_size_; index_pk++) {
+  for (int index_pk = 0; index_pk < nonlinear_module_->pk_size_; index_pk++) {
 
+    const size_t type_suffix_size = 9;
+    char type_suffix[type_suffix_size];     // 9 is enough to write "pk_cb_nl" plus closing character \0
     if ((nonlinear_module_->has_pk_m_ == _TRUE_) && (index_pk == nonlinear_module_->index_pk_m_)) {
       if (pk_output == pk_linear)
         snprintf(type_suffix, type_suffix_size, "pk");
@@ -574,7 +554,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
     /** - loop over z */
 
-    for (index_z = 0; index_z < pop->z_pk_num; index_z++) {
+    for (int index_z = 0; index_z < pop->z_pk_num; index_z++) {
 
       /** - first, check that requested redshift z_pk is consistent */
 
@@ -582,6 +562,8 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
                  error_message_,
                  "P(k,z) computed up to z=%f but requested at z=%f. Must increase z_max_pk in precision file.",ppt->z_max_pk,pop->z_pk[index_z]);
 
+      const size_t redshift_suffix_size = 7;
+      char redshift_suffix[redshift_suffix_size]; // 7 is enough to write "z%d_" as long as there are at most 10'000 bins
       if (pop->z_pk_num == 1)
         redshift_suffix[0]='\0';
       else
@@ -591,6 +573,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
       snprintf(file_name, _FILENAMESIZE_-32, "%s%s%s%s",pop->root,redshift_suffix,type_suffix,".dat");
 
+      FILE * out_pk;
       class_call(output_open_pk_file(&out_pk,
                                      file_name,
                                      "",
@@ -601,9 +584,10 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
       if (do_ic == _TRUE_) {
 
-        for (index_ic1 = 0; index_ic1 < nonlinear_module_->ic_size_; index_ic1++) {
+        char first_line[_LINE_LENGTH_MAX_];
+        for (int index_ic1 = 0; index_ic1 < nonlinear_module_->ic_size_; index_ic1++) {
 
-          for (index_ic2 = index_ic1; index_ic2 < nonlinear_module_->ic_size_; index_ic2++) {
+          for (int index_ic2 = index_ic1; index_ic2 < nonlinear_module_->ic_size_; index_ic2++) {
 
             if ((ppt->has_ad == _TRUE_) && (index_ic1 == perturbations_module_->index_ic_ad_) && (index_ic2 == perturbations_module_->index_ic_ad_)) {
               snprintf(file_name, _FILENAMESIZE_-32, "%s%s%s%s",pop->root,redshift_suffix,type_suffix,"_ad.dat");
@@ -680,7 +664,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
               strcpy(first_line,"for cross NIDxNIV mode ");
             }
 
-            index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, nonlinear_module_->ic_size_);
+            int index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, nonlinear_module_->ic_size_);
 
             if (nonlinear_module_->is_non_zero_[index_ic1_ic2] == _TRUE_) {
 
@@ -704,7 +688,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
       /** - fourth, write in files */
 
-      for (index_k = 0; index_k < nonlinear_module_->k_size_; index_k++) {
+      for (int index_k = 0; index_k < nonlinear_module_->k_size_; index_k++) {
 
         class_call(output_one_line_of_pk(out_pk,
                                          exp(nonlinear_module_->ln_k_[index_k])/pba->h,
@@ -715,7 +699,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
         if (do_ic == _TRUE_) {
 
-          for (index_ic1_ic2 = 0; index_ic1_ic2 < nonlinear_module_->ic_ic_size_; index_ic1_ic2++) {
+          for (int index_ic1_ic2 = 0; index_ic1_ic2 < nonlinear_module_->ic_ic_size_; index_ic1_ic2++) {
 
             if (nonlinear_module_->is_non_zero_[index_ic1_ic2] == _TRUE_) {
 
@@ -734,7 +718,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
       fclose(out_pk);
 
       if (do_ic == _TRUE_) {
-        for (index_ic1_ic2 = 0; index_ic1_ic2 < nonlinear_module_->ic_ic_size_; index_ic1_ic2++) {
+        for (int index_ic1_ic2 = 0; index_ic1_ic2 < nonlinear_module_->ic_ic_size_; index_ic1_ic2++) {
           if (nonlinear_module_->is_non_zero_[index_ic1_ic2] == _TRUE_) {
             fclose(out_pk_ic[index_ic1_ic2]);
           }
@@ -759,24 +743,12 @@ int OutputModule::output_tk() {
 
   /** - define local variables */
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  int size_data, number_of_titles;
 
-  FILE * tkfile;
-
-  int index_md;
-  int index_ic;
-  int index_z;
-
-  double z;
-
-  FileName file_name;
-  const size_t redshift_suffix_size = 7;
-  char redshift_suffix[redshift_suffix_size]; // 7 is enough to write "z%d_" as long as there are at most 10'000 bins
   char first_line[_LINE_LENGTH_MAX_];
   char ic_suffix[4];   // 4 is enough to write "ad", "bi", "cdi", "nid", "niv", ...
 
 
-  index_md = perturbations_module_->index_md_scalars_;
+  int index_md = perturbations_module_->index_md_scalars_;
 
   if (pop->output_format == camb_format) {
 
@@ -793,14 +765,14 @@ int OutputModule::output_tk() {
   class_call(perturbations_module_->perturb_output_titles(pop->output_format, titles),
              perturbations_module_->error_message_,
              error_message_);
-  number_of_titles = get_number_of_titles(titles);
-  size_data = number_of_titles*perturbations_module_->k_size_[index_md];
+  int number_of_titles = get_number_of_titles(titles);
+  int size_data = number_of_titles*perturbations_module_->k_size_[index_md];
 
   std::vector<double> data(perturbations_module_->ic_size_[index_md]*size_data);
 
-  for (index_z = 0; index_z < pop->z_pk_num; index_z++) {
+  for (int index_z = 0; index_z < pop->z_pk_num; index_z++) {
 
-    z = pop->z_pk[index_z];
+    double z = pop->z_pk[index_z];
 
     /** - first, check that requested redshift z_pk is consistent */
 
@@ -808,6 +780,8 @@ int OutputModule::output_tk() {
                error_message_,
                "T_i(k,z) computed up to z=%f but requested at z=%f. Must increase z_max_pk in precision file.",ppt->z_max_pk,pop->z_pk[index_z]);
 
+    const size_t redshift_suffix_size = 7;
+    char redshift_suffix[redshift_suffix_size]; // 7 is enough to write "z%d_" as long as there are at most 10'000 bins
     if (pop->z_pk_num == 1)
       redshift_suffix[0]='\0';
     else
@@ -819,17 +793,19 @@ int OutputModule::output_tk() {
                perturbations_module_->error_message_,
                error_message_);
 
-    for (index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
+    for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
 
       class_call(perturbations_module_->perturb_output_firstline_and_ic_suffix(index_ic, first_line, ic_suffix),
                  perturbations_module_->error_message_,
                  error_message_);
 
+      FileName file_name;
       if ((ppt->has_ad == _TRUE_) && (perturbations_module_->ic_size_[index_md] == 1))
         snprintf(file_name, _FILENAMESIZE_-32, "%s%s%s",pop->root,redshift_suffix,"tk.dat");
       else
         snprintf(file_name, _FILENAMESIZE_-32, "%s%s%s%s%s",pop->root,redshift_suffix,"tk_",ic_suffix,".dat");
 
+      FILE * tkfile;
       class_open(tkfile, file_name, "w", error_message_);
 
       if (pop->write_header == _TRUE_) {
@@ -881,23 +857,22 @@ int OutputModule::output_tk() {
 
 int OutputModule::output_background() {
 
-  FILE * backfile;
   FileName file_name;
 
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  int size_data, number_of_titles;
 
   class_call(background_module_->background_output_titles(titles),
              background_module_->error_message_,
              error_message_);
-  number_of_titles = get_number_of_titles(titles);
-  size_data = number_of_titles*background_module_->bt_size_;
+  int number_of_titles = get_number_of_titles(titles);
+  int size_data = number_of_titles*background_module_->bt_size_;
   std::vector<double> data(size_data);
   class_call(background_module_->background_output_data(number_of_titles, data.data()),
              background_module_->error_message_,
              error_message_);
 
   snprintf(file_name, _FILENAMESIZE_-32, "%s%s",pop->root,"background.dat");
+  FILE * backfile;
   class_open(backfile, file_name, "w", error_message_);
 
   if (pop->write_header == _TRUE_) {
@@ -926,21 +901,20 @@ int OutputModule::output_background() {
 int OutputModule::output_thermodynamics() {
 
   FileName file_name;
-  FILE * thermofile;
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  int size_data, number_of_titles;
 
   class_call(thermodynamics_module_->thermodynamics_output_titles(titles),
              thermodynamics_module_->error_message_,
              error_message_);
-  number_of_titles = get_number_of_titles(titles);
-  size_data = number_of_titles*thermodynamics_module_->tt_size_;
+  int number_of_titles = get_number_of_titles(titles);
+  int size_data = number_of_titles*thermodynamics_module_->tt_size_;
   std::vector<double> data(size_data);
   class_call(thermodynamics_module_->thermodynamics_output_data(number_of_titles, data.data()),
              thermodynamics_module_->error_message_,
              error_message_);
 
   snprintf(file_name, _FILENAMESIZE_-32, "%s%s",pop->root,"thermodynamics.dat");
+  FILE * thermofile;
   class_open(thermofile, file_name, "w", error_message_);
 
   if (pop->write_header == _TRUE_) {
@@ -1037,22 +1011,21 @@ int OutputModule::output_perturbations() {
 
 int OutputModule::output_primordial() {
   FileName file_name;
-  FILE * out;
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  int size_data, number_of_titles;
 
   snprintf(file_name, _FILENAMESIZE_-32, "%s%s",pop->root,"primordial_Pk.dat");
 
   class_call(primordial_module_->primordial_output_titles(titles),
              primordial_module_->error_message_,
              error_message_);
-  number_of_titles = get_number_of_titles(titles);
-  size_data = number_of_titles*primordial_module_->lnk_size_;
+  int number_of_titles = get_number_of_titles(titles);
+  int size_data = number_of_titles*primordial_module_->lnk_size_;
   std::vector<double> data(size_data);
   class_call(primordial_module_->primordial_output_data(number_of_titles, data.data()),
              primordial_module_->error_message_,
              error_message_);
 
+  FILE * out;
   class_open(out, file_name, "w", error_message_);
   if (pop->write_header == _TRUE_) {
     fprintf(out,"# Dimensionless primordial spectrum, equal to [k^3/2pi^2] P(k) \n");
@@ -1073,18 +1046,16 @@ int OutputModule::output_print_data(FILE *out,
                       const char titles[_MAXTITLESTRINGLENGTH_],
                       double *dataptr,
                       int size_dataptr){
-  int colnum=1, number_of_titles;
-  int index_title, index_tau;
-  char thetitle[_MAXTITLESTRINGLENGTH_];
-  char *pch;
+  int colnum=1;
 
   /** Summary*/
 
   /** - First we print the titles */
   fprintf(out,"#");
 
+  char thetitle[_MAXTITLESTRINGLENGTH_];
   strcpy(thetitle,titles);
-  pch = strtok(thetitle,_DELIMITER_);
+  char *pch = strtok(thetitle,_DELIMITER_);
   while (pch != NULL){
     class_fprintf_columntitle(out, pch, _TRUE_, colnum);
     pch = strtok(NULL,_DELIMITER_);
@@ -1092,11 +1063,11 @@ int OutputModule::output_print_data(FILE *out,
   fprintf(out,"\n");
 
   /** - Then we print the data */
-  number_of_titles = colnum-1;
+  int number_of_titles = colnum-1;
   if (number_of_titles>0){
-    for (index_tau=0; index_tau<size_dataptr/number_of_titles; index_tau++){
+    for (int index_tau=0; index_tau<size_dataptr/number_of_titles; index_tau++){
       fprintf(out," ");
-      for (index_title=0; index_title<number_of_titles; index_title++){
+      for (int index_title=0; index_title<number_of_titles; index_title++){
         class_fprintf_double(out, dataptr[index_tau*number_of_titles+index_title], _TRUE_);
       }
       fprintf(out,"\n");
