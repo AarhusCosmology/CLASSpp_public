@@ -21,9 +21,9 @@ public:
 
   //@{
   int md_size_;           /**< number of modes (scalar, tensor, ...) included in computation */
-  int * ic_size_;         /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
-  int * ic_ic_size_;      /**< for a given mode, ic_ic_size[index_md] = number of pairs of (index_ic1, index_ic2) with index_ic2 >= index_ic1; this number is just N(N+1)/2  where N = ic_size[index_md] */
-  short ** is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
+  std::vector<int> ic_size_;         /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
+  std::vector<int> ic_ic_size_;      /**< for a given mode, ic_ic_size[index_md] = number of pairs of (index_ic1, index_ic2) with index_ic2 >= index_ic1; this number is just N(N+1)/2  where N = ic_size[index_md] */
+  std::vector<std::vector<short>> is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
   //@}
 
   /** @name - information on number of type of C_l's (TT, TE...) */
@@ -63,13 +63,13 @@ public:
   //@}
 
   int l_size_max_; /**< greatest of all l_size[index_md] */
-  double * l_;    /**< list of multipole values l[index_l] */
-  int ** l_max_ct_;    /**< last multipole (given as an input) at which
+  std::vector<double> l_;    /**< list of multipole values l[index_l] */
+  std::vector<std::vector<int>> l_max_ct_;    /**< last multipole (given as an input) at which
                          we want to output \f$ C_l\f$'s for a given mode and type;
                          l[index_md][l_size[index_md]-1] can be larger
                          than l_max[index_md], in order to ensure a
                          better interpolation with no boundary effects */
-  int * l_max_;    /**< last multipole (given as an input) at which
+  std::vector<int> l_max_;    /**< last multipole (given as an input) at which
                      we want to output \f$ C_l\f$'s for a given mode (maximized over types);
                      l[index_md][l_size[index_md]-1] can be larger
                      than l_max[index_md], in order to ensure a
@@ -111,11 +111,11 @@ private:
 
   //@{
 
-  int * l_size_;   /**< number of multipole values for each requested mode, l_size[index_md] */
+  std::vector<int> l_size_;   /**< number of multipole values for each requested mode, l_size[index_md] */
 
 
-  double ** cl_;   /**< table of anisotropy spectra for each mode, multipole, pair of initial conditions and types, cl[index_md][(index_l * psp->ic_ic_size[index_md] + index_ic1_ic2) * psp->ct_size + index_ct] */
-  double ** ddcl_; /**< second derivatives of previous table with respect to l, in view of spline interpolation */
+  std::vector<std::vector<double>> cl_;   /**< table of anisotropy spectra for each mode, multipole, pair of initial conditions and types, cl[index_md][(index_l * psp->ic_ic_size[index_md] + index_ic1_ic2) * psp->ct_size + index_ct] */
+  std::vector<std::vector<double>> ddcl_; /**< second derivatives of previous table with respect to l, in view of spline interpolation */
 
   //@}
 

@@ -708,7 +708,6 @@ cdef class PyCosmology:
         cdef:
             double ln_k
             double pk_tilt
-            double* ln_k_vec
             int index_pk_m
             int k_size
             int status
@@ -718,10 +717,9 @@ cdef class PyCosmology:
 
         nonlinear_module = deref(self._thisptr).GetNonlinearModule()
         ln_k = log(k)
-        ln_k_vec = deref(nonlinear_module).ln_k_
         k_size = deref(nonlinear_module).k_size_
         index_pk_m = deref(nonlinear_module).index_pk_m_
-        if (k_size < 2 or not (ln_k_vec[1] <= ln_k <= ln_k_vec[k_size - 2])):
+        if (k_size < 2 or not (deref(nonlinear_module).ln_k_[1] <= ln_k <= deref(nonlinear_module).ln_k_[k_size - 2])):
             raise CosmoSevereError("In order to get pk_tilt at k=%e 1/Mpc, you should compute P(k,z) in a wider range of k's"%k)
         status = deref(nonlinear_module).nonlinear_pk_tilt_at_k_and_z(pk_linear, k, z, index_pk_m, &pk_tilt)
         if status == constvals.sFAILURE:
@@ -1256,8 +1254,8 @@ cdef class PyCosmology:
             Py_ssize_t number_of_titles
             Py_ssize_t timesteps
             dict tmpdict
-            double** thedata
             double[:,::1] view
+            double* thedata_ptr
             int* thesizes
             list names
             list tmparray
@@ -1267,15 +1265,12 @@ cdef class PyCosmology:
         for mode in ['scalar','vector','tensor']:
             if mode=='scalar' and self.pt.has_scalars:
                 thetitles = <bytes> deref(perturbation_module).scalar_titles_
-                thedata = <double**> deref(perturbation_module).scalar_perturbations_data_
                 thesizes = <int*> deref(perturbation_module).size_scalar_perturbation_data_
             elif mode=='vector' and self.pt.has_vectors:
                 thetitles = <bytes> deref(perturbation_module).vector_titles_
-                thedata = <double**> deref(perturbation_module).vector_perturbations_data_
                 thesizes = <int*> deref(perturbation_module).size_vector_perturbation_data_
             elif mode=='tensor' and self.pt.has_tensors:
                 thetitles = <bytes> deref(perturbation_module).tensor_titles_
-                thedata = <double**> deref(perturbation_module).tensor_perturbations_data_
                 thesizes = <int*> deref(perturbation_module).size_tensor_perturbation_data_
             else:
                 continue
@@ -1288,7 +1283,13 @@ cdef class PyCosmology:
             for j in range(k_size):
                 timesteps = thesizes[j]//number_of_titles
                 tmpdict = {}
-                view = <double[:timesteps,:number_of_titles]> thedata[j]
+                if mode == 'scalar':
+                    thedata_ptr = <double*>deref(perturbation_module).scalar_perturbations_data_[j].data()
+                elif mode == 'vector':
+                    thedata_ptr = <double*>deref(perturbation_module).vector_perturbations_data_[j].data()
+                else:
+                    thedata_ptr = <double*>deref(perturbation_module).tensor_perturbations_data_[j].data()
+                view = <double[:timesteps,:number_of_titles]> thedata_ptr
                 for i in range(number_of_titles):
                     tmpdict[names[i]] = np.asarray(view[:,i])
                 tmparray.append(tmpdict)

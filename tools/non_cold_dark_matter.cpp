@@ -16,29 +16,7 @@ NonColdDarkMatter::NonColdDarkMatter(FileContent* pfc, const NcdmSettings& ncdm_
 }
 
 NonColdDarkMatter::~NonColdDarkMatter() {
-  SafeFree(M_ncdm_);
-  SafeFree(Omega0_ncdm_);
-  SafeFree(omega0_ncdm_);
-  SafeFree(m_ncdm_in_eV_);
-  SafeFree(deg_ncdm_);
-  SafeFree(T_ncdm_);
-  SafeFree(ksi_ncdm_);
-  SafeFree(ncdm_psd_parameters_);
-  SafeFree(got_files_);
-  SafeFree(ncdm_psd_files_);
-
-  SafeFree(ncdm_quadrature_strategy_);
-  SafeFree(ncdm_input_q_size_);
-  SafeFree(q_size_ncdm_bg_);
-  SafeFree(q_size_ncdm_);
-  SafeFree(ncdm_qmax_);
-  SafeFree(factor_ncdm_);
-
-  SafeFree(q_ncdm_);
-  SafeFree(w_ncdm_);
-  SafeFree(dlnf0_dlnq_ncdm_);
-  SafeFree(q_ncdm_bg_);
-  SafeFree(w_ncdm_bg_);
+  /* All memory freed by RAII (std::vector members destroyed automatically) */
 }
 
 
@@ -57,7 +35,7 @@ int NonColdDarkMatter::background_ncdm_distribution(void* pbadist, double q, dou
   int n_ncdm = pbadist_local->n_ncdm;   /* extract index of ncdm species under consideration */
   double ksi = pbadist_local->ncdm->ksi_ncdm_[n_ncdm];      /* extract chemical potential */
   double qlast,dqlast,f0last,df0last;
-  double* param = pbadist_local->ncdm->ncdm_psd_parameters_;
+  double* param = pbadist_local->ncdm->ncdm_psd_parameters_.empty() ? nullptr : const_cast<double*>(pbadist_local->ncdm->ncdm_psd_parameters_.data());
   int lastidx;
   /* Variables corresponding to entries in param: */
   //double square_s12,square_s23,square_s13;
@@ -86,10 +64,10 @@ int NonColdDarkMatter::background_ncdm_distribution(void* pbadist, double q, dou
     else{
       //Do interpolation:
       class_call(array_interpolate_spline(
-                                          pbadist_local->q,
+                                          pbadist_local->q.data(),
                                           pbadist_local->tablesize,
-                                          pbadist_local->f0,
-                                          pbadist_local->d2f0,
+                                          pbadist_local->f0.data(),
+                                          pbadist_local->d2f0.data(),
                                           1,
                                           q,
                                           &pbadist_local->last_index,
@@ -244,68 +222,78 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     throw std::invalid_argument("Amount of ncdm species must be positive, please check the N_ncdm variables in your input file.");
   }
 
-  auto read_list_of_ints_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, int*& output, int expected_size, int default_value) {
+  auto read_list_of_ints_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, std::vector<int>& output, int expected_size, int default_value) {
     int flg1, flg2, entries_read;
+    int* raw = nullptr;
     class_call(parser_read_list_of_integers(pfc,
                                               varname.c_str(),
                                               &entries_read,
-                                              &output,
+                                              &raw,
                                               &flg1,
                                               error_message_),
                  error_message_,
                  error_message_);
-      class_call(parser_read_list_of_integers(pfc,
+    int* raw2 = nullptr;
+    class_call(parser_read_list_of_integers(pfc,
                                               varname_deprec.c_str(),
                                               &entries_read,
-                                              &output,
+                                              &raw2,
                                               &flg2,
                                               error_message_),
                  error_message_,
                  error_message_);
     if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
+      free(raw); free(raw2);
       throw std::invalid_argument(std::string("In input file, you can only enter one of ") + varname + std::string(" and ") + varname_deprec + std::string(", choose one"));
     } else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
       if (entries_read != expected_size) {
+        int* src = (flg1 == _TRUE_) ? raw : raw2;
+        free(src);
         throw std::invalid_argument(std::string("Number of entries in ") + varname + std::string(" does not match the expected number: ") + std::to_string(expected_size));
       }
+      int* src = (flg1 == _TRUE_) ? raw : raw2;
+      output.assign(src, src + entries_read);
+      free(src);
     } else {
-      class_alloc(output, expected_size*sizeof(int), error_message_);
-      for (int j = 0; j < expected_size; ++j) {
-        output[j] = default_value;
-      }
+      output.assign(expected_size, default_value);
     }
     return 0;
   };
 
-  auto read_list_of_doubles_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, double*& output, int expected_size, double default_value) {
+  auto read_list_of_doubles_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, std::vector<double>& output, int expected_size, double default_value) {
     int flg1, flg2, entries_read;
+    double* raw = nullptr;
     class_call(parser_read_list_of_doubles(pfc,
                                               varname.c_str(),
                                               &entries_read,
-                                              &output,
+                                              &raw,
                                               &flg1,
                                               error_message_),
                  error_message_,
                  error_message_);
-      class_call(parser_read_list_of_doubles(pfc,
+    double* raw2 = nullptr;
+    class_call(parser_read_list_of_doubles(pfc,
                                               varname_deprec.c_str(),
                                               &entries_read,
-                                              &output,
+                                              &raw2,
                                               &flg2,
                                               error_message_),
                  error_message_,
                  error_message_);
     if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
+      free(raw); free(raw2);
       throw std::invalid_argument(std::string("In input file, you can only enter one of ") + varname + std::string(" and ") + varname_deprec + std::string(", choose one"));
     } else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
       if (entries_read != expected_size) {
+        double* src = (flg1 == _TRUE_) ? raw : raw2;
+        free(src);
         throw std::invalid_argument(std::string("Number of entries in ") + varname + std::string(" does not match the expected number: ") + std::to_string(expected_size));
       }
+      double* src = (flg1 == _TRUE_) ? raw : raw2;
+      output.assign(src, src + entries_read);
+      free(src);
     } else {
-      class_alloc(output, expected_size*sizeof(double), error_message_);
-      for (int j = 0; j < expected_size; ++j) {
-        output[j] = default_value;
-      }
+      output.assign(expected_size, default_value);
     }
     return 0;
   };
@@ -375,8 +363,8 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
   /** The last N_ncdm_decay_dr_ ncdm-species are reserved for dncdm; here, insert the dncdm inputs at the end of the ncdm species vector */
   if (N_ncdm_decay_dr_ > 0) {
-    auto extend_list_of_integers = [&](const std::string& key, int*& output, int default_value = 0) {
-      output = static_cast<int*>(realloc(output, sizeof(int)*(N_ncdm_standard_ + N_ncdm_decay_dr_)));
+    auto extend_list_of_integers = [&](const std::string& key, std::vector<int>& output, int default_value = 0) {
+      output.resize(N_ncdm_standard_ + N_ncdm_decay_dr_);
       int* tmp;
       // class_read_list_of_integers_or_default macro uses "pfc" as FileContent input
       class_read_list_of_integers_or_default(key.c_str(), tmp, default_value, N_ncdm_decay_dr_);
@@ -386,8 +374,8 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
       free(tmp);
       return 0;
     };
-    auto extend_list_of_doubles = [&](const std::string& key, double*& output, double default_value = 0.0) {
-      output = static_cast<double*>(realloc(output, sizeof(double)*(N_ncdm_standard_ + N_ncdm_decay_dr_)));
+    auto extend_list_of_doubles = [&](const std::string& key, std::vector<double>& output, double default_value = 0.0) {
+      output.resize(N_ncdm_standard_ + N_ncdm_decay_dr_);
       double* tmp;
       // class_read_list_of_doubles_or_default macro uses "pfc" as FileContent input
       class_read_list_of_doubles_or_default(key.c_str(), tmp, default_value, N_ncdm_decay_dr_);
@@ -436,7 +424,12 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   }
 
   /* Check if filenames for interpolation tables are given: */
-  class_read_list_of_integers_or_default("use_ncdm_psd_files", got_files_, _FALSE_, N_ncdm_);
+  {
+    int* raw_got_files = nullptr;
+    class_read_list_of_integers_or_default("use_ncdm_psd_files", raw_got_files, _FALSE_, N_ncdm_);
+    got_files_.assign(raw_got_files, raw_got_files + N_ncdm_);
+    free(raw_got_files);
+  }
 
   if (flag1 == _TRUE_){
     int fileentries = 0;
@@ -447,7 +440,8 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     if (fileentries > 0) {
       /* Okay, read filenames.. */
       int flag2;
-      class_call(parser_read_list_of_strings(pfc, "ncdm_psd_filenames", &entries_read, &ncdm_psd_files_, &flag2, errmsg),
+      char* raw_psd_files = nullptr;
+      class_call(parser_read_list_of_strings(pfc, "ncdm_psd_filenames", &entries_read, &raw_psd_files, &flag2, errmsg),
                  errmsg,
                  errmsg);
       class_test(flag2 == _FALSE_, errmsg, "Input use_ncdm_files is found, but no filenames found!");
@@ -456,40 +450,41 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
                  "Number of filenames found, %d, does not match number of _TRUE_ values in use_ncdm_files, %d",
                  entries_read,
                  fileentries);
+      ncdm_psd_files_.assign(raw_psd_files, raw_psd_files + entries_read*_ARGUMENT_LENGTH_MAX_);
+      free(raw_psd_files);
     }
   }
   /* Read (optional) p.s.d.-parameters:*/
-  parser_read_list_of_doubles(pfc,
-                              "ncdm_psd_parameters",
-                              &entries_read,
-                              &ncdm_psd_parameters_,
-                              &flag1,
-                              errmsg);
+  {
+    double* raw_psd_params = nullptr;
+    parser_read_list_of_doubles(pfc,
+                                "ncdm_psd_parameters",
+                                &entries_read,
+                                &raw_psd_params,
+                                &flag1,
+                                errmsg);
+    if (raw_psd_params && entries_read > 0) {
+      ncdm_psd_parameters_.assign(raw_psd_params, raw_psd_params + entries_read);
+      free(raw_psd_params);
+    }
+  }
 
 
   int index_q,tolexp;
   double f0m2 = 0.0,f0m1,f0,f0p1,f0p2 = 0.0,q,df0dq;
 
-  /* Allocate pointer arrays: */
-  class_alloc(q_ncdm_, sizeof(double*)*N_ncdm_, error_message_);
-  class_alloc(w_ncdm_, sizeof(double*)*N_ncdm_, error_message_);
-  class_alloc(q_ncdm_bg_, sizeof(double*)*N_ncdm_, error_message_);
-  class_alloc(w_ncdm_bg_, sizeof(double*)*N_ncdm_, error_message_);
-  class_alloc(dlnf0_dlnq_ncdm_, sizeof(double*)*N_ncdm_, error_message_);
+  /* Allocate vector arrays: */
+  q_ncdm_.resize(N_ncdm_);
+  w_ncdm_.resize(N_ncdm_);
+  q_ncdm_bg_.resize(N_ncdm_);
+  w_ncdm_bg_.resize(N_ncdm_);
+  dlnf0_dlnq_ncdm_.resize(N_ncdm_);
 
-  for (int n = 0; n < N_ncdm_; ++n) {
-    q_ncdm_[n] = nullptr;
-    w_ncdm_[n] = nullptr;
-    q_ncdm_bg_[n] = nullptr;
-    w_ncdm_bg_[n] = nullptr;
-    dlnf0_dlnq_ncdm_[n] = nullptr;
-  }
-
-  /* Allocate pointers: */
-  class_alloc(q_size_ncdm_, sizeof(int)*N_ncdm_, error_message_);
-  class_alloc(q_size_ncdm_bg_, sizeof(int)*N_ncdm_, error_message_);
-  class_alloc(factor_ncdm_, sizeof(double)*N_ncdm_, error_message_);
-  class_alloc(M_ncdm_, sizeof(double)*N_ncdm_, error_message_);
+  /* Allocate 1D arrays: */
+  q_size_ncdm_.resize(N_ncdm_);
+  q_size_ncdm_bg_.resize(N_ncdm_);
+  factor_ncdm_.resize(N_ncdm_);
+  M_ncdm_.resize(N_ncdm_);
 
   int dncdm_count = 0;
   int cumulative_q_index = 0;
@@ -553,12 +548,11 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   for(int k = 0; k < N_ncdm_; k++){
     background_parameters_for_distributions pbadist(this, k);
     pbadist.n_ncdm = k;
-    pbadist.q = NULL;
     pbadist.tablesize = 0;
     /*Do we need to read in a file to interpolate the distribution function? */
-    if ((got_files_ != NULL) && (got_files_[k] == _TRUE_)) {
-      FILE* psdfile = fopen(ncdm_psd_files_ + filenum*_ARGUMENT_LENGTH_MAX_, "r");
-      class_test(psdfile == NULL, error_message_, "Could not open file %s!", ncdm_psd_files_ + filenum*_ARGUMENT_LENGTH_MAX_);
+    if ((!got_files_.empty()) && (got_files_[k] == _TRUE_)) {
+      FILE* psdfile = fopen(ncdm_psd_files_.data() + filenum*_ARGUMENT_LENGTH_MAX_, "r");
+      class_test(psdfile == NULL, error_message_, "Could not open file %s!", ncdm_psd_files_.data() + filenum*_ARGUMENT_LENGTH_MAX_);
       // Find size of table:
       double tmp1;
       double tmp2;
@@ -571,19 +565,19 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
       pbadist.tablesize = row - 1;
 
       /*Allocate room for interpolation table: */
-      class_alloc(pbadist.q, sizeof(double)*pbadist.tablesize, error_message_);
-      class_alloc(pbadist.f0, sizeof(double)*pbadist.tablesize, error_message_);
-      class_alloc(pbadist.d2f0, sizeof(double)*pbadist.tablesize, error_message_);
+      pbadist.q.resize(pbadist.tablesize);
+      pbadist.f0.resize(pbadist.tablesize);
+      pbadist.d2f0.resize(pbadist.tablesize);
       for (row = 0; row < pbadist.tablesize; row++){
         status = fscanf(psdfile, "%lf %lf", &pbadist.q[row], &pbadist.f0[row]);
       }
       fclose(psdfile);
       /* Call spline interpolation: */
-      class_call(array_spline_table_lines(pbadist.q,
+      class_call(array_spline_table_lines(pbadist.q.data(),
                                           pbadist.tablesize,
-                                          pbadist.f0,
+                                          pbadist.f0.data(),
                                           1,
-                                          pbadist.d2f0,
+                                          pbadist.d2f0.data(),
                                           _SPLINE_EST_DERIV_,
                                           error_message_),
                  error_message_,
@@ -594,15 +588,15 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     /* Handle perturbation qsampling: */
     if (ncdm_quadrature_strategy_[k] == qm_auto) {
       /** Automatic q-sampling for this species */
-      class_alloc(q_ncdm_[k], _QUADRATURE_MAX_*sizeof(double), error_message_);
-      class_alloc(w_ncdm_[k], _QUADRATURE_MAX_*sizeof(double), error_message_);
+      q_ncdm_[k].resize(_QUADRATURE_MAX_);
+      w_ncdm_[k].resize(_QUADRATURE_MAX_);
 
-      class_call(get_qsampling(q_ncdm_[k],
-                               w_ncdm_[k],
+      class_call(get_qsampling(q_ncdm_[k].data(),
+                               w_ncdm_[k].data(),
                                &(q_size_ncdm_[k]),
                                _QUADRATURE_MAX_,
                                ncdm_settings.tol_ncdm,
-                               pbadist.q,
+                               pbadist.q.data(),
                                pbadist.tablesize,
                                background_ncdm_test_function,
                                background_ncdm_distribution,
@@ -610,19 +604,19 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
                                error_message_),
                  error_message_,
                  error_message_);
-      q_ncdm_[k] = (double*)realloc(q_ncdm_[k], q_size_ncdm_[k]*sizeof(double));
-      w_ncdm_[k] = (double*)realloc(w_ncdm_[k], q_size_ncdm_[k]*sizeof(double));
+      q_ncdm_[k].resize(q_size_ncdm_[k]);
+      w_ncdm_[k].resize(q_size_ncdm_[k]);
 
       /* Handle background q_sampling: */
-      class_alloc(q_ncdm_bg_[k], _QUADRATURE_MAX_BG_*sizeof(double), error_message_);
-      class_alloc(w_ncdm_bg_[k], _QUADRATURE_MAX_BG_*sizeof(double), error_message_);
+      q_ncdm_bg_[k].resize(_QUADRATURE_MAX_BG_);
+      w_ncdm_bg_[k].resize(_QUADRATURE_MAX_BG_);
 
-      class_call(get_qsampling(q_ncdm_bg_[k],
-                               w_ncdm_bg_[k],
+      class_call(get_qsampling(q_ncdm_bg_[k].data(),
+                               w_ncdm_bg_[k].data(),
                                &(q_size_ncdm_bg_[k]),
                                _QUADRATURE_MAX_BG_,
                                ncdm_settings.tol_ncdm_bg,
-                               pbadist.q,
+                               pbadist.q.data(),
                                pbadist.tablesize,
                                background_ncdm_test_function,
                                background_ncdm_distribution,
@@ -632,8 +626,8 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
                  error_message_);
 
 
-      q_ncdm_bg_[k] = (double*)realloc(q_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double));
-      w_ncdm_bg_[k] = (double*)realloc(w_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double));
+      q_ncdm_bg_[k].resize(q_size_ncdm_bg_[k]);
+      w_ncdm_bg_[k].resize(q_size_ncdm_bg_[k]);
 
       if (ncdm_types_[k] == NCDMType::decay_dr) {
         for (int index_q = 0; index_q < q_size_ncdm_bg_[k]; index_q++) {
@@ -649,19 +643,18 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
       q_size_ncdm_bg_[k] = ncdm_input_q_size_[k];
       q_size_ncdm_[k] = ncdm_input_q_size_[k];
 
-      class_alloc(q_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double), error_message_);
-      class_alloc(w_ncdm_bg_[k], q_size_ncdm_bg_[k]*sizeof(double), error_message_);
-      class_alloc(q_ncdm_[k], q_size_ncdm_[k]*sizeof(double), error_message_);
-      class_alloc(w_ncdm_[k], q_size_ncdm_[k]*sizeof(double), error_message_);
-      double* dq;
-      class_alloc(dq, q_size_ncdm_bg_[k]*sizeof(double), error_message_);
-      class_call(get_qsampling_manual(q_ncdm_[k],
-                                      w_ncdm_[k],
-                                      dq,
+      q_ncdm_bg_[k].resize(q_size_ncdm_bg_[k]);
+      w_ncdm_bg_[k].resize(q_size_ncdm_bg_[k]);
+      q_ncdm_[k].resize(q_size_ncdm_[k]);
+      w_ncdm_[k].resize(q_size_ncdm_[k]);
+      std::vector<double> dq_vec(q_size_ncdm_bg_[k]);
+      class_call(get_qsampling_manual(q_ncdm_[k].data(),
+                                      w_ncdm_[k].data(),
+                                      dq_vec.data(),
                                       q_size_ncdm_[k],
                                       ncdm_qmax_[k],
                                       (enum quadrature_method)ncdm_quadrature_strategy_[k],
-                                      pbadist.q,
+                                      pbadist.q.data(),
                                       pbadist.tablesize,
                                       background_ncdm_distribution,
                                       &pbadist,
@@ -672,14 +665,12 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
         q_ncdm_bg_[k][index_q] = q_ncdm_[k][index_q];
         w_ncdm_bg_[k][index_q] = w_ncdm_[k][index_q];
         if (ncdm_types_[k] == NCDMType::decay_dr) {
-          decay_dr_map_[k].dq.push_back(dq[index_q]);
+          decay_dr_map_[k].dq.push_back(dq_vec[index_q]);
         }
       }
     }
 
-    class_alloc(dlnf0_dlnq_ncdm_[k],
-                q_size_ncdm_[k]*sizeof(double),
-                error_message_);
+    dlnf0_dlnq_ncdm_[k].resize(q_size_ncdm_[k]);
 
 
     for (index_q = 0; index_q < q_size_ncdm_[k]; index_q++) {
@@ -808,8 +799,8 @@ int NonColdDarkMatter::background_ncdm_momenta_mass(int n_ncdm, double M, double
 
   /** - rescale normalization at given redshift */
   double factor2 = factor_ncdm_[n_ncdm]*pow(1 + z, 4);
-  double* qvec = q_ncdm_bg_[n_ncdm];
-  double* wvec = w_ncdm_bg_[n_ncdm];
+  const double* qvec = q_ncdm_bg_[n_ncdm].data();
+  const double* wvec = w_ncdm_bg_[n_ncdm].data();
   double qsize = q_size_ncdm_bg_[n_ncdm];
   /** - initialize quantities */
   if (n != NULL) *n = 0.;
@@ -854,8 +845,8 @@ int NonColdDarkMatter::background_ncdm_momenta_deg(int n_ncdm, double deg, doubl
   double M = M_ncdm_[n_ncdm];
   double factor2 = deg*4*_PI_*pow(T_cmb*T_ncdm_[n_ncdm]*_k_B_, 4)*8*_PI_*_G_
       /3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_*pow(1 + z, 4);
-  double* qvec = q_ncdm_bg_[n_ncdm];
-  double* wvec = w_ncdm_bg_[n_ncdm];
+  const double* qvec = q_ncdm_bg_[n_ncdm].data();
+  const double* wvec = w_ncdm_bg_[n_ncdm].data();
   double qsize = q_size_ncdm_bg_[n_ncdm];
 
   if (n != NULL) *n = 0.;
@@ -933,40 +924,14 @@ double NonColdDarkMatter::GetOmega0() const {
   return res;
 }
 
-void NonColdDarkMatter::SafeFree(double* pointer) {
-  if (pointer) {
-    free(pointer);
-  }
-}
-
-void NonColdDarkMatter::SafeFree(int* pointer) {
-  if (pointer) {
-    free(pointer);
-  }
-}
-
-void NonColdDarkMatter::SafeFree(char* pointer) {
-  if (pointer) {
-    free(pointer);
-  }
-}
-
-void NonColdDarkMatter::SafeFree(double** double_pointer) {
-  if (!double_pointer) {
-    return;
-  }
-  for (int n = 0; n < N_ncdm_; ++n) {
-    SafeFree(double_pointer[n]);
-  }
-  free(double_pointer);
-}
+/* SafeFree methods removed — memory now managed by RAII (std::vector) */
 
 void NonColdDarkMatter::PrintNeffInfo() const {
   int filenum = 0;
   for (int n_ncdm = 0; n_ncdm < N_ncdm_; ++n_ncdm) {
     /* inform if p-s-d read in files */
     if (got_files_[n_ncdm] == _TRUE_) {
-      printf(" -> ncdm species i=%d read from file %s\n", n_ncdm + 1, ncdm_psd_files_ + filenum*_ARGUMENT_LENGTH_MAX_);
+      printf(" -> ncdm species i=%d read from file %s\n", n_ncdm + 1, ncdm_psd_files_.data() + filenum*_ARGUMENT_LENGTH_MAX_);
       filenum++;
     }
     double rho_ncdm_rel;

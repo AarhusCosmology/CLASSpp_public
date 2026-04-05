@@ -147,10 +147,10 @@ int PrimordialModule::primordial_spectrum_at_k(
   else {
 
     class_call(array_interpolate_spline(
-                                        lnk_,
+                                        const_cast<double*>(lnk_.data()),
                                         lnk_size_,
-                                        lnpk_[index_md],
-                                        ddlnpk_[index_md],
+                                        const_cast<double*>(lnpk_[index_md].data()),
+                                        const_cast<double*>(ddlnpk_[index_md].data()),
                                         ic_ic_size_[index_md],
                                         lnk,
                                         &last_index,
@@ -413,11 +413,11 @@ int PrimordialModule::primordial_init() {
 
   for (index_md = 0; index_md < md_size_; index_md++) {
 
-    class_call(array_spline_table_lines(lnk_,
+    class_call(array_spline_table_lines(lnk_.data(),
                                         lnk_size_,
-                                        lnpk_[index_md],
+                                        lnpk_[index_md].data(),
                                         ic_ic_size_[index_md],
-                                        ddlnpk_[index_md],
+                                        ddlnpk_[index_md].data(),
                                         _SPLINE_EST_DERIV_,
                                         error_message_),
                error_message_,
@@ -548,37 +548,11 @@ int PrimordialModule::primordial_init() {
 
 int PrimordialModule::primordial_free() {
 
-  int index_md;
-
   if (lnk_size_ > 0) {
 
-    if (ppm->primordial_spec_type == analytic_Pk) {
-      for (index_md = 0; index_md < md_size_; index_md++) {
-        free(amplitude_[index_md]);
-        free(tilt_[index_md]);
-        free(running_[index_md]);
-      }
-      free(amplitude_);
-      free(tilt_);
-      free(running_);
-    }
-    else if (ppm->primordial_spec_type == external_Pk) {
+    if (ppm->primordial_spec_type == external_Pk) {
       free(ppm->command);
     }
-
-    for (index_md = 0; index_md < md_size_; index_md++) {
-      free(lnpk_[index_md]);
-      free(ddlnpk_[index_md]);
-      free(is_non_zero_[index_md]);
-    }
-
-    free(lnpk_);
-    free(ddlnpk_);
-    free(is_non_zero_);
-    free(ic_size_);
-    free(ic_ic_size_);
-
-    free(lnk_);
 
   }
 
@@ -597,15 +571,15 @@ int PrimordialModule::primordial_indices() {
 
   md_size_ = perturbations_module_->md_size_;
 
-  class_alloc(lnpk_, perturbations_module_->md_size_*sizeof(double*), error_message_);
+  lnpk_.resize(perturbations_module_->md_size_);
 
-  class_alloc(ddlnpk_, perturbations_module_->md_size_*sizeof(double*), error_message_);
+  ddlnpk_.resize(perturbations_module_->md_size_);
 
-  class_alloc(ic_size_, perturbations_module_->md_size_*sizeof(int*), error_message_);
+  ic_size_.resize(perturbations_module_->md_size_);
 
-  class_alloc(ic_ic_size_, perturbations_module_->md_size_*sizeof(int*), error_message_);
+  ic_ic_size_.resize(perturbations_module_->md_size_);
 
-  class_alloc(is_non_zero_, md_size_*sizeof(short*), error_message_);
+  is_non_zero_.resize(md_size_);
 
   for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
 
@@ -613,17 +587,11 @@ int PrimordialModule::primordial_indices() {
 
     ic_ic_size_[index_md] = (ic_size_[index_md]*(ic_size_[index_md] + 1))/2;
 
-    class_alloc(lnpk_[index_md],
-                lnk_size_*ic_ic_size_[index_md]*sizeof(double),
-                error_message_);
+    lnpk_[index_md].resize(lnk_size_*ic_ic_size_[index_md]);
 
-    class_alloc(ddlnpk_[index_md],
-                lnk_size_*ic_ic_size_[index_md]*sizeof(double),
-                error_message_);
+    ddlnpk_[index_md].resize(lnk_size_*ic_ic_size_[index_md]);
 
-    class_alloc(is_non_zero_[index_md],
-                ic_ic_size_[index_md]*sizeof(short),
-                error_message_);
+    is_non_zero_[index_md].resize(ic_ic_size_[index_md]);
 
 
   }
@@ -652,7 +620,7 @@ int PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k
 
   lnk_size_ = (int)(log(kmax/kmin)/log(10.)*k_per_decade) + 2;
 
-  class_alloc(lnk_, lnk_size_*sizeof(double), error_message_);
+  lnk_.resize(lnk_size_);
 
   for (i = 0; i < lnk_size_; i++)
     lnk_[i] = log(kmin) + i*log(10.)/k_per_decade;
@@ -679,31 +647,19 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
   double one_running=0.;
   double one_correlation=0.;
 
-  class_alloc(amplitude_,
-              md_size_*sizeof(double *),
-              error_message_);
+  amplitude_.resize(md_size_);
 
-  class_alloc(tilt_,
-              md_size_*sizeof(double *),
-              error_message_);
+  tilt_.resize(md_size_);
 
-  class_alloc(running_,
-              md_size_*sizeof(double *),
-              error_message_);
+  running_.resize(md_size_);
 
   for (index_md = 0; index_md < md_size_; index_md++) {
 
-    class_alloc(amplitude_[index_md],
-                ic_ic_size_[index_md]*sizeof(double),
-                error_message_);
+    amplitude_[index_md].resize(ic_ic_size_[index_md]);
 
-    class_alloc(tilt_[index_md],
-                ic_ic_size_[index_md]*sizeof(double),
-                error_message_);
+    tilt_[index_md].resize(ic_ic_size_[index_md]);
 
-    class_alloc(running_[index_md],
-                ic_ic_size_[index_md]*sizeof(double),
-                error_message_);
+    running_[index_md].resize(ic_ic_size_[index_md]);
 
   }
 
@@ -1085,9 +1041,9 @@ int PrimordialModule::primordial_inflation_indices() {
 int PrimordialModule::primordial_inflation_solve_inflation() {
   /** Summary: */
   /** - define local variables */
-  double * y;
-  double * y_ini;
-  double * dy;
+  std::vector<double> y(in_size_);
+  std::vector<double> y_ini(in_size_);
+  std::vector<double> dy(in_size_);
   double a_pivot;
   double a_try;
   double H_pivot;
@@ -1100,15 +1056,10 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
   int counter;
   double dH,ddH,dddH;
 
-  /** - allocate vectors for background/perturbed quantities */
-  class_alloc(y,     in_size_*sizeof(double), error_message_);
-  class_alloc(y_ini, in_size_*sizeof(double), error_message_);
-  class_alloc(dy,    in_size_*sizeof(double), error_message_);
-
   /** - eventually, needs first to find phi_pivot */
   if (ppm->primordial_spec_type == inflation_V_end) {
 
-    class_call(primordial_inflation_find_phi_pivot(y, dy),
+    class_call(primordial_inflation_find_phi_pivot(y.data(), dy.data()),
                error_message_,
                error_message_);
 
@@ -1148,15 +1099,14 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
     if (ppm->primordial_verbose > 1)
       printf(" (search attractor at pivot)\n");
 
-    class_call_except(primordial_inflation_find_attractor(phi_pivot_,
+    class_call(primordial_inflation_find_attractor(phi_pivot_,
                                                           ppr->primordial_inflation_attractor_precision_pivot,
-                                                          y,
-                                                          dy,
+                                                          y.data(),
+                                                          dy.data(),
                                                           &H_pivot,
                                                           &dphidt_pivot),
                       error_message_,
-                      error_message_,
-                      free(y);free(y_ini);free(dy));
+                      error_message_);
     break;
 
   case inflation_H:
@@ -1164,18 +1114,16 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
     /** - check positivity and negative slope of \f$ H(\phi)\f$ in field pivot
         value, and get H_pivot */
 
-    class_call_except(primordial_inflation_check_hubble(phi_pivot_,
+    class_call(primordial_inflation_check_hubble(phi_pivot_,
                                                         &H_pivot,
                                                         &dH,
                                                         &ddH,
                                                         &dddH),
                       error_message_,
-                      error_message_,
-                      free(y);free(y_ini);free(dy));
+                      error_message_);
     break;
 
   default:
-    free(y);free(y_ini);free(dy);
     class_stop(error_message_, "ppm->primordial_spec_type=%d different from possible relevant cases", ppm->primordial_spec_type);
     break;
   }
@@ -1201,16 +1149,15 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
   if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_V_end))
     y[index_in_dphi_] = a_pivot*dphidt_pivot;
 
-  class_call_except(primordial_inflation_evolve_background(y,
-                                                           dy,
+  class_call(primordial_inflation_evolve_background(y.data(),
+                                                           dy.data(),
                                                            _aH_,
                                                            aH_end,
                                                            _TRUE_,
                                                            forward,
                                                            conformal),
                     error_message_,
-                    error_message_,
-                    free(y);free(y_ini);free(dy));
+                    error_message_);
 
   /* we need to do the opposite: to check that there is an initial
      time such that k_min << (aH)_ini. A guess is made by integrating
@@ -1250,9 +1197,8 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
       /* counter to avoid infinite loop */
       counter ++;
 
-      class_test_except(counter >= ppr->primordial_inflation_phi_ini_maxit,
+      class_test(counter >= ppr->primordial_inflation_phi_ini_maxit,
                         error_message_,
-                        free(y);free(y_ini);free(dy),
                         "when searching for an initial value of phi just before observable inflation takes place, could not converge after %d iterations. The potential does not allow eough inflationary e-folds before reaching the pivot scale",
                         counter);
 
@@ -1264,16 +1210,15 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
          this is not the case, we will iterate until a correct phi_try
          is found. */
 
-      class_call_except(primordial_inflation_evolve_background(y,
-                                                               dy,
+      class_call(primordial_inflation_evolve_background(y.data(),
+                                                               dy.data(),
                                                                _aH_,
                                                                aH_ini*ppr->primordial_inflation_aH_ini_target,
                                                                _TRUE_,
                                                                backward,
                                                                conformal),
                         error_message_,
-                        error_message_,
-                        free(y);free(y_ini);free(dy));
+                        error_message_);
 
       phi_try = y[index_in_phi_];
 
@@ -1282,15 +1227,14 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
          dphi/dtau_ini */
 
       /* find dphi/dt_ini (unlike dphi/dtau_ini, this does not depend on normalization of a) */
-      class_call_except(primordial_inflation_find_attractor(phi_try,
+      class_call(primordial_inflation_find_attractor(phi_try,
                                                             ppr->primordial_inflation_attractor_precision_initial,
-                                                            y,
-                                                            dy,
+                                                            y.data(),
+                                                            dy.data(),
                                                             &H_try,
                                                             &dphidt_try),
                         error_message_,
-                        error_message_,
-                        free(y);free(y_ini);free(dy));
+                        error_message_);
 
       /* we need to normalize a properly so that a=a_pivot when
          phi=phi_pivot. To do so, we evolve starting arbitrarily from
@@ -1300,16 +1244,15 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
       y[index_in_phi_] = phi_try;
       y[index_in_dphi_] = y[index_in_a_]*dphidt_try; // dphi/dtau = a dphi/dt
 
-      class_call_except(primordial_inflation_evolve_background(y,
-                                                               dy,
+      class_call(primordial_inflation_evolve_background(y.data(),
+                                                               dy.data(),
                                                                _phi_,
                                                                phi_pivot_,
                                                                _TRUE_,
                                                                forward,
                                                                conformal),
                         error_message_,
-                        error_message_,
-                        free(y);free(y_ini);free(dy));
+                        error_message_);
 
       /* now impose the correct a_ini */
       a_try = a_pivot/y[index_in_a_];
@@ -1331,16 +1274,15 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
     y[index_in_a_] = a_pivot;
     y[index_in_phi_] = phi_pivot_;
 
-    class_call_except(primordial_inflation_evolve_background(y,
-                                                             dy,
+    class_call(primordial_inflation_evolve_background(y.data(),
+                                                             dy.data(),
                                                              _aH_,
                                                              aH_ini,
                                                              _TRUE_,
                                                              backward,
                                                              conformal),
                       error_message_,
-                      error_message_,
-                      free(y);free(y_ini);free(dy));
+                      error_message_);
 
     y_ini[index_in_a_] = y[index_in_a_];
     y_ini[index_in_phi_] = y[index_in_phi_];
@@ -1348,7 +1290,6 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
     break;
 
   default:
-    free(y);free(y_ini);free(dy);
     class_stop(error_message_, "ppm->primordial_spec_type=%d different from possible relevant cases", ppm->primordial_spec_type);
     break;
   }
@@ -1361,17 +1302,15 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
 
   if (ppm->behavior == numerical) {
 
-    class_call_except(primordial_inflation_spectra(y_ini),
+    class_call(primordial_inflation_spectra(y_ini.data()),
                       error_message_,
-                      error_message_,
-                      free(y);free(y_ini);free(dy));
+                      error_message_);
   }
   else if (ppm->behavior == analytical) {
 
-    class_call_except(primordial_inflation_analytic_spectra(y_ini),
+    class_call(primordial_inflation_analytic_spectra(y_ini.data()),
                       error_message_,
-                      error_message_,
-                      free(y);free(y_ini);free(dy));
+                      error_message_);
   }
   else {
     class_stop(error_message_, "Uncomprehensible value of the flag ppm->behavior=%d", ppm->behavior);
@@ -1385,29 +1324,27 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
   if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_V_end))
     y[index_in_dphi_] = y_ini[index_in_dphi_];
 
-  class_call_except(primordial_inflation_evolve_background(y,
-                                                           dy,
+  class_call(primordial_inflation_evolve_background(y.data(),
+                                                           dy.data(),
                                                            _aH_,
                                                            k_min,
                                                            _FALSE_,
                                                            forward,
                                                            conformal),
                     error_message_,
-                    error_message_,
-                    free(y);free(y_ini);free(dy));
+                    error_message_);
 
   phi_min_ = y[index_in_phi_];
 
-  class_call_except(primordial_inflation_evolve_background(y,
-                                                           dy,
+  class_call(primordial_inflation_evolve_background(y.data(),
+                                                           dy.data(),
                                                            _aH_,
                                                            k_max,
                                                            _FALSE_,
                                                            forward,
                                                            conformal),
                     error_message_,
-                    error_message_,
-                    free(y);free(y_ini);free(dy));
+                    error_message_);
 
   phi_max_ = y[index_in_phi_];
 
@@ -1415,12 +1352,6 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
     printf(" (observable power spectrum goes from %e to %e)\n",
            phi_min_,
            phi_max_);
-
-  /** - finally, we can de-allocate */
-
-  free(y);
-  free(y_ini);
-  free(dy);
 
   return _SUCCESS_;
 }
@@ -1436,18 +1367,14 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
  */
 
 int PrimordialModule::primordial_inflation_analytic_spectra(double * y_ini) {
-  double * y;
-  double * dy;
+  std::vector<double> y(in_size_);
+  std::vector<double> dy(in_size_);
   int index_k;
   double k,phi_k;
   double curvature,tensors;
   double V,dV,ddV;
 
   /** Summary */
-  /** - allocate vectors for background/perturbed quantities */
-  class_alloc(y,  in_size_*sizeof(double), error_message_);
-  class_alloc(dy, in_size_*sizeof(double), error_message_);
-
   /** - initialize the background part of the running vector */
   y[index_in_a_] = y_ini[index_in_a_];
   y[index_in_phi_] = y_ini[index_in_phi_];
@@ -1460,8 +1387,8 @@ int PrimordialModule::primordial_inflation_analytic_spectra(double * y_ini) {
     k = exp(lnk_[index_k]);
 
     /* evolve background until k=aH is reached */
-    class_call(primordial_inflation_evolve_background(y,
-                                                      dy,
+    class_call(primordial_inflation_evolve_background(y.data(),
+                                                      dy.data(),
                                                       _aH_,
                                                       k,
                                                       _FALSE_,
@@ -1542,16 +1469,12 @@ int PrimordialModule::primordial_inflation_spectra(double * y_ini) {
 int PrimordialModule::primordial_inflation_one_wavenumber(double * y_ini, int index_k) {
   double k;
   double curvature,tensors;
-  double * y;
-  double * dy;
+  std::vector<double> y(in_size_);
+  std::vector<double> dy(in_size_);
 
   k = exp(lnk_[index_k]);
 
   /** Summary */
-  /** - allocate vectors for background/perturbed quantities */
-  class_alloc(y,  in_size_*sizeof(double), error_message_);
-  class_alloc(dy, in_size_*sizeof(double), error_message_);
-
   /** - initialize the background part of the running vector */
   y[index_in_a_] = y_ini[index_in_a_];
   y[index_in_phi_] = y_ini[index_in_phi_];
@@ -1560,8 +1483,8 @@ int PrimordialModule::primordial_inflation_one_wavenumber(double * y_ini, int in
 
   /** - evolve the background until the relevant initial time for
       integrating perturbations */
-  class_call(primordial_inflation_evolve_background(y,
-                                                    dy,
+  class_call(primordial_inflation_evolve_background(y.data(),
+                                                    dy.data(),
                                                     _aH_,
                                                     k/ppr->primordial_inflation_ratio_min,
                                                     _FALSE_,
@@ -1573,15 +1496,12 @@ int PrimordialModule::primordial_inflation_one_wavenumber(double * y_ini, int in
   /** - evolve the background/perturbation equations from this time and
       until some time after Horizon crossing */
   class_call(primordial_inflation_one_k(k,
-                                        y,
-                                        dy,
+                                        y.data(),
+                                        dy.data(),
                                         &curvature,
                                         &tensors),
              error_message_,
              error_message_);
-
-  free(y);
-  free(dy);
 
   class_test(curvature<=0.,
              error_message_,
@@ -3025,7 +2945,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
   char command_with_arguments[2*_ARGUMENT_LENGTH_MAX_];
   FILE *process;
   int n_data_guess, n_data = 0;
-  double *k = NULL, *pks = NULL, *pkt = NULL, *tmp = NULL;
+  std::vector<double> k, pks, pkt;
   double this_k, this_pks, this_pkt = 0.0;
   int status;
   int index_k;
@@ -3033,10 +2953,10 @@ int PrimordialModule::primordial_external_spectrum_init() {
   /** - Initialization */
   /* Prepare the data (with some initial size) */
   n_data_guess = 100;
-  k   = (double *)malloc(n_data_guess*sizeof(double));
-  pks = (double *)malloc(n_data_guess*sizeof(double));
+  k.reserve(n_data_guess);
+  pks.reserve(n_data_guess);
   if (ppt->has_tensors == _TRUE_)
-    pkt = (double *)malloc(n_data_guess*sizeof(double));
+    pkt.reserve(n_data_guess);
   /* Prepare the command */
   /* If the command is just a "cat", no arguments need to be passed */
   if(strncmp("cat ", ppm->command, 4) == 0) {
@@ -3067,33 +2987,11 @@ int PrimordialModule::primordial_external_spectrum_init() {
     else {
       sscanf(line, "%lf %lf", &this_k, &this_pks);
     }
-    /* Standard technique in C: if too many data, double the size of the vectors */
-    /* (it is faster and safer that reallocating every new line) */
-    if((n_data+1) > n_data_guess) {
-      n_data_guess *= 2;
-      tmp = (double *)realloc(k,   n_data_guess*sizeof(double));
-      class_test(tmp == NULL,
-                 error_message_,
-                 "Error allocating memory to read the external spectrum.\n");
-      k = tmp;
-      tmp = (double *)realloc(pks, n_data_guess*sizeof(double));
-      class_test(tmp == NULL,
-                 error_message_,
-                 "Error allocating memory to read the external spectrum.\n");
-      pks = tmp;
-      if (ppt->has_tensors == _TRUE_) {
-        tmp = (double *)realloc(pkt, n_data_guess*sizeof(double));
-        class_test(tmp == NULL,
-                   error_message_,
-                   "Error allocating memory to read the external spectrum.\n");
-        pkt = tmp;
-      };
-    };
     /* Store */
-    k  [n_data]   = this_k;
-    pks[n_data]   = this_pks;
+    k.push_back(this_k);
+    pks.push_back(this_pks);
     if (ppt->has_tensors == _TRUE_) {
-      pkt[n_data] = this_pkt;
+      pkt.push_back(this_pkt);
     }
     n_data++;
     /* Check ascending order of the k's */
@@ -3125,27 +3023,12 @@ int PrimordialModule::primordial_external_spectrum_init() {
   /** - Store the read results into CLASS structures */
   lnk_size_ = n_data;
   /** - Make room */
-  class_realloc(lnk_,
-                lnk_,
-                lnk_size_*sizeof(double),
-                error_message_);
-  class_realloc(lnpk_[perturbations_module_->index_md_scalars_],
-                lnpk_[perturbations_module_->index_md_scalars_],
-                lnk_size_*sizeof(double),
-                error_message_);
-  class_realloc(ddlnpk_[perturbations_module_->index_md_scalars_],
-                ddlnpk_[perturbations_module_->index_md_scalars_],
-                lnk_size_*sizeof(double),
-                error_message_);
+  lnk_.resize(lnk_size_);
+  lnpk_[perturbations_module_->index_md_scalars_].resize(lnk_size_);
+  ddlnpk_[perturbations_module_->index_md_scalars_].resize(lnk_size_);
   if (ppt->has_tensors == _TRUE_) {
-    class_realloc(lnpk_[perturbations_module_->index_md_tensors_],
-                  lnpk_[perturbations_module_->index_md_tensors_],
-                  lnk_size_*sizeof(double),
-                  error_message_);
-    class_realloc(ddlnpk_[perturbations_module_->index_md_tensors_],
-                  ddlnpk_[perturbations_module_->index_md_tensors_],
-                  lnk_size_*sizeof(double),
-                  error_message_);
+    lnpk_[perturbations_module_->index_md_tensors_].resize(lnk_size_);
+    ddlnpk_[perturbations_module_->index_md_tensors_].resize(lnk_size_);
   };
   /** - Store values */
   for (index_k = 0; index_k < lnk_size_; index_k++) {
@@ -3161,11 +3044,6 @@ int PrimordialModule::primordial_external_spectrum_init() {
        lnpk_[perturbations_module_->index_md_tensors_][index_k], log(pkt[index_k]));
     */
   };
-  /** - Release the memory used locally */
-  free(k);
-  free(pks);
-  if (ppt->has_tensors == _TRUE_)
-    free(pkt);
   /** - Tell CLASS that there are scalar (and tensor) modes */
   is_non_zero_[perturbations_module_->index_md_scalars_][perturbations_module_->index_ic_ad_] = _TRUE_;
   if (ppt->has_tensors == _TRUE_)

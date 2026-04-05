@@ -92,10 +92,10 @@ int PerturbationsModule::perturb_sources_at_tau(int index_md, int index_ic, int 
 
   if ((logtau < ln_tau_[0]) || (ln_tau_size_ <= 1)) {
 
-    class_call(array_interpolate_two_bis(tau_sampling_,
+    class_call(array_interpolate_two_bis(const_cast<double*>(tau_sampling_.data()),
                                          1,
                                          0,
-                                         sources_[index_md][index_ic*tp_size_[index_md]+index_tp],
+                                         const_cast<double*>(sources_[index_md][index_ic*tp_size_[index_md]+index_tp].data()),
                                          k_size_[index_md],
                                          tau_size_,
                                          tau,
@@ -112,10 +112,10 @@ int PerturbationsModule::perturb_sources_at_tau(int index_md, int index_ic, int 
 
   else {
 
-    class_call(array_interpolate_spline(ln_tau_,
+    class_call(array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
                                         ln_tau_size_,
                                         late_sources_[index_md][index_ic * tp_size_[index_md] + index_tp],
-                                        ddlate_sources_[index_md][index_ic*tp_size_[index_md] + index_tp],
+                                        const_cast<double*>(ddlate_sources_[index_md][index_ic*tp_size_[index_md] + index_tp].data()),
                                         k_size_[index_md],
                                         logtau,
                                         &last_index,
@@ -145,12 +145,11 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
 
   int n_ncdm;
   double k, k_over_h, k2;
-  double * tkfull=NULL;  /* array with argument
-                            pk_ic[(index_k * psp->ic_size[index_md] + index_ic)*psp->tr_size+index_tr] */
+  std::vector<double> tkfull;
   double *tk;
   double *dataptr;
 
-  double * pvecsources;
+  std::vector<double> pvecsources;
 
   double tau;
 
@@ -161,9 +160,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
   int storeidx;
 
   if (k_size_[index_md]*ic_size_[index_md]*tp_size_[index_md] > 0) {
-    class_alloc(tkfull,
-                k_size_[index_md]*ic_size_[index_md]*tp_size_[index_md]*sizeof(double),
-                error_message_);
+    tkfull.resize(k_size_[index_md]*ic_size_[index_md]*tp_size_[index_md]);
   }
 
   /** - compute \f$T_i(k)\f$ for each k (if several ic's, compute it for each ic; if z_pk = 0, this is done by directly reading inside the pre-computed table; if not, this is done by interpolating the table at the correct value of tau. */
@@ -194,9 +191,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
                error_message_,
                "Asking sources at a z bigger than z_max_pk, something probably went wrong\n");
 
-    class_alloc(pvecsources,
-                k_size_[index_md]*sizeof(double),
-                error_message_);
+    pvecsources.resize(k_size_[index_md]);
 
     for (index_k = 0; index_k < k_size_[index_md]; index_k++) {
       for (index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
@@ -205,7 +200,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
                                             index_ic,
                                             index_tp,
                                             tau,
-                                            pvecsources),
+                                            pvecsources.data()),
                      error_message_,
                      error_message_);
 
@@ -213,7 +208,6 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
         }
       }
     }
-    free(pvecsources);
   }
 
   /** - store data */
@@ -303,9 +297,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
     }
   }
 
-  //Necessary because the size could be zero (if tp_size_ is zero)
-  if (tkfull != NULL)
-    free(tkfull);
+  /* RAII: tkfull cleaned up automatically */
 
   return _SUCCESS_;
 }
@@ -730,11 +722,11 @@ int PerturbationsModule::perturb_init() {
 
         for (index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
           future_output.push_back(task_system.AsyncTask([this, index_md, index_tp, index_ic] () {
-            class_call(array_spline_table_lines(ln_tau_,
+            class_call(array_spline_table_lines(ln_tau_.data(),
                                                 ln_tau_size_,
                                                 late_sources_[index_md][index_ic*tp_size_[index_md] + index_tp],
                                                 k_size_[index_md],
-                                                ddlate_sources_[index_md][index_ic*tp_size_[index_md] + index_tp],
+                                                ddlate_sources_[index_md][index_ic*tp_size_[index_md] + index_tp].data(),
                                                 _SPLINE_EST_DERIV_,
                                                 error_message_),
                               error_message_,
@@ -768,72 +760,7 @@ int PerturbationsModule::perturb_init() {
 
 int PerturbationsModule::perturb_free() {
 
-  int index_md,index_ic,index_tp;
-  int filenum;
-
-  if (ppt->has_perturbations == _TRUE_) {
-
-    for (index_md = 0; index_md < md_size_; index_md++) {
-
-      for (index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
-
-        for (index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
-
-          free(sources_[index_md][index_ic*tp_size_[index_md] + index_tp]);
-          if (ln_tau_size_ > 1)
-            free(ddlate_sources_[index_md][index_ic*tp_size_[index_md] + index_tp]);
-
-        }
-      }
-
-      free(sources_[index_md]);
-      free(late_sources_[index_md]);
-      free(ddlate_sources_[index_md]);
-
-      free(k_[index_md]);
-
-    }
-
-    free(tau_sampling_);
-    if (ln_tau_size_ > 1)
-      free(ln_tau_);
-
-    free(tp_size_);
-
-    free(ic_size_);
-
-    free(k_);
-
-    free(k_size_cmb_);
-
-    free(k_size_cl_);
-
-    free(k_size_);
-
-    free(sources_);
-    free(late_sources_);
-    free(ddlate_sources_);
-
-    //free(ppt->alpha_idm_dr);
-
-    //free(ppt->beta_idr);
-
-    /** Stuff related to perturbations output: */
-
-    /** - Free non-NULL pointers */
-    if (index_k_output_values_ != NULL)
-      free(index_k_output_values_);
-
-    for (filenum = 0; filenum<_MAX_NUMBER_OF_K_FILES_; filenum++){
-      if (scalar_perturbations_data_[filenum] != NULL)
-        free(scalar_perturbations_data_[filenum]);
-      if (vector_perturbations_data_[filenum] != NULL)
-        free(vector_perturbations_data_[filenum]);
-      if (tensor_perturbations_data_[filenum] != NULL)
-        free(tensor_perturbations_data_[filenum]);
-    }
-
-  }
+  /* RAII: all std::vector members are automatically cleaned up */
 
   return _SUCCESS_;
 
@@ -871,31 +798,23 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
 
   /** - allocate array of number of types for each mode, tp_size_[index_md] */
 
-  class_alloc(tp_size_, md_size_*sizeof(int), error_message_);
+  tp_size_.resize(md_size_);
 
   /** - allocate array of number of initial conditions for each mode, ic_size_[index_md] */
 
-  class_alloc(ic_size_, md_size_*sizeof(int), error_message_);
+  ic_size_.resize(md_size_);
 
   /** - allocate array of arrays of source functions for each mode, ppt->source[index_md] */
 
-  class_alloc(sources_,        md_size_*sizeof(double*), error_message_);
-  class_alloc(late_sources_,   md_size_*sizeof(double*), error_message_);
-  class_alloc(ddlate_sources_, md_size_*sizeof(double*), error_message_);
+  sources_.resize(md_size_);
+  late_sources_.resize(md_size_);
+  ddlate_sources_.resize(md_size_);
 
   /** - initialize variables for the output of k values */
-
-  index_k_output_values_ = NULL;
 
   number_of_scalar_titles_ = 0;
   number_of_vector_titles_ = 0;
   number_of_tensor_titles_ = 0;
-
-  for (filenum = 0; filenum<_MAX_NUMBER_OF_K_FILES_; filenum++){
-    scalar_perturbations_data_[filenum] = NULL;
-    vector_perturbations_data_[filenum] = NULL;
-    tensor_perturbations_data_[filenum] = NULL;
-  }
 
   /** - initialization of all flags to false (will eventually be set to true later) */
 
@@ -1237,17 +1156,9 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
 
     /** - (d) for each mode, allocate array of arrays of source functions for each initial conditions and wavenumber, (ppt->source[index_md])[index_ic][index_type] */
 
-    class_alloc(sources_[index_md],
-                ic_size_[index_md]*tp_size_[index_md]*sizeof(double*),
-                error_message_);
-
-    class_alloc(late_sources_[index_md],
-                ic_size_[index_md]*tp_size_[index_md]*sizeof(double*),
-                error_message_);
-
-    class_alloc(ddlate_sources_[index_md],
-                ic_size_[index_md]*tp_size_[index_md]*sizeof(double*),
-                error_message_);
+    sources_[index_md].resize(ic_size_[index_md]*tp_size_[index_md]);
+    late_sources_[index_md].resize(ic_size_[index_md]*tp_size_[index_md]);
+    ddlate_sources_[index_md].resize(ic_size_[index_md]*tp_size_[index_md]);
 
   }
 
@@ -1292,13 +1203,10 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
   double rate_isw_squared;
   double a_prime_over_a;
   double a_primeprime_over_a;
-  double * pvecback;
-  double * pvecthermo;
-
   /** - allocate background/thermodynamics vectors */
 
-  class_alloc(pvecback, background_module_->bg_size_short_*sizeof(double), error_message_);
-  class_alloc(pvecthermo, thermodynamics_module_->th_size_*sizeof(double), error_message_);
+  std::vector<double> pvecback(background_module_->bg_size_short_);
+  std::vector<double> pvecthermo(thermodynamics_module_->th_size_);
 
   /** - first, just count the number of sampling points in order to allocate the array containing all values */
 
@@ -1318,15 +1226,15 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
     tau_lower = thermodynamics_module_->tau_ini_;
 
-    class_call(background_module_->background_at_tau(tau_lower, pba->short_info, pba->inter_normal, &first_index_back, pvecback),
+    class_call(background_module_->background_at_tau(tau_lower, pba->short_info, pba->inter_normal, &first_index_back, pvecback.data()),
                background_module_->error_message_,
                error_message_);
 
     class_call(thermodynamics_module_->thermodynamics_at_z(1./pvecback[background_module_->index_bg_a_] - 1.,  /* redshift z=1/a-1 */
                                                           thermodynamics_module_->inter_normal_,
                                                           &first_index_thermo,
-                                                          pvecback,
-                                                          pvecthermo),
+                                                          pvecback.data(),
+                                                          pvecthermo.data()),
                thermodynamics_module_->error_message_,
                error_message_);
 
@@ -1341,15 +1249,15 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
     tau_upper = thermodynamics_module_->tau_rec_;
 
-    class_call(background_module_->background_at_tau(tau_upper, pba->short_info, pba->inter_normal, &first_index_back, pvecback),
+    class_call(background_module_->background_at_tau(tau_upper, pba->short_info, pba->inter_normal, &first_index_back, pvecback.data()),
                background_module_->error_message_,
                error_message_);
 
     class_call(thermodynamics_module_->thermodynamics_at_z(1./pvecback[background_module_->index_bg_a_] - 1.,  /* redshift z=1/a-1 */
                                                           thermodynamics_module_->inter_normal_,
                                                           &first_index_thermo,
-                                                          pvecback,
-                                                          pvecthermo),
+                                                          pvecback.data(),
+                                                          pvecthermo.data()),
                thermodynamics_module_->error_message_,
                error_message_);
 
@@ -1361,15 +1269,15 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
     while (tau_upper - tau_lower > ppr->tol_tau_approx) {
 
-      class_call(background_module_->background_at_tau(tau_mid, pba->short_info, pba->inter_normal, &first_index_back, pvecback),
+      class_call(background_module_->background_at_tau(tau_mid, pba->short_info, pba->inter_normal, &first_index_back, pvecback.data()),
                  background_module_->error_message_,
                  error_message_);
 
       class_call(thermodynamics_module_->thermodynamics_at_z(1./pvecback[background_module_->index_bg_a_] - 1.,  /* redshift z=1/a-1 */
                                                             thermodynamics_module_->inter_normal_,
                                                             &first_index_thermo,
-                                                            pvecback,
-                                                            pvecthermo),
+                                                            pvecback.data(),
+                                                            pvecthermo.data()),
                  thermodynamics_module_->error_message_,
                  error_message_);
 
@@ -1401,15 +1309,15 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     /* tau_ini = thermodynamics_module_->tau_rec_; */
 
     /* set values of first_index_back/thermo */
-    class_call(background_module_->background_at_tau(tau_ini, pba->short_info, pba->inter_normal, &first_index_back, pvecback),
+    class_call(background_module_->background_at_tau(tau_ini, pba->short_info, pba->inter_normal, &first_index_back, pvecback.data()),
                background_module_->error_message_,
                error_message_);
 
     class_call(thermodynamics_module_->thermodynamics_at_z(1./pvecback[background_module_->index_bg_a_] - 1.,  /* redshift z=1/a-1 */
                                                           thermodynamics_module_->inter_normal_,
                                                           &first_index_thermo,
-                                                          pvecback,
-                                                          pvecthermo),
+                                                          pvecback.data(),
+                                                          pvecthermo.data()),
                thermodynamics_module_->error_message_,
                error_message_);
   }
@@ -1430,15 +1338,15 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
   while (tau < background_module_->conformal_age_) {
 
-    class_call(background_module_->background_at_tau(tau, pba->short_info, pba->inter_closeby, &last_index_back, pvecback),
+    class_call(background_module_->background_at_tau(tau, pba->short_info, pba->inter_closeby, &last_index_back, pvecback.data()),
                background_module_->error_message_,
                error_message_);
 
     class_call(thermodynamics_module_->thermodynamics_at_z(1./pvecback[background_module_->index_bg_a_] - 1.,  /* redshift z=1/a-1 */
                                                           thermodynamics_module_->inter_closeby_,
                                                           &last_index_thermo,
-                                                          pvecback,
-                                                          pvecthermo),
+                                                          pvecback.data(),
+                                                          pvecthermo.data()),
                thermodynamics_module_->error_message_,
                error_message_);
 
@@ -1483,7 +1391,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
   tau_size_ = counter;
 
   /** - --> allocate array of time steps, tau_sampling_[index_tau] */
-  class_alloc(tau_sampling_, tau_size_*sizeof(double), error_message_);
+  tau_sampling_.resize(tau_size_);
 
   /** - --> repeat the same steps, now filling the array with each tau value: */
 
@@ -1505,15 +1413,15 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
   while (tau < background_module_->conformal_age_) {
 
-    class_call(background_module_->background_at_tau(tau, pba->short_info, pba->inter_closeby, &last_index_back, pvecback),
+    class_call(background_module_->background_at_tau(tau, pba->short_info, pba->inter_closeby, &last_index_back, pvecback.data()),
                background_module_->error_message_,
                error_message_);
 
     class_call(thermodynamics_module_->thermodynamics_at_z(1./pvecback[background_module_->index_bg_a_] - 1.,  /* redshift z=1/a-1 */
                                                           thermodynamics_module_->inter_closeby_,
                                                           &last_index_thermo,
-                                                          pvecback,
-                                                          pvecthermo),
+                                                          pvecback.data(),
+                                                          pvecthermo.data()),
                thermodynamics_module_->error_message_,
                error_message_);
 
@@ -1555,9 +1463,6 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
   /** - last sampling point = exactly today */
   tau_sampling_[counter] = background_module_->conformal_age_;
-
-  free(pvecback);
-  free(pvecthermo);
 
   /** - check the maximum redshift z_max_pk at which the Fourier
       transfer functions \f$ T_i(k,z)\f$ should be computable by
@@ -1605,7 +1510,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     ln_tau_size_ = tau_size_ - index_tau;
 
     /* allocate and fill array of log(tau) */
-    class_alloc(ln_tau_, ln_tau_size_*sizeof(double), error_message_);
+    ln_tau_.resize(ln_tau_size_);
 
     for (index_tau = 0; index_tau < ln_tau_size_; index_tau++) {
       ln_tau_[index_tau] = log(tau_sampling_[index_tau - ln_tau_size_ + tau_size_]);
@@ -1619,18 +1524,14 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     for (index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
       for (index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
 
-        class_alloc(sources_[index_md][index_ic*tp_size_[index_md] + index_tp],
-                    k_size_[index_md]*tau_size_*sizeof(double),
-                    error_message_);
+        sources_[index_md][index_ic*tp_size_[index_md] + index_tp].resize(k_size_[index_md]*tau_size_);
 
         if (ln_tau_size_ > 1) {
           /* late_sources is just a pointer to the end of sources (starting from the relevant time index) */
           late_sources_[index_md][index_ic*tp_size_[index_md] + index_tp] =
-            &(sources_[index_md][index_ic*tp_size_[index_md] + index_tp][(tau_size_ - ln_tau_size_)*k_size_[index_md]]);
+            sources_[index_md][index_ic*tp_size_[index_md] + index_tp].data() + (tau_size_ - ln_tau_size_)*k_size_[index_md];
 
-          class_alloc(ddlate_sources_[index_md][index_ic*tp_size_[index_md] + index_tp],
-                      k_size_[index_md]*ln_tau_size_*sizeof(double),
-                      error_message_);
+          ddlate_sources_[index_md][index_ic*tp_size_[index_md] + index_tp].resize(k_size_[index_md]*ln_tau_size_);
         }
       }
     }
@@ -1649,11 +1550,11 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 int PerturbationsModule::perturb_get_k_list() {
   int index_k, index_k_output, index_mode;
   double k,k_min=0.,k_rec,step,tau1;
-  double * k_max_cmb;
-  double * k_max_cl;
+  std::vector<double> k_max_cmb;
+  std::vector<double> k_max_cl;
   double k_max=0.;
   double scale2;
-  double *tmp_k_list;
+  std::vector<double> tmp_k_list;
   int newk_size, index_newk, add_k_output_value;
 
   /** Summary: */
@@ -1668,27 +1569,13 @@ int PerturbationsModule::perturb_get_k_list() {
 
   /** - allocate arrays related to k list for each mode */
 
-  class_alloc(k_size_cmb_,
-              md_size_*sizeof(int),
-              error_message_);
-  class_alloc(k_size_cl_,
-              md_size_*sizeof(int),
-              error_message_);
-  class_alloc(k_size_,
-              md_size_*sizeof(int),
-              error_message_);
-  class_alloc(k_,
-              md_size_*sizeof(double*),
-              error_message_);
+  k_size_cmb_.resize(md_size_);
+  k_size_cl_.resize(md_size_);
+  k_size_.resize(md_size_);
+  k_.resize(md_size_);
 
-  class_calloc(k_max_cmb,
-               md_size_,
-               sizeof(double),
-               error_message_);
-  class_calloc(k_max_cl,
-               md_size_,
-               sizeof(double),
-               error_message_);
+  k_max_cmb.assign(md_size_, 0.0);
+  k_max_cl.assign(md_size_, 0.0);
 
   /** - scalar modes */
 
@@ -1788,19 +1675,16 @@ int PerturbationsModule::perturb_get_k_list() {
 
     /* the following is a boost on k_per_decade_for_pk for the interacting idm-idr cases (relevant for large k and a_idm_dr) */
     if((pba->has_idm_dr==_TRUE_)&&(pth->nindex_idm_dr>=2)){
-      class_alloc(k_[index_md_scalars_],
-                  ((int)((k_max_cmb[index_md_scalars_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) +
+      k_[index_md_scalars_].resize(
+                  (int)((k_max_cmb[index_md_scalars_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) +
                    (int)(MAX(ppr->k_per_decade_for_pk*ppr->idmdr_boost_k_per_decade_for_pk*pth->nindex_idm_dr,
-                             ppr->k_per_decade_for_bao)*log(k_max/k_min)/log(10.)) + 3)*sizeof(double),
-                  error_message_);
+                             ppr->k_per_decade_for_bao)*log(k_max/k_min)/log(10.)) + 3);
     }
 
     else{
-      class_alloc(k_[index_md_scalars_],
-                  ((int)((k_max_cmb[index_md_scalars_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) +
-                   (int)(MAX(ppr->k_per_decade_for_pk, ppr->k_per_decade_for_bao)*log(k_max/k_min)/log(10.)) + 3)
-                  *sizeof(double),
-                  error_message_);
+      k_[index_md_scalars_].resize(
+                  (int)((k_max_cmb[index_md_scalars_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) +
+                   (int)(MAX(ppr->k_per_decade_for_pk, ppr->k_per_decade_for_bao)*log(k_max/k_min)/log(10.)) + 3);
     }
 
     /* first value */
@@ -1890,10 +1774,7 @@ int PerturbationsModule::perturb_get_k_list() {
 
     k_size_[index_md_scalars_] = index_k;
 
-    class_realloc(k_[index_md_scalars_],
-                  k_[index_md_scalars_],
-                  k_size_[index_md_scalars_]*sizeof(double),
-                  error_message_);
+    k_[index_md_scalars_].resize(k_size_[index_md_scalars_]);
   }
 
   /** - vector modes */
@@ -1964,9 +1845,8 @@ int PerturbationsModule::perturb_get_k_list() {
        K=0, K<0, K>0 */
 
     /* allocate array with, for the moment, the largest possible size */
-    class_alloc(k_[index_md_vectors_],
-                ((int)((k_max_cmb[index_md_vectors_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) + 1)*sizeof(double),
-                error_message_);
+    k_[index_md_vectors_].resize(
+                (int)((k_max_cmb[index_md_vectors_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) + 1);
 
     /* first value */
 
@@ -2023,10 +1903,7 @@ int PerturbationsModule::perturb_get_k_list() {
     k_size_cl_[index_md_vectors_] = index_k;
     k_size_[index_md_vectors_] = index_k;
 
-    class_realloc(k_[index_md_vectors_],
-                  k_[index_md_vectors_],
-                  k_size_[index_md_vectors_]*sizeof(double),
-                  error_message_);
+    k_[index_md_vectors_].resize(k_size_[index_md_vectors_]);
   }
 
   /** - tensor modes */
@@ -2097,9 +1974,8 @@ int PerturbationsModule::perturb_get_k_list() {
        K=0, K<0, K>0 */
 
     /* allocate array with, for the moment, the largest possible size */
-    class_alloc(k_[index_md_tensors_],
-                ((int)((k_max_cmb[index_md_tensors_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) + 1)*sizeof(double),
-                error_message_);
+    k_[index_md_tensors_].resize(
+                (int)((k_max_cmb[index_md_tensors_] - k_min)/k_rec/MIN(ppr->k_step_super, ppr->k_step_sub)) + 1);
 
     /* first value */
 
@@ -2156,17 +2032,14 @@ int PerturbationsModule::perturb_get_k_list() {
     k_size_cl_[index_md_tensors_] = index_k;
     k_size_[index_md_tensors_] = index_k;
 
-    class_realloc(k_[index_md_tensors_],
-                  k_[index_md_tensors_],
-                  k_size_[index_md_tensors_]*sizeof(double),
-                  error_message_);
+    k_[index_md_tensors_].resize(k_size_[index_md_tensors_]);
   }
 
   /** - If user asked for k_output_values, add those to all k lists: */
   if (ppt->k_output_values_num > 0) {
 
     /* Allocate storage */
-    class_alloc(index_k_output_values_, sizeof(double)*md_size_*ppt->k_output_values_num, error_message_);
+    index_k_output_values_.resize(md_size_*ppt->k_output_values_num);
 
     /** - --> Find indices in k_[index_md] corresponding to 'k_output_values'.
         We are assuming that k_ is sorted and growing, and we have made sure
@@ -2175,7 +2048,7 @@ int PerturbationsModule::perturb_get_k_list() {
 
       newk_size = k_size_[index_mode] + ppt->k_output_values_num;
 
-      class_alloc(tmp_k_list, sizeof(double)*newk_size, error_message_);
+      tmp_k_list.resize(newk_size);
 
       index_k=0;
       index_k_output=0;
@@ -2202,8 +2075,7 @@ int PerturbationsModule::perturb_get_k_list() {
         }
       }
 
-      free(k_[index_mode]);
-      k_[index_mode] = tmp_k_list;
+      k_[index_mode] = std::move(tmp_k_list);
       k_size_[index_mode] = newk_size;
 
       index_k = newk_size-1;
@@ -2251,8 +2123,7 @@ int PerturbationsModule::perturb_get_k_list() {
     k_max_ = MAX(k_max_, k_[index_md_tensors_][k_size_[index_md_tensors_] - 1]); /* last value, inferred from perturbations structure */
   }
 
-  free(k_max_cmb);
-  free(k_max_cl);
+  /* RAII: k_max_cmb and k_max_cl cleaned up automatically */
 
   return _SUCCESS_;
 
@@ -2518,13 +2389,13 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
   int index_interval;
 
   /* number of time intervals where each particular approximation is uniform */
-  int * interval_number_of;
+  std::vector<int> interval_number_of;
 
   /* edge of intervals where approximation scheme is uniform: tau_ini, tau_switch_1, ..., tau_end */
-  double * interval_limit;
+  std::vector<double> interval_limit;
 
   /* array of approximation scheme within each interval: interval_approx[index_interval][index_ap] */
-  int ** interval_approx;
+  std::vector<std::vector<int>> interval_approx;
 
   /* index running over approximations */
   int index_ap;
@@ -2660,35 +2531,38 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
 
   /** - find the number of intervals over which approximation scheme is constant */
 
-  class_alloc(interval_number_of, ppw->ap_size*sizeof(int), error_message_);
+  interval_number_of.resize(ppw->ap_size);
 
   ppw->inter_mode = pba->inter_normal;
 
-  class_call(perturb_find_approximation_number(index_md, k, ppw, tau, tau_sampling_[tau_actual_size - 1], &interval_number, interval_number_of),
+  class_call(perturb_find_approximation_number(index_md, k, ppw, tau, tau_sampling_[tau_actual_size - 1], &interval_number, interval_number_of.data()),
              error_message_,
              error_message_);
 
-  class_alloc(interval_limit, (interval_number + 1)*sizeof(double), error_message_);
+  interval_limit.resize(interval_number + 1);
 
-  class_alloc(interval_approx, interval_number*sizeof(int*), error_message_);
-
+  interval_approx.resize(interval_number);
   for (index_interval=0; index_interval<interval_number; index_interval++)
-    class_alloc(interval_approx[index_interval], ppw->ap_size*sizeof(int), error_message_);
+    interval_approx[index_interval].resize(ppw->ap_size);
 
-  class_call(perturb_find_approximation_switches(index_md,
-                                                 k,
-                                                 ppw,
-                                                 tau,
-                                                 tau_sampling_[tau_actual_size - 1],
-                                                 ppr->tol_tau_approx,
-                                                 interval_number,
-                                                 interval_number_of,
-                                                 interval_limit,
-                                                 interval_approx),
-             error_message_,
-             error_message_);
+  {
+    std::vector<int*> interval_approx_ptrs(interval_number);
+    for (int ii = 0; ii < interval_number; ii++)
+      interval_approx_ptrs[ii] = interval_approx[ii].data();
+    class_call(perturb_find_approximation_switches(index_md,
+                                                   k,
+                                                   ppw,
+                                                   tau,
+                                                   tau_sampling_[tau_actual_size - 1],
+                                                   ppr->tol_tau_approx,
+                                                   interval_number,
+                                                   interval_number_of.data(),
+                                                   interval_limit.data(),
+                                                   interval_approx_ptrs.data()),
+               error_message_,
+               error_message_);
+  }
 
-  free(interval_number_of);
 
   /** - fill the structure containing all fixed parameters, indices
       and workspaces needed by perturb_derivs */
@@ -2732,7 +2606,7 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
       previous_approx=NULL;
     }
     else {
-      previous_approx=interval_approx[index_interval-1];
+      previous_approx=interval_approx[index_interval-1].data();
     }
 
     /** - --> (c) define the vector of perturbations to be integrated
@@ -2770,7 +2644,7 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
                                ppr->smallest_allowed_variation,
                                perturb_timescale,
                                ppr->perturb_integration_stepsize,
-                               tau_sampling_,
+                               tau_sampling_.data(),
                                tau_actual_size,
                                perturb_sources,
                                perhaps_print_variables,
@@ -2800,12 +2674,7 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
              error_message_,
              error_message_);
 
-  for (index_interval=0; index_interval<interval_number; index_interval++)
-    free(interval_approx[index_interval]);
-
-  free(interval_approx);
-
-  free(interval_limit);
+  /* RAII: interval_approx, interval_limit cleaned up automatically */
 
   return _SUCCESS_;
 }
@@ -3054,7 +2923,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
   int num_switch;
   double tau_min,lower_bound,upper_bound;
   double mid=0;
-  double * unsorted_tau_switch;
+  std::vector<double> unsorted_tau_switch;
   double next_tau_switch;
   int flag_ini;
   int num_switching_at_given_time;
@@ -3084,7 +2953,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
 
   else {
 
-    class_alloc(unsorted_tau_switch, (interval_number - 1)*sizeof(double), error_message_);
+    unsorted_tau_switch.resize(interval_number - 1);
 
     index_switch_tot=0;
 
@@ -3257,7 +3126,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
       }
     }
 
-    free(unsorted_tau_switch);
+    /* RAII: unsorted_tau_switch cleaned up automatically */
 
     class_call(perturb_approximations(index_md, k, tau_end, ppw),
                error_message_,
@@ -7719,7 +7588,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
   double delta_scf=0., theta_scf=0.;
   /** - ncdm sector begins */
   int n_ncdm;
-  double *delta_ncdm=NULL, *theta_ncdm=NULL, *shear_ncdm=NULL, *delta_p_over_delta_rho_ncdm=NULL;
+  std::vector<double> delta_ncdm, theta_ncdm, shear_ncdm, delta_p_over_delta_rho_ncdm;
   double rho_ncdm_bg, p_ncdm_bg, pseudo_p_ncdm, w_ncdm;
   double rho_delta_ncdm = 0.0;
   double rho_plus_p_theta_ncdm = 0.0;
@@ -7772,10 +7641,10 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
   H = pvecback[background_module_->index_bg_H_];
 
   if (pba->has_ncdm == _TRUE_){
-    class_alloc(delta_ncdm, sizeof(double)*pba->N_ncdm,error_message);
-    class_alloc(theta_ncdm, sizeof(double)*pba->N_ncdm,error_message);
-    class_alloc(shear_ncdm, sizeof(double)*pba->N_ncdm,error_message);
-    class_alloc(delta_p_over_delta_rho_ncdm, sizeof(double)*pba->N_ncdm,error_message);
+    delta_ncdm.resize(pba->N_ncdm);
+    theta_ncdm.resize(pba->N_ncdm);
+    shear_ncdm.resize(pba->N_ncdm);
+    delta_p_over_delta_rho_ncdm.resize(pba->N_ncdm);
   }
 
   /** - calculate perturbed recombination */
@@ -8134,19 +8003,16 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
 
     //    fprintf(ppw->perturb_output_file," ");
     /** - --> Handle (re-)allocation */
-    if (scalar_perturbations_data_[ppw->index_ikout] == NULL){
-      class_alloc(scalar_perturbations_data_[ppw->index_ikout],
-                  sizeof(double)*number_of_scalar_titles_,
-                  error_message);
+    if (scalar_perturbations_data_[ppw->index_ikout].empty()){
+      scalar_perturbations_data_[ppw->index_ikout].resize(number_of_scalar_titles_);
       size_scalar_perturbation_data_[ppw->index_ikout] = 0;
     }
     else{
-      scalar_perturbations_data_[ppw->index_ikout] =
-        (double*) realloc(scalar_perturbations_data_[ppw->index_ikout],
-                          sizeof(double)*(size_scalar_perturbation_data_[ppw->index_ikout] + number_of_scalar_titles_));
+      scalar_perturbations_data_[ppw->index_ikout].resize(
+        size_scalar_perturbation_data_[ppw->index_ikout] + number_of_scalar_titles_);
     }
     storeidx = 0;
-    dataptr = scalar_perturbations_data_[ppw->index_ikout] + size_scalar_perturbation_data_[ppw->index_ikout];
+    dataptr = scalar_perturbations_data_[ppw->index_ikout].data() + size_scalar_perturbation_data_[ppw->index_ikout];
     size_scalar_perturbation_data_[ppw->index_ikout] += number_of_scalar_titles_;
 
     class_store_double(dataptr, tau, _TRUE_, storeidx);
@@ -8262,19 +8128,16 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
     }
 
     /** - --> Handle (re-)allocation */
-    if (tensor_perturbations_data_[ppw->index_ikout] == NULL){
-      class_alloc(tensor_perturbations_data_[ppw->index_ikout],
-                  sizeof(double)*number_of_tensor_titles_,
-                  error_message);
+    if (tensor_perturbations_data_[ppw->index_ikout].empty()){
+      tensor_perturbations_data_[ppw->index_ikout].resize(number_of_tensor_titles_);
       size_tensor_perturbation_data_[ppw->index_ikout] = 0;
     }
     else{
-      tensor_perturbations_data_[ppw->index_ikout] =
-        (double*) realloc(tensor_perturbations_data_[ppw->index_ikout],
-                          sizeof(double)*(size_tensor_perturbation_data_[ppw->index_ikout] + number_of_tensor_titles_));
+      tensor_perturbations_data_[ppw->index_ikout].resize(
+        size_tensor_perturbation_data_[ppw->index_ikout] + number_of_tensor_titles_);
     }
     storeidx = 0;
-    dataptr = tensor_perturbations_data_[ppw->index_ikout] + size_tensor_perturbation_data_[ppw->index_ikout];
+    dataptr = tensor_perturbations_data_[ppw->index_ikout].data() + size_tensor_perturbation_data_[ppw->index_ikout];
     size_tensor_perturbation_data_[ppw->index_ikout] += number_of_tensor_titles_;
 
     //fprintf(ppw->perturb_output_file," ");
@@ -8337,12 +8200,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
 
   }
 
-  if (pba->has_ncdm == _TRUE_){
-    free(delta_ncdm);
-    free(theta_ncdm);
-    free(shear_ncdm);
-    free(delta_p_over_delta_rho_ncdm);
-  }
+  /* RAII: ncdm vectors cleaned up automatically */
 
   return _SUCCESS_;
 

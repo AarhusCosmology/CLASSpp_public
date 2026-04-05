@@ -238,10 +238,10 @@ int SpectraModule::spectra_cl_at_l(double l,
     if ((int)l <= l_[l_size_[index_md]-1]) {
 
       /* interpolate at l */
-      class_call(array_interpolate_spline(l_,
+      class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
                                           l_size_[index_md],
-                                          cl_[index_md],
-                                          ddcl_[index_md],
+                                          const_cast<double*>(cl_[index_md].data()),
+                                          const_cast<double*>(ddcl_[index_md].data()),
                                           ct_size_,
                                           l,
                                           &last_index,
@@ -276,10 +276,10 @@ int SpectraModule::spectra_cl_at_l(double l,
         if (((int)l <= l_[l_size_[index_md] - 1]) &&
             (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_)) {
 
-          class_call(array_interpolate_spline(l_,
+          class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
                                               l_size_[index_md],
-                                              cl_[index_md],
-                                              ddcl_[index_md],
+                                              const_cast<double*>(cl_[index_md].data()),
+                                              const_cast<double*>(ddcl_[index_md].data()),
                                               ic_ic_size_[index_md]*ct_size_,
                                               l,
                                               &last_index,
@@ -325,10 +325,10 @@ int SpectraModule::spectra_cl_at_l(double l,
       if (ic_size_[index_md] == 1) {
         if ((int)l <= l_[l_size_[index_md] - 1]) {
 
-          class_call(array_interpolate_spline(l_,
+          class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
                                               l_size_[index_md],
-                                              cl_[index_md],
-                                              ddcl_[index_md],
+                                              const_cast<double*>(cl_[index_md].data()),
+                                              const_cast<double*>(ddcl_[index_md].data()),
                                               ct_size_,
                                               l,
                                               &last_index,
@@ -357,10 +357,10 @@ int SpectraModule::spectra_cl_at_l(double l,
         if ((int)l <= l_[l_size_[index_md] - 1]) {
 
           /* interpolate all ic and ct */
-          class_call(array_interpolate_spline(l_,
+          class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
                                               l_size_[index_md],
-                                              cl_[index_md],
-                                              ddcl_[index_md],
+                                              const_cast<double*>(cl_[index_md].data()),
+                                              const_cast<double*>(ddcl_[index_md].data()),
                                               ic_ic_size_[index_md]*ct_size_,
                                               l,
                                               &last_index,
@@ -486,32 +486,6 @@ int SpectraModule::spectra_free() {
     return _SUCCESS_;
   }
 
-  int index_md;
-
-  if (md_size_ > 0) {
-    if (ct_size_ > 0) {
-
-      for (index_md = 0; index_md < md_size_; index_md++) {
-        free(l_max_ct_[index_md]);
-        free(cl_[index_md]);
-        free(ddcl_[index_md]);
-      }
-      free(l_);
-      free(l_size_);
-      free(l_max_ct_);
-      free(l_max_);
-      free(cl_);
-      free(ddcl_);
-    }
-  }
-
-  for (index_md=0; index_md < md_size_; index_md++)
-    free(is_non_zero_[index_md]);
-
-  free(is_non_zero_);
-  free(ic_size_);
-  free(ic_ic_size_);
-
   return _SUCCESS_;
 
 }
@@ -532,24 +506,16 @@ int SpectraModule::spectra_indices() {
   if (ppt->has_scalars == _TRUE_)
     index_md_scalars_ = perturbations_module_->index_md_scalars_;
 
-  class_alloc(ic_size_,
-              sizeof(int)*md_size_,
-              error_message_);
+  ic_size_.resize(md_size_);
 
-  class_alloc(ic_ic_size_,
-              sizeof(int)*md_size_,
-              error_message_);
+  ic_ic_size_.resize(md_size_);
 
-  class_alloc(is_non_zero_,
-              sizeof(short *)*md_size_,
-              error_message_);
+  is_non_zero_.resize(md_size_);
 
   for (index_md = 0; index_md < md_size_; index_md++) {
     ic_size_[index_md] = primordial_module_->ic_size_[index_md];
     ic_ic_size_[index_md] = primordial_module_->ic_ic_size_[index_md];
-    class_alloc(is_non_zero_[index_md],
-                sizeof(short)*ic_ic_size_[index_md],
-                error_message_);
+    is_non_zero_[index_md].resize(ic_ic_size_[index_md]);
     for (index_ic1_ic2=0; index_ic1_ic2 < ic_ic_size_[index_md]; index_ic1_ic2++)
       is_non_zero_[index_md][index_ic1_ic2] = primordial_module_->is_non_zero_[index_md][index_ic1_ic2];
   }
@@ -712,10 +678,10 @@ int SpectraModule::spectra_indices() {
        l_max_ct[index_md][index_type].  Maximize it over index_ct, and
        then over index_md. */
 
-    class_alloc(l_max_, sizeof(int*)*md_size_, error_message_);
-    class_alloc(l_max_ct_, sizeof(int*)*md_size_, error_message_);
+    l_max_.resize(md_size_);
+    l_max_ct_.resize(md_size_);
     for (index_md = 0; index_md < md_size_; index_md++) {
-      class_calloc(l_max_ct_[index_md], ct_size_, sizeof(int), error_message_);
+      l_max_ct_[index_md].assign(ct_size_, 0);
     }
 
     if (ppt->has_scalars == _TRUE_) {
@@ -813,12 +779,12 @@ int SpectraModule::spectra_cls() {
 
   /** - allocate pointers to arrays where results will be stored */
 
-  class_alloc(l_size_, sizeof(int)*md_size_, error_message_);
-  class_alloc(cl_, sizeof(double *)*md_size_, error_message_);
-  class_alloc(ddcl_, sizeof(double *)*md_size_, error_message_);
+  l_size_.resize(md_size_);
+  cl_.resize(md_size_);
+  ddcl_.resize(md_size_);
 
   l_size_max_ = transfer_module_->l_size_max_;
-  class_alloc(l_, sizeof(double)*l_size_max_,error_message_);
+  l_.resize(l_size_max_);
 
   /** - store values of l */
   for (index_l = 0; index_l < l_size_max_; index_l++) {
@@ -838,8 +804,8 @@ int SpectraModule::spectra_cls() {
 
     /** - --> (b) allocate arrays where results will be stored */
 
-    class_alloc(cl_[index_md],sizeof(double)*l_size_[index_md]*ct_size_*ic_ic_size_[index_md],error_message_);
-    class_alloc(ddcl_[index_md], sizeof(double)*l_size_[index_md]*ct_size_*ic_ic_size_[index_md], error_message_);
+    cl_[index_md].resize(l_size_[index_md]*ct_size_*ic_ic_size_[index_md]);
+    ddcl_[index_md].resize(l_size_[index_md]*ct_size_*ic_ic_size_[index_md]);
     cl_integrand_num_columns = 1 + ct_size_*2; /* one for k, ct_size_ for each type, ct_size_ for each second derivative of each type */
 
     /** - --> (c) loop over initial conditions */
@@ -852,16 +818,10 @@ int SpectraModule::spectra_cls() {
         if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
 
           future_output.push_back(task_system.AsyncTask([this, index_md, cl_integrand_num_columns, index_ic1, index_ic2] () {
-            double * cl_integrand; /* array with argument cl_integrand[index_k*cl_integrand_num_columns+1+psp->index_ct] */
-            double * transfer_ic1; /* array with argument transfer_ic1[index_tt] */
-            double * transfer_ic2; /* idem */
-            double * primordial_pk;  /* array with argument primordial_pk[index_ic_ic]*/
-
-
-            class_alloc(cl_integrand, transfer_module_->q_size_*cl_integrand_num_columns*sizeof(double), error_message_);
-            class_alloc(primordial_pk, ic_ic_size_[index_md]*sizeof(double), error_message_);
-            class_alloc(transfer_ic1, transfer_module_->tt_size_[index_md]*sizeof(double), error_message_);
-            class_alloc(transfer_ic2, transfer_module_->tt_size_[index_md]*sizeof(double), error_message_);
+            std::vector<double> cl_integrand(transfer_module_->q_size_*cl_integrand_num_columns);
+            std::vector<double> primordial_pk(ic_ic_size_[index_md]);
+            std::vector<double> transfer_ic1(transfer_module_->tt_size_[index_md]);
+            std::vector<double> transfer_ic2(transfer_module_->tt_size_[index_md]);
 
             /** - ---> loop over l values defined in the transfer module.
                 For each l, compute the \f$ C_l\f$'s for all types (TT, TE, ...)
@@ -878,22 +838,14 @@ int SpectraModule::spectra_cls() {
                                             index_ic2,
                                             index_l,
                                             cl_integrand_num_columns,
-                                            cl_integrand,
-                                            primordial_pk,
-                                            transfer_ic1,
-                                            transfer_ic2),
+                                            cl_integrand.data(),
+                                            primordial_pk.data(),
+                                            transfer_ic1.data(),
+                                            transfer_ic2.data()),
                          error_message_,
                          error_message_);
 
             } /* end of loop over l */
-
-            free(cl_integrand);
-
-            free(primordial_pk);
-
-            free(transfer_ic1);
-
-            free(transfer_ic2);
 
             return _SUCCESS_;
 
@@ -921,11 +873,11 @@ int SpectraModule::spectra_cls() {
         compute second derivative of the array in which they are stored,
         in view of spline interpolation. */
 
-    class_call(array_spline_table_lines(l_,
+    class_call(array_spline_table_lines(l_.data(),
                                         l_size_[index_md],
-                                        cl_[index_md],
+                                        cl_[index_md].data(),
                                         ic_ic_size_[index_md]*ct_size_,
-                                        ddcl_[index_md],
+                                        ddcl_[index_md].data(),
                                         _SPLINE_EST_DERIV_,
                                         error_message_),
                error_message_,
@@ -973,16 +925,16 @@ int SpectraModule::spectra_compute_cl(int index_md,
   int index_ic1_ic2;
   double transfer_ic1_temp=0.;
   double transfer_ic2_temp=0.;
-  double * transfer_ic1_nc=NULL;
-  double * transfer_ic2_nc=NULL;
+  std::vector<double> transfer_ic1_nc;
+  std::vector<double> transfer_ic2_nc;
   double factor;
   int index_q_spline=0;
 
   index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
 
   if (ppt->has_cl_number_count == _TRUE_) {
-    class_alloc(transfer_ic1_nc, d_size_*sizeof(double), error_message_);
-    class_alloc(transfer_ic2_nc, d_size_*sizeof(double), error_message_);
+    transfer_ic1_nc.resize(d_size_);
+    transfer_ic2_nc.resize(d_size_);
   }
 
   for (index_q = 0; index_q < transfer_module_->q_size_; index_q++) {
@@ -1340,11 +1292,6 @@ int SpectraModule::spectra_compute_cl(int index_md,
       cl_[index_md][(index_l*ic_ic_size_[index_md] + index_ic1_ic2)*ct_size_ + index_ct] = clvalue;
 
     }
-  }
-
-  if (ppt->has_cl_number_count == _TRUE_) {
-    free(transfer_ic1_nc);
-    free(transfer_ic2_nc);
   }
 
   return _SUCCESS_;

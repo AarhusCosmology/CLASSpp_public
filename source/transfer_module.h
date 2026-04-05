@@ -3,6 +3,7 @@
 
 #include "input_module.h"
 #include "base_module.h"
+#include <vector>
 
 class TransferModule : public BaseModule {
 public:
@@ -31,27 +32,27 @@ public:
   int index_tt_nc_g4_;   /**< index for first bin of transfer type = gravity term G3 for of number count */
   int index_tt_nc_g5_;   /**< index for first bin of transfer type = gravity term G3 for of number count */
 
-  int * tt_size_;     /**< number of requested transfer types tt_size[index_md] for each mode */
+  std::vector<int> tt_size_;     /**< number of requested transfer types tt_size[index_md] for each mode */
   //@}
 
   /** @name - number and list of multipoles */
   //@{
   int l_size_max_; /**< greatest of all l_size[index_md] */
-  int ** l_size_tt_;  /**< number of multipole values for which we effectively compute the transfer function,l_size_tt[index_md][index_tt] */
-  int * l_size_;   /**< number of multipole values for each requested mode, l_size[index_md] */
-  int * l_;        /**< list of multipole values l[index_l] */
+  std::vector<std::vector<int>> l_size_tt_;  /**< number of multipole values for which we effectively compute the transfer function,l_size_tt[index_md][index_tt] */
+  std::vector<int> l_size_;   /**< number of multipole values for each requested mode, l_size[index_md] */
+  std::vector<int> l_;        /**< list of multipole values l[index_l] */
   //@}
 
   /** @name - number and list of wavenumbers */
   //@{
   int q_size_; /**< number of wavenumber values */
-  double * q_;  /**< list of wavenumber values, q[index_q] */
-  double ** k_; /**< list of wavenumber values for each requested mode, k[index_md][index_q]. In flat universes k=q. In non-flat universes q and k differ through q2 = k2 + K(1+m), where m=0,1,2 for scalar, vector, tensor. q should be used throughout the transfer module, excepted when interpolating or manipulating the source functions S(k,tau): for a given value of q this should be done in k(q). */
+  std::vector<double> q_;  /**< list of wavenumber values, q[index_q] */
+  std::vector<std::vector<double>> k_; /**< list of wavenumber values for each requested mode, k[index_md][index_q]. In flat universes k=q. In non-flat universes q and k differ through q2 = k2 + K(1+m), where m=0,1,2 for scalar, vector, tensor. q should be used throughout the transfer module, excepted when interpolating or manipulating the source functions S(k,tau): for a given value of q this should be done in k(q). */
   int index_q_flat_approximation_; /**< index of the first q value using the flat rescaling approximation */
   //@}
   /** @name - transfer functions */
   //@{
-  double ** transfer_; /**< table of transfer functions for each mode, initial condition, type, multipole and wavenumber, with argument transfer[index_md][((index_ic * transfer_module_->tt_size_[index_md] + index_tt) * transfer_module_->l_size_[index_md] + index_l) * transfer_module_->q_size_ + index_q] */
+  std::vector<std::vector<double>> transfer_; /**< table of transfer functions for each mode, initial condition, type, multipole and wavenumber, with argument transfer[index_md][((index_ic * transfer_module_->tt_size_[index_md] + index_tt) * transfer_module_->l_size_[index_md] + index_l) * transfer_module_->q_size_ + index_q] */
   //@}
 
 
@@ -101,7 +102,7 @@ private:
   int transfer_update_HIS(struct transfer_workspace * ptw, int index_q, double tau0);
   int transfer_get_lmax(int (*get_xmin_generic)(int sgnK, int l, double nu, double xtol, double phiminabs, double *x_nonzero, int *fevals),
                         int sgnK, double nu, int * lvec, int lsize, double phiminabs, double xmax, double xtol, int * index_l_left, int * index_l_right, ErrorMsg error_message);
-  int transfer_precompute_selection(double tau_rec, int tau_size_max, double ** window);
+  int transfer_precompute_selection(double tau_rec, int tau_size_max, std::vector<double>& window);
   int transfer_f_evo(double * pvecback, int last_index, double cotKgen, double * f_evo);
 
   BackgroundModulePtr background_module_;
@@ -113,15 +114,15 @@ private:
   int md_size_;       /**< number of modes included in computation */
 
   int nz_size_;           /**< number of redshift values in input tabulated selection function */
-  double * nz_z_;         /**< redshift values in input tabulated selection function */
-  double * nz_nz_;        /**< input tabulated values of selection function */
-  double * nz_ddnz_;      /**< second derivatives in splined selection function*/
+  std::vector<double> nz_z_;         /**< redshift values in input tabulated selection function */
+  std::vector<double> nz_nz_;        /**< input tabulated values of selection function */
+  std::vector<double> nz_ddnz_;      /**< second derivatives in splined selection function*/
 
   int nz_evo_size_;            /**< number of redshift values in input tabulated evolution function */
-  double * nz_evo_z_;          /**< redshift values in input tabulated evolution function */
-  double * nz_evo_nz_;         /**< input tabulated values of evolution function */
-  double * nz_evo_dlog_nz_;    /**< log of tabulated values of evolution function */
-  double * nz_evo_dd_dlog_nz_; /**< second derivatives in splined log of evolution function */
+  std::vector<double> nz_evo_z_;          /**< redshift values in input tabulated evolution function */
+  std::vector<double> nz_evo_nz_;         /**< input tabulated values of evolution function */
+  std::vector<double> nz_evo_dlog_nz_;    /**< log of tabulated values of evolution function */
+  std::vector<double> nz_evo_dd_dlog_nz_; /**< second derivatives in splined log of evolution function */
 
 };
 

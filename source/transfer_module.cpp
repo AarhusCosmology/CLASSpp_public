@@ -87,10 +87,10 @@ int TransferModule::transfer_functions_at_q(int index_md,
 
   /** - interpolate in pre-computed table using array_interpolate_two() */
   class_call(array_interpolate_two(
-                                   q_,
+                                   q_.data(),
                                    1,
                                    0,
-                                   transfer_[index_md]
+                                   transfer_[index_md].data()
                                    +((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)
                                    *q_size_,
                                    1,
@@ -248,7 +248,7 @@ int TransferModule::transfer_init() {
   class_call(hyperspherical_HIS_create(0,
                                        1.,
                                        l_size_max_,
-                                       l_,
+                                       l_.data(),
                                        ppr->hyper_x_min,
                                        xmax,
                                        ppr->hyper_sampling_flat,
@@ -274,20 +274,21 @@ int TransferModule::transfer_init() {
              error_message_);
 
   /** - precompute window function for integrated nCl/sCl quantities*/
-  double* window = nullptr;
+  std::vector<double> window;
   if (ppt->has_scalars == _TRUE_) {
     // transfer_precompute_selection() assumes perturbations_module_->index_md_scalars_ to be valid.
     // window will only be used for scalar modes and only for certain sources.
-    class_call(transfer_precompute_selection(tau_rec, tau_size_max, &window),
+    class_call(transfer_precompute_selection(tau_rec, tau_size_max, window),
                error_message_,
                error_message_);
   }
+  double* window_ptr = window.empty() ? nullptr : window.data();
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<int>> future_output;
     /** - loop over all wavenumbers (parallelized).*/
     /* For each wavenumber: */
     for (index_q = 0; index_q < q_size_; index_q++) {
-    future_output.push_back(task_system.AsyncTask([this, tau_size_max, tp_of_tt, tau_rec, sources_spline, &BIS, tau0, index_q, sources, window] () {
+    future_output.push_back(task_system.AsyncTask([this, tau_size_max, tp_of_tt, tau_rec, sources_spline, &BIS, tau0, index_q, sources, window_ptr] () {
       struct transfer_workspace* ptw = NULL;
       class_call(transfer_workspace_init(&ptw, perturbations_module_->tau_size_, tau_size_max, pba->K, pba->sgnK, tau0 - thermodynamics_module_->tau_cut_, &BIS),
         error_message_,
@@ -301,7 +302,7 @@ int TransferModule::transfer_init() {
                           error_message_,
                           error_message_);
 
-      class_call(transfer_compute_for_each_q(tp_of_tt, index_q, tau_size_max, tau_rec, sources, sources_spline, window, ptw),
+      class_call(transfer_compute_for_each_q(tp_of_tt, index_q, tau_size_max, tau_rec, sources, sources_spline, window_ptr, ptw),
                           error_message_,
                           error_message_);
       /* free workspace allocated inside parallel zone */
@@ -316,7 +317,6 @@ int TransferModule::transfer_init() {
   }
   future_output.clear();
   /** - finally, free arrays allocated outside parallel zone */
-  free(window);
 
   class_call(transfer_perturbation_sources_spline_free(sources_spline),
              error_message_,
@@ -347,36 +347,10 @@ int TransferModule::transfer_init() {
 
 int TransferModule::transfer_free() {
 
-  int index_md;
-
   if (has_cls_ == _TRUE_) {
 
-    for (index_md = 0; index_md < md_size_; index_md++) {
-      free(l_size_tt_[index_md]);
-      free(transfer_[index_md]);
-      free(k_[index_md]);
-    }
+    /* RAII: std::vector members are automatically cleaned up */
 
-    free(tt_size_);
-    free(l_size_tt_);
-    free(l_size_);
-    free(l_);
-    free(q_);
-    free(k_);
-    free(transfer_);
-
-    if (nz_size_ > 0) {
-      free(nz_z_);
-      free(nz_nz_);
-      free(nz_ddnz_);
-    }
-
-    if (nz_evo_size_ > 0) {
-      free(nz_evo_z_);
-      free(nz_evo_nz_);
-      free(nz_evo_dlog_nz_);
-      free(nz_evo_dd_dlog_nz_);
-    }
   }
 
   return _SUCCESS_;
@@ -407,7 +381,7 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
 
   /** - define indices for transfer types */
 
-  class_alloc(tt_size_, md_size_*sizeof(int), error_message_);
+  tt_size_.resize(md_size_);
 
   /** - type indices common to scalars and tensors */
 
@@ -474,17 +448,17 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
      l_size_tt[index_md][index_tt], and maximized for each mode,
      l_size[index_md] */
 
-  class_alloc(l_size_,md_size_*sizeof(int), error_message_);
+  l_size_.resize(md_size_);
 
-  class_alloc(l_size_tt_, md_size_*sizeof(int *), error_message_);
+  l_size_tt_.resize(md_size_);
 
   for (index_md = 0; index_md < md_size_; index_md++) {
-    class_alloc(l_size_tt_[index_md], tt_size_[index_md]*sizeof(int), error_message_);
+    l_size_tt_[index_md].resize(tt_size_[index_md]);
   }
 
   /* array (of array) of transfer functions for each mode, transfer[index_md] */
 
-  class_alloc(transfer_, md_size_*sizeof(double *), error_message_);
+  transfer_.resize(md_size_);
 
   /** - get q values using transfer_get_q_list() */
 
@@ -527,9 +501,7 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
   for (index_md = 0; index_md < md_size_; index_md++) {
 
     /** - allocate arrays of transfer functions, (transfer_[index_md])[index_ic][index_tt][index_l][index_k] */
-    class_alloc(transfer_[index_md],
-                perturbations_module_->ic_size_[index_md]*tt_size_[index_md]*l_size_[index_md]*q_size_*sizeof(double),
-                error_message_);
+    transfer_[index_md].resize(perturbations_module_->ic_size_[index_md]*tt_size_[index_md]*l_size_[index_md]*q_size_);
 
   }
 
@@ -588,7 +560,7 @@ int TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(double
         }
         else {
           sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp] =
-            perturbations_module_->sources_[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp];
+            const_cast<double*>(perturbations_module_->sources_[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].data());
         }
       }
     }
@@ -618,7 +590,7 @@ int TransferModule::transfer_perturbation_source_spline(double *** sources, doub
                     perturbations_module_->k_size_[index_md]*perturbations_module_->tau_size_*sizeof(double),
                     error_message_);
 
-        class_call(array_spline_table_columns2(perturbations_module_->k_[index_md],
+        class_call(array_spline_table_columns2(const_cast<double*>(perturbations_module_->k_[index_md].data()),
                                                perturbations_module_->k_size_[index_md],
                                                sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
                                                perturbations_module_->tau_size_,
@@ -767,7 +739,7 @@ int TransferModule::transfer_get_l_list() {
   /** - so far we just counted the number of values. Now repeat the
       whole thing but fill array with values. */
 
-  class_alloc(l_, l_size_max_*sizeof(int), error_message_);
+  l_.resize(l_size_max_);
 
   index_l = 0;
   l_[0] = 2;
@@ -984,9 +956,7 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
   /* create array with this conservative size estimate. The exact size
      will be readjusted below, after filling the array. */
 
-  class_alloc(q_,
-              q_size_max*sizeof(double),
-              error_message_);
+  q_.resize(q_size_max);
 
   /* assign the first value before starting the loop */
 
@@ -1078,10 +1048,7 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
   /* now, readjust array size */
 
-  class_realloc(q_,
-                q_,
-                q_size_*sizeof(double),
-                error_message_);
+  q_.resize(q_size_);
 
   /* in curved universe, check at which index the flat rescaling
      approximation will start being used */
@@ -1130,11 +1097,11 @@ int TransferModule::transfer_get_k_list(double K) {
   int index_q;
   double m=0.;
 
-  class_alloc(k_, md_size_*sizeof(double*), error_message_);
+  k_.resize(md_size_);
 
   for (index_md = 0; index_md <  md_size_; index_md++) {
 
-    class_alloc(k_[index_md], q_size_*sizeof(double), error_message_);
+    k_[index_md].resize(q_size_);
 
     if (_scalarsEXT_) {
       m=0.;
@@ -2178,10 +2145,10 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
                    z);
 
         class_call(array_interpolate_spline(
-                                            nz_z_,
+                                            nz_z_.data(),
                                             nz_size_,
-                                            nz_nz_,
-                                            nz_ddnz_,
+                                            nz_nz_.data(),
+                                            nz_ddnz_.data(),
                                             1,
                                             z,
                                             &last_index,
@@ -2228,10 +2195,10 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
       if (ptr->has_nz_file == _TRUE_) {
 
         class_call(array_interpolate_spline(
-                                            nz_z_,
+                                            nz_z_.data(),
                                             nz_size_,
-                                            nz_nz_,
-                                            nz_ddnz_,
+                                            nz_nz_.data(),
+                                            nz_ddnz_.data(),
                                             1,
                                             z,
                                             &last_index,
@@ -2400,24 +2367,19 @@ int TransferModule::transfer_source_resample(int bin, double * tau0_minus_tau, i
   int index_tau;
 
   /* array of values of source */
-  double * source_at_tau;
-
-  /* array of source values for a given time and for all k's */
-  class_alloc(source_at_tau,
-              sizeof(double),
-              error_message_);
+  std::vector<double> source_at_tau(1);
 
   /* interpolate the sources linearly at the new time values */
   for (index_tau=0; index_tau<tau_size; index_tau++) {
 
-    class_call(array_interpolate_two(perturbations_module_->tau_sampling_,
+    class_call(array_interpolate_two(const_cast<double*>(perturbations_module_->tau_sampling_.data()),
                                      1,
                                      0,
                                      interpolated_sources,
                                      1,
                                      perturbations_module_->tau_size_,
                                      tau0-tau0_minus_tau[index_tau],
-                                     source_at_tau,
+                                     source_at_tau.data(),
                                      1,
                                      error_message_),
                error_message_,
@@ -2426,9 +2388,6 @@ int TransferModule::transfer_source_resample(int bin, double * tau0_minus_tau, i
     /* copy the new values in the output sources array */
     sources[index_tau] = source_at_tau[0];
   }
-
-  /* deallocate the temporary array */
-  free(source_at_tau);
 
   return _SUCCESS_;
 
@@ -3663,9 +3622,9 @@ int TransferModule::transfer_global_selection_read() {
     nz_size_ = row-1;
 
     /* Allocate room for interpolation table */
-    class_alloc(nz_z_, sizeof(double)*nz_size_, error_message_);
-    class_alloc(nz_nz_, sizeof(double)*nz_size_, error_message_);
-    class_alloc(nz_ddnz_, sizeof(double)*nz_size_, error_message_);
+    nz_z_.resize(nz_size_);
+    nz_nz_.resize(nz_size_);
+    nz_ddnz_.resize(nz_size_);
 
     for (row = 0; row < nz_size_; row++){
       status = fscanf(input_file,"%lf %lf",
@@ -3674,11 +3633,11 @@ int TransferModule::transfer_global_selection_read() {
     fclose(input_file);
 
     /* Call spline interpolation: */
-    class_call(array_spline_table_lines(nz_z_,
+    class_call(array_spline_table_lines(nz_z_.data(),
                                         nz_size_,
-                                        nz_nz_,
+                                        nz_nz_.data(),
                                         1,
-                                        nz_ddnz_,
+                                        nz_ddnz_.data(),
                                         _SPLINE_EST_DERIV_,
                                         error_message_),
                error_message_,
@@ -3702,10 +3661,10 @@ int TransferModule::transfer_global_selection_read() {
     nz_evo_size_ = row - 1;
 
     /* Allocate room for interpolation table */
-    class_alloc(nz_evo_z_, sizeof(double)*nz_evo_size_, error_message_);
-    class_alloc(nz_evo_nz_, sizeof(double)*nz_evo_size_, error_message_);
-    class_alloc(nz_evo_dlog_nz_, sizeof(double)*nz_evo_size_, error_message_);
-    class_alloc(nz_evo_dd_dlog_nz_, sizeof(double)*nz_evo_size_, error_message_);
+    nz_evo_z_.resize(nz_evo_size_);
+    nz_evo_nz_.resize(nz_evo_size_);
+    nz_evo_dlog_nz_.resize(nz_evo_size_);
+    nz_evo_dd_dlog_nz_.resize(nz_evo_size_);
 
     for (row = 0; row < nz_evo_size_; row++){
       status = fscanf(input_file,"%lf %lf",
@@ -3725,11 +3684,11 @@ int TransferModule::transfer_global_selection_read() {
 
 
     /* Call spline interpolation: */
-    class_call(array_spline_table_lines(nz_evo_z_,
+    class_call(array_spline_table_lines(nz_evo_z_.data(),
                                         nz_evo_size_,
-                                        nz_evo_dlog_nz_,
+                                        nz_evo_dlog_nz_.data(),
                                         1,
-                                        nz_evo_dd_dlog_nz_,
+                                        nz_evo_dd_dlog_nz_.data(),
                                         _SPLINE_EST_DERIV_,
                                         error_message_),
                error_message_,
@@ -3854,7 +3813,7 @@ int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int ind
       class_call(transfer_get_lmax(hyperspherical_get_xmin_from_approx,
                                    ptw->sgnK,
                                    nu,
-                                   l_,
+                                   l_.data(),
                                    l_size_max,
                                    phiminabs,
                                    xmax,
@@ -3869,7 +3828,7 @@ int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int ind
       class_call(transfer_get_lmax(hyperspherical_get_xmin_from_Airy,
                                    ptw->sgnK,
                                    nu,
-                                   l_,
+                                   l_.data(),
                                    l_size_max,
                                    phiminabs,
                                    xmax,
@@ -3890,7 +3849,7 @@ int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int ind
     class_call(hyperspherical_HIS_create(ptw->sgnK,
                                          nu,
                                          l_size_max,
-                                         l_,
+                                         l_.data(),
                                          xmin,
                                          xmax,
                                          sampling,
@@ -4050,13 +4009,10 @@ int TransferModule::transfer_get_lmax(int (*get_xmin_generic)(int sgnK, int l, d
  * @return the error status
  */
 
-int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_max, double ** window /* Pass a pointer to the pointer, so the pointer can be allocated inside of the function */){
+int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_max, std::vector<double>& window){
   /** Summary: */
 
   /** - define local variables */
-
-  double* tau0_minus_tau;
-  double* w_trapz;
 
   /* index running on time */
   int index_tau;
@@ -4069,7 +4025,6 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
 
   /* for calling background_at_eta */
   int last_index;
-  double * pvecback = NULL;
 
   /* conformal time */
   double tau, tau0;
@@ -4082,15 +4037,6 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
 
   /* rescaling factor depending on the background at a given time */
   double rescaling=0.;
-
-  /* array of selection function values at different times */
-  double * selection;
-
-  /* array of time sampling for lensing source selection function */
-  double * tau0_minus_tau_lensing_sources;
-
-  /* trapezoidal weights for lensing source selection function */
-  double * w_trapz_lensing_sources;
 
   /* index running on time in previous two arrays */
   int index_tau_sources;
@@ -4107,11 +4053,11 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
   int index_tt;
 
   /* allocate temporary arrays for storing selections, weights, times, and output; and for calling background */
-  class_alloc(tau0_minus_tau, tau_size_max*sizeof(double), error_message_);
-  class_alloc(selection, tau_size_max*sizeof(double), error_message_);
-  class_alloc(w_trapz, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*window), tau_size_max*tt_size_[index_md]*sizeof(double), error_message_);
-  class_alloc(pvecback, background_module_->bg_size_*sizeof(double), error_message_);
+  std::vector<double> tau0_minus_tau(tau_size_max);
+  std::vector<double> selection(tau_size_max);
+  std::vector<double> w_trapz(tau_size_max);
+  window.resize(tau_size_max*tt_size_[index_md]);
+  std::vector<double> pvecback(background_module_->bg_size_);
 
   /* conformal time today */
   tau0 = background_module_->conformal_age_;
@@ -4130,7 +4076,7 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
       _get_bin_nonintegrated_ncl_(index_tt)
 
       /* redefine the time sampling */
-      class_call(transfer_selection_sampling(bin, tau0_minus_tau, tau_size),
+      class_call(transfer_selection_sampling(bin, tau0_minus_tau.data(), tau_size),
                  error_message_,
                  error_message_);
 
@@ -4139,15 +4085,15 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
                  "this should not happen, there was probably a rounding error, if this error occurred, then this must be coded more carefully");
 
       /* Compute trapezoidal weights for integration over tau */
-      class_call(array_trapezoidal_mweights(tau0_minus_tau,
+      class_call(array_trapezoidal_mweights(tau0_minus_tau.data(),
                                             tau_size,
-                                            w_trapz,
+                                            w_trapz.data(),
                                             error_message_),
                  error_message_,
                  error_message_);
 
       /* compute values of selection function at sampled values of tau */
-      class_call(transfer_selection_compute(selection, tau0_minus_tau, w_trapz, tau_size, pvecback, tau0, bin),
+      class_call(transfer_selection_compute(selection.data(), tau0_minus_tau.data(), w_trapz.data(), tau_size, pvecback.data(), tau0, bin),
                  error_message_,
                  error_message_);
 
@@ -4175,7 +4121,7 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
         }
 
         /* corresponding background quantities */
-        class_call(background_module_->background_at_tau(tau, pba->long_info, pba->inter_normal, &last_index, pvecback),
+        class_call(background_module_->background_at_tau(tau, pba->long_info, pba->inter_normal, &last_index, pvecback.data()),
                    background_module_->error_message_,
                    error_message_);
 
@@ -4185,7 +4131,7 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
             (_index_tt_in_range_(index_tt_d1_,    ppt->selection_num, ppt->has_nc_rsd)) ||
             (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr)))
           {
-            class_call(transfer_f_evo(pvecback, last_index, cotKgen_source, &f_evo),
+            class_call(transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo),
                        error_message_,
                        error_message_);
             /* Error in old CLASS 2.6.3 : Number count evolution did not respect curvature */
@@ -4251,7 +4197,7 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
           rescaling = selection[index_tau]/pvecback[background_module_->index_bg_a_]/pvecback[background_module_->index_bg_H_];
 
         /* finally store in array */
-        (*window)[index_tt*tau_size_max+index_tau] = rescaling;
+        window[index_tt*tau_size_max+index_tau] = rescaling;
       }
     }
     /* End non-integrated contribution */
@@ -4270,33 +4216,29 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
         tau_sources_size=ppr->selection_sampling;
       }
 
-      class_alloc(tau0_minus_tau_lensing_sources,
-                  tau_sources_size*sizeof(double),
-                  error_message_);
+      std::vector<double> tau0_minus_tau_lensing_sources(tau_sources_size);
 
-      class_alloc(w_trapz_lensing_sources,
-                  tau_sources_size*sizeof(double),
-                  error_message_);
+      std::vector<double> w_trapz_lensing_sources(tau_sources_size);
 
       /* time sampling for source selection function */
-      class_call(transfer_selection_sampling(bin, tau0_minus_tau_lensing_sources, tau_sources_size),
+      class_call(transfer_selection_sampling(bin, tau0_minus_tau_lensing_sources.data(), tau_sources_size),
                  error_message_,
                  error_message_);
 
       /* Compute trapezoidal weights for integration over tau */
-      class_call(array_trapezoidal_mweights(tau0_minus_tau_lensing_sources,
+      class_call(array_trapezoidal_mweights(tau0_minus_tau_lensing_sources.data(),
                                             tau_sources_size,
-                                            w_trapz_lensing_sources,
+                                            w_trapz_lensing_sources.data(),
                                             error_message_),
                  error_message_,
                  error_message_);
 
       /* compute values of selection function at sampled values of tau */
-      class_call(transfer_selection_compute(selection,
-                                            tau0_minus_tau_lensing_sources,
-                                            w_trapz_lensing_sources,
+      class_call(transfer_selection_compute(selection.data(),
+                                            tau0_minus_tau_lensing_sources.data(),
+                                            w_trapz_lensing_sources.data(),
                                             tau_sources_size,
-                                            pvecback,
+                                            pvecback.data(),
                                             tau0,
                                             bin),
                  error_message_,
@@ -4305,15 +4247,15 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
       /* redefine the time sampling */
       class_call(transfer_lensing_sampling(bin,
                                            tau0,
-                                           tau0_minus_tau,
+                                           tau0_minus_tau.data(),
                                            tau_size),
                  error_message_,
                  error_message_);
 
       /* Compute trapezoidal weights for integration over tau */
-      class_call(array_trapezoidal_mweights(tau0_minus_tau,
+      class_call(array_trapezoidal_mweights(tau0_minus_tau.data(),
                                             tau_size,
-                                            w_trapz,
+                                            w_trapz.data(),
                                             error_message_),
                  error_message_,
                  error_message_);
@@ -4411,13 +4353,13 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
                                                                 pba->long_info,
                                                                 pba->inter_normal,
                                                                 &last_index,
-                                                                pvecback),
+                                                                pvecback.data()),
                            background_module_->error_message_,
                            error_message_);
 
                 /* Source evolution at time tau_lensing_source */
 
-                class_call(transfer_f_evo(pvecback, last_index, cotKgen_source, &f_evo),
+                class_call(transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo),
                            error_message_,
                            error_message_);
 
@@ -4443,21 +4385,13 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
         }
 
         /* Finally store integrated result for later use */
-        (*window)[index_tt*tau_size_max+index_tau] = rescaling;
+        window[index_tt*tau_size_max+index_tau] = rescaling;
       }
 
-      /* deallocate temporary arrays */
-      free(tau0_minus_tau_lensing_sources);
-      free(w_trapz_lensing_sources);
     }
     /* End integrated contribution */
   }
 
-  /* deallocate temporary arrays */
-  free(selection);
-  free(tau0_minus_tau);
-  free(w_trapz);
-  free(pvecback);
   return _SUCCESS_;
 }
 
@@ -4487,10 +4421,10 @@ int TransferModule::transfer_f_evo(double* pvecback, int last_index, double cotK
 
 
       class_call(array_interpolate_spline(
-                                          nz_evo_z_,
+                                          nz_evo_z_.data(),
                                           nz_evo_size_,
-                                          nz_evo_dlog_nz_,
-                                          nz_evo_dd_dlog_nz_,
+                                          nz_evo_dlog_nz_.data(),
+                                          nz_evo_dd_dlog_nz_.data(),
                                           1,
                                           z,
                                           &last_index,

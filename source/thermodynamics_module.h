@@ -3,6 +3,7 @@
 
 #include "input_module.h"
 #include "base_module.h"
+#include <vector>
 
 class ThermodynamicsModule : public BaseModule {
 public:
@@ -119,9 +120,9 @@ private:
   /** @name - thermodynamics interpolation tables */
 
   //@{
-  double* z_table_; /**< vector z_table[index_z] with values of redshift (vector of size tt_size) */
-  double* thermodynamics_table_; /**< table thermodynamics_table[index_z*tt_size_+pba->index_th] with all other quantities (array of size th_size*tt_size) */
-  double* d2thermodynamics_dz2_table_; /**< table d2thermodynamics_dz2_table[index_z*tt_size_+pba->index_th] with values of \f$ d^2 t_i / dz^2 \f$ (array of size th_size*tt_size) */
+  std::vector<double> z_table_; /**< vector z_table[index_z] with values of redshift (vector of size tt_size) */
+  std::vector<double> thermodynamics_table_; /**< table thermodynamics_table[index_z*tt_size_+pba->index_th] with all other quantities (array of size th_size*tt_size) */
+  std::vector<double> d2thermodynamics_dz2_table_; /**< table d2thermodynamics_dz2_table[index_z*tt_size_+pba->index_th] with values of \f$ d^2 t_i / dz^2 \f$ (array of size th_size*tt_size) */
   //@}
 
 };

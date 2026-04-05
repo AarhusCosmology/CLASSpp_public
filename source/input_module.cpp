@@ -233,12 +233,8 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
 
   file_content_.is_shooting = true;
 
-  class_alloc(shooting_workspace_.target_name,
-              unknown_parameters_size*sizeof(enum target_names),
-              error_message_);
-  class_alloc(shooting_workspace_.target_sizes,
-              unknown_parameters_size*sizeof(int),
-              error_message_);
+  shooting_workspace_.target_name.resize(unknown_parameters_size);
+  shooting_workspace_.target_sizes.resize(unknown_parameters_size);
   shooting_workspace_.unknown_parameters_size = unknown_parameters_size;
   shooting_workspace_.unknown_parameter_names.resize(unknown_parameters_size);
   std::vector<double> target_values;
@@ -276,12 +272,7 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     file_content_.set(param_name, comma_separated_list_of_values);
 
     //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
-    class_alloc(shooting_workspace_.target_values,
-                static_cast<int>(target_values.size())*sizeof(double),
-                error_message_);
-    for (int j = 0; j < target_values.size(); ++j) {
-      shooting_workspace_.target_values[j] = target_values[j];
-    }
+    shooting_workspace_.target_values = target_values;
 
   }
 
@@ -318,23 +309,17 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
     if (input_verbose > 0) {
       fprintf(stdout,"Computing unknown input parameters\n");
     }
-    double* x_inout;
-    double* dxdF;
-    class_alloc(x_inout,
-                sizeof(double)*static_cast<int>(target_values.size()),
-                error_message_);
-    class_alloc(dxdF,
-                sizeof(double)*static_cast<int>(target_values.size()),
-                error_message_);
-    class_call(input_get_guess(x_inout,
-                               dxdF,
+    std::vector<double> x_inout(target_values.size());
+    std::vector<double> dxdF(target_values.size());
+    class_call(input_get_guess(x_inout.data(),
+                               dxdF.data(),
                                &shooting_workspace_,
                                error_message_),
                error_message_, error_message_);
 
     class_call(fzero_Newton(input_try_unknown_parameters,
-                            x_inout,
-                            dxdF,
+                            x_inout.data(),
+                            dxdF.data(),
                             static_cast<int>(target_values.size()),
                             1e-3,
                             1e-3,
@@ -359,8 +344,6 @@ int InputModule::FixUnknownParameters(int input_verbose, int unknown_parameters_
       }
     }
 
-    free(x_inout);
-    free(dxdF);
   }
 
   if (input_verbose > 1) {
@@ -1130,7 +1113,7 @@ int InputModule::input_read_parameters() {
       double *Omega_dncdmdr_list, *omega_dncdmdr_list, *deg_list, *Omega_ini_dncdm_list, *omega_ini_dncdm_list, *Neff_ini_dncdm_list;
       int flag4, flag5, flag6, temp_size; // temp_size will always be N_ncdm_decay_dr_, the sizes are checked elsewhere
       
-      class_alloc(ncdm_->Omega_dncdmdr_, ncdm_->N_ncdm_decay_dr_*sizeof(double), errmsg);
+      ncdm_->Omega_dncdmdr_.resize(ncdm_->N_ncdm_decay_dr_);
       class_call(parser_read_list_of_doubles(pfc,"Omega_dncdmdr",&temp_size,&Omega_dncdmdr_list,&flag1,errmsg),
                  errmsg, errmsg);
       class_call(parser_read_list_of_doubles(pfc,"omega_dncdmdr",&temp_size,&omega_dncdmdr_list,&flag2,errmsg),

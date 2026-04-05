@@ -14,9 +14,9 @@ public:
   int primordial_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const;
   int primordial_output_data(int number_of_titles, double* data) const;
 
-  int* ic_size_;    /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
-  int* ic_ic_size_; /**< number of ordered pairs of (index_ic1, index_ic2); this number is just N(N+1)/2  where N = ic_size[index_md] */
-  short** is_non_zero_; /**< is_non_zero[index_md][index_ic1_ic2] set to false if pair
+  std::vector<int> ic_size_;    /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
+  std::vector<int> ic_ic_size_; /**< number of ordered pairs of (index_ic1, index_ic2); this number is just N(N+1)/2  where N = ic_size[index_md] */
+  std::vector<std::vector<short>> is_non_zero_; /**< is_non_zero[index_md][index_ic1_ic2] set to false if pair
                           (index_ic1, index_ic2) is uncorrelated
                           (ensures more precision and saves time with respect to the option
                           of simply setting P(k)_(index_ic1, index_ic2) to zero) */
@@ -72,8 +72,8 @@ private:
 
   //@{
   int md_size_;      /**< number of modes included in computation */
-  double* lnk_;    /**< list of ln(k) values lnk[index_k] */
-  double** lnpk_;  /**< depends on indices index_md, index_ic1, index_ic2, index_k as:
+  std::vector<double> lnk_;    /**< list of ln(k) values lnk[index_k] */
+  std::vector<std::vector<double>> lnpk_;  /**< depends on indices index_md, index_ic1, index_ic2, index_k as:
                       lnpk[index_md][index_k*ic_ic_size_[index_md]+index_ic1_ic2]
                       where index_ic1_ic2 labels ordered pairs (index_ic1, index_ic2) (since
                       the primordial spectrum is symmetric in (index_ic1, index_ic2)).
@@ -86,7 +86,7 @@ private:
                       is arbitrary. For fully correlated or anti-correlated initial conditions,
                       this non -diagonal element is independent on k, and equal to +1 or -1.
                    */
-  double** ddlnpk_; /**< second derivative of above array, for spline interpolation. So:
+  std::vector<std::vector<double>> ddlnpk_; /**< second derivative of above array, for spline interpolation. So:
                        - for index_ic1 = index_ic, we spline ln[P(k)] vs. ln(k), which is
                        good since this function is usually smooth.
                        - for non-diagonal coefficients, we spline
@@ -100,9 +100,9 @@ private:
 
   //@{
   /** @name - parameters describing the case primordial_spec_type = analytic_Pk : amplitudes, tilts, runnings, cross-correlations, ... */
-  double** amplitude_; /**< all amplitudes in matrix form: amplitude[index_md][index_ic1_ic2] */
-  double** tilt_;      /**< all tilts in matrix form: tilt[index_md][index_ic1_ic2] */
-  double** running_;   /**< all runnings in matrix form: running[index_md][index_ic1_ic2] */
+  std::vector<std::vector<double>> amplitude_; /**< all amplitudes in matrix form: amplitude[index_md][index_ic1_ic2] */
+  std::vector<std::vector<double>> tilt_;      /**< all tilts in matrix form: tilt[index_md][index_ic1_ic2] */
+  std::vector<std::vector<double>> running_;   /**< all runnings in matrix form: running[index_md][index_ic1_ic2] */
   //@}
 
   //@{

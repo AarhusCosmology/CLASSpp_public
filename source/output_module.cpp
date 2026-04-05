@@ -41,12 +41,6 @@ int OutputModule::output_total_cl_at_l(
                          double * cl
                          ){
 
-  double ** cl_md_ic; /* array with argument
-                         cl_md_ic[index_md][index_ic1_ic2*spectra_module_->ct_size_+index_ct] */
-
-  double ** cl_md;    /* array with argument
-                         cl_md[index_md][index_ct] */
-
   int index_md;
 
   if (ple->has_lensed_cls == _TRUE_) {
@@ -56,45 +50,28 @@ int OutputModule::output_total_cl_at_l(
   }
   else {
 
-    class_alloc(cl_md_ic,
-                spectra_module_->md_size_*sizeof(double *),
-                error_message_);
+    std::vector<std::vector<double>> cl_md_ic_storage(spectra_module_->md_size_);
+    std::vector<double*> cl_md_ic(spectra_module_->md_size_, nullptr);
 
-    class_alloc(cl_md,
-                spectra_module_->md_size_*sizeof(double *),
-                error_message_);
+    std::vector<std::vector<double>> cl_md_storage(spectra_module_->md_size_);
+    std::vector<double*> cl_md(spectra_module_->md_size_, nullptr);
 
     for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
 
-      if (spectra_module_->md_size_ > 1)
+      if (spectra_module_->md_size_ > 1) {
+        cl_md_storage[index_md].resize(spectra_module_->ct_size_);
+        cl_md[index_md] = cl_md_storage[index_md].data();
+      }
 
-        class_alloc(cl_md[index_md],
-                    spectra_module_->ct_size_*sizeof(double),
-                    error_message_);
-
-      if (spectra_module_->ic_size_[index_md] > 1)
-
-        class_alloc(cl_md_ic[index_md],
-                    spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_*sizeof(double),
-                    error_message_);
+      if (spectra_module_->ic_size_[index_md] > 1) {
+        cl_md_ic_storage[index_md].resize(spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_);
+        cl_md_ic[index_md] = cl_md_ic_storage[index_md].data();
+      }
     }
 
-    class_call(spectra_module_->spectra_cl_at_l((double)l, cl, cl_md, cl_md_ic),
+    class_call(spectra_module_->spectra_cl_at_l((double)l, cl, cl_md.data(), cl_md_ic.data()),
                psp->error_message,
                error_message_);
-
-    for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
-
-      if (spectra_module_->md_size_ > 1)
-        free(cl_md[index_md]);
-
-      if (spectra_module_->ic_size_[index_md] > 1)
-        free(cl_md_ic[index_md]);
-
-    }
-
-    free(cl_md_ic);
-    free(cl_md);
 
   }
 
@@ -215,26 +192,9 @@ int OutputModule::output_cl() {
 
   /** - define local variables */
 
-  FILE *** out_md_ic; /* array of pointers to files with argument
-                         out_md_ic[index_md][index_ic1_ic2]
-                         (will contain cl's for each mode and pairs of initial conditions) */
-
-  FILE ** out_md;     /* array of pointers to files with argument
-                         out_md[index_md]
-                         (will contain cl's for each mode, summed eventually over ic's) */
-
   FILE * out;         /* (will contain total cl's, summed eventually over modes and ic's) */
 
   FILE * out_lensed = nullptr;         /* (will contain total lensed cl's) */
-
-  double ** cl_md_ic; /* array with argument
-                         cl_md_ic[index_md][index_ic1_ic2*spectra_module_->ct_size_+index_ct] */
-
-  double ** cl_md;    /* array with argument
-                         cl_md[index_md][index_ct] */
-
-  double * cl_tot;    /* array with argument
-                         cl_tot[index_ct] */
 
   int index_md;
   int index_ic1,index_ic2,index_ic1_ic2;
@@ -245,27 +205,21 @@ int OutputModule::output_cl() {
 
   /** - first, allocate all arrays of files and \f$ C_l\f$'s */
 
-  class_alloc(out_md_ic,
-              spectra_module_->md_size_*sizeof(FILE * *),
-              error_message_);
+  std::vector<std::vector<FILE*>> out_md_ic_storage(spectra_module_->md_size_);
+  std::vector<FILE**> out_md_ic(spectra_module_->md_size_, nullptr);
 
-  class_alloc(cl_md_ic,
-              spectra_module_->md_size_*sizeof(double *),
-              error_message_);
+  std::vector<std::vector<double>> cl_md_ic_storage(spectra_module_->md_size_);
+  std::vector<double*> cl_md_ic(spectra_module_->md_size_, nullptr);
 
-  class_alloc(out_md,
-              spectra_module_->md_size_*sizeof(FILE *),
-              error_message_);
+  std::vector<FILE*> out_md(spectra_module_->md_size_, nullptr);
 
-  class_alloc(cl_md,
-              spectra_module_->md_size_*sizeof(double *),
-              error_message_);
+  std::vector<std::vector<double>> cl_md_storage(spectra_module_->md_size_);
+  std::vector<double*> cl_md(spectra_module_->md_size_, nullptr);
 
   for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
 
-    class_alloc(out_md_ic[index_md],
-                spectra_module_->ic_ic_size_[index_md]*sizeof(FILE *),
-                error_message_);
+    out_md_ic_storage[index_md].resize(spectra_module_->ic_ic_size_[index_md], nullptr);
+    out_md_ic[index_md] = out_md_ic_storage[index_md].data();
 
   }
 
@@ -281,9 +235,7 @@ int OutputModule::output_cl() {
              error_message_,
              error_message_);
 
-  class_alloc(cl_tot,
-              spectra_module_->ct_size_*sizeof(double),
-              error_message_);
+  std::vector<double> cl_tot(spectra_module_->ct_size_);
 
 
   if (ple->has_lensed_cls == _TRUE_) {
@@ -325,9 +277,8 @@ int OutputModule::output_cl() {
                  error_message_,
                  error_message_);
 
-      class_alloc(cl_md[index_md],
-                  spectra_module_->ct_size_*sizeof(double),
-                  error_message_);
+      cl_md_storage[index_md].resize(spectra_module_->ct_size_);
+      cl_md[index_md] = cl_md_storage[index_md].data();
 
     }
   }
@@ -473,9 +424,8 @@ int OutputModule::output_cl() {
         }
       }
 
-      class_alloc(cl_md_ic[index_md],
-                  spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_*sizeof(double),
-                  error_message_);
+      cl_md_ic_storage[index_md].resize(spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_);
+      cl_md_ic[index_md] = cl_md_ic_storage[index_md].data();
     }
   }
 
@@ -485,21 +435,21 @@ int OutputModule::output_cl() {
 
   for (l = 2; l <= spectra_module_->l_max_tot_; l++) {
 
-    class_call(spectra_module_->spectra_cl_at_l((double)l, cl_tot, cl_md, cl_md_ic),
+    class_call(spectra_module_->spectra_cl_at_l((double)l, cl_tot.data(), cl_md.data(), cl_md_ic.data()),
                psp->error_message,
                error_message_);
 
-    class_call(output_one_line_of_cl(out, (double)l, cl_tot, spectra_module_->ct_size_),
+    class_call(output_one_line_of_cl(out, (double)l, cl_tot.data(), spectra_module_->ct_size_),
                error_message_,
                error_message_);
 
     if ((ple->has_lensed_cls == _TRUE_) && (l <= lensing_module_->l_lensed_max_)) {
 
-      class_call(lensing_module_->lensing_cl_at_l((double)l, cl_tot),
+      class_call(lensing_module_->lensing_cl_at_l((double)l, cl_tot.data()),
                  lensing_module_->error_message_,
                  error_message_);
 
-      class_call(output_one_line_of_cl(out_lensed, l, cl_tot, spectra_module_->ct_size_),
+      class_call(output_one_line_of_cl(out_lensed, l, cl_tot.data(), spectra_module_->ct_size_),
                  error_message_,
                  error_message_);
     }
@@ -538,27 +488,17 @@ int OutputModule::output_cl() {
           fclose(out_md_ic[index_md][index_ic1_ic2]);
         }
       }
-      free(cl_md_ic[index_md]);
     }
   }
   if (perturbations_module_->md_size_ > 1) {
     for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
       fclose(out_md[index_md]);
-      free(cl_md[index_md]);
     }
   }
   fclose(out);
   if (ple->has_lensed_cls == _TRUE_) {
     fclose(out_lensed);
   }
-  free(cl_tot);
-  for (index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-    free(out_md_ic[index_md]);
-  }
-  free(out_md_ic);
-  free(cl_md_ic);
-  free(out_md);
-  free(cl_md);
 
   return _SUCCESS_;
 
@@ -577,11 +517,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
   /** - define local variables */
 
-  FILE ** out_pk_ic = NULL;  /* out_pk_ic[index_ic1_ic2] is a pointer to a file with P(k) for each pair of ic */
   FILE * out_pk;             /* out_pk[index_pk] is a pointer to a file with total P(k) summed over ic */
-
-  double * ln_pk_ic = NULL;  /* array ln_pk_ic[index_k * nonlinear_module_->ic_ic_size_ + index_ic1_ic2] */
-  double * ln_pk;            /* array ln_pk[index_k] */
 
   int index_ic1,index_ic2;
   int index_ic1_ic2=0;
@@ -605,21 +541,18 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
   /** - allocate arrays to store the P(k) */
 
-  class_alloc(ln_pk,
-              nonlinear_module_->k_size_*sizeof(double),
-              error_message_);
+  std::vector<double> ln_pk(nonlinear_module_->k_size_);
+
+  std::vector<double> ln_pk_ic;
+  std::vector<FILE*> out_pk_ic;
 
   if (do_ic == _TRUE_) {
 
-    class_alloc(ln_pk_ic,
-                nonlinear_module_->k_size_*nonlinear_module_->ic_ic_size_*sizeof(double),
-                error_message_);
+    ln_pk_ic.resize(nonlinear_module_->k_size_*nonlinear_module_->ic_ic_size_);
 
     /** - allocate pointer to output files */
 
-    class_alloc(out_pk_ic,
-                nonlinear_module_->ic_ic_size_*sizeof(FILE *),
-                error_message_);
+    out_pk_ic.resize(nonlinear_module_->ic_ic_size_, nullptr);
   }
 
   /** - loop over pk type (_cb, _m) */
@@ -765,7 +698,7 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
       /** - third, compute P(k) for each k */
 
-      class_call(nonlinear_module_->nonlinear_pk_at_z(logarithmic, pk_output, pop->z_pk[index_z], index_pk, ln_pk, ln_pk_ic),
+      class_call(nonlinear_module_->nonlinear_pk_at_z(logarithmic, pk_output, pop->z_pk[index_z], index_pk, ln_pk.data(), ln_pk_ic.data()),
                  nonlinear_module_->error_message_,
                  error_message_);
 
@@ -812,13 +745,6 @@ int OutputModule::output_pk(enum pk_outputs pk_output) {
 
   } /* end loop over index_pk */
 
-  /* free arrays and pointers */
-  free(ln_pk);
-  if (pk_output == pk_linear) {
-    free(ln_pk_ic);
-    free(out_pk_ic);
-  }
-
   return _SUCCESS_;
 }
 
@@ -833,7 +759,6 @@ int OutputModule::output_tk() {
 
   /** - define local variables */
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  double * data;
   int size_data, number_of_titles;
 
   FILE * tkfile;
@@ -871,7 +796,7 @@ int OutputModule::output_tk() {
   number_of_titles = get_number_of_titles(titles);
   size_data = number_of_titles*perturbations_module_->k_size_[index_md];
 
-  class_alloc(data, sizeof(double)*perturbations_module_->ic_size_[index_md]*size_data, error_message_);
+  std::vector<double> data(perturbations_module_->ic_size_[index_md]*size_data);
 
   for (index_z = 0; index_z < pop->z_pk_num; index_z++) {
 
@@ -890,7 +815,7 @@ int OutputModule::output_tk() {
 
     /** - second, open only the relevant files, and write a heading in each of them */
 
-    class_call(perturbations_module_->perturb_output_data(pop->output_format, pop->z_pk[index_z], number_of_titles, data),
+    class_call(perturbations_module_->perturb_output_data(pop->output_format, pop->z_pk[index_z], number_of_titles, data.data()),
                perturbations_module_->error_message_,
                error_message_);
 
@@ -940,7 +865,7 @@ int OutputModule::output_tk() {
 
       output_print_data(tkfile,
                         titles,
-                        data+index_ic*size_data,
+                        data.data()+index_ic*size_data,
                         size_data);
 
       /** - free memory and close files */
@@ -949,8 +874,6 @@ int OutputModule::output_tk() {
     }
 
   }
-
-  free(data);
 
   return _SUCCESS_;
 
@@ -962,7 +885,6 @@ int OutputModule::output_background() {
   FileName file_name;
 
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  double * data;
   int size_data, number_of_titles;
 
   class_call(background_module_->background_output_titles(titles),
@@ -970,8 +892,8 @@ int OutputModule::output_background() {
              error_message_);
   number_of_titles = get_number_of_titles(titles);
   size_data = number_of_titles*background_module_->bt_size_;
-  class_alloc(data, sizeof(double)*size_data, error_message_);
-  class_call(background_module_->background_output_data(number_of_titles, data),
+  std::vector<double> data(size_data);
+  class_call(background_module_->background_output_data(number_of_titles, data.data()),
              background_module_->error_message_,
              error_message_);
 
@@ -992,10 +914,9 @@ int OutputModule::output_background() {
 
   output_print_data(backfile,
                     titles,
-                    data,
+                    data.data(),
                     size_data);
 
-  free(data);
   fclose(backfile);
 
   return _SUCCESS_;
@@ -1007,7 +928,6 @@ int OutputModule::output_thermodynamics() {
   FileName file_name;
   FILE * thermofile;
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  double * data;
   int size_data, number_of_titles;
 
   class_call(thermodynamics_module_->thermodynamics_output_titles(titles),
@@ -1015,8 +935,8 @@ int OutputModule::output_thermodynamics() {
              error_message_);
   number_of_titles = get_number_of_titles(titles);
   size_data = number_of_titles*thermodynamics_module_->tt_size_;
-  class_alloc(data, sizeof(double)*size_data, error_message_);
-  class_call(thermodynamics_module_->thermodynamics_output_data(number_of_titles, data),
+  std::vector<double> data(size_data);
+  class_call(thermodynamics_module_->thermodynamics_output_data(number_of_titles, data.data()),
              thermodynamics_module_->error_message_,
              error_message_);
 
@@ -1050,10 +970,9 @@ int OutputModule::output_thermodynamics() {
 
   output_print_data(thermofile,
                     titles,
-                    data,
+                    data.data(),
                     size_data);
 
-  free(data);
   fclose(thermofile);
 
   return _SUCCESS_;
@@ -1078,7 +997,7 @@ int OutputModule::output_perturbations() {
       fprintf(out,"#scalar perturbations for mode k = %.*e Mpc^(-1)\n",_OUTPUTPRECISION_,k);
       output_print_data(out,
                         perturbations_module_->scalar_titles_,
-                        perturbations_module_->scalar_perturbations_data_[index_ikout],
+                        const_cast<double*>(perturbations_module_->scalar_perturbations_data_[index_ikout].data()),
                         perturbations_module_->size_scalar_perturbation_data_[index_ikout]);
 
       fclose(out);
@@ -1091,7 +1010,7 @@ int OutputModule::output_perturbations() {
       fprintf(out,"#vector perturbations for mode k = %.*e Mpc^(-1)\n",_OUTPUTPRECISION_,k);
       output_print_data(out,
                         perturbations_module_->vector_titles_,
-                        perturbations_module_->vector_perturbations_data_[index_ikout],
+                        const_cast<double*>(perturbations_module_->vector_perturbations_data_[index_ikout].data()),
                         perturbations_module_->size_vector_perturbation_data_[index_ikout]);
 
       fclose(out);
@@ -1104,7 +1023,7 @@ int OutputModule::output_perturbations() {
       fprintf(out,"#tensor perturbations for mode k = %.*e Mpc^(-1)\n",_OUTPUTPRECISION_,k);
       output_print_data(out,
                         perturbations_module_->tensor_titles_,
-                        perturbations_module_->tensor_perturbations_data_[index_ikout],
+                        const_cast<double*>(perturbations_module_->tensor_perturbations_data_[index_ikout].data()),
                         perturbations_module_->size_tensor_perturbation_data_[index_ikout]);
 
       fclose(out);
@@ -1120,7 +1039,6 @@ int OutputModule::output_primordial() {
   FileName file_name;
   FILE * out;
   char titles[_MAXTITLESTRINGLENGTH_]={0};
-  double * data;
   int size_data, number_of_titles;
 
   snprintf(file_name, _FILENAMESIZE_-32, "%s%s",pop->root,"primordial_Pk.dat");
@@ -1130,8 +1048,8 @@ int OutputModule::output_primordial() {
              error_message_);
   number_of_titles = get_number_of_titles(titles);
   size_data = number_of_titles*primordial_module_->lnk_size_;
-  class_alloc(data,sizeof(double)*size_data,error_message_);
-  class_call(primordial_module_->primordial_output_data(number_of_titles, data),
+  std::vector<double> data(size_data);
+  class_call(primordial_module_->primordial_output_data(number_of_titles, data.data()),
              primordial_module_->error_message_,
              error_message_);
 
@@ -1142,10 +1060,9 @@ int OutputModule::output_primordial() {
 
   output_print_data(out,
                     titles,
-                    data,
+                    data.data(),
                     size_data);
 
-  free(data);
   fclose(out);
 
   return _SUCCESS_;

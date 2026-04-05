@@ -4,6 +4,7 @@
 #define __THERMODYNAMICS__
 
 #include "background.h"
+#include <vector>
 //#include "arrays.h"
 //#include "helium.h"
 //#include "hydrogen.h"
@@ -197,7 +198,7 @@ struct recombination {
   //@{
 
   int rt_size; /**< number of lines (redshift steps) in the table */
-  double * recombination_table; /**< table recombination_table[index_z*preco->re_size+index_re] with all other quantities (array of size preco->rt_size*preco->re_size) */
+  std::vector<double> recombination_table; /**< table recombination_table[index_z*preco->re_size+index_re] with all other quantities (array of size preco->rt_size*preco->re_size) */
 
   //@}
 
@@ -294,7 +295,7 @@ struct reionization {
   //@{
 
   int rt_size;                 /**< number of lines (redshift steps) in the table */
-  double * reionization_table; /**< table reionization_table[index_z*preio->re_size+index_re] with all other quantities (array of size preio->rt_size*preio->re_size) */
+  std::vector<double> reionization_table; /**< table reionization_table[index_z*preio->re_size+index_re] with all other quantities (array of size preio->rt_size*preio->re_size) */
 
   //@}
 
@@ -336,7 +337,7 @@ struct reionization {
 
   /** @name - vector of such parameters, and its size */
 
-  double * reionization_parameters; /**< vector containing all reionization parameters necessary to compute xe(z) */
+  std::vector<double> reionization_parameters; /**< vector containing all reionization parameters necessary to compute xe(z) */
   int reio_num_params; /**< length of vector reionization_parameters */
 
   //@}

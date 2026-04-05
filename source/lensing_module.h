@@ -90,15 +90,15 @@ private:
 
   int l_size_;       /**< number of l values */
 
-  int * l_max_lt_;    /**< last multipole (given as an input) at which
+  std::vector<int> l_max_lt_;    /**< last multipole (given as an input) at which
         we want to output \f$ C_l \f$'s for a given mode and type */
 
-  double * l_;       /**< table of multipole values l[index_l] */
-  double * cl_lens_; /**< table of anisotropy spectra for each
+  std::vector<double> l_;       /**< table of multipole values l[index_l] */
+  std::vector<double> cl_lens_; /**< table of anisotropy spectra for each
          multipole and types,
          cl[index_l * ple->lt_size + index_lt] */
 
-  double * ddcl_lens_; /**< second derivatives for interpolation */
+  std::vector<double> ddcl_lens_; /**< second derivatives for interpolation */
 
   //@}
   SpectraModulePtr spectra_module_;

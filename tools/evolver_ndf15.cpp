@@ -58,6 +58,7 @@
 #include "evolver_ndf15.h"
 //#include "perturbations.h"
 #include "sparse.h"
+#include <vector>
 
 int evolver_ndf15(
 		  int (*derivs)(double x,double * y,double * dy,
@@ -113,20 +114,11 @@ int evolver_ndf15(
 
   /** Allocate memory . */
 
-  void * buffer;
-  int buffer_size;
+  std::vector<double> buffer(15*neqp, 0.0);
+  std::vector<double> dif_data(7*neq+1, 0.0);
+  std::vector<double*> dif_ptrs(neqp);
 
-  buffer_size=
-    15*neqp*sizeof(double)
-    +neqp*sizeof(int)
-    +neqp*sizeof(double*)
-    +(7*neq+1)*sizeof(double);
-
-  class_alloc(buffer,
-	      buffer_size,
-	      error_message);
-
-  f0       =(double*)buffer;
+  f0       =buffer.data();
   wt       =f0+neqp;
   ddfddt   =wt+neqp;
   pred     =ddfddt+neqp;
@@ -143,40 +135,18 @@ int evolver_ndf15(
   tempvec2 =tempvec1+neqp;
 
 
-  dif      =(double**)(tempvec2+neqp);
-  dif[1]   =(double*)(dif+neqp);
+  dif      =dif_ptrs.data();
+  dif[1]   =dif_data.data();
   for(j=2;j<=neq;j++) dif[j] = dif[j-1]+7; /* Set row pointers... */
   dif[0] = NULL;
-  /* for (ii=0;ii<(7*neq+1);ii++) dif[1][ii]=0.; */
   for (j=1; j<=neq; j++) {
     for (ii=1;ii<=7;ii++) {
       dif[j][ii]=0.;
     }
   }
 
-  /* 	class_alloc(f0,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(wt,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(ddfddt,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(pred,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(y,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(invwt,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(rhs,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(psi,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(difkp1,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(del,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(yinterp,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(ypinterp,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(yppinterp,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(tempvec1,sizeof(double)*neqp,error_message); */
-  /* 	class_alloc(tempvec2,sizeof(double)*neqp,error_message); */
-
-  class_alloc(interpidx, sizeof(int)*neqp, error_message);
-
-  /* Allocate vector of pointers to rows of dif:*/
-  /* 	class_alloc(dif,sizeof(double*)*neqp,error_message);  */
-  /* 	class_calloc(dif[1],(7*neq+1),sizeof(double),error_message); */
-  /* 	dif[0] = NULL; */
-  /* 	for(j=2;j<=neq;j++) dif[j] = dif[j-1]+7; */ /* Set row pointers... */
+  std::vector<int> interpidx_vec(neqp);
+  interpidx = interpidx_vec.data();
 
   /*Set pointers:*/
   ynew = y_inout-1; /* This way y_inout is always up to date. */
@@ -676,27 +646,7 @@ int evolver_ndf15(
 
   /** Deallocate memory */
 
-  free(buffer);
-
-  /* 	free(f0); */
-  /* 	free(wt); */
-  /* 	free(ddfddt); */
-  /* 	free(pred); */
-  /* 	free(y); */
-  /* 	free(invwt); */
-  /* 	free(rhs); */
-  /* 	free(psi); */
-  /* 	free(difkp1); */
-  /* 	free(del); */
-  /* 	free(yinterp); */
-  /* 	free(ypinterp); */
-  /* 	free(yppinterp); */
-  /* 	free(tempvec1); */
-  /* 	free(tempvec2); */
-
-  free(interpidx);
-  /* 	free(dif[1]); */
-  /* 	free(dif); */
+  /* buffer, dif_data, dif_ptrs, interpidx_vec freed by RAII */
 
   uninitialize_jacobian(&jac);
   uninitialize_numjac_workspace(&nj_ws);
@@ -1088,19 +1038,28 @@ int fzero_Newton(int (*func)(double *x,
 
   /** All arrays are indexed as [0, n-1] with the exception of p, indx,
       lu_work and Fjac, since they are passed to ludcmp and lubksb. */
-  class_alloc(indx, sizeof(int)*(x_size+1), error_message);
-  class_alloc(p, sizeof(double)*(x_size+1), error_message);
-  class_alloc(lu_work, sizeof(double)*(x_size+1), error_message);
-  class_alloc(Fjac, sizeof(double *)*(x_size+1), error_message);
-  Fjac[0] = NULL;
-  class_alloc(Fjac[1], sizeof(double)*(x_size*x_size+1), error_message);
+  std::vector<int> indx_vec(x_size+1);
+  std::vector<double> p_vec(x_size+1);
+  std::vector<double> lu_work_vec(x_size+1);
+  std::vector<double> Fjac_data(x_size*x_size+1);
+  std::vector<double*> Fjac_ptrs(x_size+1);
+  Fjac_ptrs[0] = NULL;
+  Fjac_ptrs[1] = Fjac_data.data();
   for (i=2; i<=x_size; i++){
-    Fjac[i] = Fjac[i-1] + x_size;
+    Fjac_ptrs[i] = Fjac_ptrs[i-1] + x_size;
   }
 
-  class_alloc(F0, sizeof(double)*x_size, error_message);
-  class_alloc(delx, sizeof(double)*x_size, error_message);
-  class_alloc(Fdel, sizeof(double)*x_size, error_message);
+  std::vector<double> F0_vec(x_size);
+  std::vector<double> delx_vec(x_size);
+  std::vector<double> Fdel_vec(x_size);
+
+  indx = indx_vec.data();
+  p = p_vec.data();
+  lu_work = lu_work_vec.data();
+  Fjac = Fjac_ptrs.data();
+  F0 = F0_vec.data();
+  delx = delx_vec.data();
+  Fdel = Fdel_vec.data();
 
   for (k=1;k<=ntrial;k++) {
     //printf("x = [%f, %f], delx = [%e, %e]\n", x_inout[0],x_inout[1],delx[0],delx[1]);
@@ -1187,14 +1146,7 @@ int fzero_Newton(int (*func)(double *x,
     }
   }
 
-  free(p);
-  free(lu_work);
-  free(indx);
-  free(Fjac[1]);
-  free(Fjac);
-  free(F0);
-  free(delx);
-  free(Fdel);
+  /* Memory freed by RAII (vectors go out of scope) */
 
   if (has_converged == _TRUE_){
     //fprintf(stderr, "Newton converged after %d iterations\n", k);
@@ -1560,35 +1512,41 @@ int initialize_jacobian(struct jacobian *jac, int neq, ErrorMsg error_message){
 
   /*Setup memory for the pointers of the dense method:*/
 
-  class_alloc(jac->dfdy,sizeof(double*)*(neq+1),error_message); /* Allocate vector of pointers to rows of matrix.*/
-  class_alloc(jac->dfdy[1],sizeof(double)*(neq*neq+1),error_message);
+  jac->dfdy_data_vec.assign(neq*neq+1, 0.0);
+  jac->dfdy_rows_vec.resize(neq+1);
+  jac->dfdy = jac->dfdy_rows_vec.data();
   jac->dfdy[0] = NULL;
+  jac->dfdy[1] = jac->dfdy_data_vec.data();
   for(i=2;i<=neq;i++) jac->dfdy[i] = jac->dfdy[i-1]+neq; /* Set row pointers... */
 
-  class_alloc(jac->LU,sizeof(double*)*(neq+1),error_message); /* Allocate vector of pointers to rows of matrix.*/
-  class_alloc(jac->LU[1],sizeof(double)*(neq*neq+1),error_message);
+  jac->LU_data_vec.assign(neq*neq+1, 0.0);
+  jac->LU_rows_vec.resize(neq+1);
+  jac->LU = jac->LU_rows_vec.data();
   jac->LU[0] = NULL;
+  jac->LU[1] = jac->LU_data_vec.data();
   for(i=2;i<=neq;i++) jac->LU[i] = jac->LU[i-1]+neq; /* Set row pointers... */
 
-  class_alloc(jac->LUw,sizeof(double)*(neq+1),error_message);
-  class_alloc(jac->jacvec,sizeof(double)*(neq+1),error_message);
-  class_alloc(jac->luidx,sizeof(int)*(neq+1),error_message);
+  jac->LUw_vec.resize(neq+1);
+  jac->LUw = jac->LUw_vec.data();
+  jac->jacvec_vec.resize(neq+1);
+  jac->jacvec = jac->jacvec_vec.data();
+  jac->luidx_vec.resize(neq+1);
+  jac->luidx = jac->luidx_vec.data();
 
   /*Setup memory for the sparse method, if used: */
   if (jac->use_sparse){
     jac->sparse_stuff_initialized = 1;
 
-    jac->xjac=(double*)(jac->luidx+neq+1);
-    jac->col_group=(int*)(jac->xjac+jac->max_nonzero);
-    jac->col_wi=jac->col_group+neq;
-    jac->Cp=jac->col_wi+neq;
-    jac->Ci=jac->Cp+neq+1;
-
-    class_alloc(jac->xjac,sizeof(double)*jac->max_nonzero,error_message);
-    class_alloc(jac->col_group,sizeof(int)*neq,error_message);
-    class_alloc(jac->col_wi,sizeof(int)*neq,error_message);
-    class_alloc(jac->Cp,sizeof(int)*(neq+1),error_message);
-    class_alloc(jac->Ci,sizeof(int)*jac->cnzmax,error_message);
+    jac->xjac_vec.resize(jac->max_nonzero);
+    jac->xjac = jac->xjac_vec.data();
+    jac->col_group_vec.resize(neq);
+    jac->col_group = jac->col_group_vec.data();
+    jac->col_wi_vec.resize(neq);
+    jac->col_wi = jac->col_wi_vec.data();
+    jac->Cp_vec.resize(neq+1);
+    jac->Cp = jac->Cp_vec.data();
+    jac->Ci_vec.resize(jac->cnzmax);
+    jac->Ci = jac->Ci_vec.data();
 
     class_call(sp_num_alloc(&jac->Numerical, neq,error_message),
 	       error_message,error_message);
@@ -1604,21 +1562,10 @@ int initialize_jacobian(struct jacobian *jac, int neq, ErrorMsg error_message){
 }
 
 int uninitialize_jacobian(struct jacobian *jac){
-  free(jac->dfdy[1]);
-  free(jac->dfdy);
-  free(jac->LU[1]);
-  free(jac->LU);
-
-  free(jac->luidx);
-  free(jac->LUw);
-  free(jac->jacvec);
+  /* Dense method memory freed by RAII (backing vectors) */
 
   if(jac->sparse_stuff_initialized){
-    free(jac->xjac);
-    free(jac->col_wi);
-    free(jac->col_group);
-    free(jac->Cp);
-    free(jac->Ci);
+    /* Sparse backing vectors freed by RAII */
     sp_mat_free(jac->spJ);
     sp_num_free(jac->Numerical);
   }
@@ -1627,47 +1574,46 @@ int uninitialize_jacobian(struct jacobian *jac){
 
 int initialize_numjac_workspace(struct numjac_workspace * nj_ws,int neq, ErrorMsg error_message){
   int i,neqp=neq+1;
-  /* Allocate vectors and matrices: */
+  /* Allocate vectors and matrices using RAII backing storage: */
 
-  class_alloc(nj_ws->yscale,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->del,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->Difmax,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->absFdelRm,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->absFvalue,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->absFvalueRm,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->Fscale,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->ffdel,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->yydel,sizeof(double)*neqp,error_message);
-  class_alloc(nj_ws->tmp,sizeof(double)*neqp,error_message);
+  nj_ws->yscale_vec.resize(neqp);
+  nj_ws->yscale = nj_ws->yscale_vec.data();
+  nj_ws->del_vec.resize(neqp);
+  nj_ws->del = nj_ws->del_vec.data();
+  nj_ws->Difmax_vec.resize(neqp);
+  nj_ws->Difmax = nj_ws->Difmax_vec.data();
+  nj_ws->absFdelRm_vec.resize(neqp);
+  nj_ws->absFdelRm = nj_ws->absFdelRm_vec.data();
+  nj_ws->absFvalue_vec.resize(neqp);
+  nj_ws->absFvalue = nj_ws->absFvalue_vec.data();
+  nj_ws->absFvalueRm_vec.resize(neqp);
+  nj_ws->absFvalueRm = nj_ws->absFvalueRm_vec.data();
+  nj_ws->Fscale_vec.resize(neqp);
+  nj_ws->Fscale = nj_ws->Fscale_vec.data();
+  nj_ws->ffdel_vec.resize(neqp);
+  nj_ws->ffdel = nj_ws->ffdel_vec.data();
+  nj_ws->yydel_vec.resize(neqp);
+  nj_ws->yydel = nj_ws->yydel_vec.data();
+  nj_ws->tmp_vec.resize(neqp);
+  nj_ws->tmp = nj_ws->tmp_vec.data();
 
-  class_alloc(nj_ws->ydel_Fdel,sizeof(double*)*(neq+1),error_message); /* Allocate vector of pointers to rows of matrix.*/
-  class_alloc(nj_ws->ydel_Fdel[1],sizeof(double)*(neq*neq+1),error_message);
+  nj_ws->ydel_Fdel_data_vec.assign(neq*neq+1, 0.0);
+  nj_ws->ydel_Fdel_rows_vec.resize(neq+1);
+  nj_ws->ydel_Fdel = nj_ws->ydel_Fdel_rows_vec.data();
   nj_ws->ydel_Fdel[0] = NULL;
+  nj_ws->ydel_Fdel[1] = nj_ws->ydel_Fdel_data_vec.data();
   for(i=2;i<=neq;i++) nj_ws->ydel_Fdel[i] = nj_ws->ydel_Fdel[i-1]+neq; /* Set row pointers... */
 
-  class_alloc(nj_ws->logj,sizeof(int)*neqp,error_message);
-  class_alloc(nj_ws->Rowmax,sizeof(int)*neqp,error_message);
+  nj_ws->logj_vec.resize(neqp);
+  nj_ws->logj = nj_ws->logj_vec.data();
+  nj_ws->Rowmax_vec.resize(neqp);
+  nj_ws->Rowmax = nj_ws->Rowmax_vec.data();
 
   /* Done allocating stuff */
   return _SUCCESS_;
 }
 
 int uninitialize_numjac_workspace(struct numjac_workspace * nj_ws){
-  /* Deallocate vectors and matrices: */
-  free(nj_ws->yscale);
-  free(nj_ws->del);
-  free(nj_ws->Difmax);
-  free(nj_ws->absFdelRm);
-  free(nj_ws->absFvalue);
-  free(nj_ws->absFvalueRm);
-  free(nj_ws->Fscale);
-  free(nj_ws->ffdel);
-  free(nj_ws->yydel);
-  free(nj_ws->tmp);
-
-  free(nj_ws->ydel_Fdel[1]);
-  free(nj_ws->ydel_Fdel);
-  free(nj_ws->logj);
-  free(nj_ws->Rowmax);
+  /* All memory freed by RAII (backing vectors destroyed with struct) */
   return _SUCCESS_;
 }

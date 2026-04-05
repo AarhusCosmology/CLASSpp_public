@@ -3,6 +3,7 @@
 #include "common.h"
 // #include "perturbations.h"
 #include "sparse.h"
+#include <vector>
 #define TINY 1e-50
 /**************************************************************/
 
@@ -31,10 +32,24 @@ struct jacobian{
 	sp_num *Numerical; /*Stores the LU decomposition.*/
 	int *Cp; /* Stores the column pointers of the spJ+spJ' sparsity pattern. */
 	int *Ci; /* Stores the row indices of the  spJ+spJ' sparsity pattern. */
+
+	/* RAII backing storage — raw pointers above alias into these vectors */
+	std::vector<double*> dfdy_rows_vec;
+	std::vector<double> dfdy_data_vec;
+	std::vector<double> jacvec_vec;
+	std::vector<double*> LU_rows_vec;
+	std::vector<double> LU_data_vec;
+	std::vector<double> LUw_vec;
+	std::vector<int> luidx_vec;
+	std::vector<double> xjac_vec;
+	std::vector<int> col_group_vec;
+	std::vector<int> col_wi_vec;
+	std::vector<int> Cp_vec;
+	std::vector<int> Ci_vec;
 };
 
 struct numjac_workspace{
-	/* Allocate vectors and matrices: */
+	/* Raw pointer API (aliases into backing vectors below) */
 	double *yscale;
 	double *del;
 	double * Difmax;
@@ -50,6 +65,22 @@ struct numjac_workspace{
 
 	int * logj;
 	int * Rowmax;
+
+	/* RAII backing storage */
+	std::vector<double> yscale_vec;
+	std::vector<double> del_vec;
+	std::vector<double> Difmax_vec;
+	std::vector<double> absFdelRm_vec;
+	std::vector<double> absFvalue_vec;
+	std::vector<double> absFvalueRm_vec;
+	std::vector<double> Fscale_vec;
+	std::vector<double> ffdel_vec;
+	std::vector<double> yydel_vec;
+	std::vector<double> tmp_vec;
+	std::vector<double*> ydel_Fdel_rows_vec;
+	std::vector<double> ydel_Fdel_data_vec;
+	std::vector<int> logj_vec;
+	std::vector<int> Rowmax_vec;
 };
 
 /**

@@ -185,6 +185,9 @@ class_names = ['FileContent', 'NonColdDarkMatter', 'InputModule', 'BackgroundMod
 allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', 'FileArg',
                  'std::map<std::string, std::vector<double>>',
                  'std::map<std::string, int>', 'std::shared_ptr<NonColdDarkMatter>',
+                 'std::vector<std::vector<double>>', 'std::vector<std::vector<short>>',
+                 'std::vector<std::vector<int>>',
+                 'std::vector<double>', 'std::vector<int>', 'std::vector<short>',
                  'std::vector<std::string>'] + struct_names
 
 keywords_to_be_ignored = ['static', 'constexpr', 'const']

@@ -164,10 +164,10 @@ int BackgroundModule::background_at_tau(double tau,
 
   if (intermode == pba->inter_normal) {
     class_call(array_interpolate_spline(
-                                        tau_table_,
+                                        const_cast<double*>(tau_table_.data()),
                                         bt_size_,
-                                        background_table_,
-                                        d2background_dtau2_table_,
+                                        const_cast<double*>(background_table_.data()),
+                                        const_cast<double*>(d2background_dtau2_table_.data()),
                                         bg_size_,
                                         tau,
                                         last_index,
@@ -179,10 +179,10 @@ int BackgroundModule::background_at_tau(double tau,
   }
   if (intermode == pba->inter_closeby) {
     class_call(array_interpolate_spline_growing_closeby(
-                                                        tau_table_,
+                                                        const_cast<double*>(tau_table_.data()),
                                                         bt_size_,
-                                                        background_table_,
-                                                        d2background_dtau2_table_,
+                                                        const_cast<double*>(background_table_.data()),
+                                                        const_cast<double*>(d2background_dtau2_table_.data()),
                                                         bg_size_,
                                                         tau,
                                                         last_index,
@@ -226,10 +226,10 @@ int BackgroundModule::background_tau_of_z(double z, double* tau) const {
 
   /** - interpolate from pre-computed table with array_interpolate() */
   class_call(array_interpolate_spline(
-                                      z_table_,
+                                      const_cast<double*>(z_table_.data()),
                                       bt_size_,
-                                      tau_table_,
-                                      d2tau_dz2_table_,
+                                      const_cast<double*>(tau_table_.data()),
+                                      const_cast<double*>(d2tau_dz2_table_.data()),
                                       1,
                                       z,
                                       &last_index,
@@ -830,12 +830,6 @@ int BackgroundModule::background_free() {
 
 int BackgroundModule::background_free_noinput() const {
 
-  free(tau_table_);
-  free(z_table_);
-  free(d2tau_dz2_table_);
-  free(background_table_);
-  free(d2background_dtau2_table_);
-
   return _SUCCESS_;
 }
 
@@ -1137,19 +1131,15 @@ int BackgroundModule::background_solve() {
   /* an index running over bi indices */
   int i;
   /* vector of quantities to be integrated */
-  double * pvecback_integration;
+  std::vector<double> pvecback_integration(bi_size_);
   /* vector of all background quantities */
-  double * pvecback;
+  std::vector<double> pvecback(bg_size_);
   /* necessary for calling array_interpolate(), but never used */
   int last_index=0;
   /* comoving radius coordinate in Mpc (equal to conformal distance in flat case) */
   double comoving_radius=0.;
 
-  class_alloc(pvecback,bg_size_*sizeof(double), error_message_);
-  bpaw.pvecback = pvecback;
-
-  /** - allocate vector of quantities to be integrated */
-  class_alloc(pvecback_integration, bi_size_*sizeof(double), error_message_);
+  bpaw.pvecback = pvecback.data();
 
   /** - initialize generic integrator with initialize_generic_integrator() */
 
@@ -1161,7 +1151,7 @@ int BackgroundModule::background_solve() {
              error_message_);
 
   /** - impose initial conditions with background_initial_conditions() */
-  class_call(background_initial_conditions(pvecback, pvecback_integration),
+  class_call(background_initial_conditions(pvecback.data(), pvecback_integration.data()),
              error_message_,
              error_message_);
 
@@ -1184,7 +1174,7 @@ int BackgroundModule::background_solve() {
     tau_start = tau_end;
 
     /* -> find step size (trying to adjust the last step as close as possible to the one needed to reach a=a_today; need not be exact, difference corrected later) */
-    class_call(background_functions(pvecback_integration, pba->short_info, pvecback),
+    class_call(background_functions(pvecback_integration.data(), pba->short_info, pvecback.data()),
                error_message_,
                error_message_);
 
@@ -1201,7 +1191,7 @@ int BackgroundModule::background_solve() {
     }
 
     /* -> save data in growTable */
-    class_call(gt_add(&gTable,_GT_END_, (void*) pvecback_integration, sizeof(double)*bi_size_),
+    class_call(gt_add(&gTable,_GT_END_, (void*) pvecback_integration.data(), sizeof(double)*bi_size_),
                gTable.error_message,
                error_message_);
     bt_size_++;
@@ -1210,7 +1200,7 @@ int BackgroundModule::background_solve() {
     class_call(generic_integrator(background_derivs,
                                   tau_start,
                                   tau_end,
-                                  pvecback_integration,
+                                  pvecback_integration.data(),
                                   &bpaw,
                                   ppr->tol_background_integration,
                                   ppr->smallest_allowed_variation,
@@ -1224,7 +1214,7 @@ int BackgroundModule::background_solve() {
   }
 
   /** - save last data in growTable with gt_add() */
-  class_call(gt_add(&gTable, _GT_END_, (void*) pvecback_integration, sizeof(double)*bi_size_),
+  class_call(gt_add(&gTable, _GT_END_, (void*) pvecback_integration.data(), sizeof(double)*bi_size_),
              gTable.error_message,
              error_message_);
   bt_size_++;
@@ -1250,7 +1240,7 @@ int BackgroundModule::background_solve() {
                                index_bi_a_,
                                pba->a_today,
                                &last_index,
-                               pvecback_integration,
+                               pvecback_integration.data(),
                                bi_size_,
                                error_message_),
              error_message_,
@@ -1278,15 +1268,11 @@ int BackgroundModule::background_solve() {
   }
 
   /** - allocate background tables */
-  class_alloc(tau_table_, bt_size_*sizeof(double), error_message_);
-
-  class_alloc(z_table_, bt_size_*sizeof(double), error_message_);
-
-  class_alloc(d2tau_dz2_table_, bt_size_*sizeof(double), error_message_);
-
-  class_alloc(background_table_, bt_size_*bg_size_*sizeof(double), error_message_);
-
-  class_alloc(d2background_dtau2_table_, bt_size_*bg_size_*sizeof(double), error_message_);
+  tau_table_.resize(bt_size_);
+  z_table_.resize(bt_size_);
+  d2tau_dz2_table_.resize(bt_size_);
+  background_table_.resize(bt_size_*bg_size_);
+  d2background_dtau2_table_.resize(bt_size_*bg_size_);
 
   /** - In a loop over lines, fill background table using the result of the integration plus background_functions() */
   for (i = 0; i < bt_size_; i++) {
@@ -1315,7 +1301,7 @@ int BackgroundModule::background_solve() {
 
     /* -> compute all other quantities depending only on {B} variables.
        The value of {B} variables in pData are also copied to pvecback.*/
-    class_call(background_functions(pData + i*bi_size_, pba->long_info, pvecback),
+    class_call(background_functions(pData + i*bi_size_, pba->long_info, pvecback.data()),
                error_message_,
                error_message_);
 
@@ -1327,9 +1313,9 @@ int BackgroundModule::background_solve() {
       (pData[i*bi_size_ + index_bi_D_]*pvecback[index_bg_a_]*pvecback[index_bg_H_]);
 
     /* -> write in the table */
-    memcopy_result = memcpy(background_table_ + i*bg_size_, pvecback, bg_size_*sizeof(double));
+    memcopy_result = memcpy(background_table_.data() + i*bg_size_, pvecback.data(), bg_size_*sizeof(double));
 
-    class_test(memcopy_result != background_table_ + i*bg_size_,
+    class_test(memcopy_result != background_table_.data() + i*bg_size_,
                error_message_,
                "cannot copy data back to background_table_");
   }
@@ -1341,21 +1327,21 @@ int BackgroundModule::background_solve() {
              error_message_);
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
-  class_call(array_spline_table_lines(z_table_,
+  class_call(array_spline_table_lines(z_table_.data(),
                                       bt_size_,
-                                      tau_table_,
+                                      tau_table_.data(),
                                       1,
-                                      d2tau_dz2_table_,
+                                      d2tau_dz2_table_.data(),
                                       _SPLINE_EST_DERIV_,
                                       error_message_),
              error_message_,
              error_message_);
 
-  class_call(array_spline_table_lines(tau_table_,
+  class_call(array_spline_table_lines(tau_table_.data(),
                                       bt_size_,
-                                      background_table_,
+                                      background_table_.data(),
                                       bg_size_,
-                                      d2background_dtau2_table_,
+                                      d2background_dtau2_table_.data(),
                                       _SPLINE_EST_DERIV_,
                                       error_message_),
              error_message_,
@@ -1406,9 +1392,6 @@ int BackgroundModule::background_solve() {
   Omega0_r_ = background_table_[(bt_size_ - 1)*bg_size_ + index_bg_Omega_r_];
   Omega0_de_ = 1. - (Omega0_m_ + Omega0_r_ + pba->Omega0_k);
 
-  free(pvecback);
-  free(pvecback_integration);
-
   return _SUCCESS_;
 
 }
@@ -1422,17 +1405,14 @@ int BackgroundModule::background_solve_evolver() {
   /* parameters and workspace for the background_derivs function */
   struct background_parameters_and_workspace bpaw{this};
   /* vector of quantities to be integrated */
-  double* pvecback_integration;
+  std::vector<double> pvecback_integration(bi_size_);
   /* vector of all background quantities */
-  double* pvecback;
+  std::vector<double> pvecback(bg_size_);
 
-  class_alloc(pvecback, bg_size_*sizeof(double), error_message_);
-  bpaw.pvecback = pvecback;
-  /** - allocate vector of quantities to be integrated */
-  class_alloc(pvecback_integration, bi_size_*sizeof(double), error_message_);
+  bpaw.pvecback = pvecback.data();
 
   /** - impose initial conditions with background_initial_conditions() */
-  class_call(background_initial_conditions(pvecback, pvecback_integration),
+  class_call(background_initial_conditions(pvecback.data(), pvecback_integration.data()),
              error_message_,
              error_message_);
 
@@ -1440,10 +1420,8 @@ int BackgroundModule::background_solve_evolver() {
   double loga_ini = log(pvecback_integration[index_bi_a_]);
   double loga_final = log(pba->a_today);
   bt_size_ = (loga_final - loga_ini)/ppr->back_integration_stepsize;
-  double* loga;
-  int* used_in_output;
-  class_alloc(loga, bt_size_*sizeof(double), error_message_);
-  class_alloc(used_in_output, bt_size_*sizeof(int), error_message_);
+  std::vector<double> loga(bt_size_);
+  std::vector<int> used_in_output(bt_size_);
   for (int index_loga = 0; index_loga < bt_size_; index_loga++){
     loga[index_loga] = loga_ini + index_loga*(loga_final - loga_ini)/(bt_size_ - 1);
     used_in_output[index_loga] = 1;
@@ -1453,11 +1431,11 @@ int BackgroundModule::background_solve_evolver() {
   pvecback_integration[index_bi_a_] =  pvecback_integration[index_bi_tau_];
 
   /** - allocate background tables */
-  class_alloc(tau_table_, bt_size_*sizeof(double), error_message_);
-  class_alloc(z_table_, bt_size_*sizeof(double), error_message_);
-  class_alloc(d2tau_dz2_table_, bt_size_*sizeof(double), error_message_);
-  class_alloc(background_table_, bt_size_*bg_size_*sizeof(double), error_message_);
-  class_alloc(d2background_dtau2_table_, bt_size_*bg_size_*sizeof(double), error_message_);
+  tau_table_.resize(bt_size_);
+  z_table_.resize(bt_size_);
+  d2tau_dz2_table_.resize(bt_size_);
+  background_table_.resize(bt_size_*bg_size_);
+  d2background_dtau2_table_.resize(bt_size_*bg_size_);
 
   auto generic_evolver = &evolver_ndf15;
   if (ppr->evolver == rk){
@@ -1470,15 +1448,15 @@ int BackgroundModule::background_solve_evolver() {
   class_call(generic_evolver(background_derivs_loga,
            loga_ini,
            loga_final,
-           pvecback_integration,
-           used_in_output,
+           pvecback_integration.data(),
+           used_in_output.data(),
            bi_size_ - 1,
            &bpaw,
            1e-6,
            ppr->smallest_allowed_variation,
            NULL,
            ppr->perturb_integration_stepsize,
-           loga,
+           loga.data(),
            bt_size_,
            background_add_line_to_bg_table,
            NULL,
@@ -1507,7 +1485,7 @@ int BackgroundModule::background_solve_evolver() {
   /** Recover some quantities today */
   double D_today = pvecback_integration[index_bi_D_];
   for (int i = 0; i < bt_size_; i++) {
-    double* bg_table_row = background_table_ + i*bg_size_;
+    double* bg_table_row = background_table_.data() + i*bg_size_;
     /** Set cosmological distances */
     double conformal_distance = conformal_age_ - tau_table_[i];
     bg_table_row[index_bg_conf_distance_] = conformal_distance;
@@ -1538,21 +1516,21 @@ int BackgroundModule::background_solve_evolver() {
   }
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
-  class_call(array_spline_table_lines(z_table_,
+  class_call(array_spline_table_lines(z_table_.data(),
                                       bt_size_,
-                                      tau_table_,
+                                      tau_table_.data(),
                                       1,
-                                      d2tau_dz2_table_,
+                                      d2tau_dz2_table_.data(),
                                       _SPLINE_EST_DERIV_,
                                       error_message_),
              error_message_,
              error_message_);
 
-  class_call(array_spline_table_lines(tau_table_,
+  class_call(array_spline_table_lines(tau_table_.data(),
                                       bt_size_,
-                                      background_table_,
+                                      background_table_.data(),
                                       bg_size_,
-                                      d2background_dtau2_table_,
+                                      d2background_dtau2_table_.data(),
                                       _SPLINE_EST_DERIV_,
                                       error_message_),
              error_message_,
@@ -1613,11 +1591,6 @@ int BackgroundModule::background_solve_evolver() {
   Omega0_m_ = background_table_[(bt_size_ - 1)*bg_size_ + index_bg_Omega_m_];
   Omega0_r_ = background_table_[(bt_size_ - 1)*bg_size_ + index_bg_Omega_r_];
   Omega0_de_ = 1. - (Omega0_m_ + Omega0_r_ + pba->Omega0_k);
-
-  free(loga);
-  free(used_in_output);
-  free(pvecback);
-  free(pvecback_integration);
 
   return _SUCCESS_;
 
@@ -1822,7 +1795,6 @@ int BackgroundModule::background_find_equality() {
   int index_tau_plus = bt_size_ - 1;
   int index_tau_mid = 0;
   double tau_minus,tau_plus,tau_mid=0.;
-  double * pvecback;
 
   /* first bracket the right tau value between two consecutive indices in the table */
 
@@ -1844,13 +1816,13 @@ int BackgroundModule::background_find_equality() {
   tau_minus = tau_table_[index_tau_minus];
   tau_plus =  tau_table_[index_tau_plus];
 
-  class_alloc(pvecback, bg_size_*sizeof(double), error_message_);
+  std::vector<double> pvecback(bg_size_);
 
   while ((tau_plus - tau_minus) > ppr->tol_tau_eq) {
 
     tau_mid = 0.5*(tau_plus+tau_minus);
 
-    class_call(background_at_tau(tau_mid, pba->long_info, pba->inter_closeby, &index_tau_minus, pvecback),
+    class_call(background_at_tau(tau_mid, pba->long_info, pba->inter_closeby, &index_tau_minus, pvecback.data()),
                error_message_,
                error_message_);
 
@@ -1872,8 +1844,6 @@ int BackgroundModule::background_find_equality() {
     printf(" -> radiation/matter equality at z = %f\n", z_eq_);
     printf("    corresponding to conformal time = %f Mpc\n", tau_eq_);
   }
-
-  free(pvecback);
 
   return _SUCCESS_;
 
@@ -1972,7 +1942,7 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
   /** Stores quantities */
   for (index_tau = 0; index_tau < bt_size_; index_tau++){
     dataptr = data + index_tau*number_of_titles;
-    pvecback = background_table_ + index_tau*bg_size_;
+    pvecback = const_cast<double*>(background_table_.data()) + index_tau*bg_size_;
     storeidx = 0;
 
     class_store_double(dataptr, pba->a_today/pvecback[index_bg_a_]-1., _TRUE_, storeidx);
@@ -2467,7 +2437,7 @@ int BackgroundModule::background_add_line_to_bg_table_member(
   z_table_[index_loga] = MAX(0., pba->a_today/exp(loga) - 1.);
   tau_table_[index_loga] = tau;
 
-  double *pvecback = background_table_ + index_loga*bg_size_;
+  double *pvecback = background_table_.data() + index_loga*bg_size_;
 
   // compute quantities depending only on {B} variables.
   class_call(background_functions(y, pba->long_info, pvecback),

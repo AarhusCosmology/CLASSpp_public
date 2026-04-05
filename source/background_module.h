@@ -90,8 +90,8 @@ public:
 
   //@}
   int bt_size_;               /**< number of lines (i.e. time-steps) in the array */
-  double* tau_table_;        /**< vector tau_table[index_tau] with values of \f$ \tau \f$ (conformal time) */
-  double* background_table_; /**< table background_table[index_tau*bg_size_+pba->index_bg] with all other quantities (array of size bg_size*bt_size) **/
+  std::vector<double> tau_table_;        /**< vector tau_table[index_tau] with values of \f$ \tau \f$ (conformal time) */
+  std::vector<double> background_table_; /**< table background_table[index_tau*bg_size_+pba->index_bg] with all other quantities (array of size bg_size*bt_size) **/
 
   double conformal_age_; /**< conformal age in Mpc */
   double Neff_; /**< so-called "effective neutrino number", computed at earliest time in interpolation table */
@@ -179,7 +179,7 @@ private:
 
   //@{
 
-  double* z_table_;          /**< vector z_table[index_tau] with values of \f$ z \f$ (redshift) */
+  std::vector<double> z_table_;          /**< vector z_table[index_tau] with values of \f$ z \f$ (redshift) */
 
   //@}
 
@@ -187,8 +187,8 @@ private:
 
   //@{
 
-  double* d2tau_dz2_table_; /**< vector d2tau_dz2_table[index_tau] with values of \f$ d^2 \tau / dz^2 \f$ (conformal time) */
-  double* d2background_dtau2_table_; /**< table d2background_dtau2_table[index_tau*bg_size_+pba->index_bg] with values of \f$ d^2 b_i / d\tau^2 \f$ (conformal time) */
+  std::vector<double> d2tau_dz2_table_; /**< vector d2tau_dz2_table[index_tau] with values of \f$ d^2 \tau / dz^2 \f$ (conformal time) */
+  std::vector<double> d2background_dtau2_table_; /**< table d2background_dtau2_table[index_tau*bg_size_+pba->index_bg] with values of \f$ d^2 b_i / d\tau^2 \f$ (conformal time) */
 
   //@}
 };

@@ -116,10 +116,10 @@ int LensingModule::lensing_cl_at_l(int l, double * cl_lensed) const {
              l,
              l_lensed_max_);
 
-  class_call(array_interpolate_spline(l_,
+  class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
                                       l_size_,
-                                      cl_lens_,
-                                      ddcl_lens_,
+                                      const_cast<double*>(cl_lens_.data()),
+                                      const_cast<double*>(ddcl_lens_.data()),
                                       lt_size_,
                                       l,
                                       &last_index,
@@ -149,33 +149,13 @@ int LensingModule::lensing_init() {
   /** Summary: */
   /** - Define local variables */
 
-  double * mu; /* mu[index_mu]: discretized values of mu
-                  between -1 and 1, roots of Legendre polynomial */
-  double * w8; /* Corresponding Gauss-Legendre quadrature weights */
   double theta,delta_theta;
 
-  double ** d00;  /* dmn[index_mu][index_l] */
-  double ** d11;
-  double ** d2m2;
-  double ** d22 = NULL;
-  double ** d20 = NULL;
-  double ** d1m1;
-  double ** d31 = NULL;
-  double ** d40 = NULL;
-  double ** d3m1 = NULL;
-  double ** d3m3 = NULL;
-  double ** d4m2 = NULL;
-  double ** d4m4 = NULL;
-  double * buf_dxx; /* buffer */
-
-  double * Cgl;   /* Cgl[index_mu] */
-  double * Cgl2;  /* Cgl2[index_mu] */
-  double * sigma2; /* sigma[index_mu] */
-
-  double * ksi = NULL;  /* ksi[index_mu] */
-  double * ksiX = NULL;  /* ksiX[index_mu] */
-  double * ksip = NULL;  /* ksip[index_mu] */
-  double * ksim = NULL;  /* ksim[index_mu] */
+  double * sqrt1;
+  double * sqrt2;
+  double * sqrt3;
+  double * sqrt4;
+  double * sqrt5;
 
   double fac,fac1;
   double X_000;
@@ -190,27 +170,9 @@ int LensingModule::lensing_init() {
   int num_mu,index_mu,icount;
   int l;
   double ll;
-  double * cl_unlensed;  /* cl_unlensed[index_ct] */
-  double * cl_tt; /* unlensed  cl, to be filled to avoid repeated calls to spectra_cl_at_l */
-  double * cl_te = NULL; /* unlensed  cl, to be filled to avoid repeated calls to spectra_cl_at_l */
-  double * cl_ee = NULL; /* unlensed  cl, to be filled to avoid repeated calls to spectra_cl_at_l */
-  double * cl_bb = NULL; /* unlensed  cl, to be filled to avoid repeated calls to spectra_cl_at_l */
-  double * cl_pp; /* potential cl, to be filled to avoid repeated calls to spectra_cl_at_l */
 
   double res,resX,lens;
   double resp, resm, lensp, lensm;
-
-  double * sqrt1;
-  double * sqrt2;
-  double * sqrt3;
-  double * sqrt4;
-  double * sqrt5;
-
-  double ** cl_md_ic; /* array with argument
-                         cl_md_ic[index_md][index_ic1_ic2*spectra_module_->ct_size_+index_ct] */
-
-  double ** cl_md;    /* array with argument
-                         cl_md[index_md][index_ct] */
 
   int index_md;
 
@@ -255,21 +217,17 @@ int LensingModule::lensing_init() {
   }
   /** - allocate array of \f$ \mu \f$ values, as well as quadrature weights */
 
-  class_alloc(mu,
-              num_mu*sizeof(double),
-              error_message_);
+  std::vector<double> mu(num_mu);
   /* Reserve last element of mu for mu=1, needed for sigma2 */
   mu[num_mu-1] = 1.0;
 
-  class_alloc(w8,
-              (num_mu-1)*sizeof(double),
-              error_message_);
+  std::vector<double> w8(num_mu-1);
 
   if (ppr->accurate_lensing == _TRUE_) {
 
     //debut = omp_get_wtime();
-    class_call(quadrature_gauss_legendre(mu,
-                                         w8,
+    class_call(quadrature_gauss_legendre(mu.data(),
+                                         w8.data(),
                                          num_mu-1,
                                          ppr->tol_gauss_legendre,
                                          error_message_),
@@ -292,69 +250,34 @@ int LensingModule::lensing_init() {
   /** - Compute \f$ d^l_{mm'} (\mu) \f$*/
 
   icount = 0;
-  class_alloc(d00,
-              num_mu*sizeof(double*),
-              error_message_);
-
-  class_alloc(d11,
-              num_mu*sizeof(double*),
-              error_message_);
-
-  class_alloc(d1m1,
-              num_mu*sizeof(double*),
-              error_message_);
-
-  class_alloc(d2m2,
-              num_mu*sizeof(double*),
-              error_message_);
+  std::vector<double*> d00(num_mu);
+  std::vector<double*> d11(num_mu);
+  std::vector<double*> d1m1(num_mu);
+  std::vector<double*> d2m2(num_mu);
   icount += 4*num_mu*(l_unlensed_max_ + 1);
 
+  std::vector<double*> d20, d3m1, d4m2;
   if (has_te_ == _TRUE_) {
-
-    class_alloc(d20,
-                num_mu*sizeof(double*),
-                error_message_);
-
-    class_alloc(d3m1,
-                num_mu*sizeof(double*),
-                error_message_);
-
-    class_alloc(d4m2,
-                num_mu*sizeof(double*),
-                error_message_);
+    d20.resize(num_mu);
+    d3m1.resize(num_mu);
+    d4m2.resize(num_mu);
     icount += 3*num_mu*(l_unlensed_max_ + 1);
   }
 
+  std::vector<double*> d22, d31, d3m3, d40, d4m4;
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
-
-    class_alloc(d22,
-                num_mu*sizeof(double*),
-                error_message_);
-
-    class_alloc(d31,
-                num_mu*sizeof(double*),
-                error_message_);
-
-    class_alloc(d3m3,
-                num_mu*sizeof(double*),
-                error_message_);
-
-    class_alloc(d40,
-                num_mu*sizeof(double*),
-                error_message_);
-
-    class_alloc(d4m4,
-                num_mu*sizeof(double*),
-                error_message_);
+    d22.resize(num_mu);
+    d31.resize(num_mu);
+    d3m3.resize(num_mu);
+    d40.resize(num_mu);
+    d4m4.resize(num_mu);
     icount += 5*num_mu*(l_unlensed_max_ + 1);
   }
 
   icount += 5*(l_unlensed_max_ + 1); /* for arrays sqrt1[l] to sqrt5[l] */
 
   /** - Allocate main contiguous buffer **/
-  class_alloc(buf_dxx,
-              icount * sizeof(double),
-              error_message_);
+  std::vector<double> buf_dxx(icount);
 
   icount = 0;
   for (index_mu=0; index_mu<num_mu; index_mu++) {
@@ -399,19 +322,19 @@ int LensingModule::lensing_init() {
   icount += l_unlensed_max_ + 1;
 
   //debut = omp_get_wtime();
-  class_call(lensing_d00(mu, num_mu, l_unlensed_max_, d00),
+  class_call(lensing_d00(mu.data(), num_mu, l_unlensed_max_, d00.data()),
              error_message_,
              error_message_);
 
-  class_call(lensing_d11(mu, num_mu, l_unlensed_max_, d11),
+  class_call(lensing_d11(mu.data(), num_mu, l_unlensed_max_, d11.data()),
              error_message_,
              error_message_);
 
-  class_call(lensing_d1m1(mu, num_mu, l_unlensed_max_, d1m1),
+  class_call(lensing_d1m1(mu.data(), num_mu, l_unlensed_max_, d1m1.data()),
              error_message_,
              error_message_);
 
-  class_call(lensing_d2m2(mu, num_mu, l_unlensed_max_, d2m2),
+  class_call(lensing_d2m2(mu.data(), num_mu, l_unlensed_max_, d2m2.data()),
              error_message_,
              error_message_);
   //fin = omp_get_wtime();
@@ -421,15 +344,15 @@ int LensingModule::lensing_init() {
 
   if (has_te_ == _TRUE_) {
 
-    class_call(lensing_d20(mu, num_mu, l_unlensed_max_, d20),
+    class_call(lensing_d20(mu.data(), num_mu, l_unlensed_max_, d20.data()),
                error_message_,
                error_message_);
 
-    class_call(lensing_d3m1(mu, num_mu, l_unlensed_max_, d3m1),
+    class_call(lensing_d3m1(mu.data(), num_mu, l_unlensed_max_, d3m1.data()),
                error_message_,
                error_message_);
 
-    class_call(lensing_d4m2(mu, num_mu, l_unlensed_max_, d4m2),
+    class_call(lensing_d4m2(mu.data(), num_mu, l_unlensed_max_, d4m2.data()),
                error_message_,
                error_message_);
 
@@ -437,93 +360,71 @@ int LensingModule::lensing_init() {
 
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
 
-    class_call(lensing_d22(mu, num_mu, l_unlensed_max_, d22),
+    class_call(lensing_d22(mu.data(), num_mu, l_unlensed_max_, d22.data()),
                error_message_,
                error_message_);
 
-    class_call(lensing_d31(mu, num_mu, l_unlensed_max_, d31),
+    class_call(lensing_d31(mu.data(), num_mu, l_unlensed_max_, d31.data()),
                error_message_,
                error_message_);
 
-    class_call(lensing_d3m3(mu, num_mu, l_unlensed_max_, d3m3),
+    class_call(lensing_d3m3(mu.data(), num_mu, l_unlensed_max_, d3m3.data()),
                error_message_,
                error_message_);
 
-    class_call(lensing_d40(mu, num_mu, l_unlensed_max_, d40),
+    class_call(lensing_d40(mu.data(), num_mu, l_unlensed_max_, d40.data()),
                error_message_,
                error_message_);
 
-    class_call(lensing_d4m4(mu, num_mu, l_unlensed_max_, d4m4),
+    class_call(lensing_d4m4(mu.data(), num_mu, l_unlensed_max_, d4m4.data()),
                error_message_,
                error_message_);
   }
 
   /** - compute \f$ Cgl(\mu)\f$, \f$ Cgl2(\mu) \f$ and sigma2(\f$\mu\f$) */
 
-  class_alloc(Cgl,
-              num_mu*sizeof(double),
-              error_message_);
+  std::vector<double> Cgl(num_mu);
 
-  class_alloc(Cgl2,
-              num_mu*sizeof(double),
-              error_message_);
+  std::vector<double> Cgl2(num_mu);
 
-  class_alloc(sigma2,
-              (num_mu-1)*sizeof(double), /* Zero separation is omitted */
-              error_message_);
+  std::vector<double> sigma2(num_mu-1);
 
-  class_alloc(cl_unlensed,
-              spectra_module_->ct_size_*sizeof(double),
-              error_message_);
+  std::vector<double> cl_unlensed(spectra_module_->ct_size_);
 
 
   /** - Locally store unlensed temperature \f$ cl_{tt}\f$ and potential \f$ cl_{pp}\f$ spectra **/
-  class_alloc(cl_tt,
-              (l_unlensed_max_ + 1)*sizeof(double),
-              error_message_);
+  std::vector<double> cl_tt(l_unlensed_max_ + 1);
+  std::vector<double> cl_te;
   if (has_te_ == _TRUE_) {
-    class_alloc(cl_te,
-                (l_unlensed_max_ + 1)*sizeof(double),
-                error_message_);
+    cl_te.resize(l_unlensed_max_ + 1);
   }
+  std::vector<double> cl_ee, cl_bb;
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
-    class_alloc(cl_ee,
-                (l_unlensed_max_ + 1)*sizeof(double),
-                error_message_);
-
-    class_alloc(cl_bb,
-                (l_unlensed_max_ + 1)*sizeof(double),
-                error_message_);
+    cl_ee.resize(l_unlensed_max_ + 1);
+    cl_bb.resize(l_unlensed_max_ + 1);
   }
-  class_alloc(cl_pp,
-              (l_unlensed_max_ + 1)*sizeof(double),
-              error_message_);
+  std::vector<double> cl_pp(l_unlensed_max_ + 1);
 
-  class_alloc(cl_md_ic,
-              spectra_module_->md_size_*sizeof(double *),
-              error_message_);
-
-  class_alloc(cl_md,
-              spectra_module_->md_size_*sizeof(double *),
-              error_message_);
+  std::vector<std::vector<double>> cl_md_ic_storage(spectra_module_->md_size_);
+  std::vector<std::vector<double>> cl_md_storage(spectra_module_->md_size_);
+  std::vector<double*> cl_md(spectra_module_->md_size_, nullptr);
+  std::vector<double*> cl_md_ic(spectra_module_->md_size_, nullptr);
 
   for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
 
-    if (spectra_module_->md_size_ > 1)
+    if (spectra_module_->md_size_ > 1) {
+      cl_md_storage[index_md].resize(spectra_module_->ct_size_);
+      cl_md[index_md] = cl_md_storage[index_md].data();
+    }
 
-      class_alloc(cl_md[index_md],
-                  spectra_module_->ct_size_*sizeof(double),
-                  error_message_);
-
-    if (spectra_module_->ic_size_[index_md] > 1)
-
-      class_alloc(cl_md_ic[index_md],
-                  spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_*sizeof(double),
-                  error_message_);
+    if (spectra_module_->ic_size_[index_md] > 1) {
+      cl_md_ic_storage[index_md].resize(spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_);
+      cl_md_ic[index_md] = cl_md_ic_storage[index_md].data();
+    }
   }
 
   for (l=2; l<=l_unlensed_max_; l++) {
-    class_call(spectra_module_->spectra_cl_at_l(l, cl_unlensed, cl_md, cl_md_ic),
+    class_call(spectra_module_->spectra_cl_at_l(l, cl_unlensed.data(), cl_md.data(), cl_md_ic.data()),
                psp->error_message,
                error_message_);
     cl_tt[l] = cl_unlensed[index_lt_tt_];
@@ -536,19 +437,6 @@ int LensingModule::lensing_init() {
       cl_bb[l] = cl_unlensed[index_lt_bb_];
     }
   }
-
-  for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
-
-    if (spectra_module_->md_size_ > 1)
-      free(cl_md[index_md]);
-
-    if (spectra_module_->ic_size_[index_md] > 1)
-      free(cl_md_ic[index_md]);
-
-  }
-
-  free(cl_md_ic);
-  free(cl_md);
 
   /** - Compute sigma2\f$(\mu)\f$ and Cgl2(\f$\mu\f$) **/
 
@@ -588,35 +476,22 @@ int LensingModule::lensing_init() {
   /** - compute ksi, ksi+, ksi-, ksiX */
 
   /** - --> ksi is for TT **/
+  std::vector<double> ksi;
   if (has_tt_ == _TRUE_) {
-
-    class_calloc(ksi,
-                 (num_mu-1),
-                 sizeof(double),
-                 error_message_);
+    ksi.assign(num_mu-1, 0.0);
   }
 
   /** - --> ksiX is for TE **/
+  std::vector<double> ksiX;
   if (has_te_ == _TRUE_) {
-
-    class_calloc(ksiX,
-                 (num_mu-1),
-                 sizeof(double),
-                 error_message_);
+    ksiX.assign(num_mu-1, 0.0);
   }
 
   /** - --> ksip, ksim for EE, BB **/
+  std::vector<double> ksip, ksim;
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
-
-    class_calloc(ksip,
-                 (num_mu-1),
-                 sizeof(double),
-                 error_message_);
-
-    class_calloc(ksim,
-                 (num_mu-1),
-                 sizeof(double),
-                 error_message_);
+    ksip.assign(num_mu-1, 0.0);
+    ksim.assign(num_mu-1, 0.0);
   }
 
   for (l=2; l<=l_unlensed_max_; l++) {
@@ -753,22 +628,22 @@ int LensingModule::lensing_init() {
   /** - compute lensed \f$ C_l\f$'s by integration */
   //debut = omp_get_wtime();
   if (has_tt_ == _TRUE_) {
-    class_call(lensing_lensed_cl_tt(ksi, d00, w8, num_mu - 1),
+    class_call(lensing_lensed_cl_tt(ksi.data(), d00.data(), w8.data(), num_mu - 1),
                error_message_,
                error_message_);
     if (ppr->accurate_lensing == _FALSE_) {
-      class_call(lensing_addback_cl_tt(cl_tt),
+      class_call(lensing_addback_cl_tt(cl_tt.data()),
                  error_message_,
                  error_message_);
     }
   }
 
   if (has_te_ == _TRUE_) {
-    class_call(lensing_lensed_cl_te(ksiX, d20, w8, num_mu - 1),
+    class_call(lensing_lensed_cl_te(ksiX.data(), d20.data(), w8.data(), num_mu - 1),
                error_message_,
                error_message_);
     if (ppr->accurate_lensing == _FALSE_) {
-      class_call(lensing_addback_cl_te(cl_te),
+      class_call(lensing_addback_cl_te(cl_te.data()),
                  error_message_,
                  error_message_);
     }
@@ -776,11 +651,11 @@ int LensingModule::lensing_init() {
 
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
 
-    class_call(lensing_lensed_cl_ee_bb(ksip, ksim, d22, d2m2, w8, num_mu - 1),
+    class_call(lensing_lensed_cl_ee_bb(ksip.data(), ksim.data(), d22.data(), d2m2.data(), w8.data(), num_mu - 1),
                error_message_,
                error_message_);
     if (ppr->accurate_lensing == _FALSE_) {
-      class_call(lensing_addback_cl_ee_bb(cl_ee,cl_bb),
+      class_call(lensing_addback_cl_ee_bb(cl_ee.data(), cl_bb.data()),
                  error_message_,
                  error_message_);
     }
@@ -791,60 +666,16 @@ int LensingModule::lensing_init() {
 
   /** - spline computed \f$ C_l\f$'s in view of interpolation */
 
-  class_call(array_spline_table_lines(l_,
+  class_call(array_spline_table_lines(l_.data(),
                                       l_size_,
-                                      cl_lens_,
+                                      cl_lens_.data(),
                                       lt_size_,
-                                      ddcl_lens_,
+                                      ddcl_lens_.data(),
                                       _SPLINE_EST_DERIV_,
                                       error_message_),
              error_message_,
              error_message_);
 
-  /** - Free lots of stuff **/
-  free(buf_dxx);
-
-  free(d00);
-  free(d11);
-  free(d1m1);
-  free(d2m2);
-  if (has_te_ == _TRUE_) {
-    free(d20);
-    free(d3m1);
-    free(d4m2);
-  }
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
-    free(d22);
-    free(d31);
-    free(d3m3);
-    free(d40);
-    free(d4m4);
-  }
-
-  if (has_tt_ == _TRUE_)
-    free(ksi);
-  if (has_te_ == _TRUE_)
-    free(ksiX);
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
-    free(ksip);
-    free(ksim);
-  }
-  free(Cgl);
-  free(Cgl2);
-  free(sigma2);
-
-  free(mu);
-  free(w8);
-
-  free(cl_unlensed);
-  free(cl_tt);
-  if (has_te_ == _TRUE_)
-    free(cl_te);
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
-    free(cl_ee);
-    free(cl_bb);
-  }
-  free(cl_pp);
   /** - Exit **/
 
   return _SUCCESS_;
@@ -862,15 +693,6 @@ int LensingModule::lensing_init() {
 
 int LensingModule::lensing_free() {
 
-  if (ple->has_lensed_cls == _TRUE_) {
-
-    free(l_);
-    free(cl_lens_);
-    free(ddcl_lens_);
-    free(l_max_lt_);
-
-  }
-
   return _SUCCESS_;
 
 }
@@ -884,12 +706,6 @@ int LensingModule::lensing_free() {
 int LensingModule::lensing_indices(){
 
   int index_l;
-
-  double ** cl_md_ic; /* array with argument
-                         cl_md_ic[index_md][index_ic1_ic2*spectra_module_->ct_size_+index_ct] */
-
-  double ** cl_md;    /* array with argument
-                         cl_md[index_md][index_ct] */
 
   int index_md;
   int index_lt;
@@ -990,7 +806,7 @@ int LensingModule::lensing_indices(){
 
   l_size_ = index_l+1;
 
-  class_alloc(l_, l_size_*sizeof(double), error_message_);
+  l_.resize(l_size_);
 
   for (index_l=0; index_l < l_size_; index_l++) {
 
@@ -1000,59 +816,37 @@ int LensingModule::lensing_indices(){
 
   /* allocate table where results will be stored */
 
-  class_alloc(cl_lens_,
-              l_size_*lt_size_*sizeof(double),
-              error_message_);
+  cl_lens_.resize(l_size_*lt_size_);
 
-  class_alloc(ddcl_lens_,
-              l_size_*lt_size_*sizeof(double),
-              error_message_);
+  ddcl_lens_.resize(l_size_*lt_size_);
 
   /* fill with unlensed cls */
 
-  class_alloc(cl_md_ic,
-              spectra_module_->md_size_*sizeof(double *),
-              error_message_);
-
-  class_alloc(cl_md,
-              spectra_module_->md_size_*sizeof(double *),
-              error_message_);
+  std::vector<std::vector<double>> cl_md_ic_storage(spectra_module_->md_size_);
+  std::vector<std::vector<double>> cl_md_storage(spectra_module_->md_size_);
+  std::vector<double*> cl_md_ptrs(spectra_module_->md_size_, nullptr);
+  std::vector<double*> cl_md_ic_ptrs(spectra_module_->md_size_, nullptr);
 
   for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
 
-    if (spectra_module_->md_size_ > 1)
+    if (spectra_module_->md_size_ > 1) {
+      cl_md_storage[index_md].resize(spectra_module_->ct_size_);
+      cl_md_ptrs[index_md] = cl_md_storage[index_md].data();
+    }
 
-      class_alloc(cl_md[index_md],
-                  spectra_module_->ct_size_*sizeof(double),
-                  error_message_);
-
-    if (spectra_module_->ic_size_[index_md] > 1)
-
-      class_alloc(cl_md_ic[index_md],
-                  spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_*sizeof(double),
-                  error_message_);
+    if (spectra_module_->ic_size_[index_md] > 1) {
+      cl_md_ic_storage[index_md].resize(spectra_module_->ic_ic_size_[index_md]*spectra_module_->ct_size_);
+      cl_md_ic_ptrs[index_md] = cl_md_ic_storage[index_md].data();
+    }
   }
 
   for (index_l=0; index_l<l_size_; index_l++) {
 
-    class_call(spectra_module_->spectra_cl_at_l(l_[index_l], &(cl_lens_[index_l*lt_size_]), cl_md, cl_md_ic),
+    class_call(spectra_module_->spectra_cl_at_l(l_[index_l], &(cl_lens_[index_l*lt_size_]), cl_md_ptrs.data(), cl_md_ic_ptrs.data()),
                psp->error_message,
                error_message_);
 
   }
-
-  for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
-
-    if (spectra_module_->md_size_ > 1)
-      free(cl_md[index_md]);
-
-    if (spectra_module_->ic_size_[index_md] > 1)
-      free(cl_md_ic[index_md]);
-
-  }
-
-  free(cl_md_ic);
-  free(cl_md);
 
   /* we want to output Cl_lensed up to the same l_max as Cl_unlensed
      (even if a number delta_l_max of extra values of l have been used
@@ -1061,9 +855,9 @@ int LensingModule::lensing_indices(){
      ClEE_unlensed(scalars) (since ClBB_unlensed is null for scalars)
   */
 
-  class_alloc(l_max_lt_, lt_size_*sizeof(double), error_message_);
+  l_max_lt_.resize(lt_size_);
   for (index_lt = 0; index_lt < lt_size_; index_lt++) {
-    l_max_lt_[index_lt] = 0.;
+    l_max_lt_[index_lt] = 0;
     for (index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
       l_max_lt_[index_lt] = MAX(l_max_lt_[index_lt], spectra_module_->l_max_ct_[index_md][index_lt]);
 
@@ -1264,12 +1058,8 @@ int LensingModule::lensing_d00(
                 ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3;
-  ErrorMsg erreur;
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax);
 
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
   for (l=1; l<lmax; l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(2*ll+1)/(ll+1);
@@ -1295,7 +1085,6 @@ int LensingModule::lensing_d00(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3);
   return _SUCCESS_;
 }
 
@@ -1321,12 +1110,7 @@ int LensingModule::lensing_d11(
                 ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=2;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/(ll*(ll+2));
@@ -1353,7 +1137,6 @@ int LensingModule::lensing_d11(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1378,12 +1161,7 @@ int LensingModule::lensing_d1m1(
                  ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=2;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/(ll*(ll+2));
@@ -1410,7 +1188,6 @@ int LensingModule::lensing_d1m1(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1435,12 +1212,7 @@ int LensingModule::lensing_d2m2(
                  ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=2;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/((ll-1)*(ll+3));
@@ -1467,7 +1239,6 @@ int LensingModule::lensing_d2m2(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1492,12 +1263,7 @@ int LensingModule::lensing_d22(
                 ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=2;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)/(2*ll+1))*(ll+1)*(2*ll+1)/((ll-1)*(ll+3));
@@ -1524,7 +1290,6 @@ int LensingModule::lensing_d22(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1549,11 +1314,7 @@ int LensingModule::lensing_d20(
                 ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
   for (l=2;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-1)*(ll+3)));
@@ -1579,7 +1340,6 @@ int LensingModule::lensing_d20(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1604,12 +1364,7 @@ int LensingModule::lensing_d31(
                 ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=3;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-2)*(ll+4)*ll*(ll+2))) * (ll+1);
@@ -1637,7 +1392,6 @@ int LensingModule::lensing_d31(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1662,12 +1416,7 @@ int LensingModule::lensing_d3m1(
                  ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=3;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-2)*(ll+4)*ll*(ll+2))) * (ll+1);
@@ -1695,7 +1444,6 @@ int LensingModule::lensing_d3m1(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1720,12 +1468,7 @@ int LensingModule::lensing_d3m3(
                  ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=3;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1))*(ll+1)/((ll-2)*(ll+4));
@@ -1753,7 +1496,6 @@ int LensingModule::lensing_d3m3(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1778,11 +1520,7 @@ int LensingModule::lensing_d40(
                 ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
   for (l=4;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-3)*(ll+5)));
@@ -1810,7 +1548,6 @@ int LensingModule::lensing_d40(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1835,12 +1572,7 @@ int LensingModule::lensing_d4m2(
                  ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=4;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1)/((ll-3)*(ll+5)*(ll-1)*(ll+3))) * (ll+1.);
@@ -1869,7 +1601,6 @@ int LensingModule::lensing_d4m2(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }
 
@@ -1894,12 +1625,7 @@ int LensingModule::lensing_d4m4(
                  ) {
   double ll, dlm1, dl, dlp1;
   int index_mu, l;
-  double *fac1, *fac2, *fac3, *fac4;
-  ErrorMsg erreur;
-  class_alloc(fac1,lmax*sizeof(double),erreur);
-  class_alloc(fac2,lmax*sizeof(double),erreur);
-  class_alloc(fac3,lmax*sizeof(double),erreur);
-  class_alloc(fac4,lmax*sizeof(double),erreur);
+  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (l=4;l<lmax;l++) {
     ll = (double) l;
     fac1[l] = sqrt((2*ll+3)*(2*ll+1))*(ll+1)/((ll-3)*(ll+5));
@@ -1928,6 +1654,5 @@ int LensingModule::lensing_d4m4(
       dl = dlp1;
     }
   }
-  free(fac1); free(fac2); free(fac3); free(fac4);
   return _SUCCESS_;
 }

@@ -3,6 +3,7 @@
 
 #include "input_module.h"
 #include "base_module.h"
+#include <vector>
 
 class PerturbationsModule : public BaseModule {
 public:
@@ -34,7 +35,7 @@ public:
   int index_ic_nid_; /**< index value for neutrino density isocurvature */
   int index_ic_niv_; /**< index value for neutrino velocity isocurvature */
   int index_ic_ten_; /**< index value for unique possibility for tensors */
-  int* ic_size_;     /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
+  std::vector<int> ic_size_;     /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
   //@}
   /** @name - flags and indices running on types (temperature, polarization, lensing, ...) */
 
@@ -95,7 +96,7 @@ public:
 
   int index_tp_delta_m_;      /**< index value for matter density fluctuation */
   int index_tp_delta_cb_;     /**< index value for delta cb */
-  int* tp_size_;              /**< number of types tp_size[index_md] included in computation for each mode */
+  std::vector<int> tp_size_;              /**< number of types tp_size[index_md] included in computation for each mode */
 
   short has_source_t_;           /**< do we need source for CMB temperature? */
   short has_source_p_;           /**< do we need source for CMB polarization? */
@@ -144,16 +145,16 @@ public:
 
   /** @name - arrays storing the evolution of all sources for given k values, passed as k_output_values */
   //@{
-   int* index_k_output_values_;  /**< List of indices corresponding to k-values close to k_output_values for each mode.
+   std::vector<int> index_k_output_values_;  /**< List of indices corresponding to k-values close to k_output_values for each mode.
                                      index_k_output_values[index_md*k_output_values_num+ik]*/
 
   char scalar_titles_[_MAXTITLESTRINGLENGTH_]; /**< _DELIMITER_ separated string of titles for scalar perturbation output files. */
   char vector_titles_[_MAXTITLESTRINGLENGTH_]; /**< _DELIMITER_ separated string of titles for vector perturbation output files. */
   char tensor_titles_[_MAXTITLESTRINGLENGTH_]; /**< _DELIMITER_ separated string of titles for tensor perturbation output files. */
 
-  double* scalar_perturbations_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for scalars */
-  double* vector_perturbations_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for vectors */
-  double* tensor_perturbations_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for tensors */
+  std::vector<double> scalar_perturbations_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for scalars */
+  std::vector<double> vector_perturbations_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for vectors */
+  std::vector<double> tensor_perturbations_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for tensors */
 
   int size_scalar_perturbation_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of sizes of scalar double pointers  */
   int size_vector_perturbation_data_[_MAX_NUMBER_OF_K_FILES_]; /**< Array of sizes of vector double pointers  */
@@ -164,7 +165,7 @@ public:
 
   //@{
 
-  double*** sources_; /**< Pointer towards the source interpolation table
+  std::vector<std::vector<std::vector<double>>> sources_; /**< Source interpolation table
                          sources[index_md]
                          [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
                          [index_tau * perturbations_module_->k_size_ + index_k] */
@@ -173,22 +174,22 @@ public:
   /** @name - arrays related to the interpolation table for sources at late times, corresponding to z < z_max_pk (used for Fourier transfer function and spectra output) */
   //@{
 
-  double* ln_tau_;      /**< log of the arrau tau_sampling, covering only the final time range required for the output of
+  std::vector<double> ln_tau_;      /**< log of the arrau tau_sampling, covering only the final time range required for the output of
                             Fourier transfer functions (used for interpolations) */
   int ln_tau_size_;     /**< number of values in this array */
 
   //@}
 
-  double* tau_sampling_;    /**< array of tau values */
+  std::vector<double> tau_sampling_;    /**< array of tau values */
   int tau_size_;            /**< number of values in this array */
 
-  int* k_size_cl_;  /**< k_size_cl[index_md] number of k values used
+  std::vector<int> k_size_cl_;  /**< k_size_cl[index_md] number of k values used
                        for non-CMB \f$ C_l \f$ calculations, requiring a coarse
                        sampling in k-space. */
-  int* k_size_;     /**< k_size[index_md] = total number of k
+  std::vector<int> k_size_;     /**< k_size[index_md] = total number of k
                        values, including those needed for P(k) but not
                        for \f$ C_l \f$'s */
-  double** k_;      /**< k[index_md][index_k] = list of values */
+  std::vector<std::vector<double>> k_;      /**< k[index_md][index_k] = list of values */
   double k_min_;    /**< minimum value (over all modes) */
   double k_max_;    /**< maximum value (over all modes) */
 
@@ -242,14 +243,12 @@ private:
   //@}
 
 
-  double*** late_sources_; /**< Pointer towards the source interpolation table
+  std::vector<std::vector<double*>> late_sources_; /**< Pointer into the source interpolation table
                                 late_sources[index_md]
                                             [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
-                                            [index_tau * perturbations_module_->k_size_ + index_k]
-                                Note that this is not a replication of part of the sources table,
-                                it is just poiting towards the same memory zone, at the place where the late_sources actually start */
+                                Note: these are non-owning pointers into sources_ memory (alias) */
 
-  double*** ddlate_sources_; /**< Pointer towards the splined source interpolation table with second derivatives with respect to time
+  std::vector<std::vector<std::vector<double>>> ddlate_sources_; /**< Splined source interpolation table with second derivatives with respect to time
                               ddlate_sources[index_md]
                                             [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
                                             [index_tau * perturbations_module_->k_size_ + index_k] */
@@ -263,7 +262,7 @@ private:
 
   //@{
 
-  int* k_size_cmb_;  /**< k_size_cmb[index_md] number of k values used
+  std::vector<int> k_size_cmb_;  /**< k_size_cmb[index_md] number of k values used
                         for CMB calculations, requiring a fine
                         sampling in k-space */
 
