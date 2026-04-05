@@ -47,6 +47,8 @@ enum reionization_z_or_tau {
 #define f1(x) (-0.75*x*(x*x/3.-1.)+0.5)  /**< goes from 0 to 1 when x goes from -1 to 1 */
 #define f2(x) (x*x*(0.5-x/3.)*6.)        /**< goes from 0 to 1 when x goes from  0 to 1 */
 
+#define _BBN_ -1
+
 /**
  * All thermodynamics parameters and evolution that other modules need to know.
  *
@@ -64,69 +66,69 @@ struct thermo
 
   //@{
 
-  double YHe;  /**< \f$ Y_{He} \f$: primordial helium fraction */
+  double YHe = _BBN_;  /**< \f$ Y_{He} \f$: primordial helium fraction */
 
-  enum recombination_algorithm recombination; /**< recombination code */
+  enum recombination_algorithm recombination = recfast; /**< recombination code */
 
-  enum reionization_parametrization reio_parametrization; /**< reionization scheme */
+  enum reionization_parametrization reio_parametrization = reio_camb; /**< reionization scheme */
 
-  enum reionization_z_or_tau reio_z_or_tau; /**< is the input parameter the reionization redshift or optical depth? */
+  enum reionization_z_or_tau reio_z_or_tau = reio_z; /**< is the input parameter the reionization redshift or optical depth? */
 
-  double tau_reio; /**< if above set to tau, input value of reionization optical depth */
+  double tau_reio = 0.0925; /**< if above set to tau, input value of reionization optical depth */
 
-  double z_reio;   /**< if above set to z,   input value of reionization redshift */
+  double z_reio = 11.357;   /**< if above set to z,   input value of reionization redshift */
 
-  short compute_cb2_derivatives; /**< do we want to include in computation derivatives of baryon sound speed? */
+  short compute_cb2_derivatives = _FALSE_; /**< do we want to include in computation derivatives of baryon sound speed? */
 
-  short compute_damping_scale; /**< do we want to compute the simplest analytic approximation to the photon damping (or diffusion) scale? */
+  short compute_damping_scale = _FALSE_; /**< do we want to compute the simplest analytic approximation to the photon damping (or diffusion) scale? */
 
   /** parameters for reio_camb */
 
-  double reionization_width; /**< width of H reionization */
+  double reionization_width = 0.5; /**< width of H reionization */
 
-  double reionization_exponent; /**< shape of H reionization */
+  double reionization_exponent = 1.5; /**< shape of H reionization */
 
-  double helium_fullreio_redshift; /**< redshift for of helium reionization */
+  double helium_fullreio_redshift = 3.5; /**< redshift for of helium reionization */
 
-  double helium_fullreio_width; /**< width of helium reionization */
+  double helium_fullreio_width = 0.5; /**< width of helium reionization */
 
   /** parameters for reio_bins_tanh */
 
-  int binned_reio_num; /**< with how many bins do we want to describe reionization? */
+  int binned_reio_num = 0; /**< with how many bins do we want to describe reionization? */
 
-  double * binned_reio_z; /**< central z value for each bin */
+  double * binned_reio_z = nullptr; /**< central z value for each bin */
 
-  double * binned_reio_xe; /**< imposed \f$ X_e(z)\f$ value at center of each bin */
+  double * binned_reio_xe = nullptr; /**< imposed \f$ X_e(z)\f$ value at center of each bin */
 
-  double binned_reio_step_sharpness; /**< sharpness of tanh() step interpolating between binned values */
+  double binned_reio_step_sharpness = 0.3; /**< sharpness of tanh() step interpolating between binned values */
 
   /** parameters for reio_many_tanh */
 
-  int many_tanh_num; /**< with how many jumps do we want to describe reionization? */
+  int many_tanh_num = 0; /**< with how many jumps do we want to describe reionization? */
 
-  double * many_tanh_z; /**< central z value for each tanh jump */
+  double * many_tanh_z = nullptr; /**< central z value for each tanh jump */
 
-  double * many_tanh_xe; /**< imposed \f$ X_e(z)\f$ value at the end of each jump (ie at later times)*/
+  double * many_tanh_xe = nullptr; /**< imposed \f$ X_e(z)\f$ value at the end of each jump (ie at later times)*/
 
-  double many_tanh_width; /**< sharpness of tanh() steps */
+  double many_tanh_width = 0.5; /**< sharpness of tanh() steps */
 
     /** parameters for reio_inter */
 
-  int reio_inter_num; /**< with how many jumps do we want to describe reionization? */
+  int reio_inter_num = 0; /**< with how many jumps do we want to describe reionization? */
 
-  double * reio_inter_z; /**< discrete z values */
+  double * reio_inter_z = nullptr; /**< discrete z values */
 
-  double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
+  double * reio_inter_xe = nullptr; /**< discrete \f$ X_e(z)\f$ values */
 
   /** parameters for energy injection */
 
-  double annihilation; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
+  double annihilation = 0.; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
 
-  short has_on_the_spot; /**< flag to specify if we want to use the on-the-spot approximation **/
+  short has_on_the_spot = _TRUE_; /**< flag to specify if we want to use the on-the-spot approximation **/
 
-  double decay; /**< parameter describing CDM decay (f/tau, see e.g. 1109.6322)*/
+  double decay = 0.; /**< parameter describing CDM decay (f/tau, see e.g. 1109.6322)*/
 
-  double annihilation_variation; /**< if this parameter is non-zero,
+  double annihilation_variation = 0.; /**< if this parameter is non-zero,
 				     the function F(z)=(f <sigma*v> /
 				     m_cdm)(z) will be a parabola in
 				     log-log scale between zmin and
@@ -136,26 +138,26 @@ struct thermo
 				     zmax; it will be constant outside
 				     this range */
 
-  double annihilation_z; /**< if annihilation_variation is non-zero,
+  double annihilation_z = 1000.; /**< if annihilation_variation is non-zero,
 			     this is the value of z at which the
 			     parameter annihilation is defined, i.e.
 			     F(annihilation_z)=annihilation */
 
-  double annihilation_zmax; /**< if annihilation_variation is non-zero,
+  double annihilation_zmax = 2500.; /**< if annihilation_variation is non-zero,
 				redshift above which annihilation rate
 				is maximal */
 
-  double annihilation_zmin; /**< if annihilation_variation is non-zero,
+  double annihilation_zmin = 30.; /**< if annihilation_variation is non-zero,
 				redshift below which annihilation rate
 				is constant */
 
-  double annihilation_f_halo; /**< takes the contribution of DM annihilation in halos into account*/
-  double annihilation_z_halo; /**< characteristic redshift for DM annihilation in halos*/
+  double annihilation_f_halo = 0.; /**< takes the contribution of DM annihilation in halos into account*/
+  double annihilation_z_halo = 30.; /**< characteristic redshift for DM annihilation in halos*/
 
-  double a_idm_dr;      /**< strength of the coupling between interacting dark matter and interacting dark radiation (idm-idr) */
-  double b_idr;         /**< strength of the self coupling for interacting dark radiation (idr-idr) */
-  double nindex_idm_dr; /**< temperature dependence of the interaction between dark matter and dark radiation */
-  double m_idm;         /**< interacting dark matter mass */
+  double a_idm_dr = 0.;      /**< strength of the coupling between interacting dark matter and interacting dark radiation (idm-idr) */
+  double b_idr = 0.;         /**< strength of the self coupling for interacting dark radiation (idr-idr) */
+  double nindex_idm_dr = 4.; /**< temperature dependence of the interaction between dark matter and dark radiation */
+  double m_idm = 1.e11;         /**< interacting dark matter mass */
 
   //@}
 
@@ -164,7 +166,7 @@ struct thermo
 
   //@{
 
-  short thermodynamics_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short thermodynamics_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 
@@ -357,8 +359,6 @@ struct reionization {
  */
 
 //@{
-
-#define _BBN_ -1
 
 //@}
 

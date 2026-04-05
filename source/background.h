@@ -59,7 +59,7 @@ struct background
 
   double Omega0_g; /**< \f$ \Omega_{0 \gamma} \f$: photons */
 
-  double T_cmb; /**< \f$ T_{cmb} \f$: current CMB temperature in Kelvins */
+  double T_cmb = 2.7255; /**< \f$ T_{cmb} \f$: current CMB temperature in Kelvins */
 
   double Omega0_b; /**< \f$ \Omega_{0 b} \f$: baryons */
 
@@ -67,59 +67,59 @@ struct background
 
   double Omega0_lambda; /**< \f$ \Omega_{0_\Lambda} \f$: cosmological constant */
 
-  double Omega0_fld; /**< \f$ \Omega_{0 de} \f$: fluid */
+  double Omega0_fld = 0.; /**< \f$ \Omega_{0 de} \f$: fluid */
 
-  enum equation_of_state fluid_equation_of_state; /**< parametrisation scheme for fluid equation of state */
+  enum equation_of_state fluid_equation_of_state = CLP; /**< parametrisation scheme for fluid equation of state */
 
-  double w0_fld; /**< \f$ w0_{DE} \f$: current fluid equation of state parameter */
-  double wa_fld; /**< \f$ wa_{DE} \f$: fluid equation of state parameter derivative */
-  double Omega_EDE; /**< \f$ wa_{DE} \f$: Early Dark Energy density parameter */
+  double w0_fld = -1.; /**< \f$ w0_{DE} \f$: current fluid equation of state parameter */
+  double wa_fld = 0.; /**< \f$ wa_{DE} \f$: fluid equation of state parameter derivative */
+  double Omega_EDE = 0.; /**< \f$ wa_{DE} \f$: Early Dark Energy density parameter */
 
-  double cs2_fld; /**< \f$ c^2_{s~DE} \f$: sound speed of the fluid
+  double cs2_fld = 1.; /**< \f$ c^2_{s~DE} \f$: sound speed of the fluid
 		     in the frame comoving with the fluid (so, this is
 		     not [delta p/delta rho] in the synchronous or
 		     newtonian gauge!) */
 
-  short use_ppf; /**< flag switching on PPF perturbation equations
+  short use_ppf = _TRUE_; /**< flag switching on PPF perturbation equations
                     instead of true fluid equations for
                     perturbations. It could have been defined inside
                     perturbation structure, but we leave it here in
                     such way to have all fld parameters grouped. */
 
-  double c_gamma_over_c_fld; /**< ppf parameter defined in eq. (16) of 0808.3125 [astro-ph] */
+  double c_gamma_over_c_fld = 0.4; /**< ppf parameter defined in eq. (16) of 0808.3125 [astro-ph] */
 
   double Omega0_ur; /**< \f$ \Omega_{0 \nu r} \f$: ultra-relativistic neutrinos */
 
-  double Omega0_idr; /**< \f$ \Omega_{0 idr} \f$: interacting dark radiation */
-  double T_idr;      /**< \f$ T_{idr} \f$: current temperature of interacting dark radiation in Kelvins */
+  double Omega0_idr = 0.; /**< \f$ \Omega_{0 idr} \f$: interacting dark radiation */
+  double T_idr = 0.;      /**< \f$ T_{idr} \f$: current temperature of interacting dark radiation in Kelvins */
 
-  double Omega0_idm_dr; /**< \f$ \Omega_{0 idm_dr} \f$: dark matter interacting with dark radiation */
+  double Omega0_idm_dr = 0.; /**< \f$ \Omega_{0 idm_dr} \f$: dark matter interacting with dark radiation */
 
-  double Omega0_dcdmdr; /**< \f$ \Omega_{0 dcdm}+\Omega_{0 dr} \f$: decaying cold dark matter (dcdm) decaying to dark radiation (dr) */
+  double Omega0_dcdmdr = 0.; /**< \f$ \Omega_{0 dcdm}+\Omega_{0 dr} \f$: decaying cold dark matter (dcdm) decaying to dark radiation (dr) */
 
-  double Gamma_dcdm; /**< \f$ \Gamma_{dcdm} \f$: decay constant for decaying cold dark matter */
+  double Gamma_dcdm = 0.; /**< \f$ \Gamma_{dcdm} \f$: decay constant for decaying cold dark matter */
 
   double Omega_ini_dcdm;    /**< \f$ \Omega_{ini,dcdm} \f$: rescaled initial value for dcdm density (see 1407.2418 for definitions) */
 
-  double Omega0_scf;        /**< \f$ \Omega_{0 scf} \f$: scalar field */
-  short attractor_ic_scf;   /**< whether the scalar field has attractor initial conditions */
-  double phi_ini_scf;       /**< \f$ \phi(t_0) \f$: scalar field initial value */
-  double phi_prime_ini_scf; /**< \f$ d\phi(t_0)/d\tau \f$: scalar field initial derivative wrt conformal time */
+  double Omega0_scf = 0.;        /**< \f$ \Omega_{0 scf} \f$: scalar field */
+  short attractor_ic_scf = _TRUE_;   /**< whether the scalar field has attractor initial conditions */
+  double phi_ini_scf = 1;       /**< \f$ \phi(t_0) \f$: scalar field initial value */
+  double phi_prime_ini_scf = 1; /**< \f$ d\phi(t_0)/d\tau \f$: scalar field initial derivative wrt conformal time */
   std::vector<double> scf_parameters;  /**< list of parameters describing the scalar field potential */
-  int scf_tuning_index;     /**< index in scf_parameters used for tuning */
+  int scf_tuning_index = 0;     /**< index in scf_parameters used for tuning */
   
-  double Omega0_k; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
+  double Omega0_k = 0.; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
 
-  int N_ncdm;                            /**< Number of distinguishable ncdm species */
-  double Omega0_ncdm_tot; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
+  int N_ncdm = 0;                            /**< Number of distinguishable ncdm species */
+  double Omega0_ncdm_tot = 0.; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
   int N_decay_dr = 0;
   /** @name - related parameters */
 
   //@{
 
-  double h; /**< reduced Hubble parameter */
-  double K; /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*a_{today}^2*H_0^2\f$; */
-  int sgnK; /**< K/|K|: -1, 0 or 1 */
+  double h = 0.67556; /**< reduced Hubble parameter */
+  double K = 0.; /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*a_{today}^2*H_0^2\f$; */
+  int sgnK = 0; /**< K/|K|: -1, 0 or 1 */
   
   //@}
 
@@ -127,11 +127,11 @@ struct background
 
   //@{
 
-  double a_today; /**< scale factor today (arbitrary and irrelevant for most purposes) */
+  double a_today = 1.; /**< scale factor today (arbitrary and irrelevant for most purposes) */
 
   //@}
 
-  enum background_evolution_method background_method;
+  enum background_evolution_method background_method = bgevo_evolver;
 
   /** @name - flags describing the absence or presence of cosmological
       ingredients
@@ -161,12 +161,12 @@ struct background
   short has_idr_drmd;
   short has_idm;
 
-  double Omega0_idr_drmd;
-  double Omega0_idm_drmd;
-  double f_idm_drmd;
-  double G_over_aH_drmd;
-  double delta_Neff_drmd;
-  double z_stop;
+  double Omega0_idr_drmd = 0.;
+  double Omega0_idm_drmd = 0.;
+  double f_idm_drmd = 0.;
+  double G_over_aH_drmd = 0.;
+  double delta_Neff_drmd = 0.;
+  double z_stop = 0.;
   //@}
 
   /**
@@ -190,7 +190,7 @@ struct background
 
   unsigned int number_of_threads;
 
-  short background_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short background_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 };

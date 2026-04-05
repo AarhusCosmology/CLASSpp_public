@@ -47,20 +47,20 @@ source_files = (
     )
     + prepend(
         'tools',
-        'arrays.c',
-        'common.c',
+        'arrays.cpp',
+        'common.cpp',
         'dark_radiation.cpp',
-        'dei_rkck.c',
+        'dei_rkck.cpp',
         'evolver_ndf15.cpp',
-        'evolver_rkck.c',
+        'evolver_rkck.cpp',
         'exceptions.cpp',
-        'growTable.c',
-        'hyperspherical.c',
+        'growTable.cpp',
+        'hyperspherical.cpp',
         'non_cold_dark_matter.cpp',
         'parser.cpp',
-        'quadrature.c',
-        'sparse.c',
-        'trigonometric_integrals.c',
+        'quadrature.cpp',
+        'sparse.cpp',
+        'trigonometric_integrals.cpp',
     )
 )
 c_source_files   = [s for s in source_files if s.endswith('.c')]

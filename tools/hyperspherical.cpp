@@ -459,9 +459,9 @@ int hyperspherical_forwards_recurrence(int K,
                                        double x,
                                        double sinK,
                                        double cotK,
-                                       double * __restrict__ sqrtK,
-                                       double * __restrict__ one_over_sqrtK,
-                                       double * __restrict__ PhiL){
+                                       double * sqrtK,
+                                       double * one_over_sqrtK,
+                                       double * PhiL){
   int l;
   PhiL[0] = 1.0/beta*sin(beta*x)/sinK;
   PhiL[1] = PhiL[0]*(cotK-beta/tan(beta*x))*one_over_sqrtK[1];
@@ -474,13 +474,13 @@ int hyperspherical_forwards_recurrence(int K,
 int hyperspherical_forwards_recurrence_chunk(int K,
                                              int lmax,
                                              double beta,
-                                             double * __restrict__ x,
-                                             double * __restrict__ sinK,
-                                             double * __restrict__ cotK,
+                                             double * x,
+                                             double * sinK,
+                                             double * cotK,
                                              int chunk,
-                                             double * __restrict__ sqrtK,
-                                             double * __restrict__ one_over_sqrtK,
-                                             double * __restrict__ PhiL){
+                                             double * sqrtK,
+                                             double * one_over_sqrtK,
+                                             double * PhiL){
   int l;
   int index_x;
   for (index_x=0; index_x<chunk; index_x++){
@@ -504,9 +504,9 @@ int hyperspherical_backwards_recurrence(int K,
                                         double x,
                                         double sinK,
                                         double cotK,
-                                        double * __restrict__ sqrtK,
-                                        double * __restrict__ one_over_sqrtK,
-                                        double * __restrict__ PhiL){
+                                        double * sqrtK,
+                                        double * one_over_sqrtK,
+                                        double * PhiL){
   double phi0, phi1, phipr1 = 0.0, phi, phi_plus_1_times_sqrtK, phi_minus_1, scaling;
   int l, k, isign;
   int funcreturn = _FAILURE_;
@@ -589,13 +589,13 @@ int hyperspherical_backwards_recurrence(int K,
 int hyperspherical_backwards_recurrence_chunk(int K,
                                               int lmax,
                                               double beta,
-                                              double * __restrict__ x,
-                                              double * __restrict__ sinK,
-                                              double * __restrict__ cotK,
+                                              double * x,
+                                              double * sinK,
+                                              double * cotK,
                                               int chunk,
-                                              double * __restrict__ sqrtK,
-                                              double * __restrict__ one_over_sqrtK,
-                                              double * __restrict__ PhiL){
+                                              double * sqrtK,
+                                              double * one_over_sqrtK,
+                                              double * PhiL){
   double phi0, phi1, phipr1 = 0.0;
   int l, k, isign;
   int funcreturn = _FAILURE_;
@@ -762,9 +762,9 @@ int CF1_from_Gegenbauer(int l,
 
  int hyperspherical_WKB_vec(int l,
                             double beta,
-                            double * __restrict__ sinK_vec,
+                            double * sinK_vec,
                             int size_sinK_vec,
-                            double * __restrict__ Phi){
+                            double * Phi){
   double e, w, w2, alpha, alpha2, t;
   double S, Q, C, argu, Ai;
   int airy_sign = 1, phisign = 1;
@@ -1184,7 +1184,7 @@ int hyperspherical_get_xmin_from_Airy(int K,
 
 double PhiWKB_minus_phiminabs(double x, void *param){
    double phiwkb;
-   struct WKB_parameters *wkbparam = param;
+   struct WKB_parameters *wkbparam = (struct WKB_parameters *)param;
    hyperspherical_WKB(wkbparam->K,wkbparam->l,wkbparam->beta,x, &phiwkb);
    return(fabs(phiwkb)-wkbparam->phiminabs);
 }

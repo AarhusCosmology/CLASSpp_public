@@ -39,25 +39,25 @@ struct nonlinear {
 
   //@{
 
-  enum non_linear_method method; /**< method for computing non-linear corrections (none, Halogit, etc.) */
+  enum non_linear_method method = nl_none; /**< method for computing non-linear corrections (none, Halogit, etc.) */
 
-  enum source_extrapolation extrapolation_method; /**< method for analytical extrapolation of sources beyond pre-computed range */
+  enum source_extrapolation extrapolation_method = extrap_max_scaled; /**< method for analytical extrapolation of sources beyond pre-computed range */
 
-  enum hmcode_baryonic_feedback_model feedback; /** to choose between different baryonic feedback models
+  enum hmcode_baryonic_feedback_model feedback = nl_emu_dmonly; /** to choose between different baryonic feedback models
                                                 in hmcode (dmonly, gas cooling, Agn or supernova feedback) */
   double c_min;      /** for HMcode: minimum concentration in Bullock 2001 mass-concentration relation */
   double eta_0;      /** for HMcode: halo bloating parameter */
-  double z_infinity; /** for HMcode: z value at which Dark Energy correction is evaluated needs to be at early times (default */
+  double z_infinity = 10.; /** for HMcode: z value at which Dark Energy correction is evaluated; should be at early times (default: 10.) */
 
   //@}
 
-  short has_pk_eq;               /**< flag: will we use the pk_eq method? */
+  short has_pk_eq = _FALSE_;               /**< flag: will we use the pk_eq method? */
 
   /** @name - technical parameters */
 
   //@{
 
-  short nonlinear_verbose;  	/**< amount of information written in standard output */
+  short nonlinear_verbose = 0;  	/**< amount of information written in standard output */
 
   //@}
 };

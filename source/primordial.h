@@ -84,117 +84,117 @@ struct primordial {
 
   //@{
 
-  double k_pivot; /**< pivot scale in \f$ Mpc^{-1} \f$ */
+  double k_pivot = 0.05; /**< pivot scale in \f$ Mpc^{-1} \f$ */
 
-  enum primordial_spectrum_type primordial_spec_type; /**< type of primordial spectrum (simple analytic from, integration of inflationary perturbations, etc.) */
+  enum primordial_spectrum_type primordial_spec_type = analytic_Pk; /**< type of primordial spectrum (simple analytic from, integration of inflationary perturbations, etc.) */
 
   /* - parameters describing the case primordial_spec_type = analytic_Pk : amplitudes, tilts, runnings, cross-correlations, ... */
 
-  double A_s;  /**< usual scalar amplitude = curvature power spectrum at pivot scale */
-  double sigma8; /**< Mass dispersion at the scale 8 h  Mpc^-1*/
-  double n_s;  /**< usual scalar tilt = [curvature power spectrum tilt at pivot scale -1] */
-  double alpha_s; /**< usual scalar running */
+  double A_s = 2.215e-9;  /**< usual scalar amplitude = curvature power spectrum at pivot scale */
+  double sigma8 = 0.; /**< Mass dispersion at the scale 8 h  Mpc^-1*/
+  double n_s = 0.9619;  /**< usual scalar tilt = [curvature power spectrum tilt at pivot scale -1] */
+  double alpha_s = 0.; /**< usual scalar running */
   
-  double r;    /**< usual tensor to scalar ratio of power spectra, \f$ r=A_T/A_S=P_h/P_R \f$*/
+  double r = 1.;    /**< usual tensor to scalar ratio of power spectra, \f$ r=A_T/A_S=P_h/P_R \f$*/
   double n_t;  /**< usual tensor tilt = [GW power spectrum tilt at pivot scale] */
   double alpha_t; /**< usual tensor running */
 
-  double f_bi;  /**< baryon isocurvature (BI) entropy-to-curvature ratio \f$ S_{bi}/R \f$*/
-  double n_bi;  /**< BI tilt */
-  double alpha_bi; /**< BI running */
+  double f_bi = 1.;  /**< baryon isocurvature (BI) entropy-to-curvature ratio \f$ S_{bi}/R \f$*/
+  double n_bi = 1.;  /**< BI tilt */
+  double alpha_bi = 0.; /**< BI running */
 
-  double f_cdi;  /**< CDM isocurvature (CDI) entropy-to-curvature ratio \f$ S_{cdi}/R \f$*/
-  double n_cdi;  /**< CDI tilt */
-  double alpha_cdi; /**< CDI running */
+  double f_cdi = 1.;  /**< CDM isocurvature (CDI) entropy-to-curvature ratio \f$ S_{cdi}/R \f$*/
+  double n_cdi = 1.;  /**< CDI tilt */
+  double alpha_cdi = 0.; /**< CDI running */
 
-  double f_nid;  /**< neutrino density isocurvature (NID) entropy-to-curvature ratio \f$ S_{nid}/R \f$*/
-  double n_nid;  /**< NID tilt */
-  double alpha_nid; /**< NID running */
+  double f_nid = 1.;  /**< neutrino density isocurvature (NID) entropy-to-curvature ratio \f$ S_{nid}/R \f$*/
+  double n_nid = 1.;  /**< NID tilt */
+  double alpha_nid = 0.; /**< NID running */
 
-  double f_niv;  /**< neutrino velocity isocurvature (NIV) entropy-to-curvature ratio \f$ S_{niv}/R \f$*/
-  double n_niv;  /**< NIV tilt */
-  double alpha_niv; /**< NIV running */
+  double f_niv = 1.;  /**< neutrino velocity isocurvature (NIV) entropy-to-curvature ratio \f$ S_{niv}/R \f$*/
+  double n_niv = 1.;  /**< NIV tilt */
+  double alpha_niv = 0.; /**< NIV running */
 
-  double c_ad_bi; /**< ADxBI cross-correlation at pivot scale, from -1 to 1 */
-  double n_ad_bi; /**< ADxBI cross-correlation tilt */
-  double alpha_ad_bi; /**< ADxBI cross-correlation running */
+  double c_ad_bi = 0.; /**< ADxBI cross-correlation at pivot scale, from -1 to 1 */
+  double n_ad_bi = 0.; /**< ADxBI cross-correlation tilt */
+  double alpha_ad_bi = 0.; /**< ADxBI cross-correlation running */
 
-  double c_ad_cdi; /**< ADxCDI cross-correlation at pivot scale, from -1 to 1 */
-  double n_ad_cdi; /**< ADxCDI cross-correlation tilt */
-  double alpha_ad_cdi; /**< ADxCDI cross-correlation running */
+  double c_ad_cdi = 0.; /**< ADxCDI cross-correlation at pivot scale, from -1 to 1 */
+  double n_ad_cdi = 0.; /**< ADxCDI cross-correlation tilt */
+  double alpha_ad_cdi = 0.; /**< ADxCDI cross-correlation running */
 
-  double c_ad_nid; /**< ADxNID cross-correlation at pivot scale, from -1 to 1 */
-  double n_ad_nid; /**< ADxNID cross-correlation tilt */
-  double alpha_ad_nid; /**< ADxNID cross-correlation running */
+  double c_ad_nid = 0.; /**< ADxNID cross-correlation at pivot scale, from -1 to 1 */
+  double n_ad_nid = 0.; /**< ADxNID cross-correlation tilt */
+  double alpha_ad_nid = 0.; /**< ADxNID cross-correlation running */
 
-  double c_ad_niv; /**< ADxNIV cross-correlation at pivot scale, from -1 to 1 */
-  double n_ad_niv; /**< ADxNIV cross-correlation tilt */
-  double alpha_ad_niv; /**< ADxNIV cross-correlation running */
+  double c_ad_niv = 0.; /**< ADxNIV cross-correlation at pivot scale, from -1 to 1 */
+  double n_ad_niv = 0.; /**< ADxNIV cross-correlation tilt */
+  double alpha_ad_niv = 0.; /**< ADxNIV cross-correlation running */
 
-  double c_bi_cdi; /**< BIxCDI cross-correlation at pivot scale, from -1 to 1 */
-  double n_bi_cdi; /**< BIxCDI cross-correlation tilt */
-  double alpha_bi_cdi; /**< BIxCDI cross-correlation running */
+  double c_bi_cdi = 0.; /**< BIxCDI cross-correlation at pivot scale, from -1 to 1 */
+  double n_bi_cdi = 0.; /**< BIxCDI cross-correlation tilt */
+  double alpha_bi_cdi = 0.; /**< BIxCDI cross-correlation running */
 
-  double c_bi_nid; /**< BIxNIV cross-correlation at pivot scale, from -1 to 1 */
-  double n_bi_nid; /**< BIxNIV cross-correlation tilt */
-  double alpha_bi_nid; /**< BIxNIV cross-correlation running */
+  double c_bi_nid = 0.; /**< BIxNIV cross-correlation at pivot scale, from -1 to 1 */
+  double n_bi_nid = 0.; /**< BIxNIV cross-correlation tilt */
+  double alpha_bi_nid = 0.; /**< BIxNIV cross-correlation running */
 
-  double c_bi_niv; /**< BIxNIV cross-correlation at pivot scale, from -1 to 1 */
-  double n_bi_niv; /**< BIxNIV cross-correlation tilt */
-  double alpha_bi_niv; /**< BIxNIV cross-correlation running */
+  double c_bi_niv = 0.; /**< BIxNIV cross-correlation at pivot scale, from -1 to 1 */
+  double n_bi_niv = 0.; /**< BIxNIV cross-correlation tilt */
+  double alpha_bi_niv = 0.; /**< BIxNIV cross-correlation running */
 
-  double c_cdi_nid; /**< CDIxNID cross-correlation at pivot scale, from -1 to 1 */
-  double n_cdi_nid; /**< CDIxNID cross-correlation tilt */
-  double alpha_cdi_nid; /**< CDIxNID cross-correlation running */
+  double c_cdi_nid = 0.; /**< CDIxNID cross-correlation at pivot scale, from -1 to 1 */
+  double n_cdi_nid = 0.; /**< CDIxNID cross-correlation tilt */
+  double alpha_cdi_nid = 0.; /**< CDIxNID cross-correlation running */
 
-  double c_cdi_niv; /**< CDIxNIV cross-correlation at pivot scale, from -1 to 1 */
-  double n_cdi_niv; /**< CDIxNIV cross-correlation tilt */
-  double alpha_cdi_niv; /**< CDIxNIV cross-correlation running */
+  double c_cdi_niv = 0.; /**< CDIxNIV cross-correlation at pivot scale, from -1 to 1 */
+  double n_cdi_niv = 0.; /**< CDIxNIV cross-correlation tilt */
+  double alpha_cdi_niv = 0.; /**< CDIxNIV cross-correlation running */
 
-  double c_nid_niv; /**< NIDxNIV cross-correlation at pivot scale, from -1 to 1 */
-  double n_nid_niv; /**< NIDxNIV cross-correlation tilt */
-  double alpha_nid_niv; /**< NIDxNIV cross-correlation running */
+  double c_nid_niv = 0.; /**< NIDxNIV cross-correlation at pivot scale, from -1 to 1 */
+  double n_nid_niv = 0.; /**< NIDxNIV cross-correlation tilt */
+  double alpha_nid_niv = 0.; /**< NIDxNIV cross-correlation running */
 
   /** parameters describing the case primordial_spec_type = inflation_V */
 
-  enum potential_shape potential;
+  enum potential_shape potential = polynomial;
 
-  double V0;	/**< one parameter of the function V(phi) */
-  double V1;	/**< one parameter of the function V(phi) */
-  double V2;	/**< one parameter of the function V(phi) */
-  double V3;	/**< one parameter of the function V(phi) */
-  double V4;	/**< one parameter of the function V(phi) */
+  double V0 = 1.25e-13;	/**< one parameter of the function V(phi) */
+  double V1 = -1.12e-14;	/**< one parameter of the function V(phi) */
+  double V2 = -6.95e-14;	/**< one parameter of the function V(phi) */
+  double V3 = 0.;	/**< one parameter of the function V(phi) */
+  double V4 = 0.;	/**< one parameter of the function V(phi) */
 
   /* parameters describing the case primordial_spec_type = inflation_H */
 
-  double H0;	/**< one parameter of the function H(phi) */
-  double H1;	/**< one parameter of the function H(phi) */
-  double H2;	/**< one parameter of the function H(phi) */
-  double H3;	/**< one parameter of the function H(phi) */
-  double H4;	/**< one parameter of the function H(phi) */
+  double H0 = 3.69e-6;	/**< one parameter of the function H(phi) */
+  double H1 = -5.84e-7;	/**< one parameter of the function H(phi) */
+  double H2 = 0.;	/**< one parameter of the function H(phi) */
+  double H3 = 0.;	/**< one parameter of the function H(phi) */
+  double H4 = 0.;	/**< one parameter of the function H(phi) */
 
   /* parameters describing inflation_V_end */
 
-  double phi_end;	/**< value of inflaton at the end of inflation */
-  enum phi_pivot_methods phi_pivot_method; /**< flag for method used to define and find the pivot scale */
-  double phi_pivot_target; /**< For each of the above methods, critical value to be reached between pivot and end of inflation (N_star, [aH]ratio, etc.) */
+  double phi_end = 0.;	/**< value of inflaton at the end of inflation */
+  enum phi_pivot_methods phi_pivot_method = N_star; /**< flag for method used to define and find the pivot scale */
+  double phi_pivot_target = 60; /**< For each of the above methods, critical value to be reached between pivot and end of inflation (N_star, [aH]ratio, etc.) */
 
   /* behavior of the inflation module */
-  enum inflation_module_behavior behavior; /**< Specifies if the inflation module computes the primordial spectrum numerically (default) or analytically*/
+  enum inflation_module_behavior behavior = numerical; /**< Specifies if the inflation module computes the primordial spectrum numerically (default) or analytically*/
 
   /** 'external_Pk' mode: command generating the table of Pk and custom parameters to be passed to it */
 
-  char*  command;  /**< string with the command for calling 'external_Pk' */
-  double custom1;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom2;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom3;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom4;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom5;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom6;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom7;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom8;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom9;  /**< one parameter of the primordial computed in 'external_Pk' */
-  double custom10; /**< one parameter of the primordial computed in 'external_Pk' */
+  char*  command = nullptr;  /**< string with the command for calling 'external_Pk' */
+  double custom1 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom2 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom3 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom4 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom5 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom6 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom7 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom8 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom9 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
+  double custom10 = 0.; /**< one parameter of the primordial computed in 'external_Pk' */
 
   //@}
 
@@ -203,7 +203,7 @@ struct primordial {
 
   //@{
 
-  short primordial_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short primordial_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 

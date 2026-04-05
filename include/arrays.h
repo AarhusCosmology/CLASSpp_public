@@ -8,7 +8,7 @@
 #include "common.h"
 
 #ifdef _WIN32
-#define __restrict__ _restrict
+#define _restrict
 #endif
 
 #define _SPLINE_NATURAL_ 0 /**< natural spline: ddy0=ddyn=0 */
@@ -235,22 +235,22 @@ int array_integrate_all_trapzd_or_spline(
 			ErrorMsg errmsg); /** from 1 to n_columns */
 
   int array_interpolate_spline(
-			       double * __restrict__ x_array,
+			       double * x_array,
 			       int n_lines,
-			       double * __restrict__ array,
-			       double * __restrict__ array_splined,
+			       double * array,
+			       double * array_splined,
 			       int n_columns,
 			       double x,
-			       int * __restrict__ last_index,
-			       double * __restrict__ result,
+			       int * last_index,
+			       double * result,
 			       int result_size, /** from 1 to n_columns */
 			       ErrorMsg errmsg);
 
   int array_search_bisect(
                        int n_lines,
-                       double * __restrict__ array,
+                       double * array,
                        double c,
-                       int * __restrict__ last_index,
+                       int * last_index,
                        ErrorMsg errmsg);
 
   int array_interpolate_linear(
@@ -422,27 +422,27 @@ int array_integrate_all_trapzd_or_spline(
 		   int radius,
 		   ErrorMsg errmsg);
 
-  int array_trapezoidal_weights(double * __restrict__ x,
+  int array_trapezoidal_weights(double * x,
                                 int n,
-                                double * __restrict__ w_trapz,
+                                double * w_trapz,
                                 ErrorMsg errmsg);
 
-  int array_trapezoidal_mweights(double * __restrict__ x,
+  int array_trapezoidal_mweights(double * x,
                                 int n,
-                                double * __restrict__ w_trapz,
+                                double * w_trapz,
                                 ErrorMsg errmsg);
 
-  int array_trapezoidal_integral(double * __restrict__ integrand,
+  int array_trapezoidal_integral(double * integrand,
                                  int n,
-                                 double * __restrict__ w_trapz,
-                                 double * __restrict__ I,
+                                 double * w_trapz,
+                                 double * I,
                                  ErrorMsg errmsg);
 
-  int array_trapezoidal_convolution(double * __restrict__ integrand1,
-                                    double * __restrict__ integrand2,
+  int array_trapezoidal_convolution(double * integrand1,
+                                    double * integrand2,
                                     int n,
-                                    double * __restrict__ w_trapz,
-                                    double * __restrict__ I,
+                                    double * w_trapz,
+                                    double * I,
                                     ErrorMsg errmsg);
 
 #ifdef __cplusplus

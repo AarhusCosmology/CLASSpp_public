@@ -34,7 +34,7 @@ int gt_add(
   ) {
   long ridx;
   void *res;
-  void *nbuffer;
+  char *nbuffer;
 
   /** - assumes the growTable is correctly initialized */
 
@@ -54,7 +54,7 @@ int gt_add(
 
   if (ridx+sz>self->sz) {
     /** - test -> pass -> ok we need to grow */
-    nbuffer=realloc(self->buffer,self->sz*_GT_FACTOR_);
+    nbuffer=(char *)realloc(self->buffer,self->sz*_GT_FACTOR_);
     class_test(nbuffer==NULL,
 	       self->error_message,
 	       "Cannot grow growTable");

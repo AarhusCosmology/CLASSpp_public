@@ -49,12 +49,7 @@ enum ncdmfa_flags {ncdmfa_off, ncdmfa_on};
 
 //@{
 
-enum tca_method {first_order_MB,first_order_CAMB,first_order_CLASS,second_order_CRS,second_order_CLASS,compromise_CLASS};
-enum rsa_method {rsa_null,rsa_MD,rsa_MD_with_reio,rsa_none};
 enum idr_method {idr_free_streaming,idr_fluid}; /* for the idm-idr case */
-enum rsa_idr_method {rsa_idr_none,rsa_idr_MD};  /* for the idm-idr case */
-enum ufa_method {ufa_mb,ufa_hu,ufa_CLASS,ufa_none};
-enum ncdmfa_method {ncdmfa_mb,ncdmfa_hu,ncdmfa_CLASS,ncdmfa_none};
 enum tensor_methods {tm_photons_only,tm_massless_approximation,tm_exact};
 
 //@}
@@ -117,73 +112,73 @@ struct perturbs
 
   short has_cls; /**< do we need any harmonic space spectrum \f$ C_l \f$ (and hence Bessel functions, transfer functions, ...)? */
 
-  short has_scalars; /**< do we need scalars? */
-  short has_vectors; /**< do we need vectors? */
-  short has_tensors; /**< do we need tensors? */
+  short has_scalars = _TRUE_; /**< do we need scalars? */
+  short has_vectors = _FALSE_; /**< do we need vectors? */
+  short has_tensors = _FALSE_; /**< do we need tensors? */
 
-  short has_ad;      /**< do we need adiabatic mode? */
-  short has_bi;      /**< do we need isocurvature bi mode? */
-  short has_cdi;     /**< do we need isocurvature cdi mode? */
-  short has_nid;     /**< do we need isocurvature nid mode? */
-  short has_niv;     /**< do we need isocurvature niv mode? */
+  short has_ad = _TRUE_;      /**< do we need adiabatic mode? */
+  short has_bi = _FALSE_;      /**< do we need isocurvature bi mode? */
+  short has_cdi = _FALSE_;     /**< do we need isocurvature cdi mode? */
+  short has_nid = _FALSE_;     /**< do we need isocurvature nid mode? */
+  short has_niv = _FALSE_;     /**< do we need isocurvature niv mode? */
 
   /* perturbed recombination */
   /** Do we want to consider perturbed temperature and ionization fraction? */
-  short has_perturbed_recombination;
+  short has_perturbed_recombination = _FALSE_;
   /** Neutrino contribution to tensors */
-  enum tensor_methods tensor_method;  /**< way to treat neutrinos in tensor perturbations(neglect, approximate as massless, take exact equations) */
+  enum tensor_methods tensor_method = tm_massless_approximation;  /**< way to treat neutrinos in tensor perturbations(neglect, approximate as massless, take exact equations) */
 
-  short has_cl_cmb_temperature;       /**< do we need \f$ C_l \f$'s for CMB temperature? */
-  short has_cl_cmb_polarization;      /**< do we need \f$ C_l \f$'s for CMB polarization? */
-  short has_cl_cmb_lensing_potential; /**< do we need \f$ C_l \f$'s for CMB lensing potential? */
-  short has_cl_lensing_potential;     /**< do we need \f$ C_l \f$'s for galaxy lensing potential? */
-  short has_cl_number_count;          /**< do we need \f$ C_l \f$'s for density number count? */
-  short has_pk_matter;                /**< do we need matter Fourier spectrum? */
-  short has_density_transfers;        /**< do we need to output individual matter density transfer functions? */
-  short has_velocity_transfers;       /**< do we need to output individual matter velocity transfer functions? */
-  short has_metricpotential_transfers;/**< do we need to output individual transfer functions for scalar metric perturbations? */
-  short has_Nbody_gauge_transfers;    /**< should we convert density and velocity transfer functions to Nbody gauge? */
+  short has_cl_cmb_temperature = _FALSE_;       /**< do we need \f$ C_l \f$'s for CMB temperature? */
+  short has_cl_cmb_polarization = _FALSE_;      /**< do we need \f$ C_l \f$'s for CMB polarization? */
+  short has_cl_cmb_lensing_potential = _FALSE_; /**< do we need \f$ C_l \f$'s for CMB lensing potential? */
+  short has_cl_lensing_potential = _FALSE_;     /**< do we need \f$ C_l \f$'s for galaxy lensing potential? */
+  short has_cl_number_count = _FALSE_;          /**< do we need \f$ C_l \f$'s for density number count? */
+  short has_pk_matter = _FALSE_;                /**< do we need matter Fourier spectrum? */
+  short has_density_transfers = _FALSE_;        /**< do we need to output individual matter density transfer functions? */
+  short has_velocity_transfers = _FALSE_;       /**< do we need to output individual matter velocity transfer functions? */
+  short has_metricpotential_transfers = _FALSE_;/**< do we need to output individual transfer functions for scalar metric perturbations? */
+  short has_Nbody_gauge_transfers = _FALSE_;    /**< should we convert density and velocity transfer functions to Nbody gauge? */
 
-  short has_nl_corrections_based_on_delta_m;  /**< do we want to compute non-linear corrections with an algorithm relying on delta_m (like halofit)? */
+  short has_nl_corrections_based_on_delta_m = _FALSE_;  /**< do we want to compute non-linear corrections with an algorithm relying on delta_m (like halofit)? */
 
-  short has_nc_density;  /**< in dCl, do we want density terms ? */
-  short has_nc_rsd;      /**< in dCl, do we want redshift space distortion terms ? */
-  short has_nc_lens;     /**< in dCl, do we want lensing terms ? */
-  short has_nc_gr;       /**< in dCl, do we want gravity terms ? */
+  short has_nc_density = _FALSE_;  /**< in dCl, do we want density terms ? */
+  short has_nc_rsd = _FALSE_;      /**< in dCl, do we want redshift space distortion terms ? */
+  short has_nc_lens = _FALSE_;     /**< in dCl, do we want lensing terms ? */
+  short has_nc_gr = _FALSE_;       /**< in dCl, do we want gravity terms ? */
 
-  int l_scalar_max; /**< maximum l value for CMB scalars \f$ C_l \f$'s */
-  int l_vector_max; /**< maximum l value for CMB vectors \f$ C_l \f$'s */
-  int l_tensor_max; /**< maximum l value for CMB tensors \f$ C_l \f$'s */
-  int l_lss_max; /**< maximum l value for LSS \f$ C_l \f$'s (density and lensing potential in  bins) */
-  double k_max_for_pk; /**< maximum value of k in 1/Mpc in P(k) (if \f$ C_l \f$'s also requested, overseeded by value kmax inferred from l_scalar_max if it is bigger) */
+  int l_scalar_max = 2500; /**< maximum l value for CMB scalars \f$ C_l \f$'s */
+  int l_vector_max = 500; /**< maximum l value for CMB vectors \f$ C_l \f$'s */
+  int l_tensor_max = 500; /**< maximum l value for CMB tensors \f$ C_l \f$'s */
+  int l_lss_max = 300; /**< maximum l value for LSS \f$ C_l \f$'s (density and lensing potential in  bins) */
+  double k_max_for_pk = 1.; /**< maximum value of k in 1/Mpc in P(k) (if \f$ C_l \f$'s also requested, overseeded by value kmax inferred from l_scalar_max if it is bigger) */
 
-  int selection_num;                            /**< number of selection functions
+  int selection_num = 1;                            /**< number of selection functions
                                                    (i.e. bins) for matter density \f$ C_l \f$'s */
-  enum selection_type selection;                /**< type of selection functions */
+  enum selection_type selection = gaussian;                /**< type of selection functions */
   double selection_mean[_SELECTION_NUM_MAX_]; /**< centers of selection functions */
   double selection_width[_SELECTION_NUM_MAX_];  /**< widths of selection functions */
 
-  int switch_sw;   /**< in temperature calculation, do we want to include the intrinsic temperature + Sachs Wolfe term? */
-  int switch_eisw; /**< in temperature calculation, do we want to include the early integrated Sachs Wolfe term? */
-  int switch_lisw; /**< in temperature calculation, do we want to include the late integrated Sachs Wolfe term? */
-  int switch_dop;  /**< in temperature calculation, do we want to include the Doppler term? */
-  int switch_pol;  /**< in temperature calculation, do we want to include the polarization-related term? */
-  double eisw_lisw_split_z; /**< at which redshift do we define the cut between eisw and lisw ?*/
+  int switch_sw = 1;   /**< in temperature calculation, do we want to include the intrinsic temperature + Sachs Wolfe term? */
+  int switch_eisw = 1; /**< in temperature calculation, do we want to include the early integrated Sachs Wolfe term? */
+  int switch_lisw = 1; /**< in temperature calculation, do we want to include the late integrated Sachs Wolfe term? */
+  int switch_dop = 1;  /**< in temperature calculation, do we want to include the Doppler term? */
+  int switch_pol = 1;  /**< in temperature calculation, do we want to include the polarization-related term? */
+  double eisw_lisw_split_z = 120; /**< at which redshift do we define the cut between eisw and lisw ?*/
 
-  int store_perturbations;  /**< Do we want to store perturbations? */
-  int k_output_values_num;       /**< Number of perturbation outputs (default=0) */
+  int store_perturbations = _FALSE_;  /**< Do we want to store perturbations? */
+  int k_output_values_num = 0;       /**< Number of perturbation outputs (default=0) */
   double k_output_values[_MAX_NUMBER_OF_K_FILES_];    /**< List of k values where perturbation output is requested. */
 
-  double three_ceff2_ur;/**< 3 x effective squared sound speed for the ultrarelativistic perturbations */
-  double three_cvis2_ur;/**< 3 x effective viscosity parameter for the ultrarelativistic perturbations */
-  double G_eff_ur;
+  double three_ceff2_ur = 1.;/**< 3 x effective squared sound speed for the ultrarelativistic perturbations */
+  double three_cvis2_ur = 1.;/**< 3 x effective viscosity parameter for the ultrarelativistic perturbations */
+  double G_eff_ur = 0.;
 
-  double z_max_pk; /**< when we compute only the matter spectrum / transfer functions, but not the CMB, we are sometimes interested to sample source functions at very high redshift, way before recombination. This z_max_pk will then fix the initial sampling time of the sources. */
+  double z_max_pk = 0.; /**< when we compute only the matter spectrum / transfer functions, but not the CMB, we are sometimes interested to sample source functions at very high redshift, way before recombination. This z_max_pk will then fix the initial sampling time of the sources. */
 
   double * alpha_idm_dr; /**< Angular contribution to collisional term at l>=2 for idm_fr-idr */
   double * beta_idr;  /**< Angular contribution to collisional term at l>=2 for idr-idr */
 
-  int idr_nature; /**< Nature of the interacting dark radiation (free streaming or fluid) */
+  int idr_nature = idr_free_streaming; /**< Nature of the interacting dark radiation (free streaming or fluid) */
 
   //@}
 
@@ -191,7 +186,7 @@ struct perturbs
 
   //@{
 
-  enum possible_gauges gauge; /**< gauge in which to perform this calculation */
+  enum possible_gauges gauge = synchronous; /**< gauge in which to perform this calculation */
 
   //@}
 
@@ -217,7 +212,7 @@ struct perturbs
 
   //@{
 
-  short perturbations_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short perturbations_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 

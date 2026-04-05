@@ -330,7 +330,7 @@ int array_spline(
 
   class_test(n_lines < 3, errmsg, "n_lines=%d, while routine needs n_lines >= 3");
 
-  u = malloc((n_lines-1) * sizeof(double));
+  u = (double *)malloc((n_lines-1) * sizeof(double));
   class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (spline_mode == _SPLINE_NATURAL_) {
@@ -435,7 +435,7 @@ int array_spline_table_line_to_line(
   double dy_first;
   double dy_last;
 
-  u = malloc((n_lines-1) * sizeof(double));
+  u = (double *)malloc((n_lines-1) * sizeof(double));
   class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (spline_mode == _SPLINE_NATURAL_) {
@@ -532,10 +532,10 @@ int array_spline_table_lines(
   double dy_first;
   double dy_last;
 
-  u = malloc((x_size-1) * y_size * sizeof(double));
-  p = malloc(y_size * sizeof(double));
-  qn = malloc(y_size * sizeof(double));
-  un = malloc(y_size * sizeof(double));
+  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
+  p = (double *)malloc(y_size * sizeof(double));
+  qn = (double *)malloc(y_size * sizeof(double));
+  un = (double *)malloc(y_size * sizeof(double));
 
   class_test(u == NULL, errmsg, "Cannot allocate u");
   class_test(p == NULL, errmsg, "Cannot allocate p");
@@ -680,10 +680,10 @@ int array_logspline_table_lines(
   double dy_first;
   double dy_last;
 
-  u = malloc((x_size-1) * y_size * sizeof(double));
-  p = malloc(y_size * sizeof(double));
-  qn = malloc(y_size * sizeof(double));
-  un = malloc(y_size * sizeof(double));
+  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
+  p = (double *)malloc(y_size * sizeof(double));
+  qn = (double *)malloc(y_size * sizeof(double));
+  un = (double *)malloc(y_size * sizeof(double));
   class_test(u == NULL, errmsg, "Cannot allocate u");
   class_test(p == NULL, errmsg, "Cannot allocate p");
   class_test(qn == NULL, errmsg, "Cannot allocate qn");
@@ -828,10 +828,10 @@ int array_spline_table_columns(
   double dy_first;
   double dy_last;
 
-  u = malloc((x_size-1) * y_size * sizeof(double));
-  p = malloc(y_size * sizeof(double));
-  qn = malloc(y_size * sizeof(double));
-  un = malloc(y_size * sizeof(double));
+  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
+  p = (double *)malloc(y_size * sizeof(double));
+  qn = (double *)malloc(y_size * sizeof(double));
+  un = (double *)malloc(y_size * sizeof(double));
   class_test(u == NULL, errmsg, "Cannot allocate u");
   class_test(p == NULL, errmsg, "Cannot allocate p");
   class_test(qn == NULL, errmsg, "Cannot allocate qn");
@@ -985,10 +985,10 @@ int array_spline_table_columns2(
   double dy_first;
   double dy_last;
 
-  u = malloc((x_size-1) * y_size * sizeof(double));
-  p = malloc(y_size * sizeof(double));
-  qn = malloc(y_size * sizeof(double));
-  un = malloc(y_size * sizeof(double));
+  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
+  p = (double *)malloc(y_size * sizeof(double));
+  qn = (double *)malloc(y_size * sizeof(double));
+  un = (double *)malloc(y_size * sizeof(double));
   class_test(u == NULL, errmsg, "Cannot allocate u");
   class_test(p == NULL, errmsg, "Cannot allocate p");
   class_test(qn == NULL, errmsg, "Cannot allocate qn");
@@ -1112,7 +1112,7 @@ int array_spline_table_one_column(
   double dy_first;
   double dy_last;
 
-  u = malloc((x_size-1) * sizeof(double));
+  u = (double *)malloc((x_size-1) * sizeof(double));
   class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
@@ -1242,7 +1242,7 @@ int array_logspline_table_one_column(
   double dy_first;
   double dy_last;
 
-  u = malloc((x_stop-1) * sizeof(double));
+  u = (double *)malloc((x_stop-1) * sizeof(double));
   class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
@@ -1563,14 +1563,14 @@ int array_interpolate(
   * Called by background_at_eta(); background_eta_of_z(); background_solve(); thermodynamics_at_z().
   */
 int array_interpolate_spline(
-                             double * __restrict__ x_array,
+                             double * x_array,
                              int n_lines,
-                             double * __restrict__ array,
-                             double * __restrict__ array_splined,
+                             double * array,
+                             double * array_splined,
                              int n_columns,
                              double x,
-                             int * __restrict__ last_index,
-                             double * __restrict__ result,
+                             int * last_index,
+                             double * result,
                              int result_size, /** from 1 to n_columns */
                              ErrorMsg errmsg) {
 
@@ -1635,9 +1635,9 @@ int array_interpolate_spline(
   */
 int array_search_bisect(
                         int n_lines,
-                        double * __restrict__ array,
+                        double * array,
                         double c,
-                        int * __restrict__ last_index,
+                        int * last_index,
                         ErrorMsg errmsg) {
 
   int inf,sup,mid;
@@ -2661,7 +2661,7 @@ int array_smooth_trg(double * array,
   double weigth;
   double *coeff;
 
-  smooth=malloc(k_size*sizeof(double));
+  smooth=(double *)malloc(k_size*sizeof(double));
   class_test(smooth == NULL, errmsg, "Cannot allocate smooth");
 
   class_calloc(coeff,2*radius+1,sizeof(double),errmsg);
@@ -2787,7 +2787,7 @@ int array_smooth(double * array,
   int i,j,jmin,jmax;
   double weigth;
 
-  smooth=malloc(n_lines*sizeof(double));
+  smooth=(double *)malloc(n_lines*sizeof(double));
   class_test(smooth == NULL, errmsg, "Cannot allocate smooth");
 
   for (i=0; i<n_lines; i++) {
@@ -2821,9 +2821,9 @@ int array_smooth(double * array,
  */
 
 int array_trapezoidal_weights(
-                              double * __restrict__ x,
+                              double * x,
                               int n,
-                              double * __restrict__ w_trapz,
+                              double * w_trapz,
                               ErrorMsg errmsg
                               ) {
   int i;
@@ -2854,9 +2854,9 @@ int array_trapezoidal_weights(
  */
 
 int array_trapezoidal_mweights(
-                              double * __restrict__ x,
+                              double * x,
                               int n,
-                              double * __restrict__ w_trapz,
+                              double * w_trapz,
                               ErrorMsg errmsg
                               ) {
   int i;
@@ -2888,10 +2888,10 @@ int array_trapezoidal_mweights(
  */
 
 int array_trapezoidal_integral(
-                                  double * __restrict__ integrand,
+                                  double * integrand,
                                   int n,
-                                  double * __restrict__ w_trapz,
-                                  double * __restrict__ I,
+                                  double * w_trapz,
+                                  double * I,
                                   ErrorMsg errmsg
                                   ) {
   int i;
@@ -2915,11 +2915,11 @@ int array_trapezoidal_integral(
  */
 
 int array_trapezoidal_convolution(
-                                     double * __restrict__ integrand1,
-                                     double * __restrict__ integrand2,
+                                     double * integrand1,
+                                     double * integrand2,
                                      int n,
-                                     double * __restrict__ w_trapz,
-                                     double * __restrict__ I,
+                                     double * w_trapz,
+                                     double * I,
                                      ErrorMsg errmsg
                                      ) {
   int i;

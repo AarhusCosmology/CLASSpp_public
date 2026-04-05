@@ -23,7 +23,7 @@ struct lensing {
 
   //@{
 
-  short has_lensed_cls; /**< do we need to compute lensed \f$ C_l\f$'s at all ? */
+  short has_lensed_cls = _FALSE_; /**< do we need to compute lensed \f$ C_l\f$'s at all ? */
 
   //@}
 
@@ -31,7 +31,7 @@ struct lensing {
 
   //@{
 
-  short lensing_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short lensing_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 };

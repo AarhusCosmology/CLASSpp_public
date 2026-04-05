@@ -521,35 +521,22 @@ int InputModule::input_init() {
 
 }
 int InputModule::input_read_precisions() {
-  FileContent* pfc = &file_content_;
   precision* ppr = &precision_;
-  char* errmsg = error_message_;
-  int int1;
   int flag1;
-  double param1;
-  char string1[_ARGUMENT_LENGTH_MAX_];
 
-  class_call(parser_read_string(pfc, "class_dir", &(ppr->class_dir), &flag1, error_message_),
+  class_call(parser_read_string(&file_content_, "class_dir", &(ppr->class_dir), &flag1, error_message_),
              error_message_, error_message_);
   if (flag1 == _FALSE_) {
     strncpy(ppr->class_dir, __CLASSDIR__, _ARGUMENT_LENGTH_MAX_);
   }
-  /** - set all precision parameters to default values */
 
-  /**
-   * Declare initial params to read into
-   * */
+  /** - set string parameter defaults (require runtime path concatenation) */
   class_call(input_default_precision(),
-             errmsg,
-             errmsg);
+             error_message_,
+             error_message_);
 
-  /**
-   * Parse all precision parameters
-   * */
-
-#define __PARSE_PRECISION_PARAMETER__
-#include "precisions.h"
-#undef __PARSE_PRECISION_PARAMETER__
+  /** - parse all precision parameters from config file */
+  ppr->parse(file_content_);
 
   return _SUCCESS_;
 }
@@ -3240,21 +3227,17 @@ int InputModule::input_read_parameters() {
 
 int InputModule::input_default_params() {
   background* pba = &background_;    /* for cosmological background */
-  thermo* pth = &thermodynamics_;    /* for thermodynamics */
-  perturbs* ppt = &perturbations_;   /* for source functions */
   primordial* ppm = &primordial_;    /* for primordial spectra */
-  nonlinear* pnl = &nonlinear_;      /* for non-linear spectra */
   transfers* ptr = &transfers_;      /* for transfer functions */
   spectra* psp = &spectra_;          /* for output spectra */
-  lensing* ple = &lensing_;          /* for lensed spectra */
   output* pop = &output_;
 
-  double sigma_B; /* Stefan-Boltzmann constant in \f$ W/m^2/K^4 = Kg/K^4/s^3 \f$*/
+  double sigma_B = 2. * pow(_PI_,5) * pow(_k_B_,4) / 15. / pow(_h_P_,3) / pow(_c_,2);
 
-  sigma_B = 2. * pow(_PI_,5) * pow(_k_B_,4) / 15. / pow(_h_P_,3) / pow(_c_,2);
+  /** Define computed default parameter values that depend on other defaults.
+      Simple constant defaults are now set as in-struct default member initializers. */
 
-  /** Define all default parameter values (for input parameters) for each structure:*/
-  /** - background structure */
+  /** - background structure: computed defaults */
 
   /* 5.10.2014: default parameters matched to Planck 2013 + WP
      best-fitting model, with ones small difference: the published
@@ -3271,292 +3254,31 @@ int InputModule::input_default_params() {
      other parameters from the Planck2013 Cosmological Parameter
      paper. */
 
-  pba->h = 0.67556;
   pba->H0 = pba->h * 1.e5 / _c_;
-  pba->T_cmb = 2.7255;
   pba->Omega0_g = (4.*sigma_B/_c_*pow(pba->T_cmb,4.)) / (3.*_c_*_c_*1.e10*pba->h*pba->h/_Mpc_over_m_/_Mpc_over_m_/8./_PI_/_G_);
   pba->Omega0_ur = 3.046*7./8.*pow(4./11.,4./3.)*pba->Omega0_g;
-  pba->Omega0_idr = 0.0;
-  pba->Omega0_idm_dr = 0.0;
-  pba->T_idr = 0.0;
   pba->Omega0_b = 0.022032/pow(pba->h,2);
   pba->Omega0_cdm = 0.12038/pow(pba->h,2);
-  pba->Omega0_dcdmdr = 0.0;
-  pba->Gamma_dcdm = 0.0;
-  pba->N_ncdm = 0;
-  pba->Omega0_ncdm_tot = 0.;
-
-  pba->Omega0_scf = 0.; /* Scalar field defaults */
-  pba->attractor_ic_scf = _TRUE_;
-  pba->scf_tuning_index = 0;
-  //MZ: initial conditions are as multiplicative factors of the radiation attractor values
-  pba->phi_ini_scf = 1;
-  pba->phi_prime_ini_scf = 1;
-
-  pba->Omega0_k = 0.;
-  pba->K = 0.;
-  pba->sgnK = 0;
   pba->Omega0_lambda = 1.-pba->Omega0_k-pba->Omega0_g-pba->Omega0_ur-pba->Omega0_b-pba->Omega0_cdm-pba->Omega0_ncdm_tot-pba->Omega0_dcdmdr-pba->Omega0_idm_dr-pba->Omega0_idr;
-  pba->Omega0_fld = 0.;
-  pba->a_today = 1.;
-  pba->use_ppf = _TRUE_;
-  pba->c_gamma_over_c_fld = 0.4;
-  pba->fluid_equation_of_state = CLP;
-  pba->w0_fld = -1.;
-  pba->wa_fld = 0.;
-  pba->Omega_EDE = 0.;
-  pba->cs2_fld = 1.;
 
-  pba->Omega0_idm_drmd = 0.; // DRMD defaults
-  pba->Omega0_idr_drmd = 0.;
-  pba->z_stop = 0.;
-  pba->G_over_aH_drmd = 0.;
-  pba->delta_Neff_drmd = 0.;
-  pba->f_idm_drmd = 0.;
+  /** - primordial structure: computed defaults */
 
-  pba->background_method = bgevo_evolver;
-
-
- 
-
-  /** - thermodynamics structure */
-
-  pth->YHe=_BBN_;
-  pth->recombination=recfast;
-  pth->reio_parametrization=reio_camb;
-  pth->reio_z_or_tau=reio_z;
-  pth->z_reio=11.357;
-  pth->tau_reio=0.0925;
-  pth->reionization_exponent=1.5;
-  pth->reionization_width=0.5;
-  pth->helium_fullreio_redshift=3.5;
-  pth->helium_fullreio_width=0.5;
-
-  pth->binned_reio_num=0;
-  pth->binned_reio_z=NULL;
-  pth->binned_reio_xe=NULL;
-  pth->binned_reio_step_sharpness = 0.3;
-
-  pth->annihilation = 0.;
-  pth->decay = 0.;
-
-  pth->annihilation_variation = 0.;
-  pth->annihilation_z = 1000.;
-  pth->annihilation_zmax = 2500.;
-  pth->annihilation_zmin = 30.;
-  pth->annihilation_f_halo = 0.;
-  pth->annihilation_z_halo = 30.;
-  pth->has_on_the_spot = _TRUE_;
-
-  pth->compute_cb2_derivatives=_FALSE_;
-
-  pth->compute_damping_scale = _FALSE_;
-
-  pth->a_idm_dr = 0.;
-  pth->b_idr = 0.;
-  pth->nindex_idm_dr = 4.;
-  pth->m_idm = 1.e11;
-
-  /** - perturbation structure */
-
-  ppt->has_cl_cmb_temperature = _FALSE_;
-  ppt->has_cl_cmb_polarization = _FALSE_;
-  ppt->has_cl_cmb_lensing_potential = _FALSE_;
-  ppt->has_cl_number_count = _FALSE_;
-  ppt->has_cl_lensing_potential = _FALSE_;
-  ppt->has_pk_matter = _FALSE_;
-  ppt->has_density_transfers = _FALSE_;
-  ppt->has_velocity_transfers = _FALSE_;
-  ppt->has_metricpotential_transfers = _FALSE_;
-
-  ppt->has_nl_corrections_based_on_delta_m = _FALSE_;
-
-  ppt->has_nc_density = _FALSE_;
-  ppt->has_nc_rsd = _FALSE_;
-  ppt->has_nc_lens = _FALSE_;
-  ppt->has_nc_gr = _FALSE_;
-
-  //ppt->pk_only_cdm_bar=_FALSE_;
-
-  ppt->switch_sw = 1;
-  ppt->switch_eisw = 1;
-  ppt->switch_lisw = 1;
-  ppt->switch_dop = 1;
-  ppt->switch_pol = 1;
-  ppt->eisw_lisw_split_z = 120;
-
-  ppt->has_ad=_TRUE_;
-  ppt->has_bi=_FALSE_;
-  ppt->has_cdi=_FALSE_;
-  ppt->has_nid=_FALSE_;
-  ppt->has_niv=_FALSE_;
-
-  ppt->has_perturbed_recombination=_FALSE_;
-  ppt->tensor_method = tm_massless_approximation;
-
-  ppt->has_scalars=_TRUE_;
-  ppt->has_vectors=_FALSE_;
-  ppt->has_tensors=_FALSE_;
-
-  ppt->l_scalar_max=2500;
-  ppt->l_vector_max=500;
-  ppt->l_tensor_max=500;
-  ppt->l_lss_max=300;
-  ppt->k_max_for_pk=1.;
-
-  ppt->gauge=synchronous;
-
-  ppt->idr_nature=idr_free_streaming;
-
-  ppt->has_Nbody_gauge_transfers = _FALSE_;
-
-  ppt->k_output_values_num=0;
-  ppt->store_perturbations = _FALSE_;
-
-  ppt->three_ceff2_ur=1.;
-  ppt->three_cvis2_ur=1.;
-  ppt->G_eff_ur=0.;
-
-  ppt->z_max_pk=0.;
-
-  ppt->selection_num=1;
-  ppt->selection=gaussian;
-  ppt->selection_mean[0]=1.;
-  ppt->selection_width[0]=0.1;
-
-  /** - primordial structure */
-
-  ppm->primordial_spec_type = analytic_Pk;
-  ppm->k_pivot = 0.05;
-  ppm->A_s = 2.215e-9;
-  ppm->n_s = 0.9619;
-  ppm->alpha_s = 0.;
-  ppm->f_bi = 1.;
-  ppm->n_bi = 1.;
-  ppm->alpha_bi = 0.;
-  ppm->f_cdi = 1.;
-  ppm->n_cdi = 1.;
-  ppm->alpha_cdi = 0.;
-  ppm->f_nid = 1.;
-  ppm->n_nid = 1.;
-  ppm->alpha_nid = 0.;
-  ppm->f_niv = 1.;
-  ppm->n_niv = 1.;
-  ppm->alpha_niv = 0.;
-  ppm->c_ad_bi = 0.;
-  ppm->n_ad_bi = 0.;
-  ppm->alpha_ad_bi = 0.;
-  ppm->c_ad_cdi = 0.;
-  ppm->n_ad_cdi = 0.;
-  ppm->alpha_ad_cdi = 0.;
-  ppm->c_ad_nid = 0.;
-  ppm->n_ad_nid = 0.;
-  ppm->alpha_ad_nid = 0.;
-  ppm->c_ad_niv = 0.;
-  ppm->n_ad_niv = 0.;
-  ppm->alpha_ad_niv = 0.;
-  ppm->c_bi_cdi = 0.;
-  ppm->n_bi_cdi = 0.;
-  ppm->alpha_bi_cdi = 0.;
-  ppm->c_bi_nid = 0.;
-  ppm->n_bi_nid = 0.;
-  ppm->alpha_bi_nid = 0.;
-  ppm->c_bi_niv = 0.;
-  ppm->n_bi_niv = 0.;
-  ppm->alpha_bi_niv = 0.;
-  ppm->c_cdi_nid = 0.;
-  ppm->n_cdi_nid = 0.;
-  ppm->alpha_cdi_nid = 0.;
-  ppm->c_cdi_niv = 0.;
-  ppm->n_cdi_niv = 0.;
-  ppm->alpha_cdi_niv = 0.;
-  ppm->c_nid_niv = 0.;
-  ppm->n_nid_niv = 0.;
-  ppm->alpha_nid_niv = 0.;
-  ppm->r = 1.;
   ppm->n_t = -ppm->r/8.*(2.-ppm->r/8.-ppm->n_s);
   ppm->alpha_t = ppm->r/8.*(ppm->r/8.+ppm->n_s-1.);
-  ppm->potential=polynomial;
-  ppm->phi_end=0.;
-  ppm->phi_pivot_method = N_star;
-  ppm->phi_pivot_target = 60;
-  ppm->V0=1.25e-13;
-  ppm->V1=-1.12e-14;
-  ppm->V2=-6.95e-14;
-  ppm->V3=0.;
-  ppm->V4=0.;
-  ppm->H0=3.69e-6;
-  ppm->H1=-5.84e-7;
-  ppm->H2=0.;
-  ppm->H3=0.;
-  ppm->H4=0.;
-  ppm->behavior=numerical;
-  ppm->command=nullptr;
-  ppm->custom1=0.;
-  ppm->custom2=0.;
-  ppm->custom3=0.;
-  ppm->custom4=0.;
-  ppm->custom5=0.;
-  ppm->custom6=0.;
-  ppm->custom7=0.;
-  ppm->custom8=0.;
-  ppm->custom9=0.;
-  ppm->custom10=0.;
-  ppm->sigma8=0.;
-  
-  /** - nonlinear structure */
-  pnl->method = nl_none;
-  pnl->extrapolation_method = extrap_max_scaled;
-  pnl->has_pk_eq = _FALSE_;
 
-  pnl->feedback = nl_emu_dmonly;
-  pnl->z_infinity = 10.;
-
-  /** - transfer structure */
+  /** - transfer structure: array element defaults */
 
   ptr->selection_bias[0]=1.;
   ptr->selection_magnification_bias[0]=0.;
-  ptr->lcmb_rescale=1.;
-  ptr->lcmb_pivot=0.1;
-  ptr->lcmb_tilt=0.;
-  ptr->initialise_HIS_cache=_FALSE_;
-  ptr->has_nz_analytic = _FALSE_;
-  ptr->has_nz_file = _FALSE_;
-  ptr->has_nz_evo_analytic = _FALSE_;
-  ptr->has_nz_evo_file = _FALSE_;
 
-  /** - spectra structure */
+  /** - spectra structure: computed default */
 
   psp->z_max_pk = pop->z_pk[0];
-  psp->non_diag=0;
 
-  /** - lensing structure */
+  /** - perturbation structure: array element defaults */
 
-  ple->has_lensed_cls = _FALSE_;
-
-  /** - output structure */
-
-  pop->z_pk_num = 1;
-  pop->z_pk[0] = 0.;
-  snprintf(pop->root, _FILENAMESIZE_-32, "output/");
-  pop->write_header = _TRUE_;
-  pop->output_format = class_format;
-  pop->write_background = _FALSE_;
-  pop->write_thermodynamics = _FALSE_;
-  pop->write_perturbations = _FALSE_;
-  pop->write_primordial = _FALSE_;
-
-  /** - all verbose parameters */
-
-  pba->background_verbose = 0;
-  pth->thermodynamics_verbose = 0;
-  ppt->perturbations_verbose = 0;
-  ptr->transfer_verbose = 0;
-  ppm->primordial_verbose = 0;
-  psp->spectra_verbose = 0;
-  pnl->nonlinear_verbose = 0;
-  ple->lensing_verbose = 0;
-  pop->output_verbose = 0;
+  perturbations_.selection_mean[0]=1.;
+  perturbations_.selection_width[0]=0.1;
 
   return _SUCCESS_;
 
@@ -3576,22 +3298,238 @@ int InputModule::input_default_precision () {
 
   precision* ppr = &precision_;      /* for precision parameters */
 
-  /**
-   * - automatic estimate of machine precision
-   */
-  ppr->smallest_allowed_variation=DBL_EPSILON;
+  /** Numeric and type precision parameters now have in-struct defaults
+      (via precisions.h macros). Only string parameters need runtime
+      path concatenation with class_dir. */
 
   class_test(ppr->smallest_allowed_variation < 0,
              ppr->error_message,
              "smallest_allowed_variation = %e < 0",ppr->smallest_allowed_variation);
 
+  /* String parameters require runtime path concatenation */
+  strncpy(ppr->sBBN_file, ppr->class_dir, sizeof(ppr->sBBN_file));
+  strcat(ppr->sBBN_file, "/bbn/sBBN_2017.dat");
 
-#define __ASSIGN_DEFAULT_PRECISION__
-#include "precisions.h"
-#undef __ASSIGN_DEFAULT_PRECISION__
+  strncpy(ppr->hyrec_Alpha_inf_file, ppr->class_dir, sizeof(ppr->hyrec_Alpha_inf_file));
+  strcat(ppr->hyrec_Alpha_inf_file, "/hyrec/Alpha_inf.dat");
+
+  strncpy(ppr->hyrec_R_inf_file, ppr->class_dir, sizeof(ppr->hyrec_R_inf_file));
+  strcat(ppr->hyrec_R_inf_file, "/hyrec/R_inf.dat");
+
+  strncpy(ppr->hyrec_two_photon_tables_file, ppr->class_dir, sizeof(ppr->hyrec_two_photon_tables_file));
+  strcat(ppr->hyrec_two_photon_tables_file, "/hyrec/two_photon_tables.dat");
 
   return _SUCCESS_;
 
+}
+
+/** Overloaded helpers for type-dispatched precision parameter reading. */
+namespace {
+void read(const FileContent& fc, const char* name, double& v) { fc.read_double(name, v); }
+void read(const FileContent& fc, const char* name, int& v) { fc.read_int(name, v); }
+void read(const FileContent& fc, const char* name, FileName& v) {
+  std::string s;
+  if (fc.read_string(name, s))
+    strncpy(v, s.c_str(), sizeof(FileName) - 1);
+}
+template<typename E>
+void read_enum(const FileContent& fc, const char* name, E& v) {
+  int tmp;
+  if (fc.read_int(name, tmp))
+    v = static_cast<E>(tmp);
+}
+} // anonymous namespace
+
+void precision::parse(const FileContent& fc) {
+  /* Background */
+  read(fc, "a_ini_over_a_today_default", a_ini_over_a_today_default);
+  read(fc, "back_integration_stepsize", back_integration_stepsize);
+  read(fc, "tol_background_integration", tol_background_integration);
+  read(fc, "tol_initial_Omega_r", tol_initial_Omega_r);
+  read(fc, "tol_M_ncdm", tol_M_ncdm);
+  read(fc, "tol_ncdm", tol_ncdm);
+  read(fc, "tol_ncdm_synchronous", tol_ncdm_synchronous);
+  read(fc, "tol_ncdm_newtonian", tol_ncdm_newtonian);
+  read(fc, "tol_ncdm_bg", tol_ncdm_bg);
+  read(fc, "tol_ncdm_initial_w", tol_ncdm_initial_w);
+  read(fc, "tol_tau_eq", tol_tau_eq);
+  read(fc, "Omega0_cdm_min_synchronous", Omega0_cdm_min_synchronous);
+  read(fc, "sBBN file", sBBN_file);
+
+  /* Thermodynamics */
+  read(fc, "recfast_z_initial", recfast_z_initial);
+  read(fc, "recfast_Nz0", recfast_Nz0);
+  read(fc, "thermo_z_initial_idm_dr", thermo_z_initial_idm_dr);
+  read(fc, "thermo_Nz1_idm_dr", thermo_Nz1_idm_dr);
+  read(fc, "thermo_Nz2_idm_dr", thermo_Nz2_idm_dr);
+  read(fc, "tol_thermo_integration", tol_thermo_integration);
+  read(fc, "recfast_Heswitch", recfast_Heswitch);
+  read(fc, "recfast_fudge_He", recfast_fudge_He);
+  read(fc, "recfast_Hswitch", recfast_Hswitch);
+  read(fc, "recfast_fudge_H", recfast_fudge_H);
+  read(fc, "recfast_delta_fudge_H", recfast_delta_fudge_H);
+  read(fc, "recfast_AGauss1", recfast_AGauss1);
+  read(fc, "recfast_AGauss2", recfast_AGauss2);
+  read(fc, "recfast_zGauss1", recfast_zGauss1);
+  read(fc, "recfast_zGauss2", recfast_zGauss2);
+  read(fc, "recfast_wGauss1", recfast_wGauss1);
+  read(fc, "recfast_wGauss2", recfast_wGauss2);
+  read(fc, "recfast_z_He_1", recfast_z_He_1);
+  read(fc, "recfast_delta_z_He_1", recfast_delta_z_He_1);
+  read(fc, "recfast_z_He_2", recfast_z_He_2);
+  read(fc, "recfast_delta_z_He_2", recfast_delta_z_He_2);
+  read(fc, "recfast_z_He_3", recfast_z_He_3);
+  read(fc, "recfast_delta_z_He_3", recfast_delta_z_He_3);
+  read(fc, "recfast_x_He0_trigger", recfast_x_He0_trigger);
+  read(fc, "recfast_x_He0_trigger2", recfast_x_He0_trigger2);
+  read(fc, "recfast_x_He0_trigger_delta", recfast_x_He0_trigger_delta);
+  read(fc, "recfast_x_H0_trigger", recfast_x_H0_trigger);
+  read(fc, "recfast_x_H0_trigger2", recfast_x_H0_trigger2);
+  read(fc, "recfast_x_H0_trigger_delta", recfast_x_H0_trigger_delta);
+  read(fc, "recfast_H_frac", recfast_H_frac);
+  read(fc, "reionization_z_start_max", reionization_z_start_max);
+  read(fc, "reionization_sampling", reionization_sampling);
+  read(fc, "reionization_optical_depth_tol", reionization_optical_depth_tol);
+  read(fc, "reionization_start_factor", reionization_start_factor);
+  read(fc, "thermo_rate_smoothing_radius", thermo_rate_smoothing_radius);
+  read(fc, "Alpha_inf hyrec file", hyrec_Alpha_inf_file);
+  read(fc, "R_inf hyrec file", hyrec_R_inf_file);
+  read(fc, "two_photon_tables hyrec file", hyrec_two_photon_tables_file);
+
+  /* Perturbations */
+  read(fc, "k_min_tau0", k_min_tau0);
+  read(fc, "k_max_tau0_over_l_max", k_max_tau0_over_l_max);
+  read(fc, "k_step_sub", k_step_sub);
+  read(fc, "k_step_super", k_step_super);
+  read(fc, "k_step_transition", k_step_transition);
+  read(fc, "k_step_super_reduction", k_step_super_reduction);
+  read(fc, "k_per_decade_for_pk", k_per_decade_for_pk);
+  read(fc, "idmdr_boost_k_per_decade_for_pk", idmdr_boost_k_per_decade_for_pk);
+  read(fc, "k_per_decade_for_bao", k_per_decade_for_bao);
+  read(fc, "k_bao_center", k_bao_center);
+  read(fc, "k_bao_width", k_bao_width);
+  read(fc, "start_small_k_at_tau_c_over_tau_h", start_small_k_at_tau_c_over_tau_h);
+  read(fc, "start_large_k_at_tau_h_over_tau_k", start_large_k_at_tau_h_over_tau_k);
+  read(fc, "tight_coupling_trigger_tau_c_over_tau_h", tight_coupling_trigger_tau_c_over_tau_h);
+  read(fc, "tight_coupling_trigger_tau_c_over_tau_k", tight_coupling_trigger_tau_c_over_tau_k);
+  read(fc, "start_sources_at_tau_c_over_tau_h", start_sources_at_tau_c_over_tau_h);
+  read(fc, "tight_coupling_approximation", tight_coupling_approximation);
+  read(fc, "idm_dr_tight_coupling_trigger_tau_c_over_tau_k", idm_dr_tight_coupling_trigger_tau_c_over_tau_k);
+  read(fc, "idm_dr_tight_coupling_trigger_tau_c_over_tau_h", idm_dr_tight_coupling_trigger_tau_c_over_tau_h);
+  read(fc, "idm_drmd_tight_coupling_trigger_G_over_aH", idm_drmd_tight_coupling_trigger_G_over_aH);
+  read(fc, "l_max_g", l_max_g);
+  read(fc, "l_max_pol_g", l_max_pol_g);
+  read(fc, "l_max_dr", l_max_dr);
+  read(fc, "l_max_dr_col", l_max_dr_col);
+  read(fc, "l_max_ur", l_max_ur);
+  read(fc, "l_max_idr", l_max_idr);
+  read(fc, "l_max_ncdm", l_max_ncdm);
+  read(fc, "l_max_g_ten", l_max_g_ten);
+  read(fc, "l_max_pol_g_ten", l_max_pol_g_ten);
+  read(fc, "curvature_ini", curvature_ini);
+  read(fc, "entropy_ini", entropy_ini);
+  read(fc, "gw_ini", gw_ini);
+  read(fc, "perturb_integration_stepsize", perturb_integration_stepsize);
+  read(fc, "perturb_sampling_stepsize", perturb_sampling_stepsize);
+  read(fc, "tol_perturb_integration", tol_perturb_integration);
+  read(fc, "c_gamma_k_H_square_max", c_gamma_k_H_square_max);
+  read(fc, "tol_tau_approx", tol_tau_approx);
+  read(fc, "radiation_streaming_approximation", radiation_streaming_approximation);
+  read(fc, "radiation_streaming_trigger_tau_over_tau_k", radiation_streaming_trigger_tau_over_tau_k);
+  read(fc, "radiation_streaming_trigger_tau_c_over_tau", radiation_streaming_trigger_tau_c_over_tau);
+  read(fc, "idr_streaming_approximation", idr_streaming_approximation);
+  read(fc, "idr_streaming_trigger_tau_over_tau_k", idr_streaming_trigger_tau_over_tau_k);
+  read(fc, "idr_streaming_trigger_tau_c_over_tau", idr_streaming_trigger_tau_c_over_tau);
+  read(fc, "ur_fluid_approximation", ur_fluid_approximation);
+  read(fc, "ur_fluid_trigger_tau_over_tau_k", ur_fluid_trigger_tau_over_tau_k);
+  read(fc, "ncdm_fluid_approximation", ncdm_fluid_approximation);
+  read(fc, "ncdm_fluid_trigger_tau_over_tau_k", ncdm_fluid_trigger_tau_over_tau_k);
+  read(fc, "neglect_CMB_sources_below_visibility", neglect_CMB_sources_below_visibility);
+  read_enum(fc, "evolver", evolver);
+
+  /* Primordial */
+  read(fc, "k_per_decade_primordial", k_per_decade_primordial);
+  read(fc, "primordial_inflation_ratio_min", primordial_inflation_ratio_min);
+  read(fc, "primordial_inflation_ratio_max", primordial_inflation_ratio_max);
+  read(fc, "primordial_inflation_phi_ini_maxit", primordial_inflation_phi_ini_maxit);
+  read(fc, "primordial_inflation_pt_stepsize", primordial_inflation_pt_stepsize);
+  read(fc, "primordial_inflation_bg_stepsize", primordial_inflation_bg_stepsize);
+  read(fc, "primordial_inflation_tol_integration", primordial_inflation_tol_integration);
+  read(fc, "primordial_inflation_attractor_precision_pivot", primordial_inflation_attractor_precision_pivot);
+  read(fc, "primordial_inflation_attractor_precision_initial", primordial_inflation_attractor_precision_initial);
+  read(fc, "primordial_inflation_attractor_maxit", primordial_inflation_attractor_maxit);
+  read(fc, "primordial_inflation_tol_curvature", primordial_inflation_tol_curvature);
+  read(fc, "primordial_inflation_aH_ini_target", primordial_inflation_aH_ini_target);
+  read(fc, "primordial_inflation_end_dphi", primordial_inflation_end_dphi);
+  read(fc, "primordial_inflation_end_logstep", primordial_inflation_end_logstep);
+  read(fc, "primordial_inflation_small_epsilon", primordial_inflation_small_epsilon);
+  read(fc, "primordial_inflation_small_epsilon_tol", primordial_inflation_small_epsilon_tol);
+  read(fc, "primordial_inflation_extra_efolds", primordial_inflation_extra_efolds);
+
+  /* Transfer */
+  read(fc, "l_linstep", l_linstep);
+  read(fc, "l_logstep", l_logstep);
+  read(fc, "hyper_x_min", hyper_x_min);
+  read(fc, "hyper_sampling_flat", hyper_sampling_flat);
+  read(fc, "hyper_sampling_curved_low_nu", hyper_sampling_curved_low_nu);
+  read(fc, "hyper_sampling_curved_high_nu", hyper_sampling_curved_high_nu);
+  read(fc, "hyper_nu_sampling_step", hyper_nu_sampling_step);
+  read(fc, "hyper_phi_min_abs", hyper_phi_min_abs);
+  read(fc, "hyper_x_tol", hyper_x_tol);
+  read(fc, "hyper_flat_approximation_nu", hyper_flat_approximation_nu);
+  read(fc, "q_linstep", q_linstep);
+  read(fc, "q_logstep_spline", q_logstep_spline);
+  read(fc, "q_logstep_open", q_logstep_open);
+  read(fc, "q_logstep_trapzd", q_logstep_trapzd);
+  read(fc, "q_numstep_transition", q_numstep_transition);
+  read(fc, "transfer_neglect_delta_k_S_t0", transfer_neglect_delta_k_S_t0);
+  read(fc, "transfer_neglect_delta_k_S_t1", transfer_neglect_delta_k_S_t1);
+  read(fc, "transfer_neglect_delta_k_S_t2", transfer_neglect_delta_k_S_t2);
+  read(fc, "transfer_neglect_delta_k_S_e", transfer_neglect_delta_k_S_e);
+  read(fc, "transfer_neglect_delta_k_V_t1", transfer_neglect_delta_k_V_t1);
+  read(fc, "transfer_neglect_delta_k_V_t2", transfer_neglect_delta_k_V_t2);
+  read(fc, "transfer_neglect_delta_k_V_e", transfer_neglect_delta_k_V_e);
+  read(fc, "transfer_neglect_delta_k_V_b", transfer_neglect_delta_k_V_b);
+  read(fc, "transfer_neglect_delta_k_T_t2", transfer_neglect_delta_k_T_t2);
+  read(fc, "transfer_neglect_delta_k_T_e", transfer_neglect_delta_k_T_e);
+  read(fc, "transfer_neglect_delta_k_T_b", transfer_neglect_delta_k_T_b);
+  read(fc, "transfer_neglect_late_source", transfer_neglect_late_source);
+  read(fc, "l_switch_limber", l_switch_limber);
+  read(fc, "l_switch_limber_for_nc_local_over_z", l_switch_limber_for_nc_local_over_z);
+  read(fc, "l_switch_limber_for_nc_los_over_z", l_switch_limber_for_nc_los_over_z);
+  read(fc, "selection_cut_at_sigma", selection_cut_at_sigma);
+  read(fc, "selection_sampling", selection_sampling);
+  read(fc, "selection_sampling_bessel", selection_sampling_bessel);
+  read(fc, "selection_sampling_bessel_los", selection_sampling_bessel_los);
+  read(fc, "selection_tophat_edge", selection_tophat_edge);
+
+  /* Nonlinear */
+  read(fc, "sigma_k_per_decade", sigma_k_per_decade);
+  read(fc, "nonlinear_min_k_max", nonlinear_min_k_max);
+  read(fc, "halofit_min_k_nonlinear", halofit_min_k_nonlinear);
+  read(fc, "halofit_min_k_max", halofit_min_k_max);
+  read(fc, "halofit_k_per_decade", halofit_k_per_decade);
+  read(fc, "halofit_sigma_precision", halofit_sigma_precision);
+  read(fc, "halofit_tol_sigma", halofit_tol_sigma);
+  read(fc, "pk_eq_z_max", pk_eq_z_max);
+  read(fc, "pk_eq_tol", pk_eq_tol);
+  read(fc, "hmcode_max_k_extra", hmcode_max_k_extra);
+  read(fc, "hmcode_min_k_max", hmcode_min_k_max);
+  read(fc, "hmcode_tol_sigma", hmcode_tol_sigma);
+  read(fc, "n_hmcode_tables", n_hmcode_tables);
+  read(fc, "rmin_for_sigtab", rmin_for_sigtab);
+  read(fc, "rmax_for_sigtab", rmax_for_sigtab);
+  read(fc, "ainit_for_growtab", ainit_for_growtab);
+  read(fc, "amax_for_growtab", amax_for_growtab);
+  read(fc, "nsteps_for_p1h_integral", nsteps_for_p1h_integral);
+  read(fc, "mmin_for_p1h_integral", mmin_for_p1h_integral);
+  read(fc, "mmax_for_p1h_integral", mmax_for_p1h_integral);
+
+  /* Lensing */
+  read(fc, "accurate_lensing", accurate_lensing);
+  read(fc, "num_mu_minus_lmax", num_mu_minus_lmax);
+  read(fc, "delta_l_max", delta_l_max);
+  read(fc, "tol_gauss_legendre", tol_gauss_legendre);
 }
 
 int class_version(

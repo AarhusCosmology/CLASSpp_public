@@ -23,17 +23,17 @@
 		AFDC68A2240D9F500044B5A3 /* nonlinear_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6898240D9F500044B5A3 /* nonlinear_module.cpp */; };
 		AFDC68A3240D9F500044B5A3 /* primordial_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6899240D9F500044B5A3 /* primordial_module.cpp */; };
 		AFDC68A4240D9F500044B5A3 /* background_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC689A240D9F500044B5A3 /* background_module.cpp */; };
-		AFDC68B5240D9F6B0044B5A3 /* common.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68A7240D9F6B0044B5A3 /* common.c */; };
-		AFDC68B6240D9F6B0044B5A3 /* arrays.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68A8240D9F6B0044B5A3 /* arrays.c */; };
-		AFDC68B7240D9F6B0044B5A3 /* hyperspherical.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AA240D9F6B0044B5A3 /* hyperspherical.c */; };
-		AFDC68B8240D9F6B0044B5A3 /* sparse.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AB240D9F6B0044B5A3 /* sparse.c */; };
-		AFDC68B9240D9F6B0044B5A3 /* dei_rkck.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AD240D9F6B0044B5A3 /* dei_rkck.c */; };
-		AFDC68BA240D9F6B0044B5A3 /* growTable.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AE240D9F6B0044B5A3 /* growTable.c */; };
-		AFDC68BB240D9F6B0044B5A3 /* quadrature.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AF240D9F6B0044B5A3 /* quadrature.c */; };
-		AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.c */; };
+		AFDC68B5240D9F6B0044B5A3 /* common.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68A7240D9F6B0044B5A3 /* common.cpp */; };
+		AFDC68B6240D9F6B0044B5A3 /* arrays.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68A8240D9F6B0044B5A3 /* arrays.cpp */; };
+		AFDC68B7240D9F6B0044B5A3 /* hyperspherical.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AA240D9F6B0044B5A3 /* hyperspherical.cpp */; };
+		AFDC68B8240D9F6B0044B5A3 /* sparse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AB240D9F6B0044B5A3 /* sparse.cpp */; };
+		AFDC68B9240D9F6B0044B5A3 /* dei_rkck.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AD240D9F6B0044B5A3 /* dei_rkck.cpp */; };
+		AFDC68BA240D9F6B0044B5A3 /* growTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */; };
+		AFDC68BB240D9F6B0044B5A3 /* quadrature.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */; };
+		AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */; };
 		AFDC68BD240D9F6B0044B5A3 /* evolver_ndf15.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B1240D9F6B0044B5A3 /* evolver_ndf15.cpp */; };
 		AFDC68BE240D9F6B0044B5A3 /* parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B3240D9F6B0044B5A3 /* parser.cpp */; };
-		AFDC68BF240D9F6B0044B5A3 /* trigonometric_integrals.c in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.c */; };
+		AFDC68BF240D9F6B0044B5A3 /* trigonometric_integrals.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.cpp */; };
 		AFDC68C2240D9FB80044B5A3 /* class.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68C1240D9FB80044B5A3 /* class.cpp */; };
 		AFDE3E01242DF6290061A4DE /* output_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDE3E00242DF6290061A4DE /* output_module.cpp */; };
 		AFEAF07E2449CC6400A3F4A2 /* non_cold_dark_matter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */; };
@@ -101,20 +101,20 @@
 		AFDC6898240D9F500044B5A3 /* nonlinear_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nonlinear_module.cpp; sourceTree = "<group>"; };
 		AFDC6899240D9F500044B5A3 /* primordial_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = primordial_module.cpp; sourceTree = "<group>"; };
 		AFDC689A240D9F500044B5A3 /* background_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = background_module.cpp; sourceTree = "<group>"; };
-		AFDC68A7240D9F6B0044B5A3 /* common.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = common.c; sourceTree = "<group>"; };
-		AFDC68A8240D9F6B0044B5A3 /* arrays.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = arrays.c; sourceTree = "<group>"; };
+		AFDC68A7240D9F6B0044B5A3 /* common.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = common.cpp; sourceTree = "<group>"; };
+		AFDC68A8240D9F6B0044B5A3 /* arrays.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = arrays.cpp; sourceTree = "<group>"; };
 		AFDC68A9240D9F6B0044B5A3 /* hermite6_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite6_interpolation_csource.h; sourceTree = "<group>"; };
-		AFDC68AA240D9F6B0044B5A3 /* hyperspherical.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = hyperspherical.c; sourceTree = "<group>"; };
-		AFDC68AB240D9F6B0044B5A3 /* sparse.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = sparse.c; sourceTree = "<group>"; };
+		AFDC68AA240D9F6B0044B5A3 /* hyperspherical.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hyperspherical.cpp; sourceTree = "<group>"; };
+		AFDC68AB240D9F6B0044B5A3 /* sparse.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sparse.cpp; sourceTree = "<group>"; };
 		AFDC68AC240D9F6B0044B5A3 /* hermite3_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite3_interpolation_csource.h; sourceTree = "<group>"; };
-		AFDC68AD240D9F6B0044B5A3 /* dei_rkck.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = dei_rkck.c; sourceTree = "<group>"; };
-		AFDC68AE240D9F6B0044B5A3 /* growTable.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = growTable.c; sourceTree = "<group>"; };
-		AFDC68AF240D9F6B0044B5A3 /* quadrature.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = quadrature.c; sourceTree = "<group>"; };
-		AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = evolver_rkck.c; sourceTree = "<group>"; };
+		AFDC68AD240D9F6B0044B5A3 /* dei_rkck.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dei_rkck.cpp; sourceTree = "<group>"; };
+		AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = growTable.cpp; sourceTree = "<group>"; };
+		AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = quadrature.cpp; sourceTree = "<group>"; };
+		AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = evolver_rkck.cpp; sourceTree = "<group>"; };
 		AFDC68B1240D9F6B0044B5A3 /* evolver_ndf15.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = evolver_ndf15.cpp; sourceTree = "<group>"; };
 		AFDC68B2240D9F6B0044B5A3 /* hermite4_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite4_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDC68B3240D9F6B0044B5A3 /* parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = parser.cpp; sourceTree = "<group>"; };
-		AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = trigonometric_integrals.c; sourceTree = "<group>"; };
+		AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = trigonometric_integrals.cpp; sourceTree = "<group>"; };
 		AFDC68C1240D9FB80044B5A3 /* class.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = class.cpp; sourceTree = "<group>"; };
 		AFDC68C4240DAAB80044B5A3 /* thread_pool.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thread_pool.h; sourceTree = "<group>"; };
 		AFDE3DD8242BA2A80061A4DE /* quadrature.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = quadrature.h; sourceTree = "<group>"; };
@@ -125,7 +125,6 @@
 		AFDE3DDD242BA2A80061A4DE /* hermite4_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite4_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDE3DDE242BA2A80061A4DE /* hermite6_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite6_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDE3DDF242BA2A80061A4DE /* sparse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = sparse.h; sourceTree = "<group>"; };
-		AFDE3DE0242BA2A80061A4DE /* precision_macros.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = precision_macros.h; sourceTree = "<group>"; };
 		AFDE3DE1242BA2A80061A4DE /* evolver_ndf15.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = evolver_ndf15.h; sourceTree = "<group>"; };
 		AFDE3DE2242BA2A80061A4DE /* hyperspherical.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hyperspherical.h; sourceTree = "<group>"; };
 		AFDE3DE3242BA2A80061A4DE /* hermite3_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite3_interpolation_csource.h; sourceTree = "<group>"; };
@@ -133,7 +132,6 @@
 		AFDE3DE5242BA2A80061A4DE /* parser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = parser.h; sourceTree = "<group>"; };
 		AFDE3DE6242BA2A80061A4DE /* trigonometric_integrals.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = trigonometric_integrals.h; sourceTree = "<group>"; };
 		AFDE3DE7242BA2A80061A4DE /* dei_rkck.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dei_rkck.h; sourceTree = "<group>"; };
-		AFDE3DE8242BA2A80061A4DE /* precisions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = precisions.h; sourceTree = "<group>"; };
 		AFDE3DFC242DE3BB0061A4DE /* base_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = base_module.h; sourceTree = "<group>"; };
 		AFDE3DFF242DF6290061A4DE /* output_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = output_module.h; sourceTree = "<group>"; };
 		AFDE3E00242DF6290061A4DE /* output_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = output_module.cpp; sourceTree = "<group>"; };
@@ -266,27 +264,27 @@
 		AFDC68A6240D9F6B0044B5A3 /* tools */ = {
 			isa = PBXGroup;
 			children = (
-				AFDC68A8240D9F6B0044B5A3 /* arrays.c */,
-				AFDC68A7240D9F6B0044B5A3 /* common.c */,
-				AFDC68AD240D9F6B0044B5A3 /* dei_rkck.c */,
+				AFDC68A8240D9F6B0044B5A3 /* arrays.cpp */,
+				AFDC68A7240D9F6B0044B5A3 /* common.cpp */,
+				AFDC68AD240D9F6B0044B5A3 /* dei_rkck.cpp */,
 				AFDC68B1240D9F6B0044B5A3 /* evolver_ndf15.cpp */,
-				AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.c */,
+				AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */,
 				AF1078F92424A86400A369F7 /* exceptions.cpp */,
 				AF1078F8241FB84F00A369F7 /* exceptions.h */,
-				AFDC68AE240D9F6B0044B5A3 /* growTable.c */,
+				AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */,
 				AFDC68AC240D9F6B0044B5A3 /* hermite3_interpolation_csource.h */,
 				AFDC68B2240D9F6B0044B5A3 /* hermite4_interpolation_csource.h */,
 				AFDC68A9240D9F6B0044B5A3 /* hermite6_interpolation_csource.h */,
-				AFDC68AA240D9F6B0044B5A3 /* hyperspherical.c */,
+				AFDC68AA240D9F6B0044B5A3 /* hyperspherical.cpp */,
 				AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */,
 				AFEAF07C2449CC6300A3F4A2 /* non_cold_dark_matter.h */,
 				20FFA73E259B1876003CAF13 /* dark_radiation.cpp */,
 				20FFA73F259B1876003CAF13 /* dark_radiation.h */,
 				AFDC68B3240D9F6B0044B5A3 /* parser.cpp */,
-				AFDC68AF240D9F6B0044B5A3 /* quadrature.c */,
-				AFDC68AB240D9F6B0044B5A3 /* sparse.c */,
+				AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */,
+				AFDC68AB240D9F6B0044B5A3 /* sparse.cpp */,
 				AFDC68C4240DAAB80044B5A3 /* thread_pool.h */,
-				AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.c */,
+				AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.cpp */,
 			);
 			path = tools;
 			sourceTree = "<group>";
@@ -314,8 +312,6 @@
 				AFDE3DDE242BA2A80061A4DE /* hermite6_interpolation_csource.h */,
 				AFDE3DE2242BA2A80061A4DE /* hyperspherical.h */,
 				AFDE3DE5242BA2A80061A4DE /* parser.h */,
-				AFDE3DE0242BA2A80061A4DE /* precision_macros.h */,
-				AFDE3DE8242BA2A80061A4DE /* precisions.h */,
 				AFDE3DD8242BA2A80061A4DE /* quadrature.h */,
 				AFDE3DDF242BA2A80061A4DE /* sparse.h */,
 				AFDE3DDC242BA2A80061A4DE /* svnversion.h */,
@@ -415,30 +411,30 @@
 				AFDC68A0240D9F500044B5A3 /* input_module.cpp in Sources */,
 				AFDC68A1240D9F500044B5A3 /* spectra_module.cpp in Sources */,
 				AFDC68A2240D9F500044B5A3 /* nonlinear_module.cpp in Sources */,
-				AFDC68B6240D9F6B0044B5A3 /* arrays.c in Sources */,
+				AFDC68B6240D9F6B0044B5A3 /* arrays.cpp in Sources */,
 				AFDC689E240D9F500044B5A3 /* transfer_module.cpp in Sources */,
 				AFDC689F240D9F500044B5A3 /* thermodynamics_module.cpp in Sources */,
 				AFDC68BE240D9F6B0044B5A3 /* parser.cpp in Sources */,
-				AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.c in Sources */,
+				AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.cpp in Sources */,
 				AFDC68BD240D9F6B0044B5A3 /* evolver_ndf15.cpp in Sources */,
 				20FFA740259B1876003CAF13 /* dark_radiation.cpp in Sources */,
 				AF1078E3241D1F3B00A369F7 /* helium.c in Sources */,
 				AF1078E4241D1F3B00A369F7 /* hydrogen.c in Sources */,
-				AFDC68B9240D9F6B0044B5A3 /* dei_rkck.c in Sources */,
-				AFDC68BA240D9F6B0044B5A3 /* growTable.c in Sources */,
+				AFDC68B9240D9F6B0044B5A3 /* dei_rkck.cpp in Sources */,
+				AFDC68BA240D9F6B0044B5A3 /* growTable.cpp in Sources */,
 				AFDC68C2240D9FB80044B5A3 /* class.cpp in Sources */,
 				AF1078FA2424A86400A369F7 /* exceptions.cpp in Sources */,
-				AFDC68BF240D9F6B0044B5A3 /* trigonometric_integrals.c in Sources */,
-				AFDC68B5240D9F6B0044B5A3 /* common.c in Sources */,
+				AFDC68BF240D9F6B0044B5A3 /* trigonometric_integrals.cpp in Sources */,
+				AFDC68B5240D9F6B0044B5A3 /* common.cpp in Sources */,
 				AFDC689C240D9F500044B5A3 /* lensing_module.cpp in Sources */,
 				AF1078DF241D1F3B00A369F7 /* history.c in Sources */,
 				AF1078E0241D1F3B00A369F7 /* hyrectools.c in Sources */,
-				AFDC68BB240D9F6B0044B5A3 /* quadrature.c in Sources */,
+				AFDC68BB240D9F6B0044B5A3 /* quadrature.cpp in Sources */,
 				AFDC689D240D9F500044B5A3 /* perturbations_module.cpp in Sources */,
 				AFDC68A3240D9F500044B5A3 /* primordial_module.cpp in Sources */,
 				AFDE3E01242DF6290061A4DE /* output_module.cpp in Sources */,
-				AFDC68B7240D9F6B0044B5A3 /* hyperspherical.c in Sources */,
-				AFDC68B8240D9F6B0044B5A3 /* sparse.c in Sources */,
+				AFDC68B7240D9F6B0044B5A3 /* hyperspherical.cpp in Sources */,
+				AFDC68B8240D9F6B0044B5A3 /* sparse.cpp in Sources */,
 				AFEAF07E2449CC6400A3F4A2 /* non_cold_dark_matter.cpp in Sources */,
 				AF14AFE924337B11005D2DE9 /* cosmology.cpp in Sources */,
 				AFDC68A4240D9F500044B5A3 /* background_module.cpp in Sources */,

@@ -78,24 +78,24 @@ struct transfers {
 
   //@{
 
-  double lcmb_rescale; /**< normally set to one, can be used
+  double lcmb_rescale = 1.; /**< normally set to one, can be used
                           exceptionally to rescale by hand the CMB
                           lensing potential */
-  double lcmb_tilt;    /**< normally set to zero, can be used
+  double lcmb_tilt = 0.;    /**< normally set to zero, can be used
                           exceptionally to tilt by hand the CMB
                           lensing potential */
-  double lcmb_pivot;   /**< if lcmb_tilt non-zero, corresponding pivot
+  double lcmb_pivot = 0.1;   /**< if lcmb_tilt non-zero, corresponding pivot
                           scale */
 
   double selection_bias[_SELECTION_NUM_MAX_];               /**< light-to-mass bias in the transfer function of density number count */
   double selection_magnification_bias[_SELECTION_NUM_MAX_]; /**< magnification bias in the transfer function of density number count */
 
-  short has_nz_file;     /**< Has dN/dz (selection function) input file? */
-  short has_nz_analytic; /**< Use analytic form for dN/dz (selection function) distribution? */
+  short has_nz_file = _FALSE_;     /**< Has dN/dz (selection function) input file? */
+  short has_nz_analytic = _FALSE_; /**< Use analytic form for dN/dz (selection function) distribution? */
   FileName nz_file_name; /**< dN/dz (selection function) input file name */
 
-  short has_nz_evo_file;      /**< Has dN/dz (evolution function) input file? */
-  short has_nz_evo_analytic;  /**< Use analytic form for dN/dz (evolution function) distribution? */
+  short has_nz_evo_file = _FALSE_;      /**< Has dN/dz (evolution function) input file? */
+  short has_nz_evo_analytic = _FALSE_;  /**< Use analytic form for dN/dz (evolution function) distribution? */
   FileName nz_evo_file_name;  /**< dN/dz (evolution function) input file name */
 
   //@}
@@ -106,9 +106,9 @@ struct transfers {
 
   //@{
 
-  short initialise_HIS_cache; /**< only true if we are using CLASS for setting up a cache of HIS structures */
+  short initialise_HIS_cache = _FALSE_; /**< only true if we are using CLASS for setting up a cache of HIS structures */
 
-  short transfer_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short transfer_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 };
