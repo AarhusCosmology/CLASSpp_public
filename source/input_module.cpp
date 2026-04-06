@@ -26,6 +26,10 @@
 #include "../species/dark_radiation_species.h"
 #include "../species/ncdm_species.h"
 #include "../species/scalar_field.h"
+#include "../species/idm_dr.h"
+#include "../species/idr.h"
+#include "../species/idm_drmd.h"
+#include "../species/idr_drmd.h"
 
 #include <thread>
 /**
@@ -221,6 +225,18 @@ void InputModule::ConstructSpecies() {
   }
   if (pba->has_scf == _TRUE_) {
     all_species_["ScalarField"] = std::make_unique<ScalarFieldSpecies>(*pba);
+  }
+  if (pba->has_idm_dr == _TRUE_) {
+    all_species_["IDM_DR"] = std::make_unique<IDM_DRSpecies>(*pba);
+  }
+  if (pba->has_idr == _TRUE_) {
+    all_species_["IDR"] = std::make_unique<IDRSpecies>(*pba);
+  }
+  if (pba->has_idm_drmd == _TRUE_) {
+    all_species_["IDM_DRMD"] = std::make_unique<IDM_DRMDSpecies>(*pba);
+  }
+  if (pba->has_idr_drmd == _TRUE_) {
+    all_species_["IDR_DRMD"] = std::make_unique<IDR_DRMDSpecies>(*pba);
   }
   // Photons and baryons are always present once there is a radiation background.
   // They are always added; the background module already guards has_ur/has_g etc.
@@ -1163,6 +1179,8 @@ int InputModule::input_read_parameters() {
 
     pba->Omega0_ncdm_tot = ncdm_->GetOmega0();
   }
+
+  pba->l_max_idr = ppr->l_max_idr;
   Omega_tot += pba->Omega0_ncdm_tot;
 
   /** - Dark radiation */

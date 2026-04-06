@@ -19,8 +19,22 @@ struct PerturbScalarContext {
   double shear_g = 0.;
   /** baryon delta/theta */
   double delta_b = 0., theta_b = 0.;
-  /** IDR delta/theta (RSA-corrected) */
-  double delta_idr = 0., theta_idr = 0.;
+  /** IDR delta/theta/shear (RSA-corrected) */
+  double delta_idr = 0., theta_idr = 0., shear_idr = 0.;
+  /** IDM_DR delta/theta */
+  double delta_idm_dr = 0., theta_idm_dr = 0.;
+  /** IDR_DRMD delta/theta */
+  double delta_idr_drmd = 0., theta_idr_drmd = 0.;
+  /** IDM_DRMD delta/theta */
+  double delta_idm_drmd = 0., theta_idm_drmd = 0.;
+  /** 4/3 * rho_idr / rho_idm_dr, idr-idm momentum ratio */
+  double R_idr = 0.;
+  /** tight-coupling shear for idr */
+  double tca_shear_idm_dr = 0.;
+  /** tight-coupling slip for idm_dr */
+  double tca_slip_idm_dr = 0.;
+  /** nature of idr (free-streaming or fluid) */
+  int idr_nature = 0;
   /** 4/3 * rho_g / rho_b, photon-baryon momentum ratio */
   double R = 0.;
   /** baryon sound speed squared */

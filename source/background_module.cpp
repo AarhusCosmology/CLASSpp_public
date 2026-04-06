@@ -312,15 +312,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     accumulate(*sp);
   }
 
-  /* DRMD (interacting DM/DR — not yet in species map, kept as-is) */
-  if (pba->has_idm_drmd == _TRUE_)
-  {
-    pvecback[index_bg_rho_idm_drmd_] = pba->Omega0_idm_drmd*pow(pba->H0, 2)/pow(a_rel, 3);
-    rho_tot += pvecback[index_bg_rho_idm_drmd_];
-    p_tot += 0.;
-    rho_m += pvecback[index_bg_rho_idm_drmd_];
-  }
-
   /* ncdm */
   if (pba->has_ncdm == _TRUE_) {
 
@@ -441,33 +432,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
     all_species_.at("Fluid")->ComputeBackground(a_rel, pvecback_B, pvecback);
     accumulate(*all_species_.at("Fluid"));
-  }
-
-  /* interacting dark matter */
-  if (pba->has_idm_dr == _TRUE_) {
-    pvecback[index_bg_rho_idm_dr_] = pba->Omega0_idm_dr*pow(pba->H0, 2)/pow(a_rel, 3);
-    rho_tot += pvecback[index_bg_rho_idm_dr_];
-    p_tot += 0.;
-    rho_m += pvecback[index_bg_rho_idm_dr_];
-  }
-
-  /* interacting dark radiation */
-  if (pba->has_idr == _TRUE_) {
-    pvecback[index_bg_rho_idr_] = pba->Omega0_idr*pow(pba->H0, 2)/pow(a_rel, 4);
-    rho_tot += pvecback[index_bg_rho_idr_];
-    p_tot += 1./3.*pvecback[index_bg_rho_idr_];
-    rho_r += pvecback[index_bg_rho_idr_];
-  }
-
-  /* interacting dark radiation (drmd) */
-  if (pba->has_idr_drmd == _TRUE_)
-  {
-    pvecback[index_bg_rho_idr_drmd_] = pba->Omega0_idr_drmd*pow(pba->H0, 2)/pow(a_rel, 4);
-    
-    
-    rho_tot += pvecback[index_bg_rho_idr_drmd_];
-    p_tot += (1. / 3.)*pvecback[index_bg_rho_idr_drmd_];
-    rho_r += pvecback[index_bg_rho_idr_drmd_];
   }
 
   /** - compute expansion rate H from Friedmann equation: this is the
@@ -822,8 +786,20 @@ int BackgroundModule::background_indices() {
 
 
   /* - index for rho_idm_drmd and rho_idr_drmd */
-  class_define_index(index_bg_rho_idm_drmd_, pba->has_idm_drmd, index_bg, 1);
-  class_define_index(index_bg_rho_idr_drmd_, pba->has_idr_drmd, index_bg, 1);
+  if (pba->has_idm_drmd == _TRUE_) {
+    index_bg_rho_idm_drmd_ = index_bg;
+    all_species_.at("IDM_DRMD")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_idm_drmd_ = -1;
+  }
+
+  if (pba->has_idr_drmd == _TRUE_) {
+    index_bg_rho_idr_drmd_ = index_bg;
+    all_species_.at("IDR_DRMD")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_idr_drmd_ = -1;
+  }
+
   class_define_index(index_bg_G_over_aH_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
   class_define_index(index_bg_Gamma0_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
 
@@ -918,11 +894,21 @@ int BackgroundModule::background_indices() {
   /* - index for Omega_r (relativistic density fraction) */
   class_define_index(index_bg_Omega_r_, _TRUE_, index_bg, 1);
 
-  /* - index interacting for dark radiation */
-  class_define_index(index_bg_rho_idr_, pba->has_idr, index_bg, 1);
+  /* - index for interacting dark radiation */
+  if (pba->has_idr == _TRUE_) {
+    index_bg_rho_idr_ = index_bg;
+    all_species_.at("IDR")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_idr_ = -1;
+  }
 
   /* - index for interacting dark matter */
-  class_define_index(index_bg_rho_idm_dr_, pba->has_idm_dr, index_bg, 1);
+  if (pba->has_idm_dr == _TRUE_) {
+    index_bg_rho_idm_dr_ = index_bg;
+    all_species_.at("IDM_DR")->RegisterBackgroundIndices(index_bg);
+  } else {
+    index_bg_rho_idm_dr_ = -1;
+  }
 
   /* - put here additional ingredients that you want to appear in the
      normal vector */
@@ -1999,12 +1985,14 @@ int BackgroundModule::background_derivs_member(
   double rho_M = pvecback[index_bg_rho_b_];
   if (pba->has_cdm)
     rho_M += pvecback[index_bg_rho_cdm_];
-  if (pba->has_idm_dr)
-    rho_M += pvecback[index_bg_rho_idm_dr_];
-    
+  if (pba->has_idm_dr) {
+    all_species_.at("IDM_DR")->BackgroundDerivs(tau, y, dy, pvecback);
+    rho_M += all_species_.at("IDM_DR")->Rho(pvecback);
+  }
   if (pba->has_idm_drmd == _TRUE_)
   {
-    rho_M += pvecback[index_bg_rho_idm_drmd_];
+    all_species_.at("IDM_DRMD")->BackgroundDerivs(tau, y, dy, pvecback);
+    rho_M += all_species_.at("IDM_DRMD")->Rho(pvecback);
   }
 
   dy[index_bi_D_] = y[index_bi_D_prime_];

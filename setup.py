@@ -44,6 +44,7 @@ source_files = (
         'photons.cpp',
         'scalar_field.cpp',
         'ultra_relativistic.cpp',
+        'interacting_species.cpp',
     )
     + prepend(
         'tools',

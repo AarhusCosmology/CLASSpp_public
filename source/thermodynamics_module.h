@@ -13,6 +13,8 @@ public:
   int thermodynamics_output_data(int number_of_titles, double* data) const;
   int thermodynamics_at_z(double z, short inter_mode, int* last_index, double* pvecback, double* pvecthermo) const;
 
+  const thermo* GetThermodynamics() const { return pth; }
+
   double tau_ini_; /**< initial conformal time at which thermodynamical variables have been be integrated */
   double YHe_;
   /**
