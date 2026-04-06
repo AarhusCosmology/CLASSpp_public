@@ -36,7 +36,8 @@ double DCDMSpecies::Rho(const double* pvecback) const {
 double DCDMSpecies::P(const double* /*pvecback*/) const { return 0.; }
 double DCDMSpecies::DpDloga(const double* /*pvecback*/) const { return 0.; }
 
-void DCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+void DCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* /*ppr*/,
+                                               int& index_pt,
                                                const perturb_workspace* /*ppw*/,
                                                int /*gauge*/) {
   class_define_index(pv->index_pt_delta_dcdm, _TRUE_, index_pt, 1);

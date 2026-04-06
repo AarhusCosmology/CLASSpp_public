@@ -28,9 +28,8 @@ public:
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   /** Registers delta_ur, theta_ur, shear_ur, and (when UFA is off) l3..l_max_ur. */
-  void RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
-                                   const perturb_workspace* ppw,
-                                   int gauge) override;
+  void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,
+                                   const perturb_workspace* ppw, int gauge) override;
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
   double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;

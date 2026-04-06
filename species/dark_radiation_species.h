@@ -33,7 +33,8 @@ public:
   }
 
   // ── Perturbations ────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+  void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr,
+                                   int& index_pt,
                                    const perturb_workspace* ppw, int gauge) override;
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;

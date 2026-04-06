@@ -11,7 +11,7 @@
 
 // ── IDM_DR ─────────────────────────────────────────────────────────────────
 
-void IDM_DRSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+void IDM_DRSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,
                                                   const perturb_workspace* /*ppw*/,
                                                   int /*gauge*/) {
   class_define_index(pv->index_pt_delta_idm_dr, _TRUE_, index_pt, 1);
@@ -48,7 +48,7 @@ void IDM_DRSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
 
 // ── IDR ───────────────────────────────────────────────────────────────────
 
-void IDRSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+void IDRSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,
                                                const perturb_workspace* ppw,
                                                int /*gauge*/) {
   /* Initialize all IDR indices to sentinel -1 */
@@ -154,7 +154,7 @@ double IDRSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,
 
 // ── IDM_DRMD ───────────────────────────────────────────────────────────────
 
-void IDM_DRMDSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+void IDM_DRMDSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,
                                                    const perturb_workspace* /*ppw*/,
                                                    int /*gauge*/) {
   class_define_index(pv->index_pt_delta_idm_drmd, _TRUE_, index_pt, 1);
@@ -187,7 +187,7 @@ void IDM_DRMDSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
 
 // ── IDR_DRMD ───────────────────────────────────────────────────────────────
 
-void IDR_DRMDSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+void IDR_DRMDSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,
                                                    const perturb_workspace* /*ppw*/,
                                                    int /*gauge*/) {
   class_define_index(pv->index_pt_delta_idr_drmd, _TRUE_, index_pt, 1);

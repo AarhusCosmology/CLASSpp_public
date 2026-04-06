@@ -63,10 +63,9 @@ void ScalarFieldSpecies::BackgroundDerivs(double /*tau*/, const double* y, doubl
   dy[index_bi_phi_prime_scf_] = -a*(2.*H*phi_prime + a*dV_scf(phi));
 }
 
-void ScalarFieldSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
-                                                      const perturb_workspace* /*ppw*/,
-                                                      int /*gauge*/) {
-  class_define_index(pv->index_pt_phi_scf,       _TRUE_, index_pt, 1);
+void ScalarFieldSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* /*ppr*/, int& index_pt,
+                                                     const perturb_workspace* /*ppw*/,
+                                                     int /*gauge*/) {  class_define_index(pv->index_pt_phi_scf,       _TRUE_, index_pt, 1);
   class_define_index(pv->index_pt_phi_prime_scf, _TRUE_, index_pt, 1);
 }
 

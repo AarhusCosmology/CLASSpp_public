@@ -21,6 +21,9 @@
 #include <string>
 
 
+class BaseSpecies;
+class NCDMSpecies;
+
 class BaseModule {
 public:
   BaseModule(InputModulePtr input_module)
@@ -39,6 +42,7 @@ public:
   , pop(&input_module->output_) {
     input_module_ = std::move(input_module);
     error_message_[0] = '\n';
+    PopulateNCDMVector();
   }
   BaseModule(const BaseModule&) = delete;
   
@@ -51,7 +55,11 @@ public:
    *  Use .at("CDM") -- never operator[] -- to preserve const safety. */
   const std::map<std::string, std::unique_ptr<BaseSpecies>>& all_species_;
 
+  std::vector<NCDMSpecies*> ncdm_species_;
+
 protected:
+  void PopulateNCDMVector();
+
   InputModulePtr input_module_;
 
   const precision* const ppr;

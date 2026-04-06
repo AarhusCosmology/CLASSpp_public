@@ -6,8 +6,7 @@
 // ── Perturbations ─────────────────────────────────────────────────────────────
 
 void PhotonsSpecies::RegisterPerturbationIndices(
-    perturb_vector* pv, int& index_pt,
-    const perturb_workspace* ppw, int /*gauge*/) {
+    perturb_vector* pv, const precision* ppr, int& index_pt, const perturb_workspace* ppw, int /*gauge*/) {
 
   /* Initialize all photon indices to sentinel -1 so that any early return
      (RSA, TCA) leaves them in a well-defined state that guards can check. */

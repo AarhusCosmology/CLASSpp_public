@@ -23,7 +23,8 @@ public:
   double P(const double* /*pvecback*/) const override { return 0.; }
   double DpDloga(const double* /*pvecback*/) const override { return 0.; }
 
-  void RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+  void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr,
+                                   int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 

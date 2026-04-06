@@ -18,6 +18,7 @@
 #include "nonlinear_module.h"
 #include "non_cold_dark_matter.h"
 #include "cosmology.h"
+#include "../species/ncdm_species.h"
 
 NonlinearModule::NonlinearModule(InputModulePtr input_module, BackgroundModulePtr background_module, PerturbationsModulePtr perturbations_module, PrimordialModulePtr primordial_module)
 : BaseModule(std::move(input_module))
@@ -1063,8 +1064,8 @@ int NonlinearModule::nonlinear_init() {
   if (pnl->method > nl_none) {
 
     if (pba->has_ncdm) {
-      for (index_ncdm=0;index_ncdm < pba->N_ncdm; index_ncdm++){
-        double m_ncdm_in_electronvolt = ncdm_->GetMassInElectronvolt(index_ncdm);
+      for (auto* ncdm_sp : ncdm_species_){
+        double m_ncdm_in_electronvolt = ncdm_->GetMassInElectronvolt(ncdm_sp->ncdm_id());
         if (m_ncdm_in_electronvolt >  _M_EV_TOO_BIG_FOR_HALOFIT_)
           fprintf(stdout,"Warning: Halofit and HMcode are proved to work for CDM, and also with a small HDM component. But it sounds like you are running with a WDM component of mass %f eV, which makes the use of Halofit suspicious.\n", m_ncdm_in_electronvolt);
       }

@@ -980,18 +980,17 @@ double NonColdDarkMatter::GetNeff(double z) const {
   return Neff;
 }
 
-std::tuple<double, double> NonColdDarkMatter::GetRescaledParameters(int n_ncdm, double a, double* pvecback_begin) {
+std::tuple<double, double> NonColdDarkMatter::GetRescaledParameters(int n_ncdm, double a, const double* lnf_array) const {
   // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
   double rho_scaled = 0.;
   double p_scaled = 0.;
   double pseudo_p_scaled = 0.;
 
-  double* lnf_ptr = pvecback_begin + decay_dr_map_.at(n_ncdm).q_offset;
-  const double lnN = GetRescalingFactor(n_ncdm, pvecback_begin);
+  const double lnN = GetRescalingFactor(n_ncdm, lnf_array);
   for (int index_q = 0; index_q < q_size_ncdm_[n_ncdm]; index_q++) {
-    double dq = decay_dr_map_[n_ncdm].dq[index_q];
+    double dq = decay_dr_map_.at(n_ncdm).dq[index_q];
     double q = q_ncdm_[n_ncdm][index_q];
-    double lnf = lnf_ptr[index_q];
+    double lnf = lnf_array[index_q];
     double epsilon = sqrt(q*q + a*a*M_ncdm_[n_ncdm]*M_ncdm_[n_ncdm]);
 
     rho_scaled += dq*q*q*epsilon*exp(lnN + lnf);
@@ -1071,11 +1070,10 @@ double NonColdDarkMatter::GetDeg(int n_ncdm) const {
   return deg_ncdm_[n_ncdm];
 }
 
-double NonColdDarkMatter::GetRescalingFactor(int n_ncdm, double* pvecback_begin) const {
+double NonColdDarkMatter::GetRescalingFactor(int n_ncdm, const double* lnf_array) const {
   double lnN = DBL_MAX;
-  double* lnf_ptr = pvecback_begin + decay_dr_map_.at(n_ncdm).q_offset;
   for (int index_q = 0; index_q < q_size_ncdm_[n_ncdm]; index_q++) {
-    double lnf = lnf_ptr[index_q];
+    double lnf = lnf_array[index_q];
     lnN = std::min(lnN, -lnf);
   }
   const double factor = lnN + 400;

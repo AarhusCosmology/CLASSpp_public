@@ -5,6 +5,7 @@
 
 // Forward declarations to avoid circular includes
 struct background;
+struct precision;
 struct perturb_vector;
 struct perturb_workspace;
 struct perturb_parameters_and_workspace;
@@ -116,7 +117,8 @@ public:
    * @param ppw   Current workspace; use approx[] flags and curvature info.
    * @param gauge Cast of enum possible_gauges (0=newtonian, 1=synchronous).
    */
-  virtual void RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+  virtual void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr,
+                                            int& index_pt,
                                             const perturb_workspace* ppw,
                                             int gauge) = 0;
 

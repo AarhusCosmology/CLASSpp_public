@@ -25,9 +25,8 @@ public:
     return -4./3. * pvecback[index_bg_rho_];
   }
 
-  void RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
-                                   const perturb_workspace* ppw,
-                                   int gauge) override;
+  void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,
+                                   const perturb_workspace* ppw, int gauge) override;
 
   void RegisterVectorPerturbationIndices(perturb_vector* pv, int& index_pt,
                                           const perturb_workspace* ppw,

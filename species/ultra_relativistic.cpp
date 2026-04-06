@@ -35,8 +35,7 @@ double UltraRelativisticSpecies::DpDloga(const double* pvecback) const {
 // ── Perturbations ─────────────────────────────────────────────────────────────
 
 void UltraRelativisticSpecies::RegisterPerturbationIndices(
-    perturb_vector* pv, int& index_pt,
-    const perturb_workspace* ppw, int /*gauge*/) {
+    perturb_vector* pv, const precision* ppr, int& index_pt, const perturb_workspace* ppw, int /*gauge*/) {
 
   /* If radiation streaming approximation is on, no UR variables are integrated.
      Sentinel -1 signals RSA to Delta/Theta/DeltaP/RhoPlusPShear. */

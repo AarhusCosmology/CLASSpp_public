@@ -14,6 +14,7 @@
 #include "nonlinear_module.h"
 #include "lensing_module.h"
 #include "spectra_module.h"
+#include <algorithm>
 
 // Species implementations
 #include "../species/cdm.h"
@@ -221,9 +222,12 @@ void InputModule::ConstructSpecies() {
     all_species_["DR"] = std::make_unique<DarkRadiationSpecies>(dr_, pba, nullptr);
   }
   if (pba->has_ncdm == _TRUE_ && ncdm_ != nullptr) {
-    all_species_["NCDM"] = std::make_unique<NCDMSpecies>(ncdm_, pba, nullptr);
+    for (int n = 0; n < pba->N_ncdm; ++n) {
+      std::string name = "NCDM_" + std::to_string(n);
+      all_species_[name] = std::make_unique<NCDMSpecies>(n, ncdm_, pba, nullptr);
+    }
   }
-  if (pba->has_scf == _TRUE_) {
+  if (pba->has_idm_dr == _TRUE_) {
     all_species_["ScalarField"] = std::make_unique<ScalarFieldSpecies>(*pba);
   }
   if (pba->has_idm_dr == _TRUE_) {
@@ -3774,7 +3778,7 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
       for (const auto& [ncdm_id, dncdm_properties] : bam->ncdm_->decay_dr_map_) {
         double rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id];
-        double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_ncdm1_ + ncdm_id];
+        double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->ncdm_species_[ncdm_id]->bg_rho_index()];
         
         if (input_verbose > 0) {
           if ((pfzw->target_name[counter] == omega_dncdmdr) || (pfzw->target_name[counter] == Omega_dncdmdr)) {
@@ -4103,4 +4107,24 @@ int input_prepare_pk_eq(
                         ) {
   return _SUCCESS_;
 
+}
+
+void BaseModule::PopulateNCDMVector() {
+  ncdm_species_.clear();
+  if (pba->has_ncdm != _TRUE_) return;
+
+  for (auto const& [name, species] : all_species_) {
+    if (auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(species.get())) {
+      ncdm_species_.push_back(ncdm_sp);
+    }
+  }
+  // Ensure they are sorted by ncdm_id
+  std::sort(ncdm_species_.begin(), ncdm_species_.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
+    return a->ncdm_id() < b->ncdm_id();
+  });
+
+  class_test(ncdm_species_.size() != (size_t)pba->N_ncdm,
+             error_message_,
+             "Populated %zu NCDM species but expected %d. Check all_species_ map consistency.",
+             ncdm_species_.size(), pba->N_ncdm);
 }

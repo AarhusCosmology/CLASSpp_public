@@ -3,7 +3,8 @@
 #include "perturbations_module.h"
 #include "thermodynamics_module.h"
 
-void BaryonsSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+void BaryonsSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* /*ppr*/,
+                                                  int& index_pt,
                                                   const perturb_workspace* /*ppw*/,
                                                   int /*gauge*/) {
   class_define_index(pv->index_pt_delta_b, _TRUE_, index_pt, 1);

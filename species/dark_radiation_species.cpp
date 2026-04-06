@@ -48,7 +48,8 @@ void DarkRadiationSpecies::BackgroundDerivs(double /*tau*/, const double* y, dou
 
 // ── Perturbations ──────────────────────────────────────────────────────────
 
-void DarkRadiationSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
+void DarkRadiationSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* /*ppr*/,
+                                                        int& index_pt,
                                                         const perturb_workspace* /*ppw*/,
                                                         int /*gauge*/) {
   // DR sum multipoles: F0_dr_sum[l=0..l_max_dr]

@@ -49,10 +49,9 @@ double FluidSpecies::DpDloga(const double* pvecback) const {
   return (a * dw_over_da_fld - 3. * (1. + w_fld) * w_fld) * pvecback[index_bg_rho_fld_];
 }
 
-void FluidSpecies::RegisterPerturbationIndices(perturb_vector* pv, int& index_pt,
-                                                const perturb_workspace* /*ppw*/,
-                                                int /*gauge*/) {
-  if (pba_.use_ppf == _FALSE_) {
+void FluidSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* /*ppr*/, int& index_pt,
+                                               const perturb_workspace* /*ppw*/,
+                                               int /*gauge*/) {  if (pba_.use_ppf == _FALSE_) {
     pv->index_pt_delta_fld = -1;
     pv->index_pt_theta_fld = -1;
     class_define_index(pv->index_pt_delta_fld, _TRUE_, index_pt, 1);
