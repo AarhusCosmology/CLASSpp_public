@@ -41,3 +41,4 @@ cclassy.pxd
 # Symlinks for local in-source development (created by: mkdir -p classy && ln -sf ../bbn classy/bbn && ln -sf ../hyrec classy/hyrec)
 classy/
 classy_community_ref.egg-info/
+.worktrees/

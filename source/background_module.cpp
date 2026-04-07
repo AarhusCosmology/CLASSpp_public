@@ -82,6 +82,10 @@
 #include "non_cold_dark_matter.h"
 #include "dark_radiation.h"
 #include "../species/ncdm_species.h"
+#include <algorithm>
+#include "../species/dcdm_dr_species.h"
+#include "../species/idm_dr_idr_species.h"
+#include "../species/idm_drmd_idr_drmd_species.h"
 
 BackgroundModule::BackgroundModule(InputModulePtr input_module)
 : BaseModule(input_module) {
@@ -314,7 +318,9 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
   }
 
     if (pba->has_ncdm_decay_dr) {
-      for (auto* ncdm_sp : ncdm_species_) {
+      for (auto& [name, sp] : all_species_) {
+        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
+        if (!ncdm_sp) continue;
         const int ncdm_id = ncdm_sp->ncdm_id();
         if (ncdm_->ncdm_types_[ncdm_id] != NCDMType::decay_dr) continue;
 
@@ -758,19 +764,14 @@ int BackgroundModule::background_indices() {
   }
 
 
-  /* - index for rho_idm_drmd and rho_idr_drmd */
-  if (pba->has_idm_drmd == _TRUE_) {
-    index_bg_rho_idm_drmd_ = index_bg;
-    all_species_.at("IDM_DRMD")->RegisterBackgroundIndices(index_bg);
+  /* - indices for IDM_DRMD + IDR_DRMD composite */
+  if (pba->has_idm_drmd == _TRUE_ || pba->has_idr_drmd == _TRUE_) {
+    auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
+    drmd.RegisterBackgroundIndices(index_bg);
+    index_bg_rho_idm_drmd_ = drmd.idm_drmd().bg_rho_index();
+    index_bg_rho_idr_drmd_ = drmd.idr_drmd().bg_rho_index();
   } else {
-    index_bg_rho_idm_drmd_ = -1;
-  }
-
-  if (pba->has_idr_drmd == _TRUE_) {
-    index_bg_rho_idr_drmd_ = index_bg;
-    all_species_.at("IDR_DRMD")->RegisterBackgroundIndices(index_bg);
-  } else {
-    index_bg_rho_idr_drmd_ = -1;
+    index_bg_rho_idm_drmd_ = index_bg_rho_idr_drmd_ = -1;
   }
 
   class_define_index(index_bg_G_over_aH_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
@@ -788,27 +789,38 @@ int BackgroundModule::background_indices() {
     index_bg_rho_ncdm1_      = -1;
     index_bg_p_ncdm1_        = -1;
     index_bg_pseudo_p_ncdm1_ = -1;
-    for (auto* ncdm : ncdm_species_) {
-      ncdm->RegisterBackgroundIndices(index_bg);
-    }
-    // For legacy single-species code that might still use these
-    if (!ncdm_species_.empty()) {
-      index_bg_rho_ncdm1_      = ncdm_species_[0]->bg_rho_index();
-      index_bg_p_ncdm1_        = ncdm_species_[0]->bg_p_index();
-      index_bg_pseudo_p_ncdm1_ = ncdm_species_[0]->bg_pseudo_p_index();
+    // Build sorted NCDM vector: order matters for contiguous index layout
+    {
+      std::vector<NCDMSpecies*> ncdm_vec;
+      for (auto& [name, sp] : all_species_) {
+        if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) ncdm_vec.push_back(n);
+      }
+      std::sort(ncdm_vec.begin(), ncdm_vec.end(),
+                [](NCDMSpecies* a, NCDMSpecies* b){ return a->ncdm_id() < b->ncdm_id(); });
+      for (auto* ncdm : ncdm_vec) {
+        ncdm->RegisterBackgroundIndices(index_bg);
+      }
+      // For legacy single-species code that might still use these
+      if (!ncdm_vec.empty()) {
+        index_bg_rho_ncdm1_      = ncdm_vec[0]->bg_rho_index();
+        index_bg_p_ncdm1_        = ncdm_vec[0]->bg_p_index();
+        index_bg_pseudo_p_ncdm1_ = ncdm_vec[0]->bg_pseudo_p_index();
+      }
     }
   } else {
     index_bg_number_ncdm1_ = index_bg_rho_ncdm1_ = index_bg_p_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
     index_bg_lnf_ncdm_decay_dr1_ = index_bg_dlnfdlnq_ncdm_decay_dr1_ = index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ = -1;
   }
 
-  /* - indices for dr */
-  if (pba->has_dr == _TRUE_) {
-    index_bg_rho_dr_species_ = index_bg;
-    all_species_.at("DR")->RegisterBackgroundIndices(index_bg);
-    index_bg_rho_dr_ = index_bg_rho_dr_species_ + pba->N_decay_dr;
+  /* - indices for DCDM + DR composite */
+  if (pba->has_dcdm == _TRUE_ || pba->has_dr == _TRUE_) {
+    auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+    dcdm_dr.RegisterBackgroundIndices(index_bg);
+    index_bg_rho_dcdm_       = dcdm_dr.dcdm().bg_rho_index();
+    index_bg_rho_dr_species_ = dcdm_dr.dr().bg_rho_dr_species_index();
+    index_bg_rho_dr_         = dcdm_dr.dr().bg_rho_index();
   } else {
-    index_bg_rho_dr_species_ = index_bg_rho_dr_ = -1;
+    index_bg_rho_dcdm_ = index_bg_rho_dr_ = index_bg_rho_dr_species_ = -1;
   }
 
   /* - indices for scalar field */
@@ -865,20 +877,14 @@ int BackgroundModule::background_indices() {
   /* - index for Omega_r (relativistic density fraction) */
   class_define_index(index_bg_Omega_r_, _TRUE_, index_bg, 1);
 
-  /* - index for interacting dark radiation */
-  if (pba->has_idr == _TRUE_) {
-    index_bg_rho_idr_ = index_bg;
-    all_species_.at("IDR")->RegisterBackgroundIndices(index_bg);
+  /* - indices for IDM_DR + IDR composite */
+  if (pba->has_idm_dr == _TRUE_ || pba->has_idr == _TRUE_) {
+    auto& idm_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+    idm_idr.RegisterBackgroundIndices(index_bg);
+    index_bg_rho_idm_dr_ = idm_idr.idm_dr().bg_rho_index();
+    index_bg_rho_idr_    = idm_idr.idr().bg_rho_index();
   } else {
-    index_bg_rho_idr_ = -1;
-  }
-
-  /* - index for interacting dark matter */
-  if (pba->has_idm_dr == _TRUE_) {
-    index_bg_rho_idm_dr_ = index_bg;
-    all_species_.at("IDM_DR")->RegisterBackgroundIndices(index_bg);
-  } else {
-    index_bg_rho_idm_dr_ = -1;
+    index_bg_rho_idm_dr_ = index_bg_rho_idr_ = -1;
   }
 
   /* - put here additional ingredients that you want to appear in the
@@ -933,24 +939,19 @@ int BackgroundModule::background_indices() {
   /* -> scale factor */
   class_define_index(index_bi_a_, _TRUE_, index_bi, 1);
 
-  /* -> energy density in DCDM */
-  if (pba->has_dcdm == _TRUE_) {
-    index_bi_rho_dcdm_ = index_bi;
-    all_species_.at("DCDM")->RegisterIntegrationIndices(index_bi);
+  /* -> energy density in DCDM + DR (integration indices via composite) */
+  if (pba->has_dcdm == _TRUE_ || pba->has_dr == _TRUE_) {
+    auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+    dcdm_dr.RegisterIntegrationIndices(index_bi);
+    index_bi_rho_dcdm_       = dcdm_dr.dcdm().bi_rho_index();
+    index_bi_rho_dr_species_ = dcdm_dr.dr().bi_rho_dr_species_index();
   } else {
-    index_bi_rho_dcdm_ = -1;
+    index_bi_rho_dcdm_ = index_bi_rho_dr_species_ = -1;
   }
 
   /* -> time-dependent distribution function in DNCDM for each q-bin */
   class_define_index(index_bi_lnf_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
   class_define_index(index_bi_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
-  
-  if (pba->has_dr == _TRUE_) {
-    index_bi_rho_dr_species_ = index_bi;
-    all_species_.at("DR")->RegisterIntegrationIndices(index_bi);
-  } else {
-    index_bi_rho_dr_species_ = -1;
-  }
 
   /* -> energy density in fluid */
   if (pba->has_fld == _TRUE_) {
@@ -1753,7 +1754,13 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles,"(.)rho_b",_TRUE_);
   class_store_columntitle(titles,"(.)rho_cdm",pba->has_cdm);
   if (pba->has_ncdm == _TRUE_){
-    for (auto* ncdm_sp : ncdm_species_){
+    std::vector<NCDMSpecies*> ncdm_vec_titles;
+    for (auto& [name, sp] : all_species_) {
+      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) ncdm_vec_titles.push_back(n);
+    }
+    std::sort(ncdm_vec_titles.begin(), ncdm_vec_titles.end(),
+              [](NCDMSpecies* a, NCDMSpecies* b){ return a->ncdm_id() < b->ncdm_id(); });
+    for (auto* ncdm_sp : ncdm_vec_titles){
       const int n = ncdm_sp->ncdm_id();
       snprintf(tmp, max_title_length, "(.)number_ncdm[%d]", n);
       class_store_columntitle(titles,tmp,_TRUE_);
@@ -1835,7 +1842,13 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rho_b_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_cdm_], pba->has_cdm, storeidx);
     if (pba->has_ncdm == _TRUE_){
-      for (auto* ncdm_sp : ncdm_species_){
+      std::vector<NCDMSpecies*> ncdm_vec_store;
+      for (auto& [name, sp] : all_species_) {
+        if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) ncdm_vec_store.push_back(n);
+      }
+      std::sort(ncdm_vec_store.begin(), ncdm_vec_store.end(),
+                [](NCDMSpecies* a, NCDMSpecies* b){ return a->ncdm_id() < b->ncdm_id(); });
+      for (auto* ncdm_sp : ncdm_vec_store){
         class_store_double(dataptr, pvecback[ncdm_sp->bg_number_index()], _TRUE_, storeidx);
         class_store_double(dataptr, pvecback[ncdm_sp->bg_rho_index()], _TRUE_, storeidx);
         class_store_double(dataptr, pvecback[ncdm_sp->bg_p_index()], _TRUE_, storeidx);
@@ -1960,31 +1973,23 @@ int BackgroundModule::background_derivs_member(
   double rho_M = pvecback[index_bg_rho_b_];
   if (pba->has_cdm)
     rho_M += pvecback[index_bg_rho_cdm_];
-  if (pba->has_idm_dr) {
-    all_species_.at("IDM_DR")->BackgroundDerivs(tau, y, dy, pvecback);
-    rho_M += all_species_.at("IDM_DR")->Rho(pvecback);
-  }
+  if (pba->has_idm_dr)
+    rho_M += pvecback[index_bg_rho_idm_dr_];   // matter-only component of IDM_DR_IDR
   if (pba->has_idm_drmd == _TRUE_)
-  {
-    all_species_.at("IDM_DRMD")->BackgroundDerivs(tau, y, dy, pvecback);
-    rho_M += all_species_.at("IDM_DRMD")->Rho(pvecback);
-  }
+    rho_M += pvecback[index_bg_rho_idm_drmd_];  // matter-only component of IDM_DRMD_IDR_DRMD
 
   dy[index_bi_D_] = y[index_bi_D_prime_];
   dy[index_bi_D_prime_] = -a*H*y[index_bi_D_prime_] + 1.5*a*a*rho_M*y[index_bi_D_];
 
-  /* Species background ODE contributions. DR is excluded: its
-     evolution (including DNCDM→DR sources) is handled inline below. */
+  /* Species background ODE contributions (including DCDM_DR composite). */
   for (const auto& [name, sp] : all_species_) {
-    if (name == "DR") continue;
     sp->BackgroundDerivs(tau, y, dy, pvecback); // default is no-op
   }
   if (pba->has_dr == _TRUE_){
-    if (pba->has_dcdm) {
-      dy[index_bi_rho_dr_species_ + 0] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_species_ + 0] + y[index_bi_a_]*pba->Gamma_dcdm*y[index_bi_rho_dcdm_];
-    }
     if (pba->has_ncdm_decay_dr) {
-      for (auto* ncdm_sp : ncdm_species_) {
+      for (auto& [name, sp] : all_species_) {
+        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
+        if (!ncdm_sp) continue;
         const int ncdm_id = ncdm_sp->ncdm_id();
         if (ncdm_->ncdm_types_[ncdm_id] != NCDMType::decay_dr) continue;
 

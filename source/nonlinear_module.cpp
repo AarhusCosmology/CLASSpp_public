@@ -1064,7 +1064,9 @@ int NonlinearModule::nonlinear_init() {
   if (pnl->method > nl_none) {
 
     if (pba->has_ncdm) {
-      for (auto* ncdm_sp : ncdm_species_){
+      for (auto& [name, sp] : all_species_) {
+        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
+        if (!ncdm_sp) continue;
         double m_ncdm_in_electronvolt = ncdm_->GetMassInElectronvolt(ncdm_sp->ncdm_id());
         if (m_ncdm_in_electronvolt >  _M_EV_TOO_BIG_FOR_HALOFIT_)
           fprintf(stdout,"Warning: Halofit and HMcode are proved to work for CDM, and also with a small HDM component. But it sounds like you are running with a WDM component of mass %f eV, which makes the use of Halofit suspicious.\n", m_ncdm_in_electronvolt);

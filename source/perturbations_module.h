@@ -230,6 +230,10 @@ private:
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;
 
+  /** Sorted cache of NCDM species pointers, built once in perturb_init.
+   *  Avoids repeated dynamic_cast iteration over all_species_ in hot paths. */
+  std::vector<NCDMSpecies*> ncdm_species_sorted_;
+
   short evolve_tensor_ur_;             /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */
   short evolve_tensor_ncdm_;             /**< will we evolve ncdm tensor perturbations (if we have ncdm species and we use the exact method) ? */
 

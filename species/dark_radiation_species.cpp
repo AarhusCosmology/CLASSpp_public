@@ -34,15 +34,9 @@ void DarkRadiationSpecies::BackgroundDerivs(double /*tau*/, const double* y, dou
   const double H = pvecback[bgm_->index_bg_H_];
 
   for (int n = 0; n < pba_->N_decay_dr; ++n) {
-    double source = 0.;
-    // Source from DCDM decay (first DR channel)
-    if (n == 0 && pba_->has_dcdm == _TRUE_) {
-      source = a * pba_->Gamma_dcdm * pvecback[bgm_->index_bg_rho_dcdm_];
-    }
-    // Sources from decaying NCDM are handled by NCDMSpecies.
-    // Here we only apply the dilution + DCDM source.
+    // Dilution only; DCDM decay source added by DCDM_DR_Species::BackgroundDerivs
     dy[index_bi_rho_dr_species_ + n] =
-        -4. * a * H * y[index_bi_rho_dr_species_ + n] + source;
+        -4. * a * H * y[index_bi_rho_dr_species_ + n];
   }
 }
 
@@ -64,8 +58,6 @@ void DarkRadiationSpecies::RegisterPerturbationIndices(perturb_vector* pv, const
 
 void DarkRadiationSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
                                           const perturb_parameters_and_workspace& ppaw) {
-  if (!pba_->has_dr) return;
-
   const perturb_workspace* ppw = ppaw.ppw;
   const perturb_vector*    pv  = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -78,40 +70,23 @@ void DarkRadiationSpecies::PerturbDerivs(double /*tau*/, const double* y, double
   const double s2_squared         = ctx.s2_squared;
   const double a = ctx.a;
 
-  auto* bgm = ppaw.perturbations_module->GetBackgroundModule().get();
   const double* pvecback = ppw->pvecback;
 
   // Zero out the running sum
   for (int l = 0; l <= pv->l_max_dr; ++l)
     dy[pv->index_pt_F0_dr_sum + l] = 0.;
 
-  int index_dr = 0;
-
-  // DCDM-sourced DR
-  if (pba_->has_dcdm == _TRUE_) {
-    const int base = pv->index_pt_F0_dr_species + index_dr * (pv->l_max_dr + 1);
-    // r_dr = rho_dr * a^4 / H0^2  (dimensionless)
-    double r_dr = pvecback[bgm->index_bg_rho_dr_species_]
+  if (pba_->N_decay_dr > 0) {
+    const int base = pv->index_pt_F0_dr_species;
+    double r_dr = pvecback[index_bg_rho_dr_species_]
                   * (a * a) * (a * a) / (pba_->H0 * pba_->H0);
-    double rprime_dr = pba_->Gamma_dcdm * pvecback[bgm->index_bg_rho_dcdm_]
-                       * std::pow(a, 5) / (pba_->H0 * pba_->H0);
 
-    // delta_dcdm and theta_dcdm come from the pv
-    double delta_dcdm = 0., theta_dcdm = 0.;
-    if (pv->index_pt_delta_dcdm >= 0) {
-      delta_dcdm = y[pv->index_pt_delta_dcdm];
-      theta_dcdm = y[pv->index_pt_theta_dcdm];
-    }
-
-    // l=0
-    dy[base + 0] = -k * y[base + 1]
-                   - 4./3. * metric_continuity * r_dr
-                   + rprime_dr * (delta_dcdm + metric_euler / (k * k));
-    // l=1
+    // l=0: free-streaming only (coupling source from DCDM added by DCDM_DR_Species::AddCouplingDerivs)
+    dy[base + 0] = -k * y[base + 1] - 4./3. * metric_continuity * r_dr;
+    // l=1: free-streaming only
     dy[base + 1] = k/3. * y[base + 0]
                    - 2./3. * k * y[base + 2] * s2_squared
-                   + 4. * metric_euler / (3. * k) * r_dr
-                   + rprime_dr / k * theta_dcdm;
+                   + 4. * metric_euler / (3. * k) * r_dr;
     // l=2
     dy[base + 2] = 8./15. * (3./4. * k * y[base + 1] + metric_shear * r_dr)
                    - 3./5. * k * s_l[3] / s_l[2] * y[base + 3];
@@ -130,12 +105,9 @@ void DarkRadiationSpecies::PerturbDerivs(double /*tau*/, const double* y, double
       int l = pv->l_max_dr;
       dy[base + l] = k * (s_l[l] * y[base + l - 1] - (1. + l) * cotKgen * y[base + l]);
     }
-
     // Accumulate into sum
     for (int l = 0; l <= pv->l_max_dr; ++l)
       dy[pv->index_pt_F0_dr_sum + l] += dy[base + l];
-
-    ++index_dr;
   }
 }
 

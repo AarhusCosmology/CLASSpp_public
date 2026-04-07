@@ -31,6 +31,8 @@ public:
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double DpDloga(const double* pvecback) const override;
+  bool RequiresDeferredPerturbDerivs() const override { return true; }
+  bool RequiresDeferredBackground() const override { return true; }
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,

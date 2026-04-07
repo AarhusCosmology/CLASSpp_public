@@ -108,6 +108,18 @@ public:
    */
   virtual double DpDloga(const double* pvecback) const = 0;
 
+  /**
+   * Returns true if this species' PerturbDerivs must run AFTER all other
+   * species in a second pass. Used for PPF fluid (FluidSpecies).
+   */
+  virtual bool RequiresDeferredPerturbDerivs() const { return false; }
+
+  /**
+   * Returns true if this species' ComputeBackground must be deferred.
+   * Used for FluidSpecies which needs w_fld evaluated before it can run.
+   */
+  virtual bool RequiresDeferredBackground() const { return false; }
+
   // ── Perturbations ─────────────────────────────────────────────────────────
 
   /**

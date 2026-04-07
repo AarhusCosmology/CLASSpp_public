@@ -31,6 +31,9 @@
 #include "../species/idr.h"
 #include "../species/idm_drmd.h"
 #include "../species/idr_drmd.h"
+#include "../species/dcdm_dr_species.h"
+#include "../species/idm_dr_idr_species.h"
+#include "../species/idm_drmd_idr_drmd_species.h"
 
 #include <thread>
 /**
@@ -215,11 +218,8 @@ void InputModule::ConstructSpecies() {
   if (pba->has_fld == _TRUE_) {
     all_species_["Fluid"] = std::make_unique<FluidSpecies>(*pba);
   }
-  if (pba->has_dcdm == _TRUE_) {
-    all_species_["DCDM"] = std::make_unique<DCDMSpecies>(*pba);
-  }
-  if (pba->has_dr == _TRUE_) {
-    all_species_["DR"] = std::make_unique<DarkRadiationSpecies>(dr_, pba, nullptr);
+  if (pba->has_dcdm == _TRUE_ || pba->has_dr == _TRUE_) {
+    all_species_["DCDM_DR"] = std::make_unique<DCDM_DR_Species>(dr_, pba, nullptr);
   }
   if (pba->has_ncdm == _TRUE_ && ncdm_ != nullptr) {
     for (int n = 0; n < pba->N_ncdm; ++n) {
@@ -230,17 +230,11 @@ void InputModule::ConstructSpecies() {
   if (pba->has_idm_dr == _TRUE_) {
     all_species_["ScalarField"] = std::make_unique<ScalarFieldSpecies>(*pba);
   }
-  if (pba->has_idm_dr == _TRUE_) {
-    all_species_["IDM_DR"] = std::make_unique<IDM_DRSpecies>(*pba);
+  if (pba->has_idm_dr == _TRUE_ || pba->has_idr == _TRUE_) {
+    all_species_["IDM_DR_IDR"] = std::make_unique<IDM_DR_IDR_Species>(*pba);
   }
-  if (pba->has_idr == _TRUE_) {
-    all_species_["IDR"] = std::make_unique<IDRSpecies>(*pba);
-  }
-  if (pba->has_idm_drmd == _TRUE_) {
-    all_species_["IDM_DRMD"] = std::make_unique<IDM_DRMDSpecies>(*pba);
-  }
-  if (pba->has_idr_drmd == _TRUE_) {
-    all_species_["IDR_DRMD"] = std::make_unique<IDR_DRMDSpecies>(*pba);
+  if (pba->has_idm_drmd == _TRUE_ || pba->has_idr_drmd == _TRUE_) {
+    all_species_["IDM_DRMD_IDR_DRMD"] = std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*pba);
   }
   // Photons and baryons are always present once there is a radiation background.
   // They are always added; the background module already guards has_ur/has_g etc.
@@ -3778,7 +3772,18 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
       BackgroundModulePtr bam = cosmology.GetBackgroundModule();
       for (const auto& [ncdm_id, dncdm_properties] : bam->ncdm_->decay_dr_map_) {
         double rho_dr_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id];
-        double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + bam->ncdm_species_[ncdm_id]->bg_rho_index()];
+        // Find the NCDM species with the matching ncdm_id
+        NCDMSpecies* ncdm_sp_dncdm = nullptr;
+        for (auto& [name, sp] : bam->all_species_) {
+          if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()); n && n->ncdm_id() == ncdm_id) {
+            ncdm_sp_dncdm = n;
+            break;
+          }
+        }
+        if (ncdm_sp_dncdm == nullptr) {
+          throw std::runtime_error("Could not find NCDMSpecies with ncdm_id matching decay_dr_map entry");
+        }
+        double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1)*bam->bg_size_ + ncdm_sp_dncdm->bg_rho_index()];
         
         if (input_verbose > 0) {
           if ((pfzw->target_name[counter] == omega_dncdmdr) || (pfzw->target_name[counter] == Omega_dncdmdr)) {
@@ -4109,22 +4114,3 @@ int input_prepare_pk_eq(
 
 }
 
-void BaseModule::PopulateNCDMVector() {
-  ncdm_species_.clear();
-  if (pba->has_ncdm != _TRUE_) return;
-
-  for (auto const& [name, species] : all_species_) {
-    if (auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(species.get())) {
-      ncdm_species_.push_back(ncdm_sp);
-    }
-  }
-  // Ensure they are sorted by ncdm_id
-  std::sort(ncdm_species_.begin(), ncdm_species_.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
-    return a->ncdm_id() < b->ncdm_id();
-  });
-
-  class_test(ncdm_species_.size() != (size_t)pba->N_ncdm,
-             error_message_,
-             "Populated %zu NCDM species but expected %d. Check all_species_ map consistency.",
-             ncdm_species_.size(), pba->N_ncdm);
-}

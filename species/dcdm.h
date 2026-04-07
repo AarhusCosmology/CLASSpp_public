@@ -43,6 +43,7 @@ public:
   double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
 
+  int bg_rho_index() const { return index_bg_rho_dcdm_; }
   int bi_rho_index() const { return index_bi_rho_dcdm_; }
 
 private:
