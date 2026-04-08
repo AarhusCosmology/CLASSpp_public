@@ -23,6 +23,7 @@ public:
                   const BackgroundModule* bgm);
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
+  void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
 
   // Override to add DCDM->DR decay source after children
   void BackgroundDerivs(double tau, const double* y, double* dy,

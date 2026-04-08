@@ -15,6 +15,10 @@ void DCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
   class_define_index(index_bi_rho_dcdm_, _TRUE_, index_bi, 1);
 }
 
+void DCDMSpecies::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
+  pvecback_integration[index_bi_rho_dcdm_] = pba_.Omega_ini_dcdm * std::pow(pba_.H0, 2) * std::pow(1.0 / a_rel, 3);
+}
+
 void DCDMSpecies::ComputeBackground(double /*a_rel*/, const double* pvecback_B,
                                      double* pvecback) {
   pvecback[index_bg_rho_dcdm_] = pvecback_B[index_bi_rho_dcdm_];

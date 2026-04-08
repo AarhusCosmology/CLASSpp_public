@@ -10,42 +10,15 @@ void NCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   index_bg_rho_      = index_bg++; // base class protected
   index_bg_p_        = index_bg++; // base class protected
   index_bg_pseudo_p_ = index_bg++;
-
-  if (pba_->has_ncdm_decay_dr == _TRUE_ && ncdm_) {
-    if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-      index_bg_lnf_decay_dr1_  = index_bg; index_bg += ncdm_->q_size_ncdm_[ncdm_id_];
-      index_bg_dlnfdlnq_decay_ = index_bg; index_bg += ncdm_->q_size_ncdm_[ncdm_id_];
-      index_bg_dlnfdlnq_sep_   = index_bg; index_bg += ncdm_->q_size_ncdm_[ncdm_id_];
-    }
-  }
 }
 
-void NCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
-  if (pba_->has_ncdm_decay_dr == _TRUE_ && ncdm_) {
-    if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-      index_bi_lnf_decay_dr1_           = index_bi; index_bi += ncdm_->q_size_ncdm_[ncdm_id_];
-      index_bi_dlnfdlnq_separate_decay_ = index_bi; index_bi += ncdm_->q_size_ncdm_[ncdm_id_];
-    }
-  }
+void NCDMSpecies::RegisterIntegrationIndices(int& /*index_bi*/) {
+  // Stable NCDM has no integration variables
 }
 
-void NCDMSpecies::ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) {
+void NCDMSpecies::ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) {
   if (!ncdm_) return;
   double z = 1. / a_rel - 1.;
-
-  // For decaying NCDM: update distribution function weights from ODE vars
-  if (pba_->has_ncdm_decay_dr == _TRUE_ && ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-    const auto& dncdm_props = ncdm_->decay_dr_map_.at(ncdm_id_);
-    for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id_]; ++i) {
-      double f_from_lnf = std::exp(
-          pvecback_B[index_bi_lnf_decay_dr1_ + i]);
-      ncdm_->SetBackgroundWeight(ncdm_id_, i, f_from_lnf * dncdm_props.dq[i]);
-      pvecback[index_bg_lnf_decay_dr1_ + i] =
-          pvecback_B[index_bi_lnf_decay_dr1_ + i];
-      pvecback[index_bg_dlnfdlnq_sep_ + i] =
-          pvecback_B[index_bi_dlnfdlnq_separate_decay_ + i];
-    }
-  }
 
   double number_ncdm, rho_ncdm, p_ncdm, pseudo_p_ncdm;
   ncdm_->background_ncdm_momenta(ncdm_id_, z, &number_ncdm, &rho_ncdm, &p_ncdm,
@@ -56,21 +29,9 @@ void NCDMSpecies::ComputeBackground(double a_rel, const double* pvecback_B, doub
   pvecback[index_bg_pseudo_p_] = pseudo_p_ncdm;
 }
 
-void NCDMSpecies::BackgroundDerivs(double /*tau*/, const double* /*y*/, double* dy,
-                                    const double* pvecback) {
-  if (!pba_->has_ncdm_decay_dr || !ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr) return;
-  const double a = pvecback[bgm_->index_bg_a_];
-  const auto& dncdm_props = ncdm_->decay_dr_map_.at(ncdm_id_);
-  const double M_ncdm = ncdm_->M_ncdm_[ncdm_id_];
-  const double Gamma  = dncdm_props.Gamma;
-  for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id_]; ++i) {
-    const double q       = ncdm_->q_ncdm_[ncdm_id_][i];
-    const double epsilon = std::sqrt(q * q + a * a * M_ncdm * M_ncdm);
-    dy[index_bi_lnf_decay_dr1_ + i] =
-        -a * a * M_ncdm * Gamma / epsilon;
-    dy[index_bi_dlnfdlnq_separate_decay_ + i] =
-        a * a * M_ncdm * Gamma * q * q / std::pow(epsilon, 3);
-  }
+void NCDMSpecies::BackgroundDerivs(double /*tau*/, const double* /*y*/, double* /*dy*/,
+                                    const double* /*pvecback*/) {
+  // Stable NCDM has no background derivatives
 }
 
 // ── Perturbations ──────────────────────────────────────────────────────────
@@ -80,8 +41,6 @@ void NCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precisio
                                                int /*gauge*/) {
   if (!pba_->has_ncdm || !ncdm_) return;
 
-  // Note: we still set pv->index_pt_psi0_ncdm1 to the start of the first NCDM species.
-  // This is for backward compatibility with code that hasn't been refactored yet.
   if (ncdm_id_ == 0) {
     pv->index_pt_psi0_ncdm1 = index_pt;
   }
@@ -154,13 +113,7 @@ void NCDMSpecies::PerturbDerivs(double tau, const double* y, double* dy,
     const double M_ncdm = ncdm_->M_ncdm_[ncdm_id_];
     for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
       const double q = ncdm_->q_ncdm_[ncdm_id_][iq];
-      double dlnf0_dlnq;
-      if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::standard) {
-        dlnf0_dlnq = ncdm_->dlnf0_dlnq_ncdm_[ncdm_id_][iq];
-      } else {
-        // decay_dr: use time-dependent dlnfdlnq from pvecback
-        dlnf0_dlnq = pvecback[index_bg_dlnfdlnq_sep_ + iq];
-      }
+      const double dlnf0_dlnq = ncdm_->dlnf0_dlnq_ncdm_[ncdm_id_][iq];
 
       const double epsilon = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
       const double qk_div_epsilon = k * q / epsilon;
@@ -197,19 +150,15 @@ double NCDMSpecies::Delta(const perturb_vector* pv, const double* y, const doubl
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int)ncdmfa_on);
   if (fa_on) return y[pv->index_ncdm_.at(ncdm_id_)[0]];
 
+  const double a = ppw->scalar_ctx.a;
   double rho_delta_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0;
-    if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::standard) {
-      w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
-    } else {
-      w0 = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    }
+    const double w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
     const double q = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * pvecback[bgm_->index_bg_a_], 2));
+    const double epsilon = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
     rho_delta_ncdm += q * q * epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / pvecback[bgm_->index_bg_a_], 4);
+  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
   return rho_delta_ncdm * factor / pvecback[index_bg_rho_];
 }
 
@@ -219,18 +168,14 @@ double NCDMSpecies::Theta(const perturb_vector* pv, const double* y, const doubl
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int)ncdmfa_on);
   if (fa_on) return y[pv->index_ncdm_.at(ncdm_id_)[0] + 1];
 
+  const double a = ppw->scalar_ctx.a;
   double rho_plus_p_theta_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0;
-    if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::standard) {
-      w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
-    } else {
-      w0 = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    }
+    const double w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
     const double q = ncdm_->q_ncdm_[ncdm_id_][iq];
     rho_plus_p_theta_ncdm += q * q * q * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 1];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / pvecback[bgm_->index_bg_a_], 4);
+  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
   const double k = ppw->scalar_ctx.k;
   return rho_plus_p_theta_ncdm * k * factor / (pvecback[index_bg_rho_] + pvecback[index_bg_p_]);
 }
@@ -244,31 +189,20 @@ double NCDMSpecies::DeltaP(const perturb_vector* pv, const double* y, const doub
     double rho_bg = pvecback[index_bg_rho_];
     double p_bg = pvecback[index_bg_p_];
     double pseudo_p_bg = pvecback[index_bg_pseudo_p_];
-    double w_ncdm, cg2_ncdm;
-    if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::standard) {
-      w_ncdm = p_bg / rho_bg;
-      cg2_ncdm = w_ncdm * (1.0 - 1.0 / (3.0 + 3.0 * w_ncdm) * (3.0 * w_ncdm - 2.0 + pseudo_p_bg / p_bg));
-    } else {
-      double pseudo_p_over_p;
-      std::tie(w_ncdm, pseudo_p_over_p) = ncdm_->GetRescaledParameters(ncdm_id_, pvecback[bgm_->index_bg_a_], pvecback + index_bg_lnf_decay_dr1_);
-      cg2_ncdm = w_ncdm * (1.0 - 1.0 / (3.0 + 3.0 * w_ncdm) * (3.0 * w_ncdm - 2.0 + pseudo_p_over_p));
-    }
+    double w_ncdm = p_bg / rho_bg;
+    double cg2_ncdm = w_ncdm * (1.0 - 1.0 / (3.0 + 3.0 * w_ncdm) * (3.0 * w_ncdm - 2.0 + pseudo_p_bg / p_bg));
     return cg2_ncdm * rho_bg * y[pv->index_ncdm_.at(ncdm_id_)[0]];
   }
 
+  const double a = ppw->scalar_ctx.a;
   double delta_p_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0;
-    if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::standard) {
-      w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
-    } else {
-      w0 = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    }
+    const double w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
     const double q = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * pvecback[bgm_->index_bg_a_], 2));
+    const double epsilon = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
     delta_p_ncdm += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / pvecback[bgm_->index_bg_a_], 4);
+  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
   return delta_p_ncdm * factor / 3.;
 }
 
@@ -278,18 +212,14 @@ double NCDMSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y, con
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int)ncdmfa_on);
   if (fa_on) return (pvecback[index_bg_rho_] + pvecback[index_bg_p_]) * y[pv->index_ncdm_.at(ncdm_id_)[0] + 2];
 
+  const double a = ppw->scalar_ctx.a;
   double rho_plus_p_shear_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0;
-    if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::standard) {
-      w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
-    } else {
-      w0 = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    }
+    const double w0 = ncdm_->w_ncdm_[ncdm_id_][iq];
     const double q = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * pvecback[bgm_->index_bg_a_], 2));
+    const double epsilon = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
     rho_plus_p_shear_ncdm += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 2];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / pvecback[bgm_->index_bg_a_], 4);
+  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
   return 2.0 / 3.0 * factor * rho_plus_p_shear_ncdm;
 }

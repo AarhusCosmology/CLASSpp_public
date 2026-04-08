@@ -41,6 +41,7 @@ public:
 
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override;
+  void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
   void ComputeBackground(double a_rel, const double* pvecback_B,
                          double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy,

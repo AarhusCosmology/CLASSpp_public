@@ -34,6 +34,11 @@ void CompositeSpecies::SetBackgroundModule(const BackgroundModule* bgm) {
     child->SetBackgroundModule(bgm);
 }
 
+void CompositeSpecies::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
+  for (auto& child : children_)
+    child->SetBackgroundInitialConditions(a_rel, pvecback_integration);
+}
+
 void CompositeSpecies::ComputeBackground(double a_rel,
                                           const double* pvecback_B,
                                           double* pvecback) {

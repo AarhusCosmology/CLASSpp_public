@@ -22,6 +22,19 @@ void DCDM_DR_Species::SetBackgroundModule(const BackgroundModule* bgm) {
   CompositeSpecies::SetBackgroundModule(bgm);
 }
 
+void DCDM_DR_Species::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
+  // Initialize children first (DCDM)
+  CompositeSpecies::SetBackgroundInitialConditions(a_rel, pvecback_integration);
+
+  // Then add the DR initial condition from DCDM decay
+  if (pba_->has_dcdm == _TRUE_) {
+    const double Omega_rad = pba_->Omega0_g + pba_->Omega0_ur;
+    const double rho_dcdm_ini = pvecback_integration[dcdm_->bi_rho_index()];
+    double f = 1./3.*std::pow(a_rel, 6) * rho_dcdm_ini * pba_->Gamma_dcdm / std::pow(pba_->H0, 3) / std::sqrt(Omega_rad);
+    pvecback_integration[dr_sp_->bi_rho_dr_species_index()] = f * std::pow(pba_->H0, 2) / std::pow(a_rel, 4);
+  }
+}
+
 void DCDM_DR_Species::BackgroundDerivs(double tau, const double* y,
                                         double* dy, const double* pvecback) {
   // Children handle their own dilution terms

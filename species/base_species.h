@@ -76,6 +76,13 @@ public:
   virtual void RegisterIntegrationIndices(int& index_bi) {}
 
   /**
+   * Set initial conditions for ODE-integrated background variables.
+   * @param a_rel                Initial relative scale factor.
+   * @param pvecback_integration ODE integration vector to be populated.
+   */
+  virtual void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {}
+
+  /**
    * Compute species background quantities at relative scale factor a_rel = a/a_today.
    * pvecback_B is the current ODE integration vector.
    * Write density (and any other owned quantities) into pvecback.

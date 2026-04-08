@@ -40,9 +40,6 @@ public:
   int index_bg_rho_idm_dr_;    /**< density of dark matter interacting with dark radiation */
   int index_bg_rho_idr_;       /**< density of interacting dark radiation */
   int index_bg_rho_dcdm_;      /**< dcdm density */
-  int index_bg_lnf_ncdm_decay_dr1_;
-  int index_bg_dlnfdlnq_ncdm_decay_dr1_;
-  int index_bg_dlnfdlnq_separate_ncdm_decay_dr1_;
 
   int index_bg_rho_idm_drmd_; //**idm dark matter in drmd model */
   int index_bg_G_over_aH_drmd_; //**G/(aH) in drmd model */
@@ -154,8 +151,6 @@ private:
 
   int index_bi_a_;       /**< {B} scale factor */
   int index_bi_rho_dcdm_;/**< {B} dcdm density */
-  int index_bi_lnf_ncdm_decay_dr1_; /**< {B} dncdm distribution function*/
-  int index_bi_dlnfdlnq_separate_ncdm_decay_dr1_;
   int index_bi_rho_dr_species_;
   
   int index_bi_rho_fld_; /**< {B} fluid density */

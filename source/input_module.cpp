@@ -34,6 +34,7 @@
 #include "../species/dcdm_dr_species.h"
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
+#include "../species/dncdm_dr_species.h"
 
 #include <thread>
 /**
@@ -224,7 +225,11 @@ void InputModule::ConstructSpecies() {
   if (pba->has_ncdm == _TRUE_ && ncdm_ != nullptr) {
     for (int n = 0; n < pba->N_ncdm; ++n) {
       std::string name = "NCDM_" + std::to_string(n);
-      all_species_[name] = std::make_unique<NCDMSpecies>(n, ncdm_, pba, nullptr);
+      if (ncdm_->ncdm_types_[n] == NCDMType::decay_dr) {
+        all_species_[name] = std::make_unique<DNCDM_DR_Species>(n, ncdm_, pba, nullptr);
+      } else {
+        all_species_[name] = std::make_unique<NCDMSpecies>(n, ncdm_, pba, nullptr);
+      }
     }
   }
   if (pba->has_scf == _TRUE_) {

@@ -86,6 +86,7 @@
 #include "../species/dcdm_dr_species.h"
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
+#include "../species/dncdm_dr_species.h"
 
 BackgroundModule::BackgroundModule(InputModulePtr input_module)
 : BaseModule(input_module) {
@@ -316,90 +317,6 @@ int BackgroundModule::background_functions(double* pvecback_B, /* Vector contain
     sp->ComputeBackground(a_rel, pvecback_B, pvecback);
     accumulate(*sp);
   }
-
-    if (pba->has_ncdm_decay_dr) {
-      for (auto& [name, sp] : all_species_) {
-        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-        if (!ncdm_sp) continue;
-        const int ncdm_id = ncdm_sp->ncdm_id();
-        if (ncdm_->ncdm_types_[ncdm_id] != NCDMType::decay_dr) continue;
-
-        const int q_size = ncdm_->q_size_ncdm_[ncdm_id];
-        const int bg_lnf_idx = ncdm_sp->bg_lnf_index();
-        const int bi_lnf_idx = ncdm_sp->bi_lnf_index();
-        const int bg_dlnfdlnq_idx = ncdm_sp->bg_dlnfdlnq_index();
-        const int q_offset = ncdm_->decay_dr_map_.at(ncdm_id).q_offset;
-
-        std::vector<double> lnf_dlnf_array(2*q_size);
-        std::vector<double> ddlnf_array(q_size);
-        std::vector<double> lnq(q_size);
-
-        if (pba->background_method == bgevo_evolver) {
-          bool has_problem = false;
-          for (int i = 0; i < q_size; i++) {
-            if (pvecback_B[bi_lnf_idx + i] <= -460) {
-              has_problem = true;
-              break;
-            }
-            lnf_dlnf_array[i] = pvecback_B[bi_lnf_idx + i];
-            lnq[i] = log(ncdm_->q_ncdm_[ncdm_id][i]);
-          }
-          if (has_problem) {
-            // Use Fermi-Dirac approximation when f becomes static
-            // FD has dlnf/dlnq = -q e^q / (e^q + 1) ≈ -q
-            for (int i = 0; i < q_size; i++) {
-              double q = ncdm_->q_ncdm_[ncdm_id][i];
-              double lnf_fd = -log(1. + exp(q));
-              double dlnfdlnq_fd = -q * exp(q) / (1. + exp(q));
-              pvecback[bg_lnf_idx + i] = lnf_fd;
-              pvecback[bg_dlnfdlnq_idx + i] = dlnfdlnq_fd;
-              // Legacy global blocks
-              if (index_bg_lnf_ncdm_decay_dr1_ != -1) {
-                pvecback[index_bg_lnf_ncdm_decay_dr1_ + q_offset + i] = lnf_fd;
-                pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + q_offset + i] = dlnfdlnq_fd;
-              }
-            }
-            continue;
-          }
-        }
-        else {
-          for (int i = 0; i < q_size; i++) {
-            lnf_dlnf_array[i] = pvecback_B[bi_lnf_idx + i];
-            lnq[i] = log(ncdm_->q_ncdm_[ncdm_id][i]);
-          }
-        }
-
-        // Find df/dq by first splining and then calculating the derivative
-        class_call(array_spline_table_lines(lnq.data(),
-                                            q_size,
-                                            lnf_dlnf_array.data(),
-                                            1,
-                                            ddlnf_array.data(),
-                                            _SPLINE_EST_DERIV_,
-                                            error_message_),
-                   error_message_, error_message_);
-
-        class_call(array_derive_spline(lnq.data(),
-                                       q_size,
-                                       lnf_dlnf_array.data(),
-                                       ddlnf_array.data(),
-                                       1,
-                                       0,
-                                       q_size,
-                                       error_message_),
-                   error_message_, error_message_);
-
-        for (int i = 0; i < q_size; i++) {
-          pvecback[bg_lnf_idx + i] = lnf_dlnf_array[i];
-          pvecback[bg_dlnfdlnq_idx + i] = lnf_dlnf_array[q_size + i];
-          // Legacy global blocks
-          if (index_bg_lnf_ncdm_decay_dr1_ != -1) {
-            pvecback[index_bg_lnf_ncdm_decay_dr1_ + q_offset + i] = lnf_dlnf_array[i];
-            pvecback[index_bg_dlnfdlnq_ncdm_decay_dr1_ + q_offset + i] = lnf_dlnf_array[q_size + i];
-          }
-        }
-      }
-    }
 
   /* Fluid needs w_fld computed before calling ComputeBackground */
   if (pba->has_fld == _TRUE_) {
@@ -777,12 +694,6 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_G_over_aH_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
   class_define_index(index_bg_Gamma0_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
 
-
-  /* - index for time-dependent distribution function in DNCDM for each q-bin */
-  class_define_index(index_bg_lnf_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
-  class_define_index(index_bg_dlnfdlnq_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
-  class_define_index(index_bg_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bg, ncdm_->q_total_size_dncdm_);
-
   /* - indices for ncdm. */
   if (pba->has_ncdm == _TRUE_) {
     index_bg_number_ncdm1_ = index_bg;
@@ -809,7 +720,6 @@ int BackgroundModule::background_indices() {
     }
   } else {
     index_bg_number_ncdm1_ = index_bg_rho_ncdm1_ = index_bg_p_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
-    index_bg_lnf_ncdm_decay_dr1_ = index_bg_dlnfdlnq_ncdm_decay_dr1_ = index_bg_dlnfdlnq_separate_ncdm_decay_dr1_ = -1;
   }
 
   /* - indices for DCDM + DR composite */
@@ -949,9 +859,12 @@ int BackgroundModule::background_indices() {
     index_bi_rho_dcdm_ = index_bi_rho_dr_species_ = -1;
   }
 
-  /* -> time-dependent distribution function in DNCDM for each q-bin */
-  class_define_index(index_bi_lnf_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
-  class_define_index(index_bi_dlnfdlnq_separate_ncdm_decay_dr1_, pba->has_ncdm_decay_dr, index_bi, ncdm_->q_total_size_dncdm_);
+  /* -> integration indices for all other species (including DNCDM composites) */
+  for (auto& [name, sp] : all_species_) {
+    if (name == "DCDM_DR") continue;
+    if (name == "Fluid" || name == "ScalarField") continue; // handled below for index capture
+    sp->RegisterIntegrationIndices(index_bi);
+  }
 
   /* -> energy density in fluid */
   if (pba->has_fld == _TRUE_) {
@@ -1527,32 +1440,9 @@ int BackgroundModule::background_initial_conditions(double* pvecback, /* vector 
     double rho_ncdm_rel_tot = 0.;
     rho_rad += rho_ncdm_rel_tot;
   }
-  if (pba->has_dcdm == _TRUE_){
-    /* Remember that the critical density today in CLASS conventions is H0^2 */
-    pvecback_integration[index_bi_rho_dcdm_] =
-      pba->Omega_ini_dcdm*pba->H0*pba->H0*pow(pba->a_today/a,3);
-    if (pba->background_verbose > 3)
-      printf("Density is %g. a_today=%g. Omega_ini=%g\n", pvecback_integration[index_bi_rho_dcdm_], pba->a_today, pba->Omega_ini_dcdm);
-  }
-
-  if (pba->has_dcdm) {
-    double f = 1./3.*pow(a/pba->a_today,6)*pvecback_integration[index_bi_rho_dcdm_]*pba->Gamma_dcdm/pow(pba->H0,3)/sqrt(Omega_rad);
-    pvecback_integration[index_bi_rho_dr_species_ + 0] = f*pba->H0*pba->H0/pow(a/pba->a_today,4);
-  }
-
-  if (pba->has_ncdm_decay_dr == _TRUE_) {
-    for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
-      pvecback_integration[index_bi_rho_dr_species_ + dncdm_properties.dr_id] = 0.;
-    }
-
-    for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
-      for (int index_q = 0; index_q < ncdm_->q_size_ncdm_[ncdm_id]; index_q++) {
-        double f0 = ncdm_->w_ncdm_[ncdm_id][index_q]/dncdm_properties.dq[index_q];
-        double q = ncdm_->q_ncdm_[ncdm_id][index_q];
-        pvecback_integration[index_bi_lnf_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = log(f0);
-        pvecback_integration[index_bi_dlnfdlnq_separate_ncdm_decay_dr1_ + dncdm_properties.q_offset + index_q] = -q*exp(q)/(exp(q) + 1); // Fermi-Dirac
-      }
-    }
+  /* Set initial conditions for all species background ODE variables (including DCDM and DNCDM) */
+  for (auto& [name, sp] : all_species_) {
+    sp->SetBackgroundInitialConditions(a/pba->a_today, pvecback_integration);
   }
 
   if (pba->has_fld == _TRUE_){
@@ -1842,22 +1732,43 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rho_b_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_cdm_], pba->has_cdm, storeidx);
     if (pba->has_ncdm == _TRUE_){
-      std::vector<NCDMSpecies*> ncdm_vec_store;
+      std::vector<BaseSpecies*> ncdm_vec_store;
       for (auto& [name, sp] : all_species_) {
         if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) ncdm_vec_store.push_back(n);
+        else if (auto* c = dynamic_cast<DNCDM_DR_Species*>(sp.get())) ncdm_vec_store.push_back(&c->dncdm());
       }
       std::sort(ncdm_vec_store.begin(), ncdm_vec_store.end(),
-                [](NCDMSpecies* a, NCDMSpecies* b){ return a->ncdm_id() < b->ncdm_id(); });
-      for (auto* ncdm_sp : ncdm_vec_store){
-        class_store_double(dataptr, pvecback[ncdm_sp->bg_number_index()], _TRUE_, storeidx);
-        class_store_double(dataptr, pvecback[ncdm_sp->bg_rho_index()], _TRUE_, storeidx);
-        class_store_double(dataptr, pvecback[ncdm_sp->bg_p_index()], _TRUE_, storeidx);
-        if (ncdm_->ncdm_types_[ncdm_sp->ncdm_id()] == NCDMType::decay_dr) {
+                [](BaseSpecies* a, BaseSpecies* b){
+                  int id_a = -1, id_b = -1;
+                  if (auto* na = dynamic_cast<NCDMSpecies*>(a)) id_a = na->ncdm_id();
+                  else if (auto* da = dynamic_cast<DNCDMSpecies*>(a)) id_a = da->ncdm_id();
+                  if (auto* nb = dynamic_cast<NCDMSpecies*>(b)) id_b = nb->ncdm_id();
+                  else if (auto* db = dynamic_cast<DNCDMSpecies*>(b)) id_b = db->ncdm_id();
+                  return id_a < id_b;
+                });
+
+      for (auto* sp : ncdm_vec_store){
+        int n_id = -1;
+        int bg_number_index = -1;
+        if (auto* n_sp = dynamic_cast<NCDMSpecies*>(sp)) {
+          n_id = n_sp->ncdm_id();
+          bg_number_index = n_sp->bg_number_index();
+        }
+        else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(sp)) {
+          n_id = d_sp->ncdm_id();
+          bg_number_index = d_sp->bg_number_index();
+        }
+
+        class_store_double(dataptr, pvecback[bg_number_index], _TRUE_, storeidx);
+        class_store_double(dataptr, pvecback[sp->bg_rho_index()], _TRUE_, storeidx);
+        class_store_double(dataptr, pvecback[sp->bg_p_index()], _TRUE_, storeidx);
+        if (ncdm_->ncdm_types_[n_id] == NCDMType::decay_dr) {
           // For each decaying species, print the distribution function at each point of q-grid
-          const int bg_lnf_idx = ncdm_sp->bg_lnf_index();
-          const int bg_dlnfdlnq_idx = ncdm_sp->bg_dlnfdlnq_index();
-          const int bg_dlnfdlnq_sep_idx = ncdm_sp->bg_dlnfdlnq_sep_index();
-          for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_sp->ncdm_id()]; i++) {
+          auto* dncdm_sp = static_cast<DNCDMSpecies*>(sp);
+          const int bg_lnf_idx = dncdm_sp->bg_lnf_index();
+          const int bg_dlnfdlnq_idx = dncdm_sp->bg_dlnfdlnq_index();
+          const int bg_dlnfdlnq_sep_idx = dncdm_sp->bg_dlnfdlnq_sep_index();
+          for (int i = 0; i < ncdm_->q_size_ncdm_[n_id]; i++) {
             class_store_double(dataptr, pvecback[bg_lnf_idx + i], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[bg_dlnfdlnq_idx + i], _TRUE_, storeidx);
             class_store_double(dataptr, pvecback[bg_dlnfdlnq_sep_idx + i], _TRUE_, storeidx);
@@ -1981,28 +1892,10 @@ int BackgroundModule::background_derivs_member(
   dy[index_bi_D_] = y[index_bi_D_prime_];
   dy[index_bi_D_prime_] = -a*H*y[index_bi_D_prime_] + 1.5*a*a*rho_M*y[index_bi_D_];
 
-  /* Species background ODE contributions (including DCDM_DR composite). */
+  /* Species background ODE contributions (including DCDM_DR and DNCDM_DR composites). */
   for (const auto& [name, sp] : all_species_) {
     sp->BackgroundDerivs(tau, y, dy, pvecback); // default is no-op
   }
-  if (pba->has_dr == _TRUE_){
-    if (pba->has_ncdm_decay_dr) {
-      for (auto& [name, sp] : all_species_) {
-        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-        if (!ncdm_sp) continue;
-        const int ncdm_id = ncdm_sp->ncdm_id();
-        if (ncdm_->ncdm_types_[ncdm_id] != NCDMType::decay_dr) continue;
-
-        const auto& dncdm_properties = ncdm_->decay_dr_map_.at(ncdm_id);
-        const double M_1 = ncdm_->M_ncdm_[ncdm_id];
-        const double Gamma = dncdm_properties.Gamma;
-
-        // Integrated density for self-consistency checks; only computes for ncdm_id = 0
-        dy[index_bi_rho_dr_species_ + dncdm_properties.dr_id] = -4.*y[index_bi_a_]*pvecback[index_bg_H_]*y[index_bi_rho_dr_species_ + dncdm_properties.dr_id] + y[index_bi_a_]*Gamma*M_1*pvecback[ncdm_sp->bg_number_index()];
-      }
-    }
-  }
-
 
   return _SUCCESS_;
 

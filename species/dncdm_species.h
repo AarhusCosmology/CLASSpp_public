@@ -8,21 +8,22 @@
 class BackgroundModule;
 
 /**
- * Non-Cold Dark Matter: massive neutrinos and warm/hot dark matter.
- * Wraps the existing NonColdDarkMatter class which handles all N_ncdm species.
+ * Decaying Non-Cold Dark Matter (DNCDM).
+ * Handles the background and perturbation evolution for a decaying NCDM species.
  */
-class NCDMSpecies : public BaseSpecies {
+class DNCDMSpecies : public BaseSpecies {
 public:
-  NCDMSpecies(int ncdm_id, std::shared_ptr<NonColdDarkMatter> ncdm,
-              const background* pba,
-              const BackgroundModule* bgm)
-    : BaseSpecies("NCDM_" + std::to_string(ncdm_id), EnergyType::Other),
+  DNCDMSpecies(int ncdm_id, std::shared_ptr<NonColdDarkMatter> ncdm,
+               const background* pba,
+               const BackgroundModule* bgm)
+    : BaseSpecies("DNCDM_" + std::to_string(ncdm_id), EnergyType::Other),
       ncdm_id_(ncdm_id), ncdm_(std::move(ncdm)), pba_(pba), bgm_(bgm) {}
 
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override { bgm_ = bgm; }
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
+  void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
 
@@ -33,7 +34,6 @@ public:
     return pvecback[index_bg_p_];
   }
   double DpDloga(const double* pvecback) const override {
-    // dp/dloga for NCDM component: (pseudo_p - 5*p)  [see CLASS IV paper eq. A6]
     return pvecback[index_bg_pseudo_p_] - 5. * pvecback[index_bg_p_];
   }
 
@@ -49,8 +49,15 @@ public:
   double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
 
   int ncdm_id() const { return ncdm_id_; }
+  const NonColdDarkMatter& ncdm() const { return *ncdm_; }
   int bg_number_index()   const { return index_bg_number_; }
   int bg_pseudo_p_index() const { return index_bg_pseudo_p_; }
+  int bg_lnf_index()      const { return index_bg_lnf_decay_dr1_; }
+  int bg_dlnfdlnq_index() const { return index_bg_dlnfdlnq_decay_; }
+  int bg_dlnfdlnq_sep_index() const { return index_bg_dlnfdlnq_sep_; }
+
+  int bi_lnf_index()      const { return index_bi_lnf_decay_dr1_; }
+  int bi_dlnfdlnq_sep_index() const { return index_bi_dlnfdlnq_separate_decay_; }
 
 private:
   int ncdm_id_;
@@ -61,7 +68,15 @@ private:
   // Background indices (single slot each)
   int index_bg_number_    = -1;
   int index_bg_pseudo_p_  = -1;
-  // index_bg_rho_ and index_bg_p_ are the base-class protected members
+
+  // Integration indices for decaying NCDM distribution function
+  int index_bi_lnf_decay_dr1_           = -1;
+  int index_bi_dlnfdlnq_separate_decay_ = -1;
+
+  // Background indices for decay-dr lnf/dlnfdlnq slots
+  int index_bg_lnf_decay_dr1_    = -1;
+  int index_bg_dlnfdlnq_decay_   = -1;
+  int index_bg_dlnfdlnq_sep_     = -1;
 
   // Perturbation indices
   int index_pt_psi0_ = -1;
