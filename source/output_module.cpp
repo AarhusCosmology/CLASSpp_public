@@ -488,7 +488,7 @@ int OutputModule::output_cl() {
     }
   }
   fclose(out);
-  if (ple->has_lensed_cls == _TRUE_) {
+  if (ple->has_lensed_cls == _TRUE_ && out_lensed != nullptr) {
     fclose(out_lensed);
   }
 

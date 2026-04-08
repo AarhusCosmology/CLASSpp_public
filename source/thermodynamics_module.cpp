@@ -845,7 +845,8 @@ int ThermodynamicsModule::thermodynamics_init() {
 
     /* (A1) --> if Gamma is not much smaller than H, set T_idm_dr to T_idm_dr = T_idr = xi*T_gamma (tight coupling solution) */
     if (Gamma_heat_idm_dr > 1.e-3*pvecback[background_module_->index_bg_a_]*pvecback[background_module_->index_bg_H_]) {
-      T_idm_dr = pba->T_idr*(1.+z);
+      T_idr = pba->T_idr*(1.+z);
+      T_idm_dr = T_idr;
       dTdz_idm_dr = pba->T_idr;
     }
 
@@ -1619,6 +1620,10 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
         class_test(sscanf(line,"%d %d",&num_omegab,&num_deltaN) != 2,
                    error_message_,
                    "could not read value of parameters (num_omegab,num_deltaN) in file %s\n",ppr->sBBN_file);
+
+        class_test(num_omegab <= 0 || num_deltaN <= 0,
+                   error_message_,
+                   "read num_omegab=%d, num_deltaN=%d in file %s, expected positive values\n",num_omegab,num_deltaN,ppr->sBBN_file);
 
         omegab.resize(num_omegab);
         deltaN.resize(num_deltaN);
@@ -3411,7 +3416,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
 
   y[0] = 1.;
   y[1] = 1.;
-  double x0 = 1.+2.*preco->fHe;
+  double x0;
   y[2] = preco->Tnow*(1.+z);
 
   /** - loop over redshift steps Nz; integrate over each step with

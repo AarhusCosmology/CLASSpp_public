@@ -1842,7 +1842,6 @@ int array_interpolate_spline_one_column(
 
 
   int inf,sup,mid;
-  double h,a,b;
 
   inf=0;
   sup=x_size-1;
@@ -1879,9 +1878,9 @@ int array_interpolate_spline_one_column(
 
   }
 
-  h = x_array[sup] - x_array[inf];
-  b = (x-x_array[inf])/h;
-  a = 1-b;
+  double h = x_array[sup] - x_array[inf];
+  double b = (x-x_array[inf])/h;
+  double a = 1-b;
 
   *y =
     a * y_array[index_y * x_size + inf] +
@@ -2011,7 +2010,6 @@ int array_interpolate_extrapolate_logspline_loglinear_one_column(
 
     h = log(x_array[x_stop-1]) - log(x_array[x_stop-2]);
     b = (log(x)-log(x_array[x_stop-2]))/h;
-    a = 1-b;
 
 /*     *y = exp(a * log(y_array[index_y * x_size + (x_stop-2)]) + */
 /* 	     b * log(y_array[index_y * x_size + (x_stop-1)])); */
@@ -2097,7 +2095,6 @@ int array_interpolate_growing_closeby(
   double weight;
 
   inf = *last_index;
-  sup = *last_index+1;
 
   while (x < *(array+inf*n_columns+index_x)) {
     inf--;
@@ -2143,7 +2140,6 @@ int array_interpolate_one_growing_closeby(
   double weight;
 
   inf = *last_index;
-  sup = *last_index+1;
 
   while (x < *(array+inf*n_columns+index_x)) {
     inf--;

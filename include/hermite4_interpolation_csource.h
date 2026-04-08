@@ -106,8 +106,6 @@ for (j=0; j<nxi; j++){
       dym = dyp;
 #if defined HERMITE_DO_DPHI || defined HERMITE_DO_D2PHI
       d2ym = d2yp;
-      sinKm = sinKp;
-      cotKm = cotKp;
 #endif
 #ifdef HERMITE_DO_D2PHI
       d3ym = d3yp;

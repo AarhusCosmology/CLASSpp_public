@@ -127,6 +127,8 @@ int hyperspherical_HIS_create(int K,
     }
     break;
   default:
+    free(sqrtK);
+    free(one_over_sqrtK);
     return _FAILURE_;
   }
 
@@ -392,8 +394,6 @@ int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct *pHIS,
         d2ym = d2yp;
         d3ym = d3yp;
         d4ym = d4yp;
-        sinKm = sinKp;
-        cotKm = cotKp;
       }
       left_border = xvec[MAX(0,current_border_idx-1)];
       right_border = xvec[current_border_idx];
@@ -1183,7 +1183,7 @@ int hyperspherical_get_xmin_from_Airy(int K,
 }
 
 double PhiWKB_minus_phiminabs(double x, void *param){
-   double phiwkb;
+   double phiwkb = 0.;
    struct WKB_parameters *wkbparam = (struct WKB_parameters *)param;
    hyperspherical_WKB(wkbparam->K,wkbparam->l,wkbparam->beta,x, &phiwkb);
    return(fabs(phiwkb)-wkbparam->phiminabs);
@@ -1302,33 +1302,28 @@ polynomials in
    case 0:
      gamma = 0;
      delta = 1;
-     NK = beta2;
      break;
    case 1:
      gamma = -1;
      delta = CotK;
-     NK = beta2*(beta2 - K);
      break;
    case 2:
      beta4 = beta2*beta2;
      CscK2 =CscK*CscK;
      gamma = -3*CotK;
      delta = -beta2 + 3*CscK2 - 2*K;
-     NK = beta2*(4.0 + beta4 - 5.0*beta2*K);
      break;
    case 3:
      beta4 = beta2*beta2;
      CscK2 =CscK*CscK;
      gamma = beta2-15*CscK2+11*K;
      delta = CotK*(-6*beta2 + 15*CscK2 - 6*K);
-     NK = beta2*(49*beta2 + beta2*beta4 - 36*K - 14*beta4*K);
      break;
    case 4:
      beta4 = beta2*beta2;
      CscK2 = CscK*CscK; CscK4 = CscK2*CscK2;
      gamma = CotK*(10*beta2-105*CscK2+50*K);
      delta = 24 + beta4 + 105*CscK4 + CscK2*(-45*beta2 - 120*K) + 35*beta2*K;
-     NK = beta2*(576 + 273*beta4 + beta4*beta4 - 10*beta2*(82 + 3*beta4)*K);
      break;
    case 5:
      beta2 = beta*beta; beta4 = beta2*beta2;
@@ -1336,8 +1331,6 @@ polynomials in
      gamma = -274-beta4+105*beta2*CscK2-945*CscK4-85*beta2*K+1155*CscK2*K;
      delta = CotK*(120 + 15*beta4 + 945*CscK4 + CscK2*(-420*beta2 - 840*K) +
            225*beta2*K);
-     NK = beta2*(beta2*(21076.0 + 1023*beta4 + beta4*beta4) -
-         5.0*(2880.0 + 11*beta4*(139 + beta4))*K);
      break;
    case 6:
      beta2 = beta*beta; beta4 = beta2*beta2; beta6 = beta4*beta2; beta8 = beta4*beta4;
@@ -1346,8 +1339,6 @@ polynomials in
            735*beta2*K + 10080*CscK2*K);
      delta = -1624*beta2 - beta6 + 10395*CscK6 + CscK4*(-4725*beta2 - 17010*K) -
        720*K - 175*beta4*K + CscK2*(7560 + 210*beta4 + 6090*beta2*K);
-     NK = beta2*(518400 + beta8*beta4 + 296296*beta4 + 3003*beta8 -
-         13*beta2*(59472 + 3421*beta4 + 7*beta8)*K);
      break;
    case 7:
      beta2 = beta*beta; beta4 = beta2*beta2; beta6 = beta4*beta2; beta8 = beta4*beta4;
@@ -1359,8 +1350,6 @@ polynomials in
      delta = CotK*(-13132*beta2 - 28*beta6 + 135135*CscK6 +
            CscK4*(-62370*beta2 - 187110*K) - 5040*K - 1960*beta4*K +
            CscK2*(68040 + 3150*beta4 + 64890*beta2*K));
-     NK = beta2*(beta2*(38402064 + beta6*beta6 + 2475473*beta4 + 7462*beta8) -
-         20*(1270080 + 7*beta12 + 764582*beta4 + 9581*beta8)*K);
      break;
    case 8:
      beta2 = beta*beta; beta4 = beta2*beta2; beta6 = beta4*beta2; beta8 = beta4*beta4;
@@ -1373,8 +1362,6 @@ polynomials in
        CscK6*(-945945*beta2 - 4324320*K) + 118124*beta2*K + 546*beta6*K +
        CscK4*(2993760 + 51975*beta4 + 1694385*beta2*K) +
        CscK2*(-879480*beta2 - 630*beta6 - 725760*K - 72450*beta4*K);
-     NK = beta2*(1625702400 + 16422*beta12 + beta16 + 1017067024*beta4 + 14739153*beta8 -
-         68*beta2*(36516672 + 3*beta12 + 2554734*beta4 + 9841*beta8)*K);
    break;
    case 9:
      beta2 = beta*beta; beta4 = beta2*beta2; beta6 = beta4*beta2; beta8 = beta4*beta4;
@@ -1389,8 +1376,6 @@ polynomials in
            CscK6*(-16216200*beta2 - 64864800*K) + 1172700*beta2*K + 9450*beta6*K +
            CscK4*(38918880 + 945945*beta4 + 24999975*beta2*K) +
            CscK2*(-10866240*beta2 - 13860*beta6 - 7983360*K - 1094940*beta4*K));
-     NK = beta2*(beta2*(202759531776.0 + 32946*beta12 + beta16 + 15088541896.0*beta4 + 68943381.0*beta8) -
-         5*(26336378880.0 + 19*beta4*(893321712.0 + 3*beta12 + 14395719.0*beta4 + 21046.0*beta8))*K);
      break;
    default:
      *Phi = 0.0;

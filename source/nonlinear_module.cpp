@@ -143,7 +143,6 @@ int NonlinearModule::nonlinear_pk_at_z(
                  "requested z was not inside of tau tabulation range (Requested ln(tau_=%.10e, Min %.10e). Solution might be to increase input parameter z_max_pk (see explanatory.ini)",ln_tau,ln_tau_[0]);
 
       /** --> if ln(tau) too small but within tolerance, round it and get right values without interpolating */
-      ln_tau = ln_tau_[0];
 
       for (int index_k = 0; index_k < k_size_; index_k++) {
         if (pk_output == pk_linear) {
@@ -170,7 +169,6 @@ int NonlinearModule::nonlinear_pk_at_z(
                  ln_tau_[ln_tau_size_ - 1]);
 
       /** --> if ln(tau) too large but within tolerance, round it and get right values without interpolating */
-      ln_tau = ln_tau_[ln_tau_size_ - 1];
 
       for (int index_k = 0; index_k < k_size_; index_k++) {
         if (pk_output == pk_linear) {
@@ -1007,7 +1005,6 @@ int NonlinearModule::nonlinear_k_nl_at_z(double z, double * k_nl, double * k_nl_
 
 int NonlinearModule::nonlinear_init() {
 
-  int index_ncdm;
   int index_tau_sources;
   int index_tau_late;
   int index_pk;
@@ -2224,8 +2221,6 @@ int NonlinearModule::nonlinear_halofit(
                background_module_->error_message_,
                error_message_);
 
-    Omega_m = pvecback[background_module_->index_bg_Omega_m_];
-    Omega_v = 1. - pvecback[background_module_->index_bg_Omega_m_] - pvecback[background_module_->index_bg_Omega_r_];
 
   }
   else {
@@ -2256,8 +2251,6 @@ int NonlinearModule::nonlinear_halofit(
                error_message_);
 
     w0 = w_and_Omega[index_pk_eq_w_];
-    Omega_m = w_and_Omega[index_pk_eq_Omega_m_];
-    Omega_v = 1.-Omega_m;
 
   }
 
@@ -2504,7 +2497,6 @@ int NonlinearModule::nonlinear_halofit(
              error_message_,
              error_message_);
 
-  sigma  = sqrt(sum1);
   d1 = -sum2/sum1;
   d2 = -sum2*sum2/sum1/sum1 - sum3/sum1;
 

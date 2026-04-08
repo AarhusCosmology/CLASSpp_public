@@ -290,7 +290,6 @@ int LensingModule::lensing_init() {
   sqrt4 = &(buf_dxx[icount]);
   icount += l_unlensed_max_ + 1;
   sqrt5 = &(buf_dxx[icount]);
-  icount += l_unlensed_max_ + 1;
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<int>> dXX_tasks;
 
@@ -984,7 +983,6 @@ int LensingModule::lensing_d00(
     double dl=mu[index_mu] * sqrt(3./2.); /*l=1*/
     d00[index_mu][1]=dl*sqrt(2./3.);
     for(int l=1;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d00 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*mu[index_mu]*dl - fac2[l]*dlm1;
       d00[index_mu][l+1] = dlp1 * fac3[l];
@@ -1031,7 +1029,6 @@ int LensingModule::lensing_d11(
     double dl=(1.0+mu[index_mu])/2.*(2.0*mu[index_mu]-1.0) * sqrt(5./2.); /*l=2*/
     d11[index_mu][2] = dl * sqrt(2./5.);
     for(int l=2;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d11 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
       d11[index_mu][l+1] = dlp1 * fac4[l];
@@ -1077,7 +1074,6 @@ int LensingModule::lensing_d1m1(
     double dl=(1.0-mu[index_mu])/2.*(2.0*mu[index_mu]+1.0) * sqrt(5./2.); /*l=2*/
     d1m1[index_mu][2] = dl * sqrt(2./5.);
     for(int l=2;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d1m1 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d1m1[index_mu][l+1] = dlp1 * fac4[l];
@@ -1123,7 +1119,6 @@ int LensingModule::lensing_d2m2(
     double dl=(1.0-mu[index_mu])*(1.0-mu[index_mu])/4. * sqrt(5./2.); /*l=2*/
     d2m2[index_mu][2] = dl * sqrt(2./5.);
     for(int l=2;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d2m2 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d2m2[index_mu][l+1] = dlp1 * fac4[l];
@@ -1169,7 +1164,6 @@ int LensingModule::lensing_d22(
     double dl=(1.0+mu[index_mu])*(1.0+mu[index_mu])/4. * sqrt(5./2.); /*l=2*/
     d22[index_mu][2] = dl * sqrt(2./5.);
     for(int l=2;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
       d22[index_mu][l+1] = dlp1 * fac4[l];
@@ -1214,7 +1208,6 @@ int LensingModule::lensing_d20(
     double dl=sqrt(15.)/4.*(1-mu[index_mu]*mu[index_mu]); /*l=2*/
     d20[index_mu][2] = dl * sqrt(2./5.);
     for(int l=2;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*mu[index_mu]*dl - fac3[l]*dlm1;
       d20[index_mu][l+1] = dlp1 * fac4[l];
@@ -1261,7 +1254,6 @@ int LensingModule::lensing_d31(
     double dl=sqrt(105./2.)*(1+mu[index_mu])*(1+mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
     d31[index_mu][3] = dl * sqrt(2./7.);
     for(int l=3;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]-fac2[l])*dl - fac3[l]*dlm1;
       d31[index_mu][l+1] = dlp1 * fac4[l];
@@ -1308,7 +1300,6 @@ int LensingModule::lensing_d3m1(
     double dl=sqrt(105./2.)*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
     d3m1[index_mu][3] = dl * sqrt(2./7.);
     for(int l=3;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d3m1[index_mu][l+1] = dlp1 * fac4[l];
@@ -1355,7 +1346,6 @@ int LensingModule::lensing_d3m3(
     double dl=sqrt(7./2.)*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/8.; /*l=3*/
     d3m3[index_mu][3] = dl * sqrt(2./7.);
     for(int l=3;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d3m3[index_mu][l+1] = dlp1 * fac4[l];
@@ -1402,7 +1392,6 @@ int LensingModule::lensing_d40(
     double dl=sqrt(315.)*(1+mu[index_mu])*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
     d40[index_mu][4] = dl * sqrt(2./9.);
     for(int l=4;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*mu[index_mu]*dl - fac3[l]*dlm1;
       d40[index_mu][l+1] = dlp1 * fac4[l];
@@ -1450,7 +1439,6 @@ int LensingModule::lensing_d4m2(
     double dl=sqrt(126.)*(1+mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
     d4m2[index_mu][4] = dl * sqrt(2./9.);
     for(int l=4;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d4m2[index_mu][l+1] = dlp1 * fac4[l];
@@ -1498,7 +1486,6 @@ int LensingModule::lensing_d4m4(
     double dl=sqrt(9./2.)*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])*(1-mu[index_mu])/16.; /*l=4*/
     d4m4[index_mu][4] = dl * sqrt(2./9.);
     for(int l=4;l<lmax;l++){
-      double ll=(double) l;
       /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
       double dlp1 = fac1[l]*(mu[index_mu]+fac2[l])*dl - fac3[l]*dlm1;
       d4m4[index_mu][l+1] = dlp1 * fac4[l];

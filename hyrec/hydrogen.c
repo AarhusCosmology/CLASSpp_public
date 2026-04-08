@@ -103,6 +103,17 @@ void read_rates(HRATEEFF *rate_table){
    unsigned i, j, l;
    int fscanf_result;
 
+   if (fA == NULL) {
+      fprintf(stderr, "Hyrec Error :: Could not open file %s\n", ALPHA_FILE);
+      if (fR != NULL) fclose(fR);
+      exit(EXIT_FAILURE);
+   }
+   if (fR == NULL) {
+      fprintf(stderr, "Hyrec Error :: Could not open file %s\n", RR_FILE);
+      fclose(fA);
+      exit(EXIT_FAILURE);
+   }
+
    maketab(log(TR_MIN), log(TR_MAX), NTR, rate_table->logTR_tab);
    maketab(TM_TR_MIN, TM_TR_MAX, NTM, rate_table->TM_TR_tab);
    rate_table->DlogTR = rate_table->logTR_tab[1] - rate_table->logTR_tab[0];
@@ -272,6 +283,11 @@ void read_twog_params(TWO_PHOTON_PARAMS *twog){
    int fscanf_result;
 
    fA = fopen(TWOG_FILE, "r");
+
+   if (fA == NULL) {
+      fprintf(stderr, "Hyrec Error :: Could not open file %s\n", TWOG_FILE);
+      exit(EXIT_FAILURE);
+   }
 
    for (b = 0; b < NVIRT; b++) {
       fscanf_result = 0;

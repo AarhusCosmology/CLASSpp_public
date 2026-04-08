@@ -119,7 +119,6 @@ void NCDMSpecies::PerturbDerivs(double tau, const double* y, double* dy,
   const double metric_ufa_class  = ctx.metric_ufa_class;
   const double cotKgen            = ctx.cotKgen;
 
-  auto* bgm = ppaw.perturbations_module->GetBackgroundModule().get();
   const double* pvecback = ppw->pvecback;
 
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int)ncdmfa_on);

@@ -96,7 +96,7 @@ int evolver_ndf15(
 
   /* Storage: */
   double *f0,*y,*wt,*ddfddt,*pred,*ynew,*invwt,*rhs,*psi,*difkp1,*del,*yinterp;
-  double *tempvec1,*tempvec2,*ypinterp,*yppinterp;
+  double *tempvec1,*ypinterp,*yppinterp;
   double **dif;
   struct jacobian jac;
   struct numjac_workspace nj_ws;
@@ -132,7 +132,6 @@ int evolver_ndf15(
   ypinterp =yinterp+neqp;
   yppinterp=ypinterp+neqp;
   tempvec1 =yppinterp+neqp;
-  tempvec2 =tempvec1+neqp;
 
 
   dif      =dif_ptrs.data();

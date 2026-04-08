@@ -710,7 +710,6 @@ int TransferModule::transfer_get_l_list() {
   if (current_l != l_max) {
 
     index_l ++;
-    current_l = l_max;
 
   }
 

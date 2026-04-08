@@ -35,7 +35,6 @@ int NonColdDarkMatter::background_ncdm_distribution(void* pbadist, double q, dou
   int n_ncdm = pbadist_local->n_ncdm;   /* extract index of ncdm species under consideration */
   double ksi = pbadist_local->ncdm->ksi_ncdm_[n_ncdm];      /* extract chemical potential */
   double qlast,dqlast,f0last,df0last;
-  double* param = pbadist_local->ncdm->ncdm_psd_parameters_.empty() ? nullptr : const_cast<double*>(pbadist_local->ncdm->ncdm_psd_parameters_.data());
   int lastidx;
   /* Variables corresponding to entries in param: */
   //double square_s12,square_s23,square_s13;
@@ -107,6 +106,8 @@ int NonColdDarkMatter::background_ncdm_distribution(void* pbadist, double q, dou
       /* We must use the list of extra parameters read in input, stored in the
          ncdm_psd_parameter list, extracted above from the structure
          and now called param[..] */
+
+      const double* param = pbadist_local->ncdm->ncdm_psd_parameters_.data();
 
       /* check that this list has been read */
       class_test(param == NULL,
@@ -675,7 +676,7 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
       //Loop to find appropriate dq:
       double dq = 1.;
-      double f0m2, f0p2;
+      double f0m2 = 0., f0p2 = 0.;
       for(int tolexp = _PSD_DERIVATIVE_EXP_MIN_; tolexp<_PSD_DERIVATIVE_EXP_MAX_; tolexp++){
 
         if (index_q == 0){

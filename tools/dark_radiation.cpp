@@ -57,20 +57,23 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
     }
   }
   
-  int int1, flag1, n, entries_read;
+  int int1, flag1, entries_read;
   int* temp_list;
   char* errmsg = error_message_;
   /* Quadrature strategy */
   class_read_list_of_integers_or_default("Quadrature strategy DR", temp_list, quadrature_strategy_default_, 1);
   quadrature_strategy_ = temp_list[0];
+  free(temp_list);
   
   /* Maximum q */
   class_read_list_of_integers_or_default("Maximum q DR", temp_list, qmax_default_, 1);
   qmax_ = temp_list[0];
+  free(temp_list);
   
   /* Number of momentum bins, same for all species */
   class_read_list_of_integers_or_default("N_q_dr", temp_list, N_q_default_, 1);
   N_q_ = temp_list[0];
+  free(temp_list);
   
   q_.resize(N_q_);
   dq_.resize(N_q_);
@@ -201,23 +204,23 @@ void DarkRadiation::IntegrateDistribution(double z, double* number, double* rho,
   }
   
   if (number != NULL) *number = 0.;
-  if ((rho != NULL) || (p != NULL)) *rho = 0.;
+  double rho_local = 0.;
   if (p != NULL) *p = 0.;
-  
+
   /* Sum over quadrature abscissas
      the q^2 is from d^3 q volume element
   */
   for (int index_q = 0; index_q < N_q_; index_q++) {
     if (number != NULL) *number += pow(q_[index_q],2)*w_vec[index_q];
-    if ((rho != NULL) || (p != NULL)) *rho += pow(q_[index_q],3)*w_vec[index_q]; // DR is massless, so epsilon = q
+    if (rho != NULL || p != NULL) rho_local += pow(q_[index_q],3)*w_vec[index_q]; // DR is massless, so epsilon = q
   }
-  if (p != NULL) *p = *rho/3.; // Equation of state for a massless particle is p = rho/3
-  
+  if (p != NULL) *p = rho_local/3.; // Equation of state for a massless particle is p = rho/3
+
   /* Adjust normalization */
   // The correct factor needs double checking...
   double integral_factor = factor_[index_dr]*pow(1. + z, 4);
   if (number != NULL) *number *= integral_factor/(1. + z);
-  if (rho != NULL) *rho *= integral_factor;
+  if (rho != NULL) *rho = rho_local*integral_factor;
   if (p != NULL) *p *= integral_factor;
 }
 

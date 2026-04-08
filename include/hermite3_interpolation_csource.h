@@ -116,8 +116,6 @@ for (j=0; j<nxi; j++){
 #endif
 #ifdef HERMITE_DO_D2PHI
       d2ym = d2yp;
-      sinKm = sinKp;
-      cotKm = cotKp;
 #endif
     }
     left_border = xvec[MAX(0,current_border_idx-1)];

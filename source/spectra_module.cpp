@@ -896,7 +896,7 @@ int SpectraModule::spectra_cls() {
  * @param index_l       Input: index of multipole under consideration
  * @param cl_integrand_num_columns Input: number of columns in cl_integrand
  * @param cl_integrand  Input: an allocated workspace
- * @param primordial_pk Input: table of primordial spectrum values
+ * @param primordial_pk_cached Input: table of primordial spectrum values
  * @param transfer_ic1  Input: table of transfer function values for first initial condition
  * @param transfer_ic2  Input: table of transfer function values for second initial condition
  * @return the error status

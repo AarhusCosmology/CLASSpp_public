@@ -316,7 +316,6 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format, dou
  */
 
 int PerturbationsModule::perturb_output_titles(enum file_format output_format, char titles[_MAXTITLESTRINGLENGTH_]) const {
-  int n_ncdm;
   const size_t tmp_size = 40;
   char tmp[tmp_size];
 
@@ -797,7 +796,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
   int index_md;
   int index_ic;
   int index_type_common;
-  int filenum;
+
 
   /** - count modes (scalar, vector, tensor) and assign corresponding indices */
 
@@ -2403,7 +2402,7 @@ int PerturbationsModule::perturb_solve(int index_md, int index_ic, int index_k, 
   /* approximation scheme within previous interval: previous_approx[index_ap] */
   int * previous_approx;
 
-  int n_ncdm,is_early_enough;
+  int is_early_enough;
 
   /* Related to the perturbation output */
   int (*perhaps_print_variables)(double, double *, double *, void *, char *);
@@ -4431,8 +4430,6 @@ int PerturbationsModule::perturb_vector_init(
                     [](NCDMSpecies* a_, NCDMSpecies* b_){ return a_->ncdm_id() < b_->ncdm_id(); });
           for (auto* ncdm_sp : ncdm_vec_ncdmfa) {
             const int n = ncdm_sp->ncdm_id();
-            // We are in the fluid approximation, so ncdm_l_size is always 3.
-            const int ncdm_l_size = ppv->l_max_ncdm[n] + 1;
             const double rho_plus_p_ncdm = ppw->pvecback[ncdm_sp->bg_rho_index()] + ppw->pvecback[ncdm_sp->bg_p_index()];
             const int idx_new = ppv->index_ncdm_[n][0];
             for (int l = 0; l <= 2; l++) {
@@ -4594,7 +4591,7 @@ int PerturbationsModule::perturb_vector_init(
           a = ppw->pvecback[background_module_->index_bg_a_];
           double a_prime_over_a = ppw->pvecback[background_module_->index_bg_H_]*a;
 
-          double Rint, csp2, Gint, theta_dr;
+          double Rint, csp2, Gint;
 
           class_call(background_module_->background_idm_drmd( a, ppw->pvecback[background_module_->index_bg_rho_idm_drmd_] / ppw->pvecback[background_module_->index_bg_rho_idr_drmd_], &Rint, &csp2, &Gint), background_module_->error_message_, background_module_->error_message_);
           
@@ -5003,8 +5000,6 @@ int PerturbationsModule::perturb_initial_conditions(int index_md, int index_ic, 
           else
           {
             double Rint, csp2, Gint;
-            double conformalH = ppw->pvecback[background_module_->index_bg_H_] * ppw->pvecback[background_module_->index_bg_a_];
-      
             class_call(background_module_->background_idm_drmd( ppw->pvecback[background_module_->index_bg_a_], ppw->pvecback[background_module_->index_bg_rho_idm_drmd_] / ppw->pvecback[background_module_->index_bg_rho_idr_drmd_], &Rint, &csp2, &Gint), background_module_->error_message_, background_module_->error_message_);
             
             ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd] = Gint/(4. + Gint)*ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd] ; //This is the general expression valid for weak (G/(aH) <<1  and strong (G/(aH)>>1 coupling.))
@@ -6251,16 +6246,12 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
 
   if (_scalars_) {
 
-    double delta_g = 0.;
-    double theta_g = 0.;
     double shear_g = 0.;
 
     double rho_m=0.;
     double delta_rho_m=0.;
     double rho_plus_p_m=0.;
     double rho_plus_p_theta_m=0.;
-    double delta_idr=0.;
-    double theta_idr=0.;
     double shear_idr=0.;
     double delta_p_b_over_rho_b;
 
@@ -6274,8 +6265,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
 
         /** - ----> (a.1.1.) no approximation */
 
-        delta_g = y[ppw->pv->index_pt_delta_g];
-        theta_g = y[ppw->pv->index_pt_theta_g];
         shear_g = y[ppw->pv->index_pt_shear_g];
 
       }
@@ -6283,17 +6272,12 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
 
         /** - ----> (a.1.2.) radiation streaming approximation */
 
-        delta_g = 0.; /* actual free streaming approximation imposed after evaluation of einstein equations */
-        theta_g = 0.; /* actual free streaming approximation imposed after evaluation of einstein equations */
         shear_g = 0.; /* shear always neglected in radiation streaming approximation */
       }
     }
     else {
 
       /** - ----> (a.1.3.) tight coupling approximation */
-
-      delta_g = y[ppw->pv->index_pt_delta_g];
-      theta_g = y[ppw->pv->index_pt_theta_g];
 
       /* first-order tight-coupling approximation for photon shear */
       if (ppt->gauge == newtonian) {
@@ -6325,8 +6309,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
 
     if (pba->has_idr == _TRUE_) {
       if (ppw->approx[ppw->index_ap_rsa_idr] == (int)rsa_idr_off) {
-        delta_idr = y[ppw->pv->index_pt_delta_idr];
-        theta_idr = y[ppw->pv->index_pt_theta_idr];
 
         if (ppt->idr_nature == idr_free_streaming){
           if((pba->has_idm_dr == _TRUE_)&&(ppw->approx[ppw->index_ap_tca_idm_dr] == (int)tca_idm_dr_on)){
@@ -6337,14 +6319,10 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md, double k, dou
             ppw->tca_shear_idm_dr = shear_idr;
           }
           else{
-            shear_idr = y[ppw->pv->index_pt_shear_idr];
           }
         }
       }
       else{
-        delta_idr = 0.;
-        theta_idr = 0.;
-        shear_idr = 0.;
       }
     }
 
@@ -7726,9 +7704,6 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
       if (pba->has_dr == _TRUE_) {
         // Assuming the first dr species corresponds to the one sourced by dcdm for simplicity, 
         // strictly speaking this alpha term depends on the specific Decay DR implementation details in C code
-        double rho_dcdm = pvecback[background_module_->index_bg_rho_dcdm_]; 
-        double rho_dr_bg = pvecback[background_module_->index_bg_rho_dr_]; 
-        
         for (int n_dr = 0; n_dr < pba->N_decay_dr; n_dr++) {
           delta_dr[n_dr] += (-4.*a*H + a*pba->Gamma_dcdm*pvecback[background_module_->index_bg_rho_dcdm_]/pvecback[background_module_->index_bg_rho_dr_])*alpha;
           theta_dr[n_dr] += k*k*alpha;
@@ -7974,7 +7949,6 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
         double rho_delta_ncdm = 0.0;
         double rho_plus_p_theta_ncdm = 0.0;
         double rho_plus_p_shear_ncdm = 0.0;
-        double delta_p_ncdm = 0.0;
         const double factor = ncdm_->factor_ncdm_[n]*pow(pba->a_today/a, 4);
 
         for (int index_q=0; index_q < ppw->pv->q_size_ncdm[n]; index_q ++) {
@@ -7986,13 +7960,11 @@ int PerturbationsModule::perturb_print_variables_member(double tau, double* y, d
           rho_delta_ncdm += q2*epsilon*ncdm_->w_ncdm_[n][index_q]*y[idx];
           rho_plus_p_theta_ncdm += q2*q*ncdm_->w_ncdm_[n][index_q]*y[idx + 1];
           rho_plus_p_shear_ncdm += q2*q2/epsilon*ncdm_->w_ncdm_[n][index_q]*y[idx + 2];
-          delta_p_ncdm += q2*q2/epsilon*ncdm_->w_ncdm_[n][index_q]*y[idx];
         }
 
         rho_delta_ncdm *= factor;
         rho_plus_p_theta_ncdm *= k*factor;
         rho_plus_p_shear_ncdm *= 2.0/3.0*factor;
-        delta_p_ncdm *= factor/3.;
 
         delta_ncdm[n] = rho_delta_ncdm/ppw->pvecback[ncdm_sp->bg_rho_index()];
         theta_ncdm[n] = rho_plus_p_theta_ncdm/
@@ -8473,8 +8445,6 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
     /** - ---> non-cold dark matter (ncdm): massive neutrinos, WDM, etc. */
     //TBC: curvature in all ncdm
     if (pba->has_ncdm == _TRUE_) {
-
-      int idx = pv->index_pt_psi0_ncdm1;
 
       /** - ----> first case: use a fluid approximation (ncdmfa) */
       //TBC: curvature

@@ -3658,7 +3658,6 @@ int InputModule::input_try_unknown_parameters(double* unknown_values, int unknow
   int input_verbose;
   int flag;
   int param;
-  short compute_sigma8 = _FALSE_;
 
   pfzw = (struct fzerofun_workspace *) voidpfzw;
   /** - Read input parameters */
