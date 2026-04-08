@@ -1555,6 +1555,13 @@ int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, in
                      error_message_,
                      error_message_);
 
+          /* For flat case, precompute fully-reversed chi array once per (q, tt) */
+          if (ptw->sgnK == 0) {
+            for (int j = 0; j < ptw->tau_size; j++) {
+              ptw->chi_full_reverse[j] = ptw->chi[ptw->tau_size - 1 - j];
+            }
+          }
+
           /** - Select radial function type */
           class_call(transfer_select_radial_function(index_md, index_tt, &radial_type),
                      error_message_,
@@ -3280,31 +3287,39 @@ int TransferModule::transfer_radial_function(struct transfer_workspace * ptw, do
   }
 
   //Reverse chi
-  for (j=0; j<x_size; j++) {
-    chireverse[j] = chi[x_size-1-j]*rescale_argument;
-    if (rescale_amplitude == 1.) {
+  if (ptw->sgnK == 0) {
+    chireverse = ptw->chi_full_reverse + (ptw->tau_size - x_size);
+    for (j=0; j<x_size; j++) {
       rescale_function[j] = 1.;
     }
-    else {
-      if (ptw->sgnK == 1) {
-        rescale_function[j] =
-          MIN(
-              rescale_amplitude
-              * (1
-                 + 0.34*atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp)
-                 + 2.00*pow(atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp), 2)),
-              chireverse[j]/rescale_argument/sin(chireverse[j]/rescale_argument)
-              );
+  }
+  else {
+    for (j=0; j<x_size; j++) {
+      chireverse[j] = chi[x_size-1-j]*rescale_argument;
+      if (rescale_amplitude == 1.) {
+        rescale_function[j] = 1.;
       }
       else {
-        rescale_function[j] =
-          MAX(
-              rescale_amplitude
-              * (1
-                 - 0.38*atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp)
-                 + 0.40*pow(atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp), 2)),
-              chireverse[j]/rescale_argument/sinh(chireverse[j]/rescale_argument)
-              );
+        if (ptw->sgnK == 1) {
+          rescale_function[j] =
+            MIN(
+                rescale_amplitude
+                * (1
+                   + 0.34*atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp)
+                   + 2.00*pow(atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp), 2)),
+                chireverse[j]/rescale_argument/sin(chireverse[j]/rescale_argument)
+                );
+        }
+        else {
+          rescale_function[j] =
+            MAX(
+                rescale_amplitude
+                * (1
+                   - 0.38*atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp)
+                   + 0.40*pow(atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp), 2)),
+                chireverse[j]/rescale_argument/sinh(chireverse[j]/rescale_argument)
+                );
+        }
       }
     }
   }
@@ -3664,6 +3679,7 @@ int TransferModule::transfer_workspace_init(struct transfer_workspace **ptw, int
   class_alloc((*ptw)->chireverse, tau_size_max*sizeof(double), error_message_);
   class_alloc((*ptw)->rescale_function, tau_size_max*sizeof(double), error_message_);
   class_alloc((*ptw)->radial_function, tau_size_max*sizeof(double), error_message_);
+  class_alloc((*ptw)->chi_full_reverse, tau_size_max*sizeof(double), error_message_);
 
   return _SUCCESS_;
 }
@@ -3689,6 +3705,7 @@ int TransferModule::transfer_workspace_free(struct transfer_workspace *ptw) {
   free(ptw->chireverse);
   free(ptw->rescale_function);
   free(ptw->radial_function);
+  free(ptw->chi_full_reverse);
 
   free(ptw);
   return _SUCCESS_;

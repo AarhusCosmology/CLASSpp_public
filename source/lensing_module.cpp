@@ -18,6 +18,7 @@
 #include "spectra_module.h"
 #include "lensing_module.h"
 #include <numeric>
+#include "thread_pool.h"
 
 /**
  * Anisotropy power spectra \f$ C_l\f$'s for all types, modes and initial conditions.
@@ -290,60 +291,57 @@ int LensingModule::lensing_init() {
   icount += l_unlensed_max_ + 1;
   sqrt5 = &(buf_dxx[icount]);
   icount += l_unlensed_max_ + 1;
-  class_call(lensing_d00(mu.data(), num_mu, l_unlensed_max_, d00.data()),
-             error_message_,
-             error_message_);
+  Tools::TaskSystem task_system(pba->number_of_threads);
+  std::vector<std::future<int>> dXX_tasks;
 
-  class_call(lensing_d11(mu.data(), num_mu, l_unlensed_max_, d11.data()),
-             error_message_,
-             error_message_);
+  dXX_tasks.push_back(task_system.AsyncTask([&]() {
+    return lensing_d00(mu.data(), num_mu, l_unlensed_max_, d00.data());
+  }));
 
-  class_call(lensing_d1m1(mu.data(), num_mu, l_unlensed_max_, d1m1.data()),
-             error_message_,
-             error_message_);
+  dXX_tasks.push_back(task_system.AsyncTask([&]() {
+    return lensing_d11(mu.data(), num_mu, l_unlensed_max_, d11.data());
+  }));
 
-  class_call(lensing_d2m2(mu.data(), num_mu, l_unlensed_max_, d2m2.data()),
-             error_message_,
-             error_message_);
+  dXX_tasks.push_back(task_system.AsyncTask([&]() {
+    return lensing_d1m1(mu.data(), num_mu, l_unlensed_max_, d1m1.data());
+  }));
 
+  dXX_tasks.push_back(task_system.AsyncTask([&]() {
+    return lensing_d2m2(mu.data(), num_mu, l_unlensed_max_, d2m2.data());
+  }));
 
   if (has_te_ == _TRUE_) {
-
-    class_call(lensing_d20(mu.data(), num_mu, l_unlensed_max_, d20.data()),
-               error_message_,
-               error_message_);
-
-    class_call(lensing_d3m1(mu.data(), num_mu, l_unlensed_max_, d3m1.data()),
-               error_message_,
-               error_message_);
-
-    class_call(lensing_d4m2(mu.data(), num_mu, l_unlensed_max_, d4m2.data()),
-               error_message_,
-               error_message_);
-
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d20(mu.data(), num_mu, l_unlensed_max_, d20.data());
+    }));
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d3m1(mu.data(), num_mu, l_unlensed_max_, d3m1.data());
+    }));
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d4m2(mu.data(), num_mu, l_unlensed_max_, d4m2.data());
+    }));
   }
 
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d22(mu.data(), num_mu, l_unlensed_max_, d22.data());
+    }));
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d31(mu.data(), num_mu, l_unlensed_max_, d31.data());
+    }));
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d3m3(mu.data(), num_mu, l_unlensed_max_, d3m3.data());
+    }));
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d40(mu.data(), num_mu, l_unlensed_max_, d40.data());
+    }));
+    dXX_tasks.push_back(task_system.AsyncTask([&]() {
+      return lensing_d4m4(mu.data(), num_mu, l_unlensed_max_, d4m4.data());
+    }));
+  }
 
-    class_call(lensing_d22(mu.data(), num_mu, l_unlensed_max_, d22.data()),
-               error_message_,
-               error_message_);
-
-    class_call(lensing_d31(mu.data(), num_mu, l_unlensed_max_, d31.data()),
-               error_message_,
-               error_message_);
-
-    class_call(lensing_d3m3(mu.data(), num_mu, l_unlensed_max_, d3m3.data()),
-               error_message_,
-               error_message_);
-
-    class_call(lensing_d40(mu.data(), num_mu, l_unlensed_max_, d40.data()),
-               error_message_,
-               error_message_);
-
-    class_call(lensing_d4m4(mu.data(), num_mu, l_unlensed_max_, d4m4.data()),
-               error_message_,
-               error_message_);
+  for (auto& task : dXX_tasks) {
+    class_call(task.get(), error_message_, error_message_);
   }
 
   /** - compute \f$ Cgl(\mu)\f$, \f$ Cgl2(\mu) \f$ and sigma2(\f$\mu\f$) */

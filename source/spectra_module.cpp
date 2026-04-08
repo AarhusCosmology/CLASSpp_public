@@ -805,6 +805,15 @@ int SpectraModule::spectra_cls() {
     ddcl_[index_md].resize(l_size_[index_md]*ct_size_*ic_ic_size_[index_md]);
     cl_integrand_num_columns = 1 + ct_size_*2; /* one for k, ct_size_ for each type, ct_size_ for each second derivative of each type */
 
+    /* Precompute primordial spectrum for all q and store it in a cached buffer */
+    std::vector<double> primordial_pk_cached(transfer_module_->q_size_*ic_ic_size_[index_md]);
+    for (int index_q = 0; index_q < transfer_module_->q_size_; index_q++) {
+      double k = transfer_module_->k_[index_md][index_q];
+      class_call(primordial_module_->primordial_spectrum_at_k(index_md, linear, k, &primordial_pk_cached[index_q * ic_ic_size_[index_md]]),
+                 primordial_module_->error_message_,
+                 error_message_);
+    }
+
     /** - --> (c) loop over initial conditions */
 
     for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
@@ -814,18 +823,13 @@ int SpectraModule::spectra_cls() {
         /* non-diagonal coefficients should be computed only if non-zero correlation */
         if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
 
-          future_output.push_back(task_system.AsyncTask([this, index_md, cl_integrand_num_columns, index_ic1, index_ic2] () {
-            std::vector<double> cl_integrand(transfer_module_->q_size_*cl_integrand_num_columns);
-            std::vector<double> primordial_pk(ic_ic_size_[index_md]);
-            std::vector<double> transfer_ic1(transfer_module_->tt_size_[index_md]);
-            std::vector<double> transfer_ic2(transfer_module_->tt_size_[index_md]);
+          int l_size = transfer_module_->l_size_[index_md];
 
-            /** - ---> loop over l values defined in the transfer module.
-                For each l, compute the \f$ C_l\f$'s for all types (TT, TE, ...)
-                by convolving primordial spectra with transfer  functions.
-                This elementary task is assigned to spectra_compute_cl() */
-
-            for (int index_l = 0; index_l < transfer_module_->l_size_[index_md]; index_l++) {
+          for (int index_l = 0; index_l < l_size; index_l++) {
+            future_output.push_back(task_system.AsyncTask([this, index_md, cl_integrand_num_columns, index_ic1, index_ic2, index_l, &primordial_pk_cached] () {
+              std::vector<double> cl_integrand(transfer_module_->q_size_*cl_integrand_num_columns);
+              std::vector<double> transfer_ic1(transfer_module_->tt_size_[index_md]);
+              std::vector<double> transfer_ic2(transfer_module_->tt_size_[index_md]);
 
               class_call(spectra_compute_cl(
                                             index_md,
@@ -834,17 +838,15 @@ int SpectraModule::spectra_cls() {
                                             index_l,
                                             cl_integrand_num_columns,
                                             cl_integrand.data(),
-                                            primordial_pk.data(),
+                                            primordial_pk_cached.data(),
                                             transfer_ic1.data(),
                                             transfer_ic2.data()),
                          error_message_,
                          error_message_);
 
-            } /* end of loop over l */
-
-            return _SUCCESS_;
-
-          }));
+              return _SUCCESS_;
+            }));
+          }
         }
         else {
 
@@ -906,7 +908,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
                        int index_l,
                        int cl_integrand_num_columns,
                        double * cl_integrand,
-                       double * primordial_pk,
+                       double * primordial_pk_cached,
                        double * transfer_ic1,
                        double * transfer_ic2
                        ) {
@@ -924,6 +926,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
   std::vector<double> transfer_ic2_nc;
   double factor;
   int index_q_spline=0;
+  double primordial_pk_value;
 
   index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
 
@@ -938,9 +941,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
 
     cl_integrand[index_q*cl_integrand_num_columns+0] = k;
 
-    class_call(primordial_module_->primordial_spectrum_at_k(index_md, linear, k, primordial_pk),
-               primordial_module_->error_message_,
-               error_message_);
+    primordial_pk_value = primordial_pk_cached[index_q * ic_ic_size_[index_md] + index_ic1_ic2];
 
     /* above routine checks that k>0: no possible division by zero below */
 
@@ -1082,49 +1083,49 @@ int SpectraModule::spectra_compute_cl(int index_md,
 
     if (has_tt_ == _TRUE_)
       cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_tt_] =
-        primordial_pk[index_ic1_ic2]
+        primordial_pk_value
         * transfer_ic1_temp
         * transfer_ic2_temp
         * factor;
 
     if (has_ee_ == _TRUE_)
       cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_ee_] =
-        primordial_pk[index_ic1_ic2]
+        primordial_pk_value
         * transfer_ic1[transfer_module_->index_tt_e_]
         * transfer_ic2[transfer_module_->index_tt_e_]
         * factor;
 
     if (has_te_ == _TRUE_)
       cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_te_] =
-        primordial_pk[index_ic1_ic2]
+        primordial_pk_value
         *0.5*(transfer_ic1_temp*transfer_ic2[transfer_module_->index_tt_e_] +
               transfer_ic1[transfer_module_->index_tt_e_]*transfer_ic2_temp)
         * factor;
 
     if (_tensorsEXT_ && (has_bb_ == _TRUE_))
       cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_bb_] =
-        primordial_pk[index_ic1_ic2]
+        primordial_pk_value
         * transfer_ic1[transfer_module_->index_tt_b_]
         * transfer_ic2[transfer_module_->index_tt_b_]
         * factor;
 
     if (_scalarsEXT_ && (has_pp_ == _TRUE_))
       cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_pp_] =
-        primordial_pk[index_ic1_ic2]
+        primordial_pk_value
         * transfer_ic1[transfer_module_->index_tt_lcmb_]
         * transfer_ic2[transfer_module_->index_tt_lcmb_]
         * factor;
 
     if (_scalarsEXT_ && (has_tp_ == _TRUE_))
       cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_tp_] =
-        primordial_pk[index_ic1_ic2]
+        primordial_pk_value
         *0.5*(transfer_ic1_temp*transfer_ic2[transfer_module_->index_tt_lcmb_] +
               transfer_ic1[transfer_module_->index_tt_lcmb_]*transfer_ic2_temp)
         * factor;
 
     if (_scalarsEXT_ && (has_ep_ == _TRUE_))
       cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_ep_] =
-        primordial_pk[index_ic1_ic2]
+        primordial_pk_value
         *0.5*(transfer_ic1[transfer_module_->index_tt_e_]*transfer_ic2[transfer_module_->index_tt_lcmb_] +
               transfer_ic1[transfer_module_->index_tt_lcmb_]*transfer_ic2[transfer_module_->index_tt_e_])
         * factor;
@@ -1134,7 +1135,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
         for (index_d2 = index_d1; index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1); index_d2++) {
           cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_dd_ + index_ct] =
-            primordial_pk[index_ic1_ic2]
+            primordial_pk_value
             * transfer_ic1_nc[index_d1]
             * transfer_ic2_nc[index_d2]
             * factor;
@@ -1146,7 +1147,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
     if (_scalarsEXT_ && (has_td_ == _TRUE_)) {
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
         cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_td_ + index_d1] =
-          primordial_pk[index_ic1_ic2]
+          primordial_pk_value
           * 0.5*(transfer_ic1_temp * transfer_ic2_nc[index_d1] +
                  transfer_ic1_nc[index_d1] * transfer_ic2_temp)
           * factor;
@@ -1156,7 +1157,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
     if (_scalarsEXT_ && (has_pd_ == _TRUE_)) {
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
         cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_pd_ + index_d1]=
-          primordial_pk[index_ic1_ic2]
+          primordial_pk_value
           *0.5*(transfer_ic1[transfer_module_->index_tt_lcmb_]*transfer_ic2_nc[index_d1] +
                 transfer_ic1_nc[index_d1]*transfer_ic2[transfer_module_->index_tt_lcmb_])
           * factor;
@@ -1168,7 +1169,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
         for (index_d2 = index_d1; index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1); index_d2++) {
           cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_ll_ + index_ct] =
-            primordial_pk[index_ic1_ic2]
+            primordial_pk_value
             * transfer_ic1[transfer_module_->index_tt_lensing_ + index_d1]
             * transfer_ic2[transfer_module_->index_tt_lensing_ + index_d2]
             * factor;
@@ -1180,7 +1181,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
     if (_scalarsEXT_ && (has_tl_ == _TRUE_)) {
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
         cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_tl_ + index_d1] =
-          primordial_pk[index_ic1_ic2]
+          primordial_pk_value
           *0.5*(transfer_ic1_temp*transfer_ic2[transfer_module_->index_tt_lensing_ + index_d1] +
                 transfer_ic1[transfer_module_->index_tt_lensing_ + index_d1]*transfer_ic2_temp)
           * factor;
@@ -1192,7 +1193,7 @@ int SpectraModule::spectra_compute_cl(int index_md,
       for (index_d1=0; index_d1<d_size_; index_d1++) {
         for (index_d2 = MAX(index_d1 - psp->non_diag, 0); index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1); index_d2++) {
           cl_integrand[index_q*cl_integrand_num_columns + 1 + index_ct_dl_ + index_ct] =
-            primordial_pk[index_ic1_ic2]
+            primordial_pk_value
             *transfer_ic1_nc[index_d1]*transfer_ic2[transfer_module_->index_tt_lensing_ + index_d2]
             * factor;
           index_ct++;

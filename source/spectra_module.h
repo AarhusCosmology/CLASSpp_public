@@ -86,7 +86,7 @@ private:
   int spectra_free();
   int spectra_indices();
   int spectra_cls();
-  int spectra_compute_cl(int index_md, int index_ic1, int index_ic2, int index_l, int cl_integrand_num_columns, double * cl_integrand, double * primordial_pk, double * transfer_ic1, double * transfer_ic2);
+  int spectra_compute_cl(int index_md, int index_ic1, int index_ic2, int index_l, int cl_integrand_num_columns, double * cl_integrand, double * primordial_pk_cached, double * transfer_ic1, double * transfer_ic2);
   int spectra_k_and_tau();
   /* deprecated functions (since v2.8) */
   int spectra_pk_at_z(enum linear_or_logarithmic mode, double z, double * output_tot, double * output_ic, double * output_cb_tot, double * output_cb_ic);

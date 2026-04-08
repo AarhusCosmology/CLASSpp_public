@@ -168,6 +168,7 @@ struct transfer_workspace {
   double * chireverse;      /**< chireverse[index_tau]: reversed chi grid */
   double * rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
   double * radial_function; /**< radial_function[index_tau]: output of transfer_radial_function */
+  double * chi_full_reverse;   /**< workspace: reversed chi array */
 
   //@}
 
