@@ -40,7 +40,7 @@
       disableMainThreadChecker = "YES"
       launchStyle = "0"
       useCustomWorkingDirectory = "YES"
-      customWorkingDirectory = "/Users/au192734/Projects/class_gemini"
+      customWorkingDirectory = "$(PROJECT_DIR)"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
@@ -58,10 +58,6 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "explanatory.ini"
-            isEnabled = "NO">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "test_ncdm2.ini"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

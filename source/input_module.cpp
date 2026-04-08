@@ -227,7 +227,7 @@ void InputModule::ConstructSpecies() {
       all_species_[name] = std::make_unique<NCDMSpecies>(n, ncdm_, pba, nullptr);
     }
   }
-  if (pba->has_idm_dr == _TRUE_) {
+  if (pba->has_scf == _TRUE_) {
     all_species_["ScalarField"] = std::make_unique<ScalarFieldSpecies>(*pba);
   }
   if (pba->has_idm_dr == _TRUE_ || pba->has_idr == _TRUE_) {

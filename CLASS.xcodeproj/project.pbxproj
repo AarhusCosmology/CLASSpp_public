@@ -48,6 +48,10 @@
 		CC0000210000000000000035 /* scalar_field.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC0000200000000000000034 /* scalar_field.cpp */; };
 		CC0000230000000000000037 /* ultra_relativistic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC0000220000000000000036 /* ultra_relativistic.cpp */; };
 		CC0000250000000000000039 /* interacting_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC0000240000000000000038 /* interacting_species.cpp */; };
+		EE0000020000000000000001 /* composite_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000010000000000000001 /* composite_species.cpp */; };
+		EE0000050000000000000001 /* dcdm_dr_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000040000000000000001 /* dcdm_dr_species.cpp */; };
+		EE0000080000000000000001 /* idm_dr_idr_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000070000000000000001 /* idm_dr_idr_species.cpp */; };
+		EE00000B0000000000000001 /* idm_drmd_idr_drmd_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE00000A0000000000000001 /* idm_drmd_idr_drmd_species.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -169,6 +173,14 @@
 		CC0000200000000000000034 /* scalar_field.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = scalar_field.cpp; sourceTree = "<group>"; };
 		CC0000220000000000000036 /* ultra_relativistic.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ultra_relativistic.cpp; sourceTree = "<group>"; };
 		CC0000240000000000000038 /* interacting_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = interacting_species.cpp; sourceTree = "<group>"; };
+		EE0000010000000000000001 /* composite_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = composite_species.cpp; sourceTree = "<group>"; };
+		EE0000030000000000000001 /* composite_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = composite_species.h; sourceTree = "<group>"; };
+		EE0000040000000000000001 /* dcdm_dr_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dcdm_dr_species.cpp; sourceTree = "<group>"; };
+		EE0000060000000000000001 /* dcdm_dr_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dcdm_dr_species.h; sourceTree = "<group>"; };
+		EE0000070000000000000001 /* idm_dr_idr_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = idm_dr_idr_species.cpp; sourceTree = "<group>"; };
+		EE0000090000000000000001 /* idm_dr_idr_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = idm_dr_idr_species.h; sourceTree = "<group>"; };
+		EE00000A0000000000000001 /* idm_drmd_idr_drmd_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = idm_drmd_idr_drmd_species.cpp; sourceTree = "<group>"; };
+		EE00000C0000000000000001 /* idm_drmd_idr_drmd_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = idm_drmd_idr_drmd_species.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -359,7 +371,15 @@
 				CC00000F0000000000000032 /* idr_drmd.h */,
 				CC0000260000000000000040 /* idr.h */,
 				CC0000240000000000000038 /* interacting_species.cpp */,
-			);
+				EE0000010000000000000001 /* composite_species.cpp */,
+				EE0000030000000000000001 /* composite_species.h */,
+				EE0000040000000000000001 /* dcdm_dr_species.cpp */,
+				EE0000060000000000000001 /* dcdm_dr_species.h */,
+				EE0000070000000000000001 /* idm_dr_idr_species.cpp */,
+				EE0000090000000000000001 /* idm_dr_idr_species.h */,
+				EE00000A0000000000000001 /* idm_drmd_idr_drmd_species.cpp */,
+				EE00000C0000000000000001 /* idm_drmd_idr_drmd_species.h */,
+);
 			path = species;
 			sourceTree = "<group>";
 		};
@@ -460,7 +480,11 @@
 				CC0000210000000000000035 /* scalar_field.cpp in Sources */,
 				CC0000230000000000000037 /* ultra_relativistic.cpp in Sources */,
 				CC0000250000000000000039 /* interacting_species.cpp in Sources */,
-			);
+				EE0000020000000000000001 /* composite_species.cpp in Sources */,
+				EE0000050000000000000001 /* dcdm_dr_species.cpp in Sources */,
+				EE0000080000000000000001 /* idm_dr_idr_species.cpp in Sources */,
+				EE00000B0000000000000001 /* idm_drmd_idr_drmd_species.cpp in Sources */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
