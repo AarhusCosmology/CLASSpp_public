@@ -1,7 +1,47 @@
+import os
+from concurrent.futures import ThreadPoolExecutor
+import distutils.ccompiler
+
+
+def _parallel_compile(self, sources, output_dir=None, macros=None,
+                      include_dirs=None, debug=0, extra_preargs=None,
+                      extra_postargs=None, depends=None):
+    """Drop-in replacement for CCompiler.compile that compiles in parallel."""
+    macros, objects, extra_postargs, pp_opts, build = self._setup_compile(
+        output_dir, macros, include_dirs, sources, depends, extra_postargs)
+    cc_args = self._get_cc_args(pp_opts, debug, extra_preargs)
+
+    def _compile_obj(obj):
+        try:
+            src, ext = build[obj]
+        except KeyError as exc:
+            raise KeyError(
+                "Missing build mapping for object {!r} during compilation".format(obj)
+            ) from exc
+        self._compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
+
+    try:
+        max_jobs = int(os.environ.get('MAX_JOBS', 0))
+    except ValueError:
+        max_jobs = 0
+    max_jobs = max(max_jobs, 0) or os.cpu_count() or 1
+    if max_jobs == 1:
+        for obj in objects:
+            _compile_obj(obj)
+    else:
+        with ThreadPoolExecutor(max_workers=max_jobs) as executor:
+            futures = [executor.submit(_compile_obj, obj) for obj in objects]
+            for future in futures:
+                future.result()  # re-raises any compilation error
+
+    return objects
+
+
+distutils.ccompiler.CCompiler.compile = _parallel_compile
+
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 import numpy
-import os
 
 def my_cythonize(*args, **kwargs):
     with open('generate_wrapper.py', 'r', encoding='utf-8') as f:
@@ -83,7 +123,7 @@ classy_ext = Extension('classy', ['classy.pyx'] + cpp_source_files,
                            libraries=['m'] if not os.name == 'nt' else [],
                            library_dirs=[root_folder],
                            language="c++",
-                           extra_compile_args=(['-std=c++17'] if os.name != 'nt' else ['/std:c++17']),
+                           extra_compile_args=(['-std=c++17', '-O3'] if os.name != 'nt' else ['/std:c++17', '/O2']),
                            define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION"),
                                           ("__CLASSDIR__", '"{}"'.format(os.path.abspath(root_folder)))]);
 myclib = ('myclib', {'sources': c_source_files,
