@@ -8273,6 +8273,95 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
         sp->PerturbDerivs(tau, y, dy, *pppaw);
     }
 
+    /** - --> metric */
+
+    if (ppt->gauge == synchronous) {
+      dy[pv->index_pt_eta] = pvecmetric[ppw->index_mt_eta_prime];
+    }
+
+    if (ppt->gauge == newtonian) {
+      dy[pv->index_pt_phi] = pvecmetric[ppw->index_mt_phi_prime];
+    }
+
+  }
+
+
+  /** - vector mode */
+  if (_vectors_) {
+
+    double cb2 = pvecthermo[thermodynamics_module_->index_th_cb2_];
+
+    /** - --> baryon velocity */
+
+    /* delta_g is needed by the baryon theta equation; use sentinel-safe read */
+    const double delta_g_vec = (pv->index_pt_delta_g >= 0) ? y[pv->index_pt_delta_g] : 0.;
+
+    if (ppt->gauge == synchronous) {
+
+      dy[pv->index_pt_theta_b] = -(1-3.*cb2)*a_prime_over_a*y[pv->index_pt_theta_b]
+        - pvecthermo[thermodynamics_module_->index_th_dkappa_]*(_SQRT2_/4.*delta_g_vec + y[pv->index_pt_theta_b]);
+
+    }
+
+    else if (ppt->gauge == newtonian) {
+
+      dy[pv->index_pt_theta_b] = -(1-3.*cb2)*a_prime_over_a*y[pv->index_pt_theta_b]
+        - _SQRT2_/4.*pvecthermo[thermodynamics_module_->index_th_dkappa_]*(delta_g_vec + 2.*_SQRT2_*y[pv->index_pt_theta_b])
+        + pvecmetric[ppw->index_mt_V_prime]+(1.-3.*cb2)*a_prime_over_a*y[pv->index_pt_V];
+
+    }
+
+    /** - --> species Boltzmann hierarchies (vector modes) */
+    for (const auto& [name, sp] : all_species_)
+      sp->PerturbVectorDerivs(tau, y, dy, *pppaw);
+
+    if (ppt->gauge == synchronous) {
+
+      /* Vector metric perturbation in synchronous gauge: */
+      dy[pv->index_pt_hv_prime] = pvecmetric[ppw->index_mt_hv_prime_prime];
+
+    }
+    else if (ppt->gauge == newtonian) {
+
+      /* Vector metric perturbation in Newtonian gauge: */
+      dy[pv->index_pt_V] = pvecmetric[ppw->index_mt_V_prime];
+
+    }
+
+  }
+
+
+  /** - tensor modes: */
+  if (_tensors_) {
+
+    /** - --> species Boltzmann hierarchies (tensor modes) */
+    for (const auto& [name, sp] : all_species_)
+      sp->PerturbTensorDerivs(tau, y, dy, *pppaw);
+
+    if (evolve_tensor_ur_ == _TRUE_) {
+
+      dy[pv->index_pt_delta_ur] = -4./3.*y[pv->index_pt_theta_ur]+_SQRT6_*y[pv->index_pt_gwdot];
+
+      dy[pv->index_pt_theta_ur] = k2*(y[pv->index_pt_delta_ur]/4.-s2_squared*y[pv->index_pt_shear_ur]);
+
+      dy[pv->index_pt_shear_ur] = (4./15.*y[pv->index_pt_theta_ur]
+                                   -3./10.*k*s_l[3]/s_l[2]*y[pv->index_pt_shear_ur+1]);
+
+      l = 3;
+      dy[pv->index_pt_l3_ur] = k/(2.*l+1.)*
+        (l*2.*s_l[l]*s_l[2]*y[pv->index_pt_shear_ur]-(l+1.)*s_l[l+1]*y[pv->index_pt_l3_ur+1]);
+
+      for (l = 4; l < pv->l_max_ur; l++) {
+        dy[pv->index_pt_delta_ur+l] = k/(2.*l+1)*
+          (l*s_l[l]*y[pv->index_pt_delta_ur+l-1]-(l+1.)*s_l[l+1]*y[pv->index_pt_delta_ur+l+1]);
+      }
+
+      l = pv->l_max_ur;
+      dy[pv->index_pt_delta_ur+l] =
+        k*(s_l[l]*y[pv->index_pt_delta_ur+l-1]-(1.+l)*cotKgen*y[pv->index_pt_delta_ur+l]);
+
+    }
+
     /** - --> non-cold dark matter (ncdm): massive neutrinos, WDM, etc. */
     //TBC: curvature in all ncdm
     if (evolve_tensor_ncdm_ == _TRUE_) {
@@ -8302,7 +8391,7 @@ int PerturbationsModule::perturb_derivs_member(double tau, double* y, double* dy
               break;
             }
           }
-          
+
           const int ncdm_idx = ppw->pv->index_ncdm_[n][index_q];
 
           const double q = ncdm_->q_ncdm_[n][index_q];
