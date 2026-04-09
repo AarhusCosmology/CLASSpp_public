@@ -16,25 +16,8 @@
 #include "spectra_module.h"
 #include <algorithm>
 
-// Species implementations
-#include "../species/cdm.h"
-#include "../species/photons.h"
-#include "../species/baryons.h"
-#include "../species/lambda.h"
-#include "../species/ultra_relativistic.h"
-#include "../species/fluid.h"
-#include "../species/dcdm.h"
-#include "../species/dark_radiation_species.h"
-#include "../species/ncdm_species.h"
-#include "../species/scalar_field.h"
-#include "../species/idm_dr.h"
-#include "../species/idr.h"
-#include "../species/idm_drmd.h"
-#include "../species/idr_drmd.h"
-#include "../species/dcdm_dr_species.h"
-#include "../species/idm_dr_idr_species.h"
-#include "../species/idm_drmd_idr_drmd_species.h"
-#include "../species/dncdm_dr_species.h"
+// All species — single consolidated header
+#include "../species/all_species_list.h"
 
 #include <thread>
 /**
