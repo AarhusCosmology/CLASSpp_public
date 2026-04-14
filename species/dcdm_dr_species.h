@@ -29,6 +29,9 @@ public:
   void BackgroundDerivs(double tau, const double* y, double* dy,
                         const double* pvecback) override;
 
+  void FillSources(const double* y, const double* dy,
+                   PerturbSourceContext& ctx) override;
+
   // Typed accessors so callers can capture child indices
   DCDMSpecies&                dcdm()       { return *dcdm_; }
   DarkRadiationSpecies&       dr()         { return *dr_sp_; }

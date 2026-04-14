@@ -92,6 +92,134 @@ void ScalarFieldSpecies::PerturbDerivs(double /*tau*/, const double* y, double* 
       - (k2 + a2*ddV_bg) * y[pv->index_pt_phi_scf];
 }
 
+void ScalarFieldSpecies::FillSources(const double* y, const double* /*dy*/,
+                                      PerturbSourceContext& ctx) {
+  PerturbationsModule*    p_mod    = ctx.p_mod;
+  perturb_workspace*      ppw      = ctx.ppw;
+  const perturb_vector*   pv       = ppw->pv;
+  const BackgroundModule* bgm      = p_mod->GetBackgroundModule().get();
+  const double*           pvecback = ppw->pvecback;
+
+  // Scalar field sources are scalar-only
+  if (ctx.index_md != p_mod->index_md_scalars_) return;
+
+  const double phi_prime_bg = pvecback[bgm->index_bg_phi_prime_scf_];
+  const double dV_bg        = pvecback[bgm->index_bg_dV_scf_];
+  const double rho_scf      = pvecback[bgm->index_bg_rho_scf_];
+  const double p_scf        = pvecback[bgm->index_bg_p_scf_];
+  const double a2_rel       = ctx.a2_rel;
+  const double k2           = ctx.k * ctx.k;  // PerturbSourceContext has no k2 field (unlike PerturbScalarContext)
+
+  // ── delta_scf ─────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_scf_ == _TRUE_) {
+    double delta_rho_scf;
+    const perturbs* ppt = p_mod->GetPerturbs();
+    if (ppt->gauge == synchronous) {
+      delta_rho_scf = 1./3. *
+        (1./a2_rel * phi_prime_bg * y[pv->index_pt_phi_prime_scf]
+         + dV_bg * y[pv->index_pt_phi_scf])
+        + 3.*ctx.a_prime_over_a*(1. + p_scf/rho_scf)*ctx.theta_over_k2;  // N-body gauge correction
+    } else {
+      delta_rho_scf = 1./3. *
+        (1./a2_rel * phi_prime_bg * y[pv->index_pt_phi_prime_scf]
+         + dV_bg * y[pv->index_pt_phi_scf]
+         - 1./a2_rel * phi_prime_bg * phi_prime_bg * ppw->pvecmetric[ppw->index_mt_psi])
+        + 3.*ctx.a_prime_over_a*(1. + p_scf/rho_scf)*ctx.theta_over_k2;  // N-body gauge correction
+    }
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_delta_scf_,
+                          ctx.index_tau, ctx.index_k,
+                          delta_rho_scf / rho_scf);
+  }
+
+  // ── theta_scf ─────────────────────────────────────────────────────────────
+  if (p_mod->has_source_theta_scf_ == _TRUE_) {
+    const double rho_plus_p_theta_scf = 1./3. *
+      k2 / a2_rel * phi_prime_bg * y[pv->index_pt_phi_scf];
+
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_theta_scf_,
+                          ctx.index_tau, ctx.index_k,
+                          rho_plus_p_theta_scf / (rho_scf + p_scf)
+                          + ctx.theta_shift);  // N-body gauge correction
+  }
+}
+
+void ScalarFieldSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) return;
+  perturb_vector* pv = ctx.ppw->pv;
+  if (pv->index_pt_phi_scf >= 0) y[pv->index_pt_phi_scf] = 0.;
+  if (pv->index_pt_phi_prime_scf >= 0) y[pv->index_pt_phi_prime_scf] = 0.;
+}
+
+void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
+                                               const PerturbationsModule& mod,
+                                               enum file_format fmt,
+                                               BaseSpecies::TransferColumnSection section) const {
+  const background* pba = mod.GetBackground();
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_)
+      w.Add("d_scf", mod.index_tp_delta_scf_, pba->has_scf);
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_)
+      w.Add("t__scf", mod.index_tp_theta_scf_, pba->has_scf);
+  }
+}
+
+void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                         const double* y,
+                                         const PerturbationsModule& mod,
+                                         const perturb_workspace* ppw) const {
+  const background* pba = mod.GetBackground();
+  if (pba->has_scf != _TRUE_) return;
+
+  double delta_scf = 0., theta_scf = 0.;
+
+  if (!w.IsTitleMode()) {
+    const perturb_vector* pv  = ppw->pv;
+    const double* pvecback    = ppw->pvecback;
+    const double* pvecmetric  = ppw->pvecmetric;
+    const double  k           = ppw->scalar_ctx.k;
+    const double  H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double  a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    const double  a2          = ppw->scalar_ctx.a2;
+    const perturbs* ppt       = mod.GetPerturbs();
+
+    const double phi_prime_bg = pvecback[mod.GetBackgroundModule()->index_bg_phi_prime_scf_];
+    const double dV_bg        = pvecback[mod.GetBackgroundModule()->index_bg_dV_scf_];
+    const double rho_scf      = pvecback[mod.GetBackgroundModule()->index_bg_rho_scf_];
+    const double p_scf        = pvecback[mod.GetBackgroundModule()->index_bg_p_scf_];
+
+    double delta_rho_scf = 0.;
+    if (ppt->gauge == synchronous) {
+      delta_rho_scf = 1./3. *
+        (1./a2 * phi_prime_bg * y[pv->index_pt_phi_prime_scf]
+         + dV_bg * y[pv->index_pt_phi_scf]);
+    } else {
+      delta_rho_scf = 1./3. *
+        (1./a2 * phi_prime_bg * y[pv->index_pt_phi_prime_scf]
+         + dV_bg * y[pv->index_pt_phi_scf]
+         - 1./a2 * phi_prime_bg * phi_prime_bg * pvecmetric[ppw->index_mt_psi]);
+    }
+
+    const double rho_plus_p_theta_scf = 1./3. *
+      ppw->scalar_ctx.k2 / a2 * phi_prime_bg * y[pv->index_pt_phi_scf];
+
+    delta_scf = delta_rho_scf / rho_scf;
+    theta_scf = rho_plus_p_theta_scf / (rho_scf + p_scf);
+
+    if (ppt->gauge == synchronous) {
+      const double alpha = pvecmetric[ppw->index_mt_alpha];
+      const double w_scf = p_scf / rho_scf;
+      delta_scf += alpha * (-3.*H*(1. + w_scf));
+      theta_scf += k*k*alpha;
+    }
+  }
+
+  w.Add("delta_scf", delta_scf, true);
+  w.Add("theta_scf", theta_scf, true);
+}
+
 double ScalarFieldSpecies::Delta(const perturb_vector* pv, const double* y,
                                   const double* pvecback, const perturb_workspace* ppw) const {
   const double rho = pvecback[index_bg_rho_];

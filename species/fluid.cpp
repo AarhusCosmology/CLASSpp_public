@@ -97,6 +97,93 @@ void FluidSpecies::PerturbDerivs(double /*tau*/, const double* y, double* dy,
   }
 }
 
+void FluidSpecies::FillSources(const double* /*y*/, const double* /*dy*/,
+                                 PerturbSourceContext& ctx) {
+  PerturbationsModule*    p_mod   = ctx.p_mod;
+  perturb_workspace*      ppw     = ctx.ppw;
+  const BackgroundModule* bgm     = p_mod->GetBackgroundModule().get();
+  const double*           pvecback = ppw->pvecback;
+
+  // Fluid sources are scalar-only
+  if (ctx.index_md != p_mod->index_md_scalars_) return;
+
+  // ── delta_fld ─────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_fld_ == _TRUE_) {
+    const double w_fld = pvecback[bgm->index_bg_w_fld_];
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_delta_fld_,
+                          ctx.index_tau, ctx.index_k,
+                          ppw->delta_rho_fld / pvecback[bgm->index_bg_rho_fld_]
+                          + 3.*ctx.a_prime_over_a*(1. + w_fld)*ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  // ── theta_fld ─────────────────────────────────────────────────────────────
+  if (p_mod->has_source_theta_fld_ == _TRUE_) {
+    const double w_fld = pvecback[bgm->index_bg_w_fld_];
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_theta_fld_,
+                          ctx.index_tau, ctx.index_k,
+                          ppw->rho_plus_p_theta_fld / (1. + w_fld) / pvecback[bgm->index_bg_rho_fld_]
+                          + ctx.theta_shift);  // N-body gauge correction
+  }
+}
+
+void FluidSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) return;
+  if (ctx.p_mod->GetBackground()->use_ppf == _TRUE_) return;
+  perturb_vector* pv = ctx.ppw->pv;
+  if (pv->index_pt_delta_fld < 0 || pv->index_pt_theta_fld < 0) return;
+
+  double w_fld, dw_over_da, integral;
+  auto* bgm = ctx.p_mod->GetBackgroundModule().get();
+  class_call(bgm->background_w_fld(ctx.a, &w_fld, &dw_over_da, &integral),
+             bgm->error_message_, bgm->error_message_);
+
+  y[pv->index_pt_delta_fld] =
+    -ctx.ktau_two/4. * (1. + w_fld) * (4. - 3. * ctx.p_mod->GetBackground()->cs2_fld)
+    / (4. - 6.*w_fld + 3.*ctx.p_mod->GetBackground()->cs2_fld)
+    * ctx.ppr->curvature_ini * ctx.s2_squared;
+
+  y[pv->index_pt_theta_fld] =
+    -ctx.k * ctx.ktau_three / 4. * ctx.p_mod->GetBackground()->cs2_fld
+    / (4. - 6.*w_fld + 3.*ctx.p_mod->GetBackground()->cs2_fld)
+    * ctx.ppr->curvature_ini * ctx.s2_squared;
+}
+
+void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
+                                         const PerturbationsModule& mod,
+                                         enum file_format fmt,
+                                         BaseSpecies::TransferColumnSection section) const {
+  const background* pba = mod.GetBackground();
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_)
+      w.Add("d_fld", mod.index_tp_delta_fld_, pba->has_fld);
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_)
+      w.Add("t_fld", mod.index_tp_theta_fld_, pba->has_fld);
+  }
+}
+
+void FluidSpecies::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                   const double* /*y*/,
+                                   const PerturbationsModule& mod,
+                                   const perturb_workspace* ppw) const {
+  const background* pba = mod.GetBackground();
+  if (pba->has_fld != _TRUE_) return;
+
+  double delta_rho_fld = 0., rho_plus_p_theta_fld = 0., delta_p_fld = 0.;
+
+  if (!w.IsTitleMode()) {
+    delta_rho_fld        = ppw->delta_rho_fld;
+    rho_plus_p_theta_fld = ppw->rho_plus_p_theta_fld;
+    delta_p_fld          = ppw->delta_p_fld;
+  }
+
+  w.Add("delta_rho_fld",        delta_rho_fld,        true);
+  w.Add("rho_plus_p_theta_fld", rho_plus_p_theta_fld, true);
+  w.Add("delta_p_fld",          delta_p_fld,          true);
+}
+
 double FluidSpecies::Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const {
   return (pv->index_pt_delta_fld >= 0) ? y[pv->index_pt_delta_fld] : 0.;
 }

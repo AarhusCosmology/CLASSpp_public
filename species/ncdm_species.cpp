@@ -34,6 +34,37 @@ void NCDMSpecies::BackgroundDerivs(double /*tau*/, const double* /*y*/, double* 
   // Stable NCDM has no background derivatives
 }
 
+void NCDMSpecies::FillSources(const double* /*y*/, const double* /*dy*/,
+                               PerturbSourceContext& ctx) {
+  PerturbationsModule* p_mod = ctx.p_mod;
+  perturb_workspace*   ppw   = ctx.ppw;
+
+  // NCDM sources are scalar-only
+  if (ctx.index_md != p_mod->index_md_scalars_) return;
+
+  const int n = ncdm_id_;
+  const double* pvecback = ppw->pvecback;
+
+  // delta_ncdm[n]: density perturbation (pre-computed in perturb_sources_member)
+  if (p_mod->has_source_delta_ncdm_ == _TRUE_) {
+    const double w = pvecback[index_bg_p_] / pvecback[index_bg_rho_];
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic,
+                          p_mod->index_tp_delta_ncdm1_ + n,
+                          ctx.index_tau, ctx.index_k,
+                          ppw->delta_ncdm[n]
+                          + 3.*ctx.a_prime_over_a*(1. + w)*ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  // theta_ncdm[n]: velocity perturbation (pre-computed in perturb_sources_member)
+  if (p_mod->has_source_theta_ncdm_ == _TRUE_) {
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic,
+                          p_mod->index_tp_theta_ncdm1_ + n,
+                          ctx.index_tau, ctx.index_k,
+                          ppw->theta_ncdm[n]
+                          + ctx.theta_shift);  // N-body gauge correction
+  }
+}
+
 // ── Perturbations ──────────────────────────────────────────────────────────
 
 void NCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr, int& index_pt,
@@ -62,7 +93,7 @@ void NCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precisio
 }
 
 void NCDMSpecies::PerturbDerivs(double tau, const double* y, double* dy,
-                                 const perturb_parameters_and_workspace& ppaw) {
+                                  const perturb_parameters_and_workspace& ppaw) {
   if (!pba_->has_ncdm || !ncdm_) return;
 
   const perturb_workspace* ppw = ppaw.ppw;
@@ -140,6 +171,114 @@ void NCDMSpecies::PerturbDerivs(double tau, const double* y, double* dy,
                        - (1. + lmax) * k * cotKgen * y[idx + lmax];
     }
   }
+}
+
+void NCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  perturb_vector* pv = ctx.ppw->pv;
+  if (!pba_->has_ncdm || !ncdm_ || pv->index_ncdm_.at(ncdm_id_).empty()) return;
+  for (int index_q = 0; index_q < pv->q_size_ncdm[ncdm_id_]; ++index_q) {
+    const int idx = pv->index_ncdm_[ncdm_id_][index_q];
+    const double q = ncdm_->q_ncdm_[ncdm_id_][index_q];
+    const double epsilon = std::sqrt(q*q + ctx.a*ctx.a*ncdm_->M_ncdm_[ncdm_id_]*ncdm_->M_ncdm_[ncdm_id_]);
+    const double dlnf0_dlnq = ncdm_->dlnf0_dlnq_ncdm_[ncdm_id_][index_q];
+    const int lmax = pv->l_max_ncdm[ncdm_id_];
+
+    y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;
+    if (lmax >= 1) y[idx + 1] = -epsilon / 3. / q / ctx.k * ctx.theta_ur * dlnf0_dlnq;
+    if (lmax >= 2) y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
+    if (lmax >= 3) y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;
+  }
+}
+
+// ── Output columns ─────────────────────────────────────────────────────────
+
+void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
+                                       const PerturbationsModule& mod,
+                                       enum file_format fmt,
+                                       BaseSpecies::TransferColumnSection section) const {
+  const background* pba = mod.GetBackground();
+  if (pba->has_ncdm != _TRUE_) return;
+
+  const int n = ncdm_id_;
+  char tmp[40];
+
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_) {
+      snprintf(tmp, sizeof(tmp), "d_ncdm[%d]", n);
+      w.Add(tmp, mod.index_tp_delta_ncdm1_ + n, _TRUE_);
+    }
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_) {
+      snprintf(tmp, sizeof(tmp), "t_ncdm[%d]", n);
+      w.Add(tmp, mod.index_tp_theta_ncdm1_ + n, _TRUE_);
+    }
+  } else if (fmt == camb_format) {
+    // camb_format: single aggregate column emitted only for n==0
+    if (section != TransferColumnSection::velocity && n == 0)
+      w.Add("-T_ncdm/k2", mod.index_tp_delta_ncdm1_, _TRUE_);
+  }
+}
+
+void NCDMSpecies::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                  const double* y,
+                                  const PerturbationsModule& mod,
+                                  const perturb_workspace* ppw) const {
+  const background* pba = mod.GetBackground();
+  if (pba->has_ncdm != _TRUE_) return;
+
+  const int n = ncdm_id_;
+  double delta_ncdm = 0., theta_ncdm = 0., shear_ncdm = 0., cs2_ncdm = 0.;
+
+  if (!w.IsTitleMode()) {
+    const perturb_vector* pv  = ppw->pv;
+    const double* pvecback    = ppw->pvecback;
+    const double* pvecmetric  = ppw->pvecmetric;
+    const double  k           = ppw->scalar_ctx.k;
+    const double  a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    const double  H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+
+    const double rho_ncdm_bg  = Rho(pvecback);
+    const double p_ncdm_bg    = P(pvecback);
+    const double rho_plus_p   = rho_ncdm_bg + p_ncdm_bg;
+    const double w_ncdm       = (rho_ncdm_bg > 0.) ? p_ncdm_bg / rho_ncdm_bg : 0.;
+
+    delta_ncdm = Delta(pv, y, pvecback, ppw);
+    theta_ncdm = Theta(pv, y, pvecback, ppw);
+    shear_ncdm = (rho_plus_p > 0.) ? RhoPlusPShear(pv, y, pvecback, ppw) / rho_plus_p : 0.;
+    const double delta_p_ncdm   = DeltaP(pv, y, pvecback, ppw);
+    const double delta_rho_ncdm = rho_ncdm_bg * delta_ncdm;
+    constexpr double eps = 1e-300;
+    cs2_ncdm = (std::abs(delta_rho_ncdm) > eps) ? delta_p_ncdm / delta_rho_ncdm : 0.;
+
+    const perturbs* ppt = mod.GetPerturbs();
+    if (ppt->gauge == synchronous) {
+      const double alpha_corr = pvecmetric[ppw->index_mt_alpha];
+      // Store pre-correction delta for cs2 update
+      const double delta_ncdm_syn = delta_ncdm;
+      delta_ncdm -= 3.*a*H*(1. + w_ncdm)*alpha_corr;
+      theta_ncdm += k*k*alpha_corr;
+      // Update cs2_ncdm with gauge correction
+      if (p_ncdm_bg > eps) {
+        const double pseudo_p_ncdm    = pvecback[index_bg_pseudo_p_];
+        const double p_prime_over_rho_ncdm = -a * H * w_ncdm * (5. - pseudo_p_ncdm / p_ncdm_bg);
+        const double delta_ncdm_corrected  = delta_ncdm_syn - 3.*(1. + w_ncdm)*a*H*alpha_corr;
+        if (std::abs(delta_ncdm_corrected) > eps)
+          cs2_ncdm = (cs2_ncdm * delta_ncdm_syn + p_prime_over_rho_ncdm * alpha_corr) / delta_ncdm_corrected;
+      }
+    }
+  }
+
+  char tmp[40];
+  snprintf(tmp, sizeof(tmp), "delta_ncdm[%d]", n);
+  w.Add(tmp, delta_ncdm, true);
+  snprintf(tmp, sizeof(tmp), "theta_ncdm[%d]", n);
+  w.Add(tmp, theta_ncdm, true);
+  snprintf(tmp, sizeof(tmp), "shear_ncdm[%d]", n);
+  w.Add(tmp, shear_ncdm, true);
+  snprintf(tmp, sizeof(tmp), "cs2_ncdm[%d]", n);
+  w.Add(tmp, cs2_ncdm, true);
 }
 
 // ── Integrated observables ──────────────────────────────────────────────────

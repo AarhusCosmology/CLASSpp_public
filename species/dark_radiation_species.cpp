@@ -147,10 +147,109 @@ double DarkRadiationSpecies::DeltaP(const perturb_vector* pv, const double* y,
 }
 
 double DarkRadiationSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,
-                                            const double* pvecback, const perturb_workspace* /*ppw*/) const {
+                                             const double* pvecback, const perturb_workspace* /*ppw*/) const {
   if (pv->index_pt_F0_dr_sum < 0) return 0.;
   double a = pvecback[bgm_->index_bg_a_];
   double a2 = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
   return 2./3. * rho_dr_over_f * y[pv->index_pt_F0_dr_sum + 2];
+}
+
+void DarkRadiationSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) return;
+
+  perturb_vector* pv = ctx.ppw->pv;
+  const double* pvecback = ctx.ppw->pvecback;
+  const double r_prefactor = std::pow(std::pow(ctx.a / pba_->a_today, 2) / pba_->H0, 2);
+
+  if (pv->index_pt_F0_dr_species >= 0) {
+    for (int n_dr = 0; n_dr < pba_->N_decay_dr; ++n_dr) {
+      const int base = pv->index_pt_F0_dr_species + n_dr * (pv->l_max_dr + 1);
+      const double r_dr_species = r_prefactor * pvecback[bgm_->index_bg_rho_dr_species_ + n_dr];
+      y[base + 0] = ctx.delta_dr * r_dr_species;
+      if (pv->l_max_dr >= 1) y[base + 1] = 4./(3.*ctx.k) * ctx.theta_ur * r_dr_species;
+      if (pv->l_max_dr >= 2) y[base + 2] = 2. * ctx.shear_ur * r_dr_species;
+      if (pv->l_max_dr >= 3) y[base + 3] = ctx.l3_ur * r_dr_species;
+    }
+  }
+
+  if (pv->index_pt_F0_dr_sum >= 0) {
+    const double r_dr_sum = r_prefactor * pvecback[bgm_->index_bg_rho_dr_];
+    y[pv->index_pt_F0_dr_sum] = ctx.delta_dr * r_dr_sum;
+    if (pv->l_max_dr >= 1) y[pv->index_pt_F0_dr_sum + 1] = 4./(3.*ctx.k) * ctx.theta_ur * r_dr_sum;
+    if (pv->l_max_dr >= 2) y[pv->index_pt_F0_dr_sum + 2] = 2. * ctx.shear_ur * r_dr_sum;
+    if (pv->l_max_dr >= 3) y[pv->index_pt_F0_dr_sum + 3] = ctx.l3_ur * r_dr_sum;
+  }
+}
+
+void DarkRadiationSpecies::WriteOutputColumns(PerturbColumnWriter& w,
+                                                 const PerturbationsModule& mod,
+                                                 enum file_format fmt,
+                                                 BaseSpecies::TransferColumnSection section) const {
+  const background* pba = mod.GetBackground();
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_)
+      w.Add("d_dr", mod.index_tp_delta_dr_, pba->has_dr);
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_)
+      w.Add("t_dr", mod.index_tp_theta_dr_, pba->has_dr);
+  }
+}
+
+void DarkRadiationSpecies::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                           const double* y,
+                                           const PerturbationsModule& mod,
+                                           const perturb_workspace* ppw) const {
+  if (pba_->has_dr != _TRUE_) return;
+
+  // l_max_dr is the same in both modes (ppr->l_max_dr == ppw->pv->l_max_dr at runtime)
+  const int l_max_dr = mod.GetPrecision()->l_max_dr;
+
+  // Pre-compute gauge correction scalars (zero in title mode — ppw is nullptr)
+  double k = 0., a = 0., H = 0., alpha_corr = 0., decay_corr = 0.;
+  const perturb_vector* pv = nullptr;
+  if (!w.IsTitleMode()) {
+    pv     = ppw->pv;
+    k      = ppw->scalar_ctx.k;
+    a      = ppw->pvecback[bgm_->index_bg_a_];
+    H      = ppw->pvecback[bgm_->index_bg_H_];
+    if (mod.GetPerturbs()->gauge == synchronous) {
+      alpha_corr = ppw->pvecmetric[ppw->index_mt_alpha];
+      const double rho_dcdm    = ppw->pvecback[bgm_->index_bg_rho_dcdm_];
+      const double rho_dr_tot  = ppw->pvecback[bgm_->index_bg_rho_dr_];
+      decay_corr = a * pba_->Gamma_dcdm * rho_dcdm / rho_dr_tot;
+    }
+  }
+
+  // Per-decay-DR-species: delta, theta, shear
+  char tmp[64];
+  for (int n_dr = 0; n_dr < pba_->N_decay_dr; n_dr++) {
+    double delta_dr = 0., theta_dr = 0., shear_dr = 0.;
+    if (!w.IsTitleMode()) {
+      const double rho_dr_n = ppw->pvecback[bgm_->index_bg_rho_dr_species_ + n_dr];
+      const double r_dr = (a*a / pba_->H0) * (a*a / pba_->H0) * rho_dr_n;
+      const int base = pv->index_pt_F0_dr_species + n_dr*(pv->l_max_dr + 1);
+      delta_dr = y[base + 0] / r_dr + (-4.*a*H + decay_corr) * alpha_corr;
+      theta_dr = y[base + 1] * 3./4. * k / r_dr + k*k * alpha_corr;
+      shear_dr = y[base + 2] * 0.5 / r_dr;
+    }
+    snprintf(tmp, sizeof(tmp), "delta_ncdm[%d]", n_dr); w.Add(tmp, delta_dr, true);
+    snprintf(tmp, sizeof(tmp), "theta_ncdm[%d]", n_dr); w.Add(tmp, theta_dr, true);
+    snprintf(tmp, sizeof(tmp), "shear_ncdm[%d]", n_dr); w.Add(tmp, shear_dr, true);
+  }
+
+  // Raw F multipoles per DR species
+  for (int n_dr = 0; n_dr < pba_->N_decay_dr; n_dr++) {
+    for (int l = 0; l <= l_max_dr; l++) {
+      double F_val = 0.;
+      if (!w.IsTitleMode()) {
+        const int base = pv->index_pt_F0_dr_species + n_dr*(pv->l_max_dr + 1);
+        F_val = y[base + l];
+      }
+      snprintf(tmp, sizeof(tmp), "F_dr[%d][%d]", n_dr, l);
+      w.Add(tmp, F_val, true);
+    }
+  }
 }

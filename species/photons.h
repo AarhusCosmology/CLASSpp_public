@@ -45,6 +45,18 @@ public:
   void PerturbTensorDerivs(double tau, const double* y, double* dy,
                             const perturb_parameters_and_workspace& ppaw) override;
 
+  void FillSources(const double* y, const double* dy,
+                   PerturbSourceContext& ctx) override;
+  void ApplyInitialConditions(double* y,
+                              const PerturbIcContext& ctx) override;
+
+  void WriteOutputColumns(PerturbColumnWriter& writer, const PerturbationsModule& mod,
+                            enum file_format fmt,
+                            TransferColumnSection section = TransferColumnSection::all) const override;
+  void PrintVariables(PerturbColumnWriter& writer, double tau, const double* y,
+                      const PerturbationsModule& mod,
+                      const perturb_workspace* ppw) const override;
+
   /** RSA/TCA active when pv->index_pt_delta_g == -1 (sentinel set by RegisterPerturbationIndices). */
   double Delta(const perturb_vector* pv, const double* y, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const override {
     return (pv->index_pt_delta_g >= 0) ? y[pv->index_pt_delta_g] : 0.;

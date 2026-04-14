@@ -31,14 +31,23 @@ public:
                                    int gauge) override;
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+  void WriteOutputColumns(PerturbColumnWriter& writer, const PerturbationsModule& mod,
+                           enum file_format fmt,
+                           TransferColumnSection section = TransferColumnSection::all) const override;
+  void PrintVariables(PerturbColumnWriter& writer, double tau, const double* y,
+                      const PerturbationsModule& mod,
+                      const perturb_workspace* ppw) const override;
   double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double Theta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+  void FillSources(const double* y, const double* dy,
+                   PerturbSourceContext& ctx) override;
+  void ApplyInitialConditions(double* y,
+                              const PerturbIcContext& ctx) override;
 
 private:
   double Omega0_cdm_;
   double H0_;
   int index_bg_rho_cdm_ = -1;
 };
-

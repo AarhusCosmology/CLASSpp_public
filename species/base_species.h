@@ -10,7 +10,7 @@ struct perturb_vector;
 struct perturb_workspace;
 struct perturb_parameters_and_workspace;
 
-#include "perturb_context.h"
+#include "perturb_source_context.h"
 
 class BackgroundModule;  // forward declaration
 
@@ -32,6 +32,7 @@ class BaseSpecies {
 public:
   /** Classification used by background_functions() to accumulate rho_r, rho_m, etc. */
   enum class EnergyType { Radiation, Matter, DarkEnergy, Other };
+  enum class TransferColumnSection { all, density, velocity };
 
   virtual ~BaseSpecies() = default;
   BaseSpecies(const BaseSpecies&) = delete;
@@ -191,6 +192,59 @@ public:
   /** (rho + p) * sigma: anisotropic stress contribution to Einstein equations. */
   virtual double RhoPlusPShear(const perturb_vector* pv, const double* y,
                                const double* pvecback, const perturb_workspace* ppw) const = 0;
+
+  // ── Stage 1: Output ──────────────────────────────────────────────────────
+
+  /**
+   * Append this species' output columns (delta, theta) to writer.
+   * Called from perturb_output_titles (title mode) and perturb_output_data (data mode).
+   * In class_format, the module may call this separately for density and velocity
+   * sections to preserve the historical transfer-column ordering.
+   * Use writer.Add(title, mod.index_tp_XXX_, active) — writer looks up tk[tp_index].
+   */
+  virtual void WriteOutputColumns(PerturbColumnWriter& /*writer*/,
+                                    const PerturbationsModule& /*mod*/,
+                                    enum file_format /*fmt*/,
+                                    TransferColumnSection /*section*/ = TransferColumnSection::all) const
+  {}
+
+  /**
+   * Append this species' time-evolution variables to writer.
+   * Called from perturb_prepare_k_output (title mode, tau=0/y=nullptr/ppw=nullptr)
+   * and perturb_print_variables_member (data mode).
+   * Guard computation behind: if (!writer.IsTitleMode()) { ... compute ... }
+   * Use writer.Add(title, computed_value, active).
+   */
+  virtual void PrintVariables(PerturbColumnWriter& /*writer*/,
+                               double /*tau*/,
+                               const double* /*y*/,
+                               const PerturbationsModule& /*mod*/,
+                               const perturb_workspace* /*ppw*/) const {}
+
+  // ── Stage 2: Source filling ───────────────────────────────────────────────
+
+  /**
+   * Write per-k, per-tau source values for this species into the source table.
+   * Called in perturb_sources_member() after metric/temperature sources are set.
+   * Use ctx.p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, ctx.p_mod->index_tp_XXX_,
+   *                               ctx.index_tau, ctx.index_k, value).
+   * All addressing (index_md, index_ic, index_k, index_tau) is in ctx.
+   */
+  virtual void FillSources(const double* /*y*/,
+                             const double* /*dy*/,
+                             PerturbSourceContext& /*ctx*/) {}
+
+  // ── Stage 3: Initial conditions ───────────────────────────────────────────
+
+  /**
+   * Write synchronous-gauge initial conditions for this species into y[].
+   * y[] == ppw->pv->y. Use ctx.ppw->pv->index_pt_* for index lookup.
+   * The module pre-computes ctx.delta_g_ic, ctx.delta_ur, etc.; species use them.
+   * Guard each IC type: if (ctx.index_ic == ctx.p_mod->index_ic_ad_) { ... }
+   * Newtonian gauge transformation is handled by the module after this loop.
+   */
+  virtual void ApplyInitialConditions(double* /*y*/,
+                                       const PerturbIcContext& /*ctx*/) {}
 
 protected:
   BaseSpecies(std::string name, EnergyType energy_type)

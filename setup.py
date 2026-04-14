@@ -86,11 +86,12 @@ source_files = (
         'fluid.cpp',
         'idm_dr_idr_species.cpp',
         'idm_drmd_idr_drmd_species.cpp',
-        'lambda.cpp',
-        'ncdm_species.cpp',
-        'photons.cpp',
-        'scalar_field.cpp',
-        'ultra_relativistic.cpp',
+         'lambda.cpp',
+         'ncdm_species.cpp',
+         'perturb_column_writer.cpp',
+         'photons.cpp',
+         'scalar_field.cpp',
+         'ultra_relativistic.cpp',
         'interacting_species.cpp',
     )
     + prepend(

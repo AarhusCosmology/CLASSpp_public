@@ -3,6 +3,168 @@
 #include "perturbations_module.h"
 #include "thermodynamics_module.h"
 #include "thermodynamics.h"
+#include "perturbations.h"
+
+void IDM_DR_IDR_Species::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  perturb_vector* pv = ctx.ppw->pv;
+  const PerturbationsModule* mod = ctx.p_mod;
+  const perturbs* ppt = mod->GetPerturbs();
+  if (ctx.index_ic != mod->index_ic_ad_) return;
+
+  if (mod->GetBackground()->has_idm_dr == _TRUE_) {
+    if (pv->index_pt_delta_idm_dr >= 0)
+    y[pv->index_pt_delta_idm_dr] = 3./4. * ctx.delta_g_ic;
+    if (pv->index_pt_theta_idm_dr >= 0)
+      y[pv->index_pt_theta_idm_dr] = ctx.theta_ur;
+  }
+  if (mod->GetBackground()->has_idr == _TRUE_) {
+    if (pv->index_pt_delta_idr >= 0) y[pv->index_pt_delta_idr] = ctx.delta_ur;
+    if (pv->index_pt_theta_idr >= 0) y[pv->index_pt_theta_idr] = ctx.theta_ur;
+    if (ppt->idr_nature == idr_free_streaming &&
+        ((mod->GetBackground()->has_idm_dr == _FALSE_) ||
+         (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_dr] == (int)tca_idm_dr_off))) {
+      if (pv->index_pt_shear_idr >= 0) y[pv->index_pt_shear_idr] = ctx.shear_ur;
+      if (pv->index_pt_l3_idr >= 0) y[pv->index_pt_l3_idr] = ctx.l3_ur;
+    }
+  }
+}
+
+void IDM_DR_IDR_Species::FillSources(const double* y, const double* /*dy*/,
+                                      PerturbSourceContext& ctx) {
+  PerturbationsModule* p_mod = ctx.p_mod;
+  perturb_workspace*   ppw   = ctx.ppw;
+  const perturb_vector* pv   = ppw->pv;
+
+  // These sources are scalar-only
+  if (ctx.index_md != p_mod->index_md_scalars_) return;
+
+  auto set_source = [&](int index_tp, double value) {
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, index_tp,
+                          ctx.index_tau, ctx.index_k, value);
+  };
+
+  // ── IDM_DR ────────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_idm_dr_ == _TRUE_) {
+    set_source(p_mod->index_tp_delta_idm_dr_,
+               y[pv->index_pt_delta_idm_dr]
+               + 3.*ctx.a_prime_over_a*ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  if (p_mod->has_source_theta_idm_dr_ == _TRUE_) {
+    set_source(p_mod->index_tp_theta_idm_dr_,
+               y[pv->index_pt_theta_idm_dr]
+               + ctx.theta_shift);  // N-body gauge correction
+  }
+
+  // ── IDR ───────────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_idr_ == _TRUE_) {
+    if (ppw->approx[ppw->index_ap_rsa_idr] == (int)rsa_idr_off)
+      set_source(p_mod->index_tp_delta_idr_,
+                 y[pv->index_pt_delta_idr]
+                 + 4.*ctx.a_prime_over_a*ctx.theta_over_k2);  // N-body gauge correction
+    else
+      set_source(p_mod->index_tp_delta_idr_,
+                 ppw->rsa_delta_idr
+                 + 4.*ctx.a_prime_over_a*ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  if (p_mod->has_source_theta_idr_ == _TRUE_) {
+    if (ppw->approx[ppw->index_ap_rsa_idr] == (int)rsa_idr_off)
+      set_source(p_mod->index_tp_theta_idr_,
+                 y[pv->index_pt_theta_idr]
+                 + ctx.theta_shift);  // N-body gauge correction
+    else
+      set_source(p_mod->index_tp_theta_idr_,
+                 ppw->rsa_theta_idr
+                 + ctx.theta_shift);  // N-body gauge correction
+  }
+}
+
+void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
+                                              const PerturbationsModule& mod,
+                                              enum file_format fmt,
+                                              BaseSpecies::TransferColumnSection section) const {
+  const background* pba = mod.GetBackground();
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_) {
+      w.Add("d_idm_dr", mod.index_tp_delta_idm_dr_, pba->has_idm_dr);
+      w.Add("d_idr",    mod.index_tp_delta_idr_,    pba->has_idr);
+    }
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_) {
+      w.Add("t_idm_dr", mod.index_tp_theta_idm_dr_, pba->has_idm_dr);
+      w.Add("t_idr",    mod.index_tp_theta_idr_,    pba->has_idr);
+    }
+  } else if (fmt == camb_format) {
+    if (section != TransferColumnSection::velocity)
+      w.Add("-T_idm_dr/k2", mod.index_tp_delta_idm_dr_, _TRUE_);
+  }
+}
+
+void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                         const double* y,
+                                         const PerturbationsModule& mod,
+                                         const perturb_workspace* ppw) const {
+  const background* pba = mod.GetBackground();
+
+  double delta_idm_dr = 0., theta_idm_dr = 0.;
+  double delta_idr    = 0., theta_idr    = 0., shear_idr = 0.;
+
+  if (!w.IsTitleMode()) {
+    const perturb_vector* pv  = ppw->pv;
+    const double* pvecback    = ppw->pvecback;
+    const double* pvecmetric  = ppw->pvecmetric;
+    const double  k           = ppw->scalar_ctx.k;
+    const double  H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double  a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    const perturbs* ppt       = mod.GetPerturbs();
+
+    if (pba->has_idm_dr == _TRUE_) {
+      delta_idm_dr = y[pv->index_pt_delta_idm_dr];
+      theta_idm_dr = y[pv->index_pt_theta_idm_dr];
+    }
+
+    if (pba->has_idr == _TRUE_) {
+      if (ppw->approx[ppw->index_ap_rsa_idr] == (int)rsa_idr_off) {
+        delta_idr = y[pv->index_pt_delta_idr];
+        theta_idr = y[pv->index_pt_theta_idr];
+        if (ppt->idr_nature == idr_free_streaming) {
+          if ((pba->has_idm_dr == _TRUE_) &&
+              (ppw->approx[ppw->index_ap_tca_idm_dr] == (int)tca_idm_dr_on)) {
+            shear_idr = ppw->tca_shear_idm_dr;
+          } else {
+            shear_idr = y[pv->index_pt_shear_idr];
+          }
+        }
+      } else {
+        delta_idr = ppw->rsa_delta_idr;
+        theta_idr = ppw->rsa_theta_idr;
+        shear_idr = 0.;
+      }
+    }
+
+    if (ppt->gauge == synchronous) {
+      const double alpha = pvecmetric[ppw->index_mt_alpha];
+      if (pba->has_idm_dr == _TRUE_) {
+        delta_idm_dr -= 3.*H*a*alpha;
+        theta_idm_dr += k*k*alpha;
+      }
+      if (pba->has_idr == _TRUE_) {
+        delta_idr -= 4.*H*a*alpha;
+        theta_idr += k*k*alpha;
+      }
+    }
+  }
+
+  w.Add("delta_idr",    delta_idr,    pba->has_idr    == _TRUE_);
+  w.Add("theta_idr",    theta_idr,    pba->has_idr    == _TRUE_);
+  if (pba->has_idr == _TRUE_ && mod.GetPerturbs()->idr_nature == idr_free_streaming)
+    w.Add("shear_idr", shear_idr, true);
+  w.Add("delta_idm_dr", delta_idm_dr, pba->has_idm_dr == _TRUE_);
+  w.Add("theta_idm_dr", theta_idm_dr, pba->has_idm_dr == _TRUE_);
+}
 
 IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba)
   : CompositeSpecies("IDM_DR_IDR", BaseSpecies::EnergyType::Other)

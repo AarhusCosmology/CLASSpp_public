@@ -2,6 +2,7 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 #include "thermodynamics_module.h"
+#include "background_module.h"
 
 // ── Perturbations ─────────────────────────────────────────────────────────────
 
@@ -387,6 +388,137 @@ void PhotonsSpecies::PerturbTensorDerivs(double /*tau*/, const double* y, double
            - (1. + l)*cotKgen*y[pv->index_pt_pol0_g + l])
         - dkappa*y[pv->index_pt_pol0_g + l];
   }
+}
+
+void PhotonsSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  perturb_vector* pv = ctx.ppw->pv;
+  const PerturbationsModule* mod = ctx.p_mod;
+  if (pv->index_pt_delta_g < 0 || pv->index_pt_theta_g < 0) return;
+
+  if (ctx.index_ic == mod->index_ic_ad_) {
+    y[pv->index_pt_delta_g] = ctx.delta_g_ic;
+    y[pv->index_pt_theta_g] = ctx.theta_g_ic;
+  } else if (ctx.index_ic == mod->index_ic_cdi_) {
+    y[pv->index_pt_delta_g] = ctx.delta_g_ic;
+    y[pv->index_pt_theta_g] = ctx.theta_g_ic;
+  } else if (ctx.index_ic == mod->index_ic_bi_) {
+    y[pv->index_pt_delta_g] = ctx.delta_g_ic;
+    y[pv->index_pt_theta_g] = ctx.theta_g_ic;
+  } else if (ctx.index_ic == mod->index_ic_nid_) {
+    y[pv->index_pt_delta_g] = ctx.delta_g_ic;
+    y[pv->index_pt_theta_g] = ctx.theta_g_ic;
+  } else if (ctx.index_ic == mod->index_ic_niv_) {
+    y[pv->index_pt_delta_g] = ctx.delta_g_ic;
+    y[pv->index_pt_theta_g] = ctx.theta_g_ic;
+  }
+}
+
+void PhotonsSpecies::FillSources(const double* y, const double* dy,
+                                     PerturbSourceContext& ctx) {
+  PerturbationsModule*  p_mod = ctx.p_mod;
+  perturb_workspace*    ppw   = ctx.ppw;
+  const perturb_vector* pv    = ppw->pv;
+
+  if (ctx.index_md != p_mod->index_md_scalars_) return;
+
+  // Convenient lambda to write into source table
+  auto set_source = [&](int index_tp, double value) {
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, index_tp,
+                          ctx.index_tau, ctx.index_k, value);
+  };
+
+  double delta_g;
+  if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_on)
+    delta_g = ppw->rsa_delta_g;
+  else
+    delta_g = y[pv->index_pt_delta_g];
+
+  if (p_mod->has_source_delta_g_ == _TRUE_) {
+    set_source(p_mod->index_tp_delta_g_,
+      delta_g + 4. * ctx.a_prime_over_a * ctx.theta_over_k2);
+  }
+
+  if (p_mod->has_source_theta_g_ == _TRUE_) {
+    double theta_g;
+    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off)
+      theta_g = y[pv->index_pt_theta_g];
+    else
+      theta_g = ppw->rsa_theta_g;
+    set_source(p_mod->index_tp_theta_g_,
+      theta_g + ctx.theta_shift);
+  }
+}
+
+void PhotonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
+                                          const PerturbationsModule& mod,
+                                          enum file_format fmt,
+                                          BaseSpecies::TransferColumnSection section) const {
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_)
+      w.Add("d_g", mod.index_tp_delta_g_, true);
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_)
+      w.Add("t_g", mod.index_tp_theta_g_, true);
+  }
+  // camb_format: photons not written separately
+}
+
+void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                     const double* y,
+                                     const PerturbationsModule& mod,
+                                     const perturb_workspace* ppw) const {
+  double delta_g = 0., theta_g = 0., shear_g = 0.;
+  double pol0_g = 0., pol1_g = 0., pol2_g = 0.;
+
+  if (!w.IsTitleMode()) {
+    const perturb_vector* pv = ppw->pv;
+    // scalar_ctx.k is always current here: the evolver sets it in perturb_derivs_member
+    // before the print callback fires, so it equals pppaw->k at this call site.
+    const double k = ppw->scalar_ctx.k;
+    const double* pvecthermo = ppw->pvecthermo;
+    const double* pvecback   = ppw->pvecback;
+    const double* pvecmetric = ppw->pvecmetric;
+
+    if (ppw->approx[ppw->index_ap_rsa] == (int)rsa_off) {
+      delta_g = y[pv->index_pt_delta_g];
+      theta_g = y[pv->index_pt_theta_g];
+      if (ppw->approx[ppw->index_ap_tca] == (int)tca_on) {
+        const double dkappa = pvecthermo[mod.GetThermodynamicsModule()->index_th_dkappa_];
+        shear_g = ppw->tca_shear_g;
+        pol0_g  = 2.5*ppw->tca_shear_g;
+        pol1_g  = 7./12.*6./7.*k/dkappa*ppw->tca_shear_g;
+        pol2_g  = 0.5*ppw->tca_shear_g;
+      } else {
+        shear_g = y[pv->index_pt_shear_g];
+        pol0_g  = y[pv->index_pt_pol0_g];
+        pol1_g  = y[pv->index_pt_pol1_g];
+        pol2_g  = y[pv->index_pt_pol2_g];
+      }
+    } else {
+      // RSA on: use approximated values; shear/pol remain 0
+      delta_g = ppw->rsa_delta_g;
+      theta_g = ppw->rsa_theta_g;
+    }
+
+    // Synchronous → Newtonian gauge conversion
+    const perturbs* ppt = mod.GetPerturbs();
+    if (ppt->gauge == synchronous) {
+      const double alpha = pvecmetric[ppw->index_mt_alpha];
+      const double H     = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+      const double a     = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+      delta_g -= 4.*H*a*alpha;
+      theta_g += k*k*alpha;
+    }
+  }
+
+  w.Add("delta_g", delta_g, true);
+  w.Add("theta_g", theta_g, true);
+  w.Add("shear_g", shear_g, true);
+  w.Add("pol0_g",  pol0_g,  true);
+  w.Add("pol1_g",  pol1_g,  true);
+  w.Add("pol2_g",  pol2_g,  true);
 }
 
 double PhotonsSpecies::RhoPlusPShear(const perturb_vector* pv, const double* y,

@@ -37,6 +37,17 @@ public:
   double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
 
+  void FillSources(const double* y, const double* dy,
+                   PerturbSourceContext& ctx) override;
+  void ApplyInitialConditions(double* y,
+                              const PerturbIcContext& ctx) override;
+  void WriteOutputColumns(PerturbColumnWriter& writer, const PerturbationsModule& mod,
+                           enum file_format fmt,
+                           TransferColumnSection section = TransferColumnSection::all) const override;
+  void PrintVariables(PerturbColumnWriter& writer, double tau, const double* y,
+                      const PerturbationsModule& mod,
+                      const perturb_workspace* ppw) const override;
+
 private:
   double Omega0_ur_;
   double H0_;

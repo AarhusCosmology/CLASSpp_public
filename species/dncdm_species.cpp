@@ -177,7 +177,7 @@ void DNCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv, const precisi
 }
 
 void DNCDMSpecies::PerturbDerivs(double tau, const double* y, double* dy,
-                                 const perturb_parameters_and_workspace& ppaw) {
+                                  const perturb_parameters_and_workspace& ppaw) {
   if (!ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr) return;
 
   const perturb_workspace* ppw = ppaw.ppw;
@@ -217,6 +217,28 @@ void DNCDMSpecies::PerturbDerivs(double tau, const double* y, double* dy,
       dy[idx + l] = qk_div_epsilon / (2. * l + 1.) * (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
     // l=lmax (truncation)
     dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
+  }
+}
+
+void DNCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  perturb_vector* pv = ctx.ppw->pv;
+  if (!ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr
+      || pv->index_ncdm_.at(ncdm_id_).empty()) {
+    return;
+  }
+
+  const double* pvecback = ctx.ppw->pvecback;
+  for (int index_q = 0; index_q < pv->q_size_ncdm[ncdm_id_]; ++index_q) {
+    const int idx = pv->index_ncdm_[ncdm_id_][index_q];
+    const double q = ncdm_->q_ncdm_[ncdm_id_][index_q];
+    const double epsilon = std::sqrt(q*q + ctx.a*ctx.a*ncdm_->M_ncdm_[ncdm_id_]*ncdm_->M_ncdm_[ncdm_id_]);
+    const double dlnf0_dlnq = pvecback[index_bg_dlnfdlnq_decay_ + index_q];
+    const int lmax = pv->l_max_ncdm[ncdm_id_];
+
+    y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;
+    if (lmax >= 1) y[idx + 1] = -epsilon / 3. / q / ctx.k * ctx.theta_ur * dlnf0_dlnq;
+    if (lmax >= 2) y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
+    if (lmax >= 3) y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;
   }
 }
 

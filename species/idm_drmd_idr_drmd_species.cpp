@@ -1,6 +1,152 @@
 #include "idm_drmd_idr_drmd_species.h"
 #include "background_module.h"
 #include "perturbations_module.h"
+#include "perturbations.h"
+
+void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  perturb_vector* pv = ctx.ppw->pv;
+  const PerturbationsModule* mod = ctx.p_mod;
+  if (ctx.index_ic != mod->index_ic_ad_) return;
+
+  if (pba_.has_idr_drmd == _TRUE_) {
+    if (pv->index_pt_delta_idr_drmd >= 0) y[pv->index_pt_delta_idr_drmd] = ctx.delta_g_ic;
+    if (pv->index_pt_theta_idr_drmd >= 0) y[pv->index_pt_theta_idr_drmd] = ctx.theta_g_ic;
+  }
+
+  if (pba_.has_idm_drmd == _TRUE_) {
+    if (pv->index_pt_delta_idm_drmd >= 0) y[pv->index_pt_delta_idm_drmd] = 3./4. * ctx.delta_g_ic;
+
+    if (pv->index_pt_theta_idm_drmd >= 0) {
+      if (pba_.has_idr_drmd == _TRUE_) {
+        if (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_drmd] == (int)tca_idm_drmd_on) {
+          y[pv->index_pt_theta_idm_drmd] =
+              (pv->index_pt_theta_idr_drmd >= 0) ? y[pv->index_pt_theta_idr_drmd] : 0.;
+        } else {
+          double Rint, csp2, Gint;
+          auto* bgm = ctx.p_mod->GetBackgroundModule().get();
+          class_call(bgm->background_idm_drmd(
+              ctx.ppw->pvecback[bgm->index_bg_a_],
+              ctx.ppw->pvecback[bgm->index_bg_rho_idm_drmd_]
+                  / ctx.ppw->pvecback[bgm->index_bg_rho_idr_drmd_],
+              &Rint, &csp2, &Gint),
+            bgm->error_message_, bgm->error_message_);
+          y[pv->index_pt_theta_idm_drmd] =
+              Gint / (4. + Gint)
+              * ((pv->index_pt_theta_idr_drmd >= 0) ? y[pv->index_pt_theta_idr_drmd] : 0.);
+        }
+      } else {
+        y[pv->index_pt_theta_idm_drmd] = 0.;
+      }
+    }
+  }
+}
+
+void IDM_DRMD_IDR_DRMD_Species::FillSources(const double* y, const double* /*dy*/,
+                                             PerturbSourceContext& ctx) {
+  PerturbationsModule* p_mod = ctx.p_mod;
+  perturb_workspace*   ppw   = ctx.ppw;
+  const perturb_vector* pv   = ppw->pv;
+
+  // These sources are scalar-only
+  if (ctx.index_md != p_mod->index_md_scalars_) return;
+
+  auto set_source = [&](int index_tp, double value) {
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, index_tp,
+                          ctx.index_tau, ctx.index_k, value);
+  };
+
+  // ── IDM_DRMD ──────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_idm_drmd_ == _TRUE_) {
+    set_source(p_mod->index_tp_delta_idm_drmd_,
+               y[pv->index_pt_delta_idm_drmd]
+               + 3.*ctx.a_prime_over_a*ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  if (p_mod->has_source_theta_idm_drmd_ == _TRUE_) {
+    set_source(p_mod->index_tp_theta_idm_drmd_,
+               y[pv->index_pt_theta_idm_drmd]
+               + ctx.theta_shift);  // N-body gauge correction
+  }
+
+  // ── IDR_DRMD ──────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_idr_drmd_ == _TRUE_) {
+    set_source(p_mod->index_tp_delta_idr_drmd_,
+               y[pv->index_pt_delta_idr_drmd]
+               + 4.*ctx.a_prime_over_a*ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  // The original perturb_sources_member allocates this slot but never writes it.
+  // Write zero explicitly to avoid relying on zero-initialization of the source table.
+  if (p_mod->has_source_theta_idr_drmd_ == _TRUE_) {
+    set_source(p_mod->index_tp_theta_idr_drmd_, 0.);
+  }
+}
+
+void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(PerturbColumnWriter& w,
+                                                     const PerturbationsModule& mod,
+                                                     enum file_format fmt,
+                                                     BaseSpecies::TransferColumnSection section) const {
+  const background* pba = mod.GetBackground();
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_) {
+      w.Add("d_idm_drmd", mod.index_tp_delta_idm_drmd_, pba->has_idm_drmd);
+      w.Add("d_idr_drmd", mod.index_tp_delta_idr_drmd_, pba->has_idr_drmd);
+    }
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_) {
+      w.Add("t_idm_drmd", mod.index_tp_theta_idm_drmd_, pba->has_idm_drmd);
+      w.Add("t_idr_drmd", mod.index_tp_theta_idr_drmd_, pba->has_idr_drmd);
+    }
+  }
+}
+
+void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                                const double* y,
+                                                const PerturbationsModule& mod,
+                                                const perturb_workspace* ppw) const {
+  const background* pba = mod.GetBackground();
+
+  double delta_idm_drmd = 0., theta_idm_drmd = 0.;
+  double delta_idr_drmd = 0., theta_idr_drmd = 0.;
+
+  if (!w.IsTitleMode()) {
+    const perturb_vector* pv  = ppw->pv;
+    const double* pvecback    = ppw->pvecback;
+    const double* pvecmetric  = ppw->pvecmetric;
+    const double  k           = ppw->scalar_ctx.k;
+    const double  H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double  a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    const perturbs* ppt       = mod.GetPerturbs();
+
+    if (pba->has_idm_drmd == _TRUE_) {
+      delta_idm_drmd = y[pv->index_pt_delta_idm_drmd];
+      theta_idm_drmd = y[pv->index_pt_theta_idm_drmd];
+    }
+    if (pba->has_idr_drmd == _TRUE_) {
+      delta_idr_drmd = y[pv->index_pt_delta_idr_drmd];
+      theta_idr_drmd = y[pv->index_pt_theta_idr_drmd];
+    }
+
+    if (ppt->gauge == synchronous) {
+      const double alpha = pvecmetric[ppw->index_mt_alpha];
+      if (pba->has_idm_drmd == _TRUE_) {
+        delta_idm_drmd -= 3.*H*a*alpha;
+        theta_idm_drmd += k*k*alpha;
+      }
+      if (pba->has_idr_drmd == _TRUE_) {
+        delta_idr_drmd -= 4.*H*a*alpha;
+        theta_idr_drmd += k*k*alpha;
+      }
+    }
+  }
+
+  w.Add("delta_idr_drmd", delta_idr_drmd, pba->has_idr_drmd == _TRUE_);
+  w.Add("theta_idr_drmd", theta_idr_drmd, pba->has_idr_drmd == _TRUE_);
+  w.Add("delta_idm_drmd", delta_idm_drmd, pba->has_idm_drmd == _TRUE_);
+  w.Add("theta_idm_drmd", theta_idm_drmd, pba->has_idm_drmd == _TRUE_);
+}
 
 IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba)
   : CompositeSpecies("IDM_DRMD_IDR_DRMD", BaseSpecies::EnergyType::Other)

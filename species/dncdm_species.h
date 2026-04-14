@@ -42,6 +42,8 @@ public:
                                    const perturb_workspace* ppw, int gauge) override;
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+  void ApplyInitialConditions(double* y,
+                              const PerturbIcContext& ctx) override;
 
   double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double Theta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;

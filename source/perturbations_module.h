@@ -20,6 +20,13 @@ public:
   BackgroundModulePtr GetBackgroundModule() const { return background_module_; }
   ThermodynamicsModulePtr GetThermodynamicsModule() const { return thermodynamics_module_; }
 
+  /** Write a value into the source table at (mode, ic, type, tau, k). */
+  void SetSourceValue(int index_md, int index_ic, int index_tp,
+                      int index_tau, int index_k, double value) {
+    sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
+            [index_tau * k_size_[index_md] + index_k] = value;
+  }
+
   /** @name - indices running on modes (scalar, vector, tensor) */
   //@{
   int index_md_scalars_; /**< index value for scalars */

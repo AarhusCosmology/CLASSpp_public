@@ -43,6 +43,11 @@ public:
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
+  void FillSources(const double* y, const double* dy,
+                   PerturbSourceContext& ctx) override;
+  void ApplyInitialConditions(double* y,
+                              const PerturbIcContext& ctx) override;
+
   double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double Theta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
@@ -51,6 +56,17 @@ public:
   int ncdm_id() const { return ncdm_id_; }
   int bg_number_index()   const { return index_bg_number_; }
   int bg_pseudo_p_index() const { return index_bg_pseudo_p_; }
+
+  void WriteOutputColumns(PerturbColumnWriter& writer,
+                          const PerturbationsModule& mod,
+                          enum file_format fmt,
+                          TransferColumnSection section = TransferColumnSection::all) const override;
+
+  void PrintVariables(PerturbColumnWriter& writer,
+                      double tau,
+                      const double* y,
+                      const PerturbationsModule& mod,
+                      const perturb_workspace* ppw) const override;
 
 private:
   int ncdm_id_;

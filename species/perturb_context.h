@@ -1,32 +1,4 @@
 #pragma once
-
-/**
- * Pre-computed scalar perturbation quantities, populated by
- * PerturbationsModule::perturb_derivs_member() before calling species.
- * Stored in perturb_workspace so every species can access shared state.
- */
-struct PerturbScalarContext {
-  double k = 0., k2 = 0.;
-  double a = 0., a2 = 0., a_prime_over_a = 0.;
-  double metric_continuity = 0.;
-  double metric_euler = 0.;
-  double metric_shear = 0.;
-  double metric_ufa_class = 0.;
-  double cotKgen = 0., s2_squared = 1.;
-  /** photon delta/theta (RSA-corrected) */
-  double delta_g = 0., theta_g = 0.;
-  /** photon shear (TCA-corrected: 16/45/dkappa*theta_g in Newtonian gauge) */
-  double shear_g = 0.;
-  /** baryon delta/theta */
-  double delta_b = 0., theta_b = 0.;
-  /** nature of idr (free-streaming or fluid) */
-  int idr_nature = 0;
-  /** 4/3 * rho_g / rho_b, photon-baryon momentum ratio */
-  double R = 0.;
-  /** baryon sound speed squared */
-  double cb2 = 0.;
-  /** baryon pressure perturbation / rho */
-  double delta_p_b_over_rho_b = 0.;
-  /** gauge: 0 = newtonian, 1 = synchronous (mirrors possible_gauges enum) */
-  int gauge = 0;
-};
+// This file is superseded by perturb_source_context.h which contains
+// PerturbScalarContext along with the other context types.
+#include "perturb_source_context.h"

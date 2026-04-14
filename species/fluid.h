@@ -39,10 +39,25 @@ public:
                                    const perturb_workspace* ppw, int gauge) override;
   void PerturbDerivs(double tau, const double* y, double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+  void FillSources(const double* y, const double* dy,
+                   PerturbSourceContext& ctx) override;
+  void ApplyInitialConditions(double* y,
+                              const PerturbIcContext& ctx) override;
   double Delta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double Theta(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double DeltaP(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
   double RhoPlusPShear(const perturb_vector* pv, const double* y, const double* pvecback, const perturb_workspace* ppw) const override;
+
+  void WriteOutputColumns(PerturbColumnWriter& writer,
+                          const PerturbationsModule& mod,
+                          enum file_format fmt,
+                          TransferColumnSection section = TransferColumnSection::all) const override;
+
+  void PrintVariables(PerturbColumnWriter& writer,
+                      double tau,
+                      const double* y,
+                      const PerturbationsModule& mod,
+                      const perturb_workspace* ppw) const override;
 
   int bi_rho_index() const { return index_bi_rho_fld_; }
   int bg_w_index()   const { return index_bg_w_fld_; }

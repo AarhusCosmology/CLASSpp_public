@@ -1,0 +1,10 @@
+CompileFlags:
+  Add:
+    - -Iinclude
+    - -Itools
+    - -Isource
+    - -Ispecies
+    - -I.
+    - -Ihyrec
+    - -std=c++17
+    - -DHYREC

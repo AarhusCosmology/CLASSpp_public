@@ -68,3 +68,59 @@ double DCDMSpecies::Theta(const perturb_vector* pv, const double* y, const doubl
 }
 double DCDMSpecies::DeltaP(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const { return 0.; }
 double DCDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/, const double* /*y*/, const double* /*pvecback*/, const perturb_workspace* /*ppw*/) const { return 0.; }
+
+void DCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) return;
+  perturb_vector* pv = ctx.ppw->pv;
+  if (pv->index_pt_delta_dcdm >= 0)
+    y[pv->index_pt_delta_dcdm] = 3./4. * ctx.delta_g_ic;
+}
+
+void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
+                                        const PerturbationsModule& mod,
+                                        enum file_format fmt,
+                                        BaseSpecies::TransferColumnSection section) const {
+  const background* pba = mod.GetBackground();
+  if (fmt == class_format) {
+    const perturbs* ppt = mod.GetPerturbs();
+    if (section != TransferColumnSection::velocity &&
+        ppt->has_density_transfers == _TRUE_)
+      w.Add("d_dcdm", mod.index_tp_delta_dcdm_, pba->has_dcdm);
+    if (section != TransferColumnSection::density &&
+        ppt->has_velocity_transfers == _TRUE_)
+      w.Add("t_dcdm", mod.index_tp_theta_dcdm_, pba->has_dcdm);
+  }
+}
+
+void DCDMSpecies::PrintVariables(PerturbColumnWriter& w, double /*tau*/,
+                                  const double* y,
+                                  const PerturbationsModule& mod,
+                                  const perturb_workspace* ppw) const {
+  const background* pba = mod.GetBackground();
+  if (pba->has_dcdm != _TRUE_) return;
+
+  double delta_dcdm = 0., theta_dcdm = 0.;
+
+  if (!w.IsTitleMode()) {
+    const perturb_vector* pv  = ppw->pv;
+    const double k            = ppw->scalar_ctx.k;
+    const double* pvecback    = ppw->pvecback;
+    const double* pvecmetric  = ppw->pvecmetric;
+
+    delta_dcdm = y[pv->index_pt_delta_dcdm];
+    theta_dcdm = y[pv->index_pt_theta_dcdm];
+
+    // Synchronous → Newtonian gauge conversion for DCDM (matter + decay term)
+    const perturbs* ppt = mod.GetPerturbs();
+    if (ppt->gauge == synchronous) {
+      const double alpha = pvecmetric[ppw->index_mt_alpha];
+      const double H     = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+      const double a     = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+      delta_dcdm += alpha*(-a*pba_.Gamma_dcdm - 3.*a*H);
+      theta_dcdm += k*k*alpha;
+    }
+  }
+
+  w.Add("delta_dcdm", delta_dcdm, true);
+  w.Add("theta_dcdm", theta_dcdm, true);
+}

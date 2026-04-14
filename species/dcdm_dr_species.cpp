@@ -46,6 +46,56 @@ void DCDM_DR_Species::BackgroundDerivs(double tau, const double* y,
       a * pba_->Gamma_dcdm * pvecback[dcdm_->bg_rho_index()];
 }
 
+void DCDM_DR_Species::FillSources(const double* y, const double* /*dy*/,
+                                   PerturbSourceContext& ctx) {
+  PerturbationsModule*  p_mod = ctx.p_mod;
+  perturb_workspace*    ppw   = ctx.ppw;
+  const perturb_vector* pv    = ppw->pv;
+  const double* pvecback      = ppw->pvecback;
+
+  const double a_prime_over_a = ctx.a_prime_over_a;
+  const double a2_rel         = ctx.a2_rel;
+
+  if (ctx.index_md != p_mod->index_md_scalars_) return;
+
+  // ── delta_dcdm ─────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_dcdm_ == _TRUE_) {
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_delta_dcdm_,
+                          ctx.index_tau, ctx.index_k,
+                          y[pv->index_pt_delta_dcdm]
+                          + (3. * a_prime_over_a + ctx.a_rel * pba_->Gamma_dcdm)
+                            * ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  // ── theta_dcdm ─────────────────────────────────────────────────────────────
+  if (p_mod->has_source_theta_dcdm_ == _TRUE_) {
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_theta_dcdm_,
+                          ctx.index_tau, ctx.index_k,
+                          y[pv->index_pt_theta_dcdm]
+                          + ctx.theta_shift);  // N-body gauge correction
+  }
+
+  // ── delta_dr ───────────────────────────────────────────────────────────────
+  if (p_mod->has_source_delta_dr_ == _TRUE_) {
+    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0)
+                        * pvecback[bgm_->index_bg_rho_dr_];
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_delta_dr_,
+                          ctx.index_tau, ctx.index_k,
+                          y[pv->index_pt_F0_dr_sum] / r_dr
+                          + 4. * a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
+  }
+
+  // ── theta_dr ───────────────────────────────────────────────────────────────
+  if (p_mod->has_source_theta_dr_ == _TRUE_) {
+    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0)
+                        * pvecback[bgm_->index_bg_rho_dr_];
+    p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, p_mod->index_tp_theta_dr_,
+                          ctx.index_tau, ctx.index_k,
+                          3./4. * ctx.k * y[pv->index_pt_F0_dr_sum + 1] / r_dr
+                          + ctx.theta_shift);  // N-body gauge correction
+  }
+}
+
 void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/, const double* y, double* dy,
                                          const perturb_parameters_and_workspace& ppaw) {
   const perturb_workspace*    ppw = ppaw.ppw;
