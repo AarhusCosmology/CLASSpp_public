@@ -6,44 +6,44 @@
 /* Thomas Tram                          */
 /****************************************/
 #include "common.h"
+#include <vector>
+#include <memory>
 
 /* Structures: */
-typedef struct sparse_matrix{
+struct sparse_matrix{
 	/* Sparse matrix in compressed column form: */
 	int ncols;		/* Number of columns */
 	int nrows;		/* Number of rows */
 	int maxnz;		/* Maximum number of non-zero entries*/
-	int *Ap;		/* Ap[0..ncols]. Ap[k+1]-Ap[k] is the number of entries in the k'th column. */
-	int *Ai;		/* Ai[0..(maxnz-1)]. Contains the row indices of the entries. */
-	double *Ax;		/* Ax[0..(maxnz-1)]. Contains the values of the entries. */
-} sp_mat;
+	std::vector<int> Ap;		/* Ap[0..ncols]. Ap[k+1]-Ap[k] is the number of entries in the k'th column. */
+	std::vector<int> Ai;		/* Ai[0..(maxnz-1)]. Contains the row indices of the entries. */
+	std::vector<double> Ax;		/* Ax[0..(maxnz-1)]. Contains the values of the entries. */
 
-typedef struct sparse_numerical{
+	sparse_matrix(int ncols, int nrows, int maxnz);
+};
+
+typedef struct sparse_matrix sp_mat;
+
+struct sparse_numerical{
 	/* Sparse LU decomposition along with enough information to do a fast refactorization: */
 	int n;			/*Matrix assumed square, [nxn] */
-	sp_mat *L;		/*L and U is the factors of the decomposed matrix.*/
-	sp_mat *U;
-	int **xi;		/*xi[k] points to a row of xi, which holds the topological ordered indices.*/
-	int *topvec;	/*topvec[k] holds the first index in xi[k].*/
-	int *pinv;		/*Inverse row permutation. */
-	int *p;			/*Row permutation. */
-	int *q;			/* Column permutation */
-	int *wamd;		/* Work array for sp_amd */
-	double *w;		/* Work array for sp_lu */
-} sp_num;
+	std::unique_ptr<sp_mat> L;		/*L and U is the factors of the decomposed matrix.*/
+	std::unique_ptr<sp_mat> U;
+	std::vector<int*> xi;		/*xi[k] points to a row of xi, which holds the topological ordered indices.*/
+	std::vector<int> xi_data;
+	std::vector<int> topvec;	/*topvec[k] holds the first index in xi[k].*/
+	std::vector<int> pinv;		/*Inverse row permutation. */
+	std::vector<int> p;			/*Row permutation. */
+	std::vector<int> q;			/* Column permutation */
+	std::vector<int> wamd;		/* Work array for sp_amd */
+	std::vector<double> w;		/* Work array for sp_lu */
 
+	sparse_numerical(int n);
+};
 
-/**
- * Boilerplate for C++
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef struct sparse_numerical sp_num;
+
 /* Routines and macros: */
-int sp_mat_alloc(sp_mat** A, int ncols, int nrows, int maxnz, ErrorMsg error_message);
-int sp_mat_free(sp_mat *A);
-int sp_num_alloc(sp_num** N, int n,ErrorMsg error_message);
-int sp_num_free(sp_num *N);
 int reachr(sp_mat *G, sp_mat *B,int k, int *xik,int *pinv);
 void dfsr(int j, sp_mat *G, int *top, int *xik, int *pinv);
 int sp_splsolve(sp_mat *G, sp_mat *B, int k, int*xik, int top, double *x, int *pinv);
@@ -60,10 +60,6 @@ int sp_tdfs(int j, int k, int *head, const int *next, int *post, int *stack);
 #define SPUNFLIP(i) (((i)<0) ? SPFLIP(i) : (i))
 #define SPMARKED(w,j) (w[j] < 0)
 #define SPMARK(w,j) {w[j] = SPFLIP(w[j]);}
-
-#ifdef __cplusplus
-}
-#endif
 
 
 #endif

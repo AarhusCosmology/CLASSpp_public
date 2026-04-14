@@ -181,77 +181,6 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 
 
 
-// Alloc
-#define class_alloc_message(err_out,extra,sz)                                                                    \
-  class_build_error_string(err_out,"could not allocate %s with size %d",extra,sz);
-
-#if (defined(_WIN32) && !defined(__cplusplus))
-/* macro for allocating memory and returning error if it failed */
-#define class_alloc(pointer, size, error_message_output)  {                                                      \
-  pointer= malloc(size);                                                                       \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message((char*)error_message_output,#pointer, size_int);                                         \
-    return _FAILURE_;                                                                                            \
-  }                                                                                                              \
-}
-
-/* macro for allocating memory, initializing it with zeros/ and returning error if it failed */
-#define class_calloc(pointer, init,size, error_message_output)  {                                                \
-  pointer = calloc(init,size);                                                                  \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message(error_message_output,#pointer, size_int);                                                \
-    return _FAILURE_;                                                                                            \
-  }                                                                                                              \
-}
-
-/* macro for re-allocating memory, returning error if it failed */
-#define class_realloc(pointer, newname, size, error_message_output)  {                                           \
-    pointer = realloc(newname, size);                                                           \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message(error_message_output,#pointer, size_int);                                                \
-    return _FAILURE_;                                                                                            \
-  }                                                                                                              \
-}
-#else
-/* macro for allocating memory and returning error if it failed */
-#define class_alloc(pointer, size, error_message_output)  {                                                      \
-  pointer= (typeof(pointer)) malloc(size);                                                                       \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message((char*)error_message_output,#pointer, size_int);                                         \
-    return _FAILURE_;                                                                                            \
-  }                                                                                                              \
-}
-
-/* macro for allocating memory, initializing it with zeros/ and returning error if it failed */
-#define class_calloc(pointer, init,size, error_message_output)  {                                                \
-  pointer=(typeof(pointer))calloc(init,size);                                                                    \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message(error_message_output,#pointer, size_int);                                                \
-    return _FAILURE_;                                                                                            \
-  }                                                                                                              \
-}
-
-/* macro for re-allocating memory, returning error if it failed */
-#define class_realloc(pointer, newname, size, error_message_output)  {                                           \
-    pointer=(typeof(pointer))realloc(newname,size);                                                              \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message(error_message_output,#pointer, size_int);                                                \
-    return _FAILURE_;                                                                                            \
-  }                                                                                                              \
-}
-#endif
 // Testing
 
 #define class_test_message(err_out,extra,args, ...) {                                                              \
@@ -314,7 +243,7 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
  * instead of returning _FAILURE_. This enables natural exception
  * propagation through the call chain:
  *
- * - class_test / class_stop / class_alloc: throw at the error origin.
+ * - class_test / class_stop: throw at the error origin.
  * - class_call: if the callee returns _FAILURE_ (C function), builds
  *   the error chain and throws. If the callee itself throws (C++
  *   function), the exception propagates naturally.
@@ -371,39 +300,6 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
   class_protect_sprintf(Optional_arguments, args, ##__VA_ARGS__);                                                \
   class_build_error_string(error_message_output, "error; %s", Optional_arguments);                               \
   throw std::runtime_error(error_message_output);                                                                \
-}
-
-#undef class_alloc
-#define class_alloc(pointer, size, error_message_output) {                                                       \
-  pointer = (typeof(pointer)) malloc(size);                                                                      \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message((char*)error_message_output, #pointer, size_int);                                        \
-    throw std::runtime_error(error_message_output);                                                              \
-  }                                                                                                              \
-}
-
-#undef class_calloc
-#define class_calloc(pointer, init, size, error_message_output) {                                                \
-  pointer = (typeof(pointer)) calloc(init, size);                                                                \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message(error_message_output, #pointer, size_int);                                               \
-    throw std::runtime_error(error_message_output);                                                              \
-  }                                                                                                              \
-}
-
-#undef class_realloc
-#define class_realloc(pointer, newname, size, error_message_output) {                                            \
-  pointer = (typeof(pointer)) realloc(newname, size);                                                            \
-  if (pointer == NULL) {                                                                                         \
-    int size_int;                                                                                                \
-    size_int = size;                                                                                             \
-    class_alloc_message(error_message_output, #pointer, size_int);                                               \
-    throw std::runtime_error(error_message_output);                                                              \
-  }                                                                                                              \
 }
 
 #undef class_open

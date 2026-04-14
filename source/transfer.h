@@ -5,6 +5,7 @@
 
 #include "nonlinear.h"
 #include "hyperspherical.h"
+#include <vector>
 
 /* macro: test if index_tt is in the range between index and index+num, while the flag is true */
 #define _index_tt_in_range_(index,num,flag) (flag == _TRUE_) && (index_tt >= index) && (index_tt < index+num)
@@ -169,6 +170,21 @@ struct transfer_workspace {
   double * rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
   double * radial_function; /**< radial_function[index_tau]: output of transfer_radial_function */
   double * chi_full_reverse;   /**< workspace: reversed chi array */
+
+  std::vector<double> interpolated_sources_storage;
+  std::vector<double> sources_storage;
+  std::vector<double> tau0_minus_tau_storage;
+  std::vector<double> w_trapz_storage;
+  std::vector<double> chi_storage;
+  std::vector<double> cscKgen_storage;
+  std::vector<double> cotKgen_storage;
+  std::vector<double> phi_storage;
+  std::vector<double> dphi_storage;
+  std::vector<double> d2phi_storage;
+  std::vector<double> chireverse_storage;
+  std::vector<double> rescale_function_storage;
+  std::vector<double> radial_function_storage;
+  std::vector<double> chi_full_reverse_storage;
 
   //@}
 

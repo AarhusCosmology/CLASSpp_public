@@ -3128,27 +3128,42 @@ int NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace 
 
   /** - allocate arrays of the nonlinear workspace */
 
-  class_alloc(pnw->rtab,   ppr->n_hmcode_tables*sizeof(double), error_message_);
-  class_alloc(pnw->stab,   ppr->n_hmcode_tables*sizeof(double), error_message_);
-  class_alloc(pnw->ddstab, ppr->n_hmcode_tables*sizeof(double), error_message_);
+  pnw->rtab_storage.resize(ppr->n_hmcode_tables);
+  pnw->stab_storage.resize(ppr->n_hmcode_tables);
+  pnw->ddstab_storage.resize(ppr->n_hmcode_tables);
+  pnw->rtab = pnw->rtab_storage.data();
+  pnw->stab = pnw->stab_storage.data();
+  pnw->ddstab = pnw->ddstab_storage.data();
 
   ng = ppr->n_hmcode_tables;
 
-  class_alloc(pnw->growtable, ng*sizeof(double), error_message_);
-  class_alloc(pnw->ztable,    ng*sizeof(double), error_message_);
-  class_alloc(pnw->tautable,  ng*sizeof(double), error_message_);
+  pnw->growtable_storage.resize(ng);
+  pnw->ztable_storage.resize(ng);
+  pnw->tautable_storage.resize(ng);
+  pnw->growtable = pnw->growtable_storage.data();
+  pnw->ztable = pnw->ztable_storage.data();
+  pnw->tautable = pnw->tautable_storage.data();
 
-  class_alloc(pnw->sigma_8,        pk_size_*sizeof(double*), error_message_);
-  class_alloc(pnw->sigma_disp,     pk_size_*sizeof(double*), error_message_);
-  class_alloc(pnw->sigma_disp_100, pk_size_*sizeof(double*), error_message_);
-  class_alloc(pnw->sigma_prime,    pk_size_*sizeof(double*), error_message_);
+  pnw->sigma_8_storage.assign(pk_size_, std::vector<double>(tau_size_));
+  pnw->sigma_disp_storage.assign(pk_size_, std::vector<double>(tau_size_));
+  pnw->sigma_disp_100_storage.assign(pk_size_, std::vector<double>(tau_size_));
+  pnw->sigma_prime_storage.assign(pk_size_, std::vector<double>(tau_size_));
+
+  pnw->sigma_8_rows.resize(pk_size_);
+  pnw->sigma_disp_rows.resize(pk_size_);
+  pnw->sigma_disp_100_rows.resize(pk_size_);
+  pnw->sigma_prime_rows.resize(pk_size_);
 
   for (int index_pk = 0; index_pk < pk_size_; index_pk++){
-    class_alloc(pnw->sigma_8       [index_pk], tau_size_*sizeof(double), error_message_);
-    class_alloc(pnw->sigma_disp    [index_pk], tau_size_*sizeof(double), error_message_);
-    class_alloc(pnw->sigma_disp_100[index_pk], tau_size_*sizeof(double), error_message_);
-    class_alloc(pnw->sigma_prime   [index_pk], tau_size_*sizeof(double), error_message_);
+    pnw->sigma_8_rows[index_pk] = pnw->sigma_8_storage[index_pk].data();
+    pnw->sigma_disp_rows[index_pk] = pnw->sigma_disp_storage[index_pk].data();
+    pnw->sigma_disp_100_rows[index_pk] = pnw->sigma_disp_100_storage[index_pk].data();
+    pnw->sigma_prime_rows[index_pk] = pnw->sigma_prime_storage[index_pk].data();
   }
+  pnw->sigma_8 = pnw->sigma_8_rows.data();
+  pnw->sigma_disp = pnw->sigma_disp_rows.data();
+  pnw->sigma_disp_100 = pnw->sigma_disp_100_rows.data();
+  pnw->sigma_prime = pnw->sigma_prime_rows.data();
 
   /** - fill table with scale independent growth factor */
 
@@ -3168,27 +3183,6 @@ int NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace 
  */
 
 int NonlinearModule::nonlinear_hmcode_workspace_free(struct nonlinear_workspace * pnw) {
-
-  free(pnw->rtab);
-  free(pnw->stab);
-  free(pnw->ddstab);
-
-  free(pnw->growtable);
-  free(pnw->ztable);
-  free(pnw->tautable);
-
-  for (int index_pk = 0; index_pk < pk_size_; index_pk++){
-    free(pnw->sigma_8[index_pk]);
-    free(pnw->sigma_disp[index_pk]);
-    free(pnw->sigma_disp_100[index_pk]);
-    free(pnw->sigma_prime[index_pk]);
-  }
-
-  free(pnw->sigma_8);
-  free(pnw->sigma_disp);
-  free(pnw->sigma_disp_100);
-  free(pnw->sigma_prime);
-
   return _SUCCESS_;
 }
 

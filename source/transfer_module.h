@@ -62,19 +62,19 @@ private:
   int transfer_init();
   int transfer_free();
   int transfer_indices_of_transfers(double q_period, double K, int sgnK);
-  int transfer_perturbation_copy_sources_and_nl_corrections(double *** sources);
-  int transfer_perturbation_source_spline(double *** sources, double *** sources_spline);
-  int transfer_perturbation_sources_free(double *** sources);
-  int transfer_perturbation_sources_spline_free(double *** sources_spline);
+  int transfer_perturbation_copy_sources_and_nl_corrections(std::vector<std::vector<double*>>& sources,
+                                                            std::vector<std::vector<std::vector<double>>>& owned_sources);
+  int transfer_perturbation_source_spline(const std::vector<std::vector<double*>>& sources,
+                                          std::vector<std::vector<double*>>& sources_spline_ptrs,
+                                          std::vector<std::vector<std::vector<double>>>& sources_spline_storage);
   int transfer_get_l_list();
   int transfer_get_q_list(double q_period, double K, int sgnK);
   int transfer_get_q_list_v1(double q_period, double K, int sgnK);
   int transfer_get_k_list(double K);
-  int transfer_get_source_correspondence(int ** tp_of_tt);
-  int transfer_free_source_correspondence(int ** tp_of_tt);
+  int transfer_get_source_correspondence(std::vector<std::vector<int>>& tp_of_tt);
   int transfer_source_tau_size_max(double tau_rec, double tau0, int * tau_size_max);
   int transfer_source_tau_size(double tau_rec, double tau0, int index_md, int index_tt, int * tau_size);
-  int transfer_compute_for_each_q(int ** tp_of_tt, int index_q, int tau_size_max, double tau_rec, double *** sources, double *** sources_spline, double * window, struct transfer_workspace * ptw);
+  int transfer_compute_for_each_q(int* const* tp_of_tt, int index_q, int tau_size_max, double tau_rec, double** const* sources, double** const* sources_spline, double * window, struct transfer_workspace * ptw);
   int transfer_radial_coordinates(struct transfer_workspace * ptw, int index_md, int index_q);
   int transfer_interpolate_sources(int index_q, int index_md, int index_ic, int index_type, double * sources, double * source_spline, double * interpolated_sources);
   int transfer_sources(double * interpolated_sources, double tau_rec, int index_q, int index_md, int index_tt, double * sources, double * window, int tau_size_max, double * tau0_minus_tau, double * delta_tau, int * tau_size_out);
@@ -97,7 +97,7 @@ private:
   int transfer_radial_function(struct transfer_workspace * ptw, double k, int index_q, int index_l, int x_size, double * radial_function, radial_function_type radial_type);
   int transfer_init_HIS_from_bessel(HyperInterpStruct *pHIS);
   int transfer_global_selection_read();
-  int transfer_workspace_init(struct transfer_workspace **ptw, int perturb_tau_size, int tau_size_max, double K, int sgnK, double tau0_minus_tau_cut, HyperInterpStruct * pBIS);
+  int transfer_workspace_init(struct transfer_workspace *ptw, int perturb_tau_size, int tau_size_max, double K, int sgnK, double tau0_minus_tau_cut, HyperInterpStruct * pBIS);
   int transfer_workspace_free(struct transfer_workspace *ptw);
   int transfer_update_HIS(struct transfer_workspace * ptw, int index_q, double tau0);
   int transfer_get_lmax(int (*get_xmin_generic)(int sgnK, int l, double nu, double xtol, double phiminabs, double *x_nonzero, int *fevals),

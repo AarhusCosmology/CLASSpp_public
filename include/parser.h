@@ -116,12 +116,6 @@ int parser_read_double(FileContent* pfc, const char* name, double* value, int* f
 
 int parser_read_string(FileContent* pfc, const char* name, FileArg* value, int* found, ErrorMsg errmsg);
 
-int parser_read_list_of_doubles(FileContent* pfc, const char* name, int* size, double** pointer_to_list, int* found, ErrorMsg errmsg);
-
-int parser_read_list_of_integers(FileContent* pfc, const char* name, int* size, int** pointer_to_list, int* found, ErrorMsg errmsg);
-
-int parser_read_list_of_strings(FileContent* pfc, const char* name, int* size, char** pointer_to_list, int* found, ErrorMsg errmsg);
-
 int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3, ErrorMsg errmsg);
 
 #ifdef __cplusplus

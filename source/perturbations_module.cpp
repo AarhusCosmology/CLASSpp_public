@@ -2180,7 +2180,8 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
 
   /** - Allocate \f$ s_l\f$[ ] array for freestreaming of multipoles (see arXiv:1305.3261) and initialize
       to 1.0, which is the K=0 value. */
-  class_alloc(ppw->s_l, sizeof(double)*(ppw->max_l_max + 1), error_message_);
+  ppw->s_l_storage.resize(ppw->max_l_max + 1);
+  ppw->s_l = ppw->s_l_storage.data();
   for (l=0; l<=ppw->max_l_max; l++){
     ppw->s_l[l] = 1.0;
   }
@@ -2244,9 +2245,12 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
       values of background, thermodynamics, metric and source
       quantities at a given time */
 
-  class_alloc(ppw->pvecback, background_module_->bg_size_normal_*sizeof(double), error_message_);
-  class_alloc(ppw->pvecthermo, thermodynamics_module_->th_size_*sizeof(double), error_message_);
-  class_alloc(ppw->pvecmetric, ppw->mt_size*sizeof(double), error_message_);
+  ppw->pvecback_storage.resize(background_module_->bg_size_normal_);
+  ppw->pvecthermo_storage.resize(thermodynamics_module_->th_size_);
+  ppw->pvecmetric_storage.resize(ppw->mt_size);
+  ppw->pvecback = ppw->pvecback_storage.data();
+  ppw->pvecthermo = ppw->pvecthermo_storage.data();
+  ppw->pvecmetric = ppw->pvecmetric_storage.data();
 
   /** - count number of approximations, initialize their indices, and allocate their flags */
   index_ap=0;
@@ -2266,8 +2270,10 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
 
   ppw->ap_size=index_ap;
 
-  if (ppw->ap_size > 0)
-    class_alloc(ppw->approx, ppw->ap_size*sizeof(int), error_message_);
+  if (ppw->ap_size > 0) {
+    ppw->approx_storage.resize(ppw->ap_size);
+    ppw->approx = ppw->approx_storage.data();
+  }
 
   /** - For definiteness, initialize approximation flags to arbitrary
       values (correct values are overwritten in
@@ -2305,9 +2311,12 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
 
     if ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_) || (has_source_delta_m_ == _TRUE_)) {
 
-      class_alloc(ppw->delta_ncdm, pba->N_ncdm*sizeof(double), error_message_);
-      class_alloc(ppw->theta_ncdm, pba->N_ncdm*sizeof(double), error_message_);
-      class_alloc(ppw->shear_ncdm, pba->N_ncdm*sizeof(double), error_message_);
+      ppw->delta_ncdm_storage.resize(pba->N_ncdm);
+      ppw->theta_ncdm_storage.resize(pba->N_ncdm);
+      ppw->shear_ncdm_storage.resize(pba->N_ncdm);
+      ppw->delta_ncdm = ppw->delta_ncdm_storage.data();
+      ppw->theta_ncdm = ppw->theta_ncdm_storage.data();
+      ppw->shear_ncdm = ppw->shear_ncdm_storage.data();
 
     }
 
@@ -2327,23 +2336,6 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
  */
 
 int PerturbationsModule::perturb_workspace_free (int index_md, perturb_workspace* ppw) {
-
-  free(ppw->s_l);
-  free(ppw->pvecback);
-  free(ppw->pvecthermo);
-  free(ppw->pvecmetric);
-  if (ppw->ap_size > 0)
-    free(ppw->approx);
-
-  if (_scalars_) {
-
-    if ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_) || (has_source_delta_m_ == _TRUE_)) {
-      free(ppw->delta_ncdm);
-      free(ppw->theta_ncdm);
-      free(ppw->shear_ncdm);
-    }
-  }
-
   return _SUCCESS_;
 }
 
@@ -3307,8 +3299,10 @@ int PerturbationsModule::perturb_vector_init(
 
     if (pba->has_ncdm == _TRUE_) {
       ppv->N_ncdm = pba->N_ncdm;
-      class_alloc(ppv->l_max_ncdm, ppv->N_ncdm*sizeof(int), error_message_);
-      class_alloc(ppv->q_size_ncdm, ppv->N_ncdm*sizeof(int), error_message_);
+      ppv->l_max_ncdm_storage.resize(ppv->N_ncdm);
+      ppv->q_size_ncdm_storage.resize(ppv->N_ncdm);
+      ppv->l_max_ncdm = ppv->l_max_ncdm_storage.data();
+      ppv->q_size_ncdm = ppv->q_size_ncdm_storage.data();
       {
         std::vector<NCDMSpecies*> ncdm_vec;
         for (auto& [name, sp] : all_species_) {
@@ -3393,8 +3387,10 @@ int PerturbationsModule::perturb_vector_init(
     if (evolve_tensor_ncdm_ == _TRUE_) {
       ppv->index_pt_psi0_ncdm1 = index_pt;
       ppv->N_ncdm = pba->N_ncdm;
-      class_alloc(ppv->l_max_ncdm, ppv->N_ncdm*sizeof(int), error_message_);
-      class_alloc(ppv->q_size_ncdm, ppv->N_ncdm*sizeof(int), error_message_);
+      ppv->l_max_ncdm_storage.resize(ppv->N_ncdm);
+      ppv->q_size_ncdm_storage.resize(ppv->N_ncdm);
+      ppv->l_max_ncdm = ppv->l_max_ncdm_storage.data();
+      ppv->q_size_ncdm = ppv->q_size_ncdm_storage.data();
 
       {
         std::vector<NCDMSpecies*> ncdm_vec;
@@ -3434,9 +3430,12 @@ int PerturbationsModule::perturb_vector_init(
   /** - allocate vectors for storing the values of all these
       quantities and their time-derivatives at a given time */
 
-  class_calloc(ppv->y, ppv->pt_size,sizeof(double), error_message_);
-  class_alloc(ppv->dy, ppv->pt_size*sizeof(double), error_message_);
-  class_alloc(ppv->used_in_sources, ppv->pt_size*sizeof(int), error_message_);
+  ppv->y_storage.assign(ppv->pt_size, 0.0);
+  ppv->dy_storage.resize(ppv->pt_size);
+  ppv->used_in_sources_storage.resize(ppv->pt_size);
+  ppv->y = ppv->y_storage.data();
+  ppv->dy = ppv->dy_storage.data();
+  ppv->used_in_sources = ppv->used_in_sources_storage.data();
 
   /** - specify which perturbations are needed in the evaluation of source terms */
 
@@ -4799,12 +4798,6 @@ int PerturbationsModule::perturb_vector_init(
  */
 
 int PerturbationsModule::perturb_vector_free(perturb_vector* pv) {
-
-  if (pv->l_max_ncdm != NULL) free(pv->l_max_ncdm);
-  if (pv->q_size_ncdm != NULL) free(pv->q_size_ncdm);
-  free(pv->y);
-  free(pv->dy);
-  free(pv->used_in_sources);
   delete pv;
 
   return _SUCCESS_;

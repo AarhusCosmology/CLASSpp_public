@@ -12,41 +12,29 @@ int initialize_generic_integrator(
 
   pgi->n = n_dim;
 
-  class_alloc(pgi->yscal,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->y,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->dydx,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
+  pgi->yscal_storage.resize(n_dim);
+  pgi->y_storage.resize(n_dim);
+  pgi->dydx_storage.resize(n_dim);
+  pgi->yerr_storage.resize(n_dim);
+  pgi->ytempo_storage.resize(n_dim);
+  pgi->ak2_storage.resize(n_dim);
+  pgi->ak3_storage.resize(n_dim);
+  pgi->ak4_storage.resize(n_dim);
+  pgi->ak5_storage.resize(n_dim);
+  pgi->ak6_storage.resize(n_dim);
+  pgi->ytemp_storage.resize(n_dim);
 
-  class_alloc(pgi->yerr,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->ytempo,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-
-  class_alloc(pgi->ak2,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->ak3,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->ak4,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->ak5,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->ak6,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
-  class_alloc(pgi->ytemp,
-	      sizeof(double)*n_dim,
-	      pgi->error_message);
+  pgi->yscal = pgi->yscal_storage.data();
+  pgi->y = pgi->y_storage.data();
+  pgi->dydx = pgi->dydx_storage.data();
+  pgi->yerr = pgi->yerr_storage.data();
+  pgi->ytempo = pgi->ytempo_storage.data();
+  pgi->ak2 = pgi->ak2_storage.data();
+  pgi->ak3 = pgi->ak3_storage.data();
+  pgi->ak4 = pgi->ak4_storage.data();
+  pgi->ak5 = pgi->ak5_storage.data();
+  pgi->ak6 = pgi->ak6_storage.data();
+  pgi->ytemp = pgi->ytemp_storage.data();
 
   return _SUCCESS_;
 }
@@ -58,21 +46,6 @@ int initialize_generic_integrator(
  * Called by background_solve(); thermodynamics_solve_with_recfast(); perturb_solve().
  */
 int cleanup_generic_integrator(struct generic_integrator_workspace * pgi){
-
-  free(pgi->yscal);
-  free(pgi->y);
-  free(pgi->dydx);
-
-  free(pgi->yerr);
-  free(pgi->ytempo);
-
-  free(pgi->ak2);
-  free(pgi->ak3);
-  free(pgi->ak4);
-  free(pgi->ak5);
-  free(pgi->ak6);
-  free(pgi->ytemp);
-
   return _SUCCESS_;
 }
 
@@ -234,5 +207,4 @@ int rkck(
 
   return _SUCCESS_;
 }
-
 

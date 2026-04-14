@@ -2,6 +2,7 @@
 
 #include "primordial.h"
 #include "trigonometric_integrals.h"
+#include <vector>
 
 #ifndef __NONLINEAR__
 #define __NONLINEAR__
@@ -85,6 +86,24 @@ struct nonlinear_workspace {
   double ** sigma_disp;
   double ** sigma_disp_100;
   double ** sigma_prime;
+
+  std::vector<double> rtab_storage;
+  std::vector<double> stab_storage;
+  std::vector<double> ddstab_storage;
+
+  std::vector<double> growtable_storage;
+  std::vector<double> ztable_storage;
+  std::vector<double> tautable_storage;
+
+  std::vector<std::vector<double>> sigma_8_storage;
+  std::vector<std::vector<double>> sigma_disp_storage;
+  std::vector<std::vector<double>> sigma_disp_100_storage;
+  std::vector<std::vector<double>> sigma_prime_storage;
+
+  std::vector<double*> sigma_8_rows;
+  std::vector<double*> sigma_disp_rows;
+  std::vector<double*> sigma_disp_100_rows;
+  std::vector<double*> sigma_prime_rows;
 
   double dark_energy_correction; /** this is the ratio [g_wcdm(z_infinity)/g_lcdm(z_infinity)]^1.5
                                   * (power comes from Dolag et al. (2004) correction)

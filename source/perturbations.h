@@ -7,6 +7,7 @@
 #include "evolver_ndf15.h"
 #include "evolver_rkck.h"
 #include "../species/base_species.h"
+#include <vector>
 
 #define _scalars_ ((ppt->has_scalars == _TRUE_) && (index_md == index_md_scalars_))
 #define _vectors_ ((ppt->has_vectors == _TRUE_) && (index_md == index_md_vectors_))
@@ -177,6 +178,8 @@ struct perturbs
 
   double * alpha_idm_dr; /**< Angular contribution to collisional term at l>=2 for idm_fr-idr */
   double * beta_idr;  /**< Angular contribution to collisional term at l>=2 for idr-idr */
+  std::vector<double> alpha_idm_dr_storage;
+  std::vector<double> beta_idr_storage;
 
   int idr_nature = idr_free_streaming; /**< Nature of the interacting dark radiation (free streaming or fluid) */
 
@@ -281,6 +284,8 @@ struct perturb_vector
   int* l_max_ncdm;	/**< mutipole l at which Boltzmann hierarchy is truncated (for each ncdm species) */
   int* q_size_ncdm;	/**< number of discrete momenta (for each ncdm species) */
   std::map<int, std::vector<int>> index_ncdm_;
+  std::vector<int> l_max_ncdm_storage;
+  std::vector<int> q_size_ncdm_storage;
 
   int index_pt_eta;       /**< synchronous gauge metric perturbation eta*/
   int index_pt_phi;	      /**< newtonian gauge metric perturbation phi */
@@ -293,10 +298,13 @@ struct perturb_vector
 
   double * y;             /**< vector of perturbations to be integrated */
   double * dy;            /**< time-derivative of the same vector */
+  std::vector<double> y_storage;
+  std::vector<double> dy_storage;
 
   int * used_in_sources; /**< boolean array specifying which
-                            perturbations enter in the calculation of
-                            source functions */
+                           perturbations enter in the calculation of
+                           source functions */
+  std::vector<int> used_in_sources_storage;
 
 };
 
@@ -420,6 +428,7 @@ struct perturb_workspace
   int ap_size;      /**< number of relevant approximations for a given mode */
 
   int * approx;     /**< array of approximation flags holding at a given time: approx[index_ap] */
+  std::vector<int> approx_storage;
 
   //@}
 
@@ -430,6 +439,14 @@ struct perturb_workspace
   int max_l_max;    /**< maximum l_max for any multipole */
   double * s_l;     /**< array of freestreaming coefficients \f$ s_l = \sqrt{1-K*(l^2-1)/k^2} \f$*/
   double cotKgen;   /**< generalised cot(sqrt(|K|)*tau)/k, for closing free-streaming hierarchies; valid for all modes */
+  std::vector<double> s_l_storage;
+
+  std::vector<double> pvecback_storage;
+  std::vector<double> pvecthermo_storage;
+  std::vector<double> pvecmetric_storage;
+  std::vector<double> delta_ncdm_storage;
+  std::vector<double> theta_ncdm_storage;
+  std::vector<double> shear_ncdm_storage;
 
   //@}
 

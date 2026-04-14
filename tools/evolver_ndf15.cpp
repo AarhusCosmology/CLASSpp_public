@@ -356,7 +356,7 @@ int evolver_ndf15(
 
 	  /*Solve the linear system A*x=del by using the LU decomposition stored in jac.*/
 	  if (jac.use_sparse){
-	    sp_lusolve(jac.Numerical, rhs+1, del+1);
+	    sp_lusolve(jac.Numerical.get(), rhs+1, del+1);
 	  }
 	  else{
 	    eqvec(rhs,del,neq);
@@ -670,7 +670,7 @@ int calc_C(struct jacobian *jac){
   int duplicate;
   int *Ci, *Cp, *Ai, *Ap;
   n = jac->Numerical->n;Ci = jac->Ci;Cp = jac->Cp;
-  Ai = jac->spJ->Ai; Ap = jac->spJ->Ap;
+  Ai = jac->spJ->Ai.data(); Ap = jac->spJ->Ap.data();
   /* Calculate sparse pattern for C = J + J'. We can use jac->Numerical->xi as
      storage, since we can't refactor when jac->repeated_pattern = 0. xi[0..n][0..n].
      At first, Cp[i+1] holds the number of elements in w[i].*/
@@ -893,7 +893,7 @@ int new_linearisation(struct jacobian *jac,double hinvGak,int neq,ErrorMsg error
   double luparity, *Ax;
   int i,j,*Ap,*Ai,funcreturn;
   if(jac->use_sparse==1){
-    Ap = jac->spJ->Ap; Ai = jac->spJ->Ai; Ax = jac->spJ->Ax;
+    Ap = jac->spJ->Ap.data(); Ai = jac->spJ->Ai.data(); Ax = jac->spJ->Ax.data();
     /* Construct jac->spJ->Ax from jac->xjac, the jacobian:*/
     for(j=0;j<neq;j++){
       for(i=Ap[j];i<Ap[j+1];i++){
@@ -915,17 +915,17 @@ int new_linearisation(struct jacobian *jac,double hinvGak,int neq,ErrorMsg error
       calc_C(jac);
       /* Calculate the optimal ordering: */
       sp_amd(jac->Cp, jac->Ci, neq, jac->cnzmax,
-	     jac->Numerical->q,jac->Numerical->wamd);
-      /* if the next line is uncomented, the code uses natural ordering instead of AMD ordering */
-      /*jac->Numerical->q = NULL;*/
-      funcreturn = sp_ludcmp(jac->Numerical, jac->spJ, 1e-3);
+	     jac->Numerical->q.data(),jac->Numerical->wamd.data());
+      /* AMD ordering is used here. The old q = NULL natural-ordering
+	 example is no longer valid now that q is a std::vector<int>. */
+      funcreturn = sp_ludcmp(jac->Numerical.get(), jac->spJ.get(), 1e-3);
       class_test(funcreturn == _FAILURE_,error_message,
 		 "Failure in sp_ludcmp. Possibly singular matrix!");
       jac->new_jacobian = _FALSE_;
     }
     else{
       /* I have a repeated pattern, so I can just refactor:*/
-      sp_refactor(jac->Numerical, jac->spJ);
+      sp_refactor(jac->Numerical.get(), jac->spJ.get());
     }
   }
   else{
@@ -1184,8 +1184,8 @@ int numjac(
   dFdy = jac->dfdy; /* Assign pointer to dfdy directly for easier notation. */
   fac = jac->jacvec;
   if (jac->use_sparse){
-    Ap = jac->spJ->Ap;
-    Ai = jac->spJ->Ai;
+    Ap = jac->spJ->Ap.data();
+    Ai = jac->spJ->Ai.data();
   }
 
   /* Set new_jacobian flag: */
@@ -1233,7 +1233,7 @@ int numjac(
     /* printf("\n Sparse calculation..neq=%d, has grouping=%d",neq,jac->has_grouping);*/
     /* Everything done sparse'ly. Do we have a grouping? */
     if (jac->has_grouping==0){
-      jac->max_group = column_grouping(jac->spJ,jac->col_group,jac->col_wi);
+      jac->max_group = column_grouping(jac->spJ.get(),jac->col_group,jac->col_wi);
       jac->has_grouping = 1;
     }
     colmax = jac->max_group+1;
@@ -1545,11 +1545,9 @@ int initialize_jacobian(struct jacobian *jac, int neq, ErrorMsg error_message){
     jac->Ci_vec.resize(jac->cnzmax);
     jac->Ci = jac->Ci_vec.data();
 
-    class_call(sp_num_alloc(&jac->Numerical, neq,error_message),
-	       error_message,error_message);
+    jac->Numerical = std::make_unique<sp_num>(neq);
 
-    class_call(sp_mat_alloc(&jac->spJ, neq, neq, jac->max_nonzero,
-			    error_message),error_message,error_message);
+    jac->spJ = std::make_unique<sp_mat>(neq, neq, jac->max_nonzero);
 
   }
 
@@ -1563,8 +1561,8 @@ int uninitialize_jacobian(struct jacobian *jac){
 
   if(jac->sparse_stuff_initialized){
     /* Sparse backing vectors freed by RAII */
-    sp_mat_free(jac->spJ);
-    sp_num_free(jac->Numerical);
+    jac->spJ.reset();
+    jac->Numerical.reset();
   }
   return _SUCCESS_;
 }

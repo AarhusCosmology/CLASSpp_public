@@ -6,6 +6,8 @@
 #define __HYPERSPHERICAL__
 
 #include "common.h"
+#include <vector>
+
 #define _HYPER_OVERFLOW_ 1e200
 #define _ONE_OVER_HYPER_OVERFLOW_ 1e-200
 #define _HYPER_SAFETY_ 1e-5
@@ -21,14 +23,14 @@ typedef struct HypersphericalInterpolationStructure{
   double delta_x;         //x-spacing. (xvec is uniformly spaced)
   int trig_order;        //Order of the interpolation formula for SinK and CosK.
   int l_size;                //Number of l values
-  int *l;             //Vector of l values stored
-  double * chi_at_phimin;     // vector x_min[index-l] below which neglect Bessels
+  std::vector<int> l;             //Vector of l values stored
+  std::vector<double> chi_at_phimin;     // vector x_min[index-l] below which neglect Bessels
   int x_size;                //Number of x-values
-  double *x;          //Pointer to x-values
-  double *sinK;          //Vector of sin_K(xvec)
-  double *cotK;          //Vector of cot_K(xvec)
-  double *phi;        //array of size nl*nx. [y_{l1}(x1) t_{l1}(x2)...]
-  double *dphi;       //Same as phivec, but containing derivatives.
+  std::vector<double> x;          //Pointer to x-values
+  std::vector<double> sinK;          //Vector of sin_K(xvec)
+  std::vector<double> cotK;          //Vector of cot_K(xvec)
+  std::vector<double> phi;        //array of size nl*nx. [y_{l1}(x1) t_{l1}(x2)...]
+  std::vector<double> dphi;       //Same as phivec, but containing derivatives.
 } HyperInterpStruct;
 
 struct WKB_parameters{
@@ -150,9 +152,6 @@ int hyperspherical_forwards_recurrence_chunk(int K,
                                           double *xmin,
                                           int *ignore2);
 
-  size_t hyperspherical_HIS_size(int nl, int nx);
-  int hyperspherical_update_pointers(HyperInterpStruct *pHIS_local,
-                                     void * HIS_storage_shared);
 
   int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct *pHIS,
                                                   int nxi,

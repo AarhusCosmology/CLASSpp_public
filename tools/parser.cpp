@@ -287,65 +287,6 @@ int parser_read_string(FileContent* pfc, const char* name, FileArg* value, int* 
   return _SUCCESS_;
 }
 
-int parser_read_list_of_doubles(
-    FileContent* pfc, const char* name, int* size,
-    double** pointer_to_list, int* found, ErrorMsg errmsg) {
-  std::vector<double> v;
-  try {
-    *found = pfc->read_list_of_doubles(name, v) ? _TRUE_ : _FALSE_;
-  } catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
-  }
-  if (*found == _TRUE_) {
-    *size = static_cast<int>(v.size());
-    class_alloc(*pointer_to_list, *size * sizeof(double), errmsg);
-    std::copy(v.begin(), v.end(), *pointer_to_list);
-  }
-  return _SUCCESS_;
-}
-
-int parser_read_list_of_integers(
-    FileContent* pfc, const char* name, int* size,
-    int** pointer_to_list, int* found, ErrorMsg errmsg) {
-  std::vector<int> v;
-  try {
-    *found = pfc->read_list_of_integers(name, v) ? _TRUE_ : _FALSE_;
-  } catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
-  }
-  if (*found == _TRUE_) {
-    *size = static_cast<int>(v.size());
-    class_alloc(*pointer_to_list, *size * sizeof(int), errmsg);
-    std::copy(v.begin(), v.end(), *pointer_to_list);
-  }
-  return _SUCCESS_;
-}
-
-int parser_read_list_of_strings(
-    FileContent* pfc, const char* name, int* size,
-    char** pointer_to_list, int* found, ErrorMsg errmsg) {
-  std::vector<std::string> v;
-  try {
-    *found = pfc->read_list_of_strings(name, v) ? _TRUE_ : _FALSE_;
-  } catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
-  }
-  if (*found == _TRUE_) {
-    *size = static_cast<int>(v.size());
-    class_alloc(*pointer_to_list, *size * sizeof(FileArg), errmsg);
-    for (int i = 0; i < *size; ++i) {
-      class_test(v[i].size() >= _ARGUMENT_LENGTH_MAX_, errmsg,
-                 "string entry %d of '%s' too long; increase _ARGUMENT_LENGTH_MAX_", i, name);
-      std::strncpy(*pointer_to_list + i * _ARGUMENT_LENGTH_MAX_,
-                   v[i].c_str(), _ARGUMENT_LENGTH_MAX_ - 1);
-      (*pointer_to_list + i * _ARGUMENT_LENGTH_MAX_)[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
-      /* legacy: terminate with '\n' */
-      (*pointer_to_list)[(i + 1) * _ARGUMENT_LENGTH_MAX_ - 1] = '\n';
-    }
-  }
-  return _SUCCESS_;
-}
-
 int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3, ErrorMsg errmsg) {
   try {
     *pfc3 = *pfc1 + *pfc2;

@@ -1,4 +1,48 @@
 #include "non_cold_dark_matter.h"
+#include <cstring>
+
+namespace {
+
+int readDoubleList(FileContent* pfc,
+                   const char* name,
+                   std::vector<double>& values,
+                   int* found,
+                   ErrorMsg errmsg) {
+  try {
+    *found = pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
+  }
+  return _SUCCESS_;
+}
+
+int readIntegerList(FileContent* pfc,
+                    const char* name,
+                    std::vector<int>& values,
+                    int* found,
+                    ErrorMsg errmsg) {
+  try {
+    *found = pfc->read_list_of_integers(name, values) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
+  }
+  return _SUCCESS_;
+}
+
+int readStringList(FileContent* pfc,
+                   const char* name,
+                   std::vector<std::string>& values,
+                   int* found,
+                   ErrorMsg errmsg) {
+  try {
+    *found = pfc->read_list_of_strings(name, values) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
+  }
+  return _SUCCESS_;
+}
+
+}
 
 std::shared_ptr<NonColdDarkMatter> NonColdDarkMatter::Create(FileContent* pfc, const NcdmSettings& ncdm_settings) {
   try {
@@ -223,36 +267,30 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
   auto read_list_of_ints_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, std::vector<int>& output, int expected_size, int default_value) {
     int flg1, flg2, entries_read;
-    int* raw = nullptr;
-    class_call(parser_read_list_of_integers(pfc,
-                                              varname.c_str(),
-                                              &entries_read,
-                                              &raw,
-                                              &flg1,
-                                              error_message_),
+    std::vector<int> raw;
+    class_call(readIntegerList(pfc,
+                               varname.c_str(),
+                               raw,
+                               &flg1,
+                               error_message_),
                  error_message_,
                  error_message_);
-    int* raw2 = nullptr;
-    class_call(parser_read_list_of_integers(pfc,
-                                              varname_deprec.c_str(),
-                                              &entries_read,
-                                              &raw2,
-                                              &flg2,
-                                              error_message_),
+    std::vector<int> raw2;
+    class_call(readIntegerList(pfc,
+                               varname_deprec.c_str(),
+                               raw2,
+                               &flg2,
+                               error_message_),
                  error_message_,
                  error_message_);
     if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
-      free(raw); free(raw2);
       throw std::invalid_argument(std::string("In input file, you can only enter one of ") + varname + std::string(" and ") + varname_deprec + std::string(", choose one"));
     } else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
+      entries_read = static_cast<int>((flg1 == _TRUE_) ? raw.size() : raw2.size());
       if (entries_read != expected_size) {
-        int* src = (flg1 == _TRUE_) ? raw : raw2;
-        free(src);
         throw std::invalid_argument(std::string("Number of entries in ") + varname + std::string(" does not match the expected number: ") + std::to_string(expected_size));
       }
-      int* src = (flg1 == _TRUE_) ? raw : raw2;
-      output.assign(src, src + entries_read);
-      free(src);
+      output = (flg1 == _TRUE_) ? raw : raw2;
     } else {
       output.assign(expected_size, default_value);
     }
@@ -261,36 +299,30 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
   auto read_list_of_doubles_with_deprecated = [&](const std::string& varname, const std::string& varname_deprec, std::vector<double>& output, int expected_size, double default_value) {
     int flg1, flg2, entries_read;
-    double* raw = nullptr;
-    class_call(parser_read_list_of_doubles(pfc,
-                                              varname.c_str(),
-                                              &entries_read,
-                                              &raw,
-                                              &flg1,
-                                              error_message_),
+    std::vector<double> raw;
+    class_call(readDoubleList(pfc,
+                              varname.c_str(),
+                              raw,
+                              &flg1,
+                              error_message_),
                  error_message_,
                  error_message_);
-    double* raw2 = nullptr;
-    class_call(parser_read_list_of_doubles(pfc,
-                                              varname_deprec.c_str(),
-                                              &entries_read,
-                                              &raw2,
-                                              &flg2,
-                                              error_message_),
+    std::vector<double> raw2;
+    class_call(readDoubleList(pfc,
+                              varname_deprec.c_str(),
+                              raw2,
+                              &flg2,
+                              error_message_),
                  error_message_,
                  error_message_);
     if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
-      free(raw); free(raw2);
       throw std::invalid_argument(std::string("In input file, you can only enter one of ") + varname + std::string(" and ") + varname_deprec + std::string(", choose one"));
     } else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
+      entries_read = static_cast<int>((flg1 == _TRUE_) ? raw.size() : raw2.size());
       if (entries_read != expected_size) {
-        double* src = (flg1 == _TRUE_) ? raw : raw2;
-        free(src);
         throw std::invalid_argument(std::string("Number of entries in ") + varname + std::string(" does not match the expected number: ") + std::to_string(expected_size));
       }
-      double* src = (flg1 == _TRUE_) ? raw : raw2;
-      output.assign(src, src + entries_read);
-      free(src);
+      output = (flg1 == _TRUE_) ? raw : raw2;
     } else {
       output.assign(expected_size, default_value);
     }
@@ -364,24 +396,32 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   if (N_ncdm_decay_dr_ > 0) {
     auto extend_list_of_integers = [&](const std::string& key, std::vector<int>& output, int default_value = 0) {
       output.resize(N_ncdm_standard_ + N_ncdm_decay_dr_);
-      int* tmp;
-      // class_read_list_of_integers_or_default macro uses "pfc" as FileContent input
-      class_read_list_of_integers_or_default(key.c_str(), tmp, default_value, N_ncdm_decay_dr_);
+      std::vector<int> tmp;
+      int found = _FALSE_;
+      class_call(readIntegerList(pfc, key.c_str(), tmp, &found, errmsg), errmsg, errmsg);
+      if (found == _FALSE_) {
+        tmp.assign(N_ncdm_decay_dr_, default_value);
+      }
+      class_test(static_cast<int>(tmp.size()) != N_ncdm_decay_dr_, errmsg,
+                 "Number of entries in %s does not match expected number, %d.", key.c_str(), N_ncdm_decay_dr_);
       for (int i = 0; i < N_ncdm_decay_dr_; i++) {
         output[N_ncdm_standard_ + i] = tmp[i];
       }
-      free(tmp);
       return 0;
     };
     auto extend_list_of_doubles = [&](const std::string& key, std::vector<double>& output, double default_value = 0.0) {
       output.resize(N_ncdm_standard_ + N_ncdm_decay_dr_);
-      double* tmp;
-      // class_read_list_of_doubles_or_default macro uses "pfc" as FileContent input
-      class_read_list_of_doubles_or_default(key.c_str(), tmp, default_value, N_ncdm_decay_dr_);
+      std::vector<double> tmp;
+      int found = _FALSE_;
+      class_call(readDoubleList(pfc, key.c_str(), tmp, &found, errmsg), errmsg, errmsg);
+      if (found == _FALSE_) {
+        tmp.assign(N_ncdm_decay_dr_, default_value);
+      }
+      class_test(static_cast<int>(tmp.size()) != N_ncdm_decay_dr_, errmsg,
+                 "Number of entries in %s does not match expected number, %d.", key.c_str(), N_ncdm_decay_dr_);
       for (int i = 0; i < N_ncdm_decay_dr_; i++) {
         output[N_ncdm_standard_ + i] = tmp[i];
       }
-      free(tmp);
       return 0;
     };
 
@@ -424,10 +464,13 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
 
   /* Check if filenames for interpolation tables are given: */
   {
-    int* raw_got_files = nullptr;
-    class_read_list_of_integers_or_default("use_ncdm_psd_files", raw_got_files, _FALSE_, N_ncdm_);
-    got_files_.assign(raw_got_files, raw_got_files + N_ncdm_);
-    free(raw_got_files);
+    int found = _FALSE_;
+    class_call(readIntegerList(pfc, "use_ncdm_psd_files", got_files_, &found, errmsg), errmsg, errmsg);
+    if (found == _FALSE_) {
+      got_files_.assign(N_ncdm_, _FALSE_);
+    }
+    class_test(static_cast<int>(got_files_.size()) != N_ncdm_, errmsg,
+               "Number of entries in use_ncdm_psd_files does not match expected number, %d.", N_ncdm_);
   }
 
   if (flag1 == _TRUE_){
@@ -439,32 +482,40 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
     if (fileentries > 0) {
       /* Okay, read filenames.. */
       int flag2;
-      char* raw_psd_files = nullptr;
-      class_call(parser_read_list_of_strings(pfc, "ncdm_psd_filenames", &entries_read, &raw_psd_files, &flag2, errmsg),
+      std::vector<std::string> raw_psd_files;
+      class_call(readStringList(pfc, "ncdm_psd_filenames", raw_psd_files, &flag2, errmsg),
                  errmsg,
                  errmsg);
+      entries_read = static_cast<int>(raw_psd_files.size());
       class_test(flag2 == _FALSE_, errmsg, "Input use_ncdm_files is found, but no filenames found!");
       class_test(entries_read != fileentries,
                  errmsg,
                  "Number of filenames found, %d, does not match number of _TRUE_ values in use_ncdm_files, %d",
                  entries_read,
                  fileentries);
-      ncdm_psd_files_.assign(raw_psd_files, raw_psd_files + entries_read*_ARGUMENT_LENGTH_MAX_);
-      free(raw_psd_files);
+      ncdm_psd_files_.clear();
+      ncdm_psd_files_.reserve(entries_read * _ARGUMENT_LENGTH_MAX_);
+      for (const std::string& file : raw_psd_files) {
+        FileArg entry = {};
+        class_test(file.size() >= _ARGUMENT_LENGTH_MAX_, errmsg,
+                   "Filename '%s' too long; increase _ARGUMENT_LENGTH_MAX_.", file.c_str());
+        std::strncpy(entry, file.c_str(), _ARGUMENT_LENGTH_MAX_ - 1);
+        entry[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
+        ncdm_psd_files_.insert(ncdm_psd_files_.end(), entry, entry + _ARGUMENT_LENGTH_MAX_);
+      }
     }
   }
   /* Read (optional) p.s.d.-parameters:*/
   {
-    double* raw_psd_params = nullptr;
-    parser_read_list_of_doubles(pfc,
-                                "ncdm_psd_parameters",
-                                &entries_read,
-                                &raw_psd_params,
-                                &flag1,
-                                errmsg);
-    if (raw_psd_params && entries_read > 0) {
-      ncdm_psd_parameters_.assign(raw_psd_params, raw_psd_params + entries_read);
-      free(raw_psd_params);
+    class_call(readDoubleList(pfc,
+                              "ncdm_psd_parameters",
+                              ncdm_psd_parameters_,
+                              &flag1,
+                              errmsg),
+               errmsg,
+               errmsg);
+    if (flag1 == _FALSE_) {
+      ncdm_psd_parameters_.clear();
     }
   }
 
@@ -497,16 +548,20 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
   std::vector<double> Gamma_input(N_ncdm_decay_dr_, 0.0);
   if (N_ncdm_decay_dr_ > 0) {
     /* Lifetime takes different kinds of input */
-    double* Gamma_list = nullptr;
-    double* log10Gamma_list = nullptr;
-    double* lifetime_list = nullptr;
-    double* log10lifetime_list = nullptr;
+    std::vector<double> Gamma_list;
+    std::vector<double> log10Gamma_list;
+    std::vector<double> lifetime_list;
+    std::vector<double> log10lifetime_list;
     int Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read;
     int size = 0;
-    class_call(parser_read_list_of_doubles(pfc, "Gamma_ncdm_decay_dr", &size, &(Gamma_list), &Gamma_read, errmsg), errmsg, errmsg);
-    class_call(parser_read_list_of_doubles(pfc, "log10Gamma_ncdm_decay_dr", &size, &(log10Gamma_list), &log10Gamma_read, errmsg), errmsg, errmsg);
-    class_call(parser_read_list_of_doubles(pfc, "lifetime_ncdm_decay_dr", &size, &(lifetime_list), &lifetime_read, errmsg), errmsg, errmsg);
-    class_call(parser_read_list_of_doubles(pfc, "log10lifetime_ncdm_decay_dr", &size, &(log10lifetime_list), &log10lifetime_read, errmsg), errmsg, errmsg);
+    class_call(readDoubleList(pfc, "Gamma_ncdm_decay_dr", Gamma_list, &Gamma_read, errmsg), errmsg, errmsg);
+    class_call(readDoubleList(pfc, "log10Gamma_ncdm_decay_dr", log10Gamma_list, &log10Gamma_read, errmsg), errmsg, errmsg);
+    class_call(readDoubleList(pfc, "lifetime_ncdm_decay_dr", lifetime_list, &lifetime_read, errmsg), errmsg, errmsg);
+    class_call(readDoubleList(pfc, "log10lifetime_ncdm_decay_dr", log10lifetime_list, &log10lifetime_read, errmsg), errmsg, errmsg);
+    if (Gamma_read == _TRUE_) size = static_cast<int>(Gamma_list.size());
+    if (log10Gamma_read == _TRUE_) size = static_cast<int>(log10Gamma_list.size());
+    if (lifetime_read == _TRUE_) size = static_cast<int>(lifetime_list.size());
+    if (log10lifetime_read == _TRUE_) size = static_cast<int>(log10lifetime_list.size());
 
     if (class_at_least_two_of_four(Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read)) {
       throw std::invalid_argument("More than two of the following inputs are given. Choose one! \nGamma_ncdm_decay_dr, log10Gamma_ncdm_decay_dr, lifetime_ncdm_decay_dr, log10lifetime_ncdm_decay_dr.");
@@ -530,10 +585,6 @@ int NonColdDarkMatter::background_ncdm_init(FileContent* pfc, const NcdmSettings
         Gamma_input[n] = 1./lifetime/(365*24*60*60)*_Mpc_over_m_*1e-3;
       }
     }
-    free(Gamma_list);
-    free(log10Gamma_list);
-    free(lifetime_list);
-    free(log10lifetime_list);
   }
 
 

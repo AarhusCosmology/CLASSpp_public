@@ -4,6 +4,7 @@
 #define __PRIMORDIAL__
 
 #include "perturbations.h"
+#include <string>
 
 /** enum defining how the primordial spectrum should be computed */
 
@@ -184,7 +185,7 @@ struct primordial {
 
   /** 'external_Pk' mode: command generating the table of Pk and custom parameters to be passed to it */
 
-  char*  command = nullptr;  /**< string with the command for calling 'external_Pk' */
+  std::string command;  /**< string with the command for calling 'external_Pk' */
   double custom1 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
   double custom2 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */
   double custom3 = 0.;  /**< one parameter of the primordial computed in 'external_Pk' */

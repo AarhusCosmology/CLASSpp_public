@@ -6,6 +6,7 @@
 #define __GROWTABLE__
 
 #include "common.h"
+#include <vector>
 
 #define _GT_INITSIZE_ 4096 /**< Init size of a growTable (in bytes)*/
 #define _GT_FACTOR_ 2      /**< inflating factor when current max size is reached */
@@ -19,6 +20,8 @@ typedef struct {
   long sz;      /**< total size */
   long csz;     /**< real size */
   int freeze;   /**< if set to _TRUE_ no data can be added */
+
+  std::vector<char> buffer_storage;
 
   ErrorMsg error_message; /**< error message slot */
 } growTable;

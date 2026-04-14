@@ -4,6 +4,7 @@
 // #include "perturbations.h"
 #include "sparse.h"
 #include <vector>
+#include <memory>
 #define TINY 1e-50
 /**************************************************************/
 
@@ -27,9 +28,9 @@ struct jacobian{
 	int *col_group; /* Column grouping. Groups go from 0 to max_group*/
 	int *col_wi; /* Workarray for column grouping*/
 	int max_group; /*Number of columngroups -1 */
-	sp_mat *spJ; /* Stores the matrix we want to decompose */
+	std::unique_ptr<sp_mat> spJ; /* Stores the matrix we want to decompose */
 	double *xjac; /*Stores the values of the sparse jacobian. (Same pattern as spJ) */
-	sp_num *Numerical; /*Stores the LU decomposition.*/
+	std::unique_ptr<sp_num> Numerical; /*Stores the LU decomposition.*/
 	int *Cp; /* Stores the column pointers of the spJ+spJ' sparsity pattern. */
 	int *Ci; /* Stores the row indices of the  spJ+spJ' sparsity pattern. */
 

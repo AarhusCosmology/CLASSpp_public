@@ -14,69 +14,31 @@
 
 #include "common.h"
 #include "sparse.h"
-int sp_mat_alloc(sp_mat** A, int ncols, int nrows, int maxnz, ErrorMsg error_message){
-	int ncp =  ncols+1;
-	class_alloc((*A),sizeof(sp_mat),error_message);
-	class_alloc((*A)->Ax,maxnz*sizeof(double),error_message);
-	class_alloc((*A)->Ai,maxnz*sizeof(int),error_message);
-	class_alloc((*A)->Ap,(ncp*sizeof(int)),error_message);
-	(*A)->ncols = ncols;
-	(*A)->nrows = nrows;
-	(*A)->maxnz = maxnz;
-	return _SUCCESS_;
+
+sparse_matrix::sparse_matrix(int ncols, int nrows, int maxnz) : ncols(ncols), nrows(nrows), maxnz(maxnz) {
+	Ap.resize(ncols + 1);
+	Ai.resize(maxnz);
+	Ax.resize(maxnz);
 }
 
-int sp_mat_free(sp_mat *A){
-	free(A->Ax);
-	free(A->Ai);
-	free(A->Ap);
-	free(A);
-	return _SUCCESS_;
-}
-
-int sp_num_alloc(sp_num** N, int n, ErrorMsg error_message){
-	int maxnz, k;
-	class_alloc((*N),sizeof(sp_num),error_message);
-	maxnz = n*(n+1);
-	maxnz /=2;
-	(*N)->n = n;
-	class_call(sp_mat_alloc(&((*N)->L), n, n, maxnz, error_message),
-		error_message,error_message);
-	class_call(sp_mat_alloc(&((*N)->U), n, n, maxnz, error_message),
-		error_message,error_message);
-	class_alloc((*N)->xi,n*sizeof(int*),error_message);
-	/* I really want xi to be a vector of pointers to vectors. */
-	class_alloc((*N)->xi[0],n*n*sizeof(int),error_message);
-	for (k=1;k<n;k++)	(*N)->xi[k] = (*N)->xi[k-1]+n;
-	/*Assign pointers to rows.*/
-	class_alloc((*N)->topvec,n*sizeof(int),error_message);
-	class_alloc((*N)->pinv,n*sizeof(int),error_message);
-	class_alloc((*N)->p,n*sizeof(int),error_message);
-	/* Has to be n+1 because sp_amd uses it for storage:*/
-	class_alloc((*N)->q,(n+1)*sizeof(int),error_message);
-	class_alloc((*N)->w,n*sizeof(double),error_message);
-	class_alloc((*N)->wamd,(8*(n+1))*sizeof(int),error_message);
-	return _SUCCESS_;
-}
-
-int sp_num_free(sp_num *N){
-	sp_mat_free(N->L);
-	sp_mat_free(N->U);
-	free(N->xi[0]);
-	free(N->xi);
-	free(N->topvec);
-	free(N->pinv);
-	free(N->p);
-	free(N->q);
-	free(N->w);
-	free(N->wamd);
-	free(N);
-	return _SUCCESS_;
+sparse_numerical::sparse_numerical(int n) : n(n) {
+	int maxnz = n * (n + 1) / 2;
+	L = std::make_unique<sp_mat>(n, n, maxnz);
+	U = std::make_unique<sp_mat>(n, n, maxnz);
+	xi.resize(n);
+	xi_data.resize(n * n);
+	for (int k = 0; k < n; k++) xi[k] = xi_data.data() + k * n;
+	topvec.resize(n);
+	pinv.resize(n);
+	p.resize(n);
+	q.resize(n + 1);
+	w.resize(n);
+	wamd.resize(8 * (n + 1));
 }
 
 int reachr(sp_mat *G, sp_mat *B,int k, int *xik,int *pinv){
 	int p, n, top, *Bp, *Bi, *Gp;
-	n=G->ncols; Bp = B->Ap; Bi = B->Ai;Gp = G->Ap;
+	n=G->ncols; Bp = B->Ap.data(); Bi = B->Ai.data();Gp = G->Ap.data();
 	top = n;
 	for (p=Bp[k];p<Bp[k+1];p++){ /* For each entry in the k'th column of B */
 		if (!SPMARKED(Gp,Bi[p])){ /* If node is not marked... */
@@ -88,7 +50,7 @@ int reachr(sp_mat *G, sp_mat *B,int k, int *xik,int *pinv){
 }
 
 void dfsr(int j, sp_mat *G, int *top, int *xik, int *pinv){
-	int i, p, p1, p2, jnew, *Gp = G->Ap, *Gi=G->Ai;
+	int i, p, p1, p2, jnew, *Gp = G->Ap.data(), *Gi=G->Ai.data();
 	jnew = pinv[j];
 	SPMARK(Gp,j);
 	if (jnew>=0){	/*We should consider the jnew column.*/
@@ -107,8 +69,8 @@ void dfsr(int j, sp_mat *G, int *top, int *xik, int *pinv){
 int sp_splsolve(sp_mat *G, sp_mat *B, int k, int*xik, int top, double *x, int *pinv){
 	int j, J, p, q, px, n, *Gp, *Gi, *Bp, *Bi;
 	double *Gx, *Bx;
-	Gp = G->Ap; Gi = G->Ai; Gx = G->Ax;
-	Bp = B->Ap; Bi = B->Ai; Bx = B->Ax;
+	Gp = G->Ap.data(); Gi = G->Ai.data(); Gx = G->Ax.data();
+	Bp = B->Ap.data(); Bi = B->Ai.data(); Bx = B->Ax.data();
 	n = G->ncols;
 
 	for (p=top; p<n; p++) x[xik[p]] = 0;
@@ -131,11 +93,11 @@ int sp_ludcmp(sp_num *N, sp_mat *A, double pivtol){
 	double pivot, *Lx, *Ux, *x, a, t;
 	int *Lp, *Li, *Up, *Ui, *pinv, *pvec, *q;
 	int n, ipiv, k, top, p, i, col, lnz, unz;
-	n = A->ncols; q = N->q;
-	Li = N->L->Ai; Lp = N->L->Ap; Lx = N->L->Ax;
-	Ui = N->U->Ai; Up = N->U->Ap; Ux = N->U->Ax;
+	n = A->ncols; q = N->q.data();
+	Li = N->L->Ai.data(); Lp = N->L->Ap.data(); Lx = N->L->Ax.data();
+	Ui = N->U->Ai.data(); Up = N->U->Ap.data(); Ux = N->U->Ax.data();
 	lnz = 0; unz = 0;
-	x = N->w; pinv = N->pinv; pvec = N->p;
+	x = N->w.data(); pinv = N->pinv.data(); pvec = N->p.data();
 	for (i=0; i<n; i++) x[i]=0;
 	for (i=0; i<n; i++) pinv[i] = -1;
 	for (k=0; k<=n; k++) Lp[k] = 0;
@@ -146,9 +108,9 @@ int sp_ludcmp(sp_num *N, sp_mat *A, double pivtol){
 		Up[k] = unz;
 		col = q ? (q[k]) : k;
 
-		top = reachr(N->L, A, col, N->xi[k], pinv);
+		top = reachr(N->L.get(), A, col, N->xi[k], pinv);
 		N->topvec[k] = top;
-		sp_splsolve(N->L, A, col, N->xi[k], top, x, pinv);
+		sp_splsolve(N->L.get(), A, col, N->xi[k], top, x, pinv);
 		/* Find pivot: */
 		ipiv = -1;
 		a = -1;
@@ -203,7 +165,7 @@ int sp_lusolve(sp_num *N, double *b, double *x){
 	/* permute b and initialize x:*/
 	for (j=0; j<n; j++) x[N->pinv[j]] = b[j];
 	/* lower solve: */
-	Ap = N->L->Ap; Ai = N->L->Ai; Ax = N->L->Ax;
+	Ap = N->L->Ap.data(); Ai = N->L->Ai.data(); Ax = N->L->Ax.data();
 	for (j=0; j<n; j++){
 		x[j] /=Ax[Ap[j]];
 		for (p=Ap[j]+1; p<Ap[j+1]; p++){
@@ -211,16 +173,16 @@ int sp_lusolve(sp_num *N, double *b, double *x){
 		}
 	}
 	/* upper solve: */
-	Ap = N->U->Ap; Ai = N->U->Ai; Ax = N->U->Ax;
+	Ap = N->U->Ap.data(); Ai = N->U->Ai.data(); Ax = N->U->Ax.data();
 	for (j=n-1; j>=0; j--){
 		x[j] /=Ax[Ap[j+1]-1];
 		for (p=Ap[j];p<Ap[j+1]-1; p++){
 			x[Ai[p]] -= Ax[p]*x[j];
 		}
 	}
-	if (N->q!=NULL){
+	if (!N->q.empty()){
 		/* We must permute once more..*/
-		w = N->w;
+		w = N->w.data();
 		for(j=0;j<n;j++) w[j] = x[j];
 		for(j=0; j<n; j++) x[N->q[j]] = w[j];
 	}
@@ -232,11 +194,11 @@ int sp_refactor(sp_num *N, sp_mat *A){
 	int *Lp, *Li, *Up, *Ui, *pinv, *pvec, *q;
 	int n, ipiv, k, top, p, i, col, lnz, unz;
 	n = A->ncols;
-	Li = N->L->Ai; Lp = N->L->Ap; Lx = N->L->Ax;
-	Ui = N->U->Ai; Up = N->U->Ap; Ux = N->U->Ax;
-	q = N->q;
+	Li = N->L->Ai.data(); Lp = N->L->Ap.data(); Lx = N->L->Ax.data();
+	Ui = N->U->Ai.data(); Up = N->U->Ap.data(); Ux = N->U->Ax.data();
+	q = N->q.data();
 	lnz = 0; unz = 0;
-	x = N->w; pinv = N->pinv; pvec = N->p;
+	x = N->w.data(); pinv = N->pinv.data(); pvec = N->p.data();
 	for (i=0; i<n; i++) x[i]=0;
 	for (k=0; k<=n; k++) Lp[k] = 0;
 	for(k=0; k<n; k++){
@@ -246,7 +208,7 @@ int sp_refactor(sp_num *N, sp_mat *A){
 		col = q ? (q[k]) : k;
 
 		top = N->topvec[k];
-		sp_splsolve(N->L, A, col, N->xi[k], top, x, pinv);
+		sp_splsolve(N->L.get(), A, col, N->xi[k], top, x, pinv);
 		/* Assign values to U and L: */
 		ipiv = pvec[k];
 		pivot = x[ipiv];
@@ -282,7 +244,7 @@ int column_grouping(sp_mat *G, int *col_g, int *filled){
   int i, *Ap, *Ai,done;
 
   neq = G->ncols;
-  Ai = G->Ai; Ap = G->Ap;
+  Ai = G->Ai.data(); Ap = G->Ap.data();
   for(i=0;i<neq;i++)
     col_g[i]=-1;
 

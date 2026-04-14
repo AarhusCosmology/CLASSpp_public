@@ -324,14 +324,12 @@ int array_spline(
 
   int i,k;
   double p,qn,sig,un;
-  double * u;
+  std::vector<double> vec_u(n_lines-1);
+  double * u = vec_u.data();
   double dy_first;
   double dy_last;
 
   class_test(n_lines < 3, errmsg, "n_lines=%d, while routine needs n_lines >= 3");
-
-  u = (double *)malloc((n_lines-1) * sizeof(double));
-  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (spline_mode == _SPLINE_NATURAL_) {
     *(array+0*n_columns+index_ddydx2) = u[0] = 0.0;
@@ -414,8 +412,6 @@ int array_spline(
     *(array+k*n_columns+index_ddydx2) = *(array+k*n_columns+index_ddydx2) *
       *(array+(k+1)*n_columns+index_ddydx2) + u[k];
 
-  free(u);
-
   return _SUCCESS_;
 }
 
@@ -431,12 +427,10 @@ int array_spline_table_line_to_line(
 
   int i,k;
   double p,qn,sig,un;
-  double * u;
+  std::vector<double> vec_u(n_lines-1);
+  double * u = vec_u.data();
   double dy_first;
   double dy_last;
-
-  u = (double *)malloc((n_lines-1) * sizeof(double));
-  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (spline_mode == _SPLINE_NATURAL_) {
     *(array+0*n_columns+index_ddydx2) = u[0] = 0.0;
@@ -506,8 +500,6 @@ int array_spline_table_line_to_line(
     *(array+k*n_columns+index_ddydx2) = *(array+k*n_columns+index_ddydx2) *
       *(array+(k+1)*n_columns+index_ddydx2) + u[k];
 
-  free(u);
-
   return _SUCCESS_;
  }
 
@@ -522,25 +514,19 @@ int array_spline_table_lines(
 			     ErrorMsg errmsg
 			     ) {
 
-  double * p;
-  double * qn;
-  double * un;
-  double * u;
+  std::vector<double> vec_u((x_size-1) * y_size);
+  std::vector<double> vec_p(y_size);
+  std::vector<double> vec_qn(y_size);
+  std::vector<double> vec_un(y_size);
+  double * u = vec_u.data();
+  double * p = vec_p.data();
+  double * qn = vec_qn.data();
+  double * un = vec_un.data();
   double sig;
   int index_x;
   int index_y;
   double dy_first;
   double dy_last;
-
-  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
-  p = (double *)malloc(y_size * sizeof(double));
-  qn = (double *)malloc(y_size * sizeof(double));
-  un = (double *)malloc(y_size * sizeof(double));
-
-  class_test(u == NULL, errmsg, "Cannot allocate u");
-  class_test(p == NULL, errmsg, "Cannot allocate p");
-  class_test(qn == NULL, errmsg, "Cannot allocate qn");
-  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -651,11 +637,6 @@ int array_spline_table_lines(
     }
   }
 
-  free(qn);
-  free(un);
-  free(p);
-  free(u);
-
   return _SUCCESS_;
  }
 
@@ -670,24 +651,19 @@ int array_logspline_table_lines(
 			     ErrorMsg errmsg
 			     ) {
 
-  double * p;
-  double * qn;
-  double * un;
-  double * u;
+  std::vector<double> vec_u((x_size-1) * y_size);
+  std::vector<double> vec_p(y_size);
+  std::vector<double> vec_qn(y_size);
+  std::vector<double> vec_un(y_size);
+  double * u = vec_u.data();
+  double * p = vec_p.data();
+  double * qn = vec_qn.data();
+  double * un = vec_un.data();
   double sig;
   int index_x;
   int index_y;
   double dy_first;
   double dy_last;
-
-  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
-  p = (double *)malloc(y_size * sizeof(double));
-  qn = (double *)malloc(y_size * sizeof(double));
-  un = (double *)malloc(y_size * sizeof(double));
-  class_test(u == NULL, errmsg, "Cannot allocate u");
-  class_test(p == NULL, errmsg, "Cannot allocate p");
-  class_test(qn == NULL, errmsg, "Cannot allocate qn");
-  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -799,11 +775,6 @@ int array_logspline_table_lines(
     }
   }
 
-  free(qn);
-  free(un);
-  free(p);
-  free(u);
-
   return _SUCCESS_;
  }
 
@@ -818,24 +789,19 @@ int array_spline_table_columns(
 		       ErrorMsg errmsg
 		       ) {
 
-  double * p;
-  double * qn;
-  double * un;
-  double * u;
+  std::vector<double> vec_u((x_size-1) * y_size);
+  std::vector<double> vec_p(y_size);
+  std::vector<double> vec_qn(y_size);
+  std::vector<double> vec_un(y_size);
+  double * u = vec_u.data();
+  double * p = vec_p.data();
+  double * qn = vec_qn.data();
+  double * un = vec_un.data();
   double sig;
   int index_x;
   int index_y;
   double dy_first;
   double dy_last;
-
-  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
-  p = (double *)malloc(y_size * sizeof(double));
-  qn = (double *)malloc(y_size * sizeof(double));
-  un = (double *)malloc(y_size * sizeof(double));
-  class_test(u == NULL, errmsg, "Cannot allocate u");
-  class_test(p == NULL, errmsg, "Cannot allocate p");
-  class_test(qn == NULL, errmsg, "Cannot allocate qn");
-  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -954,15 +920,11 @@ int array_spline_table_columns(
 	ddy_array[index_y*x_size+(index_x+1)] + u[index_x*y_size+index_y];
 
     }
-  }
+    }
 
-  free(qn);
-  free(p);
-  free(u);
-  free(un);
+    return _SUCCESS_;
+    }
 
-  return _SUCCESS_;
- }
 
 int array_spline_table_columns2(
 		       double * x, /* vector of size x_size */
@@ -975,24 +937,19 @@ int array_spline_table_columns2(
 		       ErrorMsg errmsg
 		       ) {
 
-  double * p;
-  double * qn;
-  double * un;
-  double * u;
+  std::vector<double> vec_u((x_size-1) * y_size);
+  std::vector<double> vec_p(y_size);
+  std::vector<double> vec_qn(y_size);
+  std::vector<double> vec_un(y_size);
+  double * u = vec_u.data();
+  double * p = vec_p.data();
+  double * qn = vec_qn.data();
+  double * un = vec_un.data();
   double sig;
   int index_x;
   int index_y;
   double dy_first;
   double dy_last;
-
-  u = (double *)malloc((x_size-1) * y_size * sizeof(double));
-  p = (double *)malloc(y_size * sizeof(double));
-  qn = (double *)malloc(y_size * sizeof(double));
-  un = (double *)malloc(y_size * sizeof(double));
-  class_test(u == NULL, errmsg, "Cannot allocate u");
-  class_test(p == NULL, errmsg, "Cannot allocate p");
-  class_test(qn == NULL, errmsg, "Cannot allocate qn");
-  class_test(un == NULL, errmsg, "Cannot allocate un");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ 3 x-values are needed.
 
@@ -1082,14 +1039,10 @@ int array_spline_table_columns2(
 
       }
     }
-  }
-  free(qn);
-  free(p);
-  free(u);
-  free(un);
+    }
 
-  return _SUCCESS_;
- }
+    return _SUCCESS_;
+    }
 
 int array_spline_table_one_column(
 		       double * x, /* vector of size x_size */
@@ -1106,14 +1059,12 @@ int array_spline_table_one_column(
   double p;
   double qn;
   double un;
-  double * u;
+  std::vector<double> vec_u((x_size-1));
+  double * u = vec_u.data();
   double sig;
   int index_x;
   double dy_first;
   double dy_last;
-
-  u = (double *)malloc((x_size-1) * sizeof(double));
-  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -1211,15 +1162,12 @@ int array_spline_table_one_column(
   for (index_x=x_size-2; index_x >= 0; index_x--) {
 
     ddy_array[index_y*x_size+index_x] = ddy_array[index_y*x_size+index_x] *
-      ddy_array[index_y*x_size+(index_x+1)] + u[index_x];
+    ddy_array[index_y*x_size+(index_x+1)] + u[index_x];
 
-  }
+    }
 
-  free(u);
-
-  return _SUCCESS_;
-}
-
+    return _SUCCESS_;
+    }
 int array_logspline_table_one_column(
 		       double * x, /* vector of size x_size */
 		       int x_size,
@@ -1236,14 +1184,12 @@ int array_logspline_table_one_column(
   double p;
   double qn;
   double un;
-  double * u;
+  std::vector<double> vec_u(x_stop-1);
+  double * u = vec_u.data();
   double sig;
   int index_x;
   double dy_first;
   double dy_last;
-
-  u = (double *)malloc((x_stop-1) * sizeof(double));
-  class_test(u == NULL, errmsg, "Cannot allocate u");
 
   if (x_size==2) spline_mode = _SPLINE_NATURAL_; // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
 
@@ -1345,8 +1291,6 @@ int array_logspline_table_one_column(
       ddlogy_array[index_y*x_size+(index_x+1)] + u[index_x];
 
   }
-
-  free(u);
 
   return _SUCCESS_;
 }
@@ -2652,15 +2596,12 @@ int array_smooth_trg(double * array,
 		     int radius, /*3, 5 or 7 */
 		     ErrorMsg errmsg) {
 
-  double * smooth;
+  std::vector<double> vec_smooth(k_size);
+  double * smooth = vec_smooth.data();
   int i,j,jmin,jmax;
   double weigth;
-  double *coeff;
-
-  smooth=(double *)malloc(k_size*sizeof(double));
-  class_test(smooth == NULL, errmsg, "Cannot allocate smooth");
-
-  class_calloc(coeff,2*radius+1,sizeof(double),errmsg);
+  std::vector<double> vec_coeff(2*radius+1, 0.0);
+  double * coeff = vec_coeff.data();
 
   switch(radius){
   case 3:
@@ -2765,9 +2706,6 @@ int array_smooth_trg(double * array,
   for (i=starting_k; i<k_size-radius; i++)
     array[i+k_size*index_eta] = smooth[i];
 
-  free(smooth);
-  free(coeff);
-
   return _SUCCESS_;
 
 }
@@ -2779,12 +2717,10 @@ int array_smooth(double * array,
 		 int radius,
 		 ErrorMsg errmsg) {
 
-  double * smooth;
+  std::vector<double> vec_smooth(n_lines);
+  double * smooth = vec_smooth.data();
   int i,j,jmin,jmax;
   double weigth;
-
-  smooth=(double *)malloc(n_lines*sizeof(double));
-  class_test(smooth == NULL, errmsg, "Cannot allocate smooth");
 
   for (i=0; i<n_lines; i++) {
     smooth[i]=0.;
@@ -2801,11 +2737,8 @@ int array_smooth(double * array,
   for (i=0; i<n_lines; i++)
     array[i*n_columns+index] = smooth[i];
 
-  free(smooth);
-
   return _SUCCESS_;
-
-}
+  }
 
 /**
  * Compute quadrature weights for the trapezoidal integration method, xhen x is in gorwing order.

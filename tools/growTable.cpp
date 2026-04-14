@@ -14,7 +14,8 @@ int gt_init(
   growTable* self /***< a pointer on an empty growTable */
   ) {
 
-  class_alloc(self->buffer,_GT_INITSIZE_,self->error_message);
+  self->buffer_storage.resize(_GT_INITSIZE_);
+  self->buffer = self->buffer_storage.data();
   self->sz=_GT_INITSIZE_;
   self->csz=0;
   self->freeze=_FALSE_;  /**< This line added by JL */
@@ -34,7 +35,6 @@ int gt_add(
   ) {
   long ridx;
   void *res;
-  char *nbuffer;
 
   /** - assumes the growTable is correctly initialized */
 
@@ -54,12 +54,11 @@ int gt_add(
 
   if (ridx+sz>self->sz) {
     /** - test -> pass -> ok we need to grow */
-    nbuffer=(char *)realloc(self->buffer,self->sz*_GT_FACTOR_);
-    class_test(nbuffer==NULL,
-	       self->error_message,
-	       "Cannot grow growTable");
-    self->buffer=nbuffer;
-    self->sz=self->sz*_GT_FACTOR_;
+    while (ridx + sz > self->sz) {
+      self->sz=self->sz*_GT_FACTOR_;
+    }
+    self->buffer_storage.resize(self->sz);
+    self->buffer = self->buffer_storage.data();
   }
 
   res=memcpy((void*) (self->buffer+ridx),(void*) data,(size_t) sz);
@@ -151,11 +150,12 @@ int gt_getPtr(
  * Called by background_solve().
  */
 int gt_free(growTable* self) {
-  free(self->buffer);
+  self->buffer_storage.clear();
+  self->buffer_storage.shrink_to_fit();
+  self->buffer=nullptr;
   self->csz=-1;
   self->sz=-1;
   self->freeze=_FALSE_;  /**< This line added by JL */
 
   return _SUCCESS_;
 }
-

@@ -2,6 +2,7 @@
 #define __DEI__
 
 #include "common.h"
+#include <vector>
 
 struct generic_integrator_workspace
 {
@@ -21,6 +22,20 @@ struct generic_integrator_workspace
   double * ak5;
   double * ak6;
   double * ytemp;
+
+  std::vector<double> yscal_storage;
+  std::vector<double> y_storage;
+  std::vector<double> dydx_storage;
+
+  std::vector<double> yerr_storage;
+  std::vector<double> ytempo_storage;
+
+  std::vector<double> ak2_storage;
+  std::vector<double> ak3_storage;
+  std::vector<double> ak4_storage;
+  std::vector<double> ak5_storage;
+  std::vector<double> ak6_storage;
+  std::vector<double> ytemp_storage;
 
   double stepmin;
 

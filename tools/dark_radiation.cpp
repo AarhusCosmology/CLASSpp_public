@@ -8,6 +8,23 @@
 
 #include "dark_radiation.h"
 
+namespace {
+
+int readIntegerList(FileContent* pfc,
+                    const char* name,
+                    std::vector<int>& values,
+                    int* found,
+                    ErrorMsg errmsg) {
+  try {
+    *found = pfc->read_list_of_integers(name, values) ? _TRUE_ : _FALSE_;
+  } catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
+  }
+  return _SUCCESS_;
+}
+
+}
+
 std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, std::vector<double> deg, double T_cmb) {
   try {
     return std::shared_ptr<DarkRadiation>(new DarkRadiation(pfc, source_types, dr_types, deg, T_cmb));
@@ -57,23 +74,31 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
     }
   }
   
-  int int1, flag1, entries_read;
-  int* temp_list;
+  int int1, flag1;
   char* errmsg = error_message_;
   /* Quadrature strategy */
-  class_read_list_of_integers_or_default("Quadrature strategy DR", temp_list, quadrature_strategy_default_, 1);
+  std::vector<int> temp_list;
+  class_call(readIntegerList(pfc, "Quadrature strategy DR", temp_list, &flag1, errmsg), errmsg, errmsg);
+  if (flag1 == _FALSE_) temp_list.assign(1, quadrature_strategy_default_);
+  class_test(static_cast<int>(temp_list.size()) != 1, errmsg,
+             "Number of entries in Quadrature strategy DR does not match expected number, 1.");
   quadrature_strategy_ = temp_list[0];
-  free(temp_list);
   
   /* Maximum q */
-  class_read_list_of_integers_or_default("Maximum q DR", temp_list, qmax_default_, 1);
+  temp_list.clear();
+  class_call(readIntegerList(pfc, "Maximum q DR", temp_list, &flag1, errmsg), errmsg, errmsg);
+  if (flag1 == _FALSE_) temp_list.assign(1, qmax_default_);
+  class_test(static_cast<int>(temp_list.size()) != 1, errmsg,
+             "Number of entries in Maximum q DR does not match expected number, 1.");
   qmax_ = temp_list[0];
-  free(temp_list);
   
   /* Number of momentum bins, same for all species */
-  class_read_list_of_integers_or_default("N_q_dr", temp_list, N_q_default_, 1);
+  temp_list.clear();
+  class_call(readIntegerList(pfc, "N_q_dr", temp_list, &flag1, errmsg), errmsg, errmsg);
+  if (flag1 == _FALSE_) temp_list.assign(1, N_q_default_);
+  class_test(static_cast<int>(temp_list.size()) != 1, errmsg,
+             "Number of entries in N_q_dr does not match expected number, 1.");
   N_q_ = temp_list[0];
-  free(temp_list);
   
   q_.resize(N_q_);
   dq_.resize(N_q_);

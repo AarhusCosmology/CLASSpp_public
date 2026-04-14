@@ -25,16 +25,13 @@ int get_qsampling_manual(double* x,
     return _FAILURE_;
     case (qm_Laguerre) : {
       /* Allocate storage for Laguerre coefficients: */
-      double *b, *c;
-      class_alloc(b, N*sizeof(double), errmsg);
-      class_alloc(c, N*sizeof(double), errmsg);
-      compute_Laguerre(x, dq, N, 0.0, b, c, _TRUE_);
+      std::vector<double> b(N);
+      std::vector<double> c(N);
+      compute_Laguerre(x, dq, N, 0.0, b.data(), c.data(), _TRUE_);
       for (int i = 0; i < N; i++){
         (*function)(params_for_function, x[i], &y);
         w[i] = dq[i]*y;
       }
-      free(b);
-      free(c);
       return _SUCCESS_;
     }
     case (qm_trapz) :
@@ -88,9 +85,9 @@ int get_qsampling(double *x,
 
   int i, NL=2,NR,level,Nadapt=0,NLag,NLag_max,Nold=NL;
   int adapt_converging=_FALSE_,Laguerre_converging=_FALSE_,combined_converging=_FALSE_;
-  double y,y1,y2,I,Igk,err,ILag,*b,*c;
-  qss_node *root = NULL;
-  qss_node *root_comb = NULL;
+  double y,y1,y2,I,Igk,err,ILag;
+  std::unique_ptr<qss_node> root = NULL;
+  std::unique_ptr<qss_node> root_comb = NULL;
   double I_comb,I_atzero,I_atinf,I_comb2;
   int N_comb=0,N_comb_leg=4;
   double a_comb,b_comb;
@@ -98,7 +95,8 @@ int get_qsampling(double *x,
   double q_lag[_N_COMB_LAG_],w_lag[_N_COMB_LAG_];
   char method_chosen[_METHOD_CHOSEN_SIZE_];
   double qmin=0., qmax=0., qmaxm1=0.;
-  double *wcomb2=NULL,delq;
+  std::vector<double> wcomb2;
+  double delq;
   double Itot=0.0;
   int zeroskip=0;
 
@@ -113,8 +111,8 @@ int get_qsampling(double *x,
   w_leg[0] = w_leg[3];
 
   /* Allocate storage for Laguerre coefficients: */
-  class_alloc(b,N_max*sizeof(double),errmsg);
-  class_alloc(c,N_max*sizeof(double),errmsg);
+  std::vector<double> b(N_max);
+  std::vector<double> c(N_max);
   /* If a vector of q values has been passed, use it: */
   if ((qvec!=NULL)&&(qsiz>1)){
     qmin = qvec[0];
@@ -126,26 +124,26 @@ int get_qsampling(double *x,
   }
 
   /* First do the adaptive quadrature - this will also give the value of the integral: */
-  gk_adapt(&root,(*test),(*function), params_for_function,
+  gk_adapt(root,(*test),(*function), params_for_function,
 	   rtol*1e-4, 1, 0.0, 1.0, _TRUE_, errmsg);
   /* Do a leaf count: */
-  leaf_count(root);
+  leaf_count(root.get());
   /* I can get the integral now: */
-  I = get_integral(root, 1);
+  I = get_integral(root.get(), 1);
   //printf("I = %le |%le, used points: %d\n",I,I-1.0,15*root->leaf_childs);
   Itot += I;
 
   /* Starting from the top, move down in levels until tolerance is met: */
   for(level=root->leaf_childs; level>=1; level--){
-    Igk = get_integral(root,level);
+    Igk = get_integral(root.get(),level);
     err = I-Igk;
     if (fabs(err/Itot)<rtol) break;
   }
   if (level>0){
     /* Reduce tree to the found level:*/
-    reduce_tree(root,level);
+    reduce_tree(root.get(),level);
     /* Count the new leafs: */
-    leaf_count(root);
+    leaf_count(root.get());
     /* I know know how many function evaluations is
        required by the adaptively sampled grid:*/
     Nadapt = 15*root->leaf_childs;
@@ -179,7 +177,7 @@ int get_qsampling(double *x,
     //printf("f(100) = %e ?= %e\n",y2,a_comb*exp(-b_comb*100));
 
     /* Evaluate tail using 6 point Laguerre: */
-    compute_Laguerre(q_lag, w_lag, _N_COMB_LAG_, 0.0, b, c, _TRUE_);
+    compute_Laguerre(q_lag, w_lag, _N_COMB_LAG_, 0.0, b.data(), c.data(), _TRUE_);
     for (i=0, I_atinf=0.0; i<_N_COMB_LAG_; i++){
       w_lag[i] *= exp(-q_lag[i]);
       q_lag[i] = qmax + q_lag[i]/b_comb;
@@ -189,13 +187,13 @@ int get_qsampling(double *x,
     }
 
     /* Do the adaptive quadrature - this will also give the main part of the integral: */
-    gk_adapt(&root_comb,(*test),(*function), params_for_function,
+    gk_adapt(root_comb,(*test),(*function), params_for_function,
 	     rtol*1e-2, 1, qmin, qmax, _FALSE_, errmsg);
     /* Do a leaf count: */
-    leaf_count(root_comb);
+    leaf_count(root_comb.get());
     /* Starting from the top, move down in levels until tolerance is met: */
     for(level=root_comb->leaf_childs; level>=1; level--){
-      I_comb = get_integral(root_comb,level);
+      I_comb = get_integral(root_comb.get(),level);
       //printf("%le + %le + %le = %le | %le\n",
       //     I_atzero,I_atinf,I_comb,I_comb+I_atinf+I_atzero,I_comb+I_atinf+I_atzero-1.0);
       I_comb +=(I_atinf+I_atzero);
@@ -204,16 +202,16 @@ int get_qsampling(double *x,
     }
     /* Reduce tree to the found level:*/
     if (level>0){
-      reduce_tree(root_comb,level);
+      reduce_tree(root_comb.get(),level);
       /* Count the new leafs: */
-      leaf_count(root_comb);
+      leaf_count(root_comb.get());
       N_comb = 15*root_comb->leaf_childs + _N_COMB_LAG_ + N_comb_leg;
       if (N_comb <= N_max) combined_converging = _TRUE_;
     }
 
     /* Do the second combined quadrature: Same as above, but with trapezoidal rule
        using the given q grid:  */
-    class_alloc(wcomb2,qsiz*sizeof(double),errmsg);
+    wcomb2.resize(qsiz);
     I_comb2 = 0.0;
     for(i=0; i<qsiz; i++){
       if(i==0){
@@ -241,7 +239,7 @@ int get_qsampling(double *x,
   NLag_max = MIN(N_max,80);
   for (NLag=NL; NLag<=NLag_max; NLag = MIN(NLag_max,NLag+10)){
     /* Evaluate integral: */
-    compute_Laguerre(x,w,NLag,0.0,b,c,_TRUE_);
+    compute_Laguerre(x,w,NLag,0.0,b.data(),c.data(),_TRUE_);
     ILag = 0.0;
     for (i=0; i<NLag; i++){
       (*test)(params_for_function,x[i],&y);
@@ -266,7 +264,7 @@ int get_qsampling(double *x,
     while ((NR-NL)>1) {
       NLag = (NL+NR)/2;
       /* Evaluate integral: */
-      compute_Laguerre(x,w,NLag,0.0,b,c,_TRUE_);
+      compute_Laguerre(x,w,NLag,0.0,b.data(),c.data(),_TRUE_);
       ILag = 0.0;
       for (i=0; i<NLag; i++){
 	(*test)(params_for_function,x[i],&y);
@@ -315,7 +313,7 @@ int get_qsampling(double *x,
     snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Adaptive Gauss-Kronrod Quadrature");
     /* Gather weights and xvalues from tree: */
     i = Nadapt-1;
-    get_leaf_x_and_w(root,&i,x,w,_TRUE_);
+    get_leaf_x_and_w(root.get(),&i,x,w,_TRUE_);
   }
   else if (Laguerre_converging==_TRUE_){
     snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Gauss-Laguerre Quadrature");
@@ -328,7 +326,7 @@ int get_qsampling(double *x,
       w[i] = w_leg[i];
     }
     i = N_comb_leg;
-    get_leaf_x_and_w(root_comb,&i,x,w,_FALSE_);
+    get_leaf_x_and_w(root_comb.get(),&i,x,w,_FALSE_);
     //printf("from %d to %d\n",N_comb_leg,i);
 
     for(i=0; i<_N_COMB_LAG_; i++){
@@ -351,15 +349,7 @@ int get_qsampling(double *x,
 
   //printf("Chosen sampling: %s, with %d points.\n",method_chosen,*N);
   //for(i=0; i<*N; i++) printf("(q,w) = (%g,%g)\n",x[i],w[i]);
-  /* Deallocate tree: */
-  burn_tree(root);
-  if(qvec!=NULL){
-    burn_tree(root_comb);
-    free(wcomb2);
-  }
-
-  free(b);
-  free(c);
+  /* Deallocate tree handled by unique_ptr automatically. */
 
   return _SUCCESS_;
 }
@@ -421,8 +411,8 @@ int get_leaf_x_and_w(qss_node *node, int *ind, double *x, double *w,int isindefi
   }
   else{
     /* Do recursive call: */
-    get_leaf_x_and_w(node->left,ind,x,w,isindefinite);
-    get_leaf_x_and_w(node->right,ind,x,w,isindefinite);
+    get_leaf_x_and_w(node->left.get(),ind,x,w,isindefinite);
+    get_leaf_x_and_w(node->right.get(),ind,x,w,isindefinite);
   }
   return _SUCCESS_;
 }
@@ -432,44 +422,27 @@ int reduce_tree(qss_node *node, int level){
      node->leaf_childs==level into leafs.
      If we call reduce_tree(root,1), nothing happens.*/
   if(node->leaf_childs==level){
-    burn_tree(node->left);
-    burn_tree(node->right);
-    node->left = NULL;
-    node->right = NULL;
+    node->left.reset();
+    node->right.reset();
   }
   else if(node->leaf_childs>level){
     /* else try to see if children nodes can be simplified: */
-    reduce_tree(node->left,level);
-    reduce_tree(node->right,level);
+    reduce_tree(node->left.get(),level);
+    reduce_tree(node->right.get(),level);
   }
   /* If called on a node which has leaf_childs<level, it does nothing. */
   return _SUCCESS_;
 }
 
 
-int burn_tree(qss_node *node){
-  /* Burn node and all subnodes. */
-  /* Call burn_branch recursively on children nodes: */
-  /* This node and all its subnodes */
-  if (node!=NULL){
-    if (node->left!=NULL) burn_tree(node->left);
-    if (node->right!=NULL) burn_tree(node->right);
-
-    if (node->x!=NULL) free(node->x);
-    if (node->w!=NULL) free(node->w);
-    free(node);
-  }
-  return _SUCCESS_;
-}
-
 int leaf_count(qss_node *node){
   /* Count the amount of leafs under a given node and write the number in the node. */
   /* We call recursively, until a node is a leaf - then we add the numbers on our
      way back:*/
-  if (node->left!=NULL){
+  if (node->left){
     /* This is not a leaf, do recursive call: */
-    leaf_count(node->left);
-    leaf_count(node->right);
+    leaf_count(node->left.get());
+    leaf_count(node->right.get());
     node->leaf_childs = node->left->leaf_childs + node->right->leaf_childs;
     return _SUCCESS_;
   }
@@ -489,8 +462,8 @@ double get_integral(qss_node *node, int level){
     return node->I;
   }
   else{
-    IL = get_integral(node->left, level);
-    IR = get_integral(node->right, level);
+    IL = get_integral(node->left.get(), level);
+    IR = get_integral(node->right.get(), level);
     /* Combine the integrals: */
     return (IL+IR);
   }
@@ -499,7 +472,7 @@ double get_integral(qss_node *node, int level){
 
 
 int gk_adapt(
-	     qss_node** node,
+	     std::unique_ptr<qss_node> &node,
 	     int (*test)(void * params_for_function, double q, double *psi),
 	     int (*function)(void * params_for_function, double q, double *f0),
 	     void * params_for_function,
@@ -514,19 +487,14 @@ int gk_adapt(
      At first call, a and b should be 0 and 1 if isdefinite==_TRUE_. */
   double mid;
   /* Allocate current node: */
-  class_alloc(*node,sizeof(qss_node),errmsg);
-  if (treemode==0){
-    (*node)->x = NULL;
-    (*node)->w = NULL;
+  node = std::make_unique<qss_node>();
+  if (treemode!=0){
+    node->x.resize(15);
+    node->w.resize(15);
   }
-  else{
-    class_alloc((*node)->x,15*sizeof(double),errmsg);
-    class_alloc((*node)->w,15*sizeof(double),errmsg);
-  }
-  (*node)->left = NULL; (*node)->right = NULL;
 
-  gk_quad((*test), (*function), params_for_function, *node, a, b, isindefinite);
-  if ((fabs((*node)->err/(*node)->I) < tol)||(tol>=1.0)){
+  gk_quad((*test), (*function), params_for_function, node.get(), a, b, isindefinite);
+  if ((fabs(node->err/node->I) < tol)||(tol>=1.0)){
     /* Stop recursion and return. tol>=1.0 in case of I=0 infinite recursion */
     return _SUCCESS_;
   }
@@ -534,10 +502,10 @@ int gk_adapt(
     /* Call gk_adapt recursively on children:*/
     mid = 0.5*(a+b);
     //printf("<-%g,%g,%g,%g",mid,tol,(*node)->err,(*node)->I);
-    gk_adapt(&((*node)->left),(*test),(*function), params_for_function, 1.5*tol,
+    gk_adapt(node->left,(*test),(*function), params_for_function, 1.5*tol,
 	     treemode, a, mid, isindefinite, errmsg);
     //printf("%g->",mid);
-    gk_adapt(&((*node)->right),(*test),(*function), params_for_function, 1.5*tol,
+    gk_adapt(node->right,(*test),(*function), params_for_function, 1.5*tol,
 	     treemode, mid, b, isindefinite, errmsg);
     /* Update integral and error in this node and return: */
     /* Actually, it is more convenient just to keep the nodes own estimate of the
@@ -718,8 +686,8 @@ int gk_quad(int (*test)(void * params_for_function, double q, double *psi),
     /* Update Kronrod integral: */
     Ik +=wk*y;
     /* If node->x and node->w is allocated, store values: */
-    if (node->x!=NULL) node->x[i] = x;
-    if (node->w!=NULL) node->w[i] = wk;
+    if (!node->x.empty()) node->x[i] = x;
+    if (!node->w.empty()) node->w[i] = wk;
     /* If i is uneven, update Gauss integral: */
     if ((i%2)==1){
       j = (i-1)/2;
@@ -794,9 +762,9 @@ int quadrature_in_rectangle(
 			    double yl,
 			    double yr,
 			    int *n,
-			    double ** x,
-			    double ** y,
-			    double ** w,
+			    std::vector<double>& x,
+			    std::vector<double>& y,
+			    std::vector<double>& w,
 			    ErrorMsg error_message) {
 
 
@@ -812,16 +780,16 @@ int quadrature_in_rectangle(
   *n = N;
 
 
-  class_alloc(*x,sizeof(double)*N,error_message);
-  class_alloc(*y,sizeof(double)*N,error_message);
-  class_alloc(*w,sizeof(double)*N,error_message);
+  x.resize(N);
+  y.resize(N);
+  w.resize(N);
   class_call(cubature_order_eleven(xl_tile,
 				   xr_tile,
 				   yl_tile,
 				   yr_tile,
-				   *x+0,
-				   *y+0,
-				   *w+0,
+				   x.data(),
+				   y.data(),
+				   w.data(),
 				   error_message),
 	     error_message,
 	     error_message);

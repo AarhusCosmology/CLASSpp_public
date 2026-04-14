@@ -21,8 +21,8 @@ double c[3]={0.,0.,0.};
 double d3ym=0, d3yp=0;
 #endif
 #if defined (HERMITE_DO_DPHI) || defined (HERMITE_DO_D2PHI)
-double *sinK = pHIS->sinK;
-double *cotK = pHIS->cotK;
+double *sinK = pHIS->sinK.data();
+double *cotK = pHIS->cotK.data();
 double cotKm=0,cotKp=0,sinKm=0,sinKp=0;
 double sinKm2, sinKp2;
 double d2ym = 0, d2yp=0;
@@ -43,11 +43,11 @@ int phisign = 1, dphisign = 1;
     do it.
 */
 
-xvec = pHIS->x;
+xvec = pHIS->x.data();
 deltax = pHIS->delta_x;
 nx = pHIS->x_size;
-Phi_l = pHIS->phi+lnum*nx;
-dPhi_l = pHIS->dphi+lnum*nx;
+Phi_l = pHIS->phi.data()+lnum*nx;
+dPhi_l = pHIS->dphi.data()+lnum*nx;
 
 xmin = xvec[0];
 xmax = xvec[nx-1];

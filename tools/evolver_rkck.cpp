@@ -1,4 +1,5 @@
 #include "evolver_rkck.h"
+#include <vector>
 
 int evolver_rk(int (*derivs)(double x,
 				  double * y,
@@ -36,7 +37,7 @@ int evolver_rk(int (*derivs)(double x,
   int next_index_x;
   double x1,x2=0.,timestep,timescale;
   struct generic_integrator_workspace gi;
-  double * dy;
+  std::vector<double> dy(y_size);
   short call_output;
 
   class_test(x_ini > x_sampling[x_size-1],
@@ -50,8 +51,6 @@ int evolver_rk(int (*derivs)(double x,
   class_call(initialize_generic_integrator(y_size, &gi),
 	     gi.error_message,
 	     error_message);
-
-  class_alloc(dy,y_size*sizeof(double),error_message);
 
   x1=x_ini;
 
@@ -91,7 +90,7 @@ int evolver_rk(int (*derivs)(double x,
 
 	class_call((*derivs)(x1,
 			     y,
-			     dy,
+			     dy.data(),
 			     parameters_and_workspace_for_derivs,
 			     error_message),
 		   error_message,
@@ -100,7 +99,7 @@ int evolver_rk(int (*derivs)(double x,
 
       class_call((*print_variables)(x1,
 				    y,
-				    dy,
+				    dy.data(),
 				    parameters_and_workspace_for_derivs,
 				    error_message),
 		 error_message,
@@ -121,19 +120,19 @@ int evolver_rk(int (*derivs)(double x,
     if (call_output == _TRUE_) {
 
       class_call((*derivs)(x2,
-			   y,
-			   dy,
-			   parameters_and_workspace_for_derivs,
-			   error_message),
+				   y,
+				   dy.data(),
+				   parameters_and_workspace_for_derivs,
+				   error_message),
 		 error_message,
 		 error_message);
 
       class_call((*output)(x2,
-			   y,
-			   dy,
-			   next_index_x,
-			   parameters_and_workspace_for_derivs,
-			   error_message),
+				   y,
+				   dy.data(),
+				   next_index_x,
+				   parameters_and_workspace_for_derivs,
+				   error_message),
 		 error_message,
 		 error_message);
 
@@ -152,7 +151,7 @@ int evolver_rk(int (*derivs)(double x,
      point in the covered range */
   class_call((*derivs)(x1,
 		       y,
-		       dy,
+		       dy.data(),
 		       parameters_and_workspace_for_derivs,
 		       error_message),
 	     error_message,
@@ -160,18 +159,16 @@ int evolver_rk(int (*derivs)(double x,
 
   if (print_variables != NULL)
     class_call((*print_variables)(x1,
-				  y,
-				  dy,
-				  parameters_and_workspace_for_derivs,
-				  error_message),
+					  y,
+					  dy.data(),
+					  parameters_and_workspace_for_derivs,
+					  error_message),
 	       error_message,
 	       error_message);
 
   class_call(cleanup_generic_integrator(&gi),
 	     gi.error_message,
 	     error_message);
-
-  free(dy);
 
   return _SUCCESS_;
 

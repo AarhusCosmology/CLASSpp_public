@@ -138,25 +138,6 @@ int TransferModule::transfer_init() {
   /* maximum number of sampling times for transfer sources */
   int tau_size_max;
 
-  /* array of sources S(k,tau), just taken from perturbation module,
-     or transformed if non-linear corrections are needed
-     sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp][index_tau * perturbations_module_->k_size_[index_md] + index_k]
-  */
-  double *** sources;
-
-  /* array of source derivatives S''(k,tau)
-     (second derivative with respect to k, not tau!),
-     used to interpolate sources at the right values of k,
-     sources_spline[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp][index_tau * perturbations_module_->k_size_[index_md] + index_k]
-  */
-  double *** sources_spline;
-
-  /** - array with the correspondence between the index of sources in
-      the perturbation module and in the transfer module,
-      tp_of_tt[index_md][index_tt]
-  */
-  int ** tp_of_tt;
-
   /* structure containing the flat spherical bessel functions */
 
   HyperInterpStruct BIS;
@@ -199,31 +180,24 @@ int TransferModule::transfer_init() {
 
   /** - copy sources to a local array sources (in fact, only the pointers are copied, not the data), and eventually apply non-linear corrections to the sources */
 
-  class_alloc(sources,
-              md_size_*sizeof(double**),
-              error_message_);
-
-  class_call(transfer_perturbation_copy_sources_and_nl_corrections(sources),
+  std::vector<std::vector<double*>> sources_storage(md_size_);
+  std::vector<std::vector<std::vector<double>>> owned_sources(md_size_);
+  class_call(transfer_perturbation_copy_sources_and_nl_corrections(sources_storage, owned_sources),
              error_message_,
              error_message_);
 
   /** - spline all the sources passed by the perturbation module with respect to k (in order to interpolate later at a given value of k) */
 
-  class_alloc(sources_spline,
-              md_size_*sizeof(double**),
-              error_message_);
-
-  class_call(transfer_perturbation_source_spline(sources,sources_spline),
+  std::vector<std::vector<double*>> sources_spline_storage(md_size_);
+  std::vector<std::vector<std::vector<double>>> spline_owned_storage(md_size_);
+  class_call(transfer_perturbation_source_spline(sources_storage, sources_spline_storage, spline_owned_storage),
              error_message_,
              error_message_);
 
   /** - allocate and fill array describing the correspondence between perturbation types and transfer types */
 
-  class_alloc(tp_of_tt,
-              md_size_*sizeof(int*),
-              error_message_);
-
-  class_call(transfer_get_source_correspondence(tp_of_tt),
+  std::vector<std::vector<int>> tp_of_tt_storage(md_size_);
+  class_call(transfer_get_source_correspondence(tp_of_tt_storage),
              error_message_,
              error_message_);
 
@@ -279,13 +253,21 @@ int TransferModule::transfer_init() {
                error_message_);
   }
   double* window_ptr = window.empty() ? nullptr : window.data();
+  std::vector<double**> sources(md_size_);
+  std::vector<double**> sources_spline(md_size_);
+  std::vector<int*> tp_of_tt(md_size_);
+  for (int index_md = 0; index_md < md_size_; ++index_md) {
+    sources[index_md] = sources_storage[index_md].data();
+    sources_spline[index_md] = sources_spline_storage[index_md].data();
+    tp_of_tt[index_md] = tp_of_tt_storage[index_md].data();
+  }
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<int>> future_output;
     /** - loop over all wavenumbers (parallelized).*/
     /* For each wavenumber: */
     for (int index_q = 0; index_q < q_size_; index_q++) {
     future_output.push_back(task_system.AsyncTask([this, tau_size_max, tp_of_tt, tau_rec, sources_spline, &BIS, tau0, index_q, sources, window_ptr] () {
-      struct transfer_workspace* ptw = NULL;
+      struct transfer_workspace ptw = {};
       class_call(transfer_workspace_init(&ptw, perturbations_module_->tau_size_, tau_size_max, pba->K, pba->sgnK, tau0 - thermodynamics_module_->tau_cut_, &BIS),
         error_message_,
         error_message_);
@@ -294,15 +276,15 @@ int TransferModule::transfer_init() {
         printf("Compute transfer for wavenumber [%d/%d]\n", index_q, q_size_ - 1);
 
       /* Update interpolation structure: */
-      class_call(transfer_update_HIS(ptw, index_q, tau0),
+      class_call(transfer_update_HIS(&ptw, index_q, tau0),
                           error_message_,
                           error_message_);
 
-      class_call(transfer_compute_for_each_q(tp_of_tt, index_q, tau_size_max, tau_rec, sources, sources_spline, window_ptr, ptw),
+      class_call(transfer_compute_for_each_q(tp_of_tt.data(), index_q, tau_size_max, tau_rec, sources.data(), sources_spline.data(), window_ptr, &ptw),
                           error_message_,
                           error_message_);
       /* free workspace allocated inside parallel zone */
-      class_call(transfer_workspace_free(ptw),
+      class_call(transfer_workspace_free(&ptw),
                            error_message_,
                            error_message_);
       return _SUCCESS_;
@@ -312,19 +294,7 @@ int TransferModule::transfer_init() {
       future.get();
   }
   future_output.clear();
-  /** - finally, free arrays allocated outside parallel zone */
-
-  class_call(transfer_perturbation_sources_spline_free(sources_spline),
-             error_message_,
-             error_message_);
-
-  class_call(transfer_perturbation_sources_free(sources),
-             error_message_,
-             error_message_);
-
-  class_call(transfer_free_source_correspondence(tp_of_tt),
-             error_message_,
-             error_message_);
+  /** - finally, temporary source tables are cleaned up by RAII */
 
   class_call(hyperspherical_HIS_free(&BIS,error_message_),
              error_message_,
@@ -505,13 +475,13 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
 
 }
 
-int TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(double *** sources) {
+int TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(std::vector<std::vector<double*>>& sources,
+                                                                          std::vector<std::vector<std::vector<double>>>& owned_sources) {
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
 
-    class_alloc(sources[index_md],
-                perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]*sizeof(double*),
-                error_message_);
+    sources[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
+    owned_sources[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
 
     for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
 
@@ -527,9 +497,8 @@ int TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(double
              ((perturbations_module_->has_source_phi_plus_psi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_phi_plus_psi_)) ||
              ((perturbations_module_->has_source_psi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_psi_)))) {
 
-          class_alloc(sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
-                      perturbations_module_->k_size_[index_md]*perturbations_module_->tau_size_*sizeof(double),
-                      error_message_);
+          owned_sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].resize(perturbations_module_->k_size_[index_md]*perturbations_module_->tau_size_);
+          sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp] = owned_sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].data();
 
           for (int index_tau = 0; index_tau < perturbations_module_->tau_size_; index_tau++) {
             for (int index_k = 0; index_k < perturbations_module_->k_size_[index_md]; index_k++) {
@@ -562,27 +531,27 @@ int TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(double
 }
 
 
-int TransferModule::transfer_perturbation_source_spline(double *** sources, double *** sources_spline) {
+int TransferModule::transfer_perturbation_source_spline(const std::vector<std::vector<double*>>& sources,
+                                                        std::vector<std::vector<double*>>& sources_spline_ptrs,
+                                                        std::vector<std::vector<std::vector<double>>>& sources_spline_storage) {
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
 
-    class_alloc(sources_spline[index_md],
-                perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]*sizeof(double*),
-                error_message_);
+    sources_spline_ptrs[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
+    sources_spline_storage[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
 
     for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
 
       for (int index_tp = 0; index_tp < perturbations_module_->tp_size_[index_md]; index_tp++) {
 
-        class_alloc(sources_spline[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
-                    perturbations_module_->k_size_[index_md]*perturbations_module_->tau_size_*sizeof(double),
-                    error_message_);
+        sources_spline_storage[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].resize(perturbations_module_->k_size_[index_md]*perturbations_module_->tau_size_);
+        sources_spline_ptrs[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp] = sources_spline_storage[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].data();
 
         class_call(array_spline_table_columns2(const_cast<double*>(perturbations_module_->k_[index_md].data()),
                                                perturbations_module_->k_size_[index_md],
                                                sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
                                                perturbations_module_->tau_size_,
-                                               sources_spline[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
+                                               sources_spline_ptrs[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
                                                _SPLINE_EST_DERIV_,
                                                error_message_),
                    error_message_,
@@ -596,46 +565,6 @@ int TransferModule::transfer_perturbation_source_spline(double *** sources, doub
 
 }
 
-int TransferModule::transfer_perturbation_sources_free(double *** sources) {
-
-  for (int index_md = 0; index_md < md_size_; index_md++) {
-    for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
-      for (int index_tp = 0; index_tp < perturbations_module_->tp_size_[index_md]; index_tp++) {
-        if ((pnl->method != nl_none) && (_scalarsEXT_) &&
-            (((perturbations_module_->has_source_delta_m_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_delta_m_)) ||
-             ((perturbations_module_->has_source_theta_m_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_theta_m_)) ||
-             ((perturbations_module_->has_source_delta_cb_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_delta_cb_)) ||
-             ((perturbations_module_->has_source_theta_cb_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_theta_cb_)) ||
-             ((perturbations_module_->has_source_phi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_phi_)) ||
-             ((perturbations_module_->has_source_phi_prime_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_phi_prime_)) ||
-             ((perturbations_module_->has_source_phi_plus_psi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_phi_plus_psi_)) ||
-             ((perturbations_module_->has_source_psi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_psi_)))) {
-
-          free(sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp]);
-        }
-      }
-    }
-    free(sources[index_md]);
-  }
-  free(sources);
-
-  return _SUCCESS_;
-}
-
-int TransferModule::transfer_perturbation_sources_spline_free(double *** sources_spline) {
-
-  for (int index_md = 0; index_md < md_size_; index_md++) {
-    for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
-      for (int index_tp = 0; index_tp < perturbations_module_->tp_size_[index_md]; index_tp++) {
-        free(sources_spline[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp]);
-      }
-    }
-    free(sources_spline[index_md]);
-  }
-  free(sources_spline);
-
-  return _SUCCESS_;
-}
 
 /**
  * This routine defines the number and values of multipoles l for all modes.
@@ -1138,7 +1067,7 @@ int TransferModule::transfer_get_k_list(double K) {
  * @return the error status
  */
 
-int TransferModule::transfer_get_source_correspondence(int ** tp_of_tt) {
+int TransferModule::transfer_get_source_correspondence(std::vector<std::vector<int>>& tp_of_tt) {
   /** Summary: */
 
   /** - which source are we considering? Define correspondence
@@ -1146,7 +1075,7 @@ int TransferModule::transfer_get_source_correspondence(int ** tp_of_tt) {
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
 
-    class_alloc(tp_of_tt[index_md], tt_size_[index_md]*sizeof(int), error_message_);
+    tp_of_tt[index_md].resize(tt_size_[index_md]);
 
     for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
 
@@ -1237,16 +1166,6 @@ int TransferModule::transfer_get_source_correspondence(int ** tp_of_tt) {
 
 }
 
-int TransferModule::transfer_free_source_correspondence(int ** tp_of_tt) {
-
-  for (int index_md = 0; index_md < md_size_; index_md++) {
-    free(tp_of_tt[index_md]);
-  }
-  free(tp_of_tt);
-
-  return _SUCCESS_;
-
-}
 
 int TransferModule::transfer_source_tau_size_max(double tau_rec, double tau0, int * tau_size_max) {
 
@@ -1440,7 +1359,7 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_compute_for_each_q(int ** tp_of_tt, int index_q, int tau_size_max, double tau_rec, double *** pert_sources, double *** pert_sources_spline, double * window, struct transfer_workspace * ptw) {
+int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_q, int tau_size_max, double tau_rec, double** const* pert_sources, double** const* pert_sources_spline, double * window, struct transfer_workspace * ptw) {
 
   /** Summary: */
 
@@ -3652,33 +3571,46 @@ int TransferModule::transfer_global_selection_read() {
 
 };
 
-int TransferModule::transfer_workspace_init(struct transfer_workspace **ptw, int perturb_tau_size, int tau_size_max, double K, int sgnK, double tau0_minus_tau_cut, HyperInterpStruct * pBIS){
+int TransferModule::transfer_workspace_init(struct transfer_workspace *ptw, int perturb_tau_size, int tau_size_max, double K, int sgnK, double tau0_minus_tau_cut, HyperInterpStruct * pBIS){
 
-  class_calloc(*ptw, 1, sizeof(struct transfer_workspace), error_message_);
+  ptw->tau_size_max = tau_size_max;
+  ptw->l_size = l_size_max_;
+  ptw->HIS_allocated=_FALSE_;
+  ptw->pBIS = pBIS;
+  ptw->K = K;
+  ptw->sgnK = sgnK;
+  ptw->tau0_minus_tau_cut = tau0_minus_tau_cut;
+  ptw->neglect_late_source = _FALSE_;
 
-  (*ptw)->tau_size_max = tau_size_max;
-  (*ptw)->l_size = l_size_max_;
-  (*ptw)->HIS_allocated=_FALSE_;
-  (*ptw)->pBIS = pBIS;
-  (*ptw)->K = K;
-  (*ptw)->sgnK = sgnK;
-  (*ptw)->tau0_minus_tau_cut = tau0_minus_tau_cut;
-  (*ptw)->neglect_late_source = _FALSE_;
+  ptw->interpolated_sources_storage.resize(perturb_tau_size);
+  ptw->sources_storage.resize(tau_size_max);
+  ptw->tau0_minus_tau_storage.resize(tau_size_max);
+  ptw->w_trapz_storage.resize(tau_size_max);
+  ptw->chi_storage.resize(tau_size_max);
+  ptw->cscKgen_storage.resize(tau_size_max);
+  ptw->cotKgen_storage.resize(tau_size_max);
+  ptw->phi_storage.resize(tau_size_max);
+  ptw->dphi_storage.resize(tau_size_max);
+  ptw->d2phi_storage.resize(tau_size_max);
+  ptw->chireverse_storage.resize(tau_size_max);
+  ptw->rescale_function_storage.resize(tau_size_max);
+  ptw->radial_function_storage.resize(tau_size_max);
+  ptw->chi_full_reverse_storage.resize(tau_size_max);
 
-  class_alloc((*ptw)->interpolated_sources, perturb_tau_size*sizeof(double), error_message_);
-  class_alloc((*ptw)->sources, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->tau0_minus_tau, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->w_trapz, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->chi, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->cscKgen ,tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->cotKgen, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->Phi, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->dPhi, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->d2Phi, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->chireverse, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->rescale_function, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->radial_function, tau_size_max*sizeof(double), error_message_);
-  class_alloc((*ptw)->chi_full_reverse, tau_size_max*sizeof(double), error_message_);
+  ptw->interpolated_sources = ptw->interpolated_sources_storage.data();
+  ptw->sources = ptw->sources_storage.data();
+  ptw->tau0_minus_tau = ptw->tau0_minus_tau_storage.data();
+  ptw->w_trapz = ptw->w_trapz_storage.data();
+  ptw->chi = ptw->chi_storage.data();
+  ptw->cscKgen = ptw->cscKgen_storage.data();
+  ptw->cotKgen = ptw->cotKgen_storage.data();
+  ptw->Phi = ptw->phi_storage.data();
+  ptw->dPhi = ptw->dphi_storage.data();
+  ptw->d2Phi = ptw->d2phi_storage.data();
+  ptw->chireverse = ptw->chireverse_storage.data();
+  ptw->rescale_function = ptw->rescale_function_storage.data();
+  ptw->radial_function = ptw->radial_function_storage.data();
+  ptw->chi_full_reverse = ptw->chi_full_reverse_storage.data();
 
   return _SUCCESS_;
 }
@@ -3691,22 +3623,6 @@ int TransferModule::transfer_workspace_free(struct transfer_workspace *ptw) {
                error_message_,
                error_message_);
   }
-  free(ptw->interpolated_sources);
-  free(ptw->sources);
-  free(ptw->tau0_minus_tau);
-  free(ptw->w_trapz);
-  free(ptw->chi);
-  free(ptw->cscKgen);
-  free(ptw->cotKgen);
-  free(ptw->Phi);
-  free(ptw->dPhi);
-  free(ptw->d2Phi);
-  free(ptw->chireverse);
-  free(ptw->rescale_function);
-  free(ptw->radial_function);
-  free(ptw->chi_full_reverse);
-
-  free(ptw);
   return _SUCCESS_;
 }
 

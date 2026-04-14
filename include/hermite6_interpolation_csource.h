@@ -34,17 +34,17 @@ int phisign = 1, dphisign = 1;
     do it.
 */
 
-xvec = pHIS->x;
-sinK = pHIS->sinK;
-cotK = pHIS->cotK;
+xvec = pHIS->x.data();
+sinK = pHIS->sinK.data();
+cotK = pHIS->cotK.data();
 beta = pHIS->beta;
 beta2 = beta*beta;
 deltax = pHIS->delta_x;
 deltax2 = deltax*deltax;
 K = pHIS->K;
 nx = pHIS->x_size;
-Phi_l = pHIS->phi+lnum*nx;
-dPhi_l = pHIS->dphi+lnum*nx;
+Phi_l = pHIS->phi.data()+lnum*nx;
+dPhi_l = pHIS->dphi.data()+lnum*nx;
 l = pHIS->l[lnum];
 lxlp1 = l*(l+1.0);
 xmin = xvec[0];

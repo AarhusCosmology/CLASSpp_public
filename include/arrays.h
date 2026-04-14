@@ -6,6 +6,7 @@
 #define __ARRAYS__
 
 #include "common.h"
+#include <vector>
 
 #ifdef _WIN32
 #define _restrict
@@ -13,13 +14,6 @@
 
 #define _SPLINE_NATURAL_ 0 /**< natural spline: ddy0=ddyn=0 */
 #define _SPLINE_EST_DERIV_ 1 /**< spline with estimation of first derivative on both edges */
-
-/**
- * Boilerplate for C++
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
 
   int array_derive(
 		   double * array,
@@ -444,9 +438,5 @@ int array_integrate_all_trapzd_or_spline(
                                     double * w_trapz,
                                     double * I,
                                     ErrorMsg errmsg);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

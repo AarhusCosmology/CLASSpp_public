@@ -9,6 +9,8 @@
 /* Thomas Tram                            */
 /******************************************/
 #include "common.h"
+#include <vector>
+#include <memory>
 
 enum quadrature_method {qm_auto, qm_Laguerre, qm_trapz_indefinite, qm_trapz};
 
@@ -18,19 +20,13 @@ typedef struct adaptive_integration_tree_node{
   /* binary tree node: */
   double I;		/* Estimate of integral */
   double err;		/* Estimated error */
-  double *x;		/* Pointer to the abscissas of node */
-  double *w;		/* Pointer to the corresponding weights */
+  std::vector<double> x;		/* Pointer to the abscissas of node */
+  std::vector<double> w;		/* Pointer to the corresponding weights */
   int leaf_childs;/* Number of leafs under current node. 1 means that the node is a leaf. */
   /* Pointer to children: */
-  struct  adaptive_integration_tree_node *left, *right;	/* Pointer to left child. */
+  std::unique_ptr<struct adaptive_integration_tree_node> left, right;	/* Pointer to left child. */
 } qss_node;
 
-    /**
-     * Boilerplate for C++
-     */
-#ifdef __cplusplus
-    extern "C" {
-#endif
       int get_qsampling(double *x,
 			double *w,
 			int *N,
@@ -45,11 +41,10 @@ typedef struct adaptive_integration_tree_node{
       int sort_x_and_w(double *x, double *w, double *workx, double *workw, int startidx, int endidx);
       int get_leaf_x_and_w(qss_node *node, int *ind, double *x, double *w,int isindefinite);
       int reduce_tree(qss_node *node, int level);
-      int burn_tree(qss_node *node);
       int leaf_count(qss_node *node);
       double get_integral(qss_node *node, int level);
       int gk_adapt(
-		   qss_node **node,
+		   std::unique_ptr<qss_node> &node,
 		   int (*test)(void * params_for_function, double q, double *psi),
 		   int (*function)(void * params_for_function, double q, double *f0),
 		   void * params_for_function,
@@ -90,9 +85,9 @@ typedef struct adaptive_integration_tree_node{
 				  double yl,
 				  double yr,
 				  int *n,
-				  double ** x,
-				  double ** y,
-				  double ** w,
+				  std::vector<double>& x,
+				  std::vector<double>& y,
+				  std::vector<double>& w,
 				  ErrorMsg error_message);
 
       int cubature_order_eleven(
@@ -104,11 +99,6 @@ typedef struct adaptive_integration_tree_node{
 				double *y,
 				double *w,
 				ErrorMsg error_message);
-
-
-#ifdef __cplusplus
-    }
-#endif
 
 
 #endif

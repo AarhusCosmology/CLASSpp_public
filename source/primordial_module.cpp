@@ -550,10 +550,6 @@ int PrimordialModule::primordial_free() {
 
   if (lnk_size_ > 0) {
 
-    if (ppm->primordial_spec_type == external_Pk) {
-      free(ppm->command);
-    }
-
   }
 
   return _SUCCESS_;
@@ -2952,7 +2948,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
     pkt.reserve(n_data_guess);
   /* Prepare the command */
   /* If the command is just a "cat", no arguments need to be passed */
-  if(strncmp("cat ", ppm->command, 4) == 0) {
+  if(ppm->command.rfind("cat ", 0) == 0) {
     snprintf(arguments, _ARGUMENT_LENGTH_MAX_, " ");
   }
   /* otherwise pass the list of arguments */
@@ -2962,7 +2958,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
             ppm->custom6, ppm->custom7, ppm->custom8, ppm->custom9, ppm->custom10);
   }
   /* write the actual command in a string */
-  snprintf(command_with_arguments, 2*_ARGUMENT_LENGTH_MAX_, "%s %s", ppm->command, arguments);
+  snprintf(command_with_arguments, 2*_ARGUMENT_LENGTH_MAX_, "%s %s", ppm->command.c_str(), arguments);
   if (ppm->primordial_verbose > 0)
     printf(" -> running: %s\n",command_with_arguments);
 

@@ -27,7 +27,6 @@ int hyperspherical_HIS_create(int K,
       then relative to ppHIS.
   */
   double deltax, beta2, lambda, x, xfwd;
-  double *sqrtK, *one_over_sqrtK,*PhiL;
   int j, k, l, nx, lmax, l_recurrence_max;
   int abort;
   int current_chunk, index_x;
@@ -48,13 +47,13 @@ int hyperspherical_HIS_create(int K,
   pHIS->K = K;
   //Set pointervalues in pHIS:
 
-  class_alloc(pHIS->l, sizeof(int)*nl,error_message);
-  class_alloc(pHIS->chi_at_phimin,sizeof(double)*nl,error_message);
-  class_alloc(pHIS->x,sizeof(double)*nx,error_message);
-  class_alloc(pHIS->sinK,sizeof(double)*nx,error_message);
-  class_alloc(pHIS->cotK,sizeof(double)*nx,error_message);
-  class_alloc(pHIS->phi,sizeof(double)*nx*nl,error_message);
-  class_alloc(pHIS->dphi,sizeof(double)*nx*nl,error_message);
+  pHIS->l.resize(nl);
+  pHIS->chi_at_phimin.resize(nl);
+  pHIS->x.resize(nx);
+  pHIS->sinK.resize(nx);
+  pHIS->cotK.resize(nx);
+  pHIS->phi.resize(nx*nl);
+  pHIS->dphi.resize(nx*nl);
 
   //Order needed for trig interpolation: (We are using Taylor's remainder theorem)
   if (0.5*deltax*deltax < _TRIG_PRECISSION_)
@@ -69,9 +68,8 @@ int hyperspherical_HIS_create(int K,
     pHIS->l[j] = lvec[j];
   }
   //Allocate sqrtK, and PhiL:
-  class_alloc(sqrtK,(lmax+3)*sizeof(double),error_message);
-  class_alloc(one_over_sqrtK,(lmax+3)*sizeof(double),error_message);
-  //class_alloc(PhiL,(lmax+2)*sizeof(double),error_message);
+  std::vector<double> sqrtK(lmax+3);
+  std::vector<double> one_over_sqrtK(lmax+3);
 
   //Find l_WKB_min, the highest l in lvec where l<l_WKB:
   l_recurrence_max = -10;
@@ -127,8 +125,6 @@ int hyperspherical_HIS_create(int K,
     }
     break;
   default:
-    free(sqrtK);
-    free(one_over_sqrtK);
     return _FAILURE_;
   }
 
@@ -139,10 +135,10 @@ int hyperspherical_HIS_create(int K,
 
 #pragma omp parallel                                                    \
   shared(nx,pHIS,xfwd,K,l_recurrence_max,beta,sqrtK,one_over_sqrtK,lvec,nl,xfwdidx,abort,error_message) \
-  private(j,PhiL,k,l,current_chunk,index_x)                           \
+  private(j,k,l,current_chunk,index_x)                           \
   firstprivate(lmax)
   {
-    class_alloc(PhiL,(lmax+2)*sizeof(double)*_HYPER_CHUNK_,error_message);
+    std::vector<double> PhiL((lmax+2)*_HYPER_CHUNK_);
 
     int hit_the_ceiling = ((K == 1) && ((int)(beta+0.2) == (lmax+1)));
     if (hit_the_ceiling) {
@@ -167,13 +163,13 @@ int hyperspherical_HIS_create(int K,
       hyperspherical_backwards_recurrence_chunk(K,
                                                 MIN(l_recurrence_max,lmax)+1,
                                                 beta,
-                                                pHIS->x+j,
-                                                pHIS->sinK+j,
-                                                pHIS->cotK+j,
+                                                pHIS->x.data()+j,
+                                                pHIS->sinK.data()+j,
+                                                pHIS->cotK.data()+j,
                                                 current_chunk,
-                                                sqrtK,
-                                                one_over_sqrtK,
-                                                PhiL);
+                                                sqrtK.data(),
+                                                one_over_sqrtK.data(),
+                                                PhiL.data());
       //We have now populated PhiL at x, assign Phi and dPhi for all l in lvec:
       for (k=0; k<=index_recurrence_max; k++){
         l = lvec[k];
@@ -195,13 +191,13 @@ int hyperspherical_HIS_create(int K,
       hyperspherical_forwards_recurrence_chunk(K,
                                                MIN(l_recurrence_max,lmax)+1,
                                                beta,
-                                               pHIS->x+j,
-                                               pHIS->sinK+j,
-                                               pHIS->cotK+j,
+                                               pHIS->x.data()+j,
+                                               pHIS->sinK.data()+j,
+                                               pHIS->cotK.data()+j,
                                                current_chunk,
-                                               sqrtK,
-                                               one_over_sqrtK,
-                                               PhiL);
+                                               sqrtK.data(),
+                                               one_over_sqrtK.data(),
+                                               PhiL.data());
 
       //We have now populated PhiL at x, assign Phi and dPhi for all l in lvec:
       for (k=0; k<=index_recurrence_max; k++){
@@ -215,15 +211,11 @@ int hyperspherical_HIS_create(int K,
         }
       }
     }
-    free(PhiL);
   }
   if (abort == _TRUE_) return _FAILURE_;
 
-  free(sqrtK);
-  free(one_over_sqrtK);
-
   for (k=0; k<nl; k++){
-    hyperspherical_get_xmin_from_approx(K,lvec[k],beta,0.,phiminabs,pHIS->chi_at_phimin+k,NULL);
+    hyperspherical_get_xmin_from_approx(K,lvec[k],beta,0.,phiminabs,pHIS->chi_at_phimin.data()+k,NULL);
   }
 
   //hyperspherical_get_xmin(pHIS,1.e-4,phiminabs,pHIS->chi_at_phimin);
@@ -231,39 +223,10 @@ int hyperspherical_HIS_create(int K,
   return _SUCCESS_;
 }
 
-size_t hyperspherical_HIS_size(int nl, int nx){
-  return(sizeof(int)*nl+sizeof(double)*nl+3*sizeof(double)*nx+2*sizeof(double)*nx*nl);
-}
-
-int hyperspherical_update_pointers(HyperInterpStruct *pHIS_local,
-                                   void * HIS_storage_shared){
-  /** Assign pointers in pHIS: (Remember that pointer incrementation moves
-      the number of bytes taken up by 1 variable of the type that the
-      pointer points to. */
-  int nx=pHIS_local->x_size;
-  int nl=pHIS_local->l_size;
-  pHIS_local->l = (int *) (HIS_storage_shared);
-  pHIS_local->chi_at_phimin = (double *) (pHIS_local->l+nl);
-  pHIS_local->x = pHIS_local->chi_at_phimin+nl;
-  pHIS_local->sinK = pHIS_local->x + nx;
-  pHIS_local->cotK = pHIS_local->sinK + nx;
-  pHIS_local->phi = pHIS_local->cotK +nx;
-  pHIS_local->dphi = pHIS_local->phi+nx*nl;
-
-  return _SUCCESS_;
-}
-
 int hyperspherical_HIS_free(HyperInterpStruct *pHIS,
                             ErrorMsg error_message){
-  /** Free the Hyperspherical Interpolation Structure. */
-  free(pHIS->l);
-  free(pHIS->chi_at_phimin);
-  free(pHIS->x);
-  free(pHIS->sinK);
-  free(pHIS->cotK);
-  free(pHIS->phi);
-  free(pHIS->dphi);
-
+  /** Free the Hyperspherical Interpolation Structure.
+      Now handled by RAII. */
   return _SUCCESS_;
 }
 
@@ -322,17 +285,17 @@ int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct *pHIS,
   else
     do_first_or_second_derivative = _FALSE_;
 
-  xvec = pHIS->x;
-  sinK = pHIS->sinK;
-  cotK = pHIS->cotK;
+  xvec = pHIS->x.data();
+  sinK = pHIS->sinK.data();
+  cotK = pHIS->cotK.data();
   beta = pHIS->beta;
   beta2 = beta*beta;
   deltax = pHIS->delta_x;
   deltax2 = deltax*deltax;
   K = pHIS->K;
   nx = pHIS->x_size;
-  Phi_l = pHIS->phi+lnum*nx;
-  dPhi_l = pHIS->dphi+lnum*nx;
+  Phi_l = pHIS->phi.data()+lnum*nx;
+  dPhi_l = pHIS->dphi.data()+lnum*nx;
   l = pHIS->l[lnum];
   lxlp1 = l*(l+1.0);
   xmin = xvec[0];
@@ -1051,8 +1014,8 @@ int hyperspherical_get_xmin(HyperInterpStruct *pHIS,
   int nx = pHIS->x_size;
   double x[REFINE];
   double Phi[REFINE];
-  double *phivec = pHIS->phi;
-  double *xvec = pHIS->x;
+  const double *phivec = pHIS->phi.data();
+  const double *xvec = pHIS->x.data();
   double xleft, xright;
 
   for (index_l=0; index_l<nl; index_l++){
