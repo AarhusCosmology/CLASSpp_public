@@ -1,0 +1,104 @@
+# =========================
+# Base style (mostly overridden below)
+# =========================
+BasedOnStyle: Google
+
+# =========================
+# Indentation
+# =========================
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+
+# =========================
+# Braces
+# =========================
+BreakBeforeBraces: Custom
+
+BraceWrapping:
+  AfterControlStatement: false  # if (...) { not if (...) newline {
+  AfterFunction: false
+  AfterClass: false
+  AfterStruct: false
+  AfterEnum: false
+  BeforeElse: true
+  BeforeCatch: true
+
+# =========================
+# Line length / wrapping
+# =========================
+ColumnLimit: 100  # soft limit; exceeded if needed for readability
+
+PenaltyBreakBeforeFirstCallParameter: 1000
+PenaltyReturnTypeOnItsOwnLine: 1000
+PenaltyBreakAssignment: 50
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1000000
+
+# Prevent aggressive bin-packing of arguments
+BinPackParameters: false
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
+
+# =========================
+# Short statements
+# =========================
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: false
+
+# =========================
+# Spacing rules
+# =========================
+SpaceBeforeParens: ControlStatements
+SpaceBeforeAssignmentOperators: true
+
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpacesInAngles: false
+SpaceAfterCStyleCast: true
+
+# =========================
+# Pointers
+# =========================
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+# =========================
+# Includes
+# =========================
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<.*>$'
+    Priority: 1
+  - Regex: '^".*"$'
+    Priority: 2
+
+# =========================
+# Constructors
+# =========================
+BreakConstructorInitializers: BeforeColon
+
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+AllowAllConstructorInitializersOnNextLine: false
+
+# =========================
+# Alignment
+# =========================
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+  AlignCompound: true
+
+# =========================
+# Structure
+# =========================
+NamespaceIndentation: None
+EmptyLineBeforeAccessModifier: LogicalBlock
+
+# =========================
+# Comments
+# =========================
+ReflowComments: false
