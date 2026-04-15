@@ -1,0 +1,37 @@
+name: clang-format
+
+on: [pull_request]
+
+jobs:
+  format:
+    runs-on: [self-hosted, linux, heavy]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for diff against base branch
+
+      - name: Get changed C/C++ files
+        id: changed-files
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD \
+            | grep -E '\.(cpp|c|h|hpp)$' \
+            | grep -v '^hyrec/' \
+            | tr '\n' ' ' > files.txt
+
+          echo "FILES=$(cat files.txt)" >> $GITHUB_OUTPUT
+
+      - name: Run clang-format check
+        if: steps.changed-files.outputs.FILES != ''
+        run: |
+          echo "Checking files:"
+          echo "${{ steps.changed-files.outputs.FILES }}"
+
+          clang-format --version
+
+          # Fail if any file is not formatted
+          for file in ${{ steps.changed-files.outputs.FILES }}; do
+            echo "Checking $file"
+            clang-format --dry-run --Werror "$file"
+          done
