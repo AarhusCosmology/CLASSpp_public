@@ -28,10 +28,10 @@ jobs:
           echo "Checking files:"
           echo "${{ steps.changed-files.outputs.FILES }}"
 
-          clang-format --version
+          clang-format-22 --version
 
           # Fail if any file is not formatted
           for file in ${{ steps.changed-files.outputs.FILES }}; do
             echo "Checking $file"
-            clang-format --dry-run --Werror "$file"
+            clang-format-22 --dry-run --Werror "$file"
           done
