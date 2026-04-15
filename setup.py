@@ -1,7 +1,9 @@
 import os
+import runpy
 from concurrent.futures import ThreadPoolExecutor
 import distutils.ccompiler
 
+from pathlib import Path
 
 def _parallel_compile(self, sources, output_dir=None, macros=None,
                       include_dirs=None, debug=0, extra_preargs=None,
@@ -43,9 +45,13 @@ from setuptools import setup, Extension
 from Cython.Build import cythonize
 import numpy
 
+
+def run_generate_wrapper(project_root):
+    runpy.run_path(Path(project_root) / 'generate_wrapper.py', run_name='__main__')
+
+
 def my_cythonize(*args, **kwargs):
-    with open('generate_wrapper.py', 'r', encoding='utf-8') as f:
-        exec(f.read())
+    run_generate_wrapper(Path(__file__).resolve().parent)
     return cythonize(*args, **kwargs)
 
 
