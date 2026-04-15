@@ -14,17 +14,9 @@
 extern "C" {
 #endif
 
-  int cosine_integral(
-				 double x,
-				 double *Ci,
-         ErrorMsg error_message
-				 );
+int cosine_integral(double x, double* Ci, ErrorMsg error_message);
 
-  int sine_integral(
-				 double x,
-				 double *Si,
-         ErrorMsg error_message
-				 );
+int sine_integral(double x, double* Si, ErrorMsg error_message);
 
 #ifdef __cplusplus
 }

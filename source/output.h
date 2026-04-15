@@ -20,10 +20,9 @@
  */
 
 struct output {
-
   //@{
 
-  char root[_FILENAMESIZE_-32] = "output/"; /**< root for all file names */
+  char root[_FILENAMESIZE_ - 32] = "output/"; /**< root for all file names */
 
   //@}
 
@@ -32,7 +31,8 @@ struct output {
   //@{
 
   int z_pk_num = 1; /**< number of redshift at which P(k,z) and T_i(k,z) should be written */
-  double z_pk[_Z_PK_NUM_MAX_] = {0.}; /**< value(s) of redshift at which P(k,z) and T_i(k,z) should be written */
+  double z_pk[_Z_PK_NUM_MAX_] = {
+      0.}; /**< value(s) of redshift at which P(k,z) and T_i(k,z) should be written */
 
   //@}
 
@@ -42,12 +42,15 @@ struct output {
 
   short write_header = _TRUE_; /**< flag stating whether we should write a header in output files */
 
-  enum file_format output_format = class_format; /**< which format for output files (definitions, order of columns, etc.) */
+  enum file_format output_format =
+      class_format; /**< which format for output files (definitions, order of columns, etc.) */
 
-  short write_background = _FALSE_; /**< flag for outputing background evolution in file */
+  short write_background     = _FALSE_; /**< flag for outputing background evolution in file */
   short write_thermodynamics = _FALSE_; /**< flag for outputing thermodynamical evolution in file */
-  short write_perturbations = _FALSE_; /**< flag for outputing perturbations of selected wavenumber(s) in file(s) */
-  short write_primordial = _FALSE_; /**< flag for outputing scalar/tensor primordial spectra in files */
+  short write_perturbations =
+      _FALSE_; /**< flag for outputing perturbations of selected wavenumber(s) in file(s) */
+  short write_primordial =
+      _FALSE_; /**< flag for outputing scalar/tensor primordial spectra in files */
 
   //@}
 
@@ -55,7 +58,8 @@ struct output {
 
   //@{
 
-  short output_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short output_verbose =
+      0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 };

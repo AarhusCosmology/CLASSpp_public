@@ -20,7 +20,7 @@
 namespace Tools {
 
 class NotificationQueue {
-public:
+ public:
   bool TryPop(std::function<void()>& x) {
     std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
     if (!lock || queue_.empty()) {
@@ -44,7 +44,7 @@ public:
     return true;
   }
 
-  template<typename F>
+  template <typename F>
   bool TryPush(F&& f) {
     {
       std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
@@ -57,7 +57,7 @@ public:
     return true;
   }
 
-  template<typename F>
+  template <typename F>
   void Push(F&& f) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -73,7 +73,8 @@ public:
     }
     ready_.notify_all();
   }
-private:
+
+ private:
   std::deque<std::function<void()>> queue_;
   bool done_ = false;
   std::mutex mutex_;
@@ -81,19 +82,19 @@ private:
 };
 
 class TaskSystem {
-public:
+ public:
   TaskSystem(unsigned int count = std::thread::hardware_concurrency())
-  : count_(count)
-  , index_(0)
-  , queues_{count_} {
+      : count_(count), index_(0), queues_{count_} {
     for (unsigned int n = 0; n < count_; ++n) {
-      threads_.emplace_back([&, n]{ Run(n); });
+      threads_.emplace_back([&, n] { Run(n); });
     }
   }
 
   ~TaskSystem() {
-    for (auto& e : queues_) e.Done();
-    for (auto& e : threads_) e.join();
+    for (auto& e : queues_)
+      e.Done();
+    for (auto& e : threads_)
+      e.join();
   }
 
   template <typename F>
@@ -107,16 +108,17 @@ public:
     queues_[i % count_].Push(std::forward<F>(f));
   }
 
-  template<typename F, typename... Args>
+  template <typename F, typename... Args>
   auto AsyncTask(F&& f, Args&&... args) {
     using return_type = std::invoke_result_t<F, Args...>;
-    auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+    auto task         = std::make_shared<std::packaged_task<return_type()>>(
+        std::bind(std::forward<F>(f), std::forward<Args>(args)...));
     std::future<return_type> res = task->get_future();
 
-    auto work = [task](){ (*task)(); };
+    auto work      = [task]() { (*task)(); };
     unsigned int i = index_++;
-    for(unsigned int n = 0; n < count_; ++n) {
-      if(queues_[(i + n) % count_].TryPush(work)){
+    for (unsigned int n = 0; n < count_; ++n) {
+      if (queues_[(i + n) % count_].TryPush(work)) {
         return res;
       }
     }
@@ -125,8 +127,7 @@ public:
     return res;
   }
 
-
-private:
+ private:
   void Run(unsigned int i) {
     while (true) {
       std::function<void()> f;
@@ -148,5 +149,5 @@ private:
   std::atomic<unsigned int> index_;
 };
 
-}
-#endif //THREAD_POOL_H
+}  // namespace Tools
+#endif  //THREAD_POOL_H

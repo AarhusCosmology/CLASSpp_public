@@ -15,7 +15,6 @@
  */
 
 struct lensing {
-
   /** @name - input parameters initialized by user in input module
    *  (all other quantities are computed in this module, given these
    *  parameters and the content of the 'precision', 'background' and
@@ -31,7 +30,8 @@ struct lensing {
 
   //@{
 
-  short lensing_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short lensing_verbose =
+      0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 };
@@ -44,7 +44,6 @@ struct lensing {
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 #ifdef __cplusplus
 }

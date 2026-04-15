@@ -3,51 +3,55 @@
 #ifndef __TRANSFER__
 #define __TRANSFER__
 
-#include "nonlinear.h"
-#include "hyperspherical.h"
 #include <vector>
 
+#include "hyperspherical.h"
+#include "nonlinear.h"
+
 /* macro: test if index_tt is in the range between index and index+num, while the flag is true */
-#define _index_tt_in_range_(index,num,flag) (flag == _TRUE_) && (index_tt >= index) && (index_tt < index+num)
+#define _index_tt_in_range_(index, num, flag) \
+  (flag == _TRUE_) && (index_tt >= index) && (index_tt < index + num)
 /* macro: test if index_tt corresponds to an integrated nCl/sCl contribution */
-#define _integrated_ncl_ (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) || \
-          (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens)) || \
-          (_index_tt_in_range_(index_tt_nc_g4_,   ppt->selection_num, ppt->has_nc_gr)) || \
-          (_index_tt_in_range_(index_tt_nc_g5_,   ppt->selection_num, ppt->has_nc_gr))
+#define _integrated_ncl_                                                                         \
+  (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) || \
+      (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens)) ||          \
+      (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr)) ||              \
+      (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
 /* macro: test if index_tt corresponds to an non-integrated nCl/sCl contribution */
-#define _nonintegrated_ncl_ (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density)) || \
-          (_index_tt_in_range_(index_tt_rsd_,     ppt->selection_num, ppt->has_nc_rsd)) || \
-          (_index_tt_in_range_(index_tt_d0_,      ppt->selection_num, ppt->has_nc_rsd)) || \
-          (_index_tt_in_range_(index_tt_d1_,      ppt->selection_num, ppt->has_nc_rsd)) || \
-          (_index_tt_in_range_(index_tt_nc_g1_,   ppt->selection_num, ppt->has_nc_gr))  || \
-          (_index_tt_in_range_(index_tt_nc_g2_,   ppt->selection_num, ppt->has_nc_gr))  || \
-          (_index_tt_in_range_(index_tt_nc_g3_,   ppt->selection_num, ppt->has_nc_gr))
+#define _nonintegrated_ncl_                                                            \
+  (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density)) || \
+      (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd)) ||     \
+      (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd)) ||      \
+      (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd)) ||      \
+      (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr)) ||    \
+      (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr)) ||    \
+      (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
 /* macro: bin number associated to particular redshift bin and selection function for non-integrated contributions*/
-#define _get_bin_nonintegrated_ncl_(index_tt)                                                      \
-      if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density))     \
-        bin = index_tt - index_tt_density_;                                                    \
-      if (_index_tt_in_range_(index_tt_rsd_,     ppt->selection_num, ppt->has_nc_rsd))         \
-        bin = index_tt - index_tt_rsd_;                                                        \
-      if (_index_tt_in_range_(index_tt_d0_,      ppt->selection_num, ppt->has_nc_rsd))         \
-        bin = index_tt - index_tt_d0_;                                                         \
-      if (_index_tt_in_range_(index_tt_d1_,      ppt->selection_num, ppt->has_nc_rsd))         \
-        bin = index_tt - index_tt_d1_;                                                         \
-      if (_index_tt_in_range_(index_tt_nc_g1_,   ppt->selection_num, ppt->has_nc_gr))          \
-        bin = index_tt - index_tt_nc_g1_;                                                      \
-      if (_index_tt_in_range_(index_tt_nc_g2_,   ppt->selection_num, ppt->has_nc_gr))          \
-        bin = index_tt - index_tt_nc_g2_;                                                      \
-      if (_index_tt_in_range_(index_tt_nc_g3_,   ppt->selection_num, ppt->has_nc_gr))          \
-        bin = index_tt - index_tt_nc_g3_;
+#define _get_bin_nonintegrated_ncl_(index_tt)                                          \
+  if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density)) \
+    bin = index_tt - index_tt_density_;                                                \
+  if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))         \
+    bin = index_tt - index_tt_rsd_;                                                    \
+  if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))          \
+    bin = index_tt - index_tt_d0_;                                                     \
+  if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))          \
+    bin = index_tt - index_tt_d1_;                                                     \
+  if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))        \
+    bin = index_tt - index_tt_nc_g1_;                                                  \
+  if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))        \
+    bin = index_tt - index_tt_nc_g2_;                                                  \
+  if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))        \
+    bin = index_tt - index_tt_nc_g3_;
 /* macro: bin number associated to particular redshift bin and selection function for integrated contributions*/
-#define _get_bin_integrated_ncl_(index_tt)                                                               \
-      if (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) \
-        bin = index_tt - index_tt_lensing_;                                                          \
-      if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))              \
-        bin = index_tt - index_tt_nc_lens_;                                                          \
-      if (_index_tt_in_range_(index_tt_nc_g4_,   ppt->selection_num, ppt->has_nc_gr))                \
-        bin = index_tt - index_tt_nc_g4_;                                                            \
-      if (_index_tt_in_range_(index_tt_nc_g5_,   ppt->selection_num, ppt->has_nc_gr))                \
-        bin = index_tt - index_tt_nc_g5_;
+#define _get_bin_integrated_ncl_(index_tt)                                                       \
+  if (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) \
+    bin = index_tt - index_tt_lensing_;                                                          \
+  if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))              \
+    bin = index_tt - index_tt_nc_lens_;                                                          \
+  if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr))                  \
+    bin = index_tt - index_tt_nc_g4_;                                                            \
+  if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))                  \
+    bin = index_tt - index_tt_nc_g5_;
 /**
  * Structure containing everything about transfer functions in
  * harmonic space \f$ \Delta_l^{X} (q) \f$ that other modules need to
@@ -72,44 +76,47 @@
  */
 
 struct transfers {
-
   /** @name - input parameters initialized by user in input module
    *  (all other quantities are computed in this module, given these
    *  parameters and the content of previous structures) */
 
   //@{
 
-  double lcmb_rescale = 1.; /**< normally set to one, can be used
+  double lcmb_rescale = 1.;  /**< normally set to one, can be used
                           exceptionally to rescale by hand the CMB
                           lensing potential */
-  double lcmb_tilt = 0.;    /**< normally set to zero, can be used
+  double lcmb_tilt    = 0.;  /**< normally set to zero, can be used
                           exceptionally to tilt by hand the CMB
                           lensing potential */
-  double lcmb_pivot = 0.1;   /**< if lcmb_tilt non-zero, corresponding pivot
+  double lcmb_pivot   = 0.1; /**< if lcmb_tilt non-zero, corresponding pivot
                           scale */
 
-  double selection_bias[_SELECTION_NUM_MAX_];               /**< light-to-mass bias in the transfer function of density number count */
-  double selection_magnification_bias[_SELECTION_NUM_MAX_]; /**< magnification bias in the transfer function of density number count */
+  double selection_bias
+      [_SELECTION_NUM_MAX_]; /**< light-to-mass bias in the transfer function of density number count */
+  double selection_magnification_bias
+      [_SELECTION_NUM_MAX_]; /**< magnification bias in the transfer function of density number count */
 
-  short has_nz_file = _FALSE_;     /**< Has dN/dz (selection function) input file? */
-  short has_nz_analytic = _FALSE_; /**< Use analytic form for dN/dz (selection function) distribution? */
+  short has_nz_file = _FALSE_; /**< Has dN/dz (selection function) input file? */
+  short has_nz_analytic =
+      _FALSE_;           /**< Use analytic form for dN/dz (selection function) distribution? */
   FileName nz_file_name; /**< dN/dz (selection function) input file name */
 
-  short has_nz_evo_file = _FALSE_;      /**< Has dN/dz (evolution function) input file? */
-  short has_nz_evo_analytic = _FALSE_;  /**< Use analytic form for dN/dz (evolution function) distribution? */
-  FileName nz_evo_file_name;  /**< dN/dz (evolution function) input file name */
+  short has_nz_evo_file = _FALSE_; /**< Has dN/dz (evolution function) input file? */
+  short has_nz_evo_analytic =
+      _FALSE_;               /**< Use analytic form for dN/dz (evolution function) distribution? */
+  FileName nz_evo_file_name; /**< dN/dz (evolution function) input file name */
 
   //@}
-
-
 
   /** @name - technical parameters */
 
   //@{
 
-  short initialise_HIS_cache = _FALSE_; /**< only true if we are using CLASS for setting up a cache of HIS structures */
+  short initialise_HIS_cache =
+      _FALSE_; /**< only true if we are using CLASS for setting up a cache of HIS structures */
 
-  short transfer_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short transfer_verbose =
+      0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 };
@@ -122,18 +129,19 @@ struct transfers {
 */
 
 struct transfer_workspace {
-
   /** @name - quantities related to Bessel functions */
 
   //@{
 
-  HyperInterpStruct HIS; /**< structure containing all hyperspherical bessel functions (flat case) or all hyperspherical bessel functions for a given value of beta=q/sqrt(|K|) (non-flat case). HIS = Hyperspherical Interpolation Structure. */
+  HyperInterpStruct
+      HIS; /**< structure containing all hyperspherical bessel functions (flat case) or all hyperspherical bessel functions for a given value of beta=q/sqrt(|K|) (non-flat case). HIS = Hyperspherical Interpolation Structure. */
 
   int HIS_allocated; /**< flag specifying whether the previous structure has been allocated */
 
-  HyperInterpStruct * pBIS;  /**< pointer to structure containing all the spherical bessel functions of the flat case (used even in the non-flat case, for approximation schemes). pBIS = pointer to Bessel Interpolation Structure. */
+  HyperInterpStruct*
+      pBIS; /**< pointer to structure containing all the spherical bessel functions of the flat case (used even in the non-flat case, for approximation schemes). pBIS = pointer to Bessel Interpolation Structure. */
 
-  int l_size;        /**< number of l values */
+  int l_size; /**< number of l values */
 
   //@}
 
@@ -141,35 +149,36 @@ struct transfer_workspace {
 
   //@{
 
-  int tau_size;                  /**< number of discrete time values for a given type */
-  int tau_size_max;              /**< maximum number of discrete time values for all types */
-  double * interpolated_sources; /**< interpolated_sources[index_tau]:
+  int tau_size;                 /**< number of discrete time values for a given type */
+  int tau_size_max;             /**< maximum number of discrete time values for all types */
+  double* interpolated_sources; /**< interpolated_sources[index_tau]:
                                     sources interpolated from the
                                     perturbation module at the right
                                     value of k */
-  double * sources;              /**< sources[index_tau]: sources
+  double* sources;              /**< sources[index_tau]: sources
                                     used in transfer module, possibly
                                     differing from those in the
                                     perturbation module by some
                                     resampling or rescaling */
-  double * tau0_minus_tau;       /**< tau0_minus_tau[index_tau]: values of (tau0 - tau) */
-  double * w_trapz;              /**< w_trapz[index_tau]: values of weights in trapezoidal integration (related to time steps) */
-  double * chi;                  /**< chi[index_tau]: value of argument of bessel
+  double* tau0_minus_tau;       /**< tau0_minus_tau[index_tau]: values of (tau0 - tau) */
+  double*
+      w_trapz; /**< w_trapz[index_tau]: values of weights in trapezoidal integration (related to time steps) */
+  double* chi;     /**< chi[index_tau]: value of argument of bessel
                                     function: k(tau0-tau) (flat case)
                                     or sqrt(|K|)(tau0-tau) (non-flat
                                     case) */
-  double * cscKgen;              /**< cscKgen[index_tau]: useful trigonometric function */
-  double * cotKgen;              /**< cotKgen[index_tau]: useful trigonometric function */
+  double* cscKgen; /**< cscKgen[index_tau]: useful trigonometric function */
+  double* cotKgen; /**< cotKgen[index_tau]: useful trigonometric function */
 
   /** Pre-allocated temporary buffers for transfer_radial_function and transfer_integrate.
    *  Size tau_size_max. Avoids repeated malloc/free in the hot per-(k,l) loop. */
-  double * Phi;             /**< Phi[index_tau]: Bessel function values */
-  double * dPhi;            /**< dPhi[index_tau]: first derivative of Bessel function */
-  double * d2Phi;           /**< d2Phi[index_tau]: second derivative of Bessel function */
-  double * chireverse;      /**< chireverse[index_tau]: reversed chi grid */
-  double * rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
-  double * radial_function; /**< radial_function[index_tau]: output of transfer_radial_function */
-  double * chi_full_reverse;   /**< workspace: reversed chi array */
+  double* Phi;              /**< Phi[index_tau]: Bessel function values */
+  double* dPhi;             /**< dPhi[index_tau]: first derivative of Bessel function */
+  double* d2Phi;            /**< d2Phi[index_tau]: second derivative of Bessel function */
+  double* chireverse;       /**< chireverse[index_tau]: reversed chi grid */
+  double* rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
+  double* radial_function;  /**< radial_function[index_tau]: output of transfer_radial_function */
+  double* chi_full_reverse; /**< workspace: reversed chi array */
 
   std::vector<double> interpolated_sources_storage;
   std::vector<double> sources_storage;
@@ -197,8 +206,10 @@ struct transfer_workspace {
 
   //@}
 
-  double tau0_minus_tau_cut; /**< critical value of (tau0-tau) in time cut approximation for the wavenumber at hand */
-  short neglect_late_source; /**< flag stating whether we use the time cut approximation for the wavenumber at hand */
+  double
+      tau0_minus_tau_cut; /**< critical value of (tau0-tau) in time cut approximation for the wavenumber at hand */
+  short
+      neglect_late_source; /**< flag stating whether we use the time cut approximation for the wavenumber at hand */
 };
 
 /**
@@ -208,19 +219,21 @@ struct transfer_workspace {
  * transfer_radial_function()
  */
 
-typedef enum {SCALAR_TEMPERATURE_0,
-              SCALAR_TEMPERATURE_1,
-              SCALAR_TEMPERATURE_2,
-              SCALAR_POLARISATION_E,
-              VECTOR_TEMPERATURE_1,
-              VECTOR_TEMPERATURE_2,
-              VECTOR_POLARISATION_E,
-              VECTOR_POLARISATION_B,
-              TENSOR_TEMPERATURE_2,
-              TENSOR_POLARISATION_E,
-              TENSOR_POLARISATION_B,
-              NC_RSD} radial_function_type;
+typedef enum {
+  SCALAR_TEMPERATURE_0,
+  SCALAR_TEMPERATURE_1,
+  SCALAR_TEMPERATURE_2,
+  SCALAR_POLARISATION_E,
+  VECTOR_TEMPERATURE_1,
+  VECTOR_TEMPERATURE_2,
+  VECTOR_POLARISATION_E,
+  VECTOR_POLARISATION_B,
+  TENSOR_TEMPERATURE_2,
+  TENSOR_POLARISATION_E,
+  TENSOR_POLARISATION_B,
+  NC_RSD
+} radial_function_type;
 
-enum Hermite_Interpolation_Order {HERMITE3, HERMITE4, HERMITE6};
+enum Hermite_Interpolation_Order { HERMITE3, HERMITE4, HERMITE6 };
 
 #endif

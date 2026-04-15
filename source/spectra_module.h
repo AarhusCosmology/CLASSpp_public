@@ -1,18 +1,22 @@
 #ifndef SPECTRA_MODULE_H
 #define SPECTRA_MODULE_H
 
-#include "input_module.h"
-#include "base_module.h"
-
 #include <map>
 #include <string>
 #include <vector>
 
+#include "base_module.h"
+#include "input_module.h"
+
 class SpectraModule : public BaseModule {
-public:
-  SpectraModule(InputModulePtr input_module, PerturbationsModulePtr perturbations_module, PrimordialModulePtr primordial_module_, NonlinearModulePtr nonlinear_module, TransferModulePtr transfer_module);
+ public:
+  SpectraModule(InputModulePtr input_module,
+                PerturbationsModulePtr perturbations_module,
+                PrimordialModulePtr primordial_module_,
+                NonlinearModulePtr nonlinear_module,
+                TransferModulePtr transfer_module);
   ~SpectraModule();
-  int spectra_cl_at_l(double l, double * cl, double ** cl_md, double ** cl_md_ic) const;
+  int spectra_cl_at_l(double l, double* cl, double** cl_md, double** cl_md_ic) const;
   std::map<std::string, int> cl_output_index_map() const;
   std::map<std::string, std::vector<double>> cl_output(int lmax) const;
   void cl_output_no_copy(int lmax, std::vector<double*>& output_pointers) const;
@@ -20,10 +24,13 @@ public:
   /** @name - information on number of modes and pairs of initial conditions */
 
   //@{
-  int md_size_;           /**< number of modes (scalar, tensor, ...) included in computation */
-  std::vector<int> ic_size_;         /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
-  std::vector<int> ic_ic_size_;      /**< for a given mode, ic_ic_size[index_md] = number of pairs of (index_ic1, index_ic2) with index_ic2 >= index_ic1; this number is just N(N+1)/2  where N = ic_size[index_md] */
-  std::vector<std::vector<short>> is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
+  int md_size_; /**< number of modes (scalar, tensor, ...) included in computation */
+  std::vector<int>
+      ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
+  std::vector<int>
+      ic_ic_size_; /**< for a given mode, ic_ic_size[index_md] = number of pairs of (index_ic1, index_ic2) with index_ic2 >= index_ic1; this number is just N(N+1)/2  where N = ic_size[index_md] */
+  std::vector<std::vector<short>>
+      is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
   //@}
 
   /** @name - information on number of type of C_l's (TT, TE...) */
@@ -59,46 +66,68 @@ public:
   int index_ct_dl_; /**< first index for type \f$ C_l^{dl} \f$(d_size values) */
 
   int ct_size_; /**< number of \f$ C_l \f$ types requested */
-  int d_size_;      /**< number of bins for which density Cl's are computed */
+  int d_size_;  /**< number of bins for which density Cl's are computed */
   //@}
 
-  int l_size_max_; /**< greatest of all l_size[index_md] */
-  std::vector<double> l_;    /**< list of multipole values l[index_l] */
-  std::vector<std::vector<int>> l_max_ct_;    /**< last multipole (given as an input) at which
+  int l_size_max_;                         /**< greatest of all l_size[index_md] */
+  std::vector<double> l_;                  /**< list of multipole values l[index_l] */
+  std::vector<std::vector<int>> l_max_ct_; /**< last multipole (given as an input) at which
                          we want to output \f$ C_l\f$'s for a given mode and type;
                          l[index_md][l_size[index_md]-1] can be larger
                          than l_max[index_md], in order to ensure a
                          better interpolation with no boundary effects */
-  std::vector<int> l_max_;    /**< last multipole (given as an input) at which
+  std::vector<int> l_max_;                 /**< last multipole (given as an input) at which
                      we want to output \f$ C_l\f$'s for a given mode (maximized over types);
                      l[index_md][l_size[index_md]-1] can be larger
                      than l_max[index_md], in order to ensure a
                      better interpolation with no boundary effects */
-  int l_max_tot_; /**< last multipole (given as an input) at which
+  int l_max_tot_;                          /**< last multipole (given as an input) at which
                     we want to output \f$ C_l\f$'s (maximized over modes and types);
                     l[index_md][l_size[index_md]-1] can be larger
                     than l_max[index_md], in order to ensure a
                     better interpolation with no boundary effects */
 
-
-private:
+ private:
   int spectra_init();
   int spectra_free();
   int spectra_indices();
   int spectra_cls();
-  int spectra_compute_cl(int index_md, int index_ic1, int index_ic2, int index_l, int cl_integrand_num_columns, double * cl_integrand, double * primordial_pk_cached, double * transfer_ic1, double * transfer_ic2);
+  int spectra_compute_cl(int index_md,
+                         int index_ic1,
+                         int index_ic2,
+                         int index_l,
+                         int cl_integrand_num_columns,
+                         double* cl_integrand,
+                         double* primordial_pk_cached,
+                         double* transfer_ic1,
+                         double* transfer_ic2);
   int spectra_k_and_tau();
   /* deprecated functions (since v2.8) */
-  int spectra_pk_at_z(enum linear_or_logarithmic mode, double z, double * output_tot, double * output_ic, double * output_cb_tot, double * output_cb_ic);
-  int spectra_pk_at_k_and_z(double k, double z, double * pk, double * pk_ic, double * pk_cb, double * pk_cb_ic);
-  int spectra_pk_nl_at_z(enum linear_or_logarithmic mode, double z, double * output_tot, double * output_cb_tot);
-  int spectra_pk_nl_at_k_and_z(double k, double z, double * pk_tot, double * pk_cb_tot);
-  int spectra_fast_pk_at_kvec_and_zvec(double * kvec, int kvec_size, double * zvec, int zvec_size, double * pk_tot_out, double * pk_cb_tot_out, int nonlinear);
-  int spectra_sigma(double R, double z, double * sigma);
-  int spectra_sigma_cb(double R, double z, double * sigma_cb);
+  int spectra_pk_at_z(enum linear_or_logarithmic mode,
+                      double z,
+                      double* output_tot,
+                      double* output_ic,
+                      double* output_cb_tot,
+                      double* output_cb_ic);
+  int spectra_pk_at_k_and_z(
+      double k, double z, double* pk, double* pk_ic, double* pk_cb, double* pk_cb_ic);
+  int spectra_pk_nl_at_z(enum linear_or_logarithmic mode,
+                         double z,
+                         double* output_tot,
+                         double* output_cb_tot);
+  int spectra_pk_nl_at_k_and_z(double k, double z, double* pk_tot, double* pk_cb_tot);
+  int spectra_fast_pk_at_kvec_and_zvec(double* kvec,
+                                       int kvec_size,
+                                       double* zvec,
+                                       int zvec_size,
+                                       double* pk_tot_out,
+                                       double* pk_cb_tot_out,
+                                       int nonlinear);
+  int spectra_sigma(double R, double z, double* sigma);
+  int spectra_sigma_cb(double R, double z, double* sigma_cb);
   /* deprecated functions (since v2.1) */
-  int spectra_tk_at_z(double z, double * output);
-  int spectra_tk_at_k_and_z(double k, double z, double * output);
+  int spectra_tk_at_z(double z, double* output);
+  int spectra_tk_at_k_and_z(double k, double z, double* output);
 
   PerturbationsModulePtr perturbations_module_;
   PrimordialModulePtr primordial_module_;
@@ -111,15 +140,15 @@ private:
 
   //@{
 
-  std::vector<int> l_size_;   /**< number of multipole values for each requested mode, l_size[index_md] */
+  std::vector<int>
+      l_size_; /**< number of multipole values for each requested mode, l_size[index_md] */
 
-
-  std::vector<std::vector<double>> cl_;   /**< table of anisotropy spectra for each mode, multipole, pair of initial conditions and types, cl[index_md][(index_l * psp->ic_ic_size[index_md] + index_ic1_ic2) * psp->ct_size + index_ct] */
-  std::vector<std::vector<double>> ddcl_; /**< second derivatives of previous table with respect to l, in view of spline interpolation */
+  std::vector<std::vector<double>>
+      cl_; /**< table of anisotropy spectra for each mode, multipole, pair of initial conditions and types, cl[index_md][(index_l * psp->ic_ic_size[index_md] + index_ic1_ic2) * psp->ct_size + index_ct] */
+  std::vector<std::vector<double>>
+      ddcl_; /**< second derivatives of previous table with respect to l, in view of spline interpolation */
 
   //@}
-
-
 };
 
-#endif //SPECTRA_MODULE_H
+#endif  //SPECTRA_MODULE_H

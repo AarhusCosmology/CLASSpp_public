@@ -10,24 +10,27 @@
 
 namespace {
 
-int readIntegerList(FileContent* pfc,
-                    const char* name,
-                    std::vector<int>& values,
-                    int* found,
-                    ErrorMsg errmsg) {
+int readIntegerList(
+    FileContent* pfc, const char* name, std::vector<int>& values, int* found, ErrorMsg errmsg) {
   try {
     *found = pfc->read_list_of_integers(name, values) ? _TRUE_ : _FALSE_;
-  } catch (const std::exception& e) {
+  }
+  catch (const std::exception& e) {
     class_stop(errmsg, "%s", e.what());
   }
   return _SUCCESS_;
 }
 
-}
+}  // namespace
 
-std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, std::vector<double> deg, double T_cmb) {
+std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc,
+                                                     std::vector<SourceType> source_types,
+                                                     std::vector<DRType> dr_types,
+                                                     std::vector<double> deg,
+                                                     double T_cmb) {
   try {
-    return std::shared_ptr<DarkRadiation>(new DarkRadiation(pfc, source_types, dr_types, deg, T_cmb));
+    return std::shared_ptr<DarkRadiation>(
+        new DarkRadiation(pfc, source_types, dr_types, deg, T_cmb));
   }
   catch (NoDrRequested& error) {
     return nullptr;
@@ -42,8 +45,13 @@ std::shared_ptr<DarkRadiation> DarkRadiation::Create(FileContent* pfc, std::vect
  *
 */
 
-DarkRadiation::DarkRadiation(FileContent* pfc, std::vector<SourceType> source_types, std::vector<DRType> dr_types, std::vector<double> deg, double T_cmb)
-: N_species_(static_cast<int>(source_types.size())), source_types_(source_types), dr_types_(dr_types), deg_(deg) {
+DarkRadiation::DarkRadiation(FileContent* pfc,
+                             std::vector<SourceType> source_types,
+                             std::vector<DRType> dr_types,
+                             std::vector<double> deg,
+                             double T_cmb)
+    : N_species_(static_cast<int>(source_types.size())), source_types_(source_types),
+      dr_types_(dr_types), deg_(deg) {
   if (this->Init(pfc, T_cmb) == _FAILURE_) {
     throw std::runtime_error(error_message_);
   }
@@ -62,53 +70,63 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
     // Throw error to let DarkRadiation::Create know to continue with no DR module
     throw NoDrRequested("No DR species requested; continuing without a DR module.");
   }
-  
+
   /* Get number of source types */
-  N_dcdm_ = 0;
+  N_dcdm_  = 0;
   N_dncdm_ = 0;
   for (SourceType source : source_types_) {
     if (source == SourceType::dcdm) {
       ++N_dcdm_;
-    } else if (source == SourceType::dncdm) {
+    }
+    else if (source == SourceType::dncdm) {
       ++N_dncdm_;
     }
   }
-  
+
   int int1, flag1;
   char* errmsg = error_message_;
   /* Quadrature strategy */
   std::vector<int> temp_list;
-  class_call(readIntegerList(pfc, "Quadrature strategy DR", temp_list, &flag1, errmsg), errmsg, errmsg);
-  if (flag1 == _FALSE_) temp_list.assign(1, quadrature_strategy_default_);
-  class_test(static_cast<int>(temp_list.size()) != 1, errmsg,
+  class_call(readIntegerList(pfc, "Quadrature strategy DR", temp_list, &flag1, errmsg),
+             errmsg,
+             errmsg);
+  if (flag1 == _FALSE_)
+    temp_list.assign(1, quadrature_strategy_default_);
+  class_test(static_cast<int>(temp_list.size()) != 1,
+             errmsg,
              "Number of entries in Quadrature strategy DR does not match expected number, 1.");
   quadrature_strategy_ = temp_list[0];
-  
+
   /* Maximum q */
   temp_list.clear();
   class_call(readIntegerList(pfc, "Maximum q DR", temp_list, &flag1, errmsg), errmsg, errmsg);
-  if (flag1 == _FALSE_) temp_list.assign(1, qmax_default_);
-  class_test(static_cast<int>(temp_list.size()) != 1, errmsg,
+  if (flag1 == _FALSE_)
+    temp_list.assign(1, qmax_default_);
+  class_test(static_cast<int>(temp_list.size()) != 1,
+             errmsg,
              "Number of entries in Maximum q DR does not match expected number, 1.");
   qmax_ = temp_list[0];
-  
+
   /* Number of momentum bins, same for all species */
   temp_list.clear();
   class_call(readIntegerList(pfc, "N_q_dr", temp_list, &flag1, errmsg), errmsg, errmsg);
-  if (flag1 == _FALSE_) temp_list.assign(1, N_q_default_);
-  class_test(static_cast<int>(temp_list.size()) != 1, errmsg,
+  if (flag1 == _FALSE_)
+    temp_list.assign(1, N_q_default_);
+  class_test(static_cast<int>(temp_list.size()) != 1,
+             errmsg,
              "Number of entries in N_q_dr does not match expected number, 1.");
   N_q_ = temp_list[0];
-  
+
   q_.resize(N_q_);
   dq_.resize(N_q_);
   w_.resize(N_q_);
-  
+
   /* Handle q-sampling
      Currently the same for background and perturbations
   */
   if (quadrature_strategy_ == qm_auto) {
-    throw std::runtime_error("Automatic DR quadrature not yet implemented. Assign the variable Quadrature strategy DR.");
+    throw std::runtime_error(
+        "Automatic DR quadrature not yet implemented. Assign the variable Quadrature strategy DR.");
   }
   else {
     /* Manual q-sampling */
@@ -123,7 +141,8 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
                                     InitialDistribution,
                                     NULL,
                                     error_message_),
-               error_message_, error_message_);
+               error_message_,
+               error_message_);
     /*
     printf("Created the following quadrature scheme for dark radiation:\n");
     for (int n = 0; n < N_q_; n++) {
@@ -131,7 +150,7 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
     }
     */
   }
-  
+
   // Prepare member vectors
   cumulative_q_index_.push_back(0);
   for (int n_dr = 0; n_dr < N_species_; n_dr++) {
@@ -144,20 +163,20 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
       int initial_fermionic_pop = 0;
       class_read_int("Initial daughter population", initial_fermionic_pop);
 
-        // If no inv, we have one species
-        std::vector<double> w_temp(N_q_);
-          for (int index_q = 0; index_q < N_q_; index_q++) {
-            if (initial_fermionic_pop == _FALSE_) {
-              w_temp[index_q] = 0.;
-            }
-            else if (initial_fermionic_pop == _TRUE_) {
-              double q = q_[index_q];
-              double f0;
-              InitialDistribution(NULL, q, &f0);
-              w_temp[index_q] = f0*dq_[index_q];
-            }
-          }
-        w_species_.push_back(w_temp);
+      // If no inv, we have one species
+      std::vector<double> w_temp(N_q_);
+      for (int index_q = 0; index_q < N_q_; index_q++) {
+        if (initial_fermionic_pop == _FALSE_) {
+          w_temp[index_q] = 0.;
+        }
+        else if (initial_fermionic_pop == _TRUE_) {
+          double q = q_[index_q];
+          double f0;
+          InitialDistribution(NULL, q, &f0);
+          w_temp[index_q] = f0 * dq_[index_q];
+        }
+      }
+      w_species_.push_back(w_temp);
 
       /*
       printf("Made the following initial population:\n");
@@ -168,11 +187,14 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
       }
       */
 
-      cumulative_q_index_.push_back(cumulative_q_index_.back() + N_q_); /* All species have same q_size */
+      cumulative_q_index_.push_back(cumulative_q_index_.back() +
+                                    N_q_); /* All species have same q_size */
 
       // Only the dncdm-sourced DR carry a degeneracy factor
-      double T_dr_over_T_cmb = 0.71611; // Same as T_ncdm_default
-      factor_.push_back(deg_[n_dr]*4*_PI_*pow(T_dr_over_T_cmb*T_cmb*_k_B_, 4)*8*_PI_*_G_/3./pow(_h_P_/2./_PI_, 3)/pow(_c_, 7)*_Mpc_over_m_*_Mpc_over_m_);
+      double T_dr_over_T_cmb = 0.71611;  // Same as T_ncdm_default
+      factor_.push_back(deg_[n_dr] * 4 * _PI_ * pow(T_dr_over_T_cmb * T_cmb * _k_B_, 4) * 8 * _PI_ *
+                        _G_ / 3. / pow(_h_P_ / 2. / _PI_, 3) / pow(_c_, 7) * _Mpc_over_m_ *
+                        _Mpc_over_m_);
 
       /*std::vector<double> w_temp(N_q_);
       for (int index_q = 0; index_q < N_q_; index_q++) {
@@ -181,7 +203,6 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
       }
       w_species_.push_back(w_temp);*/
     }
-
 
     // Maybe needs fixing with initial populations; double check this!
     rho_species_.push_back(0.);
@@ -197,9 +218,9 @@ int DarkRadiation::Init(FileContent* pfc, double T_cmb) {
  *
 */
 
-int DarkRadiation::InitialDistribution(void * params, double q, double* f0) {
+int DarkRadiation::InitialDistribution(void* params, double q, double* f0) {
   // Here, we should put a Taylor expansion around small a of the DR EoM to include the small amount of decay that has already occurred at a_ini, otherwise all weights are identically zero and quadrature does not make sense!
-  double f_FD = 1.0/pow(2*_PI_, 3)*2./(exp(q) + 1.);
+  double f_FD = 1.0 / pow(2 * _PI_, 3) * 2. / (exp(q) + 1.);
 
   // *f0 = 0.0*q;
   *f0 = f_FD;
@@ -214,39 +235,49 @@ int DarkRadiation::InitialDistribution(void * params, double q, double* f0) {
  *
 */
 
-void DarkRadiation::IntegrateDistribution(double z, double* number, double* rho, double* p, int index_dr) {
+void DarkRadiation::IntegrateDistribution(
+    double z, double* number, double* rho, double* p, int index_dr) {
   std::vector<double> w_vec(N_q_);
-  
+
   // Which species to sum over?
-  if (index_dr == 42) { // Sum over total distribution function, this is default
+  if (index_dr == 42) {  // Sum over total distribution function, this is default
     for (int index_q = 0; index_q < N_q_; index_q++) {
       w_vec[index_q] = w_[index_q];
     }
-  } else {
+  }
+  else {
     for (int index_q = 0; index_q < N_q_; index_q++) {
       w_vec[index_q] = w_species_[index_dr][index_q];
     }
   }
-  
-  if (number != NULL) *number = 0.;
+
+  if (number != NULL)
+    *number = 0.;
   double rho_local = 0.;
-  if (p != NULL) *p = 0.;
+  if (p != NULL)
+    *p = 0.;
 
   /* Sum over quadrature abscissas
      the q^2 is from d^3 q volume element
   */
   for (int index_q = 0; index_q < N_q_; index_q++) {
-    if (number != NULL) *number += pow(q_[index_q],2)*w_vec[index_q];
-    if (rho != NULL || p != NULL) rho_local += pow(q_[index_q],3)*w_vec[index_q]; // DR is massless, so epsilon = q
+    if (number != NULL)
+      *number += pow(q_[index_q], 2) * w_vec[index_q];
+    if (rho != NULL || p != NULL)
+      rho_local += pow(q_[index_q], 3) * w_vec[index_q];  // DR is massless, so epsilon = q
   }
-  if (p != NULL) *p = rho_local/3.; // Equation of state for a massless particle is p = rho/3
+  if (p != NULL)
+    *p = rho_local / 3.;  // Equation of state for a massless particle is p = rho/3
 
   /* Adjust normalization */
   // The correct factor needs double checking...
-  double integral_factor = factor_[index_dr]*pow(1. + z, 4);
-  if (number != NULL) *number *= integral_factor/(1. + z);
-  if (rho != NULL) *rho = rho_local*integral_factor;
-  if (p != NULL) *p *= integral_factor;
+  double integral_factor = factor_[index_dr] * pow(1. + z, 4);
+  if (number != NULL)
+    *number *= integral_factor / (1. + z);
+  if (rho != NULL)
+    *rho = rho_local * integral_factor;
+  if (p != NULL)
+    *p *= integral_factor;
 }
 
 /**
@@ -261,27 +292,28 @@ double DarkRadiation::ComputeMeanMomentum(int index_dr) {
   std::vector<double> w_vec(N_q_);
   double zero_test = 0.;
   // Which species to sum over?
-  if (index_dr == 42) { // Sum over total distribution function, this is default
+  if (index_dr == 42) {  // Sum over total distribution function, this is default
     for (int index_q = 0; index_q < N_q_; index_q++) {
-      w_vec[index_q] = w_[index_q];
-      zero_test += w_[index_q];
+      w_vec[index_q]  = w_[index_q];
+      zero_test      += w_[index_q];
     }
-  } else {
+  }
+  else {
     for (int index_q = 0; index_q < N_q_; index_q++) {
-      w_vec[index_q] = w_species_[index_dr][index_q];
-      zero_test += w_species_[index_dr][index_q];
+      w_vec[index_q]  = w_species_[index_dr][index_q];
+      zero_test      += w_species_[index_dr][index_q];
     }
   }
   if (zero_test == 0.) {
     // No DR particles, possibly since no decay has occurred yet
     return 0.;
   }
-  double num = 0.;
+  double num   = 0.;
   double denom = 0.;
   for (int index_q = 0; index_q < N_q_; index_q++) {
-    double q = q_[index_q];
-    num += w_vec[index_q]*pow(q, 3);
-    denom += w_vec[index_q]*pow(q, 2);
+    double q  = q_[index_q];
+    num      += w_vec[index_q] * pow(q, 3);
+    denom    += w_vec[index_q] * pow(q, 2);
   }
-  return num/denom;
+  return num / denom;
 }

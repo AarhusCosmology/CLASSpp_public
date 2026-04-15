@@ -3,32 +3,35 @@
 #ifndef __BACKGROUND__
 #define __BACKGROUND__
 
-#include "common.h"
-#include "quadrature.h"
-#include "growTable.h"
-#include "arrays.h"
-#include "dei_rkck.h"
-#include "parser.h"
-
 #include <memory>
 #include <vector>
+
+#include "arrays.h"
+#include "common.h"
+#include "dei_rkck.h"
+#include "growTable.h"
+#include "parser.h"
+#include "quadrature.h"
 
 class NonColdDarkMatter;
 class DarkRadiation;
 
 //The name for this macro can be at most 30 characters total
-#define _class_print_species_(name,type) \
-printf("-> %-30s Omega = %-15g , omega = %-15g\n",name,pba->Omega0_##type,pba->Omega0_##type*pba->h*pba->h);
+#define _class_print_species_(name, type)            \
+  printf("-> %-30s Omega = %-15g , omega = %-15g\n", \
+         name,                                       \
+         pba->Omega0_##type,                         \
+         pba->Omega0_##type * pba->h * pba->h);
 
 /** list of possible parametrisations of the DE equation of state */
 
-enum equation_of_state {CLP,EDE};
+enum equation_of_state { CLP, EDE };
 
 /**
  * Different ways to integrate background
  */
 
-enum background_evolution_method {bgevo_rk, bgevo_evolver};
+enum background_evolution_method { bgevo_rk, bgevo_evolver };
 
 /**
  * All background parameters and evolution that other modules need to know.
@@ -40,8 +43,7 @@ enum background_evolution_method {bgevo_rk, bgevo_evolver};
  * modules.
  */
 
-struct background
-{
+struct background {
   /** @name - input parameters initialized by user in input module
    *  (all other quantities are computed in this module, given these parameters
    *   and the content of the 'precision' structure)
@@ -69,11 +71,12 @@ struct background
 
   double Omega0_fld = 0.; /**< \f$ \Omega_{0 de} \f$: fluid */
 
-  enum equation_of_state fluid_equation_of_state = CLP; /**< parametrisation scheme for fluid equation of state */
+  enum equation_of_state fluid_equation_of_state =
+      CLP; /**< parametrisation scheme for fluid equation of state */
 
-  double w0_fld = -1.; /**< \f$ w0_{DE} \f$: current fluid equation of state parameter */
-  double wa_fld = 0.; /**< \f$ wa_{DE} \f$: fluid equation of state parameter derivative */
-  double Omega_EDE = 0.; /**< \f$ wa_{DE} \f$: Early Dark Energy density parameter */
+  double w0_fld    = -1.; /**< \f$ w0_{DE} \f$: current fluid equation of state parameter */
+  double wa_fld    = 0.;  /**< \f$ wa_{DE} \f$: fluid equation of state parameter derivative */
+  double Omega_EDE = 0.;  /**< \f$ wa_{DE} \f$: Early Dark Energy density parameter */
 
   double cs2_fld = 1.; /**< \f$ c^2_{s~DE} \f$: sound speed of the fluid
 		     in the frame comoving with the fluid (so, this is
@@ -91,37 +94,44 @@ struct background
   double Omega0_ur; /**< \f$ \Omega_{0 \nu r} \f$: ultra-relativistic neutrinos */
 
   double Omega0_idr = 0.; /**< \f$ \Omega_{0 idr} \f$: interacting dark radiation */
-  double T_idr = 0.;      /**< \f$ T_{idr} \f$: current temperature of interacting dark radiation in Kelvins */
+  double T_idr =
+      0.; /**< \f$ T_{idr} \f$: current temperature of interacting dark radiation in Kelvins */
 
-  double Omega0_idm_dr = 0.; /**< \f$ \Omega_{0 idm_dr} \f$: dark matter interacting with dark radiation */
+  double Omega0_idm_dr =
+      0.; /**< \f$ \Omega_{0 idm_dr} \f$: dark matter interacting with dark radiation */
 
-  double Omega0_dcdmdr = 0.; /**< \f$ \Omega_{0 dcdm}+\Omega_{0 dr} \f$: decaying cold dark matter (dcdm) decaying to dark radiation (dr) */
+  double Omega0_dcdmdr =
+      0.; /**< \f$ \Omega_{0 dcdm}+\Omega_{0 dr} \f$: decaying cold dark matter (dcdm) decaying to dark radiation (dr) */
 
-  double Gamma_dcdm = 0.; /**< \f$ \Gamma_{dcdm} \f$: decay constant for decaying cold dark matter */
+  double Gamma_dcdm =
+      0.; /**< \f$ \Gamma_{dcdm} \f$: decay constant for decaying cold dark matter */
 
-  double Omega_ini_dcdm;    /**< \f$ \Omega_{ini,dcdm} \f$: rescaled initial value for dcdm density (see 1407.2418 for definitions) */
+  double
+      Omega_ini_dcdm; /**< \f$ \Omega_{ini,dcdm} \f$: rescaled initial value for dcdm density (see 1407.2418 for definitions) */
 
-  double Omega0_scf = 0.;        /**< \f$ \Omega_{0 scf} \f$: scalar field */
-  short attractor_ic_scf = _TRUE_;   /**< whether the scalar field has attractor initial conditions */
-  double phi_ini_scf = 1;       /**< \f$ \phi(t_0) \f$: scalar field initial value */
-  double phi_prime_ini_scf = 1; /**< \f$ d\phi(t_0)/d\tau \f$: scalar field initial derivative wrt conformal time */
-  std::vector<double> scf_parameters;  /**< list of parameters describing the scalar field potential */
-  int scf_tuning_index = 0;     /**< index in scf_parameters used for tuning */
-  
+  double Omega0_scf      = 0.;     /**< \f$ \Omega_{0 scf} \f$: scalar field */
+  short attractor_ic_scf = _TRUE_; /**< whether the scalar field has attractor initial conditions */
+  double phi_ini_scf     = 1;      /**< \f$ \phi(t_0) \f$: scalar field initial value */
+  double phi_prime_ini_scf =
+      1; /**< \f$ d\phi(t_0)/d\tau \f$: scalar field initial derivative wrt conformal time */
+  std::vector<double>
+      scf_parameters;       /**< list of parameters describing the scalar field potential */
+  int scf_tuning_index = 0; /**< index in scf_parameters used for tuning */
+
   double Omega0_k = 0.; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
 
-  int N_ncdm = 0;                            /**< Number of distinguishable ncdm species */
+  int N_ncdm             = 0;  /**< Number of distinguishable ncdm species */
   double Omega0_ncdm_tot = 0.; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
-  int N_decay_dr = 0;
-  int l_max_idr = 0;
+  int N_decay_dr         = 0;
+  int l_max_idr          = 0;
   /** @name - related parameters */
 
   //@{
 
   double h = 0.67556; /**< reduced Hubble parameter */
-  double K = 0.; /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*a_{today}^2*H_0^2\f$; */
-  int sgnK = 0; /**< K/|K|: -1, 0 or 1 */
-  
+  double K = 0.;      /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*a_{today}^2*H_0^2\f$; */
+  int sgnK = 0;       /**< K/|K|: -1, 0 or 1 */
+
   //@}
 
   /** @name - other background parameters */
@@ -141,21 +151,20 @@ struct background
       * corresponding contributions, instead of adding null contributions.
       */
 
-
   //@{
 
-  short has_cdm;       /**< presence of cold dark matter? */
-  short has_dcdm;      /**< presence of decaying cold dark matter? */
-  short has_ncdm_decay_dr;     /**< presence of decaying non-cold dark matter? */
-  short has_dr;        /**< presence of relativistic decay radiation? */
-  short has_scf;       /**< presence of a scalar field? */
-  short has_ncdm;      /**< presence of non-cold dark matter? */
-  short has_lambda;    /**< presence of cosmological constant? */
-  short has_fld;       /**< presence of fluid with constant w and cs2? */
-  short has_ur;        /**< presence of ultra-relativistic neutrinos/relics? */
-  short has_idr;       /**< presence of interacting dark radiation? */
-  short has_idm_dr;    /**< presence of dark matter interacting with dark radiation? */
-  short has_curvature; /**< presence of global spatial curvature? */
+  short has_cdm;           /**< presence of cold dark matter? */
+  short has_dcdm;          /**< presence of decaying cold dark matter? */
+  short has_ncdm_decay_dr; /**< presence of decaying non-cold dark matter? */
+  short has_dr;            /**< presence of relativistic decay radiation? */
+  short has_scf;           /**< presence of a scalar field? */
+  short has_ncdm;          /**< presence of non-cold dark matter? */
+  short has_lambda;        /**< presence of cosmological constant? */
+  short has_fld;           /**< presence of fluid with constant w and cs2? */
+  short has_ur;            /**< presence of ultra-relativistic neutrinos/relics? */
+  short has_idr;           /**< presence of interacting dark radiation? */
+  short has_idm_dr;        /**< presence of dark matter interacting with dark radiation? */
+  short has_curvature;     /**< presence of global spatial curvature? */
 
   /*DRMD*/
   short has_idm_drmd;
@@ -164,10 +173,10 @@ struct background
 
   double Omega0_idr_drmd = 0.;
   double Omega0_idm_drmd = 0.;
-  double f_idm_drmd = 0.;
-  double G_over_aH_drmd = 0.;
+  double f_idm_drmd      = 0.;
+  double G_over_aH_drmd  = 0.;
   double delta_Neff_drmd = 0.;
-  double z_stop = 0.;
+  double z_stop          = 0.;
   //@}
 
   /**
@@ -180,8 +189,10 @@ struct background
   short normal_info; /**< flag for calling background_at_eta and return medium information */
   short long_info;   /**< flag for calling background_at_eta and return all information */
 
-  short inter_normal;  /**< flag for calling background_at_eta and find position in interpolation table normally */
-  short inter_closeby; /**< flag for calling background_at_eta and find position in interpolation table starting from previous position in previous call */
+  short
+      inter_normal; /**< flag for calling background_at_eta and find position in interpolation table normally */
+  short
+      inter_closeby; /**< flag for calling background_at_eta and find position in interpolation table starting from previous position in previous call */
 
   //@}
 
@@ -191,7 +202,8 @@ struct background
 
   unsigned int number_of_threads;
 
-  short background_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short background_verbose =
+      0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
 };
@@ -202,10 +214,10 @@ struct background
 
 //@{
 
-#define _h_BIG_ 1.5            /**< maximal \f$ h \f$ */
-#define _h_SMALL_ 0.3         /**< minimal \f$ h \f$ */
-#define _omegab_BIG_ 0.039    /**< maximal \f$ omega_b \f$ */
-#define _omegab_SMALL_ 0.005  /**< minimal \f$ omega_b \f$ */
+#define _h_BIG_ 1.5          /**< maximal \f$ h \f$ */
+#define _h_SMALL_ 0.3        /**< minimal \f$ h \f$ */
+#define _omegab_BIG_ 0.039   /**< maximal \f$ omega_b \f$ */
+#define _omegab_SMALL_ 0.005 /**< minimal \f$ omega_b \f$ */
 
 //@}
 
@@ -215,13 +227,12 @@ struct background
 
 //@{
 
-#define _SCALE_BACK_ 0.1  /**< logarithmic step used when searching
+#define _SCALE_BACK_ \
+  0.1 /**< logarithmic step used when searching
 			     for an initial scale factor at which ncdm
 			     are still relativistic */
 
-
 //@}
-
 
 #endif
 /* @endcond */

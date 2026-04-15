@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+
 #include "common.h"
 
 class BackgroundModule;
@@ -12,11 +13,11 @@ struct precision;
  * without parameter explosion.
  */
 struct ThermoTableContext {
-  std::vector<double>&        table;            /**< thermodynamics_table_ (writable) */
-  const std::vector<double>&  tau_table;        /**< conformal time for each row */
-  const std::vector<double>&  z_table;          /**< redshift for each row */
-  int                         th_size;          /**< number of columns (stride) */
-  const BackgroundModule*     background_module;
-  const precision*            ppr;
-  ErrorMsg&                   error_message;
+  std::vector<double>& table;           /**< thermodynamics_table_ (writable) */
+  const std::vector<double>& tau_table; /**< conformal time for each row */
+  const std::vector<double>& z_table;   /**< redshift for each row */
+  int th_size;                          /**< number of columns (stride) */
+  const BackgroundModule* background_module;
+  const precision* ppr;
+  ErrorMsg& error_message;
 };

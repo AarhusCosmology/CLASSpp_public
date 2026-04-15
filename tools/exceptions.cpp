@@ -1,8 +1,9 @@
 #include "exceptions.h"
-#include <string>
+
+#include <cstdarg>
 #include <sstream>
 #include <stdexcept>
-#include <cstdarg>
+#include <string>
 #include <typeinfo>
 
 void ThrowRuntimeErrorIf(bool condition, std::string string_for_printf, ...) {
@@ -29,8 +30,9 @@ std::pair<std::string, std::string> get_my_py_error_message() {
   std::pair<std::string, std::string> res;
   try {
     throw;
-  } catch (const std::exception& e) {
-    res.first = std::string(typeid(e).name());
+  }
+  catch (const std::exception& e) {
+    res.first  = std::string(typeid(e).name());
     res.second = std::string(e.what());
   }
   return res;

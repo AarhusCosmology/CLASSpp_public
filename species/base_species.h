@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
 
 // Forward declarations to avoid circular includes
 struct background;
@@ -29,17 +29,21 @@ class BackgroundModule;  // forward declaration
  * Use .at("CDM") – never operator[] – to maintain const correctness.
  */
 class BaseSpecies {
-public:
+ public:
   /** Classification used by background_functions() to accumulate rho_r, rho_m, etc. */
   enum class EnergyType { Radiation, Matter, DarkEnergy, Other };
   enum class TransferColumnSection { all, density, velocity };
 
-  virtual ~BaseSpecies() = default;
-  BaseSpecies(const BaseSpecies&) = delete;
+  virtual ~BaseSpecies()                     = default;
+  BaseSpecies(const BaseSpecies&)            = delete;
   BaseSpecies& operator=(const BaseSpecies&) = delete;
 
-  const std::string& name() const { return name_; }
-  EnergyType energy_type() const { return energy_type_; }
+  const std::string& name() const {
+    return name_;
+  }
+  EnergyType energy_type() const {
+    return energy_type_;
+  }
 
   /**
    * Called by BackgroundModule after construction to provide access to its
@@ -47,7 +51,6 @@ public:
    * Species that need it override this; default is no-op.
    */
   virtual void SetBackgroundModule(const BackgroundModule* /*bgm*/) {}
-
 
   // ── Background ────────────────────────────────────────────────────────────
 
@@ -62,13 +65,17 @@ public:
    * Index of this species' density in pvecback. Valid after RegisterBackgroundIndices().
    * Returns -1 if species is absent (has_* flag was false).
    */
-  int bg_rho_index() const { return index_bg_rho_; }
+  int bg_rho_index() const {
+    return index_bg_rho_;
+  }
 
   /**
    * Index of this species' pressure in pvecback, or -1 if p is not stored separately.
    * Most species compute p analytically from rho; NCDM stores it.
    */
-  int bg_p_index() const { return index_bg_p_; }
+  int bg_p_index() const {
+    return index_bg_p_;
+  }
 
   /**
    * Claim slots in the ODE integration vector y. Called during background_indices().
@@ -88,19 +95,14 @@ public:
    * pvecback_B is the current ODE integration vector.
    * Write density (and any other owned quantities) into pvecback.
    */
-  virtual void ComputeBackground(double a_rel,
-                                  const double* pvecback_B,
-                                  double* pvecback) = 0;
+  virtual void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) = 0;
 
   /**
    * Contribute to dy/dtau for species with ODE-integrated background variables.
    * pvecback already contains all evaluated background quantities.
    * Default: nothing (species with analytic rho(a) don't override this).
    */
-  virtual void BackgroundDerivs(double tau,
-                                  const double* y,
-                                  double* dy,
-                                  const double* pvecback) {}
+  virtual void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) {}
 
   /** Energy density at current background state. */
   virtual double Rho(const double* pvecback) const = 0;
@@ -120,13 +122,17 @@ public:
    * Returns true if this species' PerturbDerivs must run AFTER all other
    * species in a second pass. Used for PPF fluid (FluidSpecies).
    */
-  virtual bool RequiresDeferredPerturbDerivs() const { return false; }
+  virtual bool RequiresDeferredPerturbDerivs() const {
+    return false;
+  }
 
   /**
    * Returns true if this species' ComputeBackground must be deferred.
    * Used for FluidSpecies which needs w_fld evaluated before it can run.
    */
-  virtual bool RequiresDeferredBackground() const { return false; }
+  virtual bool RequiresDeferredBackground() const {
+    return false;
+  }
 
   // ── Perturbations ─────────────────────────────────────────────────────────
 
@@ -137,20 +143,23 @@ public:
    * @param ppw   Current workspace; use approx[] flags and curvature info.
    * @param gauge Cast of enum possible_gauges (0=newtonian, 1=synchronous).
    */
-  virtual void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr,
-                                            int& index_pt,
-                                            const perturb_workspace* ppw,
-                                            int gauge) = 0;
+  virtual void RegisterPerturbationIndices(perturb_vector* pv,
+                                           const precision* ppr,
+                                           int& index_pt,
+                                           const perturb_workspace* ppw,
+                                           int gauge) = 0;
 
   /** Claim perturbation slots for vector modes. Default: no-op (most species are scalar-only). */
-  virtual void RegisterVectorPerturbationIndices(perturb_vector* /*pv*/, int& /*index_pt*/,
-                                                  const perturb_workspace* /*ppw*/,
-                                                  int /*gauge*/) {}
+  virtual void RegisterVectorPerturbationIndices(perturb_vector* /*pv*/,
+                                                 int& /*index_pt*/,
+                                                 const perturb_workspace* /*ppw*/,
+                                                 int /*gauge*/) {}
 
   /** Claim perturbation slots for tensor modes. Default: no-op (most species are scalar-only). */
-  virtual void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/, int& /*index_pt*/,
-                                                  const perturb_workspace* /*ppw*/,
-                                                  int /*gauge*/) {}
+  virtual void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/,
+                                                 int& /*index_pt*/,
+                                                 const perturb_workspace* /*ppw*/,
+                                                 int /*gauge*/) {}
 
   /**
    * Contribute to dy for the scalar perturbation ODE at conformal time tau.
@@ -158,17 +167,21 @@ public:
    * cross-species state (delta_g, theta_g, theta_b, ...), and approximation flags.
    */
   virtual void PerturbDerivs(double tau,
-                               const double* y,
-                               double* dy,
-                               const perturb_parameters_and_workspace& ppaw) = 0;
+                             const double* y,
+                             double* dy,
+                             const perturb_parameters_and_workspace& ppaw) = 0;
 
   /** Contribute to dy for the vector perturbation ODE. Default: no-op. */
-  virtual void PerturbVectorDerivs(double /*tau*/, const double* /*y*/, double* /*dy*/,
-                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
+  virtual void PerturbVectorDerivs(double /*tau*/,
+                                   const double* /*y*/,
+                                   double* /*dy*/,
+                                   const perturb_parameters_and_workspace& /*ppaw*/) {}
 
   /** Contribute to dy for the tensor perturbation ODE. Default: no-op. */
-  virtual void PerturbTensorDerivs(double /*tau*/, const double* /*y*/, double* /*dy*/,
-                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
+  virtual void PerturbTensorDerivs(double /*tau*/,
+                                   const double* /*y*/,
+                                   double* /*dy*/,
+                                   const perturb_parameters_and_workspace& /*ppaw*/) {}
 
   /**
    * Fractional density perturbation delta = delta_rho / rho.
@@ -178,20 +191,28 @@ public:
    * @param ppw      Per-thread workspace; provides scalar_ctx, accumulated stress-energy,
    *                 pvecthermo, and approximation flags for species that need them.
    */
-  virtual double Delta(const perturb_vector* pv, const double* y,
-                       const double* pvecback, const perturb_workspace* ppw) const = 0;
+  virtual double Delta(const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const = 0;
 
   /** Velocity divergence theta. */
-  virtual double Theta(const perturb_vector* pv, const double* y,
-                       const double* pvecback, const perturb_workspace* ppw) const = 0;
+  virtual double Theta(const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const = 0;
 
   /** Pressure perturbation delta_p. */
-  virtual double DeltaP(const perturb_vector* pv, const double* y,
-                        const double* pvecback, const perturb_workspace* ppw) const = 0;
+  virtual double DeltaP(const perturb_vector* pv,
+                        const double* y,
+                        const double* pvecback,
+                        const perturb_workspace* ppw) const = 0;
 
   /** (rho + p) * sigma: anisotropic stress contribution to Einstein equations. */
-  virtual double RhoPlusPShear(const perturb_vector* pv, const double* y,
-                               const double* pvecback, const perturb_workspace* ppw) const = 0;
+  virtual double RhoPlusPShear(const perturb_vector* pv,
+                               const double* y,
+                               const double* pvecback,
+                               const perturb_workspace* ppw) const = 0;
 
   // ── Stage 1: Output ──────────────────────────────────────────────────────
 
@@ -202,11 +223,11 @@ public:
    * sections to preserve the historical transfer-column ordering.
    * Use writer.Add(title, mod.index_tp_XXX_, active) — writer looks up tk[tp_index].
    */
-  virtual void WriteOutputColumns(PerturbColumnWriter& /*writer*/,
-                                    const PerturbationsModule& /*mod*/,
-                                    enum file_format /*fmt*/,
-                                    TransferColumnSection /*section*/ = TransferColumnSection::all) const
-  {}
+  virtual void WriteOutputColumns(
+      PerturbColumnWriter& /*writer*/,
+      const PerturbationsModule& /*mod*/,
+      enum file_format /*fmt*/,
+      TransferColumnSection /*section*/ = TransferColumnSection::all) const {}
 
   /**
    * Append this species' time-evolution variables to writer.
@@ -216,10 +237,10 @@ public:
    * Use writer.Add(title, computed_value, active).
    */
   virtual void PrintVariables(PerturbColumnWriter& /*writer*/,
-                               double /*tau*/,
-                               const double* /*y*/,
-                               const PerturbationsModule& /*mod*/,
-                               const perturb_workspace* /*ppw*/) const {}
+                              double /*tau*/,
+                              const double* /*y*/,
+                              const PerturbationsModule& /*mod*/,
+                              const perturb_workspace* /*ppw*/) const {}
 
   // ── Stage 2: Source filling ───────────────────────────────────────────────
 
@@ -231,8 +252,8 @@ public:
    * All addressing (index_md, index_ic, index_k, index_tau) is in ctx.
    */
   virtual void FillSources(const double* /*y*/,
-                             const double* /*dy*/,
-                             PerturbSourceContext& /*ctx*/) {}
+                           const double* /*dy*/,
+                           PerturbSourceContext& /*ctx*/) {}
 
   // ── Stage 3: Initial conditions ───────────────────────────────────────────
 
@@ -243,12 +264,11 @@ public:
    * Guard each IC type: if (ctx.index_ic == ctx.p_mod->index_ic_ad_) { ... }
    * Newtonian gauge transformation is handled by the module after this loop.
    */
-  virtual void ApplyInitialConditions(double* /*y*/,
-                                       const PerturbIcContext& /*ctx*/) {}
+  virtual void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) {}
 
-protected:
+ protected:
   BaseSpecies(std::string name, EnergyType energy_type)
-    : name_(std::move(name)), energy_type_(energy_type) {}
+      : name_(std::move(name)), energy_type_(energy_type) {}
 
   std::string name_;
   EnergyType energy_type_;

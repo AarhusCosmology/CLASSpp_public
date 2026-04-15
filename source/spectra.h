@@ -15,7 +15,6 @@
  */
 
 struct spectra {
-
   /** @name - input parameters initialized by user in input module
       (all other quantities are computed in this module, given these parameters
       and the content of the 'background', 'perturbs', 'transfers' and
@@ -23,7 +22,8 @@ struct spectra {
 
   //@{
 
-  double z_max_pk;  /**< maximum value of z at which matter spectrum P(k,z) will be evaluated; keep fixed to zero if P(k) only needed today */
+  double
+      z_max_pk; /**< maximum value of z at which matter spectrum P(k,z) will be evaluated; keep fixed to zero if P(k) only needed today */
 
   int non_diag = 0; /**< sets the number of cross-correlation spectra
                    that you want to calculate: 0 means only
@@ -31,13 +31,11 @@ struct spectra {
                    and number of bins minus one means all
                    correlations */
 
-  
-
   /** @name - technical parameters */
 
   //@{
 
-  struct nonlinear * pnl; /**< a pointer to the nonlinear structure is
+  struct nonlinear* pnl; /**< a pointer to the nonlinear structure is
                             stored in the spectra structure. This odd,
                             unusual and unelegant feature has been
                             introduced in v2.8 in order to keep in use
@@ -47,7 +45,8 @@ struct spectra {
                             deprecated functions are removed, it will
                             be possible to remove also this pointer. */
 
-  short spectra_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short spectra_verbose =
+      0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   ErrorMsg error_message; /**< zone for writing error messages */
 
@@ -63,8 +62,7 @@ struct spectra {
 extern "C" {
 #endif
 
-
-  /* end deprecated functions */
+/* end deprecated functions */
 
 #ifdef __cplusplus
 }

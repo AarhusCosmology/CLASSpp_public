@@ -4,11 +4,10 @@
 #include "input_module.h"
 
 class Cosmology {
-public:
-  Cosmology(FileContent& fc)
-  : input_module_ptr_(InputModulePtr(new InputModule(fc))) {}
+ public:
+  Cosmology(FileContent& fc) : input_module_ptr_(InputModulePtr(new InputModule(fc))) {}
   Cosmology(std::unique_ptr<InputModule> input_module)
-  : input_module_ptr_(std::move(input_module)) {}
+      : input_module_ptr_(std::move(input_module)) {}
 
   InputModulePtr& GetInputModule();
   BackgroundModulePtr& GetBackgroundModule();
@@ -20,7 +19,7 @@ public:
   SpectraModulePtr& GetSpectraModule();
   LensingModulePtr& GetLensingModule();
 
-private:
+ private:
   InputModulePtr input_module_ptr_;
   BackgroundModulePtr background_module_ptr_;
   ThermodynamicsModulePtr thermodynamics_module_ptr_;
@@ -31,4 +30,4 @@ private:
   SpectraModulePtr spectra_module_ptr_;
   LensingModulePtr lensing_module_ptr_;
 };
-#endif //COSMOLOGY_H
+#endif  //COSMOLOGY_H

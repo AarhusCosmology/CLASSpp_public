@@ -1,8 +1,9 @@
 #pragma once
-#include "base_species.h"
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "base_species.h"
 
 /**
  * CompositeSpecies: a BaseSpecies that owns N child species and acts as a
@@ -21,54 +22,69 @@
  * These are what the Einstein equations need.
  */
 class CompositeSpecies : public BaseSpecies {
-public:
+ public:
   CompositeSpecies(std::string name, EnergyType energy_type)
-    : BaseSpecies(std::move(name), energy_type) {}
+      : BaseSpecies(std::move(name), energy_type) {}
 
   // ── Registration ────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
-  void RegisterPerturbationIndices(perturb_vector* pv, const precision* ppr,
+  void RegisterPerturbationIndices(perturb_vector* pv,
+                                   const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void RegisterVectorPerturbationIndices(perturb_vector* pv, int& index_pt,
+  void RegisterVectorPerturbationIndices(perturb_vector* pv,
+                                         int& index_pt,
                                          const perturb_workspace* ppw,
                                          int gauge) override;
-  void RegisterTensorPerturbationIndices(perturb_vector* pv, int& index_pt,
-                                          const perturb_workspace* ppw,
-                                          int gauge) override;
+  void RegisterTensorPerturbationIndices(perturb_vector* pv,
+                                         int& index_pt,
+                                         const perturb_workspace* ppw,
+                                         int gauge) override;
 
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
-  void ComputeBackground(double a_rel, const double* pvecback_B,
-                         double* pvecback) override;
-  void BackgroundDerivs(double tau, const double* y, double* dy,
-                        const double* pvecback) override;
+  void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
+  void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double DpDloga(const double* pvecback) const override;
 
   // ── Perturbations ────────────────────────────────────────────────────────
-  void PerturbDerivs(double tau, const double* y, double* dy,
+  void PerturbDerivs(double tau,
+                     const double* y,
+                     double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
-  void PerturbVectorDerivs(double tau, const double* y, double* dy,
-                            const perturb_parameters_and_workspace& ppaw) override;
-  void PerturbTensorDerivs(double tau, const double* y, double* dy,
-                            const perturb_parameters_and_workspace& ppaw) override;
+  void PerturbVectorDerivs(double tau,
+                           const double* y,
+                           double* dy,
+                           const perturb_parameters_and_workspace& ppaw) override;
+  void PerturbTensorDerivs(double tau,
+                           const double* y,
+                           double* dy,
+                           const perturb_parameters_and_workspace& ppaw) override;
 
   // Weighted averages: see class doc-comment above for weighting details.
-  double Delta(const perturb_vector* pv, const double* y,
-               const double* pvecback, const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv, const double* y,
-               const double* pvecback, const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv, const double* y,
-                const double* pvecback, const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv, const double* y,
-                       const double* pvecback, const perturb_workspace* ppw) const override;
+  double Delta(const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+  double Theta(const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+  double DeltaP(const perturb_vector* pv,
+                const double* y,
+                const double* pvecback,
+                const perturb_workspace* ppw) const override;
+  double RhoPlusPShear(const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
 
-protected:
+ protected:
   std::vector<std::unique_ptr<BaseSpecies>> children_;
 
   /**
@@ -76,6 +92,8 @@ protected:
    * all children have written their free-streaming contributions.
    * Default: no-op.
    */
-  virtual void AddCouplingDerivs(double tau, const double* y, double* dy,
+  virtual void AddCouplingDerivs(double tau,
+                                 const double* y,
+                                 double* dy,
                                  const perturb_parameters_and_workspace& ppaw);
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+
 #include "common.h"  // for file_format, _TRUE_, _FALSE_, class_store_* macros
 
 // Forward declarations
@@ -19,9 +20,9 @@ struct PerturbScalarContext {
   double k = 0., k2 = 0.;
   double a = 0., a2 = 0., a_prime_over_a = 0.;
   double metric_continuity = 0.;
-  double metric_euler = 0.;
-  double metric_shear = 0.;
-  double metric_ufa_class = 0.;
+  double metric_euler      = 0.;
+  double metric_shear      = 0.;
+  double metric_ufa_class  = 0.;
   double cotKgen = 0., s2_squared = 1.;
   /** photon delta/theta (RSA-corrected) */
   double delta_g = 0., theta_g = 0.;
@@ -51,20 +52,20 @@ struct PerturbScalarContext {
  *   - PrintVariables    : Add(title, value,    active)  — value passed directly
  */
 class PerturbColumnWriter {
-public:
+ public:
   // Title mode (used from perturb_output_titles and perturb_prepare_k_output)
-  explicit PerturbColumnWriter(char* titles)
-    : titles_(titles) {}
+  explicit PerturbColumnWriter(char* titles) : titles_(titles) {}
 
   // Data mode for WriteOutputColumns: value = tk[tp_index]
   PerturbColumnWriter(double* dataptr, const double* tk, int& storeidx)
-    : dataptr_(dataptr), tk_(tk), storeidx_(&storeidx) {}
+      : dataptr_(dataptr), tk_(tk), storeidx_(&storeidx) {}
 
   // Data mode for PrintVariables: value passed directly
-  PerturbColumnWriter(double* dataptr, int& storeidx)
-    : dataptr_(dataptr), storeidx_(&storeidx) {}
+  PerturbColumnWriter(double* dataptr, int& storeidx) : dataptr_(dataptr), storeidx_(&storeidx) {}
 
-  bool IsTitleMode() const { return titles_ != nullptr; }
+  bool IsTitleMode() const {
+    return titles_ != nullptr;
+  }
 
   // For WriteOutputColumns: species pass a tp_index; writer looks up tk[tp_index]
   void Add(const char* title, int tp_index, bool active);
@@ -72,11 +73,11 @@ public:
   // For PrintVariables: species pass the value directly
   void Add(const char* title, double value, bool active);
 
-private:
-  char*         titles_   = nullptr;
-  double*       dataptr_  = nullptr;
-  const double* tk_       = nullptr;
-  int*          storeidx_ = nullptr;
+ private:
+  char* titles_     = nullptr;
+  double* dataptr_  = nullptr;
+  const double* tk_ = nullptr;
+  int* storeidx_    = nullptr;
 };
 
 // ── PerturbSourceContext ─────────────────────────────────────────────────────
@@ -85,16 +86,16 @@ private:
  * Bundles workspace, addressing info, and pre-computed N-body gauge corrections.
  */
 struct PerturbSourceContext {
-  PerturbationsModule* p_mod   = nullptr;
-  perturb_workspace*   ppw     = nullptr;
-  int index_md  = 0;
-  int index_ic  = 0;
-  int index_k   = 0;
-  int index_tau = 0;
-  double k             = 0.;
-  double a_rel         = 0.;
-  double a2_rel        = 0.;
-  double a_prime_over_a = 0.;
+  PerturbationsModule* p_mod = nullptr;
+  perturb_workspace* ppw     = nullptr;
+  int index_md               = 0;
+  int index_ic               = 0;
+  int index_k                = 0;
+  int index_tau              = 0;
+  double k                   = 0.;
+  double a_rel               = 0.;
+  double a2_rel              = 0.;
+  double a_prime_over_a      = 0.;
   // Pre-computed N-body gauge corrections (0 when not has_Nbody_gauge_transfers)
   double theta_over_k2 = 0.;
   double theta_shift   = 0.;
@@ -126,9 +127,9 @@ struct PerturbIcContext {
   // Kinematics
   double k = 0., tau = 0., a = 0., a_prime_over_a = 0.;
   int index_ic = 0;
-  int gauge = 0;
+  int gauge    = 0;
   // Pointers
-  perturb_workspace*          ppw   = nullptr;
-  const precision*            ppr   = nullptr;
-  const PerturbationsModule*  p_mod = nullptr;
+  perturb_workspace* ppw           = nullptr;
+  const precision* ppr             = nullptr;
+  const PerturbationsModule* p_mod = nullptr;
 };

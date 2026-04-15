@@ -10,15 +10,13 @@
  *
  * Called by background_solve().
  */
-int gt_init(
-  growTable* self /***< a pointer on an empty growTable */
-  ) {
-
+int gt_init(growTable* self /***< a pointer on an empty growTable */
+) {
   self->buffer_storage.resize(_GT_INITSIZE_);
   self->buffer = self->buffer_storage.data();
-  self->sz=_GT_INITSIZE_;
-  self->csz=0;
-  self->freeze=_FALSE_;  /**< This line added by JL */
+  self->sz     = _GT_INITSIZE_;
+  self->csz    = 0;
+  self->freeze = _FALSE_; /**< This line added by JL */
   return _SUCCESS_;
 }
 
@@ -28,44 +26,41 @@ int gt_init(
  * Called by background_solve().
  */
 int gt_add(
-  growTable* self, /**< a growTable*/
-  long idx,        /**< index at wich to add the data (in bytes). #_GT_END_ means the end of the currently written data*/
-  void* data,      /**< data to be added*/
-  long sz          /**< size of the data (in bytes)*/
-  ) {
+    growTable* self, /**< a growTable*/
+    long
+        idx, /**< index at wich to add the data (in bytes). #_GT_END_ means the end of the currently written data*/
+    void* data, /**< data to be added*/
+    long sz     /**< size of the data (in bytes)*/
+) {
   long ridx;
-  void *res;
+  void* res;
 
   /** - assumes the growTable is correctly initialized */
 
   class_test(self->freeze == _TRUE_,
-	     self->error_message,
-	     "cannot add any more data in the growTable (freeze is on)");
+             self->error_message,
+             "cannot add any more data in the growTable (freeze is on)");
 
-  if (idx==_GT_END_) {
-    ridx=self->csz;
+  if (idx == _GT_END_) {
+    ridx = self->csz;
   }
   else {
-    ridx=idx;
+    ridx = idx;
   }
-  class_test(ridx<0,
-	     self->error_message,
-	     "Don't know what to do with idx=%ld",ridx);
+  class_test(ridx < 0, self->error_message, "Don't know what to do with idx=%ld", ridx);
 
-  if (ridx+sz>self->sz) {
+  if (ridx + sz > self->sz) {
     /** - test -> pass -> ok we need to grow */
     while (ridx + sz > self->sz) {
-      self->sz=self->sz*_GT_FACTOR_;
+      self->sz = self->sz * _GT_FACTOR_;
     }
     self->buffer_storage.resize(self->sz);
     self->buffer = self->buffer_storage.data();
   }
 
-  res=memcpy((void*) (self->buffer+ridx),(void*) data,(size_t) sz);
-  class_test(res!=self->buffer+ridx,
-	     self->error_message,
-	     "Cannot add data to growTable");
-  self->csz=ridx+sz;
+  res = memcpy((void*) (self->buffer + ridx), (void*) data, (size_t) sz);
+  class_test(res != self->buffer + ridx, self->error_message, "Cannot add data to growTable");
+  self->csz = ridx + sz;
 
   return _SUCCESS_;
 }
@@ -75,26 +70,23 @@ int gt_add(
  *
  * Not called.
  */
-int gt_retrieve(
-  growTable *self, /**< a growTable*/
-  long idx,        /**< index at wich to retrieve the data (in bytes).*/
-  long sz,         /**< size of the data (in bytes)*/
-  void* data       /**< OUTPUT : data must be allocated to ::sz bytes*/
-  ) {
-  void *res;
+int gt_retrieve(growTable* self, /**< a growTable*/
+                long idx,        /**< index at wich to retrieve the data (in bytes).*/
+                long sz,         /**< size of the data (in bytes)*/
+                void* data       /**< OUTPUT : data must be allocated to ::sz bytes*/
+) {
+  void* res;
 
-  class_test(idx<0,
-	     self->error_message,
-	     "don't know what to do with idx=%ld",idx);
+  class_test(idx < 0, self->error_message, "don't know what to do with idx=%ld", idx);
 
-  class_test((idx>self->csz) || (idx+sz>self->csz),
-	     self->error_message,
-	     "not enough data in growTable");
+  class_test((idx > self->csz) || (idx + sz > self->csz),
+             self->error_message,
+             "not enough data in growTable");
 
-  res=memcpy(data,self->buffer+idx,sz);
-  class_test(res!=self->buffer+idx,
-	     self->error_message,
-	     "cannot retrieve data from the growTable");
+  res = memcpy(data, self->buffer + idx, sz);
+  class_test(res != self->buffer + idx,
+             self->error_message,
+             "cannot retrieve data from the growTable");
 
   return _SUCCESS_;
 }
@@ -105,10 +97,10 @@ int gt_retrieve(
  * Not called.
  */
 int gt_retrieveAll(
-  growTable *self, /**< a growTable*/
-  void* data       /**< OUTPUT : data must be allocated to the size of the growTable (see gt_getSize)*/
-  ) {
-  return gt_retrieve(self,0,self->csz,data);
+    growTable* self, /**< a growTable*/
+    void* data /**< OUTPUT : data must be allocated to the size of the growTable (see gt_getSize)*/
+) {
+  return gt_retrieve(self, 0, self->csz, data);
 }
 
 /**
@@ -116,14 +108,11 @@ int gt_retrieveAll(
  *
  *  Not called.
  */
-int gt_getSize(
-  growTable* self,/**< a growTable*/
-  long *idx /**< OUTPUT : the size of the growTable ::self*/
-  ) {
-  class_test(self->csz<0,
-	     self->error_message,
-	     "growTable does not make sense");
-  *idx=self->csz;
+int gt_getSize(growTable* self, /**< a growTable*/
+               long* idx        /**< OUTPUT : the size of the growTable ::self*/
+) {
+  class_test(self->csz < 0, self->error_message, "growTable does not make sense");
+  *idx = self->csz;
   return _SUCCESS_;
 }
 
@@ -133,16 +122,14 @@ int gt_getSize(
  *
  * Called by background_solve().
  */
-int gt_getPtr(
-  growTable* self, /**< a growTable*/
-  void** ptr       /**< OUTPUT : pointer on the data */
-  ) {
-  self->freeze=_TRUE_;
-  *ptr=self->buffer;
+int gt_getPtr(growTable* self, /**< a growTable*/
+              void** ptr       /**< OUTPUT : pointer on the data */
+) {
+  self->freeze = _TRUE_;
+  *ptr         = self->buffer;
 
   return _SUCCESS_;
 }
-
 
 /**
  * free the growTable
@@ -152,10 +139,10 @@ int gt_getPtr(
 int gt_free(growTable* self) {
   self->buffer_storage.clear();
   self->buffer_storage.shrink_to_fit();
-  self->buffer=nullptr;
-  self->csz=-1;
-  self->sz=-1;
-  self->freeze=_FALSE_;  /**< This line added by JL */
+  self->buffer = nullptr;
+  self->csz    = -1;
+  self->sz     = -1;
+  self->freeze = _FALSE_; /**< This line added by JL */
 
   return _SUCCESS_;
 }

@@ -3,8 +3,9 @@
 #ifndef __THERMODYNAMICS__
 #define __THERMODYNAMICS__
 
-#include "background.h"
 #include <vector>
+
+#include "background.h"
 //#include "arrays.h"
 //#include "helium.h"
 //#include "hydrogen.h"
@@ -13,22 +14,19 @@
  * List of possible recombination algorithms.
  */
 
-enum recombination_algorithm {
-  recfast,
-  hyrec
-};
+enum recombination_algorithm { recfast, hyrec };
 
 /**
  * List of possible reionization schemes.
  */
 
 enum reionization_parametrization {
-  reio_none, /**< no reionization */
-  reio_camb,  /**< reionization parameterized like in CAMB */
-  reio_bins_tanh,  /**< binned reionization history with tanh inteprolation between bins */
-  reio_half_tanh,  /**< half a tanh, instead of the full tanh */
-  reio_many_tanh,  /**< similar to reio_camb but with more than one tanh */
-  reio_inter       /**< linear interpolation between specified points */
+  reio_none,      /**< no reionization */
+  reio_camb,      /**< reionization parameterized like in CAMB */
+  reio_bins_tanh, /**< binned reionization history with tanh inteprolation between bins */
+  reio_half_tanh, /**< half a tanh, instead of the full tanh */
+  reio_many_tanh, /**< similar to reio_camb but with more than one tanh */
+  reio_inter      /**< linear interpolation between specified points */
 };
 
 /**
@@ -44,8 +42,9 @@ enum reionization_z_or_tau {
  * Two useful smooth step functions, for smoothing transitions in recfast.
  */
 
-#define f1(x) (-0.75*x*(x*x/3.-1.)+0.5)  /**< goes from 0 to 1 when x goes from -1 to 1 */
-#define f2(x) (x*x*(0.5-x/3.)*6.)        /**< goes from 0 to 1 when x goes from  0 to 1 */
+#define f1(x) \
+  (-0.75 * x * (x * x / 3. - 1.) + 0.5)     /**< goes from 0 to 1 when x goes from -1 to 1 */
+#define f2(x) (x * x * (0.5 - x / 3.) * 6.) /**< goes from 0 to 1 when x goes from  0 to 1 */
 
 #define _BBN_ -1
 
@@ -58,29 +57,31 @@ enum reionization_z_or_tau {
  * used for interpolation in other modules.
  */
 
-struct thermo
-{
+struct thermo {
   /** @name - input parameters initialized by user in input module
    *  (all other quantities are computed in this module, given these parameters
    *   and the content of the 'precision' and 'background' structures) */
 
   //@{
 
-  double YHe = _BBN_;  /**< \f$ Y_{He} \f$: primordial helium fraction */
+  double YHe = _BBN_; /**< \f$ Y_{He} \f$: primordial helium fraction */
 
   enum recombination_algorithm recombination = recfast; /**< recombination code */
 
   enum reionization_parametrization reio_parametrization = reio_camb; /**< reionization scheme */
 
-  enum reionization_z_or_tau reio_z_or_tau = reio_z; /**< is the input parameter the reionization redshift or optical depth? */
+  enum reionization_z_or_tau reio_z_or_tau =
+      reio_z; /**< is the input parameter the reionization redshift or optical depth? */
 
   double tau_reio = 0.0925; /**< if above set to tau, input value of reionization optical depth */
 
-  double z_reio = 11.357;   /**< if above set to z,   input value of reionization redshift */
+  double z_reio = 11.357; /**< if above set to z,   input value of reionization redshift */
 
-  short compute_cb2_derivatives = _FALSE_; /**< do we want to include in computation derivatives of baryon sound speed? */
+  short compute_cb2_derivatives =
+      _FALSE_; /**< do we want to include in computation derivatives of baryon sound speed? */
 
-  short compute_damping_scale = _FALSE_; /**< do we want to compute the simplest analytic approximation to the photon damping (or diffusion) scale? */
+  short compute_damping_scale =
+      _FALSE_; /**< do we want to compute the simplest analytic approximation to the photon damping (or diffusion) scale? */
 
   /** parameters for reio_camb */
 
@@ -96,41 +97,45 @@ struct thermo
 
   int binned_reio_num = 0; /**< with how many bins do we want to describe reionization? */
 
-  double * binned_reio_z = nullptr; /**< central z value for each bin */
+  double* binned_reio_z = nullptr; /**< central z value for each bin */
   std::vector<double> binned_reio_z_storage;
 
-  double * binned_reio_xe = nullptr; /**< imposed \f$ X_e(z)\f$ value at center of each bin */
+  double* binned_reio_xe = nullptr; /**< imposed \f$ X_e(z)\f$ value at center of each bin */
   std::vector<double> binned_reio_xe_storage;
 
-  double binned_reio_step_sharpness = 0.3; /**< sharpness of tanh() step interpolating between binned values */
+  double binned_reio_step_sharpness =
+      0.3; /**< sharpness of tanh() step interpolating between binned values */
 
   /** parameters for reio_many_tanh */
 
   int many_tanh_num = 0; /**< with how many jumps do we want to describe reionization? */
 
-  double * many_tanh_z = nullptr; /**< central z value for each tanh jump */
+  double* many_tanh_z = nullptr; /**< central z value for each tanh jump */
   std::vector<double> many_tanh_z_storage;
 
-  double * many_tanh_xe = nullptr; /**< imposed \f$ X_e(z)\f$ value at the end of each jump (ie at later times)*/
+  double* many_tanh_xe =
+      nullptr; /**< imposed \f$ X_e(z)\f$ value at the end of each jump (ie at later times)*/
   std::vector<double> many_tanh_xe_storage;
 
   double many_tanh_width = 0.5; /**< sharpness of tanh() steps */
 
-    /** parameters for reio_inter */
+  /** parameters for reio_inter */
 
   int reio_inter_num = 0; /**< with how many jumps do we want to describe reionization? */
 
-  double * reio_inter_z = nullptr; /**< discrete z values */
+  double* reio_inter_z = nullptr; /**< discrete z values */
   std::vector<double> reio_inter_z_storage;
 
-  double * reio_inter_xe = nullptr; /**< discrete \f$ X_e(z)\f$ values */
+  double* reio_inter_xe = nullptr; /**< discrete \f$ X_e(z)\f$ values */
   std::vector<double> reio_inter_xe_storage;
 
   /** parameters for energy injection */
 
-  double annihilation = 0.; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
+  double annihilation =
+      0.; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
 
-  short has_on_the_spot = _TRUE_; /**< flag to specify if we want to use the on-the-spot approximation **/
+  short has_on_the_spot =
+      _TRUE_; /**< flag to specify if we want to use the on-the-spot approximation **/
 
   double decay = 0.; /**< parameter describing CDM decay (f/tau, see e.g. 1109.6322)*/
 
@@ -157,25 +162,27 @@ struct thermo
 				redshift below which annihilation rate
 				is constant */
 
-  double annihilation_f_halo = 0.; /**< takes the contribution of DM annihilation in halos into account*/
+  double annihilation_f_halo =
+      0.; /**< takes the contribution of DM annihilation in halos into account*/
   double annihilation_z_halo = 30.; /**< characteristic redshift for DM annihilation in halos*/
 
-  double a_idm_dr = 0.;      /**< strength of the coupling between interacting dark matter and interacting dark radiation (idm-idr) */
-  double b_idr = 0.;         /**< strength of the self coupling for interacting dark radiation (idr-idr) */
-  double nindex_idm_dr = 4.; /**< temperature dependence of the interaction between dark matter and dark radiation */
-  double m_idm = 1.e11;         /**< interacting dark matter mass */
+  double a_idm_dr =
+      0.; /**< strength of the coupling between interacting dark matter and interacting dark radiation (idm-idr) */
+  double b_idr = 0.; /**< strength of the self coupling for interacting dark radiation (idr-idr) */
+  double nindex_idm_dr =
+      4.; /**< temperature dependence of the interaction between dark matter and dark radiation */
+  double m_idm = 1.e11; /**< interacting dark matter mass */
 
   //@}
-
 
   /** @name - technical parameters */
 
   //@{
 
-  short thermodynamics_verbose = 0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
+  short thermodynamics_verbose =
+      0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
-
 };
 
 /**
@@ -186,7 +193,6 @@ struct thermo
  */
 
 struct recombination {
-
   /** @name - indices of vector of thermodynamics variables related to recombination */
 
   //@{
@@ -206,7 +212,8 @@ struct recombination {
   //@{
 
   int rt_size; /**< number of lines (redshift steps) in the table */
-  std::vector<double> recombination_table; /**< table recombination_table[index_z*preco->re_size+index_re] with all other quantities (array of size preco->rt_size*preco->re_size) */
+  std::vector<double>
+      recombination_table; /**< table recombination_table[index_z*preco->re_size+index_re] with all other quantities (array of size preco->rt_size*preco->re_size) */
 
   //@}
 
@@ -215,29 +222,30 @@ struct recombination {
 
   //@{
 
-  double CDB; /**< defined as in RECFAST */
-  double CR;  /**< defined as in RECFAST */
-  double CK;  /**< defined as in RECFAST */
-  double CL;  /**< defined as in RECFAST */
-  double CT;  /**< defined as in RECFAST */
-  double fHe; /**< defined as in RECFAST */
-  double CDB_He; /**< defined as in RECFAST */
-  double CK_He;  /**< defined as in RECFAST */
-  double CL_He;  /**< defined as in RECFAST */
-  double fu; /**< defined as in RECFAST */
-  double H_frac; /**< defined as in RECFAST */
-  double Tnow;   /**< defined as in RECFAST */
-  double Nnow;   /**< defined as in RECFAST */
-  double Bfact;  /**< defined as in RECFAST */
-  double CB1;    /**< defined as in RECFAST */
+  double CDB;     /**< defined as in RECFAST */
+  double CR;      /**< defined as in RECFAST */
+  double CK;      /**< defined as in RECFAST */
+  double CL;      /**< defined as in RECFAST */
+  double CT;      /**< defined as in RECFAST */
+  double fHe;     /**< defined as in RECFAST */
+  double CDB_He;  /**< defined as in RECFAST */
+  double CK_He;   /**< defined as in RECFAST */
+  double CL_He;   /**< defined as in RECFAST */
+  double fu;      /**< defined as in RECFAST */
+  double H_frac;  /**< defined as in RECFAST */
+  double Tnow;    /**< defined as in RECFAST */
+  double Nnow;    /**< defined as in RECFAST */
+  double Bfact;   /**< defined as in RECFAST */
+  double CB1;     /**< defined as in RECFAST */
   double CB1_He1; /**< defined as in RECFAST */
   double CB1_He2; /**< defined as in RECFAST */
-  double H0;  /**< defined as in RECFAST */
-  double YHe; /**< defined as in RECFAST */
+  double H0;      /**< defined as in RECFAST */
+  double YHe;     /**< defined as in RECFAST */
 
   /* parameters for energy injection */
 
-  double annihilation; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
+  double
+      annihilation; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
 
   short has_on_the_spot; /**< flag to specify if we want to use the on-the-spot approximation **/
 
@@ -270,7 +278,6 @@ struct recombination {
   double annihilation_z_halo; /**< characteristic redshift for DM annihilation in halos*/
 
   //@}
-
 };
 
 /**
@@ -281,7 +288,6 @@ struct recombination {
  */
 
 struct reionization {
-
   /** @name - indices of vector of thermodynamics variables related to reionization */
 
   //@{
@@ -292,7 +298,7 @@ struct reionization {
   int index_re_wb;         /**< baryon equation of state parameter \f$ w_b \f$ */
   int index_re_cb2;        /**< squared baryon adiabatic sound speed \f$ c_b^2 \f$ */
   int index_re_dkappadtau; /**< Thomson scattering rate \f$ d \kappa / d \tau\f$ (units 1/Mpc) */
-  int index_re_dkappadz;   /**< Thomson scattering rate with respect to redshift \f$ d \kappa / d z\f$ (units 1/Mpc) */
+  int index_re_dkappadz; /**< Thomson scattering rate with respect to redshift \f$ d \kappa / d z\f$ (units 1/Mpc) */
   int index_re_d3kappadz3; /**< second derivative of previous quantity with respect to redshift */
   int re_size;             /**< size of this vector */
 
@@ -302,8 +308,9 @@ struct reionization {
 
   //@{
 
-  int rt_size;                 /**< number of lines (redshift steps) in the table */
-  std::vector<double> reionization_table; /**< table reionization_table[index_z*preio->re_size+index_re] with all other quantities (array of size preio->rt_size*preio->re_size) */
+  int rt_size; /**< number of lines (redshift steps) in the table */
+  std::vector<double>
+      reionization_table; /**< table reionization_table[index_z*preio->re_size+index_re] with all other quantities (array of size preio->rt_size*preio->re_size) */
 
   //@}
 
@@ -311,7 +318,8 @@ struct reionization {
 
   //@{
 
-  double reionization_optical_depth; /**< reionization optical depth inferred from reionization history */
+  double
+      reionization_optical_depth; /**< reionization optical depth inferred from reionization history */
 
   //@}
 
@@ -321,31 +329,32 @@ struct reionization {
 
   /* parameters used by reio_camb */
 
-  int index_reio_redshift;  /**< hydrogen reionization redshift */
-  int index_reio_exponent;  /**< an exponent used in the function x_e(z) in the reio_camb scheme */
-  int index_reio_width;     /**< a width defining the duration of hydrogen reionization in the reio_camb scheme */
+  int index_reio_redshift; /**< hydrogen reionization redshift */
+  int index_reio_exponent; /**< an exponent used in the function x_e(z) in the reio_camb scheme */
+  int index_reio_width; /**< a width defining the duration of hydrogen reionization in the reio_camb scheme */
   int index_reio_xe_before; /**< ionization fraction at redshift 'reio_start' */
   int index_reio_xe_after;  /**< ionization fraction after full reionization */
   int index_helium_fullreio_fraction; /**< helium full reionization fraction inferred from primordial helium fraction */
   int index_helium_fullreio_redshift; /**< helium full reionization redshift */
-  int index_helium_fullreio_width;    /**< a width defining the duration of helium full reionization in the reio_camb scheme */
+  int index_helium_fullreio_width; /**< a width defining the duration of helium full reionization in the reio_camb scheme */
 
   /* parameters used by reio_bins_tanh, reio_many_tanh, reio_inter */
 
-  int reio_num_z; /**< number of reionization jumps */
+  int reio_num_z;         /**< number of reionization jumps */
   int index_reio_first_z; /**< redshift at which we start to impose reionization function */
   int index_reio_first_xe; /**< ionization fraction at redshift first_z (inferred from recombination code) */
   int index_reio_step_sharpness; /**< sharpness of tanh jump */
 
   /* parameters used by all schemes */
 
-  int index_reio_start;     /**< redshift above which hydrogen reionization neglected */
+  int index_reio_start; /**< redshift above which hydrogen reionization neglected */
 
   //@}
 
   /** @name - vector of such parameters, and its size */
 
-  std::vector<double> reionization_parameters; /**< vector containing all reionization parameters necessary to compute xe(z) */
+  std::vector<double>
+      reionization_parameters; /**< vector containing all reionization parameters necessary to compute xe(z) */
   int reio_num_params; /**< length of vector reionization_parameters */
 
   //@}
@@ -357,7 +366,6 @@ struct reionization {
   int index_reco_when_reio_start; /**< index of line in recombination table corresponding to first line of reionization table*/
 
   //@}
-
 };
 
 /**
@@ -398,13 +406,13 @@ struct reionization {
 #define _L_He2_ion_ 4.389088863e7
 #define _L_He_2s_ 1.66277434e7
 #define _L_He_2p_ 1.71134891e7
-#define	_A2P_s_		1.798287e9     /*updated like in recfast 1.4*/
-#define	_A2P_t_		177.58e0       /*updated like in recfast 1.4*/
-#define	_L_He_2Pt_	1.690871466e7  /*updated like in recfast 1.4*/
-#define	_L_He_2St_	1.5985597526e7 /*updated like in recfast 1.4*/
-#define	_L_He2St_ion_	3.8454693845e6 /*updated like in recfast 1.4*/
-#define	_sigma_He_2Ps_	1.436289e-22   /*updated like in recfast 1.4*/
-#define	_sigma_He_2Pt_	1.484872e-22   /*updated like in recfast 1.4*/
+#define _A2P_s_ 1.798287e9           /*updated like in recfast 1.4*/
+#define _A2P_t_ 177.58e0             /*updated like in recfast 1.4*/
+#define _L_He_2Pt_ 1.690871466e7     /*updated like in recfast 1.4*/
+#define _L_He_2St_ 1.5985597526e7    /*updated like in recfast 1.4*/
+#define _L_He2St_ion_ 3.8454693845e6 /*updated like in recfast 1.4*/
+#define _sigma_He_2Ps_ 1.436289e-22  /*updated like in recfast 1.4*/
+#define _sigma_He_2Pt_ 1.484872e-22  /*updated like in recfast 1.4*/
 
 //@}
 
@@ -418,12 +426,12 @@ struct reionization {
 #define _b_PPB_ -0.6166
 #define _c_PPB_ 0.6703
 #define _d_PPB_ 0.5300
-#define _T_0_ pow(10.,0.477121)   /* from recfast 1.4 */
-#define _a_VF_ pow(10.,-16.744)
+#define _T_0_ pow(10., 0.477121) /* from recfast 1.4 */
+#define _a_VF_ pow(10., -16.744)
 #define _b_VF_ 0.711
-#define _T_1_ pow(10.,5.114)
-#define	_a_trip_ pow(10.,-16.306) /* from recfast 1.4 */
-#define	_b_trip_ 0.761            /* from recfast 1.4 */
+#define _T_1_ pow(10., 5.114)
+#define _a_trip_ pow(10., -16.306) /* from recfast 1.4 */
+#define _b_trip_ 0.761             /* from recfast 1.4 */
 
 //@}
 
@@ -433,8 +441,8 @@ struct reionization {
 /* @endcond */
 //@{
 
-#define _YHE_BIG_ 0.5      /**< maximal \f$ Y_{He} \f$ */
-#define _YHE_SMALL_ 0.01   /**< minimal \f$ Y_{He} \f$ */
+#define _YHE_BIG_ 0.5    /**< maximal \f$ Y_{He} \f$ */
+#define _YHE_SMALL_ 0.01 /**< minimal \f$ Y_{He} \f$ */
 #define _Z_REC_MAX_ 2000.
 #define _Z_REC_MIN_ 500.
 

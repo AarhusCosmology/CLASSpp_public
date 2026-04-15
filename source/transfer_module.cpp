@@ -27,26 +27,29 @@
  * hence the routine transfer_functions_at_q() is actually never called.
  */
 
-#include "background_module.h"
-#include "thermodynamics_module.h"
-#include "perturbations_module.h"
-#include "nonlinear_module.h"
 #include "transfer_module.h"
+
+#include "background_module.h"
+#include "nonlinear_module.h"
+#include "perturbations_module.h"
+#include "thermodynamics_module.h"
 #include "thread_pool.h"
 
-TransferModule::TransferModule(InputModulePtr input_module, BackgroundModulePtr background_module, ThermodynamicsModulePtr thermodynamics_module, PerturbationsModulePtr perturbations_module, NonlinearModulePtr nonlinear_module)
-: BaseModule(std::move(input_module))
-, background_module_(std::move(background_module))
-, thermodynamics_module_(std::move(thermodynamics_module))
-, perturbations_module_(std::move(perturbations_module))
-, nonlinear_module_(std::move(nonlinear_module)) {
+TransferModule::TransferModule(InputModulePtr input_module,
+                               BackgroundModulePtr background_module,
+                               ThermodynamicsModulePtr thermodynamics_module,
+                               PerturbationsModulePtr perturbations_module,
+                               NonlinearModulePtr nonlinear_module)
+    : BaseModule(std::move(input_module)), background_module_(std::move(background_module)),
+      thermodynamics_module_(std::move(thermodynamics_module)),
+      perturbations_module_(std::move(perturbations_module)),
+      nonlinear_module_(std::move(nonlinear_module)) {
   transfer_init();
 }
 
 TransferModule::~TransferModule() {
   transfer_free();
 }
-
 
 /**
  * Transfer function \f$ \Delta_l^{X} (q) \f$ at a given wavenumber q.
@@ -76,23 +79,19 @@ TransferModule::~TransferModule() {
  * @return the error status
  */
 
-int TransferModule::transfer_functions_at_q(int index_md,
-                            int index_ic,
-                            int index_tt,
-                            int index_l,
-                            double q,
-                            double * transfer_function
-                            ) {
+int TransferModule::transfer_functions_at_q(
+    int index_md, int index_ic, int index_tt, int index_l, double q, double* transfer_function) {
   /** Summary: */
 
   /** - interpolate in pre-computed table using array_interpolate_two() */
-  class_call(array_interpolate_two(
-                                   q_.data(),
+  class_call(array_interpolate_two(q_.data(),
                                    1,
                                    0,
-                                   transfer_[index_md].data()
-                                   +((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)
-                                   *q_size_,
+                                   transfer_[index_md].data() +
+                                       ((index_ic * tt_size_[index_md] + index_tt) *
+                                            l_size_[index_md] +
+                                        index_l) *
+                                           q_size_,
                                    1,
                                    q_size_,
                                    q,
@@ -123,7 +122,6 @@ int TransferModule::transfer_functions_at_q(int index_md,
  */
 
 int TransferModule::transfer_init() {
-
   /** Summary: */
 
   /** - define local variables */
@@ -154,7 +152,7 @@ int TransferModule::transfer_init() {
     has_cls_ = _TRUE_;
 
   if (ptr->transfer_verbose > 0)
-    fprintf(stdout,"Computing transfers\n");
+    fprintf(stdout, "Computing transfers\n");
 
   /** - get number of modes (scalars, tensors...) */
 
@@ -164,17 +162,17 @@ int TransferModule::transfer_init() {
       from background / thermodynamics structures
       (only place where these structures are used in this module) */
 
-  tau0 = background_module_->conformal_age_;
+  tau0    = background_module_->conformal_age_;
   tau_rec = thermodynamics_module_->tau_rec_;
 
   /** - order of magnitude of the oscillation period of transfer functions */
 
-  q_period = 2.*_PI_/(tau0 - tau_rec)*thermodynamics_module_->angular_rescaling_;
+  q_period = 2. * _PI_ / (tau0 - tau_rec) * thermodynamics_module_->angular_rescaling_;
 
   /** - initialize all indices in the transfers structure and
       allocate all its arrays using transfer_indices_of_transfers() */
 
-  class_call(transfer_indices_of_transfers(q_period,pba->K,pba->sgnK),
+  class_call(transfer_indices_of_transfers(q_period, pba->K, pba->sgnK),
              error_message_,
              error_message_);
 
@@ -190,16 +188,16 @@ int TransferModule::transfer_init() {
 
   std::vector<std::vector<double*>> sources_spline_storage(md_size_);
   std::vector<std::vector<std::vector<double>>> spline_owned_storage(md_size_);
-  class_call(transfer_perturbation_source_spline(sources_storage, sources_spline_storage, spline_owned_storage),
+  class_call(transfer_perturbation_source_spline(sources_storage,
+                                                 sources_spline_storage,
+                                                 spline_owned_storage),
              error_message_,
              error_message_);
 
   /** - allocate and fill array describing the correspondence between perturbation types and transfer types */
 
   std::vector<std::vector<int>> tp_of_tt_storage(md_size_);
-  class_call(transfer_get_source_correspondence(tp_of_tt_storage),
-             error_message_,
-             error_message_);
+  class_call(transfer_get_source_correspondence(tp_of_tt_storage), error_message_, error_message_);
 
   /** - evaluate maximum number of sampled times in the transfer
       sources: needs to be known here, in order to allocate a large
@@ -211,9 +209,10 @@ int TransferModule::transfer_init() {
 
   /** - compute flat spherical bessel functions */
 
-  double xmax = q_[q_size_ - 1]*tau0;
+  double xmax = q_[q_size_ - 1] * tau0;
   if (pba->sgnK == -1 && index_q_flat_approximation_ < q_size_)
-    xmax *= sqrt(pba->sgnK*pba->K)/q_[q_size_ - 1]*(l_[l_size_max_ - 1] + 1)/asinh((l_[l_size_max_ - 1] + 1)/q_[q_size_ - 1]*sqrt(pba->sgnK*pba->K))*1.01;
+    xmax *= sqrt(pba->sgnK * pba->K) / q_[q_size_ - 1] * (l_[l_size_max_ - 1] + 1) /
+            asinh((l_[l_size_max_ - 1] + 1) / q_[q_size_ - 1] * sqrt(pba->sgnK * pba->K)) * 1.01;
 
   class_call(hyperspherical_HIS_create(0,
                                        1.,
@@ -239,9 +238,7 @@ int TransferModule::transfer_init() {
 
   /** - eventually read the selection and evolution functions */
 
-  class_call(transfer_global_selection_read(),
-             error_message_,
-             error_message_);
+  class_call(transfer_global_selection_read(), error_message_, error_message_);
 
   /** - precompute window function for integrated nCl/sCl quantities*/
   std::vector<double> window;
@@ -257,48 +254,64 @@ int TransferModule::transfer_init() {
   std::vector<double**> sources_spline(md_size_);
   std::vector<int*> tp_of_tt(md_size_);
   for (int index_md = 0; index_md < md_size_; ++index_md) {
-    sources[index_md] = sources_storage[index_md].data();
+    sources[index_md]        = sources_storage[index_md].data();
     sources_spline[index_md] = sources_spline_storage[index_md].data();
-    tp_of_tt[index_md] = tp_of_tt_storage[index_md].data();
+    tp_of_tt[index_md]       = tp_of_tt_storage[index_md].data();
   }
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<int>> future_output;
-    /** - loop over all wavenumbers (parallelized).*/
-    /* For each wavenumber: */
-    for (int index_q = 0; index_q < q_size_; index_q++) {
-    future_output.push_back(task_system.AsyncTask([this, tau_size_max, tp_of_tt, tau_rec, sources_spline, &BIS, tau0, index_q, sources, window_ptr] () {
+  /** - loop over all wavenumbers (parallelized).*/
+  /* For each wavenumber: */
+  for (int index_q = 0; index_q < q_size_; index_q++) {
+    future_output.push_back(task_system.AsyncTask([this,
+                                                   tau_size_max,
+                                                   tp_of_tt,
+                                                   tau_rec,
+                                                   sources_spline,
+                                                   &BIS,
+                                                   tau0,
+                                                   index_q,
+                                                   sources,
+                                                   window_ptr]() {
       struct transfer_workspace ptw = {};
-      class_call(transfer_workspace_init(&ptw, perturbations_module_->tau_size_, tau_size_max, pba->K, pba->sgnK, tau0 - thermodynamics_module_->tau_cut_, &BIS),
-        error_message_,
-        error_message_);
+      class_call(transfer_workspace_init(&ptw,
+                                         perturbations_module_->tau_size_,
+                                         tau_size_max,
+                                         pba->K,
+                                         pba->sgnK,
+                                         tau0 - thermodynamics_module_->tau_cut_,
+                                         &BIS),
+                 error_message_,
+                 error_message_);
 
       if (ptr->transfer_verbose > 2)
         printf("Compute transfer for wavenumber [%d/%d]\n", index_q, q_size_ - 1);
 
       /* Update interpolation structure: */
-      class_call(transfer_update_HIS(&ptw, index_q, tau0),
-                          error_message_,
-                          error_message_);
+      class_call(transfer_update_HIS(&ptw, index_q, tau0), error_message_, error_message_);
 
-      class_call(transfer_compute_for_each_q(tp_of_tt.data(), index_q, tau_size_max, tau_rec, sources.data(), sources_spline.data(), window_ptr, &ptw),
-                          error_message_,
-                          error_message_);
+      class_call(transfer_compute_for_each_q(tp_of_tt.data(),
+                                             index_q,
+                                             tau_size_max,
+                                             tau_rec,
+                                             sources.data(),
+                                             sources_spline.data(),
+                                             window_ptr,
+                                             &ptw),
+                 error_message_,
+                 error_message_);
       /* free workspace allocated inside parallel zone */
-      class_call(transfer_workspace_free(&ptw),
-                           error_message_,
-                           error_message_);
+      class_call(transfer_workspace_free(&ptw), error_message_, error_message_);
       return _SUCCESS_;
     }));
   } /* end of loop over wavenumber */
   for (std::future<int>& future : future_output) {
-      future.get();
+    future.get();
   }
   future_output.clear();
   /** - finally, temporary source tables are cleaned up by RAII */
 
-  class_call(hyperspherical_HIS_free(&BIS,error_message_),
-             error_message_,
-             error_message_);
+  class_call(hyperspherical_HIS_free(&BIS, error_message_), error_message_, error_message_);
   return _SUCCESS_;
 }
 
@@ -312,15 +325,11 @@ int TransferModule::transfer_init() {
  */
 
 int TransferModule::transfer_free() {
-
   if (has_cls_ == _TRUE_) {
-
     /* RAII: std::vector members are automatically cleaned up */
-
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -338,12 +347,11 @@ int TransferModule::transfer_free() {
  */
 
 int TransferModule::transfer_indices_of_transfers(double q_period, double K, int sgnK) {
-
   /** Summary: */
 
   /** - define local variables */
 
-  int index_md,index_tt,index_tt_common;
+  int index_md, index_tt, index_tt_common;
 
   /** - define indices for transfer types */
 
@@ -356,56 +364,53 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
   class_define_index(index_tt_t2_, ppt->has_cl_cmb_temperature, index_tt, 1);
   class_define_index(index_tt_e_, ppt->has_cl_cmb_polarization, index_tt, 1);
 
-  index_tt_common=index_tt;
+  index_tt_common = index_tt;
 
   /** - type indices for scalars */
 
   if (ppt->has_scalars == _TRUE_) {
-
     index_tt = index_tt_common;
 
-    class_define_index(index_tt_t0_,      ppt->has_cl_cmb_temperature,       index_tt, 1);
-    class_define_index(index_tt_t1_,      ppt->has_cl_cmb_temperature,       index_tt, 1);
-    class_define_index(index_tt_lcmb_,    ppt->has_cl_cmb_lensing_potential, index_tt, 1);
-    class_define_index(index_tt_density_, ppt->has_nc_density,               index_tt, ppt->selection_num);
-    class_define_index(index_tt_rsd_,     ppt->has_nc_rsd,                   index_tt, ppt->selection_num);
-    class_define_index(index_tt_d0_,      ppt->has_nc_rsd,                   index_tt, ppt->selection_num);
-    class_define_index(index_tt_d1_,      ppt->has_nc_rsd,                   index_tt, ppt->selection_num);
-    class_define_index(index_tt_nc_lens_, ppt->has_nc_lens,                  index_tt, ppt->selection_num);
-    class_define_index(index_tt_nc_g1_,   ppt->has_nc_gr,                    index_tt, ppt->selection_num);
-    class_define_index(index_tt_nc_g2_,   ppt->has_nc_gr,                    index_tt, ppt->selection_num);
-    class_define_index(index_tt_nc_g3_,   ppt->has_nc_gr,                    index_tt, ppt->selection_num);
-    class_define_index(index_tt_nc_g4_,   ppt->has_nc_gr,                    index_tt, ppt->selection_num);
-    class_define_index(index_tt_nc_g5_,   ppt->has_nc_gr,                    index_tt, ppt->selection_num);
-    class_define_index(index_tt_lensing_, ppt->has_cl_lensing_potential,     index_tt, ppt->selection_num);
+    class_define_index(index_tt_t0_, ppt->has_cl_cmb_temperature, index_tt, 1);
+    class_define_index(index_tt_t1_, ppt->has_cl_cmb_temperature, index_tt, 1);
+    class_define_index(index_tt_lcmb_, ppt->has_cl_cmb_lensing_potential, index_tt, 1);
+    class_define_index(index_tt_density_, ppt->has_nc_density, index_tt, ppt->selection_num);
+    class_define_index(index_tt_rsd_, ppt->has_nc_rsd, index_tt, ppt->selection_num);
+    class_define_index(index_tt_d0_, ppt->has_nc_rsd, index_tt, ppt->selection_num);
+    class_define_index(index_tt_d1_, ppt->has_nc_rsd, index_tt, ppt->selection_num);
+    class_define_index(index_tt_nc_lens_, ppt->has_nc_lens, index_tt, ppt->selection_num);
+    class_define_index(index_tt_nc_g1_, ppt->has_nc_gr, index_tt, ppt->selection_num);
+    class_define_index(index_tt_nc_g2_, ppt->has_nc_gr, index_tt, ppt->selection_num);
+    class_define_index(index_tt_nc_g3_, ppt->has_nc_gr, index_tt, ppt->selection_num);
+    class_define_index(index_tt_nc_g4_, ppt->has_nc_gr, index_tt, ppt->selection_num);
+    class_define_index(index_tt_nc_g5_, ppt->has_nc_gr, index_tt, ppt->selection_num);
+    class_define_index(index_tt_lensing_,
+                       ppt->has_cl_lensing_potential,
+                       index_tt,
+                       ppt->selection_num);
 
     tt_size_[perturbations_module_->index_md_scalars_] = index_tt;
-
   }
 
   /** - type indices for vectors */
 
   if (ppt->has_vectors == _TRUE_) {
-
     index_tt = index_tt_common;
 
-    class_define_index(index_tt_t1_, ppt->has_cl_cmb_temperature,  index_tt, 1);
-    class_define_index(index_tt_b_,  ppt->has_cl_cmb_polarization, index_tt, 1);
+    class_define_index(index_tt_t1_, ppt->has_cl_cmb_temperature, index_tt, 1);
+    class_define_index(index_tt_b_, ppt->has_cl_cmb_polarization, index_tt, 1);
 
     tt_size_[perturbations_module_->index_md_vectors_] = index_tt;
-
   }
 
   /** - type indices for tensors */
 
   if (ppt->has_tensors == _TRUE_) {
-
     index_tt = index_tt_common;
 
     class_define_index(index_tt_b_, ppt->has_cl_cmb_polarization, index_tt, 1);
 
     tt_size_[perturbations_module_->index_md_tensors_] = index_tt;
-
   }
 
   /** - allocate arrays of (k, l) values and transfer functions */
@@ -428,14 +433,10 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
 
   /** - get q values using transfer_get_q_list() */
 
-  class_call(transfer_get_q_list(q_period,K,sgnK),
-             error_message_,
-             error_message_);
+  class_call(transfer_get_q_list(q_period, K, sgnK), error_message_, error_message_);
 
   /** - get k values using transfer_get_k_list() */
-  class_call(transfer_get_k_list(K),
-             error_message_,
-             error_message_);
+  class_call(transfer_get_k_list(K), error_message_, error_message_);
 
   /* for testing, it can be useful to print the q list in a file: */
 
@@ -458,113 +459,143 @@ int TransferModule::transfer_indices_of_transfers(double q_period, double K, int
   */
 
   /** - get l values using transfer_get_l_list() */
-  class_call(transfer_get_l_list(),
-             error_message_,
-             error_message_);
+  class_call(transfer_get_l_list(), error_message_, error_message_);
 
   /** - loop over modes (scalar, etc). For each mode: */
 
   for (index_md = 0; index_md < md_size_; index_md++) {
-
     /** - allocate arrays of transfer functions, (transfer_[index_md])[index_ic][index_tt][index_l][index_k] */
-    transfer_[index_md].resize(perturbations_module_->ic_size_[index_md]*tt_size_[index_md]*l_size_[index_md]*q_size_);
-
+    transfer_[index_md].resize(perturbations_module_->ic_size_[index_md] * tt_size_[index_md] *
+                               l_size_[index_md] * q_size_);
   }
 
   return _SUCCESS_;
-
 }
 
-int TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(std::vector<std::vector<double*>>& sources,
-                                                                          std::vector<std::vector<std::vector<double>>>& owned_sources) {
-
+int TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(
+    std::vector<std::vector<double*>>& sources,
+    std::vector<std::vector<std::vector<double>>>& owned_sources) {
   for (int index_md = 0; index_md < md_size_; index_md++) {
-
-    sources[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
-    owned_sources[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
+    sources[index_md].resize(perturbations_module_->ic_size_[index_md] *
+                             perturbations_module_->tp_size_[index_md]);
+    owned_sources[index_md].resize(perturbations_module_->ic_size_[index_md] *
+                                   perturbations_module_->tp_size_[index_md]);
 
     for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
-
       for (int index_tp = 0; index_tp < perturbations_module_->tp_size_[index_md]; index_tp++) {
-
         if ((pnl->method != nl_none) && (_scalarsEXT_) &&
-            (((perturbations_module_->has_source_delta_m_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_delta_m_)) ||
-             ((perturbations_module_->has_source_delta_cb_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_delta_cb_)) ||
-             ((perturbations_module_->has_source_theta_m_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_theta_m_)) ||
-             ((perturbations_module_->has_source_theta_cb_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_theta_cb_)) ||
-             ((perturbations_module_->has_source_phi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_phi_)) ||
-             ((perturbations_module_->has_source_phi_prime_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_phi_prime_)) ||
-             ((perturbations_module_->has_source_phi_plus_psi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_phi_plus_psi_)) ||
-             ((perturbations_module_->has_source_psi_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_psi_)))) {
-
-          owned_sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].resize(perturbations_module_->k_size_[index_md]*perturbations_module_->tau_size_);
-          sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp] = owned_sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].data();
+            (((perturbations_module_->has_source_delta_m_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_delta_m_)) ||
+             ((perturbations_module_->has_source_delta_cb_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_delta_cb_)) ||
+             ((perturbations_module_->has_source_theta_m_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_theta_m_)) ||
+             ((perturbations_module_->has_source_theta_cb_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_theta_cb_)) ||
+             ((perturbations_module_->has_source_phi_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_phi_)) ||
+             ((perturbations_module_->has_source_phi_prime_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_phi_prime_)) ||
+             ((perturbations_module_->has_source_phi_plus_psi_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_phi_plus_psi_)) ||
+             ((perturbations_module_->has_source_psi_ == _TRUE_) &&
+              (index_tp == perturbations_module_->index_tp_psi_)))) {
+          owned_sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
+              .resize(perturbations_module_->k_size_[index_md] * perturbations_module_->tau_size_);
+          sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp] =
+              owned_sources[index_md]
+                           [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
+                               .data();
 
           for (int index_tau = 0; index_tau < perturbations_module_->tau_size_; index_tau++) {
             for (int index_k = 0; index_k < perturbations_module_->k_size_[index_md]; index_k++) {
-              if (((perturbations_module_->has_source_delta_cb_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_delta_cb_)) ||
-                  ((perturbations_module_->has_source_theta_cb_ == _TRUE_) && (index_tp == perturbations_module_->index_tp_theta_cb_))) {
-                sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp][index_tau*perturbations_module_->k_size_[index_md] + index_k] =
-                  perturbations_module_->sources_[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp][
-                    index_tau*perturbations_module_->k_size_[index_md] + index_k
-                  ]*nonlinear_module_->nl_corr_density_[nonlinear_module_->index_pk_cb_][index_tau*perturbations_module_->k_size_[index_md] + index_k];
+              if (((perturbations_module_->has_source_delta_cb_ == _TRUE_) &&
+                   (index_tp == perturbations_module_->index_tp_delta_cb_)) ||
+                  ((perturbations_module_->has_source_theta_cb_ == _TRUE_) &&
+                   (index_tp == perturbations_module_->index_tp_theta_cb_))) {
+                sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] +
+                                  index_tp][index_tau * perturbations_module_->k_size_[index_md] +
+                                            index_k] =
+                    perturbations_module_
+                        ->sources_[index_md]
+                                  [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
+                                  [index_tau * perturbations_module_->k_size_[index_md] + index_k] *
+                    nonlinear_module_
+                        ->nl_corr_density_[nonlinear_module_->index_pk_cb_]
+                                          [index_tau * perturbations_module_->k_size_[index_md] +
+                                           index_k];
               }
-              else{
-                sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp][index_tau*perturbations_module_->k_size_[index_md] + index_k] =
-                  perturbations_module_->sources_[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp][
-                    index_tau*perturbations_module_->k_size_[index_md] + index_k
-                  ]*nonlinear_module_->nl_corr_density_[nonlinear_module_->index_pk_m_][index_tau*perturbations_module_->k_size_[index_md] + index_k];
+              else {
+                sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] +
+                                  index_tp][index_tau * perturbations_module_->k_size_[index_md] +
+                                            index_k] =
+                    perturbations_module_
+                        ->sources_[index_md]
+                                  [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
+                                  [index_tau * perturbations_module_->k_size_[index_md] + index_k] *
+                    nonlinear_module_
+                        ->nl_corr_density_[nonlinear_module_->index_pk_m_]
+                                          [index_tau * perturbations_module_->k_size_[index_md] +
+                                           index_k];
               }
             }
           }
         }
         else {
-          sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp] =
-            const_cast<double*>(perturbations_module_->sources_[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].data());
+          sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp] =
+              const_cast<double*>(
+                  perturbations_module_
+                      ->sources_[index_md]
+                                [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
+                      .data());
         }
       }
     }
   }
 
   return _SUCCESS_;
-
 }
 
-
-int TransferModule::transfer_perturbation_source_spline(const std::vector<std::vector<double*>>& sources,
-                                                        std::vector<std::vector<double*>>& sources_spline_ptrs,
-                                                        std::vector<std::vector<std::vector<double>>>& sources_spline_storage) {
-
+int TransferModule::transfer_perturbation_source_spline(
+    const std::vector<std::vector<double*>>& sources,
+    std::vector<std::vector<double*>>& sources_spline_ptrs,
+    std::vector<std::vector<std::vector<double>>>& sources_spline_storage) {
   for (int index_md = 0; index_md < md_size_; index_md++) {
-
-    sources_spline_ptrs[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
-    sources_spline_storage[index_md].resize(perturbations_module_->ic_size_[index_md]*perturbations_module_->tp_size_[index_md]);
+    sources_spline_ptrs[index_md].resize(perturbations_module_->ic_size_[index_md] *
+                                         perturbations_module_->tp_size_[index_md]);
+    sources_spline_storage[index_md].resize(perturbations_module_->ic_size_[index_md] *
+                                            perturbations_module_->tp_size_[index_md]);
 
     for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
-
       for (int index_tp = 0; index_tp < perturbations_module_->tp_size_[index_md]; index_tp++) {
+        sources_spline_storage[index_md][index_ic * perturbations_module_->tp_size_[index_md] +
+                                         index_tp]
+            .resize(perturbations_module_->k_size_[index_md] * perturbations_module_->tau_size_);
+        sources_spline_ptrs[index_md][index_ic * perturbations_module_->tp_size_[index_md] +
+                                      index_tp] =
+            sources_spline_storage[index_md]
+                                  [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
+                                      .data();
 
-        sources_spline_storage[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].resize(perturbations_module_->k_size_[index_md]*perturbations_module_->tau_size_);
-        sources_spline_ptrs[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp] = sources_spline_storage[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp].data();
-
-        class_call(array_spline_table_columns2(const_cast<double*>(perturbations_module_->k_[index_md].data()),
-                                               perturbations_module_->k_size_[index_md],
-                                               sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
-                                               perturbations_module_->tau_size_,
-                                               sources_spline_ptrs[index_md][index_ic*perturbations_module_->tp_size_[index_md] + index_tp],
-                                               _SPLINE_EST_DERIV_,
-                                               error_message_),
+        class_call(array_spline_table_columns2(
+                       const_cast<double*>(perturbations_module_->k_[index_md].data()),
+                       perturbations_module_->k_size_[index_md],
+                       sources[index_md]
+                              [index_ic * perturbations_module_->tp_size_[index_md] + index_tp],
+                       perturbations_module_->tau_size_,
+                       sources_spline_ptrs[index_md]
+                                          [index_ic * perturbations_module_->tp_size_[index_md] +
+                                           index_tp],
+                       _SPLINE_EST_DERIV_,
+                       error_message_),
                    error_message_,
                    error_message_);
-
       }
     }
   }
 
   return _SUCCESS_;
-
 }
-
 
 /**
  * This routine defines the number and values of multipoles l for all modes.
@@ -573,10 +604,9 @@ int TransferModule::transfer_perturbation_source_spline(const std::vector<std::v
  */
 
 int TransferModule::transfer_get_l_list() {
-
   int index_l;
-  int l_max=0;
-  int increment,current_l;
+  int l_max = 0;
+  int increment, current_l;
   /** Summary: */
   /*
     fprintf(stderr,"rescaling %e logstep %e linstep %e\n",
@@ -588,58 +618,52 @@ int TransferModule::transfer_get_l_list() {
   /* check that largests need value of l_max */
 
   if (ppt->has_cls == _TRUE_) {
-
     if (ppt->has_scalars == _TRUE_) {
-
-      if ((ppt->has_cl_cmb_temperature == _TRUE_) ||
-          (ppt->has_cl_cmb_polarization == _TRUE_) ||
+      if ((ppt->has_cl_cmb_temperature == _TRUE_) || (ppt->has_cl_cmb_polarization == _TRUE_) ||
           (ppt->has_cl_cmb_lensing_potential == _TRUE_))
-        l_max=MAX(ppt->l_scalar_max,l_max);
+        l_max = MAX(ppt->l_scalar_max, l_max);
 
-      if ((ppt->has_cl_lensing_potential == _TRUE_) ||
-          (ppt->has_cl_number_count == _TRUE_))
-        l_max=MAX(ppt->l_lss_max,l_max);
+      if ((ppt->has_cl_lensing_potential == _TRUE_) || (ppt->has_cl_number_count == _TRUE_))
+        l_max = MAX(ppt->l_lss_max, l_max);
     }
 
     if (ppt->has_tensors == _TRUE_)
-      l_max=MAX(ppt->l_tensor_max,l_max);
-
+      l_max = MAX(ppt->l_tensor_max, l_max);
   }
 
   /** - allocate and fill l array */
 
   /** - start from l = 2 and increase with logarithmic step */
 
-  index_l = 0;
+  index_l   = 0;
   current_l = 2;
-  increment = MAX((int)(current_l*(pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)), 1);
+  increment = MAX((int) (current_l *
+                         (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+                  1);
 
-  while (((current_l + increment) < l_max) && (increment < ppr->l_linstep*thermodynamics_module_->angular_rescaling_)) {
-
-    index_l ++;
+  while (((current_l + increment) < l_max) &&
+         (increment < ppr->l_linstep * thermodynamics_module_->angular_rescaling_)) {
+    index_l++;
     current_l += increment;
-    increment = MAX((int)(current_l*(pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)), 1);
-
+    increment  = MAX((int) (current_l *
+                            (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+                     1);
   }
 
   /** - when the logarithmic step becomes larger than some linear step,
       stick to this linear step till l_max */
 
-  increment = ppr->l_linstep*thermodynamics_module_->angular_rescaling_;
+  increment = ppr->l_linstep * thermodynamics_module_->angular_rescaling_;
 
-  while ((current_l+increment) <= l_max) {
-
-    index_l ++;
+  while ((current_l + increment) <= l_max) {
+    index_l++;
     current_l += increment;
-
   }
 
   /** - last value set to exactly l_max */
 
   if (current_l != l_max) {
-
-    index_l ++;
-
+    index_l++;
   }
 
   l_size_max_ = index_l + 1;
@@ -650,31 +674,30 @@ int TransferModule::transfer_get_l_list() {
   l_.resize(l_size_max_);
 
   index_l = 0;
-  l_[0] = 2;
-  increment = MAX((int)(l_[0]*(pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)), 1);
+  l_[0]   = 2;
+  increment =
+      MAX((int) (l_[0] * (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+          1);
 
-  while (((l_[index_l] + increment) < l_max) && (increment < ppr->l_linstep*thermodynamics_module_->angular_rescaling_)) {
-
-    index_l ++;
+  while (((l_[index_l] + increment) < l_max) &&
+         (increment < ppr->l_linstep * thermodynamics_module_->angular_rescaling_)) {
+    index_l++;
     l_[index_l] = l_[index_l - 1] + increment;
-    increment = MAX((int)(l_[index_l]*(pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)), 1);
-
+    increment = MAX((int) (l_[index_l] *
+                           (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+                    1);
   }
 
-  increment = ppr->l_linstep*thermodynamics_module_->angular_rescaling_;
+  increment = ppr->l_linstep * thermodynamics_module_->angular_rescaling_;
 
   while ((l_[index_l] + increment) <= l_max) {
-
-    index_l ++;
+    index_l++;
     l_[index_l] = l_[index_l - 1] + increment;
-
   }
 
   if (l_[index_l] != l_max) {
-
-    index_l ++;
+    index_l++;
     l_[index_l] = l_max;
-
   }
 
   /* for each mode and type, find relevant size of l array,
@@ -683,39 +706,36 @@ int TransferModule::transfer_get_l_list() {
      find l_size[index_md]. */
 
   for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-
     l_size_[index_md] = 0;
 
     for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-
       if (_scalarsEXT_) {
-
         if ((ppt->has_cl_cmb_temperature == _TRUE_) &&
-            ((index_tt == index_tt_t0_) || (index_tt == index_tt_t1_) || (index_tt == index_tt_t2_)))
-          l_max=ppt->l_scalar_max;
+            ((index_tt == index_tt_t0_) || (index_tt == index_tt_t1_) ||
+             (index_tt == index_tt_t2_)))
+          l_max = ppt->l_scalar_max;
 
         if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_e_))
-          l_max=ppt->l_scalar_max;
+          l_max = ppt->l_scalar_max;
 
         if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (index_tt == index_tt_lcmb_))
-          l_max=ppt->l_scalar_max;
+          l_max = ppt->l_scalar_max;
 
         if ((_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density)) ||
-            (_index_tt_in_range_(index_tt_rsd_,     ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_d0_,      ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_d1_,      ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))||
-            (_index_tt_in_range_(index_tt_nc_g1_,   ppt->selection_num, ppt->has_nc_gr))  ||
-            (_index_tt_in_range_(index_tt_nc_g2_,   ppt->selection_num, ppt->has_nc_gr))  ||
-            (_index_tt_in_range_(index_tt_nc_g3_,   ppt->selection_num, ppt->has_nc_gr))  ||
-            (_index_tt_in_range_(index_tt_nc_g4_,   ppt->selection_num, ppt->has_nc_gr))  ||
-            (_index_tt_in_range_(index_tt_nc_g5_,   ppt->selection_num, ppt->has_nc_gr))
-            )
-          l_max=ppt->l_lss_max;
+            (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd)) ||
+            (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd)) ||
+            (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd)) ||
+            (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens)) ||
+            (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr)) ||
+            (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr)) ||
+            (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr)) ||
+            (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr)) ||
+            (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr)))
+          l_max = ppt->l_lss_max;
 
-        if ((ppt->has_cl_lensing_potential == _TRUE_) && (index_tt >= index_tt_lensing_) && (index_tt < index_tt_lensing_ + ppt->selection_num))
-          l_max=ppt->l_lss_max;
-
+        if ((ppt->has_cl_lensing_potential == _TRUE_) && (index_tt >= index_tt_lensing_) &&
+            (index_tt < index_tt_lensing_ + ppt->selection_num))
+          l_max = ppt->l_lss_max;
       }
 
       if (_tensorsEXT_) {
@@ -724,14 +744,16 @@ int TransferModule::transfer_get_l_list() {
 
       class_test(l_max > l_[l_size_max_ - 1],
                  error_message_,
-                 "For mode %d, type %d, asked for l_max=%d greater than in Bessel table where l_max=%d",
+                 "For mode %d, type %d, asked for l_max=%d greater than in Bessel table where "
+                 "l_max=%d",
                  index_md,
                  index_tt,
                  l_max,
                  l_[l_size_max_ - 1]);
 
-      index_l=0;
-      while (l_[index_l] < l_max) index_l++;
+      index_l = 0;
+      while (l_[index_l] < l_max)
+        index_l++;
       l_size_tt_[index_md][index_tt] = index_l + 1;
 
       if (l_size_tt_[index_md][index_tt] < l_size_max_)
@@ -740,12 +762,10 @@ int TransferModule::transfer_get_l_list() {
         l_size_tt_[index_md][index_tt]++;
 
       l_size_[index_md] = MAX(l_size_[index_md], l_size_tt_[index_md][index_tt]);
-
     }
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -760,15 +780,14 @@ int TransferModule::transfer_get_l_list() {
  */
 
 int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
-
   int index_q;
-  double q,q_min=0.,q_max=0.,q_step;
+  double q, q_min = 0., q_max = 0., q_step;
   int nu, nu_min, nu_proposed;
   int q_size_max;
   double q_approximation;
   double q_threshold;
-  double last_step=0.;
-  int last_index=0;
+  double last_step = 0.;
+  int last_index   = 0;
   double q_logstep_spline;
   double q_logstep_trapzd;
 
@@ -779,85 +798,91 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
     q_max = 0.;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-      q_max = MAX(q_max, perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
+      q_max =
+          MAX(q_max,
+              perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
     }
 
-    K=0;
+    K = 0;
   }
 
   /* first and last value in open case*/
 
   else if (sgnK == -1) {
-    q_min = sqrt(perturbations_module_->k_min_*perturbations_module_->k_min_ + K);
+    q_min = sqrt(perturbations_module_->k_min_ * perturbations_module_->k_min_ + K);
 
     double k_max = 0.;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-      k_max = MAX(k_max, perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
+      k_max =
+          MAX(k_max,
+              perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
     }
 
-    q_max = sqrt(k_max*k_max+K);
+    q_max = sqrt(k_max * k_max + K);
     if (ppt->has_vectors == _TRUE_)
-      q_max = MIN(q_max,sqrt(k_max*k_max+2.*K));
+      q_max = MIN(q_max, sqrt(k_max * k_max + 2. * K));
     if (ppt->has_tensors == _TRUE_)
-      q_max = MIN(q_max,sqrt(k_max*k_max+3.*K));
+      q_max = MIN(q_max, sqrt(k_max * k_max + 3. * K));
   }
 
   /* first and last value in closed case*/
 
   else if (sgnK == 1) {
     nu_min = 3;
-    q_min = nu_min * sqrt(K);
+    q_min  = nu_min * sqrt(K);
 
     q_max = 0.;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-      q_max = MAX(q_max, perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
+      q_max =
+          MAX(q_max,
+              perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
     }
   }
 
   /* adjust the parameter governing the log step size to curvature */
 
-  q_logstep_spline = ppr->q_logstep_spline/pow(thermodynamics_module_->angular_rescaling_, ppr->q_logstep_open);
+  q_logstep_spline = ppr->q_logstep_spline /
+                     pow(thermodynamics_module_->angular_rescaling_, ppr->q_logstep_open);
   q_logstep_trapzd = ppr->q_logstep_trapzd;
 
   /* slightly conservative estimate of number of values */
 
   if (sgnK == 1) {
-
-    q_approximation = MIN(ppr->hyper_flat_approximation_nu,(q_max/sqrt(K)))*sqrt(K);
+    q_approximation = MIN(ppr->hyper_flat_approximation_nu, (q_max / sqrt(K))) * sqrt(K);
 
     /* max contribution from integer nu values */
-    q_threshold = ppr->q_linstep/q_logstep_trapzd;
+    q_threshold = ppr->q_linstep / q_logstep_trapzd;
 
-    q_step = 1.+0.5*q_period*q_logstep_trapzd;
-    q_size_max = (int)(log(MIN(q_approximation,q_threshold)/q_min)/log(q_step)+1);
+    q_step     = 1. + 0.5 * q_period * q_logstep_trapzd;
+    q_size_max = (int) (log(MIN(q_approximation, q_threshold) / q_min) / log(q_step) + 1);
 
-    q_step = MAX(q_period*ppr->q_linstep, 1*sqrt(K));
-    q_size_max += (int)(1.1*(q_approximation-MIN(q_min,10*q_threshold))/q_step+18*q_threshold/q_step+1);
+    q_step      = MAX(q_period * ppr->q_linstep, 1 * sqrt(K));
+    q_size_max += (int) (1.1 * (q_approximation - MIN(q_min, 10 * q_threshold)) / q_step +
+                         18 * q_threshold / q_step + 1);
 
     /* max contribution from non-integer nu values */
-    q_threshold = ppr->q_linstep/q_logstep_spline;
+    q_threshold = ppr->q_linstep / q_logstep_spline;
 
-    q_step = 1.+0.5*q_period*q_logstep_spline;
-    q_size_max += (int)(log(MIN(q_max, q_threshold)/q_approximation)/log(q_step)+1);
+    q_step      = 1. + 0.5 * q_period * q_logstep_spline;
+    q_size_max += (int) (log(MIN(q_max, q_threshold) / q_approximation) / log(q_step) + 1);
 
-    q_step = q_period*ppr->q_linstep;
-    q_size_max += (int)(1.1*(q_max-MIN(q_max, 10*q_threshold))/q_step+18*q_threshold/q_step+1);
+    q_step      = q_period * ppr->q_linstep;
+    q_size_max += (int) (1.1 * (q_max - MIN(q_max, 10 * q_threshold)) / q_step +
+                         18 * q_threshold / q_step + 1);
 
     /* cap at 2^25 (~3*10^7) to prevent runaway allocations */
-    q_size_max = MIN(q_size_max, 1<<25);
-
+    q_size_max = MIN(q_size_max, 1 << 25);
   }
   else {
-
     /* max contribution from non-integer nu values */
-    q_threshold = ppr->q_linstep/q_logstep_spline;
+    q_threshold = ppr->q_linstep / q_logstep_spline;
 
-    q_step = 1.+0.5*q_period*q_logstep_spline;
-    q_size_max = (int)(log(MIN(q_max, q_threshold)/q_min)/log(q_step)+1);
+    q_step     = 1. + 0.5 * q_period * q_logstep_spline;
+    q_size_max = (int) (log(MIN(q_max, q_threshold) / q_min) / log(q_step) + 1);
 
-    q_step = q_period*ppr->q_linstep;
-    q_size_max += (int)(1.1*(q_max-MIN(q_max, 10*q_threshold))/q_step+18*q_threshold/q_step+1);
-
+    q_step      = q_period * ppr->q_linstep;
+    q_size_max += (int) (1.1 * (q_max - MIN(q_max, 10 * q_threshold)) / q_step +
+                         18 * q_threshold / q_step + 1);
   }
 
   /* create array with this conservative size estimate. The exact size
@@ -867,16 +892,18 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
   /* assign the first value before starting the loop */
 
-  index_q = 0;
+  index_q     = 0;
   q_[index_q] = q_min;
-  nu = 3;
+  nu          = 3;
   index_q++;
 
   /* loop over the values */
 
-  while (q_[index_q-1] < q_max) {
-
-    class_test(index_q >= q_size_max, error_message_, "buggy q-list definition (q_size=%d)", q_size_max);
+  while (q_[index_q - 1] < q_max) {
+    class_test(index_q >= q_size_max,
+               error_message_,
+               "buggy q-list definition (q_size=%d)",
+               q_size_max);
 
     /* step size formula in flat/open case. Step goes gradually from
        logarithmic to linear:
@@ -888,12 +915,9 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
        * ppr->q_linstep
        */
 
-    if (sgnK<=0) {
-
-      q = q_[index_q - 1]
-        + q_period*ppr->q_linstep*q_[index_q - 1]
-        /(q_[index_q - 1] + ppr->q_linstep/q_logstep_spline);
-
+    if (sgnK <= 0) {
+      q = q_[index_q - 1] + q_period * ppr->q_linstep * q_[index_q - 1] /
+                                (q_[index_q - 1] + ppr->q_linstep / q_logstep_spline);
     }
 
     /* step size formula in closed case. Same thing excepted that:
@@ -909,31 +933,28 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
     */
 
     else {
+      if (nu < (int) ppr->hyper_flat_approximation_nu) {
+        q = q_[index_q - 1] + q_period * ppr->q_linstep * q_[index_q - 1] /
+                                  (q_[index_q - 1] + ppr->q_linstep / q_logstep_trapzd);
 
-      if (nu < (int)ppr->hyper_flat_approximation_nu) {
-
-        q = q_[index_q - 1]
-          + q_period*ppr->q_linstep*q_[index_q - 1]
-          /(q_[index_q - 1] + ppr->q_linstep/q_logstep_trapzd);
-
-        nu_proposed = (int)(q/sqrt(K));
-        if (nu_proposed <= nu+1)
-          nu = nu+1;
+        nu_proposed = (int) (q / sqrt(K));
+        if (nu_proposed <= nu + 1)
+          nu = nu + 1;
         else
           nu = nu_proposed;
 
-        q = nu*sqrt(K);
-        last_step = q - q_[index_q - 1];
-        last_index = index_q+1;
+        q          = nu * sqrt(K);
+        last_step  = q - q_[index_q - 1];
+        last_index = index_q + 1;
       }
       else {
+        q_step = q_period * ppr->q_linstep * q_[index_q - 1] /
+                 (q_[index_q - 1] + ppr->q_linstep / q_logstep_spline);
 
-        q_step = q_period*ppr->q_linstep*q_[index_q - 1]/(q_[index_q - 1] + ppr->q_linstep/q_logstep_spline);
-
-        if (index_q-last_index < (int)ppr->q_numstep_transition)
-          q = q_[index_q - 1]
-            + (1 - (double)(index_q - last_index)/ppr->q_numstep_transition)*last_step
-            + (double)(index_q - last_index)/ppr->q_numstep_transition*q_step;
+        if (index_q - last_index < (int) ppr->q_numstep_transition)
+          q = q_[index_q - 1] +
+              (1 - (double) (index_q - last_index) / ppr->q_numstep_transition) * last_step +
+              (double) (index_q - last_index) / ppr->q_numstep_transition * q_step;
         else
           q = q_[index_q - 1] + q_step;
       }
@@ -952,7 +973,6 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
   class_test(q_size_ < 2, error_message_, "buggy q-list definition");
 
-
   /* now, readjust array size */
 
   q_.resize(q_size_);
@@ -961,17 +981,19 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
      approximation will start being used */
 
   if (sgnK != 0) {
-
-    q_approximation = ppr->hyper_flat_approximation_nu * sqrt(sgnK*K);
+    q_approximation = ppr->hyper_flat_approximation_nu * sqrt(sgnK * K);
     if (q_approximation < q_[q_size_ - 1]) {
-      for (index_q_flat_approximation_ = 0;
-           index_q_flat_approximation_ < q_size_ - 1;
+      for (index_q_flat_approximation_ = 0; index_q_flat_approximation_ < q_size_ - 1;
            index_q_flat_approximation_++) {
-        if (q_[index_q_flat_approximation_] > q_approximation) break;
+        if (q_[index_q_flat_approximation_] > q_approximation)
+          break;
       }
       if (ptr->transfer_verbose > 1)
-        printf("Flat bessel approximation spares hyperspherical bessel computations for %d wavenumbers over a total of %d\n",
-               q_size_ - index_q_flat_approximation_, q_size_);
+        printf(
+            "Flat bessel approximation spares hyperspherical bessel computations for %d "
+            "wavenumbers over a total of %d\n",
+            q_size_ - index_q_flat_approximation_,
+            q_size_);
     }
     else {
       /* All q values are below the flat approximation threshold, so
@@ -982,12 +1004,15 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
          < q_size_. */
       index_q_flat_approximation_ = q_size_;
       if (ptr->transfer_verbose > 1)
-        printf("Cannot use flat bessel approximation, since q_max = %.5e < q_start_approximation = %.5e\n", q_[q_size_ - 1], q_approximation);
+        printf(
+            "Cannot use flat bessel approximation, since q_max = %.5e < q_start_approximation = "
+            "%.5e\n",
+            q_[q_size_ - 1],
+            q_approximation);
     }
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -999,38 +1024,37 @@ int TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
  */
 
 int TransferModule::transfer_get_k_list(double K) {
-
-  double m=0.;
+  double m = 0.;
 
   k_.resize(md_size_);
 
-  for (int index_md = 0; index_md <  md_size_; index_md++) {
-
+  for (int index_md = 0; index_md < md_size_; index_md++) {
     k_[index_md].resize(q_size_);
 
     if (_scalarsEXT_) {
-      m=0.;
+      m = 0.;
     }
     if (_vectorsEXT_) {
-      m=1.;
+      m = 1.;
     }
     if (_tensorsEXT_) {
-      m=2.;
+      m = 2.;
     }
 
     for (int index_q = 0; index_q < q_size_; index_q++) {
-      k_[index_md][index_q] = sqrt(q_[index_q]*q_[index_q] - K*(m + 1.));
+      k_[index_md][index_q] = sqrt(q_[index_q] * q_[index_q] - K * (m + 1.));
     }
 
-    if (k_[index_md][0] < perturbations_module_->k_[index_md][0]){
+    if (k_[index_md][0] < perturbations_module_->k_[index_md][0]) {
       /* If k_[index_md][0] < perturbations_module_->k_[index_md][0] at the level of rounding,
          adjust first value of k_list to avoid interpolation errors: */
-      if ((perturbations_module_->k_[index_md][0] - k_[index_md][0]) < 10.*DBL_EPSILON) {
+      if ((perturbations_module_->k_[index_md][0] - k_[index_md][0]) < 10. * DBL_EPSILON) {
         k_[index_md][0] = perturbations_module_->k_[index_md][0];
       }
-      else{
+      else {
         class_stop(error_message_,
-                   "bug in k_list calculation: in perturbation module k_min=%e, in transfer module k_min[mode=%d]=%e, interpolation impossible",
+                   "bug in k_list calculation: in perturbation module k_min=%e, in transfer module "
+                   "k_min[mode=%d]=%e, interpolation impossible",
                    perturbations_module_->k_[0][0],
                    index_md,
                    k_[index_md][0]);
@@ -1045,18 +1069,17 @@ int TransferModule::transfer_get_k_list(double K) {
       index_md,
       k_[index_md][0]);
     */
-    class_test(k_[index_md][q_size_ - 1] > perturbations_module_->k_[0][perturbations_module_->k_size_cl_[0] - 1],
+    class_test(k_[index_md][q_size_ - 1] >
+                   perturbations_module_->k_[0][perturbations_module_->k_size_cl_[0] - 1],
                error_message_,
-               "bug in k_list calculation: in perturbation module k_max=%e, in transfer module k_max[mode=%d]=%e, interpolation impossible",
+               "bug in k_list calculation: in perturbation module k_max=%e, in transfer module "
+               "k_max[mode=%d]=%e, interpolation impossible",
                perturbations_module_->k_[0][perturbations_module_->k_size_cl_[0]],
                index_md,
                k_[index_md][q_size_ - 1]);
-
-
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -1074,13 +1097,10 @@ int TransferModule::transfer_get_source_correspondence(std::vector<std::vector<i
       between transfer types and source types */
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
-
     tp_of_tt[index_md].resize(tt_size_[index_md]);
 
     for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-
       if (_scalarsEXT_) {
-
         if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t0_))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t0_;
 
@@ -1101,40 +1121,39 @@ int TransferModule::transfer_get_source_correspondence(std::vector<std::vector<i
           /* (this important comment is referenced in a WARNING message in perturbations.c) */
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_delta_m_;
 
-        if (_index_tt_in_range_(index_tt_rsd_,     ppt->selection_num, ppt->has_nc_rsd))
+        if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_theta_m_;
 
-        if (_index_tt_in_range_(index_tt_d0_,      ppt->selection_num, ppt->has_nc_rsd))
+        if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_theta_m_;
 
-        if (_index_tt_in_range_(index_tt_d1_,      ppt->selection_num, ppt->has_nc_rsd))
+        if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_theta_m_;
 
         if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
 
-        if (_index_tt_in_range_(index_tt_nc_g1_,   ppt->selection_num, ppt->has_nc_gr))
+        if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_psi_;
 
-        if (_index_tt_in_range_(index_tt_nc_g2_,   ppt->selection_num, ppt->has_nc_gr))
+        if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_;
 
-        if (_index_tt_in_range_(index_tt_nc_g3_,   ppt->selection_num, ppt->has_nc_gr))
+        if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_prime_;
 
-        if (_index_tt_in_range_(index_tt_nc_g4_,   ppt->selection_num, ppt->has_nc_gr))
+        if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
 
-        if (_index_tt_in_range_(index_tt_nc_g5_,   ppt->selection_num, ppt->has_nc_gr))
+        if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
 
-        if ((ppt->has_cl_lensing_potential == _TRUE_) && (index_tt >= index_tt_lensing_) && (index_tt < index_tt_lensing_+ppt->selection_num))
+        if ((ppt->has_cl_lensing_potential == _TRUE_) && (index_tt >= index_tt_lensing_) &&
+            (index_tt < index_tt_lensing_ + ppt->selection_num))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
-
       }
 
       if (_vectorsEXT_) {
-
         if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t1_))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t1_;
 
@@ -1149,7 +1168,6 @@ int TransferModule::transfer_get_source_correspondence(std::vector<std::vector<i
       }
 
       if (_tensorsEXT_) {
-
         if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t2_))
           tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t2_;
 
@@ -1163,29 +1181,20 @@ int TransferModule::transfer_get_source_correspondence(std::vector<std::vector<i
   }
 
   return _SUCCESS_;
-
 }
 
-
-int TransferModule::transfer_source_tau_size_max(double tau_rec, double tau0, int * tau_size_max) {
-
-  int tau_size_tt=0;
+int TransferModule::transfer_source_tau_size_max(double tau_rec, double tau0, int* tau_size_max) {
+  int tau_size_tt = 0;
 
   *tau_size_max = 0;
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
-
     for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-
-      class_call(transfer_source_tau_size(tau_rec,
-                                          tau0,
-                                          index_md,
-                                          index_tt,
-                                          &tau_size_tt),
+      class_call(transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size_tt),
                  error_message_,
                  error_message_);
 
-      *tau_size_max = MAX(*tau_size_max,tau_size_tt);
+      *tau_size_max = MAX(*tau_size_max, tau_size_tt);
     }
   }
 
@@ -1209,10 +1218,10 @@ int TransferModule::transfer_source_tau_size_max(double tau_rec, double tau0, in
  * @return the error status
  */
 
-int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int index_md, int index_tt, int * tau_size) {
-
+int TransferModule::transfer_source_tau_size(
+    double tau_rec, double tau0, int index_md, int index_tt, int* tau_size) {
   /* values of conformal time */
-  double tau_min,tau_mean,tau_max;
+  double tau_min, tau_mean, tau_max;
 
   /* minimum value of index_tt */
   int index_tau_min;
@@ -1221,11 +1230,10 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
   int l_limber;
 
   /* current redshift bin number */
-  int bin=0;
+  int bin = 0;
 
   /* scalar mode */
   if (_scalarsEXT_) {
-
     /* scalar temperature */
     if ((ppt->has_cl_cmb_temperature == _TRUE_) &&
         ((index_tt == index_tt_t0_) || (index_tt == index_tt_t1_) || (index_tt == index_tt_t2_)))
@@ -1237,10 +1245,10 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
 
     /* cmb lensing potential */
     if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (index_tt == index_tt_lcmb_)) {
-
       /* find times before recombination, that will be thrown away */
-      index_tau_min=0;
-      while (perturbations_module_->tau_sampling_[index_tau_min] <= tau_rec) index_tau_min++;
+      index_tau_min = 0;
+      while (perturbations_module_->tau_sampling_[index_tau_min] <= tau_rec)
+        index_tau_min++;
 
       /* infer number of time steps after removing early times */
       *tau_size = perturbations_module_->tau_size_ - index_tau_min;
@@ -1248,27 +1256,26 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
 
     /* density Cl's */
     if (_nonintegrated_ncl_) {
-
       /* bin number associated to particular redshift bin and selection function */
       if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density))
         bin = index_tt - index_tt_density_;
 
-      if (_index_tt_in_range_(index_tt_rsd_,     ppt->selection_num, ppt->has_nc_rsd))
+      if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))
         bin = index_tt - index_tt_rsd_;
 
-      if (_index_tt_in_range_(index_tt_d0_,      ppt->selection_num, ppt->has_nc_rsd))
+      if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
         bin = index_tt - index_tt_d0_;
 
-      if (_index_tt_in_range_(index_tt_d1_,      ppt->selection_num, ppt->has_nc_rsd))
+      if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
         bin = index_tt - index_tt_d1_;
 
-      if (_index_tt_in_range_(index_tt_nc_g1_,   ppt->selection_num, ppt->has_nc_gr))
+      if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))
         bin = index_tt - index_tt_nc_g1_;
 
-      if (_index_tt_in_range_(index_tt_nc_g2_,   ppt->selection_num, ppt->has_nc_gr))
+      if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))
         bin = index_tt - index_tt_nc_g2_;
 
-      if (_index_tt_in_range_(index_tt_nc_g3_,   ppt->selection_num, ppt->has_nc_gr))
+      if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
         bin = index_tt - index_tt_nc_g3_;
 
       /* time interval for this bin */
@@ -1282,13 +1289,12 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
       }
       /* other cases (gaussian, top-hat...) */
       else {
-
         /* check that selection function well sampled */
-        *tau_size = (int)ppr->selection_sampling;
+        *tau_size = (int) ppr->selection_sampling;
 
         /* value of l at which the code switches to Limber approximation
            (necessary for next step) */
-        l_limber=ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[bin];
+        l_limber = ppr->l_switch_limber_for_nc_local_over_z * ppt->selection_mean[bin];
         /* check that bessel well sampled, if not define finer sampling
            overwriting the previous one.
            One Bessel oscillations corresponds to [Delta tau]=2pi/k.
@@ -1297,7 +1303,10 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
            We need to cut the interval (tau_max-tau_min) in pieces of size
            [Delta tau]=2pi/k_max. This gives the number below.
         */
-        *tau_size=MAX(*tau_size,(int)((tau_max-tau_min)/((tau0-tau_mean)/MIN(l_limber,ppt->l_lss_max)))*ppr->selection_sampling_bessel);
+        *tau_size =
+            MAX(*tau_size,
+                (int) ((tau_max - tau_min) / ((tau0 - tau_mean) / MIN(l_limber, ppt->l_lss_max))) *
+                    ppr->selection_sampling_bessel);
       }
     }
 
@@ -1305,7 +1314,6 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
        function will spread from the selection function region up to
        tau0 */
     if (_integrated_ncl_) {
-
       /* bin number associated to particular redshift bin and selection function */
       if (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential))
         bin = index_tt - index_tt_lensing_;
@@ -1313,10 +1321,10 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
       if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))
         bin = index_tt - index_tt_nc_lens_;
 
-      if (_index_tt_in_range_(index_tt_nc_g4_,   ppt->selection_num, ppt->has_nc_gr))
+      if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr))
         bin = index_tt - index_tt_nc_g4_;
 
-      if (_index_tt_in_range_(index_tt_nc_g5_,   ppt->selection_num, ppt->has_nc_gr))
+      if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
         bin = index_tt - index_tt_nc_g5_;
 
       /* time interval for this bin */
@@ -1325,17 +1333,20 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
                  error_message_);
 
       /* check that selection function well sampled */
-      *tau_size = (int)ppr->selection_sampling;
+      *tau_size = (int) ppr->selection_sampling;
 
       /* value of l at which the code switches to Limber approximation
          (necessary for next step) */
-      if(_index_tt_in_range_(index_tt_nc_g5_,   ppt->selection_num, ppt->has_nc_gr)) {
+      if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr)) {
         /* Even if G5 is integrated along the line-of-sight, we do not apply the same Limber criteria as for the other integrated terms, because here we have the derivative of the Bessel.  */
-        l_limber=ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[bin];
-        *tau_size=MAX(*tau_size,(int)((tau0-tau_min)/((tau0-tau_mean)/2./MIN(l_limber,ppt->l_lss_max)))*ppr->selection_sampling_bessel);
+        l_limber  = ppr->l_switch_limber_for_nc_local_over_z * ppt->selection_mean[bin];
+        *tau_size = MAX(*tau_size,
+                        (int) ((tau0 - tau_min) /
+                               ((tau0 - tau_mean) / 2. / MIN(l_limber, ppt->l_lss_max))) *
+                            ppr->selection_sampling_bessel);
       }
       else {
-        l_limber=ppr->l_switch_limber_for_nc_los_over_z*ppt->selection_mean[bin];
+        l_limber = ppr->l_switch_limber_for_nc_los_over_z * ppt->selection_mean[bin];
         /* check that bessel well sampled, if not define finer sampling
            overwriting the previous one.
            One Bessel oscillations corresponds to [Delta tau]=2pi/k.
@@ -1344,14 +1355,16 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
            We need to cut the interval (tau_0-tau_min) in pieces of size
            [Delta tau]=2pi/k_max. This gives the number below.
         */
-        *tau_size=MAX(*tau_size,(int)((tau0-tau_min)/((tau0-tau_mean)/2./MIN(l_limber,ppt->l_lss_max)))*ppr->selection_sampling_bessel_los);
+        *tau_size = MAX(*tau_size,
+                        (int) ((tau0 - tau_min) /
+                               ((tau0 - tau_mean) / 2. / MIN(l_limber, ppt->l_lss_max))) *
+                            ppr->selection_sampling_bessel_los);
       }
     }
   }
 
   /* tensor mode */
   if (_tensorsEXT_) {
-
     /* for all tensor types */
     *tau_size = perturbations_module_->tau_size_;
   }
@@ -1359,8 +1372,14 @@ int TransferModule::transfer_source_tau_size(double tau_rec, double tau0, int in
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_q, int tau_size_max, double tau_rec, double** const* pert_sources, double** const* pert_sources_spline, double * window, struct transfer_workspace * ptw) {
-
+int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt,
+                                                int index_q,
+                                                int tau_size_max,
+                                                double tau_rec,
+                                                double** const* pert_sources,
+                                                double** const* pert_sources_spline,
+                                                double* window,
+                                                struct transfer_workspace* ptw) {
   /** Summary: */
 
   /** - define local variables */
@@ -1370,20 +1389,20 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
       routine */
 
   /* - first workspace field: perturbation source interpolated from perturbation structure */
-  double * interpolated_sources;
+  double* interpolated_sources;
 
   /* - second workspace field: list of tau0-tau values, tau0_minus_tau[index_tau] */
-  double * tau0_minus_tau;
+  double* tau0_minus_tau;
 
   /* - third workspace field: list of trapezoidal weights for integration over tau */
-  double * w_trapz;
+  double* w_trapz;
 
   /* - fourth workspace field, containing just a double: number of time values */
-  int * tau_size;
+  int* tau_size;
 
   /* - fifth workspace field, identical to above interpolated sources:
      sources[index_tau] */
-  double * sources;
+  double* sources;
 
   /* a value of index_type */
   int previous_type;
@@ -1397,44 +1416,45 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
   /** - store the sources in the workspace and define all
       fields in this workspace */
   interpolated_sources = ptw->interpolated_sources;
-  tau0_minus_tau = ptw->tau0_minus_tau;
-  w_trapz  = ptw->w_trapz;
-  tau_size = &(ptw->tau_size);
-  sources = ptw->sources;
+  tau0_minus_tau       = ptw->tau0_minus_tau;
+  w_trapz              = ptw->w_trapz;
+  tau_size             = &(ptw->tau_size);
+  sources              = ptw->sources;
 
   /** - loop over all modes. For each mode */
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
-
     /* if we reached q_max for this mode, there is nothing to be done */
 
-    if (k_[index_md][index_q] <= perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]) {
-
+    if (k_[index_md][index_q] <=
+        perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]) {
       /** - loop over initial conditions. */
       /* For each of them: */
 
       for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
-
         /* initialize the previous type index */
-        previous_type=-1;
+        previous_type = -1;
 
         /* - loop over types. For each of them: */
 
         for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-
           /** - check if we must now deal with a new source with a
               new index ppt->index_type. If yes, interpolate it at the
               right values of k. */
 
           if (tp_of_tt[index_md][index_tt] != previous_type) {
-
-            class_call(transfer_interpolate_sources(index_q,
-                                                    index_md,
-                                                    index_ic,
-                                                    tp_of_tt[index_md][index_tt],
-                                                    pert_sources[index_md][index_ic*perturbations_module_->tp_size_[index_md] + tp_of_tt[index_md][index_tt]],
-                                                    pert_sources_spline[index_md][index_ic*perturbations_module_->tp_size_[index_md] + tp_of_tt[index_md][index_tt]],
-                                                    interpolated_sources),
+            class_call(transfer_interpolate_sources(
+                           index_q,
+                           index_md,
+                           index_ic,
+                           tp_of_tt[index_md][index_tt],
+                           pert_sources[index_md]
+                                       [index_ic * perturbations_module_->tp_size_[index_md] +
+                                        tp_of_tt[index_md][index_tt]],
+                           pert_sources_spline[index_md][index_ic * perturbations_module_
+                                                                        ->tp_size_[index_md] +
+                                                         tp_of_tt[index_md][index_tt]],
+                           interpolated_sources),
                        error_message_,
                        error_message_);
           }
@@ -1486,14 +1506,14 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
                      error_message_);
 
           for (int index_l = 0; index_l < l_size_[index_md]; index_l++) {
-
-            l = (double)l_[index_l];
+            l = (double) l_[index_l];
 
             /* neglect transfer function when l is much smaller than k*tau0 */
             class_call(transfer_can_be_neglected(index_md,
                                                  index_ic,
                                                  index_tt,
-                                                 (background_module_->conformal_age_ - tau_rec)*thermodynamics_module_->angular_rescaling_,
+                                                 (background_module_->conformal_age_ - tau_rec) *
+                                                     thermodynamics_module_->angular_rescaling_,
                                                  q_[index_q],
                                                  l,
                                                  &neglect),
@@ -1501,22 +1521,21 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
                        error_message_);
 
             /* for K>0 (closed), transfer functions only defined for l<nu */
-            if ((ptw->sgnK == 1) && (l_[index_l] >= (int)(q_[index_q]/sqrt(ptw->K) + 0.2))) {
+            if ((ptw->sgnK == 1) && (l_[index_l] >= (int) (q_[index_q] / sqrt(ptw->K) + 0.2))) {
               neglect = _TRUE_;
             }
             /* This would maybe go into transfer_can_be_neglected later: */
-            if ((ptw->sgnK != 0) && (index_l >= ptw->HIS.l_size) && (index_q < index_q_flat_approximation_)) {
+            if ((ptw->sgnK != 0) && (index_l >= ptw->HIS.l_size) &&
+                (index_q < index_q_flat_approximation_)) {
               neglect = _TRUE_;
             }
             if (neglect == _TRUE_) {
-
-              transfer_[index_md][
-                + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
-                + index_q
-              ] = 0.;
+              transfer_[index_md][+((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] +
+                                    index_l) *
+                                      q_size_ +
+                                  index_q] = 0.;
             }
             else {
-
               /* for a given l, maximum value of k such that we can
                  convolve the source with Bessel functions j_l(x)
                  without reaching x_max (this is relevant in the flat
@@ -1525,7 +1544,7 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
                  choice of proper xmax when computing bessels) */
               double q_max_bessel;
               if (ptw->sgnK == 0) {
-                q_max_bessel = ptw->pBIS->x[ptw->pBIS->x_size-1]/tau0_minus_tau[0];
+                q_max_bessel = ptw->pBIS->x[ptw->pBIS->x_size - 1] / tau0_minus_tau[0];
               }
               else {
                 q_max_bessel = q_[q_size_ - 1];
@@ -1548,8 +1567,7 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
                                                      index_l,
                                                      l,
                                                      q_max_bessel,
-                                                     radial_type
-                                                     ),
+                                                     radial_type),
                          error_message_,
                          error_message_);
             }
@@ -1559,19 +1577,16 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
         } /* end of loop over type */
 
       } /* end of loop over initial condition */
-
     }
 
     else {
-
       for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
         for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
           for (int index_l = 0; index_l < l_size_[index_md]; index_l++) {
-
-            transfer_[index_md][
-              + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
-              + index_q
-            ] = 0.;
+            transfer_[index_md]
+                     [+((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] + index_l) *
+                          q_size_ +
+                      index_q] = 0.;
           }
         }
       }
@@ -1580,42 +1595,41 @@ int TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt, int index_
   } /* end of loop over mode */
 
   return _SUCCESS_;
-
 }
 
-int TransferModule::transfer_radial_coordinates(struct transfer_workspace * ptw, int index_md, int index_q) {
+int TransferModule::transfer_radial_coordinates(struct transfer_workspace* ptw,
+                                                int index_md,
+                                                int index_q) {
+  double sqrt_absK = 0.;
 
-  double sqrt_absK=0.;
-
-  switch (ptw->sgnK){
-  case 1:
-    sqrt_absK = sqrt(ptw->K);
-    for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
-      ptw->chi[index_tau] = sqrt_absK*ptw->tau0_minus_tau[index_tau];
-      ptw->cscKgen[index_tau] = sqrt_absK/k_[index_md][index_q]/sin(ptw->chi[index_tau]);
-      ptw->cotKgen[index_tau] = ptw->cscKgen[index_tau]*cos(ptw->chi[index_tau]);
-    }
-    break;
-  case 0:
-    for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
-      ptw->chi[index_tau] = k_[index_md][index_q]*ptw->tau0_minus_tau[index_tau];
-      ptw->cscKgen[index_tau] = 1.0/ptw->chi[index_tau];
-      ptw->cotKgen[index_tau] = 1.0/ptw->chi[index_tau];
-    }
-    break;
-  case -1:
-    sqrt_absK = sqrt(-ptw->K);
-    for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
-      ptw->chi[index_tau] = sqrt_absK*ptw->tau0_minus_tau[index_tau];
-      ptw->cscKgen[index_tau] = sqrt_absK/k_[index_md][index_q]/sinh(ptw->chi[index_tau]);
-      ptw->cotKgen[index_tau] = ptw->cscKgen[index_tau]*cosh(ptw->chi[index_tau]);
-    }
-    break;
+  switch (ptw->sgnK) {
+    case 1:
+      sqrt_absK = sqrt(ptw->K);
+      for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
+        ptw->chi[index_tau]     = sqrt_absK * ptw->tau0_minus_tau[index_tau];
+        ptw->cscKgen[index_tau] = sqrt_absK / k_[index_md][index_q] / sin(ptw->chi[index_tau]);
+        ptw->cotKgen[index_tau] = ptw->cscKgen[index_tau] * cos(ptw->chi[index_tau]);
+      }
+      break;
+    case 0:
+      for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
+        ptw->chi[index_tau]     = k_[index_md][index_q] * ptw->tau0_minus_tau[index_tau];
+        ptw->cscKgen[index_tau] = 1.0 / ptw->chi[index_tau];
+        ptw->cotKgen[index_tau] = 1.0 / ptw->chi[index_tau];
+      }
+      break;
+    case -1:
+      sqrt_absK = sqrt(-ptw->K);
+      for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
+        ptw->chi[index_tau]     = sqrt_absK * ptw->tau0_minus_tau[index_tau];
+        ptw->cscKgen[index_tau] = sqrt_absK / k_[index_md][index_q] / sinh(ptw->chi[index_tau]);
+        ptw->cotKgen[index_tau] = ptw->cscKgen[index_tau] * cosh(ptw->chi[index_tau]);
+      }
+      break;
   }
 
   return _SUCCESS_;
 }
-
 
 /**
  * This routine interpolates sources \f$ S(k, \tau) \f$ for each mode,
@@ -1632,15 +1646,18 @@ int TransferModule::transfer_radial_coordinates(struct transfer_workspace * ptw,
  * @return the error status
  */
 
-int TransferModule::transfer_interpolate_sources(int index_q,
-                                 int index_md,
-                                 int index_ic,
-                                 int index_type,
-                                 double* pert_source,       /* array with argument pert_source[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
-                                 double* pert_source_spline, /* array with argument pert_source_spline[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
-                                 double* interpolated_sources /* array with argument interpolated_sources[index_q*perturbations_module_->tau_size_+index_tau] (must be allocated) */
-                                 ) {
-
+int TransferModule::transfer_interpolate_sources(
+    int index_q,
+    int index_md,
+    int index_ic,
+    int index_type,
+    double*
+        pert_source, /* array with argument pert_source[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
+    double*
+        pert_source_spline, /* array with argument pert_source_spline[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
+    double*
+        interpolated_sources /* array with argument interpolated_sources[index_q*perturbations_module_->tau_size_+index_tau] (must be allocated) */
+) {
   /** Summary: */
 
   /** - define local variables */
@@ -1658,33 +1675,33 @@ int TransferModule::transfer_interpolate_sources(int index_q,
       spline interpolation algorithm. */
 
   index_k = 0;
-  h = perturbations_module_->k_[index_md][index_k + 1] - perturbations_module_->k_[index_md][index_k];
+  h       = perturbations_module_->k_[index_md][index_k + 1] -
+            perturbations_module_->k_[index_md][index_k];
 
   while (((index_k + 1) < perturbations_module_->k_size_[index_md]) &&
          (perturbations_module_->k_[index_md][index_k + 1] < k_[index_md][index_q])) {
     index_k++;
-    h = perturbations_module_->k_[index_md][index_k + 1] - perturbations_module_->k_[index_md][index_k];
+    h = perturbations_module_->k_[index_md][index_k + 1] -
+        perturbations_module_->k_[index_md][index_k];
   }
 
-  class_test(h==0.,
-             error_message_,
-             "stop to avoid division by zero");
+  class_test(h == 0., error_message_, "stop to avoid division by zero");
 
-  b = (k_[index_md][index_q] - perturbations_module_->k_[index_md][index_k])/h;
-  a = 1.-b;
+  b = (k_[index_md][index_q] - perturbations_module_->k_[index_md][index_k]) / h;
+  a = 1. - b;
 
   for (index_tau = 0; index_tau < perturbations_module_->tau_size_; index_tau++) {
-
     interpolated_sources[index_tau] =
-      a * pert_source[index_tau*perturbations_module_->k_size_[index_md] + index_k]
-      + b * pert_source[index_tau*perturbations_module_->k_size_[index_md] + index_k + 1]
-      + ((a*a*a - a) * pert_source_spline[index_tau*perturbations_module_->k_size_[index_md] + index_k]
-         +(b*b*b - b) * pert_source_spline[index_tau*perturbations_module_->k_size_[index_md] + index_k + 1])*h*h/6.0;
-
+        a * pert_source[index_tau * perturbations_module_->k_size_[index_md] + index_k] +
+        b * pert_source[index_tau * perturbations_module_->k_size_[index_md] + index_k + 1] +
+        ((a * a * a - a) *
+             pert_source_spline[index_tau * perturbations_module_->k_size_[index_md] + index_k] +
+         (b * b * b - b) * pert_source_spline[index_tau * perturbations_module_->k_size_[index_md] +
+                                              index_k + 1]) *
+            h * h / 6.0;
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -1710,8 +1727,17 @@ int TransferModule::transfer_interpolate_sources(int index_q,
  * @return the error status
  */
 
-int TransferModule::transfer_sources(double * interpolated_sources, double tau_rec, int index_q, int index_md, int index_tt, double * sources, double * window, int tau_size_max, double * tau0_minus_tau, double * w_trapz, int * tau_size_out)  {
-
+int TransferModule::transfer_sources(double* interpolated_sources,
+                                     double tau_rec,
+                                     int index_q,
+                                     int index_md,
+                                     int index_tt,
+                                     double* sources,
+                                     double* window,
+                                     int tau_size_max,
+                                     double* tau0_minus_tau,
+                                     double* w_trapz,
+                                     int* tau_size_out) {
   /** Summary: */
 
   /** - define local variables */
@@ -1720,7 +1746,7 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
   int index_tau;
 
   /* bin for computation of cl_density */
-  int bin=0;
+  int bin = 0;
 
   /* number of tau values */
   int tau_size;
@@ -1732,7 +1758,7 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
   double tau, tau0;
 
   /* rescaling factor depending on the background at a given time */
-  double rescaling=0.;
+  double rescaling = 0.;
 
   /* flag: is there any difference between the perturbation and transfer source? */
   short redefine_source;
@@ -1745,7 +1771,6 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
   redefine_source = _FALSE_;
 
   if (_scalarsEXT_) {
-
     /* cmb lensing potential */
     if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (index_tt == index_tt_lcmb_))
       redefine_source = _TRUE_;
@@ -1753,7 +1778,6 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
     /* number count Cl's */
     if (_nonintegrated_ncl_ || _integrated_ncl_)
       redefine_source = _TRUE_;
-
   }
 
   /* conformal time today */
@@ -1762,27 +1786,19 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
   /** - case where we need to redefine by a window function (or any
       function of the background and of k) */
   if (redefine_source == _TRUE_) {
-
-    class_call(transfer_source_tau_size(tau_rec,
-                                        tau0,
-                                        index_md,
-                                        index_tt,
-                                        &tau_size),
+    class_call(transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size),
                error_message_,
                error_message_);
 
     if (_scalarsEXT_) {
-
       /* lensing source: throw away times before recombination, and multiply psi by window function */
 
       if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (index_tt == index_tt_lcmb_)) {
-
         /* first time step after removing early times */
-        index_tau_min =  perturbations_module_->tau_size_ - tau_size;
+        index_tau_min = perturbations_module_->tau_size_ - tau_size;
 
         /* loop over time and rescale */
         for (index_tau = index_tau_min; index_tau < perturbations_module_->tau_size_; index_tau++) {
-
           /* conformal time */
           tau = perturbations_module_->tau_sampling_[index_tau];
 
@@ -1796,46 +1812,37 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
           */
 
           if (index_tau == perturbations_module_->tau_size_ - 1) {
-            rescaling=0.;
+            rescaling = 0.;
           }
           else {
-            switch (pba->sgnK){
-            case 1:
-              rescaling = sqrt(pba->K)
-                *sin((tau_rec-tau)*sqrt(pba->K))
-                /sin((tau0-tau)*sqrt(pba->K))
-                /sin((tau0-tau_rec)*sqrt(pba->K));
-              break;
-            case 0:
-              rescaling = (tau_rec-tau)/(tau0-tau)/(tau0-tau_rec);
-              break;
-            case -1:
-              rescaling = sqrt(-pba->K)
-                *sinh((tau_rec-tau)*sqrt(-pba->K))
-                /sinh((tau0-tau)*sqrt(-pba->K))
-                /sinh((tau0-tau_rec)*sqrt(-pba->K));
-              break;
+            switch (pba->sgnK) {
+              case 1:
+                rescaling = sqrt(pba->K) * sin((tau_rec - tau) * sqrt(pba->K)) /
+                            sin((tau0 - tau) * sqrt(pba->K)) / sin((tau0 - tau_rec) * sqrt(pba->K));
+                break;
+              case 0:
+                rescaling = (tau_rec - tau) / (tau0 - tau) / (tau0 - tau_rec);
+                break;
+              case -1:
+                rescaling = sqrt(-pba->K) * sinh((tau_rec - tau) * sqrt(-pba->K)) /
+                            sinh((tau0 - tau) * sqrt(-pba->K)) /
+                            sinh((tau0 - tau_rec) * sqrt(-pba->K));
+                break;
             }
             // Note: until 2.4.3 there was a bug here: the curvature effects had been omitted.
           }
 
           /* copy from input array to output array */
-          sources[index_tau-index_tau_min] =
-            interpolated_sources[index_tau]
-            * rescaling
-            * ptr->lcmb_rescale
-            *pow(k_[index_md][index_q]/ptr->lcmb_pivot, ptr->lcmb_tilt);
+          sources[index_tau - index_tau_min] =
+              interpolated_sources[index_tau] * rescaling * ptr->lcmb_rescale *
+              pow(k_[index_md][index_q] / ptr->lcmb_pivot, ptr->lcmb_tilt);
 
           /* store value of (tau0-tau) */
-          tau0_minus_tau[index_tau-index_tau_min] = tau0 - tau;
-
+          tau0_minus_tau[index_tau - index_tau_min] = tau0 - tau;
         }
 
         /* Compute trapezoidal weights for integration over tau */
-        class_call(array_trapezoidal_mweights(tau0_minus_tau,
-                                              tau_size,
-                                              w_trapz,
-                                              error_message_),
+        class_call(array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz, error_message_),
                    error_message_,
                    error_message_);
       }
@@ -1843,34 +1850,37 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
       /* Non-integrated contributions to dCl/nCl need selection time sampling*/
 
       if (_nonintegrated_ncl_) {
-
         _get_bin_nonintegrated_ncl_(index_tt)
 
-        /* redefine the time sampling */
-        class_call(transfer_selection_sampling(bin, tau0_minus_tau, tau_size),
-                   error_message_,
-                   error_message_);
+            /* redefine the time sampling */
+            class_call(transfer_selection_sampling(bin, tau0_minus_tau, tau_size),
+                       error_message_,
+                       error_message_);
 
-        class_test(tau0 - tau0_minus_tau[0] > perturbations_module_->tau_sampling_[perturbations_module_->tau_size_ - 1],
+        class_test(tau0 - tau0_minus_tau[0] >
+                       perturbations_module_->tau_sampling_[perturbations_module_->tau_size_ - 1],
                    error_message_,
-                   "this should not happen, there was probably a rounding error, if this error occurred, then this must be coded more carefully");
+                   "this should not happen, there was probably a rounding error, if this error "
+                   "occurred, then this must be coded more carefully");
 
         /* resample the source at those times */
-        class_call(transfer_source_resample(bin, tau0_minus_tau, tau_size, index_md, tau0, interpolated_sources, sources),
+        class_call(transfer_source_resample(bin,
+                                            tau0_minus_tau,
+                                            tau_size,
+                                            index_md,
+                                            tau0,
+                                            interpolated_sources,
+                                            sources),
                    error_message_,
                    error_message_);
 
         /* Compute trapezoidal weights for integration over tau */
-        class_call(array_trapezoidal_mweights(tau0_minus_tau,
-                                              tau_size,
-                                              w_trapz,
-                                              error_message_),
+        class_call(array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz, error_message_),
                    error_message_,
                    error_message_);
 
         /* loop over time and rescale */
         for (index_tau = 0; index_tau < tau_size; index_tau++) {
-
           /* matter density source =  [- (dz/dtau) W(z)] * delta_m(k,tau)
              = W(tau) delta_m(k,tau)
              with
@@ -1881,13 +1891,17 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
              regulated anyway by Bessel).
           */
 
-          rescaling = window[index_tt*tau_size_max+index_tau];
+          rescaling = window[index_tt * tau_size_max + index_tau];
 
           if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
-            rescaling *= 1./k_[index_md][index_q]/k_[index_md][index_q]; // Factor from original ClassGAL paper ( arXiv 1307.1459 )
+            rescaling *=
+                1. / k_[index_md][index_q] /
+                k_[index_md][index_q];  // Factor from original ClassGAL paper ( arXiv 1307.1459 )
 
           if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
-            rescaling *= 1./k_[index_md][index_q]; // Factor from original ClassGAL paper ( arXiv 1307.1459 )
+            rescaling *=
+                1. /
+                k_[index_md][index_q];  // Factor from original ClassGAL paper ( arXiv 1307.1459 )
 
           sources[index_tau] *= rescaling;
         }
@@ -1897,30 +1911,31 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
       /* Integrated contributions to dCl/nCl/sCl need integrated selection time sampling */
 
       if (_integrated_ncl_) {
-
         _get_bin_integrated_ncl_(index_tt)
 
-        /* redefine the time sampling */
-        class_call(transfer_lensing_sampling(bin, tau0, tau0_minus_tau, tau_size),
-                   error_message_,
-                   error_message_);
+            /* redefine the time sampling */
+            class_call(transfer_lensing_sampling(bin, tau0, tau0_minus_tau, tau_size),
+                       error_message_,
+                       error_message_);
 
         /* resample the source at those times */
-        class_call(transfer_source_resample(bin, tau0_minus_tau, tau_size, index_md, tau0, interpolated_sources, sources),
+        class_call(transfer_source_resample(bin,
+                                            tau0_minus_tau,
+                                            tau_size,
+                                            index_md,
+                                            tau0,
+                                            interpolated_sources,
+                                            sources),
                    error_message_,
                    error_message_);
 
         /* Compute trapezoidal weights for integration over tau */
-        class_call(array_trapezoidal_mweights(tau0_minus_tau,
-                                              tau_size,
-                                              w_trapz,
-                                              error_message_),
+        class_call(array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz, error_message_),
                    error_message_,
                    error_message_);
 
         /* loop over time and rescale */
         for (index_tau = 0; index_tau < tau_size; index_tau++) {
-
           /* lensing source =  - W(tau) (phi(k,tau) + psi(k,tau)) Heaviside(tau-tau_rec)
              with
              psi,phi = metric perturbation in newtonian gauge (phi+psi = Phi_A-Phi_H of Bardeen)
@@ -1931,10 +1946,12 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
           */
 
           /* copy from input array to output array */
-          sources[index_tau] *= window[index_tt*tau_size_max+index_tau];
+          sources[index_tau] *= window[index_tt * tau_size_max + index_tau];
 
           if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
-            sources[index_tau] *= k_[index_md][index_q]; // Factor from chi derivative of d/dchi j_ell(k*chi)= d/d(kchi) j_ell(k chi) * k = k * j_ell'(kchi)
+            sources[index_tau] *= k_
+                [index_md]
+                [index_q];  // Factor from chi derivative of d/dchi j_ell(k*chi)= d/d(kchi) j_ell(k chi) * k = k * j_ell'(kchi)
         }
       }
       /* End integrated contributions */
@@ -1944,25 +1961,19 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
   /** - case where we do not need to redefine */
 
   else {
-
     /* number of sampled time values */
     tau_size = perturbations_module_->tau_size_;
 
     /* plain copy from input array to output array */
-    memcpy(sources,
-           interpolated_sources,
-           perturbations_module_->tau_size_*sizeof(double));
+    memcpy(sources, interpolated_sources, perturbations_module_->tau_size_ * sizeof(double));
 
     /* store values of (tau0-tau) */
-    for (index_tau=0; index_tau < perturbations_module_->tau_size_; index_tau++) {
+    for (index_tau = 0; index_tau < perturbations_module_->tau_size_; index_tau++) {
       tau0_minus_tau[index_tau] = tau0 - perturbations_module_->tau_sampling_[index_tau];
     }
 
     /* Compute trapezoidal weights for integration over tau */
-    class_call(array_trapezoidal_mweights(tau0_minus_tau,
-                                          tau_size,
-                                          w_trapz,
-                                          error_message_),
+    class_call(array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz, error_message_),
                error_message_,
                error_message_);
   }
@@ -1973,7 +1984,6 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
   *tau_size_out = tau_size;
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -1985,17 +1995,15 @@ int TransferModule::transfer_sources(double * interpolated_sources, double tau_r
  * @return the error status
  */
 
-int TransferModule::transfer_selection_function(int bin, double z, double * selection) {
-
+int TransferModule::transfer_selection_function(int bin, double z, double* selection) {
   double x;
   double dNdz;
   double dln_dNdz_dz;
   int last_index;
 
   /* trivial dirac case */
-  if (ppt->selection==dirac) {
-
-    *selection=1.;
+  if (ppt->selection == dirac) {
+    *selection = 1.;
 
     return _SUCCESS_;
   }
@@ -2003,29 +2011,26 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
   /* difference between z and the bin center (we can take the absolute
      value as long as all selection functions are symmetric around
      x=0) */
-  x=fabs(z-ppt->selection_mean[bin]);
+  x = fabs(z - ppt->selection_mean[bin]);
 
   /* gaussian case (the function is anyway normalized later
      automatically, but could not resist to normalize it already
      here) */
-  if (ppt->selection==gaussian) {
-
-    *selection = exp(-0.5*pow(x/ppt->selection_width[bin],2))
-      /ppt->selection_width[bin]/sqrt(2.*_PI_);
+  if (ppt->selection == gaussian) {
+    *selection = exp(-0.5 * pow(x / ppt->selection_width[bin], 2)) / ppt->selection_width[bin] /
+                 sqrt(2. * _PI_);
 
     if ((ptr->has_nz_file == _TRUE_) || (ptr->has_nz_analytic == _TRUE_)) {
-
       if (ptr->has_nz_file == _TRUE_) {
-
         class_test((z < nz_z_[0]) || (z > nz_z_[nz_size_ - 1]),
                    error_message_,
-                   "Your input file for the selection function only covers the redshift range [%f : %f]. However, your input for the selection function requires z=%f",
+                   "Your input file for the selection function only covers the redshift range [%f "
+                   ": %f]. However, your input for the selection function requires z=%f",
                    nz_z_[0],
                    nz_z_[nz_size_ - 1],
                    z);
 
-        class_call(array_interpolate_spline(
-                                            nz_z_.data(),
+        class_call(array_interpolate_spline(nz_z_.data(),
                                             nz_size_,
                                             nz_nz_.data(),
                                             nz_ddnz_.data(),
@@ -2039,10 +2044,7 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
                    error_message_);
       }
       else {
-
-        class_call(transfer_dNdz_analytic(z, &dNdz, &dln_dNdz_dz),
-                   error_message_,
-                   error_message_);
+        class_call(transfer_dNdz_analytic(z, &dNdz, &dln_dNdz_dz), error_message_, error_message_);
       }
 
       *selection *= dNdz;
@@ -2062,20 +2064,18 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
      solved, and the final Cls become mildly dependent on the
      resolution along k. */
 
-  if (ppt->selection==tophat) {
-
+  if (ppt->selection == tophat) {
     /* selection function, centered on z=mean (i.e. on x=0), equal to
        one around x=0, with tanh step centered on x=width, of width
        delta x = 0.1*width
     */
-    *selection=(1.-tanh((x-ppt->selection_width[bin])/(ppr->selection_tophat_edge*ppt->selection_width[bin])))/2.;
+    *selection = (1. - tanh((x - ppt->selection_width[bin]) /
+                            (ppr->selection_tophat_edge * ppt->selection_width[bin]))) /
+                 2.;
 
     if ((ptr->has_nz_file == _TRUE_) || (ptr->has_nz_analytic == _TRUE_)) {
-
       if (ptr->has_nz_file == _TRUE_) {
-
-        class_call(array_interpolate_spline(
-                                            nz_z_.data(),
+        class_call(array_interpolate_spline(nz_z_.data(),
                                             nz_size_,
                                             nz_nz_.data(),
                                             nz_ddnz_.data(),
@@ -2089,10 +2089,7 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
                    error_message_);
       }
       else {
-
-        class_call(transfer_dNdz_analytic(z, &dNdz, &dln_dNdz_dz),
-                   error_message_,
-                   error_message_);
+        class_call(transfer_dNdz_analytic(z, &dNdz, &dln_dNdz_dz), error_message_, error_message_);
       }
 
       *selection *= dNdz;
@@ -2102,8 +2099,7 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
   }
 
   /* get here only if selection type was recognized */
-  class_stop(error_message_,
-             "invalid choice of selection function");
+  class_stop(error_message_, "invalid choice of selection function");
 
   return _SUCCESS_;
 }
@@ -2117,8 +2113,7 @@ int TransferModule::transfer_selection_function(int bin, double z, double * sele
  * @return the error status
  */
 
-int TransferModule::transfer_dNdz_analytic(double z, double * dNdz, double * dln_dNdz_dz) {
-
+int TransferModule::transfer_dNdz_analytic(double z, double* dNdz, double* dln_dNdz_dz) {
   /* Implement here your favorite analytic ansatz for the selection
      function. Typical function for photometric sample: dN/dz =
      (z/z0)^alpha exp[-(z/z0)^beta]. Then: dln(dN/dz)/dz = (alpha -
@@ -2128,19 +2123,18 @@ int TransferModule::transfer_dNdz_analytic(double z, double * dNdz, double * dln
      evolution uses only dln(dN/dz)/dz, it is possible to use
      different functions for dN/dz and dln(dN/dz)/dz */
 
-  double z0,alpha,beta;
+  double z0, alpha, beta;
 
   //Euclid IST dNdz, do not change this!
-  z0 = 0.9/pow(2.,1./2.);
+  z0    = 0.9 / pow(2., 1. / 2.);
   alpha = 2.0;
-  beta = 1.5;
+  beta  = 1.5;
 
-  *dNdz = pow(z/z0,alpha) * exp(-pow(z/z0,beta));
+  *dNdz = pow(z / z0, alpha) * exp(-pow(z / z0, beta));
 
-  *dln_dNdz_dz = (alpha - pow(z/z0,beta)*beta)/z;
+  *dln_dNdz_dz = (alpha - pow(z / z0, beta) * beta) / z;
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -2153,41 +2147,40 @@ int TransferModule::transfer_dNdz_analytic(double z, double * dNdz, double * dln
  * @return the error status
  */
 
-int TransferModule::transfer_selection_sampling(int bin, double * tau0_minus_tau, int tau_size) {
-
+int TransferModule::transfer_selection_sampling(int bin, double* tau0_minus_tau, int tau_size) {
   /* running index on time */
   int index_tau;
 
   /* minimum and maximal value of time in new sampled interval */
-  double tau_min,tau_mean,tau_max;
+  double tau_min, tau_mean, tau_max;
 
   /* time interval for this bin */
   class_call(transfer_selection_times(bin, &tau_min, &tau_mean, &tau_max),
              error_message_,
              error_message_);
 
-  class_test(tau_size <= 0,
-             error_message_,
-             "should be at least one");
+  class_test(tau_size <= 0, error_message_, "should be at least one");
 
   /* case selection == dirac */
   if (tau_min == tau_max) {
-    class_test(tau_size !=1,
+    class_test(tau_size != 1,
                error_message_,
-               "for Dirac selection function tau_size should be 1, not %d",tau_size);
+               "for Dirac selection function tau_size should be 1, not %d",
+               tau_size);
     tau0_minus_tau[0] = background_module_->conformal_age_ - tau_mean;
   }
   /* for other cases (gaussian, tophat...) define new sampled values
      of (tau0-tau) with even spacing */
   else {
-    for (index_tau=0; index_tau<tau_size-1; index_tau++) {
-      tau0_minus_tau[index_tau] = background_module_->conformal_age_ - tau_min - ((double)index_tau)/((double)tau_size - 1.)*(tau_max - tau_min);
+    for (index_tau = 0; index_tau < tau_size - 1; index_tau++) {
+      tau0_minus_tau[index_tau] = background_module_->conformal_age_ - tau_min -
+                                  ((double) index_tau) / ((double) tau_size - 1.) *
+                                      (tau_max - tau_min);
     }
     tau0_minus_tau[tau_size - 1] = background_module_->conformal_age_ - tau_max;
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -2203,25 +2196,26 @@ int TransferModule::transfer_selection_sampling(int bin, double * tau0_minus_tau
  * @return the error status
  */
 
-int TransferModule::transfer_lensing_sampling(int bin, double tau0, double * tau0_minus_tau, int tau_size) {
-
+int TransferModule::transfer_lensing_sampling(int bin,
+                                              double tau0,
+                                              double* tau0_minus_tau,
+                                              int tau_size) {
   /* minimum and maximal value of time in new sampled interval */
-  double tau_min,tau_mean,tau_max;
+  double tau_min, tau_mean, tau_max;
 
   /* time interval for this bin */
   class_call(transfer_selection_times(bin, &tau_min, &tau_mean, &tau_max),
              error_message_,
              error_message_);
 
-  for (int index_tau = 0; index_tau<tau_size; index_tau++) {
+  for (int index_tau = 0; index_tau < tau_size; index_tau++) {
     //tau0_minus_tau[index_tau]=background_module_->conformal_age_-tau_min-((double)index_tau)/((double)tau_size-1.)*(tau0-tau_min);
-    tau0_minus_tau[index_tau]=((double)(tau_size-1-index_tau))/((double)(tau_size-1))*(tau0-tau_min);
+    tau0_minus_tau[index_tau] = ((double) (tau_size - 1 - index_tau)) / ((double) (tau_size - 1)) *
+                                (tau0 - tau_min);
   }
 
   return _SUCCESS_;
-
 }
-
 
 /**
  * For sources that need to be multiplied by a selection function,
@@ -2238,21 +2232,26 @@ int TransferModule::transfer_lensing_sampling(int bin, double tau0, double * tau
  * @return the error status
  */
 
-int TransferModule::transfer_source_resample(int bin, double * tau0_minus_tau, int tau_size, int index_md, double tau0, double * interpolated_sources, double * sources) {
-
+int TransferModule::transfer_source_resample(int bin,
+                                             double* tau0_minus_tau,
+                                             int tau_size,
+                                             int index_md,
+                                             double tau0,
+                                             double* interpolated_sources,
+                                             double* sources) {
   /* array of values of source */
   std::vector<double> source_at_tau(1);
 
   /* interpolate the sources linearly at the new time values */
-  for (int index_tau = 0; index_tau<tau_size; index_tau++) {
-
-    class_call(array_interpolate_two(const_cast<double*>(perturbations_module_->tau_sampling_.data()),
+  for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+    class_call(array_interpolate_two(const_cast<double*>(
+                                         perturbations_module_->tau_sampling_.data()),
                                      1,
                                      0,
                                      interpolated_sources,
                                      1,
                                      perturbations_module_->tau_size_,
-                                     tau0-tau0_minus_tau[index_tau],
+                                     tau0 - tau0_minus_tau[index_tau],
                                      source_at_tau.data(),
                                      1,
                                      error_message_),
@@ -2264,7 +2263,6 @@ int TransferModule::transfer_source_resample(int bin, double * tau0_minus_tau, i
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -2279,20 +2277,23 @@ int TransferModule::transfer_source_resample(int bin, double * tau0_minus_tau, i
  * @return the error status
  */
 
-int TransferModule::transfer_selection_times(int bin, double * tau_min, double * tau_mean, double * tau_max) {
-
+int TransferModule::transfer_selection_times(int bin,
+                                             double* tau_min,
+                                             double* tau_mean,
+                                             double* tau_max) {
   /* a value of redshift */
-  double z=0.;
+  double z = 0.;
 
   /* lower edge of time interval for this bin */
   /* the few lines below should be consistent with their counterpart in input.c */
-  if (ppt->selection==gaussian) {
-    z = ppt->selection_mean[bin]+ppt->selection_width[bin]*ppr->selection_cut_at_sigma;
+  if (ppt->selection == gaussian) {
+    z = ppt->selection_mean[bin] + ppt->selection_width[bin] * ppr->selection_cut_at_sigma;
   }
-  if (ppt->selection==tophat) {
-    z = ppt->selection_mean[bin]+(1.+ppr->selection_cut_at_sigma*ppr->selection_tophat_edge)*ppt->selection_width[bin];
+  if (ppt->selection == tophat) {
+    z = ppt->selection_mean[bin] +
+        (1. + ppr->selection_cut_at_sigma * ppr->selection_tophat_edge) * ppt->selection_width[bin];
   }
-  if (ppt->selection==dirac) {
+  if (ppt->selection == dirac) {
     z = ppt->selection_mean[bin];
   }
 
@@ -2302,13 +2303,16 @@ int TransferModule::transfer_selection_times(int bin, double * tau_min, double *
 
   /* higher edge of time interval for this bin */
 
-  if (ppt->selection==gaussian) {
-    z = MAX(ppt->selection_mean[bin]-ppt->selection_width[bin]*ppr->selection_cut_at_sigma,0.);
+  if (ppt->selection == gaussian) {
+    z = MAX(ppt->selection_mean[bin] - ppt->selection_width[bin] * ppr->selection_cut_at_sigma, 0.);
   }
-  if (ppt->selection==tophat) {
-    z = MAX(ppt->selection_mean[bin]-(1.+ppr->selection_cut_at_sigma*ppr->selection_tophat_edge)*ppt->selection_width[bin],0.);
+  if (ppt->selection == tophat) {
+    z = MAX(ppt->selection_mean[bin] -
+                (1. + ppr->selection_cut_at_sigma * ppr->selection_tophat_edge) *
+                    ppt->selection_width[bin],
+            0.);
   }
-  if (ppt->selection==dirac) {
+  if (ppt->selection == dirac) {
     z = ppt->selection_mean[bin];
   }
 
@@ -2318,14 +2322,13 @@ int TransferModule::transfer_selection_times(int bin, double * tau_min, double *
 
   /* central value of time interval for this bin */
 
-  z = MAX(ppt->selection_mean[bin],0.);
+  z = MAX(ppt->selection_mean[bin], 0.);
 
   class_call(background_module_->background_tau_of_z(z, tau_mean),
              background_module_->error_message_,
              error_message_);
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -2341,8 +2344,13 @@ int TransferModule::transfer_selection_times(int bin, double * tau_min, double *
  * @return the error status
  */
 
-int TransferModule::transfer_selection_compute(double * selection, double * tau0_minus_tau, double * w_trapz, int tau_size, double * pvecback, double tau0, int bin) {
-
+int TransferModule::transfer_selection_compute(double* selection,
+                                               double* tau0_minus_tau,
+                                               double* w_trapz,
+                                               int tau_size,
+                                               double* pvecback,
+                                               double tau0,
+                                               int bin) {
   /* running value of time */
   double tau;
 
@@ -2356,20 +2364,22 @@ int TransferModule::transfer_selection_compute(double * selection, double * tau0
   double z;
 
   if (tau_size > 1) {
-
     /* loop over time */
     for (int index_tau = 0; index_tau < tau_size; index_tau++) {
-
       /* running value of time */
       tau = tau0 - tau0_minus_tau[index_tau];
 
       /* get background quantities at this time */
-      class_call(background_module_->background_at_tau(tau, pba->long_info, pba->inter_normal, &last_index, pvecback),
+      class_call(background_module_->background_at_tau(tau,
+                                                       pba->long_info,
+                                                       pba->inter_normal,
+                                                       &last_index,
+                                                       pvecback),
                  background_module_->error_message_,
                  error_message_);
 
       /* infer redshift */
-      z = pba->a_today/pvecback[background_module_->index_bg_a_] - 1.;
+      z = pba->a_today / pvecback[background_module_->index_bg_a_] - 1.;
 
       /* get corresponding dN/dz(z,bin) */
       class_call(transfer_selection_function(bin, z, &(selection[index_tau])),
@@ -2378,24 +2388,17 @@ int TransferModule::transfer_selection_compute(double * selection, double * tau0
 
       /* get corresponding dN/dtau = dN/dz * dz/dtau = dN/dz * H */
       selection[index_tau] *= pvecback[background_module_->index_bg_H_];
-
     }
 
     /* compute norm = \int W(tau) dtau */
-    class_call(array_trapezoidal_integral(selection,
-                                          tau_size,
-                                          w_trapz,
-                                          &norm,
-                                          error_message_),
+    class_call(array_trapezoidal_integral(selection, tau_size, w_trapz, &norm, error_message_),
                error_message_,
                error_message_);
 
-
     /* divide W by norm so that \int W(tau) dtau = 1 */
     for (int index_tau = 0; index_tau < tau_size; index_tau++) {
-      selection[index_tau]/=norm;
+      selection[index_tau] /= norm;
     }
-
   }
 
   /* trivial case: dirac distribution */
@@ -2434,19 +2437,25 @@ int TransferModule::transfer_selection_compute(double * selection, double * tau0
  * @return the error status
  */
 
-int TransferModule::transfer_compute_for_each_l(struct transfer_workspace * ptw, int index_q, int index_md, int index_ic, int index_tt, int index_l, double l, double q_max_bessel, radial_function_type radial_type ){
-
+int TransferModule::transfer_compute_for_each_l(struct transfer_workspace* ptw,
+                                                int index_q,
+                                                int index_md,
+                                                int index_ic,
+                                                int index_tt,
+                                                int index_l,
+                                                double l,
+                                                double q_max_bessel,
+                                                radial_function_type radial_type) {
   /** Summary: */
 
   /** - define local variables */
 
   /** - return zero transfer function if l is above l_max */
   if (index_l >= l_size_tt_[index_md][index_tt]) {
-
-    transfer_[index_md][
-      + ((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_
-      + index_q
-    ] = 0.;
+    transfer_[index_md]
+             [+((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] + index_l) *
+                  q_size_ +
+              index_q] = 0.;
     return _SUCCESS_;
   }
 
@@ -2454,31 +2463,18 @@ int TransferModule::transfer_compute_for_each_l(struct transfer_workspace * ptw,
   double k = k_[index_md][index_q];
 
   if (ptr->transfer_verbose > 3)
-    printf("Compute transfer for l=%d type=%d\n",(int)l,index_tt);
+    printf("Compute transfer for l=%d type=%d\n", (int) l, index_tt);
 
   short use_limber;
-  class_call(transfer_use_limber(q_max_bessel,
-                                 index_md,
-                                 index_tt,
-                                 q,
-                                 l,
-                                 &use_limber),
+  class_call(transfer_use_limber(q_max_bessel, index_md, index_tt, q, l, &use_limber),
              error_message_,
              error_message_);
 
   double transfer_function;
   if (use_limber == _TRUE_) {
-
-    class_call(transfer_limber(ptw,
-                               index_md,
-                               index_q,
-                               l,
-                               q,
-                               radial_type,
-                               &transfer_function),
+    class_call(transfer_limber(ptw, index_md, index_q, l, q, radial_type, &transfer_function),
                error_message_,
                error_message_);
-
   }
   else {
     class_call(transfer_integrate(ptw,
@@ -2489,81 +2485,102 @@ int TransferModule::transfer_compute_for_each_l(struct transfer_workspace * ptw,
                                   index_l,
                                   k,
                                   radial_type,
-                                  &transfer_function
-                                  ),
+                                  &transfer_function),
                error_message_,
                error_message_);
   }
 
   /** - store transfer function in transfer structure */
-  transfer_[index_md][((index_ic*tt_size_[index_md] + index_tt)*l_size_[index_md] + index_l)*q_size_ + index_q] = transfer_function;
+  transfer_[index_md]
+           [((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] + index_l) * q_size_ +
+            index_q] = transfer_function;
 
   return _SUCCESS_;
-
 }
 
-int TransferModule::transfer_use_limber(double q_max_bessel, int index_md, int index_tt, double q, double l, short * use_limber) {
-
-
+int TransferModule::transfer_use_limber(
+    double q_max_bessel, int index_md, int index_tt, double q, double l, short* use_limber) {
   /* criteria for choosing between integration and Limber
      must be implemented here */
 
   *use_limber = _FALSE_;
 
-  if (q>q_max_bessel) {
+  if (q > q_max_bessel) {
     *use_limber = _TRUE_;
   }
   else {
-
     if (_scalarsEXT_) {
-
       //TBC: in principle the Limber condition should be adapted to account for curvature effects
 
-      if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (index_tt == index_tt_lcmb_) && (l > ppr->l_switch_limber)) {
+      if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) && (index_tt == index_tt_lcmb_) &&
+          (l > ppr->l_switch_limber)) {
         *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_density_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_density_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_rsd_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_rsd_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_d0_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_d0_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_d1_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_d1_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens) &&
-          (l>=ppr->l_switch_limber_for_nc_los_over_z*ppt->selection_mean[index_tt - index_tt_nc_lens_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_los_over_z *
+                    ppt->selection_mean[index_tt - index_tt_nc_lens_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_nc_g1_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_nc_g1_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_nc_g2_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_nc_g2_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_nc_g3_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_nc_g3_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_los_over_z*ppt->selection_mean[index_tt - index_tt_nc_g4_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_los_over_z *
+                    ppt->selection_mean[index_tt - index_tt_nc_g4_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
       if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z*ppt->selection_mean[index_tt - index_tt_nc_g5_])) {
-        if (ppt->selection != dirac) *use_limber = _TRUE_;
+          (l >= ppr->l_switch_limber_for_nc_local_over_z *
+                    ppt->selection_mean[index_tt - index_tt_nc_g5_])) {
+        if (ppt->selection != dirac)
+          *use_limber = _TRUE_;
       }
-      if (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential) &&
-          (l >= ppr->l_switch_limber_for_nc_los_over_z*ppt->selection_mean[index_tt - index_tt_lensing_])) {
+      if (_index_tt_in_range_(index_tt_lensing_,
+                              ppt->selection_num,
+                              ppt->has_cl_lensing_potential) &&
+          (l >= ppr->l_switch_limber_for_nc_los_over_z *
+                    ppt->selection_mean[index_tt - index_tt_lensing_])) {
         *use_limber = _TRUE_;
       }
     }
@@ -2591,15 +2608,22 @@ int TransferModule::transfer_use_limber(double q_max_bessel, int index_md, int i
  * @return the error status
  */
 
-int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index_q, int index_md, int index_tt, double l, int index_l, double k, radial_function_type radial_type, double * trsf ) {
-
+int TransferModule::transfer_integrate(struct transfer_workspace* ptw,
+                                       int index_q,
+                                       int index_md,
+                                       int index_tt,
+                                       double l,
+                                       int index_l,
+                                       double k,
+                                       radial_function_type radial_type,
+                                       double* trsf) {
   /** Summary: */
 
   /** - define local variables */
 
-  double * tau0_minus_tau = ptw->tau0_minus_tau;
-  double * w_trapz = ptw->w_trapz;
-  double * sources = ptw->sources;
+  double* tau0_minus_tau = ptw->tau0_minus_tau;
+  double* w_trapz        = ptw->w_trapz;
+  double* sources        = ptw->sources;
 
   /* minimum value of \f$ (\tau0-\tau) \f$ at which \f$ j_l(k[\tau_0-\tau]) \f$ is known, given that \f$ j_l(x) \f$ is sampled above some finite value \f$ x_{\min} \f$ (below which it can be approximated by zero) */
   double tau0_minus_tau_min_bessel;
@@ -2614,27 +2638,24 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
   /** - find minimum value of (tau0-tau) at which \f$ j_l(k[\tau_0-\tau]) \f$ is known, given that \f$ j_l(x) \f$ is sampled above some finite value \f$ x_{\min} \f$ (below which it can be approximated by zero) */
   //tau0_minus_tau_min_bessel = x_min_l/k; /* segmentation fault impossible, checked before that k != 0 */
   //printf("index_l=%d\n",index_l);
-  if (ptw->sgnK==0){
-    tau0_minus_tau_min_bessel = ptw->pBIS->chi_at_phimin[index_l]/k; /* segmentation fault impossible, checked before that k != 0 */
+  if (ptw->sgnK == 0) {
+    tau0_minus_tau_min_bessel = ptw->pBIS->chi_at_phimin[index_l] /
+                                k; /* segmentation fault impossible, checked before that k != 0 */
   }
-  else{
-
+  else {
     if (index_q < index_q_flat_approximation_) {
-
-      tau0_minus_tau_min_bessel = ptw->HIS.chi_at_phimin[index_l]/sqrt(ptw->sgnK*ptw->K);
-
+      tau0_minus_tau_min_bessel = ptw->HIS.chi_at_phimin[index_l] / sqrt(ptw->sgnK * ptw->K);
     }
     else {
-
-      tau0_minus_tau_min_bessel = ptw->pBIS->chi_at_phimin[index_l]/sqrt(ptw->sgnK*ptw->K);
+      tau0_minus_tau_min_bessel = ptw->pBIS->chi_at_phimin[index_l] / sqrt(ptw->sgnK * ptw->K);
 
       if (ptw->sgnK == 1) {
-        x_turning_point = asin(sqrt(l*(l + 1.))/q_[index_q]*sqrt(ptw->sgnK*ptw->K));
-        tau0_minus_tau_min_bessel *= x_turning_point/sqrt(l*(l+1.));
+        x_turning_point = asin(sqrt(l * (l + 1.)) / q_[index_q] * sqrt(ptw->sgnK * ptw->K));
+        tau0_minus_tau_min_bessel *= x_turning_point / sqrt(l * (l + 1.));
       }
       else {
-        x_turning_point = asinh(sqrt(l*(l + 1.))/q_[index_q]*sqrt(ptw->sgnK*ptw->K));
-        tau0_minus_tau_min_bessel *= x_turning_point/sqrt(l*(l+1.));
+        x_turning_point = asinh(sqrt(l * (l + 1.)) / q_[index_q] * sqrt(ptw->sgnK * ptw->K));
+        tau0_minus_tau_min_bessel *= x_turning_point / sqrt(l * (l + 1.));
       }
     }
   }
@@ -2648,15 +2669,7 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
 
   /** - --> trivial case: the source is a Dirac function and is sampled in only one point */
   if (ptw->tau_size == 1) {
-
-    class_call(transfer_radial_function(ptw,
-                                        k,
-                                        index_q,
-                                        index_l,
-                                        1,
-                                        &bessel,
-                                        radial_type
-                                        ),
+    class_call(transfer_radial_function(ptw, k, index_q, index_l, 1, &bessel, radial_type),
                error_message_,
                error_message_);
 
@@ -2667,7 +2680,7 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
   /** - --> other cases */
 
   /** - ---> (a) find index in the source's tau list corresponding to the last point in the overlapping region. After this step, index_tau_max can be as small as zero, but not negative. */
-  index_tau_max = ptw->tau_size-1;
+  index_tau_max = ptw->tau_size - 1;
   while (tau0_minus_tau[index_tau_max] < tau0_minus_tau_min_bessel)
     index_tau_max--;
   /* Set index so we know if the truncation of the convolution integral is due to Bessel and not
@@ -2684,7 +2697,6 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
   }
 
   if (ptw->neglect_late_source == _TRUE_) {
-
     while (tau0_minus_tau[index_tau_max] < ptw->tau0_minus_tau_cut) {
       index_tau_max--;
       if (index_tau_max < 0) {
@@ -2701,17 +2713,16 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
                                       k,
                                       index_q,
                                       index_l,
-                                      index_tau_max+1,
+                                      index_tau_max + 1,
                                       radial_function,
-                                      radial_type
-                                      ),
+                                      radial_type),
              error_message_,
              error_message_);
 
   /** - Now we do most of the convolution integral: */
   class_call(array_trapezoidal_convolution(sources,
                                            radial_function,
-                                           index_tau_max+1,
+                                           index_tau_max + 1,
                                            w_trapz,
                                            trsf,
                                            error_message_),
@@ -2724,10 +2735,10 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
       the wrong weight w_trapz[index_tau_max] is exactly compensated by the
       triangle we miss. However, for the Bessel cut off, we must subtract the
       wrong triangle and add the correct triangle. */
-  if ((index_tau_max!=(ptw->tau_size-1))&&(index_tau_max==index_tau_max_Bessel)){
+  if ((index_tau_max != (ptw->tau_size - 1)) && (index_tau_max == index_tau_max_Bessel)) {
     //Bessel truncation
-    *trsf -= 0.5*(tau0_minus_tau[index_tau_max+1]-tau0_minus_tau_min_bessel)*
-      radial_function[index_tau_max]*sources[index_tau_max];
+    *trsf -= 0.5 * (tau0_minus_tau[index_tau_max + 1] - tau0_minus_tau_min_bessel) *
+             radial_function[index_tau_max] * sources[index_tau_max];
   }
 
   return _SUCCESS_;
@@ -2751,8 +2762,13 @@ int TransferModule::transfer_integrate(struct transfer_workspace *ptw, int index
  * @return the error status
  */
 
-int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_md, int index_q, double l, double q, radial_function_type radial_type, double * trsf){
-
+int TransferModule::transfer_limber(struct transfer_workspace* ptw,
+                                    int index_md,
+                                    int index_q,
+                                    double l,
+                                    double q,
+                                    radial_function_type radial_type,
+                                    double* trsf) {
   /** Summary: */
 
   /** - define local variables */
@@ -2760,29 +2776,28 @@ int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_m
   /* interpolated source and its derivatives at this value */
   double S, Sp, Sm;
 
-  double x_limber=0.;
-  double tau0_minus_tau_limber=0.;
-  double IPhiFlat = 0.;
+  double x_limber              = 0.;
+  double tau0_minus_tau_limber = 0.;
+  double IPhiFlat              = 0.;
 
   if (radial_type == SCALAR_TEMPERATURE_0) {
-
     /** - get k, l and infer tau such that k(tau0-tau)=l+1/2;
         check that tau is in appropriate range */
 
     if (ptw->sgnK == 0) {
-      tau0_minus_tau_limber = (l+0.5)/q;
+      tau0_minus_tau_limber = (l + 0.5) / q;
     }
     else if (ptw->sgnK == 1) {
-      x_limber = asin(sqrt(l*(l+1.))/q*sqrt(ptw->K));
-      tau0_minus_tau_limber = x_limber/sqrt(ptw->K);
+      x_limber              = asin(sqrt(l * (l + 1.)) / q * sqrt(ptw->K));
+      tau0_minus_tau_limber = x_limber / sqrt(ptw->K);
     }
     else if (ptw->sgnK == -1) {
-      x_limber = asinh((l+0.5)/q*sqrt(-ptw->K));
-      tau0_minus_tau_limber = x_limber/sqrt(-ptw->K);
+      x_limber              = asinh((l + 0.5) / q * sqrt(-ptw->K));
+      tau0_minus_tau_limber = x_limber / sqrt(-ptw->K);
     }
 
     if ((tau0_minus_tau_limber > ptw->tau0_minus_tau[0]) ||
-        (tau0_minus_tau_limber < ptw->tau0_minus_tau[ptw->tau_size-1])) {
+        (tau0_minus_tau_limber < ptw->tau0_minus_tau[ptw->tau_size - 1])) {
       *trsf = 0.;
       return _SUCCESS_;
     }
@@ -2799,23 +2814,21 @@ int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_m
         = source*[tau0-tau] * \f$ \sqrt{\pi/(2l+1)}/(l+1/2)\f$
     */
 
-    IPhiFlat = sqrt(_PI_/(2.*l))*(1.-0.25/l+1./32./(l*l));
+    IPhiFlat = sqrt(_PI_ / (2. * l)) * (1. - 0.25 / l + 1. / 32. / (l * l));
 
-    *trsf = IPhiFlat*S;
+    *trsf = IPhiFlat * S;
 
     if (ptw->sgnK == 0) {
-      *trsf /= (l+0.5);
+      *trsf /= (l + 0.5);
     }
     else {
-      *trsf *= pow(1.-ptw->K*l*l/q/q,-1./4.)/(tau0_minus_tau_limber*q);
+      *trsf *= pow(1. - ptw->K * l * l / q / q, -1. / 4.) / (tau0_minus_tau_limber * q);
     }
-
   }
 
   else if (radial_type == SCALAR_TEMPERATURE_1) {
-
-    if (((l+1.5)/q > ptw->tau0_minus_tau[0]) ||
-        ((l-0.5)/q < ptw->tau0_minus_tau[ptw->tau_size-1])) {
+    if (((l + 1.5) / q > ptw->tau0_minus_tau[0]) ||
+        ((l - 0.5) / q < ptw->tau0_minus_tau[ptw->tau_size - 1])) {
       *trsf = 0.;
       return _SUCCESS_;
     }
@@ -2823,7 +2836,7 @@ int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_m
     class_call(transfer_limber_interpolate(ptw->tau0_minus_tau,
                                            ptw->sources,
                                            ptw->tau_size,
-                                           (l+1.5)/q,
+                                           (l + 1.5) / q,
                                            &Sp),
                error_message_,
                error_message_);
@@ -2831,21 +2844,18 @@ int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_m
     class_call(transfer_limber_interpolate(ptw->tau0_minus_tau,
                                            ptw->sources,
                                            ptw->tau_size,
-                                           (l-0.5)/q,
+                                           (l - 0.5) / q,
                                            &Sm),
                error_message_,
                error_message_);
 
-    *trsf =
-      -sqrt(_PI_/(2.*l+3.))*Sp/(l+1.5) * (l+1.)/(2.*l+1)
-      +sqrt(_PI_/(2.*l-1.))*Sm/(l-0.5) * l/(2.*l+1.);
-
+    *trsf = -sqrt(_PI_ / (2. * l + 3.)) * Sp / (l + 1.5) * (l + 1.) / (2. * l + 1) +
+            sqrt(_PI_ / (2. * l - 1.)) * Sm / (l - 0.5) * l / (2. * l + 1.);
   }
 
   else if (radial_type == NC_RSD) {
-
-    if (((l+2.5)/q > ptw->tau0_minus_tau[0]) ||
-        ((l-1.5)/q < ptw->tau0_minus_tau[ptw->tau_size-1])) {
+    if (((l + 2.5) / q > ptw->tau0_minus_tau[0]) ||
+        ((l - 1.5) / q < ptw->tau0_minus_tau[ptw->tau_size - 1])) {
       *trsf = 0.;
       return _SUCCESS_;
     }
@@ -2853,7 +2863,7 @@ int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_m
     class_call(transfer_limber_interpolate(ptw->tau0_minus_tau,
                                            ptw->sources,
                                            ptw->tau_size,
-                                           (l+2.5)/q,
+                                           (l + 2.5) / q,
                                            &Sp),
                error_message_,
                error_message_);
@@ -2861,7 +2871,7 @@ int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_m
     class_call(transfer_limber_interpolate(ptw->tau0_minus_tau,
                                            ptw->sources,
                                            ptw->tau_size,
-                                           (l-1.5)/q,
+                                           (l - 1.5) / q,
                                            &Sm),
                error_message_,
                error_message_);
@@ -2869,41 +2879,41 @@ int TransferModule::transfer_limber(struct transfer_workspace * ptw, int index_m
     class_call(transfer_limber_interpolate(ptw->tau0_minus_tau,
                                            ptw->sources,
                                            ptw->tau_size,
-                                           (l+0.5)/q,
+                                           (l + 0.5) / q,
                                            &S),
                error_message_,
                error_message_);
 
     *trsf =
-      sqrt(_PI_/(2.*l+5.))*Sp/(l+2.5) * l*(l+2.)/(2.*l+1.)/(2.*l+3.)
-      -sqrt(_PI_/(2.*l+1.))*S/(l+0.5) * l/(2.*l+1.)*(l/(2.*l-1.)+(l+1.)/(2.*l+3.))
-      +sqrt(_PI_/(2.*l-3.))*Sm/(l-1.5) * l*(l-1.)/(2.*l+1.)/(2.*l-1.);
-
+        sqrt(_PI_ / (2. * l + 5.)) * Sp / (l + 2.5) * l * (l + 2.) / (2. * l + 1.) / (2. * l + 3.) -
+        sqrt(_PI_ / (2. * l + 1.)) * S / (l + 0.5) * l / (2. * l + 1.) *
+            (l / (2. * l - 1.) + (l + 1.) / (2. * l + 3.)) +
+        sqrt(_PI_ / (2. * l - 3.)) * Sm / (l - 1.5) * l * (l - 1.) / (2. * l + 1.) / (2. * l - 1.);
   }
 
   else {
-
     class_stop(error_message_,
                "Limber approximation has not been coded for the radial_type of index %d\n",
                radial_type);
-
   }
 
   return _SUCCESS_;
-
 }
 
-int TransferModule::transfer_limber_interpolate(double * tau0_minus_tau, double * sources, int tau_size, double tau0_minus_tau_limber, double * S){
-
+int TransferModule::transfer_limber_interpolate(double* tau0_minus_tau,
+                                                double* sources,
+                                                int tau_size,
+                                                double tau0_minus_tau_limber,
+                                                double* S) {
   int index_tau;
-  double dS,ddS;
+  double dS, ddS;
 
   /** - find  bracketing indices.
       index_tau must be at least 1 (so that index_tau-1 is at least 0)
       and at most tau_size-2 (so that index_tau+1 is at most tau_size-1).
   */
-  index_tau=1;
-  while ((tau0_minus_tau[index_tau] > tau0_minus_tau_limber) && (index_tau<tau_size-2))
+  index_tau = 1;
+  while ((tau0_minus_tau[index_tau] > tau0_minus_tau_limber) && (index_tau < tau_size - 2))
     index_tau++;
 
   /** - interpolate by fitting a polynomial of order two; get source
@@ -2913,34 +2923,31 @@ int TransferModule::transfer_limber_interpolate(double * tau0_minus_tau, double 
       lensing. */
 
   /* the case where the last of the three point is the edge (tau0=tau) must be treated separately, see below */
-  if (index_tau < tau_size-2) {
-
-    class_call(array_interpolate_parabola(tau0_minus_tau[index_tau-1],
+  if (index_tau < tau_size - 2) {
+    class_call(array_interpolate_parabola(tau0_minus_tau[index_tau - 1],
                                           tau0_minus_tau[index_tau],
-                                          tau0_minus_tau[index_tau+1],
+                                          tau0_minus_tau[index_tau + 1],
                                           tau0_minus_tau_limber,
-                                          sources[index_tau-1]*tau0_minus_tau[index_tau-1],
-                                          sources[index_tau]*tau0_minus_tau[index_tau],
-                                          sources[index_tau+1]*tau0_minus_tau[index_tau+1],
+                                          sources[index_tau - 1] * tau0_minus_tau[index_tau - 1],
+                                          sources[index_tau] * tau0_minus_tau[index_tau],
+                                          sources[index_tau + 1] * tau0_minus_tau[index_tau + 1],
                                           S,
                                           &dS,
                                           &ddS,
                                           error_message_),
                error_message_,
                error_message_);
-
   }
 
   /* in this case, we have stored a zero for sources[index_k*tau_size+index_tau+1]. But we can use in very good approximation the fact that S*(tau0-tau) is constant near tau=tau0 and replace sources[index_k*tau_size+index_tau+1]*tau0_minus_tau[index_tau+1] by sources[index_k*tau_size+index_tau]*tau0_minus_tau[index_tau] */
   else {
-
-    class_call(array_interpolate_parabola(tau0_minus_tau[index_tau-1],
+    class_call(array_interpolate_parabola(tau0_minus_tau[index_tau - 1],
                                           tau0_minus_tau[index_tau],
-                                          tau0_minus_tau[index_tau+1],
+                                          tau0_minus_tau[index_tau + 1],
                                           tau0_minus_tau_limber,
-                                          sources[index_tau-1]*tau0_minus_tau[index_tau-1],
-                                          sources[index_tau]*tau0_minus_tau[index_tau],
-                                          sources[index_tau]*tau0_minus_tau[index_tau],
+                                          sources[index_tau - 1] * tau0_minus_tau[index_tau - 1],
+                                          sources[index_tau] * tau0_minus_tau[index_tau],
+                                          sources[index_tau] * tau0_minus_tau[index_tau],
                                           S,
                                           &dS,
                                           &ddS,
@@ -2950,7 +2957,6 @@ int TransferModule::transfer_limber_interpolate(double * tau0_minus_tau, double 
   }
 
   return _SUCCESS_;
-
 }
 
 /**
@@ -2972,8 +2978,15 @@ int TransferModule::transfer_limber_interpolate(double * tau0_minus_tau, double 
  * @return the error status
  */
 
-int TransferModule::transfer_limber2(int tau_size, int index_md, int index_k, double l, double k, double * tau0_minus_tau, double * sources, radial_function_type radial_type, double * trsf){
-
+int TransferModule::transfer_limber2(int tau_size,
+                                     int index_md,
+                                     int index_k,
+                                     double l,
+                                     double k,
+                                     double* tau0_minus_tau,
+                                     double* sources,
+                                     radial_function_type radial_type,
+                                     double* trsf) {
   /** Summary: */
 
   /** - define local variables */
@@ -2988,28 +3001,28 @@ int TransferModule::transfer_limber2(int tau_size, int index_md, int index_k, do
   /** - get k, l and infer tau such that k(tau0-tau)=l+1/2;
       check that tau is in appropriate range */
 
-  tau0_minus_tau_limber = (l+0.5)/k;  //TBC: to be updated to include curvature effects
+  tau0_minus_tau_limber = (l + 0.5) / k;  //TBC: to be updated to include curvature effects
 
   if ((tau0_minus_tau_limber > tau0_minus_tau[0]) ||
-      (tau0_minus_tau_limber < tau0_minus_tau[tau_size-1])) {
+      (tau0_minus_tau_limber < tau0_minus_tau[tau_size - 1])) {
     *trsf = 0.;
     return _SUCCESS_;
   }
 
   /** - find  bracketing indices */
-  index_tau=0;
-  while ((tau0_minus_tau[index_tau] > tau0_minus_tau_limber) && (index_tau<tau_size-2))
+  index_tau = 0;
+  while ((tau0_minus_tau[index_tau] > tau0_minus_tau_limber) && (index_tau < tau_size - 2))
     index_tau++;
 
   /** - interpolate by fitting a polynomial of order two; get source
       and its first two derivatives */
-  class_call(array_interpolate_parabola(tau0_minus_tau[index_tau-1],
+  class_call(array_interpolate_parabola(tau0_minus_tau[index_tau - 1],
                                         tau0_minus_tau[index_tau],
-                                        tau0_minus_tau[index_tau+1],
+                                        tau0_minus_tau[index_tau + 1],
                                         tau0_minus_tau_limber,
-                                        sources[index_tau-1],
+                                        sources[index_tau - 1],
                                         sources[index_tau],
-                                        sources[index_tau+1],
+                                        sources[index_tau + 1],
                                         &S,
                                         &dS,
                                         &ddS,
@@ -3017,70 +3030,85 @@ int TransferModule::transfer_limber2(int tau_size, int index_md, int index_k, do
              error_message_,
              error_message_);
 
-
   /** - get transfer from 2nd order Limber approx (inferred from 0809.5112 [astro-ph]) */
 
-  *trsf = sqrt(_PI_/(2.*l+1.))/k*((1.-3./2./(2.*l+1.)/(2.*l+1.))*S+dS/k/(2.*l+1.)-0.5*ddS/k/k);
+  *trsf = sqrt(_PI_ / (2. * l + 1.)) / k *
+          ((1. - 3. / 2. / (2. * l + 1.) / (2. * l + 1.)) * S + dS / k / (2. * l + 1.) -
+           0.5 * ddS / k / k);
 
   return _SUCCESS_;
-
 }
 
-int TransferModule::transfer_can_be_neglected(int index_md, int index_ic, int index_tt, double ra_rec, double k, double l, short * neglect) {
-
+int TransferModule::transfer_can_be_neglected(
+    int index_md, int index_ic, int index_tt, double ra_rec, double k, double l, short* neglect) {
   *neglect = _FALSE_;
 
   if (_scalarsEXT_) {
+    if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t0_) &&
+        (l < (k - ppr->transfer_neglect_delta_k_S_t0) * ra_rec))
+      *neglect = _TRUE_;
 
-    if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t0_) && (l < (k - ppr->transfer_neglect_delta_k_S_t0)*ra_rec))*neglect = _TRUE_;
+    else if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t1_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_S_t1) * ra_rec))
+      *neglect = _TRUE_;
 
-    else if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t1_) && (l < (k - ppr->transfer_neglect_delta_k_S_t1)*ra_rec))*neglect = _TRUE_;
+    else if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t2_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_S_t2) * ra_rec))
+      *neglect = _TRUE_;
 
-    else if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t2_) && (l < (k - ppr->transfer_neglect_delta_k_S_t2)*ra_rec))*neglect = _TRUE_;
-
-    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_e_) && (l < (k - ppr->transfer_neglect_delta_k_S_e)*ra_rec))*neglect = _TRUE_;
-
+    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_e_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_S_e) * ra_rec))
+      *neglect = _TRUE_;
   }
 
   else if (_vectorsEXT_) {
+    if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t1_) &&
+        (l < (k - ppr->transfer_neglect_delta_k_V_t1) * ra_rec))
+      *neglect = _TRUE_;
 
-    if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t1_) && (l < (k - ppr->transfer_neglect_delta_k_V_t1)*ra_rec))*neglect = _TRUE_;
+    else if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t2_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_V_t2) * ra_rec))
+      *neglect = _TRUE_;
 
-    else if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t2_) && (l < (k - ppr->transfer_neglect_delta_k_V_t2)*ra_rec))*neglect = _TRUE_;
+    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_e_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_V_e) * ra_rec))
+      *neglect = _TRUE_;
 
-    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_e_) && (l < (k - ppr->transfer_neglect_delta_k_V_e)*ra_rec))*neglect = _TRUE_;
-
-    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_b_) && (l < (k - ppr->transfer_neglect_delta_k_V_b)*ra_rec))*neglect = _TRUE_;
-
+    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_b_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_V_b) * ra_rec))
+      *neglect = _TRUE_;
   }
 
   else if (_tensorsEXT_) {
+    if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t2_) &&
+        (l < (k - ppr->transfer_neglect_delta_k_T_t2) * ra_rec))
+      *neglect = _TRUE_;
 
-    if ((ppt->has_cl_cmb_temperature == _TRUE_) && (index_tt == index_tt_t2_) && (l < (k - ppr->transfer_neglect_delta_k_T_t2)*ra_rec))*neglect = _TRUE_;
+    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_e_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_T_e) * ra_rec))
+      *neglect = _TRUE_;
 
-    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_e_) && (l < (k - ppr->transfer_neglect_delta_k_T_e)*ra_rec))*neglect = _TRUE_;
-
-    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_b_) && (l < (k - ppr->transfer_neglect_delta_k_T_b)*ra_rec))*neglect = _TRUE_;
-
+    else if ((ppt->has_cl_cmb_polarization == _TRUE_) && (index_tt == index_tt_b_) &&
+             (l < (k - ppr->transfer_neglect_delta_k_T_b) * ra_rec))
+      *neglect = _TRUE_;
   }
 
   return _SUCCESS_;
-
 }
 
-int TransferModule::transfer_late_source_can_be_neglected(int index_md, int index_tt, double l, short * neglect) {
-
+int TransferModule::transfer_late_source_can_be_neglected(int index_md,
+                                                          int index_tt,
+                                                          double l,
+                                                          short* neglect) {
   *neglect = _FALSE_;
 
-  if (l > ppr->transfer_neglect_late_source*thermodynamics_module_->angular_rescaling_) {
-
+  if (l > ppr->transfer_neglect_late_source * thermodynamics_module_->angular_rescaling_) {
     /* sources at late times can be neglected for CMB, excepted when
        there is a LISW: this means for tt_t1, t2, e */
 
     if (_scalarsEXT_) {
       if (ppt->has_cl_cmb_temperature == _TRUE_) {
-        if ((index_tt == index_tt_t1_) ||
-            (index_tt == index_tt_t2_))
+        if ((index_tt == index_tt_t1_) || (index_tt == index_tt_t2_))
           *neglect = _TRUE_;
       }
       if (ppt->has_cl_cmb_polarization == _TRUE_) {
@@ -3090,153 +3118,162 @@ int TransferModule::transfer_late_source_can_be_neglected(int index_md, int inde
     }
     else if (_vectorsEXT_) {
       if (ppt->has_cl_cmb_temperature == _TRUE_) {
-        if ((index_tt == index_tt_t1_) ||
-            (index_tt == index_tt_t2_))
+        if ((index_tt == index_tt_t1_) || (index_tt == index_tt_t2_))
           *neglect = _TRUE_;
       }
       if (ppt->has_cl_cmb_polarization == _TRUE_) {
-        if ((index_tt == index_tt_e_) ||
-            (index_tt == index_tt_b_))
+        if ((index_tt == index_tt_e_) || (index_tt == index_tt_b_))
           *neglect = _TRUE_;
       }
     }
     else if (_tensorsEXT_) {
       if (ppt->has_cl_cmb_polarization == _TRUE_) {
-        if ((index_tt == index_tt_e_) ||
-            (index_tt == index_tt_b_))
+        if ((index_tt == index_tt_e_) || (index_tt == index_tt_b_))
           *neglect = _TRUE_;
       }
     }
   }
 
   return _SUCCESS_;
-
 }
 
-int TransferModule::transfer_radial_function(struct transfer_workspace * ptw, double k, int index_q, int index_l, int x_size, double * radial_function, radial_function_type radial_type ){
-
-  HyperInterpStruct * pHIS;
-  double *chi = ptw->chi;
-  double *cscKgen = ptw->cscKgen;
-  double *cotKgen = ptw->cotKgen;
+int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
+                                             double k,
+                                             int index_q,
+                                             int index_l,
+                                             int x_size,
+                                             double* radial_function,
+                                             radial_function_type radial_type) {
+  HyperInterpStruct* pHIS;
+  double* chi     = ptw->chi;
+  double* cscKgen = ptw->cscKgen;
+  double* cotKgen = ptw->cotKgen;
   int j;
-  double *Phi = ptw->Phi;
-  double *dPhi = ptw->dPhi;
-  double *d2Phi = ptw->d2Phi;
-  double *chireverse = ptw->chireverse;
-  double * rescale_function = ptw->rescale_function;
-  double K=0.,k2=1.0;
+  double* Phi              = ptw->Phi;
+  double* dPhi             = ptw->dPhi;
+  double* d2Phi            = ptw->d2Phi;
+  double* chireverse       = ptw->chireverse;
+  double* rescale_function = ptw->rescale_function;
+  double K = 0., k2 = 1.0;
   double sqrt_absK_over_k;
   double absK_over_k2;
-  double nu=0., chi_tp=0.;
+  double nu = 0., chi_tp = 0.;
   double factor, s0, s2, ssqrt3, si, ssqrt2, ssqrt2i;
-  double l = (double)l_[index_l];
+  double l = (double) l_[index_l];
   double rescale_argument;
   double rescale_amplitude;
-  int (*interpolate_Phi)(HyperInterpStruct *, int, int, double *, double *, char *);
-  int (*interpolate_dPhi)(HyperInterpStruct *, int, int, double *, double *, char *);
-  int (*interpolate_Phid2Phi)(HyperInterpStruct *, int, int, double *, double *, double *, char *);
-  int (*interpolate_PhidPhi)(HyperInterpStruct *, int, int, double *, double *, double *, char *);
-  int (*interpolate_PhidPhid2Phi)(HyperInterpStruct *, int, int, double *, double *, double *, double *, char *);
+  int (*interpolate_Phi)(HyperInterpStruct*, int, int, double*, double*, char*);
+  int (*interpolate_dPhi)(HyperInterpStruct*, int, int, double*, double*, char*);
+  int (*interpolate_Phid2Phi)(HyperInterpStruct*, int, int, double*, double*, double*, char*);
+  int (*interpolate_PhidPhi)(HyperInterpStruct*, int, int, double*, double*, double*, char*);
+  int (*interpolate_PhidPhid2Phi)(HyperInterpStruct*,
+                                  int,
+                                  int,
+                                  double*,
+                                  double*,
+                                  double*,
+                                  double*,
+                                  char*);
   enum Hermite_Interpolation_Order HIorder;
 
-  K = ptw->K;
-  k2 = k*k;
+  K  = ptw->K;
+  k2 = k * k;
 
-  if (ptw->sgnK==0){
+  if (ptw->sgnK == 0) {
     /* This is the choice consistent with chi=k*(tau0-tau) and nu=1 */
     sqrt_absK_over_k = 1.0;
   }
   else {
-    K=ptw->K;
-    sqrt_absK_over_k = sqrt(ptw->sgnK*K)/k;
+    K                = ptw->K;
+    sqrt_absK_over_k = sqrt(ptw->sgnK * K) / k;
   }
-  absK_over_k2 =sqrt_absK_over_k*sqrt_absK_over_k;
+  absK_over_k2 = sqrt_absK_over_k * sqrt_absK_over_k;
 
   if (ptw->sgnK == 0) {
-    pHIS = ptw->pBIS;
-    rescale_argument = 1.;
+    pHIS              = ptw->pBIS;
+    rescale_argument  = 1.;
     rescale_amplitude = 1.;
-    HIorder = HERMITE4;
+    HIorder           = HERMITE4;
   }
   else if (index_q < index_q_flat_approximation_) {
-    pHIS = &(ptw->HIS);
-    rescale_argument = 1.;
+    pHIS              = &(ptw->HIS);
+    rescale_argument  = 1.;
     rescale_amplitude = 1.;
-    HIorder = HERMITE6;
+    HIorder           = HERMITE6;
   }
   else {
     pHIS = ptw->pBIS;
-    if (ptw->sgnK == 1){
-      nu = q_[index_q]/sqrt(K);
-      chi_tp = asin(sqrt(l_[index_l]*(l_[index_l] + 1.))/nu);
+    if (ptw->sgnK == 1) {
+      nu     = q_[index_q] / sqrt(K);
+      chi_tp = asin(sqrt(l_[index_l] * (l_[index_l] + 1.)) / nu);
     }
-    else{
-      nu = q_[index_q]/sqrt(-K);
-      chi_tp = asinh(sqrt(l_[index_l]*(l_[index_l] + 1.))/nu);
+    else {
+      nu     = q_[index_q] / sqrt(-K);
+      chi_tp = asinh(sqrt(l_[index_l] * (l_[index_l] + 1.)) / nu);
     }
-    rescale_argument = sqrt(l_[index_l]*(l_[index_l] + 1.))/chi_tp;
-    rescale_amplitude = pow(1. - K*l_[index_l]*(l_[index_l] + 1.)/q_[index_q]/q_[index_q], -1./12.);
-    HIorder = HERMITE4;
+    rescale_argument  = sqrt(l_[index_l] * (l_[index_l] + 1.)) / chi_tp;
+    rescale_amplitude = pow(1. - K * l_[index_l] * (l_[index_l] + 1.) / q_[index_q] / q_[index_q],
+                            -1. / 12.);
+    HIorder           = HERMITE4;
   }
 
-  switch (HIorder){
-  case HERMITE3:
-    interpolate_Phi = hyperspherical_Hermite3_interpolation_vector_Phi;
-    interpolate_dPhi = hyperspherical_Hermite3_interpolation_vector_dPhi;
-    interpolate_PhidPhi = hyperspherical_Hermite3_interpolation_vector_PhidPhi;
-    interpolate_Phid2Phi = hyperspherical_Hermite3_interpolation_vector_Phid2Phi;
-    interpolate_PhidPhid2Phi = hyperspherical_Hermite3_interpolation_vector_PhidPhid2Phi;
-    break;
-  case HERMITE4:
-    interpolate_Phi = hyperspherical_Hermite4_interpolation_vector_Phi;
-    interpolate_dPhi = hyperspherical_Hermite4_interpolation_vector_dPhi;
-    interpolate_PhidPhi = hyperspherical_Hermite4_interpolation_vector_PhidPhi;
-    interpolate_Phid2Phi = hyperspherical_Hermite4_interpolation_vector_Phid2Phi;
-    interpolate_PhidPhid2Phi = hyperspherical_Hermite4_interpolation_vector_PhidPhid2Phi;
-    break;
-  case HERMITE6:
-    interpolate_Phi = hyperspherical_Hermite6_interpolation_vector_Phi;
-    interpolate_dPhi = hyperspherical_Hermite6_interpolation_vector_dPhi;
-    interpolate_PhidPhi = hyperspherical_Hermite6_interpolation_vector_PhidPhi;
-    interpolate_Phid2Phi = hyperspherical_Hermite6_interpolation_vector_Phid2Phi;
-    interpolate_PhidPhid2Phi = hyperspherical_Hermite6_interpolation_vector_PhidPhid2Phi;
-    break;
+  switch (HIorder) {
+    case HERMITE3:
+      interpolate_Phi          = hyperspherical_Hermite3_interpolation_vector_Phi;
+      interpolate_dPhi         = hyperspherical_Hermite3_interpolation_vector_dPhi;
+      interpolate_PhidPhi      = hyperspherical_Hermite3_interpolation_vector_PhidPhi;
+      interpolate_Phid2Phi     = hyperspherical_Hermite3_interpolation_vector_Phid2Phi;
+      interpolate_PhidPhid2Phi = hyperspherical_Hermite3_interpolation_vector_PhidPhid2Phi;
+      break;
+    case HERMITE4:
+      interpolate_Phi          = hyperspherical_Hermite4_interpolation_vector_Phi;
+      interpolate_dPhi         = hyperspherical_Hermite4_interpolation_vector_dPhi;
+      interpolate_PhidPhi      = hyperspherical_Hermite4_interpolation_vector_PhidPhi;
+      interpolate_Phid2Phi     = hyperspherical_Hermite4_interpolation_vector_Phid2Phi;
+      interpolate_PhidPhid2Phi = hyperspherical_Hermite4_interpolation_vector_PhidPhid2Phi;
+      break;
+    case HERMITE6:
+      interpolate_Phi          = hyperspherical_Hermite6_interpolation_vector_Phi;
+      interpolate_dPhi         = hyperspherical_Hermite6_interpolation_vector_dPhi;
+      interpolate_PhidPhi      = hyperspherical_Hermite6_interpolation_vector_PhidPhi;
+      interpolate_Phid2Phi     = hyperspherical_Hermite6_interpolation_vector_Phid2Phi;
+      interpolate_PhidPhid2Phi = hyperspherical_Hermite6_interpolation_vector_PhidPhid2Phi;
+      break;
   }
 
   //Reverse chi
   if (ptw->sgnK == 0) {
     chireverse = ptw->chi_full_reverse + (ptw->tau_size - x_size);
-    for (j=0; j<x_size; j++) {
+    for (j = 0; j < x_size; j++) {
       rescale_function[j] = 1.;
     }
   }
   else {
-    for (j=0; j<x_size; j++) {
-      chireverse[j] = chi[x_size-1-j]*rescale_argument;
+    for (j = 0; j < x_size; j++) {
+      chireverse[j] = chi[x_size - 1 - j] * rescale_argument;
       if (rescale_amplitude == 1.) {
         rescale_function[j] = 1.;
       }
       else {
         if (ptw->sgnK == 1) {
           rescale_function[j] =
-            MIN(
-                rescale_amplitude
-                * (1
-                   + 0.34*atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp)
-                   + 2.00*pow(atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp), 2)),
-                chireverse[j]/rescale_argument/sin(chireverse[j]/rescale_argument)
-                );
+              MIN(rescale_amplitude *
+                      (1 +
+                       0.34 * atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp) +
+                       2.00 *
+                           pow(atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp),
+                               2)),
+                  chireverse[j] / rescale_argument / sin(chireverse[j] / rescale_argument));
         }
         else {
           rescale_function[j] =
-            MAX(
-                rescale_amplitude
-                * (1
-                   - 0.38*atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp)
-                   + 0.40*pow(atan(l_[index_l]/nu)*(chireverse[j]/rescale_argument - chi_tp), 2)),
-                chireverse[j]/rescale_argument/sinh(chireverse[j]/rescale_argument)
-                );
+              MAX(rescale_amplitude *
+                      (1 -
+                       0.38 * atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp) +
+                       0.40 *
+                           pow(atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp),
+                               2)),
+                  chireverse[j] / rescale_argument / sinh(chireverse[j] / rescale_argument));
         }
       }
     }
@@ -3250,144 +3287,195 @@ int TransferModule::transfer_radial_function(struct transfer_workspace * ptw, do
     pHIS->x[0]);
   */
 
-  class_test((pHIS->x[pHIS->x_size-1] < chireverse[x_size-1]) && (ptw->sgnK != 1),
+  class_test((pHIS->x[pHIS->x_size - 1] < chireverse[x_size - 1]) && (ptw->sgnK != 1),
              error_message_,
-             "Bessels need to be interpolated at %e, outside the range in which they have been computed (<%e). Increase their x_max.",
-             chireverse[x_size-1],
-             pHIS->x[pHIS->x_size-1]
-             );
+             "Bessels need to be interpolated at %e, outside the range in which they have been "
+             "computed (<%e). Increase their x_max.",
+             chireverse[x_size - 1],
+             pHIS->x[pHIS->x_size - 1]);
 
-  switch (radial_type){
-  case SCALAR_TEMPERATURE_0:
-    class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = Phi[j]*rescale_function[j];
-    break;
-  case SCALAR_TEMPERATURE_1:
-    class_call(interpolate_dPhi(pHIS, x_size, index_l, chireverse, dPhi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, NULL, dPhi, NULL);
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = sqrt_absK_over_k*dPhi[j]*rescale_argument*rescale_function[j];
-    break;
-  case SCALAR_TEMPERATURE_2:
-    class_call(interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, d2Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, d2Phi);
-    s2 = sqrt(1.0-3.0*K/k2);
-    factor = 1.0/(2.0*s2);
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*(3*absK_over_k2*d2Phi[j]*rescale_argument*rescale_argument+Phi[j])*rescale_function[j];
-    break;
-  case SCALAR_POLARISATION_E:
-    class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
-    s2 = sqrt(1.0-3.0*K/k2);
-    factor = sqrt(3.0/8.0*(l+2.0)*(l+1.0)*l*(l-1.0))/s2;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*cscKgen[x_size-1-j]*cscKgen[x_size-1-j]*Phi[j]*rescale_function[j];
-    break;
-  case VECTOR_TEMPERATURE_1:
-    class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
-    s0 = sqrt(1.0+K/k2);
-    factor = sqrt(0.5*l*(l+1))/s0;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*cscKgen[x_size-1-j]*Phi[j]*rescale_function[j];
-    break;
-  case VECTOR_TEMPERATURE_2:
-    class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
-    s0 = sqrt(1.0+K/k2);
-    ssqrt3 = sqrt(1.0-2.0*K/k2);
-    factor = sqrt(1.5*l*(l+1))/s0/ssqrt3;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*cscKgen[x_size-1-j]*(sqrt_absK_over_k*dPhi[j]*rescale_argument-cotKgen[j]*Phi[j])*rescale_function[j];
-    break;
-  case VECTOR_POLARISATION_E:
-    class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
-               error_message_, error_message_);
-    //    hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
-    s0 = sqrt(1.0+K/k2);
-    ssqrt3 = sqrt(1.0-2.0*K/k2);
-    factor = 0.5*sqrt((l-1.0)*(l+2.0))/s0/ssqrt3;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*cscKgen[x_size-1-j]*(cotKgen[j]*Phi[j]+sqrt_absK_over_k*dPhi[j]*rescale_argument)*rescale_function[j];
-    break;
-  case VECTOR_POLARISATION_B:
-    class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
-    s0 = sqrt(1.0+K/k2);
-    ssqrt3 = sqrt(1.0-2.0*K/k2);
-    si = sqrt(1.0+2.0*K/k2);
-    factor = 0.5*sqrt((l-1.0)*(l+2.0))*si/s0/ssqrt3;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*cscKgen[x_size-1-j]*Phi[j]*rescale_function[j];
-    break;
-  case TENSOR_TEMPERATURE_2:
-    class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
-    ssqrt2 = sqrt(1.0-1.0*K/k2);
-    si = sqrt(1.0+2.0*K/k2);
-    factor = sqrt(3.0/8.0*(l+2.0)*(l+1.0)*l*(l-1.0))/si/ssqrt2;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*cscKgen[x_size-1-j]*cscKgen[x_size-1-j]*Phi[j]*rescale_function[j];
-    break;
-  case TENSOR_POLARISATION_E:
-    class_call(interpolate_PhidPhid2Phi(pHIS, x_size, index_l, chireverse, Phi, dPhi, d2Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
-    ssqrt2 = sqrt(1.0-1.0*K/k2);
-    si = sqrt(1.0+2.0*K/k2);
-    factor = 0.25/si/ssqrt2;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*(absK_over_k2*d2Phi[j]*rescale_argument*rescale_argument
-                                            +4.0*cotKgen[x_size-1-j]*sqrt_absK_over_k*dPhi[j]*rescale_argument
-                                            -(1.0+4*K/k2-2.0*cotKgen[x_size-1-j]*cotKgen[x_size-1-j])*Phi[j])*rescale_function[j];
-    break;
-  case TENSOR_POLARISATION_B:
-    class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
-    ssqrt2i = sqrt(1.0+3.0*K/k2);
-    ssqrt2 = sqrt(1.0-1.0*K/k2);
-    si = sqrt(1.0+2.0*K/k2);
-    factor = 0.5*ssqrt2i/ssqrt2/si;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*(sqrt_absK_over_k*dPhi[j]*rescale_argument+2.0*cotKgen[x_size-1-j]*Phi[j])*rescale_function[j];
-    break;
-  case NC_RSD:
-    class_call(interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, d2Phi, error_message_),
-               error_message_, error_message_);
-    //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, d2Phi);
-    //s2 = sqrt(1.0-3.0*K/k2);
-    factor = 1.0;
-    for (j=0; j<x_size; j++)
-      radial_function[x_size-1-j] = factor*absK_over_k2*d2Phi[j]*rescale_argument*rescale_argument*rescale_function[j];
-    // Note: in previous line there was a missing factor absK_over_k2 until version 2.4.3. Credits Francesco Montanari.
-    break;
+  switch (radial_type) {
+    case SCALAR_TEMPERATURE_0:
+      class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = Phi[j] * rescale_function[j];
+      break;
+    case SCALAR_TEMPERATURE_1:
+      class_call(interpolate_dPhi(pHIS, x_size, index_l, chireverse, dPhi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, NULL, dPhi, NULL);
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = sqrt_absK_over_k * dPhi[j] * rescale_argument *
+                                          rescale_function[j];
+      break;
+    case SCALAR_TEMPERATURE_2:
+      class_call(interpolate_Phid2Phi(pHIS,
+                                      x_size,
+                                      index_l,
+                                      chireverse,
+                                      Phi,
+                                      d2Phi,
+                                      error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, d2Phi);
+      s2     = sqrt(1.0 - 3.0 * K / k2);
+      factor = 1.0 / (2.0 * s2);
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] =
+            factor * (3 * absK_over_k2 * d2Phi[j] * rescale_argument * rescale_argument + Phi[j]) *
+            rescale_function[j];
+      break;
+    case SCALAR_POLARISATION_E:
+      class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      s2     = sqrt(1.0 - 3.0 * K / k2);
+      factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / s2;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
+                                          cscKgen[x_size - 1 - j] * Phi[j] * rescale_function[j];
+      break;
+    case VECTOR_TEMPERATURE_1:
+      class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      s0     = sqrt(1.0 + K / k2);
+      factor = sqrt(0.5 * l * (l + 1)) / s0;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] * Phi[j] *
+                                          rescale_function[j];
+      break;
+    case VECTOR_TEMPERATURE_2:
+      class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
+      s0     = sqrt(1.0 + K / k2);
+      ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
+      factor = sqrt(1.5 * l * (l + 1)) / s0 / ssqrt3;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
+                                          (sqrt_absK_over_k * dPhi[j] * rescale_argument -
+                                           cotKgen[j] * Phi[j]) *
+                                          rescale_function[j];
+      break;
+    case VECTOR_POLARISATION_E:
+      class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
+                 error_message_,
+                 error_message_);
+      //    hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
+      s0     = sqrt(1.0 + K / k2);
+      ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
+      factor = 0.5 * sqrt((l - 1.0) * (l + 2.0)) / s0 / ssqrt3;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
+                                          (cotKgen[j] * Phi[j] +
+                                           sqrt_absK_over_k * dPhi[j] * rescale_argument) *
+                                          rescale_function[j];
+      break;
+    case VECTOR_POLARISATION_B:
+      class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      s0     = sqrt(1.0 + K / k2);
+      ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
+      si     = sqrt(1.0 + 2.0 * K / k2);
+      factor = 0.5 * sqrt((l - 1.0) * (l + 2.0)) * si / s0 / ssqrt3;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] * Phi[j] *
+                                          rescale_function[j];
+      break;
+    case TENSOR_TEMPERATURE_2:
+      class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
+      si     = sqrt(1.0 + 2.0 * K / k2);
+      factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / si / ssqrt2;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
+                                          cscKgen[x_size - 1 - j] * Phi[j] * rescale_function[j];
+      break;
+    case TENSOR_POLARISATION_E:
+      class_call(interpolate_PhidPhid2Phi(pHIS,
+                                          x_size,
+                                          index_l,
+                                          chireverse,
+                                          Phi,
+                                          dPhi,
+                                          d2Phi,
+                                          error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
+      si     = sqrt(1.0 + 2.0 * K / k2);
+      factor = 0.25 / si / ssqrt2;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] =
+            factor *
+            (absK_over_k2 * d2Phi[j] * rescale_argument * rescale_argument +
+             4.0 * cotKgen[x_size - 1 - j] * sqrt_absK_over_k * dPhi[j] * rescale_argument -
+             (1.0 + 4 * K / k2 - 2.0 * cotKgen[x_size - 1 - j] * cotKgen[x_size - 1 - j]) *
+                 Phi[j]) *
+            rescale_function[j];
+      break;
+    case TENSOR_POLARISATION_B:
+      class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
+      ssqrt2i = sqrt(1.0 + 3.0 * K / k2);
+      ssqrt2  = sqrt(1.0 - 1.0 * K / k2);
+      si      = sqrt(1.0 + 2.0 * K / k2);
+      factor  = 0.5 * ssqrt2i / ssqrt2 / si;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor *
+                                          (sqrt_absK_over_k * dPhi[j] * rescale_argument +
+                                           2.0 * cotKgen[x_size - 1 - j] * Phi[j]) *
+                                          rescale_function[j];
+      break;
+    case NC_RSD:
+      class_call(interpolate_Phid2Phi(pHIS,
+                                      x_size,
+                                      index_l,
+                                      chireverse,
+                                      Phi,
+                                      d2Phi,
+                                      error_message_),
+                 error_message_,
+                 error_message_);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, d2Phi);
+      //s2 = sqrt(1.0-3.0*K/k2);
+      factor = 1.0;
+      for (j = 0; j < x_size; j++)
+        radial_function[x_size - 1 - j] = factor * absK_over_k2 * d2Phi[j] * rescale_argument *
+                                          rescale_argument * rescale_function[j];
+      // Note: in previous line there was a missing factor absK_over_k2 until version 2.4.3. Credits Francesco Montanari.
+      break;
   }
 
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_select_radial_function(int index_md, int index_tt, radial_function_type * radial_type) {
-
+int TransferModule::transfer_select_radial_function(int index_md,
+                                                    int index_tt,
+                                                    radial_function_type* radial_type) {
   /* generic case leading to generic bessel function (it applies also to all nonCMB types: lcmb, density, lensing) */
   *radial_type = SCALAR_TEMPERATURE_0;
 
   /* other specific cases */
   if (_scalarsEXT_) {
-
     if (ppt->has_cl_cmb_temperature == _TRUE_) {
-
       if (index_tt == index_tt_t0_) {
         *radial_type = SCALAR_TEMPERATURE_0;
       }
@@ -3397,15 +3485,12 @@ int TransferModule::transfer_select_radial_function(int index_md, int index_tt, 
       if (index_tt == index_tt_t2_) {
         *radial_type = SCALAR_TEMPERATURE_2;
       }
-
     }
 
     if (ppt->has_cl_cmb_polarization == _TRUE_) {
-
       if (index_tt == index_tt_e_) {
         *radial_type = SCALAR_POLARISATION_E;
       }
-
     }
 
     if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
@@ -3416,13 +3501,10 @@ int TransferModule::transfer_select_radial_function(int index_md, int index_tt, 
 
     if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
       *radial_type = SCALAR_TEMPERATURE_1;
-
   }
 
   if (_vectorsEXT_) {
-
     if (ppt->has_cl_cmb_temperature == _TRUE_) {
-
       if (index_tt == index_tt_t1_) {
         *radial_type = VECTOR_TEMPERATURE_1;
       }
@@ -3432,75 +3514,63 @@ int TransferModule::transfer_select_radial_function(int index_md, int index_tt, 
     }
 
     if (ppt->has_cl_cmb_polarization == _TRUE_) {
-
       if (index_tt == index_tt_e_) {
         *radial_type = VECTOR_POLARISATION_E;
       }
       if (index_tt == index_tt_b_) {
         *radial_type = VECTOR_POLARISATION_B;
       }
-
     }
   }
 
   if (_tensorsEXT_) {
-
     if (ppt->has_cl_cmb_temperature == _TRUE_) {
-
       if (index_tt == index_tt_t2_) {
         *radial_type = TENSOR_TEMPERATURE_2;
       }
     }
 
     if (ppt->has_cl_cmb_polarization == _TRUE_) {
-
       if (index_tt == index_tt_e_) {
         *radial_type = TENSOR_POLARISATION_E;
       }
       if (index_tt == index_tt_b_) {
         *radial_type = TENSOR_POLARISATION_B;
       }
-
     }
   }
 
   return _SUCCESS_;
-
 }
 
 /* for reading global selection function (ie the one multiplying the selection function of each bin) */
 
 int TransferModule::transfer_global_selection_read() {
-
   /* for reading selection function */
-  FILE * input_file;
-  int row,status;
-  double tmp1,tmp2;
+  FILE* input_file;
+  int row, status;
+  double tmp1, tmp2;
 
   nz_size_ = 0;
 
   if (ptr->has_nz_file == _TRUE_) {
-
-    input_file = fopen(ptr->nz_file_name,"r");
-    class_test(input_file == NULL,
-               error_message_,
-               "Could not open file %s!",ptr->nz_file_name);
+    input_file = fopen(ptr->nz_file_name, "r");
+    class_test(input_file == NULL, error_message_, "Could not open file %s!", ptr->nz_file_name);
 
     /* Find size of table */
-    for (row=0,status=2; status==2; row++){
-      status = fscanf(input_file,"%lf %lf",&tmp1,&tmp2);
+    for (row = 0, status = 2; status == 2; row++) {
+      status = fscanf(input_file, "%lf %lf", &tmp1, &tmp2);
     }
     rewind(input_file);
-    nz_size_ = row-1;
+    nz_size_ = row - 1;
 
     /* Allocate room for interpolation table */
     nz_z_.resize(nz_size_);
     nz_nz_.resize(nz_size_);
     nz_ddnz_.resize(nz_size_);
 
-    for (row = 0; row < nz_size_; row++){
-      status = fscanf(input_file,"%lf %lf",
-                      &nz_z_[row], &nz_nz_[row]);
+    for (row = 0; row < nz_size_; row++) {
+      status = fscanf(input_file, "%lf %lf", &nz_z_[row], &nz_nz_[row]);
     }
     fclose(input_file);
 
@@ -3519,15 +3589,15 @@ int TransferModule::transfer_global_selection_read() {
   nz_evo_size_ = 0;
 
   if (ptr->has_nz_evo_file == _TRUE_) {
-
-    input_file = fopen(ptr->nz_evo_file_name,"r");
+    input_file = fopen(ptr->nz_evo_file_name, "r");
     class_test(input_file == NULL,
                error_message_,
-               "Could not open file %s!",ptr->nz_evo_file_name);
+               "Could not open file %s!",
+               ptr->nz_evo_file_name);
 
     /* Find size of table */
-    for (row=0,status=2; status==2; row++){
-      status = fscanf(input_file,"%lf %lf",&tmp1,&tmp2);
+    for (row = 0, status = 2; status == 2; row++) {
+      status = fscanf(input_file, "%lf %lf", &tmp1, &tmp2);
     }
     rewind(input_file);
     nz_evo_size_ = row - 1;
@@ -3538,22 +3608,20 @@ int TransferModule::transfer_global_selection_read() {
     nz_evo_dlog_nz_.resize(nz_evo_size_);
     nz_evo_dd_dlog_nz_.resize(nz_evo_size_);
 
-    for (row = 0; row < nz_evo_size_; row++){
-      status = fscanf(input_file,"%lf %lf",
-                      &nz_evo_z_[row], &nz_evo_nz_[row]);
+    for (row = 0; row < nz_evo_size_; row++) {
+      status = fscanf(input_file, "%lf %lf", &nz_evo_z_[row], &nz_evo_nz_[row]);
     }
     fclose(input_file);
 
     /* infer dlog(dN/dz)/dz from dN/dz */
-    nz_evo_dlog_nz_[0] = (log(nz_evo_nz_[1]) - log(nz_evo_nz_[0]))/(nz_evo_z_[1] - nz_evo_z_[0]);
-    for (row = 1; row < nz_evo_size_ - 1; row++){
-      nz_evo_dlog_nz_[row] = (log(nz_evo_nz_[row + 1]) - log(nz_evo_nz_[row - 1]))
-        /(nz_evo_z_[row + 1] - nz_evo_z_[row - 1]);
+    nz_evo_dlog_nz_[0] = (log(nz_evo_nz_[1]) - log(nz_evo_nz_[0])) / (nz_evo_z_[1] - nz_evo_z_[0]);
+    for (row = 1; row < nz_evo_size_ - 1; row++) {
+      nz_evo_dlog_nz_[row] = (log(nz_evo_nz_[row + 1]) - log(nz_evo_nz_[row - 1])) /
+                             (nz_evo_z_[row + 1] - nz_evo_z_[row - 1]);
     }
-    nz_evo_dlog_nz_[nz_evo_size_-1] =
-      (log(nz_evo_nz_[nz_evo_size_-1])-log(nz_evo_nz_[nz_evo_size_-2]))
-      /(nz_evo_z_[nz_evo_size_-1]-nz_evo_z_[nz_evo_size_-2]);
-
+    nz_evo_dlog_nz_[nz_evo_size_ - 1] = (log(nz_evo_nz_[nz_evo_size_ - 1]) -
+                                         log(nz_evo_nz_[nz_evo_size_ - 2])) /
+                                        (nz_evo_z_[nz_evo_size_ - 1] - nz_evo_z_[nz_evo_size_ - 2]);
 
     /* Call spline interpolation: */
     class_call(array_spline_table_lines(nz_evo_z_.data(),
@@ -3568,18 +3636,22 @@ int TransferModule::transfer_global_selection_read() {
   }
 
   return _SUCCESS_;
-
 };
 
-int TransferModule::transfer_workspace_init(struct transfer_workspace *ptw, int perturb_tau_size, int tau_size_max, double K, int sgnK, double tau0_minus_tau_cut, HyperInterpStruct * pBIS){
-
-  ptw->tau_size_max = tau_size_max;
-  ptw->l_size = l_size_max_;
-  ptw->HIS_allocated=_FALSE_;
-  ptw->pBIS = pBIS;
-  ptw->K = K;
-  ptw->sgnK = sgnK;
-  ptw->tau0_minus_tau_cut = tau0_minus_tau_cut;
+int TransferModule::transfer_workspace_init(struct transfer_workspace* ptw,
+                                            int perturb_tau_size,
+                                            int tau_size_max,
+                                            double K,
+                                            int sgnK,
+                                            double tau0_minus_tau_cut,
+                                            HyperInterpStruct* pBIS) {
+  ptw->tau_size_max        = tau_size_max;
+  ptw->l_size              = l_size_max_;
+  ptw->HIS_allocated       = _FALSE_;
+  ptw->pBIS                = pBIS;
+  ptw->K                   = K;
+  ptw->sgnK                = sgnK;
+  ptw->tau0_minus_tau_cut  = tau0_minus_tau_cut;
   ptw->neglect_late_source = _FALSE_;
 
   ptw->interpolated_sources_storage.resize(perturb_tau_size);
@@ -3598,26 +3670,25 @@ int TransferModule::transfer_workspace_init(struct transfer_workspace *ptw, int 
   ptw->chi_full_reverse_storage.resize(tau_size_max);
 
   ptw->interpolated_sources = ptw->interpolated_sources_storage.data();
-  ptw->sources = ptw->sources_storage.data();
-  ptw->tau0_minus_tau = ptw->tau0_minus_tau_storage.data();
-  ptw->w_trapz = ptw->w_trapz_storage.data();
-  ptw->chi = ptw->chi_storage.data();
-  ptw->cscKgen = ptw->cscKgen_storage.data();
-  ptw->cotKgen = ptw->cotKgen_storage.data();
-  ptw->Phi = ptw->phi_storage.data();
-  ptw->dPhi = ptw->dphi_storage.data();
-  ptw->d2Phi = ptw->d2phi_storage.data();
-  ptw->chireverse = ptw->chireverse_storage.data();
-  ptw->rescale_function = ptw->rescale_function_storage.data();
-  ptw->radial_function = ptw->radial_function_storage.data();
-  ptw->chi_full_reverse = ptw->chi_full_reverse_storage.data();
+  ptw->sources              = ptw->sources_storage.data();
+  ptw->tau0_minus_tau       = ptw->tau0_minus_tau_storage.data();
+  ptw->w_trapz              = ptw->w_trapz_storage.data();
+  ptw->chi                  = ptw->chi_storage.data();
+  ptw->cscKgen              = ptw->cscKgen_storage.data();
+  ptw->cotKgen              = ptw->cotKgen_storage.data();
+  ptw->Phi                  = ptw->phi_storage.data();
+  ptw->dPhi                 = ptw->dphi_storage.data();
+  ptw->d2Phi                = ptw->d2phi_storage.data();
+  ptw->chireverse           = ptw->chireverse_storage.data();
+  ptw->rescale_function     = ptw->rescale_function_storage.data();
+  ptw->radial_function      = ptw->radial_function_storage.data();
+  ptw->chi_full_reverse     = ptw->chi_full_reverse_storage.data();
 
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_workspace_free(struct transfer_workspace *ptw) {
-
-  if (ptw->HIS_allocated==_TRUE_){
+int TransferModule::transfer_workspace_free(struct transfer_workspace* ptw) {
+  if (ptw->HIS_allocated == _TRUE_) {
     //Free HIS structure:
     class_call(hyperspherical_HIS_free(&(ptw->HIS), error_message_),
                error_message_,
@@ -3626,14 +3697,13 @@ int TransferModule::transfer_workspace_free(struct transfer_workspace *ptw) {
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int index_q, double tau0) {
-
-  double nu,new_nu;
+int TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int index_q, double tau0) {
+  double nu, new_nu;
   int int_nu;
   double xmin, xmax, sampling, phiminabs, xtol;
   double sqrt_absK;
   int l_size_max;
-  int index_l_left,index_l_right;
+  int index_l_left, index_l_right;
 
   if (ptw->HIS_allocated == _TRUE_) {
     class_call(hyperspherical_HIS_free(&(ptw->HIS), error_message_),
@@ -3643,24 +3713,25 @@ int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int ind
   }
 
   if ((ptw->sgnK != 0) && (index_q < index_q_flat_approximation_)) {
-
     xmin = ppr->hyper_x_min;
 
-    sqrt_absK = sqrt(ptw->sgnK*ptw->K);
+    sqrt_absK = sqrt(ptw->sgnK * ptw->K);
 
-    xmax = sqrt_absK*tau0;
-    nu = q_[index_q]/sqrt_absK;
+    xmax = sqrt_absK * tau0;
+    nu   = q_[index_q] / sqrt_absK;
 
     if (ptw->sgnK == 1) {
-      xmax = MIN(xmax,_PI_/2.0-ppr->hyper_x_min); //We only need solution on [0;pi/2]
+      xmax = MIN(xmax, _PI_ / 2.0 - ppr->hyper_x_min);  //We only need solution on [0;pi/2]
 
-      int_nu = (int)(nu+0.2);
-      new_nu = (double)int_nu;
-      class_test(nu-new_nu > 1.e-6,
+      int_nu = (int) (nu + 0.2);
+      new_nu = (double) int_nu;
+      class_test(nu - new_nu > 1.e-6,
                  error_message_,
-                 "problem in q list definition in closed case for index_q=%d, nu=%e, nu-int(nu)=%e",index_q,nu,nu-new_nu);
+                 "problem in q list definition in closed case for index_q=%d, nu=%e, nu-int(nu)=%e",
+                 index_q,
+                 nu,
+                 nu - new_nu);
       nu = new_nu;
-
     }
 
     if (nu > ppr->hyper_nu_sampling_step)
@@ -3671,16 +3742,16 @@ int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int ind
     /* find the highest value of l such that x_nonzero < xmax = sqrt(|K|) tau0. That will be l_max. */
     l_size_max = l_size_max_;
     if (ptw->sgnK == 1)
-      while ((double)l_[l_size_max - 1] >= nu)
+      while ((double) l_[l_size_max - 1] >= nu)
         l_size_max--;
 
-    if (ptw->sgnK == -1){
-      xtol = ppr->hyper_x_tol;
+    if (ptw->sgnK == -1) {
+      xtol      = ppr->hyper_x_tol;
       phiminabs = ppr->hyper_phi_min_abs;
 
       /* First try to find lmax using fast approximation: */
-      index_l_left=0;
-      index_l_right=l_size_max-1;
+      index_l_left  = 0;
+      index_l_right = l_size_max - 1;
       class_call(transfer_get_lmax(hyperspherical_get_xmin_from_approx,
                                    ptw->sgnK,
                                    nu,
@@ -3709,13 +3780,18 @@ int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int ind
                                    error_message_),
                  error_message_,
                  error_message_);
-      l_size_max = index_l_right+1;
+      l_size_max = index_l_right + 1;
     }
 
     class_test(nu <= 0.,
                error_message_,
-               "nu=%e when index_q=%d, q=%e, K=%e, sqrt(|K|)=%e; instead nu should always be strictly positive",
-               nu, index_q, q_[index_q], ptw->K, sqrt_absK);
+               "nu=%e when index_q=%d, q=%e, K=%e, sqrt(|K|)=%e; instead nu should always be "
+               "strictly positive",
+               nu,
+               index_q,
+               q_[index_q],
+               ptw->K,
+               sqrt_absK);
 
     class_call(hyperspherical_HIS_create(ptw->sgnK,
                                          nu,
@@ -3732,52 +3808,50 @@ int TransferModule::transfer_update_HIS(struct transfer_workspace * ptw, int ind
                error_message_);
 
     ptw->HIS_allocated = _TRUE_;
-
   }
 
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_get_lmax(int (*get_xmin_generic)(int sgnK, int l, double nu, double xtol, double phiminabs, double *x_nonzero, int *fevals),
-                      int sgnK, double nu, int *lvec, int lsize, double phiminabs, double xmax, double xtol, int *index_l_left, int *index_l_right, ErrorMsg error_message){
+int TransferModule::transfer_get_lmax(
+    int (*get_xmin_generic)(
+        int sgnK, int l, double nu, double xtol, double phiminabs, double* x_nonzero, int* fevals),
+    int sgnK,
+    double nu,
+    int* lvec,
+    int lsize,
+    double phiminabs,
+    double xmax,
+    double xtol,
+    int* index_l_left,
+    int* index_l_right,
+    ErrorMsg error_message) {
   double x_nonzero;
-  int fevals=0, index_l_mid;
+  int fevals = 0, index_l_mid;
   int multiplier;
   int right_boundary_checked = _FALSE_;
-  int hil=0,hir=0,bini=0;
-  class_call(get_xmin_generic(sgnK,
-                              lvec[0],
-                              nu,
-                              xtol,
-                              phiminabs,
-                              &x_nonzero,
-                              &fevals),
+  int hil = 0, hir = 0, bini = 0;
+  class_call(get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals),
              error_message,
              error_message);
-  if (x_nonzero >= xmax){
+  if (x_nonzero >= xmax) {
     //printf("None relevant\n");
     //x at left boundary is already larger than xmax.
-    *index_l_right = MAX(lsize-1,1);
+    *index_l_right = MAX(lsize - 1, 1);
     return _SUCCESS_;
   }
-  class_call(get_xmin_generic(sgnK,
-                              lvec[lsize-1],
-                              nu,
-                              xtol,
-                              phiminabs,
-                              &x_nonzero,
-                              &fevals),
+  class_call(get_xmin_generic(sgnK, lvec[lsize - 1], nu, xtol, phiminabs, &x_nonzero, &fevals),
              error_message,
              error_message);
 
-  if (x_nonzero < xmax){
+  if (x_nonzero < xmax) {
     //All Bessels are relevant
     //printf("All relevant\n");
-    *index_l_left = MAX(0,(lsize-2));
+    *index_l_left = MAX(0, (lsize - 2));
     return _SUCCESS_;
   }
   /* Hunt for left boundary: */
-  for (multiplier=1; ;multiplier *= 5){
+  for (multiplier = 1;; multiplier *= 5) {
     hil++;
     class_call(get_xmin_generic(sgnK,
                                 lvec[*index_l_left],
@@ -3789,25 +3863,25 @@ int TransferModule::transfer_get_lmax(int (*get_xmin_generic)(int sgnK, int l, d
                error_message,
                error_message);
     //printf("Hunt left, iter = %d, x_nonzero=%g\n",hil,x_nonzero);
-    if (x_nonzero <= xmax){
+    if (x_nonzero <= xmax) {
       //Boundary found
       break;
     }
-    else{
+    else {
       //We can use current index_l_left as index_l_right:
-      *index_l_right = *index_l_left;
+      *index_l_right         = *index_l_left;
       right_boundary_checked = _TRUE_;
     }
     //Update index_l_left:
-    *index_l_left = (*index_l_left)-multiplier;
-    if (*index_l_left<=0){
+    *index_l_left = (*index_l_left) - multiplier;
+    if (*index_l_left <= 0) {
       *index_l_left = 0;
       break;
     }
   }
   /* If not found, hunt for right boundary: */
-  if (right_boundary_checked == _FALSE_){
-    for (multiplier=1; ;multiplier *= 5){
+  if (right_boundary_checked == _FALSE_) {
+    for (multiplier = 1;; multiplier *= 5) {
       hir++;
       //printf("right iteration %d,index_l_right:%d\n",hir,*index_l_right);
       class_call(get_xmin_generic(sgnK,
@@ -3819,44 +3893,38 @@ int TransferModule::transfer_get_lmax(int (*get_xmin_generic)(int sgnK, int l, d
                                   &fevals),
                  error_message,
                  error_message);
-      if (x_nonzero >= xmax){
+      if (x_nonzero >= xmax) {
         //Boundary found
         break;
       }
-      else{
+      else {
         //We can use current index_l_right as index_l_left:
         *index_l_left = *index_l_right;
       }
       //Update index_l_right:
-      *index_l_right = (*index_l_right)+multiplier;
-      if (*index_l_right>=(lsize-1)){
-        *index_l_right = lsize-1;
+      *index_l_right = (*index_l_right) + multiplier;
+      if (*index_l_right >= (lsize - 1)) {
+        *index_l_right = lsize - 1;
         break;
       }
     }
   }
   //  int fevalshunt=fevals;
-  fevals=0;
+  fevals = 0;
   //Do binary search
   //  printf("Do binary search in get_lmax. \n");
   //printf("Region: [%d, %d]\n",*index_l_left,*index_l_right);
   while (((*index_l_right) - (*index_l_left)) > 1) {
     bini++;
-    index_l_mid= (int)(0.5*((*index_l_right)+(*index_l_left)));
+    index_l_mid = (int) (0.5 * ((*index_l_right) + (*index_l_left)));
     //printf("left:%d, mid=%d, right=%d\n",*index_l_left,index_l_mid,*index_l_right);
-    class_call(get_xmin_generic(sgnK,
-                                lvec[index_l_mid],
-                                nu,
-                                xtol,
-                                phiminabs,
-                                &x_nonzero,
-                                &fevals),
+    class_call(get_xmin_generic(sgnK, lvec[index_l_mid], nu, xtol, phiminabs, &x_nonzero, &fevals),
                error_message,
                error_message);
     if (x_nonzero < xmax)
-      *index_l_left=index_l_mid;
+      *index_l_left = index_l_mid;
     else
-      *index_l_right=index_l_mid;
+      *index_l_right = index_l_mid;
   }
   //printf("Done\n");
   /*  printf("Hunt left iter=%d, hunt right iter=%d (fevals: %d). For binary search: %d (fevals: %d)\n",
@@ -3880,7 +3948,9 @@ int TransferModule::transfer_get_lmax(int (*get_xmin_generic)(int sgnK, int l, d
  * @return the error status
  */
 
-int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_max, std::vector<double>& window){
+int TransferModule::transfer_precompute_selection(double tau_rec,
+                                                  int tau_size_max,
+                                                  std::vector<double>& window) {
   /** Summary: */
 
   /** - define local variables */
@@ -3889,7 +3959,7 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
   int index_tau;
 
   /* bin for computation of cl_density */
-  int bin=0;
+  int bin = 0;
 
   /* number of tau values */
   int tau_size;
@@ -3901,13 +3971,13 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
   double tau, tau0;
 
   /* geometrical quantities */
-  double sinKgen_source=0.;
-  double sinKgen_source_to_lens=0.;
-  double cotKgen_source=0.;
-  double cscKgen_lens=0.;
+  double sinKgen_source         = 0.;
+  double sinKgen_source_to_lens = 0.;
+  double cotKgen_source         = 0.;
+  double cscKgen_lens           = 0.;
 
   /* rescaling factor depending on the background at a given time */
-  double rescaling=0.;
+  double rescaling = 0.;
 
   /* index running on time in previous two arrays */
   int index_tau_sources;
@@ -3918,7 +3988,6 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
   /* source evolution factor */
   double f_evo = 0.;
 
-
   /* Setup initial variables and arrays*/
   int index_md = perturbations_module_->index_md_scalars_;
 
@@ -3926,7 +3995,7 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
   std::vector<double> tau0_minus_tau(tau_size_max);
   std::vector<double> selection(tau_size_max);
   std::vector<double> w_trapz(tau_size_max);
-  window.resize(tau_size_max*tt_size_[index_md]);
+  window.resize(tau_size_max * tt_size_[index_md]);
   std::vector<double> pvecback(background_module_->bg_size_);
 
   /* conformal time today */
@@ -3934,25 +4003,25 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
 
   /* Loop through different types to be precomputed */
   for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-
     /* First set the corresponding tau size */
     class_call(transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size),
-           error_message_,
-           error_message_);
+               error_message_,
+               error_message_);
 
     /* Start with non-integrated contributions */
     if (_nonintegrated_ncl_) {
-
       _get_bin_nonintegrated_ncl_(index_tt)
 
-      /* redefine the time sampling */
-      class_call(transfer_selection_sampling(bin, tau0_minus_tau.data(), tau_size),
-                 error_message_,
-                 error_message_);
+          /* redefine the time sampling */
+          class_call(transfer_selection_sampling(bin, tau0_minus_tau.data(), tau_size),
+                     error_message_,
+                     error_message_);
 
-      class_test(tau0 - tau0_minus_tau[0] > perturbations_module_->tau_sampling_[perturbations_module_->tau_size_ - 1],
+      class_test(tau0 - tau0_minus_tau[0] >
+                     perturbations_module_->tau_sampling_[perturbations_module_->tau_size_ - 1],
                  error_message_,
-                 "this should not happen, there was probably a rounding error, if this error occurred, then this must be coded more carefully");
+                 "this should not happen, there was probably a rounding error, if this error "
+                 "occurred, then this must be coded more carefully");
 
       /* Compute trapezoidal weights for integration over tau */
       class_call(array_trapezoidal_mweights(tau0_minus_tau.data(),
@@ -3963,49 +4032,55 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
                  error_message_);
 
       /* compute values of selection function at sampled values of tau */
-      class_call(transfer_selection_compute(selection.data(), tau0_minus_tau.data(), w_trapz.data(), tau_size, pvecback.data(), tau0, bin),
+      class_call(transfer_selection_compute(selection.data(),
+                                            tau0_minus_tau.data(),
+                                            w_trapz.data(),
+                                            tau_size,
+                                            pvecback.data(),
+                                            tau0,
+                                            bin),
                  error_message_,
                  error_message_);
 
       /* loop over time and rescale */
       for (index_tau = 0; index_tau < tau_size; index_tau++) {
-
         /* conformal time */
         tau = tau0 - tau0_minus_tau[index_tau];
 
         /* geometrical quantity */
-        switch (pba->sgnK){
-        case 1:
-          cotKgen_source = sqrt(pba->K)
-            *cos(tau0_minus_tau[index_tau]*sqrt(pba->K))
-            /sin(tau0_minus_tau[index_tau]*sqrt(pba->K));
-          break;
-        case 0:
-          cotKgen_source = 1./(tau0_minus_tau[index_tau]);
-          break;
-        case -1:
-          cotKgen_source = sqrt(-pba->K)
-            *cosh(tau0_minus_tau[index_tau]*sqrt(-pba->K))
-            /sinh(tau0_minus_tau[index_tau]*sqrt(-pba->K));
-          break;
+        switch (pba->sgnK) {
+          case 1:
+            cotKgen_source = sqrt(pba->K) * cos(tau0_minus_tau[index_tau] * sqrt(pba->K)) /
+                             sin(tau0_minus_tau[index_tau] * sqrt(pba->K));
+            break;
+          case 0:
+            cotKgen_source = 1. / (tau0_minus_tau[index_tau]);
+            break;
+          case -1:
+            cotKgen_source = sqrt(-pba->K) * cosh(tau0_minus_tau[index_tau] * sqrt(-pba->K)) /
+                             sinh(tau0_minus_tau[index_tau] * sqrt(-pba->K));
+            break;
         }
 
         /* corresponding background quantities */
-        class_call(background_module_->background_at_tau(tau, pba->long_info, pba->inter_normal, &last_index, pvecback.data()),
+        class_call(background_module_->background_at_tau(tau,
+                                                         pba->long_info,
+                                                         pba->inter_normal,
+                                                         &last_index,
+                                                         pvecback.data()),
                    background_module_->error_message_,
                    error_message_);
 
         /* Source evolution, used by nCl doppler and nCl gravity terms */
 
-        if ((_index_tt_in_range_(index_tt_d0_,    ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_d1_,    ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr)))
-          {
-            class_call(transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo),
-                       error_message_,
-                       error_message_);
-            /* Error in old CLASS 2.6.3 : Number count evolution did not respect curvature */
-          }
+        if ((_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd)) ||
+            (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd)) ||
+            (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))) {
+          class_call(transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo),
+                     error_message_,
+                     error_message_);
+          /* Error in old CLASS 2.6.3 : Number count evolution did not respect curvature */
+        }
 
         /* matter density source =  [- (dz/dtau) W(z)] * delta_m(k,tau)
            = W(tau) delta_m(k,tau)
@@ -4018,31 +4093,32 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
         */
 
         if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density))
-          rescaling = ptr->selection_bias[bin]*selection[index_tau];
+          rescaling = ptr->selection_bias[bin] * selection[index_tau];
 
         /* redshift space distortion source = - [- (dz/dtau) W(z)] * (k/H) * theta(k,tau) */
 
         if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))
-          rescaling = selection[index_tau]/pvecback[background_module_->index_bg_H_]/pvecback[background_module_->index_bg_a_];
+          rescaling = selection[index_tau] / pvecback[background_module_->index_bg_H_] /
+                      pvecback[background_module_->index_bg_a_];
 
         if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
-          rescaling = (f_evo - 3.)*selection[index_tau]*pvecback[background_module_->index_bg_H_]*pvecback[background_module_->index_bg_a_];
+          rescaling = (f_evo - 3.) * selection[index_tau] *
+                      pvecback[background_module_->index_bg_H_] *
+                      pvecback[background_module_->index_bg_a_];
 
         if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
 
-          rescaling = selection[index_tau]*(1.
-                                            + pvecback[background_module_->index_bg_H_prime_]
-                                            /pvecback[background_module_->index_bg_a_]
-                                            /pvecback[background_module_->index_bg_H_]
-                                            /pvecback[background_module_->index_bg_H_]
-                                            +(2.-5.*ptr->selection_magnification_bias[bin])
-                                            // /tau0_minus_tau[index_tau] // in flat space
-                                            *cotKgen_source  // in general case
-                                            /pvecback[background_module_->index_bg_a_]
-                                            /pvecback[background_module_->index_bg_H_]
-                                            +5.*ptr->selection_magnification_bias[bin]
-                                            -f_evo
-                                            );
+          rescaling = selection[index_tau] * (1. +
+                                              pvecback[background_module_->index_bg_H_prime_] /
+                                                  pvecback[background_module_->index_bg_a_] /
+                                                  pvecback[background_module_->index_bg_H_] /
+                                                  pvecback[background_module_->index_bg_H_] +
+                                              (2. - 5. * ptr->selection_magnification_bias[bin])
+                                                  // /tau0_minus_tau[index_tau] // in flat space
+                                                  * cotKgen_source  // in general case
+                                                  / pvecback[background_module_->index_bg_a_] /
+                                                  pvecback[background_module_->index_bg_H_] +
+                                              5. * ptr->selection_magnification_bias[bin] - f_evo);
 
         if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))
 
@@ -4050,40 +4126,39 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
 
         if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))
 
-          rescaling = -selection[index_tau]*(3.
-                                             + pvecback[background_module_->index_bg_H_prime_]
-                                             /pvecback[background_module_->index_bg_a_]
-                                             /pvecback[background_module_->index_bg_H_]
-                                             /pvecback[background_module_->index_bg_H_]
-                                             +(2.-5.*ptr->selection_magnification_bias[bin])
-                                             // /tau0_minus_tau[index_tau]  // in flat space
-                                             *cotKgen_source  // in general case
-                                             /pvecback[background_module_->index_bg_a_]
-                                             /pvecback[background_module_->index_bg_H_]
-                                             -f_evo
-                                             );
+          rescaling = -selection[index_tau] * (3. +
+                                               pvecback[background_module_->index_bg_H_prime_] /
+                                                   pvecback[background_module_->index_bg_a_] /
+                                                   pvecback[background_module_->index_bg_H_] /
+                                                   pvecback[background_module_->index_bg_H_] +
+                                               (2. - 5. * ptr->selection_magnification_bias[bin])
+                                                   // /tau0_minus_tau[index_tau]  // in flat space
+                                                   * cotKgen_source  // in general case
+                                                   / pvecback[background_module_->index_bg_a_] /
+                                                   pvecback[background_module_->index_bg_H_] -
+                                               f_evo);
 
         if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
-          rescaling = selection[index_tau]/pvecback[background_module_->index_bg_a_]/pvecback[background_module_->index_bg_H_];
+          rescaling = selection[index_tau] / pvecback[background_module_->index_bg_a_] /
+                      pvecback[background_module_->index_bg_H_];
 
         /* finally store in array */
-        window[index_tt*tau_size_max+index_tau] = rescaling;
+        window[index_tt * tau_size_max + index_tau] = rescaling;
       }
     }
     /* End non-integrated contribution */
 
     /* Now deal with integrated contributions */
     if (_integrated_ncl_) {
-
       _get_bin_integrated_ncl_(index_tt)
 
-      /* dirac case */
-      if (ppt->selection == dirac) {
-        tau_sources_size=1;
+          /* dirac case */
+          if (ppt->selection == dirac) {
+        tau_sources_size = 1;
       }
       /* other cases (gaussian, tophat...) */
       else {
-        tau_sources_size=ppr->selection_sampling;
+        tau_sources_size = ppr->selection_sampling;
       }
 
       std::vector<double> tau0_minus_tau_lensing_sources(tau_sources_size);
@@ -4091,7 +4166,9 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
       std::vector<double> w_trapz_lensing_sources(tau_sources_size);
 
       /* time sampling for source selection function */
-      class_call(transfer_selection_sampling(bin, tau0_minus_tau_lensing_sources.data(), tau_sources_size),
+      class_call(transfer_selection_sampling(bin,
+                                             tau0_minus_tau_lensing_sources.data(),
+                                             tau_sources_size),
                  error_message_,
                  error_message_);
 
@@ -4115,10 +4192,7 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
                  error_message_);
 
       /* redefine the time sampling */
-      class_call(transfer_lensing_sampling(bin,
-                                           tau0,
-                                           tau0_minus_tau.data(),
-                                           tau_size),
+      class_call(transfer_lensing_sampling(bin, tau0, tau0_minus_tau.data(), tau_size),
                  error_message_,
                  error_message_);
 
@@ -4132,7 +4206,6 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
 
       /* loop over time and rescale */
       for (index_tau = 0; index_tau < tau_size; index_tau++) {
-
         /* lensing source =  - W(tau) (phi(k,tau) + psi(k,tau)) Heaviside(tau-tau_rec)
            with
            psi,phi = metric perturbation in newtonian gauge (phi+psi = Phi_A-Phi_H of Bardeen)
@@ -4142,88 +4215,92 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
            regulated anyway by Bessel).
         */
 
-        if (index_tau == tau_size-1) {
-          rescaling=0.;
+        if (index_tau == tau_size - 1) {
+          rescaling = 0.;
         }
         else {
-
           rescaling = 0.;
 
-          for (index_tau_sources=0;
-               index_tau_sources < tau_sources_size;
-               index_tau_sources++) {
-
-            switch (pba->sgnK){
-            case 1:
-              sinKgen_source = sin(tau0_minus_tau_lensing_sources[index_tau_sources]*sqrt(pba->K))/sqrt(pba->K);
-              sinKgen_source_to_lens = sin((tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])*sqrt(pba->K))/sqrt(pba->K);
-              cotKgen_source = cos(tau0_minus_tau_lensing_sources[index_tau_sources]*sqrt(pba->K))/sinKgen_source;
-              cscKgen_lens = sqrt(pba->K)/sin(sqrt(pba->K)*tau0_minus_tau[index_tau]);
-              break;
-            case 0:
-              sinKgen_source = tau0_minus_tau_lensing_sources[index_tau_sources];
-              sinKgen_source_to_lens = (tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources]);
-              cotKgen_source = 1./(tau0_minus_tau_lensing_sources[index_tau_sources]);
-              cscKgen_lens = 1./(tau0_minus_tau[index_tau]);
-              break;
-            case -1:
-              sinKgen_source = sinh(tau0_minus_tau_lensing_sources[index_tau_sources]*sqrt(-pba->K))/sqrt(-pba->K);
-              sinKgen_source_to_lens = sinh((tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])*sqrt(-pba->K))/sqrt(-pba->K);
-              cotKgen_source = cosh(tau0_minus_tau_lensing_sources[index_tau_sources]*sqrt(-pba->K))/sinKgen_source;
-              cscKgen_lens = sqrt(-pba->K)/sinh(sqrt(-pba->K)*tau0_minus_tau[index_tau]);
-              break;
+          for (index_tau_sources = 0; index_tau_sources < tau_sources_size; index_tau_sources++) {
+            switch (pba->sgnK) {
+              case 1:
+                sinKgen_source         = sin(tau0_minus_tau_lensing_sources[index_tau_sources] *
+                                             sqrt(pba->K)) /
+                                         sqrt(pba->K);
+                sinKgen_source_to_lens = sin((tau0_minus_tau[index_tau] -
+                                              tau0_minus_tau_lensing_sources[index_tau_sources]) *
+                                             sqrt(pba->K)) /
+                                         sqrt(pba->K);
+                cotKgen_source         = cos(tau0_minus_tau_lensing_sources[index_tau_sources] *
+                                             sqrt(pba->K)) /
+                                         sinKgen_source;
+                cscKgen_lens = sqrt(pba->K) / sin(sqrt(pba->K) * tau0_minus_tau[index_tau]);
+                break;
+              case 0:
+                sinKgen_source         = tau0_minus_tau_lensing_sources[index_tau_sources];
+                sinKgen_source_to_lens = (tau0_minus_tau[index_tau] -
+                                          tau0_minus_tau_lensing_sources[index_tau_sources]);
+                cotKgen_source         = 1. / (tau0_minus_tau_lensing_sources[index_tau_sources]);
+                cscKgen_lens           = 1. / (tau0_minus_tau[index_tau]);
+                break;
+              case -1:
+                sinKgen_source         = sinh(tau0_minus_tau_lensing_sources[index_tau_sources] *
+                                              sqrt(-pba->K)) /
+                                         sqrt(-pba->K);
+                sinKgen_source_to_lens = sinh((tau0_minus_tau[index_tau] -
+                                               tau0_minus_tau_lensing_sources[index_tau_sources]) *
+                                              sqrt(-pba->K)) /
+                                         sqrt(-pba->K);
+                cotKgen_source         = cosh(tau0_minus_tau_lensing_sources[index_tau_sources] *
+                                              sqrt(-pba->K)) /
+                                         sinKgen_source;
+                cscKgen_lens = sqrt(-pba->K) / sinh(sqrt(-pba->K) * tau0_minus_tau[index_tau]);
+                break;
             }
 
             /* condition for excluding from the sum the sources located in z=zero */
-            if ((tau0_minus_tau_lensing_sources[index_tau_sources] > 0.) && (tau0_minus_tau_lensing_sources[index_tau_sources]-tau0_minus_tau[index_tau] > 0.)) {
-
-              if (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) {
-
+            if ((tau0_minus_tau_lensing_sources[index_tau_sources] > 0.) &&
+                (tau0_minus_tau_lensing_sources[index_tau_sources] - tau0_minus_tau[index_tau] >
+                 0.)) {
+              if (_index_tt_in_range_(index_tt_lensing_,
+                                      ppt->selection_num,
+                                      ppt->has_cl_lensing_potential)) {
                 rescaling +=
-                  //  *(tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])
-                  //  /tau0_minus_tau[index_tau]
-                  //  /tau0_minus_tau_lensing_sources[index_tau_sources]
-                  sinKgen_source_to_lens
-                  *cscKgen_lens
-                  /sinKgen_source
-                  * selection[index_tau_sources]
-                  * w_trapz_lensing_sources[index_tau_sources];
+                    //  *(tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])
+                    //  /tau0_minus_tau[index_tau]
+                    //  /tau0_minus_tau_lensing_sources[index_tau_sources]
+                    sinKgen_source_to_lens * cscKgen_lens / sinKgen_source *
+                    selection[index_tau_sources] * w_trapz_lensing_sources[index_tau_sources];
               }
 
               if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens)) {
-
                 rescaling -=
-                  (2.-5.*ptr->selection_magnification_bias[bin])/2.
-                  //  *(tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])
-                  //  /tau0_minus_tau[index_tau]
-                  //  /tau0_minus_tau_lensing_sources[index_tau_sources]
-                  *sinKgen_source_to_lens
-                  *cscKgen_lens
-                  /sinKgen_source
-                  * selection[index_tau_sources]
-                  * w_trapz_lensing_sources[index_tau_sources];
+                    (2. - 5. * ptr->selection_magnification_bias[bin]) /
+                    2.
+                    //  *(tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])
+                    //  /tau0_minus_tau[index_tau]
+                    //  /tau0_minus_tau_lensing_sources[index_tau_sources]
+                    * sinKgen_source_to_lens * cscKgen_lens / sinKgen_source *
+                    selection[index_tau_sources] * w_trapz_lensing_sources[index_tau_sources];
               }
 
               if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr)) {
-
-                rescaling +=
-                  (2.-5.*ptr->selection_magnification_bias[bin])
-                  // /tau0_minus_tau_lensing_sources[index_tau_sources]
-                  * cotKgen_source
-                  * selection[index_tau_sources]
-                  * w_trapz_lensing_sources[index_tau_sources];
-
+                rescaling += (2. - 5. * ptr->selection_magnification_bias[bin])
+                             // /tau0_minus_tau_lensing_sources[index_tau_sources]
+                             * cotKgen_source * selection[index_tau_sources] *
+                             w_trapz_lensing_sources[index_tau_sources];
               }
 
               if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr)) {
-
                 /* background quantities at time tau_lensing_source */
 
-                class_call(background_module_->background_at_tau(tau0 - tau0_minus_tau_lensing_sources[index_tau_sources],
-                                                                pba->long_info,
-                                                                pba->inter_normal,
-                                                                &last_index,
-                                                                pvecback.data()),
+                class_call(background_module_->background_at_tau(tau0 -
+                                                                     tau0_minus_tau_lensing_sources
+                                                                         [index_tau_sources],
+                                                                 pba->long_info,
+                                                                 pba->inter_normal,
+                                                                 &last_index,
+                                                                 pvecback.data()),
                            background_module_->error_message_,
                            error_message_);
 
@@ -4233,31 +4310,26 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
                            error_message_,
                            error_message_);
 
-
-                rescaling +=
-                  (1.
-                   + pvecback[background_module_->index_bg_H_prime_]
-                   /pvecback[background_module_->index_bg_a_]
-                   /pvecback[background_module_->index_bg_H_]
-                   /pvecback[background_module_->index_bg_H_]
-                   + (2.-5.*ptr->selection_magnification_bias[bin])
-                   //  /tau0_minus_tau_lensing_sources[index_tau_sources]
-                   * cotKgen_source
-                   /pvecback[background_module_->index_bg_a_]
-                   /pvecback[background_module_->index_bg_H_]
-                   + 5.*ptr->selection_magnification_bias[bin]
-                   - f_evo)
-                  * selection[index_tau_sources]
-                  * w_trapz_lensing_sources[index_tau_sources];
+                rescaling += (1. +
+                              pvecback[background_module_->index_bg_H_prime_] /
+                                  pvecback[background_module_->index_bg_a_] /
+                                  pvecback[background_module_->index_bg_H_] /
+                                  pvecback[background_module_->index_bg_H_] +
+                              (2. - 5. * ptr->selection_magnification_bias[bin])
+                                  //  /tau0_minus_tau_lensing_sources[index_tau_sources]
+                                  * cotKgen_source / pvecback[background_module_->index_bg_a_] /
+                                  pvecback[background_module_->index_bg_H_] +
+                              5. * ptr->selection_magnification_bias[bin] - f_evo) *
+                             selection[index_tau_sources] *
+                             w_trapz_lensing_sources[index_tau_sources];
               }
             }
           }
         }
 
         /* Finally store integrated result for later use */
-        window[index_tt*tau_size_max+index_tau] = rescaling;
+        window[index_tt * tau_size_max + index_tau] = rescaling;
       }
-
     }
     /* End integrated contribution */
   }
@@ -4265,33 +4337,37 @@ int TransferModule::transfer_precompute_selection(double tau_rec, int tau_size_m
   return _SUCCESS_;
 }
 
-int TransferModule::transfer_f_evo(double* pvecback, int last_index, double cotKgen, /* Should be FILLED with values of corresponding time */
-                   double* f_evo){
+int TransferModule::transfer_f_evo(
+    double* pvecback,
+    int last_index,
+    double cotKgen, /* Should be FILLED with values of corresponding time */
+    double* f_evo) {
   /* Allocate temporary variables for calculation of f_evo */
   double z;
   double dNdz;
   double dln_dNdz_dz;
   double temp_f_evo;
 
-  if ((ptr->has_nz_evo_file == _TRUE_) || (ptr->has_nz_evo_analytic == _TRUE_)){
+  if ((ptr->has_nz_evo_file == _TRUE_) || (ptr->has_nz_evo_analytic == _TRUE_)) {
+    temp_f_evo = 2. / pvecback[background_module_->index_bg_H_] /
+                     pvecback[background_module_->index_bg_a_] * cotKgen +
+                 pvecback[background_module_->index_bg_H_prime_] /
+                     pvecback[background_module_->index_bg_H_] /
+                     pvecback[background_module_->index_bg_H_] /
+                     pvecback[background_module_->index_bg_a_];
 
-    temp_f_evo = 2./pvecback[background_module_->index_bg_H_]/pvecback[background_module_->index_bg_a_]*cotKgen
-      + pvecback[background_module_->index_bg_H_prime_]/pvecback[background_module_->index_bg_H_]/pvecback[background_module_->index_bg_H_]/pvecback[background_module_->index_bg_a_];
+    z = pba->a_today / pvecback[background_module_->index_bg_a_] - 1.;
 
-    z = pba->a_today/pvecback[background_module_->index_bg_a_] - 1.;
-
-    if (ptr->has_nz_evo_file ==_TRUE_) {
-
+    if (ptr->has_nz_evo_file == _TRUE_) {
       class_test((z < nz_evo_z_[0]) || (z > nz_evo_z_[nz_evo_size_ - 1]),
                  error_message_,
-                 "Your input file for the selection function only covers the redshift range [%f : %f]. However, your input for the selection function requires z=%f",
+                 "Your input file for the selection function only covers the redshift range [%f : "
+                 "%f]. However, your input for the selection function requires z=%f",
                  nz_evo_z_[0],
                  nz_evo_z_[nz_evo_size_ - 1],
                  z);
 
-
-      class_call(array_interpolate_spline(
-                                          nz_evo_z_.data(),
+      class_call(array_interpolate_spline(nz_evo_z_.data(),
                                           nz_evo_size_,
                                           nz_evo_dlog_nz_.data(),
                                           nz_evo_dd_dlog_nz_.data(),
@@ -4303,16 +4379,12 @@ int TransferModule::transfer_f_evo(double* pvecback, int last_index, double cotK
                                           error_message_),
                  error_message_,
                  error_message_);
-
     }
     else {
-
-      class_call(transfer_dNdz_analytic(z, &dNdz, &dln_dNdz_dz),
-                 error_message_,
-                 error_message_);
+      class_call(transfer_dNdz_analytic(z, &dNdz, &dln_dNdz_dz), error_message_, error_message_);
     }
 
-    temp_f_evo -= dln_dNdz_dz/pvecback[background_module_->index_bg_a_];
+    temp_f_evo -= dln_dNdz_dz / pvecback[background_module_->index_bg_a_];
   }
   else {
     temp_f_evo = 0.;

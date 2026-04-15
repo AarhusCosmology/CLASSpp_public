@@ -3,11 +3,11 @@
  */
 
 #include "class.h"
+
 #include "cosmology.h"
 #include "output_module.h"
 
-int main(int argc, char **argv) {
-
+int main(int argc, char** argv) {
   try {
     FileContent fc;
     ErrorMsg error_message;
@@ -18,12 +18,19 @@ int main(int argc, char **argv) {
 
     Cosmology cosmology{fc};
 
-    OutputModule output_module(cosmology.GetInputModule(), cosmology.GetBackgroundModule(), cosmology.GetThermodynamicsModule(), cosmology.GetPerturbationsModule(), cosmology.GetPrimordialModule(), cosmology.GetNonlinearModule(), cosmology.GetSpectraModule(), cosmology.GetLensingModule());
-  } catch (const std::exception& e) {
+    OutputModule output_module(cosmology.GetInputModule(),
+                               cosmology.GetBackgroundModule(),
+                               cosmology.GetThermodynamicsModule(),
+                               cosmology.GetPerturbationsModule(),
+                               cosmology.GetPrimordialModule(),
+                               cosmology.GetNonlinearModule(),
+                               cosmology.GetSpectraModule(),
+                               cosmology.GetLensingModule());
+  }
+  catch (const std::exception& e) {
     printf("\n\nError in Class:\n%s\n", e.what());
     return _FAILURE_;
   }
 
   return _SUCCESS_;
-
 }
