@@ -55,12 +55,12 @@ class PerturbationsModule : public BaseModule {
   //@}
   /** @name - indices running on initial conditions (for scalars: ad, cdi, nid, niv; for tensors: only one) */
   //@{
-  int index_ic_ad_;  /**< index value for adiabatic */
-  int index_ic_cdi_; /**< index value for CDM isocurvature */
-  int index_ic_bi_;  /**< index value for baryon isocurvature */
-  int index_ic_nid_; /**< index value for neutrino density isocurvature */
-  int index_ic_niv_; /**< index value for neutrino velocity isocurvature */
-  int index_ic_ten_; /**< index value for unique possibility for tensors */
+  int index_ic_ad_  = -1; /**< index value for adiabatic */
+  int index_ic_cdi_ = -1; /**< index value for CDM isocurvature */
+  int index_ic_bi_  = -1; /**< index value for baryon isocurvature */
+  int index_ic_nid_ = -1; /**< index value for neutrino density isocurvature */
+  int index_ic_niv_ = -1; /**< index value for neutrino velocity isocurvature */
+  int index_ic_ten_ = -1; /**< index value for unique possibility for tensors */
   std::vector<int>
       ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
   //@}

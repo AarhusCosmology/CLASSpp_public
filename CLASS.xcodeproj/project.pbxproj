@@ -14,6 +14,7 @@
 		AF1078E4241D1F3B00A369F7 /* hydrogen.c in Sources */ = {isa = PBXBuildFile; fileRef = AF1078DA241D1F3B00A369F7 /* hydrogen.c */; };
 		AF1078FA2424A86400A369F7 /* exceptions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AF1078F92424A86400A369F7 /* exceptions.cpp */; };
 		AF14AFE924337B11005D2DE9 /* cosmology.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AF14AFE724337B11005D2DE9 /* cosmology.cpp */; };
+		AF9F87302F8FB9720077F3A9 /* perturb_column_writer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AF9F872D2F8FB9720077F3A9 /* perturb_column_writer.cpp */; };
 		AFDC689C240D9F500044B5A3 /* lensing_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6892240D9F500044B5A3 /* lensing_module.cpp */; };
 		AFDC689D240D9F500044B5A3 /* perturbations_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6893240D9F500044B5A3 /* perturbations_module.cpp */; };
 		AFDC689E240D9F500044B5A3 /* transfer_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6894240D9F500044B5A3 /* transfer_module.cpp */; };
@@ -88,6 +89,10 @@
 		AF14AFEA24347ECA005D2DE9 /* nonlinear_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nonlinear_module.h; sourceTree = "<group>"; };
 		AF14AFEB2434BFC9005D2DE9 /* primordial_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = primordial_module.h; sourceTree = "<group>"; };
 		AF8EE425243B0B0700C3B509 /* perturbations_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = perturbations_module.h; sourceTree = "<group>"; };
+		AF9F872C2F8FB9720077F3A9 /* all_species_list.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = all_species_list.h; sourceTree = "<group>"; };
+		AF9F872D2F8FB9720077F3A9 /* perturb_column_writer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = perturb_column_writer.cpp; sourceTree = "<group>"; };
+		AF9F872E2F8FB9720077F3A9 /* perturb_source_context.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = perturb_source_context.h; sourceTree = "<group>"; };
+		AF9F872F2F8FB9720077F3A9 /* thermo_context.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thermo_context.h; sourceTree = "<group>"; };
 		AFA9047D241D19FB009B7DEE /* class.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = class.h; sourceTree = "<group>"; };
 		AFB5F15E241D17B5001B9B9C /* output.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = output.h; sourceTree = "<group>"; };
 		AFB5F15F241D17B5001B9B9C /* perturbations.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = perturbations.h; sourceTree = "<group>"; };
@@ -350,6 +355,10 @@
 		CC000030000000000000003A /* species */ = {
 			isa = PBXGroup;
 			children = (
+				AF9F872C2F8FB9720077F3A9 /* all_species_list.h */,
+				AF9F872D2F8FB9720077F3A9 /* perturb_column_writer.cpp */,
+				AF9F872E2F8FB9720077F3A9 /* perturb_source_context.h */,
+				AF9F872F2F8FB9720077F3A9 /* thermo_context.h */,
 				CC000001000000000000001A /* base_species.h */,
 				CC000002000000000000001B /* perturb_context.h */,
 				CC000003000000000000001C /* baryons.h */,
@@ -469,6 +478,7 @@
 				AFDC68BA240D9F6B0044B5A3 /* growTable.cpp in Sources */,
 				AFDC68C2240D9FB80044B5A3 /* class.cpp in Sources */,
 				AF1078FA2424A86400A369F7 /* exceptions.cpp in Sources */,
+				AF9F87302F8FB9720077F3A9 /* perturb_column_writer.cpp in Sources */,
 				AFDC68BF240D9F6B0044B5A3 /* trigonometric_integrals.cpp in Sources */,
 				AFDC68B5240D9F6B0044B5A3 /* common.cpp in Sources */,
 				AFDC689C240D9F500044B5A3 /* lensing_module.cpp in Sources */,
