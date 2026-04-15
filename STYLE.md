@@ -9,7 +9,7 @@ All contributions—human or automated—must follow these rules.
 
 * **RAII everywhere**: All resources are acquired in constructors and released in destructors.
 * **No partial states**: Objects are always fully initialized after construction.
-* **Immutable inputs**: Input data must not be modified after construction.
+* **Immutable shared inputs**: Input data may be normalized during initialization, but must not be modified after that point.
 * **Explicit ownership**: Ownership must be expressed using smart pointers.
 * **Deterministic behavior**: Avoid hidden state and implicit dependencies.
 
@@ -25,7 +25,7 @@ Each module is split into two parts:
 
    * Contains input parameters and directly derived quantities.
    * Plain data only (no complex logic).
-   * Mutable only during initialization.
+   * Mutable only during initialization, including canonicalization of user input into internal form.
 
 2. **Module class**
 
@@ -76,7 +76,7 @@ std::shared_ptr<const T>
 These pointers:
 
 * must not be reassigned
-* must not be used to modify input data
+* must not be used to modify input data after initialization
 
 ---
 
@@ -129,7 +129,7 @@ Formatting is enforced via `.clang-format`.
 Key rules:
 
 * Indentation: **2 spaces**, no tabs
-* Braces: Allman style
+* Braces: K&R style for control statements, with `else` on a new line
 
 ```cpp
 if (condition) {

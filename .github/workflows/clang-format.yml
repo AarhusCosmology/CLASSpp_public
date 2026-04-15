@@ -15,7 +15,7 @@ jobs:
       - name: Get changed C/C++ files
         id: changed-files
         run: |
-          git diff --name-only origin/${{ github.base_ref }}...HEAD \
+          git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} \
             | grep -E '\.(cpp|c|h|hpp)$' \
             | grep -v '^hyrec/' \
             | tr '\n' ' ' > files.txt
