@@ -624,12 +624,8 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
     int kvec_size,
     double* zvec,  // zvec[index_zvec]
     int zvec_size,
-    double* out_pk,  // output_pk[index_zvec*kvec_size+index_kvec],
-    // already allocated
-    //(or NULL if user knows there is no _m output)
-    double* out_pk_cb  // output_pk[index_zvec*kvec_size+index_kvec],
-    //already allocated
-    //(or NULL if user knows there is no _cb output)
+    double* out_pk,    // output_pk[index_zvec*kvec_size+index_kvec] already allocated or NULL
+    double* out_pk_cb  // output_pk[index_zvec*kvec_size+index_kvec] already allocated or NULL
 ) const {
   /** Summary: */
 

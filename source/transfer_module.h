@@ -63,7 +63,7 @@ class TransferModule : public BaseModule {
   //@{
   std::vector<std::vector<double>>
       transfer_; /**< table of transfer functions for each mode, initial condition, type, multipole and wavenumber, with argument transfer[index_md][((index_ic * transfer_module_->tt_size_[index_md] + index_tt) * transfer_module_->l_size_[index_md] + index_l) * transfer_module_->q_size_ + index_q] */
-  //@}
+                 //@}
 
  private:
   int transfer_functions_at_q(
