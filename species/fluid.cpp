@@ -12,6 +12,7 @@ FluidSpecies::FluidSpecies(const background& pba)
 
 void FluidSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_fld_, _TRUE_, index_bg, 1);
+  index_bg_rho_ = index_bg_rho_fld_;
   class_define_index(index_bg_w_fld_, _TRUE_, index_bg, 1);
   class_define_index(index_bg_dw_over_da_fld_, _TRUE_, index_bg, 1);
 }

@@ -597,6 +597,57 @@ class TestScenario(TestClass):
             assert status, 'Reference comparison failed in Newtonian gauge!'
 
 
+class TestTensorMassiveNcdmRegression(TestClass):
+    def _assert_reference_match(self, case_name, scenario):
+        try:
+            import classyref
+        except ImportError:
+            self.skipTest("classyref not available")
+
+        self.scenario = dict(scenario)
+        self.name = f"{self._testMethodName}_{case_name}"
+
+        candidate = Class()
+        reference = classyref.Class()
+        try:
+            candidate.set(dict(self.verbose, **scenario))
+            candidate.compute()
+            reference.set(dict(self.verbose, **scenario))
+            reference.compute()
+            status = self.compare_output(
+                reference,
+                "Reference",
+                candidate,
+                "Candidate",
+                COMPARE_CL_RELATIVE_ERROR,
+                COMPARE_PK_RELATIVE_ERROR)
+            self.assertTrue(status, f"Reference comparison failed for {case_name}")
+        finally:
+            reference.struct_cleanup()
+            reference.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+
+    def test_tensor_massive_ncdm_matches_reference(self):
+        base = {
+            'N_ur': 0.0,
+            'N_ncdm': 1,
+            'm_ncdm': 0.06,
+            'deg_ncdm': 3.0,
+            'output': 'tCl',
+            'modes': 't',
+        }
+
+        cases = [
+            ('default', {}),
+            ('exact', {'tensor method': 'exact'}),
+        ]
+
+        for case_name, extra in cases:
+            with self.subTest(case_name=case_name):
+                self._assert_reference_match(case_name, dict(base, **extra))
+
+
 if __name__ == '__main__':
     toto = TestClass()
     unittest.main()

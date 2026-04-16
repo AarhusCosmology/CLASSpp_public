@@ -10,6 +10,7 @@ DCDMSpecies::DCDMSpecies(const background& pba)
 
 void DCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_dcdm_, _TRUE_, index_bg, 1);
+  index_bg_rho_ = index_bg_rho_dcdm_;
 }
 
 void DCDMSpecies::RegisterIntegrationIndices(int& index_bi) {

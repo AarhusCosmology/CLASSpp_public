@@ -27,7 +27,7 @@ BraceWrapping:
 # =========================
 # Line length / wrapping
 # =========================
-ColumnLimit: 100  # soft limit; exceeded if needed for readability
+ColumnLimit: 100  # Soft limit; exceeded if needed for readability
 
 PenaltyBreakBeforeFirstCallParameter: 1000
 PenaltyReturnTypeOnItsOwnLine: 1000

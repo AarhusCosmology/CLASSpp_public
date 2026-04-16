@@ -8,6 +8,7 @@ LambdaSpecies::LambdaSpecies(const background& pba)
 
 void LambdaSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_lambda_, _TRUE_, index_bg, 1);
+  index_bg_rho_ = index_bg_rho_lambda_;
 }
 
 void LambdaSpecies::ComputeBackground(double /*a_rel*/,

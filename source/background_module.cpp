@@ -351,7 +351,7 @@ int BackgroundModule::background_functions(
   }
 
   /* Fluid needs w_fld computed before calling ComputeBackground */
-  if (pba->has_fld == _TRUE_) {
+  if (all_species_.count("Fluid")) {
     double w_fld, dw_over_da_fld, integral_fld;
     class_call(background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld),
                error_message_,
@@ -379,7 +379,7 @@ int BackgroundModule::background_functions(
 
   /* Derivative of total pressure w.r.t. conformal time */
   pvecback[index_bg_p_tot_prime_] = a * pvecback[index_bg_H_] * dp_dloga;
-  if (pba->has_scf == _TRUE_) {
+  if (all_species_.count("ScalarField")) {
     /** The contribution of scf was not added to dp_dloga, add p_scf_prime here: */
     pvecback[index_bg_p_prime_scf_]  = pvecback[index_bg_phi_prime_scf_] *
                                        (-pvecback[index_bg_phi_prime_scf_] * pvecback[index_bg_H_] /
@@ -388,7 +388,7 @@ int BackgroundModule::background_functions(
     pvecback[index_bg_p_tot_prime_] += pvecback[index_bg_p_prime_scf_];
   }
 
-  if ((pba->has_idm_drmd == _TRUE_) && (pba->has_idr_drmd == _TRUE_)) {
+  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
     double Rint, csp2, Gint;
     class_call(background_idm_drmd(a,
                                    pvecback[index_bg_rho_idm_drmd_] /
@@ -476,13 +476,13 @@ int BackgroundModule::background_w_fld(double a,
                    4. /
                        3.));  // assumes LambdaCDM + eventually massive neutrinos so light that they are relativistic at equality; needs to be generalised later on.
       double Omega_m = pba->Omega0_b;
-      if (pba->has_cdm == _TRUE_)
+      if (all_species_.count("CDM"))
         Omega_m += pba->Omega0_cdm;
-      if (pba->has_idm_dr == _TRUE_)
+      if (all_species_.count("IDM_DR_IDR"))
         Omega_m += pba->Omega0_idm_dr;
-      if (pba->has_idm_drmd == _TRUE_)
+      if (all_species_.count("IDM_DRMD_IDR_DRMD"))
         Omega_m += pba->Omega0_idm_drmd;
-      if (pba->has_dcdm == _TRUE_)
+      if (all_species_.count("DCDM_DR"))
         class_stop(error_message_,
                    "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
                    "to code the calculation of a_eq in that case, but it would not be difficult to "
@@ -603,7 +603,7 @@ int BackgroundModule::background_init() {
   class_call(background_indices(), error_message_, error_message_);
 
   /* fluid equation of state */
-  if (pba->has_fld == _TRUE_) {
+  if (all_species_.count("Fluid")) {
     double w_fld, dw_over_da, integral_fld;
     class_call(background_w_fld(0., &w_fld, &dw_over_da, &integral_fld),
                error_message_,
@@ -619,7 +619,7 @@ int BackgroundModule::background_init() {
   /* in verbose mode, inform the user about the value of the ncdm
      masses in eV and about the ratio [m/omega_ncdm] in eV (the usual
      93 point something)*/
-  if ((pba->background_verbose > 0) && (pba->has_ncdm == _TRUE_)) {
+  if ((pba->background_verbose > 0) && (pba->N_ncdm > 0)) {
     ncdm_->PrintMassInfo();
   }
 
@@ -719,34 +719,31 @@ int BackgroundModule::background_indices() {
   all_species_.at("Baryons")->RegisterBackgroundIndices(index_bg);
 
   /* - index for rho_cdm */
-  if (pba->has_cdm == _TRUE_) {
-    index_bg_rho_cdm_ = index_bg;
+  index_bg_rho_cdm_ = -1;
+  if (all_species_.count("CDM")) {
     all_species_.at("CDM")->RegisterBackgroundIndices(index_bg);
-  }
-  else {
-    index_bg_rho_cdm_ = -1;
+    index_bg_rho_cdm_ = all_species_.at("CDM")->bg_rho_index();
   }
 
   /* - indices for IDM_DRMD + IDR_DRMD composite */
-  if (pba->has_idm_drmd == _TRUE_ || pba->has_idr_drmd == _TRUE_) {
+  index_bg_rho_idm_drmd_ = index_bg_rho_idr_drmd_ = -1;
+  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
     auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
     drmd.RegisterBackgroundIndices(index_bg);
     index_bg_rho_idm_drmd_ = drmd.idm_drmd().bg_rho_index();
     index_bg_rho_idr_drmd_ = drmd.idr_drmd().bg_rho_index();
   }
-  else {
-    index_bg_rho_idm_drmd_ = index_bg_rho_idr_drmd_ = -1;
-  }
 
-  class_define_index(index_bg_G_over_aH_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
-  class_define_index(index_bg_Gamma0_drmd_, pba->has_idm_drmd && pba->has_idr_drmd, index_bg, 1);
+  class_define_index(index_bg_G_over_aH_drmd_,
+                     all_species_.count("IDM_DRMD_IDR_DRMD"),
+                     index_bg,
+                     1);
+  class_define_index(index_bg_Gamma0_drmd_, all_species_.count("IDM_DRMD_IDR_DRMD"), index_bg, 1);
 
   /* - indices for ncdm. */
-  if (pba->has_ncdm == _TRUE_) {
-    index_bg_number_ncdm1_   = index_bg;
-    index_bg_rho_ncdm1_      = -1;
-    index_bg_p_ncdm1_        = -1;
-    index_bg_pseudo_p_ncdm1_ = -1;
+  index_bg_number_ncdm1_ = index_bg_rho_ncdm1_ = index_bg_p_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
+  if (pba->N_ncdm > 0) {
+    index_bg_number_ncdm1_ = index_bg;
     // Build sorted NCDM vector: order matters for contiguous index layout
     {
       std::vector<NCDMSpecies*> ncdm_vec;
@@ -768,25 +765,21 @@ int BackgroundModule::background_indices() {
       }
     }
   }
-  else {
-    index_bg_number_ncdm1_ = index_bg_rho_ncdm1_ = index_bg_p_ncdm1_ = index_bg_pseudo_p_ncdm1_ =
-        -1;
-  }
 
   /* - indices for DCDM + DR composite */
-  if (pba->has_dcdm == _TRUE_ || pba->has_dr == _TRUE_) {
+  index_bg_rho_dcdm_ = index_bg_rho_dr_ = index_bg_rho_dr_species_ = -1;
+  if (all_species_.count("DCDM_DR")) {
     auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
     dcdm_dr.RegisterBackgroundIndices(index_bg);
     index_bg_rho_dcdm_       = dcdm_dr.dcdm().bg_rho_index();
     index_bg_rho_dr_species_ = dcdm_dr.dr().bg_rho_dr_species_index();
     index_bg_rho_dr_         = dcdm_dr.dr().bg_rho_index();
   }
-  else {
-    index_bg_rho_dcdm_ = index_bg_rho_dr_ = index_bg_rho_dr_species_ = -1;
-  }
 
   /* - indices for scalar field */
-  if (pba->has_scf == _TRUE_) {
+  index_bg_phi_scf_ = index_bg_phi_prime_scf_ = index_bg_V_scf_ = index_bg_dV_scf_ =
+      index_bg_ddV_scf_ = index_bg_rho_scf_ = index_bg_p_scf_ = index_bg_p_prime_scf_ = -1;
+  if (all_species_.count("ScalarField")) {
     index_bg_phi_scf_ = index_bg;
     all_species_.at("ScalarField")->RegisterBackgroundIndices(index_bg);
     index_bg_phi_prime_scf_ = index_bg_phi_scf_ + 1;
@@ -797,38 +790,28 @@ int BackgroundModule::background_indices() {
     index_bg_p_scf_         = index_bg_phi_scf_ + 6;
     index_bg_p_prime_scf_   = index_bg_phi_scf_ + 7;
   }
-  else {
-    index_bg_phi_scf_ = index_bg_phi_prime_scf_ = index_bg_V_scf_ = index_bg_dV_scf_ =
-        index_bg_ddV_scf_ = index_bg_rho_scf_ = index_bg_p_scf_ = index_bg_p_prime_scf_ = -1;
-  }
 
   /* - index for Lambda */
-  if (pba->has_lambda == _TRUE_) {
-    index_bg_rho_lambda_ = index_bg;
+  index_bg_rho_lambda_ = -1;
+  if (all_species_.count("Lambda")) {
     all_species_.at("Lambda")->RegisterBackgroundIndices(index_bg);
-  }
-  else {
-    index_bg_rho_lambda_ = -1;
+    index_bg_rho_lambda_ = all_species_.at("Lambda")->bg_rho_index();
   }
 
   /* - index for fluid */
-  if (pba->has_fld == _TRUE_) {
+  index_bg_rho_fld_ = index_bg_w_fld_ = index_bg_dw_over_da_fld_ = -1;
+  if (all_species_.count("Fluid")) {
     index_bg_rho_fld_ = index_bg;
     all_species_.at("Fluid")->RegisterBackgroundIndices(index_bg);
     index_bg_w_fld_          = index_bg_rho_fld_ + 1;
     index_bg_dw_over_da_fld_ = index_bg_rho_fld_ + 2;
   }
-  else {
-    index_bg_rho_fld_ = index_bg_w_fld_ = index_bg_dw_over_da_fld_ = -1;
-  }
 
   /* - index for ultra-relativistic neutrinos/species */
-  if (pba->has_ur == _TRUE_) {
-    index_bg_rho_ur_ = index_bg;
+  index_bg_rho_ur_ = -1;
+  if (all_species_.count("UR")) {
     all_species_.at("UR")->RegisterBackgroundIndices(index_bg);
-  }
-  else {
-    index_bg_rho_ur_ = -1;
+    index_bg_rho_ur_ = all_species_.at("UR")->bg_rho_index();
   }
 
   /* - index for total density */
@@ -844,14 +827,12 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bg_Omega_r_, _TRUE_, index_bg, 1);
 
   /* - indices for IDM_DR + IDR composite */
-  if (pba->has_idm_dr == _TRUE_ || pba->has_idr == _TRUE_) {
+  index_bg_rho_idm_dr_ = index_bg_rho_idr_ = -1;
+  if (all_species_.count("IDM_DR_IDR")) {
     auto& idm_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
     idm_idr.RegisterBackgroundIndices(index_bg);
     index_bg_rho_idm_dr_ = idm_idr.idm_dr().bg_rho_index();
     index_bg_rho_idr_    = idm_idr.idr().bg_rho_index();
-  }
-  else {
-    index_bg_rho_idm_dr_ = index_bg_rho_idr_ = -1;
   }
 
   /* - put here additional ingredients that you want to appear in the
@@ -907,14 +888,12 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bi_a_, _TRUE_, index_bi, 1);
 
   /* -> energy density in DCDM + DR (integration indices via composite) */
-  if (pba->has_dcdm == _TRUE_ || pba->has_dr == _TRUE_) {
+  index_bi_rho_dcdm_ = index_bi_rho_dr_species_ = -1;
+  if (all_species_.count("DCDM_DR")) {
     auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
     dcdm_dr.RegisterIntegrationIndices(index_bi);
     index_bi_rho_dcdm_       = dcdm_dr.dcdm().bi_rho_index();
     index_bi_rho_dr_species_ = dcdm_dr.dr().bi_rho_dr_species_index();
-  }
-  else {
-    index_bi_rho_dcdm_ = index_bi_rho_dr_species_ = -1;
   }
 
   /* -> integration indices for all other species (including DNCDM composites) */
@@ -927,22 +906,18 @@ int BackgroundModule::background_indices() {
   }
 
   /* -> energy density in fluid */
-  if (pba->has_fld == _TRUE_) {
+  index_bi_rho_fld_ = -1;
+  if (all_species_.count("Fluid")) {
     index_bi_rho_fld_ = index_bi;
     all_species_.at("Fluid")->RegisterIntegrationIndices(index_bi);
   }
-  else {
-    index_bi_rho_fld_ = -1;
-  }
 
   /* -> scalar field and its derivative wrt conformal time */
-  if (pba->has_scf == _TRUE_) {
+  index_bi_phi_scf_ = index_bi_phi_prime_scf_ = -1;
+  if (all_species_.count("ScalarField")) {
     index_bi_phi_scf_ = index_bi;
     all_species_.at("ScalarField")->RegisterIntegrationIndices(index_bi);
     index_bi_phi_prime_scf_ = index_bi_phi_scf_ + 1;
-  }
-  else {
-    index_bi_phi_scf_ = index_bi_phi_prime_scf_ = -1;
   }
 
   /* End of {B} variables, now continue with {C} variables */
@@ -1116,10 +1091,8 @@ int BackgroundModule::background_solve() {
   /* -> conformal age in Mpc */
   conformal_age_ = pvecback_integration[index_bi_tau_];
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
-  if (pba->has_dcdm == _TRUE_) {
-    Omega0_dcdm_ = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
-  }
-  if (pba->has_dr == _TRUE_) {
+  if (all_species_.count("DCDM_DR")) {
+    Omega0_dcdm_    = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
     double rho_temp = 0.;
     for (double rho_species : dr_->rho_species_) {
       rho_temp += rho_species;
@@ -1231,7 +1204,7 @@ int BackgroundModule::background_solve() {
 
   if (pba->background_verbose > 2) {
     printf(" -> Neff_ = %f\n", Neff_);
-    if ((pba->has_dcdm == _TRUE_) && (pba->has_dr == _TRUE_)) {
+    if (all_species_.count("DCDM_DR")) {
       printf("    Decaying Cold Dark Matter details: (DCDM --> DR)\n");
       printf("     -> Omega0_dcdm = %f\n", Omega0_dcdm_);
       printf("     -> Omega0_dr = %f\n", Omega0_dr_);
@@ -1240,12 +1213,12 @@ int BackgroundModule::background_solve() {
              pba->Omega0_dcdmdr);
       printf("     -> Omega_ini_dcdm/Omega_b = %f\n", pba->Omega_ini_dcdm / pba->Omega0_b);
     }
-    if (pba->has_scf == _TRUE_) {
+    if (all_species_.count("ScalarField")) {
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
              pvecback[index_bg_rho_scf_] / pvecback[index_bg_rho_crit_],
              pba->Omega0_scf);
-      if (pba->has_lambda == _TRUE_)
+      if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
                pvecback[index_bg_rho_lambda_] / pvecback[index_bg_rho_crit_],
                pba->Omega0_lambda);
@@ -1339,10 +1312,8 @@ int BackgroundModule::background_solve_evolver() {
   /* -> conformal age in Mpc. Remember that tau is stored at index_bi_a now */
   conformal_age_ = pvecback_integration[index_bi_a_];
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
-  if (pba->has_dcdm == _TRUE_) {
-    Omega0_dcdm_ = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
-  }
-  if (pba->has_dr == _TRUE_) {
+  if (all_species_.count("DCDM_DR")) {
+    Omega0_dcdm_    = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
     double rho_temp = 0.;
     for (double rho_species : dr_->rho_species_) {
       rho_temp += rho_species;
@@ -1372,7 +1343,7 @@ int BackgroundModule::background_solve_evolver() {
 
     /* DRMD -- Find the decoupling redshift where Gint = aH */
 
-    if ((pba->has_idr_drmd) && (pba->has_idm_drmd)) {
+    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
       double G_over_aH_local = background_table_[i * bg_size_ + index_bg_G_over_aH_drmd_];
       if (pow(G_over_aH_local - 1.0, 2.0) < pow(G_over_aH_tmp_ - 1.0, 2.0)) {
         G_over_aH_tmp_ = G_over_aH_local;
@@ -1419,7 +1390,7 @@ int BackgroundModule::background_solve_evolver() {
   }
 
   if (pba->background_verbose > 2) {
-    if ((pba->has_dcdm == _TRUE_) && (pba->has_dr == _TRUE_)) {
+    if (all_species_.count("DCDM_DR")) {
       printf("    Decaying Cold Dark Matter details: (DCDM --> DR)\n");
       printf("     -> Omega0_dcdm = %f\n", Omega0_dcdm_);
       printf("     -> Omega0_dr = %f\n", Omega0_dr_);
@@ -1428,7 +1399,7 @@ int BackgroundModule::background_solve_evolver() {
              pba->Omega0_dcdmdr);
       printf("     -> Omega_ini_dcdm/Omega_b = %f\n", pba->Omega_ini_dcdm / pba->Omega0_b);
     }
-    if ((pba->has_idr_drmd) && (pba->has_idm_drmd)) {
+    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
       printf(" -> Dark Radiation Matter Decoupling details: (DRMD)\n");
       printf(
           "     -> values: (initial) Gamma0 = %f 1/Mpc, zstop= %e,f_idr_drmd=%e, and f_idm= %e \n",
@@ -1443,12 +1414,12 @@ int BackgroundModule::background_solve_evolver() {
       else
         printf("     -> no decoupling occurred.\n");
     }
-    if (pba->has_scf == _TRUE_) {
+    if (all_species_.count("ScalarField")) {
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
              pvecback[index_bg_rho_scf_] / pvecback[index_bg_rho_crit_],
              pba->Omega0_scf);
-      if (pba->has_lambda == _TRUE_)
+      if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
                pvecback[index_bg_rho_lambda_] / pvecback[index_bg_rho_crit_],
                pba->Omega0_lambda);
@@ -1493,7 +1464,7 @@ int BackgroundModule::background_initial_conditions(
        This could happen for some WDM models.
   */
 
-  if (pba->has_ncdm == _TRUE_) {
+  if (pba->N_ncdm > 0) {
     a = ncdm_->GetIni(a, pba->a_today, ppr->tol_ncdm_initial_w);
   }
 
@@ -1501,14 +1472,14 @@ int BackgroundModule::background_initial_conditions(
 
   /* Set initial values of {B} variables: */
   double Omega_rad = pba->Omega0_g;
-  if (pba->has_ur == _TRUE_)
+  if (all_species_.count("UR"))
     Omega_rad += pba->Omega0_ur;
-  if (pba->has_idr == _TRUE_)
+  if (all_species_.count("IDM_DR_IDR"))
     Omega_rad += pba->Omega0_idr;
-  if (pba->has_idr_drmd == _TRUE_)
+  if (all_species_.count("IDM_DRMD_IDR_DRMD"))
     Omega_rad += pba->Omega0_idr_drmd;
   double rho_rad = Omega_rad * pow(pba->H0, 2) / pow(a / pba->a_today, 4);
-  if (pba->has_ncdm == _TRUE_) {
+  if (pba->N_ncdm > 0) {
     /** - We must add the relativistic contribution from NCDM species */
     double rho_ncdm_rel_tot  = 0.;
     rho_rad                 += rho_ncdm_rel_tot;
@@ -1518,7 +1489,7 @@ int BackgroundModule::background_initial_conditions(
     sp->SetBackgroundInitialConditions(a / pba->a_today, pvecback_integration);
   }
 
-  if (pba->has_fld == _TRUE_) {
+  if (all_species_.count("Fluid")) {
     /* rho_fld today */
     double rho_fld_today = pba->Omega0_fld * pow(pba->H0, 2);
 
@@ -1546,7 +1517,7 @@ int BackgroundModule::background_initial_conditions(
    * - Check equations and signs. Sign of phi_prime?
    * - is rho_ur all there is early on?
    */
-  if (pba->has_scf == _TRUE_) {
+  if (all_species_.count("ScalarField")) {
     double scf_lambda = pba->scf_parameters[0];
     if (pba->attractor_ic_scf == _TRUE_) {
       pvecback_integration[index_bi_phi_scf_] = -1. / scf_lambda *
@@ -1598,15 +1569,14 @@ int BackgroundModule::background_initial_conditions(
              "H = %e instead of strictly positive",
              pvecback[index_bg_H_]);
 
-  /** - compute Gamma0 andf_idr_drmd for the DRMD scenario */
-  if (pba->has_idr_drmd == _TRUE_) {
+  /** - compute Gamma0 and f_idr_drmd for the DRMD scenario */
+  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
     f_idr_drmd_ = pvecback[index_bg_rho_idr_drmd_] / pvecback[index_bg_rho_tot_];
-
-    if (pba->has_idm_drmd == _TRUE_) {
+    if (index_bg_rho_idm_drmd_ >= 0) {
       Gamma0_drmd_ = 3. / 4. * pba->G_over_aH_drmd * pvecback[index_bg_rho_idm_drmd_] /
                      pvecback[index_bg_rho_idr_drmd_] * a / pba->a_today * pvecback[index_bg_H_];
+      // Recall that Gamma0 = G * R =const with our conventions (for z >> zstop where the exponential can be set to unity )
     }
-    // Recall that Gamma0 = G * R =const with our conventions (for z >> zstop where the exponential can be set to unity )
   }
 
   pvecback_integration[index_bi_time_] = 1. / (2. * pvecback[index_bg_H_]);
@@ -1714,8 +1684,8 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles, "comov.snd.hrz.", _TRUE_);
   class_store_columntitle(titles, "(.)rho_g", _TRUE_);
   class_store_columntitle(titles, "(.)rho_b", _TRUE_);
-  class_store_columntitle(titles, "(.)rho_cdm", pba->has_cdm);
-  if (pba->has_ncdm == _TRUE_) {
+  class_store_columntitle(titles, "(.)rho_cdm", index_bg_rho_cdm_ >= 0);
+  if (pba->N_ncdm > 0) {
     std::vector<NCDMSpecies*> ncdm_vec_titles;
     for (auto& [name, sp] : all_species_) {
       if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
@@ -1747,32 +1717,32 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
       }
     }
   }
-  class_store_columntitle(titles, "(.)rho_lambda", pba->has_lambda);
-  class_store_columntitle(titles, "(.)rho_fld", pba->has_fld);
-  class_store_columntitle(titles, "(.)w_fld", pba->has_fld);
-  class_store_columntitle(titles, "(.)rho_ur", pba->has_ur);
-  class_store_columntitle(titles, "(.)rho_idr", pba->has_idr);
-  class_store_columntitle(titles, "(.)rho_idm_dr", pba->has_idm_dr);
-  class_store_columntitle(titles, "(.)rho_idr_drmd", pba->has_idr_drmd);
-  class_store_columntitle(titles, "(.)rho_idm_drmd", pba->has_idm_drmd);
-  class_store_columntitle(titles, "G_over_aH_drmd", pba->has_idr_drmd && pba->has_idm_drmd);
+  class_store_columntitle(titles, "(.)rho_lambda", index_bg_rho_lambda_ >= 0);
+  class_store_columntitle(titles, "(.)rho_fld", index_bg_rho_fld_ >= 0);
+  class_store_columntitle(titles, "(.)w_fld", index_bg_rho_fld_ >= 0);
+  class_store_columntitle(titles, "(.)rho_ur", index_bg_rho_ur_ >= 0);
+  class_store_columntitle(titles, "(.)rho_idr", index_bg_rho_idr_ >= 0);
+  class_store_columntitle(titles, "(.)rho_idm_dr", index_bg_rho_idm_dr_ >= 0);
+  class_store_columntitle(titles, "(.)rho_idr_drmd", index_bg_rho_idr_drmd_ >= 0);
+  class_store_columntitle(titles, "(.)rho_idm_drmd", index_bg_rho_idm_drmd_ >= 0);
+  class_store_columntitle(titles, "G_over_aH_drmd", index_bg_G_over_aH_drmd_ >= 0);
   class_store_columntitle(titles, "(.)rho_crit", _TRUE_);
-  class_store_columntitle(titles, "(.)rho_dcdm", pba->has_dcdm);
-  class_store_columntitle(titles, "(.)rho_dr", pba->has_dr);
-  if (pba->has_dr == _TRUE_) {
+  class_store_columntitle(titles, "(.)rho_dcdm", index_bg_rho_dcdm_ >= 0);
+  class_store_columntitle(titles, "(.)rho_dr", index_bg_rho_dr_ >= 0);
+  if (index_bg_rho_dr_ >= 0) {
     for (int j = 0; j < pba->N_decay_dr; ++j) {
       snprintf(tmp, max_title_length, "(.)rho_dr[%d]", j);
       class_store_columntitle(titles, tmp, _TRUE_);
     }
   }
-  class_store_columntitle(titles, "(.)rho_scf", pba->has_scf);
-  class_store_columntitle(titles, "(.)p_scf", pba->has_scf);
-  class_store_columntitle(titles, "(.)p_prime_scf", pba->has_scf);
-  class_store_columntitle(titles, "phi_scf", pba->has_scf);
-  class_store_columntitle(titles, "phi'_scf", pba->has_scf);
-  class_store_columntitle(titles, "V_scf", pba->has_scf);
-  class_store_columntitle(titles, "V'_scf", pba->has_scf);
-  class_store_columntitle(titles, "V''_scf", pba->has_scf);
+  class_store_columntitle(titles, "(.)rho_scf", index_bg_rho_scf_ >= 0);
+  class_store_columntitle(titles, "(.)p_scf", index_bg_rho_scf_ >= 0);
+  class_store_columntitle(titles, "(.)p_prime_scf", index_bg_rho_scf_ >= 0);
+  class_store_columntitle(titles, "phi_scf", index_bg_rho_scf_ >= 0);
+  class_store_columntitle(titles, "phi'_scf", index_bg_rho_scf_ >= 0);
+  class_store_columntitle(titles, "V_scf", index_bg_rho_scf_ >= 0);
+  class_store_columntitle(titles, "V'_scf", index_bg_rho_scf_ >= 0);
+  class_store_columntitle(titles, "V''_scf", index_bg_rho_scf_ >= 0);
 
   class_store_columntitle(titles, "(.)rho_tot", _TRUE_);
   class_store_columntitle(titles, "(.)p_tot", _TRUE_);
@@ -1806,8 +1776,8 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_rs_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_g_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_b_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_cdm_], pba->has_cdm, storeidx);
-    if (pba->has_ncdm == _TRUE_) {
+    class_store_double(dataptr, pvecback[index_bg_rho_cdm_], index_bg_rho_cdm_ >= 0, storeidx);
+    if (pba->N_ncdm > 0) {
       std::vector<BaseSpecies*> ncdm_vec_store;
       for (auto& [name, sp] : all_species_) {
         if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
@@ -1857,35 +1827,50 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
         }
       }
     }
-    class_store_double(dataptr, pvecback[index_bg_rho_lambda_], pba->has_lambda, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_fld_], pba->has_fld, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_w_fld_], pba->has_fld, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_ur_], pba->has_ur, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_idr_], pba->has_idr, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_idm_dr_], pba->has_idm_dr, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_idr_drmd_], pba->has_idr_drmd, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_idm_drmd_], pba->has_idm_drmd, storeidx);
+    class_store_double(dataptr,
+                       pvecback[index_bg_rho_lambda_],
+                       index_bg_rho_lambda_ >= 0,
+                       storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_fld_], index_bg_rho_fld_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_w_fld_], index_bg_rho_fld_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_ur_], index_bg_rho_ur_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_idr_], index_bg_rho_idr_ >= 0, storeidx);
+    class_store_double(dataptr,
+                       pvecback[index_bg_rho_idm_dr_],
+                       index_bg_rho_idm_dr_ >= 0,
+                       storeidx);
+    class_store_double(dataptr,
+                       pvecback[index_bg_rho_idr_drmd_],
+                       index_bg_rho_idr_drmd_ >= 0,
+                       storeidx);
+    class_store_double(dataptr,
+                       pvecback[index_bg_rho_idm_drmd_],
+                       index_bg_rho_idm_drmd_ >= 0,
+                       storeidx);
     class_store_double(dataptr,
                        pvecback[index_bg_G_over_aH_drmd_],
-                       pba->has_idr_drmd && pba->has_idm_drmd,
+                       index_bg_G_over_aH_drmd_ >= 0,
                        storeidx);
     class_store_double(dataptr, pvecback[index_bg_rho_crit_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_dcdm_], pba->has_dcdm, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_dr_], pba->has_dr, storeidx);
-    if (pba->has_dr == _TRUE_) {
+    class_store_double(dataptr, pvecback[index_bg_rho_dcdm_], index_bg_rho_dcdm_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_dr_], index_bg_rho_dr_ >= 0, storeidx);
+    if (index_bg_rho_dr_ >= 0) {
       for (int j = 0; j < pba->N_decay_dr; ++j) {
         class_store_double(dataptr, pvecback[index_bg_rho_dr_species_ + j], _TRUE_, storeidx);
       }
     }
 
-    class_store_double(dataptr, pvecback[index_bg_rho_scf_], pba->has_scf, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_scf_], pba->has_scf, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_prime_scf_], pba->has_scf, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_phi_scf_], pba->has_scf, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_phi_prime_scf_], pba->has_scf, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_V_scf_], pba->has_scf, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_dV_scf_], pba->has_scf, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_ddV_scf_], pba->has_scf, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_scf_], index_bg_rho_scf_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_p_scf_], index_bg_rho_scf_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_p_prime_scf_], index_bg_rho_scf_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_phi_scf_], index_bg_rho_scf_ >= 0, storeidx);
+    class_store_double(dataptr,
+                       pvecback[index_bg_phi_prime_scf_],
+                       index_bg_rho_scf_ >= 0,
+                       storeidx);
+    class_store_double(dataptr, pvecback[index_bg_V_scf_], index_bg_rho_scf_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_dV_scf_], index_bg_rho_scf_ >= 0, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_ddV_scf_], index_bg_rho_scf_ >= 0, storeidx);
 
     class_store_double(dataptr, pvecback[index_bg_rho_tot_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_p_tot_], _TRUE_, storeidx);
@@ -1965,11 +1950,11 @@ int BackgroundModule::background_derivs_member(
 
   /** - solve second order growth equation  \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
   double rho_M = pvecback[index_bg_rho_b_];
-  if (pba->has_cdm)
+  if (index_bg_rho_cdm_ >= 0)
     rho_M += pvecback[index_bg_rho_cdm_];
-  if (pba->has_idm_dr)
+  if (index_bg_rho_idm_dr_ >= 0)
     rho_M += pvecback[index_bg_rho_idm_dr_];  // matter-only component of IDM_DR_IDR
-  if (pba->has_idm_drmd == _TRUE_)
+  if (index_bg_rho_idm_drmd_ >= 0)
     rho_M += pvecback[index_bg_rho_idm_drmd_];  // matter-only component of IDM_DRMD_IDR_DRMD
 
   dy[index_bi_D_]       = y[index_bi_D_prime_];
@@ -2112,19 +2097,19 @@ int BackgroundModule::background_output_budget() {
     printf(" ---> Nonrelativistic Species \n");
     _class_print_species_("Bayrons", b);
     budget_matter += pba->Omega0_b;
-    if (pba->has_cdm) {
+    if (all_species_.count("CDM")) {
       _class_print_species_("Cold Dark Matter", cdm);
       budget_matter += pba->Omega0_cdm;
     }
-    if (pba->has_idm_dr) {
+    if (all_species_.count("IDM_DR_IDR")) {
       _class_print_species_("Interacting Dark Matter - DR ", idm_dr);
       budget_matter += pba->Omega0_idm_dr;
     }
-    if (pba->has_idm_drmd == _TRUE_) {
+    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
       _class_print_species_("Interacting DM (DRMD)", idm_drmd);
       budget_matter += pba->Omega0_idm_drmd;
     }
-    if (pba->has_dcdm) {
+    if (all_species_.count("DCDM_DR")) {
       printf("-> %-30s Omega = %-15g , omega = %-15g\n",
              "Decaying Cold Dark Matter",
              Omega0_dcdm_,
@@ -2135,22 +2120,22 @@ int BackgroundModule::background_output_budget() {
     printf(" ---> Relativistic Species \n");
     _class_print_species_("Photons", g);
     budget_radiation += pba->Omega0_g;
-    if (pba->has_ur) {
+    if (all_species_.count("UR")) {
       _class_print_species_("Ultra-relativistic relics", ur);
       budget_radiation += pba->Omega0_ur;
     }
-    if (pba->has_dr) {
+    if (all_species_.count("DCDM_DR")) {
       printf("-> %-30s Omega = %-15g , omega = %-15g\n",
              "Dark Radiation (from decay)",
              Omega0_dr_,
              Omega0_dr_ * pba->h * pba->h);
       budget_radiation += Omega0_dr_;
     }
-    if (pba->has_idr) {
+    if (all_species_.count("IDM_DR_IDR")) {
       _class_print_species_("Interacting Dark Radiation", idr);
       budget_radiation += pba->Omega0_idr;
     }
-    if (pba->has_idr_drmd == _TRUE_) {
+    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
       _class_print_species_("Dark Radiation (DRMD)", idr_drmd);
       budget_radiation += pba->Omega0_idr_drmd;
     }
@@ -2163,22 +2148,23 @@ int BackgroundModule::background_output_budget() {
       budget_neutrino += ncdm_->GetOmega0();
     }
 
-    if (pba->has_lambda || pba->has_fld || pba->has_scf || pba->has_curvature) {
+    if (all_species_.count("Lambda") || all_species_.count("Fluid") ||
+        all_species_.count("ScalarField") || pba->sgnK != 0) {
       printf(" ---> Other Content \n");
     }
-    if (pba->has_lambda) {
+    if (all_species_.count("Lambda")) {
       _class_print_species_("Cosmological Constant", lambda);
       budget_other += pba->Omega0_lambda;
     }
-    if (pba->has_fld) {
+    if (all_species_.count("Fluid")) {
       _class_print_species_("Dark Energy Fluid", fld);
       budget_other += pba->Omega0_fld;
     }
-    if (pba->has_scf) {
+    if (all_species_.count("ScalarField")) {
       _class_print_species_("Scalar Field", scf);
       budget_other += pba->Omega0_scf;
     }
-    if (pba->has_curvature) {
+    if (pba->sgnK != 0) {
       _class_print_species_("Spatial Curvature", k);
       budget_other += pba->Omega0_k;
     }
@@ -2195,7 +2181,8 @@ int BackgroundModule::background_output_budget() {
              budget_neutrino,
              budget_neutrino * pba->h * pba->h);
     }
-    if (pba->has_lambda || pba->has_fld || pba->has_scf || pba->has_curvature) {
+    if (all_species_.count("Lambda") || all_species_.count("Fluid") ||
+        all_species_.count("ScalarField") || pba->sgnK != 0) {
       printf(" Other Content                    Omega = %-15g , omega = %-15g \n",
              budget_other,
              budget_other * pba->h * pba->h);

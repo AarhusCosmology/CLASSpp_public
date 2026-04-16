@@ -10,6 +10,7 @@ CDMSpecies::CDMSpecies(const background& pba)
 
 void CDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_cdm_, _TRUE_, index_bg, 1);
+  index_bg_rho_ = index_bg_rho_cdm_;
 }
 
 void CDMSpecies::ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) {

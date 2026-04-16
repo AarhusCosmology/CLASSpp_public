@@ -384,7 +384,7 @@ int ThermodynamicsModule::thermodynamics_init() {
              "characteristic annihilation redshift cannot be negative");
 
   class_test((pth->annihilation > 0) &&
-                 ((pba->has_cdm == _FALSE_) && (all_species_.count("IDM_DR_IDR") == 0)),
+                 (all_species_.count("CDM") == 0 && all_species_.count("IDM_DR_IDR") == 0),
              error_message_,
              "CDM annihilation effects require the presence of CDM or IDM!");
 
@@ -415,7 +415,7 @@ int ThermodynamicsModule::thermodynamics_init() {
   class_test((pth->decay < 0), error_message_, "decay parameter cannot be negative");
 
   class_test((pth->decay > 0) &&
-                 ((pba->has_cdm == _FALSE_) && (all_species_.count("IDM_DR_IDR") == 0)),
+                 (all_species_.count("CDM") == 0 && all_species_.count("IDM_DR_IDR") == 0),
              error_message_,
              "CDM decay effects require the presence of CDM or IDM!");
 
