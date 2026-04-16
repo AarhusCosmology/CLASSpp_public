@@ -1,4 +1,5 @@
 #pragma once
+#include "../source/background_column_writer.h"
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
@@ -25,6 +26,13 @@ class PhotonsSpecies : public BaseSpecies {
   }
   double DpDloga(const double* pvecback) const override {
     return -4. / 3. * pvecback[index_bg_rho_];
+  }
+
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override {
+    w.Add("(.)rho_g", 0.);
+  }
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override {
+    w.Add("(.)rho_g", pvecback[index_bg_rho_]);
   }
 
   void RegisterPerturbationIndices(perturb_vector* pv,

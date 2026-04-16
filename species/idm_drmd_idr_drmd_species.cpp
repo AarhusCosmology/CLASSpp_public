@@ -1,8 +1,22 @@
 #include "idm_drmd_idr_drmd_species.h"
 
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
+
+void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_idr_drmd", 0.);
+  w.Add("(.)rho_idm_drmd", 0.);
+  w.Add("G_over_aH_drmd", 0.);
+}
+
+void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundData(const double* pvecback,
+                                                    BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_idr_drmd", idr_drmd().Rho(pvecback));
+  w.Add("(.)rho_idm_drmd", idm_drmd().Rho(pvecback));
+  w.Add("G_over_aH_drmd", pvecback[bgm_->index_bg_G_over_aH_drmd_]);
+}
 
 void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
   perturb_vector* pv             = ctx.ppw->pv;
@@ -32,8 +46,8 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(double* y, const PerturbI
           double Rint, csp2, Gint;
           auto* bgm = ctx.p_mod->GetBackgroundModule().get();
           class_call(bgm->background_idm_drmd(ctx.ppw->pvecback[bgm->index_bg_a_],
-                                              ctx.ppw->pvecback[bgm->index_bg_rho_idm_drmd_] /
-                                                  ctx.ppw->pvecback[bgm->index_bg_rho_idr_drmd_],
+                                              idm_drmd_->Rho(ctx.ppw->pvecback) /
+                                                  idr_drmd_->Rho(ctx.ppw->pvecback),
                                               &Rint,
                                               &csp2,
                                               &Gint),

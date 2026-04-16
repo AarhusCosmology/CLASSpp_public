@@ -22,6 +22,13 @@ class DNCDM_DR_Species : public CompositeSpecies {
   // Override to add DNCDM->DR decay source after children
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
 
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override {
+    dncdm_->WriteBackgroundColumnTitles(w);
+  }
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override {
+    dncdm_->WriteBackgroundData(pvecback, w);
+  }
+
   DNCDMSpecies& dncdm() {
     return *dncdm_;
   }

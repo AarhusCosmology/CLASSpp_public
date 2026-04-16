@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "background_module.h"
+#include "dcdm.h"
 #include "perturbations_module.h"
 #include "thermodynamics_module.h"
 
@@ -243,7 +244,7 @@ void DarkRadiationSpecies::PrintVariables(PerturbColumnWriter& w,
     H  = ppw->pvecback[bgm_->index_bg_H_];
     if (mod.GetPerturbs()->gauge == synchronous) {
       alpha_corr              = ppw->pvecmetric[ppw->index_mt_alpha];
-      const double rho_dcdm   = ppw->pvecback[bgm_->index_bg_rho_dcdm_];
+      const double rho_dcdm   = dcdm_ ? dcdm_->Rho(ppw->pvecback) : 0.;
       const double rho_dr_tot = ppw->pvecback[bgm_->index_bg_rho_dr_];
       decay_corr              = a * pba_->Gamma_dcdm * rho_dcdm / rho_dr_tot;
     }

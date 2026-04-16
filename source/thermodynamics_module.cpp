@@ -74,6 +74,8 @@
 
 #include "thermodynamics_module.h"
 
+#include "../species/idm_dr_idr_species.h"
+#include "../species/idm_drmd_idr_drmd_species.h"
 #include "background_module.h"
 
 #ifdef HYREC
@@ -489,8 +491,8 @@ int ThermodynamicsModule::thermodynamics_init() {
                background_module_->error_message_,
                error_message_);
 
-    R = 3. / 4. * pvecback[background_module_->index_bg_rho_b_] /
-        pvecback[background_module_->index_bg_rho_g_];
+    R = 3. / 4. * all_species_.at("Baryons")->Rho(pvecback.data()) /
+        all_species_.at("Photons")->Rho(pvecback.data());
 
     thermodynamics_table_[index_tau * th_size_ + index_th_ddkappa_] =
         -1. / R * thermodynamics_table_[index_tau * th_size_ + index_th_dkappa_];
@@ -505,10 +507,19 @@ int ThermodynamicsModule::thermodynamics_init() {
                to idr scattering), [Sinv*dmu_idm_dr] with Sinv = (4
                rho_idr) / (3 rho_idm_dr), stored temporarily in
                ddmu_idm_dr */
-      thermodynamics_table_[index_tau * th_size_ + index_th_ddmu_idm_dr_] =
-          4. / 3. * pvecback[background_module_->index_bg_rho_idr_] /
-          pvecback[background_module_->index_bg_rho_idm_dr_] *
-          thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idm_dr_];
+      {
+        auto& idm_idr           = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+        const double rho_idr    = idm_idr.idr().Rho(pvecback.data());
+        const double rho_idm_dr = idm_idr.idm_dr().Rho(pvecback.data());
+        if (rho_idr > 0. && rho_idm_dr > 0.) {
+          thermodynamics_table_[index_tau * th_size_ + index_th_ddmu_idm_dr_] =
+              4. / 3. * rho_idr / rho_idm_dr *
+              thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idm_dr_];
+        }
+        else {
+          thermodynamics_table_[index_tau * th_size_ + index_th_ddmu_idm_dr_] = 0.;
+        }
+      }
 
       /* - --> idr self-interaction rate */
       thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idr_] =
@@ -621,8 +632,8 @@ int ThermodynamicsModule::thermodynamics_init() {
                  background_module_->error_message_,
                  error_message_);
 
-      R = 3. / 4. * pvecback[background_module_->index_bg_rho_b_] /
-          pvecback[background_module_->index_bg_rho_g_];
+      R = 3. / 4. * all_species_.at("Baryons")->Rho(pvecback.data()) /
+          all_species_.at("Photons")->Rho(pvecback.data());
 
       thermodynamics_table_[index_tau * th_size_ + index_th_ddkappa_] =
           1. / 6. /
@@ -1625,16 +1636,16 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
              background_module_->error_message_,
              error_message_);
 
-  double Neff_bbn = (pvecback[background_module_->index_bg_Omega_r_] *
-                         pvecback[background_module_->index_bg_rho_crit_] -
-                     pvecback[background_module_->index_bg_rho_g_]) /
-                    (7. / 8. * pow(4. / 11., 4. / 3.) *
-                     pvecback[background_module_->index_bg_rho_g_]);
+  const double rho_g = all_species_.at("Photons")->Rho(pvecback.data());
+  double Neff_bbn    = (pvecback[background_module_->index_bg_Omega_r_] *
+                            pvecback[background_module_->index_bg_rho_crit_] -
+                        rho_g) /
+                       (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g);
 
   /**DRMD**/
-  if (all_species_.count("IDM_DRMD_IDR_DRMD") > 0) {
-    Neff_bbn -= (pvecback[background_module_->index_bg_rho_idr_drmd_]) /
-                (7. / 8. * pow(4. / 11., 4. / 3.) * pvecback[background_module_->index_bg_rho_g_]);
+  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    auto& drmd  = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
+    Neff_bbn   -= drmd.idr_drmd().Rho(pvecback.data()) / (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g);
   }
 
   //  printf("Neff early = %g, Neff at bbn: %g\n", background_module_->Neff_, Neff_bbn);
@@ -2998,8 +3009,8 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
 
     double dTdz = 2. / (1 + z) *
                       preio->reionization_table[i * preio->re_size + preio->index_re_Tb] -
-                  2. * mu / _m_e_ * 4. * pvecback[background_module_->index_bg_rho_g_] / 3. /
-                      pvecback[background_module_->index_bg_rho_b_] * opacity *
+                  2. * mu / _m_e_ * 4. * all_species_.at("Photons")->Rho(pvecback) / 3. /
+                      all_species_.at("Baryons")->Rho(pvecback) * opacity *
                       (pba->T_cmb * (1. + z) -
                        preio->reionization_table[i * preio->re_size + preio->index_re_Tb]) /
                       pvecback[background_module_->index_bg_H_];

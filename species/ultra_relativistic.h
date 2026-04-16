@@ -25,6 +25,12 @@ class UltraRelativisticSpecies : public BaseSpecies {
   double P(const double* pvecback) const override;
   double DpDloga(const double* pvecback) const override;
 
+  bool IsFreestreaming() const override {
+    return true;
+  }
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+
   // ── Perturbations ──────────────────────────────────────────────────────────
   /** Registers delta_ur, theta_ur, shear_ur, and (when UFA is off) l3..l_max_ur. */
   void RegisterPerturbationIndices(perturb_vector* pv,

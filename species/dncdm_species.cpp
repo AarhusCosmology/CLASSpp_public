@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "arrays.h"
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations_module.h"
 
@@ -180,6 +181,51 @@ void DNCDMSpecies::BackgroundDerivs(double /*tau*/,
     dy[index_bi_lnf_decay_dr1_ + i]           = -a * a * M_ncdm * Gamma / epsilon;
     dy[index_bi_dlnfdlnq_separate_decay_ + i] = a * a * M_ncdm * Gamma * q * q /
                                                 std::pow(epsilon, 3);
+  }
+}
+
+// ── Background column output ───────────────────────────────────────────────
+
+void DNCDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  char tmp[40];
+  snprintf(tmp, 40, "(.)number_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, 0.);
+  snprintf(tmp, 40, "(.)rho_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, 0.);
+  snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, 0.);
+  if (ncdm_ && ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
+    for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id_]; i++) {
+      snprintf(tmp, 40, "lnf_dncdm[%d][%d]", ncdm_id_, i);
+      w.Add(tmp, 0.);
+      snprintf(tmp, 40, "dlnfdlnq_dncdm[%d][%d]", ncdm_id_, i);
+      w.Add(tmp, 0.);
+      snprintf(tmp, 40, "dlnfdlnq_separate_dncdm[%d][%d]", ncdm_id_, i);
+      w.Add(tmp, 0.);
+    }
+  }
+}
+
+void DNCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
+  char tmp[40];
+  snprintf(tmp, 40, "(.)number_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, pvecback[bg_number_index()]);
+  snprintf(tmp, 40, "(.)rho_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, Rho(pvecback));
+  snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, P(pvecback));
+  if (ncdm_ && ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
+    const int bg_lnf_idx          = bg_lnf_index();
+    const int bg_dlnfdlnq_idx     = bg_dlnfdlnq_index();
+    const int bg_dlnfdlnq_sep_idx = bg_dlnfdlnq_sep_index();
+    for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id_]; i++) {
+      snprintf(tmp, 40, "lnf_dncdm[%d][%d]", ncdm_id_, i);
+      w.Add(tmp, pvecback[bg_lnf_idx + i]);
+      snprintf(tmp, 40, "dlnfdlnq_dncdm[%d][%d]", ncdm_id_, i);
+      w.Add(tmp, pvecback[bg_dlnfdlnq_idx + i]);
+      snprintf(tmp, 40, "dlnfdlnq_separate_dncdm[%d][%d]", ncdm_id_, i);
+      w.Add(tmp, pvecback[bg_dlnfdlnq_sep_idx + i]);
+    }
   }
 }
 

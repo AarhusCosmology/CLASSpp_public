@@ -67,6 +67,7 @@ source_files = (
     )
     + prepend(
         'source',
+        'background_column_writer.cpp',
         'background_module.cpp',
         'cosmology.cpp',
         'input_module.cpp',

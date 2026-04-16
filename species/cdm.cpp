@@ -1,6 +1,7 @@
 #include "cdm.h"
 
 #include "background.h"
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -27,6 +28,14 @@ double CDMSpecies::P(const double* /*pvecback*/) const {
 
 double CDMSpecies::DpDloga(const double* /*pvecback*/) const {
   return 0.;
+}
+
+void CDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_cdm", 0.);
+}
+
+void CDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_cdm", pvecback[index_bg_rho_cdm_]);
 }
 
 void CDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,

@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations_module.h"
 
@@ -42,6 +43,26 @@ void NCDMSpecies::BackgroundDerivs(double /*tau*/,
                                    double* /*dy*/,
                                    const double* /*pvecback*/) {
   // Stable NCDM has no background derivatives
+}
+
+void NCDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  char tmp[40];
+  snprintf(tmp, 40, "(.)number_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, 0.);
+  snprintf(tmp, 40, "(.)rho_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, 0.);
+  snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, 0.);
+}
+
+void NCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
+  char tmp[40];
+  snprintf(tmp, 40, "(.)number_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, pvecback[bg_number_index()]);
+  snprintf(tmp, 40, "(.)rho_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, Rho(pvecback));
+  snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
+  w.Add(tmp, P(pvecback));
 }
 
 void NCDMSpecies::FillSources(const double* /*y*/,

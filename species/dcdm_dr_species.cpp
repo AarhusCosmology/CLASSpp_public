@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations_module.h"
 
@@ -10,7 +11,7 @@ DCDM_DR_Species::DCDM_DR_Species(std::shared_ptr<DarkRadiation> dr,
                                  const BackgroundModule* bgm)
     : CompositeSpecies("DCDM_DR", BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm) {
   auto dcdm  = std::make_unique<DCDMSpecies>(*pba);
-  auto dr_sp = std::make_unique<DarkRadiationSpecies>(dr, pba, bgm);
+  auto dr_sp = std::make_unique<DarkRadiationSpecies>(dr, pba, bgm, dcdm.get());
   dcdm_      = dcdm.get();
   dr_sp_     = dr_sp.get();
   children_.push_back(std::move(dcdm));
@@ -20,6 +21,26 @@ DCDM_DR_Species::DCDM_DR_Species(std::shared_ptr<DarkRadiation> dr,
 void DCDM_DR_Species::SetBackgroundModule(const BackgroundModule* bgm) {
   bgm_ = bgm;
   CompositeSpecies::SetBackgroundModule(bgm);
+}
+
+void DCDM_DR_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_dcdm", 0.);
+  w.Add("(.)rho_dr", 0.);
+  for (int j = 0; j < pba_->N_decay_dr; ++j) {
+    char tmp[40];
+    snprintf(tmp, 40, "(.)rho_dr[%d]", j);
+    w.Add(tmp, 0.);
+  }
+}
+
+void DCDM_DR_Species::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_dcdm", dcdm().Rho(pvecback));
+  w.Add("(.)rho_dr", dr().Rho(pvecback));
+  for (int j = 0; j < pba_->N_decay_dr; ++j) {
+    char tmp[40];
+    snprintf(tmp, 40, "(.)rho_dr[%d]", j);
+    w.Add(tmp, pvecback[dr().bg_rho_dr_species_index() + j]);
+  }
 }
 
 void DCDM_DR_Species::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
@@ -46,7 +67,7 @@ void DCDM_DR_Species::BackgroundDerivs(double tau,
 
   // DCDM->DR decay source for first DR channel
   const double a                         = pvecback[bgm_->index_bg_a_];
-  dy[dr_sp_->bi_rho_dr_species_index()] += a * pba_->Gamma_dcdm * pvecback[dcdm_->bg_rho_index()];
+  dy[dr_sp_->bi_rho_dr_species_index()] += a * pba_->Gamma_dcdm * dcdm_->Rho(pvecback);
 }
 
 void DCDM_DR_Species::FillSources(const double* y,
@@ -128,7 +149,7 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
   const double k         = ctx.k;
 
   const int base         = pv->index_pt_F0_dr_species;  // first DR channel, index_dr=0
-  const double rprime_dr = pba_->Gamma_dcdm * pvecback[dcdm_->bg_rho_index()] * std::pow(a, 5) /
+  const double rprime_dr = pba_->Gamma_dcdm * dcdm_->Rho(pvecback) * std::pow(a, 5) /
                            (pba_->H0 * pba_->H0);
 
   const double delta_dcdm = y[pv->index_pt_delta_dcdm];

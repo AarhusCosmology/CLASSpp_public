@@ -31,21 +31,7 @@ class BackgroundModule : public BaseModule {
 
   /* end of vector in short format, now quantities in normal format */
 
-  int index_bg_rho_g_;          /**< photon density */
-  int index_bg_rho_b_;          /**< baryon density */
-  int index_bg_rho_cdm_;        /**< cdm density */
-  int index_bg_rho_lambda_;     /**< cosmological constant density */
-  int index_bg_rho_fld_;        /**< fluid density */
-  int index_bg_w_fld_;          /**< fluid equation of state */
-  int index_bg_dw_over_da_fld_; /**< fluid dw/da (cached for DpDloga, perturbations) */
-  int index_bg_rho_ur_;         /**< relativistic neutrinos/relics density */
-  int index_bg_rho_idm_dr_;     /**< density of dark matter interacting with dark radiation */
-  int index_bg_rho_idr_;        /**< density of interacting dark radiation */
-  int index_bg_rho_dcdm_;       /**< dcdm density */
-
-  int index_bg_rho_idm_drmd_;    //**idm dark matter in drmd model */
   int index_bg_G_over_aH_drmd_;  //**G/(aH) in drmd model */
-  int index_bg_rho_idr_drmd_;    //**idr dark radiation in drmd model */
   int index_bg_Gamma0_drmd_;     //**interaction rate today in drmd model */
 
   int index_bg_rho_dr_species_; /**< dr density for individual species */
@@ -55,13 +41,8 @@ class BackgroundModule : public BaseModule {
   int index_bg_V_scf_;          /**< scalar field potential V */
   int index_bg_dV_scf_;         /**< scalar field potential derivative V' */
   int index_bg_ddV_scf_;        /**< scalar field potential second derivative V'' */
-  int index_bg_rho_scf_;        /**< scalar field energy density */
-  int index_bg_p_scf_;          /**< scalar field pressure */
-  int index_bg_p_prime_scf_;    /**< scalar field pressure */
 
   int index_bg_number_ncdm1_;   /**< number density of first ncdm species (others contiguous) */
-  int index_bg_rho_ncdm1_;      /**< energy density of first ncdm species (others contiguous) */
-  int index_bg_p_ncdm1_;        /**< pressure of first ncdm species (others contiguous) */
   int index_bg_pseudo_p_ncdm1_; /**< another statistical momentum useful in ncdma approximation */
 
   int index_bg_rho_tot_;     /**< Total density */

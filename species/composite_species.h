@@ -51,6 +51,7 @@ class CompositeSpecies : public BaseSpecies {
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double DpDloga(const double* pvecback) const override;
+  double FreestreamingRho(const double* pvecback) const override;
 
   // ── Perturbations ────────────────────────────────────────────────────────
   void PerturbDerivs(double tau,

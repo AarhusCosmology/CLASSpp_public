@@ -1,5 +1,6 @@
 #include "scalar_field.h"
 
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -67,6 +68,38 @@ void ScalarFieldSpecies::BackgroundDerivs(double /*tau*/,
   dy[index_bi_phi_prime_scf_] = -a * (2. * H * phi_prime + a * dV_scf(phi));
 }
 
+double ScalarFieldSpecies::ComputePPrimeAndWrite(double a, double* pvecback) const {
+  const double phi_prime          = pvecback[index_bg_phi_prime_scf_];
+  const double H                  = pvecback[bgm_->index_bg_H_];
+  const double dV                 = pvecback[index_bg_dV_scf_];
+  const double p_prime            = phi_prime * (-phi_prime * H / a - 2. / 3. * dV);
+  pvecback[index_bg_p_prime_scf_] = p_prime;
+  return p_prime;
+}
+
+void ScalarFieldSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_scf", 0.);
+  w.Add("(.)p_scf", 0.);
+  w.Add("(.)p_prime_scf", 0.);
+  w.Add("phi_scf", 0.);
+  w.Add("phi'_scf", 0.);
+  w.Add("V_scf", 0.);
+  w.Add("V'_scf", 0.);
+  w.Add("V''_scf", 0.);
+}
+
+void ScalarFieldSpecies::WriteBackgroundData(const double* pvecback,
+                                             BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_scf", Rho(pvecback));
+  w.Add("(.)p_scf", P(pvecback));
+  w.Add("(.)p_prime_scf", pvecback[index_bg_p_prime_scf_]);
+  w.Add("phi_scf", pvecback[index_bg_phi_scf_]);
+  w.Add("phi'_scf", pvecback[index_bg_phi_prime_scf_]);
+  w.Add("V_scf", pvecback[index_bg_V_scf_]);
+  w.Add("V'_scf", pvecback[index_bg_dV_scf_]);
+  w.Add("V''_scf", pvecback[index_bg_ddV_scf_]);
+}
+
 void ScalarFieldSpecies::RegisterPerturbationIndices(perturb_vector* pv,
                                                      const precision* /*ppr*/,
                                                      int& index_pt,
@@ -115,8 +148,8 @@ void ScalarFieldSpecies::FillSources(const double* y,
 
   const double phi_prime_bg = pvecback[bgm->index_bg_phi_prime_scf_];
   const double dV_bg        = pvecback[bgm->index_bg_dV_scf_];
-  const double rho_scf      = pvecback[bgm->index_bg_rho_scf_];
-  const double p_scf        = pvecback[bgm->index_bg_p_scf_];
+  const double rho_scf      = Rho(pvecback);
+  const double p_scf        = P(pvecback);
   const double a2_rel       = ctx.a2_rel;
   const double k2 = ctx.k *
                     ctx.k;  // PerturbSourceContext has no k2 field (unlike PerturbScalarContext)
@@ -211,8 +244,8 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
 
     const double phi_prime_bg = pvecback[mod.GetBackgroundModule()->index_bg_phi_prime_scf_];
     const double dV_bg        = pvecback[mod.GetBackgroundModule()->index_bg_dV_scf_];
-    const double rho_scf      = pvecback[mod.GetBackgroundModule()->index_bg_rho_scf_];
-    const double p_scf        = pvecback[mod.GetBackgroundModule()->index_bg_p_scf_];
+    const double rho_scf      = Rho(pvecback);
+    const double p_scf        = P(pvecback);
 
     double delta_rho_scf = 0.;
     if (ppt->gauge == synchronous) {

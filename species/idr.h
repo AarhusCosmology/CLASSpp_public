@@ -12,6 +12,10 @@ class IDRSpecies : public BaseSpecies {
   explicit IDRSpecies(const background& pba)
       : BaseSpecies("IDR", EnergyType::Radiation), pba_(pba) {}
 
+  bool IsFreestreaming() const override {
+    return true;
+  }
+
   void RegisterBackgroundIndices(int& index_bg) override {
     index_bg_rho_ = index_bg++;
   }

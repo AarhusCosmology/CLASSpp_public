@@ -84,9 +84,12 @@
 
 #include "../species/dcdm_dr_species.h"
 #include "../species/dncdm_dr_species.h"
+#include "../species/fluid.h"
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "../species/ncdm_species.h"
+#include "../species/scalar_field.h"
+#include "background_column_writer.h"
 #include "dark_radiation.h"
 #include "non_cold_dark_matter.h"
 
@@ -356,8 +359,8 @@ int BackgroundModule::background_functions(
     class_call(background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld),
                error_message_,
                error_message_);
-    pvecback[index_bg_w_fld_]          = w_fld;
-    pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
+    static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
+        .WriteWFld(w_fld, dw_over_da_fld, pvecback);
     all_species_.at("Fluid")->ComputeBackground(a_rel, pvecback_B, pvecback);
     accumulate(*all_species_.at("Fluid"));
   }
@@ -381,18 +384,16 @@ int BackgroundModule::background_functions(
   pvecback[index_bg_p_tot_prime_] = a * pvecback[index_bg_H_] * dp_dloga;
   if (all_species_.count("ScalarField")) {
     /** The contribution of scf was not added to dp_dloga, add p_scf_prime here: */
-    pvecback[index_bg_p_prime_scf_]  = pvecback[index_bg_phi_prime_scf_] *
-                                       (-pvecback[index_bg_phi_prime_scf_] * pvecback[index_bg_H_] /
-                                            a -
-                                        2. / 3. * pvecback[index_bg_dV_scf_]);
-    pvecback[index_bg_p_tot_prime_] += pvecback[index_bg_p_prime_scf_];
+    pvecback[index_bg_p_tot_prime_] += static_cast<ScalarFieldSpecies&>(
+                                           *all_species_.at("ScalarField"))
+                                           .ComputePPrimeAndWrite(a, pvecback);
   }
 
   if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
     double Rint, csp2, Gint;
     class_call(background_idm_drmd(a,
-                                   pvecback[index_bg_rho_idm_drmd_] /
-                                       pvecback[index_bg_rho_idr_drmd_],
+                                   drmd.idm_drmd().Rho(pvecback) / drmd.idr_drmd().Rho(pvecback),
                                    &Rint,
                                    &csp2,
                                    &Gint),
@@ -710,75 +711,57 @@ int BackgroundModule::background_indices() {
   /* - end of indices in the short vector of background values */
   bg_size_short_ = index_bg;
 
-  /* - index for rho_g (photon density) */
-  index_bg_rho_g_ = index_bg;
+  // ── Photons (always) ──────────────────────────────────────────────────────
   all_species_.at("Photons")->RegisterBackgroundIndices(index_bg);
 
-  /* - index for rho_b (baryon density) */
-  index_bg_rho_b_ = index_bg;
+  // ── Baryons (always) ──────────────────────────────────────────────────────
   all_species_.at("Baryons")->RegisterBackgroundIndices(index_bg);
 
-  /* - index for rho_cdm */
-  index_bg_rho_cdm_ = -1;
-  if (all_species_.count("CDM")) {
+  // ── CDM (optional) ────────────────────────────────────────────────────────
+  if (all_species_.count("CDM"))
     all_species_.at("CDM")->RegisterBackgroundIndices(index_bg);
-    index_bg_rho_cdm_ = all_species_.at("CDM")->bg_rho_index();
-  }
 
-  /* - indices for IDM_DRMD + IDR_DRMD composite */
-  index_bg_rho_idm_drmd_ = index_bg_rho_idr_drmd_ = -1;
-  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-    auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
-    drmd.RegisterBackgroundIndices(index_bg);
-    index_bg_rho_idm_drmd_ = drmd.idm_drmd().bg_rho_index();
-    index_bg_rho_idr_drmd_ = drmd.idr_drmd().bg_rho_index();
-  }
+  // ── IDM_DRMD + IDR_DRMD composite (optional) ──────────────────────────────
+  if (all_species_.count("IDM_DRMD_IDR_DRMD"))
+    all_species_.at("IDM_DRMD_IDR_DRMD")->RegisterBackgroundIndices(index_bg);
 
+  // Module physics indices for DRMD (not species-dependent densities)
   class_define_index(index_bg_G_over_aH_drmd_,
                      all_species_.count("IDM_DRMD_IDR_DRMD"),
                      index_bg,
                      1);
   class_define_index(index_bg_Gamma0_drmd_, all_species_.count("IDM_DRMD_IDR_DRMD"), index_bg, 1);
 
-  /* - indices for ncdm. */
-  index_bg_number_ncdm1_ = index_bg_rho_ncdm1_ = index_bg_p_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
+  // ── NCDM (optional, sorted by ncdm_id) ───────────────────────────────────
+  index_bg_number_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
   if (pba->N_ncdm > 0) {
     index_bg_number_ncdm1_ = index_bg;
-    // Build sorted NCDM vector: order matters for contiguous index layout
-    {
-      std::vector<NCDMSpecies*> ncdm_vec;
-      for (auto& [name, sp] : all_species_) {
-        if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
-          ncdm_vec.push_back(n);
-      }
-      std::sort(ncdm_vec.begin(), ncdm_vec.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
-        return a->ncdm_id() < b->ncdm_id();
-      });
-      for (auto* ncdm : ncdm_vec) {
-        ncdm->RegisterBackgroundIndices(index_bg);
-      }
-      // For legacy single-species code that might still use these
-      if (!ncdm_vec.empty()) {
-        index_bg_rho_ncdm1_      = ncdm_vec[0]->bg_rho_index();
-        index_bg_p_ncdm1_        = ncdm_vec[0]->bg_p_index();
-        index_bg_pseudo_p_ncdm1_ = ncdm_vec[0]->bg_pseudo_p_index();
-      }
+    std::vector<NCDMSpecies*> ncdm_vec;
+    for (auto& [name, sp] : all_species_) {
+      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
+        ncdm_vec.push_back(n);
     }
+    std::sort(ncdm_vec.begin(), ncdm_vec.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
+      return a->ncdm_id() < b->ncdm_id();
+    });
+    for (auto* ncdm : ncdm_vec)
+      ncdm->RegisterBackgroundIndices(index_bg);
+    if (!ncdm_vec.empty())
+      index_bg_pseudo_p_ncdm1_ = ncdm_vec[0]->bg_pseudo_p_index();
   }
 
-  /* - indices for DCDM + DR composite */
-  index_bg_rho_dcdm_ = index_bg_rho_dr_ = index_bg_rho_dr_species_ = -1;
+  // ── DCDM_DR composite (optional) ─────────────────────────────────────────
+  index_bg_rho_dr_ = index_bg_rho_dr_species_ = -1;
   if (all_species_.count("DCDM_DR")) {
     auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
     dcdm_dr.RegisterBackgroundIndices(index_bg);
-    index_bg_rho_dcdm_       = dcdm_dr.dcdm().bg_rho_index();
     index_bg_rho_dr_species_ = dcdm_dr.dr().bg_rho_dr_species_index();
-    index_bg_rho_dr_         = dcdm_dr.dr().bg_rho_index();
+    index_bg_rho_dr_         = index_bg_rho_dr_species_ + pba->N_decay_dr;
   }
 
-  /* - indices for scalar field */
+  // ── ScalarField (optional) — module caches arithmetic offsets for dV/V/ddV
   index_bg_phi_scf_ = index_bg_phi_prime_scf_ = index_bg_V_scf_ = index_bg_dV_scf_ =
-      index_bg_ddV_scf_ = index_bg_rho_scf_ = index_bg_p_scf_ = index_bg_p_prime_scf_ = -1;
+      index_bg_ddV_scf_                                         = -1;
   if (all_species_.count("ScalarField")) {
     index_bg_phi_scf_ = index_bg;
     all_species_.at("ScalarField")->RegisterBackgroundIndices(index_bg);
@@ -786,34 +769,21 @@ int BackgroundModule::background_indices() {
     index_bg_V_scf_         = index_bg_phi_scf_ + 2;
     index_bg_dV_scf_        = index_bg_phi_scf_ + 3;
     index_bg_ddV_scf_       = index_bg_phi_scf_ + 4;
-    index_bg_rho_scf_       = index_bg_phi_scf_ + 5;
-    index_bg_p_scf_         = index_bg_phi_scf_ + 6;
-    index_bg_p_prime_scf_   = index_bg_phi_scf_ + 7;
   }
 
-  /* - index for Lambda */
-  index_bg_rho_lambda_ = -1;
-  if (all_species_.count("Lambda")) {
+  // ── Lambda (optional) ─────────────────────────────────────────────────────
+  if (all_species_.count("Lambda"))
     all_species_.at("Lambda")->RegisterBackgroundIndices(index_bg);
-    index_bg_rho_lambda_ = all_species_.at("Lambda")->bg_rho_index();
-  }
 
-  /* - index for fluid */
-  index_bg_rho_fld_ = index_bg_w_fld_ = index_bg_dw_over_da_fld_ = -1;
-  if (all_species_.count("Fluid")) {
-    index_bg_rho_fld_ = index_bg;
+  // ── Fluid (optional) ──────────────────────────────────────────────────────
+  if (all_species_.count("Fluid"))
     all_species_.at("Fluid")->RegisterBackgroundIndices(index_bg);
-    index_bg_w_fld_          = index_bg_rho_fld_ + 1;
-    index_bg_dw_over_da_fld_ = index_bg_rho_fld_ + 2;
-  }
 
-  /* - index for ultra-relativistic neutrinos/species */
-  index_bg_rho_ur_ = -1;
-  if (all_species_.count("UR")) {
+  // ── UR (optional) ─────────────────────────────────────────────────────────
+  if (all_species_.count("UR"))
     all_species_.at("UR")->RegisterBackgroundIndices(index_bg);
-    index_bg_rho_ur_ = all_species_.at("UR")->bg_rho_index();
-  }
 
+  // ── Module aggregate indices (unchanged) ──────────────────────────────────
   /* - index for total density */
   class_define_index(index_bg_rho_tot_, _TRUE_, index_bg, 1);
 
@@ -826,14 +796,9 @@ int BackgroundModule::background_indices() {
   /* - index for Omega_r (relativistic density fraction) */
   class_define_index(index_bg_Omega_r_, _TRUE_, index_bg, 1);
 
-  /* - indices for IDM_DR + IDR composite */
-  index_bg_rho_idm_dr_ = index_bg_rho_idr_ = -1;
-  if (all_species_.count("IDM_DR_IDR")) {
-    auto& idm_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
-    idm_idr.RegisterBackgroundIndices(index_bg);
-    index_bg_rho_idm_dr_ = idm_idr.idm_dr().bg_rho_index();
-    index_bg_rho_idr_    = idm_idr.idr().bg_rho_index();
-  }
+  // ── IDM_DR + IDR composite (optional) ────────────────────────────────────
+  if (all_species_.count("IDM_DR_IDR"))
+    all_species_.at("IDM_DR_IDR")->RegisterBackgroundIndices(index_bg);
 
   /* - put here additional ingredients that you want to appear in the
      normal vector */
@@ -1192,9 +1157,13 @@ int BackgroundModule::background_solve() {
       instantaneously-decoupled neutrinos accounting for the
       radiation density, beyond photons */
 
-  Neff_ = (background_table_[index_bg_Omega_r_] * background_table_[index_bg_rho_crit_] -
-           background_table_[index_bg_rho_g_]) /
-          (7. / 8. * pow(4. / 11., 4. / 3.) * background_table_[index_bg_rho_g_]);
+  {
+    const double* earliest      = background_table_.data();
+    const double rho_g_earliest = all_species_.at("Photons")->Rho(earliest);
+    Neff_ = (background_table_[index_bg_Omega_r_] * background_table_[index_bg_rho_crit_] -
+             rho_g_earliest) /
+            (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g_earliest);
+  }
 
   /** - done */
   if (pba->background_verbose > 0) {
@@ -1216,11 +1185,11 @@ int BackgroundModule::background_solve() {
     if (all_species_.count("ScalarField")) {
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
-             pvecback[index_bg_rho_scf_] / pvecback[index_bg_rho_crit_],
+             all_species_.at("ScalarField")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
              pba->Omega0_scf);
       if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
-               pvecback[index_bg_rho_lambda_] / pvecback[index_bg_rho_crit_],
+               all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
                pba->Omega0_lambda);
       printf("     -> parameters: [lambda, alpha, A, B] = \n");
       printf("                    [");
@@ -1379,9 +1348,13 @@ int BackgroundModule::background_solve_evolver() {
       definition: Neff is the equivalent number of
       instantaneously-decoupled neutrinos accounting for the
       radiation density, beyond photons */
-  Neff_ = (background_table_[index_bg_Omega_r_] * background_table_[index_bg_rho_crit_] -
-           background_table_[index_bg_rho_g_]) /
-          (7. / 8. * pow(4. / 11., 4. / 3.) * background_table_[index_bg_rho_g_]);
+  {
+    const double* earliest      = background_table_.data();
+    const double rho_g_earliest = all_species_.at("Photons")->Rho(earliest);
+    Neff_ = (background_table_[index_bg_Omega_r_] * background_table_[index_bg_rho_crit_] -
+             rho_g_earliest) /
+            (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g_earliest);
+  }
 
   /** - done */
   if (pba->background_verbose > 0) {
@@ -1417,11 +1390,11 @@ int BackgroundModule::background_solve_evolver() {
     if (all_species_.count("ScalarField")) {
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
-             pvecback[index_bg_rho_scf_] / pvecback[index_bg_rho_crit_],
+             all_species_.at("ScalarField")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
              pba->Omega0_scf);
       if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
-               pvecback[index_bg_rho_lambda_] / pvecback[index_bg_rho_crit_],
+               all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
                pba->Omega0_lambda);
       printf("     -> parameters: [lambda, alpha, A, B] = \n");
       printf("                    [");
@@ -1571,10 +1544,14 @@ int BackgroundModule::background_initial_conditions(
 
   /** - compute Gamma0 and f_idr_drmd for the DRMD scenario */
   if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-    f_idr_drmd_ = pvecback[index_bg_rho_idr_drmd_] / pvecback[index_bg_rho_tot_];
-    if (index_bg_rho_idm_drmd_ >= 0) {
-      Gamma0_drmd_ = 3. / 4. * pba->G_over_aH_drmd * pvecback[index_bg_rho_idm_drmd_] /
-                     pvecback[index_bg_rho_idr_drmd_] * a / pba->a_today * pvecback[index_bg_H_];
+    auto& drmd_ic = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
+    const double rho_idr_drmd = drmd_ic.idr_drmd().Rho(pvecback);
+    const double rho_idm_drmd = drmd_ic.idm_drmd().Rho(pvecback);
+    f_idr_drmd_               = rho_idr_drmd / pvecback[index_bg_rho_tot_];
+    Gamma0_drmd_              = 0.;
+    if (rho_idm_drmd > 0. && rho_idr_drmd > 0.) {
+      Gamma0_drmd_ = 3. / 4. * pba->G_over_aH_drmd * rho_idm_drmd / rho_idr_drmd * a /
+                     pba->a_today * pvecback[index_bg_H_];
       // Recall that Gamma0 = G * R =const with our conventions (for z >> zstop where the exponential can be set to unity )
     }
   }
@@ -1669,11 +1646,7 @@ int BackgroundModule::background_find_equality() {
  */
 
 int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const {
-  /** - Length of the column title should be less than _OUTPUTPRECISION_+6
-      to be indented correctly, but it can be as long as . */
-  const size_t max_title_length = 40;
-  char tmp[max_title_length];
-
+  // ── Module header (always present) ──────────────────────────────────────
   class_store_columntitle(titles, "z", _TRUE_);
   class_store_columntitle(titles, "proper time [Gyr]", _TRUE_);
   class_store_columntitle(titles, "conf. time [Mpc]", _TRUE_);
@@ -1682,72 +1655,17 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
   class_store_columntitle(titles, "ang.diam.dist.", _TRUE_);
   class_store_columntitle(titles, "lum. dist.", _TRUE_);
   class_store_columntitle(titles, "comov.snd.hrz.", _TRUE_);
-  class_store_columntitle(titles, "(.)rho_g", _TRUE_);
-  class_store_columntitle(titles, "(.)rho_b", _TRUE_);
-  class_store_columntitle(titles, "(.)rho_cdm", index_bg_rho_cdm_ >= 0);
-  if (pba->N_ncdm > 0) {
-    std::vector<NCDMSpecies*> ncdm_vec_titles;
-    for (auto& [name, sp] : all_species_) {
-      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
-        ncdm_vec_titles.push_back(n);
-    }
-    std::sort(ncdm_vec_titles.begin(), ncdm_vec_titles.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
-      return a->ncdm_id() < b->ncdm_id();
-    });
-    for (auto* ncdm_sp : ncdm_vec_titles) {
-      const int n = ncdm_sp->ncdm_id();
-      snprintf(tmp, max_title_length, "(.)number_ncdm[%d]", n);
-      class_store_columntitle(titles, tmp, _TRUE_);
-      snprintf(tmp, max_title_length, "(.)rho_ncdm[%d]", n);
-      class_store_columntitle(titles, tmp, _TRUE_);
-      snprintf(tmp, max_title_length, "(.)p_ncdm[%d]", n);
-      class_store_columntitle(titles, tmp, _TRUE_);
-      if (ncdm_->ncdm_types_[n] == NCDMType::decay_dr) {
-        // For each decaying species, print the distribution function, its derivative and its q-grid
-        for (int i = 0; i < ncdm_->q_size_ncdm_[n]; i++) {
-          snprintf(tmp, max_title_length, "lnf_dncdm[%d][%d]", n, i);
-          class_store_columntitle(titles, tmp, _TRUE_);
 
-          snprintf(tmp, max_title_length, "dlnfdlnq_dncdm[%d][%d]", n, i);
-          class_store_columntitle(titles, tmp, _TRUE_);
+  // ── Species output — per-species dispatch ───────────────────────────────
+  BackgroundColumnWriter writer(titles);
+  for (auto& [name, sp] : all_species_)
+    sp->WriteBackgroundColumnTitles(writer);
 
-          snprintf(tmp, max_title_length, "dlnfdlnq_separate_dncdm[%d][%d]", n, i);
-          class_store_columntitle(titles, tmp, _TRUE_);
-        }
-      }
-    }
-  }
-  class_store_columntitle(titles, "(.)rho_lambda", index_bg_rho_lambda_ >= 0);
-  class_store_columntitle(titles, "(.)rho_fld", index_bg_rho_fld_ >= 0);
-  class_store_columntitle(titles, "(.)w_fld", index_bg_rho_fld_ >= 0);
-  class_store_columntitle(titles, "(.)rho_ur", index_bg_rho_ur_ >= 0);
-  class_store_columntitle(titles, "(.)rho_idr", index_bg_rho_idr_ >= 0);
-  class_store_columntitle(titles, "(.)rho_idm_dr", index_bg_rho_idm_dr_ >= 0);
-  class_store_columntitle(titles, "(.)rho_idr_drmd", index_bg_rho_idr_drmd_ >= 0);
-  class_store_columntitle(titles, "(.)rho_idm_drmd", index_bg_rho_idm_drmd_ >= 0);
-  class_store_columntitle(titles, "G_over_aH_drmd", index_bg_G_over_aH_drmd_ >= 0);
+  // ── Module aggregate columns ────────────────────────────────────────────
   class_store_columntitle(titles, "(.)rho_crit", _TRUE_);
-  class_store_columntitle(titles, "(.)rho_dcdm", index_bg_rho_dcdm_ >= 0);
-  class_store_columntitle(titles, "(.)rho_dr", index_bg_rho_dr_ >= 0);
-  if (index_bg_rho_dr_ >= 0) {
-    for (int j = 0; j < pba->N_decay_dr; ++j) {
-      snprintf(tmp, max_title_length, "(.)rho_dr[%d]", j);
-      class_store_columntitle(titles, tmp, _TRUE_);
-    }
-  }
-  class_store_columntitle(titles, "(.)rho_scf", index_bg_rho_scf_ >= 0);
-  class_store_columntitle(titles, "(.)p_scf", index_bg_rho_scf_ >= 0);
-  class_store_columntitle(titles, "(.)p_prime_scf", index_bg_rho_scf_ >= 0);
-  class_store_columntitle(titles, "phi_scf", index_bg_rho_scf_ >= 0);
-  class_store_columntitle(titles, "phi'_scf", index_bg_rho_scf_ >= 0);
-  class_store_columntitle(titles, "V_scf", index_bg_rho_scf_ >= 0);
-  class_store_columntitle(titles, "V'_scf", index_bg_rho_scf_ >= 0);
-  class_store_columntitle(titles, "V''_scf", index_bg_rho_scf_ >= 0);
-
   class_store_columntitle(titles, "(.)rho_tot", _TRUE_);
   class_store_columntitle(titles, "(.)p_tot", _TRUE_);
   class_store_columntitle(titles, "(.)p_tot_prime", _TRUE_);
-
   class_store_columntitle(titles, "gr.fac. D", _TRUE_);
   class_store_columntitle(titles, "gr.fac. f", _TRUE_);
 
@@ -1755,14 +1673,12 @@ int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH
 }
 
 int BackgroundModule::background_output_data(int number_of_titles, double* data) const {
-  double *dataptr, *pvecback;
-
-  /** Stores quantities */
   for (int index_tau = 0; index_tau < bt_size_; index_tau++) {
-    dataptr      = data + index_tau * number_of_titles;
-    pvecback     = const_cast<double*>(background_table_.data()) + index_tau * bg_size_;
-    int storeidx = 0;
+    double* dataptr  = data + index_tau * number_of_titles;
+    double* pvecback = const_cast<double*>(background_table_.data()) + index_tau * bg_size_;
+    int storeidx     = 0;
 
+    // ── Module header ──────────────────────────────────────────────────────
     class_store_double(dataptr, pba->a_today / pvecback[index_bg_a_] - 1., _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_time_] / _Gyr_over_Mpc_, _TRUE_, storeidx);
     class_store_double(dataptr,
@@ -1774,108 +1690,17 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_ang_distance_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_lum_distance_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_rs_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_g_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_b_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_cdm_], index_bg_rho_cdm_ >= 0, storeidx);
-    if (pba->N_ncdm > 0) {
-      std::vector<BaseSpecies*> ncdm_vec_store;
-      for (auto& [name, sp] : all_species_) {
-        if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
-          ncdm_vec_store.push_back(n);
-        else if (auto* c = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-          ncdm_vec_store.push_back(&c->dncdm());
-      }
-      std::sort(ncdm_vec_store.begin(), ncdm_vec_store.end(), [](BaseSpecies* a, BaseSpecies* b) {
-        int id_a = -1, id_b = -1;
-        if (auto* na = dynamic_cast<NCDMSpecies*>(a))
-          id_a = na->ncdm_id();
-        else if (auto* da = dynamic_cast<DNCDMSpecies*>(a))
-          id_a = da->ncdm_id();
-        if (auto* nb = dynamic_cast<NCDMSpecies*>(b))
-          id_b = nb->ncdm_id();
-        else if (auto* db = dynamic_cast<DNCDMSpecies*>(b))
-          id_b = db->ncdm_id();
-        return id_a < id_b;
-      });
 
-      for (auto* sp : ncdm_vec_store) {
-        int n_id            = -1;
-        int bg_number_index = -1;
-        if (auto* n_sp = dynamic_cast<NCDMSpecies*>(sp)) {
-          n_id            = n_sp->ncdm_id();
-          bg_number_index = n_sp->bg_number_index();
-        }
-        else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(sp)) {
-          n_id            = d_sp->ncdm_id();
-          bg_number_index = d_sp->bg_number_index();
-        }
+    // ── Species data — per-species dispatch ───────────────────────────────
+    BackgroundColumnWriter writer(dataptr, storeidx);
+    for (auto& [name, sp] : all_species_)
+      sp->WriteBackgroundData(pvecback, writer);
 
-        class_store_double(dataptr, pvecback[bg_number_index], _TRUE_, storeidx);
-        class_store_double(dataptr, pvecback[sp->bg_rho_index()], _TRUE_, storeidx);
-        class_store_double(dataptr, pvecback[sp->bg_p_index()], _TRUE_, storeidx);
-        if (ncdm_->ncdm_types_[n_id] == NCDMType::decay_dr) {
-          // For each decaying species, print the distribution function at each point of q-grid
-          auto* dncdm_sp                = static_cast<DNCDMSpecies*>(sp);
-          const int bg_lnf_idx          = dncdm_sp->bg_lnf_index();
-          const int bg_dlnfdlnq_idx     = dncdm_sp->bg_dlnfdlnq_index();
-          const int bg_dlnfdlnq_sep_idx = dncdm_sp->bg_dlnfdlnq_sep_index();
-          for (int i = 0; i < ncdm_->q_size_ncdm_[n_id]; i++) {
-            class_store_double(dataptr, pvecback[bg_lnf_idx + i], _TRUE_, storeidx);
-            class_store_double(dataptr, pvecback[bg_dlnfdlnq_idx + i], _TRUE_, storeidx);
-            class_store_double(dataptr, pvecback[bg_dlnfdlnq_sep_idx + i], _TRUE_, storeidx);
-          }
-        }
-      }
-    }
-    class_store_double(dataptr,
-                       pvecback[index_bg_rho_lambda_],
-                       index_bg_rho_lambda_ >= 0,
-                       storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_fld_], index_bg_rho_fld_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_w_fld_], index_bg_rho_fld_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_ur_], index_bg_rho_ur_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_idr_], index_bg_rho_idr_ >= 0, storeidx);
-    class_store_double(dataptr,
-                       pvecback[index_bg_rho_idm_dr_],
-                       index_bg_rho_idm_dr_ >= 0,
-                       storeidx);
-    class_store_double(dataptr,
-                       pvecback[index_bg_rho_idr_drmd_],
-                       index_bg_rho_idr_drmd_ >= 0,
-                       storeidx);
-    class_store_double(dataptr,
-                       pvecback[index_bg_rho_idm_drmd_],
-                       index_bg_rho_idm_drmd_ >= 0,
-                       storeidx);
-    class_store_double(dataptr,
-                       pvecback[index_bg_G_over_aH_drmd_],
-                       index_bg_G_over_aH_drmd_ >= 0,
-                       storeidx);
+    // ── Module aggregate columns ──────────────────────────────────────────
     class_store_double(dataptr, pvecback[index_bg_rho_crit_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_dcdm_], index_bg_rho_dcdm_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_dr_], index_bg_rho_dr_ >= 0, storeidx);
-    if (index_bg_rho_dr_ >= 0) {
-      for (int j = 0; j < pba->N_decay_dr; ++j) {
-        class_store_double(dataptr, pvecback[index_bg_rho_dr_species_ + j], _TRUE_, storeidx);
-      }
-    }
-
-    class_store_double(dataptr, pvecback[index_bg_rho_scf_], index_bg_rho_scf_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_scf_], index_bg_rho_scf_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_prime_scf_], index_bg_rho_scf_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_phi_scf_], index_bg_rho_scf_ >= 0, storeidx);
-    class_store_double(dataptr,
-                       pvecback[index_bg_phi_prime_scf_],
-                       index_bg_rho_scf_ >= 0,
-                       storeidx);
-    class_store_double(dataptr, pvecback[index_bg_V_scf_], index_bg_rho_scf_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_dV_scf_], index_bg_rho_scf_ >= 0, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_ddV_scf_], index_bg_rho_scf_ >= 0, storeidx);
-
     class_store_double(dataptr, pvecback[index_bg_rho_tot_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_p_tot_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_p_tot_prime_], _TRUE_, storeidx);
-
     class_store_double(dataptr, pvecback[index_bg_D_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_f_], _TRUE_, storeidx);
   }
@@ -1938,24 +1763,30 @@ int BackgroundModule::background_derivs_member(
   /** - calculate \f$ t' = a \f$ */
   dy[index_bi_time_] = y[index_bi_a_];
 
-  class_test(pvecback[index_bg_rho_g_] <= 0.,
+  class_test(all_species_.at("Photons")->Rho(pvecback) <= 0.,
              error_message,
              "rho_g = %e instead of strictly positive",
-             pvecback[index_bg_rho_g_]);
+             all_species_.at("Photons")->Rho(pvecback));
 
   /** - calculate \f$ rs' = c_s \f$*/
-  dy[index_bi_rs_] =
-      1. / sqrt(3. * (1. + 3. * pvecback[index_bg_rho_b_] / 4. / pvecback[index_bg_rho_g_])) *
-      sqrt(1. - pba->K * y[index_bi_rs_] * y[index_bi_rs_]);  // TBC: curvature correction
+  dy[index_bi_rs_] = 1. /
+                     sqrt(3. * (1. + 3. * all_species_.at("Baryons")->Rho(pvecback) / 4. /
+                                         all_species_.at("Photons")->Rho(pvecback))) *
+                     sqrt(1. -
+                          pba->K * y[index_bi_rs_] * y[index_bi_rs_]);  // TBC: curvature correction
 
   /** - solve second order growth equation  \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
-  double rho_M = pvecback[index_bg_rho_b_];
-  if (index_bg_rho_cdm_ >= 0)
-    rho_M += pvecback[index_bg_rho_cdm_];
-  if (index_bg_rho_idm_dr_ >= 0)
-    rho_M += pvecback[index_bg_rho_idm_dr_];  // matter-only component of IDM_DR_IDR
-  if (index_bg_rho_idm_drmd_ >= 0)
-    rho_M += pvecback[index_bg_rho_idm_drmd_];  // matter-only component of IDM_DRMD_IDR_DRMD
+  double rho_M = all_species_.at("Baryons")->Rho(pvecback);
+  if (all_species_.count("CDM"))
+    rho_M += all_species_.at("CDM")->Rho(pvecback);
+  if (all_species_.count("IDM_DR_IDR")) {
+    auto& idm_idr  = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+    rho_M         += idm_idr.idm_dr().Rho(pvecback);
+  }
+  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    auto& drmd  = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
+    rho_M      += drmd.idm_drmd().Rho(pvecback);
+  }
 
   dy[index_bi_D_]       = y[index_bi_D_prime_];
   dy[index_bi_D_prime_] = -a * H * y[index_bi_D_prime_] + 1.5 * a * a * rho_M * y[index_bi_D_];

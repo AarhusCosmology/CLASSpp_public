@@ -1,6 +1,7 @@
 #include "ultra_relativistic.h"
 
 #include "background.h"
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -31,6 +32,15 @@ double UltraRelativisticSpecies::P(const double* pvecback) const {
 
 double UltraRelativisticSpecies::DpDloga(const double* pvecback) const {
   return -4. / 3. * pvecback[index_bg_rho_];
+}
+
+void UltraRelativisticSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_ur", 0.);
+}
+
+void UltraRelativisticSpecies::WriteBackgroundData(const double* pvecback,
+                                                   BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_ur", Rho(pvecback));
 }
 
 // ── Perturbations ─────────────────────────────────────────────────────────────

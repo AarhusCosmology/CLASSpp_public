@@ -1,6 +1,7 @@
 #include "lambda.h"
 
 #include "background.h" /* for class_define_index, _TRUE_ */
+#include "background_column_writer.h"
 
 LambdaSpecies::LambdaSpecies(const background& pba)
     : BaseSpecies("Lambda", EnergyType::DarkEnergy), Omega0_lambda_(pba.Omega0_lambda),
@@ -27,4 +28,12 @@ double LambdaSpecies::P(const double* pvecback) const {
 
 double LambdaSpecies::DpDloga(const double* /*pvecback*/) const {
   return 0.;
+}
+
+void LambdaSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_lambda", 0.);
+}
+
+void LambdaSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_lambda", pvecback[index_bg_rho_lambda_]);
 }

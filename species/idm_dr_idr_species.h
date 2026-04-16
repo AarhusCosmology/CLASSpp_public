@@ -27,6 +27,9 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
     return *idr_;
   }
 
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
   void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
 

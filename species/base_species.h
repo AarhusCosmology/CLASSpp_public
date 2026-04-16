@@ -12,7 +12,8 @@ struct perturb_parameters_and_workspace;
 
 #include "perturb_source_context.h"
 
-class BackgroundModule;  // forward declaration
+class BackgroundModule;        // forward declaration
+class BackgroundColumnWriter;  // forward declaration
 
 /**
  * Abstract base class for all cosmological species.
@@ -62,22 +63,6 @@ class BaseSpecies {
   virtual void RegisterBackgroundIndices(int& index_bg) = 0;
 
   /**
-   * Index of this species' density in pvecback. Valid after RegisterBackgroundIndices().
-   * Returns -1 if species is absent (has_* flag was false).
-   */
-  int bg_rho_index() const {
-    return index_bg_rho_;
-  }
-
-  /**
-   * Index of this species' pressure in pvecback, or -1 if p is not stored separately.
-   * Most species compute p analytically from rho; NCDM stores it.
-   */
-  int bg_p_index() const {
-    return index_bg_p_;
-  }
-
-  /**
    * Claim slots in the ODE integration vector y. Called during background_indices().
    * Default: no integrated variables (analytic species do not need this).
    */
@@ -117,6 +102,52 @@ class BaseSpecies {
    * For Lambda (p=-rho=-const): 0.
    */
   virtual double DpDloga(const double* pvecback) const = 0;
+
+  // ── Background output ─────────────────────────────────────────────────────
+
+  /**
+   * True for species that are free-streaming and massless at IC time
+   * (deep radiation domination). Used to accumulate rho_nu / fracnu in
+   * perturbation IC setup. Static at construction time.
+   * Default: false.
+   */
+  virtual bool IsFreestreaming() const {
+    return false;
+  }
+
+  /**
+   * Free-streaming radiation density contributed by this species at the current
+   * background state. Plain species derive this from IsFreestreaming(); composites
+   * override it to sum over their children.
+   */
+  virtual double FreestreamingRho(const double* pvecback) const {
+    return IsFreestreaming() ? Rho(pvecback) : 0.;
+  }
+
+  /**
+   * Returns true if this species is present (has registered its background
+   * indices). For top-level species use all_species_.count(); IsPresent() is
+   * for sub-components of composites where all_species_.count() is unavailable.
+   */
+  bool IsPresent() const {
+    return index_bg_rho_ >= 0;
+  }
+
+  /**
+   * Write this species' background column titles into writer.
+   * Called by BackgroundModule::background_output_titles().
+   * Default: no-op (species with no background output need not override).
+   */
+  virtual void WriteBackgroundColumnTitles(BackgroundColumnWriter& /*writer*/) const {}
+
+  /**
+   * Write this species' background data values into writer.
+   * pvecback is the full background vector at the current time step.
+   * Called by BackgroundModule::background_output_data().
+   * Default: no-op.
+   */
+  virtual void WriteBackgroundData(const double* /*pvecback*/,
+                                   BackgroundColumnWriter& /*writer*/) const {}
 
   /**
    * Returns true if this species' PerturbDerivs must run AFTER all other

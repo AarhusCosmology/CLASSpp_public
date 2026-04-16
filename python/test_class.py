@@ -648,6 +648,117 @@ class TestTensorMassiveNcdmRegression(TestClass):
                 self._assert_reference_match(case_name, dict(base, **extra))
 
 
+class TestReviewRegressions(TestClass):
+    def _compute_candidate_and_reference(self, scenario):
+        try:
+            import classyref
+        except ImportError:
+            self.skipTest("classyref not available")
+
+        self.scenario = dict(scenario)
+        self.name = self._testMethodName
+
+        candidate = Class()
+        reference = classyref.Class()
+        try:
+            candidate.set(dict(self.verbose, **scenario))
+            candidate.compute()
+            reference.set(dict(self.verbose, **scenario))
+            reference.compute()
+            return candidate, reference
+        except Exception:
+            reference.struct_cleanup()
+            reference.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+            raise
+
+    def test_rs_drag_matches_reference(self):
+        candidate, reference = self._compute_candidate_and_reference({
+            'compute damping scale': 'yes',
+        })
+        try:
+            self.assertAlmostEqual(candidate.rs_drag(), reference.rs_drag(), places=8)
+        finally:
+            reference.struct_cleanup()
+            reference.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+
+    def test_dcdm_dr_matches_reference(self):
+        scenario = {
+            'Omega_dcdmdr': 0.12,
+            'Gamma_dcdm': 10.0,
+            'output': 'tCl',
+            'l_max_scalars': 200,
+        }
+        candidate, reference = self._compute_candidate_and_reference(scenario)
+        try:
+            status = self.compare_output(
+                reference,
+                "Reference",
+                candidate,
+                "Candidate",
+                COMPARE_CL_RELATIVE_ERROR,
+                COMPARE_PK_RELATIVE_ERROR)
+            self.assertTrue(status, "Reference comparison failed for DCDM_DR scenario")
+        finally:
+            reference.struct_cleanup()
+            reference.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+
+    def test_idm_dr_idr_perturbations_match_reference(self):
+        scenario = {
+            'Omega_idm_dr': 0.12,
+            'xi_idr': 0.3,
+            'a_idm_dr': 1e-4,
+            'output': 'tCl',
+            'l_max_scalars': 100,
+            'k_output_values': '0.1',
+        }
+        candidate, reference = self._compute_candidate_and_reference(scenario)
+        try:
+            candidate_scalar = candidate.get_perturbations()['scalar'][0]
+            reference_scalar = reference.get_perturbations()['scalar'][0]
+            np.testing.assert_allclose(
+                candidate_scalar['delta_idr'][:10],
+                reference_scalar['delta_idr'][:10],
+                rtol=1e-10,
+                atol=1e-12)
+        finally:
+            reference.struct_cleanup()
+            reference.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+
+    def test_idr_without_idm_dr_computes(self):
+        scenario = {
+            'N_idr': 0.34,
+            'Omega_idm_dr': 0.0,
+            'output': 'tCl',
+            'l_max_scalars': 100,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        self.assertTrue(self.cosmo.state)
+
+    def test_drmd_without_idr_drmd_computes(self):
+        scenario = {
+            'z_stop': 1.0e4,
+            'G_over_aH_drmd_ini': 1.0,
+            'f_idm_drmd': 0.1,
+            'delta_Neff_drmd': 0.0,
+            'output': 'tCl',
+            'l_max_scalars': 100,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        self.assertTrue(self.cosmo.state)
+
+
 if __name__ == '__main__':
     toto = TestClass()
     unittest.main()

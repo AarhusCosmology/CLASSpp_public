@@ -7,6 +7,7 @@
 #include "perturbations.h"
 
 class BackgroundModule;
+class DCDMSpecies;
 
 /**
  * Dark Radiation (from DCDM decay and/or decaying NCDM).
@@ -16,8 +17,14 @@ class DarkRadiationSpecies : public BaseSpecies {
  public:
   DarkRadiationSpecies(std::shared_ptr<DarkRadiation> dr,
                        const background* pba,
-                       const BackgroundModule* bgm)
-      : BaseSpecies("DR", EnergyType::Radiation), dr_(std::move(dr)), pba_(pba), bgm_(bgm) {}
+                       const BackgroundModule* bgm,
+                       const DCDMSpecies* dcdm = nullptr)
+      : BaseSpecies("DR", EnergyType::Radiation), dr_(std::move(dr)), pba_(pba), bgm_(bgm),
+        dcdm_(dcdm) {}
+
+  bool IsFreestreaming() const override {
+    return true;
+  }
 
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override {
@@ -89,6 +96,7 @@ class DarkRadiationSpecies : public BaseSpecies {
   std::shared_ptr<DarkRadiation> dr_;
   const background* pba_;
   const BackgroundModule* bgm_;
+  const DCDMSpecies* dcdm_ = nullptr;  // optional: set when created inside DCDM_DR_Species
 
   // Background indices (per-channel, then total)
   int index_bg_rho_dr_species_ = -1;  // first of N_decay_dr contiguous slots

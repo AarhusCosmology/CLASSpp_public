@@ -7,6 +7,7 @@
 #include "perturbations.h"
 
 class BackgroundModule;
+class BackgroundColumnWriter;
 
 /**
  * Decaying Non-Cold Dark Matter (DNCDM).
@@ -69,6 +70,12 @@ class DNCDMSpecies : public BaseSpecies {
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+
+  bool IsFreestreaming() const override {
+    return true;
+  }
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
   int ncdm_id() const {
     return ncdm_id_;

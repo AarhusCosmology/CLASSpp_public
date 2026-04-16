@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "background.h"
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -51,6 +52,21 @@ double FluidSpecies::DpDloga(const double* pvecback) const {
   const double dw_over_da_fld = pvecback[index_bg_dw_over_da_fld_];
   const double a              = pvecback[bgm_->index_bg_a_];
   return (a * dw_over_da_fld - 3. * (1. + w_fld) * w_fld) * pvecback[index_bg_rho_fld_];
+}
+
+void FluidSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_fld", 0.);
+  w.Add("(.)w_fld", 0.);
+}
+
+void FluidSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_fld", pvecback[index_bg_rho_fld_]);
+  w.Add("(.)w_fld", pvecback[index_bg_w_fld_]);
+}
+
+void FluidSpecies::WriteWFld(double w_fld, double dw_over_da_fld, double* pvecback) const {
+  pvecback[index_bg_w_fld_]          = w_fld;
+  pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
 }
 
 void FluidSpecies::RegisterPerturbationIndices(perturb_vector* pv,
@@ -119,27 +135,26 @@ void FluidSpecies::FillSources(const double* /*y*/,
 
   // ── delta_fld ─────────────────────────────────────────────────────────────
   if (p_mod->has_source_delta_fld_ == _TRUE_) {
-    const double w_fld = pvecback[bgm->index_bg_w_fld_];
+    const double w_fld = W(pvecback);
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_delta_fld_,
                           ctx.index_tau,
                           ctx.index_k,
-                          ppw->delta_rho_fld / pvecback[bgm->index_bg_rho_fld_] +
+                          ppw->delta_rho_fld / Rho(pvecback) +
                               3. * ctx.a_prime_over_a * (1. + w_fld) *
                                   ctx.theta_over_k2);  // N-body gauge correction
   }
 
   // ── theta_fld ─────────────────────────────────────────────────────────────
   if (p_mod->has_source_theta_fld_ == _TRUE_) {
-    const double w_fld = pvecback[bgm->index_bg_w_fld_];
+    const double w_fld = W(pvecback);
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_theta_fld_,
                           ctx.index_tau,
                           ctx.index_k,
-                          ppw->rho_plus_p_theta_fld / (1. + w_fld) /
-                                  pvecback[bgm->index_bg_rho_fld_] +
+                          ppw->rho_plus_p_theta_fld / (1. + w_fld) / Rho(pvecback) +
                               ctx.theta_shift);  // N-body gauge correction
   }
 }

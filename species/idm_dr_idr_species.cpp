@@ -1,10 +1,22 @@
 #include "idm_dr_idr_species.h"
 
+#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 #include "thermodynamics.h"
 #include "thermodynamics_module.h"
+
+void IDM_DR_IDR_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_idr", 0.);
+  w.Add("(.)rho_idm_dr", 0.);
+}
+
+void IDM_DR_IDR_Species::WriteBackgroundData(const double* pvecback,
+                                             BackgroundColumnWriter& w) const {
+  w.Add("(.)rho_idr", idr().Rho(pvecback));
+  w.Add("(.)rho_idm_dr", idm_dr().Rho(pvecback));
+}
 
 void IDM_DR_IDR_Species::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
   perturb_vector* pv             = ctx.ppw->pv;

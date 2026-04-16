@@ -22,6 +22,7 @@
 #include <thread>
 
 #include "../species/all_species_list.h"
+#include "../species/dcdm_dr_species.h"
 
 namespace {
 
@@ -3688,12 +3689,13 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
       }
       case Omega_dcdmdr: {
         BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        double rho_dcdm_today =
-            bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ + bam->index_bg_rho_dcdm_];
+        const double* bg_today  = bam->background_table_.data() +
+                                  (bam->bt_size_ - 1) * bam->bg_size_;
+        auto& dcdm_dr           = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
+        double rho_dcdm_today   = dcdm_dr.dcdm().Rho(bg_today);
         double rho_dr_today;
         if (ba.has_dr == _TRUE_)
-          rho_dr_today = bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ +
-                                                bam->index_bg_rho_dr_species_];
+          rho_dr_today = dcdm_dr.dr().Rho(bg_today);
         else
           rho_dr_today = 0.;
         output[idx] = (rho_dcdm_today + rho_dr_today) / (ba.H0 * ba.H0) - pfzw->target_values[idx];
@@ -3701,12 +3703,13 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
       }
       case omega_dcdmdr: {
         BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        double rho_dcdm_today =
-            bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ + bam->index_bg_rho_dcdm_];
+        const double* bg_today  = bam->background_table_.data() +
+                                  (bam->bt_size_ - 1) * bam->bg_size_;
+        auto& dcdm_dr           = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
+        double rho_dcdm_today   = dcdm_dr.dcdm().Rho(bg_today);
         double rho_dr_today;
         if (ba.has_dr == _TRUE_)
-          rho_dr_today = bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ +
-                                                bam->index_bg_rho_dr_species_];
+          rho_dr_today = dcdm_dr.dr().Rho(bg_today);
         else
           rho_dr_today = 0.;
         output[idx] = (rho_dcdm_today + rho_dr_today) / (ba.H0 * ba.H0) -
@@ -3715,22 +3718,23 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
       }
       case Omega_scf: {
         BackgroundModulePtr bam = cosmology.GetBackgroundModule();
+        const double* bg_today  = bam->background_table_.data() +
+                                  (bam->bt_size_ - 1) * bam->bg_size_;
         /** - In case scalar field is used to fill, pba->Omega0_scf is not equal to pfzw->target_value[i].*/
-        output[idx] =
-            bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ + bam->index_bg_rho_scf_] /
-                (ba.H0 * ba.H0) -
-            ba.Omega0_scf;
+        output[idx] = bam->all_species_.at("ScalarField")->Rho(bg_today) / (ba.H0 * ba.H0) -
+                      ba.Omega0_scf;
         break;
       }
       case Omega_ini_dcdm:
       case omega_ini_dcdm: {
         BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        double rho_dcdm_today =
-            bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ + bam->index_bg_rho_dcdm_];
+        const double* bg_today  = bam->background_table_.data() +
+                                  (bam->bt_size_ - 1) * bam->bg_size_;
+        auto& dcdm_dr           = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
+        double rho_dcdm_today   = dcdm_dr.dcdm().Rho(bg_today);
         double rho_dr_today;
         if (ba.has_dr == _TRUE_)
-          rho_dr_today = bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ +
-                                                bam->index_bg_rho_dr_species_];
+          rho_dr_today = dcdm_dr.dr().Rho(bg_today);
         else
           rho_dr_today = 0.;
         output[idx] = -(rho_dcdm_today + rho_dr_today) / (ba.H0 * ba.H0) + ba.Omega0_dcdmdr;
@@ -3744,10 +3748,12 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
       case omega_ini_dncdm:
       case Omega_ini_dncdm: {
         BackgroundModulePtr bam = cosmology.GetBackgroundModule();
+        const double* bg_today  = bam->background_table_.data() +
+                                  (bam->bt_size_ - 1) * bam->bg_size_;
         for (const auto& [ncdm_id, dncdm_properties] : bam->ncdm_->decay_dr_map_) {
+          auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
           double rho_dr_today =
-              bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ +
-                                     bam->index_bg_rho_dr_species_ + dncdm_properties.dr_id];
+              bg_today[dcdm_dr.dr().bg_rho_dr_species_index() + dncdm_properties.dr_id];
           // Find the NCDM species with the matching ncdm_id
           NCDMSpecies* ncdm_sp_dncdm = nullptr;
           for (auto& [name, sp] : bam->all_species_) {
@@ -3760,8 +3766,7 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
             throw std::runtime_error(
                 "Could not find NCDMSpecies with ncdm_id matching decay_dr_map entry");
           }
-          double rho_dncdm_today = bam->background_table_[(bam->bt_size_ - 1) * bam->bg_size_ +
-                                                          ncdm_sp_dncdm->bg_rho_index()];
+          double rho_dncdm_today = ncdm_sp_dncdm->Rho(bg_today);
 
           if (input_verbose > 0) {
             if ((pfzw->target_name[counter] == omega_dncdmdr) ||

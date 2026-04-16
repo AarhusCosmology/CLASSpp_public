@@ -1,4 +1,5 @@
 #pragma once
+#include "../source/background_column_writer.h"
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
@@ -25,6 +26,13 @@ class BaryonsSpecies : public BaseSpecies {
   }
   double DpDloga(const double* /*pvecback*/) const override {
     return 0.;
+  }
+
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override {
+    w.Add("(.)rho_b", 0.);
+  }
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override {
+    w.Add("(.)rho_b", pvecback[index_bg_rho_]);
   }
 
   void RegisterPerturbationIndices(perturb_vector* pv,

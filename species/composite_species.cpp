@@ -79,6 +79,13 @@ double CompositeSpecies::DpDloga(const double* pvecback) const {
   return dp;
 }
 
+double CompositeSpecies::FreestreamingRho(const double* pvecback) const {
+  double rho = 0.;
+  for (const auto& child : children_)
+    rho += child->FreestreamingRho(pvecback);
+  return rho;
+}
+
 void CompositeSpecies::PerturbDerivs(double tau,
                                      const double* y,
                                      double* dy,

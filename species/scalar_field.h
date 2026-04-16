@@ -48,6 +48,9 @@ class ScalarFieldSpecies : public BaseSpecies {
     return 0.;
   }
 
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+
   // ── Perturbations ────────────────────────────────────────────────────────
   void RegisterPerturbationIndices(perturb_vector* pv,
                                    const precision* ppr,
@@ -97,6 +100,10 @@ class ScalarFieldSpecies : public BaseSpecies {
                       const double* y,
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
+
+  /** Compute p'_scf, write it into pvecback, and return its value.
+   *  Called by BackgroundModule after ComputeBackground to update p_tot_prime. */
+  double ComputePPrimeAndWrite(double a, double* pvecback) const;
 
   int bi_phi_index() const {
     return index_bi_phi_scf_;

@@ -21,6 +21,10 @@ class NCDMSpecies : public BaseSpecies {
       : BaseSpecies("NCDM_" + std::to_string(ncdm_id), EnergyType::Other), ncdm_id_(ncdm_id),
         ncdm_(std::move(ncdm)), pba_(pba), bgm_(bgm) {}
 
+  bool IsFreestreaming() const override {
+    return true;
+  }
+
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override {
     bgm_ = bgm;
@@ -71,6 +75,9 @@ class NCDMSpecies : public BaseSpecies {
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+
+  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
+  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
   int ncdm_id() const {
     return ncdm_id_;
