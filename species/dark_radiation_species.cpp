@@ -25,8 +25,6 @@ void DarkRadiationSpecies::ComputeBackground(double /*a_rel*/,
                                              double* pvecback) {
   double rho_dr_total = 0.;
   for (int n = 0; n < pba_->N_decay_dr; ++n) {
-    if (dr_)
-      dr_->rho_species_[n] = pvecback_B[index_bi_rho_dr_species_ + n];
     pvecback[index_bg_rho_dr_species_ + n]  = pvecback_B[index_bi_rho_dr_species_ + n];
     rho_dr_total                           += pvecback_B[index_bi_rho_dr_species_ + n];
   }

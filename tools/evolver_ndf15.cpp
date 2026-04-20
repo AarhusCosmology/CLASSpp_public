@@ -293,9 +293,9 @@ int evolver_ndf15(
   done    = _FALSE_;
   at_hmin = _FALSE_;
   while (done == _FALSE_) {
-    /**class_test(stepstat[2] > 1e5, error_message,
-	       "Too many steps in evolver! Current stepsize:%g, in interval: [%g:%g]\n",
-	       absh,t0,tfinal);*/
+    //class_test(stepstat[2] > 1e7, error_message,
+    //     "Too many steps in evolver! Current stepsize:%g, in interval: [%g:%g]\n",
+    //     absh,t0,tfinal);
     hmin   = minimum_variation;
     maxtmp = MAX(hmin, absh);
     absh   = MIN(hmax, maxtmp);

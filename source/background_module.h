@@ -21,6 +21,12 @@ class BackgroundModule : public BaseModule {
   int background_idm_drmd(
       double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
 
+  // Per-species NCDM accessors (indexed 0..N_ncdm-1, order matches pba->N_ncdm)
+  double GetNcdmDeg(int n) const;
+  double GetNcdmMassInEV(int n) const;
+  int GetNcdmQSize(int n) const;
+  double GetNcdmQ(int n, int q_id) const;
+
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
 
   //@{

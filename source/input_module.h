@@ -54,8 +54,6 @@ class InputModule {
   nonlinear nonlinear_;
   lensing lensing_;
   output output_;
-  std::shared_ptr<NonColdDarkMatter> ncdm_;
-  std::shared_ptr<DarkRadiation> dr_;
   /** All cosmological species, constructed at end of InputModule ctor. */
   std::map<std::string, std::unique_ptr<BaseSpecies>> all_species_;
   ErrorMsg error_message_;

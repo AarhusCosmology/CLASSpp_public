@@ -6,17 +6,29 @@
 #include "background_module.h"
 #include "perturbations_module.h"
 
-DNCDM_DR_Species::DNCDM_DR_Species(int ncdm_id,
-                                   std::shared_ptr<NonColdDarkMatter> ncdm,
+std::vector<std::unique_ptr<DNCDM_DR_Species>> DNCDM_DR_Species::CreateAll(
+    FileContent* pfc,
+    const NcdmSettings& settings,
+    const background* pba,
+    const BackgroundModule* bgm) {
+  auto dncdm_vec = DNCDMSpecies::CreateAll(pfc, settings, pba, bgm);
+  std::vector<std::unique_ptr<DNCDM_DR_Species>> result;
+  result.reserve(dncdm_vec.size());
+  for (auto& dncdm : dncdm_vec)
+    result.push_back(std::make_unique<DNCDM_DR_Species>(std::move(dncdm), pba, bgm));
+  return result;
+}
+
+DNCDM_DR_Species::DNCDM_DR_Species(std::unique_ptr<DNCDMSpecies> dncdm_arg,
                                    const background* pba,
                                    const BackgroundModule* bgm)
-    : CompositeSpecies("DNCDM_DR_" + std::to_string(ncdm_id), BaseSpecies::EnergyType::Other),
-      ncdm_id_(ncdm_id), pba_(pba), bgm_(bgm) {
-  auto dncdm = std::make_unique<DNCDMSpecies>(ncdm_id, ncdm, pba, bgm);
-  auto dr_sp = std::make_unique<DNCDM_DecayRadiationSpecies>(ncdm_id, pba, bgm);
-  dncdm_     = dncdm.get();
+    : CompositeSpecies("DNCDM_DR_" + std::to_string(dncdm_arg->ncdm_id()),
+                       BaseSpecies::EnergyType::Other),
+      ncdm_id_(dncdm_arg->ncdm_id()), pba_(pba), bgm_(bgm) {
+  auto dr_sp = std::make_unique<DNCDM_DecayRadiationSpecies>(ncdm_id_, pba, bgm);
+  dncdm_     = dncdm_arg.get();
   dr_sp_     = dr_sp.get();
-  children_.push_back(std::move(dncdm));
+  children_.push_back(std::move(dncdm_arg));
   children_.push_back(std::move(dr_sp));
 }
 
@@ -26,7 +38,6 @@ void DNCDM_DR_Species::SetBackgroundModule(const BackgroundModule* bgm) {
 }
 
 void DNCDM_DR_Species::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
-  // Initialize children first (DNCDM)
   CompositeSpecies::SetBackgroundInitialConditions(a_rel, pvecback_integration);
 }
 
@@ -38,10 +49,9 @@ void DNCDM_DR_Species::BackgroundDerivs(double tau,
   CompositeSpecies::BackgroundDerivs(tau, y, dy, pvecback);
 
   // DNCDM->DR decay source
-  const double a          = pvecback[bgm_->index_bg_a_];
-  const auto& dncdm_props = dncdm_->ncdm().decay_dr_map_.at(ncdm_id_);
-  const double M_ncdm     = dncdm_->ncdm().M_ncdm_[ncdm_id_];
-  const double Gamma      = dncdm_props.Gamma;
+  const double a      = pvecback[bgm_->index_bg_a_];
+  const double M_ncdm = dncdm_->GetMass();
+  const double Gamma  = dncdm_->Gamma();
 
   dy[dr_sp_->bi_rho_index()] += a * Gamma * M_ncdm * pvecback[dncdm_->bg_number_index()];
 }
@@ -59,18 +69,16 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
   const double a         = ctx.a;
   const double k         = ctx.k;
 
-  const auto& dncdm_props = dncdm_->ncdm().decay_dr_map_.at(ncdm_id_);
-  const double M_ncdm     = dncdm_->ncdm().M_ncdm_[ncdm_id_];
-  const double Gamma      = dncdm_props.Gamma;
-  const int q_size        = dncdm_->ncdm().q_size_ncdm_[ncdm_id_];
+  const double M_ncdm = dncdm_->GetMass();
+  const double Gamma  = dncdm_->Gamma();
+  const int q_size    = dncdm_->q_size();
 
   // rprime_dr = a^5 * Gamma * M_ncdm * n_dncdm / H0^2
   const double rprime_dr = std::pow(a, 5) / (pba_->H0 * pba_->H0) * M_ncdm * Gamma *
                            pvecback[dncdm_->bg_number_index()];
 
-  // Ported logic from legacy manual block in perturbations_module.cpp
   auto ComputeFl = [&](int index_q, int lmax, std::vector<double>& output) {
-    double q       = dncdm_->ncdm().q_ncdm_[ncdm_id_][index_q];
+    double q       = dncdm_->GetQ()[index_q];
     double epsilon = sqrt(q * q + a * a * M_ncdm * M_ncdm);
     double x       = q / epsilon;
 
@@ -121,9 +129,9 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
     if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
       bool must_rescale = false;
       for (int index_q = 0; index_q < q_size; ++index_q) {
-        double dq = dncdm_props.dq[index_q];
+        double dq = dncdm_->dq()[index_q];
         double w0 = dq * exp(pvecback[dncdm_->bg_lnf_index() + index_q]);
-        double q  = dncdm_->ncdm().q_ncdm_[ncdm_id_][index_q];
+        double q  = dncdm_->GetQ()[index_q];
 
         if (w0 == 0.) {
           must_rescale = true;
@@ -137,11 +145,11 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
       if (must_rescale) {
         integral_num   = 0.;
         integral_denom = 0.;
-        double lnN = dncdm_->ncdm().GetRescalingFactor(ncdm_id_, pvecback + dncdm_->bg_lnf_index());
+        double lnN     = dncdm_->GetRescalingFactor(pvecback + dncdm_->bg_lnf_index());
         for (int index_q = 0; index_q < q_size; ++index_q) {
-          double dq       = dncdm_props.dq[index_q];
+          double dq       = dncdm_->dq()[index_q];
           double lnf      = pvecback[dncdm_->bg_lnf_index() + index_q];
-          double q        = dncdm_->ncdm().q_ncdm_[ncdm_id_][index_q];
+          double q        = dncdm_->GetQ()[index_q];
           int psi_ind     = pv->index_ncdm_.at(ncdm_id_)[index_q] + l;
           integral_num   += dq * q * q * exp(lnN + lnf) * y[psi_ind] * FL[l * q_size + index_q];
           integral_denom += dq * q * q * exp(lnN + lnf);

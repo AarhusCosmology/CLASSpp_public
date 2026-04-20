@@ -1,6 +1,7 @@
 #include "dncdm_species.h"
 
 #include <cmath>
+#include <stdexcept>
 #include <vector>
 
 #include "arrays.h"
@@ -8,40 +9,286 @@
 #include "background_module.h"
 #include "perturbations_module.h"
 
+namespace {
+
+int readDoubleList(
+    FileContent* pfc, const char* name, std::vector<double>& values, int* found, ErrorMsg errmsg) {
+  try {
+    *found = pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
+  }
+  catch (const std::exception& e) {
+    class_stop(errmsg, "%s", e.what());
+  }
+  return _SUCCESS_;
+}
+
+}  // namespace
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constructor
+// ─────────────────────────────────────────────────────────────────────────────
+
+DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
+                           int ncdm_index,
+                           int dncdm_index,
+                           const NcdmSettings& settings,
+                           const background* pba,
+                           const BackgroundModule* bgm)
+    : NCDMBaseSpecies("DNCDM_" + std::to_string(dncdm_index),
+                      EnergyType::Other,
+                      pfc,
+                      dncdm_index,
+                      settings,
+                      true /*is_decay_dr*/),
+      ncdm_id_(ncdm_index), pba_(pba) {
+  bgm_ = bgm;
+
+  // Read Gamma for this decay_dr species.
+  // Supports: Gamma_ncdm_decay_dr, log10Gamma_ncdm_decay_dr,
+  //           lifetime_ncdm_decay_dr, log10lifetime_ncdm_decay_dr
+  char errmsg[2048];
+  int Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read;
+  std::vector<double> Gamma_list, log10Gamma_list, lifetime_list, log10lifetime_list;
+
+  readDoubleList(pfc, "Gamma_ncdm_decay_dr", Gamma_list, &Gamma_read, errmsg);
+  readDoubleList(pfc, "log10Gamma_ncdm_decay_dr", log10Gamma_list, &log10Gamma_read, errmsg);
+  readDoubleList(pfc, "lifetime_ncdm_decay_dr", lifetime_list, &lifetime_read, errmsg);
+  readDoubleList(pfc,
+                 "log10lifetime_ncdm_decay_dr",
+                 log10lifetime_list,
+                 &log10lifetime_read,
+                 errmsg);
+
+  // Exactly one decay-rate parameter must be provided
+  int n_provided = (Gamma_read == _TRUE_) + (log10Gamma_read == _TRUE_) +
+                   (lifetime_read == _TRUE_) + (log10lifetime_read == _TRUE_);
+  if (n_provided > 1)
+    throw std::invalid_argument(
+        "DNCDM species: specify exactly one of Gamma_ncdm_decay_dr, "
+        "log10Gamma_ncdm_decay_dr, lifetime_ncdm_decay_dr, log10lifetime_ncdm_decay_dr");
+
+  auto check_size = [&](const char* name, const std::vector<double>& list) {
+    if (dncdm_index >= static_cast<int>(list.size()))
+      throw std::invalid_argument(std::string(name) +
+                                  " has fewer entries than expected for DNCDM species index " +
+                                  std::to_string(dncdm_index));
+  };
+
+  double Gamma_raw = 0.;
+  if (Gamma_read == _TRUE_) {
+    check_size("Gamma_ncdm_decay_dr", Gamma_list);
+    Gamma_raw = Gamma_list[dncdm_index];
+  }
+  else if (log10Gamma_read == _TRUE_) {
+    check_size("log10Gamma_ncdm_decay_dr", log10Gamma_list);
+    Gamma_raw = std::pow(10., log10Gamma_list[dncdm_index]);
+  }
+  else if (lifetime_read == _TRUE_) {
+    check_size("lifetime_ncdm_decay_dr", lifetime_list);
+    Gamma_raw = 1. / lifetime_list[dncdm_index] / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
+  }
+  else if (log10lifetime_read == _TRUE_) {
+    check_size("log10lifetime_ncdm_decay_dr", log10lifetime_list);
+    double lifetime = std::pow(10., log10lifetime_list[dncdm_index]);
+    Gamma_raw       = 1. / lifetime / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
+  }
+  // Convert to Mpc^-1
+  Gamma_ = Gamma_raw * (1.e3 / _c_);
+
+  // Compute dq_[i] = w_bg_[i] / f0(q_bg_[i])
+  // (w_bg_ is already populated by NCDMBaseSpecies::InitQuadrature)
+  dq_ = ComputeDq();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CreateAll factory
+// ─────────────────────────────────────────────────────────────────────────────
+
+std::vector<std::unique_ptr<DNCDMSpecies>> DNCDMSpecies::CreateAll(FileContent* pfc,
+                                                                   const NcdmSettings& settings,
+                                                                   const background* pba,
+                                                                   const BackgroundModule* bgm) {
+  std::vector<std::unique_ptr<DNCDMSpecies>> result;
+  ErrorMsg errmsg_buf;
+  char* errmsg = errmsg_buf;
+
+  // Find N_ncdm_standard and N_ncdm_decay_dr
+  int N_ncdm_standard = 0, N_ncdm_decay_dr = 0;
+  int flag1, flag2, flag3, flag4;
+
+  int int1, int2;
+  parser_read_int(pfc, "N_ncdm_standard", &int1, &flag1, errmsg);
+  parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg);
+  if (flag1 == _TRUE_)
+    N_ncdm_standard = int1;
+  else if (flag2 == _TRUE_)
+    N_ncdm_standard = int2;
+
+  parser_read_int(pfc, "N_ncdm_decay_dr", &N_ncdm_decay_dr, &flag3, errmsg);
+
+  if (N_ncdm_decay_dr <= 0)
+    return result;
+
+  // Construct species: decay_dr indices are [N_ncdm_standard, N_ncdm_standard + N_ncdm_decay_dr)
+  for (int i = 0; i < N_ncdm_decay_dr; i++) {
+    int ncdm_index = N_ncdm_standard + i;
+    result.push_back(std::make_unique<DNCDMSpecies>(pfc, ncdm_index, i, settings, pba, bgm));
+  }
+
+  // ── Read DNCDM-specific Omega/deg parameters ──────────────────────────────
+  std::vector<double> Omega_dncdmdr_list, omega_dncdmdr_list, deg_list;
+  std::vector<double> Omega_ini_dncdm_list, omega_ini_dncdm_list, Neff_ini_dncdm_list;
+  int flag_omega1, flag_omega2, flag_deg, flag_Omega_ini, flag_omega_ini, flag_Neff_ini;
+
+  auto readDoubleListLocal = [&](const char* name, std::vector<double>& values, int* found) {
+    try {
+      *found = pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
+    }
+    catch (...) {
+      *found = _FALSE_;
+    }
+    return _SUCCESS_;
+  };
+
+  readDoubleListLocal("Omega_dncdmdr", Omega_dncdmdr_list, &flag_omega1);
+  readDoubleListLocal("omega_dncdmdr", omega_dncdmdr_list, &flag_omega2);
+  readDoubleListLocal("deg_ncdm_decay_dr", deg_list, &flag_deg);
+  readDoubleListLocal("Omega_ini_dncdm", Omega_ini_dncdm_list, &flag_Omega_ini);
+  readDoubleListLocal("omega_ini_dncdm", omega_ini_dncdm_list, &flag_omega_ini);
+  readDoubleListLocal("Neff_ini_dncdm", Neff_ini_dncdm_list, &flag_Neff_ini);
+
+  if ((flag_omega1 == _TRUE_) && (flag_omega2 == _TRUE_)) {
+    throw std::invalid_argument(
+        "In input file, you can only enter one of Omega_dncdmdr or omega_dncdmdr, choose one");
+  }
+  if ((flag_deg == _TRUE_) && (flag_Omega_ini == _TRUE_)) {
+    throw std::invalid_argument(
+        "In input file, you can only enter one of deg_ncdm_decay_dr or Omega_ini_dncdm, choose "
+        "one");
+  }
+
+  const double h = settings.h;
+
+  auto check_list = [&](const char* name, const std::vector<double>& list) {
+    if (static_cast<int>(list.size()) < N_ncdm_decay_dr)
+      throw std::invalid_argument(
+          std::string(name) + " has " + std::to_string(list.size()) +
+          " entries but N_ncdm_decay_dr = " + std::to_string(N_ncdm_decay_dr));
+  };
+
+  if (flag_omega1 == _TRUE_) {
+    check_list("Omega_dncdmdr", Omega_dncdmdr_list);
+    for (int n = 0; n < N_ncdm_decay_dr; n++) {
+      result[n]->SetOmega0(Omega_dncdmdr_list[n], h);
+    }
+  }
+  else if (flag_omega2 == _TRUE_) {
+    check_list("omega_dncdmdr", omega_dncdmdr_list);
+    for (int n = 0; n < N_ncdm_decay_dr; n++) {
+      result[n]->SetOmega0(omega_dncdmdr_list[n] / h / h, h);
+    }
+  }
+
+  if (flag_deg == _TRUE_) {
+    check_list("deg_ncdm_decay_dr", deg_list);
+    for (int n = 0; n < N_ncdm_decay_dr; n++) {
+      result[n]->SetDegAndFactor(deg_list[n]);
+    }
+  }
+  else if (flag_Omega_ini == _TRUE_) {
+    check_list("Omega_ini_dncdm", Omega_ini_dncdm_list);
+    double a_ini = result[0]->GetIni(pba ? pba->a_today * 1e-14 : 1e-14,
+                                     pba ? pba->a_today : 1.,
+                                     settings.tol_ncdm);
+    double z_ini = 1.0 / a_ini - 1.0;
+    double H0    = pba ? pba->H0 : settings.h * 1.e5 / _c_;
+    for (int n = 0; n < N_ncdm_decay_dr; n++) {
+      result[n]->SetDeg_from_Omega_ini(z_ini, H0, Omega_ini_dncdm_list[n]);
+    }
+  }
+  else if (flag_omega_ini == _TRUE_) {
+    check_list("omega_ini_dncdm", omega_ini_dncdm_list);
+    double a_ini = result[0]->GetIni(pba ? pba->a_today * 1e-14 : 1e-14,
+                                     pba ? pba->a_today : 1.,
+                                     settings.tol_ncdm);
+    double z_ini = 1.0 / a_ini - 1.0;
+    double H0    = pba ? pba->H0 : settings.h * 1.e5 / _c_;
+    for (int n = 0; n < N_ncdm_decay_dr; n++) {
+      result[n]->SetDeg_from_Omega_ini(z_ini, H0, omega_ini_dncdm_list[n] / h / h);
+    }
+  }
+  else if (flag_Neff_ini == _TRUE_) {
+    check_list("Neff_ini_dncdm", Neff_ini_dncdm_list);
+    double a_ini    = result[0]->GetIni(pba ? pba->a_today * 1e-14 : 1e-14,
+                                        pba ? pba->a_today : 1.,
+                                        settings.tol_ncdm);
+    double z_ini    = 1.0 / a_ini - 1.0;
+    double H0       = pba ? pba->H0 : settings.h * 1.e5 / _c_;
+    double Omega0_g = pba ? pba->Omega0_g : 0.;
+    for (int n = 0; n < N_ncdm_decay_dr; n++) {
+      double Omega_ini = Neff_ini_dncdm_list[n] * 7. / 8. * std::pow(4. / 11., 4. / 3.) * Omega0_g;
+      result[n]->SetDeg_from_Omega_ini(z_ini, H0, Omega_ini);
+    }
+  }
+
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GetRescaledParameters — uses dq_ (not standard w_ weights)
+// ─────────────────────────────────────────────────────────────────────────────
+
+std::tuple<double, double> DNCDMSpecies::GetRescaledParameters(double a,
+                                                               const double* lnf_array) const {
+  double rho_scaled      = 0.;
+  double p_scaled        = 0.;
+  double pseudo_p_scaled = 0.;
+
+  const double lnN = GetRescalingFactor(lnf_array);
+  for (int index_q = 0; index_q < q_size(); index_q++) {
+    double dq      = dq_[index_q];
+    double q       = q_[index_q];
+    double lnf     = lnf_array[index_q];
+    double epsilon = std::sqrt(q * q + a * a * M_ * M_);
+
+    rho_scaled      += dq * q * q * epsilon * std::exp(lnN + lnf);
+    p_scaled        += dq * std::pow(q, 4) / 3. / epsilon * std::exp(lnN + lnf);
+    pseudo_p_scaled += dq * std::pow(q * q / epsilon, 3) / 3. * std::exp(lnN + lnf);
+  }
+  if (rho_scaled == 0.)
+    return {0., 0.};
+  double pseudo_p_over_p = pseudo_p_scaled / p_scaled;
+  double w               = p_scaled / rho_scaled;
+  return {w, pseudo_p_over_p};
+}
+
 // ── Background ─────────────────────────────────────────────────────────────
 
 void DNCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   index_bg_number_   = index_bg++;
-  index_bg_rho_      = index_bg++;  // base class protected
-  index_bg_p_        = index_bg++;  // base class protected
+  index_bg_rho_      = index_bg++;
+  index_bg_p_        = index_bg++;
   index_bg_pseudo_p_ = index_bg++;
 
-  if (ncdm_ && ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-    index_bg_lnf_decay_dr1_   = index_bg;
-    index_bg                 += ncdm_->q_size_ncdm_[ncdm_id_];
-    index_bg_dlnfdlnq_decay_  = index_bg;
-    index_bg                 += ncdm_->q_size_ncdm_[ncdm_id_];
-    index_bg_dlnfdlnq_sep_    = index_bg;
-    index_bg                 += ncdm_->q_size_ncdm_[ncdm_id_];
-  }
+  index_bg_lnf_decay_dr1_   = index_bg;
+  index_bg                 += q_size();
+  index_bg_dlnfdlnq_decay_  = index_bg;
+  index_bg                 += q_size();
+  index_bg_dlnfdlnq_sep_    = index_bg;
+  index_bg                 += q_size();
 }
 
 void DNCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
-  if (ncdm_ && ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-    index_bi_lnf_decay_dr1_            = index_bi;
-    index_bi                          += ncdm_->q_size_ncdm_[ncdm_id_];
-    index_bi_dlnfdlnq_separate_decay_  = index_bi;
-    index_bi                          += ncdm_->q_size_ncdm_[ncdm_id_];
-  }
+  index_bi_lnf_decay_dr1_            = index_bi;
+  index_bi                          += q_size();
+  index_bi_dlnfdlnq_separate_decay_  = index_bi;
+  index_bi                          += q_size();
 }
 
 void DNCDMSpecies::SetBackgroundInitialConditions(double /*a_rel*/, double* pvecback_integration) {
-  if (!ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr)
-    return;
-  const auto& dncdm_props = ncdm_->decay_dr_map_.at(ncdm_id_);
-  for (int index_q = 0; index_q < ncdm_->q_size_ncdm_[ncdm_id_]; index_q++) {
-    double q  = ncdm_->q_ncdm_[ncdm_id_][index_q];
-    double f0 = ncdm_->w_ncdm_[ncdm_id_][index_q] / dncdm_props.dq[index_q];
+  for (int index_q = 0; index_q < q_size(); index_q++) {
+    double q  = q_[index_q];
+    double f0 = w_[index_q] / dq_[index_q];
 
     pvecback_integration[index_bi_lnf_decay_dr1_ + index_q] = std::log(f0);
     pvecback_integration[index_bi_dlnfdlnq_separate_decay_ + index_q] =
@@ -50,79 +297,36 @@ void DNCDMSpecies::SetBackgroundInitialConditions(double /*a_rel*/, double* pvec
 }
 
 void DNCDMSpecies::ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) {
-  if (!ncdm_)
-    return;
-  double z = 1. / a_rel - 1.;
+  double z       = 1. / a_rel - 1.;
+  const int q_sz = q_size();
 
-  // For decaying NCDM: update distribution function weights from ODE vars
-  if (ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-    const int q_size        = ncdm_->q_size_ncdm_[ncdm_id_];
-    const auto& dncdm_props = ncdm_->decay_dr_map_.at(ncdm_id_);
+  std::vector<double> lnf_dlnf_array(2 * q_sz);
+  std::vector<double> ddlnf_array(q_sz);
+  std::vector<double> lnq(q_sz);
 
-    std::vector<double> lnf_dlnf_array(2 * q_size);
-    std::vector<double> ddlnf_array(q_size);
-    std::vector<double> lnq(q_size);
-
-    if (pba_->background_method == bgevo_evolver) {
-      bool has_problem = false;
-      for (int i = 0; i < q_size; i++) {
-        if (pvecback_B[index_bi_lnf_decay_dr1_ + i] <= -460) {
-          has_problem = true;
-          break;
-        }
-        lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_decay_dr1_ + i];
-        lnq[i]            = std::log(ncdm_->q_ncdm_[ncdm_id_][i]);
+  if (pba_->background_method == bgevo_evolver) {
+    bool has_problem = false;
+    for (int i = 0; i < q_sz; i++) {
+      if (pvecback_B[index_bi_lnf_decay_dr1_ + i] <= -460) {
+        has_problem = true;
+        break;
       }
-      if (has_problem) {
-        // Use Fermi-Dirac approximation when f becomes static
-        for (int i = 0; i < q_size; i++) {
-          double q                               = ncdm_->q_ncdm_[ncdm_id_][i];
-          double lnf_fd                          = -std::log(1. + std::exp(q));
-          double dlnfdlnq_fd                     = -q * std::exp(q) / (1. + std::exp(q));
-          pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_fd;
-          pvecback[index_bg_dlnfdlnq_decay_ + i] = dlnfdlnq_fd;
-          ncdm_->SetBackgroundWeight(ncdm_id_, i, std::exp(lnf_fd) * dncdm_props.dq[i]);
-        }
-      }
-      else {
-        // Find df/dq by first splining and then calculating the derivative
-        class_call(array_spline_table_lines(lnq.data(),
-                                            q_size,
-                                            lnf_dlnf_array.data(),
-                                            1,
-                                            ddlnf_array.data(),
-                                            _SPLINE_EST_DERIV_,
-                                            bgm_->error_message_),
-                   bgm_->error_message_,
-                   bgm_->error_message_);
-
-        class_call(array_derive_spline(lnq.data(),
-                                       q_size,
-                                       lnf_dlnf_array.data(),
-                                       ddlnf_array.data(),
-                                       1,
-                                       0,
-                                       q_size,
-                                       bgm_->error_message_),
-                   bgm_->error_message_,
-                   bgm_->error_message_);
-
-        for (int i = 0; i < q_size; i++) {
-          pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_dlnf_array[i];
-          pvecback[index_bg_dlnfdlnq_decay_ + i] = lnf_dlnf_array[q_size + i];
-          pvecback[index_bg_dlnfdlnq_sep_ + i] = pvecback_B[index_bi_dlnfdlnq_separate_decay_ + i];
-          ncdm_->SetBackgroundWeight(ncdm_id_, i, std::exp(lnf_dlnf_array[i]) * dncdm_props.dq[i]);
-        }
+      lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_decay_dr1_ + i];
+      lnq[i]            = std::log(q_[i]);
+    }
+    if (has_problem) {
+      for (int i = 0; i < q_sz; i++) {
+        double q                               = q_[i];
+        double lnf_fd                          = -std::log(1. + std::exp(q));
+        double dlnfdlnq_fd                     = -q * std::exp(q) / (1. + std::exp(q));
+        pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_fd;
+        pvecback[index_bg_dlnfdlnq_decay_ + i] = dlnfdlnq_fd;
+        w_bg_[i]                               = std::exp(lnf_fd) * dq_[i];
       }
     }
     else {
-      for (int i = 0; i < q_size; i++) {
-        lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_decay_dr1_ + i];
-        lnq[i]            = std::log(ncdm_->q_ncdm_[ncdm_id_][i]);
-      }
-
       class_call(array_spline_table_lines(lnq.data(),
-                                          q_size,
+                                          q_sz,
                                           lnf_dlnf_array.data(),
                                           1,
                                           ddlnf_array.data(),
@@ -130,35 +334,58 @@ void DNCDMSpecies::ComputeBackground(double a_rel, const double* pvecback_B, dou
                                           bgm_->error_message_),
                  bgm_->error_message_,
                  bgm_->error_message_);
-
       class_call(array_derive_spline(lnq.data(),
-                                     q_size,
+                                     q_sz,
                                      lnf_dlnf_array.data(),
                                      ddlnf_array.data(),
                                      1,
                                      0,
-                                     q_size,
+                                     q_sz,
                                      bgm_->error_message_),
                  bgm_->error_message_,
                  bgm_->error_message_);
-
-      for (int i = 0; i < q_size; i++) {
+      for (int i = 0; i < q_sz; i++) {
         pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_dlnf_array[i];
-        pvecback[index_bg_dlnfdlnq_decay_ + i] = lnf_dlnf_array[q_size + i];
+        pvecback[index_bg_dlnfdlnq_decay_ + i] = lnf_dlnf_array[q_sz + i];
         pvecback[index_bg_dlnfdlnq_sep_ + i]   = pvecback_B[index_bi_dlnfdlnq_separate_decay_ + i];
-        ncdm_->SetBackgroundWeight(ncdm_id_, i, std::exp(lnf_dlnf_array[i]) * dncdm_props.dq[i]);
+        w_bg_[i]                               = std::exp(lnf_dlnf_array[i]) * dq_[i];
       }
+    }
+  }
+  else {
+    for (int i = 0; i < q_sz; i++) {
+      lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_decay_dr1_ + i];
+      lnq[i]            = std::log(q_[i]);
+    }
+    class_call(array_spline_table_lines(lnq.data(),
+                                        q_sz,
+                                        lnf_dlnf_array.data(),
+                                        1,
+                                        ddlnf_array.data(),
+                                        _SPLINE_EST_DERIV_,
+                                        bgm_->error_message_),
+               bgm_->error_message_,
+               bgm_->error_message_);
+    class_call(array_derive_spline(lnq.data(),
+                                   q_sz,
+                                   lnf_dlnf_array.data(),
+                                   ddlnf_array.data(),
+                                   1,
+                                   0,
+                                   q_sz,
+                                   bgm_->error_message_),
+               bgm_->error_message_,
+               bgm_->error_message_);
+    for (int i = 0; i < q_sz; i++) {
+      pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_dlnf_array[i];
+      pvecback[index_bg_dlnfdlnq_decay_ + i] = lnf_dlnf_array[q_sz + i];
+      pvecback[index_bg_dlnfdlnq_sep_ + i]   = pvecback_B[index_bi_dlnfdlnq_separate_decay_ + i];
+      w_bg_[i]                               = std::exp(lnf_dlnf_array[i]) * dq_[i];
     }
   }
 
   double number_ncdm, rho_ncdm, p_ncdm, pseudo_p_ncdm;
-  ncdm_->background_ncdm_momenta(ncdm_id_,
-                                 z,
-                                 &number_ncdm,
-                                 &rho_ncdm,
-                                 &p_ncdm,
-                                 nullptr,
-                                 &pseudo_p_ncdm);
+  ComputeMomenta(z, &number_ncdm, &rho_ncdm, &p_ncdm, nullptr, &pseudo_p_ncdm);
   pvecback[index_bg_number_]   = number_ncdm;
   pvecback[index_bg_rho_]      = rho_ncdm;
   pvecback[index_bg_p_]        = p_ncdm;
@@ -169,14 +396,11 @@ void DNCDMSpecies::BackgroundDerivs(double /*tau*/,
                                     const double* /*y*/,
                                     double* dy,
                                     const double* pvecback) {
-  if (!ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr)
-    return;
-  const double a          = pvecback[bgm_->index_bg_a_];
-  const auto& dncdm_props = ncdm_->decay_dr_map_.at(ncdm_id_);
-  const double M_ncdm     = ncdm_->M_ncdm_[ncdm_id_];
-  const double Gamma      = dncdm_props.Gamma;
-  for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id_]; ++i) {
-    const double q                            = ncdm_->q_ncdm_[ncdm_id_][i];
+  const double a      = pvecback[bgm_->index_bg_a_];
+  const double M_ncdm = M_;
+  const double Gamma  = Gamma_;
+  for (int i = 0; i < q_size(); ++i) {
+    const double q                            = q_[i];
     const double epsilon                      = std::sqrt(q * q + a * a * M_ncdm * M_ncdm);
     dy[index_bi_lnf_decay_dr1_ + i]           = -a * a * M_ncdm * Gamma / epsilon;
     dy[index_bi_dlnfdlnq_separate_decay_ + i] = a * a * M_ncdm * Gamma * q * q /
@@ -194,15 +418,13 @@ void DNCDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const 
   w.Add(tmp, 0.);
   snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
   w.Add(tmp, 0.);
-  if (ncdm_ && ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-    for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id_]; i++) {
-      snprintf(tmp, 40, "lnf_dncdm[%d][%d]", ncdm_id_, i);
-      w.Add(tmp, 0.);
-      snprintf(tmp, 40, "dlnfdlnq_dncdm[%d][%d]", ncdm_id_, i);
-      w.Add(tmp, 0.);
-      snprintf(tmp, 40, "dlnfdlnq_separate_dncdm[%d][%d]", ncdm_id_, i);
-      w.Add(tmp, 0.);
-    }
+  for (int i = 0; i < q_size(); i++) {
+    snprintf(tmp, 40, "lnf_dncdm[%d][%d]", ncdm_id_, i);
+    w.Add(tmp, 0.);
+    snprintf(tmp, 40, "dlnfdlnq_dncdm[%d][%d]", ncdm_id_, i);
+    w.Add(tmp, 0.);
+    snprintf(tmp, 40, "dlnfdlnq_separate_dncdm[%d][%d]", ncdm_id_, i);
+    w.Add(tmp, 0.);
   }
 }
 
@@ -214,18 +436,16 @@ void DNCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnW
   w.Add(tmp, Rho(pvecback));
   snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
   w.Add(tmp, P(pvecback));
-  if (ncdm_ && ncdm_->ncdm_types_[ncdm_id_] == NCDMType::decay_dr) {
-    const int bg_lnf_idx          = bg_lnf_index();
-    const int bg_dlnfdlnq_idx     = bg_dlnfdlnq_index();
-    const int bg_dlnfdlnq_sep_idx = bg_dlnfdlnq_sep_index();
-    for (int i = 0; i < ncdm_->q_size_ncdm_[ncdm_id_]; i++) {
-      snprintf(tmp, 40, "lnf_dncdm[%d][%d]", ncdm_id_, i);
-      w.Add(tmp, pvecback[bg_lnf_idx + i]);
-      snprintf(tmp, 40, "dlnfdlnq_dncdm[%d][%d]", ncdm_id_, i);
-      w.Add(tmp, pvecback[bg_dlnfdlnq_idx + i]);
-      snprintf(tmp, 40, "dlnfdlnq_separate_dncdm[%d][%d]", ncdm_id_, i);
-      w.Add(tmp, pvecback[bg_dlnfdlnq_sep_idx + i]);
-    }
+  const int bg_lnf_idx          = bg_lnf_index();
+  const int bg_dlnfdlnq_idx     = bg_dlnfdlnq_index();
+  const int bg_dlnfdlnq_sep_idx = bg_dlnfdlnq_sep_index();
+  for (int i = 0; i < q_size(); i++) {
+    snprintf(tmp, 40, "lnf_dncdm[%d][%d]", ncdm_id_, i);
+    w.Add(tmp, pvecback[bg_lnf_idx + i]);
+    snprintf(tmp, 40, "dlnfdlnq_dncdm[%d][%d]", ncdm_id_, i);
+    w.Add(tmp, pvecback[bg_dlnfdlnq_idx + i]);
+    snprintf(tmp, 40, "dlnfdlnq_separate_dncdm[%d][%d]", ncdm_id_, i);
+    w.Add(tmp, pvecback[bg_dlnfdlnq_sep_idx + i]);
   }
 }
 
@@ -234,15 +454,12 @@ void DNCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnW
 void DNCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,
                                                const precision* ppr,
                                                int& index_pt,
-                                               const perturb_workspace* ppw,
+                                               const perturb_workspace* /*ppw*/,
                                                int /*gauge*/) {
-  if (!ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr)
-    return;
-
   index_pt_psi0_ = index_pt;
 
   pv->l_max_ncdm[ncdm_id_]  = ppr->l_max_ncdm;
-  pv->q_size_ncdm[ncdm_id_] = ncdm_->q_size_ncdm_[ncdm_id_];
+  pv->q_size_ncdm[ncdm_id_] = q_size();
 
   pv->index_ncdm_[ncdm_id_].clear();
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq)
@@ -250,13 +467,10 @@ void DNCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,
   index_pt += (pv->l_max_ncdm[ncdm_id_] + 1) * pv->q_size_ncdm[ncdm_id_];
 }
 
-void DNCDMSpecies::PerturbDerivs(double tau,
+void DNCDMSpecies::PerturbDerivs(double /*tau*/,
                                  const double* y,
                                  double* dy,
                                  const perturb_parameters_and_workspace& ppaw) {
-  if (!ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr)
-    return;
-
   const perturb_workspace* ppw    = ppaw.ppw;
   const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -269,11 +483,10 @@ void DNCDMSpecies::PerturbDerivs(double tau,
   const double cotKgen            = ctx.cotKgen;
 
   const double* pvecback = ppw->pvecback;
+  const double M_ncdm    = M_;
 
-  // Exact Boltzmann hierarchy per momentum bin (fa_on not supported for decaying)
-  const double M_ncdm = ncdm_->M_ncdm_[ncdm_id_];
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    const double q    = ncdm_->q_ncdm_[ncdm_id_][iq];
+    const double q    = q_[iq];
     double dlnf0_dlnq = pvecback[index_bg_dlnfdlnq_decay_ + iq];
 
     const double epsilon        = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
@@ -281,36 +494,28 @@ void DNCDMSpecies::PerturbDerivs(double tau,
     const int idx               = pv->index_ncdm_.at(ncdm_id_)[iq];
     const int lmax              = pv->l_max_ncdm[ncdm_id_];
 
-    // l=0 (density)
-    dy[idx] = -qk_div_epsilon * y[idx + 1] + metric_continuity * dlnf0_dlnq / 3.;
-    // l=1 (velocity)
+    dy[idx]     = -qk_div_epsilon * y[idx + 1] + metric_continuity * dlnf0_dlnq / 3.;
     dy[idx + 1] = qk_div_epsilon / 3. * (y[idx] - 2. * s_l[2] * y[idx + 2]) -
                   epsilon * metric_euler / (3. * q * k) * dlnf0_dlnq;
-    // l=2 (shear)
     dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
                   s_l[2] * metric_shear * 2. / 15. * dlnf0_dlnq;
-    // l=3..lmax-1
     for (int l = 3; l < lmax; ++l)
       dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                     (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
-    // l=lmax (truncation)
     dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
   }
 }
 
 void DNCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
   perturb_vector* pv = ctx.ppw->pv;
-  if (!ncdm_ || ncdm_->ncdm_types_[ncdm_id_] != NCDMType::decay_dr ||
-      pv->index_ncdm_.at(ncdm_id_).empty()) {
+  if (pv->index_ncdm_.at(ncdm_id_).empty())
     return;
-  }
 
   const double* pvecback = ctx.ppw->pvecback;
   for (int index_q = 0; index_q < pv->q_size_ncdm[ncdm_id_]; ++index_q) {
     const int idx           = pv->index_ncdm_[ncdm_id_][index_q];
-    const double q          = ncdm_->q_ncdm_[ncdm_id_][index_q];
-    const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * ncdm_->M_ncdm_[ncdm_id_] *
-                                                    ncdm_->M_ncdm_[ncdm_id_]);
+    const double q          = q_[index_q];
+    const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * M_ * M_);
     const double dlnf0_dlnq = pvecback[index_bg_dlnfdlnq_decay_ + index_q];
     const int lmax          = pv->l_max_ncdm[ncdm_id_];
 
@@ -336,14 +541,13 @@ double DNCDMSpecies::Delta(const perturb_vector* pv,
   const double a        = ppw->scalar_ctx.a;
   double rho_delta_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0             = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) *
-                            ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    const double q        = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon  = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
+    double w0             = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * dq_[iq];
+    const double q        = q_[iq];
+    const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
     rho_delta_ncdm       += q * q * epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
-  return rho_delta_ncdm * factor / pvecback[index_bg_rho_];
+  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
+  return rho_delta_ncdm * fac / pvecback[index_bg_rho_];
 }
 
 double DNCDMSpecies::Theta(const perturb_vector* pv,
@@ -356,14 +560,13 @@ double DNCDMSpecies::Theta(const perturb_vector* pv,
   const double a               = ppw->scalar_ctx.a;
   double rho_plus_p_theta_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0              = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) *
-                             ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    const double q         = ncdm_->q_ncdm_[ncdm_id_][iq];
+    double w0              = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * dq_[iq];
+    const double q         = q_[iq];
     rho_plus_p_theta_ncdm += q * q * q * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 1];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
-  const double k      = ppw->scalar_ctx.k;
-  return rho_plus_p_theta_ncdm * k * factor / (pvecback[index_bg_rho_] + pvecback[index_bg_p_]);
+  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
+  const double k   = ppw->scalar_ctx.k;
+  return rho_plus_p_theta_ncdm * k * fac / (pvecback[index_bg_rho_] + pvecback[index_bg_p_]);
 }
 
 double DNCDMSpecies::DeltaP(const perturb_vector* pv,
@@ -376,14 +579,13 @@ double DNCDMSpecies::DeltaP(const perturb_vector* pv,
   const double a      = ppw->scalar_ctx.a;
   double delta_p_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0             = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) *
-                            ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    const double q        = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon  = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
+    double w0             = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * dq_[iq];
+    const double q        = q_[iq];
+    const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
     delta_p_ncdm         += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
-  return delta_p_ncdm * factor / 3.;
+  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
+  return delta_p_ncdm * fac / 3.;
 }
 
 double DNCDMSpecies::RhoPlusPShear(const perturb_vector* pv,
@@ -396,12 +598,11 @@ double DNCDMSpecies::RhoPlusPShear(const perturb_vector* pv,
   const double a               = ppw->scalar_ctx.a;
   double rho_plus_p_shear_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0              = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) *
-                             ncdm_->decay_dr_map_.at(ncdm_id_).dq[iq];
-    const double q         = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon   = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
+    double w0              = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * dq_[iq];
+    const double q         = q_[iq];
+    const double epsilon   = std::sqrt(q * q + std::pow(M_ * a, 2));
     rho_plus_p_shear_ncdm += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 2];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
-  return 2.0 / 3.0 * factor * rho_plus_p_shear_ncdm;
+  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
+  return 2.0 / 3.0 * fac * rho_plus_p_shear_ncdm;
 }

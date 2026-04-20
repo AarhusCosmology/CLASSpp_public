@@ -9,9 +9,7 @@
 
 #include "background_module.h"
 #include "cosmology.h"
-#include "dark_radiation.h"
 #include "lensing_module.h"
-#include "non_cold_dark_matter.h"
 #include "nonlinear_module.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
@@ -217,18 +215,31 @@ void InputModule::ConstructSpecies() {
   if (pba->has_fld == _TRUE_) {
     all_species_["Fluid"] = std::make_unique<FluidSpecies>(*pba);
   }
-  if (pba->has_dcdm == _TRUE_ || pba->has_dr == _TRUE_) {
-    all_species_["DCDM_DR"] = std::make_unique<DCDM_DR_Species>(dr_, pba, nullptr);
+  if (pba->has_dcdm == _TRUE_) {
+    all_species_["DCDM_DR"] = std::make_unique<DCDM_DR_Species>(pba, nullptr);
   }
-  if (pba->has_ncdm == _TRUE_ && ncdm_ != nullptr) {
-    for (int n = 0; n < pba->N_ncdm; ++n) {
-      std::string name = "NCDM_" + std::to_string(n);
-      if (ncdm_->ncdm_types_[n] == NCDMType::decay_dr) {
-        all_species_[name] = std::make_unique<DNCDM_DR_Species>(n, ncdm_, pba, nullptr);
-      }
-      else {
-        all_species_[name] = std::make_unique<NCDMSpecies>(n, ncdm_, pba, nullptr);
-      }
+  if (pba->has_ncdm == _TRUE_) {
+    NcdmSettings ncdm_settings_for_species;
+    ncdm_settings_for_species.h           = pba->h;
+    ncdm_settings_for_species.T_cmb       = pba->T_cmb;
+    ncdm_settings_for_species.tol_ncdm    = precision_.tol_ncdm;
+    ncdm_settings_for_species.tol_ncdm_bg = precision_.tol_ncdm_bg;
+    ncdm_settings_for_species.tol_M_ncdm  = precision_.tol_M_ncdm;
+
+    // Build standard NCDM species
+    auto ncdm_list =
+        NCDMSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
+    for (auto& sp : ncdm_list) {
+      std::string name   = sp->name();
+      all_species_[name] = std::move(sp);
+    }
+
+    // Build decay_dr species
+    auto dncdm_vec =
+        DNCDMSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
+    for (auto& dncdm_sp : dncdm_vec) {
+      std::string name   = "NCDM_" + std::to_string(dncdm_sp->ncdm_id());
+      all_species_[name] = std::make_unique<DNCDM_DR_Species>(std::move(dncdm_sp), pba, nullptr);
     }
   }
   if (pba->has_scf == _TRUE_) {
@@ -1019,11 +1030,6 @@ int InputModule::input_read_parameters() {
     ppt->beta_idr = ppt->beta_idr_storage.data();
   }
 
-  // Initialize quantities for creating DR species
-  std::vector<SourceType> dr_sources;
-  std::vector<DRType> dr_types;
-  std::vector<double> dr_deg;
-
   /** - Omega_0_dcdmdr (DCDM) */
 
   class_call(parser_read_double(pfc, "Omega_dcdmdr", &param1, &flag1, errmsg), errmsg, errmsg);
@@ -1055,12 +1061,6 @@ int InputModule::input_read_parameters() {
     class_read_double("Gamma_dcdm", pba->Gamma_dcdm);
     /* Convert to Mpc */
     pba->Gamma_dcdm *= (1.e3 / _c_);
-
-    if (pba->Omega0_dcdmdr > 0) {
-      dr_sources.push_back(SourceType::dcdm);
-      dr_types.push_back(DRType::fermion);
-      dr_deg.push_back(1.);
-    }
   }
 
   /** - non-cold relics (ncdm) */
@@ -1070,139 +1070,21 @@ int InputModule::input_read_parameters() {
   ncdm_settings.tol_ncdm    = ppr->tol_ncdm;
   ncdm_settings.tol_ncdm_bg = ppr->tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = ppr->tol_M_ncdm;
-  ncdm_                     = NonColdDarkMatter::Create(pfc, ncdm_settings);
-  if (ncdm_ != nullptr) {
-    pba->N_ncdm = ncdm_->N_ncdm_;
-    for (int n_dncdm = 0; n_dncdm < ncdm_->N_ncdm_decay_dr_; n_dncdm++) {
-      dr_sources.push_back(SourceType::dncdm);
-      dr_types.push_back(DRType::fermion);
-    }
-    if (ncdm_->N_ncdm_decay_dr_ > 0) {
-      std::vector<double> Omega_dncdmdr_list, omega_dncdmdr_list, deg_list, Omega_ini_dncdm_list,
-          omega_ini_dncdm_list, Neff_ini_dncdm_list;
-      int flag4, flag5, flag6,
-          temp_size;  // temp_size will always be N_ncdm_decay_dr_, the sizes are checked elsewhere
-
-      ncdm_->Omega_dncdmdr_.resize(ncdm_->N_ncdm_decay_dr_);
-      class_call(readDoubleList(pfc, "Omega_dncdmdr", Omega_dncdmdr_list, &flag1, errmsg),
-                 errmsg,
-                 errmsg);
-      class_call(readDoubleList(pfc, "omega_dncdmdr", omega_dncdmdr_list, &flag2, errmsg),
-                 errmsg,
-                 errmsg);
-      class_call(readDoubleList(pfc, "deg_ncdm_decay_dr", deg_list, &flag3, errmsg),
-                 errmsg,
-                 errmsg);
-      class_call(readDoubleList(pfc, "Omega_ini_dncdm", Omega_ini_dncdm_list, &flag4, errmsg),
-                 errmsg,
-                 errmsg);
-      class_call(readDoubleList(pfc, "omega_ini_dncdm", omega_ini_dncdm_list, &flag5, errmsg),
-                 errmsg,
-                 errmsg);
-      class_call(readDoubleList(pfc, "Neff_ini_dncdm", Neff_ini_dncdm_list, &flag6, errmsg),
-                 errmsg,
-                 errmsg);
-
-      class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-                 errmsg,
-                 "In input file, you can only enter one of Omega_dncdmdr or omega_dncdmdr, choose "
-                 "one");
-      class_test(((flag3 == _TRUE_) && (flag4 == _TRUE_)),
-                 errmsg,
-                 "In input file, you can only enter one of deg_ncdm_decay_dr or Omega_ini_dncdm, "
-                 "choose one");
-
-      if (flag1 == _TRUE_) {
-        // Omega_dncdmdr read
-        for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
-          if (pba->has_curvature == _FALSE_) {
-            class_test((Omega_dncdmdr_list[n] > 1.0),
-                       errmsg,
-                       "Your input requires Omega_dncdmdr > 1 which is not allowed in a flat "
-                       "Universe. Either lower your input deg_ncdm_decay_dr, "
-                       "Omega_ini_ncdm_decay_dr, m_ncdm_decay_dr, increase Gamma_ncdm_decay_dr, or "
-                       "add positive curvature to allow this energy density.");
-          }
-          ncdm_->Omega_dncdmdr_[n] = Omega_dncdmdr_list[n];
-          ncdm_->SetOmega0(ncdm_->N_ncdm_standard_ + n, Omega_dncdmdr_list[n], pba->h);
-        }
-      }
-      else if (flag2 == _TRUE_) {
-        // omega_dncdmdr read
-        for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
-          ncdm_->Omega_dncdmdr_[n] = omega_dncdmdr_list[n] / pba->h / pba->h;
-          ncdm_->SetOmega0(ncdm_->N_ncdm_standard_ + n,
-                           omega_dncdmdr_list[n] / pba->h / pba->h,
-                           pba->h);
-        }
-      }
-      if (flag3 == _TRUE_) {
-        // deg_ncdm_decay_dr read
-        for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
-          // class_test((deg_list[n] > 25.0), errmsg, "You have either chosen an unphysically large degeneracy parameter for the decaying ncdm species, or your input mass and energy density require it to be too large for consistency");
-          ncdm_->SetDegAndFactor(ncdm_->N_ncdm_standard_ + n, deg_list[n], pba->T_cmb);
-        }
-      }
-      else if (flag4 == _TRUE_) {
-        // Omega_ini_dncdm read
-        double a_ini = ncdm_->GetIni(ppr->a_ini_over_a_today_default * pba->a_today,
-                                     pba->a_today,
-                                     ppr->tol_ncdm_initial_w);
-        double z_ini = 1.0 / a_ini - 1.0;
-        for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
-          ncdm_->SetDeg_from_Omega_ini(ncdm_->N_ncdm_standard_ + n,
-                                       z_ini,
-                                       pba->H0,
-                                       Omega_ini_dncdm_list[n],
-                                       pba->T_cmb);
-        }
-      }
-      else if (flag5 == _TRUE_) {
-        // omega_ini_dncdm read
-        double a_ini = ncdm_->GetIni(ppr->a_ini_over_a_today_default * pba->a_today,
-                                     pba->a_today,
-                                     ppr->tol_ncdm_initial_w);
-        double z_ini = 1.0 / a_ini - 1.0;
-        for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
-          ncdm_->SetDeg_from_Omega_ini(ncdm_->N_ncdm_standard_ + n,
-                                       z_ini,
-                                       pba->H0,
-                                       omega_ini_dncdm_list[n] / pba->h / pba->h,
-                                       pba->T_cmb);
-        }
-      }
-      else if (flag6 == _TRUE_) {
-        // Neff_ini_dncdm read
-        double a_ini = ncdm_->GetIni(ppr->a_ini_over_a_today_default * pba->a_today,
-                                     pba->a_today,
-                                     ppr->tol_ncdm_initial_w);
-        double z_ini = 1.0 / a_ini - 1.0;
-        for (int n = 0; n < ncdm_->N_ncdm_decay_dr_; n++) {
-          double Omega_ini_dncdm = Neff_ini_dncdm_list[n] * 7. / 8. * pow(4. / 11., 4. / 3.) *
-                                   pba->Omega0_g;
-          ncdm_->SetDeg_from_Omega_ini(ncdm_->N_ncdm_standard_ + n,
-                                       z_ini,
-                                       pba->H0,
-                                       Omega_ini_dncdm,
-                                       pba->T_cmb);
-        }
-      }
-    }
-
-    pba->Omega0_ncdm_tot = ncdm_->GetOmega0();
+  {
+    // Build NCDM species temporarily to get N_ncdm, Omega0_ncdm_tot, and DNCDM count
+    auto temp_ncdm       = NCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
+    auto temp_dncdm      = DNCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
+    pba->N_ncdm          = static_cast<int>(temp_ncdm.size() + temp_dncdm.size());
+    pba->N_decay_dr      = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + static_cast<int>(temp_dncdm.size());
+    pba->Omega0_ncdm_tot = 0.;
+    for (auto& sp : temp_ncdm)
+      pba->Omega0_ncdm_tot += sp->GetOmega0();
+    for (auto& sp : temp_dncdm)
+      pba->Omega0_ncdm_tot += sp->GetOmega0();
   }
 
   pba->l_max_idr  = ppr->l_max_idr;
   Omega_tot      += pba->Omega0_ncdm_tot;
-
-  /** - Dark radiation */
-  if (ncdm_) {
-    for (const auto& [ncdm_id, dncdm_properties] : ncdm_->decay_dr_map_) {
-      dr_deg.push_back(ncdm_->GetDeg(ncdm_id));
-    }
-  }
-  dr_             = DarkRadiation::Create(pfc, dr_sources, dr_types, dr_deg, pba->T_cmb);
-  pba->N_decay_dr = static_cast<int>(dr_sources.size());
 
   /** - Omega_0_k (effective fractional density of curvature) */
   class_read_double("Omega_k", pba->Omega0_k);
@@ -3123,7 +3005,9 @@ int InputModule::input_read_parameters() {
     pba->has_dr   = _TRUE_;
   }
 
-  if ((pba->has_ncdm) && (ncdm_ != nullptr) && (ncdm_->N_ncdm_decay_dr_ != 0.)) {
+  // N_decay_dr includes one entry for DCDM (if present) + one per DNCDM species
+  const int n_dncdm_dr = pba->N_decay_dr - (pba->Omega0_dcdmdr > 0 ? 1 : 0);
+  if (pba->has_ncdm && n_dncdm_dr > 0) {
     pba->has_ncdm_decay_dr = _TRUE_;
     pba->has_dr            = _TRUE_;
   }
@@ -3750,23 +3634,24 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
         BackgroundModulePtr bam = cosmology.GetBackgroundModule();
         const double* bg_today  = bam->background_table_.data() +
                                   (bam->bt_size_ - 1) * bam->bg_size_;
-        for (const auto& [ncdm_id, dncdm_properties] : bam->ncdm_->decay_dr_map_) {
-          auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
-          double rho_dr_today =
-              bg_today[dcdm_dr.dr().bg_rho_dr_species_index() + dncdm_properties.dr_id];
-          // Find the NCDM species with the matching ncdm_id
-          NCDMSpecies* ncdm_sp_dncdm = nullptr;
-          for (auto& [name, sp] : bam->all_species_) {
-            if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()); n && n->ncdm_id() == ncdm_id) {
-              ncdm_sp_dncdm = n;
-              break;
-            }
+        int dncdm_id            = 0;
+        for (auto& [key, sp] : bam->all_species_) {
+          auto* dncdm_dr_sp = dynamic_cast<DNCDM_DR_Species*>(sp.get());
+          if (!dncdm_dr_sp)
+            continue;
+          DNCDMSpecies* ncdm_sp_dncdm = &dncdm_dr_sp->dncdm();
+          double rho_dr_today         = dncdm_dr_sp->dr().Rho(bg_today);
+          double rho_dncdm_today      = ncdm_sp_dncdm->Rho(bg_today);
+
+          // Determine target Omega: target_values stores raw input, convert omega->Omega if needed
+          double Omega_target;
+          if ((pfzw->target_name[counter] == omega_dncdmdr) ||
+              (pfzw->target_name[counter] == omega_ini_dncdm)) {
+            Omega_target = pfzw->target_values[idx + dncdm_id] / ba.h / ba.h;
           }
-          if (ncdm_sp_dncdm == nullptr) {
-            throw std::runtime_error(
-                "Could not find NCDMSpecies with ncdm_id matching decay_dr_map entry");
+          else {
+            Omega_target = pfzw->target_values[idx + dncdm_id];
           }
-          double rho_dncdm_today = ncdm_sp_dncdm->Rho(bg_today);
 
           if (input_verbose > 0) {
             if ((pfzw->target_name[counter] == omega_dncdmdr) ||
@@ -3774,22 +3659,21 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
               printf(
                   " -> Shooting iteration: Omega_dncdmdr (input) = %g, Omega_dncdmdr (computed) =  "
                   "%g \n",
-                  bam->ncdm_->Omega_dncdmdr_[dncdm_properties.dncdm_id],
+                  Omega_target,
                   (rho_dr_today + rho_dncdm_today) / ba.H0 / ba.H0);
             }
             else {
               printf(
                   " -> Shooting iteration; deg_ncdm_decay_dr (input) = %g, Omega_dncdmdr "
                   "(computed) = %g,  Omega_dncdmdr (input) = %g \n",
-                  bam->ncdm_->GetDeg(ncdm_id),
+                  ncdm_sp_dncdm->GetDeg(),
                   (rho_dr_today + rho_dncdm_today) / ba.H0 / ba.H0,
-                  bam->ncdm_->Omega_dncdmdr_[dncdm_properties.dncdm_id]);
+                  Omega_target);
             }
           }
 
-          output[idx + dncdm_properties.dncdm_id] =
-              (rho_dr_today + rho_dncdm_today) / ba.H0 / ba.H0 -
-              bam->ncdm_->Omega_dncdmdr_[dncdm_properties.dncdm_id];
+          output[idx + dncdm_id] = (rho_dr_today + rho_dncdm_today) / ba.H0 / ba.H0 - Omega_target;
+          dncdm_id++;
         }
         break;
       }
@@ -3805,9 +3689,14 @@ int InputModule::input_get_guess(double* xguess,
                                  fzerofun_workspace* pfzw,
                                  ErrorMsg errmsg) {
   std::shared_ptr<InputModule> input_module = std::make_shared<InputModule>(pfzw->fc);
-  std::shared_ptr<NonColdDarkMatter> ncdm   = input_module->ncdm_;
   background& ba = input_module->background_; /* for cosmological background */
   precision& pr  = input_module->precision_;
+  // Collect DNCDM_DR species sorted by ncdm_id (= sorted map order since keys are "NCDM_N")
+  std::vector<DNCDM_DR_Species*> dncdm_dr_species;
+  for (auto& [key, sp] : input_module->all_species_) {
+    if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      dncdm_dr_species.push_back(ds);
+  }
   /** Summary: */
   /** - Here we should write reasonable guesses for the unknown parameters.
       Also estimate dxdy, i.e. how the unknown parameter responds to the known.
@@ -3894,39 +3783,37 @@ int InputModule::input_get_guess(double* xguess,
       case omega_dncdmdr:
       case Omega_dncdmdr: {
         // deg_ncdm_decay_dr unknown, make a guess
-        double a_ini = ncdm->GetIni(pr.a_ini_over_a_today_default * ba.a_today,
-                                    ba.a_today,
-                                    pr.tol_ncdm_initial_w);
+        double a_ini = pr.a_ini_over_a_today_default * ba.a_today;
+        for (auto& [key, sp] : input_module->all_species_) {
+          if (auto* nsp = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
+            a_ini = nsp->GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
+          else if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+            a_ini = ds->dncdm().GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
+        }
         double z_ini = 1.0 / a_ini - 1.0;
 
-        for (const auto& [ncdm_id, dncdm_properties] : ncdm->decay_dr_map_) {
-          const int index_guess_local = index_guess + dncdm_properties.dncdm_id;
-          double rho_deg1;
-          ncdm->background_ncdm_momenta_deg(ncdm_id,
-                                            1.0,
-                                            z_ini,
-                                            ba.T_cmb,
-                                            NULL,
-                                            &rho_deg1,
-                                            NULL,
-                                            NULL,
-                                            NULL);
-          double Omega_deg1            = rho_deg1 * pow(a_ini, 4.0) / ba.H0 / ba.H0;
+        for (int dncdm_id = 0; dncdm_id < static_cast<int>(dncdm_dr_species.size()); ++dncdm_id) {
+          const int index_guess_local = index_guess + dncdm_id;
+          DNCDMSpecies* dncdm_sp      = &dncdm_dr_species[dncdm_id]->dncdm();
+          double rho_actual;
+          dncdm_sp->ComputeMomenta(z_ini, nullptr, &rho_actual, nullptr, nullptr, nullptr);
+          double rho_deg1   = (dncdm_sp->GetDeg() > 0.) ? rho_actual / dncdm_sp->GetDeg() : 0.;
+          double Omega_deg1 = rho_deg1 * pow(a_ini, 4.0) / ba.H0 / ba.H0;
           double Omega0_dncdmdr_target = pfzw->target_values[index_guess_local];
           if (pfzw->target_name[counter] == omega_dncdmdr) {
             Omega0_dncdmdr_target = pfzw->target_values[index_guess_local] / ba.h / ba.h;
           }
           double Omega_ini = Omega0_dncdmdr_target;
 
-          if (dncdm_properties.Gamma / ba.H0 > 1.0) {
+          if (dncdm_sp->Gamma() / ba.H0 > 1.0) {
             // Approximately fully decayed at present
-            double a_nr         = 3.15 / ncdm->M_ncdm_[ncdm_id];
+            double a_nr         = 3.15 / dncdm_sp->M();
             double k_rad        = sqrt(2 * ba.H0 * sqrt(ba.Omega0_g + ba.Omega0_ur));
             double t_nr         = pow(a_nr / k_rad, 2.0);
-            double x            = dncdm_properties.Gamma * t_nr;
+            double x            = dncdm_sp->Gamma() * t_nr;
             double experfcsqrtx = (x < 20.) ? exp(x) * erfc(sqrt(x)) : 1. / sqrt(x * _PI_);
-            Omega_ini = sqrt(2.) * a_nr * sqrt(dncdm_properties.Gamma) * Omega0_dncdmdr_target /
-                        k_rad / (2 * sqrt(x) + sqrt(_PI_) * experfcsqrtx);
+            Omega_ini = sqrt(2.) * a_nr * sqrt(dncdm_sp->Gamma()) * Omega0_dncdmdr_target / k_rad /
+                        (2 * sqrt(x) + sqrt(_PI_) * experfcsqrtx);
           }
           xguess[index_guess_local] = Omega_ini / Omega_deg1;
           dxdy[index_guess_local] =
@@ -3940,25 +3827,26 @@ int InputModule::input_get_guess(double* xguess,
       case omega_ini_dncdm:
       case Omega_ini_dncdm: {
         // Omega_dncdmdr or omega_dncdmdr unknown, make a guess
-        for (const auto& [ncdm_id, dncdm_properties] : ncdm->decay_dr_map_) {
-          const int index_guess_local = index_guess + dncdm_properties.dncdm_id;
+        for (int dncdm_id = 0; dncdm_id < static_cast<int>(dncdm_dr_species.size()); ++dncdm_id) {
+          const int index_guess_local = index_guess + dncdm_id;
+          DNCDMSpecies* dncdm_sp      = &dncdm_dr_species[dncdm_id]->dncdm();
           // From analytical solution based on radiation domination, see XXXX.XXXX
           double Omega_or_omega_ini_dncdm_target = pfzw->target_values[index_guess_local];
           if (pfzw->target_name[counter] == deg_ncdm_decay_dr) {
-            double a_ini = ncdm->GetIni(pr.a_ini_over_a_today_default * ba.a_today,
-                                        ba.a_today,
-                                        pr.tol_ncdm_initial_w);
+            double a_ini = pr.a_ini_over_a_today_default * ba.a_today;
+            for (auto& [key, sp] : input_module->all_species_) {
+              if (auto* nsp = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
+                a_ini = nsp->GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
+              else if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+                a_ini = ds->dncdm().GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
+            }
             double z_ini = 1.0 / a_ini - 1.0;
-            double rho_dncdm;
-            ncdm->background_ncdm_momenta_deg(ncdm_id,
-                                              pfzw->target_values[index_guess_local],
-                                              z_ini,
-                                              ba.T_cmb,
-                                              NULL,
-                                              &rho_dncdm,
-                                              NULL,
-                                              NULL,
-                                              NULL);
+            double rho_actual;
+            dncdm_sp->ComputeMomenta(z_ini, nullptr, &rho_actual, nullptr, nullptr, nullptr);
+            double rho_dncdm = (dncdm_sp->GetDeg() > 0.)
+                                   ? rho_actual * pfzw->target_values[index_guess_local] /
+                                         dncdm_sp->GetDeg()
+                                   : 0.;
             Omega_or_omega_ini_dncdm_target = rho_dncdm * pow(a_ini, 4.) / ba.H0 / ba.H0;
           }
           else if (pfzw->target_name[counter] == Neff_ini_dncdm) {
@@ -3966,16 +3854,16 @@ int InputModule::input_get_guess(double* xguess,
                                               pow(4. / 11., 4. / 3.) * ba.Omega0_g;
           }
           double Omega_or_omega_dncdmdr = Omega_or_omega_ini_dncdm_target;
-          if (dncdm_properties.Gamma / ba.H0 > 1.0) {
+          if (dncdm_sp->Gamma() / ba.H0 > 1.0) {
             // Approximately fully decayed at present
-            double a_nr            = 3.15 / ncdm->M_ncdm_[ncdm_id];
+            double a_nr            = 3.15 / dncdm_sp->M();
             double k_rad           = sqrt(2 * ba.H0 * sqrt(ba.Omega0_g + ba.Omega0_ur));
             double t_nr            = pow(a_nr / k_rad, 2.0);
-            double x               = dncdm_properties.Gamma * t_nr;
+            double x               = dncdm_sp->Gamma() * t_nr;
             double experfcsqrtx    = (x < 20.) ? exp(x) * erfc(sqrt(x)) : 1. / sqrt(x * _PI_);
             Omega_or_omega_dncdmdr = (k_rad * Omega_or_omega_ini_dncdm_target *
                                       (2 * sqrt(x) + sqrt(_PI_) * experfcsqrtx)) /
-                                     (sqrt(2.) * a_nr * sqrt(dncdm_properties.Gamma));
+                                     (sqrt(2.) * a_nr * sqrt(dncdm_sp->Gamma()));
           }
           xguess[index_guess_local] = Omega_or_omega_dncdmdr;
           dxdy[index_guess_local] =

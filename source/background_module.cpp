@@ -90,8 +90,24 @@
 #include "../species/ncdm_species.h"
 #include "../species/scalar_field.h"
 #include "background_column_writer.h"
-#include "dark_radiation.h"
-#include "non_cold_dark_matter.h"
+
+/**
+ * Return all NCDMBaseSpecies pointers from all_species_ in deterministic order.
+ * For DNCDM_DR_Species composites, returns the wrapped DNCDMSpecies.
+ * Since all_species_ is a std::map (sorted by key), "NCDM_0" < "NCDM_1" < ...
+ * so the order is automatically deterministic.
+ */
+static std::vector<NCDMBaseSpecies*> GetNcdmSpecies(
+    const std::map<std::string, std::unique_ptr<BaseSpecies>>& all_species) {
+  std::vector<NCDMBaseSpecies*> result;
+  for (auto& [key, sp] : all_species) {
+    if (auto* ncdm = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
+      result.push_back(ncdm);
+    else if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      result.push_back(&dncdm_dr->dncdm());
+  }
+  return result;
+}
 
 BackgroundModule::BackgroundModule(InputModulePtr input_module) : BaseModule(input_module) {
   background_init();
@@ -583,8 +599,10 @@ int BackgroundModule::background_init() {
 
       /* contribution of ncdm species to N_eff*/
       if (pba->N_ncdm > 0) {
-        Neff += ncdm_->GetNeff(0.);
-        ncdm_->PrintNeffInfo();
+        for (auto* sp : GetNcdmSpecies(all_species_)) {
+          Neff += sp->GetNeff(0.);
+          sp->PrintNeffInfo();
+        }
       }
 
       /* contribution of interacting dark radiation _idr to N_eff */
@@ -621,7 +639,8 @@ int BackgroundModule::background_init() {
      masses in eV and about the ratio [m/omega_ncdm] in eV (the usual
      93 point something)*/
   if ((pba->background_verbose > 0) && (pba->N_ncdm > 0)) {
-    ncdm_->PrintMassInfo();
+    for (auto* sp : GetNcdmSpecies(all_species_))
+      sp->PrintMassInfo();
   }
 
   /* check other quantities which would lead to segmentation fault if zero */
@@ -748,6 +767,20 @@ int BackgroundModule::background_indices() {
       ncdm->RegisterBackgroundIndices(index_bg);
     if (!ncdm_vec.empty())
       index_bg_pseudo_p_ncdm1_ = ncdm_vec[0]->bg_pseudo_p_index();
+  }
+
+  // ── DNCDM_DR composites (optional, sorted by ncdm_id) ───────────────────
+  {
+    std::vector<DNCDM_DR_Species*> dncdm_vec;
+    for (auto& [name, sp] : all_species_) {
+      if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+        dncdm_vec.push_back(d);
+    }
+    std::sort(dncdm_vec.begin(), dncdm_vec.end(), [](DNCDM_DR_Species* a, DNCDM_DR_Species* b) {
+      return a->dncdm().ncdm_id() < b->dncdm().ncdm_id();
+    });
+    for (auto* d : dncdm_vec)
+      d->RegisterBackgroundIndices(index_bg);
   }
 
   // ── DCDM_DR composite (optional) ─────────────────────────────────────────
@@ -1056,13 +1089,15 @@ int BackgroundModule::background_solve() {
   /* -> conformal age in Mpc */
   conformal_age_ = pvecback_integration[index_bi_tau_];
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
+  Omega0_dr_ = 0.;
   if (all_species_.count("DCDM_DR")) {
-    Omega0_dcdm_    = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
-    double rho_temp = 0.;
-    for (double rho_species : dr_->rho_species_) {
-      rho_temp += rho_species;
-    }
-    Omega0_dr_ = rho_temp / pba->H0 / pba->H0;
+    Omega0_dcdm_  = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
+    auto& dcdm_dr = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+    Omega0_dr_ += pvecback_integration[dcdm_dr.dr().bi_rho_dr_species_index()] / pba->H0 / pba->H0;
+  }
+  for (auto& [key, sp] : all_species_) {
+    if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      Omega0_dr_ += pvecback_integration[dncdm_dr->dr().bi_rho_index()] / pba->H0 / pba->H0;
   }
 
   /** - allocate background tables */
@@ -1281,13 +1316,15 @@ int BackgroundModule::background_solve_evolver() {
   /* -> conformal age in Mpc. Remember that tau is stored at index_bi_a now */
   conformal_age_ = pvecback_integration[index_bi_a_];
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
+  Omega0_dr_ = 0.;
   if (all_species_.count("DCDM_DR")) {
-    Omega0_dcdm_    = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
-    double rho_temp = 0.;
-    for (double rho_species : dr_->rho_species_) {
-      rho_temp += rho_species;
-    }
-    Omega0_dr_ = rho_temp / pba->H0 / pba->H0;
+    Omega0_dcdm_  = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
+    auto& dcdm_dr = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+    Omega0_dr_ += pvecback_integration[dcdm_dr.dr().bi_rho_dr_species_index()] / pba->H0 / pba->H0;
+  }
+  for (auto& [key, sp] : all_species_) {
+    if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      Omega0_dr_ += pvecback_integration[dncdm_dr->dr().bi_rho_index()] / pba->H0 / pba->H0;
   }
 
   /** Recover some quantities today */
@@ -1438,7 +1475,8 @@ int BackgroundModule::background_initial_conditions(
   */
 
   if (pba->N_ncdm > 0) {
-    a = ncdm_->GetIni(a, pba->a_today, ppr->tol_ncdm_initial_w);
+    for (auto* sp : GetNcdmSpecies(all_species_))
+      a = sp->GetIni(a, pba->a_today, ppr->tol_ncdm_initial_w);
   }
 
   pvecback_integration[index_bi_a_] = a;
@@ -1975,8 +2013,10 @@ int BackgroundModule::background_output_budget() {
       printf(" ---> Massive Neutrino Species \n");
     }
     if (pba->N_ncdm > 0) {
-      ncdm_->PrintOmegaInfo();
-      budget_neutrino += ncdm_->GetOmega0();
+      for (auto* sp : GetNcdmSpecies(all_species_)) {
+        sp->PrintOmegaInfo();
+        budget_neutrino += sp->GetOmega0();
+      }
     }
 
     if (all_species_.count("Lambda") || all_species_.count("Fluid") ||
@@ -2139,4 +2179,20 @@ int BackgroundModule::background_print_variables(
   //fprintf(fid, "%.3e %.3e %.3e %.3e %.3e %.3e\n", exp(loga), tau, pvecback[bm.index_bg_rho_ncdm1_], pvecback[bm.index_bg_rho_dr_species_], y[bm.index_bi_rho_dr_species_], pvecback[bm.index_bg_lnf_ncdm_decay_dr1_ + 2]);
   //fclose(fid);
   return _SUCCESS_;
+}
+
+double BackgroundModule::GetNcdmDeg(int n) const {
+  return GetNcdmSpecies(all_species_).at(n)->GetDeg();
+}
+
+double BackgroundModule::GetNcdmMassInEV(int n) const {
+  return GetNcdmSpecies(all_species_).at(n)->GetMassInElectronvolt();
+}
+
+int BackgroundModule::GetNcdmQSize(int n) const {
+  return GetNcdmSpecies(all_species_).at(n)->q_size();
+}
+
+double BackgroundModule::GetNcdmQ(int n, int q_id) const {
+  return GetNcdmSpecies(all_species_).at(n)->q()[q_id];
 }

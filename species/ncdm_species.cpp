@@ -6,6 +6,52 @@
 #include "background_module.h"
 #include "perturbations_module.h"
 
+// ── Constructor ─────────────────────────────────────────────────────────────
+
+NCDMSpecies::NCDMSpecies(FileContent* pfc,
+                         int species_index,
+                         const NcdmSettings& settings,
+                         const background* pba,
+                         const BackgroundModule* bgm)
+    : NCDMBaseSpecies("NCDM_" + std::to_string(species_index),
+                      EnergyType::Other,
+                      pfc,
+                      species_index,
+                      settings),
+      ncdm_id_(species_index), pba_(pba) {
+  bgm_ = bgm;  // bgm_ is protected in NCDMBaseSpecies
+}
+
+// ── CreateAll factory ───────────────────────────────────────────────────────
+
+std::vector<std::unique_ptr<NCDMSpecies>> NCDMSpecies::CreateAll(FileContent* pfc,
+                                                                 const NcdmSettings& settings,
+                                                                 const background* pba,
+                                                                 const BackgroundModule* bgm) {
+  std::vector<std::unique_ptr<NCDMSpecies>> result;
+  char errmsg[2048];
+  int int1, int2, flag1, flag2;
+
+  class_call(parser_read_int(pfc, "N_ncdm_standard", &int1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
+
+  if (flag1 == _TRUE_ && flag2 == _TRUE_) {
+    throw std::invalid_argument(
+        "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
+  }
+
+  int N_ncdm_standard = 0;
+  if (flag1 == _TRUE_)
+    N_ncdm_standard = int1;
+  else if (flag2 == _TRUE_)
+    N_ncdm_standard = int2;
+
+  for (int n = 0; n < N_ncdm_standard; ++n) {
+    result.push_back(std::make_unique<NCDMSpecies>(pfc, n, settings, pba, bgm));
+  }
+  return result;
+}
+
 // ── Background ─────────────────────────────────────────────────────────────
 
 void NCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
@@ -20,18 +66,10 @@ void NCDMSpecies::RegisterIntegrationIndices(int& /*index_bi*/) {
 }
 
 void NCDMSpecies::ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) {
-  if (!ncdm_)
-    return;
   double z = 1. / a_rel - 1.;
 
   double number_ncdm, rho_ncdm, p_ncdm, pseudo_p_ncdm;
-  ncdm_->background_ncdm_momenta(ncdm_id_,
-                                 z,
-                                 &number_ncdm,
-                                 &rho_ncdm,
-                                 &p_ncdm,
-                                 nullptr,
-                                 &pseudo_p_ncdm);
+  ComputeMomenta(z, &number_ncdm, &rho_ncdm, &p_ncdm, nullptr, &pseudo_p_ncdm);
   pvecback[index_bg_number_]   = number_ncdm;
   pvecback[index_bg_rho_]      = rho_ncdm;
   pvecback[index_bg_p_]        = p_ncdm;
@@ -108,7 +146,7 @@ void NCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,
                                               int& index_pt,
                                               const perturb_workspace* ppw,
                                               int /*gauge*/) {
-  if (!pba_->has_ncdm || !ncdm_)
+  if (!pba_->has_ncdm)
     return;
 
   if (ncdm_id_ == 0) {
@@ -124,7 +162,7 @@ void NCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,
   }
   else {
     pv->l_max_ncdm[ncdm_id_]  = ppr->l_max_ncdm;
-    pv->q_size_ncdm[ncdm_id_] = ncdm_->q_size_ncdm_[ncdm_id_];
+    pv->q_size_ncdm[ncdm_id_] = q_size();
   }
   pv->index_ncdm_[ncdm_id_].clear();
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq)
@@ -136,7 +174,7 @@ void NCDMSpecies::PerturbDerivs(double tau,
                                 const double* y,
                                 double* dy,
                                 const perturb_parameters_and_workspace& ppaw) {
-  if (!pba_->has_ncdm || !ncdm_)
+  if (!pba_->has_ncdm)
     return;
 
   const perturb_workspace* ppw    = ppaw.ppw;
@@ -181,10 +219,10 @@ void NCDMSpecies::PerturbDerivs(double tau,
   }
   else {
     // Exact Boltzmann hierarchy per momentum bin
-    const double M_ncdm = ncdm_->M_ncdm_[ncdm_id_];
+    const double M_ncdm = M_;
     for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-      const double q          = ncdm_->q_ncdm_[ncdm_id_][iq];
-      const double dlnf0_dlnq = ncdm_->dlnf0_dlnq_ncdm_[ncdm_id_][iq];
+      const double q          = q_[iq];
+      const double dlnf0_dlnq = dlnf0_dlnq_[iq];
 
       const double epsilon        = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
       const double qk_div_epsilon = k * q / epsilon;
@@ -212,14 +250,13 @@ void NCDMSpecies::PerturbDerivs(double tau,
 
 void NCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
   perturb_vector* pv = ctx.ppw->pv;
-  if (!pba_->has_ncdm || !ncdm_ || pv->index_ncdm_.at(ncdm_id_).empty())
+  if (!pba_->has_ncdm || pv->index_ncdm_.at(ncdm_id_).empty())
     return;
   for (int index_q = 0; index_q < pv->q_size_ncdm[ncdm_id_]; ++index_q) {
     const int idx           = pv->index_ncdm_[ncdm_id_][index_q];
-    const double q          = ncdm_->q_ncdm_[ncdm_id_][index_q];
-    const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * ncdm_->M_ncdm_[ncdm_id_] *
-                                                    ncdm_->M_ncdm_[ncdm_id_]);
-    const double dlnf0_dlnq = ncdm_->dlnf0_dlnq_ncdm_[ncdm_id_][index_q];
+    const double q          = q_[index_q];
+    const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * M_ * M_);
+    const double dlnf0_dlnq = dlnf0_dlnq_[index_q];
     const int lmax          = pv->l_max_ncdm[ncdm_id_];
 
     y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;
@@ -343,12 +380,12 @@ double NCDMSpecies::Delta(const perturb_vector* pv,
   const double a        = ppw->scalar_ctx.a;
   double rho_delta_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    const double w0       = ncdm_->w_ncdm_[ncdm_id_][iq];
-    const double q        = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon  = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
+    const double w0       = w_[iq];
+    const double q        = q_[iq];
+    const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
     rho_delta_ncdm       += q * q * epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
+  const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   return rho_delta_ncdm * factor / pvecback[index_bg_rho_];
 }
 
@@ -366,11 +403,11 @@ double NCDMSpecies::Theta(const perturb_vector* pv,
   const double a               = ppw->scalar_ctx.a;
   double rho_plus_p_theta_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    const double w0        = ncdm_->w_ncdm_[ncdm_id_][iq];
-    const double q         = ncdm_->q_ncdm_[ncdm_id_][iq];
+    const double w0        = w_[iq];
+    const double q         = q_[iq];
     rho_plus_p_theta_ncdm += q * q * q * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 1];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
+  const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   const double k      = ppw->scalar_ctx.k;
   return rho_plus_p_theta_ncdm * k * factor / (pvecback[index_bg_rho_] + pvecback[index_bg_p_]);
 }
@@ -397,12 +434,12 @@ double NCDMSpecies::DeltaP(const perturb_vector* pv,
   const double a      = ppw->scalar_ctx.a;
   double delta_p_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    const double w0       = ncdm_->w_ncdm_[ncdm_id_][iq];
-    const double q        = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon  = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
+    const double w0       = w_[iq];
+    const double q        = q_[iq];
+    const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
     delta_p_ncdm         += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
+  const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   return delta_p_ncdm * factor / 3.;
 }
 
@@ -421,11 +458,11 @@ double NCDMSpecies::RhoPlusPShear(const perturb_vector* pv,
   const double a               = ppw->scalar_ctx.a;
   double rho_plus_p_shear_ncdm = 0.0;
   for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    const double w0        = ncdm_->w_ncdm_[ncdm_id_][iq];
-    const double q         = ncdm_->q_ncdm_[ncdm_id_][iq];
-    const double epsilon   = std::sqrt(q * q + std::pow(ncdm_->M_ncdm_[ncdm_id_] * a, 2));
+    const double w0        = w_[iq];
+    const double q         = q_[iq];
+    const double epsilon   = std::sqrt(q * q + std::pow(M_ * a, 2));
     rho_plus_p_shear_ncdm += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 2];
   }
-  const double factor = ncdm_->factor_ncdm_[ncdm_id_] * std::pow(pba_->a_today / a, 4);
+  const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   return 2.0 / 3.0 * factor * rho_plus_p_shear_ncdm;
 }

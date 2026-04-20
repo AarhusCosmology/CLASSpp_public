@@ -1,8 +1,12 @@
 #pragma once
+#include <memory>
+#include <vector>
+
 #include "background.h"
 #include "composite_species.h"
 #include "dncdm_decay_radiation_species.h"
 #include "dncdm_species.h"
+#include "parser.h"
 
 class BackgroundModule;
 
@@ -11,10 +15,15 @@ class BackgroundModule;
  */
 class DNCDM_DR_Species : public CompositeSpecies {
  public:
-  DNCDM_DR_Species(int ncdm_id,
-                   std::shared_ptr<NonColdDarkMatter> ncdm,
+  // Takes ownership of a pre-built DNCDMSpecies (from DNCDMSpecies::CreateAll)
+  DNCDM_DR_Species(std::unique_ptr<DNCDMSpecies> dncdm,
                    const background* pba,
                    const BackgroundModule* bgm);
+
+  static std::vector<std::unique_ptr<DNCDM_DR_Species>> CreateAll(FileContent* pfc,
+                                                                  const NcdmSettings& settings,
+                                                                  const background* pba,
+                                                                  const BackgroundModule* bgm);
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;

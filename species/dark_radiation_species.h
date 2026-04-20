@@ -2,25 +2,21 @@
 #include <memory>
 
 #include "../species/base_species.h"
-#include "../tools/dark_radiation.h"
 #include "background.h"
+#include "parser.h"
 #include "perturbations.h"
 
 class BackgroundModule;
 class DCDMSpecies;
 
 /**
- * Dark Radiation (from DCDM decay and/or decaying NCDM).
+ * Dark Radiation (from DCDM decay).
  * rho_dr stored per decay-channel in the ODE integration vector; total also stored.
  */
 class DarkRadiationSpecies : public BaseSpecies {
  public:
-  DarkRadiationSpecies(std::shared_ptr<DarkRadiation> dr,
-                       const background* pba,
-                       const BackgroundModule* bgm,
-                       const DCDMSpecies* dcdm = nullptr)
-      : BaseSpecies("DR", EnergyType::Radiation), dr_(std::move(dr)), pba_(pba), bgm_(bgm),
-        dcdm_(dcdm) {}
+  DarkRadiationSpecies(const DCDMSpecies* dcdm, const background* pba, const BackgroundModule* bgm)
+      : BaseSpecies("DR", EnergyType::Radiation), pba_(pba), bgm_(bgm), dcdm_(dcdm) {}
 
   bool IsFreestreaming() const override {
     return true;
@@ -91,19 +87,21 @@ class DarkRadiationSpecies : public BaseSpecies {
   int bi_rho_dr_species_index() const {
     return index_bi_rho_dr_species_;
   }
+  int pt_F0_index() const {
+    return index_pt_F0_dr_species_;
+  }
 
  private:
-  std::shared_ptr<DarkRadiation> dr_;
   const background* pba_;
   const BackgroundModule* bgm_;
-  const DCDMSpecies* dcdm_ = nullptr;  // optional: set when created inside DCDM_DR_Species
+  const DCDMSpecies* dcdm_ = nullptr;
 
   // Background indices (per-channel, then total)
-  int index_bg_rho_dr_species_ = -1;  // first of N_decay_dr contiguous slots
+  int index_bg_rho_dr_species_ = -1;
 
   // Integration indices
-  int index_bi_rho_dr_species_ = -1;  // first of N_decay_dr ODE slots
+  int index_bi_rho_dr_species_ = -1;
 
   // Perturbation indices
-  int index_pt_F0_dr_species_ = -1;  // per-species multipoles (N_decay_dr*(l_max_dr+1))
+  int index_pt_F0_dr_species_ = -1;
 };

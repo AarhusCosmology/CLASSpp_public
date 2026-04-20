@@ -18,9 +18,7 @@ class BackgroundModule;
  */
 class DCDM_DR_Species : public CompositeSpecies {
  public:
-  DCDM_DR_Species(std::shared_ptr<DarkRadiation> dr,
-                  const background* pba,
-                  const BackgroundModule* bgm);
+  DCDM_DR_Species(const background* pba, const BackgroundModule* bgm);
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;

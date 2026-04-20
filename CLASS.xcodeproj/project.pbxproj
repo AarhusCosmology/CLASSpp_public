@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		20FFA740259B1876003CAF13 /* dark_radiation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 20FFA73E259B1876003CAF13 /* dark_radiation.cpp */; };
 		AF1078DF241D1F3B00A369F7 /* history.c in Sources */ = {isa = PBXBuildFile; fileRef = AF1078D0241D1F3B00A369F7 /* history.c */; };
 		AF1078E0241D1F3B00A369F7 /* hyrectools.c in Sources */ = {isa = PBXBuildFile; fileRef = AF1078D3241D1F3B00A369F7 /* hyrectools.c */; };
 		AF1078E3241D1F3B00A369F7 /* helium.c in Sources */ = {isa = PBXBuildFile; fileRef = AF1078D8241D1F3B00A369F7 /* helium.c */; };
@@ -37,7 +36,6 @@
 		AFDC68BF240D9F6B0044B5A3 /* trigonometric_integrals.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.cpp */; };
 		AFDC68C2240D9FB80044B5A3 /* class.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68C1240D9FB80044B5A3 /* class.cpp */; };
 		AFDE3E01242DF6290061A4DE /* output_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDE3E00242DF6290061A4DE /* output_module.cpp */; };
-		AFEAF07E2449CC6400A3F4A2 /* non_cold_dark_matter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */; };
 		CC000011000000000000001B /* baryons.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000010000000000000001A /* baryons.cpp */; };
 		CC000013000000000000001D /* cdm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000012000000000000001C /* cdm.cpp */; };
 		CC000015000000000000001F /* dark_radiation_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC000014000000000000001E /* dark_radiation_species.cpp */; };
@@ -71,8 +69,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		20FFA73E259B1876003CAF13 /* dark_radiation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dark_radiation.cpp; sourceTree = "<group>"; };
-		20FFA73F259B1876003CAF13 /* dark_radiation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = dark_radiation.h; sourceTree = "<group>"; };
 		AF1078D0241D1F3B00A369F7 /* history.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = history.c; sourceTree = "<group>"; };
 		AF1078D2241D1F3B00A369F7 /* helium.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = helium.h; sourceTree = "<group>"; };
 		AF1078D3241D1F3B00A369F7 /* hyrectools.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = hyrectools.c; sourceTree = "<group>"; };
@@ -150,8 +146,6 @@
 		AFDE3E00242DF6290061A4DE /* output_module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = output_module.cpp; sourceTree = "<group>"; };
 		AFDE3E02242E244F0061A4DE /* lensing_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lensing_module.h; sourceTree = "<group>"; };
 		AFDE3E0324309C5D0061A4DE /* spectra_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = spectra_module.h; sourceTree = "<group>"; };
-		AFEAF07C2449CC6300A3F4A2 /* non_cold_dark_matter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = non_cold_dark_matter.h; sourceTree = "<group>"; };
-		AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = non_cold_dark_matter.cpp; sourceTree = "<group>"; };
 		AFF6F6B5243F3F8700BEF31A /* thermodynamics_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = thermodynamics_module.h; sourceTree = "<group>"; };
 		AFF6F6B6244742C300BEF31A /* background_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = background_module.h; sourceTree = "<group>"; };
 		CC000001000000000000001A /* base_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = base_species.h; sourceTree = "<group>"; };
@@ -308,10 +302,6 @@
 				AFDC68B2240D9F6B0044B5A3 /* hermite4_interpolation_csource.h */,
 				AFDC68A9240D9F6B0044B5A3 /* hermite6_interpolation_csource.h */,
 				AFDC68AA240D9F6B0044B5A3 /* hyperspherical.cpp */,
-				AFEAF07D2449CC6300A3F4A2 /* non_cold_dark_matter.cpp */,
-				AFEAF07C2449CC6300A3F4A2 /* non_cold_dark_matter.h */,
-				20FFA73E259B1876003CAF13 /* dark_radiation.cpp */,
-				20FFA73F259B1876003CAF13 /* dark_radiation.h */,
 				AFDC68B3240D9F6B0044B5A3 /* parser.cpp */,
 				AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */,
 				AFDC68AB240D9F6B0044B5A3 /* sparse.cpp */,
@@ -471,7 +461,6 @@
 				AFDC68BE240D9F6B0044B5A3 /* parser.cpp in Sources */,
 				AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.cpp in Sources */,
 				AFDC68BD240D9F6B0044B5A3 /* evolver_ndf15.cpp in Sources */,
-				20FFA740259B1876003CAF13 /* dark_radiation.cpp in Sources */,
 				AF1078E3241D1F3B00A369F7 /* helium.c in Sources */,
 				AF1078E4241D1F3B00A369F7 /* hydrogen.c in Sources */,
 				AFDC68B9240D9F6B0044B5A3 /* dei_rkck.cpp in Sources */,
@@ -490,7 +479,6 @@
 				AFDE3E01242DF6290061A4DE /* output_module.cpp in Sources */,
 				AFDC68B7240D9F6B0044B5A3 /* hyperspherical.cpp in Sources */,
 				AFDC68B8240D9F6B0044B5A3 /* sparse.cpp in Sources */,
-				AFEAF07E2449CC6400A3F4A2 /* non_cold_dark_matter.cpp in Sources */,
 				AF14AFE924337B11005D2DE9 /* cosmology.cpp in Sources */,
 				AFDC68A4240D9F500044B5A3 /* background_module.cpp in Sources */,
 				CC000011000000000000001B /* baryons.cpp in Sources */,

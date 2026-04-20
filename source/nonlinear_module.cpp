@@ -16,7 +16,6 @@
 #include "../species/ncdm_species.h"
 #include "background_module.h"
 #include "cosmology.h"
-#include "non_cold_dark_matter.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
 #include "thermodynamics_module.h"
@@ -1010,7 +1009,7 @@ int NonlinearModule::nonlinear_init() {
         auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
         if (!ncdm_sp)
           continue;
-        double m_ncdm_in_electronvolt = ncdm_->GetMassInElectronvolt(ncdm_sp->ncdm_id());
+        double m_ncdm_in_electronvolt = ncdm_sp->GetMassInElectronvolt();
         if (m_ncdm_in_electronvolt > _M_EV_TOO_BIG_FOR_HALOFIT_)
           fprintf(stdout,
                   "Warning: Halofit and HMcode are proved to work for CDM, and also with a small "

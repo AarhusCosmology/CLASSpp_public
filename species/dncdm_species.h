@@ -1,8 +1,9 @@
 #pragma once
 #include <memory>
+#include <tuple>
+#include <vector>
 
-#include "../species/base_species.h"
-#include "../tools/non_cold_dark_matter.h"
+#include "../species/ncdm_base_species.h"
 #include "background.h"
 #include "perturbations.h"
 
@@ -11,21 +12,26 @@ class BackgroundColumnWriter;
 
 /**
  * Decaying Non-Cold Dark Matter (DNCDM).
- * Handles the background and perturbation evolution for a decaying NCDM species.
+ * Inherits NCDMBaseSpecies; owns per-species quadrature, distribution function,
+ * Gamma decay rate, and dq volume elements absorbed from DecayDRProperties.
  */
-class DNCDMSpecies : public BaseSpecies {
+class DNCDMSpecies : public NCDMBaseSpecies {
  public:
-  DNCDMSpecies(int ncdm_id,
-               std::shared_ptr<NonColdDarkMatter> ncdm,
+  // ncdm_index:  overall NCDM index (position in N_ncdm list)
+  // dncdm_index: 0-based index among decay_dr species only
+  DNCDMSpecies(FileContent* pfc,
+               int ncdm_index,
+               int dncdm_index,
+               const NcdmSettings& settings,
                const background* pba,
-               const BackgroundModule* bgm)
-      : BaseSpecies("DNCDM_" + std::to_string(ncdm_id), EnergyType::Other), ncdm_id_(ncdm_id),
-        ncdm_(std::move(ncdm)), pba_(pba), bgm_(bgm) {}
+               const BackgroundModule* bgm);
+
+  static std::vector<std::unique_ptr<DNCDMSpecies>> CreateAll(FileContent* pfc,
+                                                              const NcdmSettings& settings,
+                                                              const background* pba,
+                                                              const BackgroundModule* bgm);
 
   // ── Background ──────────────────────────────────────────────────────────
-  void SetBackgroundModule(const BackgroundModule* bgm) override {
-    bgm_ = bgm;
-  }
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
   void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
@@ -77,11 +83,9 @@ class DNCDMSpecies : public BaseSpecies {
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
+  // ── Accessors for DNCDM_DR_Species coupling ───────────────────────────────
   int ncdm_id() const {
     return ncdm_id_;
-  }
-  const NonColdDarkMatter& ncdm() const {
-    return *ncdm_;
   }
   int bg_number_index() const {
     return index_bg_number_;
@@ -98,7 +102,6 @@ class DNCDMSpecies : public BaseSpecies {
   int bg_dlnfdlnq_sep_index() const {
     return index_bg_dlnfdlnq_sep_;
   }
-
   int bi_lnf_index() const {
     return index_bi_lnf_decay_dr1_;
   }
@@ -106,21 +109,38 @@ class DNCDMSpecies : public BaseSpecies {
     return index_bi_dlnfdlnq_separate_decay_;
   }
 
- private:
-  int ncdm_id_;
-  std::shared_ptr<NonColdDarkMatter> ncdm_;
-  const background* pba_;
-  const BackgroundModule* bgm_;
+  double Gamma() const {
+    return Gamma_;
+  }
+  const std::vector<double>& dq() const {
+    return dq_;
+  }
+  double GetMass() const {
+    return M_;
+  }
+  const std::vector<double>& GetQ() const {
+    return q_;
+  }
 
-  // Background indices (single slot each)
+  // Override GetRescaledParameters to use dq_ (not standard w_ weights)
+  std::tuple<double, double> GetRescaledParameters(double a,
+                                                   const double* lnf_array) const override;
+
+ private:
+  int ncdm_id_;  // overall NCDM index
+  const background* pba_;
+
+  // Absorbed from DecayDRProperties
+  double Gamma_ = 0.;
+  std::vector<double> dq_;
+
+  // Background indices
   int index_bg_number_   = -1;
   int index_bg_pseudo_p_ = -1;
 
-  // Integration indices for decaying NCDM distribution function
   int index_bi_lnf_decay_dr1_           = -1;
   int index_bi_dlnfdlnq_separate_decay_ = -1;
 
-  // Background indices for decay-dr lnf/dlnfdlnq slots
   int index_bg_lnf_decay_dr1_  = -1;
   int index_bg_dlnfdlnq_decay_ = -1;
   int index_bg_dlnfdlnq_sep_   = -1;

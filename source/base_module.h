@@ -25,8 +25,7 @@ class NCDMSpecies;
 class BaseModule {
  public:
   BaseModule(InputModulePtr input_module)
-      : ncdm_(input_module->ncdm_), dr_(input_module->dr_),
-        all_species_(input_module->all_species_), ppr(&input_module->precision_),
+      : all_species_(input_module->all_species_), ppr(&input_module->precision_),
         pba(&input_module->background_), pth(&input_module->thermodynamics_),
         ppt(&input_module->perturbations_), ppm(&input_module->primordial_),
         pnl(&input_module->nonlinear_), ptr(&input_module->transfers_),
@@ -39,9 +38,6 @@ class BaseModule {
   mutable ErrorMsg error_message_;
 
  public:
-  const std::shared_ptr<NonColdDarkMatter> ncdm_;
-  const std::shared_ptr<DarkRadiation> dr_;
-
   /** Const map of all cosmological species, keyed by name.
    *  Use .at("CDM") -- never operator[] -- to preserve const safety. */
   const std::map<std::string, std::unique_ptr<BaseSpecies>>& all_species_;

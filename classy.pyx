@@ -900,20 +900,18 @@ cdef class PyCosmology:
         """
         cdef:
             dict ncdm_dict
-            vector[double] q_list
             int q_size
 
-        inm = deref(self._thisptr).GetInputModule()
-        ncdm_module_ptr = deref(inm).ncdm_
+        ibg = deref(self._thisptr).GetBackgroundModule()
 
         ncdm_dict = {}
-        for ncdm_id in range(deref(ncdm_module_ptr).N_ncdm_):
-            q_size = deref(ncdm_module_ptr).q_size_ncdm_[ncdm_id]
-            ncdm_dict[f"deg[{ncdm_id}]"]    = deref(ncdm_module_ptr).GetDeg(ncdm_id)
-            ncdm_dict[f"m_ncdm[{ncdm_id}]"] = deref(ncdm_module_ptr).m_ncdm_in_eV_[ncdm_id]
+        for ncdm_id in range(self.ba.N_ncdm):
+            q_size = deref(ibg).GetNcdmQSize(ncdm_id)
+            ncdm_dict[f"deg[{ncdm_id}]"]      = deref(ibg).GetNcdmDeg(ncdm_id)
+            ncdm_dict[f"m_ncdm[{ncdm_id}]"]   = deref(ibg).GetNcdmMassInEV(ncdm_id)
             ncdm_dict[f"q_size[{ncdm_id}]"]   = q_size
             for q_id in range(q_size):
-                ncdm_dict[f"q[{ncdm_id}][{q_id}]"] = deref(ncdm_module_ptr).q_ncdm_[ncdm_id][q_id]
+                ncdm_dict[f"q[{ncdm_id}][{q_id}]"] = deref(ibg).GetNcdmQ(ncdm_id, q_id)
 
         return ncdm_dict
 

@@ -18,6 +18,7 @@ jobs:
           git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} \
             | grep -E '\.(cpp|c|h|hpp)$' \
             | grep -v '^hyrec/' \
+            | while read f; do [ -f "$f" ] && echo "$f"; done \
             | tr '\n' ' ' > files.txt
 
           echo "FILES=$(cat files.txt)" >> $GITHUB_OUTPUT

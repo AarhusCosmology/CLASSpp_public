@@ -6,12 +6,10 @@
 #include "background_module.h"
 #include "perturbations_module.h"
 
-DCDM_DR_Species::DCDM_DR_Species(std::shared_ptr<DarkRadiation> dr,
-                                 const background* pba,
-                                 const BackgroundModule* bgm)
+DCDM_DR_Species::DCDM_DR_Species(const background* pba, const BackgroundModule* bgm)
     : CompositeSpecies("DCDM_DR", BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm) {
   auto dcdm  = std::make_unique<DCDMSpecies>(*pba);
-  auto dr_sp = std::make_unique<DarkRadiationSpecies>(dr, pba, bgm, dcdm.get());
+  auto dr_sp = std::make_unique<DarkRadiationSpecies>(dcdm.get(), pba, bgm);
   dcdm_      = dcdm.get();
   dr_sp_     = dr_sp.get();
   children_.push_back(std::move(dcdm));

@@ -36,7 +36,6 @@
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "../species/ncdm_species.h"
 #include "background_module.h"
-#include "non_cold_dark_matter.h"
 #include "thermodynamics_module.h"
 #include "thread_pool.h"
 
@@ -3306,6 +3305,36 @@ int PerturbationsModule::perturb_vector_init(
       all_species_.at("DCDM_DR")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
     }
 
+    /* DNCDM_DR composites: register DR perturbation indices sorted by ncdm_id.
+       Each DNCDM decay-radiation gets its own F0 slots; set index_pt_F0_dr_sum
+       to the first one so AddCouplingDerivs can accumulate into the "sum" slot. */
+    {
+      std::vector<DNCDM_DR_Species*> dncdm_dr_vec;
+      for (auto& [name, sp] : all_species_) {
+        if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+          dncdm_dr_vec.push_back(d);
+      }
+      if (!dncdm_dr_vec.empty()) {
+        ppv->l_max_dr = ppr->l_max_dr;
+        std::sort(dncdm_dr_vec.begin(),
+                  dncdm_dr_vec.end(),
+                  [](DNCDM_DR_Species* a, DNCDM_DR_Species* b) {
+                    return a->dncdm().ncdm_id() < b->dncdm().ncdm_id();
+                  });
+        // If no DCDM_DR registered the dr_sum index, set it to point to the first DNCDM DR
+        bool need_sum_index = !all_species_.count("DCDM_DR");
+        for (auto* d : dncdm_dr_vec) {
+          // Only register the DR child (DNCDMSpecies is registered in the NCDM block below)
+          d->dr().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+          if (need_sum_index) {
+            // Set dr_sum index to this DNCDM DR's F0 so coupling code can use it
+            ppv->index_pt_F0_dr_sum = d->dr().pt_F0_index();
+            need_sum_index          = false;  // Only first species sets the sum slot
+          }
+        }
+      }
+    }
+
     /* fluid */
     if (all_species_.count("Fluid"))
       all_species_.at("Fluid")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
@@ -3337,16 +3366,19 @@ int PerturbationsModule::perturb_vector_init(
       ppv->l_max_ncdm  = ppv->l_max_ncdm_storage.data();
       ppv->q_size_ncdm = ppv->q_size_ncdm_storage.data();
       {
-        std::vector<NCDMSpecies*> ncdm_vec;
+        // Collect all NCDM-like species (NCDMSpecies and DNCDMSpecies) sorted by ncdm_id
+        std::vector<std::pair<int, BaseSpecies*>> ncdm_reg_vec;
         for (auto& [name, sp] : all_species_) {
           if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
-            ncdm_vec.push_back(n);
+            ncdm_reg_vec.push_back({n->ncdm_id(), n});
+          else if (auto* composite = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+            ncdm_reg_vec.push_back({composite->dncdm().ncdm_id(), &composite->dncdm()});
         }
-        std::sort(ncdm_vec.begin(), ncdm_vec.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
-          return a->ncdm_id() < b->ncdm_id();
+        std::sort(ncdm_reg_vec.begin(), ncdm_reg_vec.end(), [](const auto& a, const auto& b) {
+          return a.first < b.first;
         });
-        for (auto* ncdm_sp : ncdm_vec) {
-          ncdm_sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+        for (auto& [id, sp] : ncdm_reg_vec) {
+          sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
         }
       }
     }
@@ -3449,7 +3481,7 @@ int PerturbationsModule::perturb_vector_init(
                      n);
           //Copy value from precision parameter:
           ppv->l_max_ncdm[n]  = ppr->l_max_ncdm;
-          ppv->q_size_ncdm[n] = ncdm_->q_size_ncdm_[n];
+          ppv->q_size_ncdm[n] = ncdm_sp->q_size();
           for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
             ppv->index_ncdm_[n].push_back(index_pt + index_q * (ppv->l_max_ncdm[n] + 1));
           }
@@ -4329,34 +4361,26 @@ int PerturbationsModule::perturb_vector_init(
             for (int l = 0; l <= 2; l++) {
               ppv->y[idx_new + l] = 0.0;
             }
-            const double factor = ncdm_->factor_ncdm_[n] * pow(pba->a_today / a, 4);
+            const double factor = ncdm_sp->factor() * pow(pba->a_today / a, 4);
 
             double delta = 0.;
             double theta = 0.;
             double shear = 0.;
 
-            switch (ncdm_->ncdm_types_[n]) {
-              case NCDMType::standard:
-                for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n]; index_q++) {
-                  const int index_pt_old = ppw->pv->index_ncdm_[n][index_q];
-                  const double w0        = ncdm_->w_ncdm_[n][index_q];
-                  const double q         = ncdm_->q_ncdm_[n][index_q];
-                  const double epsilon   = sqrt(q * q +
-                                                a * a * ncdm_->M_ncdm_[n] * ncdm_->M_ncdm_[n]);
+            // NCDMSpecies is always standard (not decay_dr): no switch needed
+            for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n]; index_q++) {
+              const int index_pt_old = ppw->pv->index_ncdm_[n][index_q];
+              const double w0        = ncdm_sp->w()[index_q];
+              const double q         = ncdm_sp->q()[index_q];
+              const double epsilon   = sqrt(q * q + a * a * ncdm_sp->M() * ncdm_sp->M());
 
-                  delta += w0 * pow(q, 2) * epsilon * ppw->pv->y[index_pt_old];
-                  theta += w0 * pow(q, 3) * ppw->pv->y[index_pt_old + 1];
-                  shear += w0 * pow(q, 4) / epsilon * ppw->pv->y[index_pt_old + 2];
-                }
-                delta *= factor / ncdm_sp->Rho(ppw->pvecback);
-                theta *= k * factor / rho_plus_p_ncdm;
-                shear *= 2. / 3. * factor / rho_plus_p_ncdm;
-                break;
-              case NCDMType::decay_dr:
-                // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
-                std::tie(delta, theta, shear) = RescaledNCDMPerturbations(n, a, k, ppw);
-                break;
+              delta += w0 * pow(q, 2) * epsilon * ppw->pv->y[index_pt_old];
+              theta += w0 * pow(q, 3) * ppw->pv->y[index_pt_old + 1];
+              shear += w0 * pow(q, 4) / epsilon * ppw->pv->y[index_pt_old + 2];
             }
+            delta *= factor / ncdm_sp->Rho(ppw->pvecback);
+            theta *= k * factor / rho_plus_p_ncdm;
+            shear *= 2. / 3. * factor / rho_plus_p_ncdm;
 
             ppv->y[idx_new]     = delta;
             ppv->y[idx_new + 1] = theta;
@@ -5155,20 +5179,14 @@ int PerturbationsModule::perturb_initial_conditions(
         }
         if (all_species_.count("DNCDM_DR")) {
           for (auto& [name, sp] : all_species_) {
-            auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-            if (!ncdm_sp)
+            auto* dncdm_dr_sp = dynamic_cast<DNCDM_DR_Species*>(sp.get());
+            if (!dncdm_dr_sp)
               continue;
-            if (ncdm_->ncdm_types_[ncdm_sp->ncdm_id()] != NCDMType::decay_dr)
-              continue;
-            const auto& dncdm_properties = ncdm_->decay_dr_map_.at(ncdm_sp->ncdm_id());
-            delta_dr +=
-                (-4. * a_prime_over_a +
-                 a * dncdm_properties.Gamma * ncdm_sp->Rho(ppw->pvecback) /
-                     ppw->pvecback[static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"))
-                                       .dr()
-                                       .bg_rho_dr_species_index() +
-                                   dncdm_properties.dr_id]) *
-                alpha;
+            DNCDMSpecies* dncdm_sp  = &dncdm_dr_sp->dncdm();
+            delta_dr               += (-4. * a_prime_over_a +
+                                       a * dncdm_sp->Gamma() * dncdm_sp->Rho(ppw->pvecback) /
+                                           ppw->pvecback[dncdm_dr_sp->dr().bg_rho_index()]) *
+                                      alpha;
           }
         }
       }
@@ -5205,7 +5223,8 @@ int PerturbationsModule::perturb_initial_conditions(
 
       if (!ncdm_species_sorted_.empty()) {
         for (auto* sp : ncdm_species_sorted_) {
-          int n_id = -1;
+          int n_id                      = -1;
+          NCDMBaseSpecies* ncdm_base_sp = dynamic_cast<NCDMBaseSpecies*>(sp);
           if (auto* n_sp = dynamic_cast<NCDMSpecies*>(sp))
             n_id = n_sp->ncdm_id();
           else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(sp))
@@ -5213,17 +5232,16 @@ int PerturbationsModule::perturb_initial_conditions(
 
           for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n_id]; index_q++) {
             const int idx        = ppw->pv->index_ncdm_[n_id][index_q];
-            const double q       = ncdm_->q_ncdm_[n_id][index_q];
-            const double epsilon = sqrt(q * q +
-                                        a * a * ncdm_->M_ncdm_[n_id] * ncdm_->M_ncdm_[n_id]);
+            const double q       = ncdm_base_sp->q()[index_q];
+            const double epsilon = sqrt(q * q + a * a * ncdm_base_sp->M() * ncdm_base_sp->M());
             double dlnf0_dlnq;
-            if (ncdm_->ncdm_types_[n_id] == NCDMType::standard) {
-              dlnf0_dlnq = ncdm_->dlnf0_dlnq_ncdm_[n_id][index_q];
+            auto* dncdm_sp = dynamic_cast<DNCDMSpecies*>(sp);
+            if (dncdm_sp == nullptr) {
+              dlnf0_dlnq = ncdm_base_sp->dlnf0_dlnq()[index_q];
             }
             else {
               // If the current species can decay, it is a DNCDMSpecies
-              auto* dncdm_sp = static_cast<DNCDMSpecies*>(sp);
-              dlnf0_dlnq     = ppw->pvecback[dncdm_sp->bg_dlnfdlnq_index() + index_q];
+              dlnf0_dlnq = ppw->pvecback[dncdm_sp->bg_dlnfdlnq_index() + index_q];
             }
             ppw->pv->y[idx + 0] = -0.25 * delta_ur * dlnf0_dlnq;
             ppw->pv->y[idx + 1] = -epsilon / 3. / q / k * theta_ur * dlnf0_dlnq;
@@ -6358,7 +6376,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
 
         if ((has_source_delta_ncdm_ == _TRUE_) || (has_source_theta_ncdm_ == _TRUE_) ||
             (has_source_delta_m_ == _TRUE_)) {
-          if (ncdm_->ncdm_types_[n] == NCDMType::decay_dr) {
+          if (dynamic_cast<DNCDMSpecies*>(sp) != nullptr) {
             double delta, theta, shear;
             std::tie(delta, theta, shear) = RescaledNCDMPerturbations(n, a, k, ppw);
             ppw->delta_ncdm[n]            = delta;
@@ -6638,25 +6656,24 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
           n = d_sp->ncdm_id();
         double gwncdm = 0.;
 
-        const double factor = ncdm_->factor_ncdm_[n] * pow(pba->a_today / a, 4);
+        auto* ncdm_base_sp  = dynamic_cast<NCDMBaseSpecies*>(ncdm_sp);
+        const double factor = ncdm_base_sp->factor() * pow(pba->a_today / a, 4);
 
         for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n]; index_q++) {
           const int idx = ppw->pv->index_ncdm_[n][index_q];
           double w0;
-          switch (ncdm_->ncdm_types_[n]) {
-            case NCDMType::standard:
-              w0 = ncdm_->w_ncdm_[n][index_q];
-              break;
-            case NCDMType::decay_dr: {
-              const double dq  = ncdm_->decay_dr_map_[n].dq[index_q];
-              auto* dncdm_sp   = static_cast<DNCDMSpecies*>(ncdm_sp);
-              const double f_q = exp(ppw->pvecback[dncdm_sp->bg_lnf_index() + index_q]);
-              w0               = dq * f_q;
-            } break;
+          auto* dncdm_sp = dynamic_cast<DNCDMSpecies*>(ncdm_sp);
+          if (dncdm_sp == nullptr) {
+            w0 = ncdm_base_sp->w()[index_q];
           }
-          const double q       = ncdm_->q_ncdm_[n][index_q];
+          else {
+            const double dq  = dncdm_sp->dq()[index_q];
+            const double f_q = exp(ppw->pvecback[dncdm_sp->bg_lnf_index() + index_q]);
+            w0               = dq * f_q;
+          }
+          const double q       = ncdm_base_sp->q()[index_q];
           const double q2      = q * q;
-          const double epsilon = sqrt(q2 + ncdm_->M_ncdm_[n] * ncdm_->M_ncdm_[n] * a2);
+          const double epsilon = sqrt(q2 + ncdm_base_sp->M() * ncdm_base_sp->M() * a2);
 
           gwncdm += q2 * q2 / epsilon * w0 *
                     (1. / 15. * y[idx] + 2. / 21. * y[idx + 2] + 1. / 35. * y[idx + 4]);
@@ -7299,17 +7316,17 @@ int PerturbationsModule::perturb_print_variables_member(
         double rho_delta_ncdm        = 0.0;
         double rho_plus_p_theta_ncdm = 0.0;
         double rho_plus_p_shear_ncdm = 0.0;
-        const double factor          = ncdm_->factor_ncdm_[n] * pow(pba->a_today / a, 4);
+        const double factor          = ncdm_sp->factor() * pow(pba->a_today / a, 4);
 
         for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n]; index_q++) {
           const int idx        = ppw->pv->index_ncdm_[n][index_q];
-          const double q       = ncdm_->q_ncdm_[n][index_q];
+          const double q       = ncdm_sp->q()[index_q];
           const double q2      = q * q;
-          const double epsilon = sqrt(q2 + ncdm_->M_ncdm_[n] * ncdm_->M_ncdm_[n] * a2);
+          const double epsilon = sqrt(q2 + ncdm_sp->M() * ncdm_sp->M() * a2);
 
-          rho_delta_ncdm        += q2 * epsilon * ncdm_->w_ncdm_[n][index_q] * y[idx];
-          rho_plus_p_theta_ncdm += q2 * q * ncdm_->w_ncdm_[n][index_q] * y[idx + 1];
-          rho_plus_p_shear_ncdm += q2 * q2 / epsilon * ncdm_->w_ncdm_[n][index_q] * y[idx + 2];
+          rho_delta_ncdm        += q2 * epsilon * ncdm_sp->w()[index_q] * y[idx];
+          rho_plus_p_theta_ncdm += q2 * q * ncdm_sp->w()[index_q] * y[idx + 1];
+          rho_plus_p_shear_ncdm += q2 * q2 / epsilon * ncdm_sp->w()[index_q] * y[idx + 2];
         }
 
         rho_delta_ncdm        *= factor;
@@ -7693,7 +7710,8 @@ int PerturbationsModule::perturb_derivs_member(
       /** - ---> loop over species */
 
       for (auto* sp : ncdm_species_sorted_) {
-        int n = -1;
+        int n                         = -1;
+        NCDMBaseSpecies* ncdm_base_sp = dynamic_cast<NCDMBaseSpecies*>(sp);
         if (auto* n_sp = dynamic_cast<NCDMSpecies*>(sp))
           n = n_sp->ncdm_id();
         else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(sp))
@@ -7704,23 +7722,19 @@ int PerturbationsModule::perturb_derivs_member(
         for (int index_q = 0; index_q < pv->q_size_ncdm[n]; index_q++) {
           /** - ----> define intermediate quantities */
           double dlnf0_dlnq;
-          switch (ncdm_->ncdm_types_[n]) {
-            case NCDMType::standard: {
-              dlnf0_dlnq = ncdm_->dlnf0_dlnq_ncdm_[n][index_q];
-              break;
-            }
-            case NCDMType::decay_dr: {
-              // If the current species can decay, it is a DNCDMSpecies
-              auto* dncdm_sp = static_cast<DNCDMSpecies*>(sp);
-              dlnf0_dlnq     = pvecback[dncdm_sp->bg_dlnfdlnq_index() + index_q];
-              break;
-            }
+          auto* dncdm_sp = dynamic_cast<DNCDMSpecies*>(sp);
+          if (dncdm_sp == nullptr) {
+            dlnf0_dlnq = ncdm_base_sp->dlnf0_dlnq()[index_q];
+          }
+          else {
+            // If the current species can decay, it is a DNCDMSpecies
+            dlnf0_dlnq = pvecback[dncdm_sp->bg_dlnfdlnq_index() + index_q];
           }
 
           const int ncdm_idx = ppw->pv->index_ncdm_[n][index_q];
 
-          const double q              = ncdm_->q_ncdm_[n][index_q];
-          const double epsilon        = sqrt(q * q + a2 * ncdm_->M_ncdm_[n] * ncdm_->M_ncdm_[n]);
+          const double q              = ncdm_base_sp->q()[index_q];
+          const double epsilon        = sqrt(q * q + a2 * ncdm_base_sp->M() * ncdm_base_sp->M());
           const double qk_div_epsilon = k * q / epsilon;
 
           /** - ----> ncdm density for given momentum bin */
@@ -8240,16 +8254,16 @@ std::tuple<double, double, double> PerturbationsModule::RescaledNCDMPerturbation
   if (dncdm_sp == nullptr)
     throw std::runtime_error("RescaledNCDMPerturbations: invalid ncdm_id");
   const double* lnf_array = ppw->pvecback + dncdm_sp->bg_lnf_index();
-  const double lnN        = ncdm_->GetRescalingFactor(n_ncdm, lnf_array);
+  const double lnN        = dncdm_sp->GetRescalingFactor(lnf_array);
 
-  for (int index_q = 0; index_q < ncdm_->q_size_ncdm_[n_ncdm]; index_q++) {
+  for (int index_q = 0; index_q < dncdm_sp->q_size(); index_q++) {
     const int index_pt = ppw->pv->index_ncdm_[n_ncdm][index_q];
-    double dq          = ncdm_->decay_dr_map_[n_ncdm].dq[index_q];
+    double dq          = dncdm_sp->dq()[index_q];
     double lnf         = lnf_array[index_q];
 
-    double q       = ncdm_->q_ncdm_[n_ncdm][index_q];
+    double q       = dncdm_sp->q()[index_q];
     double q2      = q * q;
-    double epsilon = sqrt(q2 + a * a * ncdm_->M_ncdm_[n_ncdm] * ncdm_->M_ncdm_[n_ncdm]);
+    double epsilon = sqrt(q2 + a * a * dncdm_sp->M() * dncdm_sp->M());
 
     rho_scaled              += dq * pow(q, 2) * epsilon * exp(lnN + lnf);
     rho_plus_p_scaled       += dq * pow(q, 2) * (epsilon + q2 / 3. / epsilon) * exp(lnN + lnf);
