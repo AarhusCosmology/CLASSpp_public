@@ -2,11 +2,11 @@
 #define BASE_MODULE_H
 
 /* class modules */
-#include <map>
 #include <memory>
 #include <string>
 
 #include "../species/base_species.h"
+#include "../species/species_collection.h"
 #include "background.h"
 #include "common.h"
 #include "input_module.h"
@@ -38,9 +38,9 @@ class BaseModule {
   mutable ErrorMsg error_message_;
 
  public:
-  /** Const map of all cosmological species, keyed by name.
-   *  Use .at("CDM") -- never operator[] -- to preserve const safety. */
-  const std::map<std::string, std::unique_ptr<BaseSpecies>>& all_species_;
+  /** Const reference to the species owned by InputModule. Use .at("CDM")
+   *  (throws if absent) or .find("CDM") (returns pointer-or-nullptr). */
+  const SpeciesCollection& all_species_;
 
  protected:
   InputModulePtr input_module_;

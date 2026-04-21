@@ -3,12 +3,12 @@
 #ifndef __INPUT__
 #define __INPUT__
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "../species/base_species.h"
+#include "../species/species_collection.h"
 #include "background.h"
 #include "common.h"
 #include "lensing.h"
@@ -55,7 +55,7 @@ class InputModule {
   lensing lensing_;
   output output_;
   /** All cosmological species, constructed at end of InputModule ctor. */
-  std::map<std::string, std::unique_ptr<BaseSpecies>> all_species_;
+  SpeciesCollection all_species_;
   ErrorMsg error_message_;
 
  private:

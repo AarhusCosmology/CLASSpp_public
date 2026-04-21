@@ -204,19 +204,19 @@ InputModule::InputModule(FileContent& fc) : file_content_(fc), shooting_workspac
 void InputModule::ConstructSpecies() {
   const background* pba = &background_;
   if (pba->has_cdm == _TRUE_) {
-    all_species_["CDM"] = std::make_unique<CDMSpecies>(*pba);
+    all_species_.insert("CDM", std::make_unique<CDMSpecies>(*pba));
   }
   if (pba->has_lambda == _TRUE_) {
-    all_species_["Lambda"] = std::make_unique<LambdaSpecies>(*pba);
+    all_species_.insert("Lambda", std::make_unique<LambdaSpecies>(*pba));
   }
   if (pba->has_ur == _TRUE_) {
-    all_species_["UR"] = std::make_unique<UltraRelativisticSpecies>(*pba);
+    all_species_.insert("UR", std::make_unique<UltraRelativisticSpecies>(*pba));
   }
   if (pba->has_fld == _TRUE_) {
-    all_species_["Fluid"] = std::make_unique<FluidSpecies>(*pba);
+    all_species_.insert("Fluid", std::make_unique<FluidSpecies>(*pba));
   }
   if (pba->has_dcdm == _TRUE_) {
-    all_species_["DCDM_DR"] = std::make_unique<DCDM_DR_Species>(pba, nullptr);
+    all_species_.insert("DCDM_DR", std::make_unique<DCDM_DR_Species>(pba, nullptr));
   }
   if (pba->has_ncdm == _TRUE_) {
     NcdmSettings ncdm_settings_for_species;
@@ -230,39 +230,41 @@ void InputModule::ConstructSpecies() {
     auto ncdm_list =
         NCDMSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
     for (auto& sp : ncdm_list) {
-      std::string name   = sp->name();
-      all_species_[name] = std::move(sp);
+      std::string name = sp->name();
+      all_species_.insert(name, std::move(sp));
     }
 
     // Build decay_dr species
     auto dncdm_vec =
         DNCDMSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
     for (auto& dncdm_sp : dncdm_vec) {
-      std::string name   = "NCDM_" + std::to_string(dncdm_sp->ncdm_id());
-      all_species_[name] = std::make_unique<DNCDM_DR_Species>(std::move(dncdm_sp), pba, nullptr);
+      std::string name = "NCDM_" + std::to_string(dncdm_sp->ncdm_id());
+      all_species_.insert(name,
+                          std::make_unique<DNCDM_DR_Species>(std::move(dncdm_sp), pba, nullptr));
     }
 
     // Build ncdm_interacting species
     auto interacting_vec =
         NCDMInteractingSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
     for (auto& int_sp : interacting_vec) {
-      std::string name   = int_sp->name();
-      all_species_[name] = std::move(int_sp);
+      std::string name = int_sp->name();
+      all_species_.insert(name, std::move(int_sp));
     }
   }
   if (pba->has_scf == _TRUE_) {
-    all_species_["ScalarField"] = std::make_unique<ScalarFieldSpecies>(*pba);
+    all_species_.insert("ScalarField", std::make_unique<ScalarFieldSpecies>(*pba));
   }
   if (pba->has_idm_dr == _TRUE_ || pba->has_idr == _TRUE_) {
-    all_species_["IDM_DR_IDR"] = std::make_unique<IDM_DR_IDR_Species>(*pba);
+    all_species_.insert("IDM_DR_IDR", std::make_unique<IDM_DR_IDR_Species>(*pba));
   }
   if (pba->has_idm_drmd == _TRUE_ || pba->has_idr_drmd == _TRUE_) {
-    all_species_["IDM_DRMD_IDR_DRMD"] = std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*pba);
+    all_species_.insert("IDM_DRMD_IDR_DRMD", std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*pba));
   }
   // Photons and baryons are always present once there is a radiation background.
   // They are always added; the background module already guards has_ur/has_g etc.
-  all_species_["Photons"] = std::make_unique<PhotonsSpecies>(*pba);
-  all_species_["Baryons"] = std::make_unique<BaryonsSpecies>(*pba);
+  all_species_.insert("Photons", std::make_unique<PhotonsSpecies>(*pba));
+  all_species_.insert("Baryons", std::make_unique<BaryonsSpecies>(*pba));
+  all_species_.freeze();
 }
 
 int InputModule::FixUnknownParameters(int input_verbose,
@@ -3650,7 +3652,7 @@ int InputModule::input_try_unknown_parameters(double* unknown_values,
         const double* bg_today  = bam->background_table_.data() +
                                   (bam->bt_size_ - 1) * bam->bg_size_;
         int dncdm_id            = 0;
-        for (auto& [key, sp] : bam->all_species_) {
+        for (auto& sp : bam->all_species_) {
           auto* dncdm_dr_sp = dynamic_cast<DNCDM_DR_Species*>(sp.get());
           if (!dncdm_dr_sp)
             continue;
@@ -3708,7 +3710,7 @@ int InputModule::input_get_guess(double* xguess,
   precision& pr  = input_module->precision_;
   // Collect DNCDM_DR species sorted by ncdm_id (= sorted map order since keys are "NCDM_N")
   std::vector<DNCDM_DR_Species*> dncdm_dr_species;
-  for (auto& [key, sp] : input_module->all_species_) {
+  for (auto& sp : input_module->all_species_) {
     if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
       dncdm_dr_species.push_back(ds);
   }
@@ -3799,7 +3801,7 @@ int InputModule::input_get_guess(double* xguess,
       case Omega_dncdmdr: {
         // deg_ncdm_decay_dr unknown, make a guess
         double a_ini = pr.a_ini_over_a_today_default * ba.a_today;
-        for (auto& [key, sp] : input_module->all_species_) {
+        for (auto& sp : input_module->all_species_) {
           if (auto* nsp = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
             a_ini = nsp->GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
           else if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
@@ -3849,7 +3851,7 @@ int InputModule::input_get_guess(double* xguess,
           double Omega_or_omega_ini_dncdm_target = pfzw->target_values[index_guess_local];
           if (pfzw->target_name[counter] == deg_ncdm_decay_dr) {
             double a_ini = pr.a_ini_over_a_today_default * ba.a_today;
-            for (auto& [key, sp] : input_module->all_species_) {
+            for (auto& sp : input_module->all_species_) {
               if (auto* nsp = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
                 a_ini = nsp->GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
               else if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))

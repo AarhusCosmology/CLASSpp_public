@@ -26,8 +26,9 @@ class BackgroundColumnWriter;  // forward declaration
  *  - provides perturbation equations in PerturbDerivs()
  *  - exposes Delta/Theta/DeltaP/RhoPlusPShear for the Einstein equations
  *
- * The map in BaseModule is: const std::map<std::string, std::unique_ptr<BaseSpecies>>.
- * Use .at("CDM") – never operator[] – to maintain const correctness.
+ * The collection in BaseModule is a const SpeciesCollection&. Use .at("CDM")
+ * (throws if absent) or .find("CDM") (returns pointer-or-nullptr); iterate
+ * with `for (auto& sp : all_species_)` and use sp.key / sp->name() as needed.
  */
 class BaseSpecies {
  public:

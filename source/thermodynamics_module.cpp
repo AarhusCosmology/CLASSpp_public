@@ -491,8 +491,8 @@ int ThermodynamicsModule::thermodynamics_init() {
                background_module_->error_message_,
                error_message_);
 
-    R = 3. / 4. * all_species_.at("Baryons")->Rho(pvecback.data()) /
-        all_species_.at("Photons")->Rho(pvecback.data());
+    R = 3. / 4. * all_species_.baryons().Rho(pvecback.data()) /
+        all_species_.photons().Rho(pvecback.data());
 
     thermodynamics_table_[index_tau * th_size_ + index_th_ddkappa_] =
         -1. / R * thermodynamics_table_[index_tau * th_size_ + index_th_dkappa_];
@@ -632,8 +632,8 @@ int ThermodynamicsModule::thermodynamics_init() {
                  background_module_->error_message_,
                  error_message_);
 
-      R = 3. / 4. * all_species_.at("Baryons")->Rho(pvecback.data()) /
-          all_species_.at("Photons")->Rho(pvecback.data());
+      R = 3. / 4. * all_species_.baryons().Rho(pvecback.data()) /
+          all_species_.photons().Rho(pvecback.data());
 
       thermodynamics_table_[index_tau * th_size_ + index_th_ddkappa_] =
           1. / 6. /
@@ -1636,7 +1636,7 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
              background_module_->error_message_,
              error_message_);
 
-  const double rho_g = all_species_.at("Photons")->Rho(pvecback.data());
+  const double rho_g = all_species_.photons().Rho(pvecback.data());
   double Neff_bbn    = (pvecback[background_module_->index_bg_Omega_r_] *
                             pvecback[background_module_->index_bg_rho_crit_] -
                         rho_g) /
@@ -3009,8 +3009,8 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
 
     double dTdz = 2. / (1 + z) *
                       preio->reionization_table[i * preio->re_size + preio->index_re_Tb] -
-                  2. * mu / _m_e_ * 4. * all_species_.at("Photons")->Rho(pvecback) / 3. /
-                      all_species_.at("Baryons")->Rho(pvecback) * opacity *
+                  2. * mu / _m_e_ * 4. * all_species_.photons().Rho(pvecback) / 3. /
+                      all_species_.baryons().Rho(pvecback) * opacity *
                       (pba->T_cmb * (1. + z) -
                        preio->reionization_table[i * preio->re_size + preio->index_re_Tb]) /
                       pvecback[background_module_->index_bg_H_];

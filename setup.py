@@ -100,6 +100,7 @@ source_files = (
          'perturb_column_writer.cpp',
          'photons.cpp',
          'scalar_field.cpp',
+         'species_collection.cpp',
          'ultra_relativistic.cpp',
         'interacting_species.cpp',
     )

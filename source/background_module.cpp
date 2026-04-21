@@ -97,10 +97,9 @@
  * Since all_species_ is a std::map (sorted by key), "NCDM_0" < "NCDM_1" < ...
  * so the order is automatically deterministic.
  */
-static std::vector<NCDMBaseSpecies*> GetNcdmSpecies(
-    const std::map<std::string, std::unique_ptr<BaseSpecies>>& all_species) {
+static std::vector<NCDMBaseSpecies*> GetNcdmSpecies(const SpeciesCollection& all_species) {
   std::vector<NCDMBaseSpecies*> result;
-  for (auto& [key, sp] : all_species) {
+  for (const auto& sp : all_species) {
     if (auto* ncdm = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
       result.push_back(ncdm);
     else if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
@@ -731,10 +730,10 @@ int BackgroundModule::background_indices() {
   bg_size_short_ = index_bg;
 
   // ── Photons (always) ──────────────────────────────────────────────────────
-  all_species_.at("Photons")->RegisterBackgroundIndices(index_bg);
+  all_species_.photons().RegisterBackgroundIndices(index_bg);
 
   // ── Baryons (always) ──────────────────────────────────────────────────────
-  all_species_.at("Baryons")->RegisterBackgroundIndices(index_bg);
+  all_species_.baryons().RegisterBackgroundIndices(index_bg);
 
   // ── CDM (optional) ────────────────────────────────────────────────────────
   if (all_species_.count("CDM"))
@@ -1194,7 +1193,7 @@ int BackgroundModule::background_solve() {
 
   {
     const double* earliest      = background_table_.data();
-    const double rho_g_earliest = all_species_.at("Photons")->Rho(earliest);
+    const double rho_g_earliest = all_species_.photons().Rho(earliest);
     Neff_ = (background_table_[index_bg_Omega_r_] * background_table_[index_bg_rho_crit_] -
              rho_g_earliest) /
             (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g_earliest);
@@ -1387,7 +1386,7 @@ int BackgroundModule::background_solve_evolver() {
       radiation density, beyond photons */
   {
     const double* earliest      = background_table_.data();
-    const double rho_g_earliest = all_species_.at("Photons")->Rho(earliest);
+    const double rho_g_earliest = all_species_.photons().Rho(earliest);
     Neff_ = (background_table_[index_bg_Omega_r_] * background_table_[index_bg_rho_crit_] -
              rho_g_earliest) /
             (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g_earliest);
@@ -1801,20 +1800,20 @@ int BackgroundModule::background_derivs_member(
   /** - calculate \f$ t' = a \f$ */
   dy[index_bi_time_] = y[index_bi_a_];
 
-  class_test(all_species_.at("Photons")->Rho(pvecback) <= 0.,
+  class_test(all_species_.photons().Rho(pvecback) <= 0.,
              error_message,
              "rho_g = %e instead of strictly positive",
-             all_species_.at("Photons")->Rho(pvecback));
+             all_species_.photons().Rho(pvecback));
 
   /** - calculate \f$ rs' = c_s \f$*/
   dy[index_bi_rs_] = 1. /
-                     sqrt(3. * (1. + 3. * all_species_.at("Baryons")->Rho(pvecback) / 4. /
-                                         all_species_.at("Photons")->Rho(pvecback))) *
+                     sqrt(3. * (1. + 3. * all_species_.baryons().Rho(pvecback) / 4. /
+                                         all_species_.photons().Rho(pvecback))) *
                      sqrt(1. -
                           pba->K * y[index_bi_rs_] * y[index_bi_rs_]);  // TBC: curvature correction
 
   /** - solve second order growth equation  \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
-  double rho_M = all_species_.at("Baryons")->Rho(pvecback);
+  double rho_M = all_species_.baryons().Rho(pvecback);
   if (all_species_.count("CDM"))
     rho_M += all_species_.at("CDM")->Rho(pvecback);
   if (all_species_.count("IDM_DR_IDR")) {

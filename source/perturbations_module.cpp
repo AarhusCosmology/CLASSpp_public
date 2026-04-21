@@ -3280,10 +3280,10 @@ int PerturbationsModule::perturb_vector_init(
     /* photons: set l_max fields before calling species (species reads them) */
     ppv->l_max_g     = ppr->l_max_g;
     ppv->l_max_pol_g = ppr->l_max_pol_g;
-    all_species_.at("Photons")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    all_species_.photons().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
 
     /* baryons */
-    all_species_.at("Baryons")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    all_species_.baryons().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
 
     /* cdm */
     if (all_species_.count("CDM"))
@@ -3413,7 +3413,7 @@ int PerturbationsModule::perturb_vector_init(
     /* photons: set l_max fields before calling species (species reads them) */
     ppv->l_max_g     = ppr->l_max_g_ten;
     ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
-    all_species_.at("Photons")->RegisterVectorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+    all_species_.photons().RegisterVectorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /** - (a) metric perturbations V or \f$ h_v \f$ depending on gauge */
     if (ppt->gauge == synchronous) {
@@ -3439,7 +3439,7 @@ int PerturbationsModule::perturb_vector_init(
     /* photons: set l_max fields before calling species (species reads them) */
     ppv->l_max_g     = ppr->l_max_g_ten;
     ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
-    all_species_.at("Photons")->RegisterTensorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+    all_species_.photons().RegisterTensorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
 
     /* ultra relativistic neutrinos */
 
@@ -4731,8 +4731,8 @@ int PerturbationsModule::perturb_initial_conditions(
     /* 8piG/3 rho_m(t_i) */
     /* 8piG/3 rho_nu(t_i) (all neutrinos and collisionless relics being relativistic at that time) */
     // ── Seed rho_r from photons, rho_m from baryons ──────────────────────────
-    double rho_r  = all_species_.at("Photons")->Rho(ppw->pvecback);
-    double rho_m  = all_species_.at("Baryons")->Rho(ppw->pvecback);
+    double rho_r  = all_species_.photons().Rho(ppw->pvecback);
+    double rho_m  = all_species_.baryons().Rho(ppw->pvecback);
     double rho_nu = 0.;
 
     // ── Dispatch over all other species ──────────────────────────────────────
@@ -4767,10 +4767,10 @@ int PerturbationsModule::perturb_initial_conditions(
     double fracnu = rho_nu / rho_r;
 
     /* f_g = Omega_g(t_i) / Omega_r(t_i) */
-    double fracg = all_species_.at("Photons")->Rho(ppw->pvecback) / rho_r;
+    double fracg = all_species_.photons().Rho(ppw->pvecback) / rho_r;
 
     /* f_b = Omega_b(t_i) / Omega_m(t_i) */
-    double fracb = all_species_.at("Baryons")->Rho(ppw->pvecback) / rho_m;
+    double fracb = all_species_.baryons().Rho(ppw->pvecback) / rho_m;
 
     /* f_cdm = Omega_cdm(t_i) / Omega_m(t_i) */
     double fraccdm = 0.;
@@ -5986,7 +5986,7 @@ int PerturbationsModule::perturb_einstein(
         shear_g = 16. / 45. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
                   (y[ppw->pv->index_pt_theta_g] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
 
-        ppw->rho_plus_p_shear += 4. / 3. * all_species_.at("Photons")->Rho(ppw->pvecback) * shear_g;
+        ppw->rho_plus_p_shear += 4. / 3. * all_species_.photons().Rho(ppw->pvecback) * shear_g;
       }
 
       if ((all_species_.count("IDM_DR_IDR")) &&
@@ -6196,15 +6196,15 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
        the original inline code so the compiler can apply FMA
        contractions identically across platforms. */
     {
-      const auto& PH     = all_species_.at("Photons");
-      const auto& BA     = all_species_.at("Baryons");
-      const double rho_g = PH->Rho(ppw->pvecback);
-      const double rho_b = BA->Rho(ppw->pvecback);
+      const auto& PH     = all_species_.photons();
+      const auto& BA     = all_species_.baryons();
+      const double rho_g = PH.Rho(ppw->pvecback);
+      const double rho_b = BA.Rho(ppw->pvecback);
 
-      const double delta_g = PH->Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_g = PH->Theta(ppw->pv, y, ppw->pvecback, ppw);
-      const double delta_b = BA->Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_b = BA->Theta(ppw->pv, y, ppw->pvecback, ppw);
+      const double delta_g = PH.Delta(ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_g = PH.Theta(ppw->pv, y, ppw->pvecback, ppw);
+      const double delta_b = BA.Delta(ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_b = BA.Theta(ppw->pv, y, ppw->pvecback, ppw);
 
       ppw->delta_rho        = rho_g * delta_g + rho_b * delta_b;
       ppw->rho_plus_p_theta = 4. / 3. * rho_g * theta_g + rho_b * theta_b;
@@ -6585,12 +6585,12 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       if (ppw->approx[ppw->index_ap_tca] ==
           (int) tca_off) { /* if tight-coupling approximation is off */
 
-        ppw->vector_source_v += 4. / 3. * a2 * all_species_.at("Photons")->Rho(ppw->pvecback) *
+        ppw->vector_source_v += 4. / 3. * a2 * all_species_.photons().Rho(ppw->pvecback) *
                                 (-1. / 4. * _SQRT2_) *
                                 (y[ppw->pv->index_pt_delta_g] + 2. * y[ppw->pv->index_pt_delta_g] +
                                  y[ppw->pv->index_pt_shear_g]);
 
-        ppw->vector_source_pi += 1. / 3. * a2 * all_species_.at("Photons")->Rho(ppw->pvecback) *
+        ppw->vector_source_pi += 1. / 3. * a2 * all_species_.photons().Rho(ppw->pvecback) *
                                  (6. * _SQRT2_ / 5. / sqrt(1. - 2. * pba->K / k / k)) *
                                  (4. / 3. / k * y[ppw->pv->index_pt_theta_g] +
                                   y[ppw->pv->index_pt_l3_g]);
@@ -6611,7 +6611,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       if (ppw->approx[ppw->index_ap_tca] ==
           (int) tca_off) { /* if tight-coupling approximation is off */
 
-        ppw->gw_source += (-_SQRT6_ * 4 * a2 * all_species_.at("Photons")->Rho(ppw->pvecback) *
+        ppw->gw_source += (-_SQRT6_ * 4 * a2 * all_species_.photons().Rho(ppw->pvecback) *
                            (1. / 15. * y[ppw->pv->index_pt_delta_g] +
                             4. / 21. * y[ppw->pv->index_pt_shear_g] +
                             1. / 35. * y[ppw->pv->index_pt_l3_g + 1]));
@@ -7429,8 +7429,7 @@ int PerturbationsModule::perturb_derivs_member(
   double a              = pvecback[background_module_->index_bg_a_];
   double a2             = a * a;
   double a_prime_over_a = pvecback[background_module_->index_bg_H_] * a;
-  double R              = 4. / 3. * all_species_.at("Photons")->Rho(pvecback) /
-                          all_species_.at("Baryons")->Rho(pvecback);
+  double R = 4. / 3. * all_species_.photons().Rho(pvecback) / all_species_.baryons().Rho(pvecback);
 
   /** - Compute 'generalised cotK function of argument \f$ \sqrt{|K|}*\tau \f$, for closing hierarchy.
       (see equation 2.34 in arXiv:1305.3261): */
@@ -7589,8 +7588,8 @@ int PerturbationsModule::perturb_derivs_member(
       class_call(perturb_tca_slip_and_shear(y, pppaw, error_message), error_message, error_message);
     }
 
-    all_species_.at("Baryons")->PerturbDerivs(tau, y, dy, *pppaw);
-    all_species_.at("Photons")->PerturbDerivs(tau, y, dy, *pppaw);
+    all_species_.baryons().PerturbDerivs(tau, y, dy, *pppaw);
+    all_species_.photons().PerturbDerivs(tau, y, dy, *pppaw);
 
     /* perturbed recombination */
     /* computes the derivatives of delta x_e and delta T_b */
@@ -7804,9 +7803,8 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y,
   double a_prime_over_a      = pvecback[background_module_->index_bg_H_] * a;
   double a_primeprime_over_a = pvecback[background_module_->index_bg_H_prime_] * a +
                                2. * a_prime_over_a * a_prime_over_a;
-  double R                   = 4. / 3. * all_species_.at("Photons")->Rho(pvecback) /
-                               all_species_.at("Baryons")->Rho(pvecback);
-  double s2_squared          = 1. - 3. * pba->K / k2;
+  double R = 4. / 3. * all_species_.photons().Rho(pvecback) / all_species_.baryons().Rho(pvecback);
+  double s2_squared = 1. - 3. * pba->K / k2;
 
   /** - --> (a) define short-cut notations for the scalar perturbations */
   double delta_g = 0., theta_g = 0.;
@@ -8177,10 +8175,9 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(
 
   /* update total delta and theta given rsa approximation results */
 
-  ppw->delta_rho += all_species_.at("Photons")->Rho(ppw->pvecback) * ppw->rsa_delta_g;
-  ppw->delta_p   += 1. / 3. * all_species_.at("Photons")->Rho(ppw->pvecback) * ppw->rsa_delta_g;
-  ppw->rho_plus_p_theta += 4. / 3. * all_species_.at("Photons")->Rho(ppw->pvecback) *
-                           ppw->rsa_theta_g;
+  ppw->delta_rho        += all_species_.photons().Rho(ppw->pvecback) * ppw->rsa_delta_g;
+  ppw->delta_p          += 1. / 3. * all_species_.photons().Rho(ppw->pvecback) * ppw->rsa_delta_g;
+  ppw->rho_plus_p_theta += 4. / 3. * all_species_.photons().Rho(ppw->pvecback) * ppw->rsa_theta_g;
 
   if (all_species_.count("UR")) {
     ppw->delta_rho += all_species_.at("UR")->Rho(ppw->pvecback) * ppw->rsa_delta_ur;
