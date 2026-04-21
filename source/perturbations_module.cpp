@@ -5068,14 +5068,15 @@ int PerturbationsModule::perturb_initial_conditions(
         delta_cdm = ppw->pv->y[ppw->pv->index_pt_delta_dcdm];
       else if (all_species_.count("IDM_DR_IDR"))
         delta_cdm = ppw->pv->y[ppw->pv->index_pt_delta_idm_dr];
+      else
+        delta_cdm = 0.;
+
       if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
         delta_cdm += static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
                          .idm_drmd()
                          .Rho(ppw->pvecback) *
                      ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
       }
-      else
-        delta_cdm = 0.;
 
       // note: if there are no neutrinos, fracnu, delta_ur and theta_ur below will consistently be zero.
 

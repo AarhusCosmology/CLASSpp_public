@@ -14,7 +14,8 @@ class NCDMSpecies : public NCDMBaseSpecies {
               int species_index,
               const NcdmSettings& settings,
               const background* pba,
-              const BackgroundModule* bgm);
+              const BackgroundModule* bgm,
+              const std::string& suffix = "_standard");
 
   static std::vector<std::unique_ptr<NCDMSpecies>> CreateAll(FileContent* pfc,
                                                              const NcdmSettings& settings,
@@ -93,7 +94,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
     return index_bg_pseudo_p_;
   }
 
- private:
+ protected:
   int ncdm_id_;  // species index (0-based), used for pv->index_ncdm_ etc.
   const background* pba_;
 

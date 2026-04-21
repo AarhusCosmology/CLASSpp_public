@@ -30,10 +30,8 @@ classy.cpp
 classy_community.egg-info/
 dist/
 *.so
-*.ipynb
 *.bak
 *.bat
-notebooks/
 CLASS.xcodeproj/xcuserdata/
 main/class.c
 cclassy.pxd

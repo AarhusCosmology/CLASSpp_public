@@ -12,12 +12,14 @@ NCDMSpecies::NCDMSpecies(FileContent* pfc,
                          int species_index,
                          const NcdmSettings& settings,
                          const background* pba,
-                         const BackgroundModule* bgm)
+                         const BackgroundModule* bgm,
+                         const std::string& suffix)
     : NCDMBaseSpecies("NCDM_" + std::to_string(species_index),
                       EnergyType::Other,
                       pfc,
                       species_index,
-                      settings),
+                      settings,
+                      suffix),
       ncdm_id_(species_index), pba_(pba) {
   bgm_ = bgm;  // bgm_ is protected in NCDMBaseSpecies
 }

@@ -14,6 +14,9 @@
 		AF1078FA2424A86400A369F7 /* exceptions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AF1078F92424A86400A369F7 /* exceptions.cpp */; };
 		AF14AFE924337B11005D2DE9 /* cosmology.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AF14AFE724337B11005D2DE9 /* cosmology.cpp */; };
 		AF9F87302F8FB9720077F3A9 /* perturb_column_writer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AF9F872D2F8FB9720077F3A9 /* perturb_column_writer.cpp */; };
+		AFB5BC272F974BD000126D51 /* ncdm_base_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFB5BC262F974BD000126D51 /* ncdm_base_species.cpp */; };
+		AFB5BC2A2F974C0900126D51 /* background_column_writer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFB5BC292F974C0900126D51 /* background_column_writer.cpp */; };
+		AFB5BC2D2F9768AA00126D51 /* ncdm_interacting_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFB5BC2C2F9768AA00126D51 /* ncdm_interacting_species.cpp */; };
 		AFDC689C240D9F500044B5A3 /* lensing_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6892240D9F500044B5A3 /* lensing_module.cpp */; };
 		AFDC689D240D9F500044B5A3 /* perturbations_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6893240D9F500044B5A3 /* perturbations_module.cpp */; };
 		AFDC689E240D9F500044B5A3 /* transfer_module.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC6894240D9F500044B5A3 /* transfer_module.cpp */; };
@@ -90,6 +93,12 @@
 		AF9F872E2F8FB9720077F3A9 /* perturb_source_context.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = perturb_source_context.h; sourceTree = "<group>"; };
 		AF9F872F2F8FB9720077F3A9 /* thermo_context.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thermo_context.h; sourceTree = "<group>"; };
 		AFA9047D241D19FB009B7DEE /* class.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = class.h; sourceTree = "<group>"; };
+		AFB5BC252F974BD000126D51 /* ncdm_base_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ncdm_base_species.h; sourceTree = "<group>"; };
+		AFB5BC262F974BD000126D51 /* ncdm_base_species.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ncdm_base_species.cpp; sourceTree = "<group>"; };
+		AFB5BC282F974C0900126D51 /* background_column_writer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = background_column_writer.h; sourceTree = "<group>"; };
+		AFB5BC292F974C0900126D51 /* background_column_writer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = background_column_writer.cpp; sourceTree = "<group>"; };
+		AFB5BC2B2F9768AA00126D51 /* ncdm_interacting_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ncdm_interacting_species.h; sourceTree = "<group>"; };
+		AFB5BC2C2F9768AA00126D51 /* ncdm_interacting_species.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ncdm_interacting_species.cpp; sourceTree = "<group>"; };
 		AFB5F15E241D17B5001B9B9C /* output.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = output.h; sourceTree = "<group>"; };
 		AFB5F15F241D17B5001B9B9C /* perturbations.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = perturbations.h; sourceTree = "<group>"; };
 		AFB5F160241D17B5001B9B9C /* nonlinear.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nonlinear.h; sourceTree = "<group>"; };
@@ -251,6 +260,8 @@
 		AFDC6891240D9F500044B5A3 /* source */ = {
 			isa = PBXGroup;
 			children = (
+				AFB5BC282F974C0900126D51 /* background_column_writer.h */,
+				AFB5BC292F974C0900126D51 /* background_column_writer.cpp */,
 				AF14AFE724337B11005D2DE9 /* cosmology.cpp */,
 				AF14AFE824337B11005D2DE9 /* cosmology.h */,
 				AFB5F164241D17B6001B9B9C /* background.h */,
@@ -345,6 +356,10 @@
 		CC000030000000000000003A /* species */ = {
 			isa = PBXGroup;
 			children = (
+				AFB5BC2B2F9768AA00126D51 /* ncdm_interacting_species.h */,
+				AFB5BC2C2F9768AA00126D51 /* ncdm_interacting_species.cpp */,
+				AFB5BC252F974BD000126D51 /* ncdm_base_species.h */,
+				AFB5BC262F974BD000126D51 /* ncdm_base_species.cpp */,
 				AF9F872C2F8FB9720077F3A9 /* all_species_list.h */,
 				AF9F872D2F8FB9720077F3A9 /* perturb_column_writer.cpp */,
 				AF9F872E2F8FB9720077F3A9 /* perturb_source_context.h */,
@@ -473,6 +488,7 @@
 				AFDC689C240D9F500044B5A3 /* lensing_module.cpp in Sources */,
 				AF1078DF241D1F3B00A369F7 /* history.c in Sources */,
 				AF1078E0241D1F3B00A369F7 /* hyrectools.c in Sources */,
+				AFB5BC2D2F9768AA00126D51 /* ncdm_interacting_species.cpp in Sources */,
 				AFDC68BB240D9F6B0044B5A3 /* quadrature.cpp in Sources */,
 				AFDC689D240D9F500044B5A3 /* perturbations_module.cpp in Sources */,
 				AFDC68A3240D9F500044B5A3 /* primordial_module.cpp in Sources */,
@@ -481,6 +497,7 @@
 				AFDC68B8240D9F6B0044B5A3 /* sparse.cpp in Sources */,
 				AF14AFE924337B11005D2DE9 /* cosmology.cpp in Sources */,
 				AFDC68A4240D9F500044B5A3 /* background_module.cpp in Sources */,
+				AFB5BC272F974BD000126D51 /* ncdm_base_species.cpp in Sources */,
 				CC000011000000000000001B /* baryons.cpp in Sources */,
 				CC000013000000000000001D /* cdm.cpp in Sources */,
 				CC000015000000000000001F /* dark_radiation_species.cpp in Sources */,
@@ -490,6 +507,7 @@
 				CC00001D0000000000000031 /* ncdm_species.cpp in Sources */,
 				CC00001F0000000000000033 /* photons.cpp in Sources */,
 				CC0000210000000000000035 /* scalar_field.cpp in Sources */,
+				AFB5BC2A2F974C0900126D51 /* background_column_writer.cpp in Sources */,
 				CC0000230000000000000037 /* ultra_relativistic.cpp in Sources */,
 				CC0000250000000000000039 /* interacting_species.cpp in Sources */,
 				EE0000020000000000000001 /* composite_species.cpp in Sources */,

@@ -96,6 +96,7 @@ source_files = (
          'lambda.cpp',
          'ncdm_base_species.cpp',
          'ncdm_species.cpp',
+         'ncdm_interacting_species.cpp',
          'perturb_column_writer.cpp',
          'photons.cpp',
          'scalar_field.cpp',

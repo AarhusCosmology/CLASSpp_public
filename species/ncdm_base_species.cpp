@@ -51,9 +51,10 @@ NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
                                  EnergyType energy_type,
                                  FileContent* pfc,
                                  int species_index,
-                                 const NcdmSettings& settings)
+                                 const NcdmSettings& settings,
+                                 const std::string& suffix)
     : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h) {
-  ReadParameters(pfc, species_index, settings);
+  ReadParameters(pfc, species_index, suffix, settings);
 }
 
 NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
@@ -146,161 +147,136 @@ void NCDMBaseSpecies::ReadDecayDrParameters(FileContent* pfc,
 
 void NCDMBaseSpecies::ReadParameters(FileContent* pfc,
                                      int species_index,
+                                     const std::string& suffix,
                                      const NcdmSettings& settings) {
   char* errmsg = error_message_;
 
-  // Read total N_ncdm_standard (needed to size the read lists)
-  int int1, int2, flag1, flag2;
-  class_call(parser_read_int(pfc, "N_ncdm_standard", &int1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
-  if ((flag1 == _TRUE_) && (flag2 == _TRUE_)) {
-    throw std::invalid_argument(
-        "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
-  }
-  int N_ncdm_standard = 0;
-  if (flag1 == _TRUE_) {
-    N_ncdm_standard = int1;
-  }
-  else if (flag2 == _TRUE_) {
-    N_ncdm_standard = int2;
+  // 1. Determine expected number of species based on suffix
+  int N_expected    = 0;
+  std::string var_N = "N_ncdm" + suffix;
+  int flag1, flag2 = _FALSE_;
+
+  class_call(parser_read_int(pfc, var_N.c_str(), &N_expected, &flag1, errmsg), errmsg, errmsg);
+
+  // Maintain backward compatibility for standard NCDM missing the suffix
+  if (suffix == "_standard") {
+    int int2;
+    class_call(parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
+    if ((flag1 == _TRUE_) && (flag2 == _TRUE_)) {
+      throw std::invalid_argument(
+          "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
+    }
+    if (flag2 == _TRUE_)
+      N_expected = int2;
   }
 
   const double deg_ncdm_default = 1.0;
   const double T_ncdm_default   = 0.71611;
   const double ksi_ncdm_default = 0.;
 
-  // Lambda helpers for reading lists (same pattern as NonColdDarkMatter)
-  auto read_list_of_ints_with_deprecated = [&](const std::string& varname,
-                                               const std::string& varname_deprec,
-                                               std::vector<int>& output,
-                                               int expected_size,
-                                               int default_value) {
-    int flg1, flg2, entries_read;
-    std::vector<int> raw;
+  // 2. Dynamic Lambda helpers
+  auto read_list_of_ints = [&](const std::string& base_name,
+                               const std::string& legacy_name,
+                               std::vector<int>& output,
+                               int default_value) {
+    int flg1, flg2 = _FALSE_, entries_read;
+    std::vector<int> raw, raw2;
+    std::string varname = base_name + suffix;
+
     class_call(readIntegerList(pfc, varname.c_str(), raw, &flg1, errmsg), errmsg, errmsg);
-    std::vector<int> raw2;
-    class_call(readIntegerList(pfc, varname_deprec.c_str(), raw2, &flg2, errmsg), errmsg, errmsg);
+
+    // Only look for deprecated names if we are parsing standard NCDM
+    if (suffix == "_standard" && !legacy_name.empty()) {
+      class_call(readIntegerList(pfc, legacy_name.c_str(), raw2, &flg2, errmsg), errmsg, errmsg);
+    }
+
     if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
-      throw std::invalid_argument(std::string("In input file, you can only enter one of ") +
-                                  varname + std::string(" and ") + varname_deprec +
-                                  std::string(", choose one"));
+      throw std::invalid_argument("In input file, you can only enter one of " + varname + " and " +
+                                  legacy_name + ", choose one");
     }
     else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
       entries_read = static_cast<int>((flg1 == _TRUE_) ? raw.size() : raw2.size());
-      if (entries_read != expected_size) {
-        throw std::invalid_argument(std::string("Number of entries in ") + varname +
-                                    std::string(" does not match the expected number: ") +
-                                    std::to_string(expected_size));
+      if (entries_read != N_expected) {
+        throw std::invalid_argument(
+            "Number of entries in " + varname +
+            " does not match the expected number: " + std::to_string(N_expected));
       }
       output = (flg1 == _TRUE_) ? raw : raw2;
     }
     else {
-      output.assign(expected_size, default_value);
+      output.assign(N_expected, default_value);
     }
     return 0;
   };
 
-  auto read_list_of_doubles_with_deprecated = [&](const std::string& varname,
-                                                  const std::string& varname_deprec,
-                                                  std::vector<double>& output,
-                                                  int expected_size,
-                                                  double default_value) {
-    int flg1, flg2, entries_read;
-    std::vector<double> raw;
+  auto read_list_of_doubles = [&](const std::string& base_name,
+                                  const std::string& legacy_name,
+                                  std::vector<double>& output,
+                                  double default_value) {
+    int flg1, flg2 = _FALSE_, entries_read;
+    std::vector<double> raw, raw2;
+    std::string varname = base_name + suffix;
+
     class_call(readDoubleList(pfc, varname.c_str(), raw, &flg1, errmsg), errmsg, errmsg);
-    std::vector<double> raw2;
-    class_call(readDoubleList(pfc, varname_deprec.c_str(), raw2, &flg2, errmsg), errmsg, errmsg);
+
+    if (suffix == "_standard" && !legacy_name.empty()) {
+      class_call(readDoubleList(pfc, legacy_name.c_str(), raw2, &flg2, errmsg), errmsg, errmsg);
+    }
+
     if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
-      throw std::invalid_argument(std::string("In input file, you can only enter one of ") +
-                                  varname + std::string(" and ") + varname_deprec +
-                                  std::string(", choose one"));
+      throw std::invalid_argument("In input file, you can only enter one of " + varname + " and " +
+                                  legacy_name + ", choose one");
     }
     else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
       entries_read = static_cast<int>((flg1 == _TRUE_) ? raw.size() : raw2.size());
-      if (entries_read != expected_size) {
-        throw std::invalid_argument(std::string("Number of entries in ") + varname +
-                                    std::string(" does not match the expected number: ") +
-                                    std::to_string(expected_size));
+      if (entries_read != N_expected) {
+        throw std::invalid_argument(
+            "Number of entries in " + varname +
+            " does not match the expected number: " + std::to_string(N_expected));
       }
       output = (flg1 == _TRUE_) ? raw : raw2;
     }
     else {
-      output.assign(expected_size, default_value);
+      output.assign(N_expected, default_value);
     }
     return 0;
   };
 
-  // Read lists for standard species and extract element [species_index]
+  // 3. Extract Element [species_index] using clean, suffix-agnostic base strings
   std::vector<int> quadrature_strategies;
-  read_list_of_ints_with_deprecated("quadrature_strategy_ncdm_standard",
-                                    "Quadrature strategy",
-                                    quadrature_strategies,
-                                    N_ncdm_standard,
-                                    0);
+  read_list_of_ints("quadrature_strategy_ncdm", "Quadrature strategy", quadrature_strategies, 0);
   quadrature_strategy_ = quadrature_strategies[species_index];
 
   std::vector<int> input_q_sizes;
-  read_list_of_ints_with_deprecated("N_momentum_bins_ncdm_standard",
-                                    "Number of momentum bins",
-                                    input_q_sizes,
-                                    N_ncdm_standard,
-                                    5);
+  read_list_of_ints("N_momentum_bins_ncdm", "Number of momentum bins", input_q_sizes, 5);
   input_q_size_ = input_q_sizes[species_index];
 
   std::vector<double> qmaxes;
-  read_list_of_doubles_with_deprecated("maximum_q_ncdm_standard",
-                                       "Maximum q",
-                                       qmaxes,
-                                       N_ncdm_standard,
-                                       15.0);
+  read_list_of_doubles("maximum_q_ncdm", "Maximum q", qmaxes, 15.0);
   qmax_ = qmaxes[species_index];
 
   std::vector<double> T_ncdm_list;
-  read_list_of_doubles_with_deprecated("T_ncdm_standard",
-                                       "T_ncdm",
-                                       T_ncdm_list,
-                                       N_ncdm_standard,
-                                       T_ncdm_default);
+  read_list_of_doubles("T_ncdm", "T_ncdm", T_ncdm_list, T_ncdm_default);
   T_ = T_ncdm_list[species_index];
 
   std::vector<double> ksi_ncdm_list;
-  read_list_of_doubles_with_deprecated("ksi_ncdm_standard",
-                                       "ksi_ncdm",
-                                       ksi_ncdm_list,
-                                       N_ncdm_standard,
-                                       ksi_ncdm_default);
+  read_list_of_doubles("ksi_ncdm", "ksi_ncdm", ksi_ncdm_list, ksi_ncdm_default);
   ksi_ = ksi_ncdm_list[species_index];
 
   std::vector<double> deg_ncdm_list;
-  read_list_of_doubles_with_deprecated("deg_ncdm_standard",
-                                       "deg_ncdm",
-                                       deg_ncdm_list,
-                                       N_ncdm_standard,
-                                       deg_ncdm_default);
+  read_list_of_doubles("deg_ncdm", "deg_ncdm", deg_ncdm_list, deg_ncdm_default);
   deg_ = deg_ncdm_list[species_index];
 
   std::vector<double> m_ncdm_list;
-  read_list_of_doubles_with_deprecated("m_ncdm_standard",
-                                       "m_ncdm",
-                                       m_ncdm_list,
-                                       N_ncdm_standard,
-                                       0.0);
+  read_list_of_doubles("m_ncdm", "m_ncdm", m_ncdm_list, 0.0);
   m_in_eV_ = m_ncdm_list[species_index];
 
   std::vector<double> Omega0_ncdm_list;
-  read_list_of_doubles_with_deprecated("Omega_ncdm_standard",
-                                       "Omega_ncdm",
-                                       Omega0_ncdm_list,
-                                       N_ncdm_standard,
-                                       0.0);
+  read_list_of_doubles("Omega_ncdm", "Omega_ncdm", Omega0_ncdm_list, 0.0);
   Omega0_ = Omega0_ncdm_list[species_index];
 
   std::vector<double> omega0_ncdm_list;
-  read_list_of_doubles_with_deprecated("omega_ncdm_standard",
-                                       "omega_ncdm",
-                                       omega0_ncdm_list,
-                                       N_ncdm_standard,
-                                       0.0);
+  read_list_of_doubles("omega_ncdm", "omega_ncdm", omega0_ncdm_list, 0.0);
   omega0_ = omega0_ncdm_list[species_index];
 
   // Resolve omega/Omega conflict and set defaults
@@ -314,6 +290,7 @@ void NCDMBaseSpecies::ReadParameters(FileContent* pfc,
   else {
     omega0_ = Omega0_ * settings.h * settings.h;
   }
+
   if ((Omega0_ == 0.0) && (m_in_eV_ == 0.0)) {
     m_in_eV_ = 1.e-5;  // ultra-relativistic default
   }
@@ -322,40 +299,41 @@ void NCDMBaseSpecies::ReadParameters(FileContent* pfc,
   std::vector<int> got_files;
   {
     int found = _FALSE_;
-    class_call(readIntegerList(pfc, "use_ncdm_psd_files", got_files, &found, errmsg),
+    // We check for "use_ncdm_psd_files" + suffix. Fall back to global if standard.
+    std::string psd_flag_name = "use_ncdm_psd_files" + (suffix == "_standard" ? "" : suffix);
+    class_call(readIntegerList(pfc, psd_flag_name.c_str(), got_files, &found, errmsg),
                errmsg,
                errmsg);
+
     if (found == _FALSE_) {
-      got_files.assign(N_ncdm_standard, _FALSE_);
+      got_files.assign(N_expected, _FALSE_);
     }
-    class_test(static_cast<int>(got_files.size()) != N_ncdm_standard,
+    class_test(static_cast<int>(got_files.size()) != N_expected,
                errmsg,
-               "Number of entries in use_ncdm_psd_files does not match expected number, %d.",
-               N_ncdm_standard);
+               "Number of entries in %s does not match expected number, %d.",
+               psd_flag_name.c_str(),
+               N_expected);
   }
 
-  // Check if this species uses a file
   got_file_ = (got_files[species_index] == _TRUE_);
   if (got_file_) {
-    // Count how many species before this one use files (to find the right filename)
     int filenum = 0;
-    for (int n = 0; n < species_index; n++) {
+    for (int n = 0; n < species_index; n++)
       if (got_files[n] == _TRUE_)
         filenum++;
-    }
 
-    // Count total file entries
     int fileentries = 0;
-    for (int n = 0; n < N_ncdm_standard; n++) {
+    for (int n = 0; n < N_expected; n++)
       if (got_files[n] == _TRUE_)
         fileentries++;
-    }
 
     std::vector<std::string> raw_psd_files;
     int flag_files;
-    class_call(readStringList(pfc, "ncdm_psd_filenames", raw_psd_files, &flag_files, errmsg),
+    std::string psd_file_name = "ncdm_psd_filenames" + (suffix == "_standard" ? "" : suffix);
+    class_call(readStringList(pfc, psd_file_name.c_str(), raw_psd_files, &flag_files, errmsg),
                errmsg,
                errmsg);
+
     class_test(flag_files == _FALSE_,
                errmsg,
                "Input use_ncdm_psd_files is found, but no filenames found!");
@@ -370,24 +348,25 @@ void NCDMBaseSpecies::ReadParameters(FileContent* pfc,
 
   // Read optional PSD parameters
   {
-    int found = _FALSE_;
-    class_call(readDoubleList(pfc, "ncdm_psd_parameters", psd_parameters_, &found, errmsg),
+    int found              = _FALSE_;
+    std::string psd_params = "ncdm_psd_parameters" + (suffix == "_standard" ? "" : suffix);
+    class_call(readDoubleList(pfc, psd_params.c_str(), psd_parameters_, &found, errmsg),
                errmsg,
                errmsg);
-    if (found == _FALSE_) {
+    if (found == _FALSE_)
       psd_parameters_.clear();
-    }
   }
 
-  // Initialize quadrature
+  // The rest remains unchanged: InitQuadrature(settings) and mass evaluations
   InitQuadrature(settings);
 
-  // Compute M_, Omega0_, etc. from the read parameters
   double H0 = settings.h * 1.e5 / _c_;
   if (m_in_eV_ != 0.0) {
     M_ = m_in_eV_ / _k_B_ * _eV_ / T_ / T_cmb_;
     double rho_ncdm;
     ComputeMomenta(0., nullptr, &rho_ncdm, nullptr, nullptr, nullptr);
+    // Overwrite behavior for pure decay products can be managed by the child class if needed,
+    // but standard initialization flows normally here.
     if (Omega0_ == 0.0) {
       Omega0_ = rho_ncdm / H0 / H0;
       omega0_ = Omega0_ * settings.h * settings.h;

@@ -241,6 +241,14 @@ void InputModule::ConstructSpecies() {
       std::string name   = "NCDM_" + std::to_string(dncdm_sp->ncdm_id());
       all_species_[name] = std::make_unique<DNCDM_DR_Species>(std::move(dncdm_sp), pba, nullptr);
     }
+
+    // Build ncdm_interacting species
+    auto interacting_vec =
+        NCDMInteractingSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
+    for (auto& int_sp : interacting_vec) {
+      std::string name   = int_sp->name();
+      all_species_[name] = std::move(int_sp);
+    }
   }
   if (pba->has_scf == _TRUE_) {
     all_species_["ScalarField"] = std::make_unique<ScalarFieldSpecies>(*pba);
@@ -1072,15 +1080,22 @@ int InputModule::input_read_parameters() {
   ncdm_settings.tol_M_ncdm  = ppr->tol_M_ncdm;
   {
     // Build NCDM species temporarily to get N_ncdm, Omega0_ncdm_tot, and DNCDM count
-    auto temp_ncdm       = NCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
-    auto temp_dncdm      = DNCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
-    pba->N_ncdm          = static_cast<int>(temp_ncdm.size() + temp_dncdm.size());
+    auto temp_ncdm        = NCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
+    auto temp_dncdm       = DNCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
+    auto temp_interacting = NCDMInteractingSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
+
+    pba->N_ncdm = static_cast<int>(temp_ncdm.size() + temp_dncdm.size() + temp_interacting.size());
     pba->N_decay_dr      = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + static_cast<int>(temp_dncdm.size());
     pba->Omega0_ncdm_tot = 0.;
-    for (auto& sp : temp_ncdm)
+    for (auto& sp : temp_ncdm) {
       pba->Omega0_ncdm_tot += sp->GetOmega0();
-    for (auto& sp : temp_dncdm)
+    }
+    for (auto& sp : temp_dncdm) {
       pba->Omega0_ncdm_tot += sp->GetOmega0();
+    }
+    for (auto& sp : temp_interacting) {
+      pba->Omega0_ncdm_tot += sp->GetOmega0();
+    }
   }
 
   pba->l_max_idr  = ppr->l_max_idr;

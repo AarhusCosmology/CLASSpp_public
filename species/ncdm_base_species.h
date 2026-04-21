@@ -96,7 +96,8 @@ class NCDMBaseSpecies : public BaseSpecies {
                   EnergyType energy_type,
                   FileContent* pfc,
                   int species_index,
-                  const NcdmSettings& settings);
+                  const NcdmSettings& settings,
+                  const std::string& suffix = "_standard");
 
   // Constructor for decay_dr NCDM species (reads from *_ncdm_decay_dr parameter lists)
   // dncdm_index: 0-based index among decay_dr species
@@ -159,7 +160,10 @@ class NCDMBaseSpecies : public BaseSpecies {
     int last_index = 0;
   };
 
-  void ReadParameters(FileContent* pfc, int species_index, const NcdmSettings& settings);
+  void ReadParameters(FileContent* pfc,
+                      int species_index,
+                      const std::string& suffix,
+                      const NcdmSettings& settings);
   void ReadDecayDrParameters(FileContent* pfc, int dncdm_index, const NcdmSettings& settings);
   void InitQuadrature(const NcdmSettings& settings);
   void InitDistribution(FileContent* pfc, int species_index);

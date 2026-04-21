@@ -19,6 +19,7 @@
 #include "idr.h"
 #include "idr_drmd.h"
 #include "lambda.h"
+#include "ncdm_interacting_species.h"
 #include "ncdm_species.h"
 #include "photons.h"
 #include "scalar_field.h"
