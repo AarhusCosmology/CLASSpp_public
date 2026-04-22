@@ -617,6 +617,14 @@ int BackgroundModule::background_init() {
     }
   }
 
+  //Initialize parameters for calculating decoupling in DRMD
+  if ((pba->has_idr_drmd) && (pba->has_idm_drmd)) {
+    // Set to a large number, so it's larger than the current G_over_aH_drmd_local
+    G_over_aH_tmp_ = 1e20;
+    // Set to -1, so it doesn't print the value unless calculated.
+    z_dec_drmd_ = -1.0;
+  }
+
   /** - assign values to all indices in vectors of background quantities with background_indices()*/
   class_call(background_indices(), error_message_, error_message_);
 
