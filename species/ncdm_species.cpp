@@ -5,6 +5,7 @@
 #include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations_module.h"
+#include "species/species_input.h"
 
 // ── Constructor ─────────────────────────────────────────────────────────────
 
@@ -26,30 +27,120 @@ NCDMSpecies::NCDMSpecies(FileContent* pfc,
 
 // ── CreateAll factory ───────────────────────────────────────────────────────
 
-std::vector<std::unique_ptr<NCDMSpecies>> NCDMSpecies::CreateAll(FileContent* pfc,
-                                                                 const NcdmSettings& settings,
-                                                                 const background* pba,
-                                                                 const BackgroundModule* bgm) {
-  std::vector<std::unique_ptr<NCDMSpecies>> result;
-  char errmsg[2048];
-  int int1, int2, flag1, flag2;
+namespace {
 
+// Field mapping: dot-syntax key (under the instance) -> legacy CSV key.
+struct FieldMap {
+  const char* dot;
+  const char* legacy;
+  const char* default_value;
+};
+constexpr FieldMap kStandardFields[] = {
+    {"m", "m_ncdm", "0"},
+    {"T", "T_ncdm", "0.71611"},
+    {"deg", "deg_ncdm", "1.0"},
+    {"Omega", "Omega_ncdm", "0"},
+    {"omega", "omega_ncdm", "0"},
+    {"ksi", "ksi_ncdm", "0"},
+    {"psd_parameters", "ncdm_psd_parameters", "0"},
+    {"psd_filename", "ncdm_psd_filenames", nullptr},
+    {"use_psd_file", "use_ncdm_psd_files", "0"},
+    {"quadrature_strategy", "quadrature_strategy_ncdm_standard", "0"},
+    {"momenta_bins", "N_momentum_bins_ncdm_standard", "5"},
+    {"max_q", "maximum_q_ncdm_standard", "15"},
+};
+
+std::vector<std::string> synthesise_standard_ncdm_flat_keys(
+    FileContent& pfc, const std::vector<std::string>& instances) {
+  const int n_fields = static_cast<int>(sizeof(kStandardFields) / sizeof(FieldMap));
+  (void) CollectInstanceFieldValues(&pfc, instances, "type");
+  std::vector<std::vector<std::string>> values;
+  values.reserve(n_fields);
+  for (int f = 0; f < n_fields; ++f) {
+    values.push_back(CollectInstanceFieldValues(&pfc, instances, kStandardFields[f].dot));
+  }
+
+  pfc.set("N_ncdm_standard", std::to_string(instances.size()));
+  for (int f = 0; f < n_fields; ++f) {
+    if (!AnyInstanceFieldValue(values[f]))
+      continue;
+
+    if (std::string(kStandardFields[f].dot) == "psd_filename") {
+      const auto use_psd_file_values = CollectInstanceFieldValues(&pfc, instances, "use_psd_file");
+      const std::string csv          = CsvForPsdFilenames(use_psd_file_values,
+                                                          values[f],
+                                                          "use_psd_file",
+                                                          "psd_filename",
+                                                          kStandardFields[f].legacy);
+      if (!csv.empty()) {
+        pfc.set(kStandardFields[f].legacy, csv);
+      }
+      continue;
+    }
+
+    pfc.set(kStandardFields[f].legacy,
+            CsvWithDefaults(values[f], kStandardFields[f].default_value));
+  }
+
+  return instances;
+}
+
+bool has_unconsumed_dot_type_keys(const FileContent& pfc,
+                                  const std::vector<std::string>& instances) {
+  for (const auto& instance : instances) {
+    if (!pfc.was_read(instance + ".type"))
+      return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+std::vector<NCDMSpecies::Named> NCDMSpecies::CreateAll(FileContent* pfc,
+                                                       const NcdmSettings& settings,
+                                                       const background* pba,
+                                                       const BackgroundModule* bgm) {
+  std::vector<Named> result;
+
+  const std::vector<std::string> dot_instances = pfc->instances_with("type", "ncdm_standard");
+
+  int int1 = 0, int2 = 0, flag1 = 0, flag2 = 0;
+  char errmsg[2048];
   class_call(parser_read_int(pfc, "N_ncdm_standard", &int1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
-
   if (flag1 == _TRUE_ && flag2 == _TRUE_) {
     throw std::invalid_argument(
         "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
   }
-
   int N_ncdm_standard = 0;
   if (flag1 == _TRUE_)
     N_ncdm_standard = int1;
   else if (flag2 == _TRUE_)
     N_ncdm_standard = int2;
 
+  const bool has_dot    = !dot_instances.empty();
+  const bool has_legacy = (flag1 == _TRUE_ || flag2 == _TRUE_);
+  if (has_dot && has_legacy && has_unconsumed_dot_type_keys(*pfc, dot_instances)) {
+    throw std::invalid_argument(
+        "cannot mix legacy N_ncdm/N_ncdm_standard with dot-syntax "
+        "'*.type = ncdm_standard'; use one or the other");
+  }
+
+  std::vector<std::string> keys;
+  if (has_dot) {
+    keys            = synthesise_standard_ncdm_flat_keys(*pfc, dot_instances);
+    N_ncdm_standard = static_cast<int>(dot_instances.size());
+  }
+  else {
+    keys.reserve(N_ncdm_standard);
+    for (int n = 0; n < N_ncdm_standard; ++n) {
+      keys.push_back("ncdm__" + std::to_string(n + 1));
+    }
+  }
+
   for (int n = 0; n < N_ncdm_standard; ++n) {
-    result.push_back(std::make_unique<NCDMSpecies>(pfc, n, settings, pba, bgm));
+    auto sp = std::make_unique<NCDMSpecies>(pfc, n, settings, pba, bgm);
+    result.push_back(Named{keys[n], std::move(sp)});
   }
   return result;
 }

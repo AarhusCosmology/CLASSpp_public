@@ -21,6 +21,7 @@
 
 #include "../species/all_species_list.h"
 #include "../species/dcdm_dr_species.h"
+#include "../species/species_input.h"
 
 namespace {
 
@@ -229,26 +230,22 @@ void InputModule::ConstructSpecies() {
     // Build standard NCDM species
     auto ncdm_list =
         NCDMSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
-    for (auto& sp : ncdm_list) {
-      std::string name = sp->name();
-      all_species_.insert(name, std::move(sp));
+    for (auto& e : ncdm_list) {
+      all_species_.insert(e.key, std::move(e.species));
     }
 
     // Build decay_dr species
-    auto dncdm_vec =
-        DNCDMSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
-    for (auto& dncdm_sp : dncdm_vec) {
-      std::string name = "NCDM_" + std::to_string(dncdm_sp->ncdm_id());
-      all_species_.insert(name,
-                          std::make_unique<DNCDM_DR_Species>(std::move(dncdm_sp), pba, nullptr));
+    auto dncdm_dr_vec =
+        DNCDM_DR_Species::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
+    for (auto& e : dncdm_dr_vec) {
+      all_species_.insert(e.key, std::move(e.species));
     }
 
     // Build ncdm_interacting species
     auto interacting_vec =
         NCDMInteractingSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
-    for (auto& int_sp : interacting_vec) {
-      std::string name = int_sp->name();
-      all_species_.insert(name, std::move(int_sp));
+    for (auto& e : interacting_vec) {
+      all_species_.insert(e.key, std::move(e.species));
     }
   }
   if (pba->has_scf == _TRUE_) {
@@ -562,6 +559,13 @@ int InputModule::input_read_precisions() {
 
   /** - set string parameter defaults (require runtime path concatenation) */
   class_call(input_default_precision(), error_message_, error_message_);
+
+  const auto standard_ncdm_instances = file_content_.instances_with("type", "ncdm_standard");
+  SynthesiseIdenticalScalarField(&file_content_,
+                                 standard_ncdm_instances,
+                                 "fluid_approximation",
+                                 "ncdm_fluid_approximation",
+                                 "dot-syntax standard NCDM species");
 
   /** - parse all precision parameters from config file */
   ppr->parse(file_content_);
@@ -1089,14 +1093,14 @@ int InputModule::input_read_parameters() {
     pba->N_ncdm = static_cast<int>(temp_ncdm.size() + temp_dncdm.size() + temp_interacting.size());
     pba->N_decay_dr      = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + static_cast<int>(temp_dncdm.size());
     pba->Omega0_ncdm_tot = 0.;
-    for (auto& sp : temp_ncdm) {
-      pba->Omega0_ncdm_tot += sp->GetOmega0();
+    for (auto& e : temp_ncdm) {
+      pba->Omega0_ncdm_tot += e.species->GetOmega0();
     }
-    for (auto& sp : temp_dncdm) {
-      pba->Omega0_ncdm_tot += sp->GetOmega0();
+    for (auto& e : temp_dncdm) {
+      pba->Omega0_ncdm_tot += e.species->GetOmega0();
     }
-    for (auto& sp : temp_interacting) {
-      pba->Omega0_ncdm_tot += sp->GetOmega0();
+    for (auto& e : temp_interacting) {
+      pba->Omega0_ncdm_tot += e.species->GetOmega0();
     }
   }
 

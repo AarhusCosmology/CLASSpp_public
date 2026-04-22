@@ -81,6 +81,12 @@ class FileContent {
     return read_params_.count(name) > 0;
   }
 
+  /** Return every instance name N such that the entry "N.<field>" has the
+   *  given value. The dot is a literal separator; N must match the instance
+   *  regex [A-Za-z_][A-Za-z0-9_]*. Results are returned in insertion order.
+   *  Does NOT mark anything as read. */
+  std::vector<std::string> instances_with(const std::string& field, const std::string& value) const;
+
   /** Return the names of all parameters that have not yet been read. */
   std::vector<std::string> unread_parameters() const;
 

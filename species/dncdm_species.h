@@ -26,10 +26,15 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                const background* pba,
                const BackgroundModule* bgm);
 
-  static std::vector<std::unique_ptr<DNCDMSpecies>> CreateAll(FileContent* pfc,
-                                                              const NcdmSettings& settings,
-                                                              const background* pba,
-                                                              const BackgroundModule* bgm);
+  struct Named {
+    std::string key;
+    std::unique_ptr<DNCDMSpecies> species;
+  };
+
+  static std::vector<Named> CreateAll(FileContent* pfc,
+                                      const NcdmSettings& settings,
+                                      const background* pba,
+                                      const BackgroundModule* bgm);
 
   // ── Background ──────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;

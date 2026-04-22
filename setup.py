@@ -101,6 +101,7 @@ source_files = (
          'photons.cpp',
          'scalar_field.cpp',
          'species_collection.cpp',
+         'species_input.cpp',
          'ultra_relativistic.cpp',
         'interacting_species.cpp',
     )

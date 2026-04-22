@@ -1,5 +1,6 @@
 #include "parser.h"
 
+#include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -67,6 +68,39 @@ FileContent& FileContent::operator+=(const FileContent& other) {
     filename_ += " or " + other.filename_;
   }
   return *this;
+}
+
+std::vector<std::string> FileContent::instances_with(const std::string& field,
+                                                     const std::string& value) const {
+  std::vector<std::string> out;
+  const std::string suffix = "." + field;
+  for (const std::string& key : keys_) {
+    if (key.size() <= suffix.size())
+      continue;
+    if (key.compare(key.size() - suffix.size(), suffix.size(), suffix) != 0)
+      continue;
+    const std::string name = key.substr(0, key.size() - suffix.size());
+    if (name.empty())
+      continue;
+    char c0 = name[0];
+    if (!(std::isalpha(static_cast<unsigned char>(c0)) || c0 == '_'))
+      continue;
+    bool ok = true;
+    for (char c : name) {
+      if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok)
+      continue;
+    auto it = params_.find(key);
+    if (it == params_.end())
+      continue;
+    if (it->second == value)
+      out.push_back(name);
+  }
+  return out;
 }
 
 std::vector<std::string> FileContent::unread_parameters() const {

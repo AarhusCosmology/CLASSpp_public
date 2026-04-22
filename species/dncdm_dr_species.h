@@ -20,10 +20,15 @@ class DNCDM_DR_Species : public CompositeSpecies {
                    const background* pba,
                    const BackgroundModule* bgm);
 
-  static std::vector<std::unique_ptr<DNCDM_DR_Species>> CreateAll(FileContent* pfc,
-                                                                  const NcdmSettings& settings,
-                                                                  const background* pba,
-                                                                  const BackgroundModule* bgm);
+  struct Named {
+    std::string key;
+    std::unique_ptr<DNCDM_DR_Species> species;
+  };
+
+  static std::vector<Named> CreateAll(FileContent* pfc,
+                                      const NcdmSettings& settings,
+                                      const background* pba,
+                                      const BackgroundModule* bgm);
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;

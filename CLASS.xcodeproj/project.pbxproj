@@ -52,6 +52,7 @@
 		CC0000250000000000000039 /* interacting_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC0000240000000000000038 /* interacting_species.cpp */; };
 		EE0000020000000000000001 /* composite_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000010000000000000001 /* composite_species.cpp */; };
 		EE1000020000000000000001 /* species_collection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE1000010000000000000001 /* species_collection.cpp */; };
+		EE2000020000000000000001 /* species_input.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE2000010000000000000001 /* species_input.cpp */; };
 		EE0000050000000000000001 /* dcdm_dr_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000040000000000000001 /* dcdm_dr_species.cpp */; };
 		EE0000080000000000000001 /* idm_dr_idr_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000070000000000000001 /* idm_dr_idr_species.cpp */; };
 		EE00000B0000000000000001 /* idm_drmd_idr_drmd_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE00000A0000000000000001 /* idm_drmd_idr_drmd_species.cpp */; };
@@ -189,6 +190,8 @@
 		EE0000030000000000000001 /* composite_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = composite_species.h; sourceTree = "<group>"; };
 		EE1000010000000000000001 /* species_collection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = species_collection.cpp; sourceTree = "<group>"; };
 		EE1000030000000000000001 /* species_collection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = species_collection.h; sourceTree = "<group>"; };
+		EE2000010000000000000001 /* species_input.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = species_input.cpp; sourceTree = "<group>"; };
+		EE2000030000000000000001 /* species_input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = species_input.h; sourceTree = "<group>"; };
 		EE0000040000000000000001 /* dcdm_dr_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dcdm_dr_species.cpp; sourceTree = "<group>"; };
 		EE0000060000000000000001 /* dcdm_dr_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dcdm_dr_species.h; sourceTree = "<group>"; };
 		EE0000070000000000000001 /* idm_dr_idr_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = idm_dr_idr_species.cpp; sourceTree = "<group>"; };
@@ -398,6 +401,8 @@
 				EE0000030000000000000001 /* composite_species.h */,
 				EE1000010000000000000001 /* species_collection.cpp */,
 				EE1000030000000000000001 /* species_collection.h */,
+				EE2000010000000000000001 /* species_input.cpp */,
+				EE2000030000000000000001 /* species_input.h */,
 				EE0000040000000000000001 /* dcdm_dr_species.cpp */,
 				EE0000060000000000000001 /* dcdm_dr_species.h */,
 				EE0000070000000000000001 /* idm_dr_idr_species.cpp */,
@@ -517,6 +522,7 @@
 				CC0000250000000000000039 /* interacting_species.cpp in Sources */,
 				EE0000020000000000000001 /* composite_species.cpp in Sources */,
 				EE1000020000000000000001 /* species_collection.cpp in Sources */,
+				EE2000020000000000000001 /* species_input.cpp in Sources */,
 				EE0000050000000000000001 /* dcdm_dr_species.cpp in Sources */,
 				EE0000080000000000000001 /* idm_dr_idr_species.cpp in Sources */,
 				EE00000B0000000000000001 /* idm_drmd_idr_drmd_species.cpp in Sources */,

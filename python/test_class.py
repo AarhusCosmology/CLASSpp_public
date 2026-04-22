@@ -649,6 +649,60 @@ class TestTensorMassiveNcdmRegression(TestClass):
 
 
 class TestReviewRegressions(TestClass):
+    def _dot_syntax_base(self):
+        return {
+            'h': 0.67556,
+            'omega_b': 0.022032,
+            'omega_cdm': 0.12038,
+            'A_s': 2.215e-9,
+            'n_s': 0.9619,
+            'tau_reio': 0.054,
+            'YHe': 0.25,
+            'output': 'tCl',
+            'l_max_scalars': 100,
+            'N_ur': 0.0,
+        }
+
+    def _assert_compute_succeeds(self, scenario):
+        self.scenario = dict(scenario)
+        self.name = self._testMethodName
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        self.assertTrue(self.cosmo.state)
+
+    def _assert_compute_fails(self, scenario, message):
+        self.scenario = dict(scenario)
+        self.name = self._testMethodName
+        self.cosmo.set(dict(self.verbose, **scenario))
+        with self.assertRaises(CosmoSevereError) as ctx:
+            self.cosmo.compute()
+        self.assertIn(message, str(ctx.exception))
+
+    def _assert_scenarios_match(self, scenario, reference_scenario, reference_name):
+        self.scenario = dict(reference_scenario)
+        self.name = self._testMethodName
+
+        candidate = Class()
+        reference = Class()
+        try:
+            candidate.set(dict(self.verbose, **scenario))
+            candidate.compute()
+            reference.set(dict(self.verbose, **reference_scenario))
+            reference.compute()
+            status = self.compare_output(
+                reference,
+                reference_name,
+                candidate,
+                "Candidate",
+                COMPARE_CL_RELATIVE_ERROR,
+                COMPARE_PK_RELATIVE_ERROR)
+            self.assertTrue(status, f"Scenario mismatch against {reference_name}")
+        finally:
+            reference.struct_cleanup()
+            reference.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+
     def _compute_candidate_and_reference(self, scenario):
         try:
             import classyref
@@ -757,6 +811,94 @@ class TestReviewRegressions(TestClass):
         self.cosmo.set(dict(self.verbose, **scenario))
         self.cosmo.compute()
         self.assertTrue(self.cosmo.state)
+
+    def test_dot_syntax_standard_partial_field_uses_legacy_defaults(self):
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_standard',
+            'nu1.m': 0.06,
+            'nu1.deg': 2.0,
+            'nu2.type': 'ncdm_standard',
+            'nu2.m': 0.08,
+        }
+        reference = dict(scenario, **{'nu2.deg': 1.0})
+        self._assert_scenarios_match(scenario, reference, "Explicit legacy default")
+
+    def test_dot_syntax_standard_fluid_approximation_must_match(self):
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_standard',
+            'nu1.m': 0.06,
+            'nu1.fluid_approximation': 2,
+            'nu2.type': 'ncdm_standard',
+            'nu2.m': 0.08,
+            'nu2.fluid_approximation': 3,
+        }
+        self._assert_compute_fails(scenario, "must be identical for all dot-syntax standard NCDM species")
+
+    def test_dot_syntax_standard_psd_filenames_follow_true_flags(self):
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_standard',
+            'nu1.m': 0.06,
+            'nu1.use_psd_file': 1,
+            'nu1.psd_filename': '../psd_FD_single.dat',
+            'nu2.type': 'ncdm_standard',
+            'nu2.m': 0.08,
+            'nu2.use_psd_file': 0,
+        }
+        self._assert_compute_succeeds(scenario)
+
+    def test_dot_syntax_interacting_partial_field_uses_legacy_defaults(self):
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_self_interacting',
+            'nu1.m': 0.06,
+            'nu1.deg': 2.0,
+            'nu2.type': 'ncdm_self_interacting',
+            'nu2.m': 0.08,
+        }
+        reference = dict(scenario, **{'nu2.deg': 1.0})
+        self._assert_scenarios_match(scenario, reference, "Explicit legacy default")
+
+    def test_dot_syntax_interacting_mixed_geff_representations_are_rejected(self):
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_self_interacting',
+            'nu1.m': 0.06,
+            'nu1.G_eff': 1e-4,
+            'nu2.type': 'ncdm_self_interacting',
+            'nu2.m': 0.08,
+            'nu2.log10G_eff': -4.0,
+        }
+        self._assert_compute_fails(scenario, "cannot mix G_eff and log10G_eff representations")
+
+    def test_dot_syntax_interacting_psd_filenames_follow_true_flags(self):
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_self_interacting',
+            'nu1.m': 0.06,
+            'nu1.use_psd_file': 1,
+            'nu1.psd_filename': '../psd_FD_single.dat',
+            'nu2.type': 'ncdm_self_interacting',
+            'nu2.m': 0.08,
+            'nu2.use_psd_file': 0,
+        }
+        self._assert_compute_succeeds(scenario)
+
+    def test_dot_syntax_decay_dr_partial_field_uses_legacy_defaults(self):
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_decay_dr',
+            'nu1.m': 0.06,
+            'nu1.Gamma': 1e-3,
+            'nu1.deg': 2.0,
+            'nu2.type': 'ncdm_decay_dr',
+            'nu2.m': 0.08,
+            'nu2.Gamma': 2e-3,
+        }
+        reference = dict(scenario, **{'nu2.deg': 1.0})
+        self._assert_scenarios_match(scenario, reference, "Explicit legacy default")
 
 
 if __name__ == '__main__':

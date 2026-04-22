@@ -13,11 +13,14 @@ class NCDMInteractingSpecies : public NCDMSpecies {
                          const BackgroundModule* bgm);
 
   // Factory method to read N_ncdm_interacting and create instances
-  static std::vector<std::unique_ptr<NCDMInteractingSpecies>> CreateAll(
-      FileContent* pfc,
-      const NcdmSettings& settings,
-      const background* pba,
-      const BackgroundModule* bgm);
+  struct Named {
+    std::string key;
+    std::unique_ptr<NCDMInteractingSpecies> species;
+  };
+  static std::vector<Named> CreateAll(FileContent* pfc,
+                                      const NcdmSettings& settings,
+                                      const background* pba,
+                                      const BackgroundModule* bgm);
 
   // Override PerturbDerivs to append collision terms
   void PerturbDerivs(double tau,

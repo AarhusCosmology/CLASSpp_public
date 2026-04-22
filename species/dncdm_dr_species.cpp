@@ -6,16 +6,17 @@
 #include "background_module.h"
 #include "perturbations_module.h"
 
-std::vector<std::unique_ptr<DNCDM_DR_Species>> DNCDM_DR_Species::CreateAll(
-    FileContent* pfc,
-    const NcdmSettings& settings,
-    const background* pba,
-    const BackgroundModule* bgm) {
+std::vector<DNCDM_DR_Species::Named> DNCDM_DR_Species::CreateAll(FileContent* pfc,
+                                                                 const NcdmSettings& settings,
+                                                                 const background* pba,
+                                                                 const BackgroundModule* bgm) {
   auto dncdm_vec = DNCDMSpecies::CreateAll(pfc, settings, pba, bgm);
-  std::vector<std::unique_ptr<DNCDM_DR_Species>> result;
+  std::vector<Named> result;
   result.reserve(dncdm_vec.size());
-  for (auto& dncdm : dncdm_vec)
-    result.push_back(std::make_unique<DNCDM_DR_Species>(std::move(dncdm), pba, bgm));
+  for (auto& e : dncdm_vec) {
+    result.push_back(
+        Named{e.key, std::make_unique<DNCDM_DR_Species>(std::move(e.species), pba, bgm)});
+  }
   return result;
 }
 
