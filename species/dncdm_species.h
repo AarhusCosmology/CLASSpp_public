@@ -131,6 +131,17 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   std::tuple<double, double> GetRescaledParameters(double a,
                                                    const double* lnf_array) const override;
 
+  /**
+   * Returns rescaled (delta, theta, shear) for this decaying NCDM flavor.
+   * Rescaling subtracts a common lnN from every lnf to prevent exp(lnf)
+   * underflow near the precision floor; lnN cancels in the delta/theta/shear
+   * ratios, so this is mathematically equivalent to the unrescaled form but
+   * numerically stable.
+   */
+  std::tuple<double, double, double> RescaledPerturbations(double a,
+                                                           double k,
+                                                           const perturb_workspace* ppw) const;
+
  private:
   int ncdm_id_;  // overall NCDM index
   const background* pba_;

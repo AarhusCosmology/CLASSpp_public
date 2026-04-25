@@ -45,6 +45,8 @@ class CompositeSpecies : public BaseSpecies {
 
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override;
+  void SetThermodynamicsModule(const ThermodynamicsModule* thm) override;
+  void SetPerturbs(const perturbs* ppt) override;
   void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
@@ -84,6 +86,20 @@ class CompositeSpecies : public BaseSpecies {
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+
+  // ── Matter tally ────────────────────────────────────────────────────────
+  bool IsMatterSpecies() const override;
+  bool IsColdMatterSpecies() const override;
+  double MatterRho(const double* pvecback) const override;
+  double MatterRhoDelta(const perturb_vector* pv,
+                        const double* y,
+                        const double* pvecback,
+                        const perturb_workspace* ppw) const override;
+  double MatterRhoPlusPTheta(const perturb_vector* pv,
+                             const double* y,
+                             const double* pvecback,
+                             const perturb_workspace* ppw) const override;
+  double MatterRhoPlusP(const double* pvecback) const override;
 
  protected:
   std::vector<std::unique_ptr<BaseSpecies>> children_;

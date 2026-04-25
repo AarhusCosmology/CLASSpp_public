@@ -126,6 +126,31 @@ void IDRSpecies::PerturbDerivs(double /*tau*/,
   }
 }
 
+double IDRSpecies::TcaShearIdr(const perturb_vector* pv,
+                               const double* y,
+                               const perturb_workspace* ppw) const {
+  // TCA shear is meaningful when shear_idr is NOT in the y-vector (i.e. we
+  // didn't register it because TCA was on at vector-init). The vector-layout
+  // check is the canonical signal — we deliberately don't gate on
+  // ppw->approx[index_ap_tca_idm_dr] because perturb_vector_init calls this
+  // during the tca_on -> tca_off transition (after the approx flag has flipped
+  // but with the old vector still in ppw->pv), and we need the last TCA
+  // prediction to seed the new shear_idr integration.
+  if (ppw->scalar_ctx.idr_nature != idr_free_streaming)
+    return 0.;
+  if (pv->index_pt_shear_idr >= 0)
+    return 0.;
+  if (ppw->approx[ppw->index_ap_rsa_idr] != (int) rsa_idr_off)
+    return 0.;
+  if (pba_.has_idm_dr != _TRUE_)
+    return 0.;
+  if (ppt_->gauge != newtonian)
+    return 0.;  // synchronous gauge derives shear in perturb_einstein
+
+  return 0.5 * (8. / 15. / ppw->pvecthermo[thm_->index_th_dmu_idm_dr_] / ppt_->alpha_idm_dr[0] *
+                y[pv->index_pt_theta_idr]);
+}
+
 double IDRSpecies::RhoPlusPShear(const perturb_vector* pv,
                                  const double* y,
                                  const double* pvecback,
@@ -134,7 +159,7 @@ double IDRSpecies::RhoPlusPShear(const perturb_vector* pv,
     return 0.;
 
   const double shear_idr = (pv->index_pt_shear_idr >= 0) ? y[pv->index_pt_shear_idr]
-                                                         : ppw->tca_shear_idm_dr;
+                                                         : TcaShearIdr(pv, y, ppw);
 
   return 4. / 3. * pvecback[index_bg_rho_] * shear_idr;
 }

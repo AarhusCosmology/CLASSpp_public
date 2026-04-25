@@ -3,6 +3,8 @@
 #include "base_species.h"
 #include "perturbations.h"
 
+class ThermodynamicsModule;  // forward declaration
+
 /**
  * IDR: Interacting Dark Radiation.
  * Coupled to IDM_DR.
@@ -11,6 +13,21 @@ class IDRSpecies : public BaseSpecies {
  public:
   explicit IDRSpecies(const background& pba)
       : BaseSpecies("IDR", EnergyType::Radiation), pba_(pba) {}
+
+  void SetThermodynamicsModule(const ThermodynamicsModule* thm) override {
+    thm_ = thm;
+  }
+  void SetPerturbs(const perturbs* ppt) override {
+    ppt_ = ppt;
+  }
+
+  /**
+   * IDR shear under TCA with IDM_DR. Returns the TCA shear prediction if all
+   * TCA guards are satisfied; otherwise returns 0. Called by RhoPlusPShear
+   * (when shear_idr is not in the y-vector) and by external code that needs
+   * the TCA shear (perturb_vector_init, IDM_DR_IDR_Species::PrintVariables).
+   */
+  double TcaShearIdr(const perturb_vector* pv, const double* y, const perturb_workspace* ppw) const;
 
   bool IsFreestreaming() const override {
     return true;
@@ -71,4 +88,6 @@ class IDRSpecies : public BaseSpecies {
 
  private:
   const background& pba_;
+  const ThermodynamicsModule* thm_ = nullptr;
+  const perturbs* ppt_             = nullptr;
 };

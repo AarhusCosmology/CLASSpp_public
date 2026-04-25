@@ -40,6 +40,16 @@ void CompositeSpecies::SetBackgroundModule(const BackgroundModule* bgm) {
     child->SetBackgroundModule(bgm);
 }
 
+void CompositeSpecies::SetThermodynamicsModule(const ThermodynamicsModule* thm) {
+  for (auto& child : children_)
+    child->SetThermodynamicsModule(thm);
+}
+
+void CompositeSpecies::SetPerturbs(const perturbs* ppt) {
+  for (auto& child : children_)
+    child->SetPerturbs(ppt);
+}
+
 void CompositeSpecies::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
   for (auto& child : children_)
     child->SetBackgroundInitialConditions(a_rel, pvecback_integration);
@@ -160,4 +170,52 @@ double CompositeSpecies::RhoPlusPShear(const perturb_vector* pv,
   for (const auto& child : children_)
     s += child->RhoPlusPShear(pv, y, pvecback, ppw);
   return s;
+}
+
+bool CompositeSpecies::IsMatterSpecies() const {
+  for (const auto& child : children_)
+    if (child->IsMatterSpecies())
+      return true;
+  return false;
+}
+
+bool CompositeSpecies::IsColdMatterSpecies() const {
+  for (const auto& child : children_)
+    if (child->IsColdMatterSpecies())
+      return true;
+  return false;
+}
+
+double CompositeSpecies::MatterRho(const double* pvecback) const {
+  double r = 0.;
+  for (const auto& child : children_)
+    r += child->MatterRho(pvecback);
+  return r;
+}
+
+double CompositeSpecies::MatterRhoDelta(const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const {
+  double rd = 0.;
+  for (const auto& child : children_)
+    rd += child->MatterRhoDelta(pv, y, pvecback, ppw);
+  return rd;
+}
+
+double CompositeSpecies::MatterRhoPlusPTheta(const perturb_vector* pv,
+                                             const double* y,
+                                             const double* pvecback,
+                                             const perturb_workspace* ppw) const {
+  double rpt = 0.;
+  for (const auto& child : children_)
+    rpt += child->MatterRhoPlusPTheta(pv, y, pvecback, ppw);
+  return rpt;
+}
+
+double CompositeSpecies::MatterRhoPlusP(const double* pvecback) const {
+  double rp = 0.;
+  for (const auto& child : children_)
+    rp += child->MatterRhoPlusP(pvecback);
+  return rp;
 }

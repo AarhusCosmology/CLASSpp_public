@@ -14,6 +14,8 @@ struct perturb_parameters_and_workspace;
 
 class BackgroundModule;        // forward declaration
 class BackgroundColumnWriter;  // forward declaration
+class ThermodynamicsModule;    // forward declaration
+struct perturbs;               // forward declaration
 
 /**
  * Abstract base class for all cosmological species.
@@ -53,6 +55,18 @@ class BaseSpecies {
    * Species that need it override this; default is no-op.
    */
   virtual void SetBackgroundModule(const BackgroundModule* /*bgm*/) {}
+
+  /**
+   * Called by PerturbationsModule during construction to provide access to
+   * the thermodynamics module (pvecthermo indices, etc.). Default: no-op.
+   */
+  virtual void SetThermodynamicsModule(const ThermodynamicsModule* /*thm*/) {}
+
+  /**
+   * Called by PerturbationsModule during construction to provide access to
+   * the perturbs struct (alpha_idm_dr, gauge, etc.). Default: no-op.
+   */
+  virtual void SetPerturbs(const perturbs* /*ppt*/) {}
 
   // ── Background ────────────────────────────────────────────────────────────
 
@@ -297,6 +311,55 @@ class BaseSpecies {
    * Newtonian gauge transformation is handled by the module after this loop.
    */
   virtual void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) {}
+
+  // ── Matter tally ──────────────────────────────────────────────────────────
+
+  /**
+   * True iff this sector participates in the matter tally (delta_m, theta_m,
+   * and the delta_cb / theta_cb passes that cap out in perturb_total_stress_energy).
+   * Default: based on EnergyType::Matter. Overrides: IDM_DR returns false
+   * (preserves a pre-existing asymmetry in the matter tally — see follow-up issue).
+   * Composites return true iff any child is matter.
+   */
+  virtual bool IsMatterSpecies() const {
+    return energy_type_ == EnergyType::Matter;
+  }
+
+  /** Rho contribution to the matter tally. Default: Rho() if IsMatterSpecies, else 0. */
+  virtual double MatterRho(const double* pvecback) const {
+    return IsMatterSpecies() ? Rho(pvecback) : 0.;
+  }
+
+  /** Rho * Delta contribution to delta_rho_m. Default: Rho*Delta if IsMatterSpecies, else 0. */
+  virtual double MatterRhoDelta(const perturb_vector* pv,
+                                const double* y,
+                                const double* pvecback,
+                                const perturb_workspace* ppw) const {
+    return IsMatterSpecies() ? Rho(pvecback) * Delta(pv, y, pvecback, ppw) : 0.;
+  }
+
+  /** (Rho+P) * Theta contribution to rho_plus_p_theta_m. */
+  virtual double MatterRhoPlusPTheta(const perturb_vector* pv,
+                                     const double* y,
+                                     const double* pvecback,
+                                     const perturb_workspace* ppw) const {
+    return IsMatterSpecies() ? (Rho(pvecback) + P(pvecback)) * Theta(pv, y, pvecback, ppw) : 0.;
+  }
+
+  /** Rho+P contribution to rho_plus_p_m. */
+  virtual double MatterRhoPlusP(const double* pvecback) const {
+    return IsMatterSpecies() ? Rho(pvecback) + P(pvecback) : 0.;
+  }
+
+  /**
+   * True iff this sector participates in the cold-matter tally (delta_cb,
+   * theta_cb). Cold matter excludes NCDM/DNCDM (which are "warm" matter) but
+   * otherwise mirrors IsMatterSpecies. Default: IsMatterSpecies. Overrides:
+   * NCDMBaseSpecies returns false; composites scan children.
+   */
+  virtual bool IsColdMatterSpecies() const {
+    return IsMatterSpecies();
+  }
 
  protected:
   BaseSpecies(std::string name, EnergyType energy_type)

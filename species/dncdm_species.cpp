@@ -632,41 +632,27 @@ void DNCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx
 // ── Integrated observables ──────────────────────────────────────────────────
 
 double DNCDMSpecies::Delta(const perturb_vector* pv,
-                           const double* y,
-                           const double* pvecback,
+                           const double* /*y*/,
+                           const double* /*pvecback*/,
                            const perturb_workspace* ppw) const {
   if (pv->index_ncdm_.at(ncdm_id_).empty())
     return 0.;
-
-  const double a        = ppw->scalar_ctx.a;
-  double rho_delta_ncdm = 0.0;
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0             = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * dq_[iq];
-    const double q        = q_[iq];
-    const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
-    rho_delta_ncdm       += q * q * epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
-  }
-  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
-  return rho_delta_ncdm * fac / pvecback[index_bg_rho_];
+  const double a = ppw->scalar_ctx.a;
+  const double k = ppw->scalar_ctx.k;
+  auto [d, t, s] = RescaledPerturbations(a, k, ppw);
+  return d;
 }
 
 double DNCDMSpecies::Theta(const perturb_vector* pv,
-                           const double* y,
-                           const double* pvecback,
+                           const double* /*y*/,
+                           const double* /*pvecback*/,
                            const perturb_workspace* ppw) const {
   if (pv->index_ncdm_.at(ncdm_id_).empty())
     return 0.;
-
-  const double a               = ppw->scalar_ctx.a;
-  double rho_plus_p_theta_ncdm = 0.0;
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0              = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * dq_[iq];
-    const double q         = q_[iq];
-    rho_plus_p_theta_ncdm += q * q * q * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 1];
-  }
-  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
-  const double k   = ppw->scalar_ctx.k;
-  return rho_plus_p_theta_ncdm * k * fac / (pvecback[index_bg_rho_] + pvecback[index_bg_p_]);
+  const double a = ppw->scalar_ctx.a;
+  const double k = ppw->scalar_ctx.k;
+  auto [d, t, s] = RescaledPerturbations(a, k, ppw);
+  return t;
 }
 
 double DNCDMSpecies::DeltaP(const perturb_vector* pv,
@@ -689,20 +675,49 @@ double DNCDMSpecies::DeltaP(const perturb_vector* pv,
 }
 
 double DNCDMSpecies::RhoPlusPShear(const perturb_vector* pv,
-                                   const double* y,
+                                   const double* /*y*/,
                                    const double* pvecback,
                                    const perturb_workspace* ppw) const {
   if (pv->index_ncdm_.at(ncdm_id_).empty())
     return 0.;
+  const double a = ppw->scalar_ctx.a;
+  const double k = ppw->scalar_ctx.k;
+  auto [d, t, s] = RescaledPerturbations(a, k, ppw);
+  return (Rho(pvecback) + P(pvecback)) * s;
+}
 
-  const double a               = ppw->scalar_ctx.a;
-  double rho_plus_p_shear_ncdm = 0.0;
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-    double w0              = std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]) * dq_[iq];
-    const double q         = q_[iq];
-    const double epsilon   = std::sqrt(q * q + std::pow(M_ * a, 2));
-    rho_plus_p_shear_ncdm += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 2];
+std::tuple<double, double, double> DNCDMSpecies::RescaledPerturbations(
+    double a, double k, const perturb_workspace* ppw) const {
+  double rho_scaled              = 0.;
+  double rho_plus_p_scaled       = 0.;
+  double rho_delta_scaled        = 0.;
+  double rho_plus_p_theta_scaled = 0.;
+  double rho_plus_p_shear_scaled = 0.;
+
+  const double* lnf_array = ppw->pvecback + bg_lnf_index();
+  const double lnN        = GetRescalingFactor(lnf_array);
+
+  for (int index_q = 0; index_q < q_size(); index_q++) {
+    const int index_pt   = ppw->pv->index_ncdm_[ncdm_id()][index_q];
+    const double dq_val  = dq()[index_q];
+    const double lnf     = lnf_array[index_q];
+    const double q       = q_[index_q];
+    const double q2      = q * q;
+    const double epsilon = std::sqrt(q2 + a * a * M_ * M_);
+
+    rho_scaled              += dq_val * q2 * epsilon * std::exp(lnN + lnf);
+    rho_plus_p_scaled       += dq_val * q2 * (epsilon + q2 / 3. / epsilon) * std::exp(lnN + lnf);
+    rho_delta_scaled        += dq_val * q2 * epsilon * std::exp(lnN + lnf) * ppw->pv->y[index_pt];
+    rho_plus_p_theta_scaled += dq_val * q2 * q * std::exp(lnN + lnf) * ppw->pv->y[index_pt + 1];
+    rho_plus_p_shear_scaled += dq_val * q2 * q2 / epsilon * std::exp(lnN + lnf) *
+                               ppw->pv->y[index_pt + 2];
   }
-  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
-  return 2.0 / 3.0 * fac * rho_plus_p_shear_ncdm;
+  rho_plus_p_theta_scaled *= k;
+  rho_plus_p_shear_scaled *= 2. / 3.;
+
+  const double delta = rho_delta_scaled / rho_scaled;
+  const double theta = rho_plus_p_theta_scaled / rho_plus_p_scaled;
+  const double shear = rho_plus_p_shear_scaled / rho_plus_p_scaled;
+
+  return {delta, theta, shear};
 }

@@ -206,10 +206,12 @@ void NCDMSpecies::FillSources(const double* /*y*/,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const int n            = ncdm_id_;
-  const double* pvecback = ppw->pvecback;
+  const int n              = ncdm_id_;
+  const double* pvecback   = ppw->pvecback;
+  const perturb_vector* pv = ppw->pv;
+  const double* y          = ppw->pv->y;
 
-  // delta_ncdm[n]: density perturbation (pre-computed in perturb_sources_member)
+  // delta_ncdm[n]: density perturbation
   if (p_mod->has_source_delta_ncdm_ == _TRUE_) {
     const double w = pvecback[index_bg_p_] / pvecback[index_bg_rho_];
     p_mod->SetSourceValue(ctx.index_md,
@@ -217,18 +219,19 @@ void NCDMSpecies::FillSources(const double* /*y*/,
                           p_mod->index_tp_delta_ncdm1_ + n,
                           ctx.index_tau,
                           ctx.index_k,
-                          ppw->delta_ncdm[n] + 3. * ctx.a_prime_over_a * (1. + w) *
-                                                   ctx.theta_over_k2);  // N-body gauge correction
+                          Delta(pv, y, pvecback, ppw) +
+                              3. * ctx.a_prime_over_a * (1. + w) *
+                                  ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  // theta_ncdm[n]: velocity perturbation (pre-computed in perturb_sources_member)
+  // theta_ncdm[n]: velocity perturbation
   if (p_mod->has_source_theta_ncdm_ == _TRUE_) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_theta_ncdm1_ + n,
                           ctx.index_tau,
                           ctx.index_k,
-                          ppw->theta_ncdm[n] + ctx.theta_shift);  // N-body gauge correction
+                          Theta(pv, y, pvecback, ppw) + ctx.theta_shift);
   }
 }
 

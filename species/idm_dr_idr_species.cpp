@@ -149,7 +149,7 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
         if (ppt->idr_nature == idr_free_streaming) {
           if ((pba->has_idm_dr == _TRUE_) &&
               (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
-            shear_idr = ppw->tca_shear_idm_dr;
+            shear_idr = idr_->TcaShearIdr(pv, y, ppw);
           }
           else {
             shear_idr = y[pv->index_pt_shear_idr];

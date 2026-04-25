@@ -44,6 +44,11 @@ PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
                                          ThermodynamicsModulePtr thermodynamics_module)
     : BaseModule(std::move(input_module)), background_module_(std::move(background_module)),
       thermodynamics_module_(std::move(thermodynamics_module)) {
+  /* Wire ThermodynamicsModule and perturbs on all species (defaults are no-ops) */
+  for (const auto& [name, sp] : all_species_) {
+    sp->SetThermodynamicsModule(thermodynamics_module_.get());
+    sp->SetPerturbs(ppt);
+  }
   perturb_init();
 }
 
@@ -2370,18 +2375,6 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
 
   /** - allocate fields where some of the perturbations are stored */
 
-  if (_scalars_) {
-    if ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_) ||
-        (has_source_delta_m_ == _TRUE_)) {
-      ppw->delta_ncdm_storage.resize(pba->N_ncdm);
-      ppw->theta_ncdm_storage.resize(pba->N_ncdm);
-      ppw->shear_ncdm_storage.resize(pba->N_ncdm);
-      ppw->delta_ncdm = ppw->delta_ncdm_storage.data();
-      ppw->theta_ncdm = ppw->theta_ncdm_storage.data();
-      ppw->shear_ncdm = ppw->shear_ncdm_storage.data();
-    }
-  }
-
   return _SUCCESS_;
 }
 
@@ -4172,7 +4165,9 @@ int PerturbationsModule::perturb_vector_init(
 
             /* idr is always free streaming if tca_idm_dr is on */
             if (ppt->idr_nature == idr_free_streaming) {
-              ppv->y[ppv->index_pt_shear_idr] = ppw->tca_shear_idm_dr;
+              auto& idm_dr_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+              ppv->y[ppv->index_pt_shear_idr] =
+                  idm_dr_idr.idr().TcaShearIdr(ppw->pv, ppw->pv->y, ppw);
               ppv->y[ppv->index_pt_l3_idr] =
                   6. / 7. * k * ppv->y[ppv->index_pt_shear_idr] /
                   ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
@@ -6101,7 +6096,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     double delta_rho_m        = 0.;
     double rho_plus_p_m       = 0.;
     double rho_plus_p_theta_m = 0.;
-    double shear_idr          = 0.;
     double delta_p_b_over_rho_b;
 
     /** - --> (a) deal with approximation schemes */
@@ -6154,29 +6148,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
                              y[ppw->pv->index_pt_delta_b];
     }
 
-    /** - ---> (a.4.) interacting dark radiation */
-
-    if (all_species_.count("IDM_DR_IDR")) {
-      if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-        if (ppt->idr_nature == idr_free_streaming) {
-          if ((all_species_.count("IDM_DR_IDR")) &&
-              (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
-            if (ppt->gauge == newtonian)
-              shear_idr = 0.5 * (8. / 15. /
-                                 ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
-                                 ppt->alpha_idm_dr[0] * (y[ppw->pv->index_pt_theta_idr]));
-            else
-              shear_idr = 0.; /* this is set in perturb_einstein, so here it's set to 0 */
-            ppw->tca_shear_idm_dr = shear_idr;
-          }
-          else {
-          }
-        }
-      }
-      else {
-      }
-    }
-
     /** - --> (b) store pre-computed approximation-corrected values for species dispatch */
 
     ppw->scalar_ctx.shear_g              = shear_g;
@@ -6222,209 +6193,72 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       }
     }
 
-    /* cdm contribution */
-    if (all_species_.count("CDM")) {
-      const auto& CDM        = all_species_.at("CDM");
-      const double rho_cdm   = CDM->Rho(ppw->pvecback);
-      const double delta_cdm = CDM->Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_cdm =
-          CDM->Theta(ppw->pv, y, ppw->pvecback, ppw);  // 0 in synchronous gauge
-
-      ppw->delta_rho        += rho_cdm * delta_cdm;
-      ppw->rho_plus_p_theta += rho_cdm * theta_cdm;  // p_cdm = 0, so rho+p = rho
-      ppw->rho_plus_p_tot   += rho_cdm;
-
-      if (has_source_delta_m_ == _TRUE_) {
-        delta_rho_m += rho_cdm * delta_cdm;
-        rho_m       += rho_cdm;
-      }
-      if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
-        rho_plus_p_theta_m += rho_cdm * theta_cdm;
-        rho_plus_p_m       += rho_cdm;
-      }
+    /* Pass 1: accumulate rho_plus_p_shear over all sectors except photons,
+       baryons, and (PPF) fluid. Photons are already in ppw->rho_plus_p_shear
+       from the photon/baryon block above; baryons contribute zero shear. */
+    for (const auto& [name, sp] : all_species_) {
+      if (name == "Photons" || name == "Baryons")
+        continue;
+      if (name == "Fluid" && pba->use_ppf == _TRUE_)
+        continue;
+      ppw->rho_plus_p_shear += sp->RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
     }
 
-    /* idm_dr contribution */
-    if (all_species_.count("IDM_DR_IDR")) {
-      const BaseSpecies& IDM_DR =
-          static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).idm_dr();
-      const double rho_idm_dr   = IDM_DR.Rho(ppw->pvecback);
-      const double delta_idm_dr = IDM_DR.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_idm_dr = IDM_DR.Theta(ppw->pv, y, ppw->pvecback, ppw);
+    /* Pass 2: accumulate delta_rho, rho_plus_p_theta, delta_p, rho_plus_p_tot,
+       and the matter tally. Cold matter (baryons, CDM, IDM_DRMD, DCDM) and warm
+       matter (NCDM/DNCDM) are kept in separate accumulators so we can snapshot
+       delta_cb / theta_cb (cold only) and delta_m / theta_m (cold + warm). */
+    double delta_rho_m_warm        = 0.;
+    double rho_m_warm              = 0.;
+    double rho_plus_p_theta_m_warm = 0.;
+    double rho_plus_p_m_warm       = 0.;
 
-      ppw->delta_rho        += rho_idm_dr * delta_idm_dr;
-      ppw->rho_plus_p_theta += rho_idm_dr * theta_idm_dr;
-      ppw->rho_plus_p_tot   += rho_idm_dr;
-    }
+    for (const auto& [name, sp] : all_species_) {
+      if (name == "Photons" || name == "Baryons")
+        continue;
+      if (name == "Fluid")
+        continue;  // Fluid handled below (PPF special case)
 
-    /* idm_drmd contribution */
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      const BaseSpecies& IDM_DRMD =
-          static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD")).idm_drmd();
-      const double rho_idm_drmd   = IDM_DRMD.Rho(ppw->pvecback);
-      const double delta_idm_drmd = IDM_DRMD.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_idm_drmd = IDM_DRMD.Theta(ppw->pv, y, ppw->pvecback, ppw);
+      const double rho        = sp->Rho(ppw->pvecback);
+      const double rho_plus_p = rho + sp->P(ppw->pvecback);
 
-      ppw->delta_rho        += rho_idm_drmd * delta_idm_drmd;
-      ppw->rho_plus_p_theta += rho_idm_drmd * theta_idm_drmd;
-      ppw->rho_plus_p_tot   += rho_idm_drmd;
+      ppw->delta_rho        += rho * sp->Delta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_theta += rho_plus_p * sp->Theta(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->delta_p          += sp->DeltaP(ppw->pv, y, ppw->pvecback, ppw);
+      ppw->rho_plus_p_tot   += rho_plus_p;
 
-      if (has_source_delta_m_ == _TRUE_) {
-        delta_rho_m += rho_idm_drmd * delta_idm_drmd;
-        rho_m       += rho_idm_drmd;
-      }
-      if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
-        rho_plus_p_theta_m += rho_idm_drmd * theta_idm_drmd;
-        rho_plus_p_m       += rho_idm_drmd;
+      if (sp->IsMatterSpecies()) {
+        const double mrd  = sp->MatterRhoDelta(ppw->pv, y, ppw->pvecback, ppw);
+        const double mr   = sp->MatterRho(ppw->pvecback);
+        const double mrpt = sp->MatterRhoPlusPTheta(ppw->pv, y, ppw->pvecback, ppw);
+        const double mrpp = sp->MatterRhoPlusP(ppw->pvecback);
+        if (sp->IsColdMatterSpecies()) {
+          delta_rho_m        += mrd;
+          rho_m              += mr;
+          rho_plus_p_theta_m += mrpt;
+          rho_plus_p_m       += mrpp;
+        }
+        else {
+          delta_rho_m_warm        += mrd;
+          rho_m_warm              += mr;
+          rho_plus_p_theta_m_warm += mrpt;
+          rho_plus_p_m_warm       += mrpp;
+        }
       }
     }
 
-    /* dcdm contribution */
-    if (all_species_.count("DCDM_DR")) {
-      const BaseSpecies& DCDM = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR")).dcdm();
-      const double rho_dcdm   = DCDM.Rho(ppw->pvecback);
-      const double delta_dcdm = DCDM.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_dcdm = DCDM.Theta(ppw->pv, y, ppw->pvecback, ppw);
-
-      ppw->delta_rho        += rho_dcdm * delta_dcdm;
-      ppw->rho_plus_p_theta += rho_dcdm * theta_dcdm;  // p_dcdm = 0
-      ppw->rho_plus_p_tot   += rho_dcdm;
-
-      if (has_source_delta_m_ == _TRUE_) {
-        delta_rho_m += rho_dcdm * delta_dcdm;
-        rho_m       += rho_dcdm;
-      }
-      if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
-        rho_plus_p_theta_m += rho_dcdm * theta_dcdm;
-        rho_plus_p_m       += rho_dcdm;
-      }
-    }
-
-    /* ultra-relativistic decay radiation */
-
-    if (all_species_.count("DCDM_DR")) {
-      const BaseSpecies& DR      = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR")).dr();
-      const double rho_plus_p_dr = DR.Rho(ppw->pvecback) + DR.P(ppw->pvecback);  // 4/3 * rho_dr
-      ppw->delta_rho        += DR.Rho(ppw->pvecback) * DR.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_theta += rho_plus_p_dr * DR.Theta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_shear += DR.RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->delta_p          += DR.DeltaP(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_tot   += rho_plus_p_dr;
-    }
-
-    /* ultra-relativistic neutrino/relics contribution */
-
-    if (all_species_.count("UR")) {
-      const auto& UR             = all_species_.at("UR");
-      const double rho_plus_p_ur = UR->Rho(ppw->pvecback) + UR->P(ppw->pvecback);  // 4/3 * rho_ur
-      ppw->delta_rho        += UR->Rho(ppw->pvecback) * UR->Delta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_theta += rho_plus_p_ur * UR->Theta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_shear += UR->RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->delta_p          += UR->DeltaP(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_tot   += rho_plus_p_ur;
-    }
-
-    /* interacting dark radiation */
-    if (all_species_.count("IDM_DR_IDR")) {
-      const BaseSpecies& IDR =
-          static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).idr();
-      const double rho_plus_p_idr = IDR.Rho(ppw->pvecback) + IDR.P(ppw->pvecback);
-      ppw->delta_rho        += IDR.Rho(ppw->pvecback) * IDR.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_theta += rho_plus_p_idr * IDR.Theta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_shear += IDR.RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->delta_p          += IDR.DeltaP(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_tot   += rho_plus_p_idr;
-    }
-
-    /* interacting dark radiation (DRMD) */
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      const BaseSpecies& IDR_DRMD =
-          static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD")).idr_drmd();
-      const double rho_plus_p_idr_drmd  = IDR_DRMD.Rho(ppw->pvecback) + IDR_DRMD.P(ppw->pvecback);
-      ppw->delta_rho                   += IDR_DRMD.Rho(ppw->pvecback) *
-                                          IDR_DRMD.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_theta += rho_plus_p_idr_drmd * IDR_DRMD.Theta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_shear += IDR_DRMD.RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->delta_p          += IDR_DRMD.DeltaP(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_tot   += rho_plus_p_idr_drmd;
-    }
-
-    /* infer delta_cb abd theta_cb (perturbations from CDM and baryons) before adding ncdm */
+    /* delta_cb / theta_cb: cold-matter tally only (excludes NCDM/DNCDM). */
     if ((has_source_delta_m_ == _TRUE_) && (has_source_delta_cb_ == _TRUE_))
       ppw->delta_cb = delta_rho_m / rho_m;
-
     if (((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) &&
         ((has_source_delta_cb_ == _TRUE_) || (has_source_theta_cb_ == _TRUE_)))
       ppw->theta_cb = rho_plus_p_theta_m / rho_plus_p_m;
 
-    /* non-cold dark matter contribution */
-    if (!ncdm_species_sorted_.empty()) {
-      for (auto* sp : ncdm_species_sorted_) {
-        const double rho_ncdm_bg     = sp->Rho(ppw->pvecback);
-        const double p_ncdm_bg       = sp->P(ppw->pvecback);
-        const double rho_plus_p_ncdm = rho_ncdm_bg + p_ncdm_bg;
-
-        const double delta_ncdm_val = sp->Delta(ppw->pv, y, ppw->pvecback, ppw);
-        const double theta_ncdm_val = sp->Theta(ppw->pv, y, ppw->pvecback, ppw);
-        const double shear_ncdm_val = sp->RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw) /
-                                      rho_plus_p_ncdm;
-
-        int n = -1;
-        if (auto* n_sp = dynamic_cast<NCDMSpecies*>(sp))
-          n = n_sp->ncdm_id();
-        else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(sp))
-          n = d_sp->ncdm_id();
-
-        if ((has_source_delta_ncdm_ == _TRUE_) || (has_source_theta_ncdm_ == _TRUE_) ||
-            (has_source_delta_m_ == _TRUE_)) {
-          if (dynamic_cast<DNCDMSpecies*>(sp) != nullptr) {
-            double delta, theta, shear;
-            std::tie(delta, theta, shear) = RescaledNCDMPerturbations(n, a, k, ppw);
-            ppw->delta_ncdm[n]            = delta;
-            ppw->theta_ncdm[n]            = theta;
-            ppw->shear_ncdm[n]            = shear;
-          }
-          else {
-            ppw->delta_ncdm[n] = delta_ncdm_val;
-            ppw->theta_ncdm[n] = theta_ncdm_val;
-            ppw->shear_ncdm[n] = shear_ncdm_val;
-          }
-        }
-
-        ppw->delta_rho        += rho_ncdm_bg * delta_ncdm_val;
-        ppw->rho_plus_p_theta += rho_plus_p_ncdm * theta_ncdm_val;
-        ppw->rho_plus_p_shear += rho_plus_p_ncdm * shear_ncdm_val;
-        ppw->delta_p          += sp->DeltaP(ppw->pv, y, ppw->pvecback, ppw);
-        ppw->rho_plus_p_tot   += rho_plus_p_ncdm;
-
-        if (has_source_delta_m_ == _TRUE_) {
-          delta_rho_m += rho_ncdm_bg * ppw->delta_ncdm[n];
-          rho_m       += rho_ncdm_bg;
-        }
-        if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
-          rho_plus_p_theta_m += rho_plus_p_ncdm * ppw->theta_ncdm[n];
-          rho_plus_p_m       += rho_plus_p_ncdm;
-        }
-      }
-    }
-
-    /* scalar field contribution via species dispatch.
-       In Newtonian gauge, delta_scf depends on the metric perturbation psi which is inferred
-       from rho_plus_p_shear. So the contribution from the scalar field must be below all
-       species with non-zero shear.
-    */
-    if (all_species_.count("ScalarField")) {
-      const BaseSpecies& SCF = *all_species_.at("ScalarField");
-      const double rho_scf   = SCF.Rho(ppw->pvecback);
-      const double p_scf     = SCF.P(ppw->pvecback);
-
-      ppw->delta_rho        += rho_scf * SCF.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_theta += (rho_scf + p_scf) * SCF.Theta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->delta_p          += SCF.DeltaP(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_tot   += rho_scf + p_scf;
-    }
-
-    /* add your extra species here */
+    /* Fold warm matter into full matter tally for delta_m / theta_m below. */
+    delta_rho_m        += delta_rho_m_warm;
+    rho_m              += rho_m_warm;
+    rho_plus_p_theta_m += rho_plus_p_theta_m_warm;
+    rho_plus_p_m       += rho_plus_p_m_warm;
 
     /* fluid contribution */
     if (all_species_.count("Fluid")) {
@@ -6446,103 +6280,8 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
                                (3 * a_prime_over_a * ppw->rho_plus_p_theta_fld / k / k);
       }
       else {
-        double s2sq               = ppw->s_l[2] * ppw->s_l[2];
-        double c_gamma_k_H_square = pow(pba->c_gamma_over_c_fld * k / a_prime_over_a, 2) *
-                                    pba->cs2_fld;
-        /** The equation is too stiff for Runge-Kutta when c_gamma_k_H_square is large.
-	    Use the asymptotic solution Gamma=Gamma'=0 in that case.
-	*/
-        double Gamma_fld;
-        if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max)
-          Gamma_fld = 0.;
-        else
-          Gamma_fld = y[ppw->pv->index_pt_Gamma_fld];
-
-        double alpha, alpha_prime, metric_euler;
-        if (ppt->gauge == synchronous) {
-          alpha        = (y[ppw->pv->index_pt_eta] +
-                          1.5 * a2 / k2 / s2sq *
-                              (ppw->delta_rho + 3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta) -
-                          Gamma_fld) /
-                         a_prime_over_a;
-          alpha_prime  = -2. * a_prime_over_a * alpha + y[ppw->pv->index_pt_eta] -
-                         4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
-          metric_euler = 0.;
-        }
-        else {
-          alpha        = 0.;
-          alpha_prime  = 0.;
-          metric_euler = k2 * y[ppw->pv->index_pt_phi] - 4.5 * a2 * ppw->rho_plus_p_shear;
-        }
-        ppw->S_fld = all_species_.at("Fluid")->Rho(ppw->pvecback) * (1. + w_fld) * 1.5 * a2 / k2 /
-                     a_prime_over_a * (ppw->rho_plus_p_theta / ppw->rho_plus_p_tot + k2 * alpha);
-        // note that the last terms in the ratio do not include fld, that's correct, it's the whole point of the PPF scheme
-        /** We must now check the stiffenss criterion again and set Gamma_prime_fld accordingly. */
-        if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max) {
-          ppw->Gamma_prime_fld = 0.;
-        }
-        else {
-          ppw->Gamma_prime_fld = a_prime_over_a * (ppw->S_fld / (1. + c_gamma_k_H_square) -
-                                                   (1. + c_gamma_k_H_square) * Gamma_fld);
-        }
-        double Gamma_prime_plus_a_prime_over_a_Gamma = ppw->Gamma_prime_fld +
-                                                       a_prime_over_a * Gamma_fld;
-        // delta and theta in both gauges gauge:
-        ppw->rho_plus_p_theta_fld =
-            all_species_.at("Fluid")->Rho(ppw->pvecback) * (1. + w_fld) * ppw->rho_plus_p_theta /
-                ppw->rho_plus_p_tot -
-            k2 * 2. / 3. * a_prime_over_a / a2 / (1 + 4.5 * a2 / k2 / s2sq * ppw->rho_plus_p_tot) *
-                (ppw->S_fld - Gamma_prime_plus_a_prime_over_a_Gamma / a_prime_over_a);
-        ppw->delta_rho_fld = -2. / 3. * k2 * s2sq / a2 * Gamma_fld -
-                             3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta_fld;
-
-        /** Now construct the pressure perturbation, see 1903.xxxxx. */
-        /** Construct energy density and pressure for DE (_fld) and the rest (_t).
-	    Also compute derivatives. */
-        double rho_fld       = all_species_.at("Fluid")->Rho(ppw->pvecback);
-        double p_fld         = w_fld * rho_fld;
-        double rho_fld_prime = -3 * a_prime_over_a * (rho_fld + p_fld);
-        double p_fld_prime   = w_prime_fld * rho_fld - 3 * a_prime_over_a * (1 + w_fld) * p_fld;
-        double rho_t         = ppw->pvecback[background_module_->index_bg_rho_tot_] - rho_fld;
-        double p_t           = ppw->pvecback[background_module_->index_bg_p_tot_] - p_fld;
-        double rho_t_prime   = -3 * a_prime_over_a * (rho_t + p_t);
-        double p_t_prime = ppw->pvecback[background_module_->index_bg_p_tot_prime_] - p_fld_prime;
-        /** Compute background quantities X,Y,Z and their derivatives. */
-        double X       = c_gamma_k_H_square;
-        double X_prime = -2 * X *
-                         (a_prime_over_a + ppw->pvecback[background_module_->index_bg_H_prime_] /
-                                               ppw->pvecback[background_module_->index_bg_H_]);
-        double Y       = 4.5 * a2 / k2 / s2sq * (rho_t + p_t);
-        double Y_prime = Y * (2. * a_prime_over_a + (rho_t_prime + p_t_prime) / (rho_t + p_t));
-        double Z       = 2. / 3. * k2 * ppw->pvecback[background_module_->index_bg_H_] / a;
-        double Z_prime = Z * (ppw->pvecback[background_module_->index_bg_H_prime_] /
-                                  ppw->pvecback[background_module_->index_bg_H_] -
-                              a_prime_over_a);
-        /** Construct theta_t and its derivative from the Euler equation */
-        double theta_t       = ppw->rho_plus_p_theta / ppw->rho_plus_p_tot;
-        double theta_t_prime = -a_prime_over_a * theta_t -
-                               (p_t_prime * theta_t - k2 * ppw->delta_p +
-                                k2 * ppw->rho_plus_p_shear) /
-                                   ppw->rho_plus_p_tot +
-                               metric_euler;
-        double S             = ppw->S_fld;
-        double S_prime       = -Z_prime / Z * S +
-                               1. / Z * (rho_fld_prime + p_fld_prime) * (theta_t + k2 * alpha) +
-                               1. / Z * (rho_fld + p_fld) * (theta_t_prime + k2 * alpha_prime);
-        /** Analytic derivative of the equation for ppw->rho_plus_p_theta_fld above. */
-        double rho_plus_p_theta_fld_prime =
-            Z_prime * (S - 1. / (1. + Y) * (S / (1. + 1. / X) + Gamma_fld * X)) +
-            Z * (S_prime + Y_prime / (1. + Y * Y + 2 * Y) * (S / (1. + 1. / X) + Gamma_fld * X) -
-                 1. / (1. + Y) *
-                     (S_prime / (1. + 1. / X) + S * X_prime / (1. + X * X + 2 * X) +
-                      ppw->Gamma_prime_fld * X + Gamma_fld * X_prime)) -
-            k2 * alpha_prime * (rho_fld + p_fld) - k2 * alpha * (rho_fld_prime + p_fld_prime);
-
-        /** We can finally compute the pressure perturbation using the Euler equation for theta_fld */
-        ppw->delta_p_fld = (rho_plus_p_theta_fld_prime +
-                            4 * a_prime_over_a * ppw->rho_plus_p_theta_fld -
-                            (rho_fld + p_fld) * metric_euler) /
-                           k2;
+        auto& fluid = static_cast<FluidSpecies&>(*all_species_.at("Fluid"));
+        fluid.ComputePpf(k, a, a_prime_over_a, ppr, y, ppw);
       }
 
       ppw->delta_rho        += ppw->delta_rho_fld;
@@ -8232,51 +7971,12 @@ int PerturbationsModule::perturb_rsa_idr_delta_and_theta(
 
 std::tuple<double, double, double> PerturbationsModule::RescaledNCDMPerturbations(
     int n_ncdm, double a, double k, perturb_workspace* ppw) {
-  // Reintegrate and rescale ratios of integrated quantities in case exp(lnf) is below precision
-  double rho_scaled              = 0.;
-  double rho_plus_p_scaled       = 0.;
-  double rho_delta_scaled        = 0.;
-  double rho_plus_p_theta_scaled = 0.;
-  double rho_plus_p_shear_scaled = 0.;
-
-  DNCDMSpecies* dncdm_sp = nullptr;
   for (auto& [name, sp] : all_species_) {
     if (auto* composite = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
       if (composite->dncdm().ncdm_id() == n_ncdm) {
-        dncdm_sp = &composite->dncdm();
-        break;
+        return composite->dncdm().RescaledPerturbations(a, k, ppw);
       }
     }
   }
-  // dncdm_sp must be non-null: this function is always called with a valid ncdm_id for decaying NCDM
-  if (dncdm_sp == nullptr)
-    throw std::runtime_error("RescaledNCDMPerturbations: invalid ncdm_id");
-  const double* lnf_array = ppw->pvecback + dncdm_sp->bg_lnf_index();
-  const double lnN        = dncdm_sp->GetRescalingFactor(lnf_array);
-
-  for (int index_q = 0; index_q < dncdm_sp->q_size(); index_q++) {
-    const int index_pt = ppw->pv->index_ncdm_[n_ncdm][index_q];
-    double dq          = dncdm_sp->dq()[index_q];
-    double lnf         = lnf_array[index_q];
-
-    double q       = dncdm_sp->q()[index_q];
-    double q2      = q * q;
-    double epsilon = sqrt(q2 + a * a * dncdm_sp->M() * dncdm_sp->M());
-
-    rho_scaled              += dq * pow(q, 2) * epsilon * exp(lnN + lnf);
-    rho_plus_p_scaled       += dq * pow(q, 2) * (epsilon + q2 / 3. / epsilon) * exp(lnN + lnf);
-    rho_delta_scaled        += dq * pow(q, 2) * epsilon * exp(lnN + lnf) * ppw->pv->y[index_pt];
-    rho_plus_p_theta_scaled += dq * pow(q, 3) * exp(lnN + lnf) * ppw->pv->y[index_pt + 1];
-    rho_plus_p_shear_scaled += dq * pow(q, 4) / epsilon * exp(lnN + lnf) * ppw->pv->y[index_pt + 2];
-  }
-  rho_delta_scaled        *= 1;
-  rho_plus_p_theta_scaled *= k;
-  rho_plus_p_shear_scaled *= 2. / 3.;
-
-  // Here, the scale factor dependent front factors get divided out directly
-  double delta = rho_delta_scaled / rho_scaled;
-  double theta = rho_plus_p_theta_scaled / rho_plus_p_scaled;
-  double shear = rho_plus_p_shear_scaled / rho_plus_p_scaled;
-
-  return std::make_tuple(delta, theta, shear);
+  throw std::runtime_error("RescaledNCDMPerturbations: invalid ncdm_id");
 }

@@ -49,6 +49,23 @@ class NCDMBaseSpecies : public BaseSpecies {
   double GetDeg() const {
     return deg_;
   }
+  /**
+   * NCDM (and DNCDM) participate in the matter tally (delta_m, theta_m).
+   * NCDMBaseSpecies uses EnergyType::Other (not Matter), so we override the
+   * default explicitly rather than reclassifying the EnergyType.
+   */
+  bool IsMatterSpecies() const override {
+    return true;
+  }
+
+  /**
+   * NCDM (and DNCDM) are "warm" matter — they participate in delta_m but
+   * NOT in the delta_cb cold-matter tally.
+   */
+  bool IsColdMatterSpecies() const override {
+    return false;
+  }
+
   double GetIni(double a, double a_today, double tol_ncdm_initial_w) const;
   double GetRescalingFactor(const double* lnf_array) const;
   virtual std::tuple<double, double> GetRescaledParameters(double a, const double* lnf_array) const;

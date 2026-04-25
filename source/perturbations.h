@@ -386,13 +386,12 @@ struct perturb_workspace {
   double vector_source_pi; /**< first stress-energy source term in Einstein's vector equations */
   double vector_source_v;  /**< second stress-energy source term in Einstein's vector equations */
 
-  double tca_shear_g;      /**< photon shear in tight-coupling approximation */
-  double tca_slip;         /**< photon-baryon slip in tight-coupling approximation */
-  double tca_shear_idm_dr; /**< interacting dark radiation shear in tight coupling appproximation */
-  double rsa_delta_g;      /**< photon density in radiation streaming approximation */
-  double rsa_theta_g;      /**< photon velocity in radiation streaming approximation */
-  double rsa_delta_ur;     /**< photon density in radiation streaming approximation */
-  double rsa_theta_ur;     /**< photon velocity in radiation streaming approximation */
+  double tca_shear_g;  /**< photon shear in tight-coupling approximation */
+  double tca_slip;     /**< photon-baryon slip in tight-coupling approximation */
+  double rsa_delta_g;  /**< photon density in radiation streaming approximation */
+  double rsa_theta_g;  /**< photon velocity in radiation streaming approximation */
+  double rsa_delta_ur; /**< photon density in radiation streaming approximation */
+  double rsa_theta_ur; /**< photon velocity in radiation streaming approximation */
   double
       rsa_delta_idr; /**< interacting dark radiation density in dark radiation streaming approximation */
   double
@@ -401,10 +400,6 @@ struct perturb_workspace {
   double theta_idm_drmd; /**< interacting dark matter velocity (DRMD)*/
   double
       theta_idm_prime_drmd; /**< derivative of interacting dark matter velocity in regard to conformal time (DRMD) */
-
-  double* delta_ncdm; /**< relative density perturbation of each ncdm species */
-  double* theta_ncdm; /**< velocity divergence theta of each ncdm species */
-  double* shear_ncdm; /**< shear for each ncdm species */
 
   double delta_m; /**< relative density perturbation of all non-relativistic species */
   double theta_m; /**< velocity divergence theta of all non-relativistic species */
@@ -473,9 +468,6 @@ struct perturb_workspace {
   std::vector<double> pvecback_storage;
   std::vector<double> pvecthermo_storage;
   std::vector<double> pvecmetric_storage;
-  std::vector<double> delta_ncdm_storage;
-  std::vector<double> theta_ncdm_storage;
-  std::vector<double> shear_ncdm_storage;
 
   //@}
 };

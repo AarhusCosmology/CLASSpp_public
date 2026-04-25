@@ -51,6 +51,29 @@ class FluidSpecies : public BaseSpecies {
     return pvecback[index_bg_w_fld_];
   }
 
+  /**
+   * Fluid equation-of-state evaluation. Owns w_fld(a), dw_fld/da(a), and the
+   * analytic integral used by background initial conditions. Implementation
+   * moved here from BackgroundModule::background_w_fld because this is pure
+   * fluid physics.
+   */
+  int ComputeWFld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
+
+  /**
+   * Compute PPF fluid contribution. Writes ppw->delta_rho_fld,
+   * rho_plus_p_theta_fld, delta_p_fld, S_fld, Gamma_prime_fld (module then
+   * accumulates into rho/theta/p totals). Only called when pba->use_ppf == _TRUE_.
+   * Moved from PerturbationsModule — PPF is fluid-specific physics that depends
+   * on the rest of the universe (rho_plus_p_theta, rho_plus_p_shear, delta_rho
+   * from non-fluid species must be fully populated before calling).
+   */
+  void ComputePpf(double k,
+                  double a,
+                  double a_prime_over_a,
+                  const precision* ppr,
+                  const double* y,
+                  perturb_workspace* ppw) const;
+
   // ── Perturbations ──────────────────────────────────────────────────────────
   void RegisterPerturbationIndices(perturb_vector* pv,
                                    const precision* ppr,

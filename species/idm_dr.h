@@ -66,6 +66,15 @@ class IDM_DRSpecies : public BaseSpecies {
     return 0.;
   }
 
+  /**
+   * IDM_DR is excluded from the matter tally by current convention. This is
+   * an asymmetry (IDM_DRMD, DCDM, NCDM are all included) that predates this
+   * refactor — see follow-up issue.
+   */
+  bool IsMatterSpecies() const override {
+    return false;
+  }
+
  private:
   const background& pba_;
 };

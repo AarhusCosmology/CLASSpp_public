@@ -232,15 +232,246 @@ double FluidSpecies::Theta(const perturb_vector* pv,
                            const perturb_workspace* /*ppw*/) const {
   return (pv->index_pt_theta_fld >= 0) ? y[pv->index_pt_theta_fld] : 0.;
 }
-double FluidSpecies::DeltaP(const perturb_vector* /*pv*/,
-                            const double* /*y*/,
-                            const double* /*pvecback*/,
-                            const perturb_workspace* /*ppw*/) const {
-  return 0.;
+double FluidSpecies::DeltaP(const perturb_vector* pv,
+                            const double* y,
+                            const double* pvecback,
+                            const perturb_workspace* ppw) const {
+  // PPF uses a dedicated path (ComputePpf); this method is not called for
+  // PPF — the module skips FluidSpecies in the main loop when use_ppf.
+  if (pv->index_pt_delta_fld < 0 || pv->index_pt_theta_fld < 0)
+    return 0.;
+
+  const double k2             = ppw->scalar_ctx.k2;
+  const double a              = ppw->scalar_ctx.a;
+  const double a_prime_over_a = pvecback[bgm_->index_bg_H_] * a;
+
+  double w_fld, dw_over_da_fld, integral_fld;
+  ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
+  const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
+
+  const double rho                  = Rho(pvecback);
+  const double delta_rho_fld        = rho * y[pv->index_pt_delta_fld];
+  const double rho_plus_p_theta_fld = (1. + w_fld) * rho * y[pv->index_pt_theta_fld];
+  const double ca2_fld              = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
+
+  return pba_.cs2_fld * delta_rho_fld +
+         (pba_.cs2_fld - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
 }
 double FluidSpecies::RhoPlusPShear(const perturb_vector* /*pv*/,
                                    const double* /*y*/,
                                    const double* /*pvecback*/,
                                    const perturb_workspace* /*ppw*/) const {
   return 0.;
+}
+
+int FluidSpecies::ComputeWFld(double a,
+                              double* w_fld,
+                              double* dw_over_da_fld,
+                              double* integral_fld) const {
+  double Omega_ede          = 0.;
+  double dOmega_ede_over_da = 0.;
+  double a_eq               = 0.0;
+
+  /** - first, define the function w(a) */
+  switch (pba_.fluid_equation_of_state) {
+    case CLP:
+      *w_fld = pba_.w0_fld + pba_.wa_fld * (1. - a / pba_.a_today);
+      break;
+    case EDE: {
+      // Omega_ede(a) taken from eq. (10) in 1706.00730
+      Omega_ede = (pba_.Omega0_fld - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) /
+                      (pba_.Omega0_fld + (1. - pba_.Omega0_fld) * pow(a, 3. * pba_.w0_fld)) +
+                  pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld));
+
+      // d Omega_ede / d a taken analytically from the above
+      dOmega_ede_over_da =
+          -pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.) /
+              (pba_.Omega0_fld + (1. - pba_.Omega0_fld) * pow(a, 3. * pba_.w0_fld)) -
+          (pba_.Omega0_fld - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) *
+              (1. - pba_.Omega0_fld) * 3. * pba_.w0_fld * pow(a, 3. * pba_.w0_fld - 1.) /
+              pow(pba_.Omega0_fld + (1. - pba_.Omega0_fld) * pow(a, 3. * pba_.w0_fld), 2) +
+          pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.);
+
+      // find a_equality (needed because EDE tracks first radiation, then matter)
+      double Omega_r =
+          pba_.Omega0_g *
+          (1. +
+           3.046 * 7. / 8. *
+               pow(4. / 11.,
+                   4. /
+                       3.));  // assumes LambdaCDM + eventually massive neutrinos so light that they are relativistic at equality; needs to be generalised later on.
+      double Omega_m = pba_.Omega0_b;
+      if (bgm_->all_species_.count("CDM"))
+        Omega_m += pba_.Omega0_cdm;
+      if (bgm_->all_species_.count("IDM_DR_IDR"))
+        Omega_m += pba_.Omega0_idm_dr;
+      if (bgm_->all_species_.count("IDM_DRMD_IDR_DRMD"))
+        Omega_m += pba_.Omega0_idm_drmd;
+      if (bgm_->all_species_.count("DCDM_DR"))
+        class_stop(bgm_->error_message_,
+                   "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
+                   "to code the calculation of a_eq in that case, but it would not be difficult to "
+                   "add it if necessary, should be a matter of 5 minutes");
+      a_eq = Omega_r / Omega_m;  // assumes a flat universe with a=1 today
+
+      // w_ede(a) taken from eq. (11) in 1706.00730
+      *w_fld = -dOmega_ede_over_da * a / Omega_ede / 3. / (1. - Omega_ede) + a_eq / 3. / (a + a_eq);
+      break;
+    }
+  }
+
+  /** - then, give the corresponding analytic derivative dw/da (used
+      by perturbation equations; we could compute it numerically,
+      but with a loss of precision; as long as there is a simple
+      analytic expression of the derivative of the previous
+      function, let's use it! */
+  switch (pba_.fluid_equation_of_state) {
+    case CLP:
+      *dw_over_da_fld = -pba_.wa_fld / pba_.a_today;
+      break;
+    case EDE: {
+      double d2Omega_ede_over_da2 = 0.;
+      *dw_over_da_fld = -d2Omega_ede_over_da2 * a / 3. / (1. - Omega_ede) / Omega_ede -
+                        dOmega_ede_over_da / 3. / (1. - Omega_ede) / Omega_ede +
+                        dOmega_ede_over_da * dOmega_ede_over_da * a / 3. / (1. - Omega_ede) /
+                            (1. - Omega_ede) / Omega_ede +
+                        a_eq / 3. / (a + a_eq) / (a + a_eq);
+      break;
+    }
+  }
+
+  /** - finally, give the analytic solution of the following integral:
+        \f$ \int_{a}^{a0} da 3(1+w_{fld})/a \f$. This is used in only
+        one place, in the initial conditions for the background, and
+        with a=a_ini. If your w(a) does not lead to a simple analytic
+        solution of this integral, no worry: instead of writing
+        something here, the best would then be to leave it equal to
+        zero, and then in background_initial_conditions() you should
+        implement a numerical calculation of this integral only for
+        a=a_ini, using for instance Romberg integration. It should be
+        fast, simple, and accurate enough. */
+  switch (pba_.fluid_equation_of_state) {
+    case CLP:
+      *integral_fld = 3. * ((1. + pba_.w0_fld + pba_.wa_fld) * log(pba_.a_today / a) +
+                            pba_.wa_fld * (a / pba_.a_today - 1.));
+      break;
+    case EDE:
+      class_stop(bgm_->error_message_,
+                 "EDE implementation not finished: to finish it, read the comments in background.c "
+                 "just before this line\n");
+      break;
+  }
+
+  /** note: of course you can generalise these formulas to anything,
+      defining new parameters pba->w..._fld. Just remember that so
+      far, HyRec explicitely assumes that w(a)= w0 + wa (1-a/a0); but
+      Recfast does not assume anything */
+
+  return _SUCCESS_;
+}
+
+void FluidSpecies::ComputePpf(double k,
+                              double a,
+                              double a_prime_over_a,
+                              const precision* ppr,
+                              const double* y,
+                              perturb_workspace* ppw) const {
+  const double a2 = a * a;
+  const double k2 = k * k;
+
+  double w_fld, dw_over_da_fld, integral_fld;
+  ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
+  const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
+
+  double s2sq               = ppw->s_l[2] * ppw->s_l[2];
+  double c_gamma_k_H_square = pow(pba_.c_gamma_over_c_fld * k / a_prime_over_a, 2) * pba_.cs2_fld;
+  /** The equation is too stiff for Runge-Kutta when c_gamma_k_H_square is large.
+      Use the asymptotic solution Gamma=Gamma'=0 in that case.
+  */
+  double Gamma_fld;
+  if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max)
+    Gamma_fld = 0.;
+  else
+    Gamma_fld = y[ppw->pv->index_pt_Gamma_fld];
+
+  double alpha, alpha_prime, metric_euler;
+  if (ppw->scalar_ctx.gauge == synchronous) {
+    alpha        = (y[ppw->pv->index_pt_eta] +
+                    1.5 * a2 / k2 / s2sq *
+                        (ppw->delta_rho + 3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta) -
+                    Gamma_fld) /
+                   a_prime_over_a;
+    alpha_prime  = -2. * a_prime_over_a * alpha + y[ppw->pv->index_pt_eta] -
+                   4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
+    metric_euler = 0.;
+  }
+  else {
+    alpha        = 0.;
+    alpha_prime  = 0.;
+    metric_euler = k2 * y[ppw->pv->index_pt_phi] - 4.5 * a2 * ppw->rho_plus_p_shear;
+  }
+  ppw->S_fld = Rho(ppw->pvecback) * (1. + w_fld) * 1.5 * a2 / k2 / a_prime_over_a *
+               (ppw->rho_plus_p_theta / ppw->rho_plus_p_tot + k2 * alpha);
+  // note that the last terms in the ratio do not include fld, that's correct, it's the whole point of the PPF scheme
+  /** We must now check the stiffenss criterion again and set Gamma_prime_fld accordingly. */
+  if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max) {
+    ppw->Gamma_prime_fld = 0.;
+  }
+  else {
+    ppw->Gamma_prime_fld = a_prime_over_a * (ppw->S_fld / (1. + c_gamma_k_H_square) -
+                                             (1. + c_gamma_k_H_square) * Gamma_fld);
+  }
+  double Gamma_prime_plus_a_prime_over_a_Gamma = ppw->Gamma_prime_fld + a_prime_over_a * Gamma_fld;
+  // delta and theta in both gauges gauge:
+  ppw->rho_plus_p_theta_fld =
+      Rho(ppw->pvecback) * (1. + w_fld) * ppw->rho_plus_p_theta / ppw->rho_plus_p_tot -
+      k2 * 2. / 3. * a_prime_over_a / a2 / (1 + 4.5 * a2 / k2 / s2sq * ppw->rho_plus_p_tot) *
+          (ppw->S_fld - Gamma_prime_plus_a_prime_over_a_Gamma / a_prime_over_a);
+  ppw->delta_rho_fld = -2. / 3. * k2 * s2sq / a2 * Gamma_fld -
+                       3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta_fld;
+
+  /** Now construct the pressure perturbation, see 1903.xxxxx. */
+  /** Construct energy density and pressure for DE (_fld) and the rest (_t).
+      Also compute derivatives. */
+  double rho_fld       = Rho(ppw->pvecback);
+  double p_fld         = w_fld * rho_fld;
+  double rho_fld_prime = -3 * a_prime_over_a * (rho_fld + p_fld);
+  double p_fld_prime   = w_prime_fld * rho_fld - 3 * a_prime_over_a * (1 + w_fld) * p_fld;
+  double rho_t         = ppw->pvecback[bgm_->index_bg_rho_tot_] - rho_fld;
+  double p_t           = ppw->pvecback[bgm_->index_bg_p_tot_] - p_fld;
+  double rho_t_prime   = -3 * a_prime_over_a * (rho_t + p_t);
+  double p_t_prime     = ppw->pvecback[bgm_->index_bg_p_tot_prime_] - p_fld_prime;
+  /** Compute background quantities X,Y,Z and their derivatives. */
+  double X       = c_gamma_k_H_square;
+  double X_prime = -2 * X *
+                   (a_prime_over_a +
+                    ppw->pvecback[bgm_->index_bg_H_prime_] / ppw->pvecback[bgm_->index_bg_H_]);
+  double Y       = 4.5 * a2 / k2 / s2sq * (rho_t + p_t);
+  double Y_prime = Y * (2. * a_prime_over_a + (rho_t_prime + p_t_prime) / (rho_t + p_t));
+  double Z       = 2. / 3. * k2 * ppw->pvecback[bgm_->index_bg_H_] / a;
+  double Z_prime = Z * (ppw->pvecback[bgm_->index_bg_H_prime_] / ppw->pvecback[bgm_->index_bg_H_] -
+                        a_prime_over_a);
+  /** Construct theta_t and its derivative from the Euler equation */
+  double theta_t       = ppw->rho_plus_p_theta / ppw->rho_plus_p_tot;
+  double theta_t_prime = -a_prime_over_a * theta_t -
+                         (p_t_prime * theta_t - k2 * ppw->delta_p + k2 * ppw->rho_plus_p_shear) /
+                             ppw->rho_plus_p_tot +
+                         metric_euler;
+  double S             = ppw->S_fld;
+  double S_prime       = -Z_prime / Z * S +
+                         1. / Z * (rho_fld_prime + p_fld_prime) * (theta_t + k2 * alpha) +
+                         1. / Z * (rho_fld + p_fld) * (theta_t_prime + k2 * alpha_prime);
+  /** Analytic derivative of the equation for ppw->rho_plus_p_theta_fld above. */
+  double rho_plus_p_theta_fld_prime =
+      Z_prime * (S - 1. / (1. + Y) * (S / (1. + 1. / X) + Gamma_fld * X)) +
+      Z * (S_prime + Y_prime / (1. + Y * Y + 2 * Y) * (S / (1. + 1. / X) + Gamma_fld * X) -
+           1. / (1. + Y) *
+               (S_prime / (1. + 1. / X) + S * X_prime / (1. + X * X + 2 * X) +
+                ppw->Gamma_prime_fld * X + Gamma_fld * X_prime)) -
+      k2 * alpha_prime * (rho_fld + p_fld) - k2 * alpha * (rho_fld_prime + p_fld_prime);
+
+  /** We can finally compute the pressure perturbation using the Euler equation for theta_fld */
+  ppw->delta_p_fld = (rho_plus_p_theta_fld_prime + 4 * a_prime_over_a * ppw->rho_plus_p_theta_fld -
+                      (rho_fld + p_fld) * metric_euler) /
+                     k2;
 }

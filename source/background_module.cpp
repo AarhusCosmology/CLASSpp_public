@@ -459,105 +459,16 @@ int BackgroundModule::background_w_fld(double a,
                                        double* w_fld,
                                        double* dw_over_da_fld,
                                        double* integral_fld) const {
-  double Omega_ede          = 0.;
-  double dOmega_ede_over_da = 0.;
-  double a_eq               = 0.0;
-
-  /** - first, define the function w(a) */
-  switch (pba->fluid_equation_of_state) {
-    case CLP:
-      *w_fld = pba->w0_fld + pba->wa_fld * (1. - a / pba->a_today);
-      break;
-    case EDE: {
-      // Omega_ede(a) taken from eq. (10) in 1706.00730
-      Omega_ede = (pba->Omega0_fld - pba->Omega_EDE * (1. - pow(a, -3. * pba->w0_fld))) /
-                      (pba->Omega0_fld + (1. - pba->Omega0_fld) * pow(a, 3. * pba->w0_fld)) +
-                  pba->Omega_EDE * (1. - pow(a, -3. * pba->w0_fld));
-
-      // d Omega_ede / d a taken analytically from the above
-      dOmega_ede_over_da =
-          -pba->Omega_EDE * 3. * pba->w0_fld * pow(a, -3. * pba->w0_fld - 1.) /
-              (pba->Omega0_fld + (1. - pba->Omega0_fld) * pow(a, 3. * pba->w0_fld)) -
-          (pba->Omega0_fld - pba->Omega_EDE * (1. - pow(a, -3. * pba->w0_fld))) *
-              (1. - pba->Omega0_fld) * 3. * pba->w0_fld * pow(a, 3. * pba->w0_fld - 1.) /
-              pow(pba->Omega0_fld + (1. - pba->Omega0_fld) * pow(a, 3. * pba->w0_fld), 2) +
-          pba->Omega_EDE * 3. * pba->w0_fld * pow(a, -3. * pba->w0_fld - 1.);
-
-      // find a_equality (needed because EDE tracks first radiation, then matter)
-      double Omega_r =
-          pba->Omega0_g *
-          (1. +
-           3.046 * 7. / 8. *
-               pow(4. / 11.,
-                   4. /
-                       3.));  // assumes LambdaCDM + eventually massive neutrinos so light that they are relativistic at equality; needs to be generalised later on.
-      double Omega_m = pba->Omega0_b;
-      if (all_species_.count("CDM"))
-        Omega_m += pba->Omega0_cdm;
-      if (all_species_.count("IDM_DR_IDR"))
-        Omega_m += pba->Omega0_idm_dr;
-      if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-        Omega_m += pba->Omega0_idm_drmd;
-      if (all_species_.count("DCDM_DR"))
-        class_stop(error_message_,
-                   "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
-                   "to code the calculation of a_eq in that case, but it would not be difficult to "
-                   "add it if necessary, should be a matter of 5 minutes");
-      a_eq = Omega_r / Omega_m;  // assumes a flat universe with a=1 today
-
-      // w_ede(a) taken from eq. (11) in 1706.00730
-      *w_fld = -dOmega_ede_over_da * a / Omega_ede / 3. / (1. - Omega_ede) + a_eq / 3. / (a + a_eq);
-      break;
-    }
+  if (all_species_.count("Fluid")) {
+    return static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
+        .ComputeWFld(a, w_fld, dw_over_da_fld, integral_fld);
   }
-
-  /** - then, give the corresponding analytic derivative dw/da (used
-      by perturbation equations; we could compute it numerically,
-      but with a loss of precision; as long as there is a simple
-      analytic expression of the derivative of the previous
-      function, let's use it! */
-  switch (pba->fluid_equation_of_state) {
-    case CLP:
-      *dw_over_da_fld = -pba->wa_fld / pba->a_today;
-      break;
-    case EDE: {
-      double d2Omega_ede_over_da2 = 0.;
-      *dw_over_da_fld = -d2Omega_ede_over_da2 * a / 3. / (1. - Omega_ede) / Omega_ede -
-                        dOmega_ede_over_da / 3. / (1. - Omega_ede) / Omega_ede +
-                        dOmega_ede_over_da * dOmega_ede_over_da * a / 3. / (1. - Omega_ede) /
-                            (1. - Omega_ede) / Omega_ede +
-                        a_eq / 3. / (a + a_eq) / (a + a_eq);
-      break;
-    }
-  }
-
-  /** - finally, give the analytic solution of the following integral:
-        \f$ \int_{a}^{a0} da 3(1+w_{fld})/a \f$. This is used in only
-        one place, in the initial conditions for the background, and
-        with a=a_ini. If your w(a) does not lead to a simple analytic
-        solution of this integral, no worry: instead of writing
-        something here, the best would then be to leave it equal to
-        zero, and then in background_initial_conditions() you should
-        implement a numerical calculation of this integral only for
-        a=a_ini, using for instance Romberg integration. It should be
-        fast, simple, and accurate enough. */
-  switch (pba->fluid_equation_of_state) {
-    case CLP:
-      *integral_fld = 3. * ((1. + pba->w0_fld + pba->wa_fld) * log(pba->a_today / a) +
-                            pba->wa_fld * (a / pba->a_today - 1.));
-      break;
-    case EDE:
-      class_stop(error_message_,
-                 "EDE implementation not finished: to finish it, read the comments in background.c "
-                 "just before this line\n");
-      break;
-  }
-
-  /** note: of course you can generalise these formulas to anything,
-      defining new parameters pba->w..._fld. Just remember that so
-      far, HyRec explicitely assumes that w(a)= w0 + wa (1-a/a0); but
-      Recfast does not assume anything */
-
+  /* No Fluid species: fall back to CLP defaults so callers (HyRec, etc.) get
+     a sensible w(a) without needing to gate on has_fld. */
+  *w_fld          = pba->w0_fld + pba->wa_fld * (1. - a / pba->a_today);
+  *dw_over_da_fld = -pba->wa_fld / pba->a_today;
+  *integral_fld   = 3. * ((1. + pba->w0_fld + pba->wa_fld) * log(pba->a_today / a) +
+                          pba->wa_fld * (a / pba->a_today - 1.));
   return _SUCCESS_;
 }
 
