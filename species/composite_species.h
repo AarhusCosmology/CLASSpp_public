@@ -43,6 +43,15 @@ class CompositeSpecies : public BaseSpecies {
                                          const perturb_workspace* ppw,
                                          int gauge) override;
 
+  // ── Omega0 (closure) ────────────────────────────────────────────────────
+  /** Sums GetOmega0() over all children. */
+  double GetOmega0() const override {
+    double sum = 0.0;
+    for (const auto& c : children_)
+      sum += c->GetOmega0();
+    return sum;
+  }
+
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetThermodynamicsModule(const ThermodynamicsModule* thm) override;

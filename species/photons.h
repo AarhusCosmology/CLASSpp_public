@@ -3,12 +3,19 @@
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
+#include "species_build_context.h"
 
 /** Photons: rho ~ a^{-4}. Boltzmann hierarchy with l_max_g multipoles. */
 class PhotonsSpecies : public BaseSpecies {
  public:
   explicit PhotonsSpecies(const background& pba)
       : BaseSpecies("Photons", EnergyType::Radiation), pba_(pba) {}
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
+
+  double GetOmega0() const override {
+    return pba_.Omega0_g;
+  }
 
   void RegisterBackgroundIndices(int& index_bg) override {
     index_bg_rho_ = index_bg++;

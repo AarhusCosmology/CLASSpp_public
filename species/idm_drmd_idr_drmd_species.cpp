@@ -222,3 +222,13 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(double /*tau*/,
     dy[pv->index_pt_theta_idr_drmd] -= Gint * Rint * (theta_idr - theta_idm);
   }
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> IDM_DRMD_IDR_DRMD_Species::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_idm_drmd == _TRUE_ || ctx.pba->has_idr_drmd == _TRUE_) {
+    result.push_back({"IDM_DRMD_IDR_DRMD", std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*ctx.pba)});
+  }
+  return result;
+}

@@ -475,3 +475,13 @@ void FluidSpecies::ComputePpf(double k,
                       (rho_fld + p_fld) * metric_euler) /
                      k2;
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_fld == _TRUE_) {
+    result.push_back({"Fluid", std::make_unique<FluidSpecies>(*ctx.pba)});
+  }
+  return result;
+}

@@ -11,6 +11,10 @@ class IDR_DRMDSpecies : public BaseSpecies {
   explicit IDR_DRMDSpecies(const background& pba)
       : BaseSpecies("IDR_DRMD", EnergyType::Radiation), pba_(pba) {}
 
+  double GetOmega0() const override {
+    return pba_.Omega0_idr_drmd;
+  }
+
   bool IsFreestreaming() const override {
     return true;
   }

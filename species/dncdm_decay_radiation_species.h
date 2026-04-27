@@ -16,6 +16,11 @@ class DNCDM_DecayRadiationSpecies : public BaseSpecies {
       : BaseSpecies("DNCDM_DecayRadiation_" + std::to_string(ncdm_id), EnergyType::Radiation),
         ncdm_id_(ncdm_id), pba_(pba), bgm_(bgm) {}
 
+  /** Decay product: no direct Omega0 input, starts at zero. */
+  double GetOmega0() const override {
+    return 0.0;
+  }
+
   bool IsFreestreaming() const override {
     return true;
   }

@@ -2,6 +2,7 @@
 #define NCDM_INTERACTING_SPECIES_H
 
 #include "ncdm_species.h"
+#include "species/species_build_context.h"
 
 class NCDMInteractingSpecies : public NCDMSpecies {
  public:
@@ -13,14 +14,7 @@ class NCDMInteractingSpecies : public NCDMSpecies {
                          const BackgroundModule* bgm);
 
   // Factory method to read N_ncdm_interacting and create instances
-  struct Named {
-    std::string key;
-    std::unique_ptr<NCDMInteractingSpecies> species;
-  };
-  static std::vector<Named> CreateAll(FileContent* pfc,
-                                      const NcdmSettings& settings,
-                                      const background* pba,
-                                      const BackgroundModule* bgm);
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   // Override PerturbDerivs to append collision terms
   void PerturbDerivs(double tau,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base_species.h"
+#include "species_build_context.h"
 
 struct background;
 
@@ -15,6 +16,10 @@ struct background;
 class CDMSpecies : public BaseSpecies {
  public:
   explicit CDMSpecies(const background& pba);
+
+  double GetOmega0() const override {
+    return Omega0_cdm_;
+  }
 
   // ── Background ─────────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
@@ -63,6 +68,8 @@ class CDMSpecies : public BaseSpecies {
                        const perturb_workspace* ppw) const override;
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
   void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
  private:
   double Omega0_cdm_;

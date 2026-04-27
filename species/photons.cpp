@@ -528,3 +528,11 @@ double PhotonsSpecies::RhoPlusPShear(const perturb_vector* pv,
     return 4. / 3. * rho_g * ppw->scalar_ctx.shear_g;
   return 4. / 3. * rho_g * y[pv->index_pt_shear_g];
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> PhotonsSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  result.push_back({"Photons", std::make_unique<PhotonsSpecies>(*ctx.pba)});
+  return result;
+}

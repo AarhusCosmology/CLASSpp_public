@@ -2,6 +2,7 @@
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
+#include "species_build_context.h"
 
 class BackgroundModule;
 
@@ -13,6 +14,10 @@ class ScalarFieldSpecies : public BaseSpecies {
  public:
   explicit ScalarFieldSpecies(const background& pba)
       : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba) {}
+
+  double GetOmega0() const override {
+    return pba_.Omega0_scf;
+  }
 
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override {
@@ -64,6 +69,8 @@ class ScalarFieldSpecies : public BaseSpecies {
                      const perturb_parameters_and_workspace& ppaw) override;
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
   void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   /**
    * Gauge-dependent fractional density perturbation delta_rho_scf / rho_scf.

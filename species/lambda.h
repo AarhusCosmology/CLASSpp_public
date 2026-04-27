@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base_species.h"
+#include "species_build_context.h"
 
 struct background;
 
@@ -15,6 +16,10 @@ class LambdaSpecies : public BaseSpecies {
  public:
   explicit LambdaSpecies(const background& pba);
 
+  double GetOmega0() const override {
+    return Omega0_lambda_;
+  }
+
   // ── Background ─────────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
@@ -23,6 +28,8 @@ class LambdaSpecies : public BaseSpecies {
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double DpDloga(const double* pvecback) const override;
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   /** Lambda has no perturbations; does nothing. */

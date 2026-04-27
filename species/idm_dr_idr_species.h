@@ -3,6 +3,7 @@
 #include "composite_species.h"
 #include "idm_dr.h"
 #include "idr.h"
+#include "species_build_context.h"
 
 /**
  * IDM_DR_IDR_Species: composite for interacting dark matter + interacting dark radiation.
@@ -44,6 +45,8 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
                       const double* y,
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
  protected:
   void AddCouplingDerivs(double tau,

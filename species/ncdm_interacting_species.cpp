@@ -123,19 +123,15 @@ NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
 }
 
 // ── CreateAll factory ───────────────────────────────────────────────────────
-std::vector<NCDMInteractingSpecies::Named> NCDMInteractingSpecies::CreateAll(
-    FileContent* pfc,
-    const NcdmSettings& settings,
-    const background* pba,
-    const BackgroundModule* bgm) {
+std::vector<Named> NCDMInteractingSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  const auto dot_instances = pfc->instances_with("type", "ncdm_self_interacting");
+  const auto dot_instances = ctx.pfc->instances_with("type", "ncdm_self_interacting");
 
   int N_ncdm_interacting = 0;
-  bool flag              = pfc->read_int("N_ncdm_interacting", N_ncdm_interacting);
+  bool flag              = ctx.pfc->read_int("N_ncdm_interacting", N_ncdm_interacting);
   const bool has_legacy  = flag;
   const bool has_dot     = !dot_instances.empty();
-  if (has_legacy && has_dot && has_unconsumed_dot_type_keys(*pfc, dot_instances)) {
+  if (has_legacy && has_dot && has_unconsumed_dot_type_keys(*ctx.pfc, dot_instances)) {
     throw std::invalid_argument(
         "cannot mix N_ncdm_interacting with dot-syntax "
         "'*.type = ncdm_self_interacting'; use one or the other");
@@ -144,13 +140,13 @@ std::vector<NCDMInteractingSpecies::Named> NCDMInteractingSpecies::CreateAll(
   std::vector<std::string> keys;
   int N = 0;
   if (has_dot) {
-    keys = synthesise_self_interacting_ncdm_flat_keys(*pfc, dot_instances);
+    keys = synthesise_self_interacting_ncdm_flat_keys(*ctx.pfc, dot_instances);
     N    = static_cast<int>(dot_instances.size());
   }
   else if (has_legacy) {
     int N_std = 0, N_dr = 0;
-    pfc->read_int("N_ncdm_standard", N_std);
-    pfc->read_int("N_ncdm_decay_dr", N_dr);
+    ctx.pfc->read_int("N_ncdm_standard", N_std);
+    ctx.pfc->read_int("N_ncdm_decay_dr", N_dr);
     keys.reserve(N_ncdm_interacting);
     for (int n = 0; n < N_ncdm_interacting; ++n) {
       keys.push_back("ncdm__" + std::to_string(N_std + N_dr + n + 1));
@@ -159,8 +155,9 @@ std::vector<NCDMInteractingSpecies::Named> NCDMInteractingSpecies::CreateAll(
   }
 
   for (int n = 0; n < N; ++n) {
-    auto sp = std::make_unique<NCDMInteractingSpecies>(pfc, n, settings, pba, bgm);
-    result.push_back(Named{keys[n], std::move(sp)});
+    auto sp =
+        std::make_unique<NCDMInteractingSpecies>(ctx.pfc, n, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
+    result.push_back({keys[n], std::move(sp)});
   }
   return result;
 }

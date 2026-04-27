@@ -327,3 +327,13 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_ur", theta_ur, true);
   w.Add("shear_ur", shear_ur, true);
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_ur == _TRUE_) {
+    result.push_back({"UR", std::make_unique<UltraRelativisticSpecies>(*ctx.pba)});
+  }
+  return result;
+}

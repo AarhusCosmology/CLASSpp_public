@@ -167,3 +167,11 @@ void BaryonsSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("delta_b", delta_b, true);
   w.Add("theta_b", theta_b, true);
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> BaryonsSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  result.push_back({"Baryons", std::make_unique<BaryonsSpecies>(*ctx.pba)});
+  return result;
+}

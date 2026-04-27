@@ -18,6 +18,11 @@ class DarkRadiationSpecies : public BaseSpecies {
   DarkRadiationSpecies(const DCDMSpecies* dcdm, const background* pba, const BackgroundModule* bgm)
       : BaseSpecies("DR", EnergyType::Radiation), pba_(pba), bgm_(bgm), dcdm_(dcdm) {}
 
+  /** Decay product: no direct Omega0 input, starts at zero. */
+  double GetOmega0() const override {
+    return 0.0;
+  }
+
   bool IsFreestreaming() const override {
     return true;
   }

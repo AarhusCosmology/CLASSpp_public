@@ -14,6 +14,10 @@ class DCDMSpecies : public BaseSpecies {
  public:
   explicit DCDMSpecies(const background& pba);
 
+  double GetOmega0() const override {
+    return pba_.Omega0_dcdmdr;
+  }
+
   // ── Background ─────────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override {
     bgm_ = bgm;

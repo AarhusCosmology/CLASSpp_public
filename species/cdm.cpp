@@ -211,3 +211,13 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("delta_cdm", delta_cdm, true);
   w.Add("theta_cdm", theta_cdm, true);
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> CDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_cdm == _TRUE_) {
+    result.push_back({"CDM", std::make_unique<CDMSpecies>(*ctx.pba)});
+  }
+  return result;
+}

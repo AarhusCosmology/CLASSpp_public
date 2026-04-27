@@ -1,8 +1,9 @@
 #pragma once
 
+#include "background.h"
 #include "base_species.h"
+#include "species_build_context.h"
 
-struct background;
 class BackgroundModule;
 
 /**
@@ -19,6 +20,10 @@ class BackgroundModule;
 class FluidSpecies : public BaseSpecies {
  public:
   explicit FluidSpecies(const background& pba);
+
+  double GetOmega0() const override {
+    return pba_.Omega0_fld;
+  }
 
   // ── Background ─────────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override {
@@ -86,6 +91,9 @@ class FluidSpecies : public BaseSpecies {
                      const perturb_parameters_and_workspace& ppaw) override;
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
   void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
+
   double Delta(const perturb_vector* pv,
                const double* y,
                const double* pvecback,

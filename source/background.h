@@ -43,6 +43,16 @@ enum background_evolution_method { bgevo_rk, bgevo_evolver };
  * modules.
  */
 
+/** Which of {Lambda, Fluid, ScalarField} (if any) is the budget-closure
+ *  species — inferred during input parsing from which corresponding Omega
+ *  parameter was left unspecified (Omega_Lambda or Omega_fld) or set to the
+ *  negative-sentinel value (Omega_scf < 0), and consumed by
+ *  InputModule::ConstructSpecies after all non-closure species are built.
+ *  Defined at file scope (not nested in `background`) so that
+ *  generate_wrapper.py's struct parser doesn't see the enum's `};` and
+ *  prematurely terminate the background struct. */
+enum class ClosureSpecies { None, Lambda, Fluid, ScalarField };
+
 struct background {
   /** @name - input parameters initialized by user in input module
    *  (all other quantities are computed in this module, given these parameters
@@ -178,6 +188,8 @@ struct background {
   double delta_Neff_drmd = 0.;
   double z_stop          = 0.;
   //@}
+
+  ClosureSpecies closure_species = ClosureSpecies::None;
 
   /**
    *@name - some flags needed for calling background functions

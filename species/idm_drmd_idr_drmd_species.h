@@ -3,6 +3,7 @@
 #include "composite_species.h"
 #include "idm_drmd.h"
 #include "idr_drmd.h"
+#include "species_build_context.h"
 
 class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
  public:
@@ -38,6 +39,8 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
                       const double* y,
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
  protected:
   void AddCouplingDerivs(double tau,

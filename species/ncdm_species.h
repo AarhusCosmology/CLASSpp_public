@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "../species/ncdm_base_species.h"
+#include "../species/species_build_context.h"
 #include "background.h"
 #include "perturbations.h"
 
@@ -18,14 +19,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
               const BackgroundModule* bgm,
               const std::string& suffix = "_standard");
 
-  struct Named {
-    std::string key;  // SpeciesCollection key
-    std::unique_ptr<NCDMSpecies> species;
-  };
-  static std::vector<Named> CreateAll(FileContent* pfc,
-                                      const NcdmSettings& settings,
-                                      const background* pba,
-                                      const BackgroundModule* bgm);
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   bool IsFreestreaming() const override {
     return true;

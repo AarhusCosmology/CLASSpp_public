@@ -37,3 +37,13 @@ void LambdaSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const
 void LambdaSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
   w.Add("(.)rho_lambda", pvecback[index_bg_rho_lambda_]);
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> LambdaSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_lambda == _TRUE_) {
+    result.push_back({"Lambda", std::make_unique<LambdaSpecies>(*ctx.pba)});
+  }
+  return result;
+}

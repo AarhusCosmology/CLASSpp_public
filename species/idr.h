@@ -29,6 +29,10 @@ class IDRSpecies : public BaseSpecies {
    */
   double TcaShearIdr(const perturb_vector* pv, const double* y, const perturb_workspace* ppw) const;
 
+  double GetOmega0() const override {
+    return pba_.Omega0_idr;
+  }
+
   bool IsFreestreaming() const override {
     return true;
   }

@@ -335,3 +335,13 @@ double ScalarFieldSpecies::DeltaP(const perturb_vector* pv,
 
   return delta_p;
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_scf == _TRUE_) {
+    result.push_back({"ScalarField", std::make_unique<ScalarFieldSpecies>(*ctx.pba)});
+  }
+  return result;
+}

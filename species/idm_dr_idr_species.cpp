@@ -285,3 +285,13 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
                                  ctx.metric_euler - 1. / (1. + Sinv) * tca_slip_idm_dr;
   }
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_idm_dr == _TRUE_ || ctx.pba->has_idr == _TRUE_) {
+    result.push_back({"IDM_DR_IDR", std::make_unique<IDM_DR_IDR_Species>(*ctx.pba)});
+  }
+  return result;
+}

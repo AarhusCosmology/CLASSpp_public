@@ -5,17 +5,15 @@
 
 #include "background_module.h"
 #include "perturbations_module.h"
+#include "species/species_build_context.h"
 
-std::vector<DNCDM_DR_Species::Named> DNCDM_DR_Species::CreateAll(FileContent* pfc,
-                                                                 const NcdmSettings& settings,
-                                                                 const background* pba,
-                                                                 const BackgroundModule* bgm) {
-  auto dncdm_vec = DNCDMSpecies::CreateAll(pfc, settings, pba, bgm);
+std::vector<Named> DNCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
+  auto dncdm_vec = DNCDMSpecies::CreateAll(ctx);
   std::vector<Named> result;
   result.reserve(dncdm_vec.size());
   for (auto& e : dncdm_vec) {
     result.push_back(
-        Named{e.key, std::make_unique<DNCDM_DR_Species>(std::move(e.species), pba, bgm)});
+        {e.key, std::make_unique<DNCDM_DR_Species>(std::move(e.species), ctx.pba, ctx.bgm)});
   }
   return result;
 }

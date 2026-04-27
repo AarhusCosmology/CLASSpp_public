@@ -19,7 +19,7 @@
 // All species — single consolidated header
 #include <thread>
 
-#include "../species/all_species_list.h"
+#include "../species/all_species.h"
 #include "../species/dcdm_dr_species.h"
 #include "../species/species_input.h"
 
@@ -203,65 +203,176 @@ InputModule::InputModule(FileContent& fc) : file_content_(fc), shooting_workspac
 }
 
 void InputModule::ConstructSpecies() {
-  const background* pba = &background_;
-  if (pba->has_cdm == _TRUE_) {
-    all_species_.insert("CDM", std::make_unique<CDMSpecies>(*pba));
-  }
-  if (pba->has_lambda == _TRUE_) {
-    all_species_.insert("Lambda", std::make_unique<LambdaSpecies>(*pba));
-  }
-  if (pba->has_ur == _TRUE_) {
-    all_species_.insert("UR", std::make_unique<UltraRelativisticSpecies>(*pba));
-  }
-  if (pba->has_fld == _TRUE_) {
-    all_species_.insert("Fluid", std::make_unique<FluidSpecies>(*pba));
-  }
-  if (pba->has_dcdm == _TRUE_) {
-    all_species_.insert("DCDM_DR", std::make_unique<DCDM_DR_Species>(pba, nullptr));
-  }
-  if (pba->has_ncdm == _TRUE_) {
-    NcdmSettings ncdm_settings_for_species;
-    ncdm_settings_for_species.h           = pba->h;
-    ncdm_settings_for_species.T_cmb       = pba->T_cmb;
-    ncdm_settings_for_species.tol_ncdm    = precision_.tol_ncdm;
-    ncdm_settings_for_species.tol_ncdm_bg = precision_.tol_ncdm_bg;
-    ncdm_settings_for_species.tol_M_ncdm  = precision_.tol_M_ncdm;
+  background* pba = &background_;  // need non-const to write closure Omega
 
-    // Build standard NCDM species
-    auto ncdm_list =
-        NCDMSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
-    for (auto& e : ncdm_list) {
+  NcdmSettings ncdm_settings;
+  ncdm_settings.h           = pba->h;
+  ncdm_settings.T_cmb       = pba->T_cmb;
+  ncdm_settings.tol_ncdm    = precision_.tol_ncdm;
+  ncdm_settings.tol_ncdm_bg = precision_.tol_ncdm_bg;
+  ncdm_settings.tol_M_ncdm  = precision_.tol_M_ncdm;
+
+  const SpeciesBuildContext ctx{
+      /*pfc=*/&file_content_,
+      /*pba=*/pba,
+      /*ppr=*/&precision_,
+      /*ncdm_settings=*/&ncdm_settings,
+      /*bgm=*/nullptr,
+  };
+
+  // Read input_verbose for the closure verbose message.
+  int input_verbose = 0;
+  {
+    int flag = _FALSE_;
+    int val  = 0;
+    class_call(parser_read_int(&file_content_, "input_verbose", &val, &flag, error_message_),
+               error_message_,
+               error_message_);
+    if (flag == _TRUE_)
+      input_verbose = val;
+  }
+
+  const std::string_view closure_name = ClosureSpeciesName(pba->closure_species);
+
+  // Set the has_* flags that factories inspect during CreateAll.  All flags
+  // that depend purely on Omega0_X (already filled by input_read_parameters)
+  // can be resolved right now.  has_ncdm / has_ncdm_decay_dr depend on the
+  // NCDM counters that we don't know until after the loop; they are set below.
+  pba->has_cdm       = (pba->Omega0_cdm != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_dcdm      = (pba->Omega0_dcdmdr != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_dr        = (pba->Omega0_dcdmdr != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_scf       = (pba->Omega0_scf != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_lambda    = (pba->Omega0_lambda != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_fld       = (pba->Omega0_fld != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_ur        = (pba->Omega0_ur != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_idr       = (pba->Omega0_idr != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_idm_dr    = (pba->Omega0_idm_dr != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_curvature = (pba->sgnK != 0) ? _TRUE_ : _FALSE_;
+  pba->has_idr_drmd  = (pba->Omega0_idr_drmd != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_idm_drmd  = ((pba->Omega0_idm_drmd != 0.) && (pba->f_idm_drmd != 0.)) ? _TRUE_ : _FALSE_;
+  // has_ncdm and has_ncdm_decay_dr are set after the factory loop below.
+  pba->has_ncdm          = _FALSE_;
+  pba->has_ncdm_decay_dr = _FALSE_;
+
+  // Pass 1: build every non-closure species, summing Omega0 contributions.
+  // Also tally NCDM-family counters as we go: we know which factories are
+  // NCDM-family by their entry name, so no downcast is needed.
+  double omega0_sum      = 0.0;
+  int n_ncdm             = 0;
+  int n_dncdm            = 0;
+  double omega0_ncdm_tot = 0.0;
+  for (const auto& entry : kAllSpeciesFactories) {
+    if (entry.name == closure_name)
+      continue;
+    auto produced             = entry.create_all(ctx);
+    const bool is_ncdm_family = (entry.name == "NCDM" || entry.name == "DNCDM_DR" ||
+                                 entry.name == "NCDMInt");
+    for (auto& e : produced) {
+      omega0_sum += e.species->GetOmega0();
+      if (is_ncdm_family) {
+        omega0_ncdm_tot += e.species->GetOmega0();
+        n_ncdm          += 1;
+        if (entry.name == "DNCDM_DR")
+          n_dncdm += 1;
+      }
       all_species_.insert(e.key, std::move(e.species));
     }
+  }
 
-    // Build decay_dr species
-    auto dncdm_dr_vec =
-        DNCDM_DR_Species::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
-    for (auto& e : dncdm_dr_vec) {
-      all_species_.insert(e.key, std::move(e.species));
+  // Compute closure value and write to pba so the closure species' factory
+  // reads it like every other species reads its own Omega0_X.
+  if (pba->closure_species != ClosureSpecies::None) {
+    const double closure_value = 1.0 - pba->Omega0_k - omega0_sum;
+    switch (pba->closure_species) {
+      case ClosureSpecies::Lambda:
+        pba->Omega0_lambda = closure_value;
+        if (input_verbose > 0) {
+          printf(" -> matched budget equations by adjusting Omega_Lambda = %e\n",
+                 pba->Omega0_lambda);
+        }
+        break;
+      case ClosureSpecies::Fluid:
+        pba->Omega0_fld = closure_value;
+        if (input_verbose > 0) {
+          printf(" -> matched budget equations by adjusting Omega_fld = %e\n", pba->Omega0_fld);
+        }
+        break;
+      case ClosureSpecies::ScalarField:
+        pba->Omega0_scf = closure_value;
+        if (input_verbose > 0) {
+          printf(" -> matched budget equations by adjusting Omega_scf = %e\n", pba->Omega0_scf);
+        }
+        break;
+      case ClosureSpecies::None:
+        break;
     }
 
-    // Build ncdm_interacting species
-    auto interacting_vec =
-        NCDMInteractingSpecies::CreateAll(&file_content_, ncdm_settings_for_species, pba, nullptr);
-    for (auto& e : interacting_vec) {
-      all_species_.insert(e.key, std::move(e.species));
+    // Update the has_* flag for the closure species so that Pass 2's
+    // CreateAll body (which inspects has_lambda / has_fld / has_scf) sees
+    // the correct value now that Omega0_X has been written above.
+    switch (pba->closure_species) {
+      case ClosureSpecies::Lambda:
+        pba->has_lambda = (pba->Omega0_lambda != 0.) ? _TRUE_ : _FALSE_;
+        break;
+      case ClosureSpecies::Fluid:
+        pba->has_fld = (pba->Omega0_fld != 0.) ? _TRUE_ : _FALSE_;
+        break;
+      case ClosureSpecies::ScalarField:
+        pba->has_scf = (pba->Omega0_scf != 0.) ? _TRUE_ : _FALSE_;
+        break;
+      case ClosureSpecies::None:
+        break;
+    }
+
+    // Pass 2: build the closure species now that pba->Omega0_X is set.
+    for (const auto& entry : kAllSpeciesFactories) {
+      if (entry.name != closure_name)
+        continue;
+      auto produced = entry.create_all(ctx);
+      for (auto& e : produced) {
+        all_species_.insert(e.key, std::move(e.species));
+      }
+      break;
     }
   }
-  if (pba->has_scf == _TRUE_) {
-    all_species_.insert("ScalarField", std::make_unique<ScalarFieldSpecies>(*pba));
-  }
-  if (pba->has_idm_dr == _TRUE_ || pba->has_idr == _TRUE_) {
-    all_species_.insert("IDM_DR_IDR", std::make_unique<IDM_DR_IDR_Species>(*pba));
-  }
-  if (pba->has_idm_drmd == _TRUE_ || pba->has_idr_drmd == _TRUE_) {
-    all_species_.insert("IDM_DRMD_IDR_DRMD", std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*pba));
-  }
-  // Photons and baryons are always present once there is a radiation background.
-  // They are always added; the background module already guards has_ur/has_g etc.
-  all_species_.insert("Photons", std::make_unique<PhotonsSpecies>(*pba));
-  all_species_.insert("Baryons", std::make_unique<BaryonsSpecies>(*pba));
+
   all_species_.freeze();
+
+  // Populate NCDM-family counters that downstream modules (thermodynamics,
+  // perturbations, nonlinear, etc.) still read from pba.  These are load-bearing
+  // until a follow-up refactor rewrites those ~40 use sites as species loops.
+  pba->N_ncdm          = n_ncdm;
+  pba->N_decay_dr      = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + n_dncdm;
+  pba->Omega0_ncdm_tot = omega0_ncdm_tot;
+
+  // Now resolve the NCDM-dependent has_* flags.
+  if (pba->Omega0_ncdm_tot != 0.)
+    pba->has_ncdm = _TRUE_;
+  {
+    const int n_dncdm_dr = pba->N_decay_dr - (pba->Omega0_dcdmdr > 0 ? 1 : 0);
+    if (pba->has_ncdm && n_dncdm_dr > 0) {
+      pba->has_ncdm_decay_dr = _TRUE_;
+      pba->has_dr            = _TRUE_;
+    }
+  }
+
+  // Precision-parameter consistency check that depends on N_ncdm.
+  // (Moved here from input_read_parameters now that N_ncdm is set post-construction.)
+  const precision* ppr = &precision_;
+  if (pba->N_ncdm > 0) {
+    if (ppr->ncdm_fluid_trigger_tau_over_tau_k == ppr->radiation_streaming_trigger_tau_over_tau_k) {
+      throw std::invalid_argument(
+          "please choose different values for precision parameters "
+          "ncdm_fluid_trigger_tau_over_tau_k and radiation_streaming_trigger_tau_over_tau_k, "
+          "in order to avoid switching two approximation schemes at the same time");
+    }
+    if (ppr->ncdm_fluid_trigger_tau_over_tau_k == ppr->ur_fluid_trigger_tau_over_tau_k) {
+      throw std::invalid_argument(
+          "please choose different values for precision parameters "
+          "ncdm_fluid_trigger_tau_over_tau_k and ur_fluid_trigger_tau_over_tau_k, in order to "
+          "avoid switching two approximation schemes at the same time");
+    }
+  }
 }
 
 int InputModule::FixUnknownParameters(int input_verbose,
@@ -611,8 +722,6 @@ int InputModule::input_read_parameters() {
   double c_cor      = 0.;
   double stat_f_idr = 7. / 8.;
 
-  double Omega_tot;
-
   int i;
 
   double sigma_B; /* Stefan-Boltzmann constant in \f$ W/m^2/K^4 = Kg/K^4/s^3 \f$*/
@@ -737,8 +846,6 @@ int InputModule::input_read_parameters() {
     }
   }
 
-  Omega_tot = pba->Omega0_g;
-
   /** - Omega_0_b (baryons) */
   class_call(parser_read_double(pfc, "Omega_b", &param1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "omega_b", &param2, &flag2, errmsg), errmsg, errmsg);
@@ -749,8 +856,6 @@ int InputModule::input_read_parameters() {
     pba->Omega0_b = param1;
   if (flag2 == _TRUE_)
     pba->Omega0_b = param2 / pba->h / pba->h;
-
-  Omega_tot += pba->Omega0_b;
 
   /** - Omega_0_ur (ultra-relativistic species / massless neutrino) */
 
@@ -816,8 +921,6 @@ int InputModule::input_read_parameters() {
     ppt->G_eff_ur = pow(10.0, ppt->G_eff_ur);
   }
 
-  Omega_tot += pba->Omega0_ur;
-
   /** - Omega_0_idr (interacting dark radiation) */
   /* Can take both the ethos parameters, and the NADM parameters */
 
@@ -862,8 +965,6 @@ int InputModule::input_read_parameters() {
 
   pba->Omega0_idr = stat_f_idr * pow(pba->T_idr / pba->T_cmb, 4.) * pba->Omega0_g;
 
-  Omega_tot += pba->Omega0_idr;
-
   /** - Omega_0_cdm (CDM) */
   class_call(parser_read_double(pfc, "Omega_cdm", &param1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "omega_cdm", &param2, &flag2, errmsg), errmsg, errmsg);
@@ -877,8 +978,6 @@ int InputModule::input_read_parameters() {
 
   if ((ppt->gauge == synchronous) && (pba->Omega0_cdm == 0))
     pba->Omega0_cdm = ppr->Omega0_cdm_min_synchronous;
-
-  Omega_tot += pba->Omega0_cdm;
 
   /** - Omega_0_icdm_dr (DM interacting with DR) */
   class_call(parser_read_double(pfc, "Omega_idm_dr", &param1, &flag1, errmsg), errmsg, errmsg);
@@ -910,17 +1009,12 @@ int InputModule::input_read_parameters() {
     pba->Omega0_idm_dr = param3 * pba->Omega0_cdm;
     /* readjust Omega0_cdm */
     pba->Omega0_cdm -= pba->Omega0_idm_dr;
-    /* to be consistent, remove same amount from Omega_tot */
-    Omega_tot -= pba->Omega0_idm_dr;
     /* avoid Omega0_cdm =0 in synchronous gauge */
     if ((ppt->gauge == synchronous) && (pba->Omega0_cdm == 0)) {
       pba->Omega0_cdm    += ppr->Omega0_cdm_min_synchronous;
-      Omega_tot          += ppr->Omega0_cdm_min_synchronous;
       pba->Omega0_idm_dr -= ppr->Omega0_cdm_min_synchronous;
     }
   }
-
-  Omega_tot += pba->Omega0_idm_dr;
 
   if (pba->Omega0_idm_dr > 0.) {
     class_test(pba->Omega0_idr == 0.0,
@@ -1057,8 +1151,6 @@ int InputModule::input_read_parameters() {
     pba->Omega0_dcdmdr = param2 / pba->h / pba->h;
 
   if (pba->Omega0_dcdmdr > 0) {
-    Omega_tot += pba->Omega0_dcdmdr;
-
     /** - Read Omega_ini_dcdm or omega_ini_dcdm */
     class_call(parser_read_double(pfc, "Omega_ini_dcdm", &param1, &flag1, errmsg), errmsg, errmsg);
     class_call(parser_read_double(pfc, "omega_ini_dcdm", &param2, &flag2, errmsg), errmsg, errmsg);
@@ -1077,35 +1169,7 @@ int InputModule::input_read_parameters() {
     pba->Gamma_dcdm *= (1.e3 / _c_);
   }
 
-  /** - non-cold relics (ncdm) */
-  NcdmSettings ncdm_settings;
-  ncdm_settings.h           = pba->h;
-  ncdm_settings.T_cmb       = pba->T_cmb;
-  ncdm_settings.tol_ncdm    = ppr->tol_ncdm;
-  ncdm_settings.tol_ncdm_bg = ppr->tol_ncdm_bg;
-  ncdm_settings.tol_M_ncdm  = ppr->tol_M_ncdm;
-  {
-    // Build NCDM species temporarily to get N_ncdm, Omega0_ncdm_tot, and DNCDM count
-    auto temp_ncdm        = NCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
-    auto temp_dncdm       = DNCDMSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
-    auto temp_interacting = NCDMInteractingSpecies::CreateAll(pfc, ncdm_settings, pba, nullptr);
-
-    pba->N_ncdm = static_cast<int>(temp_ncdm.size() + temp_dncdm.size() + temp_interacting.size());
-    pba->N_decay_dr      = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + static_cast<int>(temp_dncdm.size());
-    pba->Omega0_ncdm_tot = 0.;
-    for (auto& e : temp_ncdm) {
-      pba->Omega0_ncdm_tot += e.species->GetOmega0();
-    }
-    for (auto& e : temp_dncdm) {
-      pba->Omega0_ncdm_tot += e.species->GetOmega0();
-    }
-    for (auto& e : temp_interacting) {
-      pba->Omega0_ncdm_tot += e.species->GetOmega0();
-    }
-  }
-
-  pba->l_max_idr  = ppr->l_max_idr;
-  Omega_tot      += pba->Omega0_ncdm_tot;
+  pba->l_max_idr = ppr->l_max_idr;
 
   /** - Omega_0_k (effective fractional density of curvature) */
   class_read_double("Omega_k", pba->Omega0_k);
@@ -1174,18 +1238,12 @@ int InputModule::input_read_parameters() {
     /* readjust Omega0_cdm */
     pba->Omega0_cdm -= pba->Omega0_idm_drmd;
 
-    /* to be consistent, remove same amount from Omega_tot */
-    Omega_tot -= pba->Omega0_idm_drmd;
-
     /* avoid Omega0_cdm =0 in synchronous gauge */
     if ((ppt->gauge == synchronous) && (pba->Omega0_cdm == 0)) {
       pba->Omega0_cdm      += ppr->Omega0_cdm_min_synchronous;
-      Omega_tot            += ppr->Omega0_cdm_min_synchronous;
       pba->Omega0_idm_drmd -= ppr->Omega0_cdm_min_synchronous;
     }
   }
-  Omega_tot += pba->Omega0_idr_drmd;
-  Omega_tot += pba->Omega0_idm_drmd;
 
   /** - Omega_0_lambda (cosmological constant), Omega0_fld (dark energy fluid), Omega0_scf (scalar field) */
 
@@ -1203,53 +1261,38 @@ int InputModule::input_read_parameters() {
    *  it means that either we have not read Omega_scf so we are ignoring it
    *  (unlike lambda and fld!) OR we have read it, but it had a
    *  positive value and should not be used for filling.
-   *  We now proceed in two steps:
-   *  1) set each Omega0 and add to the total for each specified component.
+   *  We proceed in two steps:
+   *  1) set each Omega0 for each specified component.
    *  2) go through the components in order {lambda, fld, scf} and
-   *     fill using first unspecified component.
+   *     record the first unspecified component as the closure species.
    */
 
   /* Step 1 */
   if (flag1 == _TRUE_) {
-    pba->Omega0_lambda  = param1;
-    Omega_tot          += pba->Omega0_lambda;
+    pba->Omega0_lambda = param1;
   }
   if (flag2 == _TRUE_) {
-    pba->Omega0_fld  = param2;
-    Omega_tot       += pba->Omega0_fld;
+    pba->Omega0_fld = param2;
   }
   if ((flag3 == _TRUE_) && (param3 >= 0.)) {
-    pba->Omega0_scf  = param3;
-    Omega_tot       += pba->Omega0_scf;
+    pba->Omega0_scf = param3;
   }
-  /* Step 2 */
+  /* Step 2: record which species (if any) is the closure species.
+   * The actual Omega0_X value is computed later in ConstructSpecies,
+   * after all non-closure species have been built and their GetOmega0()
+   * contributions summed. */
   if (flag1 == _FALSE_) {
-    //Fill with Lambda
-    pba->Omega0_lambda = 1. - pba->Omega0_k - Omega_tot;
-    if (input_verbose > 0)
-      printf(" -> matched budget equations by adjusting Omega_Lambda = %e\n", pba->Omega0_lambda);
+    pba->closure_species = ClosureSpecies::Lambda;
   }
   else if (flag2 == _FALSE_) {
-    // Fill up with fluid
-    pba->Omega0_fld = 1. - pba->Omega0_k - Omega_tot;
-    if (input_verbose > 0)
-      printf(" -> matched budget equations by adjusting Omega_fld = %e\n", pba->Omega0_fld);
+    pba->closure_species = ClosureSpecies::Fluid;
   }
   else if ((flag3 == _TRUE_) && (param3 < 0.)) {
-    // Fill up with scalar field
-    pba->Omega0_scf = 1. - pba->Omega0_k - Omega_tot;
-    if (input_verbose > 0)
-      printf(" -> matched budget equations by adjusting Omega_scf = %e\n", pba->Omega0_scf);
+    pba->closure_species = ClosureSpecies::ScalarField;
   }
-
-  /*
-    fprintf(stderr,"%e %e %e %e %e\n",
-    pba->Omega0_lambda,
-    pba->Omega0_fld,
-    pba->Omega0_scf,
-    pba->Omega0_k,
-    Omega_tot);
-  */
+  else {
+    pba->closure_species = ClosureSpecies::None;
+  }
 
   /** - Test that the user have not specified Omega_scf = -1 but left either
       Omega_lambda or Omega_fld unspecified:*/
@@ -2840,20 +2883,6 @@ int InputModule::input_read_parameters() {
              "ur_fluid_trigger_tau_over_tau_k and radiation_streaming_trigger_tau_over_tau_k, in "
              "order to avoid switching two approximation schemes at the same time");
 
-  if (pba->N_ncdm > 0) {
-    class_test(ppr->ncdm_fluid_trigger_tau_over_tau_k ==
-                   ppr->radiation_streaming_trigger_tau_over_tau_k,
-               errmsg,
-               "please choose different values for precision parameters "
-               "ncdm_fluid_trigger_tau_over_tau_k and radiation_streaming_trigger_tau_over_tau_k, "
-               "in order to avoid switching two approximation schemes at the same time");
-
-    class_test(ppr->ncdm_fluid_trigger_tau_over_tau_k == ppr->ur_fluid_trigger_tau_over_tau_k,
-               errmsg,
-               "please choose different values for precision parameters "
-               "ncdm_fluid_trigger_tau_over_tau_k and ur_fluid_trigger_tau_over_tau_k, in order to "
-               "avoid switching two approximation schemes at the same time");
-  }
   if (pba->Omega0_idr != 0.) {
     class_test(ppr->idr_streaming_trigger_tau_over_tau_k ==
                    ppr->radiation_streaming_trigger_tau_over_tau_k,
@@ -2995,70 +3024,6 @@ int InputModule::input_read_parameters() {
 
   if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
     pop->write_primordial = _TRUE_;
-  }
-
-  /** Moved from background.c.
-   - initialize all flags: which species are present? */
-
-  pba->has_cdm           = _FALSE_;
-  pba->has_ncdm          = _FALSE_;
-  pba->has_dcdm          = _FALSE_;
-  pba->has_ncdm_decay_dr = _FALSE_;
-  pba->has_dr            = _FALSE_;
-  pba->has_scf           = _FALSE_;
-  pba->has_lambda        = _FALSE_;
-  pba->has_fld           = _FALSE_;
-  pba->has_ur            = _FALSE_;
-  pba->has_idr           = _FALSE_;
-  pba->has_idm_dr        = _FALSE_;
-  pba->has_curvature     = _FALSE_;
-  pba->has_idr_drmd      = _FALSE_;
-  pba->has_idm_drmd      = _FALSE_;
-
-  if (pba->Omega0_cdm != 0.)
-    pba->has_cdm = _TRUE_;
-
-  if (pba->Omega0_ncdm_tot != 0.)
-    pba->has_ncdm = _TRUE_;
-
-  if (pba->Omega0_dcdmdr != 0.) {
-    pba->has_dcdm = _TRUE_;
-    pba->has_dr   = _TRUE_;
-  }
-
-  // N_decay_dr includes one entry for DCDM (if present) + one per DNCDM species
-  const int n_dncdm_dr = pba->N_decay_dr - (pba->Omega0_dcdmdr > 0 ? 1 : 0);
-  if (pba->has_ncdm && n_dncdm_dr > 0) {
-    pba->has_ncdm_decay_dr = _TRUE_;
-    pba->has_dr            = _TRUE_;
-  }
-
-  if (pba->Omega0_scf != 0.)
-    pba->has_scf = _TRUE_;
-
-  if (pba->Omega0_lambda != 0.)
-    pba->has_lambda = _TRUE_;
-
-  if (pba->Omega0_fld != 0.)
-    pba->has_fld = _TRUE_;
-
-  if (pba->Omega0_ur != 0.)
-    pba->has_ur = _TRUE_;
-
-  if (pba->Omega0_idr != 0.)
-    pba->has_idr = _TRUE_;
-
-  if (pba->Omega0_idm_dr != 0.)
-    pba->has_idm_dr = _TRUE_;
-
-  if (pba->sgnK != 0)
-    pba->has_curvature = _TRUE_;
-
-  if ((pba->Omega0_idm_drmd != 0.) && (pba->f_idm_drmd != 0.))
-    pba->has_idm_drmd = _TRUE_;
-
-  if (pba->Omega0_idr_drmd != 0.) {
-    pba->has_idr_drmd = _TRUE_;
   }
 
   /* flags for calling the interpolation routine */

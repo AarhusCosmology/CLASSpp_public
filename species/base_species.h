@@ -325,6 +325,13 @@ class BaseSpecies {
     return energy_type_ == EnergyType::Matter;
   }
 
+  /**
+   * Returns the species' contribution to Omega0 (used for budget closure during
+   * construction). For composites, this defaults to summing children. For
+   * decay-product species starting at zero, override returning 0.
+   */
+  virtual double GetOmega0() const = 0;
+
   /** Rho contribution to the matter tally. Default: Rho() if IsMatterSpecies, else 0. */
   virtual double MatterRho(const double* pvecback) const {
     return IsMatterSpecies() ? Rho(pvecback) : 0.;

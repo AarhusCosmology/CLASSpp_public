@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base_species.h"
+#include "species_build_context.h"
 
 struct background;
 
@@ -17,6 +18,10 @@ struct background;
 class UltraRelativisticSpecies : public BaseSpecies {
  public:
   explicit UltraRelativisticSpecies(const background& pba);
+
+  double GetOmega0() const override {
+    return Omega0_ur_;
+  }
 
   // ── Background ─────────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
@@ -61,6 +66,9 @@ class UltraRelativisticSpecies : public BaseSpecies {
 
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
   void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
+
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,

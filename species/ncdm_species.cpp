@@ -96,18 +96,15 @@ bool has_unconsumed_dot_type_keys(const FileContent& pfc,
 
 }  // namespace
 
-std::vector<NCDMSpecies::Named> NCDMSpecies::CreateAll(FileContent* pfc,
-                                                       const NcdmSettings& settings,
-                                                       const background* pba,
-                                                       const BackgroundModule* bgm) {
+std::vector<Named> NCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
 
-  const std::vector<std::string> dot_instances = pfc->instances_with("type", "ncdm_standard");
+  const std::vector<std::string> dot_instances = ctx.pfc->instances_with("type", "ncdm_standard");
 
   int int1 = 0, int2 = 0, flag1 = 0, flag2 = 0;
   char errmsg[2048];
-  class_call(parser_read_int(pfc, "N_ncdm_standard", &int1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
+  class_call(parser_read_int(ctx.pfc, "N_ncdm_standard", &int1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_int(ctx.pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
   if (flag1 == _TRUE_ && flag2 == _TRUE_) {
     throw std::invalid_argument(
         "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
@@ -120,7 +117,7 @@ std::vector<NCDMSpecies::Named> NCDMSpecies::CreateAll(FileContent* pfc,
 
   const bool has_dot    = !dot_instances.empty();
   const bool has_legacy = (flag1 == _TRUE_ || flag2 == _TRUE_);
-  if (has_dot && has_legacy && has_unconsumed_dot_type_keys(*pfc, dot_instances)) {
+  if (has_dot && has_legacy && has_unconsumed_dot_type_keys(*ctx.pfc, dot_instances)) {
     throw std::invalid_argument(
         "cannot mix legacy N_ncdm/N_ncdm_standard with dot-syntax "
         "'*.type = ncdm_standard'; use one or the other");
@@ -128,7 +125,7 @@ std::vector<NCDMSpecies::Named> NCDMSpecies::CreateAll(FileContent* pfc,
 
   std::vector<std::string> keys;
   if (has_dot) {
-    keys            = synthesise_standard_ncdm_flat_keys(*pfc, dot_instances);
+    keys            = synthesise_standard_ncdm_flat_keys(*ctx.pfc, dot_instances);
     N_ncdm_standard = static_cast<int>(dot_instances.size());
   }
   else {
@@ -139,8 +136,8 @@ std::vector<NCDMSpecies::Named> NCDMSpecies::CreateAll(FileContent* pfc,
   }
 
   for (int n = 0; n < N_ncdm_standard; ++n) {
-    auto sp = std::make_unique<NCDMSpecies>(pfc, n, settings, pba, bgm);
-    result.push_back(Named{keys[n], std::move(sp)});
+    auto sp = std::make_unique<NCDMSpecies>(ctx.pfc, n, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
+    result.push_back({keys[n], std::move(sp)});
   }
   return result;
 }

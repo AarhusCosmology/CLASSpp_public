@@ -3,12 +3,19 @@
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
+#include "species_build_context.h"
 
 /** Baryons: rho ~ a^{-3}. Two perturbation variables: delta_b, theta_b. */
 class BaryonsSpecies : public BaseSpecies {
  public:
   explicit BaryonsSpecies(const background& pba)
       : BaseSpecies("Baryons", EnergyType::Matter), pba_(pba) {}
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
+
+  double GetOmega0() const override {
+    return pba_.Omega0_b;
+  }
 
   void RegisterBackgroundIndices(int& index_bg) override {
     index_bg_rho_ = index_bg++;

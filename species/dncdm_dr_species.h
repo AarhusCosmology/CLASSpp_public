@@ -7,6 +7,7 @@
 #include "dncdm_decay_radiation_species.h"
 #include "dncdm_species.h"
 #include "parser.h"
+#include "species/species_build_context.h"
 
 class BackgroundModule;
 
@@ -20,15 +21,7 @@ class DNCDM_DR_Species : public CompositeSpecies {
                    const background* pba,
                    const BackgroundModule* bgm);
 
-  struct Named {
-    std::string key;
-    std::unique_ptr<DNCDM_DR_Species> species;
-  };
-
-  static std::vector<Named> CreateAll(FileContent* pfc,
-                                      const NcdmSettings& settings,
-                                      const background* pba,
-                                      const BackgroundModule* bgm);
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;

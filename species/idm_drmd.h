@@ -11,6 +11,10 @@ class IDM_DRMDSpecies : public BaseSpecies {
   explicit IDM_DRMDSpecies(const background& pba)
       : BaseSpecies("IDM_DRMD", EnergyType::Matter), pba_(pba) {}
 
+  double GetOmega0() const override {
+    return pba_.Omega0_idm_drmd;
+  }
+
   void RegisterBackgroundIndices(int& index_bg) override {
     index_bg_rho_ = index_bg++;
   }

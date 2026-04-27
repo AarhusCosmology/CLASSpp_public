@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "../species/ncdm_base_species.h"
+#include "../species/species_build_context.h"
 #include "background.h"
 #include "perturbations.h"
 
@@ -31,10 +32,7 @@ class DNCDMSpecies : public NCDMBaseSpecies {
     std::unique_ptr<DNCDMSpecies> species;
   };
 
-  static std::vector<Named> CreateAll(FileContent* pfc,
-                                      const NcdmSettings& settings,
-                                      const background* pba,
-                                      const BackgroundModule* bgm);
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   // ── Background ──────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;

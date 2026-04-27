@@ -41,7 +41,7 @@ struct NcdmSettings {
 class NCDMBaseSpecies : public BaseSpecies {
  public:
   // ── Public accessors ──────────────────────────────────────────────────────
-  double GetOmega0() const;
+  double GetOmega0() const override;
   double GetNeff(double z) const;
   double GetMassInElectronvolt() const {
     return m_in_eV_;

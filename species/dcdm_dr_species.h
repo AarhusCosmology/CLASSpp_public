@@ -3,6 +3,7 @@
 #include "composite_species.h"
 #include "dark_radiation_species.h"
 #include "dcdm.h"
+#include "species_build_context.h"
 
 class BackgroundModule;
 
@@ -43,6 +44,8 @@ class DCDM_DR_Species : public CompositeSpecies {
   const DarkRadiationSpecies& dr() const {
     return *dr_sp_;
   }
+
+  static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
  protected:
   void AddCouplingDerivs(double tau,

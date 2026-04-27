@@ -163,3 +163,13 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
   dy[pv->index_pt_F0_dr_sum + 0] += dl0;
   dy[pv->index_pt_F0_dr_sum + 1] += dl1;
 }
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+  if (ctx.pba->has_dcdm == _TRUE_) {
+    result.push_back({"DCDM_DR", std::make_unique<DCDM_DR_Species>(ctx.pba, ctx.bgm)});
+  }
+  return result;
+}
