@@ -89,43 +89,6 @@ bool AnyInstanceFieldValue(const std::vector<std::string>& values) {
   return false;
 }
 
-std::string CsvWithDefaults(const std::vector<std::string>& values,
-                            const std::string& default_value) {
-  std::string csv;
-  for (size_t i = 0; i < values.size(); ++i) {
-    if (i) {
-      csv += ", ";
-    }
-    csv += values[i].empty() ? default_value : values[i];
-  }
-  return csv;
-}
-
-std::string CsvForPsdFilenames(const std::vector<std::string>& use_psd_file_values,
-                               const std::vector<std::string>& filename_values,
-                               const std::string& dot_flag_field,
-                               const std::string& dot_filename_field,
-                               const std::string& legacy_filename_key) {
-  std::string csv;
-  for (size_t i = 0; i < use_psd_file_values.size(); ++i) {
-    const std::string flag = use_psd_file_values[i].empty() ? "0" : use_psd_file_values[i];
-    if (ParseIntValue(flag, dot_flag_field) == 0) {
-      continue;
-    }
-    if (filename_values[i].empty()) {
-      throw std::invalid_argument("dot-syntax field '" + dot_filename_field +
-                                  "' must be provided whenever '" + dot_flag_field +
-                                  "' is nonzero while synthesising legacy key '" +
-                                  legacy_filename_key + "'");
-    }
-    if (!csv.empty()) {
-      csv += ", ";
-    }
-    csv += filename_values[i];
-  }
-  return csv;
-}
-
 bool SynthesiseIdenticalScalarField(FileContent* pfc,
                                     const std::vector<std::string>& instances,
                                     const std::string& dot_field,

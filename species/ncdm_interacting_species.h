@@ -6,9 +6,9 @@
 
 class NCDMInteractingSpecies : public NCDMSpecies {
  public:
-  // Constructor inherits directly from NCDMSpecies to reuse base setup
+  // New input path: parameters read from PFC under <instance_name>.<field>
   NCDMInteractingSpecies(FileContent* pfc,
-                         int species_index,
+                         const std::string& instance_name,
                          const NcdmSettings& settings,
                          const background* pba,
                          const BackgroundModule* bgm);

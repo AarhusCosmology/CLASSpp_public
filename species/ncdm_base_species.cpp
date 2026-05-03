@@ -3,45 +3,7 @@
 #include <cfloat>  // DBL_EPSILON, DBL_MAX
 #include <cstring>
 
-namespace {
-
-int readDoubleList(
-    FileContent* pfc, const char* name, std::vector<double>& values, int* found, ErrorMsg errmsg) {
-  try {
-    *found = pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
-  }
-  catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
-  }
-  return _SUCCESS_;
-}
-
-int readIntegerList(
-    FileContent* pfc, const char* name, std::vector<int>& values, int* found, ErrorMsg errmsg) {
-  try {
-    *found = pfc->read_list_of_integers(name, values) ? _TRUE_ : _FALSE_;
-  }
-  catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
-  }
-  return _SUCCESS_;
-}
-
-int readStringList(FileContent* pfc,
-                   const char* name,
-                   std::vector<std::string>& values,
-                   int* found,
-                   ErrorMsg errmsg) {
-  try {
-    *found = pfc->read_list_of_strings(name, values) ? _TRUE_ : _FALSE_;
-  }
-  catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
-  }
-  return _SUCCESS_;
-}
-
-}  // namespace
+#include "species_input.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constructor
@@ -50,336 +12,81 @@ int readStringList(FileContent* pfc,
 NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
                                  EnergyType energy_type,
                                  FileContent* pfc,
-                                 int species_index,
-                                 const NcdmSettings& settings,
-                                 const std::string& suffix)
+                                 const std::string& instance_name,
+                                 const NcdmSettings& settings)
     : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h) {
-  ReadParameters(pfc, species_index, suffix, settings);
-}
-
-NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
-                                 EnergyType energy_type,
-                                 FileContent* pfc,
-                                 int dncdm_index,
-                                 const NcdmSettings& settings,
-                                 bool /*is_decay_dr*/)
-    : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h) {
-  ReadDecayDrParameters(pfc, dncdm_index, settings);
+  ReadParametersByInstance(pfc, instance_name, settings);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ReadDecayDrParameters — read parameters for one decay_dr species
+// ReadParametersByInstance — read parameters for one species via SpeciesInput
 // ─────────────────────────────────────────────────────────────────────────────
 
-void NCDMBaseSpecies::ReadDecayDrParameters(FileContent* pfc,
-                                            int dncdm_index,
-                                            const NcdmSettings& settings) {
-  char* errmsg = error_message_;
+void NCDMBaseSpecies::ReadParametersByInstance(FileContent* pfc,
+                                               const std::string& instance_name,
+                                               const NcdmSettings& settings) {
+  SpeciesInput input(pfc, instance_name);
 
-  // Read N_ncdm_decay_dr so we know how many entries to expect
-  int N_ncdm_decay_dr = 0;
-  int flag;
-  class_call(parser_read_int(pfc, "N_ncdm_decay_dr", &N_ncdm_decay_dr, &flag, errmsg),
-             errmsg,
-             errmsg);
+  // Common scalar fields. read_double / read_int leave the destination unchanged
+  // on miss, so each member keeps its in-class default. (Defaults that were
+  // previously fixed-up here, like T_ncdm_default = 0.71611, must already be set
+  // as in-class member initialisers — see Task 4.)
+  input.read_double("m", m_in_eV_);
+  input.read_double("T", T_);
+  input.read_double("deg", deg_);
+  input.read_double("Omega", Omega0_);
+  input.read_double("omega", omega0_);
+  input.read_double("ksi", ksi_);
+  input.read_int("quadrature_strategy", quadrature_strategy_);
+  input.read_int("momenta_bins", input_q_size_);
+  input.read_double("max_q", qmax_);
 
-  // Helper: read a list of ints, fill with default if not found, return element [dncdm_index]
-  auto read_int_elem = [&](const char* key, int default_value) -> int {
-    int found;
-    std::vector<int> vals;
-    readIntegerList(pfc, key, vals, &found, errmsg);
-    if (found == _FALSE_) {
-      return default_value;
-    }
-    if (dncdm_index < static_cast<int>(vals.size())) {
-      return vals[dncdm_index];
-    }
-    return default_value;
-  };
-
-  auto read_double_elem = [&](const char* key, double default_value) -> double {
-    int found;
-    std::vector<double> vals;
-    readDoubleList(pfc, key, vals, &found, errmsg);
-    if (found == _FALSE_) {
-      return default_value;
-    }
-    if (dncdm_index < static_cast<int>(vals.size())) {
-      return vals[dncdm_index];
-    }
-    return default_value;
-  };
-
-  const double T_dncdm_default = 0.71611;
-
-  quadrature_strategy_ = read_int_elem("quadrature_strategy_ncdm_decay_dr", 0);
-  input_q_size_        = read_int_elem("N_momentum_bins_ncdm_decay_dr", 5);
-  qmax_                = read_double_elem("maximum_q_ncdm_decay_dr", 15.0);
-  T_                   = read_double_elem("T_ncdm_decay_dr", T_dncdm_default);
-  ksi_                 = read_double_elem("ksi_ncdm_decay_dr", 0.0);
-  m_in_eV_             = read_double_elem("m_ncdm_decay_dr", 1.0);
-  deg_                 = read_double_elem("deg_ncdm_decay_dr", 1.0);
-
-  // No file-based PSD for decay_dr (got_file_ stays false, psd_parameters_ stays empty)
-  got_file_ = false;
-
-  // Initialize quadrature (uses quadrature_strategy_, input_q_size_, qmax_, ksi_)
-  InitQuadrature(settings);
-
-  // Compute M_ from m_in_eV_: M = m / (k_B * T_ncdm * T_cmb)
-  double H0 = settings.h * 1.e5 / _c_;
-  if (m_in_eV_ != 0.0) {
-    M_ = m_in_eV_ / _k_B_ * _eV_ / T_ / T_cmb_;
-    double rho_ncdm;
-    ComputeMomenta(0., nullptr, &rho_ncdm, nullptr, nullptr, nullptr);
-    // For DNCDM, Omega will be set later (via SetDegAndFactor / SetDeg_from_Omega_ini)
-    // so we don't compute Omega0_ here from rho.
-    // We DO keep M_ from m_in_eV_.
-  }
-  else {
-    M_ = 0.;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ReadParameters — extract single-species data from the parameter file
-// ─────────────────────────────────────────────────────────────────────────────
-
-void NCDMBaseSpecies::ReadParameters(FileContent* pfc,
-                                     int species_index,
-                                     const std::string& suffix,
-                                     const NcdmSettings& settings) {
-  char* errmsg = error_message_;
-
-  // 1. Determine expected number of species based on suffix
-  int N_expected    = 0;
-  std::string var_N = "N_ncdm" + suffix;
-  int flag1, flag2 = _FALSE_;
-
-  class_call(parser_read_int(pfc, var_N.c_str(), &N_expected, &flag1, errmsg), errmsg, errmsg);
-
-  // Maintain backward compatibility for standard NCDM missing the suffix
-  if (suffix == "_standard") {
-    int int2;
-    class_call(parser_read_int(pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
-    if ((flag1 == _TRUE_) && (flag2 == _TRUE_)) {
-      throw std::invalid_argument(
-          "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
-    }
-    if (flag2 == _TRUE_)
-      N_expected = int2;
+  // psd_parameters: variable-length list (single instance, comma-separated values).
+  std::vector<double> psd_params;
+  if (input.read_list_of_doubles("psd_parameters", psd_params)) {
+    psd_parameters_ = std::move(psd_params);
   }
 
-  const double deg_ncdm_default = 1.0;
-  const double T_ncdm_default   = 0.71611;
-  const double ksi_ncdm_default = 0.;
-
-  // 2. Dynamic Lambda helpers
-  auto read_list_of_ints = [&](const std::string& base_name,
-                               const std::string& legacy_name,
-                               std::vector<int>& output,
-                               int default_value) {
-    int flg1, flg2 = _FALSE_, entries_read;
-    std::vector<int> raw, raw2;
-    std::string varname = base_name + suffix;
-
-    class_call(readIntegerList(pfc, varname.c_str(), raw, &flg1, errmsg), errmsg, errmsg);
-
-    // Only look for deprecated names if we are parsing standard NCDM
-    if (suffix == "_standard" && !legacy_name.empty()) {
-      class_call(readIntegerList(pfc, legacy_name.c_str(), raw2, &flg2, errmsg), errmsg, errmsg);
+  // PSD file: a single-instance flag and an optional filename.
+  int use_psd_file = 0;
+  input.read_int("use_psd_file", use_psd_file);
+  got_file_ = (use_psd_file != 0);
+  if (got_file_) {
+    std::string filename;
+    if (!input.read_string("psd_filename", filename)) {
+      throw std::invalid_argument("species '" + instance_name +
+                                  "': use_psd_file=1 but psd_filename is missing");
     }
+    psd_file_ = std::move(filename);
+  }
 
-    if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
-      throw std::invalid_argument("In input file, you can only enter one of " + varname + " and " +
-                                  legacy_name + ", choose one");
-    }
-    else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
-      entries_read = static_cast<int>((flg1 == _TRUE_) ? raw.size() : raw2.size());
-      if (entries_read != N_expected) {
-        throw std::invalid_argument(
-            "Number of entries in " + varname +
-            " does not match the expected number: " + std::to_string(N_expected));
-      }
-      output = (flg1 == _TRUE_) ? raw : raw2;
-    }
-    else {
-      output.assign(N_expected, default_value);
-    }
-    return 0;
-  };
-
-  auto read_list_of_doubles = [&](const std::string& base_name,
-                                  const std::string& legacy_name,
-                                  std::vector<double>& output,
-                                  double default_value) {
-    int flg1, flg2 = _FALSE_, entries_read;
-    std::vector<double> raw, raw2;
-    std::string varname = base_name + suffix;
-
-    class_call(readDoubleList(pfc, varname.c_str(), raw, &flg1, errmsg), errmsg, errmsg);
-
-    if (suffix == "_standard" && !legacy_name.empty()) {
-      class_call(readDoubleList(pfc, legacy_name.c_str(), raw2, &flg2, errmsg), errmsg, errmsg);
-    }
-
-    if ((flg1 == _TRUE_) && (flg2 == _TRUE_)) {
-      throw std::invalid_argument("In input file, you can only enter one of " + varname + " and " +
-                                  legacy_name + ", choose one");
-    }
-    else if ((flg1 == _TRUE_) || (flg2 == _TRUE_)) {
-      entries_read = static_cast<int>((flg1 == _TRUE_) ? raw.size() : raw2.size());
-      if (entries_read != N_expected) {
-        throw std::invalid_argument(
-            "Number of entries in " + varname +
-            " does not match the expected number: " + std::to_string(N_expected));
-      }
-      output = (flg1 == _TRUE_) ? raw : raw2;
-    }
-    else {
-      output.assign(N_expected, default_value);
-    }
-    return 0;
-  };
-
-  // 3. Extract Element [species_index] using clean, suffix-agnostic base strings
-  std::vector<int> quadrature_strategies;
-  read_list_of_ints("quadrature_strategy_ncdm", "Quadrature strategy", quadrature_strategies, 0);
-  quadrature_strategy_ = quadrature_strategies[species_index];
-
-  std::vector<int> input_q_sizes;
-  read_list_of_ints("N_momentum_bins_ncdm", "Number of momentum bins", input_q_sizes, 5);
-  input_q_size_ = input_q_sizes[species_index];
-
-  std::vector<double> qmaxes;
-  read_list_of_doubles("maximum_q_ncdm", "Maximum q", qmaxes, 15.0);
-  qmax_ = qmaxes[species_index];
-
-  std::vector<double> T_ncdm_list;
-  read_list_of_doubles("T_ncdm", "T_ncdm", T_ncdm_list, T_ncdm_default);
-  T_ = T_ncdm_list[species_index];
-
-  std::vector<double> ksi_ncdm_list;
-  read_list_of_doubles("ksi_ncdm", "ksi_ncdm", ksi_ncdm_list, ksi_ncdm_default);
-  ksi_ = ksi_ncdm_list[species_index];
-
-  std::vector<double> deg_ncdm_list;
-  read_list_of_doubles("deg_ncdm", "deg_ncdm", deg_ncdm_list, deg_ncdm_default);
-  deg_ = deg_ncdm_list[species_index];
-
-  std::vector<double> m_ncdm_list;
-  read_list_of_doubles("m_ncdm", "m_ncdm", m_ncdm_list, 0.0);
-  m_in_eV_ = m_ncdm_list[species_index];
-
-  std::vector<double> Omega0_ncdm_list;
-  read_list_of_doubles("Omega_ncdm", "Omega_ncdm", Omega0_ncdm_list, 0.0);
-  Omega0_ = Omega0_ncdm_list[species_index];
-
-  std::vector<double> omega0_ncdm_list;
-  read_list_of_doubles("omega_ncdm", "omega_ncdm", omega0_ncdm_list, 0.0);
-  omega0_ = omega0_ncdm_list[species_index];
-
-  // Resolve omega/Omega conflict and set defaults
+  // Resolve omega/Omega conflict (matches existing semantics).
   if (omega0_ != 0.0) {
-    class_test(Omega0_ != 0.0,
-               errmsg,
-               "Nonzero values for both Omega and omega for ncdm species %d are specified!",
-               species_index);
+    if (Omega0_ != 0.0) {
+      throw std::invalid_argument("species '" + instance_name +
+                                  "': both Omega and omega specified — choose one");
+    }
     Omega0_ = omega0_ / settings.h / settings.h;
   }
   else {
     omega0_ = Omega0_ * settings.h * settings.h;
   }
 
+  // Ultra-relativistic default: if both Omega and m are zero, give a tiny mass.
   if ((Omega0_ == 0.0) && (m_in_eV_ == 0.0)) {
-    m_in_eV_ = 1.e-5;  // ultra-relativistic default
+    m_in_eV_ = 1.e-5;
   }
 
-  // Read PSD file flags
-  std::vector<int> got_files;
-  {
-    int found = _FALSE_;
-    // We check for "use_ncdm_psd_files" + suffix. Fall back to global if standard.
-    std::string psd_flag_name = "use_ncdm_psd_files" + (suffix == "_standard" ? "" : suffix);
-    class_call(readIntegerList(pfc, psd_flag_name.c_str(), got_files, &found, errmsg),
-               errmsg,
-               errmsg);
-
-    if (found == _FALSE_) {
-      got_files.assign(N_expected, _FALSE_);
-    }
-    class_test(static_cast<int>(got_files.size()) != N_expected,
-               errmsg,
-               "Number of entries in %s does not match expected number, %d.",
-               psd_flag_name.c_str(),
-               N_expected);
-  }
-
-  got_file_ = (got_files[species_index] == _TRUE_);
-  if (got_file_) {
-    int filenum = 0;
-    for (int n = 0; n < species_index; n++)
-      if (got_files[n] == _TRUE_)
-        filenum++;
-
-    int fileentries = 0;
-    for (int n = 0; n < N_expected; n++)
-      if (got_files[n] == _TRUE_)
-        fileentries++;
-
-    std::vector<std::string> raw_psd_files;
-    int flag_files;
-    std::string psd_file_name = "ncdm_psd_filenames" + (suffix == "_standard" ? "" : suffix);
-    class_call(readStringList(pfc, psd_file_name.c_str(), raw_psd_files, &flag_files, errmsg),
-               errmsg,
-               errmsg);
-
-    class_test(flag_files == _FALSE_,
-               errmsg,
-               "Input use_ncdm_psd_files is found, but no filenames found!");
-    class_test(static_cast<int>(raw_psd_files.size()) != fileentries,
-               errmsg,
-               "Number of filenames found, %d, does not match number of _TRUE_ values in "
-               "use_ncdm_psd_files, %d",
-               static_cast<int>(raw_psd_files.size()),
-               fileentries);
-    psd_file_ = raw_psd_files[filenum];
-  }
-
-  // Read optional PSD parameters
-  {
-    int found              = _FALSE_;
-    std::string psd_params = "ncdm_psd_parameters" + (suffix == "_standard" ? "" : suffix);
-    class_call(readDoubleList(pfc, psd_params.c_str(), psd_parameters_, &found, errmsg),
-               errmsg,
-               errmsg);
-    if (found == _FALSE_)
-      psd_parameters_.clear();
-  }
-
-  // The rest remains unchanged: InitQuadrature(settings) and mass evaluations
+  // The rest of the construction matches the legacy path.
   InitQuadrature(settings);
 
-  double H0 = settings.h * 1.e5 / _c_;
   if (m_in_eV_ != 0.0) {
     M_ = m_in_eV_ / _k_B_ * _eV_ / T_ / T_cmb_;
     double rho_ncdm;
     ComputeMomenta(0., nullptr, &rho_ncdm, nullptr, nullptr, nullptr);
-    // Overwrite behavior for pure decay products can be managed by the child class if needed,
-    // but standard initialization flows normally here.
-    if (Omega0_ == 0.0) {
-      Omega0_ = rho_ncdm / H0 / H0;
-      omega0_ = Omega0_ * settings.h * settings.h;
-    }
-    else {
-      double fnu_factor  = H0 * H0 * Omega0_ / rho_ncdm;
-      factor_           *= fnu_factor;
-      deg_              *= fnu_factor;
-    }
   }
   else {
-    M_       = MFromOmega(H0, Omega0_, settings.tol_M_ncdm);
-    m_in_eV_ = _k_B_ / _eV_ * T_ * M_ * T_cmb_;
+    M_ = 0.;
   }
 }
 

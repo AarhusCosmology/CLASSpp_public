@@ -212,12 +212,14 @@ void InputModule::ConstructSpecies() {
   ncdm_settings.tol_ncdm_bg = precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = precision_.tol_M_ncdm;
 
+  int ncdm_id_next = 0;
   const SpeciesBuildContext ctx{
       /*pfc=*/&file_content_,
       /*pba=*/pba,
       /*ppr=*/&precision_,
       /*ncdm_settings=*/&ncdm_settings,
       /*bgm=*/nullptr,
+      /*ncdm_id_next=*/&ncdm_id_next,
   };
 
   // Read input_verbose for the closure verbose message.

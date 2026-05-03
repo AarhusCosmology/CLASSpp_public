@@ -130,13 +130,29 @@ root_folder = '.'
 for sub_folder in ['include', 'main', 'source', 'tools', 'species', '.']:
     include_dirs.append(os.path.join(root_folder, sub_folder))
 
-# Define cython extension and fix Python version
+# Define cython extension and fix Python version.
+#
+# Symbol visibility: on Linux/macOS (gcc/clang) the default for shared
+# libraries is to export every symbol, so when both classy and a parallel
+# build (e.g. classyref in the lvl2 nose tests) are loaded into the same
+# Python process the dynamic linker can collapse duplicate C++ symbols
+# (NCDMSpecies::CreateAll, SpeciesBuildContext, etc.) onto whichever .so
+# was loaded first — silently mismatching ABI between the two builds and
+# segfaulting. Building with -fvisibility=hidden hides everything except
+# the Cython PyInit_* entry point (which Cython tags PyMODINIT_FUNC =
+# default visibility), so the two .so files stay independent. Windows
+# (MSVC) hides DLL symbols by default, so no flag is needed there.
+if os.name == 'nt':
+    extra_compile_args = ['/std:c++17', '/O2']
+else:
+    extra_compile_args = ['-std=c++17', '-O3', '-fvisibility=hidden', '-fvisibility-inlines-hidden']
+
 classy_ext = Extension('classy', ['classy.pyx'] + cpp_source_files,
                            include_dirs=include_dirs,
                            libraries=['m'] if not os.name == 'nt' else [],
                            library_dirs=[root_folder],
                            language="c++",
-                           extra_compile_args=(['-std=c++17', '-O3'] if os.name != 'nt' else ['/std:c++17', '/O2']),
+                           extra_compile_args=extra_compile_args,
                            define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION"),
                                           ("__CLASSDIR__", '"{}"'.format(os.path.abspath(root_folder)))]);
 myclib = ('myclib', {'sources': c_source_files,

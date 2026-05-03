@@ -10,134 +10,188 @@
 // ── Constructor ─────────────────────────────────────────────────────────────
 
 NCDMSpecies::NCDMSpecies(FileContent* pfc,
-                         int species_index,
+                         const std::string& instance_name,
                          const NcdmSettings& settings,
                          const background* pba,
-                         const BackgroundModule* bgm,
-                         const std::string& suffix)
-    : NCDMBaseSpecies("NCDM_" + std::to_string(species_index),
-                      EnergyType::Other,
-                      pfc,
-                      species_index,
-                      settings,
-                      suffix),
-      ncdm_id_(species_index), pba_(pba) {
-  bgm_ = bgm;  // bgm_ is protected in NCDMBaseSpecies
+                         const BackgroundModule* bgm)
+    : NCDMBaseSpecies(instance_name, EnergyType::Other, pfc, instance_name, settings), pba_(pba) {
+  bgm_ = bgm;
+
+  // Standard-NCDM closure: NCDMBaseSpecies::ReadParametersByInstance only
+  // computes M_ from m_in_eV_. Standard NCDM additionally needs the closure
+  // tying Omega0_ to m / factor / deg / M_:
+  //   - if m != 0 and Omega0 == 0: derive Omega0_ from rho_ncdm
+  //   - if m != 0 and Omega0 != 0: rescale factor_ and deg_ by fnu_factor
+  //   - if m == 0:                 derive M_ via MFromOmega and back-compute m_in_eV_
+  // DNCDMSpecies skips this and instead uses a deferred Omega_ini closure
+  // applied by DNCDMSpecies::CreateAll (see ApplyDncdmInitialClosure).
+  const double H0 = settings.h * 1.e5 / _c_;
+  if (m_in_eV_ != 0.0) {
+    double rho_ncdm = 0.;
+    ComputeMomenta(0., nullptr, &rho_ncdm, nullptr, nullptr, nullptr);
+    if (GetOmega0() == 0.0) {
+      SetOmega0(rho_ncdm / H0 / H0, settings.h);
+    }
+    else {
+      const double fnu_factor  = H0 * H0 * GetOmega0() / rho_ncdm;
+      factor_                 *= fnu_factor;
+      deg_                    *= fnu_factor;
+    }
+  }
+  else {
+    M_       = MFromOmega(H0, GetOmega0(), settings.tol_M_ncdm);
+    m_in_eV_ = _k_B_ / _eV_ * T_ * M_ * T_cmb_;
+  }
+
+  // ncdm_id_ stays at its in-class default (-1) until SetNcdmId is called.
 }
 
 // ── CreateAll factory ───────────────────────────────────────────────────────
 
 namespace {
 
-// Field mapping: dot-syntax key (under the instance) -> legacy CSV key.
-struct FieldMap {
-  const char* dot;
-  const char* legacy;
-  const char* default_value;
-};
-constexpr FieldMap kStandardFields[] = {
-    {"m", "m_ncdm", "0"},
-    {"T", "T_ncdm", "0.71611"},
-    {"deg", "deg_ncdm", "1.0"},
-    {"Omega", "Omega_ncdm", "0"},
-    {"omega", "omega_ncdm", "0"},
-    {"ksi", "ksi_ncdm", "0"},
-    {"psd_parameters", "ncdm_psd_parameters", "0"},
-    {"psd_filename", "ncdm_psd_filenames", nullptr},
-    {"use_psd_file", "use_ncdm_psd_files", "0"},
-    {"quadrature_strategy", "quadrature_strategy_ncdm_standard", "0"},
-    {"momenta_bins", "N_momentum_bins_ncdm_standard", "5"},
-    {"max_q", "maximum_q_ncdm_standard", "15"},
+struct LegacyFieldMap {
+  const char* legacy;  // legacy CSV key, e.g. "m_ncdm"
+  const char* dot;     // per-instance dot field, e.g. "m"
 };
 
-std::vector<std::string> synthesise_standard_ncdm_flat_keys(
-    FileContent& pfc, const std::vector<std::string>& instances) {
-  const int n_fields = static_cast<int>(sizeof(kStandardFields) / sizeof(FieldMap));
-  (void) CollectInstanceFieldValues(&pfc, instances, "type");
-  std::vector<std::vector<std::string>> values;
-  values.reserve(n_fields);
-  for (int f = 0; f < n_fields; ++f) {
-    values.push_back(CollectInstanceFieldValues(&pfc, instances, kStandardFields[f].dot));
+// Note: use_ncdm_psd_files MUST precede ncdm_psd_filenames so the PSD-filename
+// branch in TransmuteLegacyStandardNcdmToDot can read the just-written
+// use_psd_file dot keys for each instance.
+constexpr LegacyFieldMap kLegacyStandardFields[] = {
+    {"m_ncdm", "m"},
+    {"T_ncdm", "T"},
+    {"deg_ncdm", "deg"},
+    {"Omega_ncdm", "Omega"},
+    {"omega_ncdm", "omega"},
+    {"ksi_ncdm", "ksi"},
+    {"ncdm_psd_parameters", "psd_parameters"},
+    {"use_ncdm_psd_files", "use_psd_file"},
+    {"ncdm_psd_filenames", "psd_filename"},
+    {"quadrature_strategy_ncdm_standard", "quadrature_strategy"},
+    {"N_momentum_bins_ncdm_standard", "momenta_bins"},
+    {"maximum_q_ncdm_standard", "max_q"},
+};
+
+// Returns true if any key of the form "<prefix>.*" exists in pfc.
+bool any_dot_key_with_prefix(const FileContent& pfc, const std::string& prefix) {
+  bool found = false;
+  pfc.for_each([&](const std::string& name, const std::string&, bool) {
+    if (name.rfind(prefix + ".", 0) == 0) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
+  // 1. Resolve N from N_ncdm / N_ncdm_standard.
+  int N1 = 0, N2 = 0;
+  bool has1 = pfc.read_int("N_ncdm_standard", N1);
+  bool has2 = pfc.read_int("N_ncdm", N2);
+
+  if (has1 && has2) {
+    throw std::invalid_argument(
+        "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
+  }
+  int N = has1 ? N1 : (has2 ? N2 : 0);
+  if (N <= 0) {
+    return;  // nothing to transmute
   }
 
-  pfc.set("N_ncdm_standard", std::to_string(instances.size()));
-  for (int f = 0; f < n_fields; ++f) {
-    if (!AnyInstanceFieldValue(values[f]))
-      continue;
+  // 2. Synthesised prefix collision check.
+  for (int i = 1; i <= N; ++i) {
+    const std::string prefix = "ncdm__" + std::to_string(i);
+    if (any_dot_key_with_prefix(pfc, prefix)) {
+      throw std::invalid_argument(
+          "legacy NCDM transmutation collides with existing dot-instance '" + prefix +
+          "': rename your dot instance or remove the legacy N_ncdm keys");
+    }
+  }
 
-    if (std::string(kStandardFields[f].dot) == "psd_filename") {
-      const auto use_psd_file_values = CollectInstanceFieldValues(&pfc, instances, "use_psd_file");
-      const std::string csv          = CsvForPsdFilenames(use_psd_file_values,
-                                                          values[f],
-                                                          "use_psd_file",
-                                                          "psd_filename",
-                                                          kStandardFields[f].legacy);
-      if (!csv.empty()) {
-        pfc.set(kStandardFields[f].legacy, csv);
-      }
+  // 3. For each legacy CSV field, broadcast or distribute per instance.
+  for (const auto& fm : kLegacyStandardFields) {
+    std::string raw_value;
+    if (!pfc.read_string(fm.legacy, raw_value)) {
       continue;
     }
 
-    pfc.set(kStandardFields[f].legacy,
-            CsvWithDefaults(values[f], kStandardFields[f].default_value));
+    std::vector<std::string> values = FileContent::split_csv(raw_value);
+    if (values.empty()) {
+      continue;
+    }
+
+    // psd_filename special case: legacy lists one filename per instance whose
+    // use_ncdm_psd_files flag is _TRUE_, in order. Skip the broadcast/distribute
+    // path and assign filenames only to instances that opted in. Counts must
+    // match exactly: under- or over-supplying filenames is an error.
+    if (std::string(fm.dot) == "psd_filename") {
+      std::vector<int> use_flags(N, 0);
+      int enabled = 0;
+      for (int i = 1; i <= N; ++i) {
+        int flag = 0;
+        pfc.read_int("ncdm__" + std::to_string(i) + ".use_psd_file", flag);
+        use_flags[i - 1] = flag;
+        if (flag != 0) {
+          ++enabled;
+        }
+      }
+      if (static_cast<int>(values.size()) != enabled) {
+        throw std::invalid_argument("ncdm_psd_filenames has " + std::to_string(values.size()) +
+                                    " entries but " + std::to_string(enabled) +
+                                    " instances have use_ncdm_psd_files=1");
+      }
+      size_t fn_idx = 0;
+      for (int i = 0; i < N; ++i) {
+        if (use_flags[i] != 0) {
+          pfc.set("ncdm__" + std::to_string(i + 1) + ".psd_filename", values[fn_idx]);
+          ++fn_idx;
+        }
+      }
+      continue;  // skip the generic broadcast/distribute path
+    }
+
+    if (values.size() == 1u) {
+      // broadcast scalar to all N instances
+      for (int i = 1; i <= N; ++i) {
+        pfc.set("ncdm__" + std::to_string(i) + "." + fm.dot, values[0]);
+      }
+    }
+    else if (static_cast<int>(values.size()) == N) {
+      for (int i = 0; i < N; ++i) {
+        pfc.set("ncdm__" + std::to_string(i + 1) + "." + fm.dot, values[i]);
+      }
+    }
+    else {
+      throw std::invalid_argument(std::string(fm.legacy) + " has " + std::to_string(values.size()) +
+                                  " entries but N_ncdm_standard = " + std::to_string(N) +
+                                  "; expected 1 (broadcast) or " + std::to_string(N));
+    }
   }
 
-  return instances;
-}
-
-bool has_unconsumed_dot_type_keys(const FileContent& pfc,
-                                  const std::vector<std::string>& instances) {
-  for (const auto& instance : instances) {
-    if (!pfc.was_read(instance + ".type"))
-      return true;
+  // 4. Stamp the type field on each synthesised instance.
+  for (int i = 1; i <= N; ++i) {
+    pfc.set("ncdm__" + std::to_string(i) + ".type", "ncdm_standard");
   }
-  return false;
 }
 
 }  // namespace
 
 std::vector<Named> NCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  TransmuteLegacyStandardNcdmToDot(*ctx.pfc);
+
+  const auto instances = ctx.pfc->instances_with("type", "ncdm_standard");
+
   std::vector<Named> result;
+  result.reserve(instances.size());
+  for (const auto& name : instances) {
+    // Mark <instance>.type as consumed (instances_with does not mark anything as read)
+    std::string unused_type;
+    ctx.pfc->read_string(name + ".type", unused_type);
 
-  const std::vector<std::string> dot_instances = ctx.pfc->instances_with("type", "ncdm_standard");
-
-  int int1 = 0, int2 = 0, flag1 = 0, flag2 = 0;
-  char errmsg[2048];
-  class_call(parser_read_int(ctx.pfc, "N_ncdm_standard", &int1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_int(ctx.pfc, "N_ncdm", &int2, &flag2, errmsg), errmsg, errmsg);
-  if (flag1 == _TRUE_ && flag2 == _TRUE_) {
-    throw std::invalid_argument(
-        "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
-  }
-  int N_ncdm_standard = 0;
-  if (flag1 == _TRUE_)
-    N_ncdm_standard = int1;
-  else if (flag2 == _TRUE_)
-    N_ncdm_standard = int2;
-
-  const bool has_dot    = !dot_instances.empty();
-  const bool has_legacy = (flag1 == _TRUE_ || flag2 == _TRUE_);
-  if (has_dot && has_legacy && has_unconsumed_dot_type_keys(*ctx.pfc, dot_instances)) {
-    throw std::invalid_argument(
-        "cannot mix legacy N_ncdm/N_ncdm_standard with dot-syntax "
-        "'*.type = ncdm_standard'; use one or the other");
-  }
-
-  std::vector<std::string> keys;
-  if (has_dot) {
-    keys            = synthesise_standard_ncdm_flat_keys(*ctx.pfc, dot_instances);
-    N_ncdm_standard = static_cast<int>(dot_instances.size());
-  }
-  else {
-    keys.reserve(N_ncdm_standard);
-    for (int n = 0; n < N_ncdm_standard; ++n) {
-      keys.push_back("ncdm__" + std::to_string(n + 1));
-    }
-  }
-
-  for (int n = 0; n < N_ncdm_standard; ++n) {
-    auto sp = std::make_unique<NCDMSpecies>(ctx.pfc, n, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
-    result.push_back({keys[n], std::move(sp)});
+    auto sp = std::make_unique<NCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
+    sp->SetNcdmId((*ctx.ncdm_id_next)++);
+    result.push_back({name, std::move(sp)});
   }
   return result;
 }

@@ -11,153 +11,74 @@
 
 namespace {
 
-// Field mapping: dot-syntax key (under the instance) -> legacy CSV key.
-// Legacy keys are produced by NCDMBaseSpecies::ReadParameters using suffix
-// "_interacting" (e.g. base "m_ncdm" -> "m_ncdm_interacting"); NCDM-interacting
-// extras (G_eff / log10G_eff) are read directly in the constructor.
-struct FieldMap {
-  const char* dot;
-  const char* legacy;
-  const char* default_value;
-};
-constexpr FieldMap kInteractingFields[] = {
-    {"m", "m_ncdm_interacting", "0"},
-    {"T", "T_ncdm_interacting", "0.71611"},
-    {"deg", "deg_ncdm_interacting", "1.0"},
-    {"ksi", "ksi_ncdm_interacting", "0"},
-    {"Omega", "Omega_ncdm_interacting", "0"},
-    {"omega", "omega_ncdm_interacting", "0"},
-    {"psd_parameters", "ncdm_psd_parameters_interacting", "0"},
-    {"psd_filename", "ncdm_psd_filenames_interacting", nullptr},
-    {"use_psd_file", "use_ncdm_psd_files_interacting", "0"},
-    {"quadrature_strategy", "quadrature_strategy_ncdm_interacting", "0"},
-    {"momenta_bins", "N_momentum_bins_ncdm_interacting", "5"},
-    {"max_q", "maximum_q_ncdm_interacting", "15"},
-    {"G_eff", "G_eff_ncdm_interacting", "0"},
-    {"log10G_eff", "log10G_eff_ncdm_interacting", "0"},
+constexpr const char* kLegacyInteractingKeys[] = {
+    "N_ncdm_interacting",
+    "G_eff_ncdm_interacting",
+    "log10G_eff_ncdm_interacting",
+    "quadrature_strategy_ncdm_interacting",
+    "N_momentum_bins_ncdm_interacting",
+    "maximum_q_ncdm_interacting",
 };
 
-std::vector<std::string> synthesise_self_interacting_ncdm_flat_keys(
-    FileContent& pfc, const std::vector<std::string>& instances) {
-  const int n_fields = static_cast<int>(sizeof(kInteractingFields) / sizeof(FieldMap));
-  (void) CollectInstanceFieldValues(&pfc, instances, "type");
-  std::vector<std::vector<std::string>> values;
-  values.reserve(n_fields);
-  for (int f = 0; f < n_fields; ++f) {
-    values.push_back(CollectInstanceFieldValues(&pfc, instances, kInteractingFields[f].dot));
-  }
-
-  pfc.set("N_ncdm_interacting", std::to_string(instances.size()));
-  const auto g_eff_values      = CollectInstanceFieldValues(&pfc, instances, "G_eff");
-  const auto log10g_eff_values = CollectInstanceFieldValues(&pfc, instances, "log10G_eff");
-  if (AnyInstanceFieldValue(g_eff_values) && AnyInstanceFieldValue(log10g_eff_values)) {
-    throw std::invalid_argument(
-        "cannot mix G_eff and log10G_eff representations across dot-syntax self-interacting "
-        "NCDM species");
-  }
-
-  for (int f = 0; f < n_fields; ++f) {
-    if (!AnyInstanceFieldValue(values[f]))
-      continue;
-
-    if (std::string(kInteractingFields[f].dot) == "psd_filename") {
-      const auto use_psd_file_values = CollectInstanceFieldValues(&pfc, instances, "use_psd_file");
-      const std::string csv          = CsvForPsdFilenames(use_psd_file_values,
-                                                          values[f],
-                                                          "use_psd_file",
-                                                          "psd_filename",
-                                                          kInteractingFields[f].legacy);
-      if (!csv.empty()) {
-        pfc.set(kInteractingFields[f].legacy, csv);
-      }
-      continue;
+void RejectLegacyInteractingKeys(FileContent& pfc) {
+  for (const char* key : kLegacyInteractingKeys) {
+    std::string unused;
+    if (pfc.read_string(key, unused)) {
+      throw std::invalid_argument(
+          std::string("'") + key + "' is no longer supported. Use dot-syntax: " +
+          "'<instance>.<dot-name> = ...' with '<instance>.type = ncdm_self_interacting'.");
     }
-
-    pfc.set(kInteractingFields[f].legacy,
-            CsvWithDefaults(values[f], kInteractingFields[f].default_value));
   }
-  return instances;
-}
-
-bool has_unconsumed_dot_type_keys(const FileContent& pfc,
-                                  const std::vector<std::string>& instances) {
-  for (const auto& instance : instances) {
-    if (!pfc.was_read(instance + ".type"))
-      return true;
-  }
-  return false;
 }
 
 }  // namespace
 
 // ── Constructor ─────────────────────────────────────────────────────────────
+// New input path: read per-instance dot-syntax parameters
 NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
-                                               int species_index,
+                                               const std::string& instance_name,
                                                const NcdmSettings& settings,
                                                const background* pba,
                                                const BackgroundModule* bgm)
-    : NCDMSpecies(pfc, species_index, settings, pba, bgm, "_interacting") {
-  char errmsg[2048];  // Local error message buffer to bypass private member access
+    : NCDMSpecies(pfc, instance_name, settings, pba, bgm) {
+  SpeciesInput input(pfc, instance_name);
 
-  std::vector<double> G_eff_list;
-  std::vector<double> log10G_eff_list;
+  double G_eff_value      = 0.;
+  double log10G_eff_value = 0.;
+  bool has_G              = input.read_double("G_eff", G_eff_value);
+  bool has_lG             = input.read_double("log10G_eff", log10G_eff_value);
 
-  bool flag_G    = pfc->read_list_of_doubles("G_eff_ncdm_interacting", G_eff_list);
-  bool flag_logG = pfc->read_list_of_doubles("log10G_eff_ncdm_interacting", log10G_eff_list);
-
-  class_test(flag_G && flag_logG,
-             errmsg,
-             "In input file, you cannot enter both log10G_eff_ncdm_interacting and "
-             "G_eff_ncdm_interacting, choose one");
-
-  if (flag_G) {
-    if (species_index < static_cast<int>(G_eff_list.size())) {
-      G_eff_ = G_eff_list[species_index];
-    }
+  if (has_G && has_lG) {
+    throw std::invalid_argument("species '" + instance_name +
+                                "': specify exactly one of G_eff or log10G_eff");
   }
-  else if (flag_logG) {
-    if (species_index < static_cast<int>(log10G_eff_list.size())) {
-      G_eff_ = std::pow(10.0, log10G_eff_list[species_index]);
-    }
+  if (has_G) {
+    G_eff_ = G_eff_value;
+  }
+  else if (has_lG) {
+    G_eff_ = std::pow(10.0, log10G_eff_value);
   }
 }
 
 // ── CreateAll factory ───────────────────────────────────────────────────────
 std::vector<Named> NCDMInteractingSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  RejectLegacyInteractingKeys(*ctx.pfc);
+
+  const auto instances = ctx.pfc->instances_with("type", "ncdm_self_interacting");
+
   std::vector<Named> result;
-  const auto dot_instances = ctx.pfc->instances_with("type", "ncdm_self_interacting");
+  result.reserve(instances.size());
+  for (const auto& name : instances) {
+    std::string unused_type;
+    ctx.pfc->read_string(name + ".type", unused_type);  // mark consumed
 
-  int N_ncdm_interacting = 0;
-  bool flag              = ctx.pfc->read_int("N_ncdm_interacting", N_ncdm_interacting);
-  const bool has_legacy  = flag;
-  const bool has_dot     = !dot_instances.empty();
-  if (has_legacy && has_dot && has_unconsumed_dot_type_keys(*ctx.pfc, dot_instances)) {
-    throw std::invalid_argument(
-        "cannot mix N_ncdm_interacting with dot-syntax "
-        "'*.type = ncdm_self_interacting'; use one or the other");
-  }
-
-  std::vector<std::string> keys;
-  int N = 0;
-  if (has_dot) {
-    keys = synthesise_self_interacting_ncdm_flat_keys(*ctx.pfc, dot_instances);
-    N    = static_cast<int>(dot_instances.size());
-  }
-  else if (has_legacy) {
-    int N_std = 0, N_dr = 0;
-    ctx.pfc->read_int("N_ncdm_standard", N_std);
-    ctx.pfc->read_int("N_ncdm_decay_dr", N_dr);
-    keys.reserve(N_ncdm_interacting);
-    for (int n = 0; n < N_ncdm_interacting; ++n) {
-      keys.push_back("ncdm__" + std::to_string(N_std + N_dr + n + 1));
-    }
-    N = N_ncdm_interacting;
-  }
-
-  for (int n = 0; n < N; ++n) {
-    auto sp =
-        std::make_unique<NCDMInteractingSpecies>(ctx.pfc, n, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
-    result.push_back({keys[n], std::move(sp)});
+    auto sp = std::make_unique<NCDMInteractingSpecies>(ctx.pfc,
+                                                       name,
+                                                       *ctx.ncdm_settings,
+                                                       ctx.pba,
+                                                       ctx.bgm);
+    sp->SetNcdmId((*ctx.ncdm_id_next)++);
+    result.push_back({name, std::move(sp)});
   }
   return result;
 }

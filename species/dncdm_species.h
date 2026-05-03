@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -18,14 +19,21 @@ class BackgroundColumnWriter;
  */
 class DNCDMSpecies : public NCDMBaseSpecies {
  public:
-  // ncdm_index:  overall NCDM index (position in N_ncdm list)
-  // dncdm_index: 0-based index among decay_dr species only
+  // Reads all DNCDM-specific parameters from the dot-syntax instance
+  // identified by instance_name (e.g. "dncdm1").
   DNCDMSpecies(FileContent* pfc,
-               int ncdm_index,
-               int dncdm_index,
+               const std::string& instance_name,
                const NcdmSettings& settings,
                const background* pba,
                const BackgroundModule* bgm);
+
+  // Accessors for deferred closure (used by CreateAll after construction)
+  const std::optional<double>& Omega_ini_pending() const {
+    return Omega_ini_pending_;
+  }
+  const std::optional<double>& Neff_ini_pending() const {
+    return Neff_ini_pending_;
+  }
 
   struct Named {
     std::string key;
@@ -90,6 +98,9 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   int ncdm_id() const {
     return ncdm_id_;
   }
+  void SetNcdmId(int id) override {
+    ncdm_id_ = id;
+  }
   int bg_number_index() const {
     return index_bg_number_;
   }
@@ -141,8 +152,14 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                                                            const perturb_workspace* ppw) const;
 
  private:
-  int ncdm_id_;  // overall NCDM index
+  int ncdm_id_ = -1;  // perturbation-array slot index; assigned by CreateAll via SetNcdmId
   const background* pba_;
+
+  // Deferred closure stash (instance-name constructor only).
+  // Set when the user specifies Omega_ini/omega_ini or Neff_ini; CreateAll
+  // applies SetDeg_from_Omega_ini once a_ini is available.
+  std::optional<double> Omega_ini_pending_;
+  std::optional<double> Neff_ini_pending_;
 
   // Absorbed from DecayDRProperties
   double Gamma_ = 0.;

@@ -102,33 +102,28 @@ class NCDMBaseSpecies : public BaseSpecies {
   void PrintMassInfo() const;
   void PrintOmegaInfo() const;
 
+  void SetDeg_from_Omega_ini(double z_ini, double H0, double Omega_ini);
+
   // Background overrides (shared by NCDMSpecies and DNCDMSpecies)
   void SetBackgroundModule(const BackgroundModule* bgm) override {
     bgm_ = bgm;
   }
 
- protected:
-  // Constructor for standard NCDM species (reads from *_ncdm_standard parameter lists)
-  NCDMBaseSpecies(std::string name,
-                  EnergyType energy_type,
-                  FileContent* pfc,
-                  int species_index,
-                  const NcdmSettings& settings,
-                  const std::string& suffix = "_standard");
+  // Assigns the perturbation-array slot index after construction.
+  // Called by CreateAll; each concrete subclass must override.
+  // ncdm_id() is invalid until this is called.
+  virtual void SetNcdmId(int id) = 0;
 
-  // Constructor for decay_dr NCDM species (reads from *_ncdm_decay_dr parameter lists)
-  // dncdm_index: 0-based index among decay_dr species
-  // Pass is_decay_dr=true to select the decay_dr parameter reading path
+ protected:
+  // Constructor: reads parameters per-instance via SpeciesInput (dot-syntax).
   NCDMBaseSpecies(std::string name,
                   EnergyType energy_type,
                   FileContent* pfc,
-                  int dncdm_index,
-                  const NcdmSettings& settings,
-                  bool is_decay_dr);
+                  const std::string& instance_name,
+                  const NcdmSettings& settings);
 
   void SetOmega0(double Omega0, double h);
   void SetDegAndFactor(double deg);
-  void SetDeg_from_Omega_ini(double z_ini, double H0, double Omega_ini);
 
   // Momenta variant with variable degeneracy (used by SetDeg_from_Omega_ini):
   int ComputeMomentaDeg(double deg,
@@ -177,11 +172,9 @@ class NCDMBaseSpecies : public BaseSpecies {
     int last_index = 0;
   };
 
-  void ReadParameters(FileContent* pfc,
-                      int species_index,
-                      const std::string& suffix,
-                      const NcdmSettings& settings);
-  void ReadDecayDrParameters(FileContent* pfc, int dncdm_index, const NcdmSettings& settings);
+  void ReadParametersByInstance(FileContent* pfc,
+                                const std::string& instance_name,
+                                const NcdmSettings& settings);
   void InitQuadrature(const NcdmSettings& settings);
   void InitDistribution(FileContent* pfc, int species_index);
 
@@ -196,8 +189,8 @@ class NCDMBaseSpecies : public BaseSpecies {
   static int DistributionFunction(void* params, double q, double* f0);
   static int TestFunction(void* params, double q, double* test);
 
-  int quadrature_strategy_ = 3;
-  int input_q_size_        = -1;
+  int quadrature_strategy_ = 0;
+  int input_q_size_        = 5;
   double qmax_             = 15.;
   std::vector<double> psd_parameters_;
   bool got_file_ = false;

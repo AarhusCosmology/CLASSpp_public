@@ -12,86 +12,59 @@
 
 namespace {
 
-int readDoubleList(
-    FileContent* pfc, const char* name, std::vector<double>& values, int* found, ErrorMsg errmsg) {
-  try {
-    *found = pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
-  }
-  catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
-  }
-  return _SUCCESS_;
-}
-
-// ── Dot-syntax → legacy key mapping for ncdm_decay_dr species ──────────────
-// Each dot-syntax instance field (under nu*.…) maps to the corresponding legacy
-// CSV-style key which DNCDMSpecies / NCDMBaseSpecies already knows how to read.
-//   "m"                   -> "m_ncdm_decay_dr"           // mass in eV
-//   "T"                   -> "T_ncdm_decay_dr"           // temperature ratio
-//   "ksi"                 -> "ksi_ncdm_decay_dr"         // degeneracy parameter
-//   "deg"                 -> "deg_ncdm_decay_dr"         // phase-space degeneracy
-//   "quadrature_strategy" -> "quadrature_strategy_ncdm_decay_dr"
-//   "momenta_bins"        -> "N_momentum_bins_ncdm_decay_dr"
-//   "max_q"               -> "maximum_q_ncdm_decay_dr"
-//   "Gamma"               -> "Gamma_ncdm_decay_dr"       // decay rate
-//   "log10Gamma"          -> "log10Gamma_ncdm_decay_dr"
-//   "lifetime"            -> "lifetime_ncdm_decay_dr"    // (singularised)
-//   "log10lifetime"       -> "log10lifetime_ncdm_decay_dr"
-//   "Omega"               -> "Omega_dncdmdr"             // today density
-//   "omega"               -> "omega_dncdmdr"             // today density * h^2
-//   "Omega_ini"           -> "Omega_ini_dncdm"
-//   "omega_ini"           -> "omega_ini_dncdm"
-//   "Neff_ini"            -> "Neff_ini_dncdm"
-struct FieldMap {
-  const char* dot;
-  const char* legacy;
-  const char* default_value;
-};
-constexpr FieldMap kDecayDrFields[] = {
-    {"m", "m_ncdm_decay_dr", "1.0"},
-    {"T", "T_ncdm_decay_dr", "0.71611"},
-    {"ksi", "ksi_ncdm_decay_dr", "0"},
-    {"deg", "deg_ncdm_decay_dr", "1.0"},
-    {"quadrature_strategy", "quadrature_strategy_ncdm_decay_dr", "0"},
-    {"momenta_bins", "N_momentum_bins_ncdm_decay_dr", "5"},
-    {"max_q", "maximum_q_ncdm_decay_dr", "15"},
-    {"Gamma", "Gamma_ncdm_decay_dr", "0"},
-    {"log10Gamma", "log10Gamma_ncdm_decay_dr", "0"},
-    {"lifetime", "lifetime_ncdm_decay_dr", "0"},
-    {"log10lifetime", "log10lifetime_ncdm_decay_dr", "0"},
-    {"Omega", "Omega_dncdmdr", "0"},
-    {"omega", "omega_dncdmdr", "0"},
-    {"Omega_ini", "Omega_ini_dncdm", "0"},
-    {"omega_ini", "omega_ini_dncdm", "0"},
-    {"Neff_ini", "Neff_ini_dncdm", "0"},
+constexpr const char* kLegacyDecayDrKeys[] = {
+    "N_ncdm_decay_dr",
+    "m_ncdm_decay_dr",
+    "T_ncdm_decay_dr",
+    "ksi_ncdm_decay_dr",
+    "deg_ncdm_decay_dr",
+    "quadrature_strategy_ncdm_decay_dr",
+    "N_momentum_bins_ncdm_decay_dr",
+    "maximum_q_ncdm_decay_dr",
+    "Gamma_ncdm_decay_dr",
+    "log10Gamma_ncdm_decay_dr",
+    "lifetime_ncdm_decay_dr",
+    "log10lifetime_ncdm_decay_dr",
+    "Omega_dncdmdr",
+    "omega_dncdmdr",
+    "Omega_ini_dncdm",
+    "omega_ini_dncdm",
+    "Neff_ini_dncdm",
 };
 
-std::vector<std::string> synthesise_decay_dr_ncdm_flat_keys(
-    FileContent& pfc, const std::vector<std::string>& instances) {
-  const int n_fields = static_cast<int>(sizeof(kDecayDrFields) / sizeof(FieldMap));
-  (void) CollectInstanceFieldValues(&pfc, instances, "type");
-  std::vector<std::vector<std::string>> values;
-  values.reserve(n_fields);
-  for (int f = 0; f < n_fields; ++f) {
-    values.push_back(CollectInstanceFieldValues(&pfc, instances, kDecayDrFields[f].dot));
+void RejectLegacyDecayDrKeys(FileContent& pfc) {
+  for (const char* key : kLegacyDecayDrKeys) {
+    std::string unused;
+    if (pfc.read_string(key, unused)) {
+      throw std::invalid_argument(
+          std::string("'") + key + "' is no longer supported. Use dot-syntax: " +
+          "'<instance>.<dot-name> = ...' with '<instance>.type = ncdm_decay_dr'.");
+    }
   }
-
-  pfc.set("N_ncdm_decay_dr", std::to_string(instances.size()));
-  for (int f = 0; f < n_fields; ++f) {
-    if (!AnyInstanceFieldValue(values[f]))
-      continue;
-    pfc.set(kDecayDrFields[f].legacy, CsvWithDefaults(values[f], kDecayDrFields[f].default_value));
-  }
-  return instances;
 }
 
-bool has_unconsumed_dot_type_keys(const FileContent& pfc,
-                                  const std::vector<std::string>& instances) {
-  for (const auto& instance : instances) {
-    if (!pfc.was_read(instance + ".type"))
-      return true;
+void ApplyDncdmInitialClosure(DNCDMSpecies& sp, const SpeciesBuildContext& ctx) {
+  const auto& Omega_ini = sp.Omega_ini_pending();
+  const auto& Neff_ini  = sp.Neff_ini_pending();
+  if (!Omega_ini.has_value() && !Neff_ini.has_value()) {
+    return;
   }
-  return false;
+
+  const double a_ini_seed = ctx.pba ? ctx.pba->a_today * 1e-14 : 1e-14;
+  const double a_today    = ctx.pba ? ctx.pba->a_today : 1.;
+  const double a_ini      = sp.GetIni(a_ini_seed, a_today, ctx.ncdm_settings->tol_ncdm);
+  const double z_ini      = 1.0 / a_ini - 1.0;
+  const double H0         = ctx.pba ? ctx.pba->H0 : ctx.ncdm_settings->h * 1.e5 / _c_;
+
+  if (Omega_ini.has_value()) {
+    sp.SetDeg_from_Omega_ini(z_ini, H0, *Omega_ini);
+  }
+  else {
+    // Neff_ini → Omega_ini using photon energy density at the same epoch.
+    const double Omega0_g        = ctx.pba ? ctx.pba->Omega0_g : 0.;
+    const double Omega_ini_value = *Neff_ini * 7. / 8. * std::pow(4. / 11., 4. / 3.) * Omega0_g;
+    sp.SetDeg_from_Omega_ini(z_ini, H0, Omega_ini_value);
+  }
 }
 
 }  // namespace
@@ -101,74 +74,101 @@ bool has_unconsumed_dot_type_keys(const FileContent& pfc,
 // ─────────────────────────────────────────────────────────────────────────────
 
 DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
-                           int ncdm_index,
-                           int dncdm_index,
+                           const std::string& instance_name,
                            const NcdmSettings& settings,
                            const background* pba,
                            const BackgroundModule* bgm)
-    : NCDMBaseSpecies("DNCDM_" + std::to_string(dncdm_index),
-                      EnergyType::Other,
-                      pfc,
-                      dncdm_index,
-                      settings,
-                      true /*is_decay_dr*/),
-      ncdm_id_(ncdm_index), pba_(pba) {
+    : NCDMBaseSpecies(instance_name, EnergyType::Other, pfc, instance_name, settings), pba_(pba) {
   bgm_ = bgm;
 
-  // Read Gamma for this decay_dr species.
-  // Supports: Gamma_ncdm_decay_dr, log10Gamma_ncdm_decay_dr,
-  //           lifetime_ncdm_decay_dr, log10lifetime_ncdm_decay_dr
-  char errmsg[2048];
-  int Gamma_read, log10Gamma_read, lifetime_read, log10lifetime_read;
-  std::vector<double> Gamma_list, log10Gamma_list, lifetime_list, log10lifetime_list;
+  SpeciesInput input(pfc, instance_name);
 
-  readDoubleList(pfc, "Gamma_ncdm_decay_dr", Gamma_list, &Gamma_read, errmsg);
-  readDoubleList(pfc, "log10Gamma_ncdm_decay_dr", log10Gamma_list, &log10Gamma_read, errmsg);
-  readDoubleList(pfc, "lifetime_ncdm_decay_dr", lifetime_list, &lifetime_read, errmsg);
-  readDoubleList(pfc,
-                 "log10lifetime_ncdm_decay_dr",
-                 log10lifetime_list,
-                 &log10lifetime_read,
-                 errmsg);
+  // Read decay rate (exactly one of these must be specified)
+  double Gamma_value         = 0.;
+  double log10Gamma_value    = 0.;
+  double lifetime_value      = 0.;
+  double log10lifetime_value = 0.;
+  bool has_G                 = input.read_double("Gamma", Gamma_value);
+  bool has_lG                = input.read_double("log10Gamma", log10Gamma_value);
+  bool has_lt                = input.read_double("lifetime", lifetime_value);
+  bool has_llt               = input.read_double("log10lifetime", log10lifetime_value);
 
-  // Exactly one decay-rate parameter must be provided
-  int n_provided = (Gamma_read == _TRUE_) + (log10Gamma_read == _TRUE_) +
-                   (lifetime_read == _TRUE_) + (log10lifetime_read == _TRUE_);
-  if (n_provided > 1)
+  int n_provided = (int) has_G + (int) has_lG + (int) has_lt + (int) has_llt;
+  if (n_provided != 1) {
     throw std::invalid_argument(
-        "DNCDM species: specify exactly one of Gamma_ncdm_decay_dr, "
-        "log10Gamma_ncdm_decay_dr, lifetime_ncdm_decay_dr, log10lifetime_ncdm_decay_dr");
-
-  auto check_size = [&](const char* name, const std::vector<double>& list) {
-    if (dncdm_index >= static_cast<int>(list.size()))
-      throw std::invalid_argument(std::string(name) +
-                                  " has fewer entries than expected for DNCDM species index " +
-                                  std::to_string(dncdm_index));
-  };
+        "species '" + instance_name +
+        "': specify exactly one of Gamma, log10Gamma, lifetime, log10lifetime");
+  }
 
   double Gamma_raw = 0.;
-  if (Gamma_read == _TRUE_) {
-    check_size("Gamma_ncdm_decay_dr", Gamma_list);
-    Gamma_raw = Gamma_list[dncdm_index];
+  if (has_G) {
+    Gamma_raw = Gamma_value;
   }
-  else if (log10Gamma_read == _TRUE_) {
-    check_size("log10Gamma_ncdm_decay_dr", log10Gamma_list);
-    Gamma_raw = std::pow(10., log10Gamma_list[dncdm_index]);
+  else if (has_lG) {
+    Gamma_raw = std::pow(10., log10Gamma_value);
   }
-  else if (lifetime_read == _TRUE_) {
-    check_size("lifetime_ncdm_decay_dr", lifetime_list);
-    Gamma_raw = 1. / lifetime_list[dncdm_index] / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
+  else if (has_lt) {
+    Gamma_raw = 1. / lifetime_value / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
   }
-  else if (log10lifetime_read == _TRUE_) {
-    check_size("log10lifetime_ncdm_decay_dr", log10lifetime_list);
-    double lifetime = std::pow(10., log10lifetime_list[dncdm_index]);
+  else {  // has_llt
+    double lifetime = std::pow(10., log10lifetime_value);
     Gamma_raw       = 1. / lifetime / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
   }
-  // Convert to Mpc^-1
   Gamma_ = Gamma_raw * (1.e3 / _c_);
 
-  // Compute dq_[i] = w_bg_[i] / f0(q_bg_[i])
-  // (w_bg_ is already populated by NCDMBaseSpecies::InitQuadrature)
+  // Read DNCDM-specific Omega / deg / Omega_ini values from the same instance.
+  // These were previously bulk-loaded in CreateAll from CSV lists.
+  // Semantics: at most one of {Omega, omega} and at most one of
+  // {deg, Omega_ini, omega_ini, Neff_ini} (the latter group resolved later
+  // by ConstructSpecies for shooting).
+  double Omega_local = 0., omega_local = 0.;
+  bool has_Omega = input.read_double("Omega", Omega_local);
+  bool has_omega = input.read_double("omega", omega_local);
+  if (has_Omega && has_omega) {
+    throw std::invalid_argument("species '" + instance_name +
+                                "': specify exactly one of Omega, omega");
+  }
+  if (has_omega) {
+    Omega_local = omega_local / settings.h / settings.h;
+    has_Omega   = true;
+  }
+  if (has_Omega) {
+    SetOmega0(Omega_local, settings.h);
+  }
+
+  double deg_local       = 0.;
+  double Omega_ini_local = 0.;
+  double omega_ini_local = 0.;
+  double Neff_ini_local  = 0.;
+  bool has_deg           = input.read_double("deg", deg_local);
+  bool has_Omega_ini     = input.read_double("Omega_ini", Omega_ini_local);
+  bool has_omega_ini     = input.read_double("omega_ini", omega_ini_local);
+  bool has_Neff_ini      = input.read_double("Neff_ini", Neff_ini_local);
+
+  int n_deg_options = (int) has_deg + (int) has_Omega_ini + (int) has_omega_ini +
+                      (int) has_Neff_ini;
+  if (n_deg_options > 1) {
+    throw std::invalid_argument("species '" + instance_name +
+                                "': specify at most one of deg, Omega_ini, omega_ini, Neff_ini");
+  }
+
+  if (has_deg) {
+    SetDegAndFactor(deg_local);
+  }
+  // The Omega_ini / omega_ini / Neff_ini cases require an a_ini-driven shooting step.
+  // Preserve their values by stashing them on the species so that ConstructSpecies'
+  // closure pass can apply them.
+  if (has_Omega_ini) {
+    Omega_ini_pending_ = Omega_ini_local;  // already in Omega units
+  }
+  else if (has_omega_ini) {
+    Omega_ini_pending_ = omega_ini_local / settings.h / settings.h;
+  }
+  else if (has_Neff_ini) {
+    Neff_ini_pending_ = Neff_ini_local;
+  }
+
+  // Compute dq_[i] = w_bg_[i] / f0(q_bg_[i]) (matches existing semantics)
   dq_ = ComputeDq();
 }
 
@@ -177,161 +177,20 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
 // ─────────────────────────────────────────────────────────────────────────────
 
 std::vector<DNCDMSpecies::Named> DNCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
+  RejectLegacyDecayDrKeys(*ctx.pfc);
+
+  const auto instances = ctx.pfc->instances_with("type", "ncdm_decay_dr");
+
   std::vector<Named> result;
-  ErrorMsg errmsg_buf;
-  char* errmsg = errmsg_buf;
+  result.reserve(instances.size());
+  for (const auto& name : instances) {
+    std::string unused_type;
+    ctx.pfc->read_string(name + ".type", unused_type);  // mark consumed
 
-  const std::vector<std::string> dot_instances = ctx.pfc->instances_with("type", "ncdm_decay_dr");
-
-  // Find N_ncdm_standard and N_ncdm_decay_dr
-  int N_ncdm_standard = 0, N_ncdm_decay_dr = 0;
-  int flag1, flag2, flag3;
-
-  int int1, int2;
-  parser_read_int(ctx.pfc, "N_ncdm_standard", &int1, &flag1, errmsg);
-  parser_read_int(ctx.pfc, "N_ncdm", &int2, &flag2, errmsg);
-  if (flag1 == _TRUE_)
-    N_ncdm_standard = int1;
-  else if (flag2 == _TRUE_)
-    N_ncdm_standard = int2;
-
-  parser_read_int(ctx.pfc, "N_ncdm_decay_dr", &N_ncdm_decay_dr, &flag3, errmsg);
-
-  const bool has_legacy = (flag3 == _TRUE_);
-  const bool has_dot    = !dot_instances.empty();
-  if (has_legacy && has_dot && has_unconsumed_dot_type_keys(*ctx.pfc, dot_instances)) {
-    throw std::invalid_argument(
-        "cannot mix legacy N_ncdm_decay_dr with dot-syntax "
-        "'*.type = ncdm_decay_dr'; use one or the other");
-  }
-
-  std::vector<std::string> keys;
-  if (has_dot) {
-    keys            = synthesise_decay_dr_ncdm_flat_keys(*ctx.pfc, dot_instances);
-    N_ncdm_decay_dr = static_cast<int>(dot_instances.size());
-  }
-  else {
-    keys.reserve(N_ncdm_decay_dr);
-    for (int n = 0; n < N_ncdm_decay_dr; ++n) {
-      keys.push_back("ncdm__" + std::to_string(N_ncdm_standard + n + 1));
-    }
-  }
-
-  if (N_ncdm_decay_dr <= 0)
-    return result;
-
-  // Construct species: decay_dr indices are [N_ncdm_standard, N_ncdm_standard + N_ncdm_decay_dr)
-  std::vector<std::unique_ptr<DNCDMSpecies>> species_list;
-  species_list.reserve(N_ncdm_decay_dr);
-  for (int i = 0; i < N_ncdm_decay_dr; i++) {
-    int ncdm_index = N_ncdm_standard + i;
-    species_list.push_back(std::make_unique<DNCDMSpecies>(ctx.pfc,
-                                                          ncdm_index,
-                                                          i,
-                                                          *ctx.ncdm_settings,
-                                                          ctx.pba,
-                                                          ctx.bgm));
-  }
-
-  // ── Read DNCDM-specific Omega/deg parameters ──────────────────────────────
-  std::vector<double> Omega_dncdmdr_list, omega_dncdmdr_list, deg_list;
-  std::vector<double> Omega_ini_dncdm_list, omega_ini_dncdm_list, Neff_ini_dncdm_list;
-  int flag_omega1, flag_omega2, flag_deg, flag_Omega_ini, flag_omega_ini, flag_Neff_ini;
-
-  auto readDoubleListLocal = [&](const char* name, std::vector<double>& values, int* found) {
-    try {
-      *found = ctx.pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
-    }
-    catch (...) {
-      *found = _FALSE_;
-    }
-    return _SUCCESS_;
-  };
-
-  readDoubleListLocal("Omega_dncdmdr", Omega_dncdmdr_list, &flag_omega1);
-  readDoubleListLocal("omega_dncdmdr", omega_dncdmdr_list, &flag_omega2);
-  readDoubleListLocal("deg_ncdm_decay_dr", deg_list, &flag_deg);
-  readDoubleListLocal("Omega_ini_dncdm", Omega_ini_dncdm_list, &flag_Omega_ini);
-  readDoubleListLocal("omega_ini_dncdm", omega_ini_dncdm_list, &flag_omega_ini);
-  readDoubleListLocal("Neff_ini_dncdm", Neff_ini_dncdm_list, &flag_Neff_ini);
-
-  if ((flag_omega1 == _TRUE_) && (flag_omega2 == _TRUE_)) {
-    throw std::invalid_argument(
-        "In input file, you can only enter one of Omega_dncdmdr or omega_dncdmdr, choose one");
-  }
-  if ((flag_deg == _TRUE_) && (flag_Omega_ini == _TRUE_)) {
-    throw std::invalid_argument(
-        "In input file, you can only enter one of deg_ncdm_decay_dr or Omega_ini_dncdm, choose "
-        "one");
-  }
-
-  const double h = ctx.ncdm_settings->h;
-
-  auto check_list = [&](const char* name, const std::vector<double>& list) {
-    if (static_cast<int>(list.size()) < N_ncdm_decay_dr)
-      throw std::invalid_argument(
-          std::string(name) + " has " + std::to_string(list.size()) +
-          " entries but N_ncdm_decay_dr = " + std::to_string(N_ncdm_decay_dr));
-  };
-
-  if (flag_omega1 == _TRUE_) {
-    check_list("Omega_dncdmdr", Omega_dncdmdr_list);
-    for (int n = 0; n < N_ncdm_decay_dr; n++) {
-      species_list[n]->SetOmega0(Omega_dncdmdr_list[n], h);
-    }
-  }
-  else if (flag_omega2 == _TRUE_) {
-    check_list("omega_dncdmdr", omega_dncdmdr_list);
-    for (int n = 0; n < N_ncdm_decay_dr; n++) {
-      species_list[n]->SetOmega0(omega_dncdmdr_list[n] / h / h, h);
-    }
-  }
-
-  if (flag_deg == _TRUE_) {
-    check_list("deg_ncdm_decay_dr", deg_list);
-    for (int n = 0; n < N_ncdm_decay_dr; n++) {
-      species_list[n]->SetDegAndFactor(deg_list[n]);
-    }
-  }
-  else if (flag_Omega_ini == _TRUE_) {
-    check_list("Omega_ini_dncdm", Omega_ini_dncdm_list);
-    double a_ini = species_list[0]->GetIni(ctx.pba ? ctx.pba->a_today * 1e-14 : 1e-14,
-                                           ctx.pba ? ctx.pba->a_today : 1.,
-                                           ctx.ncdm_settings->tol_ncdm);
-    double z_ini = 1.0 / a_ini - 1.0;
-    double H0    = ctx.pba ? ctx.pba->H0 : ctx.ncdm_settings->h * 1.e5 / _c_;
-    for (int n = 0; n < N_ncdm_decay_dr; n++) {
-      species_list[n]->SetDeg_from_Omega_ini(z_ini, H0, Omega_ini_dncdm_list[n]);
-    }
-  }
-  else if (flag_omega_ini == _TRUE_) {
-    check_list("omega_ini_dncdm", omega_ini_dncdm_list);
-    double a_ini = species_list[0]->GetIni(ctx.pba ? ctx.pba->a_today * 1e-14 : 1e-14,
-                                           ctx.pba ? ctx.pba->a_today : 1.,
-                                           ctx.ncdm_settings->tol_ncdm);
-    double z_ini = 1.0 / a_ini - 1.0;
-    double H0    = ctx.pba ? ctx.pba->H0 : ctx.ncdm_settings->h * 1.e5 / _c_;
-    for (int n = 0; n < N_ncdm_decay_dr; n++) {
-      species_list[n]->SetDeg_from_Omega_ini(z_ini, H0, omega_ini_dncdm_list[n] / h / h);
-    }
-  }
-  else if (flag_Neff_ini == _TRUE_) {
-    check_list("Neff_ini_dncdm", Neff_ini_dncdm_list);
-    double a_ini    = species_list[0]->GetIni(ctx.pba ? ctx.pba->a_today * 1e-14 : 1e-14,
-                                              ctx.pba ? ctx.pba->a_today : 1.,
-                                              ctx.ncdm_settings->tol_ncdm);
-    double z_ini    = 1.0 / a_ini - 1.0;
-    double H0       = ctx.pba ? ctx.pba->H0 : ctx.ncdm_settings->h * 1.e5 / _c_;
-    double Omega0_g = ctx.pba ? ctx.pba->Omega0_g : 0.;
-    for (int n = 0; n < N_ncdm_decay_dr; n++) {
-      double Omega_ini = Neff_ini_dncdm_list[n] * 7. / 8. * std::pow(4. / 11., 4. / 3.) * Omega0_g;
-      species_list[n]->SetDeg_from_Omega_ini(z_ini, H0, Omega_ini);
-    }
-  }
-
-  result.reserve(N_ncdm_decay_dr);
-  for (int n = 0; n < N_ncdm_decay_dr; ++n) {
-    result.push_back(Named{keys[n], std::move(species_list[n])});
+    auto sp = std::make_unique<DNCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
+    sp->SetNcdmId((*ctx.ncdm_id_next)++);
+    ApplyDncdmInitialClosure(*sp, ctx);
+    result.push_back({name, std::move(sp)});
   }
   return result;
 }

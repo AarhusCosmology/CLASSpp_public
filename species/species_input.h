@@ -41,15 +41,6 @@ std::vector<std::string> CollectInstanceFieldValues(FileContent* pfc,
 
 bool AnyInstanceFieldValue(const std::vector<std::string>& values);
 
-std::string CsvWithDefaults(const std::vector<std::string>& values,
-                            const std::string& default_value);
-
-std::string CsvForPsdFilenames(const std::vector<std::string>& use_psd_file_values,
-                               const std::vector<std::string>& filename_values,
-                               const std::string& dot_flag_field,
-                               const std::string& dot_filename_field,
-                               const std::string& legacy_filename_key);
-
 bool SynthesiseIdenticalScalarField(FileContent* pfc,
                                     const std::vector<std::string>& instances,
                                     const std::string& dot_field,

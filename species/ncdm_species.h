@@ -12,12 +12,12 @@ class BackgroundModule;
 
 class NCDMSpecies : public NCDMBaseSpecies {
  public:
+  // New input path: parameters are read from PFC under <instance_name>.<field>.
   NCDMSpecies(FileContent* pfc,
-              int species_index,
+              const std::string& instance_name,
               const NcdmSettings& settings,
               const background* pba,
-              const BackgroundModule* bgm,
-              const std::string& suffix = "_standard");
+              const BackgroundModule* bgm);
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
@@ -86,6 +86,9 @@ class NCDMSpecies : public NCDMBaseSpecies {
   int ncdm_id() const {
     return ncdm_id_;
   }
+  void SetNcdmId(int id) override {
+    ncdm_id_ = id;
+  }
   int bg_number_index() const {
     return index_bg_number_;
   }
@@ -94,7 +97,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
   }
 
  protected:
-  int ncdm_id_;  // species index (0-based), used for pv->index_ncdm_ etc.
+  int ncdm_id_ = -1;  // perturbation-array slot index; assigned by CreateAll via SetNcdmId
   const background* pba_;
 
   int index_bg_number_   = -1;
