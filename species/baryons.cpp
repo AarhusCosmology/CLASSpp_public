@@ -216,6 +216,22 @@ void BaryonsSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_b", theta_b, true);
 }
 
+void BaryonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                   const BaseSpecies::PerturbLayout& new_base,
+                                                   const double* old_y,
+                                                   double* new_y,
+                                                   const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  // Scalar-mode only: idx_delta is registered (>=0) in scalar pv and -1 in
+  // vector/tensor pv, so this no-ops outside scalar mode (the vector-mode
+  // baryon theta copy stays inline -- out of scope for this PR).
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+    return;
+  new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 std::vector<Named> BaryonsSpecies::CreateAll(const SpeciesBuildContext& ctx) {

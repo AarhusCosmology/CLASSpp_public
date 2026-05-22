@@ -416,3 +416,14 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
   }
   return result;
 }
+
+void IDM_DR_IDR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                       const BaseSpecies::PerturbLayout& new_base,
+                                                       const double* old_y,
+                                                       double* new_y,
+                                                       const PerturbSwitchContext& ctx) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  idm_dr_->CopyPerturbationsAcrossSwitch(old_l.idm_dr, new_l.idm_dr, old_y, new_y, ctx);
+  idr_->CopyPerturbationsAcrossSwitch(old_l.idr, new_l.idr, old_y, new_y, ctx);
+}

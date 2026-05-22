@@ -349,6 +349,18 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(double /*tau*/,
   }
 }
 
+void IDM_DRMD_IDR_DRMD_Species::CopyPerturbationsAcrossSwitch(
+    const BaseSpecies::PerturbLayout& old_base,
+    const BaseSpecies::PerturbLayout& new_base,
+    const double* old_y,
+    double* new_y,
+    const PerturbSwitchContext& ctx) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  idm_drmd_->CopyPerturbationsAcrossSwitch(old_l.idm_drmd, new_l.idm_drmd, old_y, new_y, ctx);
+  idr_drmd_->CopyPerturbationsAcrossSwitch(old_l.idr_drmd, new_l.idr_drmd, old_y, new_y, ctx);
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 std::vector<Named> IDM_DRMD_IDR_DRMD_Species::CreateAll(const SpeciesBuildContext& ctx) {

@@ -22,6 +22,12 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
+
   explicit IDM_DR_IDR_Species(const background& pba);
 
   IDM_DRSpecies& idm_dr() {

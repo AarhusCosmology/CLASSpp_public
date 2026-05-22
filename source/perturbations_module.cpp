@@ -3853,38 +3853,6 @@ int PerturbationsModule::perturb_vector_init(
           the approximation switching is. We treat them here. Below
           we will treat other variables case by case. */
 
-      {
-        const size_t b_sw_i = all_species_.index_of("Baryons");
-        const auto& b_old   = static_cast<const BaryonsSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[b_sw_i]);
-        auto& b_new = static_cast<BaryonsSpecies::PerturbLayout&>(*ppv->species_layouts[b_sw_i]);
-        ppv->y[b_new.idx_delta] = ppw->pv->y[b_old.idx_delta];
-        ppv->y[b_new.idx_theta] = ppw->pv->y[b_old.idx_theta];
-      }
-
-      if (all_species_.count("CDM")) {
-        const size_t cdm_i      = all_species_.index_of("CDM");
-        const auto& cdm_old_lay = static_cast<const CDMSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[cdm_i]);
-        auto& cdm_new_lay = static_cast<CDMSpecies::PerturbLayout&>(*ppv->species_layouts[cdm_i]);
-        ppv->y[cdm_new_lay.idx_delta] = ppw->pv->y[cdm_old_lay.idx_delta];
-        if (ppt->gauge == newtonian) {
-          ppv->y[cdm_new_lay.idx_theta] = ppw->pv->y[cdm_old_lay.idx_theta];
-        }
-      }
-
-      if (all_species_.count("IDM_DR_IDR")) {
-        const size_t idm_dr_sw_i         = all_species_.index_of("IDM_DR_IDR");
-        const auto& old_idm_dr_lay       = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                               *ppw->pv->species_layouts[idm_dr_sw_i])
-                                               .idm_dr;
-        const auto& new_idm_dr_lay       = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                               *ppv->species_layouts[idm_dr_sw_i])
-                                               .idm_dr;
-        ppv->y[new_idm_dr_lay.idx_delta] = ppw->pv->y[old_idm_dr_lay.idx_delta];
-        ppv->y[new_idm_dr_lay.idx_theta] = ppw->pv->y[old_idm_dr_lay.idx_theta];
-      }
-
       if (all_species_.count("DCDM_DR")) {
         const size_t dcdm_sw_i = all_species_.index_of("DCDM_DR");
         const auto& d_old      = static_cast<const DCDM_DR_Species::PerturbLayout&>(
@@ -3907,31 +3875,6 @@ int PerturbationsModule::perturb_vector_init(
             ++index_pt;
           }
         }
-      }
-
-      if (all_species_.count("Fluid")) {
-        const size_t fld_i      = all_species_.index_of("Fluid");
-        const auto& fld_old_lay = static_cast<const FluidSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[fld_i]);
-        auto& fld_new_lay = static_cast<FluidSpecies::PerturbLayout&>(*ppv->species_layouts[fld_i]);
-        if (pba->use_ppf == _FALSE_) {
-          ppv->y[fld_new_lay.idx_delta] = ppw->pv->y[fld_old_lay.idx_delta];
-
-          ppv->y[fld_new_lay.idx_theta] = ppw->pv->y[fld_old_lay.idx_theta];
-        }
-        else {
-          ppv->y[fld_new_lay.idx_Gamma] = ppw->pv->y[fld_old_lay.idx_Gamma];
-        }
-      }
-
-      if (all_species_.count("ScalarField")) {
-        const size_t scf_i      = all_species_.index_of("ScalarField");
-        const auto& scf_old_lay = static_cast<const ScalarFieldSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[scf_i]);
-        auto& scf_new_lay = static_cast<ScalarFieldSpecies::PerturbLayout&>(
-            *ppv->species_layouts[scf_i]);
-        ppv->y[scf_new_lay.idx_phi]       = ppw->pv->y[scf_old_lay.idx_phi];
-        ppv->y[scf_new_lay.idx_phi_prime] = ppw->pv->y[scf_old_lay.idx_phi_prime];
       }
 
       if (ppt->gauge == synchronous)

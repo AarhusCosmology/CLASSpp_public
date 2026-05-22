@@ -488,6 +488,23 @@ void FluidSpecies::ComputePpf(double k,
                      k2;
 }
 
+void FluidSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                 const BaseSpecies::PerturbLayout& new_base,
+                                                 const double* old_y,
+                                                 double* new_y,
+                                                 const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  // Standard fluid registers idx_delta/idx_theta; PPF registers idx_Gamma. The
+  // unused slots are -1. Vector/tensor pv: all -1 -> no-op.
+  if (old_l.idx_delta >= 0 && new_l.idx_delta >= 0)
+    new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0)
+    new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+  if (old_l.idx_Gamma >= 0 && new_l.idx_Gamma >= 0)
+    new_y[new_l.idx_Gamma] = old_y[old_l.idx_Gamma];
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {

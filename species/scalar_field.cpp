@@ -351,6 +351,19 @@ double ScalarFieldSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
   return delta_p;
 }
 
+void ScalarFieldSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                       const BaseSpecies::PerturbLayout& new_base,
+                                                       const double* old_y,
+                                                       double* new_y,
+                                                       const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  if (old_l.idx_phi < 0 || new_l.idx_phi < 0)
+    return;
+  new_y[new_l.idx_phi]       = old_y[old_l.idx_phi];
+  new_y[new_l.idx_phi_prime] = old_y[old_l.idx_phi_prime];
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx) {

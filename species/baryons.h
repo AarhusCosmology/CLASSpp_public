@@ -99,6 +99,12 @@ class BaryonsSpecies : public BaseSpecies {
 
   void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
+
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,

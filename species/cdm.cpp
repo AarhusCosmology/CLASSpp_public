@@ -247,6 +247,22 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_cdm", theta_cdm, true);
 }
 
+void CDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                               const BaseSpecies::PerturbLayout& new_base,
+                                               const double* old_y,
+                                               double* new_y,
+                                               const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+    return;
+  new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  // theta is registered only in newtonian gauge (idx_theta >= 0); synchronous
+  // gauge derives cdm velocity from the metric, so idx_theta == -1 there.
+  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0)
+    new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 std::vector<Named> CDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
