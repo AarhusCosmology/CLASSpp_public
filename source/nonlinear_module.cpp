@@ -1004,19 +1004,17 @@ int NonlinearModule::nonlinear_init() {
 
   /** --> check applicability of Halofit and HMcode */
   if (pnl->method > nl_none) {
-    if (pba->has_ncdm) {
-      for (auto& [name, sp] : all_species_) {
-        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-        if (!ncdm_sp)
-          continue;
-        double m_ncdm_in_electronvolt = ncdm_sp->GetMassInElectronvolt();
-        if (m_ncdm_in_electronvolt > _M_EV_TOO_BIG_FOR_HALOFIT_)
-          fprintf(stdout,
-                  "Warning: Halofit and HMcode are proved to work for CDM, and also with a small "
-                  "HDM component. But it sounds like you are running with a WDM component of mass "
-                  "%f eV, which makes the use of Halofit suspicious.\n",
-                  m_ncdm_in_electronvolt);
-      }
+    for (auto& [name, sp] : all_species_) {
+      auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
+      if (!ncdm_sp)
+        continue;
+      double m_ncdm_in_electronvolt = ncdm_sp->GetMassInElectronvolt();
+      if (m_ncdm_in_electronvolt > _M_EV_TOO_BIG_FOR_HALOFIT_)
+        fprintf(stdout,
+                "Warning: Halofit and HMcode are proved to work for CDM, and also with a small "
+                "HDM component. But it sounds like you are running with a WDM component of mass "
+                "%f eV, which makes the use of Halofit suspicious.\n",
+                m_ncdm_in_electronvolt);
     }
     if (pba->has_idm_dr) {
       fprintf(stdout,
@@ -1380,7 +1378,7 @@ int NonlinearModule::nonlinear_indices() {
      first) */
 
   has_pk_m_ = _TRUE_;
-  if (pba->has_ncdm == _TRUE_) {
+  if (background_module_->GetNcdmCount() > 0) {
     has_pk_cb_ = _TRUE_;
   }
   else {
@@ -2692,7 +2690,7 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
                                 _M_SUN_;
 
   /** Test whether pk_cb has to be taken into account (only if we have massive neutrinos)*/
-  if (pba->has_ncdm == _TRUE_) {
+  if (has_pk_cb_ == _TRUE_) {
     index_pk_cb = index_pk_cb_;
   }
   else {
@@ -3170,7 +3168,7 @@ int NonlinearModule::nonlinear_hmcode_dark_energy_correction(struct nonlinear_wo
 
   /** - if there is dynamical Dark Energy (w is not -1) modeled as a fluid */
 
-  if (pba->has_fld == _TRUE_) {
+  if (all_species_.count("Fluid")) {
     pvecback.resize(background_module_->bg_size_);
 
     class_call(background_module_->background_tau_of_z(pnl->z_infinity, &tau_growth),
@@ -3580,7 +3578,7 @@ int NonlinearModule::nonlinear_hmcode_sigma8_at_z(double z,
                error_message_);
   }
 
-  if (pba->has_ncdm) {
+  if (has_pk_cb_) {
     if (tau_size_ == 1) {
       *sigma_8_cb = pnw->sigma_8[index_pk_cb_][0];
     }
@@ -3644,7 +3642,7 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp_at_z(double z,
                error_message_);
   }
 
-  if (pba->has_ncdm) {
+  if (has_pk_cb_) {
     if (tau_size_ == 1) {
       *sigma_disp_cb = pnw->sigma_disp[index_pk_cb_][0];
     }
@@ -3708,7 +3706,7 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp100_at_z(double z,
                error_message_);
   }
 
-  if (pba->has_ncdm) {
+  if (has_pk_cb_) {
     if (tau_size_ == 1) {
       *sigma_disp_100_cb = pnw->sigma_disp_100[index_pk_cb_][0];
     }
@@ -3772,7 +3770,7 @@ int NonlinearModule::nonlinear_hmcode_sigmaprime_at_z(double z,
                error_message_);
   }
 
-  if (pba->has_ncdm) {
+  if (has_pk_cb_) {
     if (tau_size_ == 1) {
       *sigma_prime_cb = pnw->sigma_prime[index_pk_cb_][0];
     }

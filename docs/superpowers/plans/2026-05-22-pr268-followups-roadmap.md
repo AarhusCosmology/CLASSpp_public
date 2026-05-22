@@ -8,7 +8,7 @@ spec + plan when started.
 | PR | Title | Status | Spec / Plan |
 |----|-------|--------|-------------|
 | **A** | Finish switch-copy migration (N_decay_dr-free species) | **Specced + planned; implementing** | `specs/2026-05-22-finish-switch-copy-migration-design.md`, `plans/2026-05-22-finish-switch-copy-migration.md` |
-| **C** | Remove `pba->has_*` dispatch guards | Plan exists but **STALE — needs refresh** | `plans/2026-04-15-remove-has-guards.md` |
+| **C** | Remove `pba->has_*` dispatch guards | **DONE** — 9 clean guards migrated; 3 idm_dr/drmd guards handed to B | `specs/2026-05-22-remove-has-dispatch-guards-design.md`, `plans/2026-05-22-remove-has-dispatch-guards.md` |
 | **B** | Remove `pba->N_decay_dr` | Not started; **design gap** (setter pattern) | (to write) |
 | **D** | Shooter hooks (encapsulate-layouts plan Tasks 37–40) | Not started | `plans/2026-05-07-encapsulate-species-layouts.md` (Tasks 37–40) |
 
@@ -38,19 +38,26 @@ regression — B just needs to migrate it cleanly while removing `N_decay_dr`.
 
 ---
 
-## C. Remove `pba->has_*` dispatch guards  *(next)*
+## C. Remove `pba->has_*` dispatch guards  *(DONE)*
 
-Execute `plans/2026-04-15-remove-has-guards.md`: replace ~97 `pba->has_*` *dispatch* guards in
-`background_module.cpp` / `perturbations_module.cpp` / `thermodynamics_module.cpp` with
-`all_species_.count("X")` or index-based checks. Keeps `class_test` *validation* guards (so the
-`has_*` flags stay on the struct).
+The premise was badly stale. The referenced `plans/2026-04-15-remove-has-guards.md` **never existed**
+in the repo (only referenced by other docs; the "PR 247-remove-has-guards" it alludes to is not on
+GitHub either), and the intervening merges (#258/#260/#264/#266/#268/#269) had already removed nearly
+all the `pba->has_*` dispatch guards. Reality on master @ 5741e002: of the surviving `pba->has_*`,
+the `perturbations_module` ones (14) are all `class_test` *validation* (kept), `thermodynamics_module`
+has none, `input_module` (21) are the flag *setters* (kept), and only **12 dispatch guards** remained
+— in `nonlinear_module` (9), `output_module` (2), `background_module` (1).
 
-**STALE — refresh before executing:** the plan predates #268 and tells you to replace `has_ncdm` with
-`pba->N_ncdm > 0` or `!ncdm_species_sorted_.empty()` — **both deleted in #268**. Use the file-local
-helpers #268 left instead: `GetNcdmSpecies(all_species_)` (in `background_module.cpp`) and
-`NcdmFamily(all_species_)` (in `perturbations_module.cpp`), e.g. `has_ncdm` →
-`!GetNcdmSpecies(all_species_).empty()` / `!NcdmFamily(all_species_).empty()`. Verify every other
-replacement-table row against current symbol names before applying.
+PR C migrated the **9 behavior-neutral** ones (verified equivalences in the design doc):
+`has_ncdm`×7 in `nonlinear` → `has_pk_cb_` (5 consumption sites) / `background_module_->GetNcdmCount() > 0`
+(derivation) / dropped guard (Halofit warning loop self-filters); `has_fld` → `count("Fluid")`;
+`has_scf` (`output`) → `count("ScalarField")`. No new files/helpers. Verified by the scenario suite
+(84 scenarios + 6 reference tests) — behavior unchanged.
+
+The **3 idm_dr/idr/drmd-family guards** (`background:532` `has_idr_drmd && has_idm_drmd`,
+`nonlinear` `has_idm_dr`, `output` `has_idm_dr`) were **handed to B** (see below): the composites are
+created on *either* sub-species, so a `count()` swap is not behavior-neutral, and there is no clean
+species-based per-sub-species presence signal today.
 
 ---
 
@@ -73,6 +80,18 @@ migration deferred from A (DCDM_DR / DNCDM_DR + DR multipole copy).
 When B reworks this section, also merge the two consecutive `if (all_species_.count("DCDM_DR"))`
 blocks in `perturb_vector_init`'s always-reconduct region into one (flagged by the #269 Copilot
 review — left as-is in PR A because that block is the deferred N_decay_dr code being rewritten here).
+
+**Inherited from C — the 3 idm_dr/idr/drmd-family dispatch guards.** B now also owns
+`background_module.cpp:532` (`if (pba->has_idr_drmd && pba->has_idm_drmd)`), the `pba->has_idm_dr`
+guard in `nonlinear_module.cpp` (the Halofit/HMcode "you requested idm_dr" warning), and the
+`pba->has_idm_dr` guard in `output_module.cpp` (the `dmu_idm_dr` thermo-file header). These can't be
+swapped for `all_species_.count("IDM_DR_IDR")` / `count("IDM_DRMD_IDR_DRMD")` because the composites
+are created on `has_idm_dr || has_idr` / `has_idm_drmd || has_idr_drmd` (so `count()` ⊋ the flag, and
+divergence is observable for idr-only / drmd-partial models — `test_idr_without_idm_dr_computes`,
+`test_drmd_without_idr_drmd_computes`). `IDM_DR_IDR_Species` even builds *both* children
+unconditionally and distinguishes them by reading `pba->has_idm_dr`/`has_idr` internally. Migrating
+them needs **per-sub-species presence accessors** on the composites (e.g. `bool has_idm_dr() const`
+capturing the flag at construction) — the same setter-pattern work this PR already requires.
 
 ---
 

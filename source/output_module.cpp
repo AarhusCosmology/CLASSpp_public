@@ -994,7 +994,7 @@ int OutputModule::output_background() {
             "# All densities are multiplied by (8piG/3) (below, shortcut notation (.) for this "
             "factor) \n");
     fprintf(backfile, "# Densities are in units [Mpc^-2] while all distances are in [Mpc]. \n");
-    if (pba->has_scf == _TRUE_) {
+    if (all_species_.count("ScalarField")) {
       fprintf(backfile,
               "# The units of phi, tau in the derivatives and the potential V are the "
               "following:\n");
