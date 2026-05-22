@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <memory>
 #include <string>
@@ -87,6 +88,20 @@ class SpeciesCollection {
   std::unique_ptr<BaseSpecies>* find(const std::string& key);
   const std::unique_ptr<BaseSpecies>* find(const std::string& key) const;
 
+  /** Lex-sorted index of an inserted species, or size() if absent.
+   *  Valid only after freeze(); the lower_bound search relies on the
+   *  container being sorted. Asserted in debug builds. */
+  std::size_t index_of(const std::string& key) const {
+    assert(frozen_);
+    auto it = std::lower_bound(species_.begin(),
+                               species_.end(),
+                               key,
+                               [](const Entry& e, const std::string& k) { return e.key < k; });
+    if (it == species_.end() || it->key != key)
+      return species_.size();
+    return static_cast<std::size_t>(it - species_.begin());
+  }
+
   // ── Hot-path cached accessors ───────────────────────────────────────────
   // Valid only after freeze(); asserted in debug builds.
   BaseSpecies& photons() {
@@ -125,6 +140,17 @@ class SpeciesCollection {
   }
   std::size_t size() const {
     return species_.size();
+  }
+
+  /** Index-based access for parallel-vector dispatch (e.g. with
+   *  perturb_vector::species_layouts). i must be < size(). */
+  BaseSpecies* operator[](std::size_t i) {
+    assert(i < species_.size());
+    return species_[i].species.get();
+  }
+  const BaseSpecies* operator[](std::size_t i) const {
+    assert(i < species_.size());
+    return species_[i].species.get();
   }
 
  private:

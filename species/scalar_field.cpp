@@ -100,21 +100,28 @@ void ScalarFieldSpecies::WriteBackgroundData(const double* pvecback,
   w.Add("V''_scf", pvecback[index_bg_ddV_scf_]);
 }
 
-void ScalarFieldSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+void ScalarFieldSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                     perturb_vector* /*pv*/,
                                                      const precision* /*ppr*/,
                                                      int& index_pt,
                                                      const perturb_workspace* /*ppw*/,
                                                      int /*gauge*/) {
-  class_define_index(pv->index_pt_phi_scf, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_phi_prime_scf, _TRUE_, index_pt, 1);
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.idx_phi = index_pt;
+  ++index_pt;
+
+  layout.idx_phi_prime = index_pt;
+  ++index_pt;
 }
 
-void ScalarFieldSpecies::PerturbDerivs(double /*tau*/,
+void ScalarFieldSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                       double /*tau*/,
                                        const double* y,
                                        double* dy,
                                        const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   /* Use BackgroundModule's canonical pvecback slots for background quantities */
@@ -127,18 +134,19 @@ void ScalarFieldSpecies::PerturbDerivs(double /*tau*/,
   const double a_prime_over_a    = ctx.a_prime_over_a;
   const double metric_continuity = ctx.metric_continuity;
 
-  dy[pv->index_pt_phi_scf]       = y[pv->index_pt_phi_prime_scf];
-  dy[pv->index_pt_phi_prime_scf] = -2. * a_prime_over_a * y[pv->index_pt_phi_prime_scf] -
-                                   metric_continuity * phi_prime_bg -
-                                   (k2 + a2 * ddV_bg) * y[pv->index_pt_phi_scf];
+  dy[layout.idx_phi]       = y[layout.idx_phi_prime];
+  dy[layout.idx_phi_prime] = -2. * a_prime_over_a * y[layout.idx_phi_prime] -
+                             metric_continuity * phi_prime_bg -
+                             (k2 + a2 * ddV_bg) * y[layout.idx_phi];
 }
 
-void ScalarFieldSpecies::FillSources(const double* y,
+void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
+                                     const double* y,
                                      const double* /*dy*/,
                                      PerturbSourceContext& ctx) {
+  const auto& layout          = static_cast<const PerturbLayout&>(base);
   PerturbationsModule* p_mod  = ctx.p_mod;
   perturb_workspace* ppw      = ctx.ppw;
-  const perturb_vector* pv    = ppw->pv;
   const BackgroundModule* bgm = p_mod->GetBackgroundModule().get();
   const double* pvecback      = ppw->pvecback;
 
@@ -160,19 +168,18 @@ void ScalarFieldSpecies::FillSources(const double* y,
     const perturbs* ppt = p_mod->GetPerturbs();
     if (ppt->gauge == synchronous) {
       delta_rho_scf = 1. / 3. *
-                          (1. / a2_rel * phi_prime_bg * y[pv->index_pt_phi_prime_scf] +
-                           dV_bg * y[pv->index_pt_phi_scf]) +
+                          (1. / a2_rel * phi_prime_bg * y[layout.idx_phi_prime] +
+                           dV_bg * y[layout.idx_phi]) +
                       3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
                           ctx.theta_over_k2;  // N-body gauge correction
     }
     else {
-      delta_rho_scf = 1. / 3. *
-                          (1. / a2_rel * phi_prime_bg * y[pv->index_pt_phi_prime_scf] +
-                           dV_bg * y[pv->index_pt_phi_scf] -
-                           1. / a2_rel * phi_prime_bg * phi_prime_bg *
-                               ppw->pvecmetric[ppw->index_mt_psi]) +
-                      3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
-                          ctx.theta_over_k2;  // N-body gauge correction
+      delta_rho_scf =
+          1. / 3. *
+              (1. / a2_rel * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi] -
+               1. / a2_rel * phi_prime_bg * phi_prime_bg * ppw->pvecmetric[ppw->index_mt_psi]) +
+          3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
+              ctx.theta_over_k2;  // N-body gauge correction
     }
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -184,8 +191,7 @@ void ScalarFieldSpecies::FillSources(const double* y,
 
   // ── theta_scf ─────────────────────────────────────────────────────────────
   if (p_mod->has_source_theta_scf_ == _TRUE_) {
-    const double rho_plus_p_theta_scf = 1. / 3. * k2 / a2_rel * phi_prime_bg *
-                                        y[pv->index_pt_phi_scf];
+    const double rho_plus_p_theta_scf = 1. / 3. * k2 / a2_rel * phi_prime_bg * y[layout.idx_phi];
 
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -197,14 +203,16 @@ void ScalarFieldSpecies::FillSources(const double* y,
   }
 }
 
-void ScalarFieldSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+void ScalarFieldSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                                double* y,
+                                                const PerturbIcContext& ctx) {
   if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
     return;
-  perturb_vector* pv = ctx.ppw->pv;
-  if (pv->index_pt_phi_scf >= 0)
-    y[pv->index_pt_phi_scf] = 0.;
-  if (pv->index_pt_phi_prime_scf >= 0)
-    y[pv->index_pt_phi_prime_scf] = 0.;
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_phi >= 0)
+    y[layout.idx_phi] = 0.;
+  if (layout.idx_phi_prime >= 0)
+    y[layout.idx_phi_prime] = 0.;
 }
 
 void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
@@ -247,21 +255,22 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
     const double rho_scf      = Rho(pvecback);
     const double p_scf        = P(pvecback);
 
+    const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+
     double delta_rho_scf = 0.;
     if (ppt->gauge == synchronous) {
-      delta_rho_scf = 1. / 3. *
-                      (1. / a2 * phi_prime_bg * y[pv->index_pt_phi_prime_scf] +
-                       dV_bg * y[pv->index_pt_phi_scf]);
+      delta_rho_scf =
+          1. / 3. * (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi]);
     }
     else {
       delta_rho_scf = 1. / 3. *
-                      (1. / a2 * phi_prime_bg * y[pv->index_pt_phi_prime_scf] +
-                       dV_bg * y[pv->index_pt_phi_scf] -
+                      (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] +
+                       dV_bg * y[layout.idx_phi] -
                        1. / a2 * phi_prime_bg * phi_prime_bg * pvecmetric[ppw->index_mt_psi]);
     }
 
     const double rho_plus_p_theta_scf = 1. / 3. * ppw->scalar_ctx.k2 / a2 * phi_prime_bg *
-                                        y[pv->index_pt_phi_scf];
+                                        y[layout.idx_phi];
 
     delta_scf = delta_rho_scf / rho_scf;
     theta_scf = rho_plus_p_theta_scf / (rho_scf + p_scf);
@@ -278,11 +287,13 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_scf", theta_scf, true);
 }
 
-double ScalarFieldSpecies::Delta(const perturb_vector* pv,
+double ScalarFieldSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* pv,
                                  const double* y,
                                  const double* pvecback,
                                  const perturb_workspace* ppw) const {
-  const double rho = pvecback[index_bg_rho_];
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  const double rho   = pvecback[index_bg_rho_];
   if (rho == 0.)
     return 0.;
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
@@ -290,8 +301,8 @@ double ScalarFieldSpecies::Delta(const perturb_vector* pv,
   const double a2        = ppw->scalar_ctx.a2;
   const double k2        = ppw->scalar_ctx.k2;
 
-  double delta_rho = (1. / 3.) * (1. / a2 * phi_prime * y[pv->index_pt_phi_prime_scf] +
-                                  dV * y[pv->index_pt_phi_scf]);
+  double delta_rho = (1. / 3.) *
+                     (1. / a2 * phi_prime * y[layout.idx_phi_prime] + dV * y[layout.idx_phi]);
 
   if (ppw->scalar_ctx.gauge == newtonian) {
     double psi  = y[pv->index_pt_phi] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
@@ -301,10 +312,12 @@ double ScalarFieldSpecies::Delta(const perturb_vector* pv,
   return delta_rho / rho;
 }
 
-double ScalarFieldSpecies::Theta(const perturb_vector* pv,
+double ScalarFieldSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* pv,
                                  const double* y,
                                  const double* pvecback,
                                  const perturb_workspace* ppw) const {
+  const auto& layout      = static_cast<const PerturbLayout&>(base);
   const double rho        = pvecback[index_bg_rho_];
   const double p          = pvecback[index_bg_p_];
   const double rho_plus_p = rho + p;
@@ -313,23 +326,25 @@ double ScalarFieldSpecies::Theta(const perturb_vector* pv,
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
   const double a2        = ppw->scalar_ctx.a2;
   const double k2        = ppw->scalar_ctx.k2;
-  return (1. / 3.) * k2 / a2 * phi_prime * y[pv->index_pt_phi_scf] / rho_plus_p;
+  return (1. / 3.) * k2 / a2 * phi_prime * y[layout.idx_phi] / rho_plus_p;
 }
 
-double ScalarFieldSpecies::DeltaP(const perturb_vector* pv,
+double ScalarFieldSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                                  const perturb_vector* /*pv*/,
                                   const double* y,
                                   const double* pvecback,
                                   const perturb_workspace* ppw) const {
+  const auto& layout     = static_cast<const PerturbLayout&>(base);
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
   const double dV        = pvecback[index_bg_dV_scf_];
   const double a2        = ppw->scalar_ctx.a2;
   const double k2        = ppw->scalar_ctx.k2;
 
-  double delta_p = (1. / 3.) * (1. / a2 * phi_prime * y[pv->index_pt_phi_prime_scf] -
-                                dV * y[pv->index_pt_phi_scf]);
+  double delta_p = (1. / 3.) *
+                   (1. / a2 * phi_prime * y[layout.idx_phi_prime] - dV * y[layout.idx_phi]);
 
   if (ppw->scalar_ctx.gauge == newtonian) {
-    double psi  = y[pv->index_pt_phi] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
+    double psi  = y[ppw->pv->index_pt_phi] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
     delta_p    -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }
 

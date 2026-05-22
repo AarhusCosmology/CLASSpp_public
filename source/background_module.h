@@ -21,11 +21,20 @@ class BackgroundModule : public BaseModule {
   int background_idm_drmd(
       double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
 
-  // Per-species NCDM accessors (indexed 0..N_ncdm-1, order matches pba->N_ncdm)
+  // Per-species NCDM accessors (n indexes NCDM-family species in all_species_ lex order)
+  int GetNcdmCount() const;
   double GetNcdmDeg(int n) const;
   double GetNcdmMassInEV(int n) const;
   int GetNcdmQSize(int n) const;
   double GetNcdmQ(int n, int q_id) const;
+
+  /** Sum of GetOmega0() across all NCDM-family species (NCDM, NCDMInteracting,
+   *  and the DNCDMSpecies child of every DNCDM_DR_Species composite). */
+  double GetOmega0NcdmTot() const;
+
+  /** Count of DR-bearing composites: 1 if DCDM_DR is present, plus the
+   *  number of DNCDM_DR_Species composites in all_species_. */
+  int GetNDecayDr() const;
 
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
 

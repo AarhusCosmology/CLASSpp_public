@@ -25,24 +25,28 @@ void IDM_DR_IDR_Species::ApplyInitialConditions(double* y, const PerturbIcContex
   if (ctx.index_ic != mod->index_ic_ad_)
     return;
 
+  const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  const auto& idm_dr_lay = my_lay.idm_dr;
+  const auto& idr_lay    = my_lay.idr;
+
   if (mod->GetBackground()->has_idm_dr == _TRUE_) {
-    if (pv->index_pt_delta_idm_dr >= 0)
-      y[pv->index_pt_delta_idm_dr] = 3. / 4. * ctx.delta_g_ic;
-    if (pv->index_pt_theta_idm_dr >= 0)
-      y[pv->index_pt_theta_idm_dr] = ctx.theta_ur;
+    if (idm_dr_lay.idx_delta >= 0)
+      y[idm_dr_lay.idx_delta] = 3. / 4. * ctx.delta_g_ic;
+    if (idm_dr_lay.idx_theta >= 0)
+      y[idm_dr_lay.idx_theta] = ctx.theta_ur;
   }
   if (mod->GetBackground()->has_idr == _TRUE_) {
-    if (pv->index_pt_delta_idr >= 0)
-      y[pv->index_pt_delta_idr] = ctx.delta_ur;
-    if (pv->index_pt_theta_idr >= 0)
-      y[pv->index_pt_theta_idr] = ctx.theta_ur;
+    if (idr_lay.idx_delta >= 0)
+      y[idr_lay.idx_delta] = ctx.delta_ur;
+    if (idr_lay.idx_theta >= 0)
+      y[idr_lay.idx_theta] = ctx.theta_ur;
     if (ppt->idr_nature == idr_free_streaming &&
         ((mod->GetBackground()->has_idm_dr == _FALSE_) ||
          (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-      if (pv->index_pt_shear_idr >= 0)
-        y[pv->index_pt_shear_idr] = ctx.shear_ur;
-      if (pv->index_pt_l3_idr >= 0)
-        y[pv->index_pt_l3_idr] = ctx.l3_ur;
+      if (idr_lay.idx_shear >= 0)
+        y[idr_lay.idx_shear] = ctx.shear_ur;
+      if (idr_lay.idx_l3 >= 0)
+        y[idr_lay.idx_l3] = ctx.l3_ur;
     }
   }
 }
@@ -63,22 +67,25 @@ void IDM_DR_IDR_Species::FillSources(const double* y,
   };
 
   // ── IDM_DR ────────────────────────────────────────────────────────────────
+  const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  const auto& idm_dr_lay = my_lay.idm_dr;
+  const auto& idr_lay    = my_lay.idr;
   if (p_mod->has_source_delta_idm_dr_ == _TRUE_) {
     set_source(p_mod->index_tp_delta_idm_dr_,
-               y[pv->index_pt_delta_idm_dr] +
+               y[idm_dr_lay.idx_delta] +
                    3. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
   if (p_mod->has_source_theta_idm_dr_ == _TRUE_) {
     set_source(p_mod->index_tp_theta_idm_dr_,
-               y[pv->index_pt_theta_idm_dr] + ctx.theta_shift);  // N-body gauge correction
+               y[idm_dr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
 
   // ── IDR ───────────────────────────────────────────────────────────────────
   if (p_mod->has_source_delta_idr_ == _TRUE_) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
       set_source(p_mod->index_tp_delta_idr_,
-                 y[pv->index_pt_delta_idr] +
+                 y[idr_lay.idx_delta] +
                      4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
     else
       set_source(p_mod->index_tp_delta_idr_,
@@ -89,7 +96,7 @@ void IDM_DR_IDR_Species::FillSources(const double* y,
   if (p_mod->has_source_theta_idr_ == _TRUE_) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
       set_source(p_mod->index_tp_theta_idr_,
-                 y[pv->index_pt_theta_idr] + ctx.theta_shift);  // N-body gauge correction
+                 y[idr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
     else
       set_source(p_mod->index_tp_theta_idr_,
                  ppw->rsa_theta_idr + ctx.theta_shift);  // N-body gauge correction
@@ -137,22 +144,26 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const perturbs* ppt      = mod.GetPerturbs();
 
+    const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+    const auto& idm_dr_lay = my_lay.idm_dr;
+    const auto& idr_lay    = my_lay.idr;
+
     if (pba->has_idm_dr == _TRUE_) {
-      delta_idm_dr = y[pv->index_pt_delta_idm_dr];
-      theta_idm_dr = y[pv->index_pt_theta_idm_dr];
+      delta_idm_dr = y[idm_dr_lay.idx_delta];
+      theta_idm_dr = y[idm_dr_lay.idx_theta];
     }
 
     if (pba->has_idr == _TRUE_) {
       if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-        delta_idr = y[pv->index_pt_delta_idr];
-        theta_idr = y[pv->index_pt_theta_idr];
+        delta_idr = y[idr_lay.idx_delta];
+        theta_idr = y[idr_lay.idx_theta];
         if (ppt->idr_nature == idr_free_streaming) {
           if ((pba->has_idm_dr == _TRUE_) &&
               (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
-            shear_idr = idr_->TcaShearIdr(pv, y, ppw);
+            shear_idr = idr_->TcaShearIdr(idr_lay, y, ppw);
           }
           else {
-            shear_idr = y[pv->index_pt_shear_idr];
+            shear_idr = y[idr_lay.idx_shear];
           }
         }
       }
@@ -194,6 +205,113 @@ IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba)
   children_.push_back(std::move(idr));
 }
 
+// ── Perturbation layout-based overrides ───────────────────────────────────────
+
+void IDM_DR_IDR_Species::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                     perturb_vector* pv,
+                                                     const precision* ppr,
+                                                     int& index_pt,
+                                                     const perturb_workspace* ppw,
+                                                     int gauge) {
+  auto& my = static_cast<PerturbLayout&>(base);
+  idm_dr_->RegisterPerturbationIndices(my.idm_dr, pv, ppr, index_pt, ppw, gauge);
+  idr_->RegisterPerturbationIndices(my.idr, pv, ppr, index_pt, ppw, gauge);
+}
+
+void IDM_DR_IDR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                       double tau,
+                                       const double* y,
+                                       double* dy,
+                                       const perturb_parameters_and_workspace& ppaw) {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  idm_dr_->PerturbDerivs(my.idm_dr, tau, y, dy, ppaw);
+  idr_->PerturbDerivs(my.idr, tau, y, dy, ppaw);
+  AddCouplingDerivs(tau, y, dy, ppaw);
+}
+
+void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& /*base*/,
+                                                double* y,
+                                                const PerturbIcContext& ctx) {
+  // Children have no IC logic; all ICs live on this composite.
+  ApplyInitialConditions(y, ctx);
+}
+
+double IDM_DR_IDR_Species::Delta(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* pv,
+                                 const double* y,
+                                 const double* pvecback,
+                                 const perturb_workspace* ppw) const {
+  const auto& my       = static_cast<const PerturbLayout&>(base);
+  const double rho_idm = idm_dr_->Rho(pvecback);
+  const double rho_idr = idr_->Rho(pvecback);
+  const double rho_tot = rho_idm + rho_idr;
+  if (rho_tot <= 0.)
+    return 0.;
+  return (rho_idm * idm_dr_->Delta(my.idm_dr, pv, y, pvecback, ppw) +
+          rho_idr * idr_->Delta(my.idr, pv, y, pvecback, ppw)) /
+         rho_tot;
+}
+
+double IDM_DR_IDR_Species::Theta(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* pv,
+                                 const double* y,
+                                 const double* pvecback,
+                                 const perturb_workspace* ppw) const {
+  const auto& my       = static_cast<const PerturbLayout&>(base);
+  const double rpp_idm = idm_dr_->Rho(pvecback) + idm_dr_->P(pvecback);
+  const double rpp_idr = idr_->Rho(pvecback) + idr_->P(pvecback);
+  const double rpp_tot = rpp_idm + rpp_idr;
+  if (rpp_tot <= 0.)
+    return 0.;
+  return (rpp_idm * idm_dr_->Theta(my.idm_dr, pv, y, pvecback, ppw) +
+          rpp_idr * idr_->Theta(my.idr, pv, y, pvecback, ppw)) /
+         rpp_tot;
+}
+
+double IDM_DR_IDR_Species::MatterRhoDelta(const perturb_vector* pv,
+                                          const double* y,
+                                          const double* pvecback,
+                                          const perturb_workspace* ppw) const {
+  if (collection_index_ >= pv->species_layouts.size())
+    return 0.;
+  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  return idm_dr_->IsMatterSpecies()
+             ? idm_dr_->Rho(pvecback) * idm_dr_->Delta(my.idm_dr, pv, y, pvecback, ppw)
+             : 0.;
+}
+
+double IDM_DR_IDR_Species::MatterRhoPlusPTheta(const perturb_vector* pv,
+                                               const double* y,
+                                               const double* pvecback,
+                                               const perturb_workspace* ppw) const {
+  if (collection_index_ >= pv->species_layouts.size())
+    return 0.;
+  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  return idm_dr_->IsMatterSpecies() ? (idm_dr_->Rho(pvecback) + idm_dr_->P(pvecback)) *
+                                          idm_dr_->Theta(my.idm_dr, pv, y, pvecback, ppw)
+                                    : 0.;
+}
+
+double IDM_DR_IDR_Species::DeltaP(const BaseSpecies::PerturbLayout& base,
+                                  const perturb_vector* pv,
+                                  const double* y,
+                                  const double* pvecback,
+                                  const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  // IDM_DR has DeltaP == 0; only IDR contributes.
+  return idr_->DeltaP(my.idr, pv, y, pvecback, ppw);
+}
+
+double IDM_DR_IDR_Species::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
+                                         const perturb_vector* pv,
+                                         const double* y,
+                                         const double* pvecback,
+                                         const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  // IDM_DR has RhoPlusPShear == 0; only IDR contributes.
+  return idr_->RhoPlusPShear(my.idr, pv, y, pvecback, ppw);
+}
+
 void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
                                            const double* y,
                                            double* dy,
@@ -216,20 +334,23 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
   if (rho_idm_dr <= 0. || rho_idr <= 0. || dmu_idm_dr <= 0.)
     return;
 
+  const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  const auto& idm_dr_lay    = my_lay.idm_dr;
+  const auto& idr_lay       = my_lay.idr;
   const double Sinv         = 4. / 3. * rho_idr / rho_idm_dr;
-  const double theta_idm_dr = y[pv->index_pt_theta_idm_dr];
+  const double theta_idm_dr = y[idm_dr_lay.idx_theta];
 
   // Under RSA for IDR: IDR Boltzmann hierarchy is not evolved; use RSA-approximated
   // theta_idr to keep the IDM_DR drag correct. Do not write to IDR equations.
   if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on) {
-    const double theta_idr         = ppw->rsa_theta_idr;
-    dy[pv->index_pt_theta_idm_dr] -= Sinv * dmu_idm_dr * (theta_idm_dr - theta_idr) -
-                                     ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
-                                         y[pv->index_pt_delta_idm_dr];
+    const double theta_idr    = ppw->rsa_theta_idr;
+    dy[idm_dr_lay.idx_theta] -= Sinv * dmu_idm_dr * (theta_idm_dr - theta_idr) -
+                                ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
+                                    y[idm_dr_lay.idx_delta];
     return;
   }
 
-  const double theta_idr = (pv->index_pt_theta_idr >= 0) ? y[pv->index_pt_theta_idr] : 0.;
+  const double theta_idr = (idr_lay.idx_theta >= 0) ? y[idr_lay.idx_theta] : 0.;
 
   if (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
     const thermo* pth    = pth_mod->GetThermodynamics();
@@ -237,26 +358,26 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
                            dmu_idm_dr;
 
     // IDM_DR velocity coupling
-    dy[pv->index_pt_theta_idm_dr] -= Sinv * dmu_idm_dr * (theta_idm_dr - theta_idr) -
-                                     ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
-                                         y[pv->index_pt_delta_idm_dr];
+    dy[idm_dr_lay.idx_theta] -= Sinv * dmu_idm_dr * (theta_idm_dr - theta_idr) -
+                                ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
+                                    y[idm_dr_lay.idx_delta];
 
     // IDR velocity coupling
     if (ctx.idr_nature == idr_free_streaming) {
-      dy[pv->index_pt_theta_idr] += dmu_idm_dr * (theta_idm_dr - theta_idr);
+      dy[idr_lay.idx_theta] += dmu_idm_dr * (theta_idm_dr - theta_idr);
 
       // IDR Compton collision terms in hierarchy l>=2
-      const int l_max = pv->l_max_idr;
+      const int l_max = idr_lay.l_max;
       for (int l = 2; l <= l_max; l++) {
-        dy[pv->index_pt_delta_idr + l] -= (ppt->alpha_idm_dr[l - 2] * dmu_idm_dr +
-                                           ppt->beta_idr[l - 2] * dmu_idr) *
-                                          y[pv->index_pt_delta_idr + l];
+        dy[idr_lay.idx_delta + l] -= (ppt->alpha_idm_dr[l - 2] * dmu_idm_dr +
+                                      ppt->beta_idr[l - 2] * dmu_idr) *
+                                     y[idr_lay.idx_delta + l];
       }
     }
   }
   else {
     // TCA on: compute tca_shear and tca_slip locally
-    const double delta_idr = (pv->index_pt_delta_idr >= 0) ? y[pv->index_pt_delta_idr] : 0.;
+    const double delta_idr = (idr_lay.idx_delta >= 0) ? y[idr_lay.idx_delta] : 0.;
 
     const double tca_shear_idm_dr = 0.5 * 8. / 15. / dmu_idm_dr / ppt->alpha_idm_dr[0] *
                                     (theta_idm_dr + ctx.metric_shear);
@@ -266,23 +387,23 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
             (theta_idm_dr - theta_idr) +
         1. / (1. + Sinv) / dmu_idm_dr *
             (-ctx.a_prime_over_a * theta_idm_dr +
-             ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] * y[pv->index_pt_delta_idm_dr] +
+             ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] * y[idm_dr_lay.idx_delta] +
              ctx.k2 * Sinv * (delta_idr / 4. - tca_shear_idm_dr));
 
     // ASSIGN (=): TCA replaces the free-streaming velocity written by the children
-    dy[pv->index_pt_theta_idm_dr] = 1. / (1. + Sinv) *
-                                        (-ctx.a_prime_over_a * theta_idm_dr +
-                                         ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
-                                             y[pv->index_pt_delta_idm_dr] +
-                                         ctx.k2 * Sinv * (delta_idr / 4. - tca_shear_idm_dr)) +
-                                    ctx.metric_euler + Sinv / (1. + Sinv) * tca_slip_idm_dr;
+    dy[idm_dr_lay.idx_theta] = 1. / (1. + Sinv) *
+                                   (-ctx.a_prime_over_a * theta_idm_dr +
+                                    ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
+                                        y[idm_dr_lay.idx_delta] +
+                                    ctx.k2 * Sinv * (delta_idr / 4. - tca_shear_idm_dr)) +
+                               ctx.metric_euler + Sinv / (1. + Sinv) * tca_slip_idm_dr;
 
-    dy[pv->index_pt_theta_idr] = 1. / (1. + Sinv) *
-                                     (-ctx.a_prime_over_a * theta_idm_dr +
-                                      ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
-                                          y[pv->index_pt_delta_idm_dr] +
-                                      ctx.k2 * Sinv * (delta_idr / 4. - tca_shear_idm_dr)) +
-                                 ctx.metric_euler - 1. / (1. + Sinv) * tca_slip_idm_dr;
+    dy[idr_lay.idx_theta] = 1. / (1. + Sinv) *
+                                (-ctx.a_prime_over_a * theta_idm_dr +
+                                 ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
+                                     y[idm_dr_lay.idx_delta] +
+                                 ctx.k2 * Sinv * (delta_idr / 4. - tca_shear_idm_dr)) +
+                            ctx.metric_euler - 1. / (1. + Sinv) * tca_slip_idm_dr;
   }
 }
 

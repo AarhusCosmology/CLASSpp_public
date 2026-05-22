@@ -40,6 +40,25 @@ struct NcdmSettings {
  */
 class NCDMBaseSpecies : public BaseSpecies {
  public:
+  // ── PerturbLayout ─────────────────────────────────────────────────────────
+  /**
+   * Per-pv layout for all NCDM-family species.
+   * Holds l_max, q_size, and per-q index offsets into pv->y.
+   * Owned by perturb_vector::species_layouts (one per pv per species).
+   */
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    int l_max  = -1;
+    int q_size = -1;
+    std::vector<int> index_per_q;  // absolute offsets into pv->y, one per momentum bin
+    int total_size() const {
+      return q_size * (l_max + 1);
+    }
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   // ── Public accessors ──────────────────────────────────────────────────────
   double GetOmega0() const override;
   double GetNeff(double z) const;
@@ -109,12 +128,53 @@ class NCDMBaseSpecies : public BaseSpecies {
     bgm_ = bgm;
   }
 
-  // Assigns the perturbation-array slot index after construction.
-  // Called by CreateAll; each concrete subclass must override.
-  // ncdm_id() is invalid until this is called.
-  virtual void SetNcdmId(int id) = 0;
+  // ── Layout-based tensor register (shared by NCDM and DNCDM) ──────────────
+  void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                         perturb_vector* pv,
+                                         int& index_pt,
+                                         const perturb_workspace* ppw,
+                                         int gauge) override;
+
+  /** Legacy tensor register: no-op — dual-written by the layout-based path. */
+  void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/,
+                                         int& /*index_pt*/,
+                                         const perturb_workspace* /*ppw*/,
+                                         int /*gauge*/) override {}
+
+  // ── Layout-based tensor Boltzmann hierarchy ───────────────────────────────
+  /** Tensor-mode Boltzmann hierarchy for NCDM species.
+   *  Subclasses must provide GetDlnf0DlnqForTensor to specialise the driving
+   *  term (static table for NCDMSpecies; pvecback array for DNCDMSpecies). */
+  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
+                           double tau,
+                           const double* y,
+                           double* dy,
+                           const perturb_parameters_and_workspace& ppaw) override;
+
+  // ── Tensor GW source contribution ────────────────────────────────────────
+  /** Contributes this species' anisotropic-stress integral to ppw->gw_source.
+   *  Uses the species's per-pv NCDMBaseSpecies::PerturbLayout slot. */
+  void ContributeTensorGwSource(const BaseSpecies::PerturbLayout& layout,
+                                double a,
+                                double a_today,
+                                const double* y,
+                                perturb_workspace* ppw) const override;
+
+  // ── MarkUsedInSources ────────────────────────────────────────────────────
+  /** NCDM multipoles l > 2 do not enter source functions. */
+  void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+                         int* used_in_sources) const override;
 
  protected:
+  /** Return d ln f_0 / d ln q for momentum bin iq.
+   *  NCDMSpecies reads a static table; DNCDMSpecies reads pvecback.
+   *  Used by PerturbTensorDerivs. */
+  virtual double GetDlnf0DlnqForTensor(int iq, const double* pvecback) const = 0;
+
+  /** Return the quadrature weight w_0[iq] for the GW source integral.
+   *  NCDMBaseSpecies returns the static w_[iq]; DNCDMSpecies overrides. */
+  virtual double GetW0ForGwSource(int iq, const double* pvecback) const;
+
   // Constructor: reads parameters per-instance via SpeciesInput (dot-syntax).
   NCDMBaseSpecies(std::string name,
                   EnergyType energy_type,

@@ -16,6 +16,16 @@ class BackgroundModule;
  */
 class DNCDM_DR_Species : public CompositeSpecies {
  public:
+  // ── PerturbLayout ──────────────────────────────────────────────────────────
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    NCDMBaseSpecies::PerturbLayout dncdm;
+    DNCDM_DecayRadiationSpecies::PerturbLayout dr;
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   // Takes ownership of a pre-built DNCDMSpecies (from DNCDMSpecies::CreateAll)
   DNCDM_DR_Species(std::unique_ptr<DNCDMSpecies> dncdm,
                    const background* pba,
@@ -39,18 +49,68 @@ class DNCDM_DR_Species : public CompositeSpecies {
   DNCDMSpecies& dncdm() {
     return *dncdm_;
   }
+  const DNCDMSpecies& dncdm() const {
+    return *dncdm_;
+  }
   DNCDM_DecayRadiationSpecies& dr() {
     return *dr_sp_;
   }
+  const DNCDM_DecayRadiationSpecies& dr() const {
+    return *dr_sp_;
+  }
 
- protected:
-  void AddCouplingDerivs(double tau,
-                         const double* y,
-                         double* dy,
-                         const perturb_parameters_and_workspace& ppaw) override;
+  // ── Perturbations ──────────────────────────────────────────────────────────
+  // NOTE: RegisterPerturbationIndices is intentionally NOT overridden here.
+  // The module calls each child's Register directly (DR child first, then DNCDM child via
+  // the NCDM block) to preserve the pv->y slot ordering established before Task 22.
+  // See perturbations_module.cpp around the DNCDM_DR block for the direct-call site.
+
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
+                     const double* y,
+                     double* dy,
+                     const perturb_parameters_and_workspace& ppaw) override;
+
+  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
+                           double tau,
+                           const double* y,
+                           double* dy,
+                           const perturb_parameters_and_workspace& ppaw) override;
+
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
+                const double* y,
+                const double* pvecback,
+                const perturb_workspace* ppw) const override;
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
 
  private:
-  int ncdm_id_;
+  void AddCouplingDerivs(const PerturbLayout& my,
+                         const double* y,
+                         double* dy,
+                         const perturb_parameters_and_workspace& ppaw);
+
   DNCDMSpecies* dncdm_                = nullptr;
   DNCDM_DecayRadiationSpecies* dr_sp_ = nullptr;
   const background* pba_;

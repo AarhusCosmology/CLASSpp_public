@@ -315,17 +315,9 @@ class PerturbationsModule : public BaseModule {
   int perturb_rsa_idr_delta_and_theta(
       double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
 
-  std::tuple<double, double, double> RescaledNCDMPerturbations(int n_ncdm,
-                                                               double a,
-                                                               double k,
-                                                               perturb_workspace* ppw);
-
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;
 
-  /** Sorted cache of NCDM species pointers, built once in perturb_init.
-   *  Avoids repeated dynamic_cast iteration over all_species_ in hot paths. */
-  std::vector<BaseSpecies*> ncdm_species_sorted_;
   short
       evolve_tensor_ur_; /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */
   short

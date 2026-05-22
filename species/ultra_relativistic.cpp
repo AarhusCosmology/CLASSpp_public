@@ -45,38 +45,56 @@ void UltraRelativisticSpecies::WriteBackgroundData(const double* pvecback,
 
 // ── Perturbations ─────────────────────────────────────────────────────────────
 
-void UltraRelativisticSpecies::RegisterPerturbationIndices(perturb_vector* pv,
-                                                           const precision* ppr,
+void UltraRelativisticSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                           perturb_vector* /*pv*/,
+                                                           const precision* /*ppr*/,
                                                            int& index_pt,
                                                            const perturb_workspace* ppw,
                                                            int /*gauge*/) {
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  /* Caller (perturb_vector_init scalar branch) sets layout.l_max = ppr->l_max_ur
+     before calling so that the full-hierarchy l_max is available here. */
+  const int l_max_full = layout.l_max;
+
   /* If radiation streaming approximation is on, no UR variables are integrated.
      Sentinel -1 signals RSA to Delta/Theta/DeltaP/RhoPlusPShear. */
   if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
-    pv->index_pt_delta_ur = -1;
-    pv->index_pt_theta_ur = -1;
-    pv->index_pt_shear_ur = -1;
-    pv->index_pt_l3_ur    = -1;
+    layout.idx_delta = -1;
+    layout.idx_theta = -1;
+    layout.idx_shear = -1;
+    layout.idx_l3    = -1;
+    layout.l_max     = -1;
     return;
   }
 
-  class_define_index(pv->index_pt_delta_ur, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_theta_ur, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_shear_ur, _TRUE_, index_pt, 1);
+  layout.idx_delta = index_pt++;
+  layout.idx_theta = index_pt++;
+  layout.idx_shear = index_pt++;
 
   if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
-    if (pv->l_max_ur >= 3) {
-      class_define_index(pv->index_pt_l3_ur, _TRUE_, index_pt, pv->l_max_ur - 2);
+    /* Full hierarchy: l_max set by caller */
+    layout.l_max = l_max_full;
+    if (l_max_full >= 3) {
+      layout.idx_l3  = index_pt;
+      index_pt      += l_max_full - 2;  // l3, l4, ..., l_max
     }
+  }
+  else {
+    /* UFA active: only delta, theta, shear are integrated.
+       l_max in the layout is set to 2 to indicate UFA truncation. */
+    layout.l_max  = 2;
+    layout.idx_l3 = -1;
   }
 }
 
-void UltraRelativisticSpecies::PerturbDerivs(double tau,
+void UltraRelativisticSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                             double tau,
                                              const double* y,
                                              double* dy,
                                              const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
   const double* s_l               = ppw->s_l;
   const double k                  = ppaw.k;
@@ -94,48 +112,49 @@ void UltraRelativisticSpecies::PerturbDerivs(double tau,
   const precision* ppr  = ppaw.perturbations_module->GetPrecision();
 
   /* RSA active: UR quantities handled analytically, nothing to integrate */
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
+  if (layout.idx_delta < 0)
     return;
 
   int l;
   const double three_ceff2 = ppt->three_ceff2_ur;
   const double three_cvis2 = ppt->three_cvis2_ur;
 
+  const int idx_delta = layout.idx_delta;
+  const int idx_theta = layout.idx_theta;
+  const int idx_shear = layout.idx_shear;
+  const int idx_l3    = layout.idx_l3;
+  const int l_max     = layout.l_max;
+
   /* ── density ─────────────────────────────────────────────────────────── */
-  dy[pv->index_pt_delta_ur] = -4. / 3. * (y[pv->index_pt_theta_ur] + metric_continuity) +
-                              (1. - three_ceff2) * a_prime_over_a *
-                                  (y[pv->index_pt_delta_ur] +
-                                   4. * a_prime_over_a * y[pv->index_pt_theta_ur] / k2);
+  dy[idx_delta] = -4. / 3. * (y[idx_theta] + metric_continuity) +
+                  (1. - three_ceff2) * a_prime_over_a *
+                      (y[idx_delta] + 4. * a_prime_over_a * y[idx_theta] / k2);
 
   /* ── velocity ────────────────────────────────────────────────────────── */
-  dy[pv->index_pt_theta_ur] =
-      k2 * (three_ceff2 * y[pv->index_pt_delta_ur] / 4. - s2_squared * y[pv->index_pt_shear_ur]) +
-      metric_euler - (1. - three_ceff2) * a_prime_over_a * y[pv->index_pt_theta_ur];
+  dy[idx_theta] = k2 * (three_ceff2 * y[idx_delta] / 4. - s2_squared * y[idx_shear]) +
+                  metric_euler - (1. - three_ceff2) * a_prime_over_a * y[idx_theta];
 
   if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
     /* ── exact shear ──────────────────────────────────────────────────── */
-    dy[pv->index_pt_shear_ur] =
-        0.5 * (8. / 15. * (y[pv->index_pt_theta_ur] + metric_shear) -
-               3. / 5. * k * s_l[3] / s_l[2] * y[pv->index_pt_shear_ur + 1] -
-               (1. - three_cvis2) * 8. / 15. * (y[pv->index_pt_theta_ur] + metric_shear));
+    dy[idx_shear] = 0.5 * (8. / 15. * (y[idx_theta] + metric_shear) -
+                           3. / 5. * k * s_l[3] / s_l[2] * y[idx_shear + 1] -
+                           (1. - three_cvis2) * 8. / 15. * (y[idx_theta] + metric_shear));
 
     /* ── l = 3 ────────────────────────────────────────────────────────── */
-    l                      = 3;
-    dy[pv->index_pt_l3_ur] = k / (2. * l + 1.) *
-                             (l * 2. * s_l[l] * s_l[2] * y[pv->index_pt_shear_ur] -
-                              (l + 1.) * s_l[l + 1] * y[pv->index_pt_l3_ur + 1]);
+    l          = 3;
+    dy[idx_l3] = k / (2. * l + 1.) *
+                 (l * 2. * s_l[l] * s_l[2] * y[idx_shear] - (l + 1.) * s_l[l + 1] * y[idx_l3 + 1]);
 
-    /* ── l = 4 .. l_max_ur - 1 ────────────────────────────────────────── */
-    for (l = 4; l < pv->l_max_ur; l++) {
-      dy[pv->index_pt_delta_ur + l] = k / (2. * l + 1) *
-                                      (l * s_l[l] * y[pv->index_pt_delta_ur + l - 1] -
-                                       (l + 1.) * s_l[l + 1] * y[pv->index_pt_delta_ur + l + 1]);
+    /* ── l = 4 .. l_max - 1 ──────────────────────────────────────────── */
+    for (l = 4; l < l_max; l++) {
+      dy[idx_delta + l] = k / (2. * l + 1) *
+                          (l * s_l[l] * y[idx_delta + l - 1] -
+                           (l + 1.) * s_l[l + 1] * y[idx_delta + l + 1]);
     }
 
-    /* ── l = l_max_ur  (truncation) ───────────────────────────────────── */
-    l                             = pv->l_max_ur;
-    dy[pv->index_pt_delta_ur + l] = k * (s_l[l] * y[pv->index_pt_delta_ur + l - 1] -
-                                         (1. + l) * cotKgen * y[pv->index_pt_delta_ur + l]);
+    /* ── l = l_max (truncation) ──────────────────────────────────────── */
+    l                 = l_max;
+    dy[idx_delta + l] = k * (s_l[l] * y[idx_delta + l - 1] - (1. + l) * cotKgen * y[idx_delta + l]);
 
     /* ── optional self-interaction (G_eff_ur) damping ─────────────────── */
     if (ppt->G_eff_ur > 0.) {
@@ -146,10 +165,9 @@ void UltraRelativisticSpecies::PerturbDerivs(double tau,
       taudot         = std::min(taudot, a_prime_over_a * 1e9);
       if (taudot > 0.) {
         const double alpha_RTA[5] = {0.40, 0.43, 0.46, 0.47, 0.48};
-        for (l = 2; l <= pv->l_max_ur; l++) {
-          int alpha_index                = std::min(4, l - 2);
-          dy[pv->index_pt_delta_ur + l] -= alpha_RTA[alpha_index] * taudot *
-                                           y[pv->index_pt_delta_ur + l];
+        for (l = 2; l <= l_max; l++) {
+          int alpha_index    = std::min(4, l - 2);
+          dy[idx_delta + l] -= alpha_RTA[alpha_index] * taudot * y[idx_delta + l];
         }
       }
     }
@@ -159,78 +177,89 @@ void UltraRelativisticSpecies::PerturbDerivs(double tau,
     const int method = ppr->ur_fluid_approximation;
 
     if (method == (int) ufa_mb) {
-      dy[pv->index_pt_shear_ur] = -3. / tau * y[pv->index_pt_shear_ur] +
-                                  2. / 3. * (y[pv->index_pt_theta_ur] + metric_shear);
+      dy[idx_shear] = -3. / tau * y[idx_shear] + 2. / 3. * (y[idx_theta] + metric_shear);
     }
     else if (method == (int) ufa_hu) {
-      dy[pv->index_pt_shear_ur] = -3. * a_prime_over_a * y[pv->index_pt_shear_ur] +
-                                  2. / 3. * (y[pv->index_pt_theta_ur] + metric_shear);
+      dy[idx_shear] = -3. * a_prime_over_a * y[idx_shear] + 2. / 3. * (y[idx_theta] + metric_shear);
     }
     else { /* ufa_CLASS (default) */
-      dy[pv->index_pt_shear_ur] = -3. / tau * y[pv->index_pt_shear_ur] +
-                                  2. / 3. * (y[pv->index_pt_theta_ur] + metric_ufa_class);
+      dy[idx_shear] = -3. / tau * y[idx_shear] + 2. / 3. * (y[idx_theta] + metric_ufa_class);
     }
 
     /* optional G_eff_ur damping on shear */
     if (ppt->G_eff_ur > 0.) {
-      const double a = ctx.a;
-      double taudot  = pow(a, -4) * pow(pow(4. / 11., 1. / 3.) * pba->T_cmb * _k_B_, 5) *
-                       pow(ppt->G_eff_ur / (1e12 * _eV_ * _eV_), 2) * (2. * _PI_ / _h_P_) / _c_ *
-                       _Mpc_over_m_;
-      taudot         = std::min(taudot, a_prime_over_a * 1e9);
-      dy[pv->index_pt_shear_ur] -= 0.40 * taudot * y[pv->index_pt_shear_ur];
+      const double a  = ctx.a;
+      double taudot   = pow(a, -4) * pow(pow(4. / 11., 1. / 3.) * pba->T_cmb * _k_B_, 5) *
+                        pow(ppt->G_eff_ur / (1e12 * _eV_ * _eV_), 2) * (2. * _PI_ / _h_P_) / _c_ *
+                        _Mpc_over_m_;
+      taudot          = std::min(taudot, a_prime_over_a * 1e9);
+      dy[idx_shear]  -= 0.40 * taudot * y[idx_shear];
     }
   }
 }
 
-double UltraRelativisticSpecies::Delta(const perturb_vector* pv,
+double UltraRelativisticSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                                       const perturb_vector* /*pv*/,
                                        const double* y,
                                        const double* /*pvecback*/,
                                        const perturb_workspace* /*ppw*/) const {
-  return (pv->index_pt_delta_ur >= 0) ? y[pv->index_pt_delta_ur] : 0.;
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  /* RSA active (idx_delta < 0): UR delta is handled by perturb_rsa_delta_and_theta,
+     which adds rsa_delta_ur to ppw->delta_rho directly. Return 0 to avoid double-counting. */
+  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
 }
 
-double UltraRelativisticSpecies::Theta(const perturb_vector* pv,
+double UltraRelativisticSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                                       const perturb_vector* /*pv*/,
                                        const double* y,
                                        const double* /*pvecback*/,
                                        const perturb_workspace* /*ppw*/) const {
-  return (pv->index_pt_theta_ur >= 0) ? y[pv->index_pt_theta_ur] : 0.;
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  /* RSA active (idx_theta < 0): UR theta is handled by perturb_rsa_delta_and_theta. Return 0. */
+  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
 }
 
-double UltraRelativisticSpecies::DeltaP(const perturb_vector* pv,
+double UltraRelativisticSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                                        const perturb_vector* /*pv*/,
                                         const double* y,
                                         const double* pvecback,
                                         const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
   /* delta_p = c_s^2 * delta_rho = (1/3) * rho * delta */
-  return (pv->index_pt_delta_ur >= 0) ? Rho(pvecback) * y[pv->index_pt_delta_ur] / 3. : 0.;
+  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] / 3. : 0.;
 }
 
-double UltraRelativisticSpecies::RhoPlusPShear(const perturb_vector* pv,
+double UltraRelativisticSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
+                                               const perturb_vector* /*pv*/,
                                                const double* y,
                                                const double* pvecback,
                                                const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
   /* (rho + p) * sigma = 4/3 * rho_ur * shear_ur */
-  return (pv->index_pt_shear_ur >= 0) ? 4. / 3. * Rho(pvecback) * y[pv->index_pt_shear_ur] : 0.;
+  return (layout.idx_shear >= 0) ? 4. / 3. * Rho(pvecback) * y[layout.idx_shear] : 0.;
 }
 
-void UltraRelativisticSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
-  perturb_vector* pv = ctx.ppw->pv;
-  if (pv->index_pt_delta_ur >= 0)
-    y[pv->index_pt_delta_ur] = ctx.delta_ur;
-  if (pv->index_pt_theta_ur >= 0)
-    y[pv->index_pt_theta_ur] = ctx.theta_ur;
-  if (pv->index_pt_shear_ur >= 0)
-    y[pv->index_pt_shear_ur] = ctx.shear_ur;
-  if (pv->index_pt_l3_ur >= 0)
-    y[pv->index_pt_l3_ur] = ctx.l3_ur;
+void UltraRelativisticSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                                      double* y,
+                                                      const PerturbIcContext& ctx) {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_delta >= 0)
+    y[layout.idx_delta] = ctx.delta_ur;
+  if (layout.idx_theta >= 0)
+    y[layout.idx_theta] = ctx.theta_ur;
+  if (layout.idx_shear >= 0)
+    y[layout.idx_shear] = ctx.shear_ur;
+  if (layout.idx_l3 >= 0)
+    y[layout.idx_l3] = ctx.l3_ur;
 }
 
-void UltraRelativisticSpecies::FillSources(const double* y,
+void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
+                                           const double* y,
                                            const double* /*dy*/,
                                            PerturbSourceContext& ctx) {
+  const auto& layout         = static_cast<const PerturbLayout&>(base);
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv;
 
   const double a_prime_over_a = ctx.a_prime_over_a;
 
@@ -239,9 +268,7 @@ void UltraRelativisticSpecies::FillSources(const double* y,
 
   // ── delta_ur ───────────────────────────────────────────────────────────────
   if (p_mod->has_source_delta_ur_ == _TRUE_) {
-    const double delta_ur = (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)
-                                ? y[pv->index_pt_delta_ur]
-                                : ppw->rsa_delta_ur;
+    const double delta_ur = (layout.idx_delta >= 0) ? y[layout.idx_delta] : ppw->rsa_delta_ur;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_delta_ur_,
@@ -253,15 +280,39 @@ void UltraRelativisticSpecies::FillSources(const double* y,
 
   // ── theta_ur ───────────────────────────────────────────────────────────────
   if (p_mod->has_source_theta_ur_ == _TRUE_) {
-    const double theta_ur = (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)
-                                ? y[pv->index_pt_theta_ur]
-                                : ppw->rsa_theta_ur;
+    const double theta_ur = (layout.idx_theta >= 0) ? y[layout.idx_theta] : ppw->rsa_theta_ur;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_theta_ur_,
                           ctx.index_tau,
                           ctx.index_k,
                           theta_ur + ctx.theta_shift);  // N-body gauge correction
+  }
+}
+
+void UltraRelativisticSpecies::CopyPerturbationsAcrossSwitch(
+    const BaseSpecies::PerturbLayout& old_base,
+    const BaseSpecies::PerturbLayout& new_base,
+    const double* old_y,
+    double* new_y,
+    const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+
+  /* Guard: only copy if both layouts have slots registered (not RSA mode) */
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+    return;
+
+  /* delta, theta, shear always present in both layouts */
+  new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+  new_y[new_l.idx_shear] = old_y[old_l.idx_shear];
+
+  /* l3+ only present when ufa is off (full hierarchy on both sides) */
+  if (old_l.l_max >= 3 && new_l.l_max >= 3 && old_l.idx_l3 >= 0 && new_l.idx_l3 >= 0) {
+    new_y[new_l.idx_l3] = old_y[old_l.idx_l3];
+    for (int l = 4; l <= new_l.l_max; ++l)
+      new_y[new_l.idx_delta + l] = old_y[old_l.idx_delta + l];
   }
 }
 
@@ -302,9 +353,10 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
     const double* pvecmetric = ppw->pvecmetric;
 
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-      delta_ur = y[pv->index_pt_delta_ur];
-      theta_ur = y[pv->index_pt_theta_ur];
-      shear_ur = y[pv->index_pt_shear_ur];
+      const auto& lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+      delta_ur        = y[lay.idx_delta];
+      theta_ur        = y[lay.idx_theta];
+      shear_ur        = y[lay.idx_shear];
     }
     else {
       delta_ur = ppw->rsa_delta_ur;

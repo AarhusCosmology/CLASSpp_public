@@ -69,30 +69,29 @@ void FluidSpecies::WriteWFld(double w_fld, double dw_over_da_fld, double* pvecba
   pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
 }
 
-void FluidSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+void FluidSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                               perturb_vector* /*pv*/,
                                                const precision* /*ppr*/,
                                                int& index_pt,
                                                const perturb_workspace* /*ppw*/,
                                                int /*gauge*/) {
+  auto& layout = static_cast<PerturbLayout&>(base);
   if (pba_.use_ppf == _FALSE_) {
-    pv->index_pt_delta_fld = -1;
-    pv->index_pt_theta_fld = -1;
-    class_define_index(pv->index_pt_delta_fld, _TRUE_, index_pt, 1);
-    class_define_index(pv->index_pt_theta_fld, _TRUE_, index_pt, 1);
+    class_define_index(layout.idx_delta, _TRUE_, index_pt, 1);
+    class_define_index(layout.idx_theta, _TRUE_, index_pt, 1);
   }
   else {
-    pv->index_pt_delta_fld = -1;
-    pv->index_pt_theta_fld = -1;
-    class_define_index(pv->index_pt_Gamma_fld, _TRUE_, index_pt, 1);
+    class_define_index(layout.idx_Gamma, _TRUE_, index_pt, 1);
   }
 }
 
-void FluidSpecies::PerturbDerivs(double /*tau*/,
+void FluidSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                 double /*tau*/,
                                  const double* y,
                                  double* dy,
                                  const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   const double a                 = ctx.a;
@@ -108,20 +107,21 @@ void FluidSpecies::PerturbDerivs(double /*tau*/,
     const double ca2            = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
     const double cs2            = pba_.cs2_fld;
 
-    dy[pv->index_pt_delta_fld] = -(1. + w_fld) * (y[pv->index_pt_theta_fld] + metric_continuity) -
-                                 3. * (cs2 - w_fld) * a_prime_over_a * y[pv->index_pt_delta_fld] -
-                                 9. * (1. + w_fld) * (cs2 - ca2) * a_prime_over_a * a_prime_over_a *
-                                     y[pv->index_pt_theta_fld] / k2;
+    dy[layout.idx_delta] = -(1. + w_fld) * (y[layout.idx_theta] + metric_continuity) -
+                           3. * (cs2 - w_fld) * a_prime_over_a * y[layout.idx_delta] -
+                           9. * (1. + w_fld) * (cs2 - ca2) * a_prime_over_a * a_prime_over_a *
+                               y[layout.idx_theta] / k2;
 
-    dy[pv->index_pt_theta_fld] = -(1. - 3. * cs2) * a_prime_over_a * y[pv->index_pt_theta_fld] +
-                                 cs2 * k2 / (1. + w_fld) * y[pv->index_pt_delta_fld] + metric_euler;
+    dy[layout.idx_theta] = -(1. - 3. * cs2) * a_prime_over_a * y[layout.idx_theta] +
+                           cs2 * k2 / (1. + w_fld) * y[layout.idx_delta] + metric_euler;
   }
   else {
-    dy[pv->index_pt_Gamma_fld] = ppw->Gamma_prime_fld;
+    dy[layout.idx_Gamma] = ppw->Gamma_prime_fld;
   }
 }
 
-void FluidSpecies::FillSources(const double* /*y*/,
+void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& /*layout*/,
+                               const double* /*y*/,
                                const double* /*dy*/,
                                PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod  = ctx.p_mod;
@@ -159,13 +159,15 @@ void FluidSpecies::FillSources(const double* /*y*/,
   }
 }
 
-void FluidSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                          double* y,
+                                          const PerturbIcContext& ctx) {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
   if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
     return;
   if (ctx.p_mod->GetBackground()->use_ppf == _TRUE_)
     return;
-  perturb_vector* pv = ctx.ppw->pv;
-  if (pv->index_pt_delta_fld < 0 || pv->index_pt_theta_fld < 0)
+  if (layout.idx_delta < 0 || layout.idx_theta < 0)
     return;
 
   double w_fld, dw_over_da, integral;
@@ -174,14 +176,14 @@ void FluidSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx
              bgm->error_message_,
              bgm->error_message_);
 
-  y[pv->index_pt_delta_fld] = -ctx.ktau_two / 4. * (1. + w_fld) *
-                              (4. - 3. * ctx.p_mod->GetBackground()->cs2_fld) /
-                              (4. - 6. * w_fld + 3. * ctx.p_mod->GetBackground()->cs2_fld) *
-                              ctx.ppr->curvature_ini * ctx.s2_squared;
+  y[layout.idx_delta] = -ctx.ktau_two / 4. * (1. + w_fld) *
+                        (4. - 3. * ctx.p_mod->GetBackground()->cs2_fld) /
+                        (4. - 6. * w_fld + 3. * ctx.p_mod->GetBackground()->cs2_fld) *
+                        ctx.ppr->curvature_ini * ctx.s2_squared;
 
-  y[pv->index_pt_theta_fld] = -ctx.k * ctx.ktau_three / 4. * ctx.p_mod->GetBackground()->cs2_fld /
-                              (4. - 6. * w_fld + 3. * ctx.p_mod->GetBackground()->cs2_fld) *
-                              ctx.ppr->curvature_ini * ctx.s2_squared;
+  y[layout.idx_theta] = -ctx.k * ctx.ktau_three / 4. * ctx.p_mod->GetBackground()->cs2_fld /
+                        (4. - 6. * w_fld + 3. * ctx.p_mod->GetBackground()->cs2_fld) *
+                        ctx.ppr->curvature_ini * ctx.s2_squared;
 }
 
 void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
@@ -220,25 +222,31 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("delta_p_fld", delta_p_fld, true);
 }
 
-double FluidSpecies::Delta(const perturb_vector* pv,
+double FluidSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                           const perturb_vector* /*pv*/,
                            const double* y,
                            const double* /*pvecback*/,
                            const perturb_workspace* /*ppw*/) const {
-  return (pv->index_pt_delta_fld >= 0) ? y[pv->index_pt_delta_fld] : 0.;
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
 }
-double FluidSpecies::Theta(const perturb_vector* pv,
+double FluidSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                           const perturb_vector* /*pv*/,
                            const double* y,
                            const double* /*pvecback*/,
                            const perturb_workspace* /*ppw*/) const {
-  return (pv->index_pt_theta_fld >= 0) ? y[pv->index_pt_theta_fld] : 0.;
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
 }
-double FluidSpecies::DeltaP(const perturb_vector* pv,
+double FluidSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                            const perturb_vector* /*pv*/,
                             const double* y,
                             const double* pvecback,
                             const perturb_workspace* ppw) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
   // PPF uses a dedicated path (ComputePpf); this method is not called for
   // PPF — the module skips FluidSpecies in the main loop when use_ppf.
-  if (pv->index_pt_delta_fld < 0 || pv->index_pt_theta_fld < 0)
+  if (layout.idx_delta < 0 || layout.idx_theta < 0)
     return 0.;
 
   const double k2             = ppw->scalar_ctx.k2;
@@ -250,14 +258,15 @@ double FluidSpecies::DeltaP(const perturb_vector* pv,
   const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
   const double rho                  = Rho(pvecback);
-  const double delta_rho_fld        = rho * y[pv->index_pt_delta_fld];
-  const double rho_plus_p_theta_fld = (1. + w_fld) * rho * y[pv->index_pt_theta_fld];
+  const double delta_rho_fld        = rho * y[layout.idx_delta];
+  const double rho_plus_p_theta_fld = (1. + w_fld) * rho * y[layout.idx_theta];
   const double ca2_fld              = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
 
   return pba_.cs2_fld * delta_rho_fld +
          (pba_.cs2_fld - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
 }
-double FluidSpecies::RhoPlusPShear(const perturb_vector* /*pv*/,
+double FluidSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& /*base*/,
+                                   const perturb_vector* /*pv*/,
                                    const double* /*y*/,
                                    const double* /*pvecback*/,
                                    const perturb_workspace* /*ppw*/) const {
@@ -391,8 +400,11 @@ void FluidSpecies::ComputePpf(double k,
   double Gamma_fld;
   if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max)
     Gamma_fld = 0.;
-  else
-    Gamma_fld = y[ppw->pv->index_pt_Gamma_fld];
+  else {
+    const auto& layout = static_cast<const PerturbLayout&>(
+        *ppw->pv->species_layouts[collection_index_]);
+    Gamma_fld = y[layout.idx_Gamma];
+  }
 
   double alpha, alpha_prime, metric_euler;
   if (ppw->scalar_ctx.gauge == synchronous) {

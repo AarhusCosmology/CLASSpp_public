@@ -22,7 +22,6 @@ struct SpeciesBuildContext {
   const precision* ppr;
   const NcdmSettings* ncdm_settings;  // non-null
   const BackgroundModule* bgm;        // nullptr at species-construction time
-  int* ncdm_id_next;  // non-null; mutable counter, advanced by NCDM-family CreateAll
 };
 
 /**

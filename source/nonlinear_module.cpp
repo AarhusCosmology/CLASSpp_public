@@ -2130,7 +2130,7 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
   pvecback.resize(background_module_->bg_size_);
 
   if ((has_pk_m_ == _TRUE_) && (index_pk == index_pk_m_)) {
-    fnu = pba->Omega0_ncdm_tot / background_module_->Omega0_m_;
+    fnu = background_module_->GetOmega0NcdmTot() / background_module_->Omega0_m_;
   }
   else if ((has_pk_cb_ == _TRUE_) && (index_pk == index_pk_cb_)) {
     fnu = 0.;
@@ -2658,12 +2658,12 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
   /** Compute background quantitites today */
 
   Omega0_m = background_module_->Omega0_m_;
-  fnu      = pba->Omega0_ncdm_tot / Omega0_m;
+  fnu      = background_module_->GetOmega0NcdmTot() / Omega0_m;
 
   /** If index_pk_cb, choose Omega0_cb as the matter density parameter.
    * If index_pk_m, choose Omega0_cbn as the matter density parameter. */
   if (index_pk == index_pk_cb_) {
-    Omega0_m = Omega0_m - pba->Omega0_ncdm_tot;
+    Omega0_m = Omega0_m - background_module_->GetOmega0NcdmTot();
   }
 
   anorm = 1. / (2 * pow(_PI_, 2));

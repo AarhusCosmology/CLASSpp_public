@@ -5,21 +5,32 @@
 #include "perturbations_module.h"
 #include "thermodynamics_module.h"
 
-void BaryonsSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+
+void BaryonsSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                 perturb_vector* pv,
                                                  const precision* /*ppr*/,
                                                  int& index_pt,
                                                  const perturb_workspace* /*ppw*/,
                                                  int /*gauge*/) {
-  class_define_index(pv->index_pt_delta_b, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_theta_b, _TRUE_, index_pt, 1);
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.idx_delta = index_pt;
+  ++index_pt;
+
+  layout.idx_theta = index_pt;
+  ++index_pt;
 }
 
-void BaryonsSpecies::PerturbDerivs(double /*tau*/,
+// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+
+void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                   double /*tau*/,
                                    const double* y,
                                    double* dy,
                                    const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   const double k2                   = ppaw.k * ppaw.k;
@@ -30,7 +41,7 @@ void BaryonsSpecies::PerturbDerivs(double /*tau*/,
   const double s2_squared           = ctx.s2_squared;
   const double delta_p_b_over_rho_b = ctx.delta_p_b_over_rho_b;
 
-  const double theta_b = y[pv->index_pt_theta_b];
+  const double theta_b = y[layout.idx_theta];
   /* theta_g from context: RSA-corrected photon velocity */
   const double theta_g = ctx.theta_g;
   const double delta_g = ctx.delta_g;
@@ -39,22 +50,50 @@ void BaryonsSpecies::PerturbDerivs(double /*tau*/,
       ppw->pvecthermo[ppaw.perturbations_module->GetThermodynamicsModule()->index_th_dkappa_];
 
   /* density equation */
-  dy[pv->index_pt_delta_b] = -(theta_b + metric_continuity);
+  dy[layout.idx_delta] = -(theta_b + metric_continuity);
 
   if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
     /* Full equation */
-    dy[pv->index_pt_theta_b] = -a_prime_over_a * theta_b + metric_euler +
-                               k2 * delta_p_b_over_rho_b + R * dkappa * (theta_g - theta_b);
+    dy[layout.idx_theta] = -a_prime_over_a * theta_b + metric_euler + k2 * delta_p_b_over_rho_b +
+                           R * dkappa * (theta_g - theta_b);
   }
   else {
     /* TCA on: tight-coupling approximation for theta_b */
-    dy[pv->index_pt_theta_b] =
+    dy[layout.idx_theta] =
         (-a_prime_over_a * theta_b +
          k2 * (delta_p_b_over_rho_b + R * (delta_g / 4. - s2_squared * ppw->tca_shear_g)) +
          R * ppw->tca_slip) /
             (1. + R) +
         metric_euler;
   }
+}
+
+// ── Stress-energy observables (layout-based, primary path) ─────────────────
+
+double BaryonsSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                             const perturb_vector* /*pv*/,
+                             const double* y,
+                             const double* /*pvecback*/,
+                             const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_delta];
+}
+
+double BaryonsSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                             const perturb_vector* /*pv*/,
+                             const double* y,
+                             const double* /*pvecback*/,
+                             const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_theta];
+}
+
+double BaryonsSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,
+                              const perturb_vector* /*pv*/,
+                              const double* /*y*/,
+                              const double* pvecback,
+                              const perturb_workspace* ppw) const {
+  return pvecback[index_bg_rho_] * ppw->scalar_ctx.delta_p_b_over_rho_b;
 }
 
 double BaryonsSpecies::DeltaP(const perturb_vector* /*pv*/,
@@ -64,38 +103,46 @@ double BaryonsSpecies::DeltaP(const perturb_vector* /*pv*/,
   return pvecback[index_bg_rho_] * ppw->scalar_ctx.delta_p_b_over_rho_b;
 }
 
-void BaryonsSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
-  perturb_vector* pv             = ctx.ppw->pv;
+// ── ApplyInitialConditions (layout-based, primary path) ───────────────────
+
+void BaryonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                            double* y,
+                                            const PerturbIcContext& ctx) {
+  const auto& layout             = static_cast<const PerturbLayout&>(base);
   const PerturbationsModule* mod = ctx.p_mod;
-  if (pv->index_pt_delta_b < 0 || pv->index_pt_theta_b < 0)
+  if (layout.idx_delta < 0 || layout.idx_theta < 0)
     return;
 
   if (ctx.index_ic == mod->index_ic_ad_) {
-    y[pv->index_pt_delta_b] = 3. / 4. * ctx.delta_g_ic;
-    y[pv->index_pt_theta_b] = ctx.theta_g_ic;
+    y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
+    y[layout.idx_theta] = ctx.theta_g_ic;
   }
   else if (ctx.index_ic == mod->index_ic_cdi_) {
-    y[pv->index_pt_delta_b] = 3. / 4. * ctx.delta_g_ic;
-    y[pv->index_pt_theta_b] = ctx.theta_g_ic;
+    y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
+    y[layout.idx_theta] = ctx.theta_g_ic;
   }
   else if (ctx.index_ic == mod->index_ic_bi_) {
-    y[pv->index_pt_delta_b] = ctx.ppr->entropy_ini + 3. / 4. * ctx.delta_g_ic;
-    y[pv->index_pt_theta_b] = ctx.theta_g_ic;
+    y[layout.idx_delta] = ctx.ppr->entropy_ini + 3. / 4. * ctx.delta_g_ic;
+    y[layout.idx_theta] = ctx.theta_g_ic;
   }
   else if (ctx.index_ic == mod->index_ic_nid_) {
-    y[pv->index_pt_delta_b] = ctx.ppr->entropy_ini * ctx.fracnu / ctx.fracg / 8. * ctx.ktau_two;
-    y[pv->index_pt_theta_b] = ctx.theta_g_ic;
+    y[layout.idx_delta] = ctx.ppr->entropy_ini * ctx.fracnu / ctx.fracg / 8. * ctx.ktau_two;
+    y[layout.idx_theta] = ctx.theta_g_ic;
   }
   else if (ctx.index_ic == mod->index_ic_niv_) {
-    y[pv->index_pt_delta_b] = 3. / 4. * ctx.delta_g_ic;
-    y[pv->index_pt_theta_b] = ctx.theta_g_ic;
+    y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
+    y[layout.idx_theta] = ctx.theta_g_ic;
   }
 }
 
-void BaryonsSpecies::FillSources(const double* y, const double* /*dy*/, PerturbSourceContext& ctx) {
+// ── FillSources (layout-based, primary path) ──────────────────────────────
+
+void BaryonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
+                                 const double* y,
+                                 const double* /*dy*/,
+                                 PerturbSourceContext& ctx) {
+  const auto& layout         = static_cast<const PerturbLayout&>(base);
   PerturbationsModule* p_mod = ctx.p_mod;
-  perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv;
 
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
@@ -109,7 +156,7 @@ void BaryonsSpecies::FillSources(const double* y, const double* /*dy*/, PerturbS
                           p_mod->index_tp_delta_b_,
                           ctx.index_tau,
                           ctx.index_k,
-                          y[pv->index_pt_delta_b] +
+                          y[layout.idx_delta] +
                               3. * a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
@@ -120,7 +167,7 @@ void BaryonsSpecies::FillSources(const double* y, const double* /*dy*/, PerturbS
                           p_mod->index_tp_theta_b_,
                           ctx.index_tau,
                           ctx.index_k,
-                          y[pv->index_pt_theta_b] + ctx.theta_shift);  // N-body gauge correction
+                          y[layout.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
 }
 
@@ -146,12 +193,13 @@ void BaryonsSpecies::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv;
-    const double k           = ppw->scalar_ctx.k;
+    const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+    const double k     = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback;
     const double* pvecmetric = ppw->pvecmetric;
 
-    delta_b = y[pv->index_pt_delta_b];
-    theta_b = y[pv->index_pt_theta_b];
+    delta_b = y[layout.idx_delta];
+    theta_b = y[layout.idx_theta];
 
     // Converting synchronous variables to Newtonian
     const perturbs* ppt = mod.GetPerturbs();

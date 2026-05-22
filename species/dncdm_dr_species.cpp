@@ -21,10 +21,8 @@ std::vector<Named> DNCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
 DNCDM_DR_Species::DNCDM_DR_Species(std::unique_ptr<DNCDMSpecies> dncdm_arg,
                                    const background* pba,
                                    const BackgroundModule* bgm)
-    : CompositeSpecies("DNCDM_DR_" + std::to_string(dncdm_arg->ncdm_id()),
-                       BaseSpecies::EnergyType::Other),
-      ncdm_id_(dncdm_arg->ncdm_id()), pba_(pba), bgm_(bgm) {
-  auto dr_sp = std::make_unique<DNCDM_DecayRadiationSpecies>(ncdm_id_, pba, bgm);
+    : CompositeSpecies(dncdm_arg->name(), BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm) {
+  auto dr_sp = std::make_unique<DNCDM_DecayRadiationSpecies>(dncdm_arg->name() + "_DR", pba, bgm);
   dncdm_     = dncdm_arg.get();
   dr_sp_     = dr_sp.get();
   children_.push_back(std::move(dncdm_arg));
@@ -55,7 +53,93 @@ void DNCDM_DR_Species::BackgroundDerivs(double tau,
   dy[dr_sp_->bi_rho_index()] += a * Gamma * M_ncdm * pvecback[dncdm_->bg_number_index()];
 }
 
-void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
+// ── Perturbation layout-based overrides ───────────────────────────────────────
+
+void DNCDM_DR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                     double tau,
+                                     const double* y,
+                                     double* dy,
+                                     const perturb_parameters_and_workspace& ppaw) {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  dncdm_->PerturbDerivs(my.dncdm, tau, y, dy, ppaw);
+  dr_sp_->PerturbDerivs(my.dr, tau, y, dy, ppaw);
+  AddCouplingDerivs(my, y, dy, ppaw);
+}
+
+void DNCDM_DR_Species::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
+                                           double tau,
+                                           const double* y,
+                                           double* dy,
+                                           const perturb_parameters_and_workspace& ppaw) {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  // DNCDMSpecies inherits NCDMBaseSpecies::PerturbTensorDerivs.
+  // GetDlnf0DlnqForTensor is overridden by DNCDMSpecies to use pvecback.
+  dncdm_->PerturbTensorDerivs(my.dncdm, tau, y, dy, ppaw);
+}
+
+void DNCDM_DR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                              double* y,
+                                              const PerturbIcContext& ctx) {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  dncdm_->ApplyInitialConditions(my.dncdm, y, ctx);
+  dr_sp_->ApplyInitialConditions(my.dr, y, ctx);
+}
+
+double DNCDM_DR_Species::Delta(const BaseSpecies::PerturbLayout& base,
+                               const perturb_vector* pv,
+                               const double* y,
+                               const double* pvecback,
+                               const perturb_workspace* ppw) const {
+  const auto& my       = static_cast<const PerturbLayout&>(base);
+  const double rho_d   = dncdm_->Rho(pvecback);
+  const double rho_dr  = dr_sp_->Rho(pvecback);
+  const double rho_tot = rho_d + rho_dr;
+  if (rho_tot <= 0.)
+    return 0.;
+  return (rho_d * dncdm_->Delta(my.dncdm, pv, y, pvecback, ppw) +
+          rho_dr * dr_sp_->Delta(my.dr, pv, y, pvecback, ppw)) /
+         rho_tot;
+}
+
+double DNCDM_DR_Species::Theta(const BaseSpecies::PerturbLayout& base,
+                               const perturb_vector* pv,
+                               const double* y,
+                               const double* pvecback,
+                               const perturb_workspace* ppw) const {
+  const auto& my       = static_cast<const PerturbLayout&>(base);
+  const double rpp_d   = dncdm_->Rho(pvecback) + dncdm_->P(pvecback);
+  const double rpp_dr  = dr_sp_->Rho(pvecback) + dr_sp_->P(pvecback);
+  const double rpp_tot = rpp_d + rpp_dr;
+  if (rpp_tot <= 0.)
+    return 0.;
+  return (rpp_d * dncdm_->Theta(my.dncdm, pv, y, pvecback, ppw) +
+          rpp_dr * dr_sp_->Theta(my.dr, pv, y, pvecback, ppw)) /
+         rpp_tot;
+}
+
+double DNCDM_DR_Species::DeltaP(const BaseSpecies::PerturbLayout& base,
+                                const perturb_vector* pv,
+                                const double* y,
+                                const double* pvecback,
+                                const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  return dncdm_->DeltaP(my.dncdm, pv, y, pvecback, ppw) +
+         dr_sp_->DeltaP(my.dr, pv, y, pvecback, ppw);
+}
+
+double DNCDM_DR_Species::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
+                                       const perturb_vector* pv,
+                                       const double* y,
+                                       const double* pvecback,
+                                       const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  return dncdm_->RhoPlusPShear(my.dncdm, pv, y, pvecback, ppw) +
+         dr_sp_->RhoPlusPShear(my.dr, pv, y, pvecback, ppw);
+}
+
+// ── Coupling derivs ───────────────────────────────────────────────────────────
+
+void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
                                          const double* y,
                                          double* dy,
                                          const perturb_parameters_and_workspace& ppaw) {
@@ -76,7 +160,9 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
   const double rprime_dr = std::pow(a, 5) / (pba_->H0 * pba_->H0) * M_ncdm * Gamma *
                            pvecback[dncdm_->bg_number_index()];
 
-  auto ComputeFl = [&](int index_q, int lmax, std::vector<double>& output) {
+  const int lmax = my.dr.l_max;
+
+  auto ComputeFl = [&](int index_q, std::vector<double>& output) {
     double q       = dncdm_->GetQ()[index_q];
     double epsilon = sqrt(q * q + a * a * M_ncdm * M_ncdm);
     double x       = q / epsilon;
@@ -116,9 +202,9 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
     }
   };
 
-  std::vector<double> FL(q_size * (pv->l_max_dr + 1));
+  std::vector<double> FL(q_size * (lmax + 1));
   for (int index_q = 0; index_q < q_size; ++index_q) {
-    ComputeFl(index_q, pv->l_max_dr, FL);
+    ComputeFl(index_q, FL);
   }
 
   auto compute_collision_integral = [&](int l) {
@@ -137,7 +223,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
           break;
         }
 
-        int psi_ind     = pv->index_ncdm_.at(ncdm_id_)[index_q] + l;
+        int psi_ind     = my.dncdm.index_per_q[index_q] + l;
         integral_num   += w0 * q * q * y[psi_ind] * FL[l * q_size + index_q];
         integral_denom += w0 * q * q;
       }
@@ -149,7 +235,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
           double dq       = dncdm_->dq()[index_q];
           double lnf      = pvecback[dncdm_->bg_lnf_index() + index_q];
           double q        = dncdm_->GetQ()[index_q];
-          int psi_ind     = pv->index_ncdm_.at(ncdm_id_)[index_q] + l;
+          int psi_ind     = my.dncdm.index_per_q[index_q] + l;
           integral_num   += dq * q * q * exp(lnN + lnf) * y[psi_ind] * FL[l * q_size + index_q];
           integral_denom += dq * q * q * exp(lnN + lnf);
         }
@@ -158,16 +244,16 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
     }
     else {
       if (l == 0)
-        return rprime_dr * y[pv->index_ncdm_.at(ncdm_id_)[0]];
+        return rprime_dr * y[my.dncdm.index_per_q[0]];
       else if (l == 1)
-        return rprime_dr * y[pv->index_ncdm_.at(ncdm_id_)[0] + 1] / k;
+        return rprime_dr * y[my.dncdm.index_per_q[0] + 1] / k;
       else
         return 0.;
     }
   };
 
-  const int base = dr_sp_->pt_F0_index();
-  for (int l = 0; l <= pv->l_max_dr; ++l) {
+  const int base = my.dr.idx_F0;
+  for (int l = 0; l <= lmax; ++l) {
     double collision_term = 0.;
     if ((l <= ppr->l_max_dr_col) && (l < 800)) {
       collision_term = compute_collision_integral(l);

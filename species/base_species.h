@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 
@@ -37,6 +38,27 @@ class BaseSpecies {
   /** Classification used by background_functions() to accumulate rho_r, rho_m, etc. */
   enum class EnergyType { Radiation, Matter, DarkEnergy, Other };
   enum class TransferColumnSection { all, density, velocity };
+
+  // ── Perturbation layout (per-pv per-species index storage) ───────────────
+  /**
+   * Polymorphic layout base. Each concrete species defines its own subclass
+   * holding the perturbation slot indices/sizes it needs. Layouts are owned by
+   * perturb_vector::species_layouts (parallel to all_species_, lex-key order).
+   * Per-thread isolation comes for free because each thread allocates its own pv.
+   */
+  struct PerturbLayout {
+    virtual ~PerturbLayout() = default;
+  };
+
+  /**
+   * Produce a fresh layout for this species. Called once per pv during
+   * perturb_vector_init, before Register*PerturbationIndices.
+   * Default: empty base PerturbLayout (suitable for species with no
+   * perturbation slots, or as a placeholder during migration).
+   */
+  virtual std::unique_ptr<PerturbLayout> CreatePerturbLayout() const {
+    return std::make_unique<PerturbLayout>();
+  }
 
   virtual ~BaseSpecies()                     = default;
   BaseSpecies(const BaseSpecies&)            = delete;
@@ -207,6 +229,29 @@ class BaseSpecies {
                                                  const perturb_workspace* /*ppw*/,
                                                  int /*gauge*/) {}
 
+  // ── New per-species layout signatures (in-progress migration) ────────────
+  // Migrated species override these; un-migrated species ignore them and the
+  // module call site passes through to the legacy (perturb_vector*) overload.
+
+  virtual void RegisterPerturbationIndices(PerturbLayout& /*layout*/,
+                                           perturb_vector* /*pv*/,
+                                           const precision* /*ppr*/,
+                                           int& /*index_pt*/,
+                                           const perturb_workspace* /*ppw*/,
+                                           int /*gauge*/) {}
+
+  virtual void RegisterVectorPerturbationIndices(PerturbLayout& /*layout*/,
+                                                 perturb_vector* /*pv*/,
+                                                 int& /*index_pt*/,
+                                                 const perturb_workspace* /*ppw*/,
+                                                 int /*gauge*/) {}
+
+  virtual void RegisterTensorPerturbationIndices(PerturbLayout& /*layout*/,
+                                                 perturb_vector* /*pv*/,
+                                                 int& /*index_pt*/,
+                                                 const perturb_workspace* /*ppw*/,
+                                                 int /*gauge*/) {}
+
   /**
    * Contribute to dy for the scalar perturbation ODE at conformal time tau.
    * The PerturbScalarContext inside ppaw->ppw has pre-computed metric terms,
@@ -217,17 +262,53 @@ class BaseSpecies {
                              double* dy,
                              const perturb_parameters_and_workspace& ppaw) = 0;
 
+  virtual void PerturbDerivs(const PerturbLayout& /*layout*/,
+                             double tau,
+                             const double* y,
+                             double* dy,
+                             const perturb_parameters_and_workspace& ppaw) {
+    PerturbDerivs(tau, y, dy, ppaw);
+  }
+
   /** Contribute to dy for the vector perturbation ODE. Default: no-op. */
   virtual void PerturbVectorDerivs(double /*tau*/,
                                    const double* /*y*/,
                                    double* /*dy*/,
                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
 
+  virtual void PerturbVectorDerivs(const PerturbLayout& /*layout*/,
+                                   double tau,
+                                   const double* y,
+                                   double* dy,
+                                   const perturb_parameters_and_workspace& ppaw) {
+    PerturbVectorDerivs(tau, y, dy, ppaw);
+  }
+
   /** Contribute to dy for the tensor perturbation ODE. Default: no-op. */
   virtual void PerturbTensorDerivs(double /*tau*/,
                                    const double* /*y*/,
                                    double* /*dy*/,
                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
+
+  virtual void PerturbTensorDerivs(const PerturbLayout& /*layout*/,
+                                   double tau,
+                                   const double* y,
+                                   double* dy,
+                                   const perturb_parameters_and_workspace& ppaw) {
+    PerturbTensorDerivs(tau, y, dy, ppaw);
+  }
+
+  /** Write this species' tensor-mode output column titles. Default: no-op. */
+  virtual void WriteTensorOutputColumnTitles(char* /*tensor_titles*/) const {}
+
+  /** Contribute to the gravitational-wave source term (anisotropic stress) for tensor mode.
+   *  Called after perturb_workspace::gw_source is reset to zero.  Default: no-op.
+   *  The layout is this species' PerturbLayout slot (ppw->pv->species_layouts[i]). */
+  virtual void ContributeTensorGwSource(const PerturbLayout& /*layout*/,
+                                        double /*a*/,
+                                        double /*a_today*/,
+                                        const double* /*y*/,
+                                        perturb_workspace* /*ppw*/) const {}
 
   /**
    * Fractional density perturbation delta = delta_rho / rho.
@@ -242,11 +323,27 @@ class BaseSpecies {
                        const double* pvecback,
                        const perturb_workspace* ppw) const = 0;
 
+  virtual double Delta(const PerturbLayout& /*layout*/,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const {
+    return Delta(pv, y, pvecback, ppw);
+  }
+
   /** Velocity divergence theta. */
   virtual double Theta(const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const = 0;
+
+  virtual double Theta(const PerturbLayout& /*layout*/,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const {
+    return Theta(pv, y, pvecback, ppw);
+  }
 
   /** Pressure perturbation delta_p. */
   virtual double DeltaP(const perturb_vector* pv,
@@ -254,11 +351,27 @@ class BaseSpecies {
                         const double* pvecback,
                         const perturb_workspace* ppw) const = 0;
 
+  virtual double DeltaP(const PerturbLayout& /*layout*/,
+                        const perturb_vector* pv,
+                        const double* y,
+                        const double* pvecback,
+                        const perturb_workspace* ppw) const {
+    return DeltaP(pv, y, pvecback, ppw);
+  }
+
   /** (rho + p) * sigma: anisotropic stress contribution to Einstein equations. */
   virtual double RhoPlusPShear(const perturb_vector* pv,
                                const double* y,
                                const double* pvecback,
                                const perturb_workspace* ppw) const = 0;
+
+  virtual double RhoPlusPShear(const PerturbLayout& /*layout*/,
+                               const perturb_vector* pv,
+                               const double* y,
+                               const double* pvecback,
+                               const perturb_workspace* ppw) const {
+    return RhoPlusPShear(pv, y, pvecback, ppw);
+  }
 
   // ── Stage 1: Output ──────────────────────────────────────────────────────
 
@@ -301,6 +414,13 @@ class BaseSpecies {
                            const double* /*dy*/,
                            PerturbSourceContext& /*ctx*/) {}
 
+  virtual void FillSources(const PerturbLayout& /*layout*/,
+                           const double* y,
+                           const double* dy,
+                           PerturbSourceContext& ctx) {
+    FillSources(y, dy, ctx);
+  }
+
   // ── Stage 3: Initial conditions ───────────────────────────────────────────
 
   /**
@@ -311,6 +431,31 @@ class BaseSpecies {
    * Newtonian gauge transformation is handled by the module after this loop.
    */
   virtual void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) {}
+
+  virtual void ApplyInitialConditions(const PerturbLayout& /*layout*/,
+                                      double* y,
+                                      const PerturbIcContext& ctx) {
+    ApplyInitialConditions(y, ctx);
+  }
+
+  /**
+   * Copy perturbation state from one layout to another across an approximation switch.
+   * Called when the perturbation vector is reallocated (e.g., NCDM FA collapse from
+   * full Boltzmann hierarchy to fluid variables delta/theta/shear).
+   * Default: no-op. Most species have no approximation switches.
+   */
+  virtual void CopyPerturbationsAcrossSwitch(const PerturbLayout& /*old_layout*/,
+                                             const PerturbLayout& /*new_layout*/,
+                                             const double* /*old_y*/,
+                                             double* /*new_y*/,
+                                             const PerturbSwitchContext& /*ctx*/) const {}
+
+  /**
+   * Mark which source slots this species writes during FillSources.
+   * Called to build the used_in_sources bitmask/index list.
+   * Default: no-op. Sources-writing species override to flag their tp indices.
+   */
+  virtual void MarkUsedInSources(const PerturbLayout& /*layout*/, int* /*used_in_sources*/) const {}
 
   // ── Matter tally ──────────────────────────────────────────────────────────
 
@@ -337,21 +482,22 @@ class BaseSpecies {
     return IsMatterSpecies() ? Rho(pvecback) : 0.;
   }
 
-  /** Rho * Delta contribution to delta_rho_m. Default: Rho*Delta if IsMatterSpecies, else 0. */
+  /** Rho * Delta contribution to delta_rho_m. Default: Rho*Delta if IsMatterSpecies, else 0.
+      Prefers the layout-based Delta variant when a species_layouts slot is owned
+      (i.e. for first-class species registered via SpeciesCollection::freeze).
+      Composite children with no collection_index_ fall back to the legacy variant.
+      Defined out-of-line in base_species.cpp because it dereferences
+      perturb_vector, which is forward-declared here. */
   virtual double MatterRhoDelta(const perturb_vector* pv,
                                 const double* y,
                                 const double* pvecback,
-                                const perturb_workspace* ppw) const {
-    return IsMatterSpecies() ? Rho(pvecback) * Delta(pv, y, pvecback, ppw) : 0.;
-  }
+                                const perturb_workspace* ppw) const;
 
-  /** (Rho+P) * Theta contribution to rho_plus_p_theta_m. */
+  /** (Rho+P) * Theta contribution to rho_plus_p_theta_m. Out-of-line; see above. */
   virtual double MatterRhoPlusPTheta(const perturb_vector* pv,
                                      const double* y,
                                      const double* pvecback,
-                                     const perturb_workspace* ppw) const {
-    return IsMatterSpecies() ? (Rho(pvecback) + P(pvecback)) * Theta(pv, y, pvecback, ppw) : 0.;
-  }
+                                     const perturb_workspace* ppw) const;
 
   /** Rho+P contribution to rho_plus_p_m. */
   virtual double MatterRhoPlusP(const double* pvecback) const {
@@ -375,7 +521,12 @@ class BaseSpecies {
   std::string name_;
   EnergyType energy_type_;
 
+  // Set by SpeciesCollection::freeze(); used by PrintVariables to look up layout.
+  std::size_t collection_index_ = SIZE_MAX;
+
   // Set by RegisterBackgroundIndices(); -1 means "not registered / species absent"
   int index_bg_rho_ = -1;
   int index_bg_p_   = -1;  // only set by species that store p separately (e.g. NCDM)
+
+  friend class SpeciesCollection;
 };

@@ -20,6 +20,8 @@
 #include "nonlinear_module.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
+#include "species/dncdm_dr_species.h"
+#include "species/ncdm_base_species.h"
 #include "spectra_module.h"
 #include "thermodynamics_module.h"
 
@@ -820,7 +822,12 @@ int OutputModule::output_tk() {
   int index_md = perturbations_module_->index_md_scalars_;
 
   if (pop->output_format == camb_format) {
-    class_test(pba->N_ncdm > 1,
+    int n_ncdm_family = 0;
+    for (auto& [name, sp] : all_species_) {
+      if (dynamic_cast<NCDMBaseSpecies*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+        ++n_ncdm_family;
+    }
+    class_test(n_ncdm_family > 1,
                error_message_,
                "you wish to output the transfer functions in CMBFAST/CAMB format but you have more "
                "than one non-cold dark matter (ncdm) species. The two are not compatible (since "

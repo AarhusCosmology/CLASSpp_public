@@ -12,6 +12,15 @@ class BackgroundModule;
  */
 class DCDMSpecies : public BaseSpecies {
  public:
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    int idx_delta = -1;
+    int idx_theta = -1;
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   explicit DCDMSpecies(const background& pba);
 
   double GetOmega0() const override {
@@ -36,17 +45,40 @@ class DCDMSpecies : public BaseSpecies {
   double DpDloga(const double* pvecback) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(perturb_vector* pv,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(double tau,
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
 
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
   double Delta(const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
@@ -54,15 +86,35 @@ class DCDMSpecies : public BaseSpecies {
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv,
+  double DeltaP(const perturb_vector* /*pv*/,
+                const double* /*y*/,
+                const double* /*pvecback*/,
+                const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+  double RhoPlusPShear(const perturb_vector* /*pv*/,
+                       const double* /*y*/,
+                       const double* /*pvecback*/,
+                       const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

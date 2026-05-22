@@ -28,6 +28,9 @@
 
 #include <algorithm>
 
+#include "../species/baryons.h"
+#include "../species/cdm.h"
+#include "../species/dcdm.h"
 #include "../species/dcdm_dr_species.h"
 #include "../species/dncdm_dr_species.h"
 #include "../species/dncdm_species.h"
@@ -35,9 +38,39 @@
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "../species/ncdm_species.h"
+#include "../species/photons.h"
+#include "../species/scalar_field.h"
+#include "../species/ultra_relativistic.h"
 #include "background_module.h"
 #include "thermodynamics_module.h"
 #include "thread_pool.h"
+
+namespace {
+
+/** True iff any NCDM-family species (NCDM, NCDMInteracting, or the DNCDMSpecies
+ *  child of a DNCDM_DR_Species composite) is present in all_species_. */
+bool HasNcdm(const SpeciesCollection& all_species) {
+  for (const auto& sp : all_species) {
+    if (dynamic_cast<NCDMBaseSpecies*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      return true;
+  }
+  return false;
+}
+
+/** Flat list of NCDMBaseSpecies* in all_species_ lex iteration order. For
+ *  DNCDM_DR_Species composites the wrapped DNCDMSpecies child is returned. */
+std::vector<NCDMBaseSpecies*> NcdmFamily(const SpeciesCollection& all_species) {
+  std::vector<NCDMBaseSpecies*> result;
+  for (const auto& sp : all_species) {
+    if (auto* n = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
+      result.push_back(n);
+    else if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      result.push_back(&d->dncdm());
+  }
+  return result;
+}
+
+}  // namespace
 
 PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
                                          BackgroundModulePtr background_module,
@@ -505,7 +538,7 @@ int PerturbationsModule::perturb_init() {
                ppr->ur_fluid_approximation);
   }
 
-  if (pba->N_ncdm > 0) {
+  if (HasNcdm(all_species_)) {
     class_test((ppr->ncdm_fluid_approximation < ncdmfa_mb) ||
                    (ppr->ncdm_fluid_approximation > ncdmfa_none),
                error_message_,
@@ -568,7 +601,14 @@ int PerturbationsModule::perturb_init() {
                "Non-adiabatic initial conditions not coded in presence of decaying dark matter");
   }
 
-  if (all_species_.count("DNCDM_DR")) {
+  bool has_dncdm_dr = false;
+  for (const auto& sp : all_species_) {
+    if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
+      has_dncdm_dr = true;
+      break;
+    }
+  }
+  if (has_dncdm_dr) {
     class_test((ppt->has_cdi == _TRUE_) || (ppt->has_bi == _TRUE_) || (ppt->has_nid == _TRUE_) ||
                    (ppt->has_niv == _TRUE_),
                error_message_,
@@ -600,14 +640,14 @@ int PerturbationsModule::perturb_init() {
         break;
 
       case (tm_massless_approximation):
-        if ((all_species_.count("UR")) || (pba->N_ncdm > 0))
+        if ((all_species_.count("UR")) || HasNcdm(all_species_))
           evolve_tensor_ur_ = _TRUE_;
         break;
 
       case (tm_exact):
         if (all_species_.count("UR"))
           evolve_tensor_ur_ = _TRUE_;
-        if (pba->N_ncdm > 0)
+        if (HasNcdm(all_species_))
           evolve_tensor_ncdm_ = _TRUE_;
         break;
     }
@@ -632,30 +672,21 @@ int PerturbationsModule::perturb_init() {
              _omegab_SMALL_,
              _omegab_BIG_);
 
-  /** - build sorted NCDM species cache to avoid dynamic_cast in hot paths */
-  ncdm_species_sorted_.clear();
-  for (auto& [name, sp] : all_species_) {
-    if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) {
-      ncdm_species_sorted_.push_back(n);
-    }
-    else if (auto* composite = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
-      ncdm_species_sorted_.push_back(&composite->dncdm());
+  /** - assign each NCDMSpecies its source-slot offset into the
+   *  index_tp_{delta,theta}_ncdm1_ block (lex order matching all_species_).
+   *  DNCDMSpecies has no FillSources and so consumes a slot but never writes
+   *  to it. */
+  {
+    int slot = 0;
+    for (auto& [name, sp] : all_species_) {
+      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) {
+        n->SetSourceSlot(slot++);
+      }
+      else if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
+        ++slot;
+      }
     }
   }
-  std::sort(ncdm_species_sorted_.begin(),
-            ncdm_species_sorted_.end(),
-            [](BaseSpecies* a, BaseSpecies* b) {
-              int id_a = -1, id_b = -1;
-              if (auto* na = dynamic_cast<NCDMSpecies*>(a))
-                id_a = na->ncdm_id();
-              else if (auto* da = dynamic_cast<DNCDMSpecies*>(a))
-                id_a = da->ncdm_id();
-              if (auto* nb = dynamic_cast<NCDMSpecies*>(b))
-                id_b = nb->ncdm_id();
-              else if (auto* db = dynamic_cast<DNCDMSpecies*>(b))
-                id_b = db->ncdm_id();
-              return id_a < id_b;
-            });
 
   /** - initialize all indices and lists in perturbs structure using perturb_indices_of_perturbs() */
 
@@ -948,7 +979,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
         has_lss_            = _TRUE_;
         has_source_delta_m_ = _TRUE_;
 
-        if (!ncdm_species_sorted_.empty()) {
+        if (HasNcdm(all_species_)) {
           has_source_delta_cb_ = _TRUE_;
         }
       }
@@ -978,7 +1009,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
           has_source_delta_idm_drmd_ = _TRUE_;
         if (all_species_.count("DCDM_DR"))
           has_source_delta_dr_ = _TRUE_;
-        if (!ncdm_species_sorted_.empty())
+        if (HasNcdm(all_species_))
           has_source_delta_ncdm_ = _TRUE_;
         // Thanks to the following lines, (phi,psi) are also stored as sources
         // (Obtained directly in newtonian gauge, infereed from (h,eta) in synchronous gauge).
@@ -1013,7 +1044,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
           has_source_theta_idm_drmd_ = _TRUE_;
         if (all_species_.count("DCDM_DR"))
           has_source_theta_dr_ = _TRUE_;
-        if (!ncdm_species_sorted_.empty())
+        if (HasNcdm(all_species_))
           has_source_theta_ncdm_ = _TRUE_;
       }
 
@@ -1024,7 +1055,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
         }
         if (ppt->has_nc_rsd == _TRUE_) {
           has_source_theta_m_ = _TRUE_;
-          if (!ncdm_species_sorted_.empty())
+          if (HasNcdm(all_species_))
             /* we may not need theta_cb at all, rsd always defined for
                the total matter, but at least this is made
                available */
@@ -1086,7 +1117,10 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
       class_define_index(index_tp_delta_idr_drmd_, has_source_delta_idr_drmd_, index_type, 1);
       class_define_index(index_tp_delta_idm_dr_, has_source_delta_idm_dr_, index_type, 1);
       class_define_index(index_tp_delta_idm_drmd_, has_source_delta_idm_drmd_, index_type, 1);
-      class_define_index(index_tp_delta_ncdm1_, has_source_delta_ncdm_, index_type, pba->N_ncdm);
+      class_define_index(index_tp_delta_ncdm1_,
+                         has_source_delta_ncdm_,
+                         index_type,
+                         static_cast<int>(NcdmFamily(all_species_).size()));
       class_define_index(index_tp_theta_m_, has_source_theta_m_, index_type, 1);
       class_define_index(index_tp_theta_cb_, has_source_theta_cb_, index_type, 1);
       class_define_index(index_tp_theta_tot_, has_source_theta_tot_, index_type, 1);
@@ -1102,7 +1136,10 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
       class_define_index(index_tp_theta_idr_drmd_, has_source_theta_idr_drmd_, index_type, 1);
       class_define_index(index_tp_theta_idm_dr_, has_source_theta_idm_dr_, index_type, 1);
       class_define_index(index_tp_theta_idm_drmd_, has_source_theta_idm_drmd_, index_type, 1);
-      class_define_index(index_tp_theta_ncdm1_, has_source_theta_ncdm_, index_type, pba->N_ncdm);
+      class_define_index(index_tp_theta_ncdm1_,
+                         has_source_theta_ncdm_,
+                         index_type,
+                         static_cast<int>(NcdmFamily(all_species_).size()));
       class_define_index(index_tp_phi_, has_source_phi_, index_type, 1);
       class_define_index(index_tp_phi_prime_, has_source_phi_prime_, index_type, 1);
       class_define_index(index_tp_phi_plus_psi_, has_source_phi_plus_psi_, index_type, 1);
@@ -2239,7 +2276,7 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ur);
     if ((all_species_.count("IDM_DR_IDR")) && (ppt->idr_nature == idr_free_streaming))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_idr);
-    if (!ncdm_species_sorted_.empty())
+    if (HasNcdm(all_species_))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ncdm);
     if (all_species_.count("DCDM_DR"))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_dr);
@@ -2248,7 +2285,7 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
     ppw->max_l_max = MAX(ppr->l_max_g_ten, ppr->l_max_pol_g_ten);
     if (all_species_.count("UR"))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ur);
-    if (!ncdm_species_sorted_.empty())
+    if (HasNcdm(all_species_))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ncdm);
   }
 
@@ -2328,7 +2365,7 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
 
   if (_scalars_) {
     class_define_index(ppw->index_ap_ufa, all_species_.count("UR"), index_ap, 1);
-    class_define_index(ppw->index_ap_ncdmfa, !ncdm_species_sorted_.empty(), index_ap, 1);
+    class_define_index(ppw->index_ap_ncdmfa, HasNcdm(all_species_), index_ap, 1);
     class_define_index(ppw->index_ap_tca_idm_dr, all_species_.count("IDM_DR_IDR"), index_ap, 1);
     class_define_index(ppw->index_ap_tca_idm_drmd,
                        all_species_.count("IDM_DRMD_IDR_DRMD"),
@@ -2363,7 +2400,7 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
     if (all_species_.count("UR")) {
       ppw->approx[ppw->index_ap_ufa] = (int) ufa_off;
     }
-    if (!ncdm_species_sorted_.empty()) {
+    if (HasNcdm(all_species_)) {
       ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_off;
     }
   }
@@ -2540,7 +2577,7 @@ int PerturbationsModule::perturb_solve(int index_md,
              k_[index_md][k_size_[index_md] - 1] / ppw->pvecback[background_module_->index_bg_a_] /
                  ppw->pvecback[background_module_->index_bg_H_]);
 
-  if (!ncdm_species_sorted_.empty()) {
+  if (HasNcdm(all_species_)) {
     for (auto& [name, sp] : all_species_) {
       auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
       if (!ncdm_sp)
@@ -2550,9 +2587,9 @@ int PerturbationsModule::perturb_solve(int index_md,
       class_test(fabs(p_ncdm / rho_ncdm - 1. / 3.) > ppr->tol_ncdm_initial_w,
                  error_message_,
                  "your choice of initial time for integrating wavenumbers is inappropriate: it "
-                 "corresponds to a time at which the ncdm species number %d is not "
+                 "corresponds to a time at which the ncdm species '%s' is not "
                  "ultra-relativistic anymore, with w=%g, p=%g and rho=%g\n",
-                 ncdm_sp->ncdm_id(),
+                 ncdm_sp->name().c_str(),
                  p_ncdm / rho_ncdm,
                  p_ncdm,
                  rho_ncdm);
@@ -2577,7 +2614,7 @@ int PerturbationsModule::perturb_solve(int index_md,
                error_message_);
 
     /* if there are non-cold relics, check that they are relativistic enough */
-    if (!ncdm_species_sorted_.empty()) {
+    if (HasNcdm(all_species_)) {
       for (auto& [name, sp] : all_species_) {
         auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
         if (!ncdm_sp)
@@ -2822,24 +2859,8 @@ int PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(tensor_titles_, "l4_ur", evolve_tensor_ur_);
 
       if (evolve_tensor_ncdm_ == _TRUE_) {
-        std::vector<NCDMSpecies*> ncdm_vec_tensor;
-        for (auto& [name, sp] : all_species_) {
-          if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
-            ncdm_vec_tensor.push_back(n);
-        }
-        std::sort(ncdm_vec_tensor.begin(),
-                  ncdm_vec_tensor.end(),
-                  [](NCDMSpecies* a, NCDMSpecies* b) { return a->ncdm_id() < b->ncdm_id(); });
-        for (auto* ncdm_sp : ncdm_vec_tensor) {
-          const int n = ncdm_sp->ncdm_id();
-          std::string title;
-          title = "delta_ncdm[" + std::to_string(n) + "]";
-          class_store_columntitle(tensor_titles_, title.c_str(), _TRUE_);
-          title = "theta_ncdm[" + std::to_string(n) + "]";
-          class_store_columntitle(tensor_titles_, title.c_str(), _TRUE_);
-          title = "shear_ncdm[" + std::to_string(n) + "]";
-          class_store_columntitle(tensor_titles_, title.c_str(), _TRUE_);
-        }
+        for (auto* sp : NcdmFamily(all_species_))
+          sp->WriteTensorOutputColumnTitles(tensor_titles_);
       }
 
       number_of_tensor_titles_ = get_number_of_titles(tensor_titles_);
@@ -3135,7 +3156,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
                       interval_limit[index_switch]);
             }
           }
-          if (!ncdm_species_sorted_.empty()) {
+          if (HasNcdm(all_species_)) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_ncdmfa] == (int) ncdmfa_off) &&
                 (interval_approx[index_switch][ppw->index_ap_ncdmfa] == (int) ncdmfa_on)) {
               fprintf(stdout,
@@ -3226,10 +3247,11 @@ int PerturbationsModule::perturb_vector_init(
 
   struct perturb_vector* ppv = new perturb_vector();
 
-  /** - initialize pointers to NULL (they will be allocated later if
-      needed), relevant for perturb_vector_free() */
-  ppv->l_max_ncdm  = NULL;
-  ppv->q_size_ncdm = NULL;
+  // Create per-species layouts, one per all_species_ entry, in iteration order.
+  ppv->species_layouts.reserve(all_species_.size());
+  for (size_t i = 0; i < all_species_.size(); ++i) {
+    ppv->species_layouts.push_back(all_species_[i]->CreatePerturbLayout());
+  }
 
   /** - define all indices in this new vector (depends on approximation scheme, described by the input structure ppw-->pa) */
 
@@ -3245,8 +3267,20 @@ int PerturbationsModule::perturb_vector_init(
     /* reject inconsistent values of the number of mutipoles in photon polarization hierarchy */
     class_test(ppr->l_max_pol_g < 4, error_message_, "ppr->l_max_pol_g should be at least 4");
 
-    /* reject inconsistent values of the number of mutipoles in decay radiation hierarchy */
-    if (all_species_.count("DCDM_DR")) {
+    /* reject inconsistent values of the number of mutipoles in decay radiation hierarchy.
+       l_max_dr is shared by DCDM_DR and every DNCDM_DR composite (their DR children all
+       index multipoles up to ppv->l_max_dr), so the test must fire whenever any DR-emitting
+       species is present. */
+    bool has_any_dr_species = all_species_.count("DCDM_DR");
+    if (!has_any_dr_species) {
+      for (const auto& sp : all_species_) {
+        if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
+          has_any_dr_species = true;
+          break;
+        }
+      }
+    }
+    if (has_any_dr_species) {
       class_test(ppr->l_max_dr < 4,
                  error_message_,
                  "ppr->l_max_dr should be at least 4, i.e. we must integrate at least over "
@@ -3268,60 +3302,98 @@ int PerturbationsModule::perturb_vector_init(
                  "interacting dark radiation density, velocity, shear, third and fourth momentum");
     }
 
-    /* photons */
-
-    /* photons: set l_max fields before calling species (species reads them) */
-    ppv->l_max_g     = ppr->l_max_g;
-    ppv->l_max_pol_g = ppr->l_max_pol_g;
-    all_species_.photons().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    /* photons (l_max read from ppr directly in species::RegisterPerturbationIndices) */
+    {
+      const size_t i = all_species_.index_of("Photons");
+      auto* sp       = all_species_.at("Photons").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    }
 
     /* baryons */
-    all_species_.baryons().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    {
+      const size_t i = all_species_.index_of("Baryons");
+      auto* sp       = all_species_.at("Baryons").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    }
 
     /* cdm */
-    if (all_species_.count("CDM"))
-      all_species_.at("CDM")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    if (all_species_.count("CDM")) {
+      const size_t i = all_species_.index_of("CDM");
+      auto* sp       = all_species_.at("CDM").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    }
 
     /* IDM_DR + IDR composite */
-    if (all_species_.count("IDM_DR_IDR"))
-      all_species_.at("IDM_DR_IDR")
-          ->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    if (all_species_.count("IDM_DR_IDR")) {
+      const size_t i = all_species_.index_of("IDM_DR_IDR");
+      auto* sp       = all_species_.at("IDM_DR_IDR").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    }
 
     /* IDM_DRMD + IDR_DRMD composite */
-    if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-      all_species_.at("IDM_DRMD_IDR_DRMD")
-          ->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+      const size_t i = all_species_.index_of("IDM_DRMD_IDR_DRMD");
+      auto* sp       = all_species_.at("IDM_DRMD_IDR_DRMD").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    }
 
     /* DCDM + DR composite: set l_max_dr before calling (DR species reads it) */
     if (all_species_.count("DCDM_DR")) {
-      ppv->l_max_dr = ppr->l_max_dr;
-      all_species_.at("DCDM_DR")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+      ppv->l_max_dr  = ppr->l_max_dr;
+      const size_t i = all_species_.index_of("DCDM_DR");
+      auto* sp       = all_species_.at("DCDM_DR").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
     }
 
-    /* DNCDM_DR composites: register DR perturbation indices sorted by ncdm_id.
-       Each DNCDM decay-radiation gets its own F0 slots; set index_pt_F0_dr_sum
-       to the first one so AddCouplingDerivs can accumulate into the "sum" slot. */
+    /* DNCDM_DR composites: register DR perturbation indices in all_species_ lex
+       order. Each DNCDM decay-radiation gets its own F0 slots; set
+       index_pt_F0_dr_sum to the first one so AddCouplingDerivs can accumulate
+       into the "sum" slot. Registration order: DR child first (here), DNCDM
+       child second (in NCDM block below). This preserves the pv->y layout
+       established before Task 22. */
     {
-      std::vector<DNCDM_DR_Species*> dncdm_dr_vec;
-      for (auto& [name, sp] : all_species_) {
-        if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-          dncdm_dr_vec.push_back(d);
+      // Collect (composite*, all_species_ index) pairs for sorting
+      std::vector<std::pair<DNCDM_DR_Species*, size_t>> dncdm_dr_vec;
+      {
+        size_t i = 0;
+        for (auto& entry : all_species_) {
+          if (auto* d = dynamic_cast<DNCDM_DR_Species*>(entry.get()))
+            dncdm_dr_vec.emplace_back(d, i);
+          ++i;
+        }
       }
       if (!dncdm_dr_vec.empty()) {
         ppv->l_max_dr = ppr->l_max_dr;
-        std::sort(dncdm_dr_vec.begin(),
-                  dncdm_dr_vec.end(),
-                  [](DNCDM_DR_Species* a, DNCDM_DR_Species* b) {
-                    return a->dncdm().ncdm_id() < b->dncdm().ncdm_id();
-                  });
+        // dncdm_dr_vec is already in all_species_ lex iteration order.
         // If no DCDM_DR registered the dr_sum index, set it to point to the first DNCDM DR
         bool need_sum_index = !all_species_.count("DCDM_DR");
-        for (auto* d : dncdm_dr_vec) {
-          // Only register the DR child (DNCDMSpecies is registered in the NCDM block below)
-          d->dr().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+        for (auto& [d, ci] : dncdm_dr_vec) {
+          // Register the DR child using its nested layout slot in the composite's PerturbLayout.
+          auto& composite_layout = static_cast<DNCDM_DR_Species::PerturbLayout&>(
+              *ppv->species_layouts[ci]);
+          d->dr().RegisterPerturbationIndices(composite_layout.dr,
+                                              ppv,
+                                              ppr,
+                                              index_pt,
+                                              ppw,
+                                              ppt->gauge);
           if (need_sum_index) {
-            // Set dr_sum index to this DNCDM DR's F0 so coupling code can use it
-            ppv->index_pt_F0_dr_sum = d->dr().pt_F0_index();
+            // Set dr_sum index to this DNCDM DR's F0 so coupling code can use it.
+            // Use composite_layout.dr.idx_F0 directly (thread-safe; avoids the
+            // species-member index_pt_F0_ that caused the data race).
+            ppv->index_pt_F0_dr_sum = composite_layout.dr.idx_F0;
             need_sum_index          = false;  // Only first species sets the sum slot
           }
         }
@@ -3329,13 +3401,22 @@ int PerturbationsModule::perturb_vector_init(
     }
 
     /* fluid */
-    if (all_species_.count("Fluid"))
-      all_species_.at("Fluid")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    if (all_species_.count("Fluid")) {
+      const size_t i = all_species_.index_of("Fluid");
+      auto* sp       = all_species_.at("Fluid").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    }
 
     /* scalar field */
-    if (all_species_.count("ScalarField"))
-      all_species_.at("ScalarField")
-          ->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    if (all_species_.count("ScalarField")) {
+      const size_t i = all_species_.index_of("ScalarField");
+      auto* sp       = all_species_.at("ScalarField").get();
+      auto& layout   = *ppv->species_layouts[i];
+      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+    }
 
     /* perturbed recombination: the indices are defined once tca is off. */
     if ((ppt->has_perturbed_recombination == _TRUE_) &&
@@ -3344,35 +3425,43 @@ int PerturbationsModule::perturb_vector_init(
       class_define_index(ppv->index_pt_perturbed_recombination_delta_chi, _TRUE_, index_pt, 1);
     }
 
-    /* ultra relativistic neutrinos: set l_max_ur before calling species */
+    /* ultra relativistic neutrinos: species reads ppr->l_max_ur via layout. */
     if (all_species_.count("UR")) {
-      ppv->l_max_ur = ppr->l_max_ur;
-      all_species_.at("UR")->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+      const size_t i = all_species_.index_of("UR");
+      auto* sp       = all_species_.at("UR").get();
+      auto& ur_lay   = static_cast<UltraRelativisticSpecies::PerturbLayout&>(
+          *ppv->species_layouts[i]);
+      ur_lay.l_max = ppr->l_max_ur;  // species reads this before reserving slots
+      sp->RegisterPerturbationIndices(ur_lay, ppv, ppr, index_pt, ppw, ppt->gauge);
+      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
     }
 
     /* non-cold dark matter */
 
-    if (!ncdm_species_sorted_.empty()) {
-      ppv->N_ncdm = pba->N_ncdm;
-      ppv->l_max_ncdm_storage.resize(ppv->N_ncdm);
-      ppv->q_size_ncdm_storage.resize(ppv->N_ncdm);
-      ppv->l_max_ncdm  = ppv->l_max_ncdm_storage.data();
-      ppv->q_size_ncdm = ppv->q_size_ncdm_storage.data();
-      {
-        // Collect all NCDM-like species (NCDMSpecies and DNCDMSpecies) sorted by ncdm_id
-        std::vector<std::pair<int, BaseSpecies*>> ncdm_reg_vec;
-        for (auto& [name, sp] : all_species_) {
-          if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
-            ncdm_reg_vec.push_back({n->ncdm_id(), n});
-          else if (auto* composite = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-            ncdm_reg_vec.push_back({composite->dncdm().ncdm_id(), &composite->dncdm()});
+    if (HasNcdm(all_species_)) {
+      // Register NCDM-family perturbation slots in lex iteration order (matches
+      // all_species_). For DNCDM_DR composites, dispatch on the nested dncdm
+      // sub-layout so indices land in my.dncdm.
+      size_t i = 0;
+      for (auto& entry : all_species_) {
+        BaseSpecies* sp = entry.get();
+        if (auto* n = dynamic_cast<NCDMSpecies*>(sp)) {
+          n->RegisterPerturbationIndices(*ppv->species_layouts[i],
+                                         ppv,
+                                         ppr,
+                                         index_pt,
+                                         ppw,
+                                         ppt->gauge);
+          n->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
         }
-        std::sort(ncdm_reg_vec.begin(), ncdm_reg_vec.end(), [](const auto& a, const auto& b) {
-          return a.first < b.first;
-        });
-        for (auto& [id, sp] : ncdm_reg_vec) {
-          sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
+        else if (auto* composite = dynamic_cast<DNCDM_DR_Species*>(sp)) {
+          auto& comp_layout = static_cast<DNCDM_DR_Species::PerturbLayout&>(
+              *ppv->species_layouts[i]);
+          composite->dncdm()
+              .RegisterPerturbationIndices(comp_layout.dncdm, ppv, ppr, index_pt, ppw, ppt->gauge);
+          composite->dncdm().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
         }
+        ++i;
       }
     }
 
@@ -3400,13 +3489,25 @@ int PerturbationsModule::perturb_vector_init(
                error_message_,
                "ppr->l_max_pol_g_ten should be at least 4");
 
-    /* Vector baryon velocity: v_b^{(1)}. */
-    class_define_index(ppv->index_pt_theta_b, _TRUE_, index_pt, 1);
+    /* Vector baryon velocity: v_b^{(1)}. Stored in the Baryons layout so that
+       the per-thread layout doubles as a vector-mode index store. */
+    {
+      const size_t b_vec_i = all_species_.index_of("Baryons");
+      auto& b_vec_lay = static_cast<BaryonsSpecies::PerturbLayout&>(*ppv->species_layouts[b_vec_i]);
+      b_vec_lay.idx_theta = index_pt;
+      ++index_pt;
+    }
 
-    /* photons: set l_max fields before calling species (species reads them) */
-    ppv->l_max_g     = ppr->l_max_g_ten;
-    ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
-    all_species_.photons().RegisterVectorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+    {
+      const size_t i = all_species_.index_of("Photons");
+      auto* sp       = all_species_.at("Photons").get();
+      auto& layout   = static_cast<PhotonsSpecies::PerturbLayout&>(*ppv->species_layouts[i]);
+      /* Set l_max in layout before calling species (species reads layout.l_max) */
+      layout.l_max     = ppr->l_max_g_ten;
+      layout.l_max_pol = ppr->l_max_pol_g_ten;
+      sp->RegisterVectorPerturbationIndices(layout, ppv, index_pt, ppw, ppt->gauge);
+      sp->RegisterVectorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+    }
 
     /** - (a) metric perturbations V or \f$ h_v \f$ depending on gauge */
     if (ppt->gauge == synchronous) {
@@ -3429,56 +3530,56 @@ int PerturbationsModule::perturb_vector_init(
                error_message_,
                "ppr->l_max_pol_g_ten should be at least 4");
 
-    /* photons: set l_max fields before calling species (species reads them) */
-    ppv->l_max_g     = ppr->l_max_g_ten;
-    ppv->l_max_pol_g = ppr->l_max_pol_g_ten;
-    all_species_.photons().RegisterTensorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+    {
+      const size_t i = all_species_.index_of("Photons");
+      auto* sp       = all_species_.at("Photons").get();
+      auto& layout   = static_cast<PhotonsSpecies::PerturbLayout&>(*ppv->species_layouts[i]);
+      /* Set l_max in layout before calling species (species reads layout.l_max) */
+      layout.l_max     = ppr->l_max_g_ten;
+      layout.l_max_pol = ppr->l_max_pol_g_ten;
+      sp->RegisterTensorPerturbationIndices(layout, ppv, index_pt, ppw, ppt->gauge);
+      sp->RegisterTensorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+    }
 
-    /* ultra relativistic neutrinos */
-
-    class_define_index(ppv->index_pt_delta_ur, evolve_tensor_ur_, index_pt, 1); /* ur density  */
-    class_define_index(ppv->index_pt_theta_ur, evolve_tensor_ur_, index_pt, 1); /* ur velocity */
-    class_define_index(ppv->index_pt_shear_ur, evolve_tensor_ur_, index_pt, 1); /* ur shear */
-    ppv->l_max_ur = ppr->l_max_ur;
-    class_define_index(ppv->index_pt_l3_ur,
-                       evolve_tensor_ur_,
-                       index_pt,
-                       ppv->l_max_ur -
-                           2); /* additional momenta in Boltzmann hierarchy (beyond l=0,1,2,3) */
+    /* Tensor relativistic-neutrino hierarchy (massless ur or massless-approximated
+       ncdm). Owned by pv, not a species: register its slots directly. Same slot
+       order/count as the former UR registration, so y-vector layout is unchanged. */
+    if (evolve_tensor_ur_ == _TRUE_) {
+      auto& ur_lay     = ppv->tensor_ur_layout;
+      ur_lay.l_max     = ppr->l_max_ur;
+      ur_lay.idx_delta = index_pt++;
+      ur_lay.idx_theta = index_pt++;
+      ur_lay.idx_shear = index_pt++;
+      if (ur_lay.l_max >= 3) {
+        ur_lay.idx_l3  = index_pt;
+        index_pt      += ur_lay.l_max - 2;  // l3, l4, ..., l_max
+      }
+    }
 
     if (evolve_tensor_ncdm_ == _TRUE_) {
-      ppv->index_pt_psi0_ncdm1 = index_pt;
-      ppv->N_ncdm              = pba->N_ncdm;
-      ppv->l_max_ncdm_storage.resize(ppv->N_ncdm);
-      ppv->q_size_ncdm_storage.resize(ppv->N_ncdm);
-      ppv->l_max_ncdm  = ppv->l_max_ncdm_storage.data();
-      ppv->q_size_ncdm = ppv->q_size_ncdm_storage.data();
-
+      // Pre-set per-species layout l_max / q_size before species register slots.
+      class_test(ppr->l_max_ncdm < 4,
+                 error_message_,
+                 "ppr->l_max_ncdm=%d should be at least 4, i.e. we must integrate at least "
+                 "over first four momenta of non-cold dark matter perturbed phase-space "
+                 "distribution",
+                 ppr->l_max_ncdm);
+      for (size_t i = 0; i < all_species_.size(); ++i) {
+        const auto* nsp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
+        if (!nsp)
+          continue;
+        auto& ncdm_lay  = static_cast<NCDMBaseSpecies::PerturbLayout&>(*ppv->species_layouts[i]);
+        ncdm_lay.l_max  = ppr->l_max_ncdm;
+        ncdm_lay.q_size = nsp->q_size();
+      }
+      // Dispatch layout-based register to each species (non-NCDM species have a no-op).
       {
-        std::vector<NCDMSpecies*> ncdm_vec;
-        for (auto& [name, sp] : all_species_) {
-          if (auto* nsp = dynamic_cast<NCDMSpecies*>(sp.get()))
-            ncdm_vec.push_back(nsp);
-        }
-        std::sort(ncdm_vec.begin(), ncdm_vec.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
-          return a->ncdm_id() < b->ncdm_id();
-        });
-        for (auto* ncdm_sp : ncdm_vec) {
-          const int n = ncdm_sp->ncdm_id();
-          // Set value of ppv->l_max_ncdm:
-          class_test(ppr->l_max_ncdm < 4,
-                     error_message_,
-                     "ppr->l_max_ncdm=%d should be at least 4, i.e. we must integrate at least "
-                     "over first four momenta of non-cold dark matter perturbed phase-space "
-                     "distribution",
-                     n);
-          //Copy value from precision parameter:
-          ppv->l_max_ncdm[n]  = ppr->l_max_ncdm;
-          ppv->q_size_ncdm[n] = ncdm_sp->q_size();
-          for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-            ppv->index_ncdm_[n].push_back(index_pt + index_q * (ppv->l_max_ncdm[n] + 1));
-          }
-          index_pt += (ppv->l_max_ncdm[n] + 1) * ppv->q_size_ncdm[n];
+        size_t i = 0;
+        for (auto& entry : all_species_) {
+          auto* sp     = entry.get();
+          auto& layout = *ppv->species_layouts[i];
+          sp->RegisterTensorPerturbationIndices(layout, ppv, index_pt, ppw, ppt->gauge);
+          ++i;
         }
       }
     }
@@ -3511,6 +3612,13 @@ int PerturbationsModule::perturb_vector_init(
   for (index_pt = 0; index_pt < ppv->pt_size; index_pt++)
     ppv->used_in_sources[index_pt] = _TRUE_;
 
+  /* Per-species MarkUsedInSources: each migrated species marks its source-irrelevant
+     slots as _FALSE_. This dual-processes alongside the legacy NCDM masking block below.
+     Writing the same _FALSE_ value twice is idempotent (no behaviour change). */
+  for (size_t i = 0; i < all_species_.size(); ++i) {
+    all_species_[i]->MarkUsedInSources(*ppv->species_layouts[i], ppv->used_in_sources);
+  }
+
   /* indicate which ones are not needed (this is just for saving time,
      omitting perturbations in this list will not change the
      results!) */
@@ -3520,19 +3628,20 @@ int PerturbationsModule::perturb_vector_init(
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
         /* we don't need temperature multipoles above l=2 (but they are
            defined only when rsa and tca are off) */
+        {
+          const size_t g_i  = all_species_.index_of("Photons");
+          const auto& g_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+              *ppv->species_layouts[g_i]);
+          for (index_pt = g_lay.idx_l3; index_pt <= g_lay.idx_delta + g_lay.l_max; index_pt++)
+            ppv->used_in_sources[index_pt] = _FALSE_;
 
-        for (index_pt = ppv->index_pt_l3_g; index_pt <= ppv->index_pt_delta_g + ppv->l_max_g;
-             index_pt++)
-          ppv->used_in_sources[index_pt] = _FALSE_;
+          /* for polarization, we only need l=0,2 (but l =1,3, ... are
+             defined only when rsa and tca are off) */
+          ppv->used_in_sources[g_lay.idx_pol1] = _FALSE_;
 
-        /* for polarization, we only need l=0,2 (but l =1,3, ... are
-           defined only when rsa and tca are off) */
-
-        ppv->used_in_sources[ppv->index_pt_pol1_g] = _FALSE_;
-
-        for (index_pt = ppv->index_pt_pol3_g; index_pt <= ppv->index_pt_pol0_g + ppv->l_max_pol_g;
-             index_pt++)
-          ppv->used_in_sources[index_pt] = _FALSE_;
+          for (index_pt = g_lay.idx_pol3; index_pt <= g_lay.idx_pol0 + g_lay.l_max_pol; index_pt++)
+            ppv->used_in_sources[index_pt] = _FALSE_;
+        }
       }
     }
 
@@ -3541,9 +3650,10 @@ int PerturbationsModule::perturb_vector_init(
         if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
           /* we don't need ur multipoles above l=2 (but they are
              defined only when rsa and ufa are off) */
-
-          for (index_pt = ppv->index_pt_l3_ur; index_pt <= ppv->index_pt_delta_ur + ppv->l_max_ur;
-               index_pt++)
+          const size_t ur_i  = all_species_.index_of("UR");
+          const auto& ur_lay = static_cast<const UltraRelativisticSpecies::PerturbLayout&>(
+              *ppv->species_layouts[ur_i]);
+          for (index_pt = ur_lay.idx_l3; index_pt <= ur_lay.idx_delta + ur_lay.l_max; index_pt++)
             ppv->used_in_sources[index_pt] = _FALSE_;
         }
       }
@@ -3559,8 +3669,11 @@ int PerturbationsModule::perturb_vector_init(
           if ((!all_species_.count("IDM_DR_IDR")) ||
               ((all_species_.count("IDM_DR_IDR")) &&
                (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-            for (index_pt = ppv->index_pt_l3_idr;
-                 index_pt <= ppv->index_pt_delta_idr + ppv->l_max_idr;
+            const size_t mark_i  = all_species_.index_of("IDM_DR_IDR");
+            const auto& mark_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                       *ppv->species_layouts[mark_i])
+                                       .idr;
+            for (index_pt = mark_lay.idx_l3; index_pt <= mark_lay.idx_delta + mark_lay.l_max;
                  index_pt++)
               ppv->used_in_sources[index_pt] = _FALSE_;
           }
@@ -3568,18 +3681,19 @@ int PerturbationsModule::perturb_vector_init(
       }
     }
 
-    if (!ncdm_species_sorted_.empty()) {
+    if (HasNcdm(all_species_)) {
       /* we don't need ncdm multipoles above l=2 (but they are
          defined only when ncdmfa is off) */
 
-      for (auto& [name, sp] : all_species_) {
-        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
+      for (size_t i = 0; i < all_species_.size(); ++i) {
+        const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
         if (!ncdm_sp)
           continue;
-        const int n = ncdm_sp->ncdm_id();
-        for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-          int index_pt_ncdm = ppv->index_ncdm_[n][index_q];
-          for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
+        const auto& ncdm_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
+            *ppv->species_layouts[i]);
+        for (int index_q = 0; index_q < ncdm_lay.q_size; index_q++) {
+          int index_pt_ncdm = ncdm_lay.index_per_q[index_q];
+          for (int l = 0; l <= ncdm_lay.l_max; l++) {
             if (l > 2)
               ppv->used_in_sources[index_pt_ncdm] = _FALSE_;
             index_pt_ncdm++;
@@ -3594,23 +3708,27 @@ int PerturbationsModule::perturb_vector_init(
         (int) rsa_off) { /* if radiation streaming approximation is off */
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
         /* we don't need temperature multipoles above except l=0,2,4 */
+        {
+          const size_t g_i  = all_species_.index_of("Photons");
+          const auto& g_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+              *ppv->species_layouts[g_i]);
 
-        ppv->used_in_sources[ppv->index_pt_theta_g] = _FALSE_;
-        ppv->used_in_sources[ppv->index_pt_l3_g]    = _FALSE_;
+          ppv->used_in_sources[g_lay.idx_theta] = _FALSE_;
+          ppv->used_in_sources[g_lay.idx_l3]    = _FALSE_;
 
-        for (index_pt = ppv->index_pt_delta_g + 5; index_pt <= ppv->index_pt_delta_g + ppv->l_max_g;
-             index_pt++)
-          ppv->used_in_sources[index_pt] = _FALSE_;
+          for (index_pt = g_lay.idx_delta + 5; index_pt <= g_lay.idx_delta + g_lay.l_max;
+               index_pt++)
+            ppv->used_in_sources[index_pt] = _FALSE_;
 
-        /* same for polarization, we only need l=0,2,4 */
+          /* same for polarization, we only need l=0,2,4 */
 
-        ppv->used_in_sources[ppv->index_pt_pol1_g] = _FALSE_;
-        ppv->used_in_sources[ppv->index_pt_pol3_g] = _FALSE_;
+          ppv->used_in_sources[g_lay.idx_pol1] = _FALSE_;
+          ppv->used_in_sources[g_lay.idx_pol3] = _FALSE_;
 
-        for (index_pt = ppv->index_pt_pol0_g + 5;
-             index_pt <= ppv->index_pt_pol0_g + ppv->l_max_pol_g;
-             index_pt++)
-          ppv->used_in_sources[index_pt] = _FALSE_;
+          for (index_pt = g_lay.idx_pol0 + 5; index_pt <= g_lay.idx_pol0 + g_lay.l_max_pol;
+               index_pt++)
+            ppv->used_in_sources[index_pt] = _FALSE_;
+        }
       }
     }
 
@@ -3646,7 +3764,7 @@ int PerturbationsModule::perturb_vector_init(
                    "scalar initial conditions assume ur fluid approximation turned off");
       }
 
-      if (!ncdm_species_sorted_.empty()) {
+      if (HasNcdm(all_species_)) {
         class_test(ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on,
                    error_message_,
                    "scalar initial conditions assume ncdm fluid approximation turned off");
@@ -3682,6 +3800,23 @@ int PerturbationsModule::perturb_vector_init(
   /** - case of switching approximation while a wavenumber is being integrated */
 
   else {
+    // Dispatch per-species CopyPerturbationsAcrossSwitch. Each migrated species
+    // performs its own slot-by-slot copy or non-trivial migration (NCDM fa-collapse).
+    {
+      PerturbSwitchContext switch_ctx;
+      switch_ctx.k        = k;
+      switch_ctx.a        = ppw->pvecback[background_module_->index_bg_a_];
+      switch_ctx.a_today  = pba->a_today;
+      switch_ctx.pvecback = ppw->pvecback;
+      for (size_t i = 0; i < all_species_.size(); ++i) {
+        all_species_[i]->CopyPerturbationsAcrossSwitch(*ppw->pv->species_layouts[i],
+                                                       *ppv->species_layouts[i],
+                                                       ppw->pv->y,
+                                                       ppv->y,
+                                                       switch_ctx);
+      }
+    }
+
     /** - --> (a) for the scalar mode: */
 
     if (_scalars_) {
@@ -3718,28 +3853,46 @@ int PerturbationsModule::perturb_vector_init(
           the approximation switching is. We treat them here. Below
           we will treat other variables case by case. */
 
-      ppv->y[ppv->index_pt_delta_b] = ppw->pv->y[ppw->pv->index_pt_delta_b];
-
-      ppv->y[ppv->index_pt_theta_b] = ppw->pv->y[ppw->pv->index_pt_theta_b];
+      {
+        const size_t b_sw_i = all_species_.index_of("Baryons");
+        const auto& b_old   = static_cast<const BaryonsSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[b_sw_i]);
+        auto& b_new = static_cast<BaryonsSpecies::PerturbLayout&>(*ppv->species_layouts[b_sw_i]);
+        ppv->y[b_new.idx_delta] = ppw->pv->y[b_old.idx_delta];
+        ppv->y[b_new.idx_theta] = ppw->pv->y[b_old.idx_theta];
+      }
 
       if (all_species_.count("CDM")) {
-        ppv->y[ppv->index_pt_delta_cdm] = ppw->pv->y[ppw->pv->index_pt_delta_cdm];
-
+        const size_t cdm_i      = all_species_.index_of("CDM");
+        const auto& cdm_old_lay = static_cast<const CDMSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[cdm_i]);
+        auto& cdm_new_lay = static_cast<CDMSpecies::PerturbLayout&>(*ppv->species_layouts[cdm_i]);
+        ppv->y[cdm_new_lay.idx_delta] = ppw->pv->y[cdm_old_lay.idx_delta];
         if (ppt->gauge == newtonian) {
-          ppv->y[ppv->index_pt_theta_cdm] = ppw->pv->y[ppw->pv->index_pt_theta_cdm];
+          ppv->y[cdm_new_lay.idx_theta] = ppw->pv->y[cdm_old_lay.idx_theta];
         }
       }
 
       if (all_species_.count("IDM_DR_IDR")) {
-        ppv->y[ppv->index_pt_delta_idm_dr] = ppw->pv->y[ppw->pv->index_pt_delta_idm_dr];
-
-        ppv->y[ppv->index_pt_theta_idm_dr] = ppw->pv->y[ppw->pv->index_pt_theta_idm_dr];
+        const size_t idm_dr_sw_i         = all_species_.index_of("IDM_DR_IDR");
+        const auto& old_idm_dr_lay       = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                               *ppw->pv->species_layouts[idm_dr_sw_i])
+                                               .idm_dr;
+        const auto& new_idm_dr_lay       = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                               *ppv->species_layouts[idm_dr_sw_i])
+                                               .idm_dr;
+        ppv->y[new_idm_dr_lay.idx_delta] = ppw->pv->y[old_idm_dr_lay.idx_delta];
+        ppv->y[new_idm_dr_lay.idx_theta] = ppw->pv->y[old_idm_dr_lay.idx_theta];
       }
 
       if (all_species_.count("DCDM_DR")) {
-        ppv->y[ppv->index_pt_delta_dcdm] = ppw->pv->y[ppw->pv->index_pt_delta_dcdm];
-
-        ppv->y[ppv->index_pt_theta_dcdm] = ppw->pv->y[ppw->pv->index_pt_theta_dcdm];
+        const size_t dcdm_sw_i = all_species_.index_of("DCDM_DR");
+        const auto& d_old      = static_cast<const DCDM_DR_Species::PerturbLayout&>(
+            *ppw->pv->species_layouts[dcdm_sw_i]);
+        auto& d_new = static_cast<DCDM_DR_Species::PerturbLayout&>(
+            *ppv->species_layouts[dcdm_sw_i]);
+        ppv->y[d_new.dcdm.idx_delta] = ppw->pv->y[d_old.dcdm.idx_delta];
+        ppv->y[d_new.dcdm.idx_theta] = ppw->pv->y[d_old.dcdm.idx_theta];
       }
 
       if (all_species_.count("DCDM_DR")) {
@@ -3757,20 +3910,28 @@ int PerturbationsModule::perturb_vector_init(
       }
 
       if (all_species_.count("Fluid")) {
+        const size_t fld_i      = all_species_.index_of("Fluid");
+        const auto& fld_old_lay = static_cast<const FluidSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[fld_i]);
+        auto& fld_new_lay = static_cast<FluidSpecies::PerturbLayout&>(*ppv->species_layouts[fld_i]);
         if (pba->use_ppf == _FALSE_) {
-          ppv->y[ppv->index_pt_delta_fld] = ppw->pv->y[ppw->pv->index_pt_delta_fld];
+          ppv->y[fld_new_lay.idx_delta] = ppw->pv->y[fld_old_lay.idx_delta];
 
-          ppv->y[ppv->index_pt_theta_fld] = ppw->pv->y[ppw->pv->index_pt_theta_fld];
+          ppv->y[fld_new_lay.idx_theta] = ppw->pv->y[fld_old_lay.idx_theta];
         }
         else {
-          ppv->y[ppv->index_pt_Gamma_fld] = ppw->pv->y[ppw->pv->index_pt_Gamma_fld];
+          ppv->y[fld_new_lay.idx_Gamma] = ppw->pv->y[fld_old_lay.idx_Gamma];
         }
       }
 
       if (all_species_.count("ScalarField")) {
-        ppv->y[ppv->index_pt_phi_scf] = ppw->pv->y[ppw->pv->index_pt_phi_scf];
-
-        ppv->y[ppv->index_pt_phi_prime_scf] = ppw->pv->y[ppw->pv->index_pt_phi_prime_scf];
+        const size_t scf_i      = all_species_.index_of("ScalarField");
+        const auto& scf_old_lay = static_cast<const ScalarFieldSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[scf_i]);
+        auto& scf_new_lay = static_cast<ScalarFieldSpecies::PerturbLayout&>(
+            *ppv->species_layouts[scf_i]);
+        ppv->y[scf_new_lay.idx_phi]       = ppw->pv->y[scf_old_lay.idx_phi];
+        ppv->y[scf_new_lay.idx_phi_prime] = ppw->pv->y[scf_old_lay.idx_phi_prime];
       }
 
       if (ppt->gauge == synchronous)
@@ -3788,106 +3949,51 @@ int PerturbationsModule::perturb_vector_init(
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
 
-        ppv->y[ppv->index_pt_delta_g] = ppw->pv->y[ppw->pv->index_pt_delta_g];
-
-        ppv->y[ppv->index_pt_theta_g] = ppw->pv->y[ppw->pv->index_pt_theta_g];
+        const size_t new_g_i = all_species_.index_of("Photons");
+        auto& new_g_lay      = static_cast<PhotonsSpecies::PerturbLayout&>(
+            *ppv->species_layouts[new_g_i]);
 
         /* tight-coupling approximation for shear_g (previously
            computed in perturb_derivs: perturb_derivs is always
            called at the end of generic_evolver, in order to update
            all quantities in ppw to the time at which the
            approximation is switched off) */
-        ppv->y[ppv->index_pt_shear_g] = ppw->tca_shear_g;
+        ppv->y[new_g_lay.idx_shear] = ppw->tca_shear_g;
 
-        ppv->y[ppv->index_pt_l3_g] =
+        ppv->y[new_g_lay.idx_l3] =
             6. / 7. * k / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] * ppw->s_l[3] *
-            ppv->y[ppv->index_pt_shear_g]; /* second-order tight-coupling approximation for l=3 */
-        ppv->y[ppv->index_pt_pol0_g] =
+            ppv->y[new_g_lay.idx_shear]; /* second-order tight-coupling approximation for l=3 */
+        ppv->y[new_g_lay.idx_pol0] =
             2.5 *
             ppv->y
-                [ppv->index_pt_shear_g]; /* first-order tight-coupling approximation for polarization, l=0 */
-        ppv->y[ppv->index_pt_pol1_g] =
+                [new_g_lay
+                     .idx_shear]; /* first-order tight-coupling approximation for polarization, l=0 */
+        ppv->y[new_g_lay.idx_pol1] =
             k / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
             (5. - 2. * ppw->s_l[2]) / 6. *
             ppv->y
-                [ppv->index_pt_shear_g]; /* second-order tight-coupling approximation for polarization, l=1 */
-        ppv->y[ppv->index_pt_pol2_g] =
+                [new_g_lay
+                     .idx_shear]; /* second-order tight-coupling approximation for polarization, l=1 */
+        ppv->y[new_g_lay.idx_pol2] =
             0.5 *
             ppv->y
-                [ppv->index_pt_shear_g]; /* first-order tight-coupling approximation for polarization, l=2 */
-        ppv->y[ppv->index_pt_pol3_g] =
+                [new_g_lay
+                     .idx_shear]; /* first-order tight-coupling approximation for polarization, l=2 */
+        ppv->y[new_g_lay.idx_pol3] =
             k / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] * 3. * ppw->s_l[3] / 14. *
             ppv->y
-                [ppv->index_pt_shear_g]; /* second-order tight-coupling approximation for polarization, l=3 */
-
-        if (all_species_.count("UR")) {
-          ppv->y[ppv->index_pt_delta_ur] = ppw->pv->y[ppw->pv->index_pt_delta_ur];
-
-          ppv->y[ppv->index_pt_theta_ur] = ppw->pv->y[ppw->pv->index_pt_theta_ur];
-
-          ppv->y[ppv->index_pt_shear_ur] = ppw->pv->y[ppw->pv->index_pt_shear_ur];
-
-          if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
-            ppv->y[ppv->index_pt_l3_ur] = ppw->pv->y[ppw->pv->index_pt_l3_ur];
-
-            for (int l = 4; l <= ppv->l_max_ur; l++)
-              ppv->y[ppv->index_pt_delta_ur + l] = ppw->pv->y[ppw->pv->index_pt_delta_ur + l];
-          }
-        }
-
-        if (all_species_.count("IDM_DR_IDR")) {
-          if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-            ppv->y[ppv->index_pt_delta_idr] = ppw->pv->y[ppw->pv->index_pt_delta_idr];
-
-            ppv->y[ppv->index_pt_theta_idr] = ppw->pv->y[ppw->pv->index_pt_theta_idr];
-
-            if (ppt->idr_nature == idr_free_streaming) {
-              if ((!all_species_.count("IDM_DR_IDR")) ||
-                  ((all_species_.count("IDM_DR_IDR")) &&
-                   (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-                ppv->y[ppv->index_pt_shear_idr] = ppw->pv->y[ppw->pv->index_pt_shear_idr];
-
-                ppv->y[ppv->index_pt_l3_idr] = ppw->pv->y[ppw->pv->index_pt_l3_idr];
-
-                for (int l = 4; l <= ppv->l_max_idr; l++)
-                  ppv->y[ppv->index_pt_delta_idr + l] = ppw->pv->y[ppw->pv->index_pt_delta_idr + l];
-              }
-            }
-          }
-        }
-
-        if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-          ppv->y[ppv->index_pt_delta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd];
-          ppv->y[ppv->index_pt_theta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
-        }
-
-        if (!ncdm_species_sorted_.empty()) {
-          for (auto& [name, sp] : all_species_) {
-            auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-            if (!ncdm_sp)
-              continue;
-            const int n = ncdm_sp->ncdm_id();
-            for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-              for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
-                // This is correct with or without ncdmfa, since ppv->lmax_ncdm is set accordingly.
-                ppv->y[ppv->index_ncdm_[n][index_q] + l] =
-                    ppw->pv->y[ppw->pv->index_ncdm_[n][index_q] + l];
-              }
-            }
-          }
-        }
-
-        if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-          ppv->y[ppv->index_pt_delta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
-          ppv->y[ppv->index_pt_theta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd];
-        }
+                [new_g_lay
+                     .idx_shear]; /* second-order tight-coupling approximation for polarization, l=3 */
 
         /* perturbed recombination */
         /* the initial conditions are set when tca is switched off (current block) */
         if (ppt->has_perturbed_recombination == _TRUE_) {
-          ppv->y[ppv->index_pt_perturbed_recombination_delta_temp] =
-              1. / 3. * ppv->y[ppw->pv->index_pt_delta_b];
-          ppv->y[ppv->index_pt_perturbed_recombination_delta_chi] = 0.;
+          const size_t b_pr_i  = all_species_.index_of("Baryons");
+          const auto& b_pr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
+              *ppv->species_layouts[b_pr_i]);
+          ppv->y[ppv->index_pt_perturbed_recombination_delta_temp] = 1. / 3. *
+                                                                     ppv->y[b_pr_lay.idx_delta];
+          ppv->y[ppv->index_pt_perturbed_recombination_delta_chi]  = 0.;
         }
 
       }  // end of block tca ON -> tca OFF
@@ -3916,52 +4022,6 @@ int PerturbationsModule::perturb_vector_init(
                   k,
                   tau,
                   ppw->pvecback[background_module_->index_bg_Omega_r_]);
-
-        if (all_species_.count("IDM_DR_IDR")) {
-          if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-            ppv->y[ppv->index_pt_delta_idr] = ppw->pv->y[ppw->pv->index_pt_delta_idr];
-
-            ppv->y[ppv->index_pt_theta_idr] = ppw->pv->y[ppw->pv->index_pt_theta_idr];
-
-            if (ppt->idr_nature == idr_free_streaming) {
-              if ((!all_species_.count("IDM_DR_IDR")) ||
-                  ((all_species_.count("IDM_DR_IDR")) &&
-                   (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-                ppv->y[ppv->index_pt_shear_idr] = ppw->pv->y[ppw->pv->index_pt_shear_idr];
-
-                ppv->y[ppv->index_pt_l3_idr] = ppw->pv->y[ppw->pv->index_pt_l3_idr];
-
-                for (int l = 4; l <= ppv->l_max_idr; l++)
-                  ppv->y[ppv->index_pt_delta_idr + l] = ppw->pv->y[ppw->pv->index_pt_delta_idr + l];
-              }
-            }
-          }
-        }
-
-        if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-          ppv->y[ppv->index_pt_delta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd];
-          ppv->y[ppv->index_pt_theta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
-        }
-
-        if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-          ppv->y[ppv->index_pt_delta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
-          ppv->y[ppv->index_pt_theta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd];
-        }
-
-        if (!ncdm_species_sorted_.empty()) {
-          for (auto& [name, sp] : all_species_) {
-            auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-            if (!ncdm_sp)
-              continue;
-            const int n = ncdm_sp->ncdm_id();
-            for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-              for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
-                ppv->y[ppv->index_ncdm_[n][index_q] + l] =
-                    ppw->pv->y[ppw->pv->index_ncdm_[n][index_q] + l];
-              }
-            }
-          }
-        }
       }
 
       /* -- case of switching on ur fluid
@@ -3973,92 +4033,6 @@ int PerturbationsModule::perturb_vector_init(
             (ppw->approx[ppw->index_ap_ufa] == (int) ufa_on)) {
           if (ppt->perturbations_verbose > 2)
             fprintf(stdout, "Mode k=%e: switch on ur fluid approximation at tau=%e\n", k, tau);
-
-          if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-            ppv->y[ppv->index_pt_delta_g] = ppw->pv->y[ppw->pv->index_pt_delta_g];
-
-            ppv->y[ppv->index_pt_theta_g] = ppw->pv->y[ppw->pv->index_pt_theta_g];
-          }
-
-          if ((ppw->approx[ppw->index_ap_tca] == (int) tca_off) &&
-              (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)) {
-            ppv->y[ppv->index_pt_shear_g] = ppw->pv->y[ppw->pv->index_pt_shear_g];
-
-            ppv->y[ppv->index_pt_l3_g] = ppw->pv->y[ppw->pv->index_pt_l3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_g; l++) {
-              ppv->y[ppv->index_pt_delta_g + l] = ppw->pv->y[ppw->pv->index_pt_delta_g + l];
-            }
-
-            ppv->y[ppv->index_pt_pol0_g] = ppw->pv->y[ppw->pv->index_pt_pol0_g];
-
-            ppv->y[ppv->index_pt_pol1_g] = ppw->pv->y[ppw->pv->index_pt_pol1_g];
-
-            ppv->y[ppv->index_pt_pol2_g] = ppw->pv->y[ppw->pv->index_pt_pol2_g];
-
-            ppv->y[ppv->index_pt_pol3_g] = ppw->pv->y[ppw->pv->index_pt_pol3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_pol_g; l++) {
-              ppv->y[ppv->index_pt_pol0_g + l] = ppw->pv->y[ppw->pv->index_pt_pol0_g + l];
-            }
-          }
-
-          if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-            ppv->y[ppv->index_pt_delta_ur] = ppw->pv->y[ppw->pv->index_pt_delta_ur];
-
-            ppv->y[ppv->index_pt_theta_ur] = ppw->pv->y[ppw->pv->index_pt_theta_ur];
-
-            ppv->y[ppv->index_pt_shear_ur] = ppw->pv->y[ppw->pv->index_pt_shear_ur];
-          }
-
-          if (all_species_.count("IDM_DR_IDR")) {
-            if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-              ppv->y[ppv->index_pt_delta_idr] = ppw->pv->y[ppw->pv->index_pt_delta_idr];
-
-              ppv->y[ppv->index_pt_theta_idr] = ppw->pv->y[ppw->pv->index_pt_theta_idr];
-
-              if (ppt->idr_nature == idr_free_streaming) {
-                if ((!all_species_.count("IDM_DR_IDR")) ||
-                    ((all_species_.count("IDM_DR_IDR")) &&
-                     (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-                  ppv->y[ppv->index_pt_shear_idr] = ppw->pv->y[ppw->pv->index_pt_shear_idr];
-
-                  ppv->y[ppv->index_pt_l3_idr] = ppw->pv->y[ppw->pv->index_pt_l3_idr];
-
-                  for (int l = 4; l <= ppv->l_max_idr; l++)
-                    ppv->y[ppv->index_pt_delta_idr + l] =
-                        ppw->pv->y[ppw->pv->index_pt_delta_idr + l];
-                }
-              }
-            }
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd];
-            ppv->y[ppv->index_pt_theta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
-            ppv->y[ppv->index_pt_theta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd];
-          }
-
-          if (!ncdm_species_sorted_.empty()) {
-            for (auto& [name, sp] : all_species_) {
-              auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-              if (!ncdm_sp)
-                continue;
-              const int n = ncdm_sp->ncdm_id();
-              for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-                for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
-                  /* This is correct even when ncdmfa == off, since ppv->l_max_ncdm and
-                     ppv->q_size_ncdm is updated.*/
-                  ppv->y[ppv->index_ncdm_[n][index_q] + l] =
-                      ppw->pv->y[ppw->pv->index_ncdm_[n][index_q] + l];
-                }
-              }
-            }
-          }
         }
       }
 
@@ -4071,79 +4045,6 @@ int PerturbationsModule::perturb_vector_init(
                     "Mode k=%e: switch on dark radiation approximation at tau=%e\n",
                     k,
                     tau);
-
-          if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-            ppv->y[ppv->index_pt_delta_g] = ppw->pv->y[ppw->pv->index_pt_delta_g];
-
-            ppv->y[ppv->index_pt_theta_g] = ppw->pv->y[ppw->pv->index_pt_theta_g];
-          }
-
-          if ((ppw->approx[ppw->index_ap_tca] == (int) tca_off) &&
-              (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)) {
-            ppv->y[ppv->index_pt_shear_g] = ppw->pv->y[ppw->pv->index_pt_shear_g];
-
-            ppv->y[ppv->index_pt_l3_g] = ppw->pv->y[ppw->pv->index_pt_l3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_g; l++) {
-              ppv->y[ppv->index_pt_delta_g + l] = ppw->pv->y[ppw->pv->index_pt_delta_g + l];
-            }
-
-            ppv->y[ppv->index_pt_pol0_g] = ppw->pv->y[ppw->pv->index_pt_pol0_g];
-
-            ppv->y[ppv->index_pt_pol1_g] = ppw->pv->y[ppw->pv->index_pt_pol1_g];
-
-            ppv->y[ppv->index_pt_pol2_g] = ppw->pv->y[ppw->pv->index_pt_pol2_g];
-
-            ppv->y[ppv->index_pt_pol3_g] = ppw->pv->y[ppw->pv->index_pt_pol3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_pol_g; l++) {
-              ppv->y[ppv->index_pt_pol0_g + l] = ppw->pv->y[ppw->pv->index_pt_pol0_g + l];
-            }
-          }
-
-          if (all_species_.count("UR")) {
-            if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-              ppv->y[ppv->index_pt_delta_ur] = ppw->pv->y[ppw->pv->index_pt_delta_ur];
-
-              ppv->y[ppv->index_pt_theta_ur] = ppw->pv->y[ppw->pv->index_pt_theta_ur];
-
-              ppv->y[ppv->index_pt_shear_ur] = ppw->pv->y[ppw->pv->index_pt_shear_ur];
-
-              if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
-                ppv->y[ppv->index_pt_l3_ur] = ppw->pv->y[ppw->pv->index_pt_l3_ur];
-
-                for (int l = 4; l <= ppv->l_max_ur; l++)
-                  ppv->y[ppv->index_pt_delta_ur + l] = ppw->pv->y[ppw->pv->index_pt_delta_ur + l];
-              }
-            }
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd];
-            ppv->y[ppv->index_pt_theta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
-            ppv->y[ppv->index_pt_theta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd];
-          }
-
-          if (!ncdm_species_sorted_.empty()) {
-            for (auto& [name, sp] : all_species_) {
-              auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-              if (!ncdm_sp)
-                continue;
-              const int n = ncdm_sp->ncdm_id();
-              for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-                for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
-                  /* This is correct even when ncdmfa == off, since ppv->l_max_ncdm and
-                     ppv->q_size_ncdm is updated.*/
-                  ppv->y[ppv->index_ncdm_[n][index_q] + l] =
-                      ppw->pv->y[ppw->pv->index_ncdm_[n][index_q] + l];
-                }
-              }
-            }
-          }
         }
       }
 
@@ -4158,96 +4059,22 @@ int PerturbationsModule::perturb_vector_init(
                     k,
                     tau);
 
-          if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_idr_off) {
-            ppv->y[ppv->index_pt_delta_idr] = ppw->pv->y[ppw->pv->index_pt_delta_idr];
-
-            ppv->y[ppv->index_pt_theta_idr] = ppw->pv->y[ppw->pv->index_pt_theta_idr];
-
-            /* idr is always free streaming if tca_idm_dr is on */
-            if (ppt->idr_nature == idr_free_streaming) {
-              auto& idm_dr_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
-              ppv->y[ppv->index_pt_shear_idr] =
-                  idm_dr_idr.idr().TcaShearIdr(ppw->pv, ppw->pv->y, ppw);
-              ppv->y[ppv->index_pt_l3_idr] =
-                  6. / 7. * k * ppv->y[ppv->index_pt_shear_idr] /
-                  ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
-                  ppt->alpha_idm_dr[1];
-            }
-          }
-
-          if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-            ppv->y[ppv->index_pt_delta_g] = ppw->pv->y[ppw->pv->index_pt_delta_g];
-
-            ppv->y[ppv->index_pt_theta_g] = ppw->pv->y[ppw->pv->index_pt_theta_g];
-          }
-
-          if ((ppw->approx[ppw->index_ap_tca] == (int) tca_off) &&
-              (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)) {
-            ppv->y[ppv->index_pt_shear_g] = ppw->pv->y[ppw->pv->index_pt_shear_g];
-
-            ppv->y[ppv->index_pt_l3_g] = ppw->pv->y[ppw->pv->index_pt_l3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_g; l++) {
-              ppv->y[ppv->index_pt_delta_g + l] = ppw->pv->y[ppw->pv->index_pt_delta_g + l];
-            }
-
-            ppv->y[ppv->index_pt_pol0_g] = ppw->pv->y[ppw->pv->index_pt_pol0_g];
-
-            ppv->y[ppv->index_pt_pol1_g] = ppw->pv->y[ppw->pv->index_pt_pol1_g];
-
-            ppv->y[ppv->index_pt_pol2_g] = ppw->pv->y[ppw->pv->index_pt_pol2_g];
-
-            ppv->y[ppv->index_pt_pol3_g] = ppw->pv->y[ppw->pv->index_pt_pol3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_pol_g; l++) {
-              ppv->y[ppv->index_pt_pol0_g + l] = ppw->pv->y[ppw->pv->index_pt_pol0_g + l];
-            }
-          }
-
-          if (all_species_.count("UR")) {
-            if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-              ppv->y[ppv->index_pt_delta_ur] = ppw->pv->y[ppw->pv->index_pt_delta_ur];
-
-              ppv->y[ppv->index_pt_theta_ur] = ppw->pv->y[ppw->pv->index_pt_theta_ur];
-
-              ppv->y[ppv->index_pt_shear_ur] = ppw->pv->y[ppw->pv->index_pt_shear_ur];
-
-              if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
-                ppv->y[ppv->index_pt_l3_ur] = ppw->pv->y[ppw->pv->index_pt_l3_ur];
-
-                for (int l = 4; l <= ppv->l_max_ur; l++)
-                  ppv->y[ppv->index_pt_delta_ur + l] = ppw->pv->y[ppw->pv->index_pt_delta_ur + l];
-              }
-            }
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd];
-
-            ppv->y[ppv->index_pt_theta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
-
-            ppv->y[ppv->index_pt_theta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd];
-          }
-
-          if (!ncdm_species_sorted_.empty()) {
-            for (auto& [name, sp] : all_species_) {
-              auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-              if (!ncdm_sp)
-                continue;
-              const int n = ncdm_sp->ncdm_id();
-              for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-                for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
-                  /* This is correct even when ncdmfa == off, since ppv->l_max_ncdm and
-                     ppv->q_size_ncdm is updated.*/
-                  ppv->y[ppv->index_ncdm_[n][index_q] + l] =
-                      ppw->pv->y[ppw->pv->index_ncdm_[n][index_q] + l];
-                }
-              }
-            }
+          /* idr is always free streaming if tca_idm_dr is on */
+          if (ppt->idr_nature == idr_free_streaming) {
+            auto& idm_dr_idr     = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+            const size_t idr_swi = all_species_.index_of("IDM_DR_IDR");
+            const auto& old_idr_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                          *ppw->pv->species_layouts[idr_swi])
+                                          .idr;
+            const auto& new_idr_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                          *ppv->species_layouts[idr_swi])
+                                          .idr;
+            ppv->y[new_idr_lay.idx_shear] =
+                idm_dr_idr.idr().TcaShearIdr(old_idr_lay, ppw->pv->y, ppw);
+            ppv->y[new_idr_lay.idx_l3] =
+                6. / 7. * k * ppv->y[new_idr_lay.idx_shear] /
+                ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
+                ppt->alpha_idm_dr[1];
           }
         }
       }
@@ -4256,131 +4083,11 @@ int PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if (!ncdm_species_sorted_.empty()) {
+      if (HasNcdm(all_species_)) {
         if ((pa_old[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) &&
             (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on)) {
           if (ppt->perturbations_verbose > 2)
             fprintf(stdout, "Mode k=%e: switch on ncdm fluid approximation at tau=%e\n", k, tau);
-
-          if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-            ppv->y[ppv->index_pt_delta_g] = ppw->pv->y[ppw->pv->index_pt_delta_g];
-
-            ppv->y[ppv->index_pt_theta_g] = ppw->pv->y[ppw->pv->index_pt_theta_g];
-          }
-
-          if ((ppw->approx[ppw->index_ap_tca] == (int) tca_off) &&
-              (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)) {
-            ppv->y[ppv->index_pt_shear_g] = ppw->pv->y[ppw->pv->index_pt_shear_g];
-
-            ppv->y[ppv->index_pt_l3_g] = ppw->pv->y[ppw->pv->index_pt_l3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_g; l++) {
-              ppv->y[ppv->index_pt_delta_g + l] = ppw->pv->y[ppw->pv->index_pt_delta_g + l];
-            }
-
-            ppv->y[ppv->index_pt_pol0_g] = ppw->pv->y[ppw->pv->index_pt_pol0_g];
-
-            ppv->y[ppv->index_pt_pol1_g] = ppw->pv->y[ppw->pv->index_pt_pol1_g];
-
-            ppv->y[ppv->index_pt_pol2_g] = ppw->pv->y[ppw->pv->index_pt_pol2_g];
-
-            ppv->y[ppv->index_pt_pol3_g] = ppw->pv->y[ppw->pv->index_pt_pol3_g];
-
-            for (int l = 4; l <= ppw->pv->l_max_pol_g; l++) {
-              ppv->y[ppv->index_pt_pol0_g + l] = ppw->pv->y[ppw->pv->index_pt_pol0_g + l];
-            }
-          }
-
-          if (all_species_.count("UR")) {
-            if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-              ppv->y[ppv->index_pt_delta_ur] = ppw->pv->y[ppw->pv->index_pt_delta_ur];
-
-              ppv->y[ppv->index_pt_theta_ur] = ppw->pv->y[ppw->pv->index_pt_theta_ur];
-
-              ppv->y[ppv->index_pt_shear_ur] = ppw->pv->y[ppw->pv->index_pt_shear_ur];
-
-              if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
-                ppv->y[ppv->index_pt_l3_ur] = ppw->pv->y[ppw->pv->index_pt_l3_ur];
-
-                for (int l = 4; l <= ppv->l_max_ur; l++)
-                  ppv->y[ppv->index_pt_delta_ur + l] = ppw->pv->y[ppw->pv->index_pt_delta_ur + l];
-              }
-            }
-          }
-
-          if (all_species_.count("IDM_DR_IDR")) {
-            if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-              ppv->y[ppv->index_pt_delta_idr] = ppw->pv->y[ppw->pv->index_pt_delta_idr];
-
-              ppv->y[ppv->index_pt_theta_idr] = ppw->pv->y[ppw->pv->index_pt_theta_idr];
-
-              if (ppt->idr_nature == idr_free_streaming) {
-                if ((!all_species_.count("IDM_DR_IDR")) ||
-                    ((all_species_.count("IDM_DR_IDR")) &&
-                     (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-                  ppv->y[ppv->index_pt_shear_idr] = ppw->pv->y[ppw->pv->index_pt_shear_idr];
-
-                  ppv->y[ppv->index_pt_l3_idr] = ppw->pv->y[ppw->pv->index_pt_l3_idr];
-
-                  for (int l = 4; l <= ppv->l_max_idr; l++)
-                    ppv->y[ppv->index_pt_delta_idr + l] =
-                        ppw->pv->y[ppw->pv->index_pt_delta_idr + l];
-                }
-              }
-            }
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd];
-            ppv->y[ppv->index_pt_theta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
-          }
-
-          if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-            ppv->y[ppv->index_pt_delta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
-            ppv->y[ppv->index_pt_theta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd];
-          }
-
-          const double a = ppw->pvecback[background_module_->index_bg_a_];
-          std::vector<NCDMSpecies*> ncdm_vec_ncdmfa;
-          for (auto& [name, sp] : all_species_) {
-            if (auto* nsp = dynamic_cast<NCDMSpecies*>(sp.get()))
-              ncdm_vec_ncdmfa.push_back(nsp);
-          }
-          std::sort(ncdm_vec_ncdmfa.begin(),
-                    ncdm_vec_ncdmfa.end(),
-                    [](NCDMSpecies* a_, NCDMSpecies* b_) { return a_->ncdm_id() < b_->ncdm_id(); });
-          for (auto* ncdm_sp : ncdm_vec_ncdmfa) {
-            const int n                  = ncdm_sp->ncdm_id();
-            const double rho_plus_p_ncdm = ncdm_sp->Rho(ppw->pvecback) + ncdm_sp->P(ppw->pvecback);
-            const int idx_new            = ppv->index_ncdm_[n][0];
-            for (int l = 0; l <= 2; l++) {
-              ppv->y[idx_new + l] = 0.0;
-            }
-            const double factor = ncdm_sp->factor() * pow(pba->a_today / a, 4);
-
-            double delta = 0.;
-            double theta = 0.;
-            double shear = 0.;
-
-            // NCDMSpecies is always standard (not decay_dr): no switch needed
-            for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n]; index_q++) {
-              const int index_pt_old = ppw->pv->index_ncdm_[n][index_q];
-              const double w0        = ncdm_sp->w()[index_q];
-              const double q         = ncdm_sp->q()[index_q];
-              const double epsilon   = sqrt(q * q + a * a * ncdm_sp->M() * ncdm_sp->M());
-
-              delta += w0 * pow(q, 2) * epsilon * ppw->pv->y[index_pt_old];
-              theta += w0 * pow(q, 3) * ppw->pv->y[index_pt_old + 1];
-              shear += w0 * pow(q, 4) / epsilon * ppw->pv->y[index_pt_old + 2];
-            }
-            delta *= factor / ncdm_sp->Rho(ppw->pvecback);
-            theta *= k * factor / rho_plus_p_ncdm;
-            shear *= 2. / 3. * factor / rho_plus_p_ncdm;
-
-            ppv->y[idx_new]     = delta;
-            ppv->y[idx_new + 1] = theta;
-            ppv->y[idx_new + 2] = shear;
-          }
         }
       }
 
@@ -4404,74 +4111,6 @@ int PerturbationsModule::perturb_vector_init(
                     tau,
                     1. / a - 1.);
 
-          if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-            ppv->y[ppv->index_pt_delta_g] = ppw->pv->y[ppw->pv->index_pt_delta_g];
-            ppv->y[ppv->index_pt_theta_g] = ppw->pv->y[ppw->pv->index_pt_theta_g];
-          }
-
-          if ((ppw->approx[ppw->index_ap_tca] == (int) tca_off) &&
-              (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)) {
-            ppv->y[ppv->index_pt_shear_g] = ppw->pv->y[ppw->pv->index_pt_shear_g];
-            ppv->y[ppv->index_pt_l3_g]    = ppw->pv->y[ppw->pv->index_pt_l3_g];
-            for (int l = 4; l <= ppw->pv->l_max_g; l++) {
-              ppv->y[ppv->index_pt_delta_g + l] = ppw->pv->y[ppw->pv->index_pt_delta_g + l];
-            }
-
-            ppv->y[ppv->index_pt_pol0_g] = ppw->pv->y[ppw->pv->index_pt_pol0_g];
-            ppv->y[ppv->index_pt_pol1_g] = ppw->pv->y[ppw->pv->index_pt_pol1_g];
-            ppv->y[ppv->index_pt_pol2_g] = ppw->pv->y[ppw->pv->index_pt_pol2_g];
-            ppv->y[ppv->index_pt_pol3_g] = ppw->pv->y[ppw->pv->index_pt_pol3_g];
-            for (int l = 4; l <= ppw->pv->l_max_pol_g; l++) {
-              ppv->y[ppv->index_pt_pol0_g + l] = ppw->pv->y[ppw->pv->index_pt_pol0_g + l];
-            }
-          }
-
-          if (all_species_.count("UR")) {
-            if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-              ppv->y[ppv->index_pt_delta_ur] = ppw->pv->y[ppw->pv->index_pt_delta_ur];
-              ppv->y[ppv->index_pt_theta_ur] = ppw->pv->y[ppw->pv->index_pt_theta_ur];
-              ppv->y[ppv->index_pt_shear_ur] = ppw->pv->y[ppw->pv->index_pt_shear_ur];
-              if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
-                ppv->y[ppv->index_pt_l3_ur] = ppw->pv->y[ppw->pv->index_pt_l3_ur];
-                for (int l = 4; l <= ppv->l_max_ur; l++)
-                  ppv->y[ppv->index_pt_delta_ur + l] = ppw->pv->y[ppw->pv->index_pt_delta_ur + l];
-              }
-            }
-          }
-
-          if (all_species_.count("IDM_DR_IDR")) {
-            if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-              ppv->y[ppv->index_pt_delta_idr] = ppw->pv->y[ppw->pv->index_pt_delta_idr];
-              ppv->y[ppv->index_pt_theta_idr] = ppw->pv->y[ppw->pv->index_pt_theta_idr];
-              if (ppt->idr_nature == idr_free_streaming) {
-                if (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
-                  ppv->y[ppv->index_pt_shear_idr] = ppw->pv->y[ppw->pv->index_pt_shear_idr];
-
-                  ppv->y[ppv->index_pt_l3_idr] = ppw->pv->y[ppw->pv->index_pt_l3_idr];
-                  for (int l = 4; l <= ppv->l_max_idr; l++)
-                    ppv->y[ppv->index_pt_delta_idr + l] =
-                        ppw->pv->y[ppw->pv->index_pt_delta_idr + l];
-                }
-              }
-            }
-          }
-
-          if (!ncdm_species_sorted_.empty()) {
-            for (auto& [name, sp] : all_species_) {
-              auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-              if (!ncdm_sp)
-                continue;
-              const int n = ncdm_sp->ncdm_id();
-              for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-                for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
-                  /* This is correct even when ncdmfa == off, since ppv->l_max_ncdm and
-                     ppv->q_size_ncdm is updated. */
-                  ppv->y[ppv->index_ncdm_[n][index_q] + l] =
-                      ppw->pv->y[ppw->pv->index_ncdm_[n][index_q] + l];
-                }
-              }
-            }
-          }
           /* DRMD -- Here the matching of the perturbations happens*/
 
           a                     = ppw->pvecback[background_module_->index_bg_a_];
@@ -4495,16 +4134,26 @@ int PerturbationsModule::perturb_vector_init(
                      background_module_->error_message_,
                      background_module_->error_message_);
 
-          double theta_idr = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
-          double delta_idr = ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd];
+          const size_t drm_swi     = all_species_.index_of("IDM_DRMD_IDR_DRMD");
+          const auto& drm_old_full = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+              *ppw->pv->species_layouts[drm_swi]);
+          const auto& drm_new_full = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+              *ppv->species_layouts[drm_swi]);
+          const auto& drm_old_lay     = drm_old_full.idr_drmd;
+          const auto& drm_new_lay     = drm_new_full.idr_drmd;
+          const auto& idm_drm_old_lay = drm_old_full.idm_drmd;
+          const auto& idm_drm_new_lay = drm_new_full.idm_drmd;
 
-          ppv->y[ppv->index_pt_delta_idm_drmd] = ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
+          double theta_idr = ppw->pv->y[drm_old_lay.idx_theta];
+          double delta_idr = ppw->pv->y[drm_old_lay.idx_delta];
 
-          ppv->y[ppv->index_pt_delta_idr_drmd] = delta_idr;
+          ppv->y[idm_drm_new_lay.idx_delta] = ppw->pv->y[idm_drm_old_lay.idx_delta];
 
-          ppv->y[ppv->index_pt_theta_idr_drmd] = ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd];
+          ppv->y[drm_new_lay.idx_delta] = delta_idr;
 
-          ppv->y[ppv->index_pt_theta_idm_drmd] =
+          ppv->y[drm_new_lay.idx_theta] = ppw->pv->y[drm_old_lay.idx_theta];
+
+          ppv->y[idm_drm_new_lay.idx_theta] =
               theta_idr - 1. / (1. + Rint) * (k * k / 4. * delta_idr + a_prime_over_a * theta_idr);
         }
       }
@@ -4536,7 +4185,14 @@ int PerturbationsModule::perturb_vector_init(
         ppv->y[ppv->index_pt_V] = ppw->pv->y[ppw->pv->index_pt_V];
       }
 
-      ppv->y[ppv->index_pt_theta_b] = ppw->pv->y[ppw->pv->index_pt_theta_b];
+      {
+        const size_t b_vsw_i  = all_species_.index_of("Baryons");
+        const auto& b_vsw_old = static_cast<const BaryonsSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[b_vsw_i]);
+        auto& b_vsw_new = static_cast<BaryonsSpecies::PerturbLayout&>(
+            *ppv->species_layouts[b_vsw_i]);
+        ppv->y[b_vsw_new.idx_theta] = ppw->pv->y[b_vsw_old.idx_theta];
+      }
 
       /* -- case of switching off tight coupling
          approximation. Provide correct initial conditions to new set
@@ -4547,10 +4203,13 @@ int PerturbationsModule::perturb_vector_init(
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
 
-        ppv->y[ppv->index_pt_delta_g] = 0.0;  //TBC
+        const size_t new_g_i = all_species_.index_of("Photons");
+        auto& new_g_lay      = static_cast<PhotonsSpecies::PerturbLayout&>(
+            *ppv->species_layouts[new_g_i]);
+        ppv->y[new_g_lay.idx_delta] = 0.0;  //TBC
         //-4./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
-        ppv->y[ppv->index_pt_pol0_g] = 0.0;  //TBC
+        ppv->y[new_g_lay.idx_pol0] = 0.0;  //TBC
         //1./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
       }
 
@@ -4594,30 +4253,31 @@ int PerturbationsModule::perturb_vector_init(
       ppv->y[ppv->index_pt_gwdot] = ppw->pv->y[ppw->pv->index_pt_gwdot];
 
       if (evolve_tensor_ur_ == _TRUE_) {
-        /* For now, neutrinos go here. */
-        ppv->y[ppv->index_pt_delta_ur] = ppw->pv->y[ppw->pv->index_pt_delta_ur];
-
-        ppv->y[ppv->index_pt_theta_ur] = ppw->pv->y[ppw->pv->index_pt_theta_ur];
-
-        ppv->y[ppv->index_pt_shear_ur] = ppw->pv->y[ppw->pv->index_pt_shear_ur];
-
-        ppv->y[ppv->index_pt_l3_ur] = ppw->pv->y[ppw->pv->index_pt_l3_ur];
-
-        for (int l = 4; l <= ppv->l_max_ur; l++)
-          ppv->y[ppv->index_pt_delta_ur + l] = ppw->pv->y[ppw->pv->index_pt_delta_ur + l];
+        /* relativistic-neutrino tensor hierarchy (pv-owned) */
+        const auto& old_ur_lay       = ppw->pv->tensor_ur_layout;
+        const auto& new_ur_lay       = ppv->tensor_ur_layout;
+        ppv->y[new_ur_lay.idx_delta] = ppw->pv->y[old_ur_lay.idx_delta];
+        ppv->y[new_ur_lay.idx_theta] = ppw->pv->y[old_ur_lay.idx_theta];
+        ppv->y[new_ur_lay.idx_shear] = ppw->pv->y[old_ur_lay.idx_shear];
+        ppv->y[new_ur_lay.idx_l3]    = ppw->pv->y[old_ur_lay.idx_l3];
+        for (int l = 4; l <= new_ur_lay.l_max; l++)
+          ppv->y[new_ur_lay.idx_delta + l] = ppw->pv->y[old_ur_lay.idx_delta + l];
       }
 
       if (evolve_tensor_ncdm_ == _TRUE_) {
-        for (auto& [name, sp] : all_species_) {
-          auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
+        for (size_t i = 0; i < all_species_.size(); ++i) {
+          const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
           if (!ncdm_sp)
             continue;
-          const int n = ncdm_sp->ncdm_id();
-          for (int index_q = 0; index_q < ppv->q_size_ncdm[n]; index_q++) {
-            for (int l = 0; l <= ppv->l_max_ncdm[n]; l++) {
-              // This is correct with or without ncdmfa, since ppv->lmax_ncdm is set accordingly.
-              ppv->y[ppv->index_ncdm_[n][index_q] + l] =
-                  ppw->pv->y[ppw->pv->index_ncdm_[n][index_q] + l];
+          const auto& new_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
+              *ppv->species_layouts[i]);
+          const auto& old_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
+              *ppw->pv->species_layouts[i]);
+          for (int index_q = 0; index_q < new_lay.q_size; index_q++) {
+            for (int l = 0; l <= new_lay.l_max; l++) {
+              // This is correct with or without ncdmfa, since layout l_max is set accordingly.
+              ppv->y[new_lay.index_per_q[index_q] + l] =
+                  ppw->pv->y[old_lay.index_per_q[index_q] + l];
             }
           }
         }
@@ -4632,11 +4292,14 @@ int PerturbationsModule::perturb_vector_init(
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
 
-        ppv->y[ppv->index_pt_delta_g] = -4. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
-                                        ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        const size_t new_g_i = all_species_.index_of("Photons");
+        auto& new_g_lay      = static_cast<PhotonsSpecies::PerturbLayout&>(
+            *ppv->species_layouts[new_g_i]);
+        ppv->y[new_g_lay.idx_delta] = -4. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
+                                      ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
-        ppv->y[ppv->index_pt_pol0_g] = 1. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
-                                       ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        ppv->y[new_g_lay.idx_pol0] = 1. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
+                                     ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
       }
 
       /* -- case of switching on radiation streaming
@@ -4830,8 +4493,12 @@ int PerturbationsModule::perturb_initial_conditions(
       l3_ur    = ic_ctx.l3_ur;
       delta_dr = ic_ctx.delta_dr;
       eta      = ic_ctx.eta;
-      for (auto& [name, sp] : all_species_) {
-        sp->ApplyInitialConditions(ppw->pv->y, ic_ctx);
+      {
+        size_t i = 0;
+        for (auto& sp : all_species_) {
+          sp->ApplyInitialConditions(*ppw->pv->species_layouts[i], ppw->pv->y, ic_ctx);
+          ++i;
+        }
       }
     };
 
@@ -4866,7 +4533,7 @@ int PerturbationsModule::perturb_initial_conditions(
       ic_ctx.shear_ur = 0.;
       ic_ctx.l3_ur    = 0.;
       ic_ctx.delta_dr = 0.;
-      if ((all_species_.count("UR")) || (!ncdm_species_sorted_.empty()) ||
+      if ((all_species_.count("UR")) || (HasNcdm(all_species_)) ||
           (all_species_.count("DCDM_DR")) || (all_species_.count("IDM_DR_IDR"))) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = -k * ktau_three / 36. / (4. * fracnu + 15.) *
@@ -4921,7 +4588,7 @@ int PerturbationsModule::perturb_initial_conditions(
       ic_ctx.l3_ur      = 0.;
       ic_ctx.delta_dr   = 0.;
 
-      if ((all_species_.count("UR")) || (!ncdm_species_sorted_.empty())) {
+      if ((all_species_.count("UR")) || (HasNcdm(all_species_))) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = ic_ctx.theta_g_ic;
         ic_ctx.shear_ur = -ppr->entropy_ini * fraccdm * ktau_two * tau * om / 6. /
@@ -4951,7 +4618,7 @@ int PerturbationsModule::perturb_initial_conditions(
       ic_ctx.l3_ur      = 0.;
       ic_ctx.delta_dr   = 0.;
 
-      if ((all_species_.count("UR")) || (!ncdm_species_sorted_.empty())) {
+      if ((all_species_.count("UR")) || (HasNcdm(all_species_))) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = ic_ctx.theta_g_ic;
         ic_ctx.shear_ur = -ppr->entropy_ini * fracb * ktau_two * tau * om / 6. /
@@ -5057,39 +4724,67 @@ int PerturbationsModule::perturb_initial_conditions(
          = [(4/3) (f_g theta_g + f_nu theta_nu) + (rho_m/rho_r) (f_b delta_b + f_cdm 0)] / (1 + rho_m/rho_r)
       */
 
-      if (all_species_.count("CDM"))
-        delta_cdm = ppw->pv->y[ppw->pv->index_pt_delta_cdm];
-      else if (all_species_.count("DCDM_DR"))
-        delta_cdm = ppw->pv->y[ppw->pv->index_pt_delta_dcdm];
-      else if (all_species_.count("IDM_DR_IDR"))
-        delta_cdm = ppw->pv->y[ppw->pv->index_pt_delta_idm_dr];
+      if (all_species_.count("CDM")) {
+        const size_t cdm_i  = all_species_.index_of("CDM");
+        const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[cdm_i]);
+        delta_cdm = ppw->pv->y[cdm_lay.idx_delta];
+      }
+      else if (all_species_.count("DCDM_DR")) {
+        const size_t dcdm_ic_i  = all_species_.index_of("DCDM_DR");
+        const auto& dcdm_ic_lay = static_cast<const DCDM_DR_Species::PerturbLayout&>(
+            *ppw->pv->species_layouts[dcdm_ic_i]);
+        delta_cdm = ppw->pv->y[dcdm_ic_lay.dcdm.idx_delta];
+      }
+      else if (all_species_.count("IDM_DR_IDR")) {
+        const size_t idm_dr_ic_i  = all_species_.index_of("IDM_DR_IDR");
+        const auto& idm_dr_ic_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                        *ppw->pv->species_layouts[idm_dr_ic_i])
+                                        .idm_dr;
+        delta_cdm                 = ppw->pv->y[idm_dr_ic_lay.idx_delta];
+      }
       else
         delta_cdm = 0.;
 
       if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+        const size_t idm_drm_ic_i  = all_species_.index_of("IDM_DRMD_IDR_DRMD");
+        const auto& idm_drm_ic_lay = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+                                         *ppw->pv->species_layouts[idm_drm_ic_i])
+                                         .idm_drmd;
         delta_cdm += static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
                          .idm_drmd()
                          .Rho(ppw->pvecback) *
-                     ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd];
+                     ppw->pv->y[idm_drm_ic_lay.idx_delta];
       }
 
       // note: if there are no neutrinos, fracnu, delta_ur and theta_ur below will consistently be zero.
 
-      double delta_tot = (fracg * ppw->pv->y[ppw->pv->index_pt_delta_g] + fracnu * delta_ur +
-                          rho_m_over_rho_r * (fracb * ppw->pv->y[ppw->pv->index_pt_delta_b] +
-                                              fraccdm * delta_cdm)) /
+      const size_t g_i_ic  = all_species_.index_of("Photons");
+      const auto& g_lay_ic = static_cast<const PhotonsSpecies::PerturbLayout&>(
+          *ppw->pv->species_layouts[g_i_ic]);
+      const size_t b_i_ic  = all_species_.index_of("Baryons");
+      const auto& b_lay_ic = static_cast<const BaryonsSpecies::PerturbLayout&>(
+          *ppw->pv->species_layouts[b_i_ic]);
+
+      double delta_tot = (fracg * ppw->pv->y[g_lay_ic.idx_delta] + fracnu * delta_ur +
+                          rho_m_over_rho_r *
+                              (fracb * ppw->pv->y[b_lay_ic.idx_delta] + fraccdm * delta_cdm)) /
                          (1. + rho_m_over_rho_r);
 
-      double velocity_tot =
-          ((4. / 3.) * (fracg * ppw->pv->y[ppw->pv->index_pt_theta_g] + fracnu * theta_ur) +
-           rho_m_over_rho_r * fracb * ppw->pv->y[ppw->pv->index_pt_theta_b]) /
-          (1. + rho_m_over_rho_r);
+      double velocity_tot = ((4. / 3.) *
+                                 (fracg * ppw->pv->y[g_lay_ic.idx_theta] + fracnu * theta_ur) +
+                             rho_m_over_rho_r * fracb * ppw->pv->y[b_lay_ic.idx_theta]) /
+                            (1. + rho_m_over_rho_r);
 
       if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-        delta_tot    += rho_m_over_rho_r * fracidm_drmd *
-                        ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd] / (1. + rho_m_over_rho_r);
-        velocity_tot += rho_m_over_rho_r * fracidm_drmd *
-                        ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd] / (1. + rho_m_over_rho_r);
+        const size_t idm_drm_tot_i  = all_species_.index_of("IDM_DRMD_IDR_DRMD");
+        const auto& idm_drm_tot_lay = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+                                          *ppw->pv->species_layouts[idm_drm_tot_i])
+                                          .idm_drmd;
+        delta_tot    += rho_m_over_rho_r * fracidm_drmd * ppw->pv->y[idm_drm_tot_lay.idx_delta] /
+                        (1. + rho_m_over_rho_r);
+        velocity_tot += rho_m_over_rho_r * fracidm_drmd * ppw->pv->y[idm_drm_tot_lay.idx_theta] /
+                        (1. + rho_m_over_rho_r);
       }
 
       alpha = (eta + 3. / 2. * a_prime_over_a * a_prime_over_a / k / k / s2_squared *
@@ -5098,37 +4793,56 @@ int PerturbationsModule::perturb_initial_conditions(
 
       ppw->pv->y[ppw->pv->index_pt_phi] = eta - a_prime_over_a * alpha;
 
-      ppw->pv->y[ppw->pv->index_pt_delta_g] -= 4. * a_prime_over_a * alpha;
-      ppw->pv->y[ppw->pv->index_pt_theta_g] += k * k * alpha;
+      ppw->pv->y[g_lay_ic.idx_delta] -= 4. * a_prime_over_a * alpha;
+      ppw->pv->y[g_lay_ic.idx_theta] += k * k * alpha;
 
-      ppw->pv->y[ppw->pv->index_pt_delta_b] -= 3. * a_prime_over_a * alpha;
-      ppw->pv->y[ppw->pv->index_pt_theta_b] += k * k * alpha;
+      ppw->pv->y[b_lay_ic.idx_delta] -= 3. * a_prime_over_a * alpha;
+      ppw->pv->y[b_lay_ic.idx_theta] += k * k * alpha;
 
       if (all_species_.count("CDM")) {
-        ppw->pv->y[ppw->pv->index_pt_delta_cdm] -= 3. * a_prime_over_a * alpha;
-        ppw->pv->y[ppw->pv->index_pt_theta_cdm]  = k * k * alpha;
+        const size_t cdm_i  = all_species_.index_of("CDM");
+        const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[cdm_i]);
+        ppw->pv->y[cdm_lay.idx_delta] -= 3. * a_prime_over_a * alpha;
+        ppw->pv->y[cdm_lay.idx_theta]  = k * k * alpha;
       }
 
       if (all_species_.count("IDM_DR_IDR")) {
-        ppw->pv->y[ppw->pv->index_pt_delta_idm_dr] -= 3. * a_prime_over_a * alpha;
-        ppw->pv->y[ppw->pv->index_pt_theta_idm_dr]  = k * k * alpha;
+        const size_t idm_dr_alpha_i  = all_species_.index_of("IDM_DR_IDR");
+        const auto& idm_dr_alpha_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                           *ppw->pv->species_layouts[idm_dr_alpha_i])
+                                           .idm_dr;
+        ppw->pv->y[idm_dr_alpha_lay.idx_delta] -= 3. * a_prime_over_a * alpha;
+        ppw->pv->y[idm_dr_alpha_lay.idx_theta]  = k * k * alpha;
         /* comment on idm_dr initial conditions: theta_idm_dr is set later, together with theta_idr, if the tight coupling is on */
       }
 
       if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-        ppw->pv->y[ppw->pv->index_pt_delta_idm_drmd] -= 3. * a_prime_over_a * alpha;
-        ppw->pv->y[ppw->pv->index_pt_theta_idm_drmd] += k * k * alpha;
+        const size_t idm_drm_alpha_i = all_species_.index_of("IDM_DRMD_IDR_DRMD");
+        const auto& idm_drm_alpha_lay =
+            static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+                *ppw->pv->species_layouts[idm_drm_alpha_i])
+                .idm_drmd;
+        ppw->pv->y[idm_drm_alpha_lay.idx_delta] -= 3. * a_prime_over_a * alpha;
+        ppw->pv->y[idm_drm_alpha_lay.idx_theta] += k * k * alpha;
       }
 
       if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-        ppw->pv->y[ppw->pv->index_pt_delta_idr_drmd] -= 4. * a_prime_over_a * alpha;
-        ppw->pv->y[ppw->pv->index_pt_theta_idr_drmd] += k * k * alpha;
+        const size_t drm_g_i  = all_species_.index_of("IDM_DRMD_IDR_DRMD");
+        const auto& drm_g_lay = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+                                    *ppw->pv->species_layouts[drm_g_i])
+                                    .idr_drmd;
+        ppw->pv->y[drm_g_lay.idx_delta] -= 4. * a_prime_over_a * alpha;
+        ppw->pv->y[drm_g_lay.idx_theta] += k * k * alpha;
       }
 
       if (all_species_.count("DCDM_DR")) {
-        ppw->pv->y[ppw->pv->index_pt_delta_dcdm] += (-3. * a_prime_over_a - a * pba->Gamma_dcdm) *
-                                                    alpha;
-        ppw->pv->y[ppw->pv->index_pt_theta_dcdm]  = k * k * alpha;
+        const size_t dcdm_alpha_i  = all_species_.index_of("DCDM_DR");
+        const auto& dcdm_alpha_lay = static_cast<const DCDM_DR_Species::PerturbLayout&>(
+            *ppw->pv->species_layouts[dcdm_alpha_i]);
+        ppw->pv->y[dcdm_alpha_lay.dcdm.idx_delta] += (-3. * a_prime_over_a - a * pba->Gamma_dcdm) *
+                                                     alpha;
+        ppw->pv->y[dcdm_alpha_lay.dcdm.idx_theta]  = k * k * alpha;
       }
 
       /* fluid */
@@ -5138,8 +4852,11 @@ int PerturbationsModule::perturb_initial_conditions(
                    background_module_->error_message_,
                    error_message_);
 
-        ppw->pv->y[ppw->pv->index_pt_delta_fld] += 3 * (1. + w_fld) * a_prime_over_a * alpha;
-        ppw->pv->y[ppw->pv->index_pt_theta_fld] += k * k * alpha;
+        const size_t fld_i  = all_species_.index_of("Fluid");
+        const auto& fld_lay = static_cast<const FluidSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[fld_i]);
+        ppw->pv->y[fld_lay.idx_delta] += 3 * (1. + w_fld) * a_prime_over_a * alpha;
+        ppw->pv->y[fld_lay.idx_theta] += k * k * alpha;
       }
 
       /* scalar field: check */
@@ -5148,9 +4865,12 @@ int PerturbationsModule::perturb_initial_conditions(
         /* - 2. * a_prime_over_a * alpha + eta
            - 4.5 * (a2/k2) * ppw->rho_plus_p_shear; */
 
-        ppw->pv->y[ppw->pv->index_pt_phi_scf] +=
-            alpha * ppw->pvecback[background_module_->index_bg_phi_prime_scf_];
-        ppw->pv->y[ppw->pv->index_pt_phi_prime_scf] +=
+        const size_t scf_i  = all_species_.index_of("ScalarField");
+        const auto& scf_lay = static_cast<const ScalarFieldSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[scf_i]);
+        ppw->pv->y[scf_lay.idx_phi] += alpha *
+                                       ppw->pvecback[background_module_->index_bg_phi_prime_scf_];
+        ppw->pv->y[scf_lay.idx_phi_prime] +=
             (-2. * a_prime_over_a * alpha *
                  ppw->pvecback[background_module_->index_bg_phi_prime_scf_] -
              a * a *
@@ -5159,7 +4879,7 @@ int PerturbationsModule::perturb_initial_conditions(
              ppw->pvecback[background_module_->index_bg_phi_prime_scf_] * alpha_prime);
       }
 
-      if ((all_species_.count("UR")) || (!ncdm_species_sorted_.empty()) ||
+      if ((all_species_.count("UR")) || (HasNcdm(all_species_)) ||
           (all_species_.count("DCDM_DR")) || (all_species_.count("IDM_DR_IDR"))) {
         delta_ur -= 4. * a_prime_over_a * alpha;
         theta_ur += k * k * alpha;
@@ -5173,7 +4893,7 @@ int PerturbationsModule::perturb_initial_conditions(
                            ppw->pvecback[dcdm_dr.dr().bg_rho_dr_species_index()]) *
                       alpha;
         }
-        if (all_species_.count("DNCDM_DR")) {
+        {
           for (auto& [name, sp] : all_species_) {
             auto* dncdm_dr_sp = dynamic_cast<DNCDM_DR_Species*>(sp.get());
             if (!dncdm_dr_sp)
@@ -5192,46 +4912,64 @@ int PerturbationsModule::perturb_initial_conditions(
 
     if (ppt->gauge == newtonian) {
       if (all_species_.count("UR")) {
-        ppw->pv->y[ppw->pv->index_pt_delta_ur] = delta_ur;
-
-        ppw->pv->y[ppw->pv->index_pt_theta_ur] = theta_ur;
-
-        ppw->pv->y[ppw->pv->index_pt_shear_ur] = shear_ur;
-
-        ppw->pv->y[ppw->pv->index_pt_l3_ur] = l3_ur;
+        const size_t ur_i  = all_species_.index_of("UR");
+        const auto& ur_lay = static_cast<const UltraRelativisticSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[ur_i]);
+        ppw->pv->y[ur_lay.idx_delta] = delta_ur;
+        ppw->pv->y[ur_lay.idx_theta] = theta_ur;
+        ppw->pv->y[ur_lay.idx_shear] = shear_ur;
+        ppw->pv->y[ur_lay.idx_l3]    = l3_ur;
       }
 
       if (all_species_.count("IDM_DR_IDR")) {
-        ppw->pv->y[ppw->pv->index_pt_delta_idr] = delta_ur;
-        ppw->pv->y[ppw->pv->index_pt_theta_idr] = theta_ur;
+        const size_t idr_seed_i            = all_species_.index_of("IDM_DR_IDR");
+        const auto& idr_seed_lay           = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                                 *ppw->pv->species_layouts[idr_seed_i])
+                                                 .idr;
+        ppw->pv->y[idr_seed_lay.idx_delta] = delta_ur;
+        ppw->pv->y[idr_seed_lay.idx_theta] = theta_ur;
         if (ppt->idr_nature == idr_free_streaming) {
           if ((!all_species_.count("IDM_DR_IDR")) ||
               ((all_species_.count("IDM_DR_IDR")) &&
                (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-            ppw->pv->y[ppw->pv->index_pt_shear_idr] = shear_ur;
-            ppw->pv->y[ppw->pv->index_pt_l3_idr]    = l3_ur;
+            ppw->pv->y[idr_seed_lay.idx_shear] = shear_ur;
+            ppw->pv->y[idr_seed_lay.idx_l3]    = l3_ur;
           }
         }
       }
       if (all_species_.count("IDM_DR_IDR")) {
-        ppw->pv->y[ppw->pv->index_pt_theta_idm_dr] = theta_ur;
+        const size_t idm_dr_th_i            = all_species_.index_of("IDM_DR_IDR");
+        const auto& idm_dr_th_lay           = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                                  *ppw->pv->species_layouts[idm_dr_th_i])
+                                                  .idm_dr;
+        ppw->pv->y[idm_dr_th_lay.idx_theta] = theta_ur;
       }
 
-      if (!ncdm_species_sorted_.empty()) {
-        for (auto* sp : ncdm_species_sorted_) {
-          int n_id                      = -1;
-          NCDMBaseSpecies* ncdm_base_sp = dynamic_cast<NCDMBaseSpecies*>(sp);
-          if (auto* n_sp = dynamic_cast<NCDMSpecies*>(sp))
-            n_id = n_sp->ncdm_id();
-          else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(sp))
-            n_id = d_sp->ncdm_id();
+      if (HasNcdm(all_species_)) {
+        for (size_t i = 0; i < all_species_.size(); ++i) {
+          const BaseSpecies* sp                     = all_species_[i];
+          const NCDMBaseSpecies* ncdm_base_sp       = nullptr;
+          const NCDMBaseSpecies::PerturbLayout* lay = nullptr;
+          if (auto* n_sp = dynamic_cast<const NCDMSpecies*>(sp)) {
+            ncdm_base_sp = n_sp;
+            lay = &static_cast<const NCDMBaseSpecies::PerturbLayout&>(*ppw->pv->species_layouts[i]);
+          }
+          else if (auto* composite = dynamic_cast<const DNCDM_DR_Species*>(sp)) {
+            ncdm_base_sp         = &composite->dncdm();
+            const auto& comp_lay = static_cast<const DNCDM_DR_Species::PerturbLayout&>(
+                *ppw->pv->species_layouts[i]);
+            lay = &comp_lay.dncdm;
+          }
+          else {
+            continue;
+          }
 
-          for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n_id]; index_q++) {
-            const int idx        = ppw->pv->index_ncdm_[n_id][index_q];
+          const auto* dncdm_sp = dynamic_cast<const DNCDMSpecies*>(ncdm_base_sp);
+          for (int index_q = 0; index_q < lay->q_size; index_q++) {
+            const int idx        = lay->index_per_q[index_q];
             const double q       = ncdm_base_sp->q()[index_q];
             const double epsilon = sqrt(q * q + a * a * ncdm_base_sp->M() * ncdm_base_sp->M());
             double dlnf0_dlnq;
-            auto* dncdm_sp = dynamic_cast<DNCDMSpecies*>(sp);
             if (dncdm_sp == nullptr) {
               dlnf0_dlnq = ncdm_base_sp->dlnf0_dlnq()[index_q];
             }
@@ -5637,7 +5375,7 @@ int PerturbationsModule::perturb_approximations(int index_md,
       }
     }
 
-    if (!ncdm_species_sorted_.empty()) {
+    if (HasNcdm(all_species_)) {
       if ((tau / tau_k > ppr->ncdm_fluid_trigger_tau_over_tau_k) &&
           (ppr->ncdm_fluid_approximation != ncdmfa_none)) {
         ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_on;
@@ -5776,7 +5514,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
   if ((ppt->has_scalars == _TRUE_) && (pppaw->index_md == index_md_scalars_)) {
     *timescale = tau_h;
 
-    if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (!ncdm_species_sorted_.empty()))
+    if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (HasNcdm(all_species_)))
       *timescale = MIN(tau_k, *timescale);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
@@ -5978,17 +5716,24 @@ int PerturbationsModule::perturb_einstein(
       /* eventually, infer first-order tight-coupling approximation for photon
          shear, then correct the total shear */
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
+        const size_t g_ein_i  = all_species_.index_of("Photons");
+        const auto& g_ein_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[g_ein_i]);
         shear_g = 16. / 45. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-                  (y[ppw->pv->index_pt_theta_g] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
+                  (y[g_ein_lay.idx_theta] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
 
         ppw->rho_plus_p_shear += 4. / 3. * all_species_.photons().Rho(ppw->pvecback) * shear_g;
       }
 
       if ((all_species_.count("IDM_DR_IDR")) &&
           (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
+        const size_t idr_th_i  = all_species_.index_of("IDM_DR_IDR");
+        const auto& idr_th_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
+                                     *ppw->pv->species_layouts[idr_th_i])
+                                     .idr;
         shear_idr = 0.5 * 8. / 15. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
                     ppt->alpha_idm_dr[0] *
-                    (y[ppw->pv->index_pt_theta_idr] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
+                    (y[idr_th_lay.idx_theta] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
 
         ppw->rho_plus_p_shear += 4. / 3. *
                                  static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
@@ -6102,11 +5847,15 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - ---> (a.1.) photons */
 
+    const size_t g_tse_i  = all_species_.index_of("Photons");
+    const auto& g_tse_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+        *ppw->pv->species_layouts[g_tse_i]);
+
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
       if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
         /** - ----> (a.1.1.) no approximation */
 
-        shear_g = y[ppw->pv->index_pt_shear_g];
+        shear_g = y[g_tse_lay.idx_shear];
       }
       else {
         /** - ----> (a.1.2.) radiation streaming approximation */
@@ -6120,7 +5869,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       /* first-order tight-coupling approximation for photon shear */
       if (ppt->gauge == newtonian) {
         shear_g = 16. / 45. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-                  y[ppw->pv->index_pt_theta_g];
+                  y[g_tse_lay.idx_theta];
       }
       else {
         shear_g = 0.; /* in the synchronous gauge, the expression of
@@ -6137,15 +5886,19 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - ---> (a.2.) baryon pressure perturbation */
 
+    const size_t b_tse_pre_i  = all_species_.index_of("Baryons");
+    const auto& b_tse_pre_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
+        *ppw->pv->species_layouts[b_tse_pre_i]);
+
     if ((ppt->has_perturbed_recombination == _TRUE_) &&
         (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       delta_p_b_over_rho_b = ppw->pvecthermo[thermodynamics_module_->index_th_wb_] *
-                             (y[ppw->pv->index_pt_delta_b] +
+                             (y[b_tse_pre_lay.idx_delta] +
                               y[ppw->pv->index_pt_perturbed_recombination_delta_temp]);
     }
     else {
       delta_p_b_over_rho_b = ppw->pvecthermo[thermodynamics_module_->index_th_cb2_] *
-                             y[ppw->pv->index_pt_delta_b];
+                             y[b_tse_pre_lay.idx_delta];
     }
 
     /** - --> (b) store pre-computed approximation-corrected values for species dispatch */
@@ -6172,10 +5925,16 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       const double rho_g = PH.Rho(ppw->pvecback);
       const double rho_b = BA.Rho(ppw->pvecback);
 
-      const double delta_g = PH.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_g = PH.Theta(ppw->pv, y, ppw->pvecback, ppw);
-      const double delta_b = BA.Delta(ppw->pv, y, ppw->pvecback, ppw);
-      const double theta_b = BA.Theta(ppw->pv, y, ppw->pvecback, ppw);
+      const size_t g_tse2_i = all_species_.index_of("Photons");
+      const size_t b_tse_i  = all_species_.index_of("Baryons");
+      const double delta_g =
+          PH.Delta(*ppw->pv->species_layouts[g_tse2_i], ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_g =
+          PH.Theta(*ppw->pv->species_layouts[g_tse2_i], ppw->pv, y, ppw->pvecback, ppw);
+      const double delta_b =
+          BA.Delta(*ppw->pv->species_layouts[b_tse_i], ppw->pv, y, ppw->pvecback, ppw);
+      const double theta_b =
+          BA.Theta(*ppw->pv->species_layouts[b_tse_i], ppw->pv, y, ppw->pvecback, ppw);
 
       ppw->delta_rho        = rho_g * delta_g + rho_b * delta_b;
       ppw->rho_plus_p_theta = 4. / 3. * rho_g * theta_g + rho_b * theta_b;
@@ -6196,12 +5955,15 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     /* Pass 1: accumulate rho_plus_p_shear over all sectors except photons,
        baryons, and (PPF) fluid. Photons are already in ppw->rho_plus_p_shear
        from the photon/baryon block above; baryons contribute zero shear. */
-    for (const auto& [name, sp] : all_species_) {
-      if (name == "Photons" || name == "Baryons")
-        continue;
-      if (name == "Fluid" && pba->use_ppf == _TRUE_)
-        continue;
-      ppw->rho_plus_p_shear += sp->RhoPlusPShear(ppw->pv, y, ppw->pvecback, ppw);
+    {
+      size_t i = 0;
+      for (const auto& sp : all_species_) {
+        if (sp->name() != "Photons" && sp->name() != "Baryons" &&
+            !(sp->name() == "Fluid" && pba->use_ppf == _TRUE_))
+          ppw->rho_plus_p_shear +=
+              sp->RhoPlusPShear(*ppw->pv->species_layouts[i], ppw->pv, y, ppw->pvecback, ppw);
+        ++i;
+      }
     }
 
     /* Pass 2: accumulate delta_rho, rho_plus_p_theta, delta_p, rho_plus_p_tot,
@@ -6213,37 +5975,42 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     double rho_plus_p_theta_m_warm = 0.;
     double rho_plus_p_m_warm       = 0.;
 
-    for (const auto& [name, sp] : all_species_) {
-      if (name == "Photons" || name == "Baryons")
-        continue;
-      if (name == "Fluid")
-        continue;  // Fluid handled below (PPF special case)
-
-      const double rho        = sp->Rho(ppw->pvecback);
-      const double rho_plus_p = rho + sp->P(ppw->pvecback);
-
-      ppw->delta_rho        += rho * sp->Delta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_theta += rho_plus_p * sp->Theta(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->delta_p          += sp->DeltaP(ppw->pv, y, ppw->pvecback, ppw);
-      ppw->rho_plus_p_tot   += rho_plus_p;
-
-      if (sp->IsMatterSpecies()) {
-        const double mrd  = sp->MatterRhoDelta(ppw->pv, y, ppw->pvecback, ppw);
-        const double mr   = sp->MatterRho(ppw->pvecback);
-        const double mrpt = sp->MatterRhoPlusPTheta(ppw->pv, y, ppw->pvecback, ppw);
-        const double mrpp = sp->MatterRhoPlusP(ppw->pvecback);
-        if (sp->IsColdMatterSpecies()) {
-          delta_rho_m        += mrd;
-          rho_m              += mr;
-          rho_plus_p_theta_m += mrpt;
-          rho_plus_p_m       += mrpp;
+    {
+      size_t i = 0;
+      for (const auto& sp : all_species_) {
+        if (sp->name() == "Photons" || sp->name() == "Baryons" || sp->name() == "Fluid") {
+          ++i;
+          continue;  // Photons/Baryons have dedicated paths; Fluid handled below (PPF special case)
         }
-        else {
-          delta_rho_m_warm        += mrd;
-          rho_m_warm              += mr;
-          rho_plus_p_theta_m_warm += mrpt;
-          rho_plus_p_m_warm       += mrpp;
+
+        const auto& layout      = *ppw->pv->species_layouts[i];
+        const double rho        = sp->Rho(ppw->pvecback);
+        const double rho_plus_p = rho + sp->P(ppw->pvecback);
+
+        ppw->delta_rho        += rho * sp->Delta(layout, ppw->pv, y, ppw->pvecback, ppw);
+        ppw->rho_plus_p_theta += rho_plus_p * sp->Theta(layout, ppw->pv, y, ppw->pvecback, ppw);
+        ppw->delta_p          += sp->DeltaP(layout, ppw->pv, y, ppw->pvecback, ppw);
+        ppw->rho_plus_p_tot   += rho_plus_p;
+
+        if (sp->IsMatterSpecies()) {
+          const double mrd  = sp->MatterRhoDelta(ppw->pv, y, ppw->pvecback, ppw);
+          const double mr   = sp->MatterRho(ppw->pvecback);
+          const double mrpt = sp->MatterRhoPlusPTheta(ppw->pv, y, ppw->pvecback, ppw);
+          const double mrpp = sp->MatterRhoPlusP(ppw->pvecback);
+          if (sp->IsColdMatterSpecies()) {
+            delta_rho_m        += mrd;
+            rho_m              += mr;
+            rho_plus_p_theta_m += mrpt;
+            rho_plus_p_m       += mrpp;
+          }
+          else {
+            delta_rho_m_warm        += mrd;
+            rho_m_warm              += mr;
+            rho_plus_p_theta_m_warm += mrpt;
+            rho_plus_p_m_warm       += mrpp;
+          }
         }
+        ++i;
       }
     }
 
@@ -6268,11 +6035,14 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
                  error_message_);
       double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
+      const size_t fluid_i     = all_species_.index_of("Fluid");
+      const auto& fluid_layout = static_cast<const FluidSpecies::PerturbLayout&>(
+          *ppw->pv->species_layouts[fluid_i]);
       if (pba->use_ppf == _FALSE_) {
         ppw->delta_rho_fld        = all_species_.at("Fluid")->Rho(ppw->pvecback) *
-                                    y[ppw->pv->index_pt_delta_fld];
+                                    y[fluid_layout.idx_delta];
         ppw->rho_plus_p_theta_fld = (1. + w_fld) * all_species_.at("Fluid")->Rho(ppw->pvecback) *
-                                    y[ppw->pv->index_pt_theta_fld];
+                                    y[fluid_layout.idx_theta];
         double ca2_fld            = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
         /** We must gauge transform the pressure perturbation from the fluid rest-frame to the gauge we are working in */
         ppw->delta_p_fld = pba->cs2_fld * ppw->delta_rho_fld +
@@ -6319,20 +6089,23 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     ppw->vector_source_v  = 0.;
 
     /** - --> photon contribution to vector sources: */
-    if (ppw->approx[ppw->index_ap_rsa] ==
-        (int) rsa_off) { /* if radiation streaming approximation is off */
-      if (ppw->approx[ppw->index_ap_tca] ==
-          (int) tca_off) { /* if tight-coupling approximation is off */
+    {
+      const size_t g_vec_i  = all_species_.index_of("Photons");
+      const auto& g_vec_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+          *ppw->pv->species_layouts[g_vec_i]);
+      if (ppw->approx[ppw->index_ap_rsa] ==
+          (int) rsa_off) { /* if radiation streaming approximation is off */
+        if (ppw->approx[ppw->index_ap_tca] ==
+            (int) tca_off) { /* if tight-coupling approximation is off */
 
-        ppw->vector_source_v += 4. / 3. * a2 * all_species_.photons().Rho(ppw->pvecback) *
-                                (-1. / 4. * _SQRT2_) *
-                                (y[ppw->pv->index_pt_delta_g] + 2. * y[ppw->pv->index_pt_delta_g] +
-                                 y[ppw->pv->index_pt_shear_g]);
+          ppw->vector_source_v +=
+              4. / 3. * a2 * all_species_.photons().Rho(ppw->pvecback) * (-1. / 4. * _SQRT2_) *
+              (y[g_vec_lay.idx_delta] + 2. * y[g_vec_lay.idx_delta] + y[g_vec_lay.idx_shear]);
 
-        ppw->vector_source_pi += 1. / 3. * a2 * all_species_.photons().Rho(ppw->pvecback) *
-                                 (6. * _SQRT2_ / 5. / sqrt(1. - 2. * pba->K / k / k)) *
-                                 (4. / 3. / k * y[ppw->pv->index_pt_theta_g] +
-                                  y[ppw->pv->index_pt_l3_g]);
+          ppw->vector_source_pi += 1. / 3. * a2 * all_species_.photons().Rho(ppw->pvecback) *
+                                   (6. * _SQRT2_ / 5. / sqrt(1. - 2. * pba->K / k / k)) *
+                                   (4. / 3. / k * y[g_vec_lay.idx_theta] + y[g_vec_lay.idx_l3]);
+        }
       }
     }
 
@@ -6349,11 +6122,13 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
         (int) rsa_off) { /* if radiation streaming approximation is off */
       if (ppw->approx[ppw->index_ap_tca] ==
           (int) tca_off) { /* if tight-coupling approximation is off */
-
+        const size_t g_tens_i  = all_species_.index_of("Photons");
+        const auto& g_tens_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[g_tens_i]);
         ppw->gw_source += (-_SQRT6_ * 4 * a2 * all_species_.photons().Rho(ppw->pvecback) *
-                           (1. / 15. * y[ppw->pv->index_pt_delta_g] +
-                            4. / 21. * y[ppw->pv->index_pt_shear_g] +
-                            1. / 35. * y[ppw->pv->index_pt_l3_g + 1]));
+                           (1. / 15. * y[g_tens_lay.idx_delta] +
+                            4. / 21. * y[g_tens_lay.idx_shear] +
+                            1. / 35. * y[g_tens_lay.idx_l3 + 1]));
       }
     }
 
@@ -6361,14 +6136,16 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     if (evolve_tensor_ur_ == _TRUE_) {
       double rho_relativistic = 0.;
 
-      if (ppt->tensor_method == tm_exact)
-        rho_relativistic += all_species_.at("UR")->Rho(ppw->pvecback);
+      if (ppt->tensor_method == tm_exact) {
+        if (auto* ur = all_species_.find("UR"))
+          rho_relativistic += (*ur)->Rho(ppw->pvecback);
+      }
 
       if (ppt->tensor_method == tm_massless_approximation) {
-        if (all_species_.count("UR"))
-          rho_relativistic += all_species_.at("UR")->Rho(ppw->pvecback);
+        if (auto* ur = all_species_.find("UR"))
+          rho_relativistic += (*ur)->Rho(ppw->pvecback);
 
-        if (!ncdm_species_sorted_.empty()) {
+        if (HasNcdm(all_species_)) {
           for (auto& [name, sp] : all_species_) {
             auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
             if (!ncdm_sp)
@@ -6379,49 +6156,25 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
         }
       }
 
-      ppw->gw_source += (-_SQRT6_ * 4 * a2 * rho_relativistic *
-                         (1. / 15. * y[ppw->pv->index_pt_delta_ur] +
-                          4. / 21. * y[ppw->pv->index_pt_shear_ur] +
-                          1. / 35. * y[ppw->pv->index_pt_l3_ur + 1]));
+      const auto& ur_tens_lay  = ppw->pv->tensor_ur_layout;
+      ppw->gw_source          += (-_SQRT6_ * 4 * a2 * rho_relativistic *
+                                  (1. / 15. * y[ur_tens_lay.idx_delta] +
+                                   4. / 21. * y[ur_tens_lay.idx_shear] +
+                                   1. / 35. * y[ur_tens_lay.idx_l3 + 1]));
     }
 
     /** - --> ncdm contribution to gravitational wave source: */
     if (evolve_tensor_ncdm_ == _TRUE_) {
-      // We must integrate to find perturbations:
-      for (auto* ncdm_sp : ncdm_species_sorted_) {
-        int n = -1;
-        if (auto* n_sp = dynamic_cast<NCDMSpecies*>(ncdm_sp))
-          n = n_sp->ncdm_id();
-        else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(ncdm_sp))
-          n = d_sp->ncdm_id();
-        double gwncdm = 0.;
-
-        auto* ncdm_base_sp  = dynamic_cast<NCDMBaseSpecies*>(ncdm_sp);
-        const double factor = ncdm_base_sp->factor() * pow(pba->a_today / a, 4);
-
-        for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n]; index_q++) {
-          const int idx = ppw->pv->index_ncdm_[n][index_q];
-          double w0;
-          auto* dncdm_sp = dynamic_cast<DNCDMSpecies*>(ncdm_sp);
-          if (dncdm_sp == nullptr) {
-            w0 = ncdm_base_sp->w()[index_q];
-          }
-          else {
-            const double dq  = dncdm_sp->dq()[index_q];
-            const double f_q = exp(ppw->pvecback[dncdm_sp->bg_lnf_index() + index_q]);
-            w0               = dq * f_q;
-          }
-          const double q       = ncdm_base_sp->q()[index_q];
-          const double q2      = q * q;
-          const double epsilon = sqrt(q2 + ncdm_base_sp->M() * ncdm_base_sp->M() * a2);
-
-          gwncdm += q2 * q2 / epsilon * w0 *
-                    (1. / 15. * y[idx] + 2. / 21. * y[idx + 2] + 1. / 35. * y[idx + 4]);
+      for (size_t i = 0; i < all_species_.size(); ++i) {
+        const BaseSpecies* sp = all_species_[i];
+        if (dynamic_cast<const NCDMSpecies*>(sp)) {
+          sp->ContributeTensorGwSource(*ppw->pv->species_layouts[i], a, pba->a_today, y, ppw);
         }
-
-        gwncdm *= -_SQRT6_ * 4 * a2 * factor;
-
-        ppw->gw_source += gwncdm;
+        else if (auto* composite = dynamic_cast<const DNCDM_DR_Species*>(sp)) {
+          const auto& comp_lay = static_cast<const DNCDM_DR_Species::PerturbLayout&>(
+              *ppw->pv->species_layouts[i]);
+          composite->dncdm().ContributeTensorGwSource(comp_lay.dncdm, a, pba->a_today, y, ppw);
+        }
       }
     }
   }
@@ -6517,18 +6270,25 @@ int PerturbationsModule::perturb_sources_member(double tau,
 
     /** - --> compute quantities depending on approximation schemes */
 
+    const size_t g_src_i  = all_species_.index_of("Photons");
+    const auto& g_src_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+        *ppw->pv->species_layouts[g_src_i]);
+    const size_t b_src_i  = all_species_.index_of("Baryons");
+    const auto& b_src_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
+        *ppw->pv->species_layouts[b_src_i]);
+
     double delta_g;
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
       delta_g = ppw->rsa_delta_g;
       P       = 0.;
     }
     else {
-      delta_g = y[ppw->pv->index_pt_delta_g];
+      delta_g = y[g_src_lay.idx_delta];
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_on)
         P = 5. * ppw->s_l[2] * ppw->tca_shear_g / 8.; /* (2.5+0.5+2)shear_g/8 */
       else
-        P = (y[ppw->pv->index_pt_pol0_g] + y[ppw->pv->index_pt_pol2_g] +
-             2. * ppw->s_l[2] * y[ppw->pv->index_pt_shear_g]) /
+        P = (y[g_src_lay.idx_pol0] + y[g_src_lay.idx_pol2] +
+             2. * ppw->s_l[2] * y[g_src_lay.idx_shear]) /
             8.;
     }
 
@@ -6549,7 +6309,7 @@ int PerturbationsModule::perturb_sources_member(double tau,
       /*
         if (ppt->gauge == newtonian) {
         _set_source_(index_tp_t0_) = pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * pvecmetric[ppw->index_mt_phi_prime] + pvecthermo[thermodynamics_module_->index_th_g_] * delta_g / 4.;
-        _set_source_(index_tp_t1_) = pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * k* pvecmetric[ppw->index_mt_psi] + pvecthermo[thermodynamics_module_->index_th_g_] * y[ppw->pv->index_pt_theta_b]/k;
+        _set_source_(index_tp_t1_) = pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * k* pvecmetric[ppw->index_mt_psi] + pvecthermo[thermodynamics_module_->index_th_g_] * y[b_src_lay.idx_theta]/k;
         _set_source_(index_tp_t2_) = pvecthermo[thermodynamics_module_->index_th_g_] * P;
         }
       */
@@ -6565,8 +6325,8 @@ int PerturbationsModule::perturb_sources_member(double tau,
                           pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * 2. *
                               pvecmetric[ppw->index_mt_phi_prime]) +
             ppt->switch_dop / k / k *
-                (pvecthermo[thermodynamics_module_->index_th_g_] * dy[ppw->pv->index_pt_theta_b] +
-                 pvecthermo[thermodynamics_module_->index_th_dg_] * y[ppw->pv->index_pt_theta_b]);
+                (pvecthermo[thermodynamics_module_->index_th_g_] * dy[b_src_lay.idx_theta] +
+                 pvecthermo[thermodynamics_module_->index_th_dg_] * y[b_src_lay.idx_theta]);
 
         _set_source_(index_tp_t1_) = switch_isw *
                                      pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * k *
@@ -6580,7 +6340,7 @@ int PerturbationsModule::perturb_sources_member(double tau,
       /*
         if (ppt->gauge == synchronous) {
         _set_source_(index_tp_t0_) = - pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * pvecmetric[ppw->index_mt_h_prime] / 6. + pvecthermo[thermodynamics_module_->index_th_g_] / 4. * delta_g;
-        _set_source_(index_tp_t1_) = pvecthermo[thermodynamics_module_->index_th_g_] * y[ppw->pv->index_pt_theta_b] / k;
+        _set_source_(index_tp_t1_) = pvecthermo[thermodynamics_module_->index_th_g_] * y[b_src_lay.idx_theta] / k;
         _set_source_(index_tp_t2_) = pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * k*k* 2./3. * ppw->s_l[2] * pvecmetric[ppw->index_mt_alpha] + pvecthermo[thermodynamics_module_->index_th_g_] * P;
         }
       */
@@ -6600,10 +6360,9 @@ int PerturbationsModule::perturb_sources_member(double tau,
                                a_prime_over_a * pvecmetric[ppw->index_mt_alpha_prime])) +
             ppt->switch_dop *
                 (pvecthermo[thermodynamics_module_->index_th_g_] *
-                     (dy[ppw->pv->index_pt_theta_b] / k / k +
-                      pvecmetric[ppw->index_mt_alpha_prime]) +
+                     (dy[b_src_lay.idx_theta] / k / k + pvecmetric[ppw->index_mt_alpha_prime]) +
                  pvecthermo[thermodynamics_module_->index_th_dg_] *
-                     (y[ppw->pv->index_pt_theta_b] / k / k + pvecmetric[ppw->index_mt_alpha]));
+                     (y[b_src_lay.idx_theta] / k / k + pvecmetric[ppw->index_mt_alpha]));
 
         _set_source_(index_tp_t1_) =
             switch_isw * pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] * k *
@@ -6698,8 +6457,12 @@ int PerturbationsModule::perturb_sources_member(double tau,
     /* the metric potentials h and eta in synchronous gauge */
     if (ppt->gauge == synchronous) {
       /* cdm is always on in synchronous gauge, see error message above that checks gauge and has_cdm */
-      if (has_source_h_ == _TRUE_)
-        _set_source_(index_tp_h_) = -2 * y[ppw->pv->index_pt_delta_cdm];
+      if (has_source_h_ == _TRUE_) {
+        const size_t cdm_i  = all_species_.index_of("CDM");
+        const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[cdm_i]);
+        _set_source_(index_tp_h_) = -2 * y[cdm_lay.idx_delta];
+      }
 
       if (has_source_h_prime_ == _TRUE_)
         _set_source_(index_tp_h_prime_) = pvecmetric[ppw->index_mt_h_prime];
@@ -6770,8 +6533,13 @@ int PerturbationsModule::perturb_sources_member(double tau,
     }
 
     // Species-specific sources (delta_g, theta_g, delta_b, theta_b, delta_cdm, ...)
-    for (auto& [name, sp] : all_species_)
-      sp->FillSources(y, dy, src_ctx);
+    {
+      size_t i = 0;
+      for (auto& sp : all_species_) {
+        sp->FillSources(*ppw->pv->species_layouts[i], y, dy, src_ctx);
+        ++i;
+      }
+    }
 
     /* total velocity  */
     if (has_source_theta_tot_ == _TRUE_) {
@@ -6803,9 +6571,12 @@ int PerturbationsModule::perturb_sources_member(double tau,
     /** - --> compute quantities depending on approximation schemes */
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-        P = -(1. / 10. * y[ppw->pv->index_pt_delta_g] + 2. / 7. * y[ppw->pv->index_pt_shear_g] +
-              3. / 70. * y[ppw->pv->index_pt_delta_g + 4] - 3. / 5. * y[ppw->pv->index_pt_pol0_g] +
-              6. / 7. * y[ppw->pv->index_pt_pol2_g] - 3. / 70. * y[ppw->pv->index_pt_pol0_g + 4]) /
+        const size_t g_tsrc_i  = all_species_.index_of("Photons");
+        const auto& g_tsrc_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[g_tsrc_i]);
+        P = -(1. / 10. * y[g_tsrc_lay.idx_delta] + 2. / 7. * y[g_tsrc_lay.idx_shear] +
+              3. / 70. * y[g_tsrc_lay.idx_delta + 4] - 3. / 5. * y[g_tsrc_lay.idx_pol0] +
+              6. / 7. * y[g_tsrc_lay.idx_pol2] - 3. / 70. * y[g_tsrc_lay.idx_pol0 + 4]) /
             sqrt(6.);
       }
       else {
@@ -6898,13 +6669,6 @@ int PerturbationsModule::perturb_print_variables_member(
   double a  = pvecback[background_module_->index_bg_a_];
   double a2 = a * a;
 
-  std::vector<double> delta_ncdm, theta_ncdm, shear_ncdm;
-  if (!ncdm_species_sorted_.empty()) {
-    delta_ncdm.resize(pba->N_ncdm);
-    theta_ncdm.resize(pba->N_ncdm);
-    shear_ncdm.resize(pba->N_ncdm);
-  }
-
   /** - calculate perturbed recombination */
 
   double delta_temp = 0., delta_chi = 0.;
@@ -6978,13 +6742,16 @@ int PerturbationsModule::perturb_print_variables_member(
     double l4_ur = 0.;
 
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
+      const size_t g_pv_i  = all_species_.index_of("Photons");
+      const auto& g_pv_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+          *ppw->pv->species_layouts[g_pv_i]);
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-        delta_g = y[ppw->pv->index_pt_delta_g];
-        shear_g = y[ppw->pv->index_pt_shear_g];
-        l4_g    = y[ppw->pv->index_pt_delta_g + 4];
-        pol0_g  = y[ppw->pv->index_pt_pol0_g];
-        pol2_g  = y[ppw->pv->index_pt_pol2_g];
-        pol4_g  = y[ppw->pv->index_pt_pol0_g + 4];
+        delta_g = y[g_pv_lay.idx_delta];
+        shear_g = y[g_pv_lay.idx_shear];
+        l4_g    = y[g_pv_lay.idx_delta + 4];
+        pol0_g  = y[g_pv_lay.idx_pol0];
+        pol2_g  = y[g_pv_lay.idx_pol2];
+        pol4_g  = y[g_pv_lay.idx_pol0 + 4];
       }
       else {
         delta_g = -4. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
@@ -7007,9 +6774,10 @@ int PerturbationsModule::perturb_print_variables_member(
     }
 
     if (evolve_tensor_ur_ == _TRUE_) {
-      delta_ur = y[ppw->pv->index_pt_delta_ur];
-      shear_ur = y[ppw->pv->index_pt_shear_ur];
-      l4_ur    = y[ppw->pv->index_pt_delta_ur + 4];
+      const auto& ur_pv_lay = ppw->pv->tensor_ur_layout;
+      delta_ur              = y[ur_pv_lay.idx_delta];
+      shear_ur              = y[ur_pv_lay.idx_shear];
+      l4_ur                 = y[ur_pv_lay.idx_delta + 4];
     }
 
     /** - --> Handle (re-)allocation */
@@ -7041,25 +6809,25 @@ int PerturbationsModule::perturb_print_variables_member(
     class_store_double(dataptr, delta_ur, evolve_tensor_ur_, storeidx);
     class_store_double(dataptr, shear_ur, evolve_tensor_ur_, storeidx);
     class_store_double(dataptr, l4_ur, evolve_tensor_ur_, storeidx);
-    //printf("index_pt_delta+ur = %d\n",ppw->pv->index_pt_delta_ur);
 
     /* Non-cold Dark Matter */
     if (evolve_tensor_ncdm_ == _TRUE_) {
       class_test(pba->has_ncdm_decay_dr,
                  error_message_,
-                 "Cannot evolve tensor modes with decaying NCDM species.") for (auto& [name, sp] :
-                                                                                all_species_) {
-        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
+                 "Cannot evolve tensor modes with decaying NCDM species.");
+      for (size_t i = 0; i < all_species_.size(); ++i) {
+        const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
         if (!ncdm_sp)
           continue;
-        const int n                  = ncdm_sp->ncdm_id();
+        const auto& ncdm_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
+            *ppw->pv->species_layouts[i]);
         double rho_delta_ncdm        = 0.0;
         double rho_plus_p_theta_ncdm = 0.0;
         double rho_plus_p_shear_ncdm = 0.0;
         const double factor          = ncdm_sp->factor() * pow(pba->a_today / a, 4);
 
-        for (int index_q = 0; index_q < ppw->pv->q_size_ncdm[n]; index_q++) {
-          const int idx        = ppw->pv->index_ncdm_[n][index_q];
+        for (int index_q = 0; index_q < ncdm_lay.q_size; index_q++) {
+          const int idx        = ncdm_lay.index_per_q[index_q];
           const double q       = ncdm_sp->q()[index_q];
           const double q2      = q * q;
           const double epsilon = sqrt(q2 + ncdm_sp->M() * ncdm_sp->M() * a2);
@@ -7073,22 +6841,20 @@ int PerturbationsModule::perturb_print_variables_member(
         rho_plus_p_theta_ncdm *= k * factor;
         rho_plus_p_shear_ncdm *= 2.0 / 3.0 * factor;
 
-        delta_ncdm[n] = rho_delta_ncdm / ncdm_sp->Rho(ppw->pvecback);
-        theta_ncdm[n] = rho_plus_p_theta_ncdm /
-                        (ncdm_sp->Rho(ppw->pvecback) + ncdm_sp->P(ppw->pvecback));
-        shear_ncdm[n] = rho_plus_p_shear_ncdm /
-                        (ncdm_sp->Rho(ppw->pvecback) + ncdm_sp->P(ppw->pvecback));
+        const double rho        = ncdm_sp->Rho(ppw->pvecback);
+        const double rho_plus_p = rho + ncdm_sp->P(ppw->pvecback);
+        const double delta_ncdm = rho_delta_ncdm / rho;
+        const double theta_ncdm = rho_plus_p_theta_ncdm / rho_plus_p;
+        const double shear_ncdm = rho_plus_p_shear_ncdm / rho_plus_p;
 
-        class_store_double(dataptr, delta_ncdm[n], _TRUE_, storeidx);
-        class_store_double(dataptr, theta_ncdm[n], _TRUE_, storeidx);
-        class_store_double(dataptr, shear_ncdm[n], _TRUE_, storeidx);
+        class_store_double(dataptr, delta_ncdm, _TRUE_, storeidx);
+        class_store_double(dataptr, theta_ncdm, _TRUE_, storeidx);
+        class_store_double(dataptr, shear_ncdm, _TRUE_, storeidx);
       }
     }
 
     //    fprintf(ppw->perturb_output_file,"\n");
   }
-
-  /* RAII: ncdm vectors cleaned up automatically */
 
   return _SUCCESS_;
 }
@@ -7200,13 +6966,19 @@ int PerturbationsModule::perturb_derivs_member(
     double Tb_in_K = 0.;
 
     /** - --> (a) define short-cut notations for the scalar perturbations */
+    const size_t g_dr_i  = all_species_.index_of("Photons");
+    const auto& g_dr_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+        *pv->species_layouts[g_dr_i]);
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-      delta_g = y[pv->index_pt_delta_g];
-      theta_g = y[pv->index_pt_theta_g];
+      delta_g = y[g_dr_lay.idx_delta];
+      theta_g = y[g_dr_lay.idx_theta];
     }
 
-    double delta_b = y[pv->index_pt_delta_b];
-    double theta_b = y[pv->index_pt_theta_b];
+    const size_t b_dr_i  = all_species_.index_of("Baryons");
+    const auto& b_dr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
+        *pv->species_layouts[b_dr_i]);
+    double delta_b = y[b_dr_lay.idx_delta];
+    double theta_b = y[b_dr_lay.idx_theta];
     double cb2     = pvecthermo[thermodynamics_module_->index_th_cb2_];
     double delta_p_b_over_rho_b =
         cb2 *
@@ -7314,6 +7086,7 @@ int PerturbationsModule::perturb_derivs_member(
       ctx.theta_g              = theta_g;
       ctx.delta_b              = delta_b;
       ctx.theta_b              = theta_b;
+      ctx.b_idx_theta          = b_dr_lay.idx_theta;
       ctx.R                    = R;
       ctx.cb2                  = cb2;
       ctx.delta_p_b_over_rho_b = delta_p_b_over_rho_b;
@@ -7327,8 +7100,22 @@ int PerturbationsModule::perturb_derivs_member(
       class_call(perturb_tca_slip_and_shear(y, pppaw, error_message), error_message, error_message);
     }
 
-    all_species_.baryons().PerturbDerivs(tau, y, dy, *pppaw);
-    all_species_.photons().PerturbDerivs(tau, y, dy, *pppaw);
+    {
+      const size_t baryons_idx = all_species_.index_of("Baryons");
+      all_species_.baryons().PerturbDerivs(*ppw->pv->species_layouts[baryons_idx],
+                                           tau,
+                                           y,
+                                           dy,
+                                           *pppaw);
+    }
+    {
+      const size_t photons_idx = all_species_.index_of("Photons");
+      all_species_.photons().PerturbDerivs(*ppw->pv->species_layouts[photons_idx],
+                                           tau,
+                                           y,
+                                           dy,
+                                           *pppaw);
+    }
 
     /* perturbed recombination */
     /* computes the derivatives of delta x_e and delta T_b */
@@ -7341,7 +7128,7 @@ int PerturbationsModule::perturb_derivs_member(
 
       /* see the documentation for this formula */
       dy[ppw->pv->index_pt_perturbed_recombination_delta_temp] =
-          2. / 3. * dy[ppw->pv->index_pt_delta_b] -
+          2. / 3. * dy[b_dr_lay.idx_delta] -
           a * Compton_CR * pow(pba->T_cmb / a, 4) * chi / (1. + chi + fHe) *
               ((1. -
                 pba->T_cmb * pba->a_today / a / pvecthermo[thermodynamics_module_->index_th_Tb_]) *
@@ -7351,15 +7138,22 @@ int PerturbationsModule::perturb_derivs_member(
     }
 
     /* Species contributions to the perturbation ODE (scalars) */
-    for (auto& [name, sp] : all_species_) {
-      if (name == "Photons" || name == "Baryons")
-        continue;
-      if (!sp->RequiresDeferredPerturbDerivs())
-        sp->PerturbDerivs(tau, y, dy, *pppaw);
+    {
+      size_t i = 0;
+      for (auto& sp : all_species_) {
+        if (sp->name() != "Photons" && sp->name() != "Baryons" &&
+            !sp->RequiresDeferredPerturbDerivs())
+          sp->PerturbDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
+        ++i;
+      }
     }
-    for (auto& [name, sp] : all_species_) {
-      if (sp->RequiresDeferredPerturbDerivs())
-        sp->PerturbDerivs(tau, y, dy, *pppaw);
+    {
+      size_t i = 0;
+      for (auto& sp : all_species_) {
+        if (sp->RequiresDeferredPerturbDerivs())
+          sp->PerturbDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
+        ++i;
+      }
     }
 
     /** - --> metric */
@@ -7380,26 +7174,37 @@ int PerturbationsModule::perturb_derivs_member(
     /** - --> baryon velocity */
 
     /* delta_g is needed by the baryon theta equation; use sentinel-safe read */
-    const double delta_g_vec = (pv->index_pt_delta_g >= 0) ? y[pv->index_pt_delta_g] : 0.;
+    const size_t g_vec_dr_i  = all_species_.index_of("Photons");
+    const auto& g_vec_dr_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+        *pv->species_layouts[g_vec_dr_i]);
+    const double delta_g_vec = (g_vec_dr_lay.idx_delta >= 0) ? y[g_vec_dr_lay.idx_delta] : 0.;
+    const size_t b_vec_dr_i  = all_species_.index_of("Baryons");
+    const auto& b_vec_dr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
+        *pv->species_layouts[b_vec_dr_i]);
 
     if (ppt->gauge == synchronous) {
-      dy[pv->index_pt_theta_b] = -(1 - 3. * cb2) * a_prime_over_a * y[pv->index_pt_theta_b] -
-                                 pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-                                     (_SQRT2_ / 4. * delta_g_vec + y[pv->index_pt_theta_b]);
+      dy[b_vec_dr_lay.idx_theta] = -(1 - 3. * cb2) * a_prime_over_a * y[b_vec_dr_lay.idx_theta] -
+                                   pvecthermo[thermodynamics_module_->index_th_dkappa_] *
+                                       (_SQRT2_ / 4. * delta_g_vec + y[b_vec_dr_lay.idx_theta]);
     }
 
     else if (ppt->gauge == newtonian) {
-      dy[pv->index_pt_theta_b] = -(1 - 3. * cb2) * a_prime_over_a * y[pv->index_pt_theta_b] -
-                                 _SQRT2_ / 4. *
-                                     pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-                                     (delta_g_vec + 2. * _SQRT2_ * y[pv->index_pt_theta_b]) +
-                                 pvecmetric[ppw->index_mt_V_prime] +
-                                 (1. - 3. * cb2) * a_prime_over_a * y[pv->index_pt_V];
+      dy[b_vec_dr_lay.idx_theta] = -(1 - 3. * cb2) * a_prime_over_a * y[b_vec_dr_lay.idx_theta] -
+                                   _SQRT2_ / 4. *
+                                       pvecthermo[thermodynamics_module_->index_th_dkappa_] *
+                                       (delta_g_vec + 2. * _SQRT2_ * y[b_vec_dr_lay.idx_theta]) +
+                                   pvecmetric[ppw->index_mt_V_prime] +
+                                   (1. - 3. * cb2) * a_prime_over_a * y[pv->index_pt_V];
     }
 
     /** - --> species Boltzmann hierarchies (vector modes) */
-    for (const auto& [name, sp] : all_species_)
-      sp->PerturbVectorDerivs(tau, y, dy, *pppaw);
+    {
+      size_t i = 0;
+      for (auto& sp : all_species_) {
+        sp->PerturbVectorDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
+        ++i;
+      }
+    }
 
     if (ppt->gauge == synchronous) {
       /* Vector metric perturbation in synchronous gauge: */
@@ -7414,88 +7219,44 @@ int PerturbationsModule::perturb_derivs_member(
   /** - tensor modes: */
   if (_tensors_) {
     /** - --> species Boltzmann hierarchies (tensor modes) */
-    for (const auto& [name, sp] : all_species_)
-      sp->PerturbTensorDerivs(tau, y, dy, *pppaw);
-
-    if (evolve_tensor_ur_ == _TRUE_) {
-      dy[pv->index_pt_delta_ur] = -4. / 3. * y[pv->index_pt_theta_ur] +
-                                  _SQRT6_ * y[pv->index_pt_gwdot];
-
-      dy[pv->index_pt_theta_ur] = k2 * (y[pv->index_pt_delta_ur] / 4. -
-                                        s2_squared * y[pv->index_pt_shear_ur]);
-
-      dy[pv->index_pt_shear_ur] = (4. / 15. * y[pv->index_pt_theta_ur] -
-                                   3. / 10. * k * s_l[3] / s_l[2] * y[pv->index_pt_shear_ur + 1]);
-
-      l                      = 3;
-      dy[pv->index_pt_l3_ur] = k / (2. * l + 1.) *
-                               (l * 2. * s_l[l] * s_l[2] * y[pv->index_pt_shear_ur] -
-                                (l + 1.) * s_l[l + 1] * y[pv->index_pt_l3_ur + 1]);
-
-      for (l = 4; l < pv->l_max_ur; l++) {
-        dy[pv->index_pt_delta_ur + l] = k / (2. * l + 1) *
-                                        (l * s_l[l] * y[pv->index_pt_delta_ur + l - 1] -
-                                         (l + 1.) * s_l[l + 1] * y[pv->index_pt_delta_ur + l + 1]);
+    {
+      size_t i = 0;
+      for (auto& sp : all_species_) {
+        sp->PerturbTensorDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
+        ++i;
       }
-
-      l                             = pv->l_max_ur;
-      dy[pv->index_pt_delta_ur + l] = k * (s_l[l] * y[pv->index_pt_delta_ur + l - 1] -
-                                           (1. + l) * cotKgen * y[pv->index_pt_delta_ur + l]);
     }
 
-    /** - --> non-cold dark matter (ncdm): massive neutrinos, WDM, etc. */
-    //TBC: curvature in all ncdm
-    if (evolve_tensor_ncdm_ == _TRUE_) {
-      /** - ---> loop over species */
+    /** - --> relativistic-neutrino tensor hierarchy (pv-owned: ur and/or
+        massless-approximated ncdm), sourced by the gravitational waves. */
+    if (evolve_tensor_ur_ == _TRUE_) {
+      const auto& ur_lay  = pv->tensor_ur_layout;
+      const int idx_delta = ur_lay.idx_delta;
+      const int idx_theta = ur_lay.idx_theta;
+      const int idx_shear = ur_lay.idx_shear;
+      const int idx_l3    = ur_lay.idx_l3;
+      const int l_max     = ur_lay.l_max;
 
-      for (auto* sp : ncdm_species_sorted_) {
-        int n                         = -1;
-        NCDMBaseSpecies* ncdm_base_sp = dynamic_cast<NCDMBaseSpecies*>(sp);
-        if (auto* n_sp = dynamic_cast<NCDMSpecies*>(sp))
-          n = n_sp->ncdm_id();
-        else if (auto* d_sp = dynamic_cast<DNCDMSpecies*>(sp))
-          n = d_sp->ncdm_id();
+      dy[idx_delta] = -4. / 3. * y[idx_theta] + _SQRT6_ * y[pv->index_pt_gwdot];
 
-        /** - ----> loop over momentum */
+      dy[idx_theta] = k2 * (y[idx_delta] / 4. - s2_squared * y[idx_shear]);
 
-        for (int index_q = 0; index_q < pv->q_size_ncdm[n]; index_q++) {
-          /** - ----> define intermediate quantities */
-          double dlnf0_dlnq;
-          auto* dncdm_sp = dynamic_cast<DNCDMSpecies*>(sp);
-          if (dncdm_sp == nullptr) {
-            dlnf0_dlnq = ncdm_base_sp->dlnf0_dlnq()[index_q];
-          }
-          else {
-            // If the current species can decay, it is a DNCDMSpecies
-            dlnf0_dlnq = pvecback[dncdm_sp->bg_dlnfdlnq_index() + index_q];
-          }
+      dy[idx_shear] = (4. / 15. * y[idx_theta] - 3. / 10. * k * s_l[3] / s_l[2] * y[idx_shear + 1]);
 
-          const int ncdm_idx = ppw->pv->index_ncdm_[n][index_q];
+      l          = 3;
+      dy[idx_l3] = k / (2. * l + 1.) *
+                   (l * 2. * s_l[l] * s_l[2] * y[idx_shear] -
+                    (l + 1.) * s_l[l + 1] * y[idx_l3 + 1]);
 
-          const double q              = ncdm_base_sp->q()[index_q];
-          const double epsilon        = sqrt(q * q + a2 * ncdm_base_sp->M() * ncdm_base_sp->M());
-          const double qk_div_epsilon = k * q / epsilon;
-
-          /** - ----> ncdm density for given momentum bin */
-
-          dy[ncdm_idx] = -qk_div_epsilon * y[ncdm_idx + 1] -
-                         0.25 * _SQRT6_ * y[pv->index_pt_gwdot] * dlnf0_dlnq;
-
-          /** - ----> ncdm l>0 for given momentum bin */
-
-          for (l = 1; l < pv->l_max_ncdm[n]; l++) {
-            dy[ncdm_idx + l] = qk_div_epsilon / (2. * l + 1.0) *
-                               (l * s_l[l] * y[ncdm_idx + (l - 1)] -
-                                (l + 1.) * s_l[l + 1] * y[ncdm_idx + (l + 1)]);
-          }
-
-          /** - ----> ncdm lmax for given momentum bin (truncation as in Ma and Bertschinger)
-              but with curvature taken into account a la arXiv:1305.3261 */
-
-          dy[ncdm_idx + l] = qk_div_epsilon * y[ncdm_idx + l - 1] -
-                             (1. + l) * k * cotKgen * y[ncdm_idx + l];
-        }
+      for (l = 4; l < l_max; l++) {
+        dy[idx_delta + l] = k / (2. * l + 1) *
+                            (l * s_l[l] * y[idx_delta + l - 1] -
+                             (l + 1.) * s_l[l + 1] * y[idx_delta + l + 1]);
       }
+
+      l                 = l_max;
+      dy[idx_delta + l] = k *
+                          (s_l[l] * y[idx_delta + l - 1] - (1. + l) * cotKgen * y[idx_delta + l]);
     }
 
     /** - --> tensor metric perturbation h (gravitational waves) */
@@ -7546,13 +7307,19 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y,
   double s2_squared = 1. - 3. * pba->K / k2;
 
   /** - --> (a) define short-cut notations for the scalar perturbations */
+  const size_t g_tca_i  = all_species_.index_of("Photons");
+  const auto& g_tca_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+      *pv->species_layouts[g_tca_i]);
+  const size_t b_tca_i  = all_species_.index_of("Baryons");
+  const auto& b_tca_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
+      *pv->species_layouts[b_tca_i]);
   double delta_g = 0., theta_g = 0.;
   if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-    delta_g = y[pv->index_pt_delta_g];
-    theta_g = y[pv->index_pt_theta_g];
+    delta_g = y[g_tca_lay.idx_delta];
+    theta_g = y[g_tca_lay.idx_theta];
   }
-  double delta_b = y[pv->index_pt_delta_b];
-  double theta_b = y[pv->index_pt_theta_b];
+  double delta_b = y[b_tca_lay.idx_delta];
+  double theta_b = y[b_tca_lay.idx_theta];
   double cb2     = pvecthermo[thermodynamics_module_->index_th_cb2_];
   /* during TCA one can show that sound speed = adiabatic sound speed,
      so no need to take into account corrections from perturbed
@@ -7831,6 +7598,10 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(
 
   // formulas below TBC for curvaturema
 
+  const size_t b_rsa_i  = all_species_.index_of("Baryons");
+  const auto& b_rsa_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
+      *ppw->pv->species_layouts[b_rsa_i]);
+
   /* newtonian gauge */
   if (ppt->gauge == newtonian) {
     if (ppr->radiation_streaming_approximation == rsa_null) {
@@ -7844,15 +7615,15 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(
 
     if (ppr->radiation_streaming_approximation == rsa_MD_with_reio) {
       ppw->rsa_delta_g += -4. / k2 * ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-                          y[ppw->pv->index_pt_theta_b];
+                          y[b_rsa_lay.idx_theta];
 
       ppw->rsa_theta_g += 3. / k2 *
                           (ppw->pvecthermo[thermodynamics_module_->index_th_ddkappa_] *
-                               y[ppw->pv->index_pt_theta_b] +
+                               y[b_rsa_lay.idx_theta] +
                            ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-                               (-a_prime_over_a * y[ppw->pv->index_pt_theta_b] +
+                               (-a_prime_over_a * y[b_rsa_lay.idx_theta] +
                                 ppw->pvecthermo[thermodynamics_module_->index_th_cb2_] * k2 *
-                                    y[ppw->pv->index_pt_delta_b] +
+                                    y[b_rsa_lay.idx_delta] +
                                 k2 * y[ppw->pv->index_pt_phi]));
     }
 
@@ -7883,17 +7654,16 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(
 
     if (ppr->radiation_streaming_approximation == rsa_MD_with_reio) {
       ppw->rsa_delta_g += -4. / k2 * ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-                          (y[ppw->pv->index_pt_theta_b] +
-                           0.5 * ppw->pvecmetric[ppw->index_mt_h_prime]);
+                          (y[b_rsa_lay.idx_theta] + 0.5 * ppw->pvecmetric[ppw->index_mt_h_prime]);
 
       ppw->rsa_theta_g +=
           3. / k2 *
           (ppw->pvecthermo[thermodynamics_module_->index_th_ddkappa_] *
-               (y[ppw->pv->index_pt_theta_b] + 0.5 * ppw->pvecmetric[ppw->index_mt_h_prime]) +
+               (y[b_rsa_lay.idx_theta] + 0.5 * ppw->pvecmetric[ppw->index_mt_h_prime]) +
            ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-               (-a_prime_over_a * y[ppw->pv->index_pt_theta_b] +
+               (-a_prime_over_a * y[b_rsa_lay.idx_theta] +
                 ppw->pvecthermo[thermodynamics_module_->index_th_cb2_] * k2 *
-                    y[ppw->pv->index_pt_delta_b] -
+                    y[b_rsa_lay.idx_delta] -
                 a_prime_over_a * ppw->pvecmetric[ppw->index_mt_h_prime] +
                 k2 * y[ppw->pv->index_pt_eta]));
     }
@@ -7967,16 +7737,4 @@ int PerturbationsModule::perturb_rsa_idr_delta_and_theta(
   }
 
   return _SUCCESS_;
-}
-
-std::tuple<double, double, double> PerturbationsModule::RescaledNCDMPerturbations(
-    int n_ncdm, double a, double k, perturb_workspace* ppw) {
-  for (auto& [name, sp] : all_species_) {
-    if (auto* composite = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
-      if (composite->dncdm().ncdm_id() == n_ncdm) {
-        return composite->dncdm().RescaledPerturbations(a, k, ppw);
-      }
-    }
-  }
-  throw std::runtime_error("RescaledNCDMPerturbations: invalid ncdm_id");
 }

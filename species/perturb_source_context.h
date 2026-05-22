@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <vector>
 
 #include "common.h"  // for file_format, _TRUE_, _FALSE_, class_store_* macros
@@ -30,6 +31,8 @@ struct PerturbScalarContext {
   double shear_g = 0.;
   /** baryon delta/theta */
   double delta_b = 0., theta_b = 0.;
+  /** baryon theta index in the perturb_vector y/dy arrays (used by photons TCA) */
+  int b_idx_theta = -1;
   /** nature of idr (free-streaming or fluid) */
   int idr_nature = 0;
   /** 4/3 * rho_g / rho_b, photon-baryon momentum ratio */
@@ -69,9 +72,15 @@ class PerturbColumnWriter {
 
   // For WriteOutputColumns: species pass a tp_index; writer looks up tk[tp_index]
   void Add(const char* title, int tp_index, bool active);
+  void Add(const std::string& title, int tp_index, bool active) {
+    Add(title.c_str(), tp_index, active);
+  }
 
   // For PrintVariables: species pass the value directly
   void Add(const char* title, double value, bool active);
+  void Add(const std::string& title, double value, bool active) {
+    Add(title.c_str(), value, active);
+  }
 
  private:
   char* titles_     = nullptr;
@@ -132,4 +141,18 @@ struct PerturbIcContext {
   perturb_workspace* ppw           = nullptr;
   const precision* ppr             = nullptr;
   const PerturbationsModule* p_mod = nullptr;
+};
+
+// ── PerturbSwitchContext ─────────────────────────────────────────────────────
+/**
+ * Context passed to BaseSpecies::CopyPerturbationsAcrossSwitch().
+ * Bundles the kinematics and background needed for non-trivial migration logic
+ * (e.g., NCDM fluid-approximation collapse from full hierarchy to delta/theta/shear).
+ * Trivial slot-by-slot copies don't need the body — most species ignore the context.
+ */
+struct PerturbSwitchContext {
+  double k               = 0.;
+  double a               = 0.;
+  double a_today         = 1.;
+  const double* pvecback = nullptr;
 };

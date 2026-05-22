@@ -12,133 +12,301 @@
 
 // ── IDM_DR ─────────────────────────────────────────────────────────────────
 
-void IDM_DRSpecies::RegisterPerturbationIndices(perturb_vector* pv,
-                                                const precision* ppr,
+// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+
+void IDM_DRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                perturb_vector* /*pv*/,
+                                                const precision* /*ppr*/,
                                                 int& index_pt,
                                                 const perturb_workspace* /*ppw*/,
                                                 int /*gauge*/) {
-  class_define_index(pv->index_pt_delta_idm_dr, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_theta_idm_dr, _TRUE_, index_pt, 1);
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.idx_delta = index_pt;
+  ++index_pt;
+
+  layout.idx_theta = index_pt;
+  ++index_pt;
 }
 
-void IDM_DRSpecies::PerturbDerivs(double /*tau*/,
+// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+
+void IDM_DRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                  double /*tau*/,
                                   const double* y,
                                   double* dy,
                                   const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   // idm_dr density: same as CDM continuity equation
-  dy[pv->index_pt_delta_idm_dr] = -(y[pv->index_pt_theta_idm_dr] + ctx.metric_continuity);
+  dy[layout.idx_delta] = -(y[layout.idx_theta] + ctx.metric_continuity);
 
   // idm_dr velocity: Hubble friction only (coupling to IDR added by IDM_DR_IDR_Species)
-  dy[pv->index_pt_theta_idm_dr] = -ctx.a_prime_over_a * y[pv->index_pt_theta_idm_dr] +
-                                  ctx.metric_euler;
+  dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
+}
+
+// ── PerturbDerivs (legacy path: unreachable — IDM_DR is composite-only) ───
+
+void IDM_DRSpecies::PerturbDerivs(double /*tau*/,
+                                  const double* /*y*/,
+                                  double* /*dy*/,
+                                  const perturb_parameters_and_workspace& /*ppaw*/) {
+  /* Unreachable: IDM_DR_IDR_Species always dispatches the layout-aware
+     PerturbDerivs(layout, ...) overload on its IDM_DR child. */
+}
+
+// ── Stress-energy observables (layout-based, primary path) ─────────────────
+
+double IDM_DRSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                            const perturb_vector* /*pv*/,
+                            const double* y,
+                            const double* /*pvecback*/,
+                            const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_delta];
+}
+
+double IDM_DRSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                            const perturb_vector* /*pv*/,
+                            const double* y,
+                            const double* /*pvecback*/,
+                            const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_theta];
+}
+
+// ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
+
+void IDM_DRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                  const BaseSpecies::PerturbLayout& new_base,
+                                                  const double* old_y,
+                                                  double* new_y,
+                                                  const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+    return;
+  new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }
 
 // ── IDR ───────────────────────────────────────────────────────────────────
 
-void IDRSpecies::RegisterPerturbationIndices(perturb_vector* pv,
-                                             const precision* ppr,
+// ── RegisterPerturbationIndices (layout-based, primary path) ───────────────
+
+void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                             perturb_vector* pv,
+                                             const precision* /*ppr*/,
                                              int& index_pt,
                                              const perturb_workspace* ppw,
                                              int /*gauge*/) {
-  /* Initialize all IDR indices to sentinel -1 */
-  pv->index_pt_delta_idr = -1;
-  pv->index_pt_theta_idr = -1;
-  pv->index_pt_shear_idr = -1;
-  pv->index_pt_l3_idr    = -1;
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  /* Initialize layout slots to sentinel -1 */
+  layout.idx_delta = -1;
+  layout.idx_theta = -1;
+  layout.idx_shear = -1;
+  layout.idx_l3    = -1;
+  layout.l_max     = -1;
 
   /* RSA active: IDR handled analytically, nothing to integrate. */
   if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)
     return;
 
-  class_define_index(pv->index_pt_delta_idr, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_theta_idr, _TRUE_, index_pt, 1);
+  layout.idx_delta = index_pt;
+  ++index_pt;
+
+  layout.idx_theta = index_pt;
+  ++index_pt;
 
   /* Full hierarchy: only register shear/l3 if idr_nature == idr_free_streaming
      AND (no IDM_DR OR TCA is off) */
   if (ppw->scalar_ctx.idr_nature == idr_free_streaming) {
     if (pba_.has_idm_dr == _FALSE_ ||
         ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
-      class_define_index(pv->index_pt_shear_idr, _TRUE_, index_pt, 1);
-      pv->l_max_idr = pba_.l_max_idr;
-      class_define_index(pv->index_pt_l3_idr, (pv->l_max_idr >= 3), index_pt, pv->l_max_idr - 2);
+      layout.idx_shear = index_pt;
+      ++index_pt;
+
+      layout.l_max = pba_.l_max_idr;
+
+      if (pba_.l_max_idr >= 3) {
+        layout.idx_l3  = index_pt;
+        index_pt      += pba_.l_max_idr - 2;  // l3, l4, ..., l_max
+      }
     }
   }
 }
 
-void IDRSpecies::PerturbDerivs(double /*tau*/,
+// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+
+void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                               double /*tau*/,
                                const double* y,
                                double* dy,
                                const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)
+  /* RSA active (idx_delta < 0): IDR handled analytically. */
+  if (layout.idx_delta < 0)
     return;
 
   const double* s_l    = ppw->s_l;
   const double k       = ctx.k;
   const double cotKgen = ctx.cotKgen;
 
+  const int idx_delta = layout.idx_delta;
+  const int idx_theta = layout.idx_theta;
+  const int idx_shear = layout.idx_shear;
+  const int idx_l3    = layout.idx_l3;
+  const int l_max     = layout.l_max;
+
   // idr density
-  dy[pv->index_pt_delta_idr] = -4. / 3. * (y[pv->index_pt_theta_idr] + ctx.metric_continuity);
+  dy[idx_delta] = -4. / 3. * (y[idx_theta] + ctx.metric_continuity);
 
   if (ctx.idr_nature == idr_free_streaming) {
     // idr velocity and hierarchy (only when shear is registered; under TCA shear is
     // not registered and AddCouplingDerivs will overwrite theta_idr)
-    if (pv->index_pt_shear_idr >= 0) {
-      dy[pv->index_pt_theta_idr] = ctx.k2 * (y[pv->index_pt_delta_idr] / 4. -
-                                             ctx.s2_squared * y[pv->index_pt_shear_idr]) +
-                                   ctx.metric_euler;
+    if (idx_shear >= 0) {
+      dy[idx_theta] = ctx.k2 * (y[idx_delta] / 4. - ctx.s2_squared * y[idx_shear]) +
+                      ctx.metric_euler;
 
       // idr shear (l=2)
-      dy[pv->index_pt_shear_idr] = 0.5 *
-                                   (8. / 15. * (y[pv->index_pt_theta_idr] + ctx.metric_shear) -
-                                    3. / 5. * k * s_l[3] / s_l[2] * y[pv->index_pt_shear_idr + 1]);
+      dy[idx_shear] = 0.5 * (8. / 15. * (y[idx_theta] + ctx.metric_shear) -
+                             3. / 5. * k * s_l[3] / s_l[2] * y[idx_shear + 1]);
 
       // idr l=3
-      int l                   = 3;
-      dy[pv->index_pt_l3_idr] = k / (2. * l + 1.) *
-                                (l * 2. * s_l[l] * s_l[2] * y[pv->index_pt_shear_idr] -
-                                 (l + 1.) * s_l[l + 1] * y[pv->index_pt_l3_idr + 1]);
+      int l      = 3;
+      dy[idx_l3] = k / (2. * l + 1.) *
+                   (l * 2. * s_l[l] * s_l[2] * y[idx_shear] -
+                    (l + 1.) * s_l[l + 1] * y[idx_l3 + 1]);
 
       // idr l>3
-      for (l = 4; l < pv->l_max_idr; l++)
-        dy[pv->index_pt_delta_idr + l] = k / (2. * l + 1) *
-                                         (l * s_l[l] * y[pv->index_pt_delta_idr + l - 1] -
-                                          (l + 1.) * s_l[l + 1] *
-                                              y[pv->index_pt_delta_idr + l + 1]);
+      for (l = 4; l < l_max; l++)
+        dy[idx_delta + l] = k / (2. * l + 1) *
+                            (l * s_l[l] * y[idx_delta + l - 1] -
+                             (l + 1.) * s_l[l + 1] * y[idx_delta + l + 1]);
 
       // idr lmax
-      l                              = pv->l_max_idr;
-      dy[pv->index_pt_delta_idr + l] = k * (s_l[l] * y[pv->index_pt_delta_idr + l - 1] -
-                                            (1. + l) * cotKgen * y[pv->index_pt_delta_idr + l]);
+      l                 = l_max;
+      dy[idx_delta + l] = k *
+                          (s_l[l] * y[idx_delta + l - 1] - (1. + l) * cotKgen * y[idx_delta + l]);
     }
     // else: TCA-on; theta_idr will be set by IDM_DR_IDR_Species::AddCouplingDerivs
   }
   else {
     // Fluid idr velocity
-    dy[pv->index_pt_theta_idr] = ctx.k2 / 4. * y[pv->index_pt_delta_idr] + ctx.metric_euler;
+    dy[idx_theta] = ctx.k2 / 4. * y[idx_delta] + ctx.metric_euler;
   }
 }
 
-double IDRSpecies::TcaShearIdr(const perturb_vector* pv,
+// ── PerturbDerivs (legacy path: unreachable — IDR is composite-only) ───────
+
+void IDRSpecies::PerturbDerivs(double /*tau*/,
+                               const double* /*y*/,
+                               double* /*dy*/,
+                               const perturb_parameters_and_workspace& /*ppaw*/) {
+  /* Unreachable: IDM_DR_IDR_Species always dispatches the layout-aware
+     PerturbDerivs(layout, ...) overload on its IDR child. */
+}
+
+// ── Stress-energy observables (layout-based, primary path) ─────────────────
+
+double IDRSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                         const perturb_vector* /*pv*/,
+                         const double* y,
+                         const double* /*pvecback*/,
+                         const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  /* RSA active (idx_delta < 0): IDR delta is handled by rsa_delta_idr in ppw.
+     Return 0 to avoid double-counting. */
+  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
+}
+
+double IDRSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                         const perturb_vector* /*pv*/,
+                         const double* y,
+                         const double* /*pvecback*/,
+                         const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  /* RSA active (idx_theta < 0): IDR theta is handled by rsa_theta_idr in ppw.
+     Return 0 to avoid double-counting. */
+  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
+}
+
+double IDRSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                          const perturb_vector* /*pv*/,
+                          const double* y,
+                          const double* pvecback,
+                          const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  /* delta_p = c_s^2 * delta_rho = (1/3) * rho * delta */
+  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] / 3. : 0.;
+}
+
+double IDRSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* /*pv*/,
+                                 const double* y,
+                                 const double* pvecback,
+                                 const perturb_workspace* ppw) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (ppw->scalar_ctx.idr_nature != idr_free_streaming)
+    return 0.;
+
+  /* Use layout slot if shear is registered; fall back to TCA formula otherwise. */
+  const double shear_idr = (layout.idx_shear >= 0) ? y[layout.idx_shear]
+                                                   : TcaShearIdr(layout, y, ppw);
+  return 4. / 3. * Rho(pvecback) * shear_idr;
+}
+
+// ── CopyPerturbationsAcrossSwitch ──────────────────────────────────────────
+
+void IDRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                               const BaseSpecies::PerturbLayout& new_base,
+                                               const double* old_y,
+                                               double* new_y,
+                                               const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+
+  /* Guard: only copy if both layouts have slots (rsa_idr must be off in both). */
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+    return;
+
+  /* delta and theta are always present when rsa_idr is off. */
+  new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+
+  /* shear and l3+ are only present in free-streaming mode with tca_idm_dr off.
+     Copy slot-by-slot only when both sides have them registered. */
+  if (old_l.idx_shear >= 0 && new_l.idx_shear >= 0) {
+    new_y[new_l.idx_shear] = old_y[old_l.idx_shear];
+  }
+  if (old_l.idx_l3 >= 0 && new_l.idx_l3 >= 0 && old_l.l_max >= 3 && new_l.l_max >= 3) {
+    new_y[new_l.idx_l3] = old_y[old_l.idx_l3];
+    for (int l = 4; l <= new_l.l_max; ++l)
+      new_y[new_l.idx_delta + l] = old_y[old_l.idx_delta + l];
+  }
+}
+
+// ── TcaShearIdr ────────────────────────────────────────────────────────────
+
+double IDRSpecies::TcaShearIdr(const PerturbLayout& layout,
                                const double* y,
                                const perturb_workspace* ppw) const {
   // TCA shear is meaningful when shear_idr is NOT in the y-vector (i.e. we
-  // didn't register it because TCA was on at vector-init). The vector-layout
-  // check is the canonical signal — we deliberately don't gate on
+  // didn't register it because TCA was on at vector-init). The layout check
+  // is the canonical signal — we deliberately don't gate on
   // ppw->approx[index_ap_tca_idm_dr] because perturb_vector_init calls this
   // during the tca_on -> tca_off transition (after the approx flag has flipped
-  // but with the old vector still in ppw->pv), and we need the last TCA
-  // prediction to seed the new shear_idr integration.
+  // but with the old layout still pointing at the old slot set), and we need
+  // the last TCA prediction to seed the new shear_idr integration.
   if (ppw->scalar_ctx.idr_nature != idr_free_streaming)
     return 0.;
-  if (pv->index_pt_shear_idr >= 0)
+  if (layout.idx_shear >= 0)
     return 0.;
   if (ppw->approx[ppw->index_ap_rsa_idr] != (int) rsa_idr_off)
     return 0.;
@@ -148,69 +316,174 @@ double IDRSpecies::TcaShearIdr(const perturb_vector* pv,
     return 0.;  // synchronous gauge derives shear in perturb_einstein
 
   return 0.5 * (8. / 15. / ppw->pvecthermo[thm_->index_th_dmu_idm_dr_] / ppt_->alpha_idm_dr[0] *
-                y[pv->index_pt_theta_idr]);
-}
-
-double IDRSpecies::RhoPlusPShear(const perturb_vector* pv,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* ppw) const {
-  if (ppw->scalar_ctx.idr_nature != idr_free_streaming)
-    return 0.;
-
-  const double shear_idr = (pv->index_pt_shear_idr >= 0) ? y[pv->index_pt_shear_idr]
-                                                         : TcaShearIdr(pv, y, ppw);
-
-  return 4. / 3. * pvecback[index_bg_rho_] * shear_idr;
+                y[layout.idx_theta]);
 }
 
 // ── IDM_DRMD ───────────────────────────────────────────────────────────────
 
-void IDM_DRMDSpecies::RegisterPerturbationIndices(perturb_vector* pv,
-                                                  const precision* ppr,
+// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+
+void IDM_DRMDSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                  perturb_vector* /*pv*/,
+                                                  const precision* /*ppr*/,
                                                   int& index_pt,
                                                   const perturb_workspace* /*ppw*/,
                                                   int /*gauge*/) {
-  class_define_index(pv->index_pt_delta_idm_drmd, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_theta_idm_drmd, _TRUE_, index_pt, 1);
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.idx_delta = index_pt;
+  ++index_pt;
+
+  layout.idx_theta = index_pt;
+  ++index_pt;
 }
 
-void IDM_DRMDSpecies::PerturbDerivs(double /*tau*/,
+// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+
+void IDM_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                    double /*tau*/,
                                     const double* y,
                                     double* dy,
                                     const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  dy[pv->index_pt_delta_idm_drmd] = -(y[pv->index_pt_theta_idm_drmd] + ctx.metric_continuity);
+  dy[layout.idx_delta] = -(y[layout.idx_theta] + ctx.metric_continuity);
   // Free-streaming velocity: coupling to IDR_DRMD added by IDM_DRMD_IDR_DRMD_Species
-  dy[pv->index_pt_theta_idm_drmd] = -ctx.a_prime_over_a * y[pv->index_pt_theta_idm_drmd] +
-                                    ctx.metric_euler;
+  dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
+}
+
+// ── PerturbDerivs (legacy path: unreachable — IDM_DRMD is composite-only) ─
+
+void IDM_DRMDSpecies::PerturbDerivs(double /*tau*/,
+                                    const double* /*y*/,
+                                    double* /*dy*/,
+                                    const perturb_parameters_and_workspace& /*ppaw*/) {
+  /* Unreachable: IDM_DRMD_IDR_DRMD_Species always dispatches the layout-aware
+     PerturbDerivs(layout, ...) overload on its IDM_DRMD child. */
+}
+
+// ── Stress-energy observables (layout-based, primary path) ─────────────────
+
+double IDM_DRMDSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                              const perturb_vector* /*pv*/,
+                              const double* y,
+                              const double* /*pvecback*/,
+                              const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_delta];
+}
+
+double IDM_DRMDSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                              const perturb_vector* /*pv*/,
+                              const double* y,
+                              const double* /*pvecback*/,
+                              const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_theta];
+}
+
+// ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
+
+void IDM_DRMDSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                    const BaseSpecies::PerturbLayout& new_base,
+                                                    const double* old_y,
+                                                    double* new_y,
+                                                    const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+    return;
+  new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }
 
 // ── IDR_DRMD ───────────────────────────────────────────────────────────────
 
-void IDR_DRMDSpecies::RegisterPerturbationIndices(perturb_vector* pv,
-                                                  const precision* ppr,
+// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+
+void IDR_DRMDSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                  perturb_vector* /*pv*/,
+                                                  const precision* /*ppr*/,
                                                   int& index_pt,
                                                   const perturb_workspace* /*ppw*/,
                                                   int /*gauge*/) {
-  class_define_index(pv->index_pt_delta_idr_drmd, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_theta_idr_drmd, _TRUE_, index_pt, 1);
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.idx_delta = index_pt;
+  ++index_pt;
+
+  layout.idx_theta = index_pt;
+  ++index_pt;
 }
 
-void IDR_DRMDSpecies::PerturbDerivs(double /*tau*/,
+// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+
+void IDR_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                    double /*tau*/,
                                     const double* y,
                                     double* dy,
                                     const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  dy[pv->index_pt_delta_idr_drmd] = -4. / 3. *
-                                    (y[pv->index_pt_theta_idr_drmd] + ctx.metric_continuity);
+  dy[layout.idx_delta] = -4. / 3. * (y[layout.idx_theta] + ctx.metric_continuity);
   // Free-streaming velocity: coupling to IDM_DRMD added by IDM_DRMD_IDR_DRMD_Species
-  dy[pv->index_pt_theta_idr_drmd] = 0.25 * ctx.k2 * y[pv->index_pt_delta_idr_drmd] +
-                                    ctx.metric_euler;
+  dy[layout.idx_theta] = 0.25 * ctx.k2 * y[layout.idx_delta] + ctx.metric_euler;
+}
+
+// ── PerturbDerivs (legacy path: unreachable — IDR_DRMD is composite-only) ─
+
+void IDR_DRMDSpecies::PerturbDerivs(double /*tau*/,
+                                    const double* /*y*/,
+                                    double* /*dy*/,
+                                    const perturb_parameters_and_workspace& /*ppaw*/) {
+  /* Unreachable: IDM_DRMD_IDR_DRMD_Species always dispatches the layout-aware
+     PerturbDerivs(layout, ...) overload on its IDR_DRMD child. */
+}
+
+// ── Stress-energy observables (layout-based, primary path) ─────────────────
+
+double IDR_DRMDSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                              const perturb_vector* /*pv*/,
+                              const double* y,
+                              const double* /*pvecback*/,
+                              const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
+}
+
+double IDR_DRMDSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                              const perturb_vector* /*pv*/,
+                              const double* y,
+                              const double* /*pvecback*/,
+                              const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
+}
+
+double IDR_DRMDSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                               const perturb_vector* /*pv*/,
+                               const double* y,
+                               const double* pvecback,
+                               const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return (layout.idx_delta >= 0) ? pvecback[index_bg_rho_] * y[layout.idx_delta] / 3. : 0.;
+}
+
+// ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
+
+void IDR_DRMDSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                    const BaseSpecies::PerturbLayout& new_base,
+                                                    const double* old_y,
+                                                    double* new_y,
+                                                    const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+    return;
+  new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }

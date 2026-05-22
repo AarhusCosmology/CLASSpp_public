@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <string>
 
 #include "../species/base_species.h"
 #include "background.h"
@@ -12,9 +13,21 @@ class BackgroundModule;
  */
 class DNCDM_DecayRadiationSpecies : public BaseSpecies {
  public:
-  DNCDM_DecayRadiationSpecies(int ncdm_id, const background* pba, const BackgroundModule* bgm)
-      : BaseSpecies("DNCDM_DecayRadiation_" + std::to_string(ncdm_id), EnergyType::Radiation),
-        ncdm_id_(ncdm_id), pba_(pba), bgm_(bgm) {}
+  // ── PerturbLayout ──────────────────────────────────────────────────────────
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    int idx_F0 = -1;  ///< base offset for the DR multipole hierarchy in pv->y
+    int l_max  = -1;  ///< max multipole (pv->l_max_dr)
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
+  DNCDM_DecayRadiationSpecies(const std::string& parent_name,
+                              const background* pba,
+                              const BackgroundModule* bgm)
+      : BaseSpecies("DNCDM_DecayRadiation_" + parent_name, EnergyType::Radiation), pba_(pba),
+        bgm_(bgm) {}
 
   /** Decay product: no direct Omega0 input, starts at zero. */
   double GetOmega0() const override {
@@ -43,32 +56,88 @@ class DNCDM_DecayRadiationSpecies : public BaseSpecies {
     return -4. / 3. * pvecback[index_bg_rho_];
   }
 
-  void RegisterPerturbationIndices(perturb_vector* pv,
+  // ── Layout-based perturbation interface ────────────────────────────────────
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(double tau,
+
+  /** Legacy scalar register: no-op — dual-written by layout-based path above. */
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  double Delta(const perturb_vector* pv,
+  /** Legacy PerturbDerivs: no-op — composite routes through layout-based path. */
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
+
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv,
+
+  /** Legacy Delta: no-op — composite routes through layout-based path. */
+  double Delta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
+
+  /** Legacy Theta: no-op — composite routes through layout-based path. */
+  double Theta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv,
+
+  /** Legacy DeltaP: no-op — composite routes through layout-based path. */
+  double DeltaP(const perturb_vector* /*pv*/,
+                const double* /*y*/,
+                const double* /*pvecback*/,
+                const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+
+  /** Legacy RhoPlusPShear: no-op — composite routes through layout-based path. */
+  double RhoPlusPShear(const perturb_vector* /*pv*/,
+                       const double* /*y*/,
+                       const double* /*pvecback*/,
+                       const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
 
   int bi_rho_index() const {
     return index_bi_rho_;
@@ -76,15 +145,10 @@ class DNCDM_DecayRadiationSpecies : public BaseSpecies {
   int bg_rho_index() const {
     return index_bg_rho_;
   }
-  int pt_F0_index() const {
-    return index_pt_F0_;
-  }
 
  private:
-  int ncdm_id_;
   const background* pba_;
   const BackgroundModule* bgm_;
 
   int index_bi_rho_ = -1;
-  int index_pt_F0_  = -1;
 };

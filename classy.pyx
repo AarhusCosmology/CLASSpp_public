@@ -157,7 +157,8 @@ cdef class PyCosmology:
             return True
     property Omega_nu:
         def __get__(self):
-            return self.ba.Omega0_ncdm_tot
+            ibg = deref(self._thisptr).GetBackgroundModule()
+            return deref(ibg).GetOmega0NcdmTot()
     property nonlinear_method:
         def __get__(self):
             return self.nl.method
@@ -905,7 +906,7 @@ cdef class PyCosmology:
         ibg = deref(self._thisptr).GetBackgroundModule()
 
         ncdm_dict = {}
-        for ncdm_id in range(self.ba.N_ncdm):
+        for ncdm_id in range(deref(ibg).GetNcdmCount()):
             q_size = deref(ibg).GetNcdmQSize(ncdm_id)
             ncdm_dict[f"deg[{ncdm_id}]"]      = deref(ibg).GetNcdmDeg(ncdm_id)
             ncdm_dict[f"m_ncdm[{ncdm_id}]"]   = deref(ibg).GetNcdmMassInEV(ncdm_id)
@@ -1463,7 +1464,8 @@ cdef class PyCosmology:
             #    value = self.ba.m_ncdm_in_eV[0]
             elif name == 'm_ncdm_tot':
                 # TODO: Is this really what we want??
-                value = self.ba.Omega0_ncdm_tot*self.ba.h*self.ba.h*93.14
+                ibg = deref(self._thisptr).GetBackgroundModule()
+                value = deref(ibg).GetOmega0NcdmTot()*self.ba.h*self.ba.h*93.14
             elif name == 'Neff':
                 value = self.Neff()
             elif name == 'Omega_m':

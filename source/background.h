@@ -130,10 +130,8 @@ struct background {
 
   double Omega0_k = 0.; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
 
-  int N_ncdm             = 0;  /**< Number of distinguishable ncdm species */
-  double Omega0_ncdm_tot = 0.; /**< Omega0_ncdm for each species and for the total Omega0_ncdm */
-  int N_decay_dr         = 0;
-  int l_max_idr          = 0;
+  int N_decay_dr = 0;
+  int l_max_idr  = 0;
   /** @name - related parameters */
 
   //@{

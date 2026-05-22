@@ -59,6 +59,7 @@
 		EE00000E0000000000000001 /* dncdm_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE00000D0000000000000001 /* dncdm_species.cpp */; };
 		EE0000110000000000000001 /* dncdm_decay_radiation_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000100000000000000001 /* dncdm_decay_radiation_species.cpp */; };
 		EE0000140000000000000001 /* dncdm_dr_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000130000000000000001 /* dncdm_dr_species.cpp */; };
+		EE3000020000000000000001 /* base_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE3000010000000000000001 /* base_species.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -191,6 +192,7 @@
 		EE1000010000000000000001 /* species_collection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = species_collection.cpp; sourceTree = "<group>"; };
 		EE1000030000000000000001 /* species_collection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = species_collection.h; sourceTree = "<group>"; };
 		EE2000010000000000000001 /* species_input.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = species_input.cpp; sourceTree = "<group>"; };
+		EE3000010000000000000001 /* base_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = base_species.cpp; sourceTree = "<group>"; };
 		EE2000030000000000000001 /* species_input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = species_input.h; sourceTree = "<group>"; };
 		EE0000040000000000000001 /* dcdm_dr_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dcdm_dr_species.cpp; sourceTree = "<group>"; };
 		EE0000060000000000000001 /* dcdm_dr_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dcdm_dr_species.h; sourceTree = "<group>"; };
@@ -371,6 +373,7 @@
 				AF9F872E2F8FB9720077F3A9 /* perturb_source_context.h */,
 				AF9F872F2F8FB9720077F3A9 /* thermo_context.h */,
 				CC000001000000000000001A /* base_species.h */,
+				EE3000010000000000000001 /* base_species.cpp */,
 				CC000002000000000000001B /* perturb_context.h */,
 				CC000003000000000000001C /* baryons.h */,
 				CC000010000000000000001A /* baryons.cpp */,
@@ -529,6 +532,7 @@
 				EE00000E0000000000000001 /* dncdm_species.cpp in Sources */,
 				EE0000110000000000000001 /* dncdm_decay_radiation_species.cpp in Sources */,
 				EE0000140000000000000001 /* dncdm_dr_species.cpp in Sources */,
+				EE3000020000000000000001 /* base_species.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

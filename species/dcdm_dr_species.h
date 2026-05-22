@@ -19,6 +19,15 @@ class BackgroundModule;
  */
 class DCDM_DR_Species : public CompositeSpecies {
  public:
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    DCDMSpecies::PerturbLayout dcdm;
+    DarkRadiationSpecies::PerturbLayout dr;
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   DCDM_DR_Species(const background* pba, const BackgroundModule* bgm);
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
@@ -28,6 +37,58 @@ class DCDM_DR_Species : public CompositeSpecies {
 
   // Override to add DCDM->DR decay source after children
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
+
+  // ── Perturbations ──────────────────────────────────────────────────────────
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
+                                   const precision* ppr,
+                                   int& index_pt,
+                                   const perturb_workspace* ppw,
+                                   int gauge) override;
+
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
+                     const double* y,
+                     double* dy,
+                     const perturb_parameters_and_workspace& ppaw) override;
+
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
+                const double* y,
+                const double* pvecback,
+                const perturb_workspace* ppw) const override;
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
+
+  /** Matter (cold-DCDM only) contribution. DR is radiation and contributes 0. */
+  double MatterRhoDelta(const perturb_vector* pv,
+                        const double* y,
+                        const double* pvecback,
+                        const perturb_workspace* ppw) const override;
+  double MatterRhoPlusPTheta(const perturb_vector* pv,
+                             const double* y,
+                             const double* pvecback,
+                             const perturb_workspace* ppw) const override;
 
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
 

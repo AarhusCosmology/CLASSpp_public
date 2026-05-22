@@ -16,11 +16,18 @@ class NCDMInteractingSpecies : public NCDMSpecies {
   // Factory method to read N_ncdm_interacting and create instances
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  // Override PerturbDerivs to append collision terms
-  void PerturbDerivs(double tau,
+  // Layout-based PerturbDerivs: runs NCDMSpecies hierarchy + collision terms.
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+
+  /** Legacy PerturbDerivs: no-op — superseded by layout-based path above. */
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
 
   double GetGeff() const {
     return G_eff_;

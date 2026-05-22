@@ -212,14 +212,12 @@ void InputModule::ConstructSpecies() {
   ncdm_settings.tol_ncdm_bg = precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = precision_.tol_M_ncdm;
 
-  int ncdm_id_next = 0;
   const SpeciesBuildContext ctx{
       /*pfc=*/&file_content_,
       /*pba=*/pba,
       /*ppr=*/&precision_,
       /*ncdm_settings=*/&ncdm_settings,
       /*bgm=*/nullptr,
-      /*ncdm_id_next=*/&ncdm_id_next,
   };
 
   // Read input_verbose for the closure verbose message.
@@ -340,28 +338,22 @@ void InputModule::ConstructSpecies() {
 
   all_species_.freeze();
 
-  // Populate NCDM-family counters that downstream modules (thermodynamics,
-  // perturbations, nonlinear, etc.) still read from pba.  These are load-bearing
-  // until a follow-up refactor rewrites those ~40 use sites as species loops.
-  pba->N_ncdm          = n_ncdm;
-  pba->N_decay_dr      = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + n_dncdm;
-  pba->Omega0_ncdm_tot = omega0_ncdm_tot;
+  // N_decay_dr is still consumed by DR-bearing species machinery; deletion is a
+  // separate follow-up (Task 32 N_decay_dr).
+  pba->N_decay_dr = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + n_dncdm;
 
   // Now resolve the NCDM-dependent has_* flags.
-  if (pba->Omega0_ncdm_tot != 0.)
+  if (omega0_ncdm_tot != 0.)
     pba->has_ncdm = _TRUE_;
-  {
-    const int n_dncdm_dr = pba->N_decay_dr - (pba->Omega0_dcdmdr > 0 ? 1 : 0);
-    if (pba->has_ncdm && n_dncdm_dr > 0) {
-      pba->has_ncdm_decay_dr = _TRUE_;
-      pba->has_dr            = _TRUE_;
-    }
+  if (pba->has_ncdm && n_dncdm > 0) {
+    pba->has_ncdm_decay_dr = _TRUE_;
+    pba->has_dr            = _TRUE_;
   }
 
-  // Precision-parameter consistency check that depends on N_ncdm.
-  // (Moved here from input_read_parameters now that N_ncdm is set post-construction.)
+  // Precision-parameter consistency check that fires when any NCDM-family
+  // species is present (NCDMSpecies + DNCDMSpecies + NCDMInteractingSpecies).
   const precision* ppr = &precision_;
-  if (pba->N_ncdm > 0) {
+  if (n_ncdm > 0) {
     if (ppr->ncdm_fluid_trigger_tau_over_tau_k == ppr->radiation_streaming_trigger_tau_over_tau_k) {
       throw std::invalid_argument(
           "please choose different values for precision parameters "
@@ -3092,9 +3084,9 @@ int InputModule::input_default_params() {
   pba->Omega0_ur  = 3.046 * 7. / 8. * pow(4. / 11., 4. / 3.) * pba->Omega0_g;
   pba->Omega0_b   = 0.022032 / pow(pba->h, 2);
   pba->Omega0_cdm = 0.12038 / pow(pba->h, 2);
+  // No NCDM contribution in the default-write path (defaults have no NCDM species).
   pba->Omega0_lambda = 1. - pba->Omega0_k - pba->Omega0_g - pba->Omega0_ur - pba->Omega0_b -
-                       pba->Omega0_cdm - pba->Omega0_ncdm_tot - pba->Omega0_dcdmdr -
-                       pba->Omega0_idm_dr - pba->Omega0_idr;
+                       pba->Omega0_cdm - pba->Omega0_dcdmdr - pba->Omega0_idm_dr - pba->Omega0_idr;
 
   /** - primordial structure: computed defaults */
 
@@ -3679,7 +3671,7 @@ int InputModule::input_get_guess(double* xguess,
   std::shared_ptr<InputModule> input_module = std::make_shared<InputModule>(pfzw->fc);
   background& ba = input_module->background_; /* for cosmological background */
   precision& pr  = input_module->precision_;
-  // Collect DNCDM_DR species sorted by ncdm_id (= sorted map order since keys are "NCDM_N")
+  // Collect DNCDM_DR species in all_species_ lex iteration order
   std::vector<DNCDM_DR_Species*> dncdm_dr_species;
   for (auto& sp : input_module->all_species_) {
     if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))

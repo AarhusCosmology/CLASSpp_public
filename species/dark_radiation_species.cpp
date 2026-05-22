@@ -46,27 +46,35 @@ void DarkRadiationSpecies::BackgroundDerivs(double /*tau*/,
 
 // ── Perturbations ──────────────────────────────────────────────────────────
 
-void DarkRadiationSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+void DarkRadiationSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                       perturb_vector* pv,
                                                        const precision* /*ppr*/,
                                                        int& index_pt,
                                                        const perturb_workspace* /*ppw*/,
                                                        int /*gauge*/) {
+  auto& layout = static_cast<PerturbLayout&>(base);
+
   // DR sum multipoles: F0_dr_sum[l=0..l_max_dr]
+  layout.idx_F0_sum       = index_pt;
   pv->index_pt_F0_dr_sum  = index_pt;
   index_pt               += pv->l_max_dr + 1;
 
   // Per-species multipoles: N_decay_dr * (l_max_dr+1) slots
+  layout.idx_F0_species       = index_pt;
   pv->index_pt_F0_dr_species  = index_pt;
   index_pt_F0_dr_species_     = index_pt;
   index_pt                   += pba_->N_decay_dr * (pv->l_max_dr + 1);
+
+  layout.l_max = pv->l_max_dr;
 }
 
-void DarkRadiationSpecies::PerturbDerivs(double /*tau*/,
+void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                         double /*tau*/,
                                          const double* y,
                                          double* dy,
                                          const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
   const double* s_l               = ppw->s_l;
   const double k                  = ctx.k;
@@ -79,41 +87,44 @@ void DarkRadiationSpecies::PerturbDerivs(double /*tau*/,
 
   const double* pvecback = ppw->pvecback;
 
+  const int idx_sum = layout.idx_F0_sum;
+  const int idx_sp  = layout.idx_F0_species;
+  const int l_max   = layout.l_max;
+
   // Zero out the running sum
-  for (int l = 0; l <= pv->l_max_dr; ++l)
-    dy[pv->index_pt_F0_dr_sum + l] = 0.;
+  for (int l = 0; l <= l_max; ++l)
+    dy[idx_sum + l] = 0.;
 
   if (pba_->N_decay_dr > 0) {
-    const int base = pv->index_pt_F0_dr_species;
-    double r_dr    = pvecback[index_bg_rho_dr_species_] * (a * a) * (a * a) / (pba_->H0 * pba_->H0);
+    double r_dr = pvecback[index_bg_rho_dr_species_] * (a * a) * (a * a) / (pba_->H0 * pba_->H0);
 
     // l=0: free-streaming only (coupling source from DCDM added by DCDM_DR_Species::AddCouplingDerivs)
-    dy[base + 0] = -k * y[base + 1] - 4. / 3. * metric_continuity * r_dr;
+    dy[idx_sp + 0] = -k * y[idx_sp + 1] - 4. / 3. * metric_continuity * r_dr;
     // l=1: free-streaming only
-    dy[base + 1] = k / 3. * y[base + 0] - 2. / 3. * k * y[base + 2] * s2_squared +
-                   4. * metric_euler / (3. * k) * r_dr;
+    dy[idx_sp + 1] = k / 3. * y[idx_sp + 0] - 2. / 3. * k * y[idx_sp + 2] * s2_squared +
+                     4. * metric_euler / (3. * k) * r_dr;
     // l=2
-    dy[base + 2] = 8. / 15. * (3. / 4. * k * y[base + 1] + metric_shear * r_dr) -
-                   3. / 5. * k * s_l[3] / s_l[2] * y[base + 3];
+    dy[idx_sp + 2] = 8. / 15. * (3. / 4. * k * y[idx_sp + 1] + metric_shear * r_dr) -
+                     3. / 5. * k * s_l[3] / s_l[2] * y[idx_sp + 3];
     // l=3
     {
-      int l        = 3;
-      dy[base + l] = k / (2. * l + 1.) *
-                     (l * s_l[l] * s_l[2] * y[base + l - 1] -
-                      (l + 1.) * s_l[l + 1] * y[base + l + 1]);
+      int l          = 3;
+      dy[idx_sp + l] = k / (2. * l + 1.) *
+                       (l * s_l[l] * s_l[2] * y[idx_sp + l - 1] -
+                        (l + 1.) * s_l[l + 1] * y[idx_sp + l + 1]);
     }
-    // l=4..l_max_dr-1
-    for (int l = 4; l < pv->l_max_dr; ++l)
-      dy[base + l] = k / (2. * l + 1.) *
-                     (l * s_l[l] * y[base + l - 1] - (l + 1.) * s_l[l + 1] * y[base + l + 1]);
-    // l=l_max_dr (truncation)
+    // l=4..l_max-1
+    for (int l = 4; l < l_max; ++l)
+      dy[idx_sp + l] = k / (2. * l + 1.) *
+                       (l * s_l[l] * y[idx_sp + l - 1] - (l + 1.) * s_l[l + 1] * y[idx_sp + l + 1]);
+    // l=l_max (truncation)
     {
-      int l        = pv->l_max_dr;
-      dy[base + l] = k * (s_l[l] * y[base + l - 1] - (1. + l) * cotKgen * y[base + l]);
+      int l          = l_max;
+      dy[idx_sp + l] = k * (s_l[l] * y[idx_sp + l - 1] - (1. + l) * cotKgen * y[idx_sp + l]);
     }
     // Accumulate into sum
-    for (int l = 0; l <= pv->l_max_dr; ++l)
-      dy[pv->index_pt_F0_dr_sum + l] += dy[base + l];
+    for (int l = 0; l <= l_max; ++l)
+      dy[idx_sum + l] += dy[idx_sp + l];
   }
 }
 
@@ -123,10 +134,25 @@ void DarkRadiationSpecies::PerturbDerivs(double /*tau*/,
  * so delta_rho_dr = (H0/a^2)^2 * F0 = rho_dr_over_f * F0.
  * The factor rho_dr_over_f = H0^2/a^4 converts F_l to physical quantities.
  */
+double DarkRadiationSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                                   const perturb_vector* /*pv*/,
+                                   const double* y,
+                                   const double* pvecback,
+                                   const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0_sum < 0 || pvecback[index_bg_rho_] <= 0.)
+    return 0.;
+  double a             = pvecback[bgm_->index_bg_a_];
+  double a2            = a * a;
+  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
+  return rho_dr_over_f * y[layout.idx_F0_sum] / pvecback[index_bg_rho_];
+}
+
 double DarkRadiationSpecies::Delta(const perturb_vector* pv,
                                    const double* y,
                                    const double* pvecback,
                                    const perturb_workspace* /*ppw*/) const {
+  // Legacy path: pv->index_pt_F0_dr_sum is dual-written by RegisterPerturbationIndices
   if (pv->index_pt_F0_dr_sum < 0 || pvecback[index_bg_rho_] <= 0.)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
@@ -135,75 +161,97 @@ double DarkRadiationSpecies::Delta(const perturb_vector* pv,
   return rho_dr_over_f * y[pv->index_pt_F0_dr_sum] / pvecback[index_bg_rho_];
 }
 
-double DarkRadiationSpecies::Theta(const perturb_vector* pv,
+double DarkRadiationSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                                   const perturb_vector* /*pv*/,
                                    const double* y,
                                    const double* pvecback,
                                    const perturb_workspace* ppw) const {
-  if (pv->index_pt_F0_dr_sum < 0 || pvecback[index_bg_rho_] <= 0.)
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0_sum < 0 || pvecback[index_bg_rho_] <= 0.)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
   double a2            = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
   double k             = ppw->scalar_ctx.k;
   // (rho+p)*theta = k * rho_dr_over_f * F1, and (rho+p) = (4/3)*rho_dr
+  return 0.75 * k * rho_dr_over_f * y[layout.idx_F0_sum + 1] / pvecback[index_bg_rho_];
+}
+
+double DarkRadiationSpecies::Theta(const perturb_vector* pv,
+                                   const double* y,
+                                   const double* pvecback,
+                                   const perturb_workspace* ppw) const {
+  // Legacy path: pv->index_pt_F0_dr_sum is dual-written by RegisterPerturbationIndices
+  if (pv->index_pt_F0_dr_sum < 0 || pvecback[index_bg_rho_] <= 0.)
+    return 0.;
+  double a             = pvecback[bgm_->index_bg_a_];
+  double a2            = a * a;
+  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
+  double k             = ppw->scalar_ctx.k;
   return 0.75 * k * rho_dr_over_f * y[pv->index_pt_F0_dr_sum + 1] / pvecback[index_bg_rho_];
 }
 
-double DarkRadiationSpecies::DeltaP(const perturb_vector* pv,
+double DarkRadiationSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                                    const perturb_vector* /*pv*/,
                                     const double* y,
                                     const double* pvecback,
                                     const perturb_workspace* /*ppw*/) const {
-  if (pv->index_pt_F0_dr_sum < 0)
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0_sum < 0)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
   double a2            = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return rho_dr_over_f * y[pv->index_pt_F0_dr_sum] / 3.;
+  return rho_dr_over_f * y[layout.idx_F0_sum] / 3.;
 }
 
-double DarkRadiationSpecies::RhoPlusPShear(const perturb_vector* pv,
+double DarkRadiationSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
+                                           const perturb_vector* /*pv*/,
                                            const double* y,
                                            const double* pvecback,
                                            const perturb_workspace* /*ppw*/) const {
-  if (pv->index_pt_F0_dr_sum < 0)
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0_sum < 0)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
   double a2            = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return 2. / 3. * rho_dr_over_f * y[pv->index_pt_F0_dr_sum + 2];
+  return 2. / 3. * rho_dr_over_f * y[layout.idx_F0_sum + 2];
 }
 
-void DarkRadiationSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+void DarkRadiationSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                                  double* y,
+                                                  const PerturbIcContext& ctx) {
   if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
     return;
 
-  perturb_vector* pv       = ctx.ppw->pv;
+  const auto& layout       = static_cast<const PerturbLayout&>(base);
   const double* pvecback   = ctx.ppw->pvecback;
   const double r_prefactor = std::pow(std::pow(ctx.a / pba_->a_today, 2) / pba_->H0, 2);
 
-  if (pv->index_pt_F0_dr_species >= 0) {
+  if (layout.idx_F0_species >= 0) {
     for (int n_dr = 0; n_dr < pba_->N_decay_dr; ++n_dr) {
-      const int base            = pv->index_pt_F0_dr_species + n_dr * (pv->l_max_dr + 1);
+      const int base_idx        = layout.idx_F0_species + n_dr * (layout.l_max + 1);
       const double r_dr_species = r_prefactor * pvecback[bgm_->index_bg_rho_dr_species_ + n_dr];
-      y[base + 0]               = ctx.delta_dr * r_dr_species;
-      if (pv->l_max_dr >= 1)
-        y[base + 1] = 4. / (3. * ctx.k) * ctx.theta_ur * r_dr_species;
-      if (pv->l_max_dr >= 2)
-        y[base + 2] = 2. * ctx.shear_ur * r_dr_species;
-      if (pv->l_max_dr >= 3)
-        y[base + 3] = ctx.l3_ur * r_dr_species;
+      y[base_idx + 0]           = ctx.delta_dr * r_dr_species;
+      if (layout.l_max >= 1)
+        y[base_idx + 1] = 4. / (3. * ctx.k) * ctx.theta_ur * r_dr_species;
+      if (layout.l_max >= 2)
+        y[base_idx + 2] = 2. * ctx.shear_ur * r_dr_species;
+      if (layout.l_max >= 3)
+        y[base_idx + 3] = ctx.l3_ur * r_dr_species;
     }
   }
 
-  if (pv->index_pt_F0_dr_sum >= 0) {
-    const double r_dr_sum     = r_prefactor * pvecback[bgm_->index_bg_rho_dr_];
-    y[pv->index_pt_F0_dr_sum] = ctx.delta_dr * r_dr_sum;
-    if (pv->l_max_dr >= 1)
-      y[pv->index_pt_F0_dr_sum + 1] = 4. / (3. * ctx.k) * ctx.theta_ur * r_dr_sum;
-    if (pv->l_max_dr >= 2)
-      y[pv->index_pt_F0_dr_sum + 2] = 2. * ctx.shear_ur * r_dr_sum;
-    if (pv->l_max_dr >= 3)
-      y[pv->index_pt_F0_dr_sum + 3] = ctx.l3_ur * r_dr_sum;
+  if (layout.idx_F0_sum >= 0) {
+    const double r_dr_sum = r_prefactor * pvecback[bgm_->index_bg_rho_dr_];
+    y[layout.idx_F0_sum]  = ctx.delta_dr * r_dr_sum;
+    if (layout.l_max >= 1)
+      y[layout.idx_F0_sum + 1] = 4. / (3. * ctx.k) * ctx.theta_ur * r_dr_sum;
+    if (layout.l_max >= 2)
+      y[layout.idx_F0_sum + 2] = 2. * ctx.shear_ur * r_dr_sum;
+    if (layout.l_max >= 3)
+      y[layout.idx_F0_sum + 3] = ctx.l3_ur * r_dr_sum;
   }
 }
 

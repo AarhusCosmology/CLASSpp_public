@@ -3147,7 +3147,8 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
 
   param.T0    = pba->T_cmb;
   param.obh2  = pba->Omega0_b * pba->h * pba->h;
-  param.omh2  = (pba->Omega0_b + pba->Omega0_cdm + pba->Omega0_idm_dr + pba->Omega0_ncdm_tot) *
+  param.omh2  = (pba->Omega0_b + pba->Omega0_cdm + pba->Omega0_idm_dr +
+                 background_module_->GetOmega0NcdmTot()) *
                 pba->h * pba->h;
   param.okh2  = pba->Omega0_k * pba->h * pba->h;
   param.odeh2 = (pba->Omega0_lambda + pba->Omega0_fld) * pba->h * pba->h;

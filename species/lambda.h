@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "base_species.h"
 #include "species_build_context.h"
 
@@ -18,6 +20,14 @@ class LambdaSpecies : public BaseSpecies {
 
   double GetOmega0() const override {
     return Omega0_lambda_;
+  }
+
+  // ── Perturbation Layout ────────────────────────────────────────────────────
+  // Lambda has no perturbation slots; the layout is empty.
+  struct PerturbLayout : BaseSpecies::PerturbLayout {};
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
   }
 
   // ── Background ─────────────────────────────────────────────────────────────

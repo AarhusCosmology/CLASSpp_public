@@ -15,6 +15,16 @@ class DCDMSpecies;
  */
 class DarkRadiationSpecies : public BaseSpecies {
  public:
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    int idx_F0_sum     = -1;  ///< index_pt_F0_dr_sum  (accumulated-sum multipoles)
+    int idx_F0_species = -1;  ///< index_pt_F0_dr_species (per-channel multipoles)
+    int l_max          = -1;  ///< l_max_dr
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   DarkRadiationSpecies(const DCDMSpecies* dcdm, const background* pba, const BackgroundModule* bgm)
       : BaseSpecies("DR", EnergyType::Radiation), pba_(pba), bgm_(bgm), dcdm_(dcdm) {}
 
@@ -47,17 +57,42 @@ class DarkRadiationSpecies : public BaseSpecies {
   }
 
   // ── Perturbations ────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(perturb_vector* pv,
+
+  // Layout-based overrides (primary path)
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(double tau,
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
 
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
   double Delta(const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
@@ -65,15 +100,35 @@ class DarkRadiationSpecies : public BaseSpecies {
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv,
+  double DeltaP(const perturb_vector* /*pv*/,
+                const double* /*y*/,
+                const double* /*pvecback*/,
+                const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+  double RhoPlusPShear(const perturb_vector* /*pv*/,
+                       const double* /*y*/,
+                       const double* /*pvecback*/,
+                       const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

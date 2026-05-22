@@ -38,91 +38,125 @@ void CDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWri
   w.Add("(.)rho_cdm", pvecback[index_bg_rho_cdm_]);
 }
 
-void CDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+void CDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                             perturb_vector* pv,
                                              const precision* /*ppr*/,
                                              int& index_pt,
                                              const perturb_workspace* /*ppw*/,
                                              int gauge) {
-  class_define_index(pv->index_pt_delta_cdm, _TRUE_, index_pt, 1);
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.idx_delta = index_pt;
+  ++index_pt;
 
   /* theta_cdm is a dynamical variable only in Newtonian gauge (gauge==0);
      in synchronous gauge it is zero by definition. Sentinel -1 signals absent. */
-  pv->index_pt_theta_cdm = -1;
-  class_define_index(pv->index_pt_theta_cdm, (gauge == 0), index_pt, 1);
+  layout.idx_theta = -1;
+  if (gauge == 0) {
+    layout.idx_theta = index_pt;
+    ++index_pt;
+  }
 }
 
-void CDMSpecies::PerturbDerivs(double /*tau*/,
+void CDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                               double /*tau*/,
                                const double* y,
                                double* dy,
                                const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
   const int gauge                 = (int) ppaw.perturbations_module->GetPerturbs()->gauge;
 
   if (gauge == 0) { /* newtonian */
-    dy[pv->index_pt_delta_cdm] = -(y[pv->index_pt_theta_cdm] + ctx.metric_continuity);
-    dy[pv->index_pt_theta_cdm] = -ctx.a_prime_over_a * y[pv->index_pt_theta_cdm] + ctx.metric_euler;
+    dy[layout.idx_delta] = -(y[layout.idx_theta] + ctx.metric_continuity);
+    dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
   }
   else { /* synchronous: theta_cdm = 0 by gauge choice */
-    dy[pv->index_pt_delta_cdm] = -ctx.metric_continuity;
+    dy[layout.idx_delta] = -ctx.metric_continuity;
   }
+}
+
+double CDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                         const perturb_vector* /*pv*/,
+                         const double* y,
+                         const double* /*pvecback*/,
+                         const perturb_workspace* /*ppw*/) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_delta];
 }
 
 double CDMSpecies::Delta(const perturb_vector* pv,
                          const double* y,
+                         const double* pvecback,
+                         const perturb_workspace* ppw) const {
+  // Legacy override: route through the layout via collection_index_.
+  return Delta(*pv->species_layouts[collection_index_], pv, y, pvecback, ppw);
+}
+
+double CDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                         const perturb_vector* /*pv*/,
+                         const double* y,
                          const double* /*pvecback*/,
                          const perturb_workspace* /*ppw*/) const {
-  return y[pv->index_pt_delta_cdm];
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
 }
 
 double CDMSpecies::Theta(const perturb_vector* pv,
                          const double* y,
-                         const double* /*pvecback*/,
-                         const perturb_workspace* /*ppw*/) const {
-  return (pv->index_pt_theta_cdm >= 0) ? y[pv->index_pt_theta_cdm] : 0.;
+                         const double* pvecback,
+                         const perturb_workspace* ppw) const {
+  // Legacy override: route through the layout via collection_index_.
+  return Theta(*pv->species_layouts[collection_index_], pv, y, pvecback, ppw);
 }
 
-double CDMSpecies::DeltaP(const perturb_vector* /*pv*/,
+double CDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,
+                          const perturb_vector* /*pv*/,
                           const double* /*y*/,
                           const double* /*pvecback*/,
                           const perturb_workspace* /*ppw*/) const {
   return 0.;
 }
 
-double CDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/,
+double CDMSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& /*base*/,
+                                 const perturb_vector* /*pv*/,
                                  const double* /*y*/,
                                  const double* /*pvecback*/,
                                  const perturb_workspace* /*ppw*/) const {
   return 0.;
 }
 
-void CDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
-  perturb_vector* pv             = ctx.ppw->pv;
+void CDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                        double* y,
+                                        const PerturbIcContext& ctx) {
+  const auto& layout             = static_cast<const PerturbLayout&>(base);
   const PerturbationsModule* mod = ctx.p_mod;
-  if (pv->index_pt_delta_cdm < 0)
+  if (layout.idx_delta < 0)
     return;
 
   if (ctx.index_ic == mod->index_ic_ad_ || ctx.index_ic == mod->index_ic_bi_) {
-    y[pv->index_pt_delta_cdm] = 3. / 4. * ctx.delta_g_ic;
+    y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
   }
   else if (ctx.index_ic == mod->index_ic_cdi_) {
-    y[pv->index_pt_delta_cdm] = ctx.ppr->entropy_ini + 3. / 4. * ctx.delta_g_ic;
+    y[layout.idx_delta] = ctx.ppr->entropy_ini + 3. / 4. * ctx.delta_g_ic;
   }
   else if (ctx.index_ic == mod->index_ic_nid_) {
-    y[pv->index_pt_delta_cdm] = -ctx.ppr->entropy_ini * ctx.fracnu * ctx.fracb / ctx.fracg / 80. *
-                                ctx.ktau_two * ctx.om * ctx.tau;
+    y[layout.idx_delta] = -ctx.ppr->entropy_ini * ctx.fracnu * ctx.fracb / ctx.fracg / 80. *
+                          ctx.ktau_two * ctx.om * ctx.tau;
   }
   else if (ctx.index_ic == mod->index_ic_niv_) {
-    y[pv->index_pt_delta_cdm] = -ctx.ppr->entropy_ini * 9. / 64. * ctx.fracnu * ctx.fracb /
-                                ctx.fracg * ctx.k * ctx.tau * ctx.om * ctx.tau;
+    y[layout.idx_delta] = -ctx.ppr->entropy_ini * 9. / 64. * ctx.fracnu * ctx.fracb / ctx.fracg *
+                          ctx.k * ctx.tau * ctx.om * ctx.tau;
   }
 }
 
-void CDMSpecies::FillSources(const double* y, const double* /*dy*/, PerturbSourceContext& ctx) {
+void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
+                             const double* y,
+                             const double* /*dy*/,
+                             PerturbSourceContext& ctx) {
+  const auto& layout         = static_cast<const PerturbLayout&>(base);
   PerturbationsModule* p_mod = ctx.p_mod;
-  perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv;
 
   const double a_prime_over_a = ctx.a_prime_over_a;
 
@@ -136,13 +170,13 @@ void CDMSpecies::FillSources(const double* y, const double* /*dy*/, PerturbSourc
                           p_mod->index_tp_delta_cdm_,
                           ctx.index_tau,
                           ctx.index_k,
-                          y[pv->index_pt_delta_cdm] +
+                          y[layout.idx_delta] +
                               3. * a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
   // ── theta_cdm ──────────────────────────────────────────────────────────────
   if (p_mod->has_source_theta_cdm_ == _TRUE_) {
-    const double theta_cdm = (pv->index_pt_theta_cdm >= 0) ? y[pv->index_pt_theta_cdm] : 0.;
+    const double theta_cdm = (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_theta_cdm_,
@@ -185,17 +219,18 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv;
-    const double k           = ppw->scalar_ctx.k;
+    const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+    const double k     = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback;
     const double* pvecmetric = ppw->pvecmetric;
 
-    delta_cdm           = y[pv->index_pt_delta_cdm];
+    delta_cdm           = y[layout.idx_delta];
     const perturbs* ppt = mod.GetPerturbs();
     if (ppt->gauge == synchronous) {
       theta_cdm = 0.;
     }
     else {
-      theta_cdm = y[pv->index_pt_theta_cdm];
+      theta_cdm = (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
     }
 
     // Converting synchronous variables to Newtonian

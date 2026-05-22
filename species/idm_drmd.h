@@ -33,29 +33,81 @@ class IDM_DRMDSpecies : public BaseSpecies {
     return 0.;
   }
 
-  void RegisterPerturbationIndices(perturb_vector* pv,
+  // ── PerturbLayout ──────────────────────────────────────────────────────────
+
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    int idx_delta = -1;  ///< index_pt_delta_idm_drmd
+    int idx_theta = -1;  ///< index_pt_theta_idm_drmd
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
+  // ── Perturbation index registration ────────────────────────────────────────
+
+  /** Layout-based override (primary path). */
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
+  /** Legacy override: stubbed — IDM_DRMD is composite-only (IDM_DRMD_IDR_DRMD
+      always dispatches the layout-aware overload on its IDM_DRMD child). */
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  // ── PerturbDerivs ──────────────────────────────────────────────────────────
+
+  /** Layout-based PerturbDerivs (primary path). */
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
+                     const double* y,
+                     double* dy,
+                     const perturb_parameters_and_workspace& ppaw) override;
+
+  /** Legacy PerturbDerivs. */
   void PerturbDerivs(double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  double Delta(const perturb_vector* pv,
+  // ── Stress-energy observables ───────────────────────────────────────────────
+
+  /** Layout-based Delta (primary). */
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+  /** Legacy Delta: unreachable — composite IDM_DRMD_IDR_DRMD always dispatches
+      the layout-aware Delta() on its IDM_DRMD child. */
+  double Delta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
                const double* /*pvecback*/,
                const perturb_workspace* /*ppw*/) const override {
-    return y[pv->index_pt_delta_idm_drmd];
+    return 0.;
   }
-  double Theta(const perturb_vector* pv,
+
+  /** Layout-based Theta (primary). */
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+  /** Legacy Theta: unreachable — see Delta. */
+  double Theta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
                const double* /*pvecback*/,
                const perturb_workspace* /*ppw*/) const override {
-    return y[pv->index_pt_theta_idm_drmd];
+    return 0.;
   }
+
   double DeltaP(const perturb_vector* /*pv*/,
                 const double* /*y*/,
                 const double* /*pvecback*/,
@@ -68,6 +120,14 @@ class IDM_DRMDSpecies : public BaseSpecies {
                        const perturb_workspace* /*ppw*/) const override {
     return 0.;
   }
+
+  // ── Switch-copy hook ────────────────────────────────────────────────────────
+
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
 
  private:
   const background& pba_;

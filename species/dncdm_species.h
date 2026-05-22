@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <tuple>
@@ -60,18 +61,57 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   }
 
   // ── Perturbations ────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(perturb_vector* pv,
+
+  // Layout-based scalar register (writes both layout and legacy pv arrays).
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
+
+  /** Legacy scalar register: no-op — dual-written by the layout-based path above. */
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  // Layout-based scalar PerturbDerivs (called by DNCDM_DR_Species composite
+  // with my.dncdm). The legacy (non-layout) overload throws — no real path
+  // exercises it (the composite always passes a layout).
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
+                     const double* y,
+                     double* dy,
+                     const perturb_parameters_and_workspace& ppaw) override;
+
   void PerturbDerivs(double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
 
+  // Layout-based ApplyInitialConditions.
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+
+  /** Legacy ApplyInitialConditions: no-op — superseded by layout-based path above. */
+  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
+
+  // Layout-based stress-energy observables. Legacy versions STAY FUNCTIONAL.
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
   double Delta(const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
@@ -79,10 +119,22 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
+                const double* y,
+                const double* pvecback,
+                const perturb_workspace* ppw) const override;
   double DeltaP(const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
   double RhoPlusPShear(const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
@@ -95,12 +147,6 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
   // ── Accessors for DNCDM_DR_Species coupling ───────────────────────────────
-  int ncdm_id() const {
-    return ncdm_id_;
-  }
-  void SetNcdmId(int id) override {
-    ncdm_id_ = id;
-  }
   int bg_number_index() const {
     return index_bg_number_;
   }
@@ -146,13 +192,24 @@ class DNCDMSpecies : public NCDMBaseSpecies {
    * underflow near the precision floor; lnN cancels in the delta/theta/shear
    * ratios, so this is mathematically equivalent to the unrescaled form but
    * numerically stable.
+   *
+   * @param layout this species' per-pv NCDM layout (provides index_per_q).
    */
-  std::tuple<double, double, double> RescaledPerturbations(double a,
-                                                           double k,
-                                                           const perturb_workspace* ppw) const;
+  std::tuple<double, double, double> RescaledPerturbations(
+      const NCDMBaseSpecies::PerturbLayout& layout,
+      double a,
+      double k,
+      const perturb_workspace* ppw) const;
+
+ protected:
+  double GetDlnf0DlnqForTensor(int iq, const double* pvecback) const override {
+    return pvecback[index_bg_dlnfdlnq_decay_ + iq];
+  }
+  double GetW0ForGwSource(int iq, const double* pvecback) const override {
+    return dq_[iq] * std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]);
+  }
 
  private:
-  int ncdm_id_ = -1;  // perturbation-array slot index; assigned by CreateAll via SetNcdmId
   const background* pba_;
 
   // Deferred closure stash (instance-name constructor only).

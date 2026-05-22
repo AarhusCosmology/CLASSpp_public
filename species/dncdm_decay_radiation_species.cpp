@@ -34,21 +34,25 @@ void DNCDM_DecayRadiationSpecies::BackgroundDerivs(double /*tau*/,
 
 // ── Perturbations ──────────────────────────────────────────────────────────
 
-void DNCDM_DecayRadiationSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+void DNCDM_DecayRadiationSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                              perturb_vector* pv,
                                                               const precision* /*ppr*/,
                                                               int& index_pt,
                                                               const perturb_workspace* /*ppw*/,
                                                               int /*gauge*/) {
-  index_pt_F0_  = index_pt;
-  index_pt     += pv->l_max_dr + 1;  // Reuse l_max_dr parameter for simplicity
+  auto& layout   = static_cast<PerturbLayout&>(base);
+  layout.idx_F0  = index_pt;
+  layout.l_max   = pv->l_max_dr;
+  index_pt      += pv->l_max_dr + 1;
 }
 
-void DNCDM_DecayRadiationSpecies::PerturbDerivs(double /*tau*/,
+void DNCDM_DecayRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                                double /*tau*/,
                                                 const double* y,
                                                 double* dy,
                                                 const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
   const double* s_l               = ppw->s_l;
   const double k                  = ctx.k;
@@ -58,83 +62,91 @@ void DNCDM_DecayRadiationSpecies::PerturbDerivs(double /*tau*/,
   const double cotKgen            = ctx.cotKgen;
   const double s2_squared         = ctx.s2_squared;
   const double a                  = ctx.a;
+  const double* pvecback          = ppw->pvecback;
+  const int base_idx              = layout.idx_F0;
+  const int lmax                  = layout.l_max;
+  double r_dr = pvecback[index_bg_rho_] * (a * a) * (a * a) / (pba_->H0 * pba_->H0);
 
-  const double* pvecback = ppw->pvecback;
-
-  const int base = index_pt_F0_;
-  double r_dr    = pvecback[index_bg_rho_] * (a * a) * (a * a) / (pba_->H0 * pba_->H0);
-
-  // l=0: free-streaming only (coupling source from DNCDM added by DNCDM_DR_Species::AddCouplingDerivs)
-  dy[base + 0] = -k * y[base + 1] - 4. / 3. * metric_continuity * r_dr;
+  // l=0: free-streaming only (coupling source added by DNCDM_DR_Species::AddCouplingDerivs)
+  dy[base_idx + 0] = -k * y[base_idx + 1] - 4. / 3. * metric_continuity * r_dr;
   // l=1: free-streaming only
-  dy[base + 1] = k / 3. * y[base + 0] - 2. / 3. * k * y[base + 2] * s2_squared +
-                 4. * metric_euler / (3. * k) * r_dr;
+  dy[base_idx + 1] = k / 3. * y[base_idx + 0] - 2. / 3. * k * y[base_idx + 2] * s2_squared +
+                     4. * metric_euler / (3. * k) * r_dr;
   // l=2
-  dy[base + 2] = 8. / 15. * (3. / 4. * k * y[base + 1] + metric_shear * r_dr) -
-                 3. / 5. * k * s_l[3] / s_l[2] * y[base + 3];
+  dy[base_idx + 2] = 8. / 15. * (3. / 4. * k * y[base_idx + 1] + metric_shear * r_dr) -
+                     3. / 5. * k * s_l[3] / s_l[2] * y[base_idx + 3];
   // l=3
   {
-    int l        = 3;
-    dy[base + l] = k / (2. * l + 1.) *
-                   (l * s_l[l] * s_l[2] * y[base + l - 1] -
-                    (l + 1.) * s_l[l + 1] * y[base + l + 1]);
+    int l            = 3;
+    dy[base_idx + l] = k / (2. * l + 1.) *
+                       (l * s_l[l] * s_l[2] * y[base_idx + l - 1] -
+                        (l + 1.) * s_l[l + 1] * y[base_idx + l + 1]);
   }
-  // l=4..l_max_dr-1
-  for (int l = 4; l < pv->l_max_dr; ++l)
-    dy[base + l] = k / (2. * l + 1.) *
-                   (l * s_l[l] * y[base + l - 1] - (l + 1.) * s_l[l + 1] * y[base + l + 1]);
-  // l=l_max_dr (truncation)
+  // l=4..lmax-1
+  for (int l = 4; l < lmax; ++l)
+    dy[base_idx + l] = k / (2. * l + 1.) *
+                       (l * s_l[l] * y[base_idx + l - 1] -
+                        (l + 1.) * s_l[l + 1] * y[base_idx + l + 1]);
+  // l=lmax (truncation)
   {
-    int l        = pv->l_max_dr;
-    dy[base + l] = k * (s_l[l] * y[base + l - 1] - (1. + l) * cotKgen * y[base + l]);
+    int l            = lmax;
+    dy[base_idx + l] = k * (s_l[l] * y[base_idx + l - 1] - (1. + l) * cotKgen * y[base_idx + l]);
   }
 }
 
-double DNCDM_DecayRadiationSpecies::Delta(const perturb_vector* pv,
+double DNCDM_DecayRadiationSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                                          const perturb_vector* /*pv*/,
                                           const double* y,
                                           const double* pvecback,
                                           const perturb_workspace* /*ppw*/) const {
-  if (index_pt_F0_ < 0 || pvecback[index_bg_rho_] <= 0.)
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0 < 0 || pvecback[index_bg_rho_] <= 0.)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
   double a2            = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return rho_dr_over_f * y[index_pt_F0_] / pvecback[index_bg_rho_];
+  return rho_dr_over_f * y[layout.idx_F0] / pvecback[index_bg_rho_];
 }
 
-double DNCDM_DecayRadiationSpecies::Theta(const perturb_vector* pv,
+double DNCDM_DecayRadiationSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                                          const perturb_vector* /*pv*/,
                                           const double* y,
                                           const double* pvecback,
                                           const perturb_workspace* ppw) const {
-  if (index_pt_F0_ < 0 || pvecback[index_bg_rho_] <= 0.)
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0 < 0 || pvecback[index_bg_rho_] <= 0.)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
   double a2            = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
   double k             = ppw->scalar_ctx.k;
-  return 0.75 * k * rho_dr_over_f * y[index_pt_F0_ + 1] / pvecback[index_bg_rho_];
+  return 0.75 * k * rho_dr_over_f * y[layout.idx_F0 + 1] / pvecback[index_bg_rho_];
 }
 
-double DNCDM_DecayRadiationSpecies::DeltaP(const perturb_vector* pv,
+double DNCDM_DecayRadiationSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                                           const perturb_vector* /*pv*/,
                                            const double* y,
                                            const double* pvecback,
                                            const perturb_workspace* /*ppw*/) const {
-  if (index_pt_F0_ < 0)
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0 < 0)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
   double a2            = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return rho_dr_over_f * y[index_pt_F0_] / 3.;
+  return rho_dr_over_f * y[layout.idx_F0] / 3.;
 }
 
-double DNCDM_DecayRadiationSpecies::RhoPlusPShear(const perturb_vector* pv,
+double DNCDM_DecayRadiationSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
+                                                  const perturb_vector* /*pv*/,
                                                   const double* y,
                                                   const double* pvecback,
                                                   const perturb_workspace* /*ppw*/) const {
-  if (index_pt_F0_ < 0)
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_F0 < 0)
     return 0.;
   double a             = pvecback[bgm_->index_bg_a_];
   double a2            = a * a;
   double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return 2. / 3. * rho_dr_over_f * y[index_pt_F0_ + 2];
+  return 2. / 3. * rho_dr_over_f * y[layout.idx_F0 + 2];
 }

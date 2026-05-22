@@ -48,59 +48,97 @@ double DCDMSpecies::DpDloga(const double* /*pvecback*/) const {
   return 0.;
 }
 
-void DCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+void DCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                              perturb_vector* pv,
                                               const precision* /*ppr*/,
                                               int& index_pt,
                                               const perturb_workspace* /*ppw*/,
                                               int /*gauge*/) {
-  class_define_index(pv->index_pt_delta_dcdm, _TRUE_, index_pt, 1);
-  class_define_index(pv->index_pt_theta_dcdm, _TRUE_, index_pt, 1);
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.idx_delta = index_pt;
+  ++index_pt;
+
+  layout.idx_theta = index_pt;
+  ++index_pt;
 }
 
-void DCDMSpecies::PerturbDerivs(double /*tau*/,
+void DCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                double /*tau*/,
                                 const double* y,
                                 double* dy,
                                 const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  dy[pv->index_pt_delta_dcdm] = -(y[pv->index_pt_theta_dcdm] + ctx.metric_continuity) -
-                                ctx.a * pba_.Gamma_dcdm / ctx.k2 * ctx.metric_euler;
-  dy[pv->index_pt_theta_dcdm] = -ctx.a_prime_over_a * y[pv->index_pt_theta_dcdm] + ctx.metric_euler;
+  dy[layout.idx_delta] = -(y[layout.idx_theta] + ctx.metric_continuity) -
+                         ctx.a * pba_.Gamma_dcdm / ctx.k2 * ctx.metric_euler;
+  dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
 }
 
-double DCDMSpecies::Delta(const perturb_vector* pv,
+double DCDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                          const perturb_vector* /*pv*/,
                           const double* y,
                           const double* /*pvecback*/,
                           const perturb_workspace* /*ppw*/) const {
-  return y[pv->index_pt_delta_dcdm];
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_delta];
 }
-double DCDMSpecies::Theta(const perturb_vector* pv,
+
+double DCDMSpecies::Delta(const perturb_vector* /*pv*/,
+                          const double* /*y*/,
+                          const double* /*pvecback*/,
+                          const perturb_workspace* /*ppw*/) const {
+  // Unreachable on the matter dispatch path: DCDM_DR_Species overrides
+  // MatterRhoDelta/Delta(layout,...) to use the nested my.dcdm layout, and DCDM
+  // never lives as a top-level species so its collection_index_ is never set.
+  // The legacy (pv,...) override is retained only to satisfy the pure-virtual
+  // signature on BaseSpecies; returning 0 is safe.
+  return 0.;
+}
+
+double DCDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                          const perturb_vector* /*pv*/,
                           const double* y,
                           const double* /*pvecback*/,
                           const perturb_workspace* /*ppw*/) const {
-  return y[pv->index_pt_theta_dcdm];
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  return y[layout.idx_theta];
 }
-double DCDMSpecies::DeltaP(const perturb_vector* /*pv*/,
+
+double DCDMSpecies::Theta(const perturb_vector* /*pv*/,
+                          const double* /*y*/,
+                          const double* /*pvecback*/,
+                          const perturb_workspace* /*ppw*/) const {
+  // Unreachable on the matter dispatch path; see comment on Delta(pv,...).
+  return 0.;
+}
+
+double DCDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,
+                           const perturb_vector* /*pv*/,
                            const double* /*y*/,
                            const double* /*pvecback*/,
                            const perturb_workspace* /*ppw*/) const {
   return 0.;
 }
-double DCDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/,
+
+double DCDMSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& /*base*/,
+                                  const perturb_vector* /*pv*/,
                                   const double* /*y*/,
                                   const double* /*pvecback*/,
                                   const perturb_workspace* /*ppw*/) const {
   return 0.;
 }
 
-void DCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
+void DCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                         double* y,
+                                         const PerturbIcContext& ctx) {
   if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
     return;
-  perturb_vector* pv = ctx.ppw->pv;
-  if (pv->index_pt_delta_dcdm >= 0)
-    y[pv->index_pt_delta_dcdm] = 3. / 4. * ctx.delta_g_ic;
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.idx_delta >= 0)
+    y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
 }
 
 void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
@@ -130,12 +168,13 @@ void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv;
-    const double k           = ppw->scalar_ctx.k;
+    const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+    const double k     = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback;
     const double* pvecmetric = ppw->pvecmetric;
 
-    delta_dcdm = y[pv->index_pt_delta_dcdm];
-    theta_dcdm = y[pv->index_pt_theta_dcdm];
+    delta_dcdm = y[layout.idx_delta];
+    theta_dcdm = y[layout.idx_theta];
 
     // Synchronous → Newtonian gauge conversion for DCDM (matter + decay term)
     const perturbs* ppt = mod.GetPerturbs();

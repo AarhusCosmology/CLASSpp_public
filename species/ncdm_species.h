@@ -42,34 +42,106 @@ class NCDMSpecies : public NCDMBaseSpecies {
   }
 
   // ── Perturbations ────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(perturb_vector* pv,
+
+  // Layout-based scalar register (implementation writes both layout and legacy pv arrays).
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(double tau,
+
+  /** Legacy scalar register: no-op — dual-written by the layout-based path above. */
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  // Layout-based PerturbDerivs.
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
-  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+
+  /** Legacy PerturbDerivs: no-op — superseded by layout-based path above. */
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
+
+  // Layout-based FillSources.
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) override;
+
+  /** Legacy FillSources: no-op — superseded by layout-based path above. */
+  void FillSources(const double* /*y*/,
+                   const double* /*dy*/,
+                   PerturbSourceContext& /*ctx*/) override {}
+
+  // Layout-based ApplyInitialConditions.
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+
+  /** Legacy ApplyInitialConditions: no-op — superseded by layout-based path above. */
+  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
+
+  // Layout-based stress-energy observables. Legacy versions throw — all
+  // callers go through the layout-based path.
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
 
   double Delta(const perturb_vector*,
                const double*,
                const double*,
                const perturb_workspace*) const override;
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
   double Theta(const perturb_vector*,
                const double*,
                const double*,
                const perturb_workspace*) const override;
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
+                const double* y,
+                const double* pvecback,
+                const perturb_workspace* ppw) const override;
+
   double DeltaP(const perturb_vector*,
                 const double*,
                 const double*,
                 const perturb_workspace*) const override;
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
+
   double RhoPlusPShear(const perturb_vector*,
                        const double*,
                        const double*,
                        const perturb_workspace*) const override;
+
+  // FA-collapse switch hook.
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
@@ -82,13 +154,19 @@ class NCDMSpecies : public NCDMBaseSpecies {
                       const double*,
                       const PerturbationsModule&,
                       const perturb_workspace*) const override;
+  void WriteTensorOutputColumnTitles(char* tensor_titles) const override;
 
-  int ncdm_id() const {
-    return ncdm_id_;
+  /** Per-species offset into the NCDM source-slot block, assigned in lex order
+   *  by PerturbationsModule when source indices are allocated. Used to compute
+   *  this species' (delta, theta) slot as `index_tp_delta_ncdm1_ + source_slot_`
+   *  and to label output columns. -1 until the module assigns it. */
+  void SetSourceSlot(int s) {
+    source_slot_ = s;
   }
-  void SetNcdmId(int id) override {
-    ncdm_id_ = id;
+  int source_slot() const {
+    return source_slot_;
   }
+
   int bg_number_index() const {
     return index_bg_number_;
   }
@@ -97,7 +175,11 @@ class NCDMSpecies : public NCDMBaseSpecies {
   }
 
  protected:
-  int ncdm_id_ = -1;  // perturbation-array slot index; assigned by CreateAll via SetNcdmId
+  double GetDlnf0DlnqForTensor(int iq, const double* /*pvecback*/) const override {
+    return dlnf0_dlnq_[iq];
+  }
+
+  int source_slot_ = -1;  // assigned in lex order by PerturbationsModule
   const background* pba_;
 
   int index_bg_number_   = -1;

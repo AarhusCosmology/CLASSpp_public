@@ -37,35 +37,122 @@ class UltraRelativisticSpecies : public BaseSpecies {
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
+
+  /** Per-species layout holding perturbation slot indices for UR. */
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    int idx_delta = -1;  ///< index_pt_delta_ur
+    int idx_theta = -1;  ///< index_pt_theta_ur
+    int idx_shear = -1;  ///< index_pt_shear_ur
+    int idx_l3    = -1;  ///< index_pt_l3_ur (only when ufa_off and l_max>=3)
+    int l_max     = -1;  ///< 2 when ufa_on, else ppr->l_max_ur
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   /** Registers delta_ur, theta_ur, shear_ur, and (when UFA is off) l3..l_max_ur. */
-  void RegisterPerturbationIndices(perturb_vector* pv,
+  // Layout-based override (primary path)
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(double tau,
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  // Layout-based PerturbDerivs (primary path)
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
-  double Delta(const perturb_vector* pv,
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
+
+  // Layout-based Delta/Theta/DeltaP/RhoPlusPShear
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv,
+  double Delta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
+  double Theta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv,
+  double DeltaP(const perturb_vector* /*pv*/,
+                const double* /*y*/,
+                const double* /*pvecback*/,
+                const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+  double RhoPlusPShear(const perturb_vector* /*pv*/,
+                       const double* /*y*/,
+                       const double* /*pvecback*/,
+                       const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
 
-  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+  // Layout-based FillSources and ApplyInitialConditions
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) override;
+  void FillSources(const double* /*y*/,
+                   const double* /*dy*/,
+                   PerturbSourceContext& /*ctx*/) override {}
+
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
+
+  /** Copy UR perturbations across an approximation switch (UFA on/off transition). */
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
+
+  // ── Tensor mode ────────────────────────────────────────────────────────────
+  //
+  // The tensor "relativistic neutrino" hierarchy is NOT a UR-species concern: it
+  // is a single hierarchy sourced by the gravitational waves and shared by ur and
+  // massless-approximated ncdm. perturb_vector owns it (pv->tensor_ur_layout) and
+  // the perturbations module registers/evolves it directly, so URSpecies has no
+  // tensor index-registration or tensor-derivs overrides.
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 

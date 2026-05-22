@@ -77,19 +77,19 @@ std::vector<Named> NCDMInteractingSpecies::CreateAll(const SpeciesBuildContext& 
                                                        *ctx.ncdm_settings,
                                                        ctx.pba,
                                                        ctx.bgm);
-    sp->SetNcdmId((*ctx.ncdm_id_next)++);
     result.push_back({name, std::move(sp)});
   }
   return result;
 }
 
 // ── Perturbations ──────────────────────────────────────────────────────────
-void NCDMInteractingSpecies::PerturbDerivs(double tau,
+void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                                           double tau,
                                            const double* y,
                                            double* dy,
                                            const perturb_parameters_and_workspace& ppaw) {
-  // 1. Compute standard free-streaming derivatives
-  NCDMSpecies::PerturbDerivs(tau, y, dy, ppaw);
+  // 1. Compute standard free-streaming derivatives via layout-based NCDMSpecies
+  NCDMSpecies::PerturbDerivs(layout, tau, y, dy, ppaw);
 
   // If there are no interactions, we are done
   if (G_eff_ <= 0.) {
@@ -97,8 +97,8 @@ void NCDMInteractingSpecies::PerturbDerivs(double tau,
   }
 
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
+  const auto& ncdm_layout         = static_cast<const NCDMBaseSpecies::PerturbLayout&>(layout);
 
   // 2. Extract necessary cosmological variables
   const double a              = std::sqrt(ctx.a2);
@@ -118,15 +118,15 @@ void NCDMInteractingSpecies::PerturbDerivs(double tau,
 
   if (fa_on) {
     // --- Fluid Approximation ---
-    const int idx  = pv->index_ncdm_.at(ncdm_id_)[0];
+    const int idx  = ncdm_layout.index_per_q[0];
     dy[idx + 2]   -= 0.40 * taudot * y[idx + 2];
   }
   else {
     // --- Exact Boltzmann Hierarchy ---
-    const int lmax = pv->l_max_ncdm[ncdm_id_];
+    const int lmax = ncdm_layout.l_max;
 
-    for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
-      const int idx = pv->index_ncdm_.at(ncdm_id_)[iq];
+    for (int iq = 0; iq < ncdm_layout.q_size; ++iq) {
+      const int idx = ncdm_layout.index_per_q[iq];
 
       for (int l = 2; l <= lmax; l++) {
         int alpha_index  = std::min(4, l - 2);

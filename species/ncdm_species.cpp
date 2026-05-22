@@ -1,6 +1,7 @@
 #include "ncdm_species.h"
 
 #include <cmath>
+#include <stdexcept>
 
 #include "background_column_writer.h"
 #include "background_module.h"
@@ -43,7 +44,8 @@ NCDMSpecies::NCDMSpecies(FileContent* pfc,
     m_in_eV_ = _k_B_ / _eV_ * T_ * M_ * T_cmb_;
   }
 
-  // ncdm_id_ stays at its in-class default (-1) until SetNcdmId is called.
+  // source_slot_ stays at its in-class default (-1) until
+  // PerturbationsModule::perturb_indices_of_perturbs() assigns it via SetSourceSlot.
 }
 
 // ── CreateAll factory ───────────────────────────────────────────────────────
@@ -190,7 +192,6 @@ std::vector<Named> NCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
     ctx.pfc->read_string(name + ".type", unused_type);
 
     auto sp = std::make_unique<NCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
-    sp->SetNcdmId((*ctx.ncdm_id_next)++);
     result.push_back({name, std::move(sp)});
   }
   return result;
@@ -228,26 +229,19 @@ void NCDMSpecies::BackgroundDerivs(double /*tau*/,
 }
 
 void NCDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  char tmp[40];
-  snprintf(tmp, 40, "(.)number_ncdm[%d]", ncdm_id_);
-  w.Add(tmp, 0.);
-  snprintf(tmp, 40, "(.)rho_ncdm[%d]", ncdm_id_);
-  w.Add(tmp, 0.);
-  snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
-  w.Add(tmp, 0.);
+  w.Add("(.)number_" + name(), 0.);
+  w.Add("(.)rho_" + name(), 0.);
+  w.Add("(.)p_" + name(), 0.);
 }
 
 void NCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  char tmp[40];
-  snprintf(tmp, 40, "(.)number_ncdm[%d]", ncdm_id_);
-  w.Add(tmp, pvecback[bg_number_index()]);
-  snprintf(tmp, 40, "(.)rho_ncdm[%d]", ncdm_id_);
-  w.Add(tmp, Rho(pvecback));
-  snprintf(tmp, 40, "(.)p_ncdm[%d]", ncdm_id_);
-  w.Add(tmp, P(pvecback));
+  w.Add("(.)number_" + name(), pvecback[bg_number_index()]);
+  w.Add("(.)rho_" + name(), Rho(pvecback));
+  w.Add("(.)p_" + name(), P(pvecback));
 }
 
-void NCDMSpecies::FillSources(const double* /*y*/,
+void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
+                              const double* /*y*/,
                               const double* /*dy*/,
                               PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
@@ -257,7 +251,7 @@ void NCDMSpecies::FillSources(const double* /*y*/,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const int n              = ncdm_id_;
+  const int n              = source_slot_;
   const double* pvecback   = ppw->pvecback;
   const perturb_vector* pv = ppw->pv;
   const double* y          = ppw->pv->y;
@@ -270,7 +264,7 @@ void NCDMSpecies::FillSources(const double* /*y*/,
                           p_mod->index_tp_delta_ncdm1_ + n,
                           ctx.index_tau,
                           ctx.index_k,
-                          Delta(pv, y, pvecback, ppw) +
+                          Delta(layout, pv, y, pvecback, ppw) +
                               3. * ctx.a_prime_over_a * (1. + w) *
                                   ctx.theta_over_k2);  // N-body gauge correction
   }
@@ -282,50 +276,51 @@ void NCDMSpecies::FillSources(const double* /*y*/,
                           p_mod->index_tp_theta_ncdm1_ + n,
                           ctx.index_tau,
                           ctx.index_k,
-                          Theta(pv, y, pvecback, ppw) + ctx.theta_shift);
+                          Theta(layout, pv, y, pvecback, ppw) + ctx.theta_shift);
   }
 }
 
 // ── Perturbations ──────────────────────────────────────────────────────────
 
-void NCDMSpecies::RegisterPerturbationIndices(perturb_vector* pv,
+void NCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                              perturb_vector* pv,
                                               const precision* ppr,
                                               int& index_pt,
                                               const perturb_workspace* ppw,
                                               int /*gauge*/) {
   if (!pba_->has_ncdm)
     return;
+  auto& layout = static_cast<NCDMBaseSpecies::PerturbLayout&>(base);
 
-  if (ncdm_id_ == 0) {
-    pv->index_pt_psi0_ncdm1 = index_pt;
-  }
   index_pt_psi0_ = index_pt;
 
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
-
   if (fa_on) {
-    pv->l_max_ncdm[ncdm_id_]  = 2;
-    pv->q_size_ncdm[ncdm_id_] = 1;
+    layout.l_max  = 2;
+    layout.q_size = 1;
   }
   else {
-    pv->l_max_ncdm[ncdm_id_]  = ppr->l_max_ncdm;
-    pv->q_size_ncdm[ncdm_id_] = q_size();
+    layout.l_max  = ppr->l_max_ncdm;
+    layout.q_size = q_size();
   }
-  pv->index_ncdm_[ncdm_id_].clear();
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq)
-    pv->index_ncdm_[ncdm_id_].push_back(index_pt + iq * (pv->l_max_ncdm[ncdm_id_] + 1));
-  index_pt += (pv->l_max_ncdm[ncdm_id_] + 1) * pv->q_size_ncdm[ncdm_id_];
+  layout.index_per_q.clear();
+  layout.index_per_q.reserve(layout.q_size);
+  for (int iq = 0; iq < layout.q_size; ++iq)
+    layout.index_per_q.push_back(index_pt + iq * (layout.l_max + 1));
+
+  index_pt += layout.total_size();
 }
 
-void NCDMSpecies::PerturbDerivs(double tau,
+void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
+                                double tau,
                                 const double* y,
                                 double* dy,
                                 const perturb_parameters_and_workspace& ppaw) {
   if (!pba_->has_ncdm)
     return;
+  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
 
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
   const double* s_l               = ppw->s_l;
   const double k                  = ctx.k;
@@ -351,7 +346,7 @@ void NCDMSpecies::PerturbDerivs(double tau,
     const double ceff2           = ca2_ncdm;
     const double cvis2           = 3. * w_ncdm * ca2_ncdm;
     const double pseudo_p_over_p = pseudo_p / p_ncdm;
-    const int idx                = pv->index_ncdm_.at(ncdm_id_)[0];
+    const int idx                = layout.index_per_q[0];
 
     dy[idx] = -(1. + w_ncdm) * (y[idx + 1] + metric_continuity) -
               3. * a_prime_over_a * (ceff2 - w_ncdm) * y[idx];
@@ -365,16 +360,16 @@ void NCDMSpecies::PerturbDerivs(double tau,
                   8. / 3. * cvis2 / (1. + w_ncdm) * s_l[2] * (y[idx + 1] + metric_ufa_class);
   }
   else {
-    // Exact Boltzmann hierarchy per momentum bin
+    // Exact Boltzmann hierarchy
     const double M_ncdm = M_;
-    for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
+    const int lmax      = layout.l_max;
+    for (int iq = 0; iq < layout.q_size; ++iq) {
       const double q          = q_[iq];
       const double dlnf0_dlnq = dlnf0_dlnq_[iq];
 
       const double epsilon        = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
       const double qk_div_epsilon = k * q / epsilon;
-      const int idx               = pv->index_ncdm_.at(ncdm_id_)[iq];
-      const int lmax              = pv->l_max_ncdm[ncdm_id_];
+      const int idx               = layout.index_per_q[iq];
 
       // l=0 (density)
       dy[idx] = -qk_div_epsilon * y[idx + 1] + metric_continuity * dlnf0_dlnq / 3.;
@@ -395,16 +390,21 @@ void NCDMSpecies::PerturbDerivs(double tau,
   }
 }
 
-void NCDMSpecies::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
-  perturb_vector* pv = ctx.ppw->pv;
-  if (!pba_->has_ncdm || pv->index_ncdm_.at(ncdm_id_).empty())
+void NCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                         double* y,
+                                         const PerturbIcContext& ctx) {
+  if (!pba_->has_ncdm)
     return;
-  for (int index_q = 0; index_q < pv->q_size_ncdm[ncdm_id_]; ++index_q) {
-    const int idx           = pv->index_ncdm_[ncdm_id_][index_q];
+  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  if (layout.q_size <= 0 || layout.index_per_q.empty())
+    return;
+
+  const int lmax = layout.l_max;
+  for (int index_q = 0; index_q < layout.q_size; ++index_q) {
+    const int idx           = layout.index_per_q[index_q];
     const double q          = q_[index_q];
     const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * M_ * M_);
     const double dlnf0_dlnq = dlnf0_dlnq_[index_q];
-    const int lmax          = pv->l_max_ncdm[ncdm_id_];
 
     y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;
     if (lmax >= 1)
@@ -426,19 +426,15 @@ void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (pba->has_ncdm != _TRUE_)
     return;
 
-  const int n = ncdm_id_;
-  char tmp[40];
+  const int n           = source_slot_;
+  const std::string& nm = name();
 
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_) {
-      snprintf(tmp, sizeof(tmp), "d_ncdm[%d]", n);
-      w.Add(tmp, mod.index_tp_delta_ncdm1_ + n, _TRUE_);
-    }
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_) {
-      snprintf(tmp, sizeof(tmp), "t_ncdm[%d]", n);
-      w.Add(tmp, mod.index_tp_theta_ncdm1_ + n, _TRUE_);
-    }
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+      w.Add("d_" + nm, mod.index_tp_delta_ncdm1_ + n, _TRUE_);
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+      w.Add("t_" + nm, mod.index_tp_theta_ncdm1_ + n, _TRUE_);
   }
   else if (fmt == camb_format) {
     // camb_format: single aggregate column emitted only for n==0
@@ -456,7 +452,6 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
   if (pba->has_ncdm != _TRUE_)
     return;
 
-  const int n       = ncdm_id_;
   double delta_ncdm = 0., theta_ncdm = 0., shear_ncdm = 0., cs2_ncdm = 0.;
 
   if (!w.IsTitleMode()) {
@@ -472,10 +467,11 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
     const double rho_plus_p  = rho_ncdm_bg + p_ncdm_bg;
     const double w_ncdm      = (rho_ncdm_bg > 0.) ? p_ncdm_bg / rho_ncdm_bg : 0.;
 
-    delta_ncdm = Delta(pv, y, pvecback, ppw);
-    theta_ncdm = Theta(pv, y, pvecback, ppw);
-    shear_ncdm = (rho_plus_p > 0.) ? RhoPlusPShear(pv, y, pvecback, ppw) / rho_plus_p : 0.;
-    const double delta_p_ncdm   = DeltaP(pv, y, pvecback, ppw);
+    const auto& layout = *pv->species_layouts[collection_index_];
+    delta_ncdm         = Delta(layout, pv, y, pvecback, ppw);
+    theta_ncdm         = Theta(layout, pv, y, pvecback, ppw);
+    shear_ncdm = (rho_plus_p > 0.) ? RhoPlusPShear(layout, pv, y, pvecback, ppw) / rho_plus_p : 0.;
+    const double delta_p_ncdm   = DeltaP(layout, pv, y, pvecback, ppw);
     const double delta_rho_ncdm = rho_ncdm_bg * delta_ncdm;
     constexpr double eps        = 1e-300;
     cs2_ncdm = (std::abs(delta_rho_ncdm) > eps) ? delta_p_ncdm / delta_rho_ncdm : 0.;
@@ -500,116 +496,229 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
     }
   }
 
-  char tmp[40];
-  snprintf(tmp, sizeof(tmp), "delta_ncdm[%d]", n);
-  w.Add(tmp, delta_ncdm, true);
-  snprintf(tmp, sizeof(tmp), "theta_ncdm[%d]", n);
-  w.Add(tmp, theta_ncdm, true);
-  snprintf(tmp, sizeof(tmp), "shear_ncdm[%d]", n);
-  w.Add(tmp, shear_ncdm, true);
-  snprintf(tmp, sizeof(tmp), "cs2_ncdm[%d]", n);
-  w.Add(tmp, cs2_ncdm, true);
+  const std::string& nm = name();
+  w.Add("delta_" + nm, delta_ncdm, true);
+  w.Add("theta_" + nm, theta_ncdm, true);
+  w.Add("shear_" + nm, shear_ncdm, true);
+  w.Add("cs2_" + nm, cs2_ncdm, true);
 }
 
-// ── Integrated observables ──────────────────────────────────────────────────
+// ── Tensor output column titles ────────────────────────────────────────────
 
-double NCDMSpecies::Delta(const perturb_vector* pv,
+void NCDMSpecies::WriteTensorOutputColumnTitles(char* tensor_titles) const {
+  const std::string& nm = name();
+  std::string title     = "delta_" + nm;
+  class_store_columntitle(tensor_titles, title.c_str(), _TRUE_);
+  title = "theta_" + nm;
+  class_store_columntitle(tensor_titles, title.c_str(), _TRUE_);
+  title = "shear_" + nm;
+  class_store_columntitle(tensor_titles, title.c_str(), _TRUE_);
+}
+
+// ── Integrated observables (layout-based) ──────────────────────────────────
+
+double NCDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
+                          const perturb_vector* /*pv*/,
                           const double* y,
                           const double* pvecback,
                           const perturb_workspace* ppw) const {
-  if (pv->index_ncdm_.at(ncdm_id_).empty())
+  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  if (layout.index_per_q.empty())
     return 0.;
 
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
   if (fa_on)
-    return y[pv->index_ncdm_.at(ncdm_id_)[0]];
+    return y[layout.index_per_q[0]];
 
   const double a        = ppw->scalar_ctx.a;
   double rho_delta_ncdm = 0.0;
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     const double w0       = w_[iq];
     const double q        = q_[iq];
     const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
-    rho_delta_ncdm       += q * q * epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
+    rho_delta_ncdm       += q * q * epsilon * w0 * y[layout.index_per_q[iq]];
   }
   const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   return rho_delta_ncdm * factor / pvecback[index_bg_rho_];
 }
 
-double NCDMSpecies::Theta(const perturb_vector* pv,
+double NCDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
+                          const perturb_vector* /*pv*/,
                           const double* y,
                           const double* pvecback,
                           const perturb_workspace* ppw) const {
-  if (pv->index_ncdm_.at(ncdm_id_).empty())
+  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  if (layout.index_per_q.empty())
     return 0.;
 
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
   if (fa_on)
-    return y[pv->index_ncdm_.at(ncdm_id_)[0] + 1];
+    return y[layout.index_per_q[0] + 1];
 
   const double a               = ppw->scalar_ctx.a;
   double rho_plus_p_theta_ncdm = 0.0;
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     const double w0        = w_[iq];
     const double q         = q_[iq];
-    rho_plus_p_theta_ncdm += q * q * q * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 1];
+    rho_plus_p_theta_ncdm += q * q * q * w0 * y[layout.index_per_q[iq] + 1];
   }
   const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   const double k      = ppw->scalar_ctx.k;
   return rho_plus_p_theta_ncdm * k * factor / (pvecback[index_bg_rho_] + pvecback[index_bg_p_]);
 }
 
-double NCDMSpecies::DeltaP(const perturb_vector* pv,
+double NCDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                           const perturb_vector* /*pv*/,
                            const double* y,
                            const double* pvecback,
                            const perturb_workspace* ppw) const {
-  if (pv->index_ncdm_.at(ncdm_id_).empty())
+  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  if (layout.index_per_q.empty())
     return 0.;
 
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
   if (fa_on) {
-    // cg2_ncdm logic for fluid approx
     double rho_bg      = pvecback[index_bg_rho_];
     double p_bg        = pvecback[index_bg_p_];
     double pseudo_p_bg = pvecback[index_bg_pseudo_p_];
     double w_ncdm      = p_bg / rho_bg;
     double cg2_ncdm    = w_ncdm * (1.0 - 1.0 / (3.0 + 3.0 * w_ncdm) *
                                              (3.0 * w_ncdm - 2.0 + pseudo_p_bg / p_bg));
-    return cg2_ncdm * rho_bg * y[pv->index_ncdm_.at(ncdm_id_)[0]];
+    return cg2_ncdm * rho_bg * y[layout.index_per_q[0]];
   }
 
   const double a      = ppw->scalar_ctx.a;
   double delta_p_ncdm = 0.0;
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     const double w0       = w_[iq];
     const double q        = q_[iq];
     const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
-    delta_p_ncdm         += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq]];
+    delta_p_ncdm         += q * q * q * q / epsilon * w0 * y[layout.index_per_q[iq]];
   }
   const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   return delta_p_ncdm * factor / 3.;
 }
 
-double NCDMSpecies::RhoPlusPShear(const perturb_vector* pv,
+double NCDMSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
+                                  const perturb_vector* /*pv*/,
                                   const double* y,
                                   const double* pvecback,
                                   const perturb_workspace* ppw) const {
-  if (pv->index_ncdm_.at(ncdm_id_).empty())
+  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  if (layout.index_per_q.empty())
     return 0.;
 
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
   if (fa_on)
-    return (pvecback[index_bg_rho_] + pvecback[index_bg_p_]) *
-           y[pv->index_ncdm_.at(ncdm_id_)[0] + 2];
+    return (pvecback[index_bg_rho_] + pvecback[index_bg_p_]) * y[layout.index_per_q[0] + 2];
 
   const double a               = ppw->scalar_ctx.a;
   double rho_plus_p_shear_ncdm = 0.0;
-  for (int iq = 0; iq < pv->q_size_ncdm[ncdm_id_]; ++iq) {
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     const double w0        = w_[iq];
     const double q         = q_[iq];
     const double epsilon   = std::sqrt(q * q + std::pow(M_ * a, 2));
-    rho_plus_p_shear_ncdm += q * q * q * q / epsilon * w0 * y[pv->index_ncdm_.at(ncdm_id_)[iq] + 2];
+    rho_plus_p_shear_ncdm += q * q * q * q / epsilon * w0 * y[layout.index_per_q[iq] + 2];
   }
   const double factor = factor_ * std::pow(pba_->a_today / a, 4);
   return 2.0 / 3.0 * factor * rho_plus_p_shear_ncdm;
+}
+
+// ── Integrated observables (legacy — unreachable; layout-based overrides
+// above are used everywhere. These exist only to satisfy the pure-virtual
+// contract on BaseSpecies). ──
+
+double NCDMSpecies::Delta(const perturb_vector* /*pv*/,
+                          const double* /*y*/,
+                          const double* /*pvecback*/,
+                          const perturb_workspace* /*ppw*/) const {
+  throw std::logic_error("NCDMSpecies::Delta(pv,...) is unreachable — caller must pass layout");
+}
+
+double NCDMSpecies::Theta(const perturb_vector* /*pv*/,
+                          const double* /*y*/,
+                          const double* /*pvecback*/,
+                          const perturb_workspace* /*ppw*/) const {
+  throw std::logic_error("NCDMSpecies::Theta(pv,...) is unreachable — caller must pass layout");
+}
+
+double NCDMSpecies::DeltaP(const perturb_vector* /*pv*/,
+                           const double* /*y*/,
+                           const double* /*pvecback*/,
+                           const perturb_workspace* /*ppw*/) const {
+  throw std::logic_error("NCDMSpecies::DeltaP(pv,...) is unreachable — caller must pass layout");
+}
+
+double NCDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/,
+                                  const double* /*y*/,
+                                  const double* /*pvecback*/,
+                                  const perturb_workspace* /*ppw*/) const {
+  throw std::logic_error(
+      "NCDMSpecies::RhoPlusPShear(pv,...) is unreachable — caller must pass layout");
+}
+
+// ── CopyPerturbationsAcrossSwitch (FA-collapse) ─────────────────────────────
+
+void NCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                const BaseSpecies::PerturbLayout& new_base,
+                                                const double* old_y,
+                                                double* new_y,
+                                                const PerturbSwitchContext& ctx) const {
+  const auto& old_l = static_cast<const NCDMBaseSpecies::PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const NCDMBaseSpecies::PerturbLayout&>(new_base);
+  if (old_l.q_size < 0 || new_l.q_size < 0)
+    return;
+
+  const bool fa_was_on = (old_l.q_size == 1 && old_l.l_max == 2);
+  const bool fa_is_on  = (new_l.q_size == 1 && new_l.l_max == 2);
+
+  if (fa_was_on == fa_is_on) {
+    // Slot-by-slot copy (no-switch or unchanged approximation).
+    for (int iq = 0; iq < new_l.q_size; ++iq) {
+      const int new_base_idx = new_l.index_per_q[iq];
+      const int old_base_idx = old_l.index_per_q[iq];
+      for (int l = 0; l <= new_l.l_max; ++l)
+        new_y[new_base_idx + l] = old_y[old_base_idx + l];
+    }
+    return;
+  }
+
+  if (!fa_was_on && fa_is_on) {
+    // Collapse full hierarchy → (delta, theta, shear) for fluid approximation.
+    const double a            = ctx.a;
+    const double k            = ctx.k;
+    const double a_today      = ctx.a_today;
+    const double rho          = Rho(ctx.pvecback);
+    const double p            = P(ctx.pvecback);
+    const double rho_plus_p   = rho + p;
+    const double M_local      = M_;
+    const double factor_local = factor_ * std::pow(a_today / a, 4);
+
+    const int idx_new = new_l.index_per_q[0];
+    for (int l = 0; l <= 2; ++l)
+      new_y[idx_new + l] = 0.0;
+
+    double delta = 0., theta = 0., shear = 0.;
+    for (int iq = 0; iq < old_l.q_size; ++iq) {
+      const int idx_old    = old_l.index_per_q[iq];
+      const double w0      = w_[iq];
+      const double q       = q_[iq];
+      const double epsilon = std::sqrt(q * q + a * a * M_local * M_local);
+
+      delta += w0 * std::pow(q, 2) * epsilon * old_y[idx_old];
+      theta += w0 * std::pow(q, 3) * old_y[idx_old + 1];
+      shear += w0 * std::pow(q, 4) / epsilon * old_y[idx_old + 2];
+    }
+    delta *= factor_local / rho;
+    theta *= k * factor_local / rho_plus_p;
+    shear *= 2. / 3. * factor_local / rho_plus_p;
+
+    new_y[idx_new]     = delta;
+    new_y[idx_new + 1] = theta;
+    new_y[idx_new + 2] = shear;
+    return;
+  }
+
+  // fa_on → fa_off: unreachable in CLASS once FA is on.
+  // Defensive fallback: leave new_y zero-initialized.
 }

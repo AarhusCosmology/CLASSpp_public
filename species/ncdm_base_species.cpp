@@ -1,8 +1,12 @@
 #include "ncdm_base_species.h"
 
 #include <cfloat>  // DBL_EPSILON, DBL_MAX
+#include <cmath>
 #include <cstring>
 
+#include "background_module.h"
+#include "perturbations.h"
+#include "perturbations_module.h"
 #include "species_input.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -582,4 +586,134 @@ void NCDMBaseSpecies::PrintMassInfo() const {
 
 void NCDMBaseSpecies::PrintOmegaInfo() const {
   printf("-> %-26s Omega = %-15g , omega = %-15g\n", "Neutrino Species", Omega0_, omega0_);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RegisterTensorPerturbationIndices (layout-based)
+// The module pre-sets layout.l_max (from ppr->l_max_ncdm) and layout.q_size
+// (from q_size()) before calling this virtual. Thread-safe: layout/pv are
+// per-thread.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void NCDMBaseSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                        perturb_vector* /*pv*/,
+                                                        int& index_pt,
+                                                        const perturb_workspace* /*ppw*/,
+                                                        int /*gauge*/) {
+  auto& layout = static_cast<PerturbLayout&>(base);
+
+  layout.index_per_q.clear();
+  layout.index_per_q.reserve(layout.q_size);
+  for (int iq = 0; iq < layout.q_size; ++iq)
+    layout.index_per_q.push_back(index_pt + iq * (layout.l_max + 1));
+
+  index_pt += layout.total_size();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MarkUsedInSources
+// NCDM multipoles l > 2 do not enter source functions.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void NCDMBaseSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
+                                        int* used_in_sources) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.q_size < 0)
+    return;
+  for (int iq = 0; iq < layout.q_size; ++iq) {
+    const int b = layout.index_per_q[iq];
+    for (int l = 0; l <= layout.l_max; ++l) {
+      if (l > 2)
+        used_in_sources[b + l] = _FALSE_;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PerturbTensorDerivs (layout-based)
+// Ports the per-species tensor Boltzmann hierarchy from perturb_derivs_member.
+// GetDlnf0DlnqForTensor is supplied by the concrete subclass:
+//   NCDMSpecies → static dlnf0_dlnq_[iq]
+//   DNCDMSpecies → pvecback[bg_dlnfdlnq_index + iq]
+// ─────────────────────────────────────────────────────────────────────────────
+
+void NCDMBaseSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
+                                          double /*tau*/,
+                                          const double* y,
+                                          double* dy,
+                                          const perturb_parameters_and_workspace& ppaw) {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.q_size <= 0 || layout.index_per_q.empty())
+    return;
+
+  const perturb_workspace* ppw = ppaw.ppw;
+  const perturb_vector* pv     = ppw->pv;
+  const double* pvecback       = ppw->pvecback;
+  const double* s_l            = ppw->s_l;
+  const double k               = ppaw.k;
+  const double a               = pvecback[bgm_->index_bg_a_];
+  const double a2              = a * a;
+  const double cotKgen         = ppw->cotKgen;
+  const int lmax               = layout.l_max;
+
+  for (int iq = 0; iq < layout.q_size; ++iq) {
+    const double q              = q_[iq];
+    const double dlnf0_dlnq     = GetDlnf0DlnqForTensor(iq, pvecback);
+    const double epsilon        = std::sqrt(q * q + a2 * M_ * M_);
+    const double qk_div_epsilon = k * q / epsilon;
+    const int ncdm_idx          = layout.index_per_q[iq];
+
+    dy[ncdm_idx] = -qk_div_epsilon * y[ncdm_idx + 1] -
+                   0.25 * _SQRT6_ * y[pv->index_pt_gwdot] * dlnf0_dlnq;
+
+    for (int l = 1; l < lmax; ++l) {
+      dy[ncdm_idx + l] = qk_div_epsilon / (2. * l + 1.0) *
+                         (l * s_l[l] * y[ncdm_idx + (l - 1)] -
+                          (l + 1.) * s_l[l + 1] * y[ncdm_idx + (l + 1)]);
+    }
+
+    dy[ncdm_idx + lmax] = qk_div_epsilon * y[ncdm_idx + lmax - 1] -
+                          (1. + lmax) * k * cotKgen * y[ncdm_idx + lmax];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GetW0ForGwSource  (base-class version: static quadrature weight)
+// DNCDMSpecies overrides to use pvecback[bg_lnf_index + iq].
+// ─────────────────────────────────────────────────────────────────────────────
+
+double NCDMBaseSpecies::GetW0ForGwSource(int iq, const double* /*pvecback*/) const {
+  return w_[iq];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ContributeTensorGwSource
+// Ports the per-species GW source integral from perturb_total_stress_energy.
+// Uses the species's NCDMBaseSpecies::PerturbLayout slot from ppw->pv.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void NCDMBaseSpecies::ContributeTensorGwSource(const BaseSpecies::PerturbLayout& base,
+                                               double a,
+                                               double a_today,
+                                               const double* y,
+                                               perturb_workspace* ppw) const {
+  const auto& layout     = static_cast<const PerturbLayout&>(base);
+  const double* pvecback = ppw->pvecback;
+  const double a2        = a * a;
+  const double factor    = factor_ * std::pow(a_today / a, 4);
+
+  double gwncdm = 0.;
+  for (int iq = 0; iq < layout.q_size; ++iq) {
+    const int idx        = layout.index_per_q[iq];
+    const double w0      = GetW0ForGwSource(iq, pvecback);
+    const double q       = q_[iq];
+    const double q2      = q * q;
+    const double epsilon = std::sqrt(q2 + M_ * M_ * a2);
+
+    gwncdm += q2 * q2 / epsilon * w0 *
+              (1. / 15. * y[idx] + 2. / 21. * y[idx + 2] + 1. / 35. * y[idx + 4]);
+  }
+
+  gwncdm         *= -_SQRT6_ * 4 * a2 * factor;
+  ppw->gw_source += gwncdm;
 }

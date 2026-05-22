@@ -3,6 +3,7 @@
 #ifndef __PERTURBATIONS__
 #define __PERTURBATIONS__
 
+#include <memory>
 #include <vector>
 
 #include "../species/base_species.h"
@@ -255,43 +256,23 @@ struct perturbs {
  */
 
 struct perturb_vector {
-  int index_pt_delta_g;        /**< photon density */
-  int index_pt_theta_g;        /**< photon velocity */
-  int index_pt_shear_g;        /**< photon shear */
-  int index_pt_l3_g;           /**< photon l=3 */
-  int l_max_g;                 /**< max momentum in Boltzmann hierarchy (at least 3) */
-  int index_pt_pol0_g;         /**< photon polarization, l=0 */
-  int index_pt_pol1_g;         /**< photon polarization, l=1 */
-  int index_pt_pol2_g;         /**< photon polarization, l=2 */
-  int index_pt_pol3_g;         /**< photon polarization, l=3 */
-  int l_max_pol_g;             /**< max momentum in Boltzmann hierarchy (at least 3) */
-  int index_pt_delta_b;        /**< baryon density */
-  int index_pt_theta_b;        /**< baryon velocity */
-  int index_pt_delta_cdm;      /**< cdm density */
-  int index_pt_theta_cdm;      /**< cdm velocity */
-  int index_pt_delta_idm_dr;   /**< idm_dr density */
-  int index_pt_theta_idm_dr;   /**< idm_dr velocity */
-  int index_pt_delta_idm_drmd; /**< idm_drmd density */
-  int index_pt_theta_idm_drmd; /**< idm_drmd velocity */
-  int index_pt_delta_dcdm;     /**< dcdm density */
-  int index_pt_theta_dcdm;     /**< dcdm velocity */
-  int index_pt_delta_fld;      /**< dark energy density in true fluid case */
-  int index_pt_theta_fld;      /**< dark energy velocity in true fluid case */
-  int index_pt_Gamma_fld;      /**< unique dark energy dynamical variable in PPF case */
-  int index_pt_phi_scf;        /**< scalar field density */
-  int index_pt_phi_prime_scf;  /**< scalar field velocity */
-  int index_pt_delta_ur;       /**< density of ultra-relativistic neutrinos/relics */
-  int index_pt_theta_ur;       /**< velocity of ultra-relativistic neutrinos/relics */
-  int index_pt_shear_ur;       /**< shear of ultra-relativistic neutrinos/relics */
-  int index_pt_l3_ur;          /**< l=3 of ultra-relativistic neutrinos/relics */
-  int l_max_ur;                /**< max momentum in Boltzmann hierarchy (at least 3) */
-  int index_pt_delta_idr;      /**< density of interacting dark radiation */
-  int index_pt_theta_idr;      /**< velocity of interacting dark radiation */
-  int index_pt_delta_idr_drmd; /**< density of interacting dark radiation */
-  int index_pt_theta_idr_drmd; /**< velocity of interacting dark radiation */
-  int index_pt_shear_idr;      /**< shear of interacting dark radiation */
-  int index_pt_l3_idr;         /**< l=3 of interacting dark radiation */
-  int l_max_idr; /**< max momentum in Boltzmann hierarchy (at least 3) for interacting dark radiation */
+  // Per-species perturbation layouts, parallel to all_species_ (lex-key order).
+  // Each thread allocates its own pv, so this storage is per-thread.
+  std::vector<std::unique_ptr<BaseSpecies::PerturbLayout>> species_layouts;
+
+  /* Photons bare fields removed — use pv->species_layouts[g_i] (PhotonsSpecies::PerturbLayout). */
+  /* Baryons bare fields removed — use pv->species_layouts[b_i] (BaryonsSpecies::PerturbLayout). */
+  /* CDM bare fields removed — use pv->species_layouts[cdm_i] (CDMSpecies::PerturbLayout). */
+  /* IDM_DR bare fields removed — use pv->species_layouts[idm_dr_idr_i]
+     (IDM_DR_IDR_Species::PerturbLayout::idm_dr). */
+  /* IDM_DRMD bare fields removed — use pv->species_layouts[idm_drmd_idr_drmd_i]
+     (IDM_DRMD_IDR_DRMD_Species::PerturbLayout::idm_drmd). */
+  /* DCDM bare fields removed — use pv->species_layouts[dcdm_dr_i] (DCDM_DR_Species::PerturbLayout::dcdm). */
+  /* UR bare fields removed — use pv->species_layouts[ur_i] (UltraRelativisticSpecies::PerturbLayout). */
+  /* IDR bare fields removed — use pv->species_layouts[idm_dr_idr_i]
+     (IDM_DR_IDR_Species::PerturbLayout::idr). */
+  /* IDR_DRMD bare fields removed — use pv->species_layouts[idm_drmd_idr_drmd_i]
+     (IDM_DRMD_IDR_DRMD_Species::PerturbLayout::idr_drmd). */
 
   /* perturbed recombination */
   int index_pt_perturbed_recombination_delta_temp; /**< Gas temperature perturbation */
@@ -302,17 +283,8 @@ struct perturb_vector {
       astro-ph/9907388. */
   int index_pt_F0_dr_sum;
   int index_pt_F0_dr_species;
-  int l_max_dr;            /**< max momentum in Boltzmann hierarchy for dr) */
-  int l_max_dr_col;        /**< max collision term in Boltzmann hierarchy for dr) */
-  int index_pt_psi0_ncdm1; /**< first multipole of perturbation of first ncdm species, Psi_0 */
-  int N_ncdm;              /**< number of distinct non-cold-dark-matter (ncdm) species */
-  int*
-      l_max_ncdm; /**< mutipole l at which Boltzmann hierarchy is truncated (for each ncdm species) */
-  int* q_size_ncdm; /**< number of discrete momenta (for each ncdm species) */
-  std::map<int, std::vector<int>> index_ncdm_;
-  std::vector<int> l_max_ncdm_storage;
-  std::vector<int> q_size_ncdm_storage;
-
+  int l_max_dr;          /**< max momentum in Boltzmann hierarchy for dr) */
+  int l_max_dr_col;      /**< max collision term in Boltzmann hierarchy for dr) */
   int index_pt_eta;      /**< synchronous gauge metric perturbation eta*/
   int index_pt_phi;      /**< newtonian gauge metric perturbation phi */
   int index_pt_hv_prime; /**< vector metric perturbation h_v' in synchronous gauge */
@@ -320,7 +292,23 @@ struct perturb_vector {
 
   int index_pt_gw;    /**< tensor metric perturbation h (gravitational waves) */
   int index_pt_gwdot; /**< its time-derivative */
-  int pt_size;        /**< size of perturbation vector */
+
+  /** Tensor "relativistic neutrino" Boltzmann hierarchy. Unlike the scalar/vector
+      hierarchies this is NOT owned by a species: it is a single hierarchy sourced
+      by the gravitational waves (index_pt_gwdot) and exists whenever
+      evolve_tensor_ur_ is set — i.e. when any massless relativistic species
+      contributes, be it the ultra-relativistic neutrinos or massive ncdm under the
+      massless approximation. The perturb_vector owns it and the perturbations
+      module registers/evolves it directly (formerly the bare index_pt_*_ur fields). */
+  struct TensorRelativisticLayout {
+    int idx_delta = -1; /**< was index_pt_delta_ur */
+    int idx_theta = -1; /**< was index_pt_theta_ur */
+    int idx_shear = -1; /**< was index_pt_shear_ur */
+    int idx_l3    = -1; /**< was index_pt_l3_ur (only registered when l_max >= 3) */
+    int l_max     = -1; /**< was l_max_ur */
+  } tensor_ur_layout;
+
+  int pt_size; /**< size of perturbation vector */
 
   double* y;  /**< vector of perturbations to be integrated */
   double* dy; /**< time-derivative of the same vector */

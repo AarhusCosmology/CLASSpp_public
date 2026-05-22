@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+
 #include "common.h"  // class_store_columntitle, class_store_double, _TRUE_, _FALSE_
 
 /**
@@ -25,6 +27,9 @@ class BackgroundColumnWriter {
    *  semantics. Both WriteBackgroundColumnTitles and WriteBackgroundData must
    *  pass the same condition so title and data counts stay aligned. */
   void Add(const char* title, double value, bool condition = true);
+  void Add(const std::string& title, double value, bool condition = true) {
+    Add(title.c_str(), value, condition);
+  }
 
  private:
   char* titles_    = nullptr;

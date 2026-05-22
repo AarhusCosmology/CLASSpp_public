@@ -13,6 +13,15 @@
  */
 class IDM_DR_IDR_Species : public CompositeSpecies {
  public:
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    IDM_DRSpecies::PerturbLayout idm_dr;
+    IDRSpecies::PerturbLayout idr;
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   explicit IDM_DR_IDR_Species(const background& pba);
 
   IDM_DRSpecies& idm_dr() {
@@ -30,6 +39,58 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+
+  // ── Perturbations ──────────────────────────────────────────────────────────
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
+                                   const precision* ppr,
+                                   int& index_pt,
+                                   const perturb_workspace* ppw,
+                                   int gauge) override;
+
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
+                     const double* y,
+                     double* dy,
+                     const perturb_parameters_and_workspace& ppaw) override;
+
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
+               const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
+                const double* y,
+                const double* pvecback,
+                const perturb_workspace* ppw) const override;
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
+
+  /** Matter (IDM_DR only) contribution. IDR is radiation and contributes 0. */
+  double MatterRhoDelta(const perturb_vector* pv,
+                        const double* y,
+                        const double* pvecback,
+                        const perturb_workspace* ppw) const override;
+  double MatterRhoPlusPTheta(const perturb_vector* pv,
+                             const double* y,
+                             const double* pvecback,
+                             const perturb_workspace* ppw) const override;
 
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
   void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;

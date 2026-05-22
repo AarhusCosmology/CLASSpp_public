@@ -19,6 +19,16 @@ class BackgroundModule;
  */
 class FluidSpecies : public BaseSpecies {
  public:
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    int idx_delta = -1;
+    int idx_theta = -1;
+    int idx_Gamma = -1;  // PPF dynamical variable (only populated when use_ppf == _TRUE_)
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   explicit FluidSpecies(const background& pba);
 
   double GetOmega0() const override {
@@ -80,36 +90,91 @@ class FluidSpecies : public BaseSpecies {
                   perturb_workspace* ppw) const;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(perturb_vector* pv,
+
+  // Layout-based signatures: do the real work.
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(double tau,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
-  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) override;
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+
+  // Legacy signatures: no-op (Fluid is migrated; legacy call sites dual-write is in layout overrides).
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
+  void FillSources(const double* /*y*/,
+                   const double* /*dy*/,
+                   PerturbSourceContext& /*ctx*/) override {}
+  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  double Delta(const perturb_vector* pv,
+  // Layout-based read virtuals: do the real work.
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv,
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv,
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+
+  // Legacy read virtuals: no-op stubs (migrated species use layout-based overrides).
+  double Delta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+  double Theta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+  double DeltaP(const perturb_vector* /*pv*/,
+                const double* /*y*/,
+                const double* /*pvecback*/,
+                const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
+  double RhoPlusPShear(const perturb_vector* /*pv*/,
+                       const double* /*y*/,
+                       const double* /*pvecback*/,
+                       const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

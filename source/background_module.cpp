@@ -503,12 +503,12 @@ int BackgroundModule::background_init() {
     printf("Computing background\n");
 
     /* below we want to inform the user about ncdm species and/or the total N_eff */
-    if ((pba->N_ncdm > 0) || (pba->Omega0_idr != 0.)) {
+    if (!GetNcdmSpecies(all_species_).empty() || (pba->Omega0_idr != 0.)) {
       /* contribution of ultra-relativistic species _ur to N_eff */
       double Neff = pba->Omega0_ur / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
 
       /* contribution of ncdm species to N_eff*/
-      if (pba->N_ncdm > 0) {
+      if (!GetNcdmSpecies(all_species_).empty()) {
         for (auto* sp : GetNcdmSpecies(all_species_)) {
           Neff += sp->GetNeff(0.);
           sp->PrintNeffInfo();
@@ -556,7 +556,7 @@ int BackgroundModule::background_init() {
   /* in verbose mode, inform the user about the value of the ncdm
      masses in eV and about the ratio [m/omega_ncdm] in eV (the usual
      93 point something)*/
-  if ((pba->background_verbose > 0) && (pba->N_ncdm > 0)) {
+  if ((pba->background_verbose > 0) && (!GetNcdmSpecies(all_species_).empty())) {
     for (auto* sp : GetNcdmSpecies(all_species_))
       sp->PrintMassInfo();
   }
@@ -669,35 +669,26 @@ int BackgroundModule::background_indices() {
                      1);
   class_define_index(index_bg_Gamma0_drmd_, all_species_.count("IDM_DRMD_IDR_DRMD"), index_bg, 1);
 
-  // ── NCDM (optional, sorted by ncdm_id) ───────────────────────────────────
+  // ── NCDM (optional, in lex iteration order matching all_species_) ────────
   index_bg_number_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
-  if (pba->N_ncdm > 0) {
-    index_bg_number_ncdm1_ = index_bg;
-    std::vector<NCDMSpecies*> ncdm_vec;
+  {
+    NCDMSpecies* first_ncdm = nullptr;
     for (auto& [name, sp] : all_species_) {
-      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get()))
-        ncdm_vec.push_back(n);
+      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) {
+        if (first_ncdm == nullptr) {
+          first_ncdm             = n;
+          index_bg_number_ncdm1_ = index_bg;
+        }
+        n->RegisterBackgroundIndices(index_bg);
+      }
     }
-    std::sort(ncdm_vec.begin(), ncdm_vec.end(), [](NCDMSpecies* a, NCDMSpecies* b) {
-      return a->ncdm_id() < b->ncdm_id();
-    });
-    for (auto* ncdm : ncdm_vec)
-      ncdm->RegisterBackgroundIndices(index_bg);
-    if (!ncdm_vec.empty())
-      index_bg_pseudo_p_ncdm1_ = ncdm_vec[0]->bg_pseudo_p_index();
+    if (first_ncdm != nullptr)
+      index_bg_pseudo_p_ncdm1_ = first_ncdm->bg_pseudo_p_index();
   }
 
-  // ── DNCDM_DR composites (optional, sorted by ncdm_id) ───────────────────
-  {
-    std::vector<DNCDM_DR_Species*> dncdm_vec;
-    for (auto& [name, sp] : all_species_) {
-      if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-        dncdm_vec.push_back(d);
-    }
-    std::sort(dncdm_vec.begin(), dncdm_vec.end(), [](DNCDM_DR_Species* a, DNCDM_DR_Species* b) {
-      return a->dncdm().ncdm_id() < b->dncdm().ncdm_id();
-    });
-    for (auto* d : dncdm_vec)
+  // ── DNCDM_DR composites (optional, in lex iteration order) ───────────────
+  for (auto& [name, sp] : all_species_) {
+    if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
       d->RegisterBackgroundIndices(index_bg);
   }
 
@@ -1392,7 +1383,7 @@ int BackgroundModule::background_initial_conditions(
        This could happen for some WDM models.
   */
 
-  if (pba->N_ncdm > 0) {
+  if (!GetNcdmSpecies(all_species_).empty()) {
     for (auto* sp : GetNcdmSpecies(all_species_))
       a = sp->GetIni(a, pba->a_today, ppr->tol_ncdm_initial_w);
   }
@@ -1408,7 +1399,7 @@ int BackgroundModule::background_initial_conditions(
   if (all_species_.count("IDM_DRMD_IDR_DRMD"))
     Omega_rad += pba->Omega0_idr_drmd;
   double rho_rad = Omega_rad * pow(pba->H0, 2) / pow(a / pba->a_today, 4);
-  if (pba->N_ncdm > 0) {
+  if (!GetNcdmSpecies(all_species_).empty()) {
     /** - We must add the relativistic contribution from NCDM species */
     double rho_ncdm_rel_tot  = 0.;
     rho_rad                 += rho_ncdm_rel_tot;
@@ -1927,10 +1918,10 @@ int BackgroundModule::background_output_budget() {
       budget_radiation += pba->Omega0_idr_drmd;
     }
 
-    if (pba->N_ncdm > 0) {
+    if (!GetNcdmSpecies(all_species_).empty()) {
       printf(" ---> Massive Neutrino Species \n");
     }
-    if (pba->N_ncdm > 0) {
+    if (!GetNcdmSpecies(all_species_).empty()) {
       for (auto* sp : GetNcdmSpecies(all_species_)) {
         sp->PrintOmegaInfo();
         budget_neutrino += sp->GetOmega0();
@@ -1965,7 +1956,7 @@ int BackgroundModule::background_output_budget() {
     printf(" Non-relativistic                 Omega = %-15g , omega = %-15g \n",
            budget_matter,
            budget_matter * pba->h * pba->h);
-    if (pba->N_ncdm > 0) {
+    if (!GetNcdmSpecies(all_species_).empty()) {
       printf(" Neutrinos                        Omega = %-15g , omega = %-15g \n",
              budget_neutrino,
              budget_neutrino * pba->h * pba->h);
@@ -2099,6 +2090,10 @@ int BackgroundModule::background_print_variables(
   return _SUCCESS_;
 }
 
+int BackgroundModule::GetNcdmCount() const {
+  return static_cast<int>(GetNcdmSpecies(all_species_).size());
+}
+
 double BackgroundModule::GetNcdmDeg(int n) const {
   return GetNcdmSpecies(all_species_).at(n)->GetDeg();
 }
@@ -2113,4 +2108,20 @@ int BackgroundModule::GetNcdmQSize(int n) const {
 
 double BackgroundModule::GetNcdmQ(int n, int q_id) const {
   return GetNcdmSpecies(all_species_).at(n)->q()[q_id];
+}
+
+double BackgroundModule::GetOmega0NcdmTot() const {
+  double total = 0.;
+  for (auto* sp : GetNcdmSpecies(all_species_))
+    total += sp->GetOmega0();
+  return total;
+}
+
+int BackgroundModule::GetNDecayDr() const {
+  int n = (pba->Omega0_dcdmdr > 0 ? 1 : 0);
+  for (const auto& sp : all_species_) {
+    if (dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      ++n;
+  }
+  return n;
 }

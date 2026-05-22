@@ -11,6 +11,20 @@ class PhotonsSpecies : public BaseSpecies {
   explicit PhotonsSpecies(const background& pba)
       : BaseSpecies("Photons", EnergyType::Radiation), pba_(pba) {}
 
+  // ── PerturbLayout ──────────────────────────────────────────────────────────
+
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    // Scalar / vector / tensor — same struct holds whichever mode this pv is for.
+    int idx_delta = -1, idx_theta = -1, idx_shear = -1, idx_l3 = -1;
+    int idx_pol0 = -1, idx_pol1 = -1, idx_pol2 = -1, idx_pol3 = -1;
+    int l_max     = -1;
+    int l_max_pol = -1;
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   double GetOmega0() const override {
@@ -42,39 +56,105 @@ class PhotonsSpecies : public BaseSpecies {
     w.Add("(.)rho_g", pvecback[index_bg_rho_]);
   }
 
-  void RegisterPerturbationIndices(perturb_vector* pv,
+  // ── Perturbation index registration ────────────────────────────────────────
+
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  void RegisterVectorPerturbationIndices(perturb_vector* pv,
+  /** Legacy override: no-op — pv->index_pt_*_g are dual-written by the layout-based path. */
+  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
+                                   const precision* /*ppr*/,
+                                   int& /*index_pt*/,
+                                   const perturb_workspace* /*ppw*/,
+                                   int /*gauge*/) override {}
+
+  void RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                         perturb_vector* pv,
                                          int& index_pt,
                                          const perturb_workspace* ppw,
                                          int gauge) override;
 
-  void RegisterTensorPerturbationIndices(perturb_vector* pv,
+  /** Legacy override: no-op — pv->index_pt_*_g are dual-written by the layout-based path. */
+  void RegisterVectorPerturbationIndices(perturb_vector* /*pv*/,
+                                         int& /*index_pt*/,
+                                         const perturb_workspace* /*ppw*/,
+                                         int /*gauge*/) override {}
+
+  void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                         perturb_vector* pv,
                                          int& index_pt,
                                          const perturb_workspace* ppw,
                                          int gauge) override;
 
-  void PerturbDerivs(double tau,
+  /** Legacy override: no-op — pv->index_pt_*_g are dual-written by the layout-based path. */
+  void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/,
+                                         int& /*index_pt*/,
+                                         const perturb_workspace* /*ppw*/,
+                                         int /*gauge*/) override {}
+
+  // ── PerturbDerivs ──────────────────────────────────────────────────────────
+
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  void PerturbVectorDerivs(double tau,
+  void PerturbDerivs(double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
+
+  void PerturbVectorDerivs(const BaseSpecies::PerturbLayout& layout,
+                           double tau,
                            const double* y,
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) override;
 
-  void PerturbTensorDerivs(double tau,
+  void PerturbVectorDerivs(double /*tau*/,
+                           const double* /*y*/,
+                           double* /*dy*/,
+                           const perturb_parameters_and_workspace& /*ppaw*/) override {}
+
+  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
+                           double tau,
                            const double* y,
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) override;
 
-  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
+  void PerturbTensorDerivs(double /*tau*/,
+                           const double* /*y*/,
+                           double* /*dy*/,
+                           const perturb_parameters_and_workspace& /*ppaw*/) override {}
+
+  // ── Source filling and initial conditions ──────────────────────────────────
+
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) override;
+
+  void FillSources(const double* /*y*/,
+                   const double* /*dy*/,
+                   PerturbSourceContext& /*ctx*/) override {}
+
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+
+  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
+
+  // ── Switch-copy hook ────────────────────────────────────────────────────────
+
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
@@ -87,35 +167,64 @@ class PhotonsSpecies : public BaseSpecies {
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
 
-  /** RSA/TCA active when pv->index_pt_delta_g == -1 (sentinel set by RegisterPerturbationIndices). */
-  double Delta(const perturb_vector* pv,
+  // ── Stress-energy observables ───────────────────────────────────────────────
+
+  double Delta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
+  double Delta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
                const double* /*pvecback*/,
                const perturb_workspace* /*ppw*/) const override {
-    return (pv->index_pt_delta_g >= 0) ? y[pv->index_pt_delta_g] : 0.;
+    return 0.;
   }
-  double Theta(const perturb_vector* pv,
+
+  double Theta(const BaseSpecies::PerturbLayout& layout,
+               const perturb_vector* pv,
                const double* y,
+               const double* pvecback,
+               const perturb_workspace* ppw) const override;
+
+  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
+  double Theta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
                const double* /*pvecback*/,
                const perturb_workspace* /*ppw*/) const override {
-    return (pv->index_pt_theta_g >= 0) ? y[pv->index_pt_theta_g] : 0.;
+    return 0.;
   }
+
   /** δp_g = δρ_g / 3 = ρ_g * δ_g / 3. Returns 0 when RSA is active. */
-  double DeltaP(const perturb_vector* pv,
+  double DeltaP(const BaseSpecies::PerturbLayout& layout,
+                const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
+                const perturb_workspace* ppw) const override;
+
+  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
+  double DeltaP(const perturb_vector* /*pv*/,
+                const double* /*y*/,
+                const double* /*pvecback*/,
                 const perturb_workspace* /*ppw*/) const override {
-    return (pv->index_pt_delta_g >= 0) ? pvecback[index_bg_rho_] * y[pv->index_pt_delta_g] / 3.
-                                       : 0.;
+    return 0.;
   }
-  /**
-   * (rho+p)*shear for photons. Uses the TCA-corrected shear_g stored in
-   * ppw->scalar_ctx when the shear perturbation index is not evolved.
-   */
-  double RhoPlusPShear(const perturb_vector* pv,
+
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+
+  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
+  double RhoPlusPShear(const perturb_vector* /*pv*/,
+                       const double* /*y*/,
+                       const double* /*pvecback*/,
+                       const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
 
  private:
   const background& pba_;

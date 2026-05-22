@@ -82,6 +82,7 @@ source_files = (
     + prepend(
         'species',
         'baryons.cpp',
+        'base_species.cpp',
         'cdm.cpp',
         'composite_species.cpp',
         'dark_radiation_species.cpp',
