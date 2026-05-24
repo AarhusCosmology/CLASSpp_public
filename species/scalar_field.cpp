@@ -1,7 +1,11 @@
 #include "scalar_field.h"
 
+#include <cmath>
+#include <string>
+
 #include "background_column_writer.h"
 #include "background_module.h"
+#include "parser.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 
@@ -364,12 +368,68 @@ void ScalarFieldSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::Pertur
   new_y[new_l.idx_phi_prime] = old_y[old_l.idx_phi_prime];
 }
 
+// ── Shooting hooks ────────────────────────────────────────────────────────────
+
+std::vector<ShootingTarget> ScalarFieldSpecies::GetShootingTargets() const {
+  if (needs_shooting_)
+    return {shooting_target_};
+  return {};
+}
+
+void ScalarFieldSpecies::ComputeShootingGuess(const SpeciesBuildContext& ctx,
+                                              std::vector<double>& guess,
+                                              std::vector<double>& dxdy) const {
+  const background& ba = *ctx.pba;
+  if (ba.scf_tuning_index == 0) {
+    guess.push_back(sqrt(3.0 / ba.Omega0_scf));
+    dxdy.push_back(-0.5 * sqrt(3.0) * pow(ba.Omega0_scf, -1.5));
+  }
+  else {
+    /* Default: take the passed value as xguess and set dxdy to 1. */
+    guess.push_back(ba.scf_parameters[ba.scf_tuning_index]);
+    dxdy.push_back(1.);
+  }
+}
+
+double ScalarFieldSpecies::ComputeShootingResidual(const ShootingResidualContext& ctx,
+                                                   const ShootingTarget& target) const {
+  // Omega_scf is filled to close the budget; the requested value is target.target_value.
+  const background& ba = *ctx.pba;
+  return Rho(ctx.bg_today) / (ba.H0 * ba.H0) - target.target_value;
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  if (ctx.pba->has_scf == _TRUE_) {
-    result.push_back({"ScalarField", std::make_unique<ScalarFieldSpecies>(*ctx.pba)});
+  if (ctx.pba->has_scf != _TRUE_)
+    return result;
+
+  auto composite = std::make_unique<ScalarFieldSpecies>(*ctx.pba);
+
+  // Detect guess-driven construction: Omega_scf present (and nonzero) but
+  // scf_shooting_parameter absent. The nonzero check matches the historic shooting
+  // condition (a zero target meant "no shooting").
+  double omega_scf_val        = 0.;
+  double unknown_val          = 0.;
+  bool omega_scf_present      = ctx.pfc->read_double("Omega_scf", omega_scf_val);
+  bool shooting_param_present = ctx.pfc->read_double("scf_shooting_parameter", unknown_val);
+
+  if (omega_scf_present && omega_scf_val != 0. && !shooting_param_present) {
+    composite->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
+    composite->needs_shooting_  = true;
+
+    std::vector<double> g, d;
+    composite->ComputeShootingGuess(ctx, g, d);
+
+    // Seed the guess into pba->scf_parameters[scf_tuning_index] so this (discovery) build
+    // is valid. Do NOT write it into the file content: the fc is user-facing state checked
+    // for unread parameters, and DoShooting writes the *resolved* scf_shooting_parameter
+    // back into the fc (which the final build then reads). A guess here would never be read.
+    background* pba                            = const_cast<background*>(ctx.pba);
+    pba->scf_parameters[pba->scf_tuning_index] = g[0];
   }
+
+  result.push_back({"ScalarField", std::move(composite)});
   return result;
 }

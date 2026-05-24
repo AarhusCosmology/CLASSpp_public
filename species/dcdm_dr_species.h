@@ -92,6 +92,18 @@ class DCDM_DR_Species : public CompositeSpecies {
 
   void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
 
+  void WriteOutputColumns(
+      PerturbColumnWriter& writer,
+      const PerturbationsModule& mod,
+      enum file_format fmt,
+      TransferColumnSection section = TransferColumnSection::all) const override;
+
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
+
   // Typed accessors so callers can capture child indices
   DCDMSpecies& dcdm() {
     return *dcdm_;
@@ -108,6 +120,13 @@ class DCDM_DR_Species : public CompositeSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
+  std::vector<ShootingTarget> GetShootingTargets() const override;
+  void ComputeShootingGuess(const SpeciesBuildContext& ctx,
+                            std::vector<double>& guess,
+                            std::vector<double>& dxdy) const override;
+  double ComputeShootingResidual(const ShootingResidualContext& ctx,
+                                 const ShootingTarget& target) const override;
+
  protected:
   void AddCouplingDerivs(double tau,
                          const double* y,
@@ -119,4 +138,7 @@ class DCDM_DR_Species : public CompositeSpecies {
   DarkRadiationSpecies* dr_sp_ = nullptr;  // non-owning pointer into children_
   const background* pba_;
   const BackgroundModule* bgm_ = nullptr;
+
+  ShootingTarget shooting_target_{};  // unknown_param empty => no shooting target
+  bool needs_shooting_ = false;       // true iff the direct unknown was absent (we guessed)
 };

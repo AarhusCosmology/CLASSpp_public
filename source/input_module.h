@@ -22,26 +22,15 @@
 #include "thermodynamics.h"
 #include "transfer.h"
 
-enum target_names {
-  theta_s,
-  Omega_dcdmdr,
-  omega_dcdmdr,
-  Omega_scf,
-  Omega_ini_dcdm,
-  omega_ini_dcdm,
-  Omega_dncdmdr,
-  omega_dncdmdr,
-  deg_ncdm_decay_dr,
-  Omega_ini_dncdm,
-  Neff_ini_dncdm,
-  omega_ini_dncdm
-};
-#define _NUM_TARGETS_ 12  //Keep this number as number of target_names
-
 class InputModule {
  public:
   InputModule(FileContent& fc);
   static int file_content_from_arguments(int argc, char** argv, FileContent& fc, ErrorMsg errmsg);
+
+  /** Resolve any per-species / theta_s shooting targets by root-finding, returning a fully
+   *  resolved module. No targets (or already inside a shooting context) → returns the input
+   *  unchanged. Called lazily by Cosmology::GetInputModule. */
+  static InputModulePtr DoShooting(InputModulePtr input_module);
 
   FileContent& file_content_;
   precision precision_;
@@ -59,19 +48,20 @@ class InputModule {
   ErrorMsg error_message_;
 
  private:
-  struct fzerofun_workspace {
-    fzerofun_workspace(FileContent& fc_ref) : fc(fc_ref) {}
+  // Hook-based shooting (used by DoShooting). theta_s is identified by
+  // target_name == "100*theta_s" / unknown_param == "h"; all targets are scalar.
+  struct ShootingWorkspace {
+    explicit ShootingWorkspace(FileContent& fc_ref) : fc(fc_ref) {}
     FileContent& fc;
-    std::vector<std::string> unknown_parameter_names;
-    std::vector<enum target_names> target_name;
-    std::vector<double> target_values;
-    std::vector<int> target_sizes;
-    int unknown_parameters_size;
+    std::vector<ShootingTarget> targets;  // theta_s first (if present), then species in lex order
+    // Parallel to targets: the all_species_ key owning each target ("" for the module-level
+    // theta_s). Lets ShootingResidual route each slot to its species' ComputeShootingResidual
+    // with the authoritative target (so the species never re-derives it from the file content).
+    std::vector<std::string> target_species_keys;
   };
-  static const std::vector<std::string> kTargetNamestrings_;
-  static const std::vector<std::string> kUnknownNamestrings_;
+  static int ShootingResidual(
+      double* x, int x_size, void* pworkspace, double* output, ErrorMsg error_message);
 
-  int FixUnknownParameters(int input_verbose, int unknown_parameters_size, int* target_indices);
   void ConstructSpecies();
 
   int input_init();
@@ -79,41 +69,8 @@ class InputModule {
   int input_read_precisions();
   int input_default_params();
   int input_default_precision();
-  static int input_auxillary_target_conditions(FileContent* pfc,
-                                               enum target_names target_name,
-                                               double* target_values,
-                                               int target_values_size,
-                                               int* aux_flag,
-                                               ErrorMsg error_message);
   static int compare_doubles(const void* a, const void* b);
   static int file_exists(const char* fname);
-  static int class_fzero_ridder(
-      int (*func)(double x, void* param, double* y, ErrorMsg error_message),
-      double x1,
-      double x2,
-      double xtol,
-      void* param,
-      double* Fx1,
-      double* Fx2,
-      double* xzero,
-      int* fevals,
-      ErrorMsg error_message);
-  static int input_try_unknown_parameters(double* unknown_parameter,
-                                          int unknown_parameters_size,
-                                          void* pfzw,
-                                          double* output,
-                                          ErrorMsg errmsg);
-  static int input_fzerofun_1d(double input,
-                               void* fzerofun_workspace,
-                               double* output,
-                               ErrorMsg error_message);
-  static int input_get_guess(double* xguess,
-                             double* dxdy,
-                             fzerofun_workspace* pfzw,
-                             ErrorMsg errmsg);
-  static int input_find_root(double* xzero, int* fevals, fzerofun_workspace* pfzw, ErrorMsg errmsg);
-
-  fzerofun_workspace shooting_workspace_;
 };
 
 /* macro for reading parameter values with routines from the parser */

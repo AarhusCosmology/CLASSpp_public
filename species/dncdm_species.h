@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "../species/ncdm_base_species.h"
@@ -35,6 +36,15 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   const std::optional<double>& Neff_ini_pending() const {
     return Neff_ini_pending_;
   }
+  const std::optional<double>& Omega_dncdmdr_pending() const {
+    return Omega_dncdmdr_pending_;
+  }
+
+  // Compute a (deg_guess, dxdy) pair for Newton shooting that varies deg to hit
+  // a target today-density Omega_target = (rho_dncdm + rho_dr) / H0^2 at z=0.
+  // Ported from input_module.cpp:3759-3800 (single-flavor, no loop).
+  std::pair<double, double> DegGuessFromOmegaToday(const SpeciesBuildContext& ctx,
+                                                   double Omega_target) const;
 
   struct Named {
     std::string key;
@@ -217,6 +227,8 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   // applies SetDeg_from_Omega_ini once a_ini is available.
   std::optional<double> Omega_ini_pending_;
   std::optional<double> Neff_ini_pending_;
+  // Today-density target: shoot deg so that (rho_dncdm+rho_dr)/H0^2 == this value at z=0.
+  std::optional<double> Omega_dncdmdr_pending_;
 
   // Absorbed from DecayDRProperties
   double Gamma_ = 0.;

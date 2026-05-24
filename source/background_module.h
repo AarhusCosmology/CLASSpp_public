@@ -49,13 +49,11 @@ class BackgroundModule : public BaseModule {
   int index_bg_G_over_aH_drmd_;  //**G/(aH) in drmd model */
   int index_bg_Gamma0_drmd_;     //**interaction rate today in drmd model */
 
-  int index_bg_rho_dr_species_; /**< dr density for individual species */
-  int index_bg_rho_dr_;         /**< total dr density */
-  int index_bg_phi_scf_;        /**< scalar field value */
-  int index_bg_phi_prime_scf_;  /**< scalar field derivative wrt conformal time */
-  int index_bg_V_scf_;          /**< scalar field potential V */
-  int index_bg_dV_scf_;         /**< scalar field potential derivative V' */
-  int index_bg_ddV_scf_;        /**< scalar field potential second derivative V'' */
+  int index_bg_phi_scf_;       /**< scalar field value */
+  int index_bg_phi_prime_scf_; /**< scalar field derivative wrt conformal time */
+  int index_bg_V_scf_;         /**< scalar field potential V */
+  int index_bg_dV_scf_;        /**< scalar field potential derivative V' */
+  int index_bg_ddV_scf_;       /**< scalar field potential second derivative V'' */
 
   int index_bg_number_ncdm1_;   /**< number density of first ncdm species (others contiguous) */
   int index_bg_pseudo_p_ncdm1_; /**< another statistical momentum useful in ncdma approximation */
@@ -169,7 +167,6 @@ class BackgroundModule : public BaseModule {
 
   int index_bi_a_;        /**< {B} scale factor */
   int index_bi_rho_dcdm_; /**< {B} dcdm density */
-  int index_bi_rho_dr_species_;
 
   int index_bi_rho_fld_;       /**< {B} fluid density */
   int index_bi_phi_scf_;       /**< {B} scalar field value */

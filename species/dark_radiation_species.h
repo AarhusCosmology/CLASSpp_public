@@ -1,32 +1,35 @@
 #pragma once
 #include <memory>
+#include <string>
 
 #include "../species/base_species.h"
 #include "background.h"
-#include "parser.h"
 #include "perturbations.h"
 
 class BackgroundModule;
-class DCDMSpecies;
 
 /**
- * Dark Radiation (from DCDM decay).
- * rho_dr stored per decay-channel in the ODE integration vector; total also stored.
+ * Dark Radiation: a single, self-contained free-streaming decay-radiation channel.
+ *
+ * One instance == one decay channel. A composite that emits N decay-radiation
+ * products simply owns N instances (DR is not shared between channels). The decay
+ * *source* is injected by the parent composite (in BackgroundDerivs / AddCouplingDerivs);
+ * this species only carries dilution + the free-streaming Boltzmann hierarchy.
  */
 class DarkRadiationSpecies : public BaseSpecies {
  public:
+  // ── PerturbLayout ──────────────────────────────────────────────────────────
   struct PerturbLayout : BaseSpecies::PerturbLayout {
-    int idx_F0_sum     = -1;  ///< index_pt_F0_dr_sum  (accumulated-sum multipoles)
-    int idx_F0_species = -1;  ///< index_pt_F0_dr_species (per-channel multipoles)
-    int l_max          = -1;  ///< l_max_dr
+    int idx_F0 = -1;  ///< base offset for the DR multipole hierarchy in pv->y
+    int l_max  = -1;  ///< max multipole (ppr->l_max_dr)
   };
 
   std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
     return std::make_unique<PerturbLayout>();
   }
 
-  DarkRadiationSpecies(const DCDMSpecies* dcdm, const background* pba, const BackgroundModule* bgm)
-      : BaseSpecies("DR", EnergyType::Radiation), pba_(pba), bgm_(bgm), dcdm_(dcdm) {}
+  DarkRadiationSpecies(const std::string& name, const background* pba, const BackgroundModule* bgm)
+      : BaseSpecies(name, EnergyType::Radiation), pba_(pba), bgm_(bgm) {}
 
   /** Decay product: no direct Omega0 input, starts at zero. */
   double GetOmega0() const override {
@@ -37,7 +40,7 @@ class DarkRadiationSpecies : public BaseSpecies {
     return true;
   }
 
-  // ── Background ──────────────────────────────────────────────────────────
+  // ── Background ──────────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override {
     bgm_ = bgm;
   }
@@ -56,15 +59,15 @@ class DarkRadiationSpecies : public BaseSpecies {
     return -4. / 3. * pvecback[index_bg_rho_];
   }
 
-  // ── Perturbations ────────────────────────────────────────────────────────
-
-  // Layout-based overrides (primary path)
+  // ── Perturbations ────────────────────────────────────────────────────────────
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
+
+  /** Legacy scalar register: no-op — composite routes through layout-based path. */
   void RegisterPerturbationIndices(perturb_vector* /*pv*/,
                                    const precision* /*ppr*/,
                                    int& /*index_pt*/,
@@ -76,6 +79,8 @@ class DarkRadiationSpecies : public BaseSpecies {
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
+
+  /** Legacy PerturbDerivs: no-op — composite routes through layout-based path. */
   void PerturbDerivs(double /*tau*/,
                      const double* /*y*/,
                      double* /*dy*/,
@@ -86,26 +91,36 @@ class DarkRadiationSpecies : public BaseSpecies {
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double Delta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+
+  /** Legacy Delta: no-op — composite routes through layout-based path. */
+  double Delta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
 
   double Theta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+
+  /** Legacy Theta: no-op — composite routes through layout-based path. */
+  double Theta(const perturb_vector* /*pv*/,
+               const double* /*y*/,
+               const double* /*pvecback*/,
+               const perturb_workspace* /*ppw*/) const override {
+    return 0.;
+  }
 
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
+
+  /** Legacy DeltaP: no-op — composite routes through layout-based path. */
   double DeltaP(const perturb_vector* /*pv*/,
                 const double* /*y*/,
                 const double* /*pvecback*/,
@@ -118,6 +133,8 @@ class DarkRadiationSpecies : public BaseSpecies {
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
+
+  /** Legacy RhoPlusPShear: no-op — composite routes through layout-based path. */
   double RhoPlusPShear(const perturb_vector* /*pv*/,
                        const double* /*y*/,
                        const double* /*pvecback*/,
@@ -128,40 +145,41 @@ class DarkRadiationSpecies : public BaseSpecies {
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;
+
+  /** Legacy IC: no-op — composite routes through layout-based path. */
   void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      enum file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
-  void PrintVariables(PerturbColumnWriter& writer,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
 
-  int bg_rho_dr_species_index() const {
-    return index_bg_rho_dr_species_;
+  int bg_rho_index() const {
+    return index_bg_rho_;
   }
-  int bi_rho_dr_species_index() const {
-    return index_bi_rho_dr_species_;
+  int bi_rho_index() const {
+    return index_bi_rho_;
   }
   int pt_F0_index() const {
-    return index_pt_F0_dr_species_;
+    return index_pt_F0_;
+  }
+
+  /** Per-species offset into the index_tp_{delta,theta}_dr_ source block, assigned
+   *  in lex order by PerturbationsModule. Used by the parent composite to write this
+   *  channel's transfer source and label its output column. -1 until assigned. */
+  void SetSourceSlot(int s) {
+    source_slot_ = s;
+  }
+  int source_slot() const {
+    return source_slot_;
   }
 
  private:
   const background* pba_;
   const BackgroundModule* bgm_;
-  const DCDMSpecies* dcdm_ = nullptr;
 
-  // Background indices (per-channel, then total)
-  int index_bg_rho_dr_species_ = -1;
-
-  // Integration indices
-  int index_bi_rho_dr_species_ = -1;
-
-  // Perturbation indices
-  int index_pt_F0_dr_species_ = -1;
+  int index_bi_rho_ = -1;
+  int index_pt_F0_  = -1;
+  int source_slot_  = -1;  // assigned in lex order by PerturbationsModule
 };

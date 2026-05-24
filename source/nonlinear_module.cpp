@@ -13,6 +13,7 @@
 
 #include "nonlinear_module.h"
 
+#include "../species/idm_dr_idr_species.h"
 #include "../species/ncdm_species.h"
 #include "background_module.h"
 #include "cosmology.h"
@@ -1016,7 +1017,8 @@ int NonlinearModule::nonlinear_init() {
                 "%f eV, which makes the use of Halofit suspicious.\n",
                 m_ncdm_in_electronvolt);
     }
-    if (pba->has_idm_dr) {
+    if (all_species_.count("IDM_DR_IDR") &&
+        static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
       fprintf(stdout,
               "Warning: Halofit and HMcode are proved to work for CDM, and also with a small HDM "
               "component. But you have requested interacting dark matter (idm_dr), which makes the "

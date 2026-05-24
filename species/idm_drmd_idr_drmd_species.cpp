@@ -184,10 +184,12 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
 
 IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba)
     : CompositeSpecies("IDM_DRMD_IDR_DRMD", BaseSpecies::EnergyType::Other), pba_(pba) {
-  auto idm  = std::make_unique<IDM_DRMDSpecies>(pba);
-  auto idr  = std::make_unique<IDR_DRMDSpecies>(pba);
-  idm_drmd_ = idm.get();
-  idr_drmd_ = idr.get();
+  has_idm_drmd_ = pba.has_idm_drmd;
+  has_idr_drmd_ = pba.has_idr_drmd;
+  auto idm      = std::make_unique<IDM_DRMDSpecies>(pba);
+  auto idr      = std::make_unique<IDR_DRMDSpecies>(pba);
+  idm_drmd_     = idm.get();
+  idr_drmd_     = idr.get();
   children_.push_back(std::move(idm));
   children_.push_back(std::move(idr));
 }

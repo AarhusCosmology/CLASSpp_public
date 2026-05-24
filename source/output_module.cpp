@@ -21,6 +21,7 @@
 #include "perturbations_module.h"
 #include "primordial_module.h"
 #include "species/dncdm_dr_species.h"
+#include "species/idm_dr_idr_species.h"
 #include "species/ncdm_base_species.h"
 #include "spectra_module.h"
 #include "thermodynamics_module.h"
@@ -1044,7 +1045,8 @@ int OutputModule::output_thermodynamics() {
     fprintf(thermofile, "#       tau_d = baryon drag optical depth \n");
     if (pth->compute_damping_scale == _TRUE_)
       fprintf(thermofile, "#         r_d = approximate comoving value of photon damping scale \n");
-    if (pba->has_idm_dr == _TRUE_) {
+    if (all_species_.count("IDM_DR_IDR") &&
+        static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
       fprintf(thermofile,
               "#  dmu_idm_dr = scattering rate of idr with idm_dr (i.e. idr opacity to idm_dr "
               "scattering) (units 1/Mpc)\n");

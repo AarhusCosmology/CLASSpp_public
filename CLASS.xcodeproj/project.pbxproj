@@ -57,7 +57,6 @@
 		EE0000080000000000000001 /* idm_dr_idr_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000070000000000000001 /* idm_dr_idr_species.cpp */; };
 		EE00000B0000000000000001 /* idm_drmd_idr_drmd_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE00000A0000000000000001 /* idm_drmd_idr_drmd_species.cpp */; };
 		EE00000E0000000000000001 /* dncdm_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE00000D0000000000000001 /* dncdm_species.cpp */; };
-		EE0000110000000000000001 /* dncdm_decay_radiation_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000100000000000000001 /* dncdm_decay_radiation_species.cpp */; };
 		EE0000140000000000000001 /* dncdm_dr_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE0000130000000000000001 /* dncdm_dr_species.cpp */; };
 		EE3000020000000000000001 /* base_species.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EE3000010000000000000001 /* base_species.cpp */; };
 /* End PBXBuildFile section */
@@ -202,8 +201,6 @@
 		EE00000C0000000000000001 /* idm_drmd_idr_drmd_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = idm_drmd_idr_drmd_species.h; sourceTree = "<group>"; };
 		EE00000D0000000000000001 /* dncdm_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dncdm_species.cpp; sourceTree = "<group>"; };
 		EE00000F0000000000000001 /* dncdm_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dncdm_species.h; sourceTree = "<group>"; };
-		EE0000100000000000000001 /* dncdm_decay_radiation_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dncdm_decay_radiation_species.cpp; sourceTree = "<group>"; };
-		EE0000120000000000000001 /* dncdm_decay_radiation_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dncdm_decay_radiation_species.h; sourceTree = "<group>"; };
 		EE0000130000000000000001 /* dncdm_dr_species.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dncdm_dr_species.cpp; sourceTree = "<group>"; };
 		EE0000150000000000000001 /* dncdm_dr_species.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dncdm_dr_species.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -414,8 +411,6 @@
 				EE00000C0000000000000001 /* idm_drmd_idr_drmd_species.h */,
 				EE00000D0000000000000001 /* dncdm_species.cpp */,
 				EE00000F0000000000000001 /* dncdm_species.h */,
-				EE0000100000000000000001 /* dncdm_decay_radiation_species.cpp */,
-				EE0000120000000000000001 /* dncdm_decay_radiation_species.h */,
 				EE0000130000000000000001 /* dncdm_dr_species.cpp */,
 				EE0000150000000000000001 /* dncdm_dr_species.h */,
 			);
@@ -530,7 +525,6 @@
 				EE0000080000000000000001 /* idm_dr_idr_species.cpp in Sources */,
 				EE00000B0000000000000001 /* idm_drmd_idr_drmd_species.cpp in Sources */,
 				EE00000E0000000000000001 /* dncdm_species.cpp in Sources */,
-				EE0000110000000000000001 /* dncdm_decay_radiation_species.cpp in Sources */,
 				EE0000140000000000000001 /* dncdm_dr_species.cpp in Sources */,
 				EE3000020000000000000001 /* base_species.cpp in Sources */,
 			);

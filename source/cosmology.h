@@ -20,6 +20,7 @@ class Cosmology {
   LensingModulePtr& GetLensingModule();
 
  private:
+  bool shot_ = false;  // GetInputModule runs DoShooting once, on first use
   InputModulePtr input_module_ptr_;
   BackgroundModulePtr background_module_ptr_;
   ThermodynamicsModulePtr thermodynamics_module_ptr_;

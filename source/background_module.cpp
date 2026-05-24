@@ -529,11 +529,14 @@ int BackgroundModule::background_init() {
   }
 
   //Initialize parameters for calculating decoupling in DRMD
-  if ((pba->has_idr_drmd) && (pba->has_idm_drmd)) {
-    // Set to a large number, so it's larger than the current G_over_aH_drmd_local
-    G_over_aH_tmp_ = 1e20;
-    // Set to -1, so it doesn't print the value unless calculated.
-    z_dec_drmd_ = -1.0;
+  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    auto& c = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
+    if (c.has_idr_drmd() && c.has_idm_drmd()) {
+      // Set to a large number, so it's larger than the current G_over_aH_drmd_local
+      G_over_aH_tmp_ = 1e20;
+      // Set to -1, so it doesn't print the value unless calculated.
+      z_dec_drmd_ = -1.0;
+    }
   }
 
   /** - assign values to all indices in vectors of background quantities with background_indices()*/
@@ -693,12 +696,9 @@ int BackgroundModule::background_indices() {
   }
 
   // ── DCDM_DR composite (optional) ─────────────────────────────────────────
-  index_bg_rho_dr_ = index_bg_rho_dr_species_ = -1;
   if (all_species_.count("DCDM_DR")) {
     auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
     dcdm_dr.RegisterBackgroundIndices(index_bg);
-    index_bg_rho_dr_species_ = dcdm_dr.dr().bg_rho_dr_species_index();
-    index_bg_rho_dr_         = index_bg_rho_dr_species_ + pba->N_decay_dr;
   }
 
   // ── ScalarField (optional) — module caches arithmetic offsets for dV/V/ddV
@@ -795,12 +795,11 @@ int BackgroundModule::background_indices() {
   class_define_index(index_bi_a_, _TRUE_, index_bi, 1);
 
   /* -> energy density in DCDM + DR (integration indices via composite) */
-  index_bi_rho_dcdm_ = index_bi_rho_dr_species_ = -1;
+  index_bi_rho_dcdm_ = -1;
   if (all_species_.count("DCDM_DR")) {
     auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
     dcdm_dr.RegisterIntegrationIndices(index_bi);
-    index_bi_rho_dcdm_       = dcdm_dr.dcdm().bi_rho_index();
-    index_bi_rho_dr_species_ = dcdm_dr.dr().bi_rho_dr_species_index();
+    index_bi_rho_dcdm_ = dcdm_dr.dcdm().bi_rho_index();
   }
 
   /* -> integration indices for all other species (including DNCDM composites) */
@@ -1000,9 +999,9 @@ int BackgroundModule::background_solve() {
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
   Omega0_dr_ = 0.;
   if (all_species_.count("DCDM_DR")) {
-    Omega0_dcdm_  = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
-    auto& dcdm_dr = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
-    Omega0_dr_ += pvecback_integration[dcdm_dr.dr().bi_rho_dr_species_index()] / pba->H0 / pba->H0;
+    Omega0_dcdm_   = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
+    auto& dcdm_dr  = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+    Omega0_dr_    += pvecback_integration[dcdm_dr.dr().bi_rho_index()] / pba->H0 / pba->H0;
   }
   for (auto& [key, sp] : all_species_) {
     if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
@@ -1227,9 +1226,9 @@ int BackgroundModule::background_solve_evolver() {
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
   Omega0_dr_ = 0.;
   if (all_species_.count("DCDM_DR")) {
-    Omega0_dcdm_  = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
-    auto& dcdm_dr = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
-    Omega0_dr_ += pvecback_integration[dcdm_dr.dr().bi_rho_dr_species_index()] / pba->H0 / pba->H0;
+    Omega0_dcdm_   = pvecback_integration[index_bi_rho_dcdm_] / pba->H0 / pba->H0;
+    auto& dcdm_dr  = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+    Omega0_dr_    += pvecback_integration[dcdm_dr.dr().bi_rho_index()] / pba->H0 / pba->H0;
   }
   for (auto& [key, sp] : all_species_) {
     if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))

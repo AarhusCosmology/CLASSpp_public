@@ -141,6 +141,19 @@ void DCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
     y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
 }
 
+void DCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                const BaseSpecies::PerturbLayout& new_base,
+                                                const double* old_y,
+                                                double* new_y,
+                                                const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  if (old_l.idx_delta >= 0 && new_l.idx_delta >= 0)
+    new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
+  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0)
+    new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+}
+
 void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      const PerturbationsModule& mod,
                                      enum file_format fmt,

@@ -57,6 +57,18 @@ bool HasNcdm(const SpeciesCollection& all_species) {
   return false;
 }
 
+/** Number of DR-emitting composites (each owns one DarkRadiationSpecies channel):
+ *  the DCDM_DR composite plus every DNCDM_DR composite. Sizes the per-species
+ *  index_tp_{delta,theta}_dr_ source block (replaces the old pba->N_decay_dr). */
+int DrSpeciesCount(const SpeciesCollection& all_species) {
+  int n = 0;
+  for (const auto& sp : all_species) {
+    if (dynamic_cast<DCDM_DR_Species*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      ++n;
+  }
+  return n;
+}
+
 /** Flat list of NCDMBaseSpecies* in all_species_ lex iteration order. For
  *  DNCDM_DR_Species composites the wrapped DNCDMSpecies child is returned. */
 std::vector<NCDMBaseSpecies*> NcdmFamily(const SpeciesCollection& all_species) {
@@ -688,6 +700,21 @@ int PerturbationsModule::perturb_init() {
     }
   }
 
+  /** - assign each DR-emitting composite's DR child its source-slot offset into
+   *  the index_tp_{delta,theta}_dr_ block (lex order matching all_species_).
+   *  Each composite writes its own channel's DR transfer at that slot. */
+  {
+    int slot = 0;
+    for (auto& [name, sp] : all_species_) {
+      if (auto* d = dynamic_cast<DCDM_DR_Species*>(sp.get())) {
+        d->dr().SetSourceSlot(slot++);
+      }
+      else if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
+        d->dr().SetSourceSlot(slot++);
+      }
+    }
+  }
+
   /** - initialize all indices and lists in perturbs structure using perturb_indices_of_perturbs() */
 
   class_call(perturb_indices_of_perturbs(), error_message_, error_message_);
@@ -843,6 +870,11 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
   int index_md;
   int index_ic;
   int index_type_common;
+
+  // Number of DR-emitting composites (DCDM_DR + each DNCDM_DR). Drives both the
+  // has_source_{delta,theta}_dr_ gating and the index_tp_{delta,theta}_dr_ block
+  // sizes, so it must be the single source of truth for the two to agree.
+  const int n_dr_species = DrSpeciesCount(all_species_);
 
   /** - count modes (scalar, vector, tensor) and assign corresponding indices */
 
@@ -1007,7 +1039,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
           has_source_delta_idm_dr_ = _TRUE_;
         if (all_species_.count("IDM_DRMD_IDR_DRMD"))
           has_source_delta_idm_drmd_ = _TRUE_;
-        if (all_species_.count("DCDM_DR"))
+        if (n_dr_species > 0)
           has_source_delta_dr_ = _TRUE_;
         if (HasNcdm(all_species_))
           has_source_delta_ncdm_ = _TRUE_;
@@ -1042,7 +1074,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
           has_source_theta_idm_dr_ = _TRUE_;
         if (all_species_.count("IDM_DRMD_IDR_DRMD"))
           has_source_theta_idm_drmd_ = _TRUE_;
-        if (all_species_.count("DCDM_DR"))
+        if (n_dr_species > 0)
           has_source_theta_dr_ = _TRUE_;
         if (HasNcdm(all_species_))
           has_source_theta_ncdm_ = _TRUE_;
@@ -1111,7 +1143,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
       class_define_index(index_tp_delta_dcdm_, has_source_delta_dcdm_, index_type, 1);
       class_define_index(index_tp_delta_fld_, has_source_delta_fld_, index_type, 1);
       class_define_index(index_tp_delta_scf_, has_source_delta_scf_, index_type, 1);
-      class_define_index(index_tp_delta_dr_, has_source_delta_dr_, index_type, 1);
+      class_define_index(index_tp_delta_dr_, has_source_delta_dr_, index_type, n_dr_species);
       class_define_index(index_tp_delta_ur_, has_source_delta_ur_, index_type, 1);
       class_define_index(index_tp_delta_idr_, has_source_delta_idr_, index_type, 1);
       class_define_index(index_tp_delta_idr_drmd_, has_source_delta_idr_drmd_, index_type, 1);
@@ -1130,7 +1162,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
       class_define_index(index_tp_theta_dcdm_, has_source_theta_dcdm_, index_type, 1);
       class_define_index(index_tp_theta_fld_, has_source_theta_fld_, index_type, 1);
       class_define_index(index_tp_theta_scf_, has_source_theta_scf_, index_type, 1);
-      class_define_index(index_tp_theta_dr_, has_source_theta_dr_, index_type, 1);
+      class_define_index(index_tp_theta_dr_, has_source_theta_dr_, index_type, n_dr_species);
       class_define_index(index_tp_theta_ur_, has_source_theta_ur_, index_type, 1);
       class_define_index(index_tp_theta_idr_, has_source_theta_idr_, index_type, 1);
       class_define_index(index_tp_theta_idr_drmd_, has_source_theta_idr_drmd_, index_type, 1);
@@ -3347,9 +3379,8 @@ int PerturbationsModule::perturb_vector_init(
       sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
     }
 
-    /* DCDM + DR composite: set l_max_dr before calling (DR species reads it) */
+    /* DCDM + DR composite (DR child reads ppr->l_max_dr for its hierarchy length) */
     if (all_species_.count("DCDM_DR")) {
-      ppv->l_max_dr  = ppr->l_max_dr;
       const size_t i = all_species_.index_of("DCDM_DR");
       auto* sp       = all_species_.at("DCDM_DR").get();
       auto& layout   = *ppv->species_layouts[i];
@@ -3357,46 +3388,24 @@ int PerturbationsModule::perturb_vector_init(
       sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
     }
 
-    /* DNCDM_DR composites: register DR perturbation indices in all_species_ lex
-       order. Each DNCDM decay-radiation gets its own F0 slots; set
-       index_pt_F0_dr_sum to the first one so AddCouplingDerivs can accumulate
-       into the "sum" slot. Registration order: DR child first (here), DNCDM
-       child second (in NCDM block below). This preserves the pv->y layout
+    /* DNCDM_DR composites: register each DR child's single-hierarchy F0 slots in
+       all_species_ lex order. Registration order: DR child first (here), DNCDM
+       child second (in the NCDM block below). This preserves the pv->y layout
        established before Task 22. */
     {
-      // Collect (composite*, all_species_ index) pairs for sorting
-      std::vector<std::pair<DNCDM_DR_Species*, size_t>> dncdm_dr_vec;
-      {
-        size_t i = 0;
-        for (auto& entry : all_species_) {
-          if (auto* d = dynamic_cast<DNCDM_DR_Species*>(entry.get()))
-            dncdm_dr_vec.emplace_back(d, i);
-          ++i;
-        }
-      }
-      if (!dncdm_dr_vec.empty()) {
-        ppv->l_max_dr = ppr->l_max_dr;
-        // dncdm_dr_vec is already in all_species_ lex iteration order.
-        // If no DCDM_DR registered the dr_sum index, set it to point to the first DNCDM DR
-        bool need_sum_index = !all_species_.count("DCDM_DR");
-        for (auto& [d, ci] : dncdm_dr_vec) {
-          // Register the DR child using its nested layout slot in the composite's PerturbLayout.
+      size_t i = 0;
+      for (auto& entry : all_species_) {
+        if (auto* d = dynamic_cast<DNCDM_DR_Species*>(entry.get())) {
           auto& composite_layout = static_cast<DNCDM_DR_Species::PerturbLayout&>(
-              *ppv->species_layouts[ci]);
+              *ppv->species_layouts[i]);
           d->dr().RegisterPerturbationIndices(composite_layout.dr,
                                               ppv,
                                               ppr,
                                               index_pt,
                                               ppw,
                                               ppt->gauge);
-          if (need_sum_index) {
-            // Set dr_sum index to this DNCDM DR's F0 so coupling code can use it.
-            // Use composite_layout.dr.idx_F0 directly (thread-safe; avoids the
-            // species-member index_pt_F0_ that caused the data race).
-            ppv->index_pt_F0_dr_sum = composite_layout.dr.idx_F0;
-            need_sum_index          = false;  // Only first species sets the sum slot
-          }
         }
+        ++i;
       }
     }
 
@@ -3850,32 +3859,10 @@ int PerturbationsModule::perturb_vector_init(
 
       /** - ---> (a.2.) some variables (b, cdm, fld, ...) are not affected by
           any approximation. They need to be reconducted whatever
-          the approximation switching is. We treat them here. Below
-          we will treat other variables case by case. */
-
-      if (all_species_.count("DCDM_DR")) {
-        const size_t dcdm_sw_i = all_species_.index_of("DCDM_DR");
-        const auto& d_old      = static_cast<const DCDM_DR_Species::PerturbLayout&>(
-            *ppw->pv->species_layouts[dcdm_sw_i]);
-        auto& d_new = static_cast<DCDM_DR_Species::PerturbLayout&>(
-            *ppv->species_layouts[dcdm_sw_i]);
-        ppv->y[d_new.dcdm.idx_delta] = ppw->pv->y[d_old.dcdm.idx_delta];
-        ppv->y[d_new.dcdm.idx_theta] = ppw->pv->y[d_old.dcdm.idx_theta];
-      }
-
-      if (all_species_.count("DCDM_DR")) {
-        for (int l = 0; l <= ppv->l_max_dr; l++) {
-          ppv->y[ppv->index_pt_F0_dr_sum + l] = ppw->pv->y[ppw->pv->index_pt_F0_dr_sum + l];
-        }
-        index_pt = 0;
-        for (int n_dr = 0; n_dr < pba->N_decay_dr; n_dr++) {
-          for (int l = 0; l <= ppv->l_max_dr; l++) {
-            ppv->y[ppv->index_pt_F0_dr_species + index_pt] =
-                ppw->pv->y[ppw->pv->index_pt_F0_dr_species + index_pt];
-            ++index_pt;
-          }
-        }
-      }
+          the approximation switching is. These are handled generically by the
+          per-species CopyPerturbationsAcrossSwitch dispatch above (DCDM_DR's dcdm
+          + DR hierarchies included). Below we will treat other variables case by
+          case. */
 
       if (ppt->gauge == synchronous)
         ppv->y[ppv->index_pt_eta] = ppw->pv->y[ppw->pv->index_pt_eta];
@@ -4829,23 +4816,23 @@ int PerturbationsModule::perturb_initial_conditions(
         /* shear and l3 are gauge invariant */
 
         if (all_species_.count("DCDM_DR")) {
-          auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
-          // If dcdm is present, the first dr_species is the one sourced by dcdm
-          delta_dr += (-4. * a_prime_over_a +
-                       a * pba->Gamma_dcdm * dcdm_dr.dcdm().Rho(ppw->pvecback) /
-                           ppw->pvecback[dcdm_dr.dr().bg_rho_dr_species_index()]) *
-                      alpha;
+          auto& dcdm_dr       = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+          const double rho_dr = dcdm_dr.dr().Rho(ppw->pvecback);
+          // Decay-source term vanishes when there is no DR (rho_dr == 0, e.g. Gamma_dcdm == 0).
+          const double decay_corr =
+              (rho_dr > 0.) ? a * pba->Gamma_dcdm * dcdm_dr.dcdm().Rho(ppw->pvecback) / rho_dr : 0.;
+          delta_dr += (-4. * a_prime_over_a + decay_corr) * alpha;
         }
         {
           for (auto& [name, sp] : all_species_) {
             auto* dncdm_dr_sp = dynamic_cast<DNCDM_DR_Species*>(sp.get());
             if (!dncdm_dr_sp)
               continue;
-            DNCDMSpecies* dncdm_sp  = &dncdm_dr_sp->dncdm();
-            delta_dr               += (-4. * a_prime_over_a +
-                                       a * dncdm_sp->Gamma() * dncdm_sp->Rho(ppw->pvecback) /
-                                           ppw->pvecback[dncdm_dr_sp->dr().bg_rho_index()]) *
-                                      alpha;
+            DNCDMSpecies* dncdm_sp = &dncdm_dr_sp->dncdm();
+            const double rho_dr    = ppw->pvecback[dncdm_dr_sp->dr().bg_rho_index()];
+            const double decay_corr =
+                (rho_dr > 0.) ? a * dncdm_sp->Gamma() * dncdm_sp->Rho(ppw->pvecback) / rho_dr : 0.;
+            delta_dr += (-4. * a_prime_over_a + decay_corr) * alpha;
           }
         }
       }
@@ -4928,27 +4915,22 @@ int PerturbationsModule::perturb_initial_conditions(
         }
       }
 
+      // Newtonian-gauge DR re-seed for the DCDM_DR channel (single hierarchy).
+      // TODO: this whole synchronous->newtonian IC re-seed (UR/IDR/NCDM/DR) should
+      // become a per-species PerturbSynchronousToNewtonian dispatch where composites
+      // transform their own members, instead of these inline gauge-specific blocks.
       if (all_species_.count("DCDM_DR")) {
-        auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
-        for (int n_dr = 0; n_dr < pba->N_decay_dr; ++n_dr) {
-          double r_dr_species = pow(pow(a / pba->a_today, 2) / pba->H0, 2) *
-                                ppw->pvecback[dcdm_dr.dr().bg_rho_dr_species_index() + n_dr];
-          ppw->pv->y[ppw->pv->index_pt_F0_dr_species + n_dr * (ppr->l_max_dr + 1) + 0] =
-              delta_dr * r_dr_species;
-          ppw->pv->y[ppw->pv->index_pt_F0_dr_species + n_dr * (ppr->l_max_dr + 1) + 1] =
-              4. / (3. * k) * theta_ur * r_dr_species;
-          ppw->pv->y[ppw->pv->index_pt_F0_dr_species + n_dr * (ppr->l_max_dr + 1) + 2] =
-              2. * shear_ur * r_dr_species;
-          ppw->pv->y[ppw->pv->index_pt_F0_dr_species + n_dr * (ppr->l_max_dr + 1) + 3] =
-              l3_ur * r_dr_species;
-        }
-
-        double r_dr_sum                             = pow(pow(a / pba->a_today, 2) / pba->H0, 2) *
-                                                      dcdm_dr.dr().Rho(ppw->pvecback);
-        ppw->pv->y[ppw->pv->index_pt_F0_dr_sum]     = delta_dr * r_dr_sum;
-        ppw->pv->y[ppw->pv->index_pt_F0_dr_sum + 1] = 4. / (3. * k) * theta_ur * r_dr_sum;
-        ppw->pv->y[ppw->pv->index_pt_F0_dr_sum + 2] = 2. * shear_ur * r_dr_sum;
-        ppw->pv->y[ppw->pv->index_pt_F0_dr_sum + 3] = l3_ur * r_dr_sum;
+        auto& dcdm_dr     = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
+        const size_t dr_i = all_species_.index_of("DCDM_DR");
+        const auto& dr_lay =
+            static_cast<const DCDM_DR_Species::PerturbLayout&>(*ppw->pv->species_layouts[dr_i]).dr;
+        const int base       = dr_lay.idx_F0;
+        const double r_dr    = pow(pow(a / pba->a_today, 2) / pba->H0, 2) *
+                               dcdm_dr.dr().Rho(ppw->pvecback);
+        ppw->pv->y[base + 0] = delta_dr * r_dr;
+        ppw->pv->y[base + 1] = 4. / (3. * k) * theta_ur * r_dr;
+        ppw->pv->y[base + 2] = 2. * shear_ur * r_dr;
+        ppw->pv->y[base + 3] = l3_ur * r_dr;
       }
     }
   }

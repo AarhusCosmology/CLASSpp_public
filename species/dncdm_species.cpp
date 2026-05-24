@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "arrays.h"
@@ -136,36 +137,75 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
     SetOmega0(Omega_local, settings.h);
   }
 
-  double deg_local       = 0.;
-  double Omega_ini_local = 0.;
-  double omega_ini_local = 0.;
-  double Neff_ini_local  = 0.;
-  bool has_deg           = input.read_double("deg", deg_local);
-  bool has_Omega_ini     = input.read_double("Omega_ini", Omega_ini_local);
-  bool has_omega_ini     = input.read_double("omega_ini", omega_ini_local);
-  bool has_Neff_ini      = input.read_double("Neff_ini", Neff_ini_local);
-
-  int n_deg_options = (int) has_deg + (int) has_Omega_ini + (int) has_omega_ini +
-                      (int) has_Neff_ini;
-  if (n_deg_options > 1) {
+  double deg_local           = 0.;
+  double Omega_ini_local     = 0.;
+  double omega_ini_local     = 0.;
+  double Neff_ini_local      = 0.;
+  double Omega_dncdmdr_local = 0.;
+  double omega_dncdmdr_local = 0.;
+  bool has_deg               = input.read_double("deg", deg_local);
+  bool has_Omega_ini         = input.read_double("Omega_ini", Omega_ini_local);
+  bool has_omega_ini         = input.read_double("omega_ini", omega_ini_local);
+  bool has_Neff_ini          = input.read_double("Neff_ini", Neff_ini_local);
+  bool has_Omega_dncdmdr     = input.read_double("Omega_dncdmdr", Omega_dncdmdr_local);
+  bool has_omega_dncdmdr     = input.read_double("omega_dncdmdr", omega_dncdmdr_local);
+  if (has_Omega_dncdmdr && has_omega_dncdmdr) {
     throw std::invalid_argument("species '" + instance_name +
-                                "': specify at most one of deg, Omega_ini, omega_ini, Neff_ini");
+                                "': specify exactly one of Omega_dncdmdr, omega_dncdmdr");
+  }
+  if (has_omega_dncdmdr) {
+    Omega_dncdmdr_local = omega_dncdmdr_local / settings.h / settings.h;
+    has_Omega_dncdmdr   = true;
+  }
+
+  // Omega_dncdmdr is mutually exclusive with Omega_ini/omega_ini/Neff_ini/Omega/omega.
+  // deg may co-occur with Omega_dncdmdr (shooting-iteration case: DoShooting wrote deg).
+  if (has_Omega_dncdmdr && (has_Omega_ini || has_omega_ini || has_Neff_ini || has_Omega)) {
+    throw std::invalid_argument(
+        "species '" + instance_name +
+        "': Omega_dncdmdr conflicts with Omega_ini/omega_ini/Neff_ini/Omega/omega");
+  }
+
+  // Count mutually-exclusive target specs (Omega_dncdmdr counts as one; deg does not).
+  int n_deg_options = (int) has_Omega_ini + (int) has_omega_ini + (int) has_Neff_ini +
+                      (int) has_Omega_dncdmdr;
+  if (n_deg_options > 1) {
+    throw std::invalid_argument(
+        "species '" + instance_name +
+        "': specify at most one of Omega_ini, omega_ini, Neff_ini, Omega_dncdmdr");
   }
 
   if (has_deg) {
+    // deg wins: used directly (also covers shooting-iteration case where DoShooting set deg).
     SetDegAndFactor(deg_local);
   }
-  // The Omega_ini / omega_ini / Neff_ini cases require an a_ini-driven shooting step.
-  // Preserve their values by stashing them on the species so that ConstructSpecies'
-  // closure pass can apply them.
-  if (has_Omega_ini) {
-    Omega_ini_pending_ = Omega_ini_local;  // already in Omega units
+  else if (has_Omega_dncdmdr) {
+    // Today-density target: stash the target and set a guessed deg via DegGuessFromOmegaToday.
+    // DegGuessFromOmegaToday calls GetDeg() — deg_ is initialized to 1. by NCDMBaseSpecies,
+    // so the per-unit-degeneracy calculation is well-defined without a prior SetDegAndFactor.
+    Omega_dncdmdr_pending_ = Omega_dncdmdr_local;
+    if (pba) {
+      // Build context needed for GetIni; assemble a minimal one from available data.
+      SpeciesBuildContext guess_ctx{nullptr, pba, nullptr, &settings, nullptr};
+      auto [g, d] = DegGuessFromOmegaToday(guess_ctx, Omega_dncdmdr_local);
+      SetDegAndFactor(g);
+    }
+    // If pba is null (early-construction pass), leave deg_ at 1. and let the shooting
+    // dispatch provide the correct value when DoShooting writes <instance>.deg.
   }
-  else if (has_omega_ini) {
-    Omega_ini_pending_ = omega_ini_local / settings.h / settings.h;
-  }
-  else if (has_Neff_ini) {
-    Neff_ini_pending_ = Neff_ini_local;
+  else {
+    // The Omega_ini / omega_ini / Neff_ini cases require an a_ini-driven shooting step.
+    // Preserve their values by stashing them on the species so that ConstructSpecies'
+    // closure pass can apply them.
+    if (has_Omega_ini) {
+      Omega_ini_pending_ = Omega_ini_local;  // already in Omega units
+    }
+    else if (has_omega_ini) {
+      Omega_ini_pending_ = omega_ini_local / settings.h / settings.h;
+    }
+    else if (has_Neff_ini) {
+      Neff_ini_pending_ = Neff_ini_local;
+    }
   }
 
   // Compute dq_[i] = w_bg_[i] / f0(q_bg_[i]) (matches existing semantics)
@@ -192,6 +232,45 @@ std::vector<DNCDMSpecies::Named> DNCDMSpecies::CreateAll(const SpeciesBuildConte
     result.push_back({name, std::move(sp)});
   }
   return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DegGuessFromOmegaToday — initial-guess helper for Omega_dncdmdr shooting
+// ─────────────────────────────────────────────────────────────────────────────
+
+std::pair<double, double> DNCDMSpecies::DegGuessFromOmegaToday(const SpeciesBuildContext& ctx,
+                                                               double Omega_target) const {
+  const background& ba = *ctx.pba;
+  // a_ini: earliest scale factor at which the NCDM distribution is non-relativistic enough
+  // to integrate numerically.  Mirror input_module.cpp:3764-3769.
+  double a_ini = ctx.ppr ? ctx.ppr->a_ini_over_a_today_default * ba.a_today : ba.a_today * 1e-14;
+  const double tol_ini = ctx.ppr ? ctx.ppr->tol_ncdm_initial_w : ctx.ncdm_settings->tol_ncdm;
+  a_ini                = GetIni(a_ini, ba.a_today, tol_ini);
+  const double z_ini   = 1.0 / a_ini - 1.0;
+
+  double rho_actual;
+  ComputeMomenta(z_ini, nullptr, &rho_actual, nullptr, nullptr, nullptr);
+
+  // rho per unit degeneracy at a_ini, converted to Omega units scaled to a_ini.
+  const double rho_deg1   = (GetDeg() > 0.) ? rho_actual / GetDeg() : 0.;
+  const double Omega_deg1 = rho_deg1 * std::pow(a_ini, 4.0) / (ba.H0 * ba.H0);
+
+  double Omega_ini = Omega_target;
+  if (Gamma() / ba.H0 > 1.0) {
+    // Approximately fully decayed today: compute correction factor.
+    const double a_nr         = 3.15 / GetMass();
+    const double k_rad        = std::sqrt(2.0 * ba.H0 * std::sqrt(ba.Omega0_g + ba.Omega0_ur));
+    const double t_nr         = std::pow(a_nr / k_rad, 2.0);
+    const double x            = Gamma() * t_nr;
+    const double experfcsqrtx = (x < 20.) ? std::exp(x) * std::erfc(std::sqrt(x))
+                                          : 1.0 / std::sqrt(x * _PI_);
+    Omega_ini                 = std::sqrt(2.0) * a_nr * std::sqrt(Gamma()) * Omega_target / k_rad /
+                                (2.0 * std::sqrt(x) + std::sqrt(_PI_) * experfcsqrtx);
+  }
+
+  const double guess = (Omega_deg1 > 0.) ? Omega_ini / Omega_deg1 : 0.;
+  const double dxdy  = (Omega_target != 0.) ? guess / Omega_target : 0.;
+  return {guess, dxdy};
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

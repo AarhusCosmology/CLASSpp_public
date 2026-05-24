@@ -88,7 +88,6 @@ source_files = (
         'dark_radiation_species.cpp',
         'dcdm.cpp',
         'dcdm_dr_species.cpp',
-        'dncdm_decay_radiation_species.cpp',
         'dncdm_dr_species.cpp',
         'dncdm_species.cpp',
         'fluid.cpp',

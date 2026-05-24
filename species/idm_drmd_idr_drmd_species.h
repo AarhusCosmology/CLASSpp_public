@@ -37,6 +37,16 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
     return *idr_drmd_;
   }
 
+  /** Per-sub-species presence, captured at construction (== pba->has_* at build
+   *  time). The composite is created on has_idm_drmd || has_idr_drmd, so callers
+   *  needing the individual flags must use these rather than count(...). */
+  bool has_idm_drmd() const {
+    return has_idm_drmd_;
+  }
+  bool has_idr_drmd() const {
+    return has_idr_drmd_;
+  }
+
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
@@ -125,4 +135,6 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   IDR_DRMDSpecies* idr_drmd_ = nullptr;
   const background& pba_;
   const BackgroundModule* bgm_ = nullptr;
+  bool has_idm_drmd_           = false;
+  bool has_idr_drmd_           = false;
 };

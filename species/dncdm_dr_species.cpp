@@ -5,6 +5,7 @@
 
 #include "background_module.h"
 #include "perturbations_module.h"
+#include "species/shooting_target.h"
 #include "species/species_build_context.h"
 
 std::vector<Named> DNCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
@@ -22,7 +23,7 @@ DNCDM_DR_Species::DNCDM_DR_Species(std::unique_ptr<DNCDMSpecies> dncdm_arg,
                                    const background* pba,
                                    const BackgroundModule* bgm)
     : CompositeSpecies(dncdm_arg->name(), BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm) {
-  auto dr_sp = std::make_unique<DNCDM_DecayRadiationSpecies>(dncdm_arg->name() + "_DR", pba, bgm);
+  auto dr_sp = std::make_unique<DarkRadiationSpecies>(dncdm_arg->name() + "_DR", pba, bgm);
   dncdm_     = dncdm_arg.get();
   dr_sp_     = dr_sp.get();
   children_.push_back(std::move(dncdm_arg));
@@ -144,7 +145,6 @@ void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
                                          double* dy,
                                          const perturb_parameters_and_workspace& ppaw) {
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
   const precision* ppr            = ppaw.perturbations_module->GetPrecision();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
@@ -258,7 +258,135 @@ void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
     if ((l <= ppr->l_max_dr_col) && (l < 800)) {
       collision_term = compute_collision_integral(l);
     }
-    dy[base + l]                   += collision_term;
-    dy[pv->index_pt_F0_dr_sum + l] += collision_term;
+    dy[base + l] += collision_term;
   }
+}
+
+// ── Matter tally (warm DNCDM only; DR is radiation → 0) ─────────────────────────
+
+double DNCDM_DR_Species::MatterRhoDelta(const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const {
+  if (collection_index_ >= pv->species_layouts.size())
+    return 0.;
+  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  return dncdm_->IsMatterSpecies()
+             ? dncdm_->Rho(pvecback) * dncdm_->Delta(my.dncdm, pv, y, pvecback, ppw)
+             : 0.;
+}
+
+double DNCDM_DR_Species::MatterRhoPlusPTheta(const perturb_vector* pv,
+                                             const double* y,
+                                             const double* pvecback,
+                                             const perturb_workspace* ppw) const {
+  if (collection_index_ >= pv->species_layouts.size())
+    return 0.;
+  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  return dncdm_->IsMatterSpecies() ? (dncdm_->Rho(pvecback) + dncdm_->P(pvecback)) *
+                                         dncdm_->Theta(my.dncdm, pv, y, pvecback, ppw)
+                                   : 0.;
+}
+
+// ── Output ────────────────────────────────────────────────────────────────────
+
+void DNCDM_DR_Species::FillSources(const double* y,
+                                   const double* /*dy*/,
+                                   PerturbSourceContext& ctx) {
+  PerturbationsModule* p_mod = ctx.p_mod;
+  perturb_workspace* ppw     = ctx.ppw;
+  const perturb_vector* pv   = ppw->pv;
+  const double* pvecback     = ppw->pvecback;
+
+  const double a_prime_over_a = ctx.a_prime_over_a;
+  const double a2_rel         = ctx.a2_rel;
+
+  if (ctx.index_md != p_mod->index_md_scalars_)
+    return;
+
+  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+
+  // ── delta_dr (this channel's slot) ───────────────────────────────────────────
+  // r_dr == 0 when the channel carries no DR (e.g. Gamma == 0); write 0 then,
+  // matching DarkRadiationSpecies::Delta's rho_dr <= 0 convention (avoids 0/0).
+  if (p_mod->has_source_delta_dr_ == _TRUE_) {
+    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
+    const double src  = (r_dr > 0.)
+                            ? y[my.dr.idx_F0] / r_dr +
+                                  4. * a_prime_over_a * ctx.theta_over_k2  // N-body gauge corr.
+                            : 0.;
+    p_mod->SetSourceValue(ctx.index_md,
+                          ctx.index_ic,
+                          p_mod->index_tp_delta_dr_ + dr_sp_->source_slot(),
+                          ctx.index_tau,
+                          ctx.index_k,
+                          src);
+  }
+
+  // ── theta_dr (this channel's slot) ───────────────────────────────────────────
+  if (p_mod->has_source_theta_dr_ == _TRUE_) {
+    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
+    const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[my.dr.idx_F0 + 1] / r_dr +
+                                          ctx.theta_shift  // N-body gauge correction
+                                    : 0.;
+    p_mod->SetSourceValue(ctx.index_md,
+                          ctx.index_ic,
+                          p_mod->index_tp_theta_dr_ + dr_sp_->source_slot(),
+                          ctx.index_tau,
+                          ctx.index_k,
+                          src);
+  }
+}
+
+void DNCDM_DR_Species::WriteOutputColumns(PerturbColumnWriter& w,
+                                          const PerturbationsModule& mod,
+                                          enum file_format fmt,
+                                          BaseSpecies::TransferColumnSection section) const {
+  if (fmt != class_format)
+    return;
+  const perturbs* ppt = mod.GetPerturbs();
+  const int slot      = dr_sp_->source_slot();
+  if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    w.Add("d_" + dr_sp_->name(), mod.index_tp_delta_dr_ + slot, mod.has_source_delta_dr_ == _TRUE_);
+  if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    w.Add("t_" + dr_sp_->name(), mod.index_tp_theta_dr_ + slot, mod.has_source_theta_dr_ == _TRUE_);
+}
+
+void DNCDM_DR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                     const BaseSpecies::PerturbLayout& new_base,
+                                                     const double* old_y,
+                                                     double* new_y,
+                                                     const PerturbSwitchContext& ctx) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  dncdm_->CopyPerturbationsAcrossSwitch(old_l.dncdm, new_l.dncdm, old_y, new_y, ctx);
+  dr_sp_->CopyPerturbationsAcrossSwitch(old_l.dr, new_l.dr, old_y, new_y, ctx);
+}
+
+// ── Shooter hooks ─────────────────────────────────────────────────────────────
+
+std::vector<ShootingTarget> DNCDM_DR_Species::GetShootingTargets() const {
+  if (!dncdm_->Omega_dncdmdr_pending().has_value())
+    return {};
+  // target_name: the input key the user specified (per-flavor dot key, e.g. "dncdm1.Omega_dncdmdr")
+  // unknown_param: the fc key DoShooting will vary   (e.g. "dncdm1.deg")
+  return {{name() + ".Omega_dncdmdr", name() + ".deg", *dncdm_->Omega_dncdmdr_pending()}};
+}
+
+void DNCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
+                                            std::vector<double>& guess,
+                                            std::vector<double>& dxdy) const {
+  if (!dncdm_->Omega_dncdmdr_pending().has_value())
+    return;
+  auto [g, d] = dncdm_->DegGuessFromOmegaToday(ctx, *dncdm_->Omega_dncdmdr_pending());
+  guess.push_back(g);
+  dxdy.push_back(d);
+}
+
+double DNCDM_DR_Species::ComputeShootingResidual(const ShootingResidualContext& ctx,
+                                                 const ShootingTarget& target) const {
+  // Today-density of this flavor's dncdm+dr minus the requested target (Omega units).
+  const double* bg = ctx.bg_today;
+  const double H0  = ctx.pba->H0;
+  return (dncdm_->Rho(bg) + dr_sp_->Rho(bg)) / (H0 * H0) - target.target_value;
 }

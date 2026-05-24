@@ -15,7 +15,6 @@
 #include "dark_radiation_species.h"
 #include "dcdm.h"
 #include "dcdm_dr_species.h"
-#include "dncdm_decay_radiation_species.h"
 #include "dncdm_dr_species.h"
 #include "fluid.h"
 #include "idm_dr.h"

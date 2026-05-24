@@ -3,9 +3,13 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <vector>
+
+#include "shooting_target.h"
 
 // Forward declarations to avoid circular includes
 struct background;
+struct SpeciesBuildContext;
 struct precision;
 struct perturb_vector;
 struct perturb_workspace;
@@ -449,6 +453,28 @@ class BaseSpecies {
                                              const double* /*old_y*/,
                                              double* /*new_y*/,
                                              const PerturbSwitchContext& /*ctx*/) const {}
+
+  // ── Shooter / root-finding ────────────────────────────────────────────────
+  // Reported after construction; non-empty iff this species guessed its unknown
+  // (target-form input set, direct unknown absent). Drives target detection, the
+  // unknown vector, and the lazy-shooting trigger.
+  virtual std::vector<ShootingTarget> GetShootingTargets() const {
+    return {};
+  }
+  // Initial guess + Jacobian seed for each unknown, same order as GetShootingTargets.
+  // Also called by CreateAll to obtain the value to build from when the unknown is absent.
+  virtual void ComputeShootingGuess(const SpeciesBuildContext& /*ctx*/,
+                                    std::vector<double>& /*guess*/,
+                                    std::vector<double>& /*dxdy*/) const {}
+  // computed-today minus the requested target. The authoritative target is supplied by
+  // the shooter (collected once at discovery), so the species never re-derives it from
+  // the file content — in iteration builds DoShooting has set the unknown, which for some
+  // species (e.g. DCDM_DR's overlapping Omega_dcdmdr/Omega_ini_dcdm) makes the user's
+  // target indistinguishable by key presence.
+  virtual double ComputeShootingResidual(const ShootingResidualContext& /*ctx*/,
+                                         const ShootingTarget& /*target*/) const {
+    return 0.;
+  }
 
   /**
    * Mark which source slots this species writes during FillSources.

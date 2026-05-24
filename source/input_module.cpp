@@ -46,32 +46,6 @@ int readDoubleList(
  * through a 'file_content' structure.
  */
 
-const std::vector<std::string> InputModule::kTargetNamestrings_{"100*theta_s",
-                                                                "Omega_dcdmdr",
-                                                                "omega_dcdmdr",
-                                                                "Omega_scf",
-                                                                "Omega_ini_dcdm",
-                                                                "omega_ini_dcdm",
-                                                                "Omega_dncdmdr",
-                                                                "omega_dncdmdr",
-                                                                "deg_ncdm_decay_dr",
-                                                                "Omega_ini_dncdm",
-                                                                "Neff_ini_dncdm",
-                                                                "omega_ini_dncdm"};
-const std::vector<std::string> InputModule::kUnknownNamestrings_{"h",
-                                                                 "Omega_ini_dcdm",
-                                                                 "Omega_ini_dcdm",
-                                                                 "scf_shooting_parameter",
-                                                                 "Omega_dcdmdr",
-                                                                 "omega_dcdmdr",
-                                                                 "A_s",
-                                                                 "deg_ncdm_decay_dr",
-                                                                 "deg_ncdm_decay_dr",
-                                                                 "Omega_dncdmdr",
-                                                                 "Omega_dncdmdr",
-                                                                 "Omega_dncdmdr",
-                                                                 "omega_dncdmdr"};
-
 int InputModule::file_content_from_arguments(int argc,
                                              char** argv,
                                              FileContent& fc,
@@ -191,7 +165,7 @@ int InputModule::file_content_from_arguments(int argc,
   return _SUCCESS_;
 }
 
-InputModule::InputModule(FileContent& fc) : file_content_(fc), shooting_workspace_(file_content_) {
+InputModule::InputModule(FileContent& fc) : file_content_(fc) {
   file_content_.mark_all_unread();
   try {
     input_init();
@@ -238,9 +212,16 @@ void InputModule::ConstructSpecies() {
   // that depend purely on Omega0_X (already filled by input_read_parameters)
   // can be resolved right now.  has_ncdm / has_ncdm_decay_dr depend on the
   // NCDM counters that we don't know until after the loop; they are set below.
-  pba->has_cdm       = (pba->Omega0_cdm != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_dcdm      = (pba->Omega0_dcdmdr != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_dr        = (pba->Omega0_dcdmdr != 0.) ? _TRUE_ : _FALSE_;
+  pba->has_cdm = (pba->Omega0_cdm != 0.) ? _TRUE_ : _FALSE_;
+  {
+    int f1 = _FALSE_, f2 = _FALSE_;
+    double tmp;
+    parser_read_double(&file_content_, "Omega_ini_dcdm", &tmp, &f1, error_message_);
+    parser_read_double(&file_content_, "omega_ini_dcdm", &tmp, &f2, error_message_);
+    const bool dcdm_present = (pba->Omega0_dcdmdr != 0.) || (f1 == _TRUE_) || (f2 == _TRUE_);
+    pba->has_dcdm           = dcdm_present ? _TRUE_ : _FALSE_;
+    pba->has_dr             = dcdm_present ? _TRUE_ : _FALSE_;
+  }
   pba->has_scf       = (pba->Omega0_scf != 0.) ? _TRUE_ : _FALSE_;
   pba->has_lambda    = (pba->Omega0_lambda != 0.) ? _TRUE_ : _FALSE_;
   pba->has_fld       = (pba->Omega0_fld != 0.) ? _TRUE_ : _FALSE_;
@@ -338,10 +319,6 @@ void InputModule::ConstructSpecies() {
 
   all_species_.freeze();
 
-  // N_decay_dr is still consumed by DR-bearing species machinery; deletion is a
-  // separate follow-up (Task 32 N_decay_dr).
-  pba->N_decay_dr = (pba->Omega0_dcdmdr > 0 ? 1 : 0) + n_dncdm;
-
   // Now resolve the NCDM-dependent has_* flags.
   if (omega0_ncdm_tot != 0.)
     pba->has_ncdm = _TRUE_;
@@ -369,122 +346,6 @@ void InputModule::ConstructSpecies() {
   }
 }
 
-int InputModule::FixUnknownParameters(int input_verbose,
-                                      int unknown_parameters_size,
-                                      int* target_indices) {
-  file_content_.is_shooting = true;
-
-  shooting_workspace_.target_name.resize(unknown_parameters_size);
-  shooting_workspace_.target_sizes.resize(unknown_parameters_size);
-  shooting_workspace_.unknown_parameters_size = unknown_parameters_size;
-  shooting_workspace_.unknown_parameter_names.resize(unknown_parameters_size);
-  std::vector<double> target_values;
-
-  /** - --> go through all cases with unknown parameters: */
-  for (int counter = 0; counter < unknown_parameters_size; counter++) {
-    int index_target = target_indices[counter];
-    int flag1;
-    std::vector<double> params;
-    class_call(readDoubleList(&file_content_,
-                              kTargetNamestrings_[index_target].c_str(),
-                              params,
-                              &flag1,
-                              error_message_),
-               error_message_,
-               error_message_);
-
-    // store name of target parameter
-    shooting_workspace_.target_name[counter]             = (enum target_names) index_target;
-    shooting_workspace_.target_sizes[counter]            = static_cast<int>(params.size());
-    const std::string& param_name                        = kUnknownNamestrings_[index_target];
-    shooting_workspace_.unknown_parameter_names[counter] = param_name;
-    std::string comma_separated_list_of_values           = "1.0";
-    for (size_t j = 0; j < params.size(); ++j) {
-      // store target value of target parameter
-      target_values.push_back(params[j]);
-      if (j > 0) {
-        comma_separated_list_of_values.append(",1.0");
-      }
-    }
-    file_content_.set(param_name, comma_separated_list_of_values);
-
-    //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
-    shooting_workspace_.target_values = target_values;
-  }
-
-  int fevals = 0;
-  if (target_values.size() == 1) {
-    // 1d root finding
-    const std::string& param_name0 = shooting_workspace_.unknown_parameter_names[0];
-    if (input_verbose > 0) {
-      fprintf(stdout,
-              "Computing unknown input parameter '%s' using input parameter '%s'\n",
-              param_name0.c_str(),
-              kTargetNamestrings_[shooting_workspace_.target_name[0]].c_str());
-    }
-    double xzero;
-    class_call(input_find_root(&xzero, &fevals, &shooting_workspace_, error_message_),
-               error_message_,
-               error_message_);
-
-    /* Store xzero */
-    char xzero_buf[64];
-    snprintf(xzero_buf, sizeof(xzero_buf), "%e", xzero);
-    file_content_.set(param_name0, xzero_buf);
-    double fzero_value;
-    input_fzerofun_1d(xzero, (void*) (&shooting_workspace_), &fzero_value, error_message_);
-
-    if (input_verbose > 0) {
-      fprintf(stdout, " -> found '%s = %s'\n", param_name0.c_str(), xzero_buf);
-    }
-  }
-  else {
-    /* We need to do multidimensional root finding */
-
-    if (input_verbose > 0) {
-      fprintf(stdout, "Computing unknown input parameters\n");
-    }
-    std::vector<double> x_inout(target_values.size());
-    std::vector<double> dxdF(target_values.size());
-    class_call(input_get_guess(x_inout.data(), dxdF.data(), &shooting_workspace_, error_message_),
-               error_message_,
-               error_message_);
-
-    class_call(fzero_Newton(input_try_unknown_parameters,
-                            x_inout.data(),
-                            dxdF.data(),
-                            static_cast<int>(target_values.size()),
-                            1e-3,
-                            1e-3,
-                            &shooting_workspace_,
-                            &fevals,
-                            error_message_),
-               error_message_,
-               error_message_);
-
-    /* Store xzero */
-    int x_inout_index = 0;
-    for (int counter = 0; counter < unknown_parameters_size; counter++) {
-      const std::string& param_name = shooting_workspace_.unknown_parameter_names[counter];
-      std::string new_value;
-      for (int j = 0; j < shooting_workspace_.target_sizes[counter]; ++j) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), j > 0 ? ",%.17g" : "%.17g", x_inout[x_inout_index++]);
-        new_value += buf;
-      }
-      file_content_.set(param_name, new_value);
-      if (input_verbose > 0) {
-        fprintf(stdout, " -> found '%s = %s'\n", param_name.c_str(), new_value.c_str());
-      }
-    }
-  }
-
-  if (input_verbose > 1) {
-    fprintf(stdout, "Shooting completed using %d function evaluations\n", fevals);
-  }
-  return _SUCCESS_;
-}
-
 /**
  * Initialize each parameter, first to its default values, and then
  * from what can be interpreted from the values passed in the input
@@ -498,8 +359,6 @@ int InputModule::input_init() {
   FileContent* pfc = &file_content_;
 
   int flag1;
-  int unknown_parameters_size;
-  int target_indices[_NUM_TARGETS_];
 
   char string1[_ARGUMENT_LENGTH_MAX_];
 
@@ -514,80 +373,19 @@ int InputModule::input_init() {
   class_call(input_read_precisions(), error_message_, error_message_);
 
   /**
-   * In CLASS, we can do something we call 'shooting', where a variable,
-   *  which is not directly given is calculated by another variable
-   *  through successive runs of class.
-   *
-   * This is needed for variables which do not immediately follow from
-   *  other input parameters. An example is theta_s, the angular scale
-   *  of the sound horizon giving us the horizontal peak positions.
-   *  This quantity can only replace the hubble parameter h, if we
-   *  run all the way into class through to thermodynamics to figure out
-   *  how h and theta_s relate numerically.
-   *
-   * A default parameter for h is chosen, and then we shoot through
-   *  CLASS, finding what the corresponding theta_s is. We adjust our
-   *  initial h, and shoot again, repeating this process until a
-   *  suitable value for h is found which gives the correct
-   *  100*theta_s value
-   *
-   * These two arrays must contain the strings of names to be searched
-   *  for and the corresponding new parameter
-   * The third array contains the module inside of which the old
-   *  parameter is calculated
-   *
-   * See input_try_unknown_parameters for the actual shooting
-   *
+   * 'Shooting' resolves inputs that can't be set directly — a condition (e.g. the
+   *  angular sound-horizon scale 100*theta_s, or a species' today density) is satisfied
+   *  by root-finding an unknown (e.g. h, or Omega_ini_dcdm) through repeated CLASS runs.
+   *  This no longer happens in the constructor: each shooting-capable species guesses its
+   *  own unknown during ConstructSpecies and reports its target, and Cosmology::GetInputModule
+   *  lazily calls InputModule::DoShooting to solve the coupled system. See DoShooting.
    */
 
-  int input_verbose = 0, int1, aux_flag;
+  int input_verbose = 0, int1;
   class_read_int("input_verbose", input_verbose);
   if (input_verbose > 0)
     printf("Reading input parameters\n");
 
-  /** - Do we need to fix unknown parameters? */
-  unknown_parameters_size = 0;
-  for (int index_target = 0; index_target < _NUM_TARGETS_; index_target++) {
-    int flag1;
-    std::vector<double> params;
-    class_call(readDoubleList(&file_content_,
-                              kTargetNamestrings_[index_target].c_str(),
-                              params,
-                              &flag1,
-                              error_message_),
-               error_message_,
-               error_message_);
-    if (flag1 == _TRUE_) {
-      /** - --> input_auxillary_target_conditions() takes care of the case where for
-          instance Omega_dcdmdr is set to 0.0.
-      */
-      class_call(input_auxillary_target_conditions(pfc,
-                                                   (enum target_names) index_target,
-                                                   params.data(),
-                                                   static_cast<int>(params.size()),
-                                                   &aux_flag,
-                                                   errmsg),
-                 errmsg,
-                 errmsg);
-      if (aux_flag == _TRUE_) {
-        //printf("Found target: %s\n",target_namestrings[index_target]);
-        target_indices[unknown_parameters_size] = index_target;
-        unknown_parameters_size++;
-      }
-    }
-  }
-
-  /**
-   * Case with unknown parameters...
-   *
-   * Here we start shooting (see above for explanation of shooting)
-   *
-   *  */
-  if ((unknown_parameters_size > 0) && !file_content_.is_shooting) {
-    class_call(FixUnknownParameters(input_verbose, unknown_parameters_size, target_indices),
-               error_message_,
-               error_message_);
-  }
   /** - -->  read all parameters from input pfc: */
   class_call(input_read_parameters(), errmsg, errmsg);
 
@@ -796,6 +594,15 @@ int InputModule::input_read_parameters() {
     pba->H0 = param2 * 1.e5 / _c_;
     pba->h  = param2;
   }
+
+  /** - 100*theta_s is a module-level shooting target (varies h; resolved later by
+   *  DoShooting). Consume it here so the unread-parameter check passes, and reject
+   *  combining it with a direct h/H0 — except inside a shooting build, where DoShooting
+   *  has itself set the trial h. h keeps its default; DoShooting seeds and solves it. */
+  class_call(parser_read_double(pfc, "100*theta_s", &param3, &flag3, errmsg), errmsg, errmsg);
+  class_test((flag3 == _TRUE_) && (flag1 == _TRUE_ || flag2 == _TRUE_) && !pfc->is_shooting,
+             errmsg,
+             "In input file, you cannot enter both 100*theta_s and h (or H0), choose one");
 
   /** - Omega_0_g (photons) and T_cmb */
   class_call(parser_read_double(pfc, "T_cmb", &param1, &flag1, errmsg), errmsg, errmsg);
@@ -3380,568 +3187,138 @@ int class_version(char* version) {
   return _SUCCESS_;
 }
 
-int InputModule::input_fzerofun_1d(double input,
-                                   void* pfzw,
-                                   double* output,
-                                   ErrorMsg error_message) {
-  class_call(input_try_unknown_parameters(&input, 1, pfzw, output, error_message),
-             error_message,
-             error_message);
+// ── Hook-based shooting (the species-owned replacement for the enum dispatch) ──
 
-  return _SUCCESS_;
-}
+int InputModule::ShootingResidual(
+    double* x, int x_size, void* pworkspace, double* output, ErrorMsg /*error_message*/) {
+  auto* w = static_cast<ShootingWorkspace*>(pworkspace);
 
-int InputModule::class_fzero_ridder(
-    int (*func)(double x, void* param, double* y, ErrorMsg error_message),
-    double x1,
-    double x2,
-    double xtol,
-    void* param,
-    double* Fx1,
-    double* Fx2,
-    double* xzero,
-    int* fevals,
-    ErrorMsg error_message) {
-  /**Using Ridders' method, return the root of a function func known to
-     lie between x1 and x2. The root, returned as zriddr, will be found to
-     an approximate accuracy xtol.
-  */
-  int MAXIT = 1000;
-  double fl = 0., fh = 0.;
-  if ((Fx1 != NULL) && (Fx2 != NULL)) {
-    fl = *Fx1;
-    fh = *Fx2;
+  // Write each trial unknown into the file content.
+  for (int i = 0; i < x_size; ++i) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.17g", x[i]);
+    w->fc.set(w->targets[i].unknown_param, buf);
   }
-  else {
-    class_call((*func)(x1, param, &fl, error_message), error_message, error_message);
-    class_call((*func)(x2, param, &fh, error_message), error_message, error_message);
+  // Mark as a shooting build so the lazily-evaluated module does not re-enter DoShooting.
+  w->fc.is_shooting = true;
 
-    *fevals = (*fevals) + 2;
-  }
-  if ((fl > 0.0 && fh < 0.0) || (fl < 0.0 && fh > 0.0)) {
-    double xl  = x1;
-    double xh  = x2;
-    double ans = -1.11e11;
-    for (int j = 1; j <= MAXIT; j++) {
-      double xm = 0.5 * (xl + xh);
-      double fm;
-      class_call((*func)(xm, param, &fm, error_message), error_message, error_message);
-      *fevals  = (*fevals) + 1;
-      double s = sqrt(fm * fm - fl * fh);
-      if (s == 0.0) {
-        *xzero = ans;
-        //printf("Success 1\n");
-        return _SUCCESS_;
-      }
-      double xnew = xm + (xm - xl) * ((fl >= fh ? 1.0 : -1.0) * fm / s);
-      if (fabs(xnew - ans) <= xtol) {
-        *xzero = ans;
-        return _SUCCESS_;
-      }
-      ans = xnew;
-      double fnew;
-      class_call((*func)(ans, param, &fnew, error_message), error_message, error_message);
-      *fevals = (*fevals) + 1;
-      if (fnew == 0.0) {
-        *xzero = ans;
-        //printf("Success 2, ans=%g\n",ans);
-        return _SUCCESS_;
-      }
-      if (NRSIGN(fm, fnew) != fm) {
-        xl = xm;
-        fl = fm;
-        xh = ans;
-        fh = fnew;
-      }
-      else if (NRSIGN(fl, fnew) != fl) {
-        xh = ans;
-        fh = fnew;
-      }
-      else if (NRSIGN(fh, fnew) != fh) {
-        xl = ans;
-        fl = fnew;
-      }
-      else {
-        class_stop(error_message, "unexpected sign change in zriddr");
-      }
-      if (fabs(xh - xl) <= xtol) {
-        *xzero = ans;
-        //        printf("Success 3\n");
-        return _SUCCESS_;
-      }
-    }
-    class_stop(error_message, "zriddr exceed maximum iterations");
-  }
-  else {
-    if (fl == 0.0)
-      return x1;
-    if (fh == 0.0)
-      return x2;
-    class_stop(error_message, "root must be bracketed in zriddr.");
-  }
-  class_stop(error_message, "Failure in int.");
-}
+  Cosmology cosmology{std::make_unique<InputModule>(w->fc)};
+  BackgroundModulePtr bgm  = cosmology.GetBackgroundModule();
+  const double* bg_today   = bgm->background_table_.data() + (bgm->bt_size_ - 1) * bgm->bg_size_;
+  const InputModulePtr& im = cosmology.GetInputModule();
 
-int InputModule::input_try_unknown_parameters(double* unknown_values,
-                                              int unknown_values_size,
-                                              void* voidpfzw,
-                                              double* output,
-                                              ErrorMsg errmsg) {
-  /** Summary:
-   * - Call the structures*/
+  bool need_thermo = false;
+  for (const auto& t : w->targets)
+    if (t.target_name == "100*theta_s")
+      need_thermo = true;
+  ThermodynamicsModulePtr thm;
+  if (need_thermo)
+    thm = cosmology.GetThermodynamicsModule();
 
-  struct fzerofun_workspace* pfzw;
-  int input_verbose;
-  int flag;
-  int param;
-
-  pfzw = (struct fzerofun_workspace*) voidpfzw;
-  /** - Read input parameters */
-  int x_inout_index = 0;
-  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
-    const std::string& param_name = pfzw->unknown_parameter_names[counter];
-    std::string new_value;
-    for (int j = 0; j < pfzw->target_sizes[counter]; ++j) {
-      char buf[32];
-      snprintf(buf, sizeof(buf), j > 0 ? ",%.17g" : "%.17g", unknown_values[x_inout_index++]);
-      new_value += buf;
-    }
-    pfzw->fc.set(param_name, new_value);
-  }
-
-  std::unique_ptr<InputModule> input_module{new InputModule(pfzw->fc)};
-  precision& pr  = input_module->precision_;      /* for precision parameters */
-  background& ba = input_module->background_;     /* for cosmological background */
-  thermo& th     = input_module->thermodynamics_; /* for thermodynamics */
-  perturbs& pt   = input_module->perturbations_;  /* for source functions */
-  primordial& pm = input_module->primordial_;     /* for primordial spectra */
-  nonlinear& nl  = input_module->nonlinear_;      /* for non-linear spectra */
-  transfers& tr  = input_module->transfers_;      /* for transfer functions */
-  spectra& sp    = input_module->spectra_;        /* for output spectra */
-  lensing& le    = input_module->lensing_;        /* for lensed spectra */
-
-  class_call(parser_read_int(&(pfzw->fc), "input_verbose", &param, &flag, errmsg), errmsg, errmsg);
-
-  if (flag == _TRUE_)
-    input_verbose = param;
-  else
-    input_verbose = 0;
-
-  // Zero the verbose flags
-  ba.background_verbose     = 0;
-  th.thermodynamics_verbose = 0;
-  pt.perturbations_verbose  = 0;
-  pm.primordial_verbose     = 0;
-  nl.nonlinear_verbose      = 0;
-  tr.transfer_verbose       = 0;
-  sp.spectra_verbose        = 0;
-  le.lensing_verbose        = 0;
-
-  // Optimise some precision flags:
-  pr.recfast_Nz0 = 10000;
-
-  Cosmology cosmology{std::move(input_module)};
-
-  /** - Get the corresponding shoot variable and put into output */
-  int idx = 0;
-  for (int counter = 0; counter < pfzw->unknown_parameters_size; ++counter) {
-    switch (pfzw->target_name[counter]) {
-      case theta_s: {
-        ThermodynamicsModulePtr thm = cosmology.GetThermodynamicsModule();
-        output[idx]                 = 100. * thm->rs_rec_ / thm->ra_rec_ - pfzw->target_values[idx];
-        break;
-      }
-      case Omega_dcdmdr: {
-        BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        const double* bg_today  = bam->background_table_.data() +
-                                  (bam->bt_size_ - 1) * bam->bg_size_;
-        auto& dcdm_dr           = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
-        double rho_dcdm_today   = dcdm_dr.dcdm().Rho(bg_today);
-        double rho_dr_today;
-        if (ba.has_dr == _TRUE_)
-          rho_dr_today = dcdm_dr.dr().Rho(bg_today);
-        else
-          rho_dr_today = 0.;
-        output[idx] = (rho_dcdm_today + rho_dr_today) / (ba.H0 * ba.H0) - pfzw->target_values[idx];
-        break;
-      }
-      case omega_dcdmdr: {
-        BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        const double* bg_today  = bam->background_table_.data() +
-                                  (bam->bt_size_ - 1) * bam->bg_size_;
-        auto& dcdm_dr           = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
-        double rho_dcdm_today   = dcdm_dr.dcdm().Rho(bg_today);
-        double rho_dr_today;
-        if (ba.has_dr == _TRUE_)
-          rho_dr_today = dcdm_dr.dr().Rho(bg_today);
-        else
-          rho_dr_today = 0.;
-        output[idx] = (rho_dcdm_today + rho_dr_today) / (ba.H0 * ba.H0) -
-                      pfzw->target_values[idx] / ba.h / ba.h;
-        break;
-      }
-      case Omega_scf: {
-        BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        const double* bg_today  = bam->background_table_.data() +
-                                  (bam->bt_size_ - 1) * bam->bg_size_;
-        /** - In case scalar field is used to fill, pba->Omega0_scf is not equal to pfzw->target_value[i].*/
-        output[idx] = bam->all_species_.at("ScalarField")->Rho(bg_today) / (ba.H0 * ba.H0) -
-                      ba.Omega0_scf;
-        break;
-      }
-      case Omega_ini_dcdm:
-      case omega_ini_dcdm: {
-        BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        const double* bg_today  = bam->background_table_.data() +
-                                  (bam->bt_size_ - 1) * bam->bg_size_;
-        auto& dcdm_dr           = static_cast<DCDM_DR_Species&>(*bam->all_species_.at("DCDM_DR"));
-        double rho_dcdm_today   = dcdm_dr.dcdm().Rho(bg_today);
-        double rho_dr_today;
-        if (ba.has_dr == _TRUE_)
-          rho_dr_today = dcdm_dr.dr().Rho(bg_today);
-        else
-          rho_dr_today = 0.;
-        output[idx] = -(rho_dcdm_today + rho_dr_today) / (ba.H0 * ba.H0) + ba.Omega0_dcdmdr;
-        break;
-      }
-
-      case omega_dncdmdr:
-      case Omega_dncdmdr:
-      case Neff_ini_dncdm:
-      case deg_ncdm_decay_dr:
-      case omega_ini_dncdm:
-      case Omega_ini_dncdm: {
-        BackgroundModulePtr bam = cosmology.GetBackgroundModule();
-        const double* bg_today  = bam->background_table_.data() +
-                                  (bam->bt_size_ - 1) * bam->bg_size_;
-        int dncdm_id            = 0;
-        for (auto& sp : bam->all_species_) {
-          auto* dncdm_dr_sp = dynamic_cast<DNCDM_DR_Species*>(sp.get());
-          if (!dncdm_dr_sp)
-            continue;
-          DNCDMSpecies* ncdm_sp_dncdm = &dncdm_dr_sp->dncdm();
-          double rho_dr_today         = dncdm_dr_sp->dr().Rho(bg_today);
-          double rho_dncdm_today      = ncdm_sp_dncdm->Rho(bg_today);
-
-          // Determine target Omega: target_values stores raw input, convert omega->Omega if needed
-          double Omega_target;
-          if ((pfzw->target_name[counter] == omega_dncdmdr) ||
-              (pfzw->target_name[counter] == omega_ini_dncdm)) {
-            Omega_target = pfzw->target_values[idx + dncdm_id] / ba.h / ba.h;
-          }
-          else {
-            Omega_target = pfzw->target_values[idx + dncdm_id];
-          }
-
-          if (input_verbose > 0) {
-            if ((pfzw->target_name[counter] == omega_dncdmdr) ||
-                (pfzw->target_name[counter] == Omega_dncdmdr)) {
-              printf(
-                  " -> Shooting iteration: Omega_dncdmdr (input) = %g, Omega_dncdmdr (computed) =  "
-                  "%g \n",
-                  Omega_target,
-                  (rho_dr_today + rho_dncdm_today) / ba.H0 / ba.H0);
-            }
-            else {
-              printf(
-                  " -> Shooting iteration; deg_ncdm_decay_dr (input) = %g, Omega_dncdmdr "
-                  "(computed) = %g,  Omega_dncdmdr (input) = %g \n",
-                  ncdm_sp_dncdm->GetDeg(),
-                  (rho_dr_today + rho_dncdm_today) / ba.H0 / ba.H0,
-                  Omega_target);
-            }
-          }
-
-          output[idx + dncdm_id] = (rho_dr_today + rho_dncdm_today) / ba.H0 / ba.H0 - Omega_target;
-          dncdm_id++;
-        }
-        break;
-      }
-    }
-    idx += pfzw->target_sizes[counter];
-  }
-
-  return _SUCCESS_;
-}
-
-int InputModule::input_get_guess(double* xguess,
-                                 double* dxdy,
-                                 fzerofun_workspace* pfzw,
-                                 ErrorMsg errmsg) {
-  std::shared_ptr<InputModule> input_module = std::make_shared<InputModule>(pfzw->fc);
-  background& ba = input_module->background_; /* for cosmological background */
-  precision& pr  = input_module->precision_;
-  // Collect DNCDM_DR species in all_species_ lex iteration order
-  std::vector<DNCDM_DR_Species*> dncdm_dr_species;
-  for (auto& sp : input_module->all_species_) {
-    if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-      dncdm_dr_species.push_back(ds);
-  }
-  /** Summary: */
-  /** - Here we should write reasonable guesses for the unknown parameters.
-      Also estimate dxdy, i.e. how the unknown parameter responds to the known.
-      This can simply be estimated as the derivative of the guess formula.*/
-  int index_guess = 0;
-  for (int counter = 0; counter < pfzw->unknown_parameters_size; counter++) {
-    switch (pfzw->target_name[counter]) {
-      case theta_s: {
-        xguess[index_guess] = 3.54 * pow(pfzw->target_values[index_guess], 2) -
-                              5.455 * pfzw->target_values[index_guess] + 2.548;
-        dxdy[index_guess]   = (7.08 * pfzw->target_values[index_guess] - 5.455);
-        /** - Update pb to reflect guess */
-        ba.h  = xguess[index_guess];
-        ba.H0 = ba.h * 1.e5 / _c_;
-        break;
-      }
-      case omega_dcdmdr:
-      case Omega_dcdmdr: {
-        double Omega_M = ba.Omega0_cdm + ba.Omega0_idm_dr + ba.Omega0_dcdmdr + ba.Omega0_b;
-        /* This formula is exact in a Matter + Lambda Universe, but only
-         for Omega_dcdm, not the combined.
-         sqrt_one_minus_M = sqrt(1.0 - Omega_M);
-         xguess[index_guess] = pfzw->target_value[index_guess]*
-         exp(2./3.*ba.Gamma_dcdm/ba.H0*
-         atanh(sqrt_one_minus_M)/sqrt_one_minus_M);
-         dxdy[index_guess] = 1.0;//exp(2./3.*ba.Gamma_dcdm/ba.H0*atanh(sqrt_one_minus_M)/sqrt_one_minus_M);
-      */
-        double gamma   = ba.Gamma_dcdm / ba.H0;
-        double a_decay = 1.0;
-        if (gamma > 1) {
-          a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
-        }
-        double Omega_ini_dcdm_target = pfzw->target_values[index_guess];
-        if (pfzw->target_name[counter] == omega_dcdmdr) {
-          Omega_ini_dcdm_target = pfzw->target_values[index_guess] / ba.h / ba.h;
-        }
-        xguess[index_guess] = Omega_ini_dcdm_target / a_decay;
-        dxdy[index_guess]   = xguess[index_guess] / pfzw->target_values[index_guess];
-        break;
-      }
-      case Omega_scf: {
-        /** - This guess is arbitrary, something nice using WKB should be implemented.
-       *
-       * - Version 2: use a fit: `xguess[index_guess] = 1.77835*pow(ba.Omega0_scf,-2./7.);
-       * dxdy[index_guess] = -0.5081*pow(ba.Omega0_scf,-9./7.)`;
-       *
-       * - Version 3: use attractor solution */
-
-        if (ba.scf_tuning_index == 0) {
-          xguess[index_guess] = sqrt(3.0 / ba.Omega0_scf);
-          dxdy[index_guess]   = -0.5 * sqrt(3.0) * pow(ba.Omega0_scf, -1.5);
-        }
-        else {
-          /* Default: take the passed value as xguess and set dxdy to 1. */
-          xguess[index_guess] = ba.scf_parameters[ba.scf_tuning_index];
-          dxdy[index_guess]   = 1.;
-        }
-        break;
-      }
-      case omega_ini_dcdm:
-      case Omega_ini_dcdm: {
-        /** - This works since correspondence is
-          Omega_ini_dcdm -> Omega_dcdmdr and
-          omega_ini_dcdm -> omega_dcdmdr */
-        double Omega0_dcdmdr = pfzw->target_values[index_guess];
-        if (pfzw->target_name[counter] == omega_ini_dcdm) {
-          Omega0_dcdmdr = pfzw->target_values[index_guess] / (ba.h * ba.h);
-        }
-        double Omega_M = ba.Omega0_cdm + ba.Omega0_idm_dr + Omega0_dcdmdr + ba.Omega0_b;
-        double gamma   = ba.Gamma_dcdm / ba.H0;
-        double a_decay = 1.0;
-        if (gamma > 1) {
-          a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
-        }
-        xguess[index_guess] = pfzw->target_values[index_guess] * a_decay;
-        dxdy[index_guess]   = a_decay;
-        if (gamma > 100)
-          dxdy[index_guess] *= gamma / 100;
-
-        //printf("x = Omega_ini_guess = %g, dxdy = %g\n",*xguess,*dxdy);
-        break;
-      }
-
-      case omega_dncdmdr:
-      case Omega_dncdmdr: {
-        // deg_ncdm_decay_dr unknown, make a guess
-        double a_ini = pr.a_ini_over_a_today_default * ba.a_today;
-        for (auto& sp : input_module->all_species_) {
-          if (auto* nsp = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
-            a_ini = nsp->GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
-          else if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-            a_ini = ds->dncdm().GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
-        }
-        double z_ini = 1.0 / a_ini - 1.0;
-
-        for (int dncdm_id = 0; dncdm_id < static_cast<int>(dncdm_dr_species.size()); ++dncdm_id) {
-          const int index_guess_local = index_guess + dncdm_id;
-          DNCDMSpecies* dncdm_sp      = &dncdm_dr_species[dncdm_id]->dncdm();
-          double rho_actual;
-          dncdm_sp->ComputeMomenta(z_ini, nullptr, &rho_actual, nullptr, nullptr, nullptr);
-          double rho_deg1   = (dncdm_sp->GetDeg() > 0.) ? rho_actual / dncdm_sp->GetDeg() : 0.;
-          double Omega_deg1 = rho_deg1 * pow(a_ini, 4.0) / ba.H0 / ba.H0;
-          double Omega0_dncdmdr_target = pfzw->target_values[index_guess_local];
-          if (pfzw->target_name[counter] == omega_dncdmdr) {
-            Omega0_dncdmdr_target = pfzw->target_values[index_guess_local] / ba.h / ba.h;
-          }
-          double Omega_ini = Omega0_dncdmdr_target;
-
-          if (dncdm_sp->Gamma() / ba.H0 > 1.0) {
-            // Approximately fully decayed at present
-            double a_nr         = 3.15 / dncdm_sp->M();
-            double k_rad        = sqrt(2 * ba.H0 * sqrt(ba.Omega0_g + ba.Omega0_ur));
-            double t_nr         = pow(a_nr / k_rad, 2.0);
-            double x            = dncdm_sp->Gamma() * t_nr;
-            double experfcsqrtx = (x < 20.) ? exp(x) * erfc(sqrt(x)) : 1. / sqrt(x * _PI_);
-            Omega_ini = sqrt(2.) * a_nr * sqrt(dncdm_sp->Gamma()) * Omega0_dncdmdr_target / k_rad /
-                        (2 * sqrt(x) + sqrt(_PI_) * experfcsqrtx);
-          }
-          xguess[index_guess_local] = Omega_ini / Omega_deg1;
-          dxdy[index_guess_local] =
-              Omega_ini / Omega_deg1 /
-              pfzw->target_values[index_guess_local];  // The guess is linear in the known variable
-        }
-        break;
-      }
-      case Neff_ini_dncdm:
-      case deg_ncdm_decay_dr:
-      case omega_ini_dncdm:
-      case Omega_ini_dncdm: {
-        // Omega_dncdmdr or omega_dncdmdr unknown, make a guess
-        for (int dncdm_id = 0; dncdm_id < static_cast<int>(dncdm_dr_species.size()); ++dncdm_id) {
-          const int index_guess_local = index_guess + dncdm_id;
-          DNCDMSpecies* dncdm_sp      = &dncdm_dr_species[dncdm_id]->dncdm();
-          // From analytical solution based on radiation domination, see XXXX.XXXX
-          double Omega_or_omega_ini_dncdm_target = pfzw->target_values[index_guess_local];
-          if (pfzw->target_name[counter] == deg_ncdm_decay_dr) {
-            double a_ini = pr.a_ini_over_a_today_default * ba.a_today;
-            for (auto& sp : input_module->all_species_) {
-              if (auto* nsp = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
-                a_ini = nsp->GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
-              else if (auto* ds = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-                a_ini = ds->dncdm().GetIni(a_ini, ba.a_today, pr.tol_ncdm_initial_w);
-            }
-            double z_ini = 1.0 / a_ini - 1.0;
-            double rho_actual;
-            dncdm_sp->ComputeMomenta(z_ini, nullptr, &rho_actual, nullptr, nullptr, nullptr);
-            double rho_dncdm = (dncdm_sp->GetDeg() > 0.)
-                                   ? rho_actual * pfzw->target_values[index_guess_local] /
-                                         dncdm_sp->GetDeg()
-                                   : 0.;
-            Omega_or_omega_ini_dncdm_target = rho_dncdm * pow(a_ini, 4.) / ba.H0 / ba.H0;
-          }
-          else if (pfzw->target_name[counter] == Neff_ini_dncdm) {
-            Omega_or_omega_ini_dncdm_target = pfzw->target_values[index_guess_local] * 7. / 8. *
-                                              pow(4. / 11., 4. / 3.) * ba.Omega0_g;
-          }
-          double Omega_or_omega_dncdmdr = Omega_or_omega_ini_dncdm_target;
-          if (dncdm_sp->Gamma() / ba.H0 > 1.0) {
-            // Approximately fully decayed at present
-            double a_nr            = 3.15 / dncdm_sp->M();
-            double k_rad           = sqrt(2 * ba.H0 * sqrt(ba.Omega0_g + ba.Omega0_ur));
-            double t_nr            = pow(a_nr / k_rad, 2.0);
-            double x               = dncdm_sp->Gamma() * t_nr;
-            double experfcsqrtx    = (x < 20.) ? exp(x) * erfc(sqrt(x)) : 1. / sqrt(x * _PI_);
-            Omega_or_omega_dncdmdr = (k_rad * Omega_or_omega_ini_dncdm_target *
-                                      (2 * sqrt(x) + sqrt(_PI_) * experfcsqrtx)) /
-                                     (sqrt(2.) * a_nr * sqrt(dncdm_sp->Gamma()));
-          }
-          xguess[index_guess_local] = Omega_or_omega_dncdmdr;
-          dxdy[index_guess_local] =
-              -Omega_or_omega_dncdmdr /
-              pfzw->target_values[index_guess];  // the guess in linear in the target
-        }
-        break;
-      }
-    }
-    index_guess += pfzw->target_sizes[counter];
-    //printf("xguess = %g\n",xguess[index_guess]);
-  }
-
-  return _SUCCESS_;
-}
-
-int InputModule::input_find_root(double* xzero,
-                                 int* fevals,
-                                 fzerofun_workspace* pfzw,
-                                 ErrorMsg errmsg) {
-  double x1, f1, f2 = 0.0, dxdy;
-  int max_iter_outer = 150;
-  int max_iter_inner = 30;
-  int return_function;
-  /** Summary: */
-
-  /** - Fisrt we do our guess */
-  class_call(input_get_guess(&x1, &dxdy, pfzw, errmsg), errmsg, errmsg);
-  //      printf("x1= %g\n",x1);
-
-  class_call(input_fzerofun_1d(x1, pfzw, &f1, errmsg), errmsg, errmsg);
-
-  (*fevals)++;
-  //printf("x1= %g, f1= %g\n",x1,f1);
-
-  double dx     = 1.5 * f1 * dxdy;
-  double x2     = x1 - dx;
-  int direction = 1;
-  /** - Then we do a linear hunt for the boundaries */
-  for (int iter_outer = 1; iter_outer <= max_iter_outer; ++iter_outer) {
-    // Loop for getting new output value
-    bool got_new_output_value = false;
-    for (int iter_inner = 1; iter_inner <= max_iter_inner; ++iter_inner) {
-      x2 = x1 - direction * dx;
-
-      try {
-        return_function = input_fzerofun_1d(x2, pfzw, &f2, errmsg);
-        (*fevals)++;
-      }
-      catch (...) {
-        return_function = _FAILURE_;
-      }
-
-      if (return_function == _SUCCESS_) {
-        got_new_output_value = true;
-        break;
-      }
-
-      dx *= 0.5;
-    }
-    if (!got_new_output_value) {
-      throw(std::runtime_error(errmsg));
-    }
-
-    if (f1 * f2 < 0.0) {
-      /** - root has been bracketed */
-      break;
-    }
-
-    // x2 still on the wrong side of root, continue search.
-    const double local_minima_tolerance = 5.0;
-    if (fabs(f2) > local_minima_tolerance * fabs(f1)) {
-      // We are moving in the wrong direction, dydx estimate must have wrong sign or there is a really nasty local minimum. Try reversing direction.
-      direction *= -1;
+  // Assemble residuals in workspace order. theta_s is module-level (from thermo rs/ra);
+  // each species target is routed to its owning species via the recorded key, passing the
+  // authoritative target collected at discovery (the species must not re-derive it — in
+  // this iteration build DoShooting has set the unknown, so for species with overlapping
+  // target/unknown keys the user's target is not recoverable from the file content).
+  ShootingResidualContext ctx{&im->background_, bg_today};
+  for (size_t i = 0; i < w->targets.size(); ++i) {
+    const ShootingTarget& t = w->targets[i];
+    if (t.target_name == "100*theta_s") {
+      output[i] = 100. * thm->rs_rec_ / thm->ra_rec_ - t.target_value;
     }
     else {
-      // Choose new point as boundary and double dx.
-      x1  = x2;
-      f1  = f2;
-      dx *= 2;
+      const auto& sp = im->all_species_.at(w->target_species_keys[i]);
+      output[i]      = sp->ComputeShootingResidual(ctx, t);
+    }
+  }
+  return _SUCCESS_;
+}
+
+InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
+  // Guard: never shoot from within a shooting build (the residual marks its fc this way).
+  if (input_module->file_content_.is_shooting)
+    return input_module;
+
+  FileContent& fc = input_module->file_content_;
+  ErrorMsg errmsg = "";  // initialized so a failure that skips writing it can't surface garbage
+
+  ShootingWorkspace w(fc);
+  std::vector<double> xguess, dxdF;
+
+  // Cosmological target: 100*theta_s varies h (residual from thermo rs/ra). Module-level.
+  {
+    double tv;
+    int flag = _FALSE_;
+    parser_read_double(&fc, "100*theta_s", &tv, &flag, errmsg);
+    if (flag == _TRUE_) {
+      w.targets.push_back({"100*theta_s", "h", tv});
+      w.target_species_keys.emplace_back();  // module-level: no owning species
+      xguess.push_back(3.54 * tv * tv - 5.455 * tv + 2.548);
+      dxdF.push_back(7.08 * tv - 5.455);
     }
   }
 
-  /** - Find root using Ridders method. (Exchange for bisection if you are old-school.)*/
-  class_call(class_fzero_ridder(input_fzerofun_1d,
-                                x1,
-                                x2,
-                                1e-5 * MAX(fabs(x1), fabs(x2)),
-                                pfzw,
-                                &f1,
-                                &f2,
-                                xzero,
-                                fevals,
-                                errmsg),
-             errmsg,
-             errmsg);
+  // Per-species targets (all_species_ lex order). The discovery module's species already
+  // guessed their unknowns at construction; query them for {target, guess} here.
+  // SpeciesBuildContext::ncdm_settings is non-null by contract (some guesses fall back to
+  // it when ppr is unavailable); build it from the module as ConstructSpecies does.
+  NcdmSettings ncdm_settings;
+  ncdm_settings.h           = input_module->background_.h;
+  ncdm_settings.T_cmb       = input_module->background_.T_cmb;
+  ncdm_settings.tol_ncdm    = input_module->precision_.tol_ncdm;
+  ncdm_settings.tol_ncdm_bg = input_module->precision_.tol_ncdm_bg;
+  ncdm_settings.tol_M_ncdm  = input_module->precision_.tol_M_ncdm;
+  const SpeciesBuildContext gctx{&fc,
+                                 &input_module->background_,
+                                 &input_module->precision_,
+                                 &ncdm_settings,
+                                 nullptr};
+  for (const auto& [key, sp] : input_module->all_species_) {
+    std::vector<ShootingTarget> tgts = sp->GetShootingTargets();
+    if (tgts.empty())
+      continue;
+    std::vector<double> g, d;
+    sp->ComputeShootingGuess(gctx, g, d);
+    // A species must report one guess + one Jacobian seed per target (same order), or the
+    // flattened unknown vector below desyncs. Guard against a mis-implemented hook.
+    if (g.size() != tgts.size() || d.size() != tgts.size()) {
+      throw std::runtime_error("species '" + key + "' reported " + std::to_string(tgts.size()) +
+                               " shooting target(s) but " + std::to_string(g.size()) +
+                               " guess(es) / " + std::to_string(d.size()) + " Jacobian seed(s)");
+    }
+    for (size_t j = 0; j < tgts.size(); ++j) {
+      w.targets.push_back(tgts[j]);
+      w.target_species_keys.push_back(key);
+      xguess.push_back(g[j]);
+      dxdF.push_back(d[j]);
+    }
+  }
 
-  return _SUCCESS_;
+  if (w.targets.empty())
+    return input_module;  // nothing to shoot — the common path
+
+  // Solve (fzero_Newton handles n>=1 and writes the solution back into xguess).
+  fc.is_shooting = true;
+  int fevals     = 0;
+  if (fzero_Newton(ShootingResidual,
+                   xguess.data(),
+                   dxdF.data(),
+                   static_cast<int>(w.targets.size()),
+                   1e-3,
+                   1e-3,
+                   &w,
+                   &fevals,
+                   errmsg) != _SUCCESS_) {
+    throw std::runtime_error(std::string("Shooting (DoShooting) failed: ") + errmsg);
+  }
+
+  // Write the resolved unknowns; build and return a fresh, fully-resolved module.
+  for (size_t i = 0; i < w.targets.size(); ++i) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.17g", xguess[i]);
+    fc.set(w.targets[i].unknown_param, buf);
+  }
+  return std::make_shared<InputModule>(fc);
 }
 
 int InputModule::file_exists(const char* fname) {
@@ -3951,44 +3328,6 @@ int InputModule::file_exists(const char* fname) {
     return _TRUE_;
   }
   return _FALSE_;
-}
-
-int InputModule::input_auxillary_target_conditions(FileContent* pfc,
-                                                   enum target_names target_name,
-                                                   double* target_values,
-                                                   int target_values_size,
-                                                   int* aux_flag,
-                                                   ErrorMsg errmsg) {
-  *aux_flag = _TRUE_;
-  switch (target_name) {
-    case Omega_dcdmdr:
-    case omega_dcdmdr:
-    case Omega_scf:
-    case Omega_ini_dcdm:
-    case omega_ini_dcdm:
-      /* Check that Omega's or omega's are nonzero: */
-      if (target_values[0] == 0.)
-        *aux_flag = _FALSE_;
-      break;
-    case Omega_dncdmdr:
-    case deg_ncdm_decay_dr:
-    case Omega_ini_dncdm: {
-      int N_ncdm_decay_dr = 0;
-      int flag1;
-      class_call(parser_read_int(pfc, "N_ncdm_decay_dr", &N_ncdm_decay_dr, &flag1, errmsg),
-                 errmsg,
-                 errmsg);
-      if ((flag1 == _FALSE_) || N_ncdm_decay_dr <= 0) {
-        *aux_flag = _FALSE_;
-      }
-      break;
-    }
-    default:
-      /* Default is no additional checks */
-      *aux_flag = _TRUE_;
-      break;
-  }
-  return _SUCCESS_;
 }
 
 int InputModule::compare_doubles(const void* a, const void* b) {

@@ -278,13 +278,6 @@ struct perturb_vector {
   int index_pt_perturbed_recombination_delta_temp; /**< Gas temperature perturbation */
   int index_pt_perturbed_recombination_delta_chi;  /**< Inionization fraction perturbation */
 
-  /** The index to the first Legendre multipole of the DR expansion. Not
-      that this is not exactly the usual delta, see Kaplinghat et al.,
-      astro-ph/9907388. */
-  int index_pt_F0_dr_sum;
-  int index_pt_F0_dr_species;
-  int l_max_dr;          /**< max momentum in Boltzmann hierarchy for dr) */
-  int l_max_dr_col;      /**< max collision term in Boltzmann hierarchy for dr) */
   int index_pt_eta;      /**< synchronous gauge metric perturbation eta*/
   int index_pt_phi;      /**< newtonian gauge metric perturbation phi */
   int index_pt_hv_prime; /**< vector metric perturbation h_v' in synchronous gauge */

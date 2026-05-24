@@ -130,8 +130,7 @@ struct background {
 
   double Omega0_k = 0.; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
 
-  int N_decay_dr = 0;
-  int l_max_idr  = 0;
+  int l_max_idr = 0;
   /** @name - related parameters */
 
   //@{

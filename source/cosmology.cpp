@@ -11,12 +11,16 @@
 #include "transfer_module.h"
 
 InputModulePtr& Cosmology::GetInputModule() {
+  if (!shot_) {
+    input_module_ptr_ = InputModule::DoShooting(std::move(input_module_ptr_));
+    shot_             = true;
+  }
   return input_module_ptr_;
 }
 
 BackgroundModulePtr& Cosmology::GetBackgroundModule() {
   if (!background_module_ptr_) {
-    background_module_ptr_ = BackgroundModulePtr(new BackgroundModule(input_module_ptr_));
+    background_module_ptr_ = BackgroundModulePtr(new BackgroundModule(GetInputModule()));
   }
   return background_module_ptr_;
 }
@@ -24,7 +28,7 @@ BackgroundModulePtr& Cosmology::GetBackgroundModule() {
 ThermodynamicsModulePtr& Cosmology::GetThermodynamicsModule() {
   if (!thermodynamics_module_ptr_) {
     thermodynamics_module_ptr_ = ThermodynamicsModulePtr(
-        new ThermodynamicsModule(input_module_ptr_, GetBackgroundModule()));
+        new ThermodynamicsModule(GetInputModule(), GetBackgroundModule()));
   }
   return thermodynamics_module_ptr_;
 }
@@ -32,7 +36,7 @@ ThermodynamicsModulePtr& Cosmology::GetThermodynamicsModule() {
 PerturbationsModulePtr& Cosmology::GetPerturbationsModule() {
   if (!perturbations_module_ptr_) {
     perturbations_module_ptr_ = PerturbationsModulePtr(
-        new PerturbationsModule(input_module_ptr_,
+        new PerturbationsModule(GetInputModule(),
                                 GetBackgroundModule(),
                                 GetThermodynamicsModule()));
   }
@@ -42,11 +46,11 @@ PerturbationsModulePtr& Cosmology::GetPerturbationsModule() {
 PrimordialModulePtr& Cosmology::GetPrimordialModule() {
   if (!primordial_module_ptr_) {
     /** If sigma8 was input, compute local pm and nl module here, compute sigma8, update As and continue*/
-    if (input_module_ptr_->primordial_.sigma8 > 0) {
+    if (GetInputModule()->primordial_.sigma8 > 0) {
       auto pm = PrimordialModulePtr(
-          new PrimordialModule(input_module_ptr_, GetPerturbationsModule()));
+          new PrimordialModule(GetInputModule(), GetPerturbationsModule()));
       auto nl =
-          NonlinearModule(input_module_ptr_, GetBackgroundModule(), GetPerturbationsModule(), pm);
+          NonlinearModule(GetInputModule(), GetBackgroundModule(), GetPerturbationsModule(), pm);
       double sigma8 = 0;
       if (nl.has_pk_m_ == _TRUE_) {
         sigma8 = nl.sigma8_[nl.index_pk_m_];
@@ -58,18 +62,18 @@ PrimordialModulePtr& Cosmology::GetPrimordialModule() {
         throw std::invalid_argument(
             "No valid power spectrum found in nonlinear module for calculating sigma8.");
       }
-      const_cast<primordial*>(&input_module_ptr_->primordial_)->A_s *=
-          pow(input_module_ptr_->primordial_.sigma8 / sigma8, 2);
+      const_cast<primordial*>(&GetInputModule()->primordial_)->A_s *=
+          pow(GetInputModule()->primordial_.sigma8 / sigma8, 2);
     }
     primordial_module_ptr_ = PrimordialModulePtr(
-        new PrimordialModule(input_module_ptr_, GetPerturbationsModule()));
+        new PrimordialModule(GetInputModule(), GetPerturbationsModule()));
   }
   return primordial_module_ptr_;
 }
 
 NonlinearModulePtr& Cosmology::GetNonlinearModule() {
   if (!nonlinear_module_ptr_) {
-    nonlinear_module_ptr_ = NonlinearModulePtr(new NonlinearModule(input_module_ptr_,
+    nonlinear_module_ptr_ = NonlinearModulePtr(new NonlinearModule(GetInputModule(),
                                                                    GetBackgroundModule(),
                                                                    GetPerturbationsModule(),
                                                                    GetPrimordialModule()));
@@ -79,7 +83,7 @@ NonlinearModulePtr& Cosmology::GetNonlinearModule() {
 
 TransferModulePtr& Cosmology::GetTransferModule() {
   if (!transfer_module_ptr_) {
-    transfer_module_ptr_ = TransferModulePtr(new TransferModule(input_module_ptr_,
+    transfer_module_ptr_ = TransferModulePtr(new TransferModule(GetInputModule(),
                                                                 GetBackgroundModule(),
                                                                 GetThermodynamicsModule(),
                                                                 GetPerturbationsModule(),
@@ -90,7 +94,7 @@ TransferModulePtr& Cosmology::GetTransferModule() {
 
 SpectraModulePtr& Cosmology::GetSpectraModule() {
   if (!spectra_module_ptr_) {
-    spectra_module_ptr_ = SpectraModulePtr(new SpectraModule(input_module_ptr_,
+    spectra_module_ptr_ = SpectraModulePtr(new SpectraModule(GetInputModule(),
                                                              GetPerturbationsModule(),
                                                              GetPrimordialModule(),
                                                              GetNonlinearModule(),
@@ -101,8 +105,7 @@ SpectraModulePtr& Cosmology::GetSpectraModule() {
 
 LensingModulePtr& Cosmology::GetLensingModule() {
   if (!lensing_module_ptr_) {
-    lensing_module_ptr_ = LensingModulePtr(
-        new LensingModule(input_module_ptr_, GetSpectraModule()));
+    lensing_module_ptr_ = LensingModulePtr(new LensingModule(GetInputModule(), GetSpectraModule()));
   }
   return lensing_module_ptr_;
 }

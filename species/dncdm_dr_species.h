@@ -4,9 +4,10 @@
 
 #include "background.h"
 #include "composite_species.h"
-#include "dncdm_decay_radiation_species.h"
+#include "dark_radiation_species.h"
 #include "dncdm_species.h"
 #include "parser.h"
+#include "species/shooting_target.h"
 #include "species/species_build_context.h"
 
 class BackgroundModule;
@@ -19,7 +20,7 @@ class DNCDM_DR_Species : public CompositeSpecies {
   // ── PerturbLayout ──────────────────────────────────────────────────────────
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     NCDMBaseSpecies::PerturbLayout dncdm;
-    DNCDM_DecayRadiationSpecies::PerturbLayout dr;
+    DarkRadiationSpecies::PerturbLayout dr;
   };
 
   std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
@@ -32,6 +33,14 @@ class DNCDM_DR_Species : public CompositeSpecies {
                    const BackgroundModule* bgm);
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
+
+  // ── Shooter hooks ──────────────────────────────────────────────────────────
+  std::vector<ShootingTarget> GetShootingTargets() const override;
+  void ComputeShootingGuess(const SpeciesBuildContext& ctx,
+                            std::vector<double>& guess,
+                            std::vector<double>& dxdy) const override;
+  double ComputeShootingResidual(const ShootingResidualContext& ctx,
+                                 const ShootingTarget& target) const override;
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
@@ -52,10 +61,10 @@ class DNCDM_DR_Species : public CompositeSpecies {
   const DNCDMSpecies& dncdm() const {
     return *dncdm_;
   }
-  DNCDM_DecayRadiationSpecies& dr() {
+  DarkRadiationSpecies& dr() {
     return *dr_sp_;
   }
-  const DNCDM_DecayRadiationSpecies& dr() const {
+  const DarkRadiationSpecies& dr() const {
     return *dr_sp_;
   }
 
@@ -105,14 +114,40 @@ class DNCDM_DR_Species : public CompositeSpecies {
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
 
+  /** Matter (warm DNCDM only) contribution. DR is radiation and contributes 0.
+   *  Routes to the layout-based dncdm Delta/Theta (the inherited legacy pv-only
+   *  composite path would hit DNCDMSpecies' unreachable legacy overloads). */
+  double MatterRhoDelta(const perturb_vector* pv,
+                        const double* y,
+                        const double* pvecback,
+                        const perturb_workspace* ppw) const override;
+  double MatterRhoPlusPTheta(const perturb_vector* pv,
+                             const double* y,
+                             const double* pvecback,
+                             const perturb_workspace* ppw) const override;
+
+  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
+
+  void WriteOutputColumns(
+      PerturbColumnWriter& writer,
+      const PerturbationsModule& mod,
+      enum file_format fmt,
+      TransferColumnSection section = TransferColumnSection::all) const override;
+
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
+
  private:
   void AddCouplingDerivs(const PerturbLayout& my,
                          const double* y,
                          double* dy,
                          const perturb_parameters_and_workspace& ppaw);
 
-  DNCDMSpecies* dncdm_                = nullptr;
-  DNCDM_DecayRadiationSpecies* dr_sp_ = nullptr;
+  DNCDMSpecies* dncdm_         = nullptr;
+  DarkRadiationSpecies* dr_sp_ = nullptr;
   const background* pba_;
   const BackgroundModule* bgm_ = nullptr;
 };

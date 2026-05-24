@@ -109,6 +109,14 @@ class ScalarFieldSpecies : public BaseSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
+  // ── Shooting hooks ───────────────────────────────────────────────────────
+  std::vector<ShootingTarget> GetShootingTargets() const override;
+  void ComputeShootingGuess(const SpeciesBuildContext& ctx,
+                            std::vector<double>& guess,
+                            std::vector<double>& dxdy) const override;
+  double ComputeShootingResidual(const ShootingResidualContext& ctx,
+                                 const ShootingTarget& target) const override;
+
   /**
    * Gauge-dependent fractional density perturbation delta_rho_scf / rho_scf.
    * In Newtonian gauge, includes the metric perturbation psi computed from
@@ -184,6 +192,9 @@ class ScalarFieldSpecies : public BaseSpecies {
   double V_scf(double phi) const;
   double dV_scf(double phi) const;
   double ddV_scf(double phi) const;
+
+  ShootingTarget shooting_target_{};  // unknown_param empty => no shooting target
+  bool needs_shooting_ = false;       // true iff the direct unknown was absent (we guessed)
 
   const background& pba_;
   const BackgroundModule* bgm_ = nullptr;

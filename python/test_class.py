@@ -762,6 +762,30 @@ class TestReviewRegressions(TestClass):
             candidate.struct_cleanup()
             candidate.empty()
 
+    def test_theta_s_shooting_matches_reference(self):
+        # The most common shoot: 100*theta_s varies h (module-level target in DoShooting).
+        # Candidate (lazy DoShooting) must match the reference (ctor-shooting) within tol.
+        scenario = {
+            '100*theta_s': 1.041783,
+            'output': 'tCl',
+            'l_max_scalars': 200,
+        }
+        candidate, reference = self._compute_candidate_and_reference(scenario)
+        try:
+            status = self.compare_output(
+                reference,
+                "Reference",
+                candidate,
+                "Candidate",
+                COMPARE_CL_RELATIVE_ERROR,
+                COMPARE_PK_RELATIVE_ERROR)
+            self.assertTrue(status, "Reference comparison failed for 100*theta_s shooting")
+        finally:
+            reference.struct_cleanup()
+            reference.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+
     def test_idm_dr_idr_perturbations_match_reference(self):
         scenario = {
             'Omega_idm_dr': 0.12,
