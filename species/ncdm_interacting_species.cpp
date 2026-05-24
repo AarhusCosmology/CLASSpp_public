@@ -58,6 +58,23 @@ NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
   else if (has_lG) {
     G_eff_ = std::pow(10.0, log10G_eff_value);
   }
+
+  std::string use_alpha_correction_string = "false";
+  input.read_string("use_alpha_correction", use_alpha_correction_string);
+
+  if (use_alpha_correction_string == "True" || use_alpha_correction_string == "true" ||
+      use_alpha_correction_string == "yes") {
+    use_alpha_correction_ = _TRUE_;
+  }
+  else if (use_alpha_correction_string == "False" || use_alpha_correction_string == "false" ||
+           use_alpha_correction_string == "no") {
+    use_alpha_correction_ = _FALSE_;
+  }
+  else {
+    throw std::invalid_argument(
+        "species '" + instance_name +
+        "': Please specify use_alpha_correction as either True/true/yes or False/false/no");
+  }
 }
 
 // ── CreateAll factory ───────────────────────────────────────────────────────
@@ -80,6 +97,29 @@ std::vector<Named> NCDMInteractingSpecies::CreateAll(const SpeciesBuildContext& 
     result.push_back({name, std::move(sp)});
   }
   return result;
+}
+
+double NCDMInteractingSpecies::FitIntegralOfl(double z) {
+  const double qs[6]{0.0,
+                     265.1039577689589,
+                     22154.177207573077,
+                     687011.2661763201,
+                     8041726.168424849,
+                     21122401.83355329};
+
+  const double ps[6]{5529600.0,
+                     -656640000.0 + 5529600.0 * qs[1],
+                     64159257600.0 - 656640000.0 * qs[1] + 5529600.0 * qs[2],
+                     17894987354.00044,
+                     -9680376946.240694,
+                     1623310849.867793};
+
+  double numerator   = ps[0] + ps[1] * z + ps[2] * std::pow(z, 2) + ps[3] * std::pow(z, 3) +
+                       ps[4] * std::pow(z, 4) + ps[5] * std::pow(z, 5);
+  double denominator = qs[0] + qs[1] * z + qs[2] * std::pow(z, 2) + qs[3] * std::pow(z, 3) +
+                       qs[4] * std::pow(z, 4) + qs[5] * std::pow(z, 5);
+
+  return std::pow(z, 3) * numerator / denominator;
 }
 
 // ── Perturbations ──────────────────────────────────────────────────────────
@@ -129,9 +169,19 @@ void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& lay
       const int idx = ncdm_layout.index_per_q[iq];
 
       for (int l = 2; l <= lmax; l++) {
-        int alpha_index  = std::min(4, l - 2);
-        double alpha     = alpha_RTA[alpha_index];
-        dy[idx + l]     -= alpha * taudot * y[idx + l];
+        if (use_alpha_correction_) {
+          double z_correction = std::pow(l + 0.5, -2);
+          double I_l          = FitIntegralOfl(z_correction);
+          double N            = 7.0 * std::pow(_PI_, 4) / 720.0;
+          double alpha        = N / (6.0 * std::pow(2.0 * _PI_, 3)) * (800.0 - I_l);
+
+          dy[idx + l] -= alpha * taudot * y[idx + l];
+        }
+        else {
+          int alpha_index  = std::min(4, l - 2);
+          double alpha     = alpha_RTA[alpha_index];
+          dy[idx + l]     -= alpha * taudot * y[idx + l];
+        }
       }
     }
   }
