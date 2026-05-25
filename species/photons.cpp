@@ -512,6 +512,15 @@ void PhotonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
+// ── Newtonian-gauge transform ─────────────────────────────────────────────────
+
+void PhotonsSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                   double* y,
+                                                   const PerturbIcContext& ctx) {
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 // ── Switch-copy hook ──────────────────────────────────────────────────────────
 
 void PhotonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,

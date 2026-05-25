@@ -146,6 +146,13 @@ class DarkRadiationSpecies : public BaseSpecies {
                               double* y,
                               const PerturbIcContext& ctx) override;
 
+  /** Re-seed the DR multipole hierarchy from the gauge-shifted IC. decay_corr is
+      supplied by the owning composite (= aΓ·ρ_parent/ρ_dr; 0 when ρ_dr == 0). */
+  void PerturbNewtonianReseed(const PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx,
+                              double decay_corr) const;
+
   /** Legacy IC: no-op — composite routes through layout-based path. */
   void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 

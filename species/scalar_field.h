@@ -101,6 +101,9 @@ class ScalarFieldSpecies : public BaseSpecies {
                               double* y,
                               const PerturbIcContext& ctx) override;
   void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
                                      const BaseSpecies::PerturbLayout& new_layout,
                                      const double* old_y,

@@ -89,6 +89,18 @@ void DCDM_DR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& b
   dr_sp_->ApplyInitialConditions(my.dr, y, ctx);
 }
 
+void DCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                    double* y,
+                                                    const PerturbIcContext& ctx) {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  dcdm_->PerturbSynchronousToNewtonian(my.dcdm, y, ctx);  // matter+decay via RhoDotOverRho
+  const double* pvecback  = ctx.ppw->pvecback;
+  const double rho_dr     = dr_sp_->Rho(pvecback);
+  const double decay_corr = (rho_dr > 0.) ? ctx.a * pba_->Gamma_dcdm * dcdm_->Rho(pvecback) / rho_dr
+                                          : 0.;
+  dr_sp_->PerturbNewtonianReseed(my.dr, y, ctx, decay_corr);
+}
+
 double DCDM_DR_Species::Delta(const BaseSpecies::PerturbLayout& base,
                               const perturb_vector* pv,
                               const double* y,

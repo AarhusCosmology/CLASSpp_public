@@ -488,6 +488,18 @@ void FluidSpecies::ComputePpf(double k,
                      k2;
 }
 
+// ── Newtonian-gauge transform ─────────────────────────────────────────────────
+
+void FluidSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                 double* y,
+                                                 const PerturbIcContext& ctx) {
+  // Non-PPF only: in PPF mode idx_delta/idx_theta are unregistered (== -1) and
+  // the helper is a no-op. delta uses the universal ρ̇/ρ shift = -3(1+w)ℋα, which
+  // corrects the historical opposite-sign bug.
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 void FluidSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
                                                  const BaseSpecies::PerturbLayout& new_base,
                                                  const double* old_y,

@@ -74,7 +74,7 @@ void DNCDM_DR_Species::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& bas
                                            const perturb_parameters_and_workspace& ppaw) {
   const auto& my = static_cast<const PerturbLayout&>(base);
   // DNCDMSpecies inherits NCDMBaseSpecies::PerturbTensorDerivs.
-  // GetDlnf0DlnqForTensor is overridden by DNCDMSpecies to use pvecback.
+  // GetDlnf0Dlnq is overridden by DNCDMSpecies to use pvecback.
   dncdm_->PerturbTensorDerivs(my.dncdm, tau, y, dy, ppaw);
 }
 
@@ -84,6 +84,18 @@ void DNCDM_DR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& 
   const auto& my = static_cast<const PerturbLayout&>(base);
   dncdm_->ApplyInitialConditions(my.dncdm, y, ctx);
   dr_sp_->ApplyInitialConditions(my.dr, y, ctx);
+}
+
+void DNCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                     double* y,
+                                                     const PerturbIcContext& ctx) {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  dncdm_->PerturbSynchronousToNewtonian(my.dncdm, y, ctx);  // NCDMBaseSpecies per-q transform
+  const double* pvecback  = ctx.ppw->pvecback;
+  const double rho_dr     = dr_sp_->Rho(pvecback);
+  const double decay_corr = (rho_dr > 0.) ? ctx.a * dncdm_->Gamma() * dncdm_->Rho(pvecback) / rho_dr
+                                          : 0.;
+  dr_sp_->PerturbNewtonianReseed(my.dr, y, ctx, decay_corr);
 }
 
 double DNCDM_DR_Species::Delta(const BaseSpecies::PerturbLayout& base,

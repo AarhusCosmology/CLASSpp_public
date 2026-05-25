@@ -175,7 +175,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
   }
 
  protected:
-  double GetDlnf0DlnqForTensor(int iq, const double* /*pvecback*/) const override {
+  double GetDlnf0Dlnq(int iq, const double* /*pvecback*/) const override {
     return dlnf0_dlnq_[iq];
   }
 

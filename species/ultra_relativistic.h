@@ -139,6 +139,10 @@ class UltraRelativisticSpecies : public BaseSpecies {
                               const PerturbIcContext& ctx) override;
   void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
+
   /** Copy UR perturbations across an approximation switch (UFA on/off transition). */
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
                                      const BaseSpecies::PerturbLayout& new_layout,

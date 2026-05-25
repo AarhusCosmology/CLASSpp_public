@@ -247,6 +247,15 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_cdm", theta_cdm, true);
 }
 
+// ── Newtonian-gauge transform ─────────────────────────────────────────────────
+
+void CDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                               double* y,
+                                               const PerturbIcContext& ctx) {
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 void CDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
                                                const BaseSpecies::PerturbLayout& new_base,
                                                const double* old_y,

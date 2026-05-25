@@ -219,6 +219,22 @@ void ScalarFieldSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout
     y[layout.idx_phi_prime] = 0.;
 }
 
+void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                       double* y,
+                                                       const PerturbIcContext& ctx) {
+  const auto& l               = static_cast<const PerturbLayout&>(base);
+  const double* pvecback      = ctx.ppw->pvecback;
+  const BackgroundModule* bgm = ctx.p_mod->GetBackgroundModule().get();
+  const double phi_prime      = pvecback[bgm->index_bg_phi_prime_scf_];
+  const double phi_scf        = pvecback[bgm->index_bg_phi_scf_];
+  if (l.idx_phi >= 0)
+    y[l.idx_phi] += ctx.alpha * phi_prime;
+  if (l.idx_phi_prime >= 0)
+    y[l.idx_phi_prime] += (-2. * ctx.a_prime_over_a * ctx.alpha * phi_prime -
+                           ctx.a * ctx.a * bgm->dV_scf(phi_scf) * ctx.alpha +
+                           phi_prime * ctx.alpha_prime);
+}
+
 void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                             const PerturbationsModule& mod,
                                             enum file_format fmt,

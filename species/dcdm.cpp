@@ -48,6 +48,12 @@ double DCDMSpecies::DpDloga(const double* /*pvecback*/) const {
   return 0.;
 }
 
+double DCDMSpecies::RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {
+  // ρ̇/ρ = -a(3H + Γ) = -3ℋ - aΓ  (same physics as BackgroundDerivs).
+  const double a = pvecback[bgm_->index_bg_a_];
+  return -3. * a_prime_over_a - a * pba_.Gamma_dcdm;
+}
+
 void DCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                               perturb_vector* pv,
                                               const precision* /*ppr*/,
@@ -139,6 +145,14 @@ void DCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
   const auto& layout = static_cast<const PerturbLayout&>(base);
   if (layout.idx_delta >= 0)
     y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
+}
+
+void DCDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                double* y,
+                                                const PerturbIcContext& ctx) {
+  // delta += (ρ̇/ρ)·α with ρ̇/ρ = -3ℋ - aΓ (decay-aware RhoDotOverRho), theta += k²·α.
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
 }
 
 void DCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,

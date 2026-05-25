@@ -630,9 +630,41 @@ void NCDMBaseSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PerturbSynchronousToNewtonian
+// Per-q synchronous→Newtonian gauge shift for all NCDM-family species.
+// delta_ur/theta_ur are the shared free-streaming radiation IC, gauge-shifted
+// as radiation (delta: -4ℋα; theta: +k²α). shear_ur/l3_ur are gauge-invariant.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void NCDMBaseSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                    double* y,
+                                                    const PerturbIcContext& ctx) {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.q_size <= 0 || layout.index_per_q.empty())
+    return;
+  const double* pvecback = ctx.ppw->pvecback;
+  const double delta_ur  = ctx.delta_ur - 4. * ctx.a_prime_over_a * ctx.alpha;
+  const double theta_ur  = ctx.theta_ur + ctx.k * ctx.k * ctx.alpha;
+  const int lmax         = layout.l_max;
+  for (int index_q = 0; index_q < layout.q_size; ++index_q) {
+    const int idx           = layout.index_per_q[index_q];
+    const double q          = q_[index_q];
+    const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * M_ * M_);
+    const double dlnf0_dlnq = GetDlnf0Dlnq(index_q, pvecback);
+    y[idx + 0]              = -0.25 * delta_ur * dlnf0_dlnq;
+    if (lmax >= 1)
+      y[idx + 1] = -epsilon / 3. / q / ctx.k * theta_ur * dlnf0_dlnq;
+    if (lmax >= 2)
+      y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
+    if (lmax >= 3)
+      y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PerturbTensorDerivs (layout-based)
 // Ports the per-species tensor Boltzmann hierarchy from perturb_derivs_member.
-// GetDlnf0DlnqForTensor is supplied by the concrete subclass:
+// GetDlnf0Dlnq is supplied by the concrete subclass:
 //   NCDMSpecies → static dlnf0_dlnq_[iq]
 //   DNCDMSpecies → pvecback[bg_dlnfdlnq_index + iq]
 // ─────────────────────────────────────────────────────────────────────────────
@@ -658,7 +690,7 @@ void NCDMBaseSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base
 
   for (int iq = 0; iq < layout.q_size; ++iq) {
     const double q              = q_[iq];
-    const double dlnf0_dlnq     = GetDlnf0DlnqForTensor(iq, pvecback);
+    const double dlnf0_dlnq     = GetDlnf0Dlnq(iq, pvecback);
     const double epsilon        = std::sqrt(q * q + a2 * M_ * M_);
     const double qk_div_epsilon = k * q / epsilon;
     const int ncdm_idx          = layout.index_per_q[iq];

@@ -43,6 +43,7 @@ class DCDMSpecies : public BaseSpecies {
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double DpDloga(const double* pvecback) const override;
+  double RhoDotOverRho(const double* pvecback, double a_prime_over_a) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
@@ -115,6 +116,10 @@ class DCDMSpecies : public BaseSpecies {
                               double* y,
                               const PerturbIcContext& ctx) override;
   void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
+
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
 
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
                                      const BaseSpecies::PerturbLayout& new_layout,

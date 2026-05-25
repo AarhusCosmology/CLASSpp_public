@@ -225,6 +225,13 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
   ApplyInitialConditions(y, ctx);
 }
 
+void IDM_DRMD_IDR_DRMD_Species::PerturbSynchronousToNewtonian(
+    const BaseSpecies::PerturbLayout& base, double* y, const PerturbIcContext& ctx) {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  idm_drmd_->PerturbSynchronousToNewtonian(my.idm_drmd, y, ctx);
+  idr_drmd_->PerturbSynchronousToNewtonian(my.idr_drmd, y, ctx);
+}
+
 double IDM_DRMD_IDR_DRMD_Species::Delta(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,

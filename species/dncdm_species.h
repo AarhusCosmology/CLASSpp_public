@@ -212,7 +212,7 @@ class DNCDMSpecies : public NCDMBaseSpecies {
       const perturb_workspace* ppw) const;
 
  protected:
-  double GetDlnf0DlnqForTensor(int iq, const double* pvecback) const override {
+  double GetDlnf0Dlnq(int iq, const double* pvecback) const override {
     return pvecback[index_bg_dlnfdlnq_decay_ + iq];
   }
   double GetW0ForGwSource(int iq, const double* pvecback) const override {

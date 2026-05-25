@@ -132,6 +132,10 @@ class IDR_DRMDSpecies : public BaseSpecies {
     return 0.;
   }
 
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
+
   // ── Switch-copy hook ────────────────────────────────────────────────────────
 
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,

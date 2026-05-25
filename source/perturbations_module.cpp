@@ -4295,9 +4295,7 @@ int PerturbationsModule::perturb_initial_conditions(
   /** --> For scalars */
 
   if (_scalars_) {
-    double delta_ur = 0., theta_ur = 0., shear_ur = 0., l3_ur = 0., eta = 0., delta_cdm = 0., alpha,
-           alpha_prime;
-    double delta_dr = 0;
+    double eta = 0., alpha = 0.;
 
     /** - (a) compute relevant background quantities: compute rho_r,
         rho_m, rho_nu (= all relativistic except photons), and their
@@ -4417,12 +4415,7 @@ int PerturbationsModule::perturb_initial_conditions(
     ic_ctx.p_mod            = this;
 
     auto dispatch_species_ic = [&]() {
-      delta_ur = ic_ctx.delta_ur;
-      theta_ur = ic_ctx.theta_ur;
-      shear_ur = ic_ctx.shear_ur;
-      l3_ur    = ic_ctx.l3_ur;
-      delta_dr = ic_ctx.delta_dr;
-      eta      = ic_ctx.eta;
+      eta = ic_ctx.eta;
       {
         size_t i = 0;
         for (auto& sp : all_species_) {
@@ -4654,68 +4647,43 @@ int PerturbationsModule::perturb_initial_conditions(
          = [(4/3) (f_g theta_g + f_nu theta_nu) + (rho_m/rho_r) (f_b delta_b + f_cdm 0)] / (1 + rho_m/rho_r)
       */
 
-      if (all_species_.count("CDM")) {
-        const size_t cdm_i  = all_species_.index_of("CDM");
-        const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[cdm_i]);
-        delta_cdm = ppw->pv->y[cdm_lay.idx_delta];
+      /* delta_tot = δρ/ρ_c and velocity_tot = (ρ+p)θ/ρ_c with ρ_c = rho_r + rho_m,
+         summed over every non-dark-energy species. This is the synchronous-gauge total
+         density/momentum perturbation that sources alpha, read from the just-set
+         synchronous y[]. Downcast-free analogue of perturb_total_stress_energy; it now
+         includes every matter species (the old fraccdm channel counted only literal
+         "CDM", silently dropping DCDM/IDM_DR), all radiation, and the full NCDM moment.
+
+         The scalar context is forced to synchronous here so each species returns its
+         synchronous Delta/Theta: the gauge-agnostic species read y[] directly, and the
+         scalar field correctly returns 0 from its zero IC field perturbation (its
+         Newtonian-branch metric terms would need workspace state not valid at IC).
+         scalar_ctx is re-set in perturb_total_stress_energy before the ODE uses it. */
+      ppw->scalar_ctx.gauge = synchronous;
+      ppw->scalar_ctx.a     = a;
+      ppw->scalar_ctx.a2    = a * a;
+      ppw->scalar_ctx.k     = k;
+      ppw->scalar_ctx.k2    = k * k;
+
+      double delta_rho_ic = 0., rho_plus_p_theta_ic = 0.;
+      {
+        size_t i = 0;
+        for (const auto& sp : all_species_) {
+          if (sp->energy_type() == BaseSpecies::EnergyType::DarkEnergy) {
+            ++i;
+            continue;
+          }
+          const double rho        = sp->Rho(ppw->pvecback);
+          const double rho_plus_p = rho + sp->P(ppw->pvecback);
+          const auto& layout      = *ppw->pv->species_layouts[i];
+          delta_rho_ic        += rho * sp->Delta(layout, ppw->pv, ppw->pv->y, ppw->pvecback, ppw);
+          rho_plus_p_theta_ic += rho_plus_p *
+                                 sp->Theta(layout, ppw->pv, ppw->pv->y, ppw->pvecback, ppw);
+          ++i;
+        }
       }
-      else if (all_species_.count("DCDM_DR")) {
-        const size_t dcdm_ic_i  = all_species_.index_of("DCDM_DR");
-        const auto& dcdm_ic_lay = static_cast<const DCDM_DR_Species::PerturbLayout&>(
-            *ppw->pv->species_layouts[dcdm_ic_i]);
-        delta_cdm = ppw->pv->y[dcdm_ic_lay.dcdm.idx_delta];
-      }
-      else if (all_species_.count("IDM_DR_IDR")) {
-        const size_t idm_dr_ic_i  = all_species_.index_of("IDM_DR_IDR");
-        const auto& idm_dr_ic_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                        *ppw->pv->species_layouts[idm_dr_ic_i])
-                                        .idm_dr;
-        delta_cdm                 = ppw->pv->y[idm_dr_ic_lay.idx_delta];
-      }
-      else
-        delta_cdm = 0.;
-
-      if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-        const size_t idm_drm_ic_i  = all_species_.index_of("IDM_DRMD_IDR_DRMD");
-        const auto& idm_drm_ic_lay = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
-                                         *ppw->pv->species_layouts[idm_drm_ic_i])
-                                         .idm_drmd;
-        delta_cdm += static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
-                         .idm_drmd()
-                         .Rho(ppw->pvecback) *
-                     ppw->pv->y[idm_drm_ic_lay.idx_delta];
-      }
-
-      // note: if there are no neutrinos, fracnu, delta_ur and theta_ur below will consistently be zero.
-
-      const size_t g_i_ic  = all_species_.index_of("Photons");
-      const auto& g_lay_ic = static_cast<const PhotonsSpecies::PerturbLayout&>(
-          *ppw->pv->species_layouts[g_i_ic]);
-      const size_t b_i_ic  = all_species_.index_of("Baryons");
-      const auto& b_lay_ic = static_cast<const BaryonsSpecies::PerturbLayout&>(
-          *ppw->pv->species_layouts[b_i_ic]);
-
-      double delta_tot = (fracg * ppw->pv->y[g_lay_ic.idx_delta] + fracnu * delta_ur +
-                          rho_m_over_rho_r *
-                              (fracb * ppw->pv->y[b_lay_ic.idx_delta] + fraccdm * delta_cdm)) /
-                         (1. + rho_m_over_rho_r);
-
-      double velocity_tot = ((4. / 3.) *
-                                 (fracg * ppw->pv->y[g_lay_ic.idx_theta] + fracnu * theta_ur) +
-                             rho_m_over_rho_r * fracb * ppw->pv->y[b_lay_ic.idx_theta]) /
-                            (1. + rho_m_over_rho_r);
-
-      if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-        const size_t idm_drm_tot_i  = all_species_.index_of("IDM_DRMD_IDR_DRMD");
-        const auto& idm_drm_tot_lay = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
-                                          *ppw->pv->species_layouts[idm_drm_tot_i])
-                                          .idm_drmd;
-        delta_tot    += rho_m_over_rho_r * fracidm_drmd * ppw->pv->y[idm_drm_tot_lay.idx_delta] /
-                        (1. + rho_m_over_rho_r);
-        velocity_tot += rho_m_over_rho_r * fracidm_drmd * ppw->pv->y[idm_drm_tot_lay.idx_theta] /
-                        (1. + rho_m_over_rho_r);
-      }
+      double delta_tot    = delta_rho_ic / (rho_r + rho_m);
+      double velocity_tot = rho_plus_p_theta_ic / (rho_r + rho_m);
 
       alpha = (eta + 3. / 2. * a_prime_over_a * a_prime_over_a / k / k / s2_squared *
                          (delta_tot + 3. * a_prime_over_a / k / k * velocity_tot)) /
@@ -4723,216 +4691,21 @@ int PerturbationsModule::perturb_initial_conditions(
 
       ppw->pv->y[ppw->pv->index_pt_phi] = eta - a_prime_over_a * alpha;
 
-      ppw->pv->y[g_lay_ic.idx_delta] -= 4. * a_prime_over_a * alpha;
-      ppw->pv->y[g_lay_ic.idx_theta] += k * k * alpha;
-
-      ppw->pv->y[b_lay_ic.idx_delta] -= 3. * a_prime_over_a * alpha;
-      ppw->pv->y[b_lay_ic.idx_theta] += k * k * alpha;
-
-      if (all_species_.count("CDM")) {
-        const size_t cdm_i  = all_species_.index_of("CDM");
-        const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[cdm_i]);
-        ppw->pv->y[cdm_lay.idx_delta] -= 3. * a_prime_over_a * alpha;
-        ppw->pv->y[cdm_lay.idx_theta]  = k * k * alpha;
-      }
-
-      if (all_species_.count("IDM_DR_IDR")) {
-        const size_t idm_dr_alpha_i  = all_species_.index_of("IDM_DR_IDR");
-        const auto& idm_dr_alpha_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                           *ppw->pv->species_layouts[idm_dr_alpha_i])
-                                           .idm_dr;
-        ppw->pv->y[idm_dr_alpha_lay.idx_delta] -= 3. * a_prime_over_a * alpha;
-        ppw->pv->y[idm_dr_alpha_lay.idx_theta]  = k * k * alpha;
-        /* comment on idm_dr initial conditions: theta_idm_dr is set later, together with theta_idr, if the tight coupling is on */
-      }
-
-      if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-        const size_t idm_drm_alpha_i = all_species_.index_of("IDM_DRMD_IDR_DRMD");
-        const auto& idm_drm_alpha_lay =
-            static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
-                *ppw->pv->species_layouts[idm_drm_alpha_i])
-                .idm_drmd;
-        ppw->pv->y[idm_drm_alpha_lay.idx_delta] -= 3. * a_prime_over_a * alpha;
-        ppw->pv->y[idm_drm_alpha_lay.idx_theta] += k * k * alpha;
-      }
-
-      if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-        const size_t drm_g_i  = all_species_.index_of("IDM_DRMD_IDR_DRMD");
-        const auto& drm_g_lay = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
-                                    *ppw->pv->species_layouts[drm_g_i])
-                                    .idr_drmd;
-        ppw->pv->y[drm_g_lay.idx_delta] -= 4. * a_prime_over_a * alpha;
-        ppw->pv->y[drm_g_lay.idx_theta] += k * k * alpha;
-      }
-
-      if (all_species_.count("DCDM_DR")) {
-        const size_t dcdm_alpha_i  = all_species_.index_of("DCDM_DR");
-        const auto& dcdm_alpha_lay = static_cast<const DCDM_DR_Species::PerturbLayout&>(
-            *ppw->pv->species_layouts[dcdm_alpha_i]);
-        ppw->pv->y[dcdm_alpha_lay.dcdm.idx_delta] += (-3. * a_prime_over_a - a * pba->Gamma_dcdm) *
-                                                     alpha;
-        ppw->pv->y[dcdm_alpha_lay.dcdm.idx_theta]  = k * k * alpha;
-      }
-
-      /* fluid */
-      if ((all_species_.count("Fluid")) && (pba->use_ppf == _FALSE_)) {
-        double w_fld, dw_over_da_fld, integral_fld;
-        class_call(background_module_->background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld),
-                   background_module_->error_message_,
-                   error_message_);
-
-        const size_t fld_i  = all_species_.index_of("Fluid");
-        const auto& fld_lay = static_cast<const FluidSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[fld_i]);
-        ppw->pv->y[fld_lay.idx_delta] += 3 * (1. + w_fld) * a_prime_over_a * alpha;
-        ppw->pv->y[fld_lay.idx_theta] += k * k * alpha;
-      }
-
-      /* scalar field: check */
-      if (all_species_.count("ScalarField")) {
-        alpha_prime = 0.0;
-        /* - 2. * a_prime_over_a * alpha + eta
-           - 4.5 * (a2/k2) * ppw->rho_plus_p_shear; */
-
-        const size_t scf_i  = all_species_.index_of("ScalarField");
-        const auto& scf_lay = static_cast<const ScalarFieldSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[scf_i]);
-        ppw->pv->y[scf_lay.idx_phi] += alpha *
-                                       ppw->pvecback[background_module_->index_bg_phi_prime_scf_];
-        ppw->pv->y[scf_lay.idx_phi_prime] +=
-            (-2. * a_prime_over_a * alpha *
-                 ppw->pvecback[background_module_->index_bg_phi_prime_scf_] -
-             a * a *
-                 background_module_->dV_scf(ppw->pvecback[background_module_->index_bg_phi_scf_]) *
-                 alpha +
-             ppw->pvecback[background_module_->index_bg_phi_prime_scf_] * alpha_prime);
-      }
-
-      if ((all_species_.count("UR")) || (HasNcdm(all_species_)) ||
-          (all_species_.count("DCDM_DR")) || (all_species_.count("IDM_DR_IDR"))) {
-        delta_ur -= 4. * a_prime_over_a * alpha;
-        theta_ur += k * k * alpha;
-        /* shear and l3 are gauge invariant */
-
-        if (all_species_.count("DCDM_DR")) {
-          auto& dcdm_dr       = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
-          const double rho_dr = dcdm_dr.dr().Rho(ppw->pvecback);
-          // Decay-source term vanishes when there is no DR (rho_dr == 0, e.g. Gamma_dcdm == 0).
-          const double decay_corr =
-              (rho_dr > 0.) ? a * pba->Gamma_dcdm * dcdm_dr.dcdm().Rho(ppw->pvecback) / rho_dr : 0.;
-          delta_dr += (-4. * a_prime_over_a + decay_corr) * alpha;
-        }
-        {
-          for (auto& [name, sp] : all_species_) {
-            auto* dncdm_dr_sp = dynamic_cast<DNCDM_DR_Species*>(sp.get());
-            if (!dncdm_dr_sp)
-              continue;
-            DNCDMSpecies* dncdm_sp = &dncdm_dr_sp->dncdm();
-            const double rho_dr    = ppw->pvecback[dncdm_dr_sp->dr().bg_rho_index()];
-            const double decay_corr =
-                (rho_dr > 0.) ? a * dncdm_sp->Gamma() * dncdm_sp->Rho(ppw->pvecback) / rho_dr : 0.;
-            delta_dr += (-4. * a_prime_over_a + decay_corr) * alpha;
-          }
+      /** Per-species synchronous->Newtonian gauge transformation. Each species
+          shifts its own variables in place (the synchronous IC is already in y[]
+          from ApplyInitialConditions, which runs in both gauges). This replaces
+          the former inline per-species shift blocks and the relativistic re-seed
+          in former section (e). */
+      ic_ctx.alpha       = alpha;
+      ic_ctx.alpha_prime = 0.;  // historical: alpha_prime was hardcoded 0 (scalar-field block)
+      {
+        size_t sp_idx = 0;
+        for (auto& sp : all_species_) {
+          sp->PerturbSynchronousToNewtonian(*ppw->pv->species_layouts[sp_idx], ppw->pv->y, ic_ctx);
+          ++sp_idx;
         }
       }
     } /* end of gauge transformation to newtonian gauge */
-
-    /** - (e) In any gauge, we should now implement the relativistic initial conditions in ur and ncdm variables */
-
-    if (ppt->gauge == newtonian) {
-      if (all_species_.count("UR")) {
-        const size_t ur_i  = all_species_.index_of("UR");
-        const auto& ur_lay = static_cast<const UltraRelativisticSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[ur_i]);
-        ppw->pv->y[ur_lay.idx_delta] = delta_ur;
-        ppw->pv->y[ur_lay.idx_theta] = theta_ur;
-        ppw->pv->y[ur_lay.idx_shear] = shear_ur;
-        ppw->pv->y[ur_lay.idx_l3]    = l3_ur;
-      }
-
-      if (all_species_.count("IDM_DR_IDR")) {
-        const size_t idr_seed_i            = all_species_.index_of("IDM_DR_IDR");
-        const auto& idr_seed_lay           = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                                 *ppw->pv->species_layouts[idr_seed_i])
-                                                 .idr;
-        ppw->pv->y[idr_seed_lay.idx_delta] = delta_ur;
-        ppw->pv->y[idr_seed_lay.idx_theta] = theta_ur;
-        if (ppt->idr_nature == idr_free_streaming) {
-          if ((!all_species_.count("IDM_DR_IDR")) ||
-              ((all_species_.count("IDM_DR_IDR")) &&
-               (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-            ppw->pv->y[idr_seed_lay.idx_shear] = shear_ur;
-            ppw->pv->y[idr_seed_lay.idx_l3]    = l3_ur;
-          }
-        }
-      }
-      if (all_species_.count("IDM_DR_IDR")) {
-        const size_t idm_dr_th_i            = all_species_.index_of("IDM_DR_IDR");
-        const auto& idm_dr_th_lay           = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                                  *ppw->pv->species_layouts[idm_dr_th_i])
-                                                  .idm_dr;
-        ppw->pv->y[idm_dr_th_lay.idx_theta] = theta_ur;
-      }
-
-      if (HasNcdm(all_species_)) {
-        for (size_t i = 0; i < all_species_.size(); ++i) {
-          const BaseSpecies* sp                     = all_species_[i];
-          const NCDMBaseSpecies* ncdm_base_sp       = nullptr;
-          const NCDMBaseSpecies::PerturbLayout* lay = nullptr;
-          if (auto* n_sp = dynamic_cast<const NCDMSpecies*>(sp)) {
-            ncdm_base_sp = n_sp;
-            lay = &static_cast<const NCDMBaseSpecies::PerturbLayout&>(*ppw->pv->species_layouts[i]);
-          }
-          else if (auto* composite = dynamic_cast<const DNCDM_DR_Species*>(sp)) {
-            ncdm_base_sp         = &composite->dncdm();
-            const auto& comp_lay = static_cast<const DNCDM_DR_Species::PerturbLayout&>(
-                *ppw->pv->species_layouts[i]);
-            lay = &comp_lay.dncdm;
-          }
-          else {
-            continue;
-          }
-
-          const auto* dncdm_sp = dynamic_cast<const DNCDMSpecies*>(ncdm_base_sp);
-          for (int index_q = 0; index_q < lay->q_size; index_q++) {
-            const int idx        = lay->index_per_q[index_q];
-            const double q       = ncdm_base_sp->q()[index_q];
-            const double epsilon = sqrt(q * q + a * a * ncdm_base_sp->M() * ncdm_base_sp->M());
-            double dlnf0_dlnq;
-            if (dncdm_sp == nullptr) {
-              dlnf0_dlnq = ncdm_base_sp->dlnf0_dlnq()[index_q];
-            }
-            else {
-              // If the current species can decay, it is a DNCDMSpecies
-              dlnf0_dlnq = ppw->pvecback[dncdm_sp->bg_dlnfdlnq_index() + index_q];
-            }
-            ppw->pv->y[idx + 0] = -0.25 * delta_ur * dlnf0_dlnq;
-            ppw->pv->y[idx + 1] = -epsilon / 3. / q / k * theta_ur * dlnf0_dlnq;
-            ppw->pv->y[idx + 2] = -0.5 * shear_ur * dlnf0_dlnq;
-            ppw->pv->y[idx + 3] = -0.25 * l3_ur * dlnf0_dlnq;
-          }
-        }
-      }
-
-      // Newtonian-gauge DR re-seed for the DCDM_DR channel (single hierarchy).
-      // TODO: this whole synchronous->newtonian IC re-seed (UR/IDR/NCDM/DR) should
-      // become a per-species PerturbSynchronousToNewtonian dispatch where composites
-      // transform their own members, instead of these inline gauge-specific blocks.
-      if (all_species_.count("DCDM_DR")) {
-        auto& dcdm_dr     = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
-        const size_t dr_i = all_species_.index_of("DCDM_DR");
-        const auto& dr_lay =
-            static_cast<const DCDM_DR_Species::PerturbLayout&>(*ppw->pv->species_layouts[dr_i]).dr;
-        const int base       = dr_lay.idx_F0;
-        const double r_dr    = pow(pow(a / pba->a_today, 2) / pba->H0, 2) *
-                               dcdm_dr.dr().Rho(ppw->pvecback);
-        ppw->pv->y[base + 0] = delta_dr * r_dr;
-        ppw->pv->y[base + 1] = 4. / (3. * k) * theta_ur * r_dr;
-        ppw->pv->y[base + 2] = 2. * shear_ur * r_dr;
-        ppw->pv->y[base + 3] = l3_ur * r_dr;
-      }
-    }
   }
   /** --> For tensors */
 

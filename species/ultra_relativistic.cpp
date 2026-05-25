@@ -290,6 +290,16 @@ void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& bas
   }
 }
 
+// ── Newtonian-gauge transform ─────────────────────────────────────────────────
+
+void UltraRelativisticSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                             double* y,
+                                                             const PerturbIcContext& ctx) {
+  // delta/theta shift; shear (idx_shear) and l3 (idx_l3) are gauge-invariant.
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 void UltraRelativisticSpecies::CopyPerturbationsAcrossSwitch(
     const BaseSpecies::PerturbLayout& old_base,
     const BaseSpecies::PerturbLayout& new_base,

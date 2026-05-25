@@ -454,6 +454,29 @@ class BaseSpecies {
                                              double* /*new_y*/,
                                              const PerturbSwitchContext& /*ctx*/) const {}
 
+  // ── Synchronous → Newtonian gauge transformation ──────────────────────────
+  /**
+   * Log conformal-time derivative of the background density, ρ̇/ρ (ρ̇ ≡ dρ̄/dτ).
+   * Single source of truth for the density-contrast gauge shift; mirrors the
+   * continuity equation used in BackgroundDerivs. Default: ρ̇/ρ = -3ℋ(Rho+P)/Rho.
+   * Species with extra source/sink terms (e.g. decay) override this.
+   * @param a_prime_over_a  ℋ = a'/a (base does not store H/a indices).
+   */
+  virtual double RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {
+    return -3. * a_prime_over_a * (Rho(pvecback) + P(pvecback)) / Rho(pvecback);
+  }
+
+  /**
+   * Transform this species' own perturbation variables from synchronous to
+   * Newtonian gauge, in place in y[]. Called by the module after alpha is known
+   * (ctx.alpha / ctx.alpha_prime filled). The synchronous IC is already in y[]
+   * (ApplyInitialConditions runs in both gauges), so this is a pure shift/re-seed.
+   * Default: no-op (species with no perturbed variables, e.g. cosmological constant).
+   */
+  virtual void PerturbSynchronousToNewtonian(const PerturbLayout& /*layout*/,
+                                             double* /*y*/,
+                                             const PerturbIcContext& /*ctx*/) {}
+
   // ── Shooter / root-finding ────────────────────────────────────────────────
   // Reported after construction; non-empty iff this species guessed its unknown
   // (target-form input set, direct unknown absent). Drives target detection, the
@@ -543,6 +566,22 @@ class BaseSpecies {
  protected:
   BaseSpecies(std::string name, EnergyType energy_type)
       : name_(std::move(name)), energy_type_(energy_type) {}
+
+  /**
+   * Universal fluid-like gauge shift: delta += (ρ̇/ρ)·alpha ; theta += k²·alpha
+   * (shear, l3 and higher moments are gauge-invariant). Fluid-like species call
+   * this from PerturbSynchronousToNewtonian, supplying their own delta/theta slots.
+   */
+  void ApplyFluidLikeNewtonianShift(double* y,
+                                    int idx_delta,
+                                    int idx_theta,
+                                    const double* pvecback,
+                                    const PerturbIcContext& ctx) const {
+    if (idx_delta >= 0)
+      y[idx_delta] += RhoDotOverRho(pvecback, ctx.a_prime_over_a) * ctx.alpha;
+    if (idx_theta >= 0)
+      y[idx_theta] += ctx.k * ctx.k * ctx.alpha;
+  }
 
   std::string name_;
   EnergyType energy_type_;

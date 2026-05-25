@@ -216,6 +216,15 @@ void BaryonsSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_b", theta_b, true);
 }
 
+// ── Newtonian-gauge transform ─────────────────────────────────────────────────
+
+void BaryonsSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                   double* y,
+                                                   const PerturbIcContext& ctx) {
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 void BaryonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
                                                    const BaseSpecies::PerturbLayout& new_base,
                                                    const double* old_y,

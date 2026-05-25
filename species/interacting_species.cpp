@@ -77,6 +77,15 @@ double IDM_DRSpecies::Theta(const BaseSpecies::PerturbLayout& base,
   return y[layout.idx_theta];
 }
 
+// ── PerturbSynchronousToNewtonian ─────────────────────────────────────────
+
+void IDM_DRSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                  double* y,
+                                                  const PerturbIcContext& ctx) {
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 // ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
 
 void IDM_DRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
@@ -262,6 +271,17 @@ double IDRSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
   return 4. / 3. * Rho(pvecback) * shear_idr;
 }
 
+// ── PerturbSynchronousToNewtonian ──────────────────────────────────────────
+
+void IDRSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                               double* y,
+                                               const PerturbIcContext& ctx) {
+  // delta/theta shift; shear/l3 gauge-invariant. idm_dr's synchronous theta is
+  // already theta_ur (tight-coupling lock), so the universal += reproduces it.
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 // ── CopyPerturbationsAcrossSwitch ──────────────────────────────────────────
 
 void IDRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
@@ -384,6 +404,15 @@ double IDM_DRMDSpecies::Theta(const BaseSpecies::PerturbLayout& base,
   return y[layout.idx_theta];
 }
 
+// ── PerturbSynchronousToNewtonian ─────────────────────────────────────────
+
+void IDM_DRMDSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                    double* y,
+                                                    const PerturbIcContext& ctx) {
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+}
+
 // ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
 
 void IDM_DRMDSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
@@ -471,6 +500,15 @@ double IDR_DRMDSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
                                const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   return (layout.idx_delta >= 0) ? pvecback[index_bg_rho_] * y[layout.idx_delta] / 3. : 0.;
+}
+
+// ── PerturbSynchronousToNewtonian ─────────────────────────────────────────
+
+void IDR_DRMDSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                    double* y,
+                                                    const PerturbIcContext& ctx) {
+  const auto& l = static_cast<const PerturbLayout&>(base);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
 }
 
 // ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────

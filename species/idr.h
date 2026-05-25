@@ -177,6 +177,10 @@ class IDRSpecies : public BaseSpecies {
     return 0.;
   }
 
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
+
   // ── Switch-copy hook (for Phase C / Task 25) ───────────────────────────────
 
   /**

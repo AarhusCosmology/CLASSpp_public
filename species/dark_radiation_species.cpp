@@ -181,6 +181,26 @@ void DarkRadiationSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayo
     y[layout.idx_F0 + 3] = ctx.l3_ur * r_dr;
 }
 
+void DarkRadiationSpecies::PerturbNewtonianReseed(const PerturbLayout& layout,
+                                                  double* y,
+                                                  const PerturbIcContext& ctx,
+                                                  double decay_corr) const {
+  if (layout.idx_F0 < 0)
+    return;
+  const double* pvecback = ctx.ppw->pvecback;
+  const double r_dr      = std::pow(std::pow(ctx.a / pba_->a_today, 2) / pba_->H0, 2) *
+                           pvecback[index_bg_rho_];
+  const double delta_dr  = ctx.delta_dr + (-4. * ctx.a_prime_over_a + decay_corr) * ctx.alpha;
+  const double theta_ur  = ctx.theta_ur + ctx.k * ctx.k * ctx.alpha;
+  y[layout.idx_F0 + 0]   = delta_dr * r_dr;
+  if (layout.l_max >= 1)
+    y[layout.idx_F0 + 1] = 4. / (3. * ctx.k) * theta_ur * r_dr;
+  if (layout.l_max >= 2)
+    y[layout.idx_F0 + 2] = 2. * ctx.shear_ur * r_dr;  // shear/l3 gauge-invariant
+  if (layout.l_max >= 3)
+    y[layout.idx_F0 + 3] = ctx.l3_ur * r_dr;
+}
+
 void DarkRadiationSpecies::CopyPerturbationsAcrossSwitch(
     const BaseSpecies::PerturbLayout& old_base,
     const BaseSpecies::PerturbLayout& new_base,

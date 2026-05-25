@@ -143,7 +143,7 @@ class NCDMBaseSpecies : public BaseSpecies {
 
   // ── Layout-based tensor Boltzmann hierarchy ───────────────────────────────
   /** Tensor-mode Boltzmann hierarchy for NCDM species.
-   *  Subclasses must provide GetDlnf0DlnqForTensor to specialise the driving
+   *  Subclasses must provide GetDlnf0Dlnq to specialise the driving
    *  term (static table for NCDMSpecies; pvecback array for DNCDMSpecies). */
   void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
                            double tau,
@@ -165,11 +165,15 @@ class NCDMBaseSpecies : public BaseSpecies {
   void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
                          int* used_in_sources) const override;
 
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
+
  protected:
   /** Return d ln f_0 / d ln q for momentum bin iq.
    *  NCDMSpecies reads a static table; DNCDMSpecies reads pvecback.
    *  Used by PerturbTensorDerivs. */
-  virtual double GetDlnf0DlnqForTensor(int iq, const double* pvecback) const = 0;
+  virtual double GetDlnf0Dlnq(int iq, const double* pvecback) const = 0;
 
   /** Return the quadrature weight w_0[iq] for the GW source integral.
    *  NCDMBaseSpecies returns the static w_[iq]; DNCDMSpecies overrides. */

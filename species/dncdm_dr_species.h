@@ -90,6 +90,10 @@ class DNCDM_DR_Species : public CompositeSpecies {
                               double* y,
                               const PerturbIcContext& ctx) override;
 
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
+
   double Delta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
