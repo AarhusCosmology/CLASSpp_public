@@ -29,19 +29,19 @@ void IDM_DR_IDR_Species::ApplyInitialConditions(double* y, const PerturbIcContex
   const auto& idm_dr_lay = my_lay.idm_dr;
   const auto& idr_lay    = my_lay.idr;
 
-  if (mod->GetBackground()->has_idm_dr == _TRUE_) {
+  if (has_idm_dr()) {
     if (idm_dr_lay.idx_delta >= 0)
       y[idm_dr_lay.idx_delta] = 3. / 4. * ctx.delta_g_ic;
     if (idm_dr_lay.idx_theta >= 0)
       y[idm_dr_lay.idx_theta] = ctx.theta_ur;
   }
-  if (mod->GetBackground()->has_idr == _TRUE_) {
+  if (has_idr()) {
     if (idr_lay.idx_delta >= 0)
       y[idr_lay.idx_delta] = ctx.delta_ur;
     if (idr_lay.idx_theta >= 0)
       y[idr_lay.idx_theta] = ctx.theta_ur;
     if (ppt->idr_nature == idr_free_streaming &&
-        ((mod->GetBackground()->has_idm_dr == _FALSE_) ||
+        (!has_idm_dr() ||
          (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
       if (idr_lay.idx_shear >= 0)
         y[idr_lay.idx_shear] = ctx.shear_ur;
@@ -107,16 +107,15 @@ void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
                                             const PerturbationsModule& mod,
                                             enum file_format fmt,
                                             BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_) {
-      w.Add("d_idm_dr", mod.index_tp_delta_idm_dr_, pba->has_idm_dr);
-      w.Add("d_idr", mod.index_tp_delta_idr_, pba->has_idr);
+      w.Add("d_idm_dr", mod.index_tp_delta_idm_dr_, has_idm_dr() ? _TRUE_ : _FALSE_);
+      w.Add("d_idr", mod.index_tp_delta_idr_, has_idr() ? _TRUE_ : _FALSE_);
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_) {
-      w.Add("t_idm_dr", mod.index_tp_theta_idm_dr_, pba->has_idm_dr);
-      w.Add("t_idr", mod.index_tp_theta_idr_, pba->has_idr);
+      w.Add("t_idm_dr", mod.index_tp_theta_idm_dr_, has_idm_dr() ? _TRUE_ : _FALSE_);
+      w.Add("t_idr", mod.index_tp_theta_idr_, has_idr() ? _TRUE_ : _FALSE_);
     }
   }
   else if (fmt == camb_format) {
@@ -130,8 +129,6 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
                                         const double* y,
                                         const PerturbationsModule& mod,
                                         const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-
   double delta_idm_dr = 0., theta_idm_dr = 0.;
   double delta_idr = 0., theta_idr = 0., shear_idr = 0.;
 
@@ -148,18 +145,17 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
     const auto& idm_dr_lay = my_lay.idm_dr;
     const auto& idr_lay    = my_lay.idr;
 
-    if (pba->has_idm_dr == _TRUE_) {
+    if (has_idm_dr()) {
       delta_idm_dr = y[idm_dr_lay.idx_delta];
       theta_idm_dr = y[idm_dr_lay.idx_theta];
     }
 
-    if (pba->has_idr == _TRUE_) {
+    if (has_idr()) {
       if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
         delta_idr = y[idr_lay.idx_delta];
         theta_idr = y[idr_lay.idx_theta];
         if (ppt->idr_nature == idr_free_streaming) {
-          if ((pba->has_idm_dr == _TRUE_) &&
-              (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
+          if (has_idm_dr() && (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
             shear_idr = idr_->TcaShearIdr(idr_lay, y, ppw);
           }
           else {
@@ -176,31 +172,33 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
 
     if (ppt->gauge == synchronous) {
       const double alpha = pvecmetric[ppw->index_mt_alpha];
-      if (pba->has_idm_dr == _TRUE_) {
+      if (has_idm_dr()) {
         delta_idm_dr -= 3. * H * a * alpha;
         theta_idm_dr += k * k * alpha;
       }
-      if (pba->has_idr == _TRUE_) {
+      if (has_idr()) {
         delta_idr -= 4. * H * a * alpha;
         theta_idr += k * k * alpha;
       }
     }
   }
 
-  w.Add("delta_idr", delta_idr, pba->has_idr == _TRUE_);
-  w.Add("theta_idr", theta_idr, pba->has_idr == _TRUE_);
-  if (pba->has_idr == _TRUE_ && mod.GetPerturbs()->idr_nature == idr_free_streaming)
+  w.Add("delta_idr", delta_idr, has_idr());
+  w.Add("theta_idr", theta_idr, has_idr());
+  if (has_idr() && mod.GetPerturbs()->idr_nature == idr_free_streaming)
     w.Add("shear_idr", shear_idr, true);
-  w.Add("delta_idm_dr", delta_idm_dr, pba->has_idm_dr == _TRUE_);
-  w.Add("theta_idm_dr", theta_idm_dr, pba->has_idm_dr == _TRUE_);
+  w.Add("delta_idm_dr", delta_idm_dr, has_idm_dr());
+  w.Add("theta_idm_dr", theta_idm_dr, has_idm_dr());
 }
 
-IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba)
+IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba,
+                                       double omega0_idm_dr,
+                                       double omega0_idr)
     : CompositeSpecies("IDM_DR_IDR", BaseSpecies::EnergyType::Other), pba_(pba) {
-  has_idm_dr_ = pba.has_idm_dr;
-  has_idr_    = pba.has_idr;
-  auto idm    = std::make_unique<IDM_DRSpecies>(pba);
-  auto idr    = std::make_unique<IDRSpecies>(pba);
+  has_idm_dr_ = (omega0_idm_dr != 0.);
+  has_idr_    = (omega0_idr != 0.);
+  auto idm    = std::make_unique<IDM_DRSpecies>(pba, omega0_idm_dr);
+  auto idr    = std::make_unique<IDRSpecies>(pba, omega0_idr, has_idm_dr_);
   idm_dr_     = idm.get();
   idr_        = idr.get();
   children_.push_back(std::move(idm));
@@ -364,7 +362,7 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
 
   if (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
     const thermo* pth    = pth_mod->GetThermodynamics();
-    const double dmu_idr = pth->b_idr / pth->a_idm_dr * pba_.Omega0_idr / pba_.Omega0_idm_dr *
+    const double dmu_idr = pth->b_idr / pth->a_idm_dr * idr().GetOmega0() / idm_dr().GetOmega0() *
                            dmu_idm_dr;
 
     // IDM_DR velocity coupling
@@ -421,8 +419,15 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
 
 std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  if (ctx.pba->has_idm_dr == _TRUE_ || ctx.pba->has_idr == _TRUE_) {
-    result.push_back({"IDM_DR_IDR", std::make_unique<IDM_DR_IDR_Species>(*ctx.pba)});
+  // Read both slots from the resolved coupled-species budget.  Missing budget
+  // (shooting-guess fallback) or both slots absent → composite is absent.
+  if (!ctx.omega_budget)
+    return result;
+  const double omega0_idm_dr = ctx.omega_budget->idm_dr.value_or(0.);
+  const double omega0_idr    = ctx.omega_budget->idr.value_or(0.);
+  if (omega0_idm_dr != 0. || omega0_idr != 0.) {
+    result.push_back(
+        {"IDM_DR_IDR", std::make_unique<IDM_DR_IDR_Species>(*ctx.pba, omega0_idm_dr, omega0_idr)});
   }
   return result;
 }

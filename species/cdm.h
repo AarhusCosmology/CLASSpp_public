@@ -24,7 +24,7 @@ class CDMSpecies : public BaseSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
-  explicit CDMSpecies(const background& pba);
+  explicit CDMSpecies(const background& pba, double omega0_cdm);
 
   double GetOmega0() const override {
     return Omega0_cdm_;

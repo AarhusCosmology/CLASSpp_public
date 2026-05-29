@@ -259,7 +259,10 @@ std::pair<double, double> DNCDMSpecies::DegGuessFromOmegaToday(const SpeciesBuil
   if (Gamma() / ba.H0 > 1.0) {
     // Approximately fully decayed today: compute correction factor.
     const double a_nr         = 3.15 / GetMass();
-    const double k_rad        = std::sqrt(2.0 * ba.H0 * std::sqrt(ba.Omega0_g + ba.Omega0_ur));
+    const double Omega0_ur    = (ctx.all_species && ctx.all_species->count("UR"))
+                                    ? ctx.all_species->at("UR")->GetOmega0()
+                                    : 0.;
+    const double k_rad        = std::sqrt(2.0 * ba.H0 * std::sqrt(ba.Omega0_g + Omega0_ur));
     const double t_nr         = std::pow(a_nr / k_rad, 2.0);
     const double x            = Gamma() * t_nr;
     const double experfcsqrtx = (x < 20.) ? std::exp(x) * std::erfc(std::sqrt(x))

@@ -243,9 +243,9 @@ void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
-      w.Add("d_scf", mod.index_tp_delta_scf_, pba->has_scf);
+      w.Add("d_scf", mod.index_tp_delta_scf_, _TRUE_);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
-      w.Add("t__scf", mod.index_tp_theta_scf_, pba->has_scf);
+      w.Add("t__scf", mod.index_tp_theta_scf_, _TRUE_);
   }
 }
 
@@ -254,10 +254,6 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
                                         const double* y,
                                         const PerturbationsModule& mod,
                                         const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-  if (pba->has_scf != _TRUE_)
-    return;
-
   double delta_scf = 0., theta_scf = 0.;
 
   if (!w.IsTitleMode()) {
@@ -397,8 +393,8 @@ void ScalarFieldSpecies::ComputeShootingGuess(const SpeciesBuildContext& ctx,
                                               std::vector<double>& dxdy) const {
   const background& ba = *ctx.pba;
   if (ba.scf_tuning_index == 0) {
-    guess.push_back(sqrt(3.0 / ba.Omega0_scf));
-    dxdy.push_back(-0.5 * sqrt(3.0) * pow(ba.Omega0_scf, -1.5));
+    guess.push_back(sqrt(3.0 / Omega0_scf_));
+    dxdy.push_back(-0.5 * sqrt(3.0) * pow(Omega0_scf_, -1.5));
   }
   else {
     /* Default: take the passed value as xguess and set dxdy to 1. */
@@ -418,32 +414,60 @@ double ScalarFieldSpecies::ComputeShootingResidual(const ShootingResidualContext
 
 std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  if (ctx.pba->has_scf != _TRUE_)
+
+  // Decide our Omega0_scf and whether shooting may apply.
+  // Three cases:
+  //   (i) Closure-Scf: Pass 2 of ConstructSpecies hands us the closure value via
+  //       omega0_closure_override. Use it; no shooting.
+  //  (ii) Non-closure, user gave Omega_scf > 0 in the input file → use it; shooting
+  //       applies when scf_shooting_parameter is absent.
+  // (iii) Otherwise (no override, Omega_scf absent or negative or zero) → no Scf species.
+  //       (A negative Omega_scf in the input is the user's "scf is closure" signal,
+  //       which is handled separately by ConstructSpecies via the override path.)
+
+  double omega_scf_val   = 0.;
+  bool omega_scf_present = ctx.pfc->read_double("Omega_scf", omega_scf_val);
+
+  double omega0_scf     = 0.;
+  bool shooting_allowed = false;
+
+  if (ctx.omega0_closure_override.has_value()) {
+    omega0_scf = *ctx.omega0_closure_override;
+  }
+  else if (omega_scf_present && omega_scf_val > 0.) {
+    omega0_scf       = omega_scf_val;
+    shooting_allowed = true;
+  }
+  else {
+    return result;
+  }
+
+  if (omega0_scf == 0.)
     return result;
 
-  auto composite = std::make_unique<ScalarFieldSpecies>(*ctx.pba);
+  auto composite = std::make_unique<ScalarFieldSpecies>(*ctx.pba, omega0_scf);
 
-  // Detect guess-driven construction: Omega_scf present (and nonzero) but
+  // Detect guess-driven construction: Omega_scf user-set to >0 but
   // scf_shooting_parameter absent. The nonzero check matches the historic shooting
   // condition (a zero target meant "no shooting").
-  double omega_scf_val        = 0.;
-  double unknown_val          = 0.;
-  bool omega_scf_present      = ctx.pfc->read_double("Omega_scf", omega_scf_val);
-  bool shooting_param_present = ctx.pfc->read_double("scf_shooting_parameter", unknown_val);
+  if (shooting_allowed) {
+    double unknown_val          = 0.;
+    bool shooting_param_present = ctx.pfc->read_double("scf_shooting_parameter", unknown_val);
 
-  if (omega_scf_present && omega_scf_val != 0. && !shooting_param_present) {
-    composite->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
-    composite->needs_shooting_  = true;
+    if (!shooting_param_present) {
+      composite->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
+      composite->needs_shooting_  = true;
 
-    std::vector<double> g, d;
-    composite->ComputeShootingGuess(ctx, g, d);
+      std::vector<double> g, d;
+      composite->ComputeShootingGuess(ctx, g, d);
 
-    // Seed the guess into pba->scf_parameters[scf_tuning_index] so this (discovery) build
-    // is valid. Do NOT write it into the file content: the fc is user-facing state checked
-    // for unread parameters, and DoShooting writes the *resolved* scf_shooting_parameter
-    // back into the fc (which the final build then reads). A guess here would never be read.
-    background* pba                            = const_cast<background*>(ctx.pba);
-    pba->scf_parameters[pba->scf_tuning_index] = g[0];
+      // Seed the guess into pba->scf_parameters[scf_tuning_index] so this (discovery) build
+      // is valid. Do NOT write it into the file content: the fc is user-facing state checked
+      // for unread parameters, and DoShooting writes the *resolved* scf_shooting_parameter
+      // back into the fc (which the final build then reads). A guess here would never be read.
+      background* pba                            = const_cast<background*>(ctx.pba);
+      pba->scf_parameters[pba->scf_tuning_index] = g[0];
+    }
   }
 
   result.push_back({"ScalarField", std::move(composite)});

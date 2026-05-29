@@ -16,7 +16,7 @@ struct background;
  */
 class LambdaSpecies : public BaseSpecies {
  public:
-  explicit LambdaSpecies(const background& pba);
+  explicit LambdaSpecies(const background& pba, double omega0_lambda);
 
   double GetOmega0() const override {
     return Omega0_lambda_;

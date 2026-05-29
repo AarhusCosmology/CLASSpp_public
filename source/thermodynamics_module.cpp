@@ -200,9 +200,13 @@ int ThermodynamicsModule::thermodynamics_at_z(
 
     /* quantities related to DM interacting with DR */
     if (all_species_.count("IDM_DR_IDR") > 0) {
+      const auto& idm_dr_comp = static_cast<const IDM_DR_IDR_Species&>(
+          *all_species_.at("IDM_DR_IDR"));
+      const double Omega0_idm_dr_thermo = idm_dr_comp.idm_dr().GetOmega0();
+      const double Omega0_idr_thermo    = idm_dr_comp.idr().GetOmega0();
       /* calculate dmu_idm_dr and approximate its derivatives as zero */
       pvecthermo[index_th_dmu_idm_dr_]  = pth->a_idm_dr * pow((1. + z) / 1.e7, pth->nindex_idm_dr) *
-                                          pba->Omega0_idm_dr * pow(pba->h, 2);
+                                          Omega0_idm_dr_thermo * pow(pba->h, 2);
       pvecthermo[index_th_ddmu_idm_dr_] = -pvecback[background_module_->index_bg_H_] *
                                           pth->nindex_idm_dr / (1 + z) *
                                           pvecthermo[index_th_dmu_idm_dr_];
@@ -214,7 +218,7 @@ int ThermodynamicsModule::thermodynamics_at_z(
 
       /* calculate dmu_idr (self interaction) */
       pvecthermo[index_th_dmu_idr_] = pth->b_idr * pow((1. + z) / 1.e7, pth->nindex_idm_dr) *
-                                      pba->Omega0_idr * pow(pba->h, 2);
+                                      Omega0_idr_thermo * pow(pba->h, 2);
 
       /* extrapolate optical depth of idm_dr and idr */
       pvecthermo[index_th_tau_idm_dr_] =
@@ -498,17 +502,19 @@ int ThermodynamicsModule::thermodynamics_init() {
         -1. / R * thermodynamics_table_[index_tau * th_size_ + index_th_dkappa_];
 
     if (all_species_.count("IDM_DR_IDR") > 0) {
+      auto& idm_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+      const double Omega0_idm_dr_table = idm_idr.idm_dr().GetOmega0();
+      const double Omega0_idr_table    = idm_idr.idr().GetOmega0();
       /* - --> idr interaction rate with idm_dr (i.e. idr opacity to idm_dr scattering) */
       thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idm_dr_] =
           pth->a_idm_dr * pow((1. + z_table_[index_tau]) / 1.e7, pth->nindex_idm_dr) *
-          pba->Omega0_idm_dr * pow(pba->h, 2);
+          Omega0_idm_dr_table * pow(pba->h, 2);
 
       /* - --> idm_dr interaction rate with idr (i.e. idm_dr opacity
                to idr scattering), [Sinv*dmu_idm_dr] with Sinv = (4
                rho_idr) / (3 rho_idm_dr), stored temporarily in
                ddmu_idm_dr */
       {
-        auto& idm_idr           = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
         const double rho_idr    = idm_idr.idr().Rho(pvecback.data());
         const double rho_idm_dr = idm_idr.idm_dr().Rho(pvecback.data());
         if (rho_idr > 0. && rho_idm_dr > 0.) {
@@ -524,7 +530,7 @@ int ThermodynamicsModule::thermodynamics_init() {
       /* - --> idr self-interaction rate */
       thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idr_] =
           pth->b_idr * pow((1. + z_table_[index_tau]) / 1.e7, pth->nindex_idm_dr) *
-          pba->Omega0_idr * pow(pba->h, 2);
+          Omega0_idr_table * pow(pba->h, 2);
     }
   }
 
@@ -820,6 +826,8 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /* - ---> fill columns for ddmu_idm_dr and dddmu_idm_dr with true values, and compute idm_dr temperature and sound speed */
   if (all_species_.count("IDM_DR_IDR") > 0) {
+    const double Omega0_idr_local =
+        static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).idr().GetOmega0();
     double Gamma_heat_idm_dr, dTdz_idm_dr, T_idm_dr, T_idr, dz, T_adia, z_adia;
     double z;
 
@@ -865,7 +873,7 @@ int ThermodynamicsModule::thermodynamics_init() {
                background_module_->error_message_,
                error_message_);
 
-    Gamma_heat_idm_dr = 2. * pba->Omega0_idr * pow(pba->h, 2) * pth->a_idm_dr *
+    Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                         pow((1. + z), (pth->nindex_idm_dr + 1.)) / pow(1.e7, pth->nindex_idm_dr);
 
     /* (A1) --> if Gamma is not much smaller than H, set T_idm_dr to T_idm_dr = T_idr = xi*T_gamma (tight coupling solution) */
@@ -915,7 +923,7 @@ int ThermodynamicsModule::thermodynamics_init() {
         z                 = z_table_[index_tau];
         T_idr             = pba->T_idr * (1. + z);
         T_idm_dr          = T_idr;
-        Gamma_heat_idm_dr = 2. * pba->Omega0_idr * pow(pba->h, 2) * pth->a_idm_dr *
+        Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                             pow((1. + z), (pth->nindex_idm_dr + 1.)) /
                             pow(1.e7, pth->nindex_idm_dr);
         class_call(background_module_->background_tau_of_z(z, &(tau)),
@@ -941,7 +949,7 @@ int ThermodynamicsModule::thermodynamics_init() {
           z                  = z_table_[index_tau];
           T_idr              = pba->T_idr * (1. + z);
           T_idm_dr          -= dTdz_idm_dr * dz;
-          Gamma_heat_idm_dr  = 2. * pba->Omega0_idr * pow(pba->h, 2) * pth->a_idm_dr *
+          Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                                pow((1. + z), (pth->nindex_idm_dr + 1.)) /
                                pow(1.e7, pth->nindex_idm_dr);
           class_call(background_module_->background_tau_of_z(z, &(tau)),
@@ -981,7 +989,7 @@ int ThermodynamicsModule::thermodynamics_init() {
 
             T_idr              = pba->T_idr * (1. + z);
             T_idm_dr          -= dTdz_idm_dr * dz_sub_step;
-            Gamma_heat_idm_dr  = 2. * pba->Omega0_idr * pow(pba->h, 2) * pth->a_idm_dr *
+            Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                                  pow((1. + z), (pth->nindex_idm_dr + 1.)) /
                                  pow(1.e7, pth->nindex_idm_dr);
             class_call(background_module_->background_tau_of_z(z, &(tau)),
@@ -1010,7 +1018,7 @@ int ThermodynamicsModule::thermodynamics_init() {
         z                 = z_table_[index_tau];
         T_idr             = pba->T_idr * (1. + z);
         T_idm_dr          = T_adia * pow((1. + z) / (1. + z_adia), 2);
-        Gamma_heat_idm_dr = 2. * pba->Omega0_idr * pow(pba->h, 2) * pth->a_idm_dr *
+        Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                             pow((1. + z), (pth->nindex_idm_dr + 1.)) /
                             pow(1.e7, pth->nindex_idm_dr);
         class_call(background_module_->background_tau_of_z(z, &(tau)),
@@ -1855,9 +1863,17 @@ int ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombinatio
              pow(log((preco->annihilation_zmin + 1.) / (preco->annihilation_zmax + 1.)), 2)));
   }
 
-  double rho_cdm_today = pow(pba->H0 * _c_ / _Mpc_over_m_, 2) * 3 / 8. / _PI_ / _G_ *
-                         (pba->Omega0_idm_dr + pba->Omega0_cdm) * _c_ *
-                         _c_; /* energy density in J/m^3 */
+  const double Omega0_idm_dr_ann = all_species_.count("IDM_DR_IDR")
+                                       ? static_cast<const IDM_DR_IDR_Species&>(
+                                             *all_species_.at("IDM_DR_IDR"))
+                                             .idm_dr()
+                                             .GetOmega0()
+                                       : 0.;
+  const double Omega0_cdm_ann    = all_species_.count("CDM") ? all_species_.at("CDM")->GetOmega0()
+                                                             : 0.;
+  double rho_cdm_today           = pow(pba->H0 * _c_ / _Mpc_over_m_, 2) * 3 / 8. / _PI_ / _G_ *
+                                   (Omega0_idm_dr_ann + Omega0_cdm_ann) * _c_ *
+                                   _c_; /* energy density in J/m^3 */
 
   double u_min = (1 + z) / (1 + preco->annihilation_z_halo);
 
@@ -1898,9 +1914,17 @@ int ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco,
       double nH0 = 3. * preco->H0 * preco->H0 * pba->Omega0_b / (8. * _PI_ * _G_ * _m_H_) *
                    (1. - preco->YHe);
 
+      const double Omega0_cdm_inj = all_species_.count("CDM") ? all_species_.at("CDM")->GetOmega0()
+                                                              : 0.;
+      const double Omega0_idm_dr_inj = all_species_.count("IDM_DR_IDR")
+                                           ? static_cast<const IDM_DR_IDR_Species&>(
+                                                 *all_species_.at("IDM_DR_IDR"))
+                                                 .idm_dr()
+                                                 .GetOmega0()
+                                           : 0.;
       /* factor = c sigma_T n_H(0) / (H(0) \sqrt(Omega_m)) (dimensionless) */
       double factor = _sigma_ * nH0 / pba->H0 * _Mpc_over_m_ /
-                      sqrt(pba->Omega0_b + pba->Omega0_cdm + pba->Omega0_idm_dr);
+                      sqrt(pba->Omega0_b + Omega0_cdm_inj + Omega0_idm_dr_inj);
 
       /* integral over z'(=zp) with step dz */
       double dz = 1.;
@@ -3145,13 +3169,29 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
 
   /** - Fill hyrec parameter structure */
 
-  param.T0    = pba->T_cmb;
-  param.obh2  = pba->Omega0_b * pba->h * pba->h;
-  param.omh2  = (pba->Omega0_b + pba->Omega0_cdm + pba->Omega0_idm_dr +
-                 background_module_->GetOmega0NcdmTot()) *
-                pba->h * pba->h;
-  param.okh2  = pba->Omega0_k * pba->h * pba->h;
-  param.odeh2 = (pba->Omega0_lambda + pba->Omega0_fld) * pba->h * pba->h;
+  param.T0   = pba->T_cmb;
+  param.obh2 = pba->Omega0_b * pba->h * pba->h;
+  {
+    const double Omega0_idm_dr_hyrec = all_species_.count("IDM_DR_IDR")
+                                           ? static_cast<const IDM_DR_IDR_Species&>(
+                                                 *all_species_.at("IDM_DR_IDR"))
+                                                 .idm_dr()
+                                                 .GetOmega0()
+                                           : 0.;
+    const double Omega0_cdm_hyrec = all_species_.count("CDM") ? all_species_.at("CDM")->GetOmega0()
+                                                              : 0.;
+    const double Omega0_lambda_hyrec = all_species_.count("Lambda")
+                                           ? all_species_.at("Lambda")->GetOmega0()
+                                           : 0.;
+    const double Omega0_fld_hyrec    = all_species_.count("Fluid")
+                                           ? all_species_.at("Fluid")->GetOmega0()
+                                           : 0.;
+    param.omh2                       = (pba->Omega0_b + Omega0_cdm_hyrec + Omega0_idm_dr_hyrec +
+                                        background_module_->GetOmega0NcdmTot()) *
+                                       pba->h * pba->h;
+    param.okh2                       = pba->Omega0_k * pba->h * pba->h;
+    param.odeh2                      = (Omega0_lambda_hyrec + Omega0_fld_hyrec) * pba->h * pba->h;
+  }
   double w_fld, dw_over_da_fld, integral_fld;
   class_call(background_module_->background_w_fld(pba->a_today,
                                                   &w_fld,

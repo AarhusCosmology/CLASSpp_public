@@ -6,8 +6,8 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-CDMSpecies::CDMSpecies(const background& pba)
-    : BaseSpecies("CDM", EnergyType::Matter), Omega0_cdm_(pba.Omega0_cdm), H0_(pba.H0) {}
+CDMSpecies::CDMSpecies(const background& pba, double omega0_cdm)
+    : BaseSpecies("CDM", EnergyType::Matter), Omega0_cdm_(omega0_cdm), H0_(pba.H0) {}
 
 void CDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_cdm_, _TRUE_, index_bg, 1);
@@ -194,15 +194,13 @@ void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
-      w.Add("d_cdm", mod.index_tp_delta_cdm_, pba->has_cdm);
+      w.Add("d_cdm", mod.index_tp_delta_cdm_, _TRUE_);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
-      w.Add("t_cdm",
-            mod.index_tp_theta_cdm_,
-            (pba->has_cdm == _TRUE_) && (ppt->gauge != synchronous));
+      w.Add("t_cdm", mod.index_tp_theta_cdm_, (ppt->gauge != synchronous));
   }
   else if (fmt == camb_format) {
     if (section != TransferColumnSection::velocity)
-      w.Add("-T_cdm/k2", mod.index_tp_delta_cdm_, pba->has_cdm);
+      w.Add("-T_cdm/k2", mod.index_tp_delta_cdm_, _TRUE_);
   }
 }
 
@@ -211,10 +209,6 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
                                 const double* y,
                                 const PerturbationsModule& mod,
                                 const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-  if (pba->has_cdm != _TRUE_)
-    return;
-
   double delta_cdm = 0., theta_cdm = 0.;
 
   if (!w.IsTitleMode()) {
@@ -276,8 +270,15 @@ void CDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout&
 
 std::vector<Named> CDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  if (ctx.pba->has_cdm == _TRUE_) {
-    result.push_back({"CDM", std::make_unique<CDMSpecies>(*ctx.pba)});
-  }
+  // CDM's Omega0 is the resolved cdm slot of the coupled-species budget
+  // (parser block in InputModule::ReadCoupledOmegaBudget applied the user's
+  // Omega_cdm / omega_cdm, then any f_idm_dr / f_idm_drmd subtractions, then
+  // the synchronous-gauge minimum). Absent slot → CDM absent.
+  if (!ctx.omega_budget || !ctx.omega_budget->cdm.has_value())
+    return result;
+  const double omega0 = *ctx.omega_budget->cdm;
+  if (omega0 == 0.0)
+    return result;
+  result.push_back({"CDM", std::make_unique<CDMSpecies>(*ctx.pba, omega0)});
   return result;
 }

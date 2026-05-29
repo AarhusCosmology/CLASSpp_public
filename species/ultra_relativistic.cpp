@@ -1,13 +1,17 @@
 #include "ultra_relativistic.h"
 
+#include <cmath>
+#include <stdexcept>
+
 #include "background.h"
 #include "background_column_writer.h"
 #include "background_module.h"
+#include "parser.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-UltraRelativisticSpecies::UltraRelativisticSpecies(const background& pba)
-    : BaseSpecies("UR", EnergyType::Radiation), Omega0_ur_(pba.Omega0_ur), H0_(pba.H0) {}
+UltraRelativisticSpecies::UltraRelativisticSpecies(const background& pba, double omega0_ur)
+    : BaseSpecies("UR", EnergyType::Radiation), Omega0_ur_(omega0_ur), H0_(pba.H0) {}
 
 // ── Background ────────────────────────────────────────────────────────────────
 
@@ -335,13 +339,13 @@ void UltraRelativisticSpecies::WriteOutputColumns(
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
-      w.Add("d_ur", mod.index_tp_delta_ur_, pba->has_ur);
+      w.Add("d_ur", mod.index_tp_delta_ur_, _TRUE_);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
-      w.Add("t_ur", mod.index_tp_theta_ur_, pba->has_ur);
+      w.Add("t_ur", mod.index_tp_theta_ur_, _TRUE_);
   }
   else if (fmt == camb_format) {
     if (section != TransferColumnSection::velocity)
-      w.Add("-T_ur/k2", mod.index_tp_delta_ur_, pba->has_ur);
+      w.Add("-T_ur/k2", mod.index_tp_delta_ur_, _TRUE_);
   }
 }
 
@@ -350,10 +354,6 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
                                               const double* y,
                                               const PerturbationsModule& mod,
                                               const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-  if (pba->has_ur != _TRUE_)
-    return;
-
   double delta_ur = 0., theta_ur = 0., shear_ur = 0.;
 
   if (!w.IsTitleMode()) {
@@ -394,8 +394,67 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
 
 std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  if (ctx.pba->has_ur == _TRUE_) {
-    result.push_back({"UR", std::make_unique<UltraRelativisticSpecies>(*ctx.pba)});
+
+  // Read the UR density from the input file, supporting four equivalent forms:
+  //   N_ur   (or deprecated N_eff) — effective neutrino number (massless)
+  //   Omega_ur                     — physical density parameter
+  //   omega_ur                     — reduced density (omega = Omega * h^2)
+  // At most one of the three forms may be specified; if none is given, the
+  // standard default N_ur = 3.046 is used.
+
+  // (a) Try to read N_ur (and deprecated N_eff alias).
+  double n_ur    = 0.;
+  double n_eff   = 0.;
+  bool flag_nur  = ctx.pfc->read_double("N_ur", n_ur);
+  bool flag_neff = ctx.pfc->read_double("N_eff", n_eff);
+
+  // N_eff is a deprecated synonym for N_ur — only one may be present.
+  if (flag_nur && flag_neff)
+    throw std::invalid_argument(
+        "In input file, you can only enter one of N_eff (deprecated syntax) or N_ur "
+        "(up-to-date syntax), since they both describe the same, i.e. the contribution "
+        "of ultra-relativistic species to the effective neutrino number");
+  // Normalise: treat N_eff as N_ur going forward.
+  if (flag_neff) {
+    n_ur      = n_eff;
+    flag_nur  = true;
+    flag_neff = false;
   }
+
+  // (b) Try to read Omega_ur and omega_ur.
+  double omega_ur_big   = 0.;  // Omega_ur
+  double omega_ur_small = 0.;  // omega_ur (= Omega_ur * h^2)
+  bool flag_Omega       = ctx.pfc->read_double("Omega_ur", omega_ur_big);
+  bool flag_omega       = ctx.pfc->read_double("omega_ur", omega_ur_small);
+
+  // At most one of the three forms may be specified.
+  const int n_specified = (flag_nur ? 1 : 0) + (flag_Omega ? 1 : 0) + (flag_omega ? 1 : 0);
+  if (n_specified >= 2)
+    throw std::invalid_argument(
+        "In input file, you can only enter one of N_ur (or deprecated N_eff), Omega_ur, or "
+        "omega_ur, choose one");
+
+  // (c) Compute Omega0_ur from whichever form was provided.
+  double omega0_ur      = 0.;
+  const double omega0_g = ctx.pba->Omega0_g;
+
+  if (n_specified == 0) {
+    // Default: standard 3.046 massless neutrinos.
+    omega0_ur = 3.046 * 7. / 8. * pow(4. / 11., 4. / 3.) * omega0_g;
+  }
+  else if (flag_nur) {
+    omega0_ur = n_ur * 7. / 8. * pow(4. / 11., 4. / 3.) * omega0_g;
+  }
+  else if (flag_Omega) {
+    omega0_ur = omega_ur_big;
+  }
+  else {
+    omega0_ur = omega_ur_small / ctx.pba->h / ctx.pba->h;
+  }
+
+  if (omega0_ur == 0.)
+    return result;
+
+  result.push_back({"UR", std::make_unique<UltraRelativisticSpecies>(*ctx.pba, omega0_ur)});
   return result;
 }

@@ -12,11 +12,11 @@ class BackgroundModule;
  */
 class ScalarFieldSpecies : public BaseSpecies {
  public:
-  explicit ScalarFieldSpecies(const background& pba)
-      : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba) {}
+  ScalarFieldSpecies(const background& pba, double omega0_scf)
+      : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba), Omega0_scf_(omega0_scf) {}
 
   double GetOmega0() const override {
-    return pba_.Omega0_scf;
+    return Omega0_scf_;
   }
 
   // ── Background ──────────────────────────────────────────────────────────
@@ -209,4 +209,5 @@ class ScalarFieldSpecies : public BaseSpecies {
   int index_bg_p_prime_scf_    = -1;
   int index_bi_phi_scf_        = -1;
   int index_bi_phi_prime_scf_  = -1;
+  double Omega0_scf_           = 0.;
 };

@@ -17,7 +17,7 @@ struct background;
  */
 class UltraRelativisticSpecies : public BaseSpecies {
  public:
-  explicit UltraRelativisticSpecies(const background& pba);
+  UltraRelativisticSpecies(const background& pba, double omega0_ur);
 
   double GetOmega0() const override {
     return Omega0_ur_;

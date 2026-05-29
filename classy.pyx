@@ -770,7 +770,8 @@ cdef class PyCosmology:
         return 100.*deref(thm).rd_rec_/deref(thm).ra_rec_
 
     cpdef Omega_Lambda(self):
-        return self.ba.Omega0_lambda
+        bam = deref(self._thisptr).GetBackgroundModule()
+        return deref(bam).GetOmega0Species(b"Lambda")
 
     cpdef Omega_g(self):
         return self.ba.Omega0_g
@@ -1451,9 +1452,11 @@ cdef class PyCosmology:
             elif name == 'H0':
                 value = self.ba.h*100
             elif name == 'Omega0_lambda' or name == 'Omega_Lambda':
-                value = self.ba.Omega0_lambda
+                bam_l = deref(self._thisptr).GetBackgroundModule()
+                value = deref(bam_l).GetOmega0Species(b"Lambda")
             elif name == 'Omega0_fld':
-                value = self.ba.Omega0_fld
+                bam_f = deref(self._thisptr).GetBackgroundModule()
+                value = deref(bam_f).GetOmega0Species(b"Fluid")
             elif name == 'age':
                 value = self.age()
             elif name == 'conformal_age':
@@ -1477,9 +1480,11 @@ cdef class PyCosmology:
             elif name == 'xi_idr':
                 value = self.ba.T_idr/self.ba.T_cmb
             elif name == 'N_dg':
-                value = self.ba.Omega0_idr/self.ba.Omega0_g*8./7.*pow(11./4.,4./3.)
+                bam_idr = deref(self._thisptr).GetBackgroundModule()
+                value = deref(bam_idr).GetOmega0Species(b"IDR")/self.ba.Omega0_g*8./7.*pow(11./4.,4./3.)
             elif name == 'Gamma_0_nadm':
-                value = self.th.a_idm_dr*(4./3.)*(self.ba.h*self.ba.h*self.ba.Omega0_idr)
+                bam_idr2 = deref(self._thisptr).GetBackgroundModule()
+                value = self.th.a_idm_dr*(4./3.)*(self.ba.h*self.ba.h*deref(bam_idr2).GetOmega0Species(b"IDR"))
             elif name == 'a_dark':
                 value = self.th.a_idm_dr
             elif name == 'tau_reio':
@@ -1774,4 +1779,5 @@ cdef class PyCosmology:
         return self.ba.Omega0_k
 
     cpdef Omega0_cdm(self):
-        return self.ba.Omega0_cdm
+        bam = deref(self._thisptr).GetBackgroundModule()
+        return deref(bam).GetOmega0Species(b"CDM")

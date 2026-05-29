@@ -133,8 +133,7 @@ void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   /* Full hierarchy: only register shear/l3 if idr_nature == idr_free_streaming
      AND (no IDM_DR OR TCA is off) */
   if (ppw->scalar_ctx.idr_nature == idr_free_streaming) {
-    if (pba_.has_idm_dr == _FALSE_ ||
-        ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
+    if (!has_sibling_idm_dr_ || ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
       layout.idx_shear = index_pt;
       ++index_pt;
 
@@ -330,7 +329,7 @@ double IDRSpecies::TcaShearIdr(const PerturbLayout& layout,
     return 0.;
   if (ppw->approx[ppw->index_ap_rsa_idr] != (int) rsa_idr_off)
     return 0.;
-  if (pba_.has_idm_dr != _TRUE_)
+  if (!has_sibling_idm_dr_)
     return 0.;
   if (ppt_->gauge != newtonian)
     return 0.;  // synchronous gauge derives shear in perturb_einstein

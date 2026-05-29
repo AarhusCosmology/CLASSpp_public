@@ -11,8 +11,13 @@ class ThermodynamicsModule;  // forward declaration
  */
 class IDRSpecies : public BaseSpecies {
  public:
-  explicit IDRSpecies(const background& pba)
-      : BaseSpecies("IDR", EnergyType::Radiation), pba_(pba) {}
+  IDRSpecies(const background& pba, double omega0_idr, bool has_sibling_idm_dr = false)
+      : BaseSpecies("IDR", EnergyType::Radiation), pba_(pba), Omega0_idr_(omega0_idr),
+        has_sibling_idm_dr_(has_sibling_idm_dr) {}
+
+  bool has_sibling_idm_dr() const {
+    return has_sibling_idm_dr_;
+  }
 
   void SetThermodynamicsModule(const ThermodynamicsModule* thm) override {
     thm_ = thm;
@@ -22,7 +27,7 @@ class IDRSpecies : public BaseSpecies {
   }
 
   double GetOmega0() const override {
-    return pba_.Omega0_idr;
+    return Omega0_idr_;
   }
 
   bool IsFreestreaming() const override {
@@ -34,7 +39,7 @@ class IDRSpecies : public BaseSpecies {
   }
 
   void ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) override {
-    pvecback[index_bg_rho_] = pba_.Omega0_idr * pba_.H0 * pba_.H0 / (a_rel * a_rel * a_rel * a_rel);
+    pvecback[index_bg_rho_] = Omega0_idr_ * pba_.H0 * pba_.H0 / (a_rel * a_rel * a_rel * a_rel);
   }
 
   double Rho(const double* pvecback) const override {
@@ -198,6 +203,8 @@ class IDRSpecies : public BaseSpecies {
 
  private:
   const background& pba_;
+  double Omega0_idr_;
+  bool has_sibling_idm_dr_;
   const ThermodynamicsModule* thm_ = nullptr;
   const perturbs* ppt_             = nullptr;
 };

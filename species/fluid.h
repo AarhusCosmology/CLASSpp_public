@@ -29,10 +29,10 @@ class FluidSpecies : public BaseSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
-  explicit FluidSpecies(const background& pba);
+  FluidSpecies(const background& pba, double omega0_fld);
 
   double GetOmega0() const override {
-    return pba_.Omega0_fld;
+    return Omega0_fld_;
   }
 
   // ── Background ─────────────────────────────────────────────────────────────
@@ -209,6 +209,7 @@ class FluidSpecies : public BaseSpecies {
  private:
   const background& pba_;
   const BackgroundModule* bgm_ = nullptr;
+  double Omega0_fld_;
 
   int index_bg_rho_fld_        = -1;
   int index_bg_w_fld_          = -1;

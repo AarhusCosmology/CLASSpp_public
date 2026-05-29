@@ -8,11 +8,11 @@
  */
 class IDM_DRMDSpecies : public BaseSpecies {
  public:
-  explicit IDM_DRMDSpecies(const background& pba)
-      : BaseSpecies("IDM_DRMD", EnergyType::Matter), pba_(pba) {}
+  IDM_DRMDSpecies(const background& pba, double omega0_idm_drmd)
+      : BaseSpecies("IDM_DRMD", EnergyType::Matter), pba_(pba), Omega0_idm_drmd_(omega0_idm_drmd) {}
 
   double GetOmega0() const override {
-    return pba_.Omega0_idm_drmd;
+    return Omega0_idm_drmd_;
   }
 
   void RegisterBackgroundIndices(int& index_bg) override {
@@ -20,7 +20,7 @@ class IDM_DRMDSpecies : public BaseSpecies {
   }
 
   void ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) override {
-    pvecback[index_bg_rho_] = pba_.Omega0_idm_drmd * pba_.H0 * pba_.H0 / (a_rel * a_rel * a_rel);
+    pvecback[index_bg_rho_] = Omega0_idm_drmd_ * pba_.H0 * pba_.H0 / (a_rel * a_rel * a_rel);
   }
 
   double Rho(const double* pvecback) const override {
@@ -135,4 +135,5 @@ class IDM_DRMDSpecies : public BaseSpecies {
 
  private:
   const background& pba_;
+  double Omega0_idm_drmd_;
 };

@@ -5,8 +5,8 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-DCDMSpecies::DCDMSpecies(const background& pba)
-    : BaseSpecies("DCDM", EnergyType::Matter), pba_(pba) {}
+DCDMSpecies::DCDMSpecies(const background& pba, double omega0_dcdmdr)
+    : BaseSpecies("DCDM", EnergyType::Matter), pba_(pba), Omega0_dcdmdr_(omega0_dcdmdr) {}
 
 void DCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_dcdm_, _TRUE_, index_bg, 1);
@@ -176,9 +176,9 @@ void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
-      w.Add("d_dcdm", mod.index_tp_delta_dcdm_, pba->has_dcdm);
+      w.Add("d_dcdm", mod.index_tp_delta_dcdm_, _TRUE_);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
-      w.Add("t_dcdm", mod.index_tp_theta_dcdm_, pba->has_dcdm);
+      w.Add("t_dcdm", mod.index_tp_theta_dcdm_, _TRUE_);
   }
 }
 
@@ -187,10 +187,6 @@ void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
                                  const double* y,
                                  const PerturbationsModule& mod,
                                  const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-  if (pba->has_dcdm != _TRUE_)
-    return;
-
   double delta_dcdm = 0., theta_dcdm = 0.;
 
   if (!w.IsTitleMode()) {

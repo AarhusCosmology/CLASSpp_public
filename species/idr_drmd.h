@@ -8,11 +8,12 @@
  */
 class IDR_DRMDSpecies : public BaseSpecies {
  public:
-  explicit IDR_DRMDSpecies(const background& pba)
-      : BaseSpecies("IDR_DRMD", EnergyType::Radiation), pba_(pba) {}
+  IDR_DRMDSpecies(const background& pba, double omega0_idr_drmd)
+      : BaseSpecies("IDR_DRMD", EnergyType::Radiation), pba_(pba),
+        Omega0_idr_drmd_(omega0_idr_drmd) {}
 
   double GetOmega0() const override {
-    return pba_.Omega0_idr_drmd;
+    return Omega0_idr_drmd_;
   }
 
   bool IsFreestreaming() const override {
@@ -24,7 +25,7 @@ class IDR_DRMDSpecies : public BaseSpecies {
   }
 
   void ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) override {
-    pvecback[index_bg_rho_] = pba_.Omega0_idr_drmd * pba_.H0 * pba_.H0 /
+    pvecback[index_bg_rho_] = Omega0_idr_drmd_ * pba_.H0 * pba_.H0 /
                               (a_rel * a_rel * a_rel * a_rel);
   }
 
@@ -146,4 +147,5 @@ class IDR_DRMDSpecies : public BaseSpecies {
 
  private:
   const background& pba_;
+  double Omega0_idr_drmd_;
 };

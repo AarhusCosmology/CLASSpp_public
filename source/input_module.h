@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "../species/base_species.h"
+#include "../species/species_build_context.h"
 #include "../species/species_collection.h"
 #include "background.h"
 #include "common.h"
@@ -45,6 +46,10 @@ class InputModule {
   output output_;
   /** All cosmological species, constructed at end of InputModule ctor. */
   SpeciesCollection all_species_;
+  /** Pre-resolved Omega budget for coupled species (CDM, IDM_DR/IDR,
+   *  IDM_DRMD/IDR_DRMD, DCDM_DR). Populated by ReadCoupledOmegaBudget during
+   *  input_read_parameters and passed to ConstructSpecies via SpeciesBuildContext. */
+  SpeciesOmegaBudget omega_budget_;
   ErrorMsg error_message_;
 
  private:
@@ -63,6 +68,14 @@ class InputModule {
       double* x, int x_size, void* pworkspace, double* output, ErrorMsg error_message);
 
   void ConstructSpecies();
+
+  /** Parse the coupled-species cluster (CDM, IDM_DR/IDR, IDM_DRMD/IDR_DRMD,
+   *  DCDM_DR) into omega_budget_. Resolves f_idm_dr/f_idm_drmd CDM subtractions,
+   *  IDR derivation from T_idr*Omega0_g, and the synchronous-gauge CDM minimum.
+   *  Writes T_idr / Omega_ini_dcdm / Gamma_dcdm / f_idm_drmd / delta_Neff_drmd /
+   *  z_stop / G_over_aH_drmd to pba (those are physics params, not Omega0).
+   *  Called from input_read_parameters. */
+  int ReadCoupledOmegaBudget();
 
   int input_init();
   int input_read_parameters();

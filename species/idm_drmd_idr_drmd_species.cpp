@@ -28,19 +28,19 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(double* y, const PerturbI
   const auto& idm_drm_lay = my_lay.idm_drmd;
   const auto& idr_drm_lay = my_lay.idr_drmd;
 
-  if (pba_.has_idr_drmd == _TRUE_) {
+  if (has_idr_drmd()) {
     if (idr_drm_lay.idx_delta >= 0)
       y[idr_drm_lay.idx_delta] = ctx.delta_g_ic;
     if (idr_drm_lay.idx_theta >= 0)
       y[idr_drm_lay.idx_theta] = ctx.theta_g_ic;
   }
 
-  if (pba_.has_idm_drmd == _TRUE_) {
+  if (has_idm_drmd()) {
     if (idm_drm_lay.idx_delta >= 0)
       y[idm_drm_lay.idx_delta] = 3. / 4. * ctx.delta_g_ic;
 
     if (idm_drm_lay.idx_theta >= 0) {
-      if (pba_.has_idr_drmd == _TRUE_) {
+      if (has_idr_drmd()) {
         if (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_on) {
           y[idm_drm_lay.idx_theta] = (idr_drm_lay.idx_theta >= 0) ? y[idr_drm_lay.idx_theta] : 0.;
         }
@@ -116,16 +116,15 @@ void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(
     const PerturbationsModule& mod,
     enum file_format fmt,
     BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_) {
-      w.Add("d_idm_drmd", mod.index_tp_delta_idm_drmd_, pba->has_idm_drmd);
-      w.Add("d_idr_drmd", mod.index_tp_delta_idr_drmd_, pba->has_idr_drmd);
+      w.Add("d_idm_drmd", mod.index_tp_delta_idm_drmd_, has_idm_drmd());
+      w.Add("d_idr_drmd", mod.index_tp_delta_idr_drmd_, has_idr_drmd());
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_) {
-      w.Add("t_idm_drmd", mod.index_tp_theta_idm_drmd_, pba->has_idm_drmd);
-      w.Add("t_idr_drmd", mod.index_tp_theta_idr_drmd_, pba->has_idr_drmd);
+      w.Add("t_idm_drmd", mod.index_tp_theta_idm_drmd_, has_idm_drmd());
+      w.Add("t_idr_drmd", mod.index_tp_theta_idr_drmd_, has_idr_drmd());
     }
   }
 }
@@ -135,8 +134,6 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
                                                const double* y,
                                                const PerturbationsModule& mod,
                                                const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-
   double delta_idm_drmd = 0., theta_idm_drmd = 0.;
   double delta_idr_drmd = 0., theta_idr_drmd = 0.;
 
@@ -154,40 +151,42 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
     const auto& idm_drm_pr_lay = my_pr_lay.idm_drmd;
     const auto& idr_drm_pr_lay = my_pr_lay.idr_drmd;
 
-    if (pba->has_idm_drmd == _TRUE_) {
+    if (has_idm_drmd()) {
       delta_idm_drmd = y[idm_drm_pr_lay.idx_delta];
       theta_idm_drmd = y[idm_drm_pr_lay.idx_theta];
     }
-    if (pba->has_idr_drmd == _TRUE_) {
+    if (has_idr_drmd()) {
       delta_idr_drmd = y[idr_drm_pr_lay.idx_delta];
       theta_idr_drmd = y[idr_drm_pr_lay.idx_theta];
     }
 
     if (ppt->gauge == synchronous) {
       const double alpha = pvecmetric[ppw->index_mt_alpha];
-      if (pba->has_idm_drmd == _TRUE_) {
+      if (has_idm_drmd()) {
         delta_idm_drmd -= 3. * H * a * alpha;
         theta_idm_drmd += k * k * alpha;
       }
-      if (pba->has_idr_drmd == _TRUE_) {
+      if (has_idr_drmd()) {
         delta_idr_drmd -= 4. * H * a * alpha;
         theta_idr_drmd += k * k * alpha;
       }
     }
   }
 
-  w.Add("delta_idr_drmd", delta_idr_drmd, pba->has_idr_drmd == _TRUE_);
-  w.Add("theta_idr_drmd", theta_idr_drmd, pba->has_idr_drmd == _TRUE_);
-  w.Add("delta_idm_drmd", delta_idm_drmd, pba->has_idm_drmd == _TRUE_);
-  w.Add("theta_idm_drmd", theta_idm_drmd, pba->has_idm_drmd == _TRUE_);
+  w.Add("delta_idr_drmd", delta_idr_drmd, has_idr_drmd());
+  w.Add("theta_idr_drmd", theta_idr_drmd, has_idr_drmd());
+  w.Add("delta_idm_drmd", delta_idm_drmd, has_idm_drmd());
+  w.Add("theta_idm_drmd", theta_idm_drmd, has_idm_drmd());
 }
 
-IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba)
+IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba,
+                                                     double omega0_idm_drmd,
+                                                     double omega0_idr_drmd)
     : CompositeSpecies("IDM_DRMD_IDR_DRMD", BaseSpecies::EnergyType::Other), pba_(pba) {
-  has_idm_drmd_ = pba.has_idm_drmd;
-  has_idr_drmd_ = pba.has_idr_drmd;
-  auto idm      = std::make_unique<IDM_DRMDSpecies>(pba);
-  auto idr      = std::make_unique<IDR_DRMDSpecies>(pba);
+  has_idm_drmd_ = (omega0_idm_drmd != 0.);
+  has_idr_drmd_ = (omega0_idr_drmd != 0.);
+  auto idm      = std::make_unique<IDM_DRMDSpecies>(pba, omega0_idm_drmd);
+  auto idr      = std::make_unique<IDR_DRMDSpecies>(pba, omega0_idr_drmd);
   idm_drmd_     = idm.get();
   idr_drmd_     = idr.get();
   children_.push_back(std::move(idm));
@@ -374,8 +373,16 @@ void IDM_DRMD_IDR_DRMD_Species::CopyPerturbationsAcrossSwitch(
 
 std::vector<Named> IDM_DRMD_IDR_DRMD_Species::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  if (ctx.pba->has_idm_drmd == _TRUE_ || ctx.pba->has_idr_drmd == _TRUE_) {
-    result.push_back({"IDM_DRMD_IDR_DRMD", std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*ctx.pba)});
+  // Read both slots from the resolved coupled-species budget.  Missing budget
+  // (shooting-guess fallback) or both slots absent → composite is absent.
+  if (!ctx.omega_budget)
+    return result;
+  const double omega0_idm_drmd = ctx.omega_budget->idm_drmd.value_or(0.);
+  const double omega0_idr_drmd = ctx.omega_budget->idr_drmd.value_or(0.);
+  if (omega0_idm_drmd != 0. || omega0_idr_drmd != 0.) {
+    result.push_back(
+        {"IDM_DRMD_IDR_DRMD",
+         std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*ctx.pba, omega0_idm_drmd, omega0_idr_drmd)});
   }
   return result;
 }

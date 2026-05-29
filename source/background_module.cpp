@@ -116,6 +116,33 @@ BackgroundModule::~BackgroundModule() {
   background_free();
 }
 
+double BackgroundModule::GetOmega0Species(const std::string& key) const {
+  // Top-level species first.
+  if (auto* ptr = all_species_.find(key))
+    return (*ptr)->GetOmega0();
+  // Sub-species of composites: IDR / IDM_DR live in IDM_DR_IDR, etc.
+  if (auto* ptr = all_species_.find("IDM_DR_IDR")) {
+    const auto& comp = static_cast<const IDM_DR_IDR_Species&>(**ptr);
+    if (key == "IDR")
+      return comp.idr().GetOmega0();
+    if (key == "IDM_DR")
+      return comp.idm_dr().GetOmega0();
+  }
+  if (auto* ptr = all_species_.find("IDM_DRMD_IDR_DRMD")) {
+    const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**ptr);
+    if (key == "IDR_DRMD")
+      return comp.idr_drmd().GetOmega0();
+    if (key == "IDM_DRMD")
+      return comp.idm_drmd().GetOmega0();
+  }
+  if (auto* ptr = all_species_.find("DCDM_DR")) {
+    const auto& comp = static_cast<const DCDM_DR_Species&>(**ptr);
+    if (key == "DCDM")
+      return comp.dcdm().GetOmega0();
+  }
+  return 0.;
+}
+
 // Wrapper functions to pass non-static member functions
 int BackgroundModule::background_derivs(
     double z, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
@@ -503,9 +530,16 @@ int BackgroundModule::background_init() {
     printf("Computing background\n");
 
     /* below we want to inform the user about ncdm species and/or the total N_eff */
-    if (!GetNcdmSpecies(all_species_).empty() || (pba->Omega0_idr != 0.)) {
+    const double Omega0_idr = all_species_.count("IDM_DR_IDR")
+                                  ? static_cast<const IDM_DR_IDR_Species&>(
+                                        *all_species_.at("IDM_DR_IDR"))
+                                        .idr()
+                                        .GetOmega0()
+                                  : 0.;
+    const double Omega0_ur  = all_species_.count("UR") ? all_species_.at("UR")->GetOmega0() : 0.;
+    if (!GetNcdmSpecies(all_species_).empty() || (Omega0_idr != 0.)) {
       /* contribution of ultra-relativistic species _ur to N_eff */
-      double Neff = pba->Omega0_ur / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
+      double Neff = Omega0_ur / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
 
       /* contribution of ncdm species to N_eff*/
       if (!GetNcdmSpecies(all_species_).empty()) {
@@ -516,8 +550,8 @@ int BackgroundModule::background_init() {
       }
 
       /* contribution of interacting dark radiation _idr to N_eff */
-      if (pba->Omega0_idr != 0.) {
-        double N_dark  = pba->Omega0_idr / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
+      if (Omega0_idr != 0.) {
+        double N_dark  = Omega0_idr / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
         Neff          += N_dark;
         printf(" -> dark radiation Delta Neff %e\n", N_dark);
       }
@@ -1117,23 +1151,24 @@ int BackgroundModule::background_solve() {
   if (pba->background_verbose > 2) {
     printf(" -> Neff_ = %f\n", Neff_);
     if (all_species_.count("DCDM_DR")) {
+      const auto& dcdm_dr_comp = static_cast<const DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
       printf("    Decaying Cold Dark Matter details: (DCDM --> DR)\n");
       printf("     -> Omega0_dcdm = %f\n", Omega0_dcdm_);
       printf("     -> Omega0_dr = %f\n", Omega0_dr_);
       printf("     -> Omega0_dr+Omega0_dcdm = %f, input value = %f\n",
              Omega0_dr_ + Omega0_dcdm_,
-             pba->Omega0_dcdmdr);
+             dcdm_dr_comp.dcdm().GetOmega0());
       printf("     -> Omega_ini_dcdm/Omega_b = %f\n", pba->Omega_ini_dcdm / pba->Omega0_b);
     }
     if (all_species_.count("ScalarField")) {
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
              all_species_.at("ScalarField")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-             pba->Omega0_scf);
+             all_species_.at("ScalarField")->GetOmega0());
       if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
                all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-               pba->Omega0_lambda);
+               all_species_.at("Lambda")->GetOmega0());
       printf("     -> parameters: [lambda, alpha, A, B] = \n");
       printf("                    [");
       for (size_t i = 0; i < pba->scf_parameters.size() - 1; i++) {
@@ -1309,12 +1344,13 @@ int BackgroundModule::background_solve_evolver() {
 
   if (pba->background_verbose > 2) {
     if (all_species_.count("DCDM_DR")) {
+      const auto& dcdm_dr_comp2 = static_cast<const DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
       printf("    Decaying Cold Dark Matter details: (DCDM --> DR)\n");
       printf("     -> Omega0_dcdm = %f\n", Omega0_dcdm_);
       printf("     -> Omega0_dr = %f\n", Omega0_dr_);
       printf("     -> Omega0_dr+Omega0_dcdm = %f, input value = %f\n",
              Omega0_dr_ + Omega0_dcdm_,
-             pba->Omega0_dcdmdr);
+             dcdm_dr_comp2.dcdm().GetOmega0());
       printf("     -> Omega_ini_dcdm/Omega_b = %f\n", pba->Omega_ini_dcdm / pba->Omega0_b);
     }
     if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
@@ -1336,11 +1372,11 @@ int BackgroundModule::background_solve_evolver() {
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
              all_species_.at("ScalarField")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-             pba->Omega0_scf);
+             all_species_.at("ScalarField")->GetOmega0());
       if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
                all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-               pba->Omega0_lambda);
+               all_species_.at("Lambda")->GetOmega0());
       printf("     -> parameters: [lambda, alpha, A, B] = \n");
       printf("                    [");
       for (int i = 0; i < pba->scf_parameters.size() - 1; i++) {
@@ -1392,11 +1428,16 @@ int BackgroundModule::background_initial_conditions(
   /* Set initial values of {B} variables: */
   double Omega_rad = pba->Omega0_g;
   if (all_species_.count("UR"))
-    Omega_rad += pba->Omega0_ur;
-  if (all_species_.count("IDM_DR_IDR"))
-    Omega_rad += pba->Omega0_idr;
-  if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-    Omega_rad += pba->Omega0_idr_drmd;
+    Omega_rad += all_species_.at("UR")->GetOmega0();
+  if (all_species_.count("IDM_DR_IDR")) {
+    const auto& comp  = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+    Omega_rad        += comp.idr().GetOmega0();
+  }
+  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(
+        *all_species_.at("IDM_DRMD_IDR_DRMD"));
+    Omega_rad += comp.idr_drmd().GetOmega0();
+  }
   double rho_rad = Omega_rad * pow(pba->H0, 2) / pow(a / pba->a_today, 4);
   if (!GetNcdmSpecies(all_species_).empty()) {
     /** - We must add the relativistic contribution from NCDM species */
@@ -1410,7 +1451,7 @@ int BackgroundModule::background_initial_conditions(
 
   if (all_species_.count("Fluid")) {
     /* rho_fld today */
-    double rho_fld_today = pba->Omega0_fld * pow(pba->H0, 2);
+    double rho_fld_today = all_species_.at("Fluid")->GetOmega0() * pow(pba->H0, 2);
 
     /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0) */
     double w_fld, dw_over_da_fld, integral_fld;
@@ -1862,65 +1903,58 @@ double BackgroundModule::ddV_scf(double phi) const {
  */
 
 int BackgroundModule::background_output_budget() {
-  //The name for the _class_print_species_ macro can be at most 30 characters total
   if (pba->background_verbose > 1) {
     double budget_matter    = 0;
     double budget_radiation = 0;
     double budget_other     = 0;
     double budget_neutrino  = 0;
 
+    // Helper: print one species line and accumulate into a budget bucket.
+    auto print_one = [&](const char* label, double omega, double& budget) {
+      printf("-> %-30s Omega = %-15g , omega = %-15g\n", label, omega, omega * pba->h * pba->h);
+      budget += omega;
+    };
+
     printf(" ---------------------------- Budget equation ----------------------- \n");
 
     printf(" ---> Nonrelativistic Species \n");
-    _class_print_species_("Bayrons", b);
-    budget_matter += pba->Omega0_b;
-    if (all_species_.count("CDM")) {
-      _class_print_species_("Cold Dark Matter", cdm);
-      budget_matter += pba->Omega0_cdm;
-    }
+    print_one("Bayrons", pba->Omega0_b, budget_matter);
+    if (all_species_.count("CDM"))
+      print_one("Cold Dark Matter", all_species_.at("CDM")->GetOmega0(), budget_matter);
     if (all_species_.count("IDM_DR_IDR")) {
-      _class_print_species_("Interacting Dark Matter - DR ", idm_dr);
-      budget_matter += pba->Omega0_idm_dr;
+      const auto& comp = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+      print_one("Interacting Dark Matter - DR ", comp.idm_dr().GetOmega0(), budget_matter);
     }
     if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      _class_print_species_("Interacting DM (DRMD)", idm_drmd);
-      budget_matter += pba->Omega0_idm_drmd;
+      const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(
+          *all_species_.at("IDM_DRMD_IDR_DRMD"));
+      print_one("Interacting DM (DRMD)", comp.idm_drmd().GetOmega0(), budget_matter);
     }
     if (all_species_.count("DCDM_DR")) {
-      printf("-> %-30s Omega = %-15g , omega = %-15g\n",
-             "Decaying Cold Dark Matter",
-             Omega0_dcdm_,
-             Omega0_dcdm_ * pba->h * pba->h);
-      budget_matter += Omega0_dcdm_;
+      // Use integration-derived Omega0_dcdm_ for accuracy (set in background_solve).
+      print_one("Decaying Cold Dark Matter", Omega0_dcdm_, budget_matter);
     }
 
     printf(" ---> Relativistic Species \n");
-    _class_print_species_("Photons", g);
-    budget_radiation += pba->Omega0_g;
-    if (all_species_.count("UR")) {
-      _class_print_species_("Ultra-relativistic relics", ur);
-      budget_radiation += pba->Omega0_ur;
-    }
+    print_one("Photons", pba->Omega0_g, budget_radiation);
+    if (all_species_.count("UR"))
+      print_one("Ultra-relativistic relics", all_species_.at("UR")->GetOmega0(), budget_radiation);
     if (all_species_.count("DCDM_DR")) {
-      printf("-> %-30s Omega = %-15g , omega = %-15g\n",
-             "Dark Radiation (from decay)",
-             Omega0_dr_,
-             Omega0_dr_ * pba->h * pba->h);
-      budget_radiation += Omega0_dr_;
+      // Use integration-derived Omega0_dr_ for accuracy (set in background_solve).
+      print_one("Dark Radiation (from decay)", Omega0_dr_, budget_radiation);
     }
     if (all_species_.count("IDM_DR_IDR")) {
-      _class_print_species_("Interacting Dark Radiation", idr);
-      budget_radiation += pba->Omega0_idr;
+      const auto& comp = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+      print_one("Interacting Dark Radiation", comp.idr().GetOmega0(), budget_radiation);
     }
     if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      _class_print_species_("Dark Radiation (DRMD)", idr_drmd);
-      budget_radiation += pba->Omega0_idr_drmd;
+      const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(
+          *all_species_.at("IDM_DRMD_IDR_DRMD"));
+      print_one("Dark Radiation (DRMD)", comp.idr_drmd().GetOmega0(), budget_radiation);
     }
 
     if (!GetNcdmSpecies(all_species_).empty()) {
       printf(" ---> Massive Neutrino Species \n");
-    }
-    if (!GetNcdmSpecies(all_species_).empty()) {
       for (auto* sp : GetNcdmSpecies(all_species_)) {
         sp->PrintOmegaInfo();
         budget_neutrino += sp->GetOmega0();
@@ -1931,22 +1965,14 @@ int BackgroundModule::background_output_budget() {
         all_species_.count("ScalarField") || pba->sgnK != 0) {
       printf(" ---> Other Content \n");
     }
-    if (all_species_.count("Lambda")) {
-      _class_print_species_("Cosmological Constant", lambda);
-      budget_other += pba->Omega0_lambda;
-    }
-    if (all_species_.count("Fluid")) {
-      _class_print_species_("Dark Energy Fluid", fld);
-      budget_other += pba->Omega0_fld;
-    }
-    if (all_species_.count("ScalarField")) {
-      _class_print_species_("Scalar Field", scf);
-      budget_other += pba->Omega0_scf;
-    }
-    if (pba->sgnK != 0) {
-      _class_print_species_("Spatial Curvature", k);
-      budget_other += pba->Omega0_k;
-    }
+    if (all_species_.count("Lambda"))
+      print_one("Cosmological Constant", all_species_.at("Lambda")->GetOmega0(), budget_other);
+    if (all_species_.count("Fluid"))
+      print_one("Dark Energy Fluid", all_species_.at("Fluid")->GetOmega0(), budget_other);
+    if (all_species_.count("ScalarField"))
+      print_one("Scalar Field", all_species_.at("ScalarField")->GetOmega0(), budget_other);
+    if (pba->sgnK != 0)
+      print_one("Spatial Curvature", pba->Omega0_k, budget_other);
 
     printf(" ---> Total budgets \n");
     printf(" Radiation                        Omega = %-15g , omega = %-15g \n",
@@ -2117,7 +2143,7 @@ double BackgroundModule::GetOmega0NcdmTot() const {
 }
 
 int BackgroundModule::GetNDecayDr() const {
-  int n = (pba->Omega0_dcdmdr > 0 ? 1 : 0);
+  int n = (all_species_.count("DCDM_DR") ? 1 : 0);
   for (const auto& sp : all_species_) {
     if (dynamic_cast<DNCDM_DR_Species*>(sp.get()))
       ++n;

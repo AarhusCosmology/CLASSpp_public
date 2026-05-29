@@ -6,6 +6,11 @@
 
 class BackgroundModule : public BaseModule {
  public:
+  /** Look up a species by key (CDM, Lambda, Fluid, ScalarField, UR, IDM_DR_IDR,
+   *  IDM_DRMD_IDR_DRMD, DCDM_DR, NCDM, DNCDM_DR, ...) and return its present-day
+   *  Omega0; returns 0 if the species is absent.  For composite sub-species
+   *  (e.g. IDR inside IDM_DR_IDR) use the dedicated sub_key form. */
+  double GetOmega0Species(const std::string& key) const;
   BackgroundModule(InputModulePtr input_module);
   ~BackgroundModule();
   int background_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const;

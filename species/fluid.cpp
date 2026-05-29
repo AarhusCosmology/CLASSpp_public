@@ -5,11 +5,14 @@
 #include "background.h"
 #include "background_column_writer.h"
 #include "background_module.h"
+#include "idm_dr_idr_species.h"
+#include "idm_drmd_idr_drmd_species.h"
+#include "parser.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-FluidSpecies::FluidSpecies(const background& pba)
-    : BaseSpecies("Fluid", EnergyType::DarkEnergy), pba_(pba) {}
+FluidSpecies::FluidSpecies(const background& pba, double omega0_fld)
+    : BaseSpecies("Fluid", EnergyType::DarkEnergy), pba_(pba), Omega0_fld_(omega0_fld) {}
 
 void FluidSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_fld_, _TRUE_, index_bg, 1);
@@ -194,9 +197,9 @@ void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
-      w.Add("d_fld", mod.index_tp_delta_fld_, pba->has_fld);
+      w.Add("d_fld", mod.index_tp_delta_fld_, _TRUE_);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
-      w.Add("t_fld", mod.index_tp_theta_fld_, pba->has_fld);
+      w.Add("t_fld", mod.index_tp_theta_fld_, _TRUE_);
   }
 }
 
@@ -205,10 +208,6 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
                                   const double* /*y*/,
                                   const PerturbationsModule& mod,
                                   const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-  if (pba->has_fld != _TRUE_)
-    return;
-
   double delta_rho_fld = 0., rho_plus_p_theta_fld = 0., delta_p_fld = 0.;
 
   if (!w.IsTitleMode()) {
@@ -288,18 +287,18 @@ int FluidSpecies::ComputeWFld(double a,
       break;
     case EDE: {
       // Omega_ede(a) taken from eq. (10) in 1706.00730
-      Omega_ede = (pba_.Omega0_fld - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) /
-                      (pba_.Omega0_fld + (1. - pba_.Omega0_fld) * pow(a, 3. * pba_.w0_fld)) +
+      Omega_ede = (Omega0_fld_ - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) /
+                      (Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * pba_.w0_fld)) +
                   pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld));
 
       // d Omega_ede / d a taken analytically from the above
-      dOmega_ede_over_da =
-          -pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.) /
-              (pba_.Omega0_fld + (1. - pba_.Omega0_fld) * pow(a, 3. * pba_.w0_fld)) -
-          (pba_.Omega0_fld - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) *
-              (1. - pba_.Omega0_fld) * 3. * pba_.w0_fld * pow(a, 3. * pba_.w0_fld - 1.) /
-              pow(pba_.Omega0_fld + (1. - pba_.Omega0_fld) * pow(a, 3. * pba_.w0_fld), 2) +
-          pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.);
+      dOmega_ede_over_da = -pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.) /
+                               (Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * pba_.w0_fld)) -
+                           (Omega0_fld_ - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) *
+                               (1. - Omega0_fld_) * 3. * pba_.w0_fld *
+                               pow(a, 3. * pba_.w0_fld - 1.) /
+                               pow(Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * pba_.w0_fld), 2) +
+                           pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.);
 
       // find a_equality (needed because EDE tracks first radiation, then matter)
       double Omega_r =
@@ -310,12 +309,12 @@ int FluidSpecies::ComputeWFld(double a,
                    4. /
                        3.));  // assumes LambdaCDM + eventually massive neutrinos so light that they are relativistic at equality; needs to be generalised later on.
       double Omega_m = pba_.Omega0_b;
-      if (bgm_->all_species_.count("CDM"))
-        Omega_m += pba_.Omega0_cdm;
-      if (bgm_->all_species_.count("IDM_DR_IDR"))
-        Omega_m += pba_.Omega0_idm_dr;
-      if (bgm_->all_species_.count("IDM_DRMD_IDR_DRMD"))
-        Omega_m += pba_.Omega0_idm_drmd;
+      if (auto* p = bgm_->all_species_.find("CDM"))
+        Omega_m += (*p)->GetOmega0();
+      if (auto* p = bgm_->all_species_.find("IDM_DR_IDR"))
+        Omega_m += static_cast<const IDM_DR_IDR_Species&>(**p).idm_dr().GetOmega0();
+      if (auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD"))
+        Omega_m += static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**p).idm_drmd().GetOmega0();
       if (bgm_->all_species_.count("DCDM_DR"))
         class_stop(bgm_->error_message_,
                    "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
@@ -521,8 +520,20 @@ void FluidSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayou
 
 std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
-  if (ctx.pba->has_fld == _TRUE_) {
-    result.push_back({"Fluid", std::make_unique<FluidSpecies>(*ctx.pba)});
+
+  // Closure-Fluid path: ConstructSpecies's Pass 2 hands us the budget-closure value.
+  if (ctx.omega0_closure_override.has_value()) {
+    const double omega0_fld = *ctx.omega0_closure_override;
+    if (omega0_fld != 0.)
+      result.push_back({"Fluid", std::make_unique<FluidSpecies>(*ctx.pba, omega0_fld)});
+    return result;
   }
+
+  // Non-closure Fluid: read Omega_fld directly from the input file.
+  double omega0_fld = 0.;
+  if (!ctx.pfc->read_double("Omega_fld", omega0_fld) || omega0_fld == 0.)
+    return result;
+
+  result.push_back({"Fluid", std::make_unique<FluidSpecies>(*ctx.pba, omega0_fld)});
   return result;
 }

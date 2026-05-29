@@ -186,12 +186,14 @@ void InputModule::ConstructSpecies() {
   ncdm_settings.tol_ncdm_bg = precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = precision_.tol_M_ncdm;
 
-  const SpeciesBuildContext ctx{
+  SpeciesBuildContext ctx{
       /*pfc=*/&file_content_,
       /*pba=*/pba,
       /*ppr=*/&precision_,
       /*ncdm_settings=*/&ncdm_settings,
       /*bgm=*/nullptr,
+      /*all_species=*/&all_species_,
+      /*omega_budget=*/&omega_budget_,
   };
 
   // Read input_verbose for the closure verbose message.
@@ -207,33 +209,6 @@ void InputModule::ConstructSpecies() {
   }
 
   const std::string_view closure_name = ClosureSpeciesName(pba->closure_species);
-
-  // Set the has_* flags that factories inspect during CreateAll.  All flags
-  // that depend purely on Omega0_X (already filled by input_read_parameters)
-  // can be resolved right now.  has_ncdm / has_ncdm_decay_dr depend on the
-  // NCDM counters that we don't know until after the loop; they are set below.
-  pba->has_cdm = (pba->Omega0_cdm != 0.) ? _TRUE_ : _FALSE_;
-  {
-    int f1 = _FALSE_, f2 = _FALSE_;
-    double tmp;
-    parser_read_double(&file_content_, "Omega_ini_dcdm", &tmp, &f1, error_message_);
-    parser_read_double(&file_content_, "omega_ini_dcdm", &tmp, &f2, error_message_);
-    const bool dcdm_present = (pba->Omega0_dcdmdr != 0.) || (f1 == _TRUE_) || (f2 == _TRUE_);
-    pba->has_dcdm           = dcdm_present ? _TRUE_ : _FALSE_;
-    pba->has_dr             = dcdm_present ? _TRUE_ : _FALSE_;
-  }
-  pba->has_scf       = (pba->Omega0_scf != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_lambda    = (pba->Omega0_lambda != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_fld       = (pba->Omega0_fld != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_ur        = (pba->Omega0_ur != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_idr       = (pba->Omega0_idr != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_idm_dr    = (pba->Omega0_idm_dr != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_curvature = (pba->sgnK != 0) ? _TRUE_ : _FALSE_;
-  pba->has_idr_drmd  = (pba->Omega0_idr_drmd != 0.) ? _TRUE_ : _FALSE_;
-  pba->has_idm_drmd  = ((pba->Omega0_idm_drmd != 0.) && (pba->f_idm_drmd != 0.)) ? _TRUE_ : _FALSE_;
-  // has_ncdm and has_ncdm_decay_dr are set after the factory loop below.
-  pba->has_ncdm          = _FALSE_;
-  pba->has_ncdm_decay_dr = _FALSE_;
 
   // Pass 1: build every non-closure species, summing Omega0 contributions.
   // Also tally NCDM-family counters as we go: we know which factories are
@@ -260,52 +235,23 @@ void InputModule::ConstructSpecies() {
     }
   }
 
-  // Compute closure value and write to pba so the closure species' factory
-  // reads it like every other species reads its own Omega0_X.
+  // Compute closure value and hand it to the closure species via the context.
+  // Closure species' factories pick it up from ctx.omega0_closure_override
+  // rather than reading pba->Omega0_X (which is no longer written here).
   if (pba->closure_species != ClosureSpecies::None) {
     const double closure_value = 1.0 - pba->Omega0_k - omega0_sum;
-    switch (pba->closure_species) {
-      case ClosureSpecies::Lambda:
-        pba->Omega0_lambda = closure_value;
-        if (input_verbose > 0) {
-          printf(" -> matched budget equations by adjusting Omega_Lambda = %e\n",
-                 pba->Omega0_lambda);
-        }
-        break;
-      case ClosureSpecies::Fluid:
-        pba->Omega0_fld = closure_value;
-        if (input_verbose > 0) {
-          printf(" -> matched budget equations by adjusting Omega_fld = %e\n", pba->Omega0_fld);
-        }
-        break;
-      case ClosureSpecies::ScalarField:
-        pba->Omega0_scf = closure_value;
-        if (input_verbose > 0) {
-          printf(" -> matched budget equations by adjusting Omega_scf = %e\n", pba->Omega0_scf);
-        }
-        break;
-      case ClosureSpecies::None:
-        break;
+    if (input_verbose > 0) {
+      const char* name_for_msg = (pba->closure_species == ClosureSpecies::Lambda)  ? "Omega_Lambda"
+                                 : (pba->closure_species == ClosureSpecies::Fluid) ? "Omega_fld"
+                                 : (pba->closure_species == ClosureSpecies::ScalarField)
+                                     ? "Omega_scf"
+                                     : "";
+      printf(" -> matched budget equations by adjusting %s = %e\n", name_for_msg, closure_value);
     }
 
-    // Update the has_* flag for the closure species so that Pass 2's
-    // CreateAll body (which inspects has_lambda / has_fld / has_scf) sees
-    // the correct value now that Omega0_X has been written above.
-    switch (pba->closure_species) {
-      case ClosureSpecies::Lambda:
-        pba->has_lambda = (pba->Omega0_lambda != 0.) ? _TRUE_ : _FALSE_;
-        break;
-      case ClosureSpecies::Fluid:
-        pba->has_fld = (pba->Omega0_fld != 0.) ? _TRUE_ : _FALSE_;
-        break;
-      case ClosureSpecies::ScalarField:
-        pba->has_scf = (pba->Omega0_scf != 0.) ? _TRUE_ : _FALSE_;
-        break;
-      case ClosureSpecies::None:
-        break;
-    }
-
-    // Pass 2: build the closure species now that pba->Omega0_X is set.
+    // Pass 2: build the closure species. Override is consumed by its CreateAll
+    // and cleared afterward so subsequent callers (shooting guess, etc.) don't see it.
+    ctx.omega0_closure_override = closure_value;
     for (const auto& entry : kAllSpeciesFactories) {
       if (entry.name != closure_name)
         continue;
@@ -315,17 +261,10 @@ void InputModule::ConstructSpecies() {
       }
       break;
     }
+    ctx.omega0_closure_override.reset();
   }
 
   all_species_.freeze();
-
-  // Now resolve the NCDM-dependent has_* flags.
-  if (omega0_ncdm_tot != 0.)
-    pba->has_ncdm = _TRUE_;
-  if (pba->has_ncdm && n_dncdm > 0) {
-    pba->has_ncdm_decay_dr = _TRUE_;
-    pba->has_dr            = _TRUE_;
-  }
 
   // Precision-parameter consistency check that fires when any NCDM-family
   // species is present (NCDMSpecies + DNCDMSpecies + NCDMInteractingSpecies).
@@ -344,6 +283,233 @@ void InputModule::ConstructSpecies() {
           "avoid switching two approximation schemes at the same time");
     }
   }
+}
+
+int InputModule::ReadCoupledOmegaBudget() {
+  char* errmsg        = error_message_;
+  FileContent* pfc    = &file_content_;
+  precision* ppr      = &precision_;
+  background* pba     = &background_;
+  thermo* /*pth*/ pth = &thermodynamics_;
+  perturbs* ppt       = &perturbations_;
+
+  (void) pth;  // future-proof; the budget computation itself doesn't touch pth.
+
+  int flag1, flag2, flag3, flag4;
+  double param1, param2, param3, param4;
+  int int1;
+  int input_verbose = 0;
+  class_read_int("input_verbose", input_verbose);
+
+  // ── IDR: stat_f_idr * (T_idr / T_cmb)^4 * Omega0_g ───────────────────────────
+  // T_idr (a physics param, not an Omega) stays on pba.
+  double stat_f_idr = 7. / 8.;
+  class_read_double("stat_f_idr", stat_f_idr);
+
+  class_call(parser_read_double(pfc, "N_idr", &param1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "N_dg", &param2, &flag2, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "xi_idr", &param3, &flag3, errmsg), errmsg, errmsg);
+  class_test(class_at_least_two_of_three(flag1, flag2, flag3),
+             errmsg,
+             "In input file, you can only enter one of N_idr, N_dg or xi_idr, choose one");
+
+  if (flag1 == _TRUE_) {
+    pba->T_idr = pow(param1 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
+                 pba->T_cmb;
+    if (input_verbose > 1)
+      printf(
+          "You passed N_idr = N_dg = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
+          "\n",
+          param1,
+          pba->T_idr / pba->T_cmb);
+  }
+  else if (flag2 == _TRUE_) {
+    pba->T_idr = pow(param2 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
+                 pba->T_cmb;
+    if (input_verbose > 2)
+      printf(
+          "You passed N_dg = N_idr = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
+          "\n",
+          param2,
+          pba->T_idr / pba->T_cmb);
+  }
+  else if (flag3 == _TRUE_) {
+    pba->T_idr = param3 * pba->T_cmb;
+    if (input_verbose > 1)
+      printf(
+          "You passed xi_idr = %e, this is equivalent to N_idr = N_dg = %e in the NADM notation. "
+          "\n",
+          param3,
+          stat_f_idr * pow(param3, 4.) / (7. / 8.) * pow(11. / 4., (4. / 3.)));
+  }
+
+  // Mark the budget slot present iff any of the three IDR-temperature inputs was given.
+  // (Matches the legacy semantics: pba->Omega0_idr was always written, but only became
+  // nonzero when T_idr was set by one of these inputs.)
+  if (flag1 == _TRUE_ || flag2 == _TRUE_ || flag3 == _TRUE_) {
+    omega_budget_.idr = stat_f_idr * pow(pba->T_idr / pba->T_cmb, 4.) * pba->Omega0_g;
+  }
+
+  // ── CDM: parser value (or default), then synchronous-gauge minimum ───────────
+  // input_default_params() already set pba->Omega0_cdm = 0.12038/h^2 as the fallback
+  // for the closure-Omega budget computation; honour that as the budget default too.
+  double omega0_cdm = 0.12038 / (pba->h * pba->h);
+  bool cdm_user_set = false;
+
+  class_call(parser_read_double(pfc, "Omega_cdm", &param1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "omega_cdm", &param2, &flag2, errmsg), errmsg, errmsg);
+  class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
+             errmsg,
+             "In input file, you can only enter one of Omega_cdm or omega_cdm, choose one");
+  if (flag1 == _TRUE_) {
+    omega0_cdm   = param1;
+    cdm_user_set = true;
+  }
+  if (flag2 == _TRUE_) {
+    omega0_cdm   = param2 / pba->h / pba->h;
+    cdm_user_set = true;
+  }
+
+  // Synchronous-gauge minimum: if CDM ends up zero in synchronous gauge, bump it
+  // to Omega0_cdm_min_synchronous. Track presence: the gauge minimum kicks in
+  // even if the user supplied nothing, so the budget slot becomes present.
+  bool cdm_present = cdm_user_set || omega0_cdm != 0.;
+  if ((ppt->gauge == synchronous) && (omega0_cdm == 0.)) {
+    omega0_cdm  = ppr->Omega0_cdm_min_synchronous;
+    cdm_present = true;
+  }
+  if (cdm_present)
+    omega_budget_.cdm = omega0_cdm;
+
+  // ── IDM_DR: Omega_idm_dr / omega_idm_dr / f_idm_dr ───────────────────────────
+  class_call(parser_read_double(pfc, "Omega_idm_dr", &param1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "omega_idm_dr", &param2, &flag2, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "f_idm_dr", &param3, &flag3, errmsg), errmsg, errmsg);
+  class_test(class_at_least_two_of_three(flag1, flag2, flag3),
+             errmsg,
+             "In input file, you can only enter one of Omega_idm_dr, omega_idm_dr or f_idm_dr, "
+             "choose one");
+
+  if (flag1 == _TRUE_)
+    omega_budget_.idm_dr = param1;
+  if (flag2 == _TRUE_)
+    omega_budget_.idm_dr = param2 / pba->h / pba->h;
+
+  if (flag3 == _TRUE_) {
+    class_test((param3 < 0.) || (param3 > 1.),
+               errmsg,
+               "The fraction of interacting DM with DR must be between 0 and 1, you asked for "
+               "f_idm_dr=%e",
+               param3);
+    const double cdm_for_frac = omega_budget_.cdm.value_or(0.);
+    class_test((param3 > 0.) && (cdm_for_frac == 0.),
+               errmsg,
+               "If you want a fraction of interacting DM with DR, to be consistent, you should not "
+               "set the fraction of CDM to zero");
+
+    double new_idm_dr = param3 * cdm_for_frac;
+    double new_cdm    = cdm_for_frac - new_idm_dr;
+    // avoid CDM=0 in synchronous gauge after the subtraction
+    if ((ppt->gauge == synchronous) && (new_cdm == 0.)) {
+      new_cdm    += ppr->Omega0_cdm_min_synchronous;
+      new_idm_dr -= ppr->Omega0_cdm_min_synchronous;
+    }
+    omega_budget_.idm_dr = new_idm_dr;
+    omega_budget_.cdm    = new_cdm;
+  }
+
+  // ── DCDM_DR: Omega_dcdmdr / omega_dcdmdr; Omega_ini_dcdm / Gamma_dcdm ────────
+  // (Gamma_dcdm and Omega_ini_dcdm are physics params, not Omega0; they stay on pba.)
+  class_call(parser_read_double(pfc, "Omega_dcdmdr", &param1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_double(pfc, "omega_dcdmdr", &param2, &flag2, errmsg), errmsg, errmsg);
+  class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
+             errmsg,
+             "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose one");
+  if (flag1 == _TRUE_)
+    omega_budget_.dcdmdr = param1;
+  if (flag2 == _TRUE_)
+    omega_budget_.dcdmdr = param2 / pba->h / pba->h;
+
+  if (omega_budget_.dcdmdr.value_or(0.) > 0.) {
+    class_call(parser_read_double(pfc, "Omega_ini_dcdm", &param1, &flag1, errmsg), errmsg, errmsg);
+    class_call(parser_read_double(pfc, "omega_ini_dcdm", &param2, &flag2, errmsg), errmsg, errmsg);
+    class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
+               errmsg,
+               "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, choose "
+               "one");
+    if (flag1 == _TRUE_)
+      pba->Omega_ini_dcdm = param1;
+    if (flag2 == _TRUE_)
+      pba->Omega_ini_dcdm = param2 / pba->h / pba->h;
+
+    class_read_double("Gamma_dcdm", pba->Gamma_dcdm);
+    pba->Gamma_dcdm *= (1.e3 / _c_);  // Convert km/(s Mpc) -> Mpc^-1
+  }
+
+  // ── DRMD: z_stop, G_over_aH_drmd_ini, f_idm_drmd, delta_Neff_drmd ────────────
+  // The four pba physics-params get written here (they belong to pba, not Omega0).
+  // delta_Neff_drmd → omega_budget_.idr_drmd; f_idm_drmd → omega_budget_.idm_drmd
+  // with the CDM subtraction.
+  class_call(parser_read_double(pfc, "z_stop", &param1, &flag1, errmsg), errmsg, errmsg);
+  if (flag1 == _TRUE_)
+    pba->z_stop = param1;
+  class_call(parser_read_double(pfc, "G_over_aH_drmd_ini", &param2, &flag2, errmsg),
+             errmsg,
+             errmsg);
+  if (flag2 == _TRUE_)
+    pba->G_over_aH_drmd = param2;
+  class_call(parser_read_double(pfc, "f_idm_drmd", &param3, &flag3, errmsg), errmsg, errmsg);
+  if (flag3 == _TRUE_)
+    pba->f_idm_drmd = param3;
+  class_call(parser_read_double(pfc, "delta_Neff_drmd", &param4, &flag4, errmsg), errmsg, errmsg);
+  if (flag4 == _TRUE_)
+    pba->delta_Neff_drmd = param4;
+
+  const int any_drmd = (flag1 == _TRUE_) || (flag2 == _TRUE_) || (flag3 == _TRUE_) ||
+                       (flag4 == _TRUE_);
+  const int all_drmd = (flag1 == _TRUE_) && (flag2 == _TRUE_) && (flag3 == _TRUE_) &&
+                       (flag4 == _TRUE_);
+  class_test(any_drmd && !all_drmd,
+             errmsg,
+             "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters are "
+             "'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
+
+  if (pba->delta_Neff_drmd > 0.) {
+    omega_budget_.idr_drmd = pba->delta_Neff_drmd * 7. / 8. * pow(4. / 11., 4. / 3.) *
+                             pba->Omega0_g;
+    if (pba->f_idm_drmd > 0) {
+      class_test((pba->z_stop > 200000.),
+                 errmsg,
+                 "z_stop is chosen too large. If you want to probe z_stop > 1000000 you need to "
+                 "start evolving perturbations earlier in CLASS by changing the precision "
+                 "settings. Also you should check that the exponential suppression factor does not "
+                 "lead to numerical problems.");
+    }
+  }
+
+  if (pba->f_idm_drmd > 0) {
+    class_test((pba->f_idm_drmd > 1.),
+               errmsg,
+               "The fraction of interacting DM with DR must be between 0 and 1, you asked for "
+               "f_idm_drmd=%e",
+               pba->f_idm_drmd);
+    const double cdm_for_drmd = omega_budget_.cdm.value_or(0.);
+    class_test((cdm_for_drmd == 0.),
+               errmsg,
+               "If you want a fraction of interacting DM with DRMD, to be consistent, you should "
+               "not set the fraction of CDM to zero");
+
+    double new_idm_drmd = pba->f_idm_drmd * cdm_for_drmd;
+    double new_cdm      = cdm_for_drmd - new_idm_drmd;
+    if ((ppt->gauge == synchronous) && (new_cdm == 0.)) {
+      new_cdm      += ppr->Omega0_cdm_min_synchronous;
+      new_idm_drmd -= ppr->Omega0_cdm_min_synchronous;
+    }
+    omega_budget_.idm_drmd = new_idm_drmd;
+    omega_budget_.cdm      = new_cdm;
+  }
+
+  return _SUCCESS_;
 }
 
 /**
@@ -658,50 +824,8 @@ int InputModule::input_read_parameters() {
   if (flag2 == _TRUE_)
     pba->Omega0_b = param2 / pba->h / pba->h;
 
-  /** - Omega_0_ur (ultra-relativistic species / massless neutrino) */
-
-  /* (a) try to read N_ur */
-  class_call(parser_read_double(pfc, "N_ur", &param1, &flag1, errmsg), errmsg, errmsg);
-
-  /* these lines have been added for compatibility with deprecated syntax 'N_eff' instead of 'N_ur', in the future they could be suppressed */
-  class_call(parser_read_double(pfc, "N_eff", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
-             errmsg,
-             "In input file, you can only enter one of N_eff (deprecated syntax) or N_ur "
-             "(up-to-date syntax), since they botgh describe the same, i.e. the contribution "
-             "ukltra-relativistic species to the effective neutrino number");
-  if (flag2 == _TRUE_) {
-    param1 = param2;
-    flag1  = _TRUE_;
-    flag2  = _FALSE_;
-  }
-  /* end of lines for deprecated syntax */
-
-  /* (b) try to read Omega_ur */
-  class_call(parser_read_double(pfc, "Omega_ur", &param2, &flag2, errmsg), errmsg, errmsg);
-
-  /* (c) try to read omega_ur */
-  class_call(parser_read_double(pfc, "omega_ur", &param3, &flag3, errmsg), errmsg, errmsg);
-
-  /* (d) infer the unpassed ones from the passed one */
-  class_test(class_at_least_two_of_three(flag1, flag2, flag3),
-             errmsg,
-             "In input file, you can only enter one of N_eff, Omega_ur or omega_ur, choose one");
-
-  if (class_none_of_three(flag1, flag2, flag3)) {
-    pba->Omega0_ur = 3.046 * 7. / 8. * pow(4. / 11., 4. / 3.) * pba->Omega0_g;
-  }
-  else {
-    if (flag1 == _TRUE_) {
-      pba->Omega0_ur = param1 * 7. / 8. * pow(4. / 11., 4. / 3.) * pba->Omega0_g;
-    }
-    if (flag2 == _TRUE_) {
-      pba->Omega0_ur = param2;
-    }
-    if (flag3 == _TRUE_) {
-      pba->Omega0_ur = param3 / pba->h / pba->h;
-    }
-  }
+  // NOTE: N_ur / N_eff / Omega_ur / omega_ur parsing has been moved to
+  // UltraRelativisticSpecies::CreateAll, which reads pfc directly.
 
   class_call(parser_read_double(pfc, "ceff2_ur", &param1, &flag1, errmsg), errmsg, errmsg);
   if (flag1 == _TRUE_)
@@ -722,103 +846,16 @@ int InputModule::input_read_parameters() {
     ppt->G_eff_ur = pow(10.0, ppt->G_eff_ur);
   }
 
-  /** - Omega_0_idr (interacting dark radiation) */
-  /* Can take both the ethos parameters, and the NADM parameters */
+  // Coupled-species cluster (CDM, IDR, IDM_DR, DCDM_DR, IDM_DRMD, IDR_DRMD)
+  // Omega-budget parsing has been moved to ReadCoupledOmegaBudget so each
+  // species's CreateAll can read its slot from the budget instead of from
+  // pba->Omega0_X. Sub-parameters that are not Omega0 (pth->a_idm_dr,
+  // thermo block, etc.) remain below and consume the budget.
+  class_call(ReadCoupledOmegaBudget(), errmsg, errmsg);
 
-  class_read_double("stat_f_idr", stat_f_idr);
-
-  class_call(parser_read_double(pfc, "N_idr", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "N_dg", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "xi_idr", &param3, &flag3, errmsg), errmsg, errmsg);
-  class_test(class_at_least_two_of_three(flag1, flag2, flag3),
-             errmsg,
-             "In input file, you can only enter one of N_idr, N_dg or xi_idr, choose one");
-
-  if (flag1 == _TRUE_) {
-    pba->T_idr = pow(param1 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
-                 pba->T_cmb;
-    if (input_verbose > 1)
-      printf(
-          "You passed N_idr = N_dg = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
-          "\n",
-          param2,
-          pba->T_idr / pba->T_cmb);
-  }
-  else if (flag2 == _TRUE_) {
-    pba->T_idr = pow(param2 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
-                 pba->T_cmb;
-    if (input_verbose > 2)
-      printf(
-          "You passed N_dg = N_idr = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
-          "\n",
-          param2,
-          pba->T_idr / pba->T_cmb);
-  }
-  else if (flag3 == _TRUE_) {
-    pba->T_idr = param3 * pba->T_cmb;
-    if (input_verbose > 1)
-      printf(
-          "You passed xi_idr = %e, this is equivalent to N_idr = N_dg = %e in the NADM notation. "
-          "\n",
-          param3,
-          stat_f_idr * pow(param3, 4.) / (7. / 8.) * pow(11. / 4., (4. / 3.)));
-  }
-
-  pba->Omega0_idr = stat_f_idr * pow(pba->T_idr / pba->T_cmb, 4.) * pba->Omega0_g;
-
-  /** - Omega_0_cdm (CDM) */
-  class_call(parser_read_double(pfc, "Omega_cdm", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_cdm", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-             errmsg,
-             "In input file, you can only enter one of Omega_cdm or omega_cdm, choose one");
-  if (flag1 == _TRUE_)
-    pba->Omega0_cdm = param1;
-  if (flag2 == _TRUE_)
-    pba->Omega0_cdm = param2 / pba->h / pba->h;
-
-  if ((ppt->gauge == synchronous) && (pba->Omega0_cdm == 0))
-    pba->Omega0_cdm = ppr->Omega0_cdm_min_synchronous;
-
-  /** - Omega_0_icdm_dr (DM interacting with DR) */
-  class_call(parser_read_double(pfc, "Omega_idm_dr", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_idm_dr", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "f_idm_dr", &param3, &flag3, errmsg), errmsg, errmsg);
-  class_test(class_at_least_two_of_three(flag1, flag2, flag3),
-             errmsg,
-             "In input file, you can only enter one of Omega_idm_dr, omega_idm_dr or f_idm_dr, "
-             "choose one");
-
-  /* ---> if user passes directly the density of idm_dr */
-  if (flag1 == _TRUE_)
-    pba->Omega0_idm_dr = param1;
-  if (flag2 == _TRUE_)
-    pba->Omega0_idm_dr = param2 / pba->h / pba->h;
-
-  /* ---> if user passes density of idm_dr as a fraction of the CDM one */
-  if (flag3 == _TRUE_) {
-    class_test((param3 < 0.) || (param3 > 1.),
-               errmsg,
-               "The fraction of interacting DM with DR must be between 0 and 1, you asked for "
-               "f_idm_dr=%e",
-               param3);
-    class_test((param3 > 0.) && (pba->Omega0_cdm == 0.),
-               errmsg,
-               "If you want a fraction of interacting DM with DR, to be consistent, you should not "
-               "set the fraction of CDM to zero");
-
-    pba->Omega0_idm_dr = param3 * pba->Omega0_cdm;
-    /* readjust Omega0_cdm */
-    pba->Omega0_cdm -= pba->Omega0_idm_dr;
-    /* avoid Omega0_cdm =0 in synchronous gauge */
-    if ((ppt->gauge == synchronous) && (pba->Omega0_cdm == 0)) {
-      pba->Omega0_cdm    += ppr->Omega0_cdm_min_synchronous;
-      pba->Omega0_idm_dr -= ppr->Omega0_cdm_min_synchronous;
-    }
-  }
-
-  if (pba->Omega0_idm_dr > 0.) {
-    class_test(pba->Omega0_idr == 0.0,
+  if (omega_budget_.idm_dr.value_or(0.) > 0.) {
+    const double omega0_idr_budget = omega_budget_.idr.value_or(0.);
+    class_test(omega0_idr_budget == 0.0,
                errmsg,
                "You have requested interacting DM ith DR, this requires a non-zero density of "
                "interacting DR. Please set either N_idr or xi_idr");
@@ -838,7 +875,7 @@ int InputModule::input_read_parameters() {
             "You passed a_idm_dr = a_dark = %e, this is equivalent to Gamma_0_nadm = %e in the "
             "NADM notation. \n",
             param1,
-            param1 * (4. / 3.) * (pba->h * pba->h * pba->Omega0_idr));
+            param1 * (4. / 3.) * (pba->h * pba->h * omega0_idr_budget));
     }
     else if (flag2 == _TRUE_) {
       pth->a_idm_dr = param2;
@@ -847,10 +884,10 @@ int InputModule::input_read_parameters() {
             "You passed a_dark = a_idm_dr = %e, this is equivalent to Gamma_0_nadm = %e in the "
             "NADM notation. \n",
             param2,
-            param2 * (4. / 3.) * (pba->h * pba->h * pba->Omega0_idr));
+            param2 * (4. / 3.) * (pba->h * pba->h * omega0_idr_budget));
     }
     else if (flag3 == _TRUE_) {
-      pth->a_idm_dr = param3 * (3. / 4.) / (pba->h * pba->h * pba->Omega0_idr);
+      pth->a_idm_dr = param3 * (3. / 4.) / (pba->h * pba->h * omega0_idr_budget);
       if (input_verbose > 1)
         printf(
             "You passed Gamma_0_nadm = %e, this is equivalent to a_idm_dr = a_dark = %e in the "
@@ -939,36 +976,9 @@ int InputModule::input_read_parameters() {
     ppt->beta_idr = ppt->beta_idr_storage.data();
   }
 
-  /** - Omega_0_dcdmdr (DCDM) */
-
-  class_call(parser_read_double(pfc, "Omega_dcdmdr", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_dcdmdr", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-             errmsg,
-             "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose one");
-  if (flag1 == _TRUE_)
-    pba->Omega0_dcdmdr = param1;
-  if (flag2 == _TRUE_)
-    pba->Omega0_dcdmdr = param2 / pba->h / pba->h;
-
-  if (pba->Omega0_dcdmdr > 0) {
-    /** - Read Omega_ini_dcdm or omega_ini_dcdm */
-    class_call(parser_read_double(pfc, "Omega_ini_dcdm", &param1, &flag1, errmsg), errmsg, errmsg);
-    class_call(parser_read_double(pfc, "omega_ini_dcdm", &param2, &flag2, errmsg), errmsg, errmsg);
-    class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-               errmsg,
-               "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, choose "
-               "one");
-    if (flag1 == _TRUE_)
-      pba->Omega_ini_dcdm = param1;
-    if (flag2 == _TRUE_)
-      pba->Omega_ini_dcdm = param2 / pba->h / pba->h;
-
-    /** - Read Gamma in same units as H0, i.e. km/(s Mpc)*/
-    class_read_double("Gamma_dcdm", pba->Gamma_dcdm);
-    /* Convert to Mpc */
-    pba->Gamma_dcdm *= (1.e3 / _c_);
-  }
+  // Omega_dcdmdr / Omega_ini_dcdm / Gamma_dcdm parsing has been moved to
+  // ReadCoupledOmegaBudget (Omega_dcdmdr → omega_budget_.dcdmdr; Gamma_dcdm and
+  // Omega_ini_dcdm are physics params that stay on pba).
 
   pba->l_max_idr = ppr->l_max_idr;
 
@@ -982,69 +992,9 @@ int InputModule::input_read_parameters() {
   else if (pba->K < 0.)
     pba->sgnK = -1;
 
-  /*DRMD*/
-  double param4;
-  int flag4;
-  /* Here, we read in the model parameters. */
-  class_call(parser_read_double(pfc, "z_stop", &param1, &flag1, errmsg), errmsg, errmsg);
-  if (flag1 == _TRUE_)
-    pba->z_stop = param1;
-  class_call(parser_read_double(pfc, "G_over_aH_drmd_ini", &param2, &flag2, errmsg),
-             errmsg,
-             errmsg);
-  if (flag2 == _TRUE_)
-    pba->G_over_aH_drmd = param2;
-  class_call(parser_read_double(pfc, "f_idm_drmd", &param3, &flag3, errmsg), errmsg, errmsg);
-  if (flag3 == _TRUE_)
-    pba->f_idm_drmd = param3;
-  class_call(parser_read_double(pfc, "delta_Neff_drmd", &param4, &flag4, errmsg), errmsg, errmsg);
-  if (flag4 == _TRUE_)
-    pba->delta_Neff_drmd = param4;
-
-  int any_flag = (flag1 == _TRUE_) || (flag2 == _TRUE_) || (flag3 == _TRUE_) || (flag4 == _TRUE_);
-  int all_flag = (flag1 == _TRUE_) && (flag2 == _TRUE_) && (flag3 == _TRUE_) && (flag4 == _TRUE_);
-
-  class_test(any_flag && !all_flag,
-             errmsg,
-             "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters are "
-             "'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
-
-  if (pba->delta_Neff_drmd > 0.) {
-    pba->Omega0_idr_drmd = pba->delta_Neff_drmd * 7. / 8. * pow(4. / 11., 4. / 3.) * pba->Omega0_g;
-
-    if (pba->f_idm_drmd > 0) {
-      class_test((pba->z_stop > 200000.),
-                 errmsg,
-                 "z_stop is chosen too large. If you want to probe z_stop > 1000000 you need to "
-                 "start evolving perturbations earlier in CLASS by changing the precision "
-                 "settings. Also you should check that the exponential suppression factor does not "
-                 "lead to numerical problems.");
-    }
-  }
-
-  if (pba->f_idm_drmd > 0) {
-    class_test((pba->f_idm_drmd > 1.),
-               errmsg,
-               "The fraction of interacting DM with DR must be between 0 and 1, you asked for "
-               "f_idm_drmd=%e",
-               pba->f_idm_drmd);
-
-    class_test((pba->Omega0_cdm == 0.),
-               errmsg,
-               "If you want a fraction of interacting DM with DRMD, to be consistent, you should "
-               "not set the fraction of CDM to zero");
-
-    pba->Omega0_idm_drmd = pba->f_idm_drmd * pba->Omega0_cdm;
-
-    /* readjust Omega0_cdm */
-    pba->Omega0_cdm -= pba->Omega0_idm_drmd;
-
-    /* avoid Omega0_cdm =0 in synchronous gauge */
-    if ((ppt->gauge == synchronous) && (pba->Omega0_cdm == 0)) {
-      pba->Omega0_cdm      += ppr->Omega0_cdm_min_synchronous;
-      pba->Omega0_idm_drmd -= ppr->Omega0_cdm_min_synchronous;
-    }
-  }
+  // DRMD parameter block (z_stop, G_over_aH_drmd_ini, f_idm_drmd, delta_Neff_drmd,
+  // and the resulting Omega0_idr_drmd / Omega0_idm_drmd contributions) has been
+  // moved to ReadCoupledOmegaBudget.
 
   /** - Omega_0_lambda (cosmological constant), Omega0_fld (dark energy fluid), Omega0_scf (scalar field) */
 
@@ -1062,26 +1012,17 @@ int InputModule::input_read_parameters() {
    *  it means that either we have not read Omega_scf so we are ignoring it
    *  (unlike lambda and fld!) OR we have read it, but it had a
    *  positive value and should not be used for filling.
-   *  We proceed in two steps:
-   *  1) set each Omega0 for each specified component.
-   *  2) go through the components in order {lambda, fld, scf} and
-   *     record the first unspecified component as the closure species.
+   *  We only record which component closes the budget here; the actual
+   *  Omega0_X value is computed in ConstructSpecies after all non-closure
+   *  species have been built and their GetOmega0() contributions summed.
+   *  The non-closure species' factories read their Omega from pfc directly.
    */
 
-  /* Step 1 */
-  if (flag1 == _TRUE_) {
-    pba->Omega0_lambda = param1;
-  }
-  if (flag2 == _TRUE_) {
-    pba->Omega0_fld = param2;
-  }
-  if ((flag3 == _TRUE_) && (param3 >= 0.)) {
-    pba->Omega0_scf = param3;
-  }
-  /* Step 2: record which species (if any) is the closure species.
-   * The actual Omega0_X value is computed later in ConstructSpecies,
-   * after all non-closure species have been built and their GetOmega0()
-   * contributions summed. */
+  // Record which species (if any) is the closure species.
+  // NOTE: pba->Omega0_lambda/fld/scf are no longer written from this block;
+  // FluidSpecies::CreateAll and ScalarFieldSpecies::CreateAll read pfc directly,
+  // and Pass 2 of ConstructSpecies hands the closure species its closure value via
+  // SpeciesBuildContext::omega0_closure_override.
   if (flag1 == _FALSE_) {
     pba->closure_species = ClosureSpecies::Lambda;
   }
@@ -1102,7 +1043,15 @@ int InputModule::input_read_parameters() {
              "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar "
              "field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
-  if (pba->Omega0_fld != 0.) {
+  // Snapshot fluid/scf presence here: later parser blocks reuse flag1/flag2/flag3
+  // and param1/param2/param3, and pba->Omega0_fld / pba->Omega0_scf are no longer
+  // written. These flags now decide whether to parse fluid/scf sub-parameters.
+  const bool fluid_present_pfc = (flag2 == _TRUE_) ||
+                                 (pba->closure_species == ClosureSpecies::Fluid);
+  const bool scf_present_pfc   = ((flag3 == _TRUE_) && (param3 != 0.)) ||
+                                 (pba->closure_species == ClosureSpecies::ScalarField);
+
+  if (fluid_present_pfc) {
     class_call(parser_read_string(pfc, "use_ppf", &string1, &flag1, errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
@@ -1149,7 +1098,7 @@ int InputModule::input_read_parameters() {
   }
 
   /* Additional SCF parameters: */
-  if (pba->Omega0_scf != 0.) {
+  if (scf_present_pfc) {
     /** - Read parameters describing scalar field potential */
     std::vector<double> scf_parameters;
     class_call(readDoubleList(pfc, "scf_parameters", scf_parameters, &flag1, errmsg),
@@ -1841,7 +1790,10 @@ int InputModule::input_read_parameters() {
         class_test(param3 < 0., errmsg, "sigma8 should be non-negative");
       }
       else if (flag4 == _TRUE_) {
-        ppm->sigma8 = param4 / pow((pba->Omega0_b + pba->Omega0_cdm) / 0.3, 0.5);
+        // CDM read from the resolved budget (pba->Omega0_cdm is no longer
+        // written by the coupled-species parser block).
+        const double Omega0_cdm_for_S8 = omega_budget_.cdm.value_or(0.);
+        ppm->sigma8 = param4 / pow((pba->Omega0_b + Omega0_cdm_for_S8) / 0.3, 0.5);
         class_test(param4 < 0., errmsg, "S8 should be non-negative");
       }
 
@@ -2684,7 +2636,7 @@ int InputModule::input_read_parameters() {
              "ur_fluid_trigger_tau_over_tau_k and radiation_streaming_trigger_tau_over_tau_k, in "
              "order to avoid switching two approximation schemes at the same time");
 
-  if (pba->Omega0_idr != 0.) {
+  if (omega_budget_.idr.value_or(0.) != 0.) {
     class_test(ppr->idr_streaming_trigger_tau_over_tau_k ==
                    ppr->radiation_streaming_trigger_tau_over_tau_k,
                errmsg,
@@ -2838,7 +2790,7 @@ int InputModule::input_read_parameters() {
   /** - (i.5) special steps if we want Halofit with wa_fld non-zero:
       so-called "Pk_equal method" of 0810.0190 and 1601.07230 */
 
-  if ((pnl->method == nl_halofit) && (pba->Omega0_fld != 0.) && (pba->wa_fld != 0.)) {
+  if ((pnl->method == nl_halofit) && fluid_present_pfc && (pba->wa_fld != 0.)) {
     class_call(parser_read_string(pfc, "pk_eq", &string1, &flag1, errmsg), errmsg, errmsg);
 
     if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
@@ -2884,16 +2836,13 @@ int InputModule::input_default_params() {
      other parameters from the Planck2013 Cosmological Parameter
      paper. */
 
-  pba->H0         = pba->h * 1.e5 / _c_;
-  pba->Omega0_g   = (4. * sigma_B / _c_ * pow(pba->T_cmb, 4.)) /
-                    (3. * _c_ * _c_ * 1.e10 * pba->h * pba->h / _Mpc_over_m_ / _Mpc_over_m_ / 8. /
-                     _PI_ / _G_);
-  pba->Omega0_ur  = 3.046 * 7. / 8. * pow(4. / 11., 4. / 3.) * pba->Omega0_g;
-  pba->Omega0_b   = 0.022032 / pow(pba->h, 2);
-  pba->Omega0_cdm = 0.12038 / pow(pba->h, 2);
-  // No NCDM contribution in the default-write path (defaults have no NCDM species).
-  pba->Omega0_lambda = 1. - pba->Omega0_k - pba->Omega0_g - pba->Omega0_ur - pba->Omega0_b -
-                       pba->Omega0_cdm - pba->Omega0_dcdmdr - pba->Omega0_idm_dr - pba->Omega0_idr;
+  pba->H0       = pba->h * 1.e5 / _c_;
+  pba->Omega0_g = (4. * sigma_B / _c_ * pow(pba->T_cmb, 4.)) /
+                  (3. * _c_ * _c_ * 1.e10 * pba->h * pba->h / _Mpc_over_m_ / _Mpc_over_m_ / 8. /
+                   _PI_ / _G_);
+  pba->Omega0_b = 0.022032 / pow(pba->h, 2);
+  // pba->Omega0_{ur,cdm,lambda,...} are no longer stored: those defaults live
+  // on the species (read from pfc or applied by ReadCoupledOmegaBudget).
 
   /** - primordial structure: computed defaults */
 
@@ -3272,7 +3221,9 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
                                  &input_module->background_,
                                  &input_module->precision_,
                                  &ncdm_settings,
-                                 nullptr};
+                                 /*bgm=*/nullptr,
+                                 /*all_species=*/&input_module->all_species_,
+                                 /*omega_budget=*/&input_module->omega_budget_};
   for (const auto& [key, sp] : input_module->all_species_) {
     std::vector<ShootingTarget> tgts = sp->GetShootingTargets();
     if (tgts.empty())

@@ -514,7 +514,7 @@ int PerturbationsModule::perturb_init() {
       printf("Computing sources\n");
   }
 
-  class_test((ppt->gauge == synchronous) && (pba->has_cdm == _FALSE_),
+  class_test((ppt->gauge == synchronous) && (all_species_.count("CDM") == 0),
              error_message_,
              "In the synchronous gauge, it is not self-consistent to assume no CDM: the later is "
              "used to define the initial timelike hypersurface. You can either add a negligible "
@@ -4491,15 +4491,15 @@ int PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.2.) Cold dark matter Isocurvature */
 
     if ((ppt->has_cdi == _TRUE_) && (index_ic == index_ic_cdi_)) {
-      class_test((pba->has_idr == _TRUE_),
+      class_test((all_species_.count("IDM_DR_IDR") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((pba->has_idr_drmd == _TRUE_),
+      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)")
 
-          class_test(pba->has_cdm == _FALSE_,
+          class_test(all_species_.count("CDM") == 0,
                      error_message_,
                      "not consistent to ask for CDI in absence of CDM!");
 
@@ -4525,11 +4525,11 @@ int PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.3.) Baryon Isocurvature */
 
     if ((ppt->has_bi == _TRUE_) && (index_ic == index_ic_bi_)) {
-      class_test((pba->has_idr == _TRUE_),
+      class_test((all_species_.count("IDM_DR_IDR") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((pba->has_idr_drmd == _TRUE_),
+      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
 
@@ -4555,15 +4555,15 @@ int PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.4.) Neutrino density Isocurvature */
 
     if ((ppt->has_nid == _TRUE_) && (index_ic == index_ic_nid_)) {
-      class_test((pba->has_ur == _FALSE_) && (pba->has_ncdm == _FALSE_),
+      class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
                  error_message_,
                  "not consistent to ask for NID in absence of ur or ncdm species!");
 
-      class_test((pba->has_idr == _TRUE_),
+      class_test((all_species_.count("IDM_DR_IDR") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((pba->has_idr_drmd == _TRUE_),
+      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
 
@@ -4582,15 +4582,15 @@ int PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.5.) Neutrino velocity Isocurvature */
 
     if ((ppt->has_niv == _TRUE_) && (index_ic == index_ic_niv_)) {
-      class_test((pba->has_ur == _FALSE_) && (pba->has_ncdm == _FALSE_),
+      class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
                  error_message_,
                  "not consistent to ask for NIV in absence of ur or ncdm species!");
 
-      class_test((pba->has_idr == _TRUE_),
+      class_test((all_species_.count("IDM_DR_IDR") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((pba->has_idr_drmd == _TRUE_),
+      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
                  error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
       ic_ctx.delta_g_ic = ppr->entropy_ini * k * tau * fracnu / fracg *
@@ -4624,7 +4624,7 @@ int PerturbationsModule::perturb_initial_conditions(
     /** - (d) If the needed gauge is the newtonian gauge, we must compute alpha and then perform a gauge transformation for each variable */
 
     if (ppt->gauge == newtonian) {
-      class_test((pba->has_idr_drmd == _TRUE_),
+      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
                  error_message_,
                  "Use synchronous gauge for the DRMD implementation as Netwonian gauge has not "
                  "been tested!");
@@ -6510,7 +6510,7 @@ int PerturbationsModule::perturb_print_variables_member(
 
     /* Non-cold Dark Matter */
     if (evolve_tensor_ncdm_ == _TRUE_) {
-      class_test(pba->has_ncdm_decay_dr,
+      class_test(all_species_.count("DNCDM_DR") != 0,
                  error_message_,
                  "Cannot evolve tensor modes with decaying NCDM species.");
       for (size_t i = 0; i < all_species_.size(); ++i) {

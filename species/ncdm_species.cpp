@@ -288,8 +288,7 @@ void NCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                               int& index_pt,
                                               const perturb_workspace* ppw,
                                               int /*gauge*/) {
-  if (!pba_->has_ncdm)
-    return;
+  // This species only exists when NCDM is present, so the legacy pba->has_ncdm guard is gone.
   auto& layout = static_cast<NCDMBaseSpecies::PerturbLayout&>(base);
 
   index_pt_psi0_ = index_pt;
@@ -316,8 +315,7 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                 const double* y,
                                 double* dy,
                                 const perturb_parameters_and_workspace& ppaw) {
-  if (!pba_->has_ncdm)
-    return;
+  // This species only exists when NCDM is present, so the legacy pba->has_ncdm guard is gone.
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
 
   const perturb_workspace* ppw    = ppaw.ppw;
@@ -393,8 +391,7 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 void NCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                          double* y,
                                          const PerturbIcContext& ctx) {
-  if (!pba_->has_ncdm)
-    return;
+  // This species only exists when NCDM is present, so the legacy pba->has_ncdm guard is gone.
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
   if (layout.q_size <= 0 || layout.index_per_q.empty())
     return;
@@ -422,10 +419,6 @@ void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      const PerturbationsModule& mod,
                                      enum file_format fmt,
                                      BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
-  if (pba->has_ncdm != _TRUE_)
-    return;
-
   const int n           = source_slot_;
   const std::string& nm = name();
 
@@ -448,10 +441,6 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
                                  const double* y,
                                  const PerturbationsModule& mod,
                                  const perturb_workspace* ppw) const {
-  const background* pba = mod.GetBackground();
-  if (pba->has_ncdm != _TRUE_)
-    return;
-
   double delta_ncdm = 0., theta_ncdm = 0., shear_ncdm = 0., cs2_ncdm = 0.;
 
   if (!w.IsTitleMode()) {
