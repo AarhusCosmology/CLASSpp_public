@@ -10,31 +10,6 @@ void CompositeSpecies::RegisterIntegrationIndices(int& index_bi) {
     child->RegisterIntegrationIndices(index_bi);
 }
 
-void CompositeSpecies::RegisterPerturbationIndices(perturb_vector* pv,
-                                                   const precision* ppr,
-                                                   int& index_pt,
-                                                   const perturb_workspace* ppw,
-                                                   int gauge) {
-  for (auto& child : children_)
-    child->RegisterPerturbationIndices(pv, ppr, index_pt, ppw, gauge);
-}
-
-void CompositeSpecies::RegisterVectorPerturbationIndices(perturb_vector* pv,
-                                                         int& index_pt,
-                                                         const perturb_workspace* ppw,
-                                                         int gauge) {
-  for (auto& child : children_)
-    child->RegisterVectorPerturbationIndices(pv, index_pt, ppw, gauge);
-}
-
-void CompositeSpecies::RegisterTensorPerturbationIndices(perturb_vector* pv,
-                                                         int& index_pt,
-                                                         const perturb_workspace* ppw,
-                                                         int gauge) {
-  for (auto& child : children_)
-    child->RegisterTensorPerturbationIndices(pv, index_pt, ppw, gauge);
-}
-
 void CompositeSpecies::SetBackgroundModule(const BackgroundModule* bgm) {
   for (auto& child : children_)
     child->SetBackgroundModule(bgm);

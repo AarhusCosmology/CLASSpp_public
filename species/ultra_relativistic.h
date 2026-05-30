@@ -59,12 +59,6 @@ class UltraRelativisticSpecies : public BaseSpecies {
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
-
   // Layout-based PerturbDerivs (primary path)
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
@@ -142,6 +136,11 @@ class UltraRelativisticSpecies : public BaseSpecies {
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
+
+  /** Scalar mode: UR l>=3 multipoles not needed in sources when both rsa and ufa are off. */
+  void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+                         const perturb_workspace* ppw,
+                         int* used_in_sources) const override;
 
   /** Copy UR perturbations across an approximation switch (UFA on/off transition). */
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,

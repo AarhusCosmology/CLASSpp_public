@@ -46,11 +46,6 @@ class CDMSpecies : public BaseSpecies {
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
                      const double* y,

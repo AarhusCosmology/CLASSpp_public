@@ -62,12 +62,12 @@ class BaryonsSpecies : public BaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  /** Legacy override: no-op — pv->index_pt_*_b are dual-written by the layout-based path. */
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
+  void RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                         perturb_vector* pv,
+                                         const precision* ppr,
+                                         int& index_pt,
+                                         const perturb_workspace* ppw,
+                                         int gauge) override;
 
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 

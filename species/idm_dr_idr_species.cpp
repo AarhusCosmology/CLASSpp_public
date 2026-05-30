@@ -467,6 +467,30 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
   return result;
 }
 
+// ── MarkUsedInSources ─────────────────────────────────────────────────────────
+
+void IDM_DR_IDR_Species::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
+                                           const perturb_workspace* ppw,
+                                           int* used_in_sources) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  /* IDM_DR_IDR has no tensor-mode slots; idx_l3 < 0 also when TCA is on.
+     index_ap_rsa_idr and index_ap_tca_idm_dr are only defined in scalar mode,
+     so we must not access them in tensor/vector mode. */
+  if (my.idr.idx_l3 < 0)
+    return;
+  /* IDR l>=3 multipoles not needed in sources when rsa_idr is off, idr is
+     free-streaming, and tca_idm_dr is off. */
+  if (ppw->approx[ppw->index_ap_rsa_idr] != (int) rsa_idr_off)
+    return;
+  if (ppt_->idr_nature != idr_free_streaming)
+    return;
+  if (ppw->approx[ppw->index_ap_tca_idm_dr] != (int) tca_idm_dr_off)
+    return;
+
+  for (int idx = my.idr.idx_l3; idx <= my.idr.idx_delta + my.idr.l_max; ++idx)
+    used_in_sources[idx] = _FALSE_;
+}
+
 void IDM_DR_IDR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
                                                        const BaseSpecies::PerturbLayout& new_base,
                                                        const double* old_y,

@@ -590,17 +590,26 @@ void NCDMBaseSpecies::PrintOmegaInfo() const {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RegisterTensorPerturbationIndices (layout-based)
-// The module pre-sets layout.l_max (from ppr->l_max_ncdm) and layout.q_size
-// (from q_size()) before calling this virtual. Thread-safe: layout/pv are
-// per-thread.
+// Reads ppr->l_max_ncdm and q_size() directly; no caller pre-setup required.
+// Thread-safe: layout/pv are per-thread.
 // ─────────────────────────────────────────────────────────────────────────────
 
 void NCDMBaseSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                         perturb_vector* /*pv*/,
+                                                        const precision* ppr,
                                                         int& index_pt,
                                                         const perturb_workspace* /*ppw*/,
                                                         int /*gauge*/) {
   auto& layout = static_cast<PerturbLayout&>(base);
+
+  /* NCDM tensor slots are only reserved when tensor_method == tm_exact.
+     Other tensor methods (photons-only, massless approximation) do not
+     need NCDM tensor multipoles. */
+  if (ppt_ == nullptr || ppt_->tensor_method != tm_exact)
+    return;
+
+  layout.l_max  = ppr->l_max_ncdm;
+  layout.q_size = q_size();
 
   layout.index_per_q.clear();
   layout.index_per_q.reserve(layout.q_size);
@@ -616,8 +625,10 @@ void NCDMBaseSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayo
 // ─────────────────────────────────────────────────────────────────────────────
 
 void NCDMBaseSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
+                                        const perturb_workspace* /*ppw*/,
                                         int* used_in_sources) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
+  /* NCDMBaseSpecies scalar mask: multipoles l > 2 do not enter source functions. */
   if (layout.q_size < 0)
     return;
   for (int iq = 0; iq < layout.q_size; ++iq) {

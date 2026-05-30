@@ -51,13 +51,6 @@ class NCDMSpecies : public NCDMBaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  /** Legacy scalar register: no-op — dual-written by the layout-based path above. */
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
-
   // Layout-based PerturbDerivs.
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,

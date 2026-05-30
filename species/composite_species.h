@@ -29,20 +29,6 @@ class CompositeSpecies : public BaseSpecies {
   // ── Registration ────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
-  void RegisterPerturbationIndices(perturb_vector* pv,
-                                   const precision* ppr,
-                                   int& index_pt,
-                                   const perturb_workspace* ppw,
-                                   int gauge) override;
-  void RegisterVectorPerturbationIndices(perturb_vector* pv,
-                                         int& index_pt,
-                                         const perturb_workspace* ppw,
-                                         int gauge) override;
-  void RegisterTensorPerturbationIndices(perturb_vector* pv,
-                                         int& index_pt,
-                                         const perturb_workspace* ppw,
-                                         int gauge) override;
-
   // ── Omega0 (closure) ────────────────────────────────────────────────────
   /** Sums GetOmega0() over all children. */
   double GetOmega0() const override {

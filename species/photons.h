@@ -65,36 +65,19 @@ class PhotonsSpecies : public BaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  /** Legacy override: no-op — pv->index_pt_*_g are dual-written by the layout-based path. */
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
-
   void RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                          perturb_vector* pv,
+                                         const precision* ppr,
                                          int& index_pt,
                                          const perturb_workspace* ppw,
                                          int gauge) override;
-
-  /** Legacy override: no-op — pv->index_pt_*_g are dual-written by the layout-based path. */
-  void RegisterVectorPerturbationIndices(perturb_vector* /*pv*/,
-                                         int& /*index_pt*/,
-                                         const perturb_workspace* /*ppw*/,
-                                         int /*gauge*/) override {}
 
   void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                          perturb_vector* pv,
+                                         const precision* ppr,
                                          int& index_pt,
                                          const perturb_workspace* ppw,
                                          int gauge) override;
-
-  /** Legacy override: no-op — pv->index_pt_*_g are dual-written by the layout-based path. */
-  void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/,
-                                         int& /*index_pt*/,
-                                         const perturb_workspace* /*ppw*/,
-                                         int /*gauge*/) override {}
 
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 
@@ -151,6 +134,21 @@ class PhotonsSpecies : public BaseSpecies {
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
+
+  // ── MarkUsedInSources ──────────────────────────────────────────────────────
+
+  /** Photon temperature l>=3 and polarization l=1,3+ are not needed in source
+   *  evaluation when both rsa and tca are off. Called only in scalar mode
+   *  (the dispatch loop in the module is guarded by if (_scalars_)). */
+  void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+                         const perturb_workspace* ppw,
+                         int* used_in_sources) const override;
+
+  /** In tensor mode, photon temperature l=0,2,4 and pol l=0,2,4 are needed;
+   *  mark higher multipoles as unused when both rsa and tca are off. */
+  void MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& layout,
+                               const perturb_workspace* ppw,
+                               int* used_in_sources) const override;
 
   // ── Switch-copy hook ────────────────────────────────────────────────────────
 

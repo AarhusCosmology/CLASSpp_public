@@ -150,11 +150,6 @@ class FluidSpecies : public BaseSpecies {
                                      const PerturbSwitchContext& ctx) const override;
 
   // Legacy signatures: no-op (Fluid is migrated; legacy call sites dual-write is in layout overrides).
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
   void PerturbDerivs(double /*tau*/,
                      const double* /*y*/,
                      double* /*dy*/,

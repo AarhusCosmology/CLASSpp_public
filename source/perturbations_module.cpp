@@ -3291,188 +3291,30 @@ int PerturbationsModule::perturb_vector_init(
   int index_pt = 0;
 
   if (_scalars_) {
-    /* reject inconsistent values of the number of mutipoles in photon temperature hierarchy */
-    class_test(ppr->l_max_g < 4,
-               error_message_,
-               "ppr->l_max_g should be at least 4, i.e. we must integrate at least over photon "
-               "density, velocity, shear, third and fourth momentum");
-
-    /* reject inconsistent values of the number of mutipoles in photon polarization hierarchy */
-    class_test(ppr->l_max_pol_g < 4, error_message_, "ppr->l_max_pol_g should be at least 4");
-
-    /* reject inconsistent values of the number of mutipoles in decay radiation hierarchy.
-       l_max_dr is shared by DCDM_DR and every DNCDM_DR composite (their DR children all
-       index multipoles up to ppv->l_max_dr), so the test must fire whenever any DR-emitting
-       species is present. */
-    bool has_any_dr_species = all_species_.count("DCDM_DR");
-    if (!has_any_dr_species) {
-      for (const auto& sp : all_species_) {
-        if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
-          has_any_dr_species = true;
-          break;
-        }
-      }
-    }
-    if (has_any_dr_species) {
-      class_test(ppr->l_max_dr < 4,
-                 error_message_,
-                 "ppr->l_max_dr should be at least 4, i.e. we must integrate at least over "
-                 "neutrino/relic density, velocity, shear, third and fourth momentum");
-    }
-
-    /* reject inconsistent values of the number of mutipoles in ultra relativistic neutrino hierarchy */
-    if (all_species_.count("UR")) {
-      class_test(ppr->l_max_ur < 4,
-                 error_message_,
-                 "ppr->l_max_ur should be at least 4, i.e. we must integrate at least over "
-                 "neutrino/relic density, velocity, shear, third and fourth momentum");
-    }
-
-    if (all_species_.count("IDM_DR_IDR")) {
-      class_test(((ppr->l_max_idr < 4) && (ppt->idr_nature == idr_free_streaming)),
-                 error_message_,
-                 "ppr->l_max_idr should be at least 4, i.e. we must integrate at least over "
-                 "interacting dark radiation density, velocity, shear, third and fourth momentum");
-    }
-
-    /* photons (l_max read from ppr directly in species::RegisterPerturbationIndices) */
-    {
-      const size_t i = all_species_.index_of("Photons");
-      auto* sp       = all_species_.at("Photons").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* baryons */
-    {
-      const size_t i = all_species_.index_of("Baryons");
-      auto* sp       = all_species_.at("Baryons").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* cdm */
-    if (all_species_.count("CDM")) {
-      const size_t i = all_species_.index_of("CDM");
-      auto* sp       = all_species_.at("CDM").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* IDM_DR + IDR composite */
-    if (all_species_.count("IDM_DR_IDR")) {
-      const size_t i = all_species_.index_of("IDM_DR_IDR");
-      auto* sp       = all_species_.at("IDM_DR_IDR").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* IDM_DRMD + IDR_DRMD composite */
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      const size_t i = all_species_.index_of("IDM_DRMD_IDR_DRMD");
-      auto* sp       = all_species_.at("IDM_DRMD_IDR_DRMD").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* DCDM + DR composite (DR child reads ppr->l_max_dr for its hierarchy length) */
-    if (all_species_.count("DCDM_DR")) {
-      const size_t i = all_species_.index_of("DCDM_DR");
-      auto* sp       = all_species_.at("DCDM_DR").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* DNCDM_DR composites: register each DR child's single-hierarchy F0 slots in
-       all_species_ lex order. Registration order: DR child first (here), DNCDM
-       child second (in the NCDM block below). This preserves the pv->y layout
-       established before Task 22. */
+    /* Per-species perturbation registration — single dispatch loop.
+       Each species reads its own ppr->l_max_* values and fills its layout.
+       Composites (IDM_DR_IDR, IDM_DRMD_IDR_DRMD, DCDM_DR, DNCDM_DR) register
+       all children at their lex position in all_species_. */
     {
       size_t i = 0;
       for (auto& entry : all_species_) {
-        if (auto* d = dynamic_cast<DNCDM_DR_Species*>(entry.get())) {
-          auto& composite_layout = static_cast<DNCDM_DR_Species::PerturbLayout&>(
-              *ppv->species_layouts[i]);
-          d->dr().RegisterPerturbationIndices(composite_layout.dr,
-                                              ppv,
-                                              ppr,
-                                              index_pt,
-                                              ppw,
-                                              ppt->gauge);
-        }
+        entry->RegisterPerturbationIndices(*ppv->species_layouts[i],
+                                           ppv,
+                                           ppr,
+                                           index_pt,
+                                           ppw,
+                                           ppt->gauge);
         ++i;
       }
     }
 
-    /* fluid */
-    if (all_species_.count("Fluid")) {
-      const size_t i = all_species_.index_of("Fluid");
-      auto* sp       = all_species_.at("Fluid").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* scalar field */
-    if (all_species_.count("ScalarField")) {
-      const size_t i = all_species_.index_of("ScalarField");
-      auto* sp       = all_species_.at("ScalarField").get();
-      auto& layout   = *ppv->species_layouts[i];
-      sp->RegisterPerturbationIndices(layout, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* perturbed recombination: the indices are defined once tca is off. */
+    /* perturbed_recombination — owned by the module (extension of the
+       baryon-photon system, not a standalone species). Indices defined
+       once TCA is off. */
     if ((ppt->has_perturbed_recombination == _TRUE_) &&
         (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       class_define_index(ppv->index_pt_perturbed_recombination_delta_temp, _TRUE_, index_pt, 1);
       class_define_index(ppv->index_pt_perturbed_recombination_delta_chi, _TRUE_, index_pt, 1);
-    }
-
-    /* ultra relativistic neutrinos: species reads ppr->l_max_ur via layout. */
-    if (all_species_.count("UR")) {
-      const size_t i = all_species_.index_of("UR");
-      auto* sp       = all_species_.at("UR").get();
-      auto& ur_lay   = static_cast<UltraRelativisticSpecies::PerturbLayout&>(
-          *ppv->species_layouts[i]);
-      ur_lay.l_max = ppr->l_max_ur;  // species reads this before reserving slots
-      sp->RegisterPerturbationIndices(ur_lay, ppv, ppr, index_pt, ppw, ppt->gauge);
-      sp->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-    }
-
-    /* non-cold dark matter */
-
-    if (HasNcdm(all_species_)) {
-      // Register NCDM-family perturbation slots in lex iteration order (matches
-      // all_species_). For DNCDM_DR composites, dispatch on the nested dncdm
-      // sub-layout so indices land in my.dncdm.
-      size_t i = 0;
-      for (auto& entry : all_species_) {
-        BaseSpecies* sp = entry.get();
-        if (auto* n = dynamic_cast<NCDMSpecies*>(sp)) {
-          n->RegisterPerturbationIndices(*ppv->species_layouts[i],
-                                         ppv,
-                                         ppr,
-                                         index_pt,
-                                         ppw,
-                                         ppt->gauge);
-          n->RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-        }
-        else if (auto* composite = dynamic_cast<DNCDM_DR_Species*>(sp)) {
-          auto& comp_layout = static_cast<DNCDM_DR_Species::PerturbLayout&>(
-              *ppv->species_layouts[i]);
-          composite->dncdm()
-              .RegisterPerturbationIndices(comp_layout.dncdm, ppv, ppr, index_pt, ppw, ppt->gauge);
-          composite->dncdm().RegisterPerturbationIndices(ppv, ppr, index_pt, ppw, ppt->gauge);
-        }
-        ++i;
-      }
     }
 
     /* metric (only quantities to be integrated, not those obeying constraint equations) */
@@ -3488,35 +3330,18 @@ int PerturbationsModule::perturb_vector_init(
   }
 
   if (_vectors_) {
-    /* reject inconsistent values of the number of mutipoles in photon temperature hierarchy */
-    class_test(ppr->l_max_g_ten < 4,
-               error_message_,
-               "ppr->l_max_g_ten should be at least 4, i.e. we must integrate at least over photon "
-               "density, velocity, shear, third momentum");
-
-    /* reject inconsistent values of the number of mutipoles in photon polarization hierarchy */
-    class_test(ppr->l_max_pol_g_ten < 4,
-               error_message_,
-               "ppr->l_max_pol_g_ten should be at least 4");
-
-    /* Vector baryon velocity: v_b^{(1)}. Stored in the Baryons layout so that
-       the per-thread layout doubles as a vector-mode index store. */
+    /* Per-species vector-mode registration. */
     {
-      const size_t b_vec_i = all_species_.index_of("Baryons");
-      auto& b_vec_lay = static_cast<BaryonsSpecies::PerturbLayout&>(*ppv->species_layouts[b_vec_i]);
-      b_vec_lay.idx_theta = index_pt;
-      ++index_pt;
-    }
-
-    {
-      const size_t i = all_species_.index_of("Photons");
-      auto* sp       = all_species_.at("Photons").get();
-      auto& layout   = static_cast<PhotonsSpecies::PerturbLayout&>(*ppv->species_layouts[i]);
-      /* Set l_max in layout before calling species (species reads layout.l_max) */
-      layout.l_max     = ppr->l_max_g_ten;
-      layout.l_max_pol = ppr->l_max_pol_g_ten;
-      sp->RegisterVectorPerturbationIndices(layout, ppv, index_pt, ppw, ppt->gauge);
-      sp->RegisterVectorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+      size_t i = 0;
+      for (auto& entry : all_species_) {
+        entry->RegisterVectorPerturbationIndices(*ppv->species_layouts[i],
+                                                 ppv,
+                                                 ppr,
+                                                 index_pt,
+                                                 ppw,
+                                                 ppt->gauge);
+        ++i;
+      }
     }
 
     /** - (a) metric perturbations V or \f$ h_v \f$ depending on gauge */
@@ -3529,26 +3354,21 @@ int PerturbationsModule::perturb_vector_init(
   }
 
   if (_tensors_) {
-    /* reject inconsistent values of the number of mutipoles in photon temperature hierarchy */
-    class_test(ppr->l_max_g_ten < 4,
-               error_message_,
-               "ppr->l_max_g_ten should be at least 4, i.e. we must integrate at least over photon "
-               "density, velocity, shear, third momentum");
-
-    /* reject inconsistent values of the number of mutipoles in photon polarization hierarchy */
-    class_test(ppr->l_max_pol_g_ten < 4,
-               error_message_,
-               "ppr->l_max_pol_g_ten should be at least 4");
-
+    /* Unified per-species tensor-mode registration — unconditional dispatch loop.
+       Each species self-gates: NCDMBaseSpecies::RegisterTensorPerturbationIndices
+       early-returns when ppt_->tensor_method != tm_exact, so no module-side
+       type check is needed. */
     {
-      const size_t i = all_species_.index_of("Photons");
-      auto* sp       = all_species_.at("Photons").get();
-      auto& layout   = static_cast<PhotonsSpecies::PerturbLayout&>(*ppv->species_layouts[i]);
-      /* Set l_max in layout before calling species (species reads layout.l_max) */
-      layout.l_max     = ppr->l_max_g_ten;
-      layout.l_max_pol = ppr->l_max_pol_g_ten;
-      sp->RegisterTensorPerturbationIndices(layout, ppv, index_pt, ppw, ppt->gauge);
-      sp->RegisterTensorPerturbationIndices(ppv, index_pt, ppw, ppt->gauge);
+      size_t i = 0;
+      for (auto& entry : all_species_) {
+        entry->RegisterTensorPerturbationIndices(*ppv->species_layouts[i],
+                                                 ppv,
+                                                 ppr,
+                                                 index_pt,
+                                                 ppw,
+                                                 ppt->gauge);
+        ++i;
+      }
     }
 
     /* Tensor relativistic-neutrino hierarchy (massless ur or massless-approximated
@@ -3563,34 +3383,6 @@ int PerturbationsModule::perturb_vector_init(
       if (ur_lay.l_max >= 3) {
         ur_lay.idx_l3  = index_pt;
         index_pt      += ur_lay.l_max - 2;  // l3, l4, ..., l_max
-      }
-    }
-
-    if (evolve_tensor_ncdm_ == _TRUE_) {
-      // Pre-set per-species layout l_max / q_size before species register slots.
-      class_test(ppr->l_max_ncdm < 4,
-                 error_message_,
-                 "ppr->l_max_ncdm=%d should be at least 4, i.e. we must integrate at least "
-                 "over first four momenta of non-cold dark matter perturbed phase-space "
-                 "distribution",
-                 ppr->l_max_ncdm);
-      for (size_t i = 0; i < all_species_.size(); ++i) {
-        const auto* nsp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
-        if (!nsp)
-          continue;
-        auto& ncdm_lay  = static_cast<NCDMBaseSpecies::PerturbLayout&>(*ppv->species_layouts[i]);
-        ncdm_lay.l_max  = ppr->l_max_ncdm;
-        ncdm_lay.q_size = nsp->q_size();
-      }
-      // Dispatch layout-based register to each species (non-NCDM species have a no-op).
-      {
-        size_t i = 0;
-        for (auto& entry : all_species_) {
-          auto* sp     = entry.get();
-          auto& layout = *ppv->species_layouts[i];
-          sp->RegisterTensorPerturbationIndices(layout, ppv, index_pt, ppw, ppt->gauge);
-          ++i;
-        }
       }
     }
 
@@ -3622,127 +3414,21 @@ int PerturbationsModule::perturb_vector_init(
   for (index_pt = 0; index_pt < ppv->pt_size; index_pt++)
     ppv->used_in_sources[index_pt] = _TRUE_;
 
-  /* Per-species MarkUsedInSources: each migrated species marks its source-irrelevant
-     slots as _FALSE_. This dual-processes alongside the legacy NCDM masking block below.
-     Writing the same _FALSE_ value twice is idempotent (no behaviour change). */
-  for (size_t i = 0; i < all_species_.size(); ++i) {
-    all_species_[i]->MarkUsedInSources(*ppv->species_layouts[i], ppv->used_in_sources);
-  }
-
-  /* indicate which ones are not needed (this is just for saving time,
-     omitting perturbations in this list will not change the
-     results!) */
-
+  /* Per-species MarkUsedInSources: each species marks its approximation-irrelevant
+     slots as _FALSE_ (omitting perturbations in this list does not change results,
+     it only saves evaluation time). Scalar mode only — tensor/vector masking is
+     handled by the _tensors_ / _vectors_ blocks below. */
   if (_scalars_) {
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-      if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-        /* we don't need temperature multipoles above l=2 (but they are
-           defined only when rsa and tca are off) */
-        {
-          const size_t g_i  = all_species_.index_of("Photons");
-          const auto& g_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-              *ppv->species_layouts[g_i]);
-          for (index_pt = g_lay.idx_l3; index_pt <= g_lay.idx_delta + g_lay.l_max; index_pt++)
-            ppv->used_in_sources[index_pt] = _FALSE_;
-
-          /* for polarization, we only need l=0,2 (but l =1,3, ... are
-             defined only when rsa and tca are off) */
-          ppv->used_in_sources[g_lay.idx_pol1] = _FALSE_;
-
-          for (index_pt = g_lay.idx_pol3; index_pt <= g_lay.idx_pol0 + g_lay.l_max_pol; index_pt++)
-            ppv->used_in_sources[index_pt] = _FALSE_;
-        }
-      }
-    }
-
-    if (all_species_.count("UR")) {
-      if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-        if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
-          /* we don't need ur multipoles above l=2 (but they are
-             defined only when rsa and ufa are off) */
-          const size_t ur_i  = all_species_.index_of("UR");
-          const auto& ur_lay = static_cast<const UltraRelativisticSpecies::PerturbLayout&>(
-              *ppv->species_layouts[ur_i]);
-          for (index_pt = ur_lay.idx_l3; index_pt <= ur_lay.idx_delta + ur_lay.l_max; index_pt++)
-            ppv->used_in_sources[index_pt] = _FALSE_;
-        }
-      }
-    }
-
-    if (all_species_.count("IDM_DR_IDR")) {
-      /* we don't need interacting dark radiation multipoles
-         above l=2 (but they are defined only when rsa_idr
-         and tca_idm_dr are off) */
-
-      if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
-        if (ppt->idr_nature == idr_free_streaming) {
-          if ((!all_species_.count("IDM_DR_IDR")) ||
-              ((all_species_.count("IDM_DR_IDR")) &&
-               (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
-            const size_t mark_i  = all_species_.index_of("IDM_DR_IDR");
-            const auto& mark_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                       *ppv->species_layouts[mark_i])
-                                       .idr;
-            for (index_pt = mark_lay.idx_l3; index_pt <= mark_lay.idx_delta + mark_lay.l_max;
-                 index_pt++)
-              ppv->used_in_sources[index_pt] = _FALSE_;
-          }
-        }
-      }
-    }
-
-    if (HasNcdm(all_species_)) {
-      /* we don't need ncdm multipoles above l=2 (but they are
-         defined only when ncdmfa is off) */
-
-      for (size_t i = 0; i < all_species_.size(); ++i) {
-        const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
-        if (!ncdm_sp)
-          continue;
-        const auto& ncdm_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
-            *ppv->species_layouts[i]);
-        for (int index_q = 0; index_q < ncdm_lay.q_size; index_q++) {
-          int index_pt_ncdm = ncdm_lay.index_per_q[index_q];
-          for (int l = 0; l <= ncdm_lay.l_max; l++) {
-            if (l > 2)
-              ppv->used_in_sources[index_pt_ncdm] = _FALSE_;
-            index_pt_ncdm++;
-          }
-        }
-      }
+    for (size_t i = 0; i < all_species_.size(); ++i) {
+      all_species_[i]->MarkUsedInSources(*ppv->species_layouts[i], ppw, ppv->used_in_sources);
     }
   }
 
   if (_tensors_) {
-    if (ppw->approx[ppw->index_ap_rsa] ==
-        (int) rsa_off) { /* if radiation streaming approximation is off */
-      if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-        /* we don't need temperature multipoles above except l=0,2,4 */
-        {
-          const size_t g_i  = all_species_.index_of("Photons");
-          const auto& g_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-              *ppv->species_layouts[g_i]);
-
-          ppv->used_in_sources[g_lay.idx_theta] = _FALSE_;
-          ppv->used_in_sources[g_lay.idx_l3]    = _FALSE_;
-
-          for (index_pt = g_lay.idx_delta + 5; index_pt <= g_lay.idx_delta + g_lay.l_max;
-               index_pt++)
-            ppv->used_in_sources[index_pt] = _FALSE_;
-
-          /* same for polarization, we only need l=0,2,4 */
-
-          ppv->used_in_sources[g_lay.idx_pol1] = _FALSE_;
-          ppv->used_in_sources[g_lay.idx_pol3] = _FALSE_;
-
-          for (index_pt = g_lay.idx_pol0 + 5; index_pt <= g_lay.idx_pol0 + g_lay.l_max_pol;
-               index_pt++)
-            ppv->used_in_sources[index_pt] = _FALSE_;
-        }
-      }
+    for (size_t i = 0; i < all_species_.size(); ++i) {
+      all_species_[i]->MarkTensorUsedInSources(*ppv->species_layouts[i], ppw, ppv->used_in_sources);
     }
-
-    /* we need h' but not h */
+    /* gw is a metric slot, not a species — module-owned. */
     ppv->used_in_sources[ppv->index_pt_gw] = _FALSE_;
   }
 
@@ -4193,25 +3879,6 @@ int PerturbationsModule::perturb_vector_init(
         ppv->y[new_ur_lay.idx_l3]    = ppw->pv->y[old_ur_lay.idx_l3];
         for (int l = 4; l <= new_ur_lay.l_max; l++)
           ppv->y[new_ur_lay.idx_delta + l] = ppw->pv->y[old_ur_lay.idx_delta + l];
-      }
-
-      if (evolve_tensor_ncdm_ == _TRUE_) {
-        for (size_t i = 0; i < all_species_.size(); ++i) {
-          const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
-          if (!ncdm_sp)
-            continue;
-          const auto& new_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
-              *ppv->species_layouts[i]);
-          const auto& old_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
-              *ppw->pv->species_layouts[i]);
-          for (int index_q = 0; index_q < new_lay.q_size; index_q++) {
-            for (int l = 0; l <= new_lay.l_max; l++) {
-              // This is correct with or without ncdmfa, since layout l_max is set accordingly.
-              ppv->y[new_lay.index_per_q[index_q] + l] =
-                  ppw->pv->y[old_lay.index_per_q[index_q] + l];
-            }
-          }
-        }
       }
 
       /* -- case of switching off tight coupling

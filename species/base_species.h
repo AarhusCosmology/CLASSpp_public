@@ -217,34 +217,7 @@ class BaseSpecies {
 
   // ── Perturbations ─────────────────────────────────────────────────────────
 
-  /**
-   * Claim consecutive slots in the perturbation integration vector (scalar mode).
-   * Also writes the species' indices into the corresponding fields of pv
-   * (which other code still uses for e.g. initial conditions and sources).
-   * @param ppw   Current workspace; use approx[] flags and curvature info.
-   * @param gauge Cast of enum possible_gauges (0=newtonian, 1=synchronous).
-   */
-  virtual void RegisterPerturbationIndices(perturb_vector* pv,
-                                           const precision* ppr,
-                                           int& index_pt,
-                                           const perturb_workspace* ppw,
-                                           int gauge) = 0;
-
-  /** Claim perturbation slots for vector modes. Default: no-op (most species are scalar-only). */
-  virtual void RegisterVectorPerturbationIndices(perturb_vector* /*pv*/,
-                                                 int& /*index_pt*/,
-                                                 const perturb_workspace* /*ppw*/,
-                                                 int /*gauge*/) {}
-
-  /** Claim perturbation slots for tensor modes. Default: no-op (most species are scalar-only). */
-  virtual void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/,
-                                                 int& /*index_pt*/,
-                                                 const perturb_workspace* /*ppw*/,
-                                                 int /*gauge*/) {}
-
-  // ── New per-species layout signatures (in-progress migration) ────────────
-  // Migrated species override these; un-migrated species ignore them and the
-  // module call site passes through to the legacy (perturb_vector*) overload.
+  // ── Per-species layout signatures ───────────────────────────────────────
 
   virtual void RegisterPerturbationIndices(PerturbLayout& /*layout*/,
                                            perturb_vector* /*pv*/,
@@ -255,12 +228,14 @@ class BaseSpecies {
 
   virtual void RegisterVectorPerturbationIndices(PerturbLayout& /*layout*/,
                                                  perturb_vector* /*pv*/,
+                                                 const precision* /*ppr*/,
                                                  int& /*index_pt*/,
                                                  const perturb_workspace* /*ppw*/,
                                                  int /*gauge*/) {}
 
   virtual void RegisterTensorPerturbationIndices(PerturbLayout& /*layout*/,
                                                  perturb_vector* /*pv*/,
+                                                 const precision* /*ppr*/,
                                                  int& /*index_pt*/,
                                                  const perturb_workspace* /*ppw*/,
                                                  int /*gauge*/) {}
@@ -511,9 +486,20 @@ class BaseSpecies {
   /**
    * Mark which source slots this species writes during FillSources.
    * Called to build the used_in_sources bitmask/index list.
+   * ppw is supplied so species can consult their approximation flags.
    * Default: no-op. Sources-writing species override to flag their tp indices.
    */
-  virtual void MarkUsedInSources(const PerturbLayout& /*layout*/, int* /*used_in_sources*/) const {}
+  virtual void MarkUsedInSources(const PerturbLayout& /*layout*/,
+                                 const perturb_workspace* /*ppw*/,
+                                 int* /*used_in_sources*/) const {}
+
+  virtual void MarkVectorUsedInSources(const PerturbLayout& /*layout*/,
+                                       const perturb_workspace* /*ppw*/,
+                                       int* /*used_in_sources*/) const {}
+
+  virtual void MarkTensorUsedInSources(const PerturbLayout& /*layout*/,
+                                       const perturb_workspace* /*ppw*/,
+                                       int* /*used_in_sources*/) const {}
 
   // ── Matter tally ──────────────────────────────────────────────────────────
 

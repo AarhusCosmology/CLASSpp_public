@@ -58,6 +58,7 @@ void PhotonsSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& bas
 
 void PhotonsSpecies::RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                        perturb_vector* /*pv*/,
+                                                       const precision* ppr,
                                                        int& index_pt,
                                                        const perturb_workspace* ppw,
                                                        int /*gauge*/) {
@@ -66,7 +67,9 @@ void PhotonsSpecies::RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayou
   layout.idx_delta = layout.idx_theta = layout.idx_shear = layout.idx_l3 = -1;
   layout.idx_pol0 = layout.idx_pol1 = layout.idx_pol2 = layout.idx_pol3 = -1;
 
-  /* l_max / l_max_pol are set by caller (perturb_vector_init) before invoking this method. */
+  /* Photons read their own l_max values from ppr — no caller pre-setup. */
+  layout.l_max     = ppr->l_max_g_ten;
+  layout.l_max_pol = ppr->l_max_pol_g_ten;
 
   /* In vector mode there is no TCA shortcut: either full hierarchy or nothing. */
   if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
@@ -89,6 +92,7 @@ void PhotonsSpecies::RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayou
 
 void PhotonsSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                        perturb_vector* /*pv*/,
+                                                       const precision* ppr,
                                                        int& index_pt,
                                                        const perturb_workspace* ppw,
                                                        int /*gauge*/) {
@@ -97,7 +101,9 @@ void PhotonsSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayou
   layout.idx_delta = layout.idx_theta = layout.idx_shear = layout.idx_l3 = -1;
   layout.idx_pol0 = layout.idx_pol1 = layout.idx_pol2 = layout.idx_pol3 = -1;
 
-  /* l_max / l_max_pol are set by caller (perturb_vector_init) before invoking this method. */
+  /* Photons read their own l_max values from ppr — no caller pre-setup. */
+  layout.l_max     = ppr->l_max_g_ten;
+  layout.l_max_pol = ppr->l_max_pol_g_ten;
 
   if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
     return;
@@ -633,6 +639,51 @@ void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("pol0_g", pol0_g, true);
   w.Add("pol1_g", pol1_g, true);
   w.Add("pol2_g", pol2_g, true);
+}
+
+// ── MarkUsedInSources ─────────────────────────────────────────────────────────
+
+void PhotonsSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
+                                       const perturb_workspace* ppw,
+                                       int* used_in_sources) const {
+  const auto& g_lay = static_cast<const PerturbLayout&>(base);
+  /* Photon temperature l>=3 and pol l=1,3+ are not needed in source evaluation
+     when both rsa and tca are off. */
+  if (ppw->approx[ppw->index_ap_rsa] != (int) rsa_off)
+    return;
+  if (ppw->approx[ppw->index_ap_tca] != (int) tca_off)
+    return;
+
+  for (int idx = g_lay.idx_l3; idx <= g_lay.idx_delta + g_lay.l_max; ++idx)
+    used_in_sources[idx] = _FALSE_;
+
+  used_in_sources[g_lay.idx_pol1] = _FALSE_;
+  for (int idx = g_lay.idx_pol3; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx)
+    used_in_sources[idx] = _FALSE_;
+}
+
+// ── MarkTensorUsedInSources ────────────────────────────────────────────────────
+
+void PhotonsSpecies::MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& base,
+                                             const perturb_workspace* ppw,
+                                             int* used_in_sources) const {
+  const auto& g_lay = static_cast<const PerturbLayout&>(base);
+  /* In tensor mode, we only need temperature l=0,2,4 and pol l=0,2,4
+     when both rsa and tca are off. */
+  if (ppw->approx[ppw->index_ap_rsa] != (int) rsa_off)
+    return;
+  if (ppw->approx[ppw->index_ap_tca] != (int) tca_off)
+    return;
+
+  used_in_sources[g_lay.idx_theta] = _FALSE_;
+  used_in_sources[g_lay.idx_l3]    = _FALSE_;
+  for (int idx = g_lay.idx_delta + 5; idx <= g_lay.idx_delta + g_lay.l_max; ++idx)
+    used_in_sources[idx] = _FALSE_;
+
+  used_in_sources[g_lay.idx_pol1] = _FALSE_;
+  used_in_sources[g_lay.idx_pol3] = _FALSE_;
+  for (int idx = g_lay.idx_pol0 + 5; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx)
+    used_in_sources[idx] = _FALSE_;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

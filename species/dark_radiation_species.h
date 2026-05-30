@@ -67,13 +67,6 @@ class DarkRadiationSpecies : public BaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  /** Legacy scalar register: no-op — composite routes through layout-based path. */
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
-
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
                      const double* y,

@@ -55,14 +55,6 @@ class IDM_DRSpecies : public BaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  /** Legacy override: stubbed — IDM_DR is composite-only (IDM_DR_IDR always
-      dispatches the layout-aware overload on its IDM_DR child). */
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
-
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 
   /** Layout-based PerturbDerivs (primary path). */

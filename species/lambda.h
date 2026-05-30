@@ -42,12 +42,6 @@ class LambdaSpecies : public BaseSpecies {
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   // ── Perturbations ──────────────────────────────────────────────────────────
-  /** Lambda has no perturbations; does nothing. */
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
   void PerturbDerivs(double /*tau*/,
                      const double* /*y*/,
                      double* /*dy*/,

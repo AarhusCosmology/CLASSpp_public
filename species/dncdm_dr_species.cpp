@@ -56,6 +56,21 @@ void DNCDM_DR_Species::BackgroundDerivs(double tau,
 
 // ── Perturbation layout-based overrides ───────────────────────────────────────
 
+void DNCDM_DR_Species::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                   perturb_vector* pv,
+                                                   const precision* ppr,
+                                                   int& index_pt,
+                                                   const perturb_workspace* ppw,
+                                                   int gauge) {
+  auto& my = static_cast<PerturbLayout&>(base);
+  /* DR child first, DNCDM child second — contiguous per composite.
+     NOTE: differs from the legacy split layout (all-DR-of-all-composites
+     first, all-DNCDM-of-all-composites second). See design spec section
+     B.3 for the y-vector reorder rationale. */
+  dr_sp_->RegisterPerturbationIndices(my.dr, pv, ppr, index_pt, ppw, gauge);
+  dncdm_->RegisterPerturbationIndices(my.dncdm, pv, ppr, index_pt, ppw, gauge);
+}
+
 void DNCDM_DR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                      double tau,
                                      const double* y,

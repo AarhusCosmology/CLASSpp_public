@@ -51,14 +51,13 @@ void UltraRelativisticSpecies::WriteBackgroundData(const double* pvecback,
 
 void UltraRelativisticSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                            perturb_vector* /*pv*/,
-                                                           const precision* /*ppr*/,
+                                                           const precision* ppr,
                                                            int& index_pt,
                                                            const perturb_workspace* ppw,
                                                            int /*gauge*/) {
   auto& layout = static_cast<PerturbLayout&>(base);
 
-  /* Caller (perturb_vector_init scalar branch) sets layout.l_max = ppr->l_max_ur
-     before calling so that the full-hierarchy l_max is available here. */
+  layout.l_max         = ppr->l_max_ur; /* moved from perturb_vector_init pre-loop setup */
   const int l_max_full = layout.l_max;
 
   /* If radiation streaming approximation is on, no UR variables are integrated.
@@ -388,6 +387,29 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("delta_ur", delta_ur, true);
   w.Add("theta_ur", theta_ur, true);
   w.Add("shear_ur", shear_ur, true);
+}
+
+// ── MarkUsedInSources ─────────────────────────────────────────────────────────
+
+void UltraRelativisticSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
+                                                 const perturb_workspace* ppw,
+                                                 int* used_in_sources) const {
+  const auto& ur_lay = static_cast<const PerturbLayout&>(base);
+  /* idx_l3 < 0 when RSA is on, UFA is on, or we are in tensor/vector mode
+     (UR has no tensor slots). index_ap_ufa is only defined in scalar mode,
+     so we must not access it when idx_l3 < 0. */
+  if (ur_lay.idx_l3 < 0)
+    return;
+  /* UR l>=3 multipoles not needed in sources when both rsa and ufa are off.
+     (The idx_l3 >= 0 guard above already implies rsa_off and ufa_off, but we
+     check explicitly for clarity and to mirror the legacy module condition.) */
+  if (ppw->approx[ppw->index_ap_rsa] != (int) rsa_off)
+    return;
+  if (ppw->approx[ppw->index_ap_ufa] != (int) ufa_off)
+    return;
+
+  for (int idx = ur_lay.idx_l3; idx <= ur_lay.idx_delta + ur_lay.l_max; ++idx)
+    used_in_sources[idx] = _FALSE_;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

@@ -80,13 +80,6 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  /** Legacy scalar register: no-op — dual-written by the layout-based path above. */
-  void RegisterPerturbationIndices(perturb_vector* /*pv*/,
-                                   const precision* /*ppr*/,
-                                   int& /*index_pt*/,
-                                   const perturb_workspace* /*ppw*/,
-                                   int /*gauge*/) override {}
-
   // Layout-based scalar PerturbDerivs (called by DNCDM_DR_Species composite
   // with my.dncdm). The legacy (non-layout) overload throws — no real path
   // exercises it (the composite always passes a layout).

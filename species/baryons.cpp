@@ -22,6 +22,16 @@ void BaryonsSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& bas
   ++index_pt;
 }
 
+void BaryonsSpecies::RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& base,
+                                                       perturb_vector* /*pv*/,
+                                                       const precision* /*ppr*/,
+                                                       int& index_pt,
+                                                       const perturb_workspace* /*ppw*/,
+                                                       int /*gauge*/) {
+  auto& layout     = static_cast<PerturbLayout&>(base);
+  layout.idx_theta = index_pt++; /* v_b^{(1)} */
+}
+
 // ── PerturbDerivs (layout-based, primary path) ────────────────────────────
 
 void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,

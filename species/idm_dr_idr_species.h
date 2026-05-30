@@ -54,6 +54,17 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
     return has_idr_;
   }
 
+  void SetPerturbs(const perturbs* ppt) override {
+    ppt_ = ppt;
+    CompositeSpecies::SetPerturbs(ppt);
+  }
+
+  /** IDR l>=3 multipoles not needed in sources when rsa_idr is off, idr is
+   *  free-streaming, and tca_idm_dr is off. */
+  void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+                         const perturb_workspace* ppw,
+                         int* used_in_sources) const override;
+
   std::optional<double> GetParam(const std::string& name) const override;
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
@@ -142,6 +153,7 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
   IDM_DRSpecies* idm_dr_ = nullptr;
   IDRSpecies* idr_       = nullptr;
   const background& pba_;
-  bool has_idm_dr_ = false;
-  bool has_idr_    = false;
+  bool has_idm_dr_     = false;
+  bool has_idr_        = false;
+  const perturbs* ppt_ = nullptr;
 };

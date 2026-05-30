@@ -2719,6 +2719,41 @@ int InputModule::input_read_parameters() {
     }
   }
 
+  /* ── Precision-consistency tests for perturbation-hierarchy l_max values.
+     Moved here from perturb_vector_init: these checks depend only on ppr
+     (plus ppt->idr_nature for the IDR test), so they belong at input-parse
+     time, not inside the per-(k, approximation) hot path.  Tests run
+     unconditionally — a too-low l_max is a user-config error whether or not
+     the species ends up active. */
+  class_test(ppr->l_max_g < 4,
+             errmsg,
+             "ppr->l_max_g should be at least 4, i.e. we must integrate at least over photon "
+             "density, velocity, shear, third and fourth momentum");
+  class_test(ppr->l_max_pol_g < 4, errmsg, "ppr->l_max_pol_g should be at least 4");
+  class_test(ppr->l_max_ur < 4,
+             errmsg,
+             "ppr->l_max_ur should be at least 4, i.e. we must integrate at least over "
+             "neutrino/relic density, velocity, shear, third and fourth momentum");
+  class_test(ppr->l_max_dr < 4,
+             errmsg,
+             "ppr->l_max_dr should be at least 4, i.e. we must integrate at least over "
+             "neutrino/relic density, velocity, shear, third and fourth momentum");
+  class_test((ppr->l_max_idr < 4) && (ppt->idr_nature == idr_free_streaming),
+             errmsg,
+             "ppr->l_max_idr should be at least 4, i.e. we must integrate at least over "
+             "interacting dark radiation density, velocity, shear, third and fourth momentum");
+  class_test(ppr->l_max_g_ten < 4,
+             errmsg,
+             "ppr->l_max_g_ten should be at least 4, i.e. we must integrate at least over photon "
+             "density, velocity, shear, third momentum");
+  class_test(ppr->l_max_pol_g_ten < 4, errmsg, "ppr->l_max_pol_g_ten should be at least 4");
+  class_test(ppr->l_max_ncdm < 4,
+             errmsg,
+             "ppr->l_max_ncdm=%d should be at least 4, i.e. we must integrate at least "
+             "over first four momenta of non-cold dark matter perturbed phase-space "
+             "distribution",
+             ppr->l_max_ncdm);
+
   return _SUCCESS_;
 }
 

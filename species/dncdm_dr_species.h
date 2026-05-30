@@ -69,10 +69,12 @@ class DNCDM_DR_Species : public CompositeSpecies {
   }
 
   // ── Perturbations ──────────────────────────────────────────────────────────
-  // NOTE: RegisterPerturbationIndices is intentionally NOT overridden here.
-  // The module calls each child's Register directly (DR child first, then DNCDM child via
-  // the NCDM block) to preserve the pv->y slot ordering established before Task 22.
-  // See perturbations_module.cpp around the DNCDM_DR block for the direct-call site.
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
+                                   const precision* ppr,
+                                   int& index_pt,
+                                   const perturb_workspace* ppw,
+                                   int gauge) override;
 
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,

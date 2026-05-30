@@ -127,19 +127,17 @@ class NCDMBaseSpecies : public BaseSpecies {
   void SetBackgroundModule(const BackgroundModule* bgm) override {
     bgm_ = bgm;
   }
+  void SetPerturbs(const perturbs* ppt) override {
+    ppt_ = ppt;
+  }
 
   // ── Layout-based tensor register (shared by NCDM and DNCDM) ──────────────
   void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                          perturb_vector* pv,
+                                         const precision* ppr,
                                          int& index_pt,
                                          const perturb_workspace* ppw,
                                          int gauge) override;
-
-  /** Legacy tensor register: no-op — dual-written by the layout-based path. */
-  void RegisterTensorPerturbationIndices(perturb_vector* /*pv*/,
-                                         int& /*index_pt*/,
-                                         const perturb_workspace* /*ppw*/,
-                                         int /*gauge*/) override {}
 
   // ── Layout-based tensor Boltzmann hierarchy ───────────────────────────────
   /** Tensor-mode Boltzmann hierarchy for NCDM species.
@@ -163,6 +161,7 @@ class NCDMBaseSpecies : public BaseSpecies {
   // ── MarkUsedInSources ────────────────────────────────────────────────────
   /** NCDM multipoles l > 2 do not enter source functions. */
   void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+                         const perturb_workspace* ppw,
                          int* used_in_sources) const override;
 
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
@@ -228,6 +227,8 @@ class NCDMBaseSpecies : public BaseSpecies {
   double h_                    = 0.;
 
  private:
+  const perturbs* ppt_ = nullptr;
+
   struct DistributionParams {
     const NCDMBaseSpecies* sp = nullptr;
     // For file-based PSD interpolation:
