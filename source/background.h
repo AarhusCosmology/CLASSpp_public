@@ -73,46 +73,20 @@ struct background {
   // photons (Omega0_g), baryons (Omega0_b), and curvature (Omega0_k) live
   // on pba.
 
-  enum equation_of_state fluid_equation_of_state =
-      CLP; /**< parametrisation scheme for fluid equation of state */
+  // Fluid physics params (fluid_equation_of_state, w0_fld, wa_fld, cs2_fld,
+  // Omega_EDE, use_ppf, c_gamma_over_c_fld) live on FluidSpecies — see
+  // FluidSpecies::CreateAll for the parser and species/fluid.h for the
+  // accessors used by cross-module readers.
 
-  double w0_fld    = -1.; /**< \f$ w0_{DE} \f$: current fluid equation of state parameter */
-  double wa_fld    = 0.;  /**< \f$ wa_{DE} \f$: fluid equation of state parameter derivative */
-  double Omega_EDE = 0.;  /**< \f$ wa_{DE} \f$: Early Dark Energy density parameter */
-
-  double cs2_fld = 1.; /**< \f$ c^2_{s~DE} \f$: sound speed of the fluid
-		     in the frame comoving with the fluid (so, this is
-		     not [delta p/delta rho] in the synchronous or
-		     newtonian gauge!) */
-
-  short use_ppf = _TRUE_; /**< flag switching on PPF perturbation equations
-                    instead of true fluid equations for
-                    perturbations. It could have been defined inside
-                    perturbation structure, but we leave it here in
-                    such way to have all fld parameters grouped. */
-
-  double c_gamma_over_c_fld = 0.4; /**< ppf parameter defined in eq. (16) of 0808.3125 [astro-ph] */
-
-  double T_idr =
-      0.; /**< \f$ T_{idr} \f$: current temperature of interacting dark radiation in Kelvins */
-
-  double Gamma_dcdm =
-      0.; /**< \f$ \Gamma_{dcdm} \f$: decay constant for decaying cold dark matter */
-
-  double
-      Omega_ini_dcdm; /**< \f$ \Omega_{ini,dcdm} \f$: rescaled initial value for dcdm density (see 1407.2418 for definitions) */
-
-  short attractor_ic_scf = _TRUE_; /**< whether the scalar field has attractor initial conditions */
-  double phi_ini_scf     = 1;      /**< \f$ \phi(t_0) \f$: scalar field initial value */
-  double phi_prime_ini_scf =
-      1; /**< \f$ d\phi(t_0)/d\tau \f$: scalar field initial derivative wrt conformal time */
-  std::vector<double>
-      scf_parameters;       /**< list of parameters describing the scalar field potential */
-  int scf_tuning_index = 0; /**< index in scf_parameters used for tuning */
+  // DCDM physics params (Gamma_dcdm, Omega_ini_dcdm) live on DCDMSpecies — see
+  // DCDM_DR_Species::CreateAll for the parser and species/dcdm.h for the
+  // accessors used by cross-module readers.
+  // IDR physics params (T_idr, l_max_idr) live on IDRSpecies — see
+  // IDM_DR_IDR_Species::CreateAll for the parser and species/idr.h for the
+  // accessors used by cross-module readers.
 
   double Omega0_k = 0.; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
 
-  int l_max_idr = 0;
   /** @name - related parameters */
 
   //@{
@@ -132,17 +106,6 @@ struct background {
   //@}
 
   enum background_evolution_method background_method = bgevo_evolver;
-
-  // Species-presence flags and Omega0_<species> removed; species own their own
-  // density (queryable via species->GetOmega0()).
-
-  //@{
-
-  double f_idm_drmd      = 0.;
-  double G_over_aH_drmd  = 0.;
-  double delta_Neff_drmd = 0.;
-  double z_stop          = 0.;
-  //@}
 
   ClosureSpecies closure_species = ClosureSpecies::None;
 

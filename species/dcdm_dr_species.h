@@ -28,7 +28,11 @@ class DCDM_DR_Species : public CompositeSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
-  DCDM_DR_Species(const background* pba, const BackgroundModule* bgm, double omega0_dcdmdr);
+  DCDM_DR_Species(const background* pba,
+                  const BackgroundModule* bgm,
+                  double omega0_dcdmdr,
+                  double Gamma_dcdm,
+                  double Omega_ini_dcdm);
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;

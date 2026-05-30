@@ -1,6 +1,8 @@
 #include "fluid.h"
 
 #include <cmath>
+#include <stdexcept>
+#include <string>
 
 #include "background.h"
 #include "background_column_writer.h"
@@ -11,8 +13,18 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-FluidSpecies::FluidSpecies(const background& pba, double omega0_fld)
-    : BaseSpecies("Fluid", EnergyType::DarkEnergy), pba_(pba), Omega0_fld_(omega0_fld) {}
+FluidSpecies::FluidSpecies(const background& pba,
+                           double omega0_fld,
+                           equation_of_state fluid_eos,
+                           double w0_fld,
+                           double wa_fld,
+                           double cs2_fld,
+                           double Omega_EDE,
+                           short use_ppf,
+                           double c_gamma_over_c_fld)
+    : BaseSpecies("Fluid", EnergyType::DarkEnergy), pba_(pba), Omega0_fld_(omega0_fld),
+      fluid_eos_(fluid_eos), w0_fld_(w0_fld), wa_fld_(wa_fld), cs2_fld_(cs2_fld),
+      Omega_EDE_(Omega_EDE), use_ppf_(use_ppf), c_gamma_over_c_fld_(c_gamma_over_c_fld) {}
 
 void FluidSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_fld_, _TRUE_, index_bg, 1);
@@ -79,7 +91,7 @@ void FluidSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                const perturb_workspace* /*ppw*/,
                                                int /*gauge*/) {
   auto& layout = static_cast<PerturbLayout&>(base);
-  if (pba_.use_ppf == _FALSE_) {
+  if (use_ppf_ == _FALSE_) {
     class_define_index(layout.idx_delta, _TRUE_, index_pt, 1);
     class_define_index(layout.idx_theta, _TRUE_, index_pt, 1);
   }
@@ -103,12 +115,12 @@ void FluidSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double metric_continuity = ctx.metric_continuity;
   const double metric_euler      = ctx.metric_euler;
 
-  if (pba_.use_ppf == _FALSE_) {
+  if (use_ppf_ == _FALSE_) {
     const double w_fld          = ppw->pvecback[index_bg_w_fld_];
     const double dw_over_da_fld = ppw->pvecback[index_bg_dw_over_da_fld_];
     const double w_prime_fld    = dw_over_da_fld * a_prime_over_a * a;
     const double ca2            = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
-    const double cs2            = pba_.cs2_fld;
+    const double cs2            = cs2_fld_;
 
     dy[layout.idx_delta] = -(1. + w_fld) * (y[layout.idx_theta] + metric_continuity) -
                            3. * (cs2 - w_fld) * a_prime_over_a * y[layout.idx_delta] -
@@ -168,7 +180,7 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
   const auto& layout = static_cast<const PerturbLayout&>(base);
   if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
     return;
-  if (ctx.p_mod->GetBackground()->use_ppf == _TRUE_)
+  if (use_ppf_ == _TRUE_)
     return;
   if (layout.idx_delta < 0 || layout.idx_theta < 0)
     return;
@@ -179,14 +191,11 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
              bgm->error_message_,
              bgm->error_message_);
 
-  y[layout.idx_delta] = -ctx.ktau_two / 4. * (1. + w_fld) *
-                        (4. - 3. * ctx.p_mod->GetBackground()->cs2_fld) /
-                        (4. - 6. * w_fld + 3. * ctx.p_mod->GetBackground()->cs2_fld) *
-                        ctx.ppr->curvature_ini * ctx.s2_squared;
+  y[layout.idx_delta] = -ctx.ktau_two / 4. * (1. + w_fld) * (4. - 3. * cs2_fld_) /
+                        (4. - 6. * w_fld + 3. * cs2_fld_) * ctx.ppr->curvature_ini * ctx.s2_squared;
 
-  y[layout.idx_theta] = -ctx.k * ctx.ktau_three / 4. * ctx.p_mod->GetBackground()->cs2_fld /
-                        (4. - 6. * w_fld + 3. * ctx.p_mod->GetBackground()->cs2_fld) *
-                        ctx.ppr->curvature_ini * ctx.s2_squared;
+  y[layout.idx_theta] = -ctx.k * ctx.ktau_three / 4. * cs2_fld_ /
+                        (4. - 6. * w_fld + 3. * cs2_fld_) * ctx.ppr->curvature_ini * ctx.s2_squared;
 }
 
 void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
@@ -261,8 +270,8 @@ double FluidSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
   const double rho_plus_p_theta_fld = (1. + w_fld) * rho * y[layout.idx_theta];
   const double ca2_fld              = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
 
-  return pba_.cs2_fld * delta_rho_fld +
-         (pba_.cs2_fld - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
+  return cs2_fld_ * delta_rho_fld +
+         (cs2_fld_ - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
 }
 double FluidSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& /*base*/,
                                    const perturb_vector* /*pv*/,
@@ -281,24 +290,23 @@ int FluidSpecies::ComputeWFld(double a,
   double a_eq               = 0.0;
 
   /** - first, define the function w(a) */
-  switch (pba_.fluid_equation_of_state) {
+  switch (fluid_eos_) {
     case CLP:
-      *w_fld = pba_.w0_fld + pba_.wa_fld * (1. - a / pba_.a_today);
+      *w_fld = w0_fld_ + wa_fld_ * (1. - a / pba_.a_today);
       break;
     case EDE: {
       // Omega_ede(a) taken from eq. (10) in 1706.00730
-      Omega_ede = (Omega0_fld_ - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) /
-                      (Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * pba_.w0_fld)) +
-                  pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld));
+      Omega_ede = (Omega0_fld_ - Omega_EDE_ * (1. - pow(a, -3. * w0_fld_))) /
+                      (Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * w0_fld_)) +
+                  Omega_EDE_ * (1. - pow(a, -3. * w0_fld_));
 
       // d Omega_ede / d a taken analytically from the above
-      dOmega_ede_over_da = -pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.) /
-                               (Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * pba_.w0_fld)) -
-                           (Omega0_fld_ - pba_.Omega_EDE * (1. - pow(a, -3. * pba_.w0_fld))) *
-                               (1. - Omega0_fld_) * 3. * pba_.w0_fld *
-                               pow(a, 3. * pba_.w0_fld - 1.) /
-                               pow(Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * pba_.w0_fld), 2) +
-                           pba_.Omega_EDE * 3. * pba_.w0_fld * pow(a, -3. * pba_.w0_fld - 1.);
+      dOmega_ede_over_da = -Omega_EDE_ * 3. * w0_fld_ * pow(a, -3. * w0_fld_ - 1.) /
+                               (Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * w0_fld_)) -
+                           (Omega0_fld_ - Omega_EDE_ * (1. - pow(a, -3. * w0_fld_))) *
+                               (1. - Omega0_fld_) * 3. * w0_fld_ * pow(a, 3. * w0_fld_ - 1.) /
+                               pow(Omega0_fld_ + (1. - Omega0_fld_) * pow(a, 3. * w0_fld_), 2) +
+                           Omega_EDE_ * 3. * w0_fld_ * pow(a, -3. * w0_fld_ - 1.);
 
       // find a_equality (needed because EDE tracks first radiation, then matter)
       double Omega_r =
@@ -333,9 +341,9 @@ int FluidSpecies::ComputeWFld(double a,
       but with a loss of precision; as long as there is a simple
       analytic expression of the derivative of the previous
       function, let's use it! */
-  switch (pba_.fluid_equation_of_state) {
+  switch (fluid_eos_) {
     case CLP:
-      *dw_over_da_fld = -pba_.wa_fld / pba_.a_today;
+      *dw_over_da_fld = -wa_fld_ / pba_.a_today;
       break;
     case EDE: {
       double d2Omega_ede_over_da2 = 0.;
@@ -358,10 +366,10 @@ int FluidSpecies::ComputeWFld(double a,
         implement a numerical calculation of this integral only for
         a=a_ini, using for instance Romberg integration. It should be
         fast, simple, and accurate enough. */
-  switch (pba_.fluid_equation_of_state) {
+  switch (fluid_eos_) {
     case CLP:
-      *integral_fld = 3. * ((1. + pba_.w0_fld + pba_.wa_fld) * log(pba_.a_today / a) +
-                            pba_.wa_fld * (a / pba_.a_today - 1.));
+      *integral_fld = 3. * ((1. + w0_fld_ + wa_fld_) * log(pba_.a_today / a) +
+                            wa_fld_ * (a / pba_.a_today - 1.));
       break;
     case EDE:
       class_stop(bgm_->error_message_,
@@ -392,7 +400,7 @@ void FluidSpecies::ComputePpf(double k,
   const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
   double s2sq               = ppw->s_l[2] * ppw->s_l[2];
-  double c_gamma_k_H_square = pow(pba_.c_gamma_over_c_fld * k / a_prime_over_a, 2) * pba_.cs2_fld;
+  double c_gamma_k_H_square = pow(c_gamma_over_c_fld_ * k / a_prime_over_a, 2) * cs2_fld_;
   /** The equation is too stiff for Runge-Kutta when c_gamma_k_H_square is large.
       Use the asymptotic solution Gamma=Gamma'=0 in that case.
   */
@@ -521,19 +529,70 @@ void FluidSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayou
 std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
 
-  // Closure-Fluid path: ConstructSpecies's Pass 2 hands us the budget-closure value.
+  // Resolve Omega0_fld first: either the closure-budget override or pfc.
+  double omega0_fld = 0.;
   if (ctx.omega0_closure_override.has_value()) {
-    const double omega0_fld = *ctx.omega0_closure_override;
-    if (omega0_fld != 0.)
-      result.push_back({"Fluid", std::make_unique<FluidSpecies>(*ctx.pba, omega0_fld)});
+    omega0_fld = *ctx.omega0_closure_override;
+  }
+  else {
+    ctx.pfc->read_double("Omega_fld", omega0_fld);
+  }
+  if (omega0_fld == 0.)
     return result;
+
+  // ── fluid_equation_of_state (string-keyed enum) ────────────────────────────
+  equation_of_state fluid_eos = CLP;
+  std::string eos_str;
+  if (ctx.pfc->read_string("fluid_equation_of_state", eos_str)) {
+    if (eos_str.find("CLP") != std::string::npos || eos_str.find("clp") != std::string::npos) {
+      fluid_eos = CLP;
+    }
+    else if (eos_str.find("EDE") != std::string::npos || eos_str.find("ede") != std::string::npos) {
+      fluid_eos = EDE;
+    }
+    else {
+      throw std::invalid_argument("incomprehensible input '" + eos_str +
+                                  "' for the field 'fluid_equation_of_state'");
+    }
   }
 
-  // Non-closure Fluid: read Omega_fld directly from the input file.
-  double omega0_fld = 0.;
-  if (!ctx.pfc->read_double("Omega_fld", omega0_fld) || omega0_fld == 0.)
-    return result;
+  // ── numeric params ────────────────────────────────────────────────────────
+  double w0_fld    = -1.;
+  double wa_fld    = 0.;
+  double cs2_fld   = 1.;
+  double Omega_EDE = 0.;
+  if (fluid_eos == CLP) {
+    ctx.pfc->read_double("w0_fld", w0_fld);
+    ctx.pfc->read_double("wa_fld", wa_fld);
+    ctx.pfc->read_double("cs2_fld", cs2_fld);
+  }
+  else {  // EDE
+    ctx.pfc->read_double("w0_fld", w0_fld);
+    ctx.pfc->read_double("Omega_EDE", Omega_EDE);
+    ctx.pfc->read_double("cs2_fld", cs2_fld);
+  }
 
-  result.push_back({"Fluid", std::make_unique<FluidSpecies>(*ctx.pba, omega0_fld)});
+  // ── PPF flag + sound-speed param ──────────────────────────────────────────
+  short use_ppf             = _TRUE_;
+  double c_gamma_over_c_fld = 0.4;
+  std::string ppf_str;
+  if (ctx.pfc->read_string("use_ppf", ppf_str)) {
+    use_ppf = (ppf_str.find("y") != std::string::npos || ppf_str.find("Y") != std::string::npos)
+                  ? _TRUE_
+                  : _FALSE_;
+  }
+  if (use_ppf == _TRUE_)
+    ctx.pfc->read_double("c_gamma_over_c_fld", c_gamma_over_c_fld);
+
+  result.push_back({"Fluid",
+                    std::make_unique<FluidSpecies>(*ctx.pba,
+                                                   omega0_fld,
+                                                   fluid_eos,
+                                                   w0_fld,
+                                                   wa_fld,
+                                                   cs2_fld,
+                                                   Omega_EDE,
+                                                   use_ppf,
+                                                   c_gamma_over_c_fld)});
   return result;
 }

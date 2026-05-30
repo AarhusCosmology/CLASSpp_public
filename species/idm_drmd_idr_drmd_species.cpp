@@ -181,8 +181,14 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
 
 IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba,
                                                      double omega0_idm_drmd,
-                                                     double omega0_idr_drmd)
-    : CompositeSpecies("IDM_DRMD_IDR_DRMD", BaseSpecies::EnergyType::Other), pba_(pba) {
+                                                     double omega0_idr_drmd,
+                                                     double f_idm_drmd,
+                                                     double G_over_aH_drmd,
+                                                     double delta_Neff_drmd,
+                                                     double z_stop)
+    : CompositeSpecies("IDM_DRMD_IDR_DRMD", BaseSpecies::EnergyType::Other), pba_(pba),
+      f_idm_drmd_(f_idm_drmd), G_over_aH_drmd_(G_over_aH_drmd), delta_Neff_drmd_(delta_Neff_drmd),
+      z_stop_(z_stop) {
   has_idm_drmd_ = (omega0_idm_drmd != 0.);
   has_idr_drmd_ = (omega0_idr_drmd != 0.);
   auto idm      = std::make_unique<IDM_DRMDSpecies>(pba, omega0_idm_drmd);
@@ -380,9 +386,22 @@ std::vector<Named> IDM_DRMD_IDR_DRMD_Species::CreateAll(const SpeciesBuildContex
   const double omega0_idm_drmd = ctx.omega_budget->idm_drmd.value_or(0.);
   const double omega0_idr_drmd = ctx.omega_budget->idr_drmd.value_or(0.);
   if (omega0_idm_drmd != 0. || omega0_idr_drmd != 0.) {
-    result.push_back(
-        {"IDM_DRMD_IDR_DRMD",
-         std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*ctx.pba, omega0_idm_drmd, omega0_idr_drmd)});
+    double f_idm_drmd      = 0.;
+    double G_over_aH_drmd  = 0.;
+    double delta_Neff_drmd = 0.;
+    double z_stop          = 0.;
+    ctx.pfc->read_double("f_idm_drmd", f_idm_drmd);
+    ctx.pfc->read_double("G_over_aH_drmd_ini", G_over_aH_drmd);
+    ctx.pfc->read_double("delta_Neff_drmd", delta_Neff_drmd);
+    ctx.pfc->read_double("z_stop", z_stop);
+    result.push_back({"IDM_DRMD_IDR_DRMD",
+                      std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*ctx.pba,
+                                                                  omega0_idm_drmd,
+                                                                  omega0_idr_drmd,
+                                                                  f_idm_drmd,
+                                                                  G_over_aH_drmd,
+                                                                  delta_Neff_drmd,
+                                                                  z_stop)});
   }
   return result;
 }

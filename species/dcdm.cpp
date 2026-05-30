@@ -5,8 +5,12 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-DCDMSpecies::DCDMSpecies(const background& pba, double omega0_dcdmdr)
-    : BaseSpecies("DCDM", EnergyType::Matter), pba_(pba), Omega0_dcdmdr_(omega0_dcdmdr) {}
+DCDMSpecies::DCDMSpecies(const background& pba,
+                         double omega0_dcdmdr,
+                         double Gamma_dcdm,
+                         double Omega_ini_dcdm)
+    : BaseSpecies("DCDM", EnergyType::Matter), pba_(pba), Omega0_dcdmdr_(omega0_dcdmdr),
+      Gamma_dcdm_(Gamma_dcdm), Omega_ini_dcdm_(Omega_ini_dcdm) {}
 
 void DCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_dcdm_, _TRUE_, index_bg, 1);
@@ -18,7 +22,7 @@ void DCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
 }
 
 void DCDMSpecies::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
-  pvecback_integration[index_bi_rho_dcdm_] = pba_.Omega_ini_dcdm * std::pow(pba_.H0, 2) *
+  pvecback_integration[index_bi_rho_dcdm_] = Omega_ini_dcdm_ * std::pow(pba_.H0, 2) *
                                              std::pow(1.0 / a_rel, 3);
 }
 
@@ -34,7 +38,7 @@ void DCDMSpecies::BackgroundDerivs(double /*tau*/,
   const double H   = pvecback[bgm_->index_bg_H_];
   const double rho = y[index_bi_rho_dcdm_];
   /** rho' = -a*(3H + Gamma) * rho */
-  dy[index_bi_rho_dcdm_] = -a * (3. * H + pba_.Gamma_dcdm) * rho;
+  dy[index_bi_rho_dcdm_] = -a * (3. * H + Gamma_dcdm_) * rho;
 }
 
 double DCDMSpecies::Rho(const double* pvecback) const {
@@ -51,7 +55,7 @@ double DCDMSpecies::DpDloga(const double* /*pvecback*/) const {
 double DCDMSpecies::RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {
   // ρ̇/ρ = -a(3H + Γ) = -3ℋ - aΓ  (same physics as BackgroundDerivs).
   const double a = pvecback[bgm_->index_bg_a_];
-  return -3. * a_prime_over_a - a * pba_.Gamma_dcdm;
+  return -3. * a_prime_over_a - a * Gamma_dcdm_;
 }
 
 void DCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
@@ -79,7 +83,7 @@ void DCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   dy[layout.idx_delta] = -(y[layout.idx_theta] + ctx.metric_continuity) -
-                         ctx.a * pba_.Gamma_dcdm / ctx.k2 * ctx.metric_euler;
+                         ctx.a * Gamma_dcdm_ / ctx.k2 * ctx.metric_euler;
   dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
 }
 
@@ -205,7 +209,7 @@ void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
       const double alpha  = pvecmetric[ppw->index_mt_alpha];
       const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
       const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      delta_dcdm         += alpha * (-a * pba_.Gamma_dcdm - 3. * a * H);
+      delta_dcdm         += alpha * (-a * Gamma_dcdm_ - 3. * a * H);
       theta_dcdm         += k * k * alpha;
     }
   }

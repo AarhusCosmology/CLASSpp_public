@@ -302,7 +302,8 @@ int InputModule::ReadCoupledOmegaBudget() {
   class_read_int("input_verbose", input_verbose);
 
   // ── IDR: stat_f_idr * (T_idr / T_cmb)^4 * Omega0_g ───────────────────────────
-  // T_idr (a physics param, not an Omega) stays on pba.
+  // T_idr is a physics param owned by IDRSpecies; compute a local copy here
+  // solely to derive the omega budget entry for IDR.
   double stat_f_idr = 7. / 8.;
   class_read_double("stat_f_idr", stat_f_idr);
 
@@ -313,28 +314,29 @@ int InputModule::ReadCoupledOmegaBudget() {
              errmsg,
              "In input file, you can only enter one of N_idr, N_dg or xi_idr, choose one");
 
+  double T_idr_local = 0.;
   if (flag1 == _TRUE_) {
-    pba->T_idr = pow(param1 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
-                 pba->T_cmb;
+    T_idr_local = pow(param1 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
+                  pba->T_cmb;
     if (input_verbose > 1)
       printf(
           "You passed N_idr = N_dg = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
           "\n",
           param1,
-          pba->T_idr / pba->T_cmb);
+          T_idr_local / pba->T_cmb);
   }
   else if (flag2 == _TRUE_) {
-    pba->T_idr = pow(param2 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
-                 pba->T_cmb;
+    T_idr_local = pow(param2 / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
+                  pba->T_cmb;
     if (input_verbose > 2)
       printf(
           "You passed N_dg = N_idr = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
           "\n",
           param2,
-          pba->T_idr / pba->T_cmb);
+          T_idr_local / pba->T_cmb);
   }
   else if (flag3 == _TRUE_) {
-    pba->T_idr = param3 * pba->T_cmb;
+    T_idr_local = param3 * pba->T_cmb;
     if (input_verbose > 1)
       printf(
           "You passed xi_idr = %e, this is equivalent to N_idr = N_dg = %e in the NADM notation. "
@@ -347,7 +349,7 @@ int InputModule::ReadCoupledOmegaBudget() {
   // (Matches the legacy semantics: pba->Omega0_idr was always written, but only became
   // nonzero when T_idr was set by one of these inputs.)
   if (flag1 == _TRUE_ || flag2 == _TRUE_ || flag3 == _TRUE_) {
-    omega_budget_.idr = stat_f_idr * pow(pba->T_idr / pba->T_cmb, 4.) * pba->Omega0_g;
+    omega_budget_.idr = stat_f_idr * pow(T_idr_local / pba->T_cmb, 4.) * pba->Omega0_g;
   }
 
   // ── CDM: parser value (or default), then synchronous-gauge minimum ───────────
@@ -418,8 +420,9 @@ int InputModule::ReadCoupledOmegaBudget() {
     omega_budget_.cdm    = new_cdm;
   }
 
-  // ── DCDM_DR: Omega_dcdmdr / omega_dcdmdr; Omega_ini_dcdm / Gamma_dcdm ────────
-  // (Gamma_dcdm and Omega_ini_dcdm are physics params, not Omega0; they stay on pba.)
+  // ── DCDM_DR: Omega_dcdmdr / omega_dcdmdr ────────────────────────────────────
+  // Gamma_dcdm and Omega_ini_dcdm are physics params owned by DCDMSpecies;
+  // they are parsed in DCDM_DR_Species::CreateAll, not here.
   class_call(parser_read_double(pfc, "Omega_dcdmdr", &param1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "omega_dcdmdr", &param2, &flag2, errmsg), errmsg, errmsg);
   class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
@@ -430,40 +433,20 @@ int InputModule::ReadCoupledOmegaBudget() {
   if (flag2 == _TRUE_)
     omega_budget_.dcdmdr = param2 / pba->h / pba->h;
 
-  if (omega_budget_.dcdmdr.value_or(0.) > 0.) {
-    class_call(parser_read_double(pfc, "Omega_ini_dcdm", &param1, &flag1, errmsg), errmsg, errmsg);
-    class_call(parser_read_double(pfc, "omega_ini_dcdm", &param2, &flag2, errmsg), errmsg, errmsg);
-    class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-               errmsg,
-               "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, choose "
-               "one");
-    if (flag1 == _TRUE_)
-      pba->Omega_ini_dcdm = param1;
-    if (flag2 == _TRUE_)
-      pba->Omega_ini_dcdm = param2 / pba->h / pba->h;
-
-    class_read_double("Gamma_dcdm", pba->Gamma_dcdm);
-    pba->Gamma_dcdm *= (1.e3 / _c_);  // Convert km/(s Mpc) -> Mpc^-1
-  }
-
   // ── DRMD: z_stop, G_over_aH_drmd_ini, f_idm_drmd, delta_Neff_drmd ────────────
-  // The four pba physics-params get written here (they belong to pba, not Omega0).
-  // delta_Neff_drmd → omega_budget_.idr_drmd; f_idm_drmd → omega_budget_.idm_drmd
-  // with the CDM subtraction.
+  // These fields now live on IDM_DRMD_IDR_DRMD_Species; we parse them locally here
+  // only for the budget math (delta_Neff_drmd → omega_budget_.idr_drmd;
+  // f_idm_drmd → omega_budget_.idm_drmd with the CDM subtraction).
   class_call(parser_read_double(pfc, "z_stop", &param1, &flag1, errmsg), errmsg, errmsg);
-  if (flag1 == _TRUE_)
-    pba->z_stop = param1;
   class_call(parser_read_double(pfc, "G_over_aH_drmd_ini", &param2, &flag2, errmsg),
              errmsg,
              errmsg);
-  if (flag2 == _TRUE_)
-    pba->G_over_aH_drmd = param2;
   class_call(parser_read_double(pfc, "f_idm_drmd", &param3, &flag3, errmsg), errmsg, errmsg);
-  if (flag3 == _TRUE_)
-    pba->f_idm_drmd = param3;
   class_call(parser_read_double(pfc, "delta_Neff_drmd", &param4, &flag4, errmsg), errmsg, errmsg);
-  if (flag4 == _TRUE_)
-    pba->delta_Neff_drmd = param4;
+
+  const double z_stop_drmd           = (flag1 == _TRUE_) ? param1 : 0.;
+  const double f_idm_drmd_local      = (flag3 == _TRUE_) ? param3 : 0.;
+  const double delta_Neff_drmd_local = (flag4 == _TRUE_) ? param4 : 0.;
 
   const int any_drmd = (flag1 == _TRUE_) || (flag2 == _TRUE_) || (flag3 == _TRUE_) ||
                        (flag4 == _TRUE_);
@@ -474,11 +457,11 @@ int InputModule::ReadCoupledOmegaBudget() {
              "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters are "
              "'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
 
-  if (pba->delta_Neff_drmd > 0.) {
-    omega_budget_.idr_drmd = pba->delta_Neff_drmd * 7. / 8. * pow(4. / 11., 4. / 3.) *
+  if (delta_Neff_drmd_local > 0.) {
+    omega_budget_.idr_drmd = delta_Neff_drmd_local * 7. / 8. * pow(4. / 11., 4. / 3.) *
                              pba->Omega0_g;
-    if (pba->f_idm_drmd > 0) {
-      class_test((pba->z_stop > 200000.),
+    if (f_idm_drmd_local > 0) {
+      class_test((z_stop_drmd > 200000.),
                  errmsg,
                  "z_stop is chosen too large. If you want to probe z_stop > 1000000 you need to "
                  "start evolving perturbations earlier in CLASS by changing the precision "
@@ -487,19 +470,19 @@ int InputModule::ReadCoupledOmegaBudget() {
     }
   }
 
-  if (pba->f_idm_drmd > 0) {
-    class_test((pba->f_idm_drmd > 1.),
+  if (f_idm_drmd_local > 0) {
+    class_test((f_idm_drmd_local > 1.),
                errmsg,
                "The fraction of interacting DM with DR must be between 0 and 1, you asked for "
                "f_idm_drmd=%e",
-               pba->f_idm_drmd);
+               f_idm_drmd_local);
     const double cdm_for_drmd = omega_budget_.cdm.value_or(0.);
     class_test((cdm_for_drmd == 0.),
                errmsg,
                "If you want a fraction of interacting DM with DRMD, to be consistent, you should "
                "not set the fraction of CDM to zero");
 
-    double new_idm_drmd = pba->f_idm_drmd * cdm_for_drmd;
+    double new_idm_drmd = f_idm_drmd_local * cdm_for_drmd;
     double new_cdm      = cdm_for_drmd - new_idm_drmd;
     if ((ppt->gauge == synchronous) && (new_cdm == 0.)) {
       new_cdm      += ppr->Omega0_cdm_min_synchronous;
@@ -662,7 +645,6 @@ int InputModule::input_read_parameters() {
   double param1, param2, param3;
   int entries_read;
   int int1;
-  double scf_lambda;
   double* pointer1;
   char string1[_ARGUMENT_LENGTH_MAX_];
   char string2[_ARGUMENT_LENGTH_MAX_];
@@ -976,11 +958,11 @@ int InputModule::input_read_parameters() {
     ppt->beta_idr = ppt->beta_idr_storage.data();
   }
 
-  // Omega_dcdmdr / Omega_ini_dcdm / Gamma_dcdm parsing has been moved to
-  // ReadCoupledOmegaBudget (Omega_dcdmdr → omega_budget_.dcdmdr; Gamma_dcdm and
-  // Omega_ini_dcdm are physics params that stay on pba).
-
-  pba->l_max_idr = ppr->l_max_idr;
+  // Omega_dcdmdr parsing has been moved to ReadCoupledOmegaBudget
+  // (Omega_dcdmdr → omega_budget_.dcdmdr); Gamma_dcdm and Omega_ini_dcdm are
+  // owned by DCDMSpecies and parsed in DCDM_DR_Species::CreateAll.
+  // T_idr and l_max_idr are owned by IDRSpecies and parsed in
+  // IDM_DR_IDR_Species::CreateAll.
 
   /** - Omega_0_k (effective fractional density of curvature) */
   class_read_double("Omega_k", pba->Omega0_k);
@@ -1043,107 +1025,20 @@ int InputModule::input_read_parameters() {
              "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar "
              "field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
-  // Snapshot fluid/scf presence here: later parser blocks reuse flag1/flag2/flag3
-  // and param1/param2/param3, and pba->Omega0_fld / pba->Omega0_scf are no longer
-  // written. These flags now decide whether to parse fluid/scf sub-parameters.
+  // Snapshot fluid presence here: later parser blocks reuse flag1/flag2/flag3
+  // and param1/param2/param3, and pba->Omega0_fld is no longer written.
+  // This flag decides whether to apply the halofit gate (see below).
   const bool fluid_present_pfc = (flag2 == _TRUE_) ||
                                  (pba->closure_species == ClosureSpecies::Fluid);
-  const bool scf_present_pfc   = ((flag3 == _TRUE_) && (param3 != 0.)) ||
-                                 (pba->closure_species == ClosureSpecies::ScalarField);
 
-  if (fluid_present_pfc) {
-    class_call(parser_read_string(pfc, "use_ppf", &string1, &flag1, errmsg), errmsg, errmsg);
+  /* Fluid physics params (use_ppf, fluid_equation_of_state, w0_fld, wa_fld,
+     cs2_fld, Omega_EDE, c_gamma_over_c_fld) are parsed inside
+     FluidSpecies::CreateAll directly from pfc; no per-key writes to pba here.
 
-    if (flag1 == _TRUE_) {
-      if ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL)) {
-        pba->use_ppf = _TRUE_;
-        class_read_double("c_gamma_over_c_fld", pba->c_gamma_over_c_fld);
-      }
-      else {
-        pba->use_ppf = _FALSE_;
-      }
-    }
-
-    class_call(parser_read_string(pfc, "fluid_equation_of_state", &string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
-
-    if (flag1 == _TRUE_) {
-      if ((strstr(string1, "CLP") != NULL) || (strstr(string1, "clp") != NULL)) {
-        pba->fluid_equation_of_state = CLP;
-      }
-
-      else if ((strstr(string1, "EDE") != NULL) || (strstr(string1, "ede") != NULL)) {
-        pba->fluid_equation_of_state = EDE;
-      }
-
-      else {
-        class_stop(errmsg,
-                   "incomprehensible input '%s' for the field 'fluid_equation_of_state'",
-                   string1);
-      }
-    }
-
-    if (pba->fluid_equation_of_state == CLP) {
-      class_read_double("w0_fld", pba->w0_fld);
-      class_read_double("wa_fld", pba->wa_fld);
-      class_read_double("cs2_fld", pba->cs2_fld);
-    }
-
-    if (pba->fluid_equation_of_state == EDE) {
-      class_read_double("w0_fld", pba->w0_fld);
-      class_read_double("Omega_EDE", pba->Omega_EDE);
-      class_read_double("cs2_fld", pba->cs2_fld);
-    }
-  }
-
-  /* Additional SCF parameters: */
-  if (scf_present_pfc) {
-    /** - Read parameters describing scalar field potential */
-    std::vector<double> scf_parameters;
-    class_call(readDoubleList(pfc, "scf_parameters", scf_parameters, &flag1, errmsg),
-               errmsg,
-               errmsg);
-    if ((flag1 == _TRUE_) && !scf_parameters.empty()) {
-      pba->scf_parameters = scf_parameters;
-    }
-    class_read_int("scf_tuning_index", pba->scf_tuning_index);
-    class_test(pba->scf_tuning_index >= pba->scf_parameters.size(),
-               errmsg,
-               "Tuning index scf_tuning_index = %d is larger than the number of entries %d in "
-               "scf_parameters. Check your .ini file.",
-               pba->scf_tuning_index,
-               pba->scf_parameters.size());
-    /** - Assign shooting parameter */
-    class_read_double("scf_shooting_parameter", pba->scf_parameters[pba->scf_tuning_index]);
-
-    scf_lambda = pba->scf_parameters[0];
-    if ((fabs(scf_lambda) < 3.) && (pba->background_verbose > 1))
-      printf(
-          "lambda = %e <3 won't be tracking (for exp quint) unless overwritten by tuning "
-          "function\n",
-          scf_lambda);
-
-    class_call(parser_read_string(pfc, "attractor_ic_scf", &string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
-
-    if (flag1 == _TRUE_) {
-      if ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL)) {
-        pba->attractor_ic_scf = _TRUE_;
-      }
-      else {
-        pba->attractor_ic_scf = _FALSE_;
-        class_test(pba->scf_parameters.size() < 2,
-                   errmsg,
-                   "Since you are not using attractor initial conditions, you must specify phi and "
-                   "its derivative phi' as the last two entries in scf_parameters. See "
-                   "explanatory.ini for more details.");
-        pba->phi_ini_scf       = pba->scf_parameters[pba->scf_parameters.size() - 2];
-        pba->phi_prime_ini_scf = pba->scf_parameters[pba->scf_parameters.size() - 1];
-      }
-    }
-  }
+     Scalar field physics params (scf_parameters, scf_tuning_index,
+     scf_shooting_parameter, attractor_ic_scf, phi_ini_scf, phi_prime_ini_scf)
+     are parsed inside ScalarFieldSpecies::CreateAll directly from pfc; no
+     per-key writes to pba here. */
 
   /** (b) assign values to thermodynamics cosmological parameters */
 
@@ -2790,7 +2685,33 @@ int InputModule::input_read_parameters() {
   /** - (i.5) special steps if we want Halofit with wa_fld non-zero:
       so-called "Pk_equal method" of 0810.0190 and 1601.07230 */
 
-  if ((pnl->method == nl_halofit) && fluid_present_pfc && (pba->wa_fld != 0.)) {
+  /* Species aren't built yet at this point — peek wa_fld from pfc directly.
+     Note: this read is informational (no class_read_double-style write target),
+     so we just probe the file content via parser_read_double.
+
+     The original (pre-refactor) parser block only wrote pba->wa_fld in the CLP
+     branch, so the Pk_equal gate must only engage for CLP. Probe
+     fluid_equation_of_state first; default-when-absent is CLP (matching
+     FluidSpecies::CreateAll). */
+  bool fluid_eos_is_clp = true;
+  class_call(parser_read_string(pfc, "fluid_equation_of_state", &string1, &flag1, errmsg),
+             errmsg,
+             errmsg);
+  if (flag1 == _TRUE_) {
+    if ((strstr(string1, "EDE") != NULL) || (strstr(string1, "ede") != NULL)) {
+      fluid_eos_is_clp = false;
+    }
+    else if ((strstr(string1, "CLP") != NULL) || (strstr(string1, "clp") != NULL)) {
+      fluid_eos_is_clp = true;
+    }
+    /* Other strings: leave as CLP default (FluidSpecies::CreateAll will error
+       later on an unrecognized value). */
+  }
+  double wa_fld_peek = 0.;
+  class_call(parser_read_double(pfc, "wa_fld", &param1, &flag1, errmsg), errmsg, errmsg);
+  if (flag1 == _TRUE_)
+    wa_fld_peek = param1;
+  if ((pnl->method == nl_halofit) && fluid_present_pfc && fluid_eos_is_clp && (wa_fld_peek != 0.)) {
     class_call(parser_read_string(pfc, "pk_eq", &string1, &flag1, errmsg), errmsg, errmsg);
 
     if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {

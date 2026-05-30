@@ -1,11 +1,21 @@
 #include "idm_dr_idr_species.h"
 
+#include <cmath>
+#include <optional>
+#include <string>
+
 #include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 #include "thermodynamics.h"
 #include "thermodynamics_module.h"
+
+std::optional<double> IDM_DR_IDR_Species::GetParam(const std::string& name) const {
+  if (name == "T_idr")
+    return idr().T_idr();
+  return std::nullopt;
+}
 
 void IDM_DR_IDR_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
   w.Add("(.)rho_idr", 0.);
@@ -191,14 +201,13 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_idm_dr", theta_idm_dr, has_idm_dr());
 }
 
-IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba,
-                                       double omega0_idm_dr,
-                                       double omega0_idr)
+IDM_DR_IDR_Species::IDM_DR_IDR_Species(
+    const background& pba, double omega0_idm_dr, double omega0_idr, double T_idr, int l_max_idr)
     : CompositeSpecies("IDM_DR_IDR", BaseSpecies::EnergyType::Other), pba_(pba) {
   has_idm_dr_ = (omega0_idm_dr != 0.);
   has_idr_    = (omega0_idr != 0.);
   auto idm    = std::make_unique<IDM_DRSpecies>(pba, omega0_idm_dr);
-  auto idr    = std::make_unique<IDRSpecies>(pba, omega0_idr, has_idm_dr_);
+  auto idr    = std::make_unique<IDRSpecies>(pba, omega0_idr, has_idm_dr_, T_idr, l_max_idr);
   idm_dr_     = idm.get();
   idr_        = idr.get();
   children_.push_back(std::move(idm));
@@ -426,8 +435,34 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
   const double omega0_idm_dr = ctx.omega_budget->idm_dr.value_or(0.);
   const double omega0_idr    = ctx.omega_budget->idr.value_or(0.);
   if (omega0_idm_dr != 0. || omega0_idr != 0.) {
-    result.push_back(
-        {"IDM_DR_IDR", std::make_unique<IDM_DR_IDR_Species>(*ctx.pba, omega0_idm_dr, omega0_idr)});
+    // ── Parse T_idr (same logic as ReadCoupledOmegaBudget, kept local) ─────
+    double T_idr_local = 0.;
+    double stat_f_idr  = 7. / 8.;
+    ctx.pfc->read_double("stat_f_idr", stat_f_idr);
+
+    double N_idr = 0., N_dg = 0., xi_idr = 0.;
+    bool flag_N_idr = ctx.pfc->read_double("N_idr", N_idr);
+    bool flag_N_dg  = ctx.pfc->read_double("N_dg", N_dg);
+    bool flag_xi    = ctx.pfc->read_double("xi_idr", xi_idr);
+
+    if (flag_N_idr)
+      T_idr_local = std::pow(N_idr / stat_f_idr * (7. / 8.) / std::pow(11. / 4., 4. / 3.),
+                             1. / 4.) *
+                    ctx.pba->T_cmb;
+    else if (flag_N_dg)
+      T_idr_local = std::pow(N_dg / stat_f_idr * (7. / 8.) / std::pow(11. / 4., 4. / 3.), 1. / 4.) *
+                    ctx.pba->T_cmb;
+    else if (flag_xi)
+      T_idr_local = xi_idr * ctx.pba->T_cmb;
+
+    const int l_max_idr_local = ctx.ppr->l_max_idr;
+
+    result.push_back({"IDM_DR_IDR",
+                      std::make_unique<IDM_DR_IDR_Species>(*ctx.pba,
+                                                           omega0_idm_dr,
+                                                           omega0_idr,
+                                                           T_idr_local,
+                                                           l_max_idr_local)});
   }
   return result;
 }

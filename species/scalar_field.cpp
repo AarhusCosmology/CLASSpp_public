@@ -1,7 +1,10 @@
 #include "scalar_field.h"
 
 #include <cmath>
+#include <cstdio>
+#include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "background_column_writer.h"
 #include "background_module.h"
@@ -9,19 +12,31 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 
+ScalarFieldSpecies::ScalarFieldSpecies(const background& pba,
+                                       double omega0_scf,
+                                       std::vector<double> scf_parameters,
+                                       int scf_tuning_index,
+                                       short attractor_ic_scf,
+                                       double phi_ini_scf,
+                                       double phi_prime_ini_scf)
+    : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba), Omega0_scf_(omega0_scf),
+      scf_parameters_(std::move(scf_parameters)), scf_tuning_index_(scf_tuning_index),
+      attractor_ic_scf_(attractor_ic_scf), phi_ini_scf_(phi_ini_scf),
+      phi_prime_ini_scf_(phi_prime_ini_scf) {}
+
 double ScalarFieldSpecies::V_scf(double phi) const {
-  double lambda = pba_.scf_parameters[0];
-  double alpha  = pba_.scf_parameters[1];
-  double A      = pba_.scf_parameters[2];
-  double B      = pba_.scf_parameters[3];
+  double lambda = scf_parameters_[0];
+  double alpha  = scf_parameters_[1];
+  double A      = scf_parameters_[2];
+  double B      = scf_parameters_[3];
   return exp(-lambda * phi) * (pow(phi - B, alpha) + A);
 }
 
 double ScalarFieldSpecies::dV_scf(double phi) const {
-  double lambda = pba_.scf_parameters[0];
-  double alpha  = pba_.scf_parameters[1];
-  double A      = pba_.scf_parameters[2];
-  double B      = pba_.scf_parameters[3];
+  double lambda = scf_parameters_[0];
+  double alpha  = scf_parameters_[1];
+  double A      = scf_parameters_[2];
+  double B      = scf_parameters_[3];
   double Ve     = exp(-lambda * phi);
   double Vp     = pow(phi - B, alpha) + A;
   double dVe    = -lambda * Ve;
@@ -30,10 +45,10 @@ double ScalarFieldSpecies::dV_scf(double phi) const {
 }
 
 double ScalarFieldSpecies::ddV_scf(double phi) const {
-  double lambda = pba_.scf_parameters[0];
-  double alpha  = pba_.scf_parameters[1];
-  double A      = pba_.scf_parameters[2];
-  double B      = pba_.scf_parameters[3];
+  double lambda = scf_parameters_[0];
+  double alpha  = scf_parameters_[1];
+  double A      = scf_parameters_[2];
+  double B      = scf_parameters_[3];
   double Ve     = exp(-lambda * phi);
   double Vp     = pow(phi - B, alpha) + A;
   double dVe    = -lambda * Ve;
@@ -388,17 +403,16 @@ std::vector<ShootingTarget> ScalarFieldSpecies::GetShootingTargets() const {
   return {};
 }
 
-void ScalarFieldSpecies::ComputeShootingGuess(const SpeciesBuildContext& ctx,
+void ScalarFieldSpecies::ComputeShootingGuess(const SpeciesBuildContext& /*ctx*/,
                                               std::vector<double>& guess,
                                               std::vector<double>& dxdy) const {
-  const background& ba = *ctx.pba;
-  if (ba.scf_tuning_index == 0) {
+  if (scf_tuning_index_ == 0) {
     guess.push_back(sqrt(3.0 / Omega0_scf_));
     dxdy.push_back(-0.5 * sqrt(3.0) * pow(Omega0_scf_, -1.5));
   }
   else {
     /* Default: take the passed value as xguess and set dxdy to 1. */
-    guess.push_back(ba.scf_parameters[ba.scf_tuning_index]);
+    guess.push_back(scf_parameters_[scf_tuning_index_]);
     dxdy.push_back(1.);
   }
 }
@@ -445,7 +459,72 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   if (omega0_scf == 0.)
     return result;
 
-  auto composite = std::make_unique<ScalarFieldSpecies>(*ctx.pba, omega0_scf);
+  // ── scf_parameters (variable-length list) ────────────────────────────────
+  std::vector<double> scf_parameters;
+  try {
+    ctx.pfc->read_list_of_doubles("scf_parameters", scf_parameters);
+  }
+  catch (const std::exception& e) {
+    throw std::invalid_argument(std::string("scf_parameters parse error: ") + e.what());
+  }
+
+  // ── scf_tuning_index + bounds check ──────────────────────────────────────
+  int scf_tuning_index = 0;
+  ctx.pfc->read_int("scf_tuning_index", scf_tuning_index);
+  if (scf_tuning_index >= static_cast<int>(scf_parameters.size())) {
+    throw std::invalid_argument(
+        "Tuning index scf_tuning_index = " + std::to_string(scf_tuning_index) +
+        " is larger than the number of entries " + std::to_string(scf_parameters.size()) +
+        " in scf_parameters. Check your .ini file.");
+  }
+
+  // scf_shooting_parameter (when present) OVERWRITES the slot at tuning_index.
+  // This is the resolved value DoShooting writes back into the fc for the final build.
+  double scf_shooting_param = 0.;
+  if (ctx.pfc->read_double("scf_shooting_parameter", scf_shooting_param))
+    scf_parameters[scf_tuning_index] = scf_shooting_param;
+
+  // Preserve the legacy SCF parser warning: lambda<3 in the exponential-quintessence
+  // potential won't track unless overwritten by the shooter / tuning function.
+  if (!scf_parameters.empty()) {
+    const double scf_lambda = scf_parameters[0];
+    if (std::fabs(scf_lambda) < 3. && ctx.pba->background_verbose > 1) {
+      printf(
+          "lambda = %e <3 won't be tracking (for exp quint) unless overwritten "
+          "by tuning function\n",
+          scf_lambda);
+    }
+  }
+
+  // ── attractor_ic_scf (y/n string) ────────────────────────────────────────
+  short attractor_ic_scf   = _TRUE_;
+  double phi_ini_scf       = 1.;
+  double phi_prime_ini_scf = 1.;
+  std::string attr_str;
+  if (ctx.pfc->read_string("attractor_ic_scf", attr_str)) {
+    if (attr_str.find("y") != std::string::npos || attr_str.find("Y") != std::string::npos) {
+      attractor_ic_scf = _TRUE_;
+    }
+    else {
+      attractor_ic_scf = _FALSE_;
+      if (scf_parameters.size() < 2) {
+        throw std::invalid_argument(
+            "Since you are not using attractor initial conditions, you must specify phi and "
+            "its derivative phi' as the last two entries in scf_parameters. See "
+            "explanatory.ini for more details.");
+      }
+      phi_ini_scf       = scf_parameters[scf_parameters.size() - 2];
+      phi_prime_ini_scf = scf_parameters[scf_parameters.size() - 1];
+    }
+  }
+
+  auto composite = std::make_unique<ScalarFieldSpecies>(*ctx.pba,
+                                                        omega0_scf,
+                                                        std::move(scf_parameters),
+                                                        scf_tuning_index,
+                                                        attractor_ic_scf,
+                                                        phi_ini_scf,
+                                                        phi_prime_ini_scf);
 
   // Detect guess-driven construction: Omega_scf user-set to >0 but
   // scf_shooting_parameter absent. The nonzero check matches the historic shooting
@@ -461,12 +540,12 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
       std::vector<double> g, d;
       composite->ComputeShootingGuess(ctx, g, d);
 
-      // Seed the guess into pba->scf_parameters[scf_tuning_index] so this (discovery) build
-      // is valid. Do NOT write it into the file content: the fc is user-facing state checked
-      // for unread parameters, and DoShooting writes the *resolved* scf_shooting_parameter
-      // back into the fc (which the final build then reads). A guess here would never be read.
-      background* pba                            = const_cast<background*>(ctx.pba);
-      pba->scf_parameters[pba->scf_tuning_index] = g[0];
+      // Seed the guess into this discovery-build species' scf_parameters_[tuning_index]
+      // so its ComputeBackground / shooter residual see a valid potential. Do NOT write it
+      // into the file content: the fc is user-facing state checked for unread parameters,
+      // and DoShooting writes the *resolved* scf_shooting_parameter back into the fc (which
+      // the final build then reads). A guess here would never be read.
+      composite->scf_parameters_[composite->scf_tuning_index_] = g[0];
     }
   }
 

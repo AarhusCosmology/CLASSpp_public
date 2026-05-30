@@ -41,6 +41,12 @@ class BackgroundModule : public BaseModule {
    *  number of DNCDM_DR_Species composites in all_species_. */
   int GetNDecayDr() const;
 
+  /** Generic look-up: find species by all_species_ key, then call
+   *  GetParam(param).  Returns 0.0 if either is absent.  Used by the
+   *  Python wrapper to read species-specific quantities without
+   *  downcasting. */
+  double GetSpeciesParam(const std::string& key, const std::string& param) const;
+
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
 
   //@{
@@ -115,6 +121,7 @@ class BackgroundModule : public BaseModule {
   double G_over_aH_tmp_;
   double Gamma0_drmd_;
   double f_idr_drmd_;
+  double z_stop_ = 0.;  ///< cached from IDM_DRMD_IDR_DRMD_Species at setup
   double z_dec_drmd_;
 
  private:

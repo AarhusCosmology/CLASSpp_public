@@ -137,11 +137,11 @@ void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
       layout.idx_shear = index_pt;
       ++index_pt;
 
-      layout.l_max = pba_.l_max_idr;
+      layout.l_max = l_max_idr_;
 
-      if (pba_.l_max_idr >= 3) {
+      if (l_max_idr_ >= 3) {
         layout.idx_l3  = index_pt;
-        index_pt      += pba_.l_max_idr - 2;  // l3, l4, ..., l_max
+        index_pt      += l_max_idr_ - 2;  // l3, l4, ..., l_max
       }
     }
   }

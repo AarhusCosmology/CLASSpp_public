@@ -11,12 +11,23 @@ class ThermodynamicsModule;  // forward declaration
  */
 class IDRSpecies : public BaseSpecies {
  public:
-  IDRSpecies(const background& pba, double omega0_idr, bool has_sibling_idm_dr = false)
+  IDRSpecies(const background& pba,
+             double omega0_idr,
+             bool has_sibling_idm_dr = false,
+             double T_idr            = 0.,
+             int l_max_idr           = 0)
       : BaseSpecies("IDR", EnergyType::Radiation), pba_(pba), Omega0_idr_(omega0_idr),
-        has_sibling_idm_dr_(has_sibling_idm_dr) {}
+        has_sibling_idm_dr_(has_sibling_idm_dr), T_idr_(T_idr), l_max_idr_(l_max_idr) {}
 
   bool has_sibling_idm_dr() const {
     return has_sibling_idm_dr_;
+  }
+
+  double T_idr() const {
+    return T_idr_;
+  }
+  int l_max_idr() const {
+    return l_max_idr_;
   }
 
   void SetThermodynamicsModule(const ThermodynamicsModule* thm) override {
@@ -58,7 +69,7 @@ class IDRSpecies : public BaseSpecies {
    * Per-species perturbation slot layout for IDR.
    *
    * When idr_nature == idr_free_streaming AND TCA is off:
-   *   idx_delta, idx_theta, idx_shear, idx_l3 are set; l_max == pba.l_max_idr.
+   *   idx_delta, idx_theta, idx_shear, idx_l3 are set; l_max == IDRSpecies::l_max_idr().
    * When idr_nature == idr_fluid OR TCA is on (shear not registered):
    *   idx_delta, idx_theta set; idx_shear == idx_l3 == -1; l_max == -1.
    * When RSA is on (nothing registered):
@@ -69,7 +80,7 @@ class IDRSpecies : public BaseSpecies {
     int idx_theta = -1;  ///< index_pt_theta_idr
     int idx_shear = -1;  ///< index_pt_shear_idr (free-streaming + tca_off only)
     int idx_l3    = -1;  ///< index_pt_l3_idr    (free-streaming + tca_off + l_max>=3)
-    int l_max     = -1;  ///< pba.l_max_idr when full hierarchy, else -1
+    int l_max     = -1;  ///< IDRSpecies::l_max_idr() when full hierarchy, else -1
   };
 
   std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
@@ -205,6 +216,8 @@ class IDRSpecies : public BaseSpecies {
   const background& pba_;
   double Omega0_idr_;
   bool has_sibling_idm_dr_;
+  double T_idr_                    = 0.;
+  int l_max_idr_                   = 0;
   const ThermodynamicsModule* thm_ = nullptr;
   const perturbs* ppt_             = nullptr;
 };

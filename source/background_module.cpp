@@ -143,6 +143,14 @@ double BackgroundModule::GetOmega0Species(const std::string& key) const {
   return 0.;
 }
 
+double BackgroundModule::GetSpeciesParam(const std::string& key, const std::string& param) const {
+  if (auto* ptr = all_species_.find(key)) {
+    if (auto val = (*ptr)->GetParam(param))
+      return *val;
+  }
+  return 0.;
+}
+
 // Wrapper functions to pass non-static member functions
 int BackgroundModule::background_derivs(
     double z, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
@@ -490,12 +498,11 @@ int BackgroundModule::background_w_fld(double a,
     return static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
         .ComputeWFld(a, w_fld, dw_over_da_fld, integral_fld);
   }
-  /* No Fluid species: fall back to CLP defaults so callers (HyRec, etc.) get
-     a sensible w(a) without needing to gate on has_fld. */
-  *w_fld          = pba->w0_fld + pba->wa_fld * (1. - a / pba->a_today);
-  *dw_over_da_fld = -pba->wa_fld / pba->a_today;
-  *integral_fld   = 3. * ((1. + pba->w0_fld + pba->wa_fld) * log(pba->a_today / a) +
-                          pba->wa_fld * (a / pba->a_today - 1.));
+  /* No Fluid species: fall back to CLP defaults (w0=-1, wa=0) so callers
+     (HyRec, etc.) get a sensible w(a) without needing to gate on has_fld. */
+  *w_fld          = -1.;
+  *dw_over_da_fld = 0.;
+  *integral_fld   = 0.;
   return _SUCCESS_;
 }
 
@@ -506,10 +513,10 @@ int BackgroundModule::background_idm_drmd(
   *Rint            = R_int_tmp;
   *csp2            = 1.0 / 3.0 / (1.0 + R_int_tmp);
 
-  if ((1.0 + pba->z_stop) / (1 + z) > 100)  // To avoid numerical problems in exp()
+  if ((1.0 + z_stop_) / (1 + z) > 100)  // To avoid numerical problems in exp()
     *Gint = 0;
   else
-    *Gint = Gamma0_drmd_ / R_int_tmp * exp(-(1.0 + pba->z_stop) / (1 + z));
+    *Gint = Gamma0_drmd_ / R_int_tmp * exp(-(1.0 + z_stop_) / (1 + z));
 
   return _SUCCESS_;
 }
@@ -1158,23 +1165,26 @@ int BackgroundModule::background_solve() {
       printf("     -> Omega0_dr+Omega0_dcdm = %f, input value = %f\n",
              Omega0_dr_ + Omega0_dcdm_,
              dcdm_dr_comp.dcdm().GetOmega0());
-      printf("     -> Omega_ini_dcdm/Omega_b = %f\n", pba->Omega_ini_dcdm / pba->Omega0_b);
+      printf("     -> Omega_ini_dcdm/Omega_b = %f\n",
+             dcdm_dr_comp.dcdm().Omega_ini_dcdm() / pba->Omega0_b);
     }
     if (all_species_.count("ScalarField")) {
+      const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
-             all_species_.at("ScalarField")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-             all_species_.at("ScalarField")->GetOmega0());
+             scf.Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
+             scf.GetOmega0());
       if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
                all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
                all_species_.at("Lambda")->GetOmega0());
       printf("     -> parameters: [lambda, alpha, A, B] = \n");
       printf("                    [");
-      for (size_t i = 0; i < pba->scf_parameters.size() - 1; i++) {
-        printf("%.3f, ", pba->scf_parameters[i]);
+      const auto& scf_params = scf.scf_parameters();
+      for (size_t i = 0; i < scf_params.size() - 1; i++) {
+        printf("%.3f, ", scf_params[i]);
       }
-      printf("%.3f]\n", pba->scf_parameters[pba->scf_parameters.size() - 1]);
+      printf("%.3f]\n", scf_params[scf_params.size() - 1]);
     }
   }
 
@@ -1351,17 +1361,20 @@ int BackgroundModule::background_solve_evolver() {
       printf("     -> Omega0_dr+Omega0_dcdm = %f, input value = %f\n",
              Omega0_dr_ + Omega0_dcdm_,
              dcdm_dr_comp2.dcdm().GetOmega0());
-      printf("     -> Omega_ini_dcdm/Omega_b = %f\n", pba->Omega_ini_dcdm / pba->Omega0_b);
+      printf("     -> Omega_ini_dcdm/Omega_b = %f\n",
+             dcdm_dr_comp2.dcdm().Omega_ini_dcdm() / pba->Omega0_b);
     }
     if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+      const auto& drmd_verbose = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(
+          *all_species_.at("IDM_DRMD_IDR_DRMD"));
       printf(" -> Dark Radiation Matter Decoupling details: (DRMD)\n");
       printf(
           "     -> values: (initial) Gamma0 = %f 1/Mpc, zstop= %e,f_idr_drmd=%e, and f_idm= %e \n",
           Gamma0_drmd_,
-          pba->z_stop,
+          z_stop_,
           f_idr_drmd_,
-          pba->f_idm_drmd);
-      printf("     -> dark radiation Delta N_eff (DRMD) %e\n", pba->delta_Neff_drmd);
+          drmd_verbose.f_idm_drmd());
+      printf("     -> dark radiation Delta N_eff (DRMD) %e\n", drmd_verbose.delta_Neff_drmd());
 
       if (z_dec_drmd_ > 0)
         printf("     -> decoupling occurred at z=%f \n", z_dec_drmd_);
@@ -1369,20 +1382,22 @@ int BackgroundModule::background_solve_evolver() {
         printf("     -> no decoupling occurred.\n");
     }
     if (all_species_.count("ScalarField")) {
+      const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
-             all_species_.at("ScalarField")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-             all_species_.at("ScalarField")->GetOmega0());
+             scf.Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
+             scf.GetOmega0());
       if (all_species_.count("Lambda"))
         printf("     -> Omega_Lambda = %g, wished %g\n",
                all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
                all_species_.at("Lambda")->GetOmega0());
       printf("     -> parameters: [lambda, alpha, A, B] = \n");
       printf("                    [");
-      for (int i = 0; i < pba->scf_parameters.size() - 1; i++) {
-        printf("%.3f, ", pba->scf_parameters[i]);
+      const auto& scf_params = scf.scf_parameters();
+      for (size_t i = 0; i < scf_params.size() - 1; i++) {
+        printf("%.3f, ", scf_params[i]);
       }
-      printf("%.3f]\n", pba->scf_parameters[pba->scf_parameters.size() - 1]);
+      printf("%.3f]\n", scf_params[scf_params.size() - 1]);
     }
   }
 
@@ -1478,11 +1493,12 @@ int BackgroundModule::background_initial_conditions(
    * - is rho_ur all there is early on?
    */
   if (all_species_.count("ScalarField")) {
-    double scf_lambda = pba->scf_parameters[0];
-    if (pba->attractor_ic_scf == _TRUE_) {
+    const auto& scf   = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
+    double scf_lambda = scf.scf_parameters()[0];
+    if (scf.attractor_ic_scf() == _TRUE_) {
       pvecback_integration[index_bi_phi_scf_] = -1. / scf_lambda *
                                                 log(rho_rad * 4. / (3 * pow(scf_lambda, 2) - 12)) *
-                                                pba->phi_ini_scf;
+                                                scf.phi_ini_scf();
       if (3. * pow(scf_lambda, 2) - 12. < 0) {
         /** - --> If there is no attractor solution for scf_lambda, assign some value. Otherwise would give a nan.*/
         pvecback_integration[index_bi_phi_scf_] = 1. / scf_lambda;  //seems to the work
@@ -1491,13 +1507,13 @@ int BackgroundModule::background_initial_conditions(
       }
       pvecback_integration[index_bi_phi_prime_scf_] =
           2 * pvecback_integration[index_bi_a_] *
-          sqrt(V_scf(pvecback_integration[index_bi_phi_scf_])) * pba->phi_prime_ini_scf;
+          sqrt(V_scf(pvecback_integration[index_bi_phi_scf_])) * scf.phi_prime_ini_scf();
     }
     else {
       printf("Not using attractor initial conditions\n");
       /** - --> If no attractor initial conditions are assigned, gets the provided ones. */
-      pvecback_integration[index_bi_phi_scf_]       = pba->phi_ini_scf;
-      pvecback_integration[index_bi_phi_prime_scf_] = pba->phi_prime_ini_scf;
+      pvecback_integration[index_bi_phi_scf_]       = scf.phi_ini_scf();
+      pvecback_integration[index_bi_phi_prime_scf_] = scf.phi_prime_ini_scf();
     }
     class_test(!isfinite(pvecback_integration[index_bi_phi_scf_]) ||
                    !isfinite(pvecback_integration[index_bi_phi_scf_]),
@@ -1529,15 +1545,16 @@ int BackgroundModule::background_initial_conditions(
              "H = %e instead of strictly positive",
              pvecback[index_bg_H_]);
 
-  /** - compute Gamma0 and f_idr_drmd for the DRMD scenario */
+  /** - compute Gamma0, f_idr_drmd, and z_stop_ for the DRMD scenario */
   if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
     auto& drmd_ic = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
     const double rho_idr_drmd = drmd_ic.idr_drmd().Rho(pvecback);
     const double rho_idm_drmd = drmd_ic.idm_drmd().Rho(pvecback);
     f_idr_drmd_               = rho_idr_drmd / pvecback[index_bg_rho_tot_];
+    z_stop_                   = drmd_ic.z_stop();
     Gamma0_drmd_              = 0.;
     if (rho_idm_drmd > 0. && rho_idr_drmd > 0.) {
-      Gamma0_drmd_ = 3. / 4. * pba->G_over_aH_drmd * rho_idm_drmd / rho_idr_drmd * a /
+      Gamma0_drmd_ = 3. / 4. * drmd_ic.G_over_aH_drmd() * rho_idm_drmd / rho_idr_drmd * a /
                      pba->a_today * pvecback[index_bg_H_];
       // Recall that Gamma0 = G * R =const with our conventions (for z >> zstop where the exponential can be set to unity )
     }
@@ -1813,28 +1830,31 @@ int BackgroundModule::background_derivs_member(
 */
 
 double BackgroundModule::V_e_scf(double phi) const {
-  double scf_lambda = pba->scf_parameters[0];
-  //  double scf_alpha  = pba->scf_parameters[1];
-  //  double scf_A      = pba->scf_parameters[2];
-  //  double scf_B      = pba->scf_parameters[3];
+  const auto& scf   = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
+  double scf_lambda = scf.scf_parameters()[0];
+  //  double scf_alpha  = scf.scf_parameters()[1];
+  //  double scf_A      = scf.scf_parameters()[2];
+  //  double scf_B      = scf.scf_parameters()[3];
 
   return exp(-scf_lambda * phi);
 }
 
 double BackgroundModule::dV_e_scf(double phi) const {
-  double scf_lambda = pba->scf_parameters[0];
-  //  double scf_alpha  = pba->scf_parameters[1];
-  //  double scf_A      = pba->scf_parameters[2];
-  //  double scf_B      = pba->scf_parameters[3];
+  const auto& scf   = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
+  double scf_lambda = scf.scf_parameters()[0];
+  //  double scf_alpha  = scf.scf_parameters()[1];
+  //  double scf_A      = scf.scf_parameters()[2];
+  //  double scf_B      = scf.scf_parameters()[3];
 
   return -scf_lambda * V_scf(phi);
 }
 
 double BackgroundModule::ddV_e_scf(double phi) const {
-  double scf_lambda = pba->scf_parameters[0];
-  //  double scf_alpha  = pba->scf_parameters[1];
-  //  double scf_A      = pba->scf_parameters[2];
-  //  double scf_B      = pba->scf_parameters[3];
+  const auto& scf   = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
+  double scf_lambda = scf.scf_parameters()[0];
+  //  double scf_alpha  = scf.scf_parameters()[1];
+  //  double scf_A      = scf.scf_parameters()[2];
+  //  double scf_B      = scf.scf_parameters()[3];
 
   return pow(-scf_lambda, 2) * V_scf(phi);
 }
@@ -1850,28 +1870,31 @@ double BackgroundModule::ddV_e_scf(double phi) const {
  */
 
 double BackgroundModule::V_p_scf(double phi) const {
-  //  double scf_lambda = pba->scf_parameters[0];
-  double scf_alpha = pba->scf_parameters[1];
-  double scf_A     = pba->scf_parameters[2];
-  double scf_B     = pba->scf_parameters[3];
+  const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
+  //  double scf_lambda = scf.scf_parameters()[0];
+  double scf_alpha = scf.scf_parameters()[1];
+  double scf_A     = scf.scf_parameters()[2];
+  double scf_B     = scf.scf_parameters()[3];
 
   return pow(phi - scf_B, scf_alpha) + scf_A;
 }
 
 double BackgroundModule::dV_p_scf(double phi) const {
-  //  double scf_lambda = pba->scf_parameters[0];
-  double scf_alpha = pba->scf_parameters[1];
-  //  double scf_A      = pba->scf_parameters[2];
-  double scf_B = pba->scf_parameters[3];
+  const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
+  //  double scf_lambda = scf.scf_parameters()[0];
+  double scf_alpha = scf.scf_parameters()[1];
+  //  double scf_A      = scf.scf_parameters()[2];
+  double scf_B = scf.scf_parameters()[3];
 
   return scf_alpha * pow(phi - scf_B, scf_alpha - 1);
 }
 
 double BackgroundModule::ddV_p_scf(double phi) const {
-  //  double scf_lambda = pba->scf_parameters[0];
-  double scf_alpha = pba->scf_parameters[1];
-  //  double scf_A      = pba->scf_parameters[2];
-  double scf_B = pba->scf_parameters[3];
+  const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
+  //  double scf_lambda = scf.scf_parameters()[0];
+  double scf_alpha = scf.scf_parameters()[1];
+  //  double scf_A      = scf.scf_parameters()[2];
+  double scf_B = scf.scf_parameters()[3];
 
   return scf_alpha * (scf_alpha - 1.) * pow(phi - scf_B, scf_alpha - 2);
 }

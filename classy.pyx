@@ -1478,7 +1478,8 @@ cdef class PyCosmology:
             elif name == 'Omega_g':
                 value = self.ba.Omega0_g
             elif name == 'xi_idr':
-                value = self.ba.T_idr/self.ba.T_cmb
+                bam_xi_idr = deref(self._thisptr).GetBackgroundModule()
+                value = deref(bam_xi_idr).GetSpeciesParam(b"IDM_DR_IDR", b"T_idr")/self.ba.T_cmb
             elif name == 'N_dg':
                 bam_idr = deref(self._thisptr).GetBackgroundModule()
                 value = deref(bam_idr).GetOmega0Species(b"IDR")/self.ba.Omega0_g*8./7.*pow(11./4.,4./3.)

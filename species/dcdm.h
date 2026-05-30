@@ -21,10 +21,20 @@ class DCDMSpecies : public BaseSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
-  DCDMSpecies(const background& pba, double omega0_dcdmdr);
+  DCDMSpecies(const background& pba,
+              double omega0_dcdmdr,
+              double Gamma_dcdm,
+              double Omega_ini_dcdm);
 
   double GetOmega0() const override {
     return Omega0_dcdmdr_;
+  }
+
+  double Gamma_dcdm() const {
+    return Gamma_dcdm_;
+  }
+  double Omega_ini_dcdm() const {
+    return Omega_ini_dcdm_;
   }
 
   // ── Background ─────────────────────────────────────────────────────────────
@@ -142,6 +152,8 @@ class DCDMSpecies : public BaseSpecies {
   const background& pba_;
   const BackgroundModule* bgm_ = nullptr;
   double Omega0_dcdmdr_;
+  double Gamma_dcdm_     = 0.;
+  double Omega_ini_dcdm_ = 0.;
 
   // Integration indices
   int index_bi_rho_dcdm_ = -1;

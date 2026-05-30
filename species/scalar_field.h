@@ -12,11 +12,32 @@ class BackgroundModule;
  */
 class ScalarFieldSpecies : public BaseSpecies {
  public:
-  ScalarFieldSpecies(const background& pba, double omega0_scf)
-      : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba), Omega0_scf_(omega0_scf) {}
+  ScalarFieldSpecies(const background& pba,
+                     double omega0_scf,
+                     std::vector<double> scf_parameters,
+                     int scf_tuning_index,
+                     short attractor_ic_scf,
+                     double phi_ini_scf,
+                     double phi_prime_ini_scf);
 
   double GetOmega0() const override {
     return Omega0_scf_;
+  }
+
+  const std::vector<double>& scf_parameters() const {
+    return scf_parameters_;
+  }
+  int scf_tuning_index() const {
+    return scf_tuning_index_;
+  }
+  short attractor_ic_scf() const {
+    return attractor_ic_scf_;
+  }
+  double phi_ini_scf() const {
+    return phi_ini_scf_;
+  }
+  double phi_prime_ini_scf() const {
+    return phi_prime_ini_scf_;
   }
 
   // ── Background ──────────────────────────────────────────────────────────
@@ -210,4 +231,9 @@ class ScalarFieldSpecies : public BaseSpecies {
   int index_bi_phi_scf_        = -1;
   int index_bi_phi_prime_scf_  = -1;
   double Omega0_scf_           = 0.;
+  std::vector<double> scf_parameters_;
+  int scf_tuning_index_     = 0;
+  short attractor_ic_scf_   = _TRUE_;
+  double phi_ini_scf_       = 1.;
+  double phi_prime_ini_scf_ = 1.;
 };

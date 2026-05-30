@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -93,6 +94,14 @@ class BaseSpecies {
    * the perturbs struct (alpha_idm_dr, gauge, etc.). Default: no-op.
    */
   virtual void SetPerturbs(const perturbs* /*ppt*/) {}
+
+  /** Generic species-param accessor for the Python wrapper layer and
+   *  cross-module readers that don't want to downcast.  Each species
+   *  may opt in by overriding this and returning the named param;
+   *  default is std::nullopt. */
+  virtual std::optional<double> GetParam(const std::string& /*name*/) const {
+    return std::nullopt;
+  }
 
   // ── Background ────────────────────────────────────────────────────────────
 

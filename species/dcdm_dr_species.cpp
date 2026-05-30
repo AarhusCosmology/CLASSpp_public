@@ -1,6 +1,7 @@
 #include "dcdm_dr_species.h"
 
 #include <cmath>
+#include <stdexcept>
 
 #include "background_column_writer.h"
 #include "background_module.h"
@@ -8,9 +9,11 @@
 
 DCDM_DR_Species::DCDM_DR_Species(const background* pba,
                                  const BackgroundModule* bgm,
-                                 double omega0_dcdmdr)
+                                 double omega0_dcdmdr,
+                                 double Gamma_dcdm,
+                                 double Omega_ini_dcdm)
     : CompositeSpecies("DCDM_DR", BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm) {
-  auto dcdm  = std::make_unique<DCDMSpecies>(*pba, omega0_dcdmdr);
+  auto dcdm  = std::make_unique<DCDMSpecies>(*pba, omega0_dcdmdr, Gamma_dcdm, Omega_ini_dcdm);
   auto dr_sp = std::make_unique<DarkRadiationSpecies>("DR", pba, bgm);
   dcdm_      = dcdm.get();
   dr_sp_     = dr_sp.get();
@@ -43,7 +46,7 @@ void DCDM_DR_Species::SetBackgroundInitialConditions(double a_rel, double* pvecb
                                                           : 0.;
   const double Omega_rad = pba_->Omega0_g + Omega0_ur;
   const double rho_dcdm_ini = pvecback_integration[dcdm_->bi_rho_index()];
-  double f                  = 1. / 3. * std::pow(a_rel, 6) * rho_dcdm_ini * pba_->Gamma_dcdm /
+  double f                  = 1. / 3. * std::pow(a_rel, 6) * rho_dcdm_ini * dcdm_->Gamma_dcdm() /
                               std::pow(pba_->H0, 3) / std::sqrt(Omega_rad);
   pvecback_integration[dr_sp_->bi_rho_index()] = f * std::pow(pba_->H0, 2) / std::pow(a_rel, 4);
 }
@@ -57,7 +60,7 @@ void DCDM_DR_Species::BackgroundDerivs(double tau,
 
   // DCDM->DR decay source
   const double a              = pvecback[bgm_->index_bg_a_];
-  dy[dr_sp_->bi_rho_index()] += a * pba_->Gamma_dcdm * dcdm_->Rho(pvecback);
+  dy[dr_sp_->bi_rho_index()] += a * dcdm_->Gamma_dcdm() * dcdm_->Rho(pvecback);
 }
 
 // ── Perturbation layout-based overrides ───────────────────────────────────────
@@ -99,8 +102,9 @@ void DCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
   dcdm_->PerturbSynchronousToNewtonian(my.dcdm, y, ctx);  // matter+decay via RhoDotOverRho
   const double* pvecback  = ctx.ppw->pvecback;
   const double rho_dr     = dr_sp_->Rho(pvecback);
-  const double decay_corr = (rho_dr > 0.) ? ctx.a * pba_->Gamma_dcdm * dcdm_->Rho(pvecback) / rho_dr
-                                          : 0.;
+  const double decay_corr = (rho_dr > 0.)
+                                ? ctx.a * dcdm_->Gamma_dcdm() * dcdm_->Rho(pvecback) / rho_dr
+                                : 0.;
   dr_sp_->PerturbNewtonianReseed(my.dr, y, ctx, decay_corr);
 }
 
@@ -203,7 +207,7 @@ void DCDM_DR_Species::FillSources(const double* y,
                           ctx.index_tau,
                           ctx.index_k,
                           y[my_lay.dcdm.idx_delta] +
-                              (3. * a_prime_over_a + ctx.a_rel * pba_->Gamma_dcdm) *
+                              (3. * a_prime_over_a + ctx.a_rel * dcdm_->Gamma_dcdm()) *
                                   ctx.theta_over_k2);  // N-body gauge correction
   }
 
@@ -281,7 +285,7 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
   const double k         = ctx.k;
 
   const int base         = my_cd_lay.dr.idx_F0;
-  const double rprime_dr = pba_->Gamma_dcdm * dcdm_->Rho(pvecback) * std::pow(a, 5) /
+  const double rprime_dr = dcdm_->Gamma_dcdm() * dcdm_->Rho(pvecback) * std::pow(a, 5) /
                            (pba_->H0 * pba_->H0);
 
   const double delta_dcdm = y[my_cd_lay.dcdm.idx_delta];
@@ -325,7 +329,7 @@ void DCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
   const double Omega0_dcdmdr_eff   = budget ? budget->dcdmdr.value_or(0.) : 0.;
   if (t == "Omega_dcdmdr" || t == "omega_dcdmdr") {
     double Omega_M = Omega0_cdm_eff + Omega0_idm_dr_eff + Omega0_dcdmdr_eff + ba.Omega0_b;
-    double gamma = ba.Gamma_dcdm / ba.H0, a_decay = 1.0;
+    double gamma = dcdm_->Gamma_dcdm() / ba.H0, a_decay = 1.0;
     if (gamma > 1)
       a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
     double tgt = (t == "omega_dcdmdr") ? tv / ba.h / ba.h : tv;
@@ -335,7 +339,7 @@ void DCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
   else {  // Omega_ini_dcdm / omega_ini_dcdm
     double Omega0_dcdmdr_ini = (t == "omega_ini_dcdm") ? tv / (ba.h * ba.h) : tv;
     double Omega_M           = Omega0_cdm_eff + Omega0_idm_dr_eff + Omega0_dcdmdr_ini + ba.Omega0_b;
-    double gamma = ba.Gamma_dcdm / ba.H0, a_decay = 1.0;
+    double gamma = dcdm_->Gamma_dcdm() / ba.H0, a_decay = 1.0;
     if (gamma > 1)
       a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
     guess.push_back(tv * a_decay);
@@ -376,14 +380,32 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
   const double omega0_dcdmdr_from_budget = (ctx.omega_budget ? ctx.omega_budget->dcdmdr.value_or(0.)
                                                              : 0.);
   double omega0_dcdmdr                   = omega0_dcdmdr_from_budget;
-  bool exists                            = (omega0_dcdmdr != 0.);
-  if (!exists) {
+  {
     double tmp;
-    exists = ctx.pfc->read_double("Omega_ini_dcdm", tmp) ||
-             ctx.pfc->read_double("omega_ini_dcdm", tmp);
+    bool exists = (omega0_dcdmdr != 0.) || ctx.pfc->read_double("Omega_ini_dcdm", tmp) ||
+                  ctx.pfc->read_double("omega_ini_dcdm", tmp);
+    if (!exists)
+      return result;
   }
-  if (!exists)
-    return result;
+
+  // ── Parse DCDM physics params (Gamma_dcdm + Omega_ini_dcdm) ────────────────
+  // Gamma_dcdm is read in km/(s·Mpc) and converted to Mpc^-1 (same as the
+  // original input_module code path).  Default 0 keeps the legacy semantics.
+  double Gamma_dcdm = 0.;
+  if (ctx.pfc->read_double("Gamma_dcdm", Gamma_dcdm))
+    Gamma_dcdm *= 1.e3 / _c_;
+
+  // Omega_ini_dcdm: direct (Omega_ini_dcdm) XOR rescaled (omega_ini_dcdm = Omega*h^2).
+  // The two are mutually exclusive (replicates ReadCoupledOmegaBudget's class_test).
+  double Omega_ini_dcdm     = 0.;
+  double omega_ini_dcdm_val = 0.;
+  bool has_Omega_ini        = ctx.pfc->read_double("Omega_ini_dcdm", Omega_ini_dcdm);
+  bool has_omega_ini        = ctx.pfc->read_double("omega_ini_dcdm", omega_ini_dcdm_val);
+  if (has_Omega_ini && has_omega_ini)
+    throw std::invalid_argument(
+        "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, choose one");
+  if (has_omega_ini)
+    Omega_ini_dcdm = omega_ini_dcdm_val / (ctx.pba->h * ctx.pba->h);
 
   // Detect guess-driven construction: target key present but direct unknown absent.
   // Mapping: Omega_dcdmdr/omega_dcdmdr -> unknown Omega_ini_dcdm
@@ -411,52 +433,57 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
       shooting_target = {ts.target_name, ts.unknown_param, target_val};
       needs_shooting  = true;
 
-      // Set the target's own pba field (ini-form targets may not have been read
-      // by ReadCoupledOmegaBudget, which only reads Omega_ini_dcdm when
-      // Omega0_dcdmdr > 0 in the budget).
-      background* pba = const_cast<background*>(ctx.pba);
+      // Set the target's own value for use by the discovery build's
+      // ComputeShootingGuess (ini-form targets were not parsed above when
+      // Omega0_dcdmdr was 0 in the budget — pfc reads above only set
+      // Omega_ini_dcdm when the user gave it directly).
       const std::string tname(ts.target_name);
       if (tname == "Omega_ini_dcdm") {
-        pba->Omega_ini_dcdm = target_val;
+        Omega_ini_dcdm = target_val;
       }
       else if (tname == "omega_ini_dcdm") {
-        pba->Omega_ini_dcdm = target_val / (pba->h * pba->h);
+        Omega_ini_dcdm = target_val / (ctx.pba->h * ctx.pba->h);
       }
       // Omega_dcdmdr/omega_dcdmdr: already accounted for in omega0_dcdmdr above.
 
       // Build a temporary composite to compute the shooting guess; discard it
       // once the guess has been applied. The final composite is built below
-      // with the post-mutation omega0_dcdmdr.  ComputeShootingGuess reads
-      // the matter sum from ctx.omega_budget, so we don't need to write
-      // pba->Omega0_dcdmdr (which no longer exists).
-      auto tmp_composite = std::make_unique<DCDM_DR_Species>(ctx.pba, ctx.bgm, omega0_dcdmdr);
+      // with the post-mutation omega0_dcdmdr / Omega_ini_dcdm.
+      auto tmp_composite              = std::make_unique<DCDM_DR_Species>(ctx.pba,
+                                                                          ctx.bgm,
+                                                                          omega0_dcdmdr,
+                                                                          Gamma_dcdm,
+                                                                          Omega_ini_dcdm);
       tmp_composite->shooting_target_ = shooting_target;
       tmp_composite->needs_shooting_  = true;
 
       std::vector<double> g, d;
       tmp_composite->ComputeShootingGuess(ctx, g, d);
 
-      // Seed the guess into the UNKNOWN's pba field so this (discovery) build is valid.
-      // Do NOT write it into the file content: the fc is user-facing state checked for
-      // unread parameters, and DoShooting writes the *resolved* unknown back into the fc
-      // (which the final build then reads). A guess written here would never be read.
+      // Seed the guess into the UNKNOWN so this (discovery) build is valid.
+      // DoShooting later writes the *resolved* unknown back into the fc; the
+      // final build then re-parses it from there.
       const std::string uname(ts.unknown_param);
       if (uname == "Omega_ini_dcdm") {
-        pba->Omega_ini_dcdm = g[0];
+        Omega_ini_dcdm = g[0];
       }
       else if (uname == "Omega_dcdmdr") {
         omega0_dcdmdr = g[0];
       }
       else if (uname == "omega_dcdmdr") {
-        omega0_dcdmdr = g[0] / (pba->h * pba->h);
+        omega0_dcdmdr = g[0] / (ctx.pba->h * ctx.pba->h);
       }
       break;
     }
   }
 
-  // Construct the final composite with the post-mutation omega0_dcdmdr so the
-  // DCDM child stores the correct existence-time value.
-  auto composite              = std::make_unique<DCDM_DR_Species>(ctx.pba, ctx.bgm, omega0_dcdmdr);
+  // Construct the final composite with the post-mutation omega0_dcdmdr and
+  // Omega_ini_dcdm so the DCDM child stores the correct existence-time values.
+  auto composite              = std::make_unique<DCDM_DR_Species>(ctx.pba,
+                                                                  ctx.bgm,
+                                                                  omega0_dcdmdr,
+                                                                  Gamma_dcdm,
+                                                                  Omega_ini_dcdm);
   composite->shooting_target_ = shooting_target;
   composite->needs_shooting_  = needs_shooting;
 

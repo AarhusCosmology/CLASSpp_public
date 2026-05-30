@@ -572,6 +572,7 @@ int PerturbationsModule::perturb_init() {
   }
 
   if (all_species_.count("Fluid")) {
+    const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
     /* check values of w_fld at initial time and today */
     class_call(background_module_->background_w_fld(0., &w_fld_ini, &dw_over_da_fld, &integral_fld),
                background_module_->error_message_,
@@ -590,7 +591,7 @@ int PerturbationsModule::perturb_init() {
                "assumption may break down, since at early times you have w_fld(a--->0) = %e >= 0",
                w_fld_ini);
 
-    if (pba->use_ppf == _FALSE_) {
+    if (fluid.use_ppf() == _FALSE_) {
       class_test((w_fld_ini + 1.0) * (w_fld_0 + 1.0) <= 0.0,
                  error_message_,
                  "w crosses -1 between the infinite past and today, and this would lead to "
@@ -5654,10 +5655,13 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
        baryons, and (PPF) fluid. Photons are already in ppw->rho_plus_p_shear
        from the photon/baryon block above; baryons contribute zero shear. */
     {
+      const FluidSpecies* fluid_tse = nullptr;
+      if (auto* p = all_species_.find("Fluid"))
+        fluid_tse = static_cast<const FluidSpecies*>(p->get());
       size_t i = 0;
       for (const auto& sp : all_species_) {
         if (sp->name() != "Photons" && sp->name() != "Baryons" &&
-            !(sp->name() == "Fluid" && pba->use_ppf == _TRUE_))
+            !(sp->name() == "Fluid" && fluid_tse && fluid_tse->use_ppf() == _TRUE_))
           ppw->rho_plus_p_shear +=
               sp->RhoPlusPShear(*ppw->pv->species_layouts[i], ppw->pv, y, ppw->pvecback, ppw);
         ++i;
@@ -5736,15 +5740,20 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       const size_t fluid_i     = all_species_.index_of("Fluid");
       const auto& fluid_layout = static_cast<const FluidSpecies::PerturbLayout&>(
           *ppw->pv->species_layouts[fluid_i]);
-      if (pba->use_ppf == _FALSE_) {
+      /* Local lookup colocated with its dereference: all_species_.count("Fluid")
+         above guarantees find() returns non-null, so this deref is safe. */
+      const FluidSpecies* fluid_tse = static_cast<const FluidSpecies*>(
+          all_species_.find("Fluid")->get());
+      if (fluid_tse->use_ppf() == _FALSE_) {
         ppw->delta_rho_fld        = all_species_.at("Fluid")->Rho(ppw->pvecback) *
                                     y[fluid_layout.idx_delta];
         ppw->rho_plus_p_theta_fld = (1. + w_fld) * all_species_.at("Fluid")->Rho(ppw->pvecback) *
                                     y[fluid_layout.idx_theta];
         double ca2_fld            = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
         /** We must gauge transform the pressure perturbation from the fluid rest-frame to the gauge we are working in */
-        ppw->delta_p_fld = pba->cs2_fld * ppw->delta_rho_fld +
-                           (pba->cs2_fld - ca2_fld) *
+        const double cs2 = fluid_tse->cs2_fld();
+        ppw->delta_p_fld = cs2 * ppw->delta_rho_fld +
+                           (cs2 - ca2_fld) *
                                (3 * a_prime_over_a * ppw->rho_plus_p_theta_fld / k / k);
       }
       else {

@@ -29,10 +29,40 @@ class FluidSpecies : public BaseSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
-  FluidSpecies(const background& pba, double omega0_fld);
+  FluidSpecies(const background& pba,
+               double omega0_fld,
+               equation_of_state fluid_eos,
+               double w0_fld,
+               double wa_fld,
+               double cs2_fld,
+               double Omega_EDE,
+               short use_ppf,
+               double c_gamma_over_c_fld);
 
   double GetOmega0() const override {
     return Omega0_fld_;
+  }
+
+  equation_of_state fluid_eos() const {
+    return fluid_eos_;
+  }
+  double w0_fld() const {
+    return w0_fld_;
+  }
+  double wa_fld() const {
+    return wa_fld_;
+  }
+  double cs2_fld() const {
+    return cs2_fld_;
+  }
+  double Omega_EDE() const {
+    return Omega_EDE_;
+  }
+  short use_ppf() const {
+    return use_ppf_;
+  }
+  double c_gamma_over_c_fld() const {
+    return c_gamma_over_c_fld_;
   }
 
   // ── Background ─────────────────────────────────────────────────────────────
@@ -77,7 +107,7 @@ class FluidSpecies : public BaseSpecies {
   /**
    * Compute PPF fluid contribution. Writes ppw->delta_rho_fld,
    * rho_plus_p_theta_fld, delta_p_fld, S_fld, Gamma_prime_fld (module then
-   * accumulates into rho/theta/p totals). Only called when pba->use_ppf == _TRUE_.
+   * accumulates into rho/theta/p totals). Only called when use_ppf() == _TRUE_.
    * Moved from PerturbationsModule — PPF is fluid-specific physics that depends
    * on the rest of the universe (rho_plus_p_theta, rho_plus_p_shear, delta_rho
    * from non-fluid species must be fully populated before calling).
@@ -210,6 +240,14 @@ class FluidSpecies : public BaseSpecies {
   const background& pba_;
   const BackgroundModule* bgm_ = nullptr;
   double Omega0_fld_;
+
+  equation_of_state fluid_eos_ = CLP;
+  double w0_fld_               = -1.;
+  double wa_fld_               = 0.;
+  double cs2_fld_              = 1.;
+  double Omega_EDE_            = 0.;
+  short use_ppf_               = _TRUE_;
+  double c_gamma_over_c_fld_   = 0.4;
 
   int index_bg_rho_fld_        = -1;
   int index_bg_w_fld_          = -1;

@@ -204,6 +204,7 @@ int ThermodynamicsModule::thermodynamics_at_z(
           *all_species_.at("IDM_DR_IDR"));
       const double Omega0_idm_dr_thermo = idm_dr_comp.idm_dr().GetOmega0();
       const double Omega0_idr_thermo    = idm_dr_comp.idr().GetOmega0();
+      const double T_idr                = idm_dr_comp.idr().T_idr();
       /* calculate dmu_idm_dr and approximate its derivatives as zero */
       pvecthermo[index_th_dmu_idm_dr_]  = pth->a_idm_dr * pow((1. + z) / 1.e7, pth->nindex_idm_dr) *
                                           Omega0_idm_dr_thermo * pow(pba->h, 2);
@@ -238,10 +239,10 @@ int ThermodynamicsModule::thermodynamics_at_z(
           thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_g_idm_dr_];
 
       /* calculate interacting dark matter sound speed */
-      pvecthermo[index_th_cidm_dr2_] = 4 * _k_B_ * pba->T_idr * (1. + z) / _eV_ / 3. / pth->m_idm;
+      pvecthermo[index_th_cidm_dr2_] = 4 * _k_B_ * T_idr * (1. + z) / _eV_ / 3. / pth->m_idm;
 
       /* calculate interacting dark matter temperature (equal to idr temperature at this redhsift) */
-      pvecthermo[index_th_Tidm_dr_] = pba->T_idr * (1. + z);
+      pvecthermo[index_th_Tidm_dr_] = T_idr * (1. + z);
     }
   }
 
@@ -826,8 +827,9 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /* - ---> fill columns for ddmu_idm_dr and dddmu_idm_dr with true values, and compute idm_dr temperature and sound speed */
   if (all_species_.count("IDM_DR_IDR") > 0) {
-    const double Omega0_idr_local =
-        static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).idr().GetOmega0();
+    const auto& comp_ref = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+    const double Omega0_idr_local = comp_ref.idr().GetOmega0();
+    const double T_idr_param      = comp_ref.idr().T_idr();
     double Gamma_heat_idm_dr, dTdz_idm_dr, T_idm_dr, T_idr, dz, T_adia, z_adia;
     double z;
 
@@ -879,16 +881,16 @@ int ThermodynamicsModule::thermodynamics_init() {
     /* (A1) --> if Gamma is not much smaller than H, set T_idm_dr to T_idm_dr = T_idr = xi*T_gamma (tight coupling solution) */
     if (Gamma_heat_idm_dr > 1.e-3 * pvecback[background_module_->index_bg_a_] *
                                 pvecback[background_module_->index_bg_H_]) {
-      T_idr       = pba->T_idr * (1. + z);
+      T_idr       = T_idr_param * (1. + z);
       T_idm_dr    = T_idr;
-      dTdz_idm_dr = pba->T_idr;
+      dTdz_idm_dr = T_idr_param;
     }
 
     /* (A2) --> otherwise, if Gamma << H, set initial T_idm_dr to the
        approximate analytic solution (Gamma/aH)/(1+(Gamma/aH)*T_idr)
        (eq. (A62) in ETHOS I ) */
     else {
-      T_idr       = pba->T_idr * (1. + z);
+      T_idr       = T_idr_param * (1. + z);
       T_idm_dr    = Gamma_heat_idm_dr /
                     (pvecback[background_module_->index_bg_a_] *
                      pvecback[background_module_->index_bg_H_]) /
@@ -921,7 +923,7 @@ int ThermodynamicsModule::thermodynamics_init() {
       if (Gamma_heat_idm_dr > 1.e3 * pvecback[background_module_->index_bg_a_] *
                                   pvecback[background_module_->index_bg_H_]) {
         z                 = z_table_[index_tau];
-        T_idr             = pba->T_idr * (1. + z);
+        T_idr             = T_idr_param * (1. + z);
         T_idm_dr          = T_idr;
         Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                             pow((1. + z), (pth->nindex_idm_dr + 1.)) /
@@ -936,7 +938,7 @@ int ThermodynamicsModule::thermodynamics_init() {
                                                          pvecback.data()),
                    background_module_->error_message_,
                    error_message_);
-        dTdz_idm_dr = pba->T_idr;
+        dTdz_idm_dr = T_idr_param;
       }
 
       /* (B2) --> intermediate solution: integrate differential equation equation dT_idm_dr/dz = 2 a T_DM - Gamma/H (T_idr - T_idm_dr) */
@@ -947,7 +949,7 @@ int ThermodynamicsModule::thermodynamics_init() {
         /* (B2a) ----> if dz << H/Gamma the equation is not too stiff and the traditional forward Euler method converges */
         if (dz < pvecback[background_module_->index_bg_H_] / Gamma_heat_idm_dr / 10.) {
           z                  = z_table_[index_tau];
-          T_idr              = pba->T_idr * (1. + z);
+          T_idr              = T_idr_param * (1. + z);
           T_idm_dr          -= dTdz_idm_dr * dz;
           Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                                pow((1. + z), (pth->nindex_idm_dr + 1.)) /
@@ -987,7 +989,7 @@ int ThermodynamicsModule::thermodynamics_init() {
             if (n == (N_sub_steps - 1))
               z = z_table_[index_tau];
 
-            T_idr              = pba->T_idr * (1. + z);
+            T_idr              = T_idr_param * (1. + z);
             T_idm_dr          -= dTdz_idm_dr * dz_sub_step;
             Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                                  pow((1. + z), (pth->nindex_idm_dr + 1.)) /
@@ -1016,7 +1018,7 @@ int ThermodynamicsModule::thermodynamics_init() {
       /* (B3) --> decoupled solution: T_idm_dr scales like a^-2 */
       else {
         z                 = z_table_[index_tau];
-        T_idr             = pba->T_idr * (1. + z);
+        T_idr             = T_idr_param * (1. + z);
         T_idm_dr          = T_adia * pow((1. + z) / (1. + z_adia), 2);
         Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
                             pow((1. + z), (pth->nindex_idm_dr + 1.)) /

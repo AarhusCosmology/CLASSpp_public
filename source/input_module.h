@@ -72,8 +72,10 @@ class InputModule {
   /** Parse the coupled-species cluster (CDM, IDM_DR/IDR, IDM_DRMD/IDR_DRMD,
    *  DCDM_DR) into omega_budget_. Resolves f_idm_dr/f_idm_drmd CDM subtractions,
    *  IDR derivation from T_idr*Omega0_g, and the synchronous-gauge CDM minimum.
-   *  Writes T_idr / Omega_ini_dcdm / Gamma_dcdm / f_idm_drmd / delta_Neff_drmd /
-   *  z_stop / G_over_aH_drmd to pba (those are physics params, not Omega0).
+   *  Species-specific physics params (T_idr, l_max_idr, f_idm_drmd,
+   *  delta_Neff_drmd, z_stop, G_over_aH_drmd, Gamma_dcdm, Omega_ini_dcdm) are
+   *  owned by their species and parsed in each species' CreateAll; this
+   *  function only reads them as locals where the budget math needs them.
    *  Called from input_read_parameters. */
   int ReadCoupledOmegaBudget();
 

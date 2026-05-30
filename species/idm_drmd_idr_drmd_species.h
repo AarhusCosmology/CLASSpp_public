@@ -22,7 +22,26 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
-  IDM_DRMD_IDR_DRMD_Species(const background& pba, double omega0_idm_drmd, double omega0_idr_drmd);
+  IDM_DRMD_IDR_DRMD_Species(const background& pba,
+                            double omega0_idm_drmd,
+                            double omega0_idr_drmd,
+                            double f_idm_drmd,
+                            double G_over_aH_drmd,
+                            double delta_Neff_drmd,
+                            double z_stop);
+
+  double f_idm_drmd() const {
+    return f_idm_drmd_;
+  }
+  double G_over_aH_drmd() const {
+    return G_over_aH_drmd_;
+  }
+  double delta_Neff_drmd() const {
+    return delta_Neff_drmd_;
+  }
+  double z_stop() const {
+    return z_stop_;
+  }
 
   IDM_DRMDSpecies& idm_drmd() {
     return *idm_drmd_;
@@ -141,4 +160,8 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   const BackgroundModule* bgm_ = nullptr;
   bool has_idm_drmd_           = false;
   bool has_idr_drmd_           = false;
+  double f_idm_drmd_           = 0.;
+  double G_over_aH_drmd_       = 0.;
+  double delta_Neff_drmd_      = 0.;
+  double z_stop_               = 0.;
 };

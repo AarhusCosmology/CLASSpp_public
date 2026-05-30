@@ -13,6 +13,10 @@
 
 #include "nonlinear_module.h"
 
+#include <iomanip>
+#include <sstream>
+
+#include "../species/fluid.h"
 #include "../species/idm_dr_idr_species.h"
 #include "../species/ncdm_species.h"
 #include "background_module.h"
@@ -3876,13 +3880,25 @@ int NonlinearModule::prepare_pk_eq() {
 
     /* launch iterations in order to coverge to effective model with wa=0 but the same chi = (tau[z_i] - tau_rec) */
 
-    double w0_fld = pba->w0_fld;
+    double w0_fld = -1.;
+    if (auto* p = all_species_.find("Fluid"))
+      w0_fld = static_cast<const FluidSpecies*>(p->get())->w0_fld();
+    /* Local copy of the input file content so that overrides for w0/wa do not
+       leak back into input_module_->file_content_ (the original code mutated
+       per-iteration copies of pba's w0_fld/wa_fld fields, which no longer
+       exist). */
+    FileContent fc_local = input_module_->file_content_;
+    auto format_double   = [](double v) {
+      std::ostringstream oss;
+      oss << std::setprecision(17) << v;
+      return oss.str();
+    };
     do {
-      input.reset(new InputModule(input_module_->file_content_));
+      fc_local.set("w0_fld", format_double(w0_fld));
+      fc_local.set("wa_fld", format_double(0.0));
+      input.reset(new InputModule(fc_local));
       input->background_.background_verbose         = 0;
       input->thermodynamics_.thermodynamics_verbose = 0;
-      input->background_.w0_fld                     = w0_fld;
-      input->background_.wa_fld                     = 0.0;
 
       Cosmology cosmology{std::move(input)};
       background_module     = cosmology.GetBackgroundModule();

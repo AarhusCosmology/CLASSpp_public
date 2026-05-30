@@ -28,7 +28,8 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
-  IDM_DR_IDR_Species(const background& pba, double omega0_idm_dr, double omega0_idr);
+  IDM_DR_IDR_Species(
+      const background& pba, double omega0_idm_dr, double omega0_idr, double T_idr, int l_max_idr);
 
   IDM_DRSpecies& idm_dr() {
     return *idm_dr_;
@@ -52,6 +53,8 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
   bool has_idr() const {
     return has_idr_;
   }
+
+  std::optional<double> GetParam(const std::string& name) const override;
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
