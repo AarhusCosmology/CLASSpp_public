@@ -84,8 +84,6 @@ class InputModule {
   int input_read_precisions();
   int input_default_params();
   int input_default_precision();
-  static int compare_doubles(const void* a, const void* b);
-  static int file_exists(const char* fname);
 };
 
 /* macro for reading parameter values with routines from the parser */

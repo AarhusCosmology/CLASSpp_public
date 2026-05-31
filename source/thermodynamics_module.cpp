@@ -1678,7 +1678,7 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
   class_open(fA, ppr->sBBN_file, "r", error_message_);
 
   /* go through each line */
-  while (fgets(line, _LINE_LENGTH_MAX_ - 1, fA) != NULL) {
+  while (fgets(line, _LINE_LENGTH_MAX_ - 1, fA) != nullptr) {
     /* eliminate blank spaces at beginning of line */
     left = line;
     while (left[0] == ' ') {
@@ -4276,23 +4276,16 @@ int ThermodynamicsModule::thermodynamics_output_titles(char titles[_MAXTITLESTRI
   class_store_columntitle(titles, "conf. time [Mpc]", _TRUE_);
   class_store_columntitle(titles, "x_e", _TRUE_);
   class_store_columntitle(titles, "kappa' [Mpc^-1]", _TRUE_);
-  //class_store_columntitle(titles,"kappa''",_TRUE_);
-  //class_store_columntitle(titles,"kappa'''",_TRUE_);
   class_store_columntitle(titles, "exp(-kappa)", _TRUE_);
   class_store_columntitle(titles, "g [Mpc^-1]", _TRUE_);
-  //class_store_columntitle(titles,"g'",_TRUE_);
-  //class_store_columntitle(titles,"g''",_TRUE_);
   class_store_columntitle(titles, "Tb [K]", _TRUE_);
   class_store_columntitle(titles, "w_b", _TRUE_);
   class_store_columntitle(titles, "c_b^2", _TRUE_);
   class_store_columntitle(titles, "tau_d", _TRUE_);
-  //class_store_columntitle(titles,"max. rate",_TRUE_);
   class_store_columntitle(titles, "r_d", pth->compute_damping_scale);
 
   if (all_species_.count("IDM_DR_IDR") > 0) {
     class_store_columntitle(titles, "dmu_idm_dr", _TRUE_);
-    //class_store_columntitle(titles,"ddmu_idm_dr",_TRUE_);
-    //class_store_columntitle(titles,"dddmu_idm_dr",_TRUE_);
     class_store_columntitle(titles, "tau_idm_dr", _TRUE_);
     class_store_columntitle(titles, "tau_idr", _TRUE_);
     class_store_columntitle(titles, "g_idm_dr [Mpc^-1]", _TRUE_);
@@ -4309,9 +4302,6 @@ int ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, doubl
   double *dataptr, *pvecthermo;
   double z, tau;
 
-  //  pth->number_of_thermodynamics_titles = get_number_of_titles(pth->thermodynamics_titles);
-  //pth->size_thermodynamics_data = pth->number_of_thermodynamics_titles*tt_size_;
-
   /* Store quantities: */
   for (int index_z = 0; index_z < tt_size_; index_z++) {
     dataptr    = data + index_z * number_of_titles;
@@ -4327,23 +4317,16 @@ int ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, doubl
     class_store_double(dataptr, tau, _TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_xe_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_dkappa_], _TRUE_, storeidx);
-    //class_store_double(dataptr, pvecthermo[index_th_ddkappa_],_TRUE_, storeidx);
-    //class_store_double(dataptr, pvecthermo[index_th_dddkappa_],_TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_exp_m_kappa_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_g_], _TRUE_, storeidx);
-    //class_store_double(dataptr, pvecthermo[index_th_dg_],_TRUE_, storeidx);
-    //class_store_double(dataptr, pvecthermo[index_th_ddg_],_TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_Tb_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_wb_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_cb2_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_tau_d_], _TRUE_, storeidx);
-    //class_store_double(dataptr, pvecthermo[index_th_rate_],_TRUE_, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_r_d_], pth->compute_damping_scale, storeidx);
 
     if (all_species_.count("IDM_DR_IDR") > 0) {
       class_store_double(dataptr, pvecthermo[index_th_dmu_idm_dr_], _TRUE_, storeidx);
-      //class_store_double(dataptr, pvecthermo[index_th_ddmu_idm_dr_],_TRUE_, storeidx);
-      //class_store_double(dataptr, pvecthermo[index_th_dddmu_idm_dr_],_TRUE_, storeidx);
       class_store_double(dataptr, pvecthermo[index_th_tau_idm_dr_], _TRUE_, storeidx);
       class_store_double(dataptr, pvecthermo[index_th_tau_idr_], _TRUE_, storeidx);
       class_store_double(dataptr, pvecthermo[index_th_g_idm_dr_], _TRUE_, storeidx);

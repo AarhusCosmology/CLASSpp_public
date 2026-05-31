@@ -44,7 +44,7 @@ NonlinearModule::~NonlinearModule() {
  * (linear if pk_output = pk_linear, nonlinear if pk_output = pk_nonlinear)
  *
  * In the linear case, if there are several initial conditions *and* the
- * input pointer out_pk_ic is not set to NULL, the function also
+ * input pointer out_pk_ic is not set to nullptr, the function also
  * returns the decomposition into different IC contributions.
  *
  * Hints on input index_pk:
@@ -103,7 +103,7 @@ int NonlinearModule::nonlinear_pk_at_z(
 
   /** - check whether we need the decomposition into contributions from each initial condition */
 
-  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != NULL))
+  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
     do_ic = _TRUE_;
 
   /** - case z=0 requiring no interpolation in z */
@@ -338,7 +338,7 @@ int NonlinearModule::nonlinear_pks_at_z(
  * (linear if pk_output = pk_linear, nonlinear if pk_output = pk_nonlinear)
  *
  * In the linear case, if there are several initial conditions *and* the
- * input pointer out_pk_ic is not set to NULL, the function also
+ * input pointer out_pk_ic is not set to nullptr, the function also
  * returns the decomposition into different IC contributions.
  *
  * Hints on input index_pk:
@@ -385,7 +385,7 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 
   /** - preliminary: check whether we need the decomposition into contributions from each initial condition */
 
-  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != NULL))
+  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
     do_ic = _TRUE_;
 
   /** - first step: check that k is in valid range [0:kmax]
@@ -427,7 +427,7 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
                                  z,
                                  index_pk,
                                  out_pk_at_z.data(),
-                                 do_ic == _TRUE_ ? out_pk_ic_at_z.data() : NULL),
+                                 do_ic == _TRUE_ ? out_pk_ic_at_z.data() : nullptr),
                error_message_,
                error_message_);
 
@@ -628,8 +628,8 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
     int kvec_size,
     double* zvec,  // zvec[index_zvec]
     int zvec_size,
-    double* out_pk,    // output_pk[index_zvec*kvec_size+index_kvec] already allocated or NULL
-    double* out_pk_cb  // output_pk[index_zvec*kvec_size+index_kvec] already allocated or NULL
+    double* out_pk,    // output_pk[index_zvec*kvec_size+index_kvec] already allocated or nullptr
+    double* out_pk_cb  // output_pk[index_zvec*kvec_size+index_kvec] already allocated or nullptr
 ) const {
   /** Summary: */
 
@@ -665,7 +665,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
                                    zvec[index_zvec],
                                    index_pk_m_,
                                    &ln_pk_table[index_zvec * k_size_],
-                                   NULL),
+                                   nullptr),
                  error_message_,
                  error_message_);
     }
@@ -675,7 +675,7 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
                                    zvec[index_zvec],
                                    index_pk_cb_,
                                    &ln_pk_cb_table[index_zvec * k_size_],
-                                   NULL),
+                                   nullptr),
                  error_message_,
                  error_message_);
     }
@@ -801,11 +801,11 @@ int NonlinearModule::nonlinear_pk_tilt_at_k_and_z(
 
   dlnk = ln_k_[k_size_ - 1] - ln_k_[k_size_ - 2];
 
-  class_call(nonlinear_pk_at_k_and_z(pk_output, k / (1. + dlnk), z, index_pk, &out_pk1, NULL),
+  class_call(nonlinear_pk_at_k_and_z(pk_output, k / (1. + dlnk), z, index_pk, &out_pk1, nullptr),
              error_message_,
              error_message_);
 
-  class_call(nonlinear_pk_at_k_and_z(pk_output, k * (1. + dlnk), z, index_pk, &out_pk2, NULL),
+  class_call(nonlinear_pk_at_k_and_z(pk_output, k * (1. + dlnk), z, index_pk, &out_pk2, nullptr),
              error_message_,
              error_message_);
 
@@ -842,7 +842,7 @@ int NonlinearModule::nonlinear_sigmas_at_z(
 
   /** - get P(k,z) as a function of k, for the right z */
 
-  class_call(nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), NULL),
+  class_call(nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), nullptr),
              error_message_,
              error_message_);
 
@@ -1185,7 +1185,7 @@ int NonlinearModule::nonlinear_init() {
                                        index_tau,
                                        k_size_extra_,
                                        lnpk_l[index_pk].data(),
-                                       NULL),
+                                       nullptr),
                    error_message_,
                    error_message_);
 
@@ -1687,7 +1687,7 @@ int NonlinearModule::nonlinear_get_source(int index_k,
  *
  * - in the quantitites labelled _ic, the splitting of one of these
  * spectra in different modes for different initial conditions. If the
- * pointer ln_pk_ic is NULL in input, the function will ignore this
+ * pointer ln_pk_ic is nullptr in input, the function will ignore this
  * part; thus, to get the result, one should allocate the array before
  * calling the function. Then the convention is the following:
  *
@@ -1784,7 +1784,7 @@ int NonlinearModule::nonlinear_pk_linear(
 
       pk += pk_ic[index_ic1_ic1];
 
-      if (lnpk_ic != NULL) {
+      if (lnpk_ic != nullptr) {
         lnpk_ic[index_k * ic_ic_size_ + index_ic1_ic1] = log(pk_ic[index_ic1_ic1]);
       }
     }
@@ -1825,12 +1825,12 @@ int NonlinearModule::nonlinear_pk_linear(
 
           pk += 2. * pk_ic[index_ic1_ic2];
 
-          if (lnpk_ic != NULL) {
+          if (lnpk_ic != nullptr) {
             lnpk_ic[index_k * ic_ic_size_ + index_ic1_ic2] = cosine_correlation;
           }
         }
         else {
-          if (lnpk_ic != NULL) {
+          if (lnpk_ic != nullptr) {
             lnpk_ic[index_k * ic_ic_size_ + index_ic1_ic2] = 0.;
           }
         }
@@ -2033,7 +2033,7 @@ int NonlinearModule::nonlinear_sigma_at_z(
 
   /** - get P(k,z) as a function of k, for the right z */
 
-  class_call(nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), NULL),
+  class_call(nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), nullptr),
              error_message_,
              error_message_);
 
@@ -2291,21 +2291,9 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
 
   sigma = sqrt(sum1);
 
-  /* the following error should not stop the code: it will arrive
-     inevitably at some large redshift, and then the code should not
-     stop, but just give up computing P_NL(k,z). This is why we have a
-     special error handling here (using class_test_except and free()
-     commands to avoid memory leaks, and calling this whole function
-     not through a class_call) */
-
-  /*
-    class_test_except(sigma < 1.,
-    error_message_,
-    free(pvecback);free(integrand_array),
-    "Your k_max=%g 1/Mpc is too small for Halofit to find the non-linearity scale z_nl at z=%g. Increase input parameter P_k_max_h/Mpc or P_k_max_1/Mpc",
-    k_[k_size_-1],
-    pba->a_today/pvecback[background_module_->index_bg_a_]-1.);
-  */
+  /* Don't abort when sigma < 1: at high z this is expected. Return
+     _SUCCESS_ with the flag set so the caller skips P_NL(k,z) for
+     this redshift without treating it as an error. */
 
   if (sigma < 1.) {
     *nl_corr_not_computable_at_this_k = _TRUE_;

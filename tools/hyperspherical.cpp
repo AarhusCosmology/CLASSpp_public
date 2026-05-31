@@ -233,7 +233,7 @@ int hyperspherical_HIS_create(int K,
                                         0.,
                                         phiminabs,
                                         pHIS->chi_at_phimin.data() + k,
-                                        NULL);
+                                        nullptr);
   }
 
   //hyperspherical_get_xmin(pHIS,1.e-4,phiminabs,pHIS->chi_at_phimin);
@@ -260,7 +260,7 @@ int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS,
       routine optimised for this case. The more sorted the vector, the faster
       the execution time. For closed case, the interpolation structure only
       covers [safety;pi/2-safety]. The calling routine should respect this.
-      if sinK and cosK are not NULL, we will also interpolate them.
+      if sinK and cosK are not nullptr, we will also interpolate them.
   */
 
   int do_function = _TRUE_, do_first_derivative = _TRUE_;
@@ -283,15 +283,15 @@ int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS,
       do it.
   */
 
-  if (Phi == NULL)
+  if (Phi == nullptr)
     do_function = _FALSE_;
   else
     do_function = _TRUE_;
-  if (dPhi == NULL)
+  if (dPhi == nullptr)
     do_first_derivative = _FALSE_;
   else
     do_first_derivative = _TRUE_;
-  if (d2Phi == NULL)
+  if (d2Phi == nullptr)
     do_second_derivative = _FALSE_;
   else
     do_second_derivative = _TRUE_;
@@ -1063,7 +1063,7 @@ int hyperspherical_get_xmin(HyperInterpStruct* pHIS, double xtol, double phimina
       //printf("Refining\n");
       for (j = 0; j < REFINE; j++)
         x[j] = xleft + j * (xright - xleft) / (REFINE - 1.0);
-      hyperspherical_Hermite_interpolation_vector(pHIS, REFINE, index_l, x, Phi, NULL, NULL);
+      hyperspherical_Hermite_interpolation_vector(pHIS, REFINE, index_l, x, Phi, nullptr, nullptr);
       for (right_index = 1; right_index < REFINE; right_index++) {
         if (fabs(Phi[right_index]) > phiminabs)
           break;
@@ -1182,7 +1182,7 @@ int fzero_ridder(double (*func)(double, void*),
    */
   int j, MAXIT = 1000;
   double ans, fh, fl, fm, fnew, s, xh, xl, xm, xnew;
-  if ((Fx1 != NULL) && (Fx2 != NULL)) {
+  if ((Fx1 != nullptr) && (Fx2 != nullptr)) {
     fl = *Fx1;
     fh = *Fx2;
   }

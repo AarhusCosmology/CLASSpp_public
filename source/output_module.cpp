@@ -1191,9 +1191,9 @@ int OutputModule::output_print_data(FILE* out,
   char thetitle[_MAXTITLESTRINGLENGTH_];
   strcpy(thetitle, titles);
   char* pch = strtok(thetitle, _DELIMITER_);
-  while (pch != NULL) {
+  while (pch != nullptr) {
     class_fprintf_columntitle(out, pch, _TRUE_, colnum);
-    pch = strtok(NULL, _DELIMITER_);
+    pch = strtok(nullptr, _DELIMITER_);
   }
   fprintf(out, "\n");
 

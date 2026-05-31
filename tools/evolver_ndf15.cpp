@@ -140,7 +140,7 @@ int evolver_ndf15(
   dif[1] = dif_data.data();
   for (j = 2; j <= neq; j++)
     dif[j] = dif[j - 1] + 7; /* Set row pointers... */
-  dif[0] = NULL;
+  dif[0] = nullptr;
   for (j = 1; j <= neq; j++) {
     for (ii = 1; ii <= 7; ii++) {
       dif[j][ii] = 0.;
@@ -169,7 +169,7 @@ int evolver_ndf15(
   /* But if we want to print variables for testing purposes, just interpolate everything.. */
   for (ii = 1; ii <= neq; ii++) {
     y[ii] = y_inout[ii - 1];
-    if (print_variables == NULL) {
+    if (print_variables == nullptr) {
       interpidx[ii] = used_in_output[ii - 1];
     }
     else {
@@ -582,7 +582,7 @@ int evolver_ndf15(
         // MODIFICATION BY LUC
         // All print_variables have been moved to the end of time step
         /*
-	if (print_variables != NULL){
+	if (print_variables != nullptr){
 	  class_call((*print_variables)(t_vec[next],ynew+1,f0+1,
 					parameters_and_workspace_for_derivs,error_message),
 		     error_message,error_message);
@@ -680,7 +680,7 @@ int evolver_ndf15(
     Jcurrent = _FALSE_;
 
     // MODIFICATION BY LUC
-    if (print_variables != NULL) {
+    if (print_variables != nullptr) {
       class_call((*derivs)(tnew,
                            ynew + 1,
                            f0 + 1,
@@ -707,7 +707,7 @@ int evolver_ndf15(
              error_message,
              error_message);
 
-  if (print_variables != NULL) {
+  if (print_variables != nullptr) {
     /** If we are printing variables, we must store the final point */
     class_call((*print_variables)(tnew,
                                   ynew + 1,
@@ -1168,7 +1168,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F, Erro
   std::vector<double> lu_work_vec(x_size + 1);
   std::vector<double> Fjac_data(x_size * x_size + 1);
   std::vector<double*> Fjac_ptrs(x_size + 1);
-  Fjac_ptrs[0] = NULL;
+  Fjac_ptrs[0] = nullptr;
   Fjac_ptrs[1] = Fjac_data.data();
   for (i = 2; i <= x_size; i++) {
     Fjac_ptrs[i] = Fjac_ptrs[i - 1] + x_size;
@@ -1316,7 +1316,7 @@ int numjac(int (*derivs)(double x,
   int colmax, group, row, nz, nz2;
   double Fdiff_absrm, Fdiff_new;
   double **dFdy, *fac;
-  int *Ap = NULL, *Ai = NULL;
+  int *Ap = nullptr, *Ai = nullptr;
 
   dFdy = jac->dfdy; /* Assign pointer to dfdy directly for easier notation. */
   fac  = jac->jacvec;
@@ -1663,7 +1663,7 @@ int initialize_jacobian(struct jacobian* jac, int neq, ErrorMsg error_message) {
   jac->dfdy_data_vec.assign(neq * neq + 1, 0.0);
   jac->dfdy_rows_vec.resize(neq + 1);
   jac->dfdy    = jac->dfdy_rows_vec.data();
-  jac->dfdy[0] = NULL;
+  jac->dfdy[0] = nullptr;
   jac->dfdy[1] = jac->dfdy_data_vec.data();
   for (i = 2; i <= neq; i++)
     jac->dfdy[i] = jac->dfdy[i - 1] + neq; /* Set row pointers... */
@@ -1671,7 +1671,7 @@ int initialize_jacobian(struct jacobian* jac, int neq, ErrorMsg error_message) {
   jac->LU_data_vec.assign(neq * neq + 1, 0.0);
   jac->LU_rows_vec.resize(neq + 1);
   jac->LU    = jac->LU_rows_vec.data();
-  jac->LU[0] = NULL;
+  jac->LU[0] = nullptr;
   jac->LU[1] = jac->LU_data_vec.data();
   for (i = 2; i <= neq; i++)
     jac->LU[i] = jac->LU[i - 1] + neq; /* Set row pointers... */
@@ -1748,7 +1748,7 @@ int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq, ErrorMs
   nj_ws->ydel_Fdel_data_vec.assign(neq * neq + 1, 0.0);
   nj_ws->ydel_Fdel_rows_vec.resize(neq + 1);
   nj_ws->ydel_Fdel    = nj_ws->ydel_Fdel_rows_vec.data();
-  nj_ws->ydel_Fdel[0] = NULL;
+  nj_ws->ydel_Fdel[0] = nullptr;
   nj_ws->ydel_Fdel[1] = nj_ws->ydel_Fdel_data_vec.data();
   for (int i = 2; i <= neq; i++)
     nj_ws->ydel_Fdel[i] = nj_ws->ydel_Fdel[i - 1] + neq; /* Set row pointers... */

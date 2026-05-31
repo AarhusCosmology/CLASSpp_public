@@ -350,7 +350,7 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 #define class_open(pointer, filename, mode, error_output)                    \
   {                                                                          \
     pointer = fopen(filename, mode);                                         \
-    if (pointer == NULL) {                                                   \
+    if (pointer == nullptr) {                                                \
       class_build_error_string(error_output,                                 \
                                "could not open %s with name %s and mode %s", \
                                #pointer,                                     \

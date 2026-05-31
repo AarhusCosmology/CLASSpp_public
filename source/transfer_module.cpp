@@ -3299,7 +3299,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       for (j = 0; j < x_size; j++)
         radial_function[x_size - 1 - j] = Phi[j] * rescale_function[j];
       break;
@@ -3307,7 +3307,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_dPhi(pHIS, x_size, index_l, chireverse, dPhi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, NULL, dPhi, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, nullptr, dPhi, nullptr);
       for (j = 0; j < x_size; j++)
         radial_function[x_size - 1 - j] = sqrt_absK_over_k * dPhi[j] * rescale_argument *
                                           rescale_function[j];
@@ -3322,7 +3322,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                       error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, d2Phi);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
       s2     = sqrt(1.0 - 3.0 * K / k2);
       factor = 1.0 / (2.0 * s2);
       for (j = 0; j < x_size; j++)
@@ -3334,7 +3334,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s2     = sqrt(1.0 - 3.0 * K / k2);
       factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / s2;
       for (j = 0; j < x_size; j++)
@@ -3345,7 +3345,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s0     = sqrt(1.0 + K / k2);
       factor = sqrt(0.5 * l * (l + 1)) / s0;
       for (j = 0; j < x_size; j++)
@@ -3356,7 +3356,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       factor = sqrt(1.5 * l * (l + 1)) / s0 / ssqrt3;
@@ -3370,7 +3370,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
                  error_message_,
                  error_message_);
-      //    hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
+      //    hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       factor = 0.5 * sqrt((l - 1.0) * (l + 2.0)) / s0 / ssqrt3;
@@ -3384,7 +3384,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
@@ -3397,7 +3397,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
       factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / si / ssqrt2;
@@ -3416,7 +3416,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                           error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
       factor = 0.25 / si / ssqrt2;
@@ -3433,7 +3433,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       class_call(interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, NULL);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       ssqrt2i = sqrt(1.0 + 3.0 * K / k2);
       ssqrt2  = sqrt(1.0 - 1.0 * K / k2);
       si      = sqrt(1.0 + 2.0 * K / k2);
@@ -3454,7 +3454,7 @@ int TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                       error_message_),
                  error_message_,
                  error_message_);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, NULL, d2Phi);
+      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
       //s2 = sqrt(1.0-3.0*K/k2);
       factor = 1.0;
       for (j = 0; j < x_size; j++)
@@ -3555,7 +3555,7 @@ int TransferModule::transfer_global_selection_read() {
 
   if (ptr->has_nz_file == _TRUE_) {
     input_file = fopen(ptr->nz_file_name, "r");
-    class_test(input_file == NULL, error_message_, "Could not open file %s!", ptr->nz_file_name);
+    class_test(input_file == nullptr, error_message_, "Could not open file %s!", ptr->nz_file_name);
 
     /* Find size of table */
     for (row = 0, status = 2; status == 2; row++) {
@@ -3590,7 +3590,7 @@ int TransferModule::transfer_global_selection_read() {
 
   if (ptr->has_nz_evo_file == _TRUE_) {
     input_file = fopen(ptr->nz_evo_file_name, "r");
-    class_test(input_file == NULL,
+    class_test(input_file == nullptr,
                error_message_,
                "Could not open file %s!",
                ptr->nz_evo_file_name);

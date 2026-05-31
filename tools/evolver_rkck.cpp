@@ -79,7 +79,7 @@ int evolver_rk(
       call_output = _FALSE_;
     }
 
-    if (print_variables != NULL) {
+    if (print_variables != nullptr) {
       if (x1 == x_ini) {
         class_call((*derivs)(x1, y, dy.data(), parameters_and_workspace_for_derivs, error_message),
                    error_message,
@@ -135,7 +135,7 @@ int evolver_rk(
              error_message,
              error_message);
 
-  if (print_variables != NULL)
+  if (print_variables != nullptr)
     class_call((*print_variables)(x1,
                                   y,
                                   dy.data(),

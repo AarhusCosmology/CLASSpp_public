@@ -84,8 +84,8 @@ int get_qsampling(double* x,
   int i, NL = 2, NR, level, Nadapt = 0, NLag, NLag_max, Nold = NL;
   int adapt_converging = _FALSE_, Laguerre_converging = _FALSE_, combined_converging = _FALSE_;
   double y, y1, y2, I, Igk, err, ILag;
-  std::unique_ptr<qss_node> root      = NULL;
-  std::unique_ptr<qss_node> root_comb = NULL;
+  std::unique_ptr<qss_node> root      = nullptr;
+  std::unique_ptr<qss_node> root_comb = nullptr;
   double I_comb, I_atzero, I_atinf, I_comb2;
   int N_comb = 0, N_comb_leg = 4;
   double a_comb, b_comb;
@@ -112,13 +112,13 @@ int get_qsampling(double* x,
   std::vector<double> b(N_max);
   std::vector<double> c(N_max);
   /* If a vector of q values has been passed, use it: */
-  if ((qvec != NULL) && (qsiz > 1)) {
+  if ((qvec != nullptr) && (qsiz > 1)) {
     qmin   = qvec[0];
     qmax   = qvec[qsiz - 1];
     qmaxm1 = qvec[qsiz - 2];
   }
   else {
-    qvec = NULL;
+    qvec = nullptr;
   }
 
   /* First do the adaptive quadrature - this will also give the value of the integral: */
@@ -161,7 +161,7 @@ int get_qsampling(double* x,
   }
 
   /* Combined adaptive quadrature and Laguerre rescaled quadrature: */
-  if (qvec != NULL) {
+  if (qvec != nullptr) {
     /* Evaluate [0;qmin] using 4 point Gauss-Legendre rule: */
     (*function)(params_for_function, qmin, &y2);
     for (i = 0, I_atzero = 0.0; i < N_comb_leg; i++) {

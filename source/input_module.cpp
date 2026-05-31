@@ -6,6 +6,7 @@
 #include "input_module.h"
 
 #include <algorithm>
+#include <filesystem>
 
 #include "background_module.h"
 #include "cosmology.h"
@@ -128,17 +129,18 @@ int InputModule::file_content_from_arguments(int argc,
       strncpy(inifilename, input_file, strlen(input_file) - 4);
       inifilename[strlen(input_file) - 4] = '\0';
       for (filenum = 0; filenum < 100; filenum++) {
+        std::error_code ec;
         snprintf(tmp_file, tmp_file_size, "output/%s%02d_cl.dat", inifilename, filenum);
-        if (file_exists(tmp_file) == _TRUE_)
+        if (std::filesystem::exists(tmp_file, ec))
           continue;
         snprintf(tmp_file, tmp_file_size, "output/%s%02d_pk.dat", inifilename, filenum);
-        if (file_exists(tmp_file) == _TRUE_)
+        if (std::filesystem::exists(tmp_file, ec))
           continue;
         snprintf(tmp_file, tmp_file_size, "output/%s%02d_tk.dat", inifilename, filenum);
-        if (file_exists(tmp_file) == _TRUE_)
+        if (std::filesystem::exists(tmp_file, ec))
           continue;
         snprintf(tmp_file, tmp_file_size, "output/%s%02d_parameters.ini", inifilename, filenum);
-        if (file_exists(tmp_file) == _TRUE_)
+        if (std::filesystem::exists(tmp_file, ec))
           continue;
         break;
       }
@@ -542,7 +544,8 @@ int InputModule::input_init() {
 
   class_call(parser_read_string(pfc, "write parameters", &string1, &flag1, errmsg), errmsg, errmsg);
 
-  if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+  if ((flag1 == _TRUE_) &&
+      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
     output* pop = &output_;
     char param_output_name[_LINE_LENGTH_MAX_];
     char param_unused_name[_LINE_LENGTH_MAX_];
@@ -582,7 +585,8 @@ int InputModule::input_init() {
 
   class_call(parser_read_string(pfc, "write warnings", &string1, &flag1, errmsg), errmsg, errmsg);
 
-  if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+  if ((flag1 == _TRUE_) &&
+      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
     pfc->for_each([](const std::string& name, const std::string& value, bool read) {
       if (!read)
         fprintf(stdout,
@@ -709,13 +713,13 @@ int InputModule::input_read_parameters() {
   class_call(parser_read_string(pfc, "gauge", &string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "newtonian") != NULL) || (strstr(string1, "Newtonian") != NULL) ||
-        (strstr(string1, "new") != NULL)) {
+    if ((strstr(string1, "newtonian") != nullptr) || (strstr(string1, "Newtonian") != nullptr) ||
+        (strstr(string1, "new") != nullptr)) {
       ppt->gauge = newtonian;
     }
 
-    if ((strstr(string1, "synchronous") != NULL) || (strstr(string1, "sync") != NULL) ||
-        (strstr(string1, "Synchronous") != NULL)) {
+    if ((strstr(string1, "synchronous") != nullptr) || (strstr(string1, "sync") != nullptr) ||
+        (strstr(string1, "Synchronous") != nullptr)) {
       ppt->gauge = synchronous;
     }
   }
@@ -895,14 +899,14 @@ int InputModule::input_read_parameters() {
       class_call(parser_read_string(pfc, "idr_nature", &string1, &flag1, errmsg), errmsg, errmsg);
 
       if (flag1 == _TRUE_) {
-        if ((strstr(string1, "free_streaming") != NULL) ||
-            (strstr(string1, "Free_Streaming") != NULL) ||
-            (strstr(string1, "Free_streaming") != NULL) ||
-            (strstr(string1, "FREE_STREAMING") != NULL)) {
+        if ((strstr(string1, "free_streaming") != nullptr) ||
+            (strstr(string1, "Free_Streaming") != nullptr) ||
+            (strstr(string1, "Free_streaming") != nullptr) ||
+            (strstr(string1, "FREE_STREAMING") != nullptr)) {
           ppt->idr_nature = idr_free_streaming;
         }
-        if ((strstr(string1, "fluid") != NULL) || (strstr(string1, "Fluid") != NULL) ||
-            (strstr(string1, "FLUID") != NULL)) {
+        if ((strstr(string1, "fluid") != nullptr) || (strstr(string1, "Fluid") != nullptr) ||
+            (strstr(string1, "FLUID") != nullptr)) {
           ppt->idr_nature = idr_fluid;
         }
       }
@@ -1046,7 +1050,7 @@ int InputModule::input_read_parameters() {
   class_call(parser_read_string(pfc, "YHe", &string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "BBN") != NULL) || (strstr(string1, "bbn") != NULL)) {
+    if ((strstr(string1, "BBN") != nullptr) || (strstr(string1, "bbn") != nullptr)) {
       pth->YHe = _BBN_;
     }
     else {
@@ -1058,8 +1062,8 @@ int InputModule::input_read_parameters() {
   class_call(parser_read_string(pfc, "recombination", &string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "HYREC") != NULL) || (strstr(string1, "hyrec") != NULL) ||
-        (strstr(string1, "HyRec") != NULL)) {
+    if ((strstr(string1, "HYREC") != nullptr) || (strstr(string1, "hyrec") != nullptr) ||
+        (strstr(string1, "HyRec") != nullptr)) {
       pth->recombination = hyrec;
     }
   }
@@ -1213,11 +1217,11 @@ int InputModule::input_read_parameters() {
                errmsg);
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL)) {
+      if ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr)) {
         pth->has_on_the_spot = _TRUE_;
       }
       else {
-        if ((strstr(string1, "n") != NULL) || (strstr(string1, "N") != NULL)) {
+        if ((strstr(string1, "n") != nullptr) || (strstr(string1, "N") != nullptr)) {
           pth->has_on_the_spot = _FALSE_;
         }
         else {
@@ -1234,11 +1238,11 @@ int InputModule::input_read_parameters() {
              errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL)) {
+    if ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr)) {
       pth->compute_damping_scale = _TRUE_;
     }
     else {
-      if ((strstr(string1, "n") != NULL) || (strstr(string1, "N") != NULL)) {
+      if ((strstr(string1, "n") != nullptr) || (strstr(string1, "N") != nullptr)) {
         pth->compute_damping_scale = _FALSE_;
       }
       else {
@@ -1257,44 +1261,44 @@ int InputModule::input_read_parameters() {
   class_call(parser_read_string(pfc, "output", &string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "tCl") != NULL) || (strstr(string1, "TCl") != NULL) ||
-        (strstr(string1, "TCL") != NULL)) {
+    if ((strstr(string1, "tCl") != nullptr) || (strstr(string1, "TCl") != nullptr) ||
+        (strstr(string1, "TCL") != nullptr)) {
       ppt->has_cl_cmb_temperature = _TRUE_;
       ppt->has_perturbations      = _TRUE_;
       ppt->has_cls                = _TRUE_;
     }
 
-    if ((strstr(string1, "pCl") != NULL) || (strstr(string1, "PCl") != NULL) ||
-        (strstr(string1, "PCL") != NULL)) {
+    if ((strstr(string1, "pCl") != nullptr) || (strstr(string1, "PCl") != nullptr) ||
+        (strstr(string1, "PCL") != nullptr)) {
       ppt->has_cl_cmb_polarization = _TRUE_;
       ppt->has_perturbations       = _TRUE_;
       ppt->has_cls                 = _TRUE_;
     }
 
-    if ((strstr(string1, "lCl") != NULL) || (strstr(string1, "LCl") != NULL) ||
-        (strstr(string1, "LCL") != NULL)) {
+    if ((strstr(string1, "lCl") != nullptr) || (strstr(string1, "LCl") != nullptr) ||
+        (strstr(string1, "LCL") != nullptr)) {
       ppt->has_cl_cmb_lensing_potential = _TRUE_;
       ppt->has_perturbations            = _TRUE_;
       ppt->has_cls                      = _TRUE_;
     }
 
-    if ((strstr(string1, "nCl") != NULL) || (strstr(string1, "NCl") != NULL) ||
-        (strstr(string1, "NCL") != NULL) || (strstr(string1, "dCl") != NULL) ||
-        (strstr(string1, "DCl") != NULL) || (strstr(string1, "DCL") != NULL)) {
+    if ((strstr(string1, "nCl") != nullptr) || (strstr(string1, "NCl") != nullptr) ||
+        (strstr(string1, "NCL") != nullptr) || (strstr(string1, "dCl") != nullptr) ||
+        (strstr(string1, "DCl") != nullptr) || (strstr(string1, "DCL") != nullptr)) {
       ppt->has_cl_number_count = _TRUE_;
       ppt->has_perturbations   = _TRUE_;
       ppt->has_cls             = _TRUE_;
     }
 
-    if ((strstr(string1, "sCl") != NULL) || (strstr(string1, "SCl") != NULL) ||
-        (strstr(string1, "SCL") != NULL)) {
+    if ((strstr(string1, "sCl") != nullptr) || (strstr(string1, "SCl") != nullptr) ||
+        (strstr(string1, "SCL") != nullptr)) {
       ppt->has_cl_lensing_potential = _TRUE_;
       ppt->has_perturbations        = _TRUE_;
       ppt->has_cls                  = _TRUE_;
     }
 
-    if ((strstr(string1, "mPk") != NULL) || (strstr(string1, "MPk") != NULL) ||
-        (strstr(string1, "MPK") != NULL)) {
+    if ((strstr(string1, "mPk") != nullptr) || (strstr(string1, "MPk") != nullptr) ||
+        (strstr(string1, "MPK") != nullptr)) {
       ppt->has_pk_matter     = _TRUE_;
       ppt->has_perturbations = _TRUE_;
 
@@ -1303,7 +1307,7 @@ int InputModule::input_read_parameters() {
         errmsg,
         errmsg);
         if (flag1 == _TRUE_){
-        if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+        if((strstr(string1,"y") != nullptr) || (strstr(string1,"Y") != nullptr)){
         ppt->pk_only_cdm_bar = _TRUE_;
         }
         else {
@@ -1313,24 +1317,18 @@ int InputModule::input_read_parameters() {
         }*/
     }
 
-    if ((strstr(string1, "mTk") != NULL) || (strstr(string1, "MTk") != NULL) ||
-        (strstr(string1, "MTK") != NULL) || (strstr(string1, "dTk") != NULL) ||
-        (strstr(string1, "DTk") != NULL) || (strstr(string1, "DTK") != NULL)) {
+    if ((strstr(string1, "mTk") != nullptr) || (strstr(string1, "MTk") != nullptr) ||
+        (strstr(string1, "MTK") != nullptr) || (strstr(string1, "dTk") != nullptr) ||
+        (strstr(string1, "DTk") != nullptr) || (strstr(string1, "DTK") != nullptr)) {
       ppt->has_density_transfers = _TRUE_;
       ppt->has_perturbations     = _TRUE_;
     }
 
-    if ((strstr(string1, "vTk") != NULL) || (strstr(string1, "VTk") != NULL) ||
-        (strstr(string1, "VTK") != NULL)) {
+    if ((strstr(string1, "vTk") != nullptr) || (strstr(string1, "VTk") != nullptr) ||
+        (strstr(string1, "VTK") != nullptr)) {
       ppt->has_velocity_transfers = _TRUE_;
       ppt->has_perturbations      = _TRUE_;
     }
-  }
-
-  /* The following lines make sure that if perturbations are not computed, IDR parameters are still freed */
-  if (ppt->has_perturbations == _FALSE_) {
-    //free(ppt->alpha_idm_dr);
-    //free(ppt->beta_idr);
   }
 
   if (ppt->has_density_transfers == _TRUE_) {
@@ -1338,7 +1336,8 @@ int InputModule::input_read_parameters() {
                errmsg,
                errmsg);
 
-    if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "y") != NULL))) {
+    if ((flag1 == _TRUE_) &&
+        ((strstr(string1, "y") != nullptr) || (strstr(string1, "y") != nullptr))) {
       ppt->has_metricpotential_transfers = _TRUE_;
     }
   }
@@ -1355,15 +1354,15 @@ int InputModule::input_read_parameters() {
       ppt->switch_dop  = 0;
       ppt->switch_pol  = 0;
 
-      if ((strstr(string1, "tsw") != NULL) || (strstr(string1, "TSW") != NULL))
+      if ((strstr(string1, "tsw") != nullptr) || (strstr(string1, "TSW") != nullptr))
         ppt->switch_sw = 1;
-      if ((strstr(string1, "eisw") != NULL) || (strstr(string1, "EISW") != NULL))
+      if ((strstr(string1, "eisw") != nullptr) || (strstr(string1, "EISW") != nullptr))
         ppt->switch_eisw = 1;
-      if ((strstr(string1, "lisw") != NULL) || (strstr(string1, "LISW") != NULL))
+      if ((strstr(string1, "lisw") != nullptr) || (strstr(string1, "LISW") != nullptr))
         ppt->switch_lisw = 1;
-      if ((strstr(string1, "dop") != NULL) || (strstr(string1, "Dop") != NULL))
+      if ((strstr(string1, "dop") != nullptr) || (strstr(string1, "Dop") != nullptr))
         ppt->switch_dop = 1;
-      if ((strstr(string1, "pol") != NULL) || (strstr(string1, "Pol") != NULL))
+      if ((strstr(string1, "pol") != nullptr) || (strstr(string1, "Pol") != nullptr))
         ppt->switch_pol = 1;
 
       class_test((ppt->switch_sw == 0) && (ppt->switch_eisw == 0) && (ppt->switch_lisw == 0) &&
@@ -1382,13 +1381,13 @@ int InputModule::input_read_parameters() {
                errmsg);
 
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "density") != NULL)
+      if (strstr(string1, "density") != nullptr)
         ppt->has_nc_density = _TRUE_;
-      if (strstr(string1, "rsd") != NULL)
+      if (strstr(string1, "rsd") != nullptr)
         ppt->has_nc_rsd = _TRUE_;
-      if (strstr(string1, "lensing") != NULL)
+      if (strstr(string1, "lensing") != nullptr)
         ppt->has_nc_lens = _TRUE_;
-      if (strstr(string1, "gr") != NULL)
+      if (strstr(string1, "gr") != nullptr)
         ppt->has_nc_gr = _TRUE_;
 
       class_test((ppt->has_nc_density == _FALSE_) && (ppt->has_nc_rsd == _FALSE_) &&
@@ -1410,7 +1409,8 @@ int InputModule::input_read_parameters() {
                errmsg,
                errmsg);
 
-    if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+    if ((flag1 == _TRUE_) &&
+        ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
       ppt->has_perturbed_recombination = _TRUE_;
     }
 
@@ -1422,13 +1422,13 @@ int InputModule::input_read_parameters() {
          but if they are specified we should reset has_scalars to _FALSE_ before reading */
       ppt->has_scalars = _FALSE_;
 
-      if ((strstr(string1, "s") != NULL) || (strstr(string1, "S") != NULL))
+      if ((strstr(string1, "s") != nullptr) || (strstr(string1, "S") != nullptr))
         ppt->has_scalars = _TRUE_;
 
-      if ((strstr(string1, "v") != NULL) || (strstr(string1, "V") != NULL))
+      if ((strstr(string1, "v") != nullptr) || (strstr(string1, "V") != nullptr))
         ppt->has_vectors = _TRUE_;
 
-      if ((strstr(string1, "t") != NULL) || (strstr(string1, "T") != NULL))
+      if ((strstr(string1, "t") != nullptr) || (strstr(string1, "T") != nullptr))
         ppt->has_tensors = _TRUE_;
 
       class_test(class_none_of_three(ppt->has_scalars, ppt->has_vectors, ppt->has_tensors),
@@ -1446,19 +1446,19 @@ int InputModule::input_read_parameters() {
            but if they are specified we should reset has_ad to _FALSE_ before reading */
         ppt->has_ad = _FALSE_;
 
-        if ((strstr(string1, "ad") != NULL) || (strstr(string1, "AD") != NULL))
+        if ((strstr(string1, "ad") != nullptr) || (strstr(string1, "AD") != nullptr))
           ppt->has_ad = _TRUE_;
 
-        if ((strstr(string1, "bi") != NULL) || (strstr(string1, "BI") != NULL))
+        if ((strstr(string1, "bi") != nullptr) || (strstr(string1, "BI") != nullptr))
           ppt->has_bi = _TRUE_;
 
-        if ((strstr(string1, "cdi") != NULL) || (strstr(string1, "CDI") != NULL))
+        if ((strstr(string1, "cdi") != nullptr) || (strstr(string1, "CDI") != nullptr))
           ppt->has_cdi = _TRUE_;
 
-        if ((strstr(string1, "nid") != NULL) || (strstr(string1, "NID") != NULL))
+        if ((strstr(string1, "nid") != nullptr) || (strstr(string1, "NID") != nullptr))
           ppt->has_nid = _TRUE_;
 
-        if ((strstr(string1, "niv") != NULL) || (strstr(string1, "NIV") != NULL))
+        if ((strstr(string1, "niv") != nullptr) || (strstr(string1, "NIV") != nullptr))
           ppt->has_niv = _TRUE_;
 
         class_test(ppt->has_ad == _FALSE_ && ppt->has_bi == _FALSE_ && ppt->has_cdi == _FALSE_ &&
@@ -1575,19 +1575,19 @@ int InputModule::input_read_parameters() {
                    errmsg);
 
         /* axion case, only one iso parameter: piir1  */
-        if ((flag1 == _TRUE_) && (strstr(string1, "axion") != NULL)) {
+        if ((flag1 == _TRUE_) && (strstr(string1, "axion") != nullptr)) {
           n_iso = 1.;
           n_cor = 0.;
           c_cor = 0.;
         }
         /* curvaton case, only one iso parameter: piir1  */
-        else if ((flag1 == _TRUE_) && (strstr(string1, "anticurvaton") != NULL)) {
+        else if ((flag1 == _TRUE_) && (strstr(string1, "anticurvaton") != nullptr)) {
           n_iso = ppm->n_s;
           n_cor = 0.;
           c_cor = 1.;
         }
         /* inverted-correlation-curvaton case, only one iso parameter: piir1  */
-        else if ((flag1 == _TRUE_) && (strstr(string1, "curvaton") != NULL)) {
+        else if ((flag1 == _TRUE_) && (strstr(string1, "curvaton") != nullptr)) {
           n_iso = ppm->n_s;
           n_cor = 0.;
           c_cor = -1.;
@@ -1796,7 +1796,7 @@ int InputModule::input_read_parameters() {
         class_call(parser_read_string(pfc, "n_t", &string1, &flag1, errmsg), errmsg, errmsg);
 
         if ((flag1 == _TRUE_) &&
-            !((strstr(string1, "SCC") != NULL) || (strstr(string1, "scc") != NULL))) {
+            !((strstr(string1, "SCC") != nullptr) || (strstr(string1, "scc") != nullptr))) {
           class_read_double("n_t", ppm->n_t);
         }
         else {
@@ -1807,7 +1807,7 @@ int InputModule::input_read_parameters() {
         class_call(parser_read_string(pfc, "alpha_t", &string1, &flag1, errmsg), errmsg, errmsg);
 
         if ((flag1 == _TRUE_) &&
-            !((strstr(string1, "SCC") != NULL) || (strstr(string1, "scc") != NULL))) {
+            !((strstr(string1, "SCC") != nullptr) || (strstr(string1, "scc") != nullptr))) {
           class_read_double("alpha_t", ppm->alpha_t);
         }
         else {
@@ -1974,7 +1974,7 @@ int InputModule::input_read_parameters() {
                "compatible");
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "auto") != NULL) || (strstr(string1, "AUTO") != NULL)) {
+      if ((strstr(string1, "auto") != nullptr) || (strstr(string1, "AUTO") != nullptr)) {
         ppm->phi_pivot_method = ln_aH_ratio_auto;
       }
       else {
@@ -1993,10 +1993,10 @@ int InputModule::input_read_parameters() {
                errmsg);
 
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "numerical") != NULL) {
+      if (strstr(string1, "numerical") != nullptr) {
         ppm->behavior = numerical;
       }
-      else if (strstr(string1, "analytical") != NULL) {
+      else if (strstr(string1, "analytical") != nullptr) {
         ppm->behavior = analytical;
       }
       else {
@@ -2066,7 +2066,8 @@ int InputModule::input_read_parameters() {
 
   class_call(parser_read_string(pfc, "lensing", &(string1), &(flag1), errmsg), errmsg, errmsg);
 
-  if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+  if ((flag1 == _TRUE_) &&
+      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
     if ((ppt->has_scalars == _TRUE_) &&
         ((ppt->has_cl_cmb_temperature == _TRUE_) || (ppt->has_cl_cmb_polarization == _TRUE_)) &&
         (ppt->has_cl_cmb_lensing_potential == _TRUE_)) {
@@ -2124,7 +2125,8 @@ int InputModule::input_read_parameters() {
                errmsg,
                errmsg);
 
-    if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "y") != NULL))) {
+    if ((flag1 == _TRUE_) &&
+        ((strstr(string1, "y") != nullptr) || (strstr(string1, "y") != nullptr))) {
       ppt->has_Nbody_gauge_transfers = _TRUE_;
     }
   }
@@ -2134,13 +2136,13 @@ int InputModule::input_read_parameters() {
     class_call(parser_read_string(pfc, "selection", &(string1), &(flag1), errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "gaussian") != NULL) {
+      if (strstr(string1, "gaussian") != nullptr) {
         ppt->selection = gaussian;
       }
-      else if (strstr(string1, "tophat") != NULL) {
+      else if (strstr(string1, "tophat") != nullptr) {
         ppt->selection = tophat;
       }
-      else if (strstr(string1, "dirac") != NULL) {
+      else if (strstr(string1, "dirac") != nullptr) {
         ppt->selection = dirac;
       }
       else {
@@ -2290,7 +2292,7 @@ int InputModule::input_read_parameters() {
                errmsg);
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "analytic") != NULL)) {
+      if ((strstr(string1, "analytic") != nullptr)) {
         ptr->has_nz_analytic = _TRUE_;
       }
       else {
@@ -2304,7 +2306,7 @@ int InputModule::input_read_parameters() {
                errmsg);
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "analytic") != NULL)) {
+      if ((strstr(string1, "analytic") != nullptr)) {
         ptr->has_nz_evo_analytic = _TRUE_;
       }
       else {
@@ -2386,17 +2388,18 @@ int InputModule::input_read_parameters() {
 
   class_call(parser_read_string(pfc, "headers", &(string1), &(flag1), errmsg), errmsg, errmsg);
 
-  if ((flag1 == _TRUE_) && ((strstr(string1, "y") == NULL) && (strstr(string1, "Y") == NULL))) {
+  if ((flag1 == _TRUE_) &&
+      ((strstr(string1, "y") == nullptr) && (strstr(string1, "Y") == nullptr))) {
     pop->write_header = _FALSE_;
   }
 
   class_call(parser_read_string(pfc, "format", &string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "class") != NULL) || (strstr(string1, "CLASS") != NULL))
+    if ((strstr(string1, "class") != nullptr) || (strstr(string1, "CLASS") != nullptr))
       pop->output_format = class_format;
     else {
-      if ((strstr(string1, "camb") != NULL) || (strstr(string1, "CAMB") != NULL))
+      if ((strstr(string1, "camb") != nullptr) || (strstr(string1, "CAMB") != nullptr))
         pop->output_format = camb_format;
       else
         class_stop(errmsg,
@@ -2416,15 +2419,15 @@ int InputModule::input_read_parameters() {
                "You requested non linear computation but no linear computation. You must set "
                "output to tCl or similar.");
 
-    if ((strstr(string1, "halofit") != NULL) || (strstr(string1, "Halofit") != NULL) ||
-        (strstr(string1, "HALOFIT") != NULL)) {
+    if ((strstr(string1, "halofit") != nullptr) || (strstr(string1, "Halofit") != nullptr) ||
+        (strstr(string1, "HALOFIT") != nullptr)) {
       pnl->method       = nl_halofit;
       ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
                               MAX(ppr->halofit_min_k_max, ppr->nonlinear_min_k_max));
       ppt->has_nl_corrections_based_on_delta_m = _TRUE_;
     }
-    if ((strstr(string1, "hmcode") != NULL) || (strstr(string1, "HMCODE") != NULL) ||
-        (strstr(string1, "HMcode") != NULL) || (strstr(string1, "Hmcode") != NULL)) {
+    if ((strstr(string1, "hmcode") != nullptr) || (strstr(string1, "HMCODE") != nullptr) ||
+        (strstr(string1, "HMcode") != nullptr) || (strstr(string1, "Hmcode") != nullptr)) {
       pnl->method       = nl_HMcode;
       ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
                               MAX(ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max));
@@ -2436,19 +2439,19 @@ int InputModule::input_read_parameters() {
                  errmsg);
 
       if (flag1 == _TRUE_) {
-        if (strstr(string1, "emu_dmonly") != NULL) {
+        if (strstr(string1, "emu_dmonly") != nullptr) {
           pnl->feedback = nl_emu_dmonly;
         }
-        if (strstr(string1, "owls_dmonly") != NULL) {
+        if (strstr(string1, "owls_dmonly") != nullptr) {
           pnl->feedback = nl_owls_dmonly;
         }
-        if (strstr(string1, "owls_ref") != NULL) {
+        if (strstr(string1, "owls_ref") != nullptr) {
           pnl->feedback = nl_owls_ref;
         }
-        if (strstr(string1, "owls_agn") != NULL) {
+        if (strstr(string1, "owls_agn") != nullptr) {
           pnl->feedback = nl_owls_agn;
         }
-        if (strstr(string1, "owls_dblim") != NULL) {
+        if (strstr(string1, "owls_dblim") != nullptr) {
           pnl->feedback = nl_owls_dblim;
         }
       }
@@ -2509,11 +2512,11 @@ int InputModule::input_read_parameters() {
     /** - ---> Include ur and ncdm shear in tensor computation? */
     class_call(parser_read_string(pfc, "tensor method", &string1, &flag1, errmsg), errmsg, errmsg);
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "photons") != NULL)
+      if (strstr(string1, "photons") != nullptr)
         ppt->tensor_method = tm_photons_only;
-      if (strstr(string1, "massless") != NULL)
+      if (strstr(string1, "massless") != nullptr)
         ppt->tensor_method = tm_massless_approximation;
-      if (strstr(string1, "exact") != NULL)
+      if (strstr(string1, "exact") != nullptr)
         ppt->tensor_method = tm_exact;
     }
   }
@@ -2626,7 +2629,8 @@ int InputModule::input_read_parameters() {
 
   class_call(parser_read_string(pfc, "write background", &string1, &flag1, errmsg), errmsg, errmsg);
 
-  if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+  if ((flag1 == _TRUE_) &&
+      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
     pop->write_background = _TRUE_;
   }
 
@@ -2636,7 +2640,8 @@ int InputModule::input_read_parameters() {
              errmsg,
              errmsg);
 
-  if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+  if ((flag1 == _TRUE_) &&
+      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
     pop->write_thermodynamics = _TRUE_;
   }
 
@@ -2659,8 +2664,8 @@ int InputModule::input_read_parameters() {
       ppt->k_output_values[i] = kOutputValues[i];
     }
 
-    /* Sort the k_array using qsort */
-    qsort(ppt->k_output_values, ppt->k_output_values_num, sizeof(double), compare_doubles);
+    /* Sort k_output_values ascending */
+    std::sort(ppt->k_output_values, ppt->k_output_values + ppt->k_output_values_num);
 
     ppt->store_perturbations = _TRUE_;
     pop->write_perturbations = _TRUE_;
@@ -2670,7 +2675,8 @@ int InputModule::input_read_parameters() {
 
   class_call(parser_read_string(pfc, "write primordial", &string1, &flag1, errmsg), errmsg, errmsg);
 
-  if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+  if ((flag1 == _TRUE_) &&
+      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
     pop->write_primordial = _TRUE_;
   }
 
@@ -2698,10 +2704,10 @@ int InputModule::input_read_parameters() {
              errmsg,
              errmsg);
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "EDE") != NULL) || (strstr(string1, "ede") != NULL)) {
+    if ((strstr(string1, "EDE") != nullptr) || (strstr(string1, "ede") != nullptr)) {
       fluid_eos_is_clp = false;
     }
-    else if ((strstr(string1, "CLP") != NULL) || (strstr(string1, "clp") != NULL)) {
+    else if ((strstr(string1, "CLP") != nullptr) || (strstr(string1, "clp") != nullptr)) {
       fluid_eos_is_clp = true;
     }
     /* Other strings: leave as CLP default (FluidSpecies::CreateAll will error
@@ -2714,7 +2720,8 @@ int InputModule::input_read_parameters() {
   if ((pnl->method == nl_halofit) && fluid_present_pfc && fluid_eos_is_clp && (wa_fld_peek != 0.)) {
     class_call(parser_read_string(pfc, "pk_eq", &string1, &flag1, errmsg), errmsg, errmsg);
 
-    if ((flag1 == _TRUE_) && ((strstr(string1, "y") != NULL) || (strstr(string1, "Y") != NULL))) {
+    if ((flag1 == _TRUE_) &&
+        ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
       pnl->has_pk_eq = _TRUE_;
     }
   }
@@ -3226,25 +3233,6 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
     fc.set(w.targets[i].unknown_param, buf);
   }
   return std::make_shared<InputModule>(fc);
-}
-
-int InputModule::file_exists(const char* fname) {
-  FILE* file = fopen(fname, "r");
-  if (file != NULL) {
-    fclose(file);
-    return _TRUE_;
-  }
-  return _FALSE_;
-}
-
-int InputModule::compare_doubles(const void* a, const void* b) {
-  double* x = (double*) a;
-  double* y = (double*) b;
-  if (*x < *y)
-    return -1;
-  else if (*x > *y)
-    return 1;
-  return 0;
 }
 
 int input_prepare_pk_eq(const struct precision* ppr_input,

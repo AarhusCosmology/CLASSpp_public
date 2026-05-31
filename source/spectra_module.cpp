@@ -1409,8 +1409,13 @@ int SpectraModule::spectra_pk_nl_at_z(
           " -> [WARNING:] You are calling the function spectra_pk_nl_at_z() which is deprecated "
           "since v2.8. Try using nonlinear_pk_at_z() instead.\n");
 
-  class_call(nonlinear_module_
-                 ->nonlinear_pks_at_z(mode, pk_nonlinear, z, output_tot, NULL, output_cb_tot, NULL),
+  class_call(nonlinear_module_->nonlinear_pks_at_z(mode,
+                                                   pk_nonlinear,
+                                                   z,
+                                                   output_tot,
+                                                   nullptr,
+                                                   output_cb_tot,
+                                                   nullptr),
              nonlinear_module_->error_message_,
              error_message_);
 
@@ -1439,8 +1444,13 @@ int SpectraModule::spectra_pk_nl_at_k_and_z(
           " -> [WARNING:] You are calling the function spectra_pk_nl_at_k_and_z() which is "
           "deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.\n");
 
-  class_call(nonlinear_module_
-                 ->nonlinear_pks_at_k_and_z(pk_nonlinear, k, z, pk_tot, NULL, pk_cb_tot, NULL),
+  class_call(nonlinear_module_->nonlinear_pks_at_k_and_z(pk_nonlinear,
+                                                         k,
+                                                         z,
+                                                         pk_tot,
+                                                         nullptr,
+                                                         pk_cb_tot,
+                                                         nullptr),
              nonlinear_module_->error_message_,
              error_message_);
 
@@ -1471,7 +1481,7 @@ int SpectraModule::spectra_fast_pk_at_kvec_and_zvec(
     int zvec_size,
     double* pk_tot_out,     // pk_tot_out[index_zvec*kvec_size+index_kvec],
                             // already allocated
-                            //(or NULL if user knows there is no _m output)
+                            //(or nullptr if user knows there is no _m output)
     double* pk_cb_tot_out,  // idem
     int nonlinear) {
   enum pk_outputs pk_output;

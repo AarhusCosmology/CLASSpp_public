@@ -2745,7 +2745,7 @@ int PerturbationsModule::perturb_solve(int index_md,
 
   /** - check whether we need to print perturbations to a file for this wavenumber */
 
-  perhaps_print_variables = NULL;
+  perhaps_print_variables = nullptr;
   ppw->index_ikout        = -1;
   for (index_ikout = 0; index_ikout < ppt->k_output_values_num; index_ikout++) {
     if (index_k_output_values_[index_md * ppt->k_output_values_num + index_ikout] == index_k) {
@@ -2764,12 +2764,12 @@ int PerturbationsModule::perturb_solve(int index_md,
 
     /** - --> (b) get the previous approximation scheme. If the current
         interval starts from the initial time tau_ini, the previous
-        approximation is set to be a NULL pointer, so that the
+        approximation is set to be a nullptr pointer, so that the
         function perturb_vector_init() knows that perturbations must
         be initialized */
 
     if (index_interval == 0) {
-      previous_approx = NULL;
+      previous_approx = nullptr;
     }
     else {
       previous_approx = interval_approx[index_interval - 1].data();
@@ -2821,7 +2821,7 @@ int PerturbationsModule::perturb_solve(int index_md,
 
   /** - if perturbations were printed in a file, close the file */
 
-  //if (perhaps_print_variables != NULL)
+  //if (perhaps_print_variables != nullptr)
   //  fclose(ppw->perturb_output_file);
 
   /** - fill the source terms array with zeros for all times between
@@ -3236,7 +3236,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
  * constraint equations are NOT included in this vector). This routine
  * distinguishes between two cases:
  *
- * --> the input pa_old is set to the NULL pointer:
+ * --> the input pa_old is set to the nullptr pointer:
  *
  * This happens when we start integrating over a new wavenumber and we
  * want to set initial conditions for the perturbations. Then, it is
@@ -3244,7 +3244,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
  * it, defines all indices, and then fills the vector ppw-->pv-->y with
  * the initial conditions defined in perturb_initial_conditions.
  *
- * --> the input pa_old is not set to the NULL pointer and describes
+ * --> the input pa_old is not set to the nullptr pointer and describes
  * some set of approximations:
  *
  * This happens when we need to change approximation scheme while
@@ -3262,7 +3262,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
  * @param k          Input: wavenumber
  * @param tau        Input: conformal time
  * @param ppw        Input/Output: workspace containing in input the approximation scheme, the background/thermodynamics/metric quantities, and eventually the previous vector y; and in output the new vector y.
- * @param pa_old     Input: NULL is we need to set y to initial conditions for a new wavenumber; points towards a perturb_approximations if we want to switch of approximation.
+ * @param pa_old     Input: nullptr is we need to set y to initial conditions for a new wavenumber; points towards a perturb_approximations if we want to switch of approximation.
  * @return the error status
  */
 
@@ -3272,7 +3272,7 @@ int PerturbationsModule::perturb_vector_init(
     double k,
     double tau,
     perturb_workspace*
-        ppw, /* ppw->pv unallocated if pa_old = NULL, allocated and filled otherwise */
+        ppw, /* ppw->pv unallocated if pa_old = nullptr, allocated and filled otherwise */
     int* pa_old) {
   /** Summary: */
 
@@ -3434,7 +3434,7 @@ int PerturbationsModule::perturb_vector_init(
 
   /** - case of setting initial conditions for a new wavenumber */
 
-  if (pa_old == NULL) {
+  if (pa_old == nullptr) {
     if (ppt->perturbations_verbose > 2)
       fprintf(stdout, "Mode k=%e: initializing vector at tau=%e\n", k, tau);
 

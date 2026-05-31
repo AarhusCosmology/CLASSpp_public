@@ -2921,12 +2921,12 @@ int PrimordialModule::primordial_external_spectrum_init() {
   /** - Launch the command and retrieve the output */
   /* Launch the process */
   process = popen(command_with_arguments, "r");
-  class_test(process == NULL,
+  class_test(process == nullptr,
              error_message_,
              "The program failed to set the environment for the external command. Maybe you ran "
              "out of memory.");
   /* Read output and store it */
-  while (fgets(line, sizeof(line) - 1, process) != NULL) {
+  while (fgets(line, sizeof(line) - 1, process) != nullptr) {
     if (ppt->has_tensors == _TRUE_) {
       sscanf(line, "%lf %lf %lf", &this_k, &this_pks, &this_pkt);
     }
