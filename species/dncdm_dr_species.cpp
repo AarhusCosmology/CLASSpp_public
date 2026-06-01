@@ -390,19 +390,59 @@ void DNCDM_DR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbL
   dr_sp_->CopyPerturbationsAcrossSwitch(old_l.dr, new_l.dr, old_y, new_y, ctx);
 }
 
+// ── Closure ───────────────────────────────────────────────────────────────────
+
+double DNCDM_DR_Species::GetOmega0() const {
+  // Combined mode: Omega_dncdmdr is the user input; initial-shooting iterations:
+  // the shooter writes <flavor>.Omega_dncdmdr, read into Omega_dncdmdr_pending_.
+  if (dncdm_->Omega_dncdmdr_pending().has_value())
+    return *dncdm_->Omega_dncdmdr_pending();
+  // Pre-shooting discovery build with no pinned value yet: fall back to the
+  // child-sum (matter child + DR child(0)). Replaced by the pinned value once
+  // DoShooting writes the unknown.
+  return CompositeSpecies::GetOmega0();
+}
+
 // ── Shooter hooks ─────────────────────────────────────────────────────────────
 
 std::vector<ShootingTarget> DNCDM_DR_Species::GetShootingTargets() const {
-  if (!dncdm_->Omega_dncdmdr_pending().has_value())
-    return {};
-  // target_name: the input key the user specified (per-flavor dot key, e.g. "dncdm1.Omega_dncdmdr")
-  // unknown_param: the fc key DoShooting will vary   (e.g. "dncdm1.deg")
-  return {{name() + ".Omega_dncdmdr", name() + ".deg", *dncdm_->Omega_dncdmdr_pending()}};
+  if (dncdm_->InitialAbundanceMode()) {
+    // Initial mode: the given initial abundance drives deg; shoot Omega_dncdmdr itself (the
+    // closure reserve) as a fixed point, driven to the integrated combined density.
+    // target_value is only a Newton seed (the residual is a fixed point, not a difference to it).
+    const double seed = dncdm_->Omega_dncdmdr_pending().value_or(
+        dncdm_->Omega_ini_pending().value_or(0.1));
+    return {{name() + ".Omega_dncdmdr_fixedpoint", name() + ".Omega_dncdmdr", seed}};
+  }
+  if (dncdm_->Omega_dncdmdr_pending().has_value()) {
+    // Combined mode: shoot deg to hit the user-specified combined today-density.
+    // target_name = the input key; unknown_param = the fc key DoShooting varies (.deg).
+    return {{name() + ".Omega_dncdmdr", name() + ".deg", *dncdm_->Omega_dncdmdr_pending()}};
+  }
+  return {};
 }
 
 void DNCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
                                             std::vector<double>& guess,
                                             std::vector<double>& dxdy) const {
+  if (dncdm_->InitialAbundanceMode()) {
+    // Seed Omega_dncdmdr with the given initial abundance. The fixed-point residual is ~linear
+    // in this unknown (it sets only Lambda, weakly coupled to the integrated combined via H),
+    // so Newton converges in ~1-2 steps; d(unknown)/d(residual) ~= 1.
+    // For a Neff_ini-only spec (no Omega_ini) convert to Omega scale via the photon energy
+    // density, matching ApplyDncdmInitialClosure(), rather than falling back to the 0.1 default.
+    double seed = 0.1;
+    if (dncdm_->Omega_ini_pending().has_value()) {
+      seed = *dncdm_->Omega_ini_pending();
+    }
+    else if (dncdm_->Neff_ini_pending().has_value() && ctx.pba) {
+      seed = *dncdm_->Neff_ini_pending() * 7. / 8. * std::pow(4. / 11., 4. / 3.) *
+             ctx.pba->Omega0_g;
+    }
+    guess.push_back(seed);
+    dxdy.push_back(1.0);
+    return;
+  }
   if (!dncdm_->Omega_dncdmdr_pending().has_value())
     return;
   auto [g, d] = dncdm_->DegGuessFromOmegaToday(ctx, *dncdm_->Omega_dncdmdr_pending());
@@ -412,8 +452,13 @@ void DNCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
 
 double DNCDM_DR_Species::ComputeShootingResidual(const ShootingResidualContext& ctx,
                                                  const ShootingTarget& target) const {
-  // Today-density of this flavor's dncdm+dr minus the requested target (Omega units).
-  const double* bg = ctx.bg_today;
-  const double H0  = ctx.pba->H0;
-  return (dncdm_->Rho(bg) + dr_sp_->Rho(bg)) / (H0 * H0) - target.target_value;
+  const double* bg      = ctx.bg_today;
+  const double H0       = ctx.pba->H0;
+  const double combined = (dncdm_->Rho(bg) + dr_sp_->Rho(bg)) / (H0 * H0);
+  if (target.target_name == name() + ".Omega_dncdmdr_fixedpoint") {
+    // Initial mode: drive the reserved Omega_dncdmdr (= GetOmega0()) to the integrated combined.
+    return -combined + GetOmega0();
+  }
+  // Combined mode: drive the integrated combined to the requested target (Omega units).
+  return combined - target.target_value;
 }

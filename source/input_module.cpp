@@ -215,10 +215,8 @@ void InputModule::ConstructSpecies() {
   // Pass 1: build every non-closure species, summing Omega0 contributions.
   // Also tally NCDM-family counters as we go: we know which factories are
   // NCDM-family by their entry name, so no downcast is needed.
-  double omega0_sum      = 0.0;
-  int n_ncdm             = 0;
-  int n_dncdm            = 0;
-  double omega0_ncdm_tot = 0.0;
+  double omega0_sum = 0.0;
+  int n_ncdm        = 0;
   for (const auto& entry : kAllSpeciesFactories) {
     if (entry.name == closure_name)
       continue;
@@ -228,10 +226,7 @@ void InputModule::ConstructSpecies() {
     for (auto& e : produced) {
       omega0_sum += e.species->GetOmega0();
       if (is_ncdm_family) {
-        omega0_ncdm_tot += e.species->GetOmega0();
-        n_ncdm          += 1;
-        if (entry.name == "DNCDM_DR")
-          n_dncdm += 1;
+        n_ncdm += 1;
       }
       all_species_.insert(e.key, std::move(e.species));
     }

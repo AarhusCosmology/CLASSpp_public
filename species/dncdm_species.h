@@ -39,6 +39,22 @@ class DNCDMSpecies : public NCDMBaseSpecies {
     return Omega_dncdmdr_pending_;
   }
 
+  /** True iff this flavor is normalized by initial abundance (Omega_ini/omega_ini/Neff_ini) —
+   *  the mode that needs the Omega_dncdmdr fixed-point shoot for closure (vs combined mode,
+   *  which shoots deg). */
+  bool InitialAbundanceMode() const {
+    return Omega_ini_pending_.has_value() || Neff_ini_pending_.has_value();
+  }
+
+  /** Backfill this species' today density fraction Omega0_ from its integrated density
+   *  at a=1. In combined/initial modes the matter child is normalized via `deg`, never
+   *  SetOmega0, so GetOmega0() stays 0 — which drops it from fnu (GetOmega0NcdmTot) and
+   *  the budget-print neutrino line. BackgroundModule calls this post-integration.
+   *  (SetOmega0 is protected; this public wrapper lets the module trigger the backfill.) */
+  void BackfillOmega0FromToday(const double* pvecback_today, double H0, double h) {
+    SetOmega0(Rho(pvecback_today) / (H0 * H0), h);
+  }
+
   // Compute a (deg_guess, dxdy) pair for Newton shooting that varies deg to hit
   // a target today-density Omega_target = (rho_dncdm + rho_dr) / H0^2 at z=0.
   // Ported from input_module.cpp:3759-3800 (single-flavor, no loop).

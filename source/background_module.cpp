@@ -1059,6 +1059,18 @@ int BackgroundModule::background_solve_evolver() {
   Omega0_r_  = background_table_[(bt_size_ - 1) * bg_size_ + index_bg_Omega_r_];
   Omega0_de_ = 1. - (Omega0_m_ + Omega0_r_ + pba->Omega0_k);
 
+  /* -> Backfill each DNCDM matter child's today density fraction (parallels Omega0_dcdm_).
+     In combined/initial modes the child only carries `deg`; without this its GetOmega0()
+     stays 0, dropping it from fnu (GetOmega0NcdmTot) and the budget-print neutrino line.
+     The DNCDM density is not an evolved bi_ variable, so read it from the today table row. */
+  {
+    const double* bg_today = background_table_.data() + (bt_size_ - 1) * bg_size_;
+    for (auto& [key, sp] : all_species_) {
+      if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+        dncdm_dr->dncdm().BackfillOmega0FromToday(bg_today, pba->H0, pba->h);
+    }
+  }
+
   return _SUCCESS_;
 }
 
@@ -1424,8 +1436,10 @@ int BackgroundModule::background_output_budget() {
     print_one("Photons", pba->Omega0_g, budget_radiation);
     if (all_species_.count("UR"))
       print_one("Ultra-relativistic relics", all_species_.at("UR")->GetOmega0(), budget_radiation);
-    if (all_species_.count("DCDM_DR")) {
-      // Use integration-derived Omega0_dr_ for accuracy (set in background_solve_evolver).
+    if (GetNDecayDr() > 0) {
+      // Omega0_dr_ aggregates the decay radiation of DCDM_DR and every DNCDM_DR
+      // composite (integration-derived, set in background_solve_evolver), so this
+      // single line covers all decay-DR channels.
       print_one("Dark Radiation (from decay)", Omega0_dr_, budget_radiation);
     }
     if (all_species_.count("IDM_DR_IDR")) {

@@ -116,24 +116,20 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   }
   Gamma_ = Gamma_raw * (1.e3 / _c_);
 
-  // Read DNCDM-specific Omega / deg / Omega_ini values from the same instance.
+  // Read DNCDM-specific deg / Omega_ini values from the same instance.
   // These were previously bulk-loaded in CreateAll from CSV lists.
-  // Semantics: at most one of {Omega, omega} and at most one of
-  // {deg, Omega_ini, omega_ini, Neff_ini} (the latter group resolved later
-  // by ConstructSpecies for shooting).
-  double Omega_local = 0., omega_local = 0.;
-  bool has_Omega = input.read_double("Omega", Omega_local);
-  bool has_omega = input.read_double("omega", omega_local);
-  if (has_Omega && has_omega) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': specify exactly one of Omega, omega");
-  }
-  if (has_omega) {
-    Omega_local = omega_local / settings.h / settings.h;
-    has_Omega   = true;
-  }
-  if (has_Omega) {
-    SetOmega0(Omega_local, settings.h);
+  // Semantics: at most one of {deg, Omega_ini, omega_ini, Neff_ini, Omega_dncdmdr}
+  // (resolved later by ConstructSpecies / DoShooting). Bare today-matter Omega/omega is
+  // rejected: it leaves the decay radiation out of the flatness budget.
+  double omega_reject = 0.;
+  if (input.read_double("Omega", omega_reject) || input.read_double("omega", omega_reject)) {
+    throw std::invalid_argument(
+        "species '" + instance_name +
+        "': a decaying species (ncdm_decay_dr) cannot be normalized by today-matter "
+        "'Omega'/'omega' "
+        "(the decay radiation would be left out of the flatness budget). Use "
+        "'Omega_ini'/'omega_ini'/'Neff_ini' to pin the initial abundance, or "
+        "'Omega_dncdmdr'/'omega_dncdmdr' to pin the combined matter+radiation density today.");
   }
 
   double deg_local           = 0.;
@@ -157,32 +153,53 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
     has_Omega_dncdmdr   = true;
   }
 
-  // Omega_dncdmdr is mutually exclusive with Omega_ini/omega_ini/Neff_ini/Omega/omega.
-  // deg may co-occur with Omega_dncdmdr (shooting-iteration case: DoShooting wrote deg).
-  if (has_Omega_dncdmdr && (has_Omega_ini || has_omega_ini || has_Neff_ini || has_Omega)) {
-    throw std::invalid_argument(
-        "species '" + instance_name +
-        "': Omega_dncdmdr conflicts with Omega_ini/omega_ini/Neff_ini/Omega/omega");
+  // Omega_dncdmdr is mutually exclusive with Omega_ini/omega_ini/Neff_ini — EXCEPT inside a
+  // shooting build, where DoShooting legitimately writes <flavor>.Omega_dncdmdr as the
+  // initial-mode fixed-point unknown (or .deg for combined mode) alongside the user's key.
+  const bool in_shooting = (pfc != nullptr) && pfc->is_shooting;
+  if (has_Omega_dncdmdr && (has_Omega_ini || has_omega_ini || has_Neff_ini) && !in_shooting) {
+    throw std::invalid_argument("species '" + instance_name +
+                                "': Omega_dncdmdr conflicts with Omega_ini/omega_ini/Neff_ini");
   }
 
-  // Count mutually-exclusive target specs (Omega_dncdmdr counts as one; deg does not).
-  int n_deg_options = (int) has_Omega_ini + (int) has_omega_ini + (int) has_Neff_ini +
-                      (int) has_Omega_dncdmdr;
-  if (n_deg_options > 1) {
-    throw std::invalid_argument(
-        "species '" + instance_name +
-        "': specify at most one of Omega_ini, omega_ini, Neff_ini, Omega_dncdmdr");
+  // Count mutually-exclusive target specs (skip inside a shooting build: the shooter adds
+  // Omega_dncdmdr alongside the user's initial-abundance key).
+  if (!in_shooting) {
+    int n_deg_options = (int) has_deg + (int) has_Omega_ini + (int) has_omega_ini +
+                        (int) has_Neff_ini + (int) has_Omega_dncdmdr;
+    if (n_deg_options > 1) {
+      throw std::invalid_argument(
+          "species '" + instance_name +
+          "': specify at most one of deg, Omega_ini, omega_ini, Neff_ini, Omega_dncdmdr");
+    }
   }
+
+  // Stash Omega_dncdmdr_pending_ whenever Omega_dncdmdr is present: combined mode (user input),
+  // or the initial-mode fixed-point unknown the shooter wrote. GetOmega0() on the DNCDM_DR
+  // composite reads this to reserve the combined sector density.
+  if (has_Omega_dncdmdr)
+    Omega_dncdmdr_pending_ = Omega_dncdmdr_local;
+
+  // Stash the initial-abundance target; deg is set later by DNCDMSpecies::CreateAll's
+  // ApplyDncdmInitialClosure (a_ini-driven). In a shooting iteration this co-occurs with the
+  // shot Omega_dncdmdr above — the initial key drives deg, Omega_dncdmdr only the closure reserve.
+  const bool has_initial = has_Omega_ini || has_omega_ini || has_Neff_ini;
+  if (has_Omega_ini)
+    Omega_ini_pending_ = Omega_ini_local;  // already in Omega units
+  else if (has_omega_ini)
+    Omega_ini_pending_ = omega_ini_local / settings.h / settings.h;
+  else if (has_Neff_ini)
+    Neff_ini_pending_ = Neff_ini_local;
 
   if (has_deg) {
-    // deg wins: used directly (also covers shooting-iteration case where DoShooting set deg).
+    // deg wins: used directly (also covers the combined-mode shooting iteration where
+    // DoShooting wrote .deg).
     SetDegAndFactor(deg_local);
   }
-  else if (has_Omega_dncdmdr) {
-    // Today-density target: stash the target and set a guessed deg via DegGuessFromOmegaToday.
+  else if (has_Omega_dncdmdr && !has_initial) {
+    // Combined mode: set a guessed deg via DegGuessFromOmegaToday.
     // DegGuessFromOmegaToday calls GetDeg() — deg_ is initialized to 1. by NCDMBaseSpecies,
     // so the per-unit-degeneracy calculation is well-defined without a prior SetDegAndFactor.
-    Omega_dncdmdr_pending_ = Omega_dncdmdr_local;
     if (pba) {
       // Build context needed for GetIni; assemble a minimal one from available data.
       SpeciesBuildContext guess_ctx{nullptr, pba, nullptr, &settings, nullptr};
@@ -192,20 +209,7 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
     // If pba is null (early-construction pass), leave deg_ at 1. and let the shooting
     // dispatch provide the correct value when DoShooting writes <instance>.deg.
   }
-  else {
-    // The Omega_ini / omega_ini / Neff_ini cases require an a_ini-driven shooting step.
-    // Preserve their values by stashing them on the species so that ConstructSpecies'
-    // closure pass can apply them.
-    if (has_Omega_ini) {
-      Omega_ini_pending_ = Omega_ini_local;  // already in Omega units
-    }
-    else if (has_omega_ini) {
-      Omega_ini_pending_ = omega_ini_local / settings.h / settings.h;
-    }
-    else if (has_Neff_ini) {
-      Neff_ini_pending_ = Neff_ini_local;
-    }
-  }
+  // else: initial mode — deg comes from ApplyDncdmInitialClosure (stashed above).
 
   // Compute dq_[i] = w_bg_[i] / f0(q_bg_[i]) (matches existing semantics)
   dq_ = ComputeDq();

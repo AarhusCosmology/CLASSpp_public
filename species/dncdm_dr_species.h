@@ -55,6 +55,12 @@ class DNCDM_DR_Species : public CompositeSpecies {
     dncdm_->WriteBackgroundData(pvecback, w);
   }
 
+  /** Total density fraction of the whole decaying sector today (matter + decay
+   *  radiation) = the closure-reserved Omega_dncdmdr. Mirrors DCDMSpecies::GetOmega0().
+   *  Surfaces the pinned/shot combined rather than summing children, because at
+   *  Pass-1 closure time the emergent DR is not yet integrated. */
+  double GetOmega0() const override;
+
   DNCDMSpecies& dncdm() {
     return *dncdm_;
   }
