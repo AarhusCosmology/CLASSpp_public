@@ -16,12 +16,47 @@ struct perturb_vector;
 struct perturb_workspace;
 struct perturb_parameters_and_workspace;
 
+#include "background_ic_context.h"
+#include "common.h"  // class_store_columntitle, class_store_double, _TRUE_, _FALSE_
 #include "perturb_source_context.h"
 
-class BackgroundModule;        // forward declaration
-class BackgroundColumnWriter;  // forward declaration
-class ThermodynamicsModule;    // forward declaration
-struct perturbs;               // forward declaration
+class BackgroundModule;      // forward declaration
+class ThermodynamicsModule;  // forward declaration
+
+// ── BackgroundColumnWriter ───────────────────────────────────────────────────
+/**
+ * Thin helper for background output — analogous to PerturbColumnWriter.
+ * Construct in title mode (titles != nullptr) or data mode (dataptr != nullptr).
+ * Call Add() once per column in both modes; the writer handles the branching.
+ */
+class BackgroundColumnWriter {
+ public:
+  explicit BackgroundColumnWriter(char* titles) : titles_(titles) {}
+  BackgroundColumnWriter(double* dataptr, int& storeidx)
+      : dataptr_(dataptr), storeidx_(&storeidx) {}
+
+  bool IsTitleMode() const {
+    return titles_ != nullptr;
+  }
+
+  void Add(const char* title, double value, bool condition = true) {
+    if (titles_) {
+      class_store_columntitle(titles_, title, condition ? _TRUE_ : _FALSE_);
+    }
+    else if (dataptr_) {
+      class_store_double(dataptr_, value, condition ? _TRUE_ : _FALSE_, (*storeidx_));
+    }
+  }
+  void Add(const std::string& title, double value, bool condition = true) {
+    Add(title.c_str(), value, condition);
+  }
+
+ private:
+  char* titles_    = nullptr;
+  double* dataptr_ = nullptr;
+  int* storeidx_   = nullptr;
+};
+struct perturbs;  // forward declaration
 
 /**
  * Abstract base class for all cosmological species.
@@ -78,7 +113,7 @@ class BaseSpecies {
 
   /**
    * Called by BackgroundModule after construction to provide access to its
-   * indices (index_bg_a_, index_bg_H_, etc.) and methods (dV_scf, etc.).
+   * indices (index_bg_a_, index_bg_H_, etc.) and background state.
    * Species that need it override this; default is no-op.
    */
   virtual void SetBackgroundModule(const BackgroundModule* /*bgm*/) {}
@@ -120,10 +155,10 @@ class BaseSpecies {
 
   /**
    * Set initial conditions for ODE-integrated background variables.
-   * @param a_rel                Initial relative scale factor.
-   * @param pvecback_integration ODE integration vector to be populated.
+   * @param ctx Background initial-condition context (a_rel, a_ini, rho_rad,
+   *            and the integration vector to fill).
    */
-  virtual void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {}
+  virtual void SetBackgroundInitialConditions(const BackgroundICContext& ctx) {}
 
   /**
    * Compute species background quantities at relative scale factor a_rel = a/a_today.
@@ -520,6 +555,18 @@ class BaseSpecies {
    * decay-product species starting at zero, override returning 0.
    */
   virtual double GetOmega0() const = 0;
+
+  /** Relativistic (radiation-like) Omega0 contribution at early times.
+   *  Default 0; ultra-relativistic and interacting-dark-radiation species override. */
+  virtual double GetRadiationOmega0() const {
+    return 0.;
+  }
+
+  /** Earliest a/a_today this species needs integration to start from.
+   *  Default: returns a_proposed unchanged. NCDM species may pull it earlier. */
+  virtual double BackgroundAIni(double a_proposed, double /*a_today*/, double /*tol*/) const {
+    return a_proposed;
+  }
 
   /** Rho contribution to the matter tally. Default: Rho() if IsMatterSpecies, else 0. */
   virtual double MatterRho(const double* pvecback) const {

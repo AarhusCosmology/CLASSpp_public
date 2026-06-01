@@ -20,9 +20,6 @@ class BackgroundModule : public BaseModule {
   int background_tau_of_z(double z, double* tau) const;
   int background_w_fld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
   int background_free_noinput() const;
-  double dV_scf(double phi) const;
-  double V_scf(double phi) const;
-  double ddV_scf(double phi) const;
   int background_idm_drmd(
       double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
 
@@ -129,13 +126,10 @@ class BackgroundModule : public BaseModule {
   int background_init();
   int background_free();
   int background_indices();
-  int background_solve();
   int background_solve_evolver();
   int background_initial_conditions(double* pvecback, double* pvecback_integration);
   int background_find_equality();
   int background_derivs_member(
-      double z, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  static int background_derivs(
       double z, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
   int background_derivs_loga_member(
       double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
@@ -153,13 +147,6 @@ class BackgroundModule : public BaseModule {
                                              int index_loga,
                                              void* parameters_and_workspace,
                                              ErrorMsg error_message);
-  double Q_scf(double phi, double phi_prime);
-  double V_e_scf(double phi) const;
-  double dV_e_scf(double phi) const;
-  double ddV_e_scf(double phi) const;
-  double V_p_scf(double phi) const;
-  double dV_p_scf(double phi) const;
-  double ddV_p_scf(double phi) const;
   int background_output_budget();
   static int background_print_variables(
       double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
@@ -177,12 +164,7 @@ class BackgroundModule : public BaseModule {
 
   //@{
 
-  int index_bi_a_;        /**< {B} scale factor */
-  int index_bi_rho_dcdm_; /**< {B} dcdm density */
-
-  int index_bi_rho_fld_;       /**< {B} fluid density */
-  int index_bi_phi_scf_;       /**< {B} scalar field value */
-  int index_bi_phi_prime_scf_; /**< {B} scalar field derivative wrt conformal time */
+  int index_bi_a_; /**< {B} scale factor */
 
   int index_bi_time_;    /**< {C} proper (cosmological) time in Mpc */
   int index_bi_rs_;      /**< {C} sound horizon */
@@ -217,7 +199,7 @@ class BackgroundModule : public BaseModule {
 };
 
 /**
- * temporary parameters and workspace passed to the background_derivs function
+ * temporary parameters and workspace passed to the background_derivs_loga / background_derivs evolver functions
  */
 
 struct background_parameters_and_workspace {

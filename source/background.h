@@ -21,12 +21,6 @@ class DarkRadiation;
 enum equation_of_state { CLP, EDE };
 
 /**
- * Different ways to integrate background
- */
-
-enum background_evolution_method { bgevo_rk, bgevo_evolver };
-
-/**
  * All background parameters and evolution that other modules need to know.
  *
  * Once initialized by the backgound_init(), contains all necessary
@@ -104,8 +98,6 @@ struct background {
   double a_today = 1.; /**< scale factor today (arbitrary and irrelevant for most purposes) */
 
   //@}
-
-  enum background_evolution_method background_method = bgevo_evolver;
 
   ClosureSpecies closure_species = ClosureSpecies::None;
 

@@ -42,6 +42,7 @@
 #include "../species/scalar_field.h"
 #include "../species/ultra_relativistic.h"
 #include "background_module.h"
+#include "bisection.h"
 #include "thermodynamics_module.h"
 #include "thread_pool.h"
 
@@ -1360,9 +1361,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
                "to a time after recombination. You should decrease "
                "'start_sources_at_tau_c_over_tau_h'\n");
 
-    double tau_mid = 0.5 * (tau_lower + tau_upper);
-
-    while (tau_upper - tau_lower > ppr->tol_tau_approx) {
+    tau_ini = bisect_value(tau_lower, tau_upper, ppr->tol_tau_approx, [&](double tau_mid) {
       class_call(background_module_->background_at_tau(tau_mid,
                                                        pba->short_info,
                                                        pba->inter_normal,
@@ -1381,18 +1380,10 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
                  thermodynamics_module_->error_message_,
                  error_message_);
 
-      if (pvecback[background_module_->index_bg_a_] * pvecback[background_module_->index_bg_H_] /
-              pvecthermo[thermodynamics_module_->index_th_dkappa_] >
-          ppr->start_sources_at_tau_c_over_tau_h)
-
-        tau_upper = tau_mid;
-      else
-        tau_lower = tau_mid;
-
-      tau_mid = 0.5 * (tau_lower + tau_upper);
-    }
-
-    tau_ini = tau_mid;
+      return pvecback[background_module_->index_bg_a_] * pvecback[background_module_->index_bg_H_] /
+                 pvecthermo[thermodynamics_module_->index_th_dkappa_] >
+             ppr->start_sources_at_tau_c_over_tau_h;
+    });
   }
   else {
     /* check the time corresponding to the highest redshift requested in output plus one */
@@ -2633,6 +2624,7 @@ int PerturbationsModule::perturb_solve(int index_md,
   tau_upper = tau_sampling_[0];
 
   /* start bisection */
+  /* bisection kept inline: stops on the relative (tau_upper - tau_lower)/tau_lower, and ppw->last_index_back/thermo + pvecback from the final iteration are read afterward */
   tau_mid = 0.5 * (tau_lower + tau_upper);
 
   while ((tau_upper - tau_lower) / tau_lower > ppr->tol_tau_approx) {
@@ -3030,24 +3022,10 @@ int PerturbationsModule::perturb_find_approximation_switches(
         int flag_ini = interval_approx[0][index_ap];
 
         for (index_switch = 0; index_switch < num_switch; index_switch++) {
-          double lower_bound = tau_min;
-          double upper_bound = tau_end;
-          double mid         = 0.5 * (lower_bound + upper_bound);
-
-          while (upper_bound - lower_bound > precision) {
-            class_call(perturb_approximations(index_md, k, mid, ppw),
-                       error_message_,
-                       error_message_);
-
-            if (ppw->approx[index_ap] > flag_ini + index_switch) {
-              upper_bound = mid;
-            }
-            else {
-              lower_bound = mid;
-            }
-
-            mid = 0.5 * (lower_bound + upper_bound);
-          }
+          double mid = bisect_value(tau_min, tau_end, precision, [&](double m) {
+            class_call(perturb_approximations(index_md, k, m, ppw), error_message_, error_message_);
+            return ppw->approx[index_ap] > flag_ini + index_switch;
+          });
 
           unsorted_tau_switch[index_switch_tot] = mid;
           index_switch_tot++;

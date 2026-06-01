@@ -21,9 +21,9 @@ void DCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
   class_define_index(index_bi_rho_dcdm_, _TRUE_, index_bi, 1);
 }
 
-void DCDMSpecies::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
-  pvecback_integration[index_bi_rho_dcdm_] = Omega_ini_dcdm_ * std::pow(pba_.H0, 2) *
-                                             std::pow(1.0 / a_rel, 3);
+void DCDMSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
+  ctx.pvecback_integration[index_bi_rho_dcdm_] = Omega_ini_dcdm_ * std::pow(pba_.H0, 2) *
+                                                 std::pow(1.0 / ctx.a_rel, 3);
 }
 
 void DCDMSpecies::ComputeBackground(double /*a_rel*/, const double* pvecback_B, double* pvecback) {

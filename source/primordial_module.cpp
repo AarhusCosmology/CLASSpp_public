@@ -2209,6 +2209,7 @@ int PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy)
     phi_left = ppm->phi_end - dphi;
 
     /** - --> find value such that epsilon = primordial_inflation_small_epsilon by bisection */
+    /* bisection kept inline: bisects phi but stops on |epsilon - target| and phi_mid from the final iteration is read afterward */
     do {
       phi_mid = 0.5 * (phi_left + phi_right);
       class_call(primordial_inflation_get_epsilon(phi_mid, &epsilon),

@@ -1,7 +1,6 @@
 #include "cdm.h"
 
 #include "background.h"
-#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"

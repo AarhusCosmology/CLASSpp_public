@@ -12,7 +12,6 @@
 #include "perturbations.h"
 
 class BackgroundModule;
-class BackgroundColumnWriter;
 
 /**
  * Decaying Non-Cold Dark Matter (DNCDM).
@@ -56,7 +55,7 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   // ── Background ──────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
-  void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
+  void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
 

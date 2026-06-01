@@ -43,7 +43,7 @@ class DNCDM_DR_Species : public CompositeSpecies {
                                  const ShootingTarget& target) const override;
 
   void SetBackgroundModule(const BackgroundModule* bgm) override;
-  void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
+  void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
 
   // Override to add DNCDM->DR decay source after children
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;

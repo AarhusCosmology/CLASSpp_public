@@ -726,9 +726,6 @@ int InputModule::input_read_parameters() {
 
   /** (a) background parameters */
 
-  /** - background evolution method; (0 is Runge-Kutta evolution in conformal time, 1 is stiff evolution in log(a)) */
-  class_read_int("background_method", pba->background_method);
-
   /** - scale factor today (arbitrary) */
   class_read_double("a_today", pba->a_today);
 

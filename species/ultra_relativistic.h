@@ -23,6 +23,11 @@ class UltraRelativisticSpecies : public BaseSpecies {
     return Omega0_ur_;
   }
 
+  /** UR is radiation: its Omega0 seeds the early-time radiation density. */
+  double GetRadiationOmega0() const override {
+    return Omega0_ur_;
+  }
+
   // ── Background ─────────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;

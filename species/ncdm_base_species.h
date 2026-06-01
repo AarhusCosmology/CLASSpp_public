@@ -86,6 +86,12 @@ class NCDMBaseSpecies : public BaseSpecies {
   }
 
   double GetIni(double a, double a_today, double tol_ncdm_initial_w) const;
+
+  /** NCDM may need to start integration earlier so it is relativistic at a_ini. */
+  double BackgroundAIni(double a_proposed, double a_today, double tol) const override {
+    return GetIni(a_proposed, a_today, tol);
+  }
+
   double GetRescalingFactor(const double* lnf_array) const;
   virtual std::tuple<double, double> GetRescaledParameters(double a, const double* lnf_array) const;
 

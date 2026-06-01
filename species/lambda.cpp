@@ -1,7 +1,6 @@
 #include "lambda.h"
 
 #include "background.h" /* for class_define_index, _TRUE_ */
-#include "background_column_writer.h"
 
 LambdaSpecies::LambdaSpecies(const background& pba, double omega0_lambda)
     : BaseSpecies("Lambda", EnergyType::DarkEnergy), Omega0_lambda_(omega0_lambda), H0_(pba.H0) {}

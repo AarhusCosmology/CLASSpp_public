@@ -37,7 +37,7 @@ class DCDM_DR_Species : public CompositeSpecies {
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
-  void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
+  void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
 
   // Override to add DCDM->DR decay source after children
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;

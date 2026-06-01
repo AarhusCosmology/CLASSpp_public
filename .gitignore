@@ -2,6 +2,8 @@ output/
 *~
 build/
 class
+test-parser
+test-bisection
 *.prof
 *.ini
 libclass.a

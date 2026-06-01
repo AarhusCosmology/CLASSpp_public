@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "arrays.h"
-#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations_module.h"
 #include "species/species_input.h"
@@ -327,7 +326,8 @@ void DNCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
   index_bi                          += q_size();
 }
 
-void DNCDMSpecies::SetBackgroundInitialConditions(double /*a_rel*/, double* pvecback_integration) {
+void DNCDMSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
+  double* pvecback_integration = ctx.pvecback_integration;
   for (int index_q = 0; index_q < q_size(); index_q++) {
     double q  = q_[index_q];
     double f0 = w_[index_q] / dq_[index_q];
@@ -346,59 +346,26 @@ void DNCDMSpecies::ComputeBackground(double a_rel, const double* pvecback_B, dou
   std::vector<double> ddlnf_array(q_sz);
   std::vector<double> lnq(q_sz);
 
-  if (pba_->background_method == bgevo_evolver) {
-    bool has_problem = false;
+  bool has_problem = false;
+  for (int i = 0; i < q_sz; i++) {
+    if (pvecback_B[index_bi_lnf_decay_dr1_ + i] <= -460) {
+      has_problem = true;
+      break;
+    }
+    lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_decay_dr1_ + i];
+    lnq[i]            = std::log(q_[i]);
+  }
+  if (has_problem) {
     for (int i = 0; i < q_sz; i++) {
-      if (pvecback_B[index_bi_lnf_decay_dr1_ + i] <= -460) {
-        has_problem = true;
-        break;
-      }
-      lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_decay_dr1_ + i];
-      lnq[i]            = std::log(q_[i]);
-    }
-    if (has_problem) {
-      for (int i = 0; i < q_sz; i++) {
-        double q                               = q_[i];
-        double lnf_fd                          = -std::log(1. + std::exp(q));
-        double dlnfdlnq_fd                     = -q * std::exp(q) / (1. + std::exp(q));
-        pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_fd;
-        pvecback[index_bg_dlnfdlnq_decay_ + i] = dlnfdlnq_fd;
-        w_bg_[i]                               = std::exp(lnf_fd) * dq_[i];
-      }
-    }
-    else {
-      class_call(array_spline_table_lines(lnq.data(),
-                                          q_sz,
-                                          lnf_dlnf_array.data(),
-                                          1,
-                                          ddlnf_array.data(),
-                                          _SPLINE_EST_DERIV_,
-                                          bgm_->error_message_),
-                 bgm_->error_message_,
-                 bgm_->error_message_);
-      class_call(array_derive_spline(lnq.data(),
-                                     q_sz,
-                                     lnf_dlnf_array.data(),
-                                     ddlnf_array.data(),
-                                     1,
-                                     0,
-                                     q_sz,
-                                     bgm_->error_message_),
-                 bgm_->error_message_,
-                 bgm_->error_message_);
-      for (int i = 0; i < q_sz; i++) {
-        pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_dlnf_array[i];
-        pvecback[index_bg_dlnfdlnq_decay_ + i] = lnf_dlnf_array[q_sz + i];
-        pvecback[index_bg_dlnfdlnq_sep_ + i]   = pvecback_B[index_bi_dlnfdlnq_separate_decay_ + i];
-        w_bg_[i]                               = std::exp(lnf_dlnf_array[i]) * dq_[i];
-      }
+      double q                               = q_[i];
+      double lnf_fd                          = -std::log(1. + std::exp(q));
+      double dlnfdlnq_fd                     = -q * std::exp(q) / (1. + std::exp(q));
+      pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_fd;
+      pvecback[index_bg_dlnfdlnq_decay_ + i] = dlnfdlnq_fd;
+      w_bg_[i]                               = std::exp(lnf_fd) * dq_[i];
     }
   }
   else {
-    for (int i = 0; i < q_sz; i++) {
-      lnf_dlnf_array[i] = pvecback_B[index_bi_lnf_decay_dr1_ + i];
-      lnq[i]            = std::log(q_[i]);
-    }
     class_call(array_spline_table_lines(lnq.data(),
                                         q_sz,
                                         lnf_dlnf_array.data(),

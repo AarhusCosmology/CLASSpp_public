@@ -35,8 +35,8 @@ void DNCDM_DR_Species::SetBackgroundModule(const BackgroundModule* bgm) {
   CompositeSpecies::SetBackgroundModule(bgm);
 }
 
-void DNCDM_DR_Species::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
-  CompositeSpecies::SetBackgroundInitialConditions(a_rel, pvecback_integration);
+void DNCDM_DR_Species::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
+  CompositeSpecies::SetBackgroundInitialConditions(ctx);
 }
 
 void DNCDM_DR_Species::BackgroundDerivs(double tau,

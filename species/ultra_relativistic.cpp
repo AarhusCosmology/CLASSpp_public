@@ -4,7 +4,6 @@
 #include <stdexcept>
 
 #include "background.h"
-#include "background_column_writer.h"
 #include "background_module.h"
 #include "parser.h"
 #include "perturbations.h"

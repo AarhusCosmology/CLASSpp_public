@@ -25,9 +25,9 @@ void CompositeSpecies::SetPerturbs(const perturbs* ppt) {
     child->SetPerturbs(ppt);
 }
 
-void CompositeSpecies::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
+void CompositeSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
   for (auto& child : children_)
-    child->SetBackgroundInitialConditions(a_rel, pvecback_integration);
+    child->SetBackgroundInitialConditions(ctx);
 }
 
 void CompositeSpecies::ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) {

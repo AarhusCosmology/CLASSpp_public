@@ -5,7 +5,6 @@
 #include <string>
 
 #include "background.h"
-#include "background_column_writer.h"
 #include "background_module.h"
 #include "idm_dr_idr_species.h"
 #include "idm_drmd_idr_drmd_species.h"
@@ -35,6 +34,27 @@ void FluidSpecies::RegisterBackgroundIndices(int& index_bg) {
 
 void FluidSpecies::RegisterIntegrationIndices(int& index_bi) {
   class_define_index(index_bi_rho_fld_, _TRUE_, index_bi, 1);
+}
+
+void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
+  /* rho_fld today */
+  const double rho_fld_today = GetOmega0() * pow(pba_.H0, 2);
+
+  /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0).
+     The module previously passed the absolute a = a_rel*a_today (= ctx.a_ini). */
+  double w_fld, dw_over_da_fld, integral_fld;
+  class_call(ComputeWFld(ctx.a_ini, &w_fld, &dw_over_da_fld, &integral_fld),
+             bgm_->error_message_,
+             bgm_->error_message_);
+
+  /* Note: for complicated w_fld(a) functions with no simple
+     analytic integral, this is the place were you should compute
+     numerically the simple 1d integral [int_{a_ini}^{a_0} 3
+     [(1+w_fld)/a] da] (e.g. with the Romberg method?) instead of
+     calling ComputeWFld */
+
+  /* rho_fld at initial time */
+  ctx.pvecback_integration[bi_rho_index()] = rho_fld_today * exp(integral_fld);
 }
 
 void FluidSpecies::ComputeBackground(double /*a_rel*/, const double* pvecback_B, double* pvecback) {

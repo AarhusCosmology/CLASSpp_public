@@ -502,8 +502,12 @@ struct precision {
   double back_integration_stepsize = 7.e-3;
   /**
    * Tolerance of the background integration, giving the allowed relative integration error.
+   * Passed to the evolver in background_solve_evolver(). The default is 1e-6 (not the
+   * historical 1e-2): the removed legacy RK solver had no dense output, so the requested
+   * output points capped the step size and the step count acted as the effective precision
+   * knob; the evolver instead relies on this tolerance directly, so it must be tight.
    */
-  double tol_background_integration = 1.e-2;
+  double tol_background_integration = 1.e-6;
   /**
    * Tolerance of the deviation of \f$ \Omega_r \f$ from 1 for which to start integration:
    * The starting point of integration will be chosen,

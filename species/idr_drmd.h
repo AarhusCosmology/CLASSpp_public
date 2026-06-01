@@ -16,6 +16,11 @@ class IDR_DRMDSpecies : public BaseSpecies {
     return Omega0_idr_drmd_;
   }
 
+  /** IDR_DRMD is dark radiation: contributes its Omega0 to the early-time radiation density. */
+  double GetRadiationOmega0() const override {
+    return Omega0_idr_drmd_;
+  }
+
   bool IsFreestreaming() const override {
     return true;
   }

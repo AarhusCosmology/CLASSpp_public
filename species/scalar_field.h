@@ -60,6 +60,8 @@ class ScalarFieldSpecies : public BaseSpecies {
     index_bi_phi_prime_scf_ = index_bi++;
   }
 
+  void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
+
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
 
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;

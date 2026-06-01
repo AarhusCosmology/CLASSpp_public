@@ -3,7 +3,6 @@
 #include <cmath>
 #include <stdexcept>
 
-#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations_module.h"
 
@@ -36,19 +35,21 @@ void DCDM_DR_Species::WriteBackgroundData(const double* pvecback, BackgroundColu
   w.Add("(.)rho_dr", dr().Rho(pvecback));
 }
 
-void DCDM_DR_Species::SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) {
+void DCDM_DR_Species::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
   // Initialize children first (DCDM)
-  CompositeSpecies::SetBackgroundInitialConditions(a_rel, pvecback_integration);
+  CompositeSpecies::SetBackgroundInitialConditions(ctx);
 
   // Then add the DR initial condition from DCDM decay.  This method only runs
   // when a DCDM_DR_Species exists, so the legacy pba->has_dcdm guard is gone.
-  const double Omega0_ur = bgm_->all_species_.count("UR") ? bgm_->all_species_.at("UR")->GetOmega0()
-                                                          : 0.;
-  const double Omega_rad = pba_->Omega0_g + Omega0_ur;
-  const double rho_dcdm_ini = pvecback_integration[dcdm_->bi_rho_index()];
-  double f                  = 1. / 3. * std::pow(a_rel, 6) * rho_dcdm_ini * dcdm_->Gamma_dcdm() /
-                              std::pow(pba_->H0, 3) / std::sqrt(Omega_rad);
-  pvecback_integration[dr_sp_->bi_rho_index()] = f * std::pow(pba_->H0, 2) / std::pow(a_rel, 4);
+  // Total radiation Omega0 at a_ini, recovered from the module-wide rho_rad
+  // (rho_rad = Omega_rad * H0^2 / a_rel^4). This includes every radiation-like
+  // species (photons, UR, IDR, ...) consistently and needs no cross-species lookup.
+  const double Omega_rad    = ctx.rho_rad * std::pow(ctx.a_rel, 4) / std::pow(pba_->H0, 2);
+  const double rho_dcdm_ini = ctx.pvecback_integration[dcdm_->bi_rho_index()];
+  double f = 1. / 3. * std::pow(ctx.a_rel, 6) * rho_dcdm_ini * dcdm_->Gamma_dcdm() /
+             std::pow(pba_->H0, 3) / std::sqrt(Omega_rad);
+  ctx.pvecback_integration[dr_sp_->bi_rho_index()] = f * std::pow(pba_->H0, 2) /
+                                                     std::pow(ctx.a_rel, 4);
 }
 
 void DCDM_DR_Species::BackgroundDerivs(double tau,

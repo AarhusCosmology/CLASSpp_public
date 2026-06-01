@@ -3,7 +3,6 @@
 #include <cmath>
 #include <stdexcept>
 
-#include "background_column_writer.h"
 #include "background_module.h"
 #include "perturbations_module.h"
 #include "species/species_input.h"

@@ -38,11 +38,28 @@ class CompositeSpecies : public BaseSpecies {
     return sum;
   }
 
+  /** Sums GetRadiationOmega0() over all children (dark-radiation children
+   *  contribute their Omega0; matter children contribute 0). */
+  double GetRadiationOmega0() const override {
+    double sum = 0.0;
+    for (const auto& c : children_)
+      sum += c->GetRadiationOmega0();
+    return sum;
+  }
+
+  /** Threads a_proposed through all children (e.g. a wrapped DNCDM child
+   *  may pull the earliest integration start earlier). */
+  double BackgroundAIni(double a_proposed, double a_today, double tol) const override {
+    for (const auto& c : children_)
+      a_proposed = c->BackgroundAIni(a_proposed, a_today, tol);
+    return a_proposed;
+  }
+
   // ── Background ──────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetThermodynamicsModule(const ThermodynamicsModule* thm) override;
   void SetPerturbs(const perturbs* ppt) override;
-  void SetBackgroundInitialConditions(double a_rel, double* pvecback_integration) override;
+  void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
   double Rho(const double* pvecback) const override;

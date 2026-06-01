@@ -6,7 +6,6 @@
 #include <string>
 #include <utility>
 
-#include "background_column_writer.h"
 #include "background_module.h"
 #include "parser.h"
 #include "perturbations.h"
@@ -56,6 +55,48 @@ double ScalarFieldSpecies::ddV_scf(double phi) const {
   double ddVe   = lambda * lambda * Ve;
   double ddVp   = alpha * (alpha - 1.) * pow(phi - B, alpha - 2);
   return ddVe * Vp + 2 * dVe * dVp + Ve * ddVp;
+}
+
+void ScalarFieldSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
+  /** - Fix initial value of \f$ \phi, \phi' \f$
+   * set directly in the radiation attractor => fixes the units in terms of rho_ur
+   *
+   * TODO:
+   * - There seems to be some small oscillation when it starts.
+   * - Check equations and signs. Sign of phi_prime?
+   * - is rho_ur all there is early on?
+   */
+  double* pvecback_integration = ctx.pvecback_integration;
+  const double rho_rad         = ctx.rho_rad;
+  double scf_lambda            = scf_parameters()[0];
+  if (attractor_ic_scf() == _TRUE_) {
+    const double attractor_denom = 3 * pow(scf_lambda, 2) - 12;
+    if (attractor_denom < 0) {
+      /** - --> If there is no attractor solution for scf_lambda, assign some value. Otherwise would give a nan.*/
+      pvecback_integration[bi_phi_index()] = 1. / scf_lambda;  //seems to the work
+      if (pba_.background_verbose > 0)
+        printf(" No attractor IC for lambda = %.3e ! \n ", scf_lambda);
+    }
+    else {
+      pvecback_integration[bi_phi_index()] = -1. / scf_lambda *
+                                             log(rho_rad * 4. / attractor_denom) * phi_ini_scf();
+    }
+    pvecback_integration[bi_phi_prime_index()] = 2 * ctx.a_ini *
+                                                 sqrt(V_scf(pvecback_integration[bi_phi_index()])) *
+                                                 phi_prime_ini_scf();
+  }
+  else {
+    printf("Not using attractor initial conditions\n");
+    /** - --> If no attractor initial conditions are assigned, gets the provided ones. */
+    pvecback_integration[bi_phi_index()]       = phi_ini_scf();
+    pvecback_integration[bi_phi_prime_index()] = phi_prime_ini_scf();
+  }
+  class_test(!isfinite(pvecback_integration[bi_phi_index()]) ||
+                 !isfinite(pvecback_integration[bi_phi_prime_index()]),
+             bgm_->error_message_,
+             "initial phi = %e phi_prime = %e -> check initial conditions",
+             pvecback_integration[bi_phi_index()],
+             pvecback_integration[bi_phi_prime_index()]);
 }
 
 void ScalarFieldSpecies::ComputeBackground(double a_rel,
@@ -246,7 +287,7 @@ void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::Pertur
     y[l.idx_phi] += ctx.alpha * phi_prime;
   if (l.idx_phi_prime >= 0)
     y[l.idx_phi_prime] += (-2. * ctx.a_prime_over_a * ctx.alpha * phi_prime -
-                           ctx.a * ctx.a * bgm->dV_scf(phi_scf) * ctx.alpha +
+                           ctx.a * ctx.a * dV_scf(phi_scf) * ctx.alpha +
                            phi_prime * ctx.alpha_prime);
 }
 

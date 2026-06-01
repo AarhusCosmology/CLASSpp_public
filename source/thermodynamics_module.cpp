@@ -2397,6 +2397,7 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
       /* try intermediate values */
 
       int counter = 0;
+      /* bisection kept inline: bisects z but stops on (tau_sup - tau_inf) and the reionization table from the final iteration is read afterward */
       while ((tau_sup - tau_inf) > tau_reionization_ * ppr->reionization_optical_depth_tol) {
         double z_mid = 0.5 * (z_sup + z_inf);
 

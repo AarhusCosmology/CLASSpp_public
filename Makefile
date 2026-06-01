@@ -81,7 +81,7 @@ TOOLS = growTable.opp dei_rkck.opp sparse.opp evolver_rkck.opp arrays.opp parser
 
 SPECIES_OPP = base_species.opp cdm.opp photons.opp baryons.opp lambda.opp ultra_relativistic.opp fluid.opp dcdm.opp dark_radiation_species.opp ncdm_base_species.opp ncdm_species.opp ncdm_interacting_species.opp scalar_field.opp interacting_species.opp composite_species.opp species_collection.opp species_input.opp dcdm_dr_species.opp idm_dr_idr_species.opp idm_drmd_idr_drmd_species.opp dncdm_species.opp dncdm_dr_species.opp perturb_column_writer.opp
 
-SOURCE = background_column_writer.opp input_module.opp background_module.opp thermodynamics_module.opp perturbations_module.opp primordial_module.opp nonlinear_module.opp transfer_module.opp spectra_module.opp lensing_module.opp cosmology.opp
+SOURCE = input_module.opp background_module.opp thermodynamics_module.opp perturbations_module.opp primordial_module.opp nonlinear_module.opp transfer_module.opp spectra_module.opp lensing_module.opp cosmology.opp
 
 OUTPUT = output_module.opp
 
@@ -111,3 +111,6 @@ clean: .base
 
 test-parser: parser.opp common.opp exceptions.opp trigonometric_integrals.opp species_input.opp
 	$(CXX) $(OPTFLAG) $(CXXFLAG) -Iinclude -Itools -Isource -I. tools/parser_test.cpp $(addprefix build/,$(notdir $^)) -o test-parser $(LIBRARIES)
+
+test-bisection:
+	$(CXX) $(OPTFLAG) $(CXXFLAG) -Iinclude -Itools -Isource -I. tools/bisection_test.cpp -o test-bisection $(LIBRARIES)
