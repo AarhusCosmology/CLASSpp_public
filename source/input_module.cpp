@@ -350,9 +350,12 @@ int InputModule::ReadCoupledOmegaBudget() {
   }
 
   // ── CDM: parser value (or default), then synchronous-gauge minimum ───────────
-  // input_default_params() already set pba->Omega0_cdm = 0.12038/h^2 as the fallback
-  // for the closure-Omega budget computation; honour that as the budget default too.
-  double omega0_cdm = 0.12038 / (pba->h * pba->h);
+  // Default CDM fallback, frozen at the default h=0.67556 (matches the historical
+  // input_default_params() pba->Omega0_cdm = 0.12038/h^2 and classyref). Must NOT use
+  // pba->h here: ReadCoupledOmegaBudget runs after the user's h/H0 is read, so dividing
+  // by the live h would let the default drift when h is set or 100*theta_s is shot
+  // (the omega_b/Omega0_g defaults are likewise frozen at default h in input_default_params).
+  double omega0_cdm = 0.12038 / (0.67556 * 0.67556);
   bool cdm_user_set = false;
 
   class_call(parser_read_double(pfc, "Omega_cdm", &param1, &flag1, errmsg), errmsg, errmsg);
