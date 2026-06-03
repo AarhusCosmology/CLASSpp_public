@@ -182,9 +182,13 @@ void InputModule::ConstructSpecies() {
   background* pba = &background_;  // need non-const to write closure Omega
 
   NcdmSettings ncdm_settings;
-  ncdm_settings.h           = pba->h;
-  ncdm_settings.T_cmb       = pba->T_cmb;
-  ncdm_settings.tol_ncdm    = precision_.tol_ncdm;
+  ncdm_settings.h     = pba->h;
+  ncdm_settings.T_cmb = pba->T_cmb;
+  // The ncdm perturbation momentum grid is gauge-dependent: synchronous gauge
+  // converges with far fewer q-bins than Newtonian (synchronous reaches sub-0.1%
+  // P(k) at ~5 bins, Newtonian needs ~11). Use the gauge-appropriate tolerance.
+  ncdm_settings.tol_ncdm    = (perturbations_.gauge == newtonian) ? precision_.tol_ncdm_newtonian
+                                                                  : precision_.tol_ncdm_synchronous;
   ncdm_settings.tol_ncdm_bg = precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = precision_.tol_M_ncdm;
 
@@ -2892,7 +2896,10 @@ void precision::parse(const FileContent& fc) {
   read(fc, "tol_background_integration", tol_background_integration);
   read(fc, "tol_initial_Omega_r", tol_initial_Omega_r);
   read(fc, "tol_M_ncdm", tol_M_ncdm);
-  read(fc, "tol_ncdm", tol_ncdm);
+  // "tol_ncdm" is a convenience input that sets BOTH gauge-specific tolerances;
+  // the gauge-specific keys then override per gauge if also given.
+  read(fc, "tol_ncdm", tol_ncdm_synchronous);
+  read(fc, "tol_ncdm", tol_ncdm_newtonian);
   read(fc, "tol_ncdm_synchronous", tol_ncdm_synchronous);
   read(fc, "tol_ncdm_newtonian", tol_ncdm_newtonian);
   read(fc, "tol_ncdm_bg", tol_ncdm_bg);
@@ -3170,9 +3177,12 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
   // SpeciesBuildContext::ncdm_settings is non-null by contract (some guesses fall back to
   // it when ppr is unavailable); build it from the module as ConstructSpecies does.
   NcdmSettings ncdm_settings;
-  ncdm_settings.h           = input_module->background_.h;
-  ncdm_settings.T_cmb       = input_module->background_.T_cmb;
-  ncdm_settings.tol_ncdm    = input_module->precision_.tol_ncdm;
+  ncdm_settings.h     = input_module->background_.h;
+  ncdm_settings.T_cmb = input_module->background_.T_cmb;
+  // Gauge-dependent ncdm momentum tolerance (see ConstructSpecies for rationale).
+  ncdm_settings.tol_ncdm    = (input_module->perturbations_.gauge == newtonian)
+                                  ? input_module->precision_.tol_ncdm_newtonian
+                                  : input_module->precision_.tol_ncdm_synchronous;
   ncdm_settings.tol_ncdm_bg = input_module->precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = input_module->precision_.tol_M_ncdm;
   const SpeciesBuildContext gctx{&fc,

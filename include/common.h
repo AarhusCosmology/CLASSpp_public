@@ -523,17 +523,15 @@ struct precision {
   double tol_M_ncdm = 1.e-7;
   /**
    * Tolerance on the relative precision of the integration over
-   * non-cold dark matter phase-space distributions.
-   */
-  double tol_ncdm = 1.e-3;
-  /**
-   * Tolerance on the relative precision of the integration over
    * non-cold dark matter phase-space distributions in the synchronous gauge.
+   * The convenience input key "tol_ncdm" sets both this and tol_ncdm_newtonian.
    */
   double tol_ncdm_synchronous = 1.e-3;
   /**
    * Tolerance on the relative precision of the integration over
    * non-cold dark matter phase-space distributions in the newtonian gauge.
+   * Newtonian gauge needs a finer ncdm momentum grid than synchronous for the
+   * same P(k) accuracy, hence the tighter default.
    */
   double tol_ncdm_newtonian = 1.e-5;
   /**
