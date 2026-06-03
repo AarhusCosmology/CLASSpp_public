@@ -630,7 +630,7 @@ int BackgroundModule::background_free() {
 }
 
 /**
- * Free only the memory space NOT allocated through input_read_parameters()
+ * Free only the memory space NOT allocated through the input module
  *
  * @return the error status
  */

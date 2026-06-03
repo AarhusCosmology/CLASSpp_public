@@ -47,9 +47,13 @@ class InputModule {
   /** All cosmological species, constructed at end of InputModule ctor. */
   SpeciesCollection all_species_;
   /** Pre-resolved Omega budget for coupled species (CDM, IDM_DR/IDR,
-   *  IDM_DRMD/IDR_DRMD, DCDM_DR). Populated by ReadCoupledOmegaBudget during
-   *  input_read_parameters and passed to ConstructSpecies via SpeciesBuildContext. */
+   *  IDM_DRMD/IDR_DRMD, DCDM_DR). Populated by ReadCoupledCluster during
+   *  ReadContext and passed to ConstructSpecies via SpeciesBuildContext. */
   SpeciesOmegaBudget omega_budget_;
+  /** Raw intermediates from phase-i parsing that coupled factories need for
+   *  physics construction. Populated by ReadCoupledCluster alongside
+   *  omega_budget_ and threaded through SpeciesBuildContext. */
+  CoupledClusterInputs coupled_inputs_;
   ErrorMsg error_message_;
 
  private:
@@ -70,17 +74,18 @@ class InputModule {
   void ConstructSpecies();
 
   /** Parse the coupled-species cluster (CDM, IDM_DR/IDR, IDM_DRMD/IDR_DRMD,
-   *  DCDM_DR) into omega_budget_. Resolves f_idm_dr/f_idm_drmd CDM subtractions,
-   *  IDR derivation from T_idr*Omega0_g, and the synchronous-gauge CDM minimum.
-   *  Species-specific physics params (T_idr, l_max_idr, f_idm_drmd,
+   *  DCDM_DR) into omega_budget_ and coupled_inputs_. Resolves f_idm_dr/f_idm_drmd
+   *  CDM subtractions, IDR derivation from T_idr*Omega0_g, and the synchronous-gauge
+   *  CDM minimum. Species-specific physics params (T_idr, l_max_idr, f_idm_drmd,
    *  delta_Neff_drmd, z_stop, G_over_aH_drmd, Gamma_dcdm, Omega_ini_dcdm) are
    *  owned by their species and parsed in each species' CreateAll; this
-   *  function only reads them as locals where the budget math needs them.
-   *  Called from input_read_parameters. */
-  int ReadCoupledOmegaBudget();
+   *  function also stores them in coupled_inputs_ so factories need not re-parse.
+   *  Called from ReadContext. */
+  int ReadCoupledCluster();
 
-  int input_init();
-  int input_read_parameters();
+  void ReadContext();          // phase i: inputs needed to build species
+  void ReadDerived();          // phase iii: everything else + species-dependent reads
+  void WriteParameterFiles();  // read/unread parameter dump (runs after ReadDerived)
   int input_read_precisions();
   int input_default_params();
   int input_default_precision();

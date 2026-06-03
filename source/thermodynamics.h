@@ -166,13 +166,6 @@ struct thermo {
       0.; /**< takes the contribution of DM annihilation in halos into account*/
   double annihilation_z_halo = 30.; /**< characteristic redshift for DM annihilation in halos*/
 
-  double a_idm_dr =
-      0.; /**< strength of the coupling between interacting dark matter and interacting dark radiation (idm-idr) */
-  double b_idr = 0.; /**< strength of the self coupling for interacting dark radiation (idr-idr) */
-  double nindex_idm_dr =
-      4.; /**< temperature dependence of the interaction between dark matter and dark radiation */
-  double m_idm = 1.e11; /**< interacting dark matter mass */
-
   //@}
 
   /** @name - technical parameters */

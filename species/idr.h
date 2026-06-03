@@ -1,4 +1,6 @@
 #pragma once
+#include <vector>
+
 #include "background.h"
 #include "base_species.h"
 #include "perturbations.h"
@@ -13,11 +15,17 @@ class IDRSpecies : public BaseSpecies {
  public:
   IDRSpecies(const background& pba,
              double omega0_idr,
-             bool has_sibling_idm_dr = false,
-             double T_idr            = 0.,
-             int l_max_idr           = 0)
+             bool has_sibling_idm_dr          = false,
+             double T_idr                     = 0.,
+             int l_max_idr                    = 0,
+             double b_idr                     = 0.,
+             int idr_nature                   = 0,
+             std::vector<double> alpha_idm_dr = {},
+             std::vector<double> beta_idr     = {})
       : BaseSpecies("IDR", EnergyType::Radiation), pba_(pba), Omega0_idr_(omega0_idr),
-        has_sibling_idm_dr_(has_sibling_idm_dr), T_idr_(T_idr), l_max_idr_(l_max_idr) {}
+        has_sibling_idm_dr_(has_sibling_idm_dr), T_idr_(T_idr), l_max_idr_(l_max_idr),
+        b_idr_(b_idr), idr_nature_(idr_nature), alpha_idm_dr_(std::move(alpha_idm_dr)),
+        beta_idr_(std::move(beta_idr)) {}
 
   bool has_sibling_idm_dr() const {
     return has_sibling_idm_dr_;
@@ -28,6 +36,19 @@ class IDRSpecies : public BaseSpecies {
   }
   int l_max_idr() const {
     return l_max_idr_;
+  }
+
+  double b_idr() const {
+    return b_idr_;
+  }
+  int idr_nature() const {
+    return idr_nature_;
+  }
+  const std::vector<double>& alpha_idm_dr() const {
+    return alpha_idm_dr_;
+  }
+  const std::vector<double>& beta_idr() const {
+    return beta_idr_;
   }
 
   void SetThermodynamicsModule(const ThermodynamicsModule* thm) override {
@@ -217,4 +238,8 @@ class IDRSpecies : public BaseSpecies {
   int l_max_idr_                   = 0;
   const ThermodynamicsModule* thm_ = nullptr;
   const perturbs* ppt_             = nullptr;
+  double b_idr_                    = 0.;
+  int idr_nature_                  = 0;
+  std::vector<double> alpha_idm_dr_;
+  std::vector<double> beta_idr_;
 };

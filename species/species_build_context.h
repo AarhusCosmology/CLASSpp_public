@@ -37,6 +37,21 @@ struct SpeciesOmegaBudget {
 };
 
 /**
+ * Raw intermediates parsed once in phase i that the coupled factories need for
+ * physics construction (not just budget math). Single source of truth for the
+ * coupled cluster's reusable parsed values, so factories don't re-parse pfc
+ * identically to the budget resolver. See spec Blocker 4.
+ */
+struct CoupledClusterInputs {
+  std::optional<double> T_idr;  // resolved from N_idr | N_dg | xi_idr (+ stat_f_idr)
+  double stat_f_idr         = 7. / 8.;
+  double f_idm_drmd         = 0.;
+  double G_over_aH_drmd_ini = 0.;
+  double delta_Neff_drmd    = 0.;
+  double z_stop             = 0.;
+};
+
+/**
  * Inputs every species' static CreateAll factory needs.
  * Bundled into one struct to keep factory signatures uniform.
  */
@@ -56,6 +71,10 @@ struct SpeciesBuildContext {
   // InputModule before ConstructSpecies runs and threaded through to DoShooting's
   // per-species guess loop; default nullptr for standalone callers (tests etc.).
   const SpeciesOmegaBudget* omega_budget = nullptr;
+
+  // Raw intermediates parsed once in phase i that the coupled factories need for
+  // physics construction (not just budget math). nullptr for standalone callers.
+  const CoupledClusterInputs* coupled_inputs = nullptr;
 
   // Set by ConstructSpecies when running Pass 2 (closure species). Carries the
   // budget-closure value Omega0 that the closure species must adopt instead of

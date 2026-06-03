@@ -43,8 +43,10 @@ int readDoubleList(
  * and/or 'xxx.pre'. They can be the arguments of the main() routine.
  *
  * If class is embedded into another code, you will probably prefer to
- * call directly input_init() in order to pass input parameters
- * through a 'file_content' structure.
+ * populate a 'file_content' structure directly and pass it to the
+ * InputModule constructor, which then runs input_read_precisions,
+ * input_default_params, ReadContext, ConstructSpecies, ReadDerived,
+ * and WriteParameterFiles in sequence.
  */
 
 int InputModule::file_content_from_arguments(int argc,
@@ -170,12 +172,16 @@ int InputModule::file_content_from_arguments(int argc,
 InputModule::InputModule(FileContent& fc) : file_content_(fc) {
   file_content_.mark_all_unread();
   try {
-    input_init();
+    input_read_precisions();
+    input_default_params();
+    ReadContext();
+    ConstructSpecies();
+    ReadDerived();
+    WriteParameterFiles();
   }
   catch (const std::runtime_error& e) {
     throw std::invalid_argument(e.what());
   }
-  ConstructSpecies();
 }
 
 void InputModule::ConstructSpecies() {
@@ -201,6 +207,7 @@ void InputModule::ConstructSpecies() {
       /*all_species=*/&all_species_,
       /*omega_budget=*/&omega_budget_,
   };
+  ctx.coupled_inputs = &coupled_inputs_;
 
   // Read input_verbose for the closure verbose message.
   int input_verbose = 0;
@@ -286,7 +293,7 @@ void InputModule::ConstructSpecies() {
   }
 }
 
-int InputModule::ReadCoupledOmegaBudget() {
+int InputModule::ReadCoupledCluster() {
   char* errmsg        = error_message_;
   FileContent* pfc    = &file_content_;
   precision* ppr      = &precision_;
@@ -346,6 +353,11 @@ int InputModule::ReadCoupledOmegaBudget() {
           stat_f_idr * pow(param3, 4.) / (7. / 8.) * pow(11. / 4., (4. / 3.)));
   }
 
+  // Store IDR intermediates into coupled_inputs_ for factory reuse.
+  coupled_inputs_.stat_f_idr = stat_f_idr;
+  if (flag1 == _TRUE_ || flag2 == _TRUE_ || flag3 == _TRUE_)
+    coupled_inputs_.T_idr = T_idr_local;
+
   // Mark the budget slot present iff any of the three IDR-temperature inputs was given.
   // (Matches the legacy semantics: pba->Omega0_idr was always written, but only became
   // nonzero when T_idr was set by one of these inputs.)
@@ -356,7 +368,7 @@ int InputModule::ReadCoupledOmegaBudget() {
   // ── CDM: parser value (or default), then synchronous-gauge minimum ───────────
   // Default CDM fallback, frozen at the default h=0.67556 (matches the historical
   // input_default_params() pba->Omega0_cdm = 0.12038/h^2 and classyref). Must NOT use
-  // pba->h here: ReadCoupledOmegaBudget runs after the user's h/H0 is read, so dividing
+  // pba->h here: ReadCoupledCluster runs after the user's h/H0 is read, so dividing
   // by the live h would let the default drift when h is set or 100*theta_s is shot
   // (the omega_b/Omega0_g defaults are likewise frozen at default h in input_default_params).
   double omega0_cdm = 0.12038 / (0.67556 * 0.67556);
@@ -461,6 +473,12 @@ int InputModule::ReadCoupledOmegaBudget() {
              "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters are "
              "'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
 
+  // Store DRMD intermediates into coupled_inputs_ for factory reuse.
+  coupled_inputs_.z_stop             = z_stop_drmd;
+  coupled_inputs_.f_idm_drmd         = f_idm_drmd_local;
+  coupled_inputs_.delta_Neff_drmd    = delta_Neff_drmd_local;
+  coupled_inputs_.G_over_aH_drmd_ini = (flag2 == _TRUE_) ? param2 : 0.;
+
   if (delta_Neff_drmd_local > 0.) {
     omega_budget_.idr_drmd = delta_Neff_drmd_local * 7. / 8. * pow(4. / 11., 4. / 3.) *
                              pba->Omega0_g;
@@ -500,47 +518,20 @@ int InputModule::ReadCoupledOmegaBudget() {
 }
 
 /**
- * Initialize each parameter, first to its default values, and then
- * from what can be interpreted from the values passed in the input
- * 'file_content' structure. If its size is null, all parameters keep
- * their default values.
+ * Write the read parameters to a file, the unread parameters to another
+ * file, and warnings about unread parameters. Runs after ConstructSpecies
+ * and ReadDerived, so species inputs read inside species factories are
+ * correctly classified as read.
  *
  */
 
-int InputModule::input_init() {
+void InputModule::WriteParameterFiles() {
   char* errmsg     = error_message_;
   FileContent* pfc = &file_content_;
 
   int flag1;
 
   char string1[_ARGUMENT_LENGTH_MAX_];
-
-  /**
-   * Before getting into the assignment of parameters,
-   * and before the shooting, we want to already fix our precision parameters.
-   *
-   * No precision parameter should depend on any input parameter
-   *
-   */
-
-  class_call(input_read_precisions(), error_message_, error_message_);
-
-  /**
-   * 'Shooting' resolves inputs that can't be set directly — a condition (e.g. the
-   *  angular sound-horizon scale 100*theta_s, or a species' today density) is satisfied
-   *  by root-finding an unknown (e.g. h, or Omega_ini_dcdm) through repeated CLASS runs.
-   *  This no longer happens in the constructor: each shooting-capable species guesses its
-   *  own unknown during ConstructSpecies and reports its target, and Cosmology::GetInputModule
-   *  lazily calls InputModule::DoShooting to solve the coupled system. See DoShooting.
-   */
-
-  int input_verbose = 0, int1;
-  class_read_int("input_verbose", input_verbose);
-  if (input_verbose > 0)
-    printf("Reading input parameters\n");
-
-  /** - -->  read all parameters from input pfc: */
-  class_call(input_read_parameters(), errmsg, errmsg);
 
   /** - eventually write all the read parameters in a file, unread parameters in another file, and warnings about unread parameters */
 
@@ -597,8 +588,6 @@ int InputModule::input_init() {
                 value.c_str());
     });
   }
-
-  return _SUCCESS_;
 }
 int InputModule::input_read_precisions() {
   precision* ppr = &precision_;
@@ -630,7 +619,12 @@ int InputModule::input_read_precisions() {
 
   return _SUCCESS_;
 }
-int InputModule::input_read_parameters() {
+/**
+ * Phase i: read the non-species inputs that building the species needs
+ * (gauge, h, photon/baryon densities, the coupled-Omega budget, closure
+ * selection). Runs before ConstructSpecies.
+ */
+void InputModule::ReadContext() {
   /** Summary: */
 
   /** - define local variables */
@@ -640,52 +634,22 @@ int InputModule::input_read_parameters() {
   background* pba  = &background_;     /* for cosmological background */
   thermo* pth      = &thermodynamics_; /* for thermodynamics */
   perturbs* ppt    = &perturbations_;  /* for source functions */
-  primordial* ppm  = &primordial_;     /* for primordial spectra */
-  nonlinear* pnl   = &nonlinear_;      /* for non-linear spectra */
-  transfers* ptr   = &transfers_;      /* for transfer functions */
-  spectra* psp     = &spectra_;        /* for output spectra */
-  lensing* ple     = &lensing_;        /* for lensed spectra */
-  output* pop      = &output_;
 
   int flag1, flag2, flag3;
   double param1, param2, param3;
   int entries_read;
   int int1;
-  double* pointer1;
   char string1[_ARGUMENT_LENGTH_MAX_];
-  char string2[_ARGUMENT_LENGTH_MAX_];
-  double k1         = 0.;
-  double k2         = 0.;
-  double prr1       = 0.;
-  double prr2       = 0.;
-  double pii1       = 0.;
-  double pii2       = 0.;
-  double pri1       = 0.;
-  double pri2       = 0.;
-  double n_iso      = 0.;
-  double f_iso      = 0.;
-  double n_cor      = 0.;
-  double c_cor      = 0.;
-  double stat_f_idr = 7. / 8.;
 
-  int i;
-
-  double sigma_B; /* Stefan-Boltzmann constant in \f$ W/m^2/K^4 = Kg/K^4/s^3 \f$*/
-
-  double z_max      = 0.;
   int input_verbose = 0;
-
-  sigma_B = 2. * pow(_PI_, 5) * pow(_k_B_, 4) / 15. / pow(_h_P_, 3) / pow(_c_, 2);
-
-  /** - set all input parameters to default values */
-
-  class_call(input_default_params(), error_message_, error_message_);
 
   /** - if entries passed in file_content structure, carefully read
       and interpret each of them, and tune the relevant input
       parameters accordingly*/
 
   class_read_int("input_verbose", input_verbose);
+  if (input_verbose > 0)
+    printf("Reading input parameters\n");
 
   class_call(parser_read_int(pfc, "threads", &int1, &flag1, errmsg), errmsg, errmsg);
   if (flag1 == _TRUE_) {
@@ -764,37 +728,25 @@ int InputModule::input_read_parameters() {
              "In input file, you can only enter one of T_cmb, Omega_g or omega_g, choose one");
 
   if (class_none_of_three(flag1, flag2, flag3)) {
-    pba->Omega0_g = (4. * sigma_B / _c_ * pow(pba->T_cmb, 4.)) /
-                    (3. * _c_ * _c_ * 1.e10 * pba->h * pba->h / _Mpc_over_m_ / _Mpc_over_m_ / 8. /
-                     _PI_ / _G_);
+    pba->Omega0_g = PhotonsSpecies::Omega0gFromTcmb(pba->T_cmb, pba->h);
   }
   else {
     if (flag1 == _TRUE_) {
       /** - Omega0_g = rho_g / rho_c0, each of them expressed in \f$ Kg/m/s^2 \f$*/
       /** - rho_g = (4 sigma_B / c) \f$ T^4 \f$*/
       /** - rho_c0 \f$ = 3 c^2 H_0^2 / (8 \pi G) \f$*/
-      pba->Omega0_g = (4. * sigma_B / _c_ * pow(param1, 4.)) /
-                      (3. * _c_ * _c_ * 1.e10 * pba->h * pba->h / _Mpc_over_m_ / _Mpc_over_m_ / 8. /
-                       _PI_ / _G_);
+      pba->Omega0_g = PhotonsSpecies::Omega0gFromTcmb(param1, pba->h);
       pba->T_cmb    = param1;
     }
 
     if (flag2 == _TRUE_) {
       pba->Omega0_g = param2;
-      pba->T_cmb = pow(pba->Omega0_g *
-                           (3. * _c_ * _c_ * 1.e10 * pba->h * pba->h / _Mpc_over_m_ / _Mpc_over_m_ /
-                            8. / _PI_ / _G_) /
-                           (4. * sigma_B / _c_),
-                       0.25);
+      pba->T_cmb    = PhotonsSpecies::TcmbFromOmega0g(pba->Omega0_g, pba->h);
     }
 
     if (flag3 == _TRUE_) {
       pba->Omega0_g = param3 / pba->h / pba->h;
-      pba->T_cmb = pow(pba->Omega0_g *
-                           (3. * _c_ * _c_ * 1.e10 * pba->h * pba->h / _Mpc_over_m_ / _Mpc_over_m_ /
-                            8. / _PI_ / _G_) /
-                           (4. * sigma_B / _c_),
-                       0.25);
+      pba->T_cmb    = PhotonsSpecies::TcmbFromOmega0g(pba->Omega0_g, pba->h);
     }
   }
 
@@ -832,136 +784,18 @@ int InputModule::input_read_parameters() {
   }
 
   // Coupled-species cluster (CDM, IDR, IDM_DR, DCDM_DR, IDM_DRMD, IDR_DRMD)
-  // Omega-budget parsing has been moved to ReadCoupledOmegaBudget so each
-  // species's CreateAll can read its slot from the budget instead of from
-  // pba->Omega0_X. Sub-parameters that are not Omega0 (pth->a_idm_dr,
-  // thermo block, etc.) remain below and consume the budget.
-  class_call(ReadCoupledOmegaBudget(), errmsg, errmsg);
+  // ReadCoupledCluster computes the coupled-Omega budget and fills
+  // CoupledClusterInputs; IDM/IDR interaction physics parameters
+  // (a_idm_dr/nindex/idr_nature/m_idm/b_idr/alpha/beta) are parsed
+  // exclusively in IDM_DR_IDR_Species::CreateAll.
+  class_call(ReadCoupledCluster(), errmsg, errmsg);
 
-  if (omega_budget_.idm_dr.value_or(0.) > 0.) {
-    const double omega0_idr_budget = omega_budget_.idr.value_or(0.);
-    class_test(omega0_idr_budget == 0.0,
-               errmsg,
-               "You have requested interacting DM ith DR, this requires a non-zero density of "
-               "interacting DR. Please set either N_idr or xi_idr");
+  // The idm/idr interaction parameters (a_idm_dr/nindex/idr_nature/m_idm/b_idr/
+  // alpha/beta) and the "non-zero IDR density" validation are now owned and
+  // parsed entirely by IDM_DR_IDR_Species::CreateAll. The transitional pth/ppt
+  // copies have been removed.
 
-    class_call(parser_read_double(pfc, "a_idm_dr", &param1, &flag1, errmsg), errmsg, errmsg);
-    class_call(parser_read_double(pfc, "a_dark", &param2, &flag2, errmsg), errmsg, errmsg);
-    class_call(parser_read_double(pfc, "Gamma_0_nadm", &param3, &flag3, errmsg), errmsg, errmsg);
-    class_test(class_at_least_two_of_three(flag1, flag2, flag3),
-               errmsg,
-               "In input file, you can only enter one of a_idm_dr, a_dark or Gamma_0_nadm, choose "
-               "one");
-
-    if (flag1 == _TRUE_) {
-      pth->a_idm_dr = param1;
-      if (input_verbose > 1)
-        printf(
-            "You passed a_idm_dr = a_dark = %e, this is equivalent to Gamma_0_nadm = %e in the "
-            "NADM notation. \n",
-            param1,
-            param1 * (4. / 3.) * (pba->h * pba->h * omega0_idr_budget));
-    }
-    else if (flag2 == _TRUE_) {
-      pth->a_idm_dr = param2;
-      if (input_verbose > 1)
-        printf(
-            "You passed a_dark = a_idm_dr = %e, this is equivalent to Gamma_0_nadm = %e in the "
-            "NADM notation. \n",
-            param2,
-            param2 * (4. / 3.) * (pba->h * pba->h * omega0_idr_budget));
-    }
-    else if (flag3 == _TRUE_) {
-      pth->a_idm_dr = param3 * (3. / 4.) / (pba->h * pba->h * omega0_idr_budget);
-      if (input_verbose > 1)
-        printf(
-            "You passed Gamma_0_nadm = %e, this is equivalent to a_idm_dr = a_dark = %e in the "
-            "ETHOS notation. \n",
-            param3,
-            pth->a_idm_dr);
-    }
-
-    /** - Load the rest of the parameters for idm and idr */
-
-    if (flag3 ==
-        _TRUE_) { /* If the user passed Gamma_0_nadm, assume they want nadm parameterisation*/
-      pth->nindex_idm_dr = 0;
-      ppt->idr_nature    = idr_fluid;
-      if (input_verbose > 1)
-        printf("NADM requested. Defaulting on nindex_idm_dr = %e and idr_nature = fluid \n",
-               pth->nindex_idm_dr);
-    }
-
-    else {
-      class_read_double_one_of_two("nindex_dark", "nindex_idm_dr", pth->nindex_idm_dr);
-
-      class_call(parser_read_string(pfc, "idr_nature", &string1, &flag1, errmsg), errmsg, errmsg);
-
-      if (flag1 == _TRUE_) {
-        if ((strstr(string1, "free_streaming") != nullptr) ||
-            (strstr(string1, "Free_Streaming") != nullptr) ||
-            (strstr(string1, "Free_streaming") != nullptr) ||
-            (strstr(string1, "FREE_STREAMING") != nullptr)) {
-          ppt->idr_nature = idr_free_streaming;
-        }
-        if ((strstr(string1, "fluid") != nullptr) || (strstr(string1, "Fluid") != nullptr) ||
-            (strstr(string1, "FLUID") != nullptr)) {
-          ppt->idr_nature = idr_fluid;
-        }
-      }
-    }
-
-    class_read_double_one_of_two("m_idm", "m_dm", pth->m_idm);
-
-    class_read_double_one_of_two("b_dark", "b_idr", pth->b_idr);
-
-    /* Read alpha_idm_dr or alpha_dark */
-
-    std::vector<double> alpha_values;
-    class_call(readDoubleList(pfc, "alpha_idm_dr", alpha_values, &flag1, errmsg), errmsg, errmsg);
-
-    /* try with the other syntax */
-    if (flag1 == _FALSE_) {
-      class_call(readDoubleList(pfc, "alpha_dark", alpha_values, &flag1, errmsg), errmsg, errmsg);
-    }
-
-    if (flag1 == _TRUE_) {
-      entries_read              = static_cast<int>(alpha_values.size());
-      ppt->alpha_idm_dr_storage = alpha_values;
-      if (entries_read != (ppr->l_max_idr - 1)) {
-        ppt->alpha_idm_dr_storage.resize(ppr->l_max_idr - 1,
-                                         ppt->alpha_idm_dr_storage[entries_read - 1]);
-      }
-    }
-    else {
-      ppt->alpha_idm_dr_storage.assign(ppr->l_max_idr - 1, 1.5);
-    }
-    ppt->alpha_idm_dr = ppt->alpha_idm_dr_storage.data();
-
-    /* Read alpha_idm_dr or alpha_dark */
-
-    std::vector<double> beta_values;
-    class_call(readDoubleList(pfc, "beta_idr", beta_values, &flag1, errmsg), errmsg, errmsg);
-
-    /* try with the other syntax */
-    if (flag1 == _FALSE_) {
-      class_call(readDoubleList(pfc, "beta_dark", beta_values, &flag1, errmsg), errmsg, errmsg);
-    }
-
-    if (flag1 == _TRUE_) {
-      entries_read          = static_cast<int>(beta_values.size());
-      ppt->beta_idr_storage = beta_values;
-      if (entries_read != (ppr->l_max_idr - 1)) {
-        ppt->beta_idr_storage.resize(ppr->l_max_idr - 1, ppt->beta_idr_storage[entries_read - 1]);
-      }
-    }
-    else {
-      ppt->beta_idr_storage.assign(ppr->l_max_idr - 1, 1.5);
-    }
-    ppt->beta_idr = ppt->beta_idr_storage.data();
-  }
-
-  // Omega_dcdmdr parsing has been moved to ReadCoupledOmegaBudget
+  // Omega_dcdmdr parsing has been moved to ReadCoupledCluster
   // (Omega_dcdmdr → omega_budget_.dcdmdr); Gamma_dcdm and Omega_ini_dcdm are
   // owned by DCDMSpecies and parsed in DCDM_DR_Species::CreateAll.
   // T_idr and l_max_idr are owned by IDRSpecies and parsed in
@@ -979,7 +813,7 @@ int InputModule::input_read_parameters() {
 
   // DRMD parameter block (z_stop, G_over_aH_drmd_ini, f_idm_drmd, delta_Neff_drmd,
   // and the resulting Omega0_idr_drmd / Omega0_idm_drmd contributions) has been
-  // moved to ReadCoupledOmegaBudget.
+  // moved to ReadCoupledCluster.
 
   /** - Omega_0_lambda (cosmological constant), Omega0_fld (dark energy fluid), Omega0_scf (scalar field) */
 
@@ -1028,12 +862,6 @@ int InputModule::input_read_parameters() {
              "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar "
              "field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
-  // Snapshot fluid presence here: later parser blocks reuse flag1/flag2/flag3
-  // and param1/param2/param3, and pba->Omega0_fld is no longer written.
-  // This flag decides whether to apply the halofit gate (see below).
-  const bool fluid_present_pfc = (flag2 == _TRUE_) ||
-                                 (pba->closure_species == ClosureSpecies::Fluid);
-
   /* Fluid physics params (use_ppf, fluid_equation_of_state, w0_fld, wa_fld,
      cs2_fld, Omega_EDE, c_gamma_over_c_fld) are parsed inside
      FluidSpecies::CreateAll directly from pfc; no per-key writes to pba here.
@@ -1042,6 +870,50 @@ int InputModule::input_read_parameters() {
      scf_shooting_parameter, attractor_ic_scf, phi_ini_scf, phi_prime_ini_scf)
      are parsed inside ScalarFieldSpecies::CreateAll directly from pfc; no
      per-key writes to pba here. */
+}
+
+/**
+ * Phase iii: read everything that does not feed species construction —
+ * thermodynamics, reionization, energy injection, output / perturbation /
+ * primordial / transfer / spectra / lensing configuration, and the
+ * species-dependent S8 and halofit reads. Runs after ConstructSpecies.
+ */
+void InputModule::ReadDerived() {
+  /** - define local variables */
+  char* errmsg     = error_message_;
+  FileContent* pfc = &file_content_;
+  precision* ppr   = &precision_;      /* for precision parameters */
+  background* pba  = &background_;     /* for cosmological background */
+  thermo* pth      = &thermodynamics_; /* for thermodynamics */
+  perturbs* ppt    = &perturbations_;  /* for source functions */
+  primordial* ppm  = &primordial_;     /* for primordial spectra */
+  nonlinear* pnl   = &nonlinear_;      /* for non-linear spectra */
+  transfers* ptr   = &transfers_;      /* for transfer functions */
+  spectra* psp     = &spectra_;        /* for output spectra */
+  lensing* ple     = &lensing_;        /* for lensed spectra */
+  output* pop      = &output_;
+
+  int flag1, flag2, flag3;
+  double param1, param2, param3;
+  int int1;
+  char string1[_ARGUMENT_LENGTH_MAX_];
+  char string2[_ARGUMENT_LENGTH_MAX_];
+  double k1    = 0.;
+  double k2    = 0.;
+  double prr1  = 0.;
+  double prr2  = 0.;
+  double pii1  = 0.;
+  double pii2  = 0.;
+  double pri1  = 0.;
+  double pri2  = 0.;
+  double n_iso = 0.;
+  double f_iso = 0.;
+  double n_cor = 0.;
+  double c_cor = 0.;
+
+  int i;
+
+  double z_max = 0.;
 
   /** (b) assign values to thermodynamics cosmological parameters */
 
@@ -1684,9 +1556,10 @@ int InputModule::input_read_parameters() {
         class_test(param3 < 0., errmsg, "sigma8 should be non-negative");
       }
       else if (flag4 == _TRUE_) {
-        // CDM read from the resolved budget (pba->Omega0_cdm is no longer
-        // written by the coupled-species parser block).
-        const double Omega0_cdm_for_S8 = omega_budget_.cdm.value_or(0.);
+        // CDM read from the built species (ReadDerived runs after ConstructSpecies).
+        const double Omega0_cdm_for_S8 = all_species_.count("CDM")
+                                             ? all_species_.at("CDM")->GetOmega0()
+                                             : 0.0;
         ppm->sigma8 = param4 / pow((pba->Omega0_b + Omega0_cdm_for_S8) / 0.3, 0.5);
         class_test(param4 < 0., errmsg, "S8 should be non-negative");
       }
@@ -2690,38 +2563,18 @@ int InputModule::input_read_parameters() {
   /** - (i.5) special steps if we want Halofit with wa_fld non-zero:
       so-called "Pk_equal method" of 0810.0190 and 1601.07230 */
 
-  /* Species aren't built yet at this point — peek wa_fld from pfc directly.
-     Note: this read is informational (no class_read_double-style write target),
-     so we just probe the file content via parser_read_double.
+  /* ReadDerived runs after ConstructSpecies, so query the built FluidSpecies
+     directly instead of peeking the raw parameter file. The AND-chain matches
+     the original gate: halofit enabled + fluid present + CLP EoS + wa_fld≠0. */
+  if ((pnl->method == nl_halofit) && all_species_.count("Fluid")) {
+    const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
+    if ((fluid.fluid_eos() == CLP) && (fluid.wa_fld() != 0.)) {
+      class_call(parser_read_string(pfc, "pk_eq", &string1, &flag1, errmsg), errmsg, errmsg);
 
-     The original (pre-refactor) parser block only wrote pba->wa_fld in the CLP
-     branch, so the Pk_equal gate must only engage for CLP. Probe
-     fluid_equation_of_state first; default-when-absent is CLP (matching
-     FluidSpecies::CreateAll). */
-  bool fluid_eos_is_clp = true;
-  class_call(parser_read_string(pfc, "fluid_equation_of_state", &string1, &flag1, errmsg),
-             errmsg,
-             errmsg);
-  if (flag1 == _TRUE_) {
-    if ((strstr(string1, "EDE") != nullptr) || (strstr(string1, "ede") != nullptr)) {
-      fluid_eos_is_clp = false;
-    }
-    else if ((strstr(string1, "CLP") != nullptr) || (strstr(string1, "clp") != nullptr)) {
-      fluid_eos_is_clp = true;
-    }
-    /* Other strings: leave as CLP default (FluidSpecies::CreateAll will error
-       later on an unrecognized value). */
-  }
-  double wa_fld_peek = 0.;
-  class_call(parser_read_double(pfc, "wa_fld", &param1, &flag1, errmsg), errmsg, errmsg);
-  if (flag1 == _TRUE_)
-    wa_fld_peek = param1;
-  if ((pnl->method == nl_halofit) && fluid_present_pfc && fluid_eos_is_clp && (wa_fld_peek != 0.)) {
-    class_call(parser_read_string(pfc, "pk_eq", &string1, &flag1, errmsg), errmsg, errmsg);
-
-    if ((flag1 == _TRUE_) &&
-        ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
-      pnl->has_pk_eq = _TRUE_;
+      if ((flag1 == _TRUE_) &&
+          ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+        pnl->has_pk_eq = _TRUE_;
+      }
     }
   }
 
@@ -2744,7 +2597,16 @@ int InputModule::input_read_parameters() {
              errmsg,
              "ppr->l_max_dr should be at least 4, i.e. we must integrate at least over "
              "neutrino/relic density, velocity, shear, third and fourth momentum");
-  class_test((ppr->l_max_idr < 4) && (ppt->idr_nature == idr_free_streaming),
+  // idr_nature now lives on the IDM_DR_IDR species. Preserve the original
+  // semantics exactly: with no IDM_DR_IDR species the legacy ppt->idr_nature
+  // defaulted to idr_free_streaming, so the test fired iff l_max_idr < 4.
+  const int eff_idr_nature = all_species_.count("IDM_DR_IDR")
+                                 ? static_cast<const IDM_DR_IDR_Species&>(
+                                       *all_species_.at("IDM_DR_IDR"))
+                                       .idr()
+                                       .idr_nature()
+                                 : idr_free_streaming;
+  class_test((ppr->l_max_idr < 4) && (eff_idr_nature == idr_free_streaming),
              errmsg,
              "ppr->l_max_idr should be at least 4, i.e. we must integrate at least over "
              "interacting dark radiation density, velocity, shear, third and fourth momentum");
@@ -2759,8 +2621,6 @@ int InputModule::input_read_parameters() {
              "over first four momenta of non-cold dark matter perturbed phase-space "
              "distribution",
              ppr->l_max_ncdm);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2775,8 +2635,6 @@ int InputModule::input_default_params() {
   transfers* ptr  = &transfers_;  /* for transfer functions */
   spectra* psp    = &spectra_;    /* for output spectra */
   output* pop     = &output_;
-
-  double sigma_B = 2. * pow(_PI_, 5) * pow(_k_B_, 4) / 15. / pow(_h_P_, 3) / pow(_c_, 2);
 
   /** Define computed default parameter values that depend on other defaults.
       Simple constant defaults are now set as in-struct default member initializers. */
@@ -2799,12 +2657,10 @@ int InputModule::input_default_params() {
      paper. */
 
   pba->H0       = pba->h * 1.e5 / _c_;
-  pba->Omega0_g = (4. * sigma_B / _c_ * pow(pba->T_cmb, 4.)) /
-                  (3. * _c_ * _c_ * 1.e10 * pba->h * pba->h / _Mpc_over_m_ / _Mpc_over_m_ / 8. /
-                   _PI_ / _G_);
+  pba->Omega0_g = PhotonsSpecies::Omega0gFromTcmb(pba->T_cmb, pba->h);
   pba->Omega0_b = 0.022032 / pow(pba->h, 2);
   // pba->Omega0_{ur,cdm,lambda,...} are no longer stored: those defaults live
-  // on the species (read from pfc or applied by ReadCoupledOmegaBudget).
+  // on the species (read from pfc or applied by ReadCoupledCluster).
 
   /** - primordial structure: computed defaults */
 
@@ -3185,13 +3041,14 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
                                   : input_module->precision_.tol_ncdm_synchronous;
   ncdm_settings.tol_ncdm_bg = input_module->precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = input_module->precision_.tol_M_ncdm;
-  const SpeciesBuildContext gctx{&fc,
-                                 &input_module->background_,
-                                 &input_module->precision_,
-                                 &ncdm_settings,
-                                 /*bgm=*/nullptr,
-                                 /*all_species=*/&input_module->all_species_,
-                                 /*omega_budget=*/&input_module->omega_budget_};
+  SpeciesBuildContext gctx{&fc,
+                           &input_module->background_,
+                           &input_module->precision_,
+                           &ncdm_settings,
+                           /*bgm=*/nullptr,
+                           /*all_species=*/&input_module->all_species_,
+                           /*omega_budget=*/&input_module->omega_budget_};
+  gctx.coupled_inputs = &input_module->coupled_inputs_;
   for (const auto& [key, sp] : input_module->all_species_) {
     std::vector<ShootingTarget> tgts = sp->GetShootingTargets();
     if (tgts.empty())

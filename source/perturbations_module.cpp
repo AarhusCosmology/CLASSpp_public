@@ -1796,12 +1796,17 @@ int PerturbationsModule::perturb_get_k_list() {
     /* allocate array with, for the moment, the largest possible size */
 
     /* the following is a boost on k_per_decade_for_pk for the interacting idm-idr cases (relevant for large k and a_idm_dr) */
-    if ((all_species_.count("IDM_DR_IDR")) && (pth->nindex_idm_dr >= 2)) {
+    const double idmdr_nindex = all_species_.count("IDM_DR_IDR")
+                                    ? static_cast<const IDM_DR_IDR_Species&>(
+                                          *all_species_.at("IDM_DR_IDR"))
+                                          .idm_dr()
+                                          .nindex_idm_dr()
+                                    : 0.;
+    if ((all_species_.count("IDM_DR_IDR")) && (idmdr_nindex >= 2)) {
       k_[index_md_scalars_].resize(
           (int) ((k_max_cmb[index_md_scalars_] - k_min) / k_rec /
                  MIN(ppr->k_step_super, ppr->k_step_sub)) +
-          (int) (MAX(ppr->k_per_decade_for_pk * ppr->idmdr_boost_k_per_decade_for_pk *
-                         pth->nindex_idm_dr,
+          (int) (MAX(ppr->k_per_decade_for_pk * ppr->idmdr_boost_k_per_decade_for_pk * idmdr_nindex,
                      ppr->k_per_decade_for_bao) *
                  log(k_max / k_min) / log(10.)) +
           3);
@@ -1887,13 +1892,13 @@ int PerturbationsModule::perturb_get_k_list() {
     /* values until k_max */
 
     while (k < k_max) {
-      if ((all_species_.count("IDM_DR_IDR")) && (pth->nindex_idm_dr >= 2)) {
+      if ((all_species_.count("IDM_DR_IDR")) && (idmdr_nindex >= 2)) {
         k *= pow(10.,
                  1. / (ppr->k_per_decade_for_pk * ppr->idmdr_boost_k_per_decade_for_pk *
-                           pth->nindex_idm_dr +
+                           idmdr_nindex +
                        (ppr->k_per_decade_for_bao - ppr->k_per_decade_for_pk *
                                                         ppr->idmdr_boost_k_per_decade_for_pk *
-                                                        pth->nindex_idm_dr) *
+                                                        idmdr_nindex) *
                            (1. - tanh(pow((log(k) - log(ppr->k_bao_center * k_rec)) /
                                               log(ppr->k_bao_width),
                                           4)))));
@@ -2298,7 +2303,10 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
     ppw->max_l_max = MAX(ppr->l_max_g, ppr->l_max_pol_g);
     if (all_species_.count("UR"))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ur);
-    if ((all_species_.count("IDM_DR_IDR")) && (ppt->idr_nature == idr_free_streaming))
+    if ((all_species_.count("IDM_DR_IDR")) &&
+        (static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
+             .idr()
+             .idr_nature() == idr_free_streaming))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_idr);
     if (HasNcdm(all_species_))
       ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ncdm);
@@ -3655,9 +3663,9 @@ int PerturbationsModule::perturb_vector_init(
                     tau);
 
           /* idr is always free streaming if tca_idm_dr is on */
-          if (ppt->idr_nature == idr_free_streaming) {
-            auto& idm_dr_idr     = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
-            const size_t idr_swi = all_species_.index_of("IDM_DR_IDR");
+          auto& idm_dr_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+          if (idm_dr_idr.idr().idr_nature() == idr_free_streaming) {
+            const size_t idr_swi    = all_species_.index_of("IDM_DR_IDR");
             const auto& old_idr_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
                                           *ppw->pv->species_layouts[idr_swi])
                                           .idr;
@@ -3669,7 +3677,7 @@ int PerturbationsModule::perturb_vector_init(
             ppv->y[new_idr_lay.idx_l3] =
                 6. / 7. * k * ppv->y[new_idr_lay.idx_shear] /
                 ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
-                ppt->alpha_idm_dr[1];
+                idm_dr_idr.idr().alpha_idm_dr()[1];
           }
         }
       }
@@ -4620,6 +4628,8 @@ int PerturbationsModule::perturb_approximations(int index_md,
     }
 
     if (all_species_.count("IDM_DR_IDR")) {
+      const auto& idm_dr_idr = static_cast<const IDM_DR_IDR_Species&>(
+          *all_species_.at("IDM_DR_IDR"));
       if (ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] == 0.) {
         ppw->approx[ppw->index_ap_tca_idm_dr] = (int) tca_idm_dr_off;
       }
@@ -4635,7 +4645,8 @@ int PerturbationsModule::perturb_approximations(int index_md,
              ppr->idm_dr_tight_coupling_trigger_tau_c_over_tau_h) &&
             (1. / tau_k / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] <
              ppr->idm_dr_tight_coupling_trigger_tau_c_over_tau_k) &&
-            (pth->nindex_idm_dr >= 2) && (ppt->idr_nature == idr_free_streaming)) {
+            (idm_dr_idr.idm_dr().nindex_idm_dr() >= 2) &&
+            (idm_dr_idr.idr().idr_nature() == idr_free_streaming)) {
           ppw->approx[ppw->index_ap_tca_idm_dr] = (int) tca_idm_dr_on;
         }
         else {
@@ -4693,7 +4704,7 @@ int PerturbationsModule::perturb_approximations(int index_md,
         /* IDM_DR component present: apply nindex_idm_dr threshold */
         if ((tau / tau_k > ppr->idr_streaming_trigger_tau_over_tau_k) &&
             ((tau > thermodynamics_module_->tau_idr_free_streaming_) &&
-             (pth->nindex_idm_dr >= 2)) &&
+             (idm_idr.idm_dr().nindex_idm_dr() >= 2)) &&
             (ppr->idr_streaming_approximation != rsa_idr_none)) {
           ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_on;
         }
@@ -5084,7 +5095,9 @@ int PerturbationsModule::perturb_einstein(
                                      *ppw->pv->species_layouts[idr_th_i])
                                      .idr;
         shear_idr = 0.5 * 8. / 15. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
-                    ppt->alpha_idm_dr[0] *
+                    static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
+                        .idr()
+                        .alpha_idm_dr()[0] *
                     (y[idr_th_lay.idx_theta] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
 
         ppw->rho_plus_p_shear += 4. / 3. *
@@ -5262,7 +5275,15 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     ppw->scalar_ctx.a                    = a;
     ppw->scalar_ctx.a2                   = a2;
     ppw->scalar_ctx.gauge                = ppt->gauge;
-    ppw->scalar_ctx.idr_nature           = ppt->idr_nature;
+    if (all_species_.count("IDM_DR_IDR")) {
+      ppw->scalar_ctx.idr_nature =
+          static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).idr().idr_nature();
+    }
+    else {
+      // No IDM_DR_IDR species — idr_nature is unused downstream; default to
+      // free-streaming (matches the old ppt->idr_nature default).
+      ppw->scalar_ctx.idr_nature = idr_free_streaming;
+    }
 
     /** - --> (c) compute the total density, velocity and shear perturbations */
 

@@ -385,14 +385,11 @@ std::vector<Named> IDM_DRMD_IDR_DRMD_Species::CreateAll(const SpeciesBuildContex
   const double omega0_idm_drmd = ctx.omega_budget->idm_drmd.value_or(0.);
   const double omega0_idr_drmd = ctx.omega_budget->idr_drmd.value_or(0.);
   if (omega0_idm_drmd != 0. || omega0_idr_drmd != 0.) {
-    double f_idm_drmd      = 0.;
-    double G_over_aH_drmd  = 0.;
-    double delta_Neff_drmd = 0.;
-    double z_stop          = 0.;
-    ctx.pfc->read_double("f_idm_drmd", f_idm_drmd);
-    ctx.pfc->read_double("G_over_aH_drmd_ini", G_over_aH_drmd);
-    ctx.pfc->read_double("delta_Neff_drmd", delta_Neff_drmd);
-    ctx.pfc->read_double("z_stop", z_stop);
+    const auto* ci               = ctx.coupled_inputs;
+    const double f_idm_drmd      = ci ? ci->f_idm_drmd : 0.;
+    const double G_over_aH_drmd  = ci ? ci->G_over_aH_drmd_ini : 0.;
+    const double delta_Neff_drmd = ci ? ci->delta_Neff_drmd : 0.;
+    const double z_stop          = ci ? ci->z_stop : 0.;
     result.push_back({"IDM_DRMD_IDR_DRMD",
                       std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*ctx.pba,
                                                                   omega0_idm_drmd,

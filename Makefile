@@ -114,3 +114,6 @@ test-parser: parser.opp common.opp exceptions.opp trigonometric_integrals.opp sp
 
 test-bisection:
 	$(CXX) $(OPTFLAG) $(CXXFLAG) -Iinclude -Itools -Isource -I. tools/bisection_test.cpp -o test-bisection $(LIBRARIES)
+
+test-photons: photons.opp base_species.opp perturb_column_writer.opp
+	$(CXX) $(OPTFLAG) $(CXXFLAG) -Iinclude -Itools -Isource -Ispecies -I. species/photons_formula_test.cpp $(addprefix build/,$(notdir $^)) -o test-photons $(LIBRARIES)

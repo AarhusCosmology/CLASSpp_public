@@ -28,8 +28,18 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
-  IDM_DR_IDR_Species(
-      const background& pba, double omega0_idm_dr, double omega0_idr, double T_idr, int l_max_idr);
+  IDM_DR_IDR_Species(const background& pba,
+                     double omega0_idm_dr,
+                     double omega0_idr,
+                     double T_idr,
+                     int l_max_idr,
+                     double a_idm_dr,
+                     double nindex_idm_dr,
+                     double m_idm,
+                     double b_idr,
+                     int idr_nature,
+                     std::vector<double> alpha_idm_dr,
+                     std::vector<double> beta_idr);
 
   IDM_DRSpecies& idm_dr() {
     return *idm_dr_;

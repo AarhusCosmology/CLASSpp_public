@@ -197,14 +197,6 @@ struct perturbs {
   double z_max_pk =
       0.; /**< when we compute only the matter spectrum / transfer functions, but not the CMB, we are sometimes interested to sample source functions at very high redshift, way before recombination. This z_max_pk will then fix the initial sampling time of the sources. */
 
-  double* alpha_idm_dr; /**< Angular contribution to collisional term at l>=2 for idm_fr-idr */
-  double* beta_idr;     /**< Angular contribution to collisional term at l>=2 for idr-idr */
-  std::vector<double> alpha_idm_dr_storage;
-  std::vector<double> beta_idr_storage;
-
-  int idr_nature =
-      idr_free_streaming; /**< Nature of the interacting dark radiation (free streaming or fluid) */
-
   //@}
 
   /** @name - gauge in which to perform the calculation */

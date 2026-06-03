@@ -9,8 +9,23 @@
  */
 class IDM_DRSpecies : public BaseSpecies {
  public:
-  IDM_DRSpecies(const background& pba, double omega0_idm_dr)
-      : BaseSpecies("IDM_DR", EnergyType::Matter), pba_(pba), Omega0_idm_dr_(omega0_idm_dr) {}
+  IDM_DRSpecies(const background& pba,
+                double omega0_idm_dr,
+                double a_idm_dr      = 0.,
+                double nindex_idm_dr = 4.,
+                double m_idm         = 1.e11)
+      : BaseSpecies("IDM_DR", EnergyType::Matter), pba_(pba), Omega0_idm_dr_(omega0_idm_dr),
+        a_idm_dr_(a_idm_dr), nindex_idm_dr_(nindex_idm_dr), m_idm_(m_idm) {}
+
+  double a_idm_dr() const {
+    return a_idm_dr_;
+  }
+  double nindex_idm_dr() const {
+    return nindex_idm_dr_;
+  }
+  double m_idm() const {
+    return m_idm_;
+  }
 
   double GetOmega0() const override {
     return Omega0_idm_dr_;
@@ -138,4 +153,7 @@ class IDM_DRSpecies : public BaseSpecies {
  private:
   const background& pba_;
   double Omega0_idm_dr_;
+  double a_idm_dr_      = 0.;
+  double nindex_idm_dr_ = 4.;
+  double m_idm_         = 1.e11;
 };

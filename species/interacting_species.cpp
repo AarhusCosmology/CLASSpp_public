@@ -334,7 +334,7 @@ double IDRSpecies::TcaShearIdr(const PerturbLayout& layout,
   if (ppt_->gauge != newtonian)
     return 0.;  // synchronous gauge derives shear in perturb_einstein
 
-  return 0.5 * (8. / 15. / ppw->pvecthermo[thm_->index_th_dmu_idm_dr_] / ppt_->alpha_idm_dr[0] *
+  return 0.5 * (8. / 15. / ppw->pvecthermo[thm_->index_th_dmu_idm_dr_] / alpha_idm_dr_[0] *
                 y[layout.idx_theta]);
 }
 

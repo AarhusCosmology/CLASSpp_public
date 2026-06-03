@@ -1485,9 +1485,10 @@ cdef class PyCosmology:
                 value = deref(bam_idr).GetOmega0Species(b"IDR")/self.ba.Omega0_g*8./7.*pow(11./4.,4./3.)
             elif name == 'Gamma_0_nadm':
                 bam_idr2 = deref(self._thisptr).GetBackgroundModule()
-                value = self.th.a_idm_dr*(4./3.)*(self.ba.h*self.ba.h*deref(bam_idr2).GetOmega0Species(b"IDR"))
+                value = deref(bam_idr2).GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")*(4./3.)*(self.ba.h*self.ba.h*deref(bam_idr2).GetOmega0Species(b"IDR"))
             elif name == 'a_dark':
-                value = self.th.a_idm_dr
+                bam_a_dark = deref(self._thisptr).GetBackgroundModule()
+                value = deref(bam_a_dark).GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")
             elif name == 'tau_reio':
                 value = self.tau_reio()
             elif name == 'z_reio':

@@ -206,19 +206,22 @@ int ThermodynamicsModule::thermodynamics_at_z(
       const double Omega0_idr_thermo    = idm_dr_comp.idr().GetOmega0();
       const double T_idr                = idm_dr_comp.idr().T_idr();
       /* calculate dmu_idm_dr and approximate its derivatives as zero */
-      pvecthermo[index_th_dmu_idm_dr_]  = pth->a_idm_dr * pow((1. + z) / 1.e7, pth->nindex_idm_dr) *
+      pvecthermo[index_th_dmu_idm_dr_]  = idm_dr_comp.idm_dr().a_idm_dr() *
+                                          pow((1. + z) / 1.e7,
+                                              idm_dr_comp.idm_dr().nindex_idm_dr()) *
                                           Omega0_idm_dr_thermo * pow(pba->h, 2);
       pvecthermo[index_th_ddmu_idm_dr_] = -pvecback[background_module_->index_bg_H_] *
-                                          pth->nindex_idm_dr / (1 + z) *
+                                          idm_dr_comp.idm_dr().nindex_idm_dr() / (1 + z) *
                                           pvecthermo[index_th_dmu_idm_dr_];
       pvecthermo[index_th_dddmu_idm_dr_] =
           (pvecback[background_module_->index_bg_H_] * pvecback[background_module_->index_bg_H_] /
                (1. + z) -
            pvecback[background_module_->index_bg_H_prime_]) *
-          pth->nindex_idm_dr / (1. + z) * pvecthermo[index_th_dmu_idm_dr_];
+          idm_dr_comp.idm_dr().nindex_idm_dr() / (1. + z) * pvecthermo[index_th_dmu_idm_dr_];
 
       /* calculate dmu_idr (self interaction) */
-      pvecthermo[index_th_dmu_idr_] = pth->b_idr * pow((1. + z) / 1.e7, pth->nindex_idm_dr) *
+      pvecthermo[index_th_dmu_idr_] = idm_dr_comp.idr().b_idr() *
+                                      pow((1. + z) / 1.e7, idm_dr_comp.idm_dr().nindex_idm_dr()) *
                                       Omega0_idr_thermo * pow(pba->h, 2);
 
       /* extrapolate optical depth of idm_dr and idr */
@@ -239,7 +242,8 @@ int ThermodynamicsModule::thermodynamics_at_z(
           thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_g_idm_dr_];
 
       /* calculate interacting dark matter sound speed */
-      pvecthermo[index_th_cidm_dr2_] = 4 * _k_B_ * T_idr * (1. + z) / _eV_ / 3. / pth->m_idm;
+      pvecthermo[index_th_cidm_dr2_] = 4 * _k_B_ * T_idr * (1. + z) / _eV_ / 3. /
+                                       idm_dr_comp.idm_dr().m_idm();
 
       /* calculate interacting dark matter temperature (equal to idr temperature at this redhsift) */
       pvecthermo[index_th_Tidm_dr_] = T_idr * (1. + z);
@@ -508,7 +512,8 @@ int ThermodynamicsModule::thermodynamics_init() {
       const double Omega0_idr_table    = idm_idr.idr().GetOmega0();
       /* - --> idr interaction rate with idm_dr (i.e. idr opacity to idm_dr scattering) */
       thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idm_dr_] =
-          pth->a_idm_dr * pow((1. + z_table_[index_tau]) / 1.e7, pth->nindex_idm_dr) *
+          idm_idr.idm_dr().a_idm_dr() *
+          pow((1. + z_table_[index_tau]) / 1.e7, idm_idr.idm_dr().nindex_idm_dr()) *
           Omega0_idm_dr_table * pow(pba->h, 2);
 
       /* - --> idm_dr interaction rate with idr (i.e. idm_dr opacity
@@ -530,7 +535,8 @@ int ThermodynamicsModule::thermodynamics_init() {
 
       /* - --> idr self-interaction rate */
       thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idr_] =
-          pth->b_idr * pow((1. + z_table_[index_tau]) / 1.e7, pth->nindex_idm_dr) *
+          idm_idr.idr().b_idr() *
+          pow((1. + z_table_[index_tau]) / 1.e7, idm_idr.idm_dr().nindex_idm_dr()) *
           Omega0_idr_table * pow(pba->h, 2);
     }
   }
@@ -875,8 +881,9 @@ int ThermodynamicsModule::thermodynamics_init() {
                background_module_->error_message_,
                error_message_);
 
-    Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
-                        pow((1. + z), (pth->nindex_idm_dr + 1.)) / pow(1.e7, pth->nindex_idm_dr);
+    Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
+                        pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
+                        pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
 
     /* (A1) --> if Gamma is not much smaller than H, set T_idm_dr to T_idm_dr = T_idr = xi*T_gamma (tight coupling solution) */
     if (Gamma_heat_idm_dr > 1.e-3 * pvecback[background_module_->index_bg_a_] *
@@ -903,7 +910,7 @@ int ThermodynamicsModule::thermodynamics_init() {
 
     thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_Tidm_dr_] = T_idm_dr;
     thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_cidm_dr2_] =
-        _k_B_ * T_idm_dr / _eV_ / pth->m_idm * (1. + dTdz_idm_dr / 3. / T_idm_dr);
+        _k_B_ * T_idm_dr / _eV_ / comp_ref.idm_dr().m_idm() * (1. + dTdz_idm_dr / 3. / T_idm_dr);
 
     /* T_adia and z_adia will be used later. They are defined as "the
        last T_idm_dr(z) at which the temperature was evaluated
@@ -925,9 +932,9 @@ int ThermodynamicsModule::thermodynamics_init() {
         z                 = z_table_[index_tau];
         T_idr             = T_idr_param * (1. + z);
         T_idm_dr          = T_idr;
-        Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
-                            pow((1. + z), (pth->nindex_idm_dr + 1.)) /
-                            pow(1.e7, pth->nindex_idm_dr);
+        Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
+                            pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
+                            pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
         class_call(background_module_->background_tau_of_z(z, &(tau)),
                    background_module_->error_message_,
                    error_message_);
@@ -951,9 +958,10 @@ int ThermodynamicsModule::thermodynamics_init() {
           z                  = z_table_[index_tau];
           T_idr              = T_idr_param * (1. + z);
           T_idm_dr          -= dTdz_idm_dr * dz;
-          Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
-                               pow((1. + z), (pth->nindex_idm_dr + 1.)) /
-                               pow(1.e7, pth->nindex_idm_dr);
+          Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) *
+                               comp_ref.idm_dr().a_idm_dr() *
+                               pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
+                               pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
           class_call(background_module_->background_tau_of_z(z, &(tau)),
                      background_module_->error_message_,
                      error_message_);
@@ -991,9 +999,10 @@ int ThermodynamicsModule::thermodynamics_init() {
 
             T_idr              = T_idr_param * (1. + z);
             T_idm_dr          -= dTdz_idm_dr * dz_sub_step;
-            Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
-                                 pow((1. + z), (pth->nindex_idm_dr + 1.)) /
-                                 pow(1.e7, pth->nindex_idm_dr);
+            Gamma_heat_idm_dr  = 2. * Omega0_idr_local * pow(pba->h, 2) *
+                                 comp_ref.idm_dr().a_idm_dr() *
+                                 pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
+                                 pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
             class_call(background_module_->background_tau_of_z(z, &(tau)),
                        background_module_->error_message_,
                        error_message_);
@@ -1020,9 +1029,9 @@ int ThermodynamicsModule::thermodynamics_init() {
         z                 = z_table_[index_tau];
         T_idr             = T_idr_param * (1. + z);
         T_idm_dr          = T_adia * pow((1. + z) / (1. + z_adia), 2);
-        Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * pth->a_idm_dr *
-                            pow((1. + z), (pth->nindex_idm_dr + 1.)) /
-                            pow(1.e7, pth->nindex_idm_dr);
+        Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
+                            pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
+                            pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
         class_call(background_module_->background_tau_of_z(z, &(tau)),
                    background_module_->error_message_,
                    error_message_);
@@ -1038,7 +1047,7 @@ int ThermodynamicsModule::thermodynamics_init() {
 
       thermodynamics_table_[index_tau * th_size_ + index_th_Tidm_dr_] = T_idm_dr;
       thermodynamics_table_[index_tau * th_size_ + index_th_cidm_dr2_] =
-          _k_B_ * T_idm_dr / _eV_ / pth->m_idm * (1. + dTdz_idm_dr / 3. / T_idm_dr);
+          _k_B_ * T_idm_dr / _eV_ / comp_ref.idm_dr().m_idm() * (1. + dTdz_idm_dr / 3. / T_idm_dr);
     }
   }
 
@@ -1151,8 +1160,9 @@ int ThermodynamicsModule::thermodynamics_init() {
   double tau_idm_dr_fs = 0.;
 
   if (all_species_.count("IDM_DR_IDR") > 0) {
-    if (all_species_.count("IDM_DR_IDR") > 0) {
-      if (pth->nindex_idm_dr >= 2) {
+    const auto& comp = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+    if (comp.has_idm_dr()) {
+      if (comp.idm_dr().nindex_idm_dr() >= 2) {
         index_tau = index_tau_fs - 1;
         /* comment: using index_tau_max (index_tau_fs) instead of tt_size_ - 1 ensures that the switch is always after recombination (free streaming) */
       }
@@ -1166,9 +1176,9 @@ int ThermodynamicsModule::thermodynamics_init() {
 
       while ((1. / thermodynamics_table_[(index_tau) *th_size_ + index_th_dmu_idm_dr_] / tau <
               ppr->idr_streaming_trigger_tau_c_over_tau) &&
-             ((pth->nindex_idm_dr >= 2 && index_tau > 0) ||
-              (pth->nindex_idm_dr < 2 && index_tau < tt_size_ - 1))) {
-        if (pth->nindex_idm_dr >= 2) {
+             ((comp.idm_dr().nindex_idm_dr() >= 2 && index_tau > 0) ||
+              (comp.idm_dr().nindex_idm_dr() < 2 && index_tau < tt_size_ - 1))) {
+        if (comp.idm_dr().nindex_idm_dr() >= 2) {
           index_tau--;
         }
         else {
