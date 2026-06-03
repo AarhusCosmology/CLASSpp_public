@@ -207,8 +207,10 @@ task will check and match):
 - `FileContent::instances_with()`: discovers the expected instance names without
   marking `*.type` as read.
 - Per-class `CreateAll()` synthesis: partial dot fields pick up the same legacy
-  defaults, compressed PSD filename lists follow the `use_psd_file` flags, and
-  mixed interacting `G_eff`/`log10G_eff` representations are rejected early.
+  defaults, compressed PSD filename lists follow the `use_psd_file` flags, and a
+  *single* interacting species setting both `G_eff` and `log10G_eff` is rejected
+  early (ambiguous). Distinct species may freely use different representations —
+  each stores its own `G_eff` locally, so there is nothing to reconcile.
 
 **Integration tests** at `InputModule` level: feed a minimal .ini with
 dot-syntax only and a matching legacy-only .ini; assert both produce the same

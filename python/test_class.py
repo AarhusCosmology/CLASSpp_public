@@ -892,7 +892,25 @@ class TestReviewRegressions(TestClass):
         reference = dict(scenario, **{'nu2.deg': 1.0})
         self._assert_scenarios_match(scenario, reference, "Explicit legacy default")
 
-    def test_dot_syntax_interacting_mixed_geff_representations_are_rejected(self):
+    def test_dot_syntax_interacting_single_species_both_geff_forms_rejected(self):
+        # A *single* species may not set both G_eff and log10G_eff (ambiguous).
+        # Distinct species are free to use different representations: each stores
+        # its own G_eff locally, so there is no conflict to reject.
+        scenario = {
+            **self._dot_syntax_base(),
+            'nu1.type': 'ncdm_self_interacting',
+            'nu1.m': 0.06,
+            'nu1.G_eff': 1e-4,
+            'nu1.log10G_eff': -4.0,
+        }
+        self._assert_compute_fails(scenario, "specify exactly one of G_eff or log10G_eff")
+
+    def test_dot_syntax_interacting_mixed_geff_representations_across_species_allowed(self):
+        # nu1 uses the linear G_eff, nu2 uses log10G_eff. Species are configured
+        # independently, so this must succeed -- AND nu2's log10G_eff=-4.0 must
+        # resolve to exactly the same physics as G_eff=1e-4. Compare against a
+        # reference where nu2 uses the linear form directly, so the test fails if
+        # log10G_eff is ever parsed wrong or silently ignored.
         scenario = {
             **self._dot_syntax_base(),
             'nu1.type': 'ncdm_self_interacting',
@@ -902,7 +920,10 @@ class TestReviewRegressions(TestClass):
             'nu2.m': 0.08,
             'nu2.log10G_eff': -4.0,
         }
-        self._assert_compute_fails(scenario, "cannot mix G_eff and log10G_eff representations")
+        reference = dict(scenario)
+        del reference['nu2.log10G_eff']
+        reference['nu2.G_eff'] = 1e-4
+        self._assert_scenarios_match(scenario, reference, "Linear G_eff for nu2")
 
     def test_scalar_field_newtonian_gauge_is_rejected(self):
         # The Newtonian-gauge scalar-field Klein-Gordon source is incomplete
