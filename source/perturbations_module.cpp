@@ -4275,6 +4275,14 @@ int PerturbationsModule::perturb_initial_conditions(
                  "Use synchronous gauge for the DRMD implementation as Netwonian gauge has not "
                  "been tested!");
 
+      class_test((all_species_.count("ScalarField") != 0),
+                 error_message_,
+                 "Scalar field (scf) perturbations are only implemented in the synchronous "
+                 "gauge: the Newtonian-gauge Klein-Gordon source term is incomplete (it is "
+                 "missing the psi' and -2 a^2 V_,phi psi contributions, which would require the "
+                 "shear time-derivative), so Newtonian-gauge results are not gauge-invariant. "
+                 "Please use synchronous gauge.");
+
       /* alpha is like in Ma & Bertschinger: (h'+6 eta')/(2k^2). We obtain it from the first two Einstein equations:
 
          alpha = [eta + 3/2 (a'/a)^2 (delta_rho/rho_c) / k^2 /s_2^2 + 3/2 (a'/a)^3 3 ((rho+p)theta/rho_c) / k^4 / s_2^2] / (a'/a)

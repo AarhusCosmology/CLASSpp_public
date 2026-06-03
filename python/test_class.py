@@ -81,6 +81,7 @@ import unittest
 
 from classy import Class
 from classy import CosmoSevereError
+from classy import CosmoComputationError
 from math import log10
 from matplotlib.offsetbox import AnchoredText
 from parameterized import parameterized
@@ -567,13 +568,18 @@ class TestScenario(TestClass):
                 # testing absence of mPk
                 self.assertRaises(CosmoSevereError, self.cosmo.pk, 0.1, 0)
 
-        if COMPARE_OUTPUT_REF or COMPARE_OUTPUT_GAUGE:
+        # The scalar field (scf) is only implemented in synchronous gauge (the
+        # Newtonian-gauge Klein-Gordon source is incomplete and intentionally
+        # rejected), so it has no Newtonian counterpart to compare against.
+        scf_present = 'Omega_scf' in self.scenario
+
+        if (COMPARE_OUTPUT_REF or COMPARE_OUTPUT_GAUGE) and not scf_present:
             # Now compute same scenario in Newtonian gauge
             self.cosmo_newt.set(dict(self.verbose, **self.scenario))
             self.cosmo_newt.set({'gauge': 'newtonian'})
             self.cosmo_newt.compute()
 
-        if COMPARE_OUTPUT_GAUGE:
+        if COMPARE_OUTPUT_GAUGE and not scf_present:
             # Compare synchronous and Newtonian gauge
             self.assertTrue(
                 self.cosmo_newt.state,
@@ -589,12 +595,13 @@ class TestScenario(TestClass):
             status = self.compare_output(cosmo_ref, "Reference", self.cosmo, 'Synchronous', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
             assert status, 'Reference comparison failed in Synchronous gauge!'
 
-            cosmo_ref = classyref.Class()
-            cosmo_ref.set(dict(self.verbose, **self.scenario))
-            cosmo_ref.set({'gauge': 'newtonian'})
-            cosmo_ref.compute()
-            self.compare_output(cosmo_ref, "Reference", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
-            assert status, 'Reference comparison failed in Newtonian gauge!'
+            if not scf_present:
+                cosmo_ref = classyref.Class()
+                cosmo_ref.set(dict(self.verbose, **self.scenario))
+                cosmo_ref.set({'gauge': 'newtonian'})
+                cosmo_ref.compute()
+                status = self.compare_output(cosmo_ref, "Reference", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
+                assert status, 'Reference comparison failed in Newtonian gauge!'
 
 
 class TestTensorMassiveNcdmRegression(TestClass):
@@ -896,6 +903,38 @@ class TestReviewRegressions(TestClass):
             'nu2.log10G_eff': -4.0,
         }
         self._assert_compute_fails(scenario, "cannot mix G_eff and log10G_eff representations")
+
+    def test_scalar_field_newtonian_gauge_is_rejected(self):
+        # The Newtonian-gauge scalar-field Klein-Gordon source is incomplete
+        # (missing the psi' / -2 a^2 V_,phi psi terms), so it is not gauge-invariant.
+        # It is only valid in synchronous gauge; Newtonian must be rejected up front.
+        scenario = {
+            'output': 'tCl',
+            'gauge': 'newtonian',
+            'Omega_fld': 0,
+            'Omega_scf': 0.1,
+            'attractor_ic_scf': 'yes',
+            'scf_parameters': '10, 0, 0, 0',
+        }
+        # The guard fires during perturbation solving, so classy raises a
+        # CosmoComputationError (not the input-time CosmoSevereError).
+        self.scenario = dict(scenario)
+        self.name = self._testMethodName
+        self.cosmo.set(dict(self.verbose, **scenario))
+        with self.assertRaises(CosmoComputationError) as ctx:
+            self.cosmo.compute()
+        self.assertIn("synchronous gauge", str(ctx.exception))
+
+    def test_scalar_field_synchronous_gauge_computes(self):
+        scenario = {
+            'output': 'tCl',
+            'gauge': 'synchronous',
+            'Omega_fld': 0,
+            'Omega_scf': 0.1,
+            'attractor_ic_scf': 'yes',
+            'scf_parameters': '10, 0, 0, 0',
+        }
+        self._assert_compute_succeeds(scenario)
 
     def test_dot_syntax_interacting_psd_filenames_follow_true_flags(self):
         scenario = {
