@@ -20,6 +20,10 @@ constexpr const char* kLegacyInteractingKeys[] = {
     "maximum_q_ncdm_interacting",
 };
 
+constexpr double kAlphaRtaCoefficients[5]{0.40, 0.43, 0.46, 0.47, 0.48};
+constexpr double kCorrectedAlpha2            = (7 * _PI_ * (3949.0 - 400 * _PI_ * _PI_)) / 60.;
+constexpr double kExactHierarchyL2Correction = 64.0;
+
 void RejectLegacyInteractingKeys(FileContent& pfc) {
   for (const char* key : kLegacyInteractingKeys) {
     std::string unused;
@@ -148,7 +152,6 @@ void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& lay
   double taudot = std::pow(a, -4) * std::pow(std::pow(4. / 11., 1. / 3.) * T_cmb_ * _k_B_, 5) *
                   std::pow(G_eff_ / (1e12 * _eV_ * _eV_), 2) * (2. * _PI_ / _h_P_) / _c_ *
                   _Mpc_over_m_;
-  double alpha_RTA[5]{0.40, 0.43, 0.46, 0.47, 0.48};
 
   // Cap taudot to avoid stiff differential equations crashing the integrator
   taudot = std::min(taudot, a_prime_over_a * 1e9);
@@ -158,8 +161,9 @@ void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& lay
 
   if (fa_on) {
     // --- Fluid Approximation ---
-    const int idx  = ncdm_layout.index_per_q[0];
-    dy[idx + 2]   -= 0.40 * taudot * y[idx + 2];
+    const int idx         = ncdm_layout.index_per_q[0];
+    const double alpha_2  = use_alpha_correction_ ? kCorrectedAlpha2 : kAlphaRtaCoefficients[0];
+    dy[idx + 2]          -= alpha_2 * taudot * y[idx + 2];
   }
   else {
     // --- Exact Boltzmann Hierarchy ---
@@ -173,13 +177,14 @@ void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& lay
           double z_correction = std::pow(l + 0.5, -2);
           double I_l          = FitIntegralOfl(z_correction);
           double N            = 7.0 * std::pow(_PI_, 4) / 720.0;
-          double alpha        = N / (6.0 * std::pow(2.0 * _PI_, 3)) * (800.0 - I_l);
+          const double corr_l = (l == 2) ? kExactHierarchyL2Correction : 0.0;
+          double alpha        = N / (6.0 * std::pow(2.0 * _PI_, 3)) * (800.0 - I_l + corr_l);
 
           dy[idx + l] -= alpha * taudot * y[idx + l];
         }
         else {
           int alpha_index  = std::min(4, l - 2);
-          double alpha     = alpha_RTA[alpha_index];
+          double alpha     = kAlphaRtaCoefficients[alpha_index];
           dy[idx + l]     -= alpha * taudot * y[idx + l];
         }
       }
