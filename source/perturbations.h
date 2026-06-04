@@ -165,11 +165,13 @@ struct perturbs {
   double k_max_for_pk =
       1.; /**< maximum value of k in 1/Mpc in P(k) (if \f$ C_l \f$'s also requested, overseeded by value kmax inferred from l_scalar_max if it is bigger) */
 
-  int selection_num             = 1;           /**< number of selection functions
+  int selection_num                          = 1;        /**< number of selection functions
                                                    (i.e. bins) for matter density \f$ C_l \f$'s */
-  enum selection_type selection = gaussian;    /**< type of selection functions */
-  double selection_mean[_SELECTION_NUM_MAX_];  /**< centers of selection functions */
-  double selection_width[_SELECTION_NUM_MAX_]; /**< widths of selection functions */
+  enum selection_type selection              = gaussian; /**< type of selection functions */
+  double selection_mean[_SELECTION_NUM_MAX_] = {
+      1.}; /**< centers of selection functions; element [0] default 1 */
+  double selection_width[_SELECTION_NUM_MAX_] = {
+      0.1}; /**< widths of selection functions; element [0] default 0.1 */
 
   int switch_sw =
       1; /**< in temperature calculation, do we want to include the intrinsic temperature + Sachs Wolfe term? */

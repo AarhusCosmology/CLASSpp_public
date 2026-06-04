@@ -22,8 +22,7 @@ struct spectra {
 
   //@{
 
-  double
-      z_max_pk; /**< maximum value of z at which matter spectrum P(k,z) will be evaluated; keep fixed to zero if P(k) only needed today */
+  double z_max_pk = 0.; /**< maximum z for P(k,z) output; set from perturbs by the reader */
 
   int non_diag = 0; /**< sets the number of cross-correlation spectra
                    that you want to calculate: 0 means only

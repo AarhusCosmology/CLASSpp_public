@@ -72,9 +72,14 @@ struct primordial {
   double n_s = 0.9619; /**< usual scalar tilt = [curvature power spectrum tilt at pivot scale -1] */
   double alpha_s = 0.; /**< usual scalar running */
 
-  double r = 1.;  /**< usual tensor to scalar ratio of power spectra, \f$ r=A_T/A_S=P_h/P_R \f$*/
-  double n_t;     /**< usual tensor tilt = [GW power spectrum tilt at pivot scale] */
-  double alpha_t; /**< usual tensor running */
+  double r = 1.; /**< usual tensor to scalar ratio of power spectra, \f$ r=A_T/A_S=P_h/P_R \f$*/
+  double n_t =
+      -r / 8. *
+      (2. - r / 8. -
+       n_s); /**< usual tensor tilt; default from single-field consistency (order 2 in slow-roll) */
+  double alpha_t = r / 8. *
+                   (r / 8. + n_s -
+                    1.); /**< usual tensor running; default from single-field consistency */
 
   double f_bi     = 1.; /**< baryon isocurvature (BI) entropy-to-curvature ratio \f$ S_{bi}/R \f$*/
   double n_bi     = 1.; /**< BI tilt */

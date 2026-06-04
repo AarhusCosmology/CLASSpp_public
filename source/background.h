@@ -54,13 +54,20 @@ struct background {
 
   //@{
 
-  double H0; /**< \f$ H_0 \f$: Hubble parameter (in fact, [\f$H_0/c\f$]) in \f$ Mpc^{-1} \f$ */
-
-  double Omega0_g; /**< \f$ \Omega_{0 \gamma} \f$: photons */
-
   double T_cmb = 2.7255; /**< \f$ T_{cmb} \f$: current CMB temperature in Kelvins */
 
-  double Omega0_b; /**< \f$ \Omega_{0 b} \f$: baryons */
+  double h = 0.67556; /**< reduced Hubble parameter */
+
+  double H0 =
+      h * 1.e5 /
+      _c_; /**< \f$ H_0 \f$ (in fact [\f$H_0/c\f$]) in \f$ Mpc^{-1} \f$; default derived from h */
+
+  double Omega0_g =
+      Omega0gFromTcmb(T_cmb,
+                      h); /**< \f$ \Omega_{0 \gamma} \f$: photons; default derived from T_cmb, h */
+
+  double Omega0_b = 0.022032 /
+                    (h * h); /**< \f$ \Omega_{0 b} \f$: baryons; default \f$ \omega_b/h^2 \f$ */
 
   // Per-species Omega0_* fields removed: each species owns its density
   // through its constructor (queryable via species->GetOmega0()).  Only
@@ -85,9 +92,8 @@ struct background {
 
   //@{
 
-  double h = 0.67556; /**< reduced Hubble parameter */
-  double K = 0.;      /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*a_{today}^2*H_0^2\f$; */
-  int sgnK = 0;       /**< K/|K|: -1, 0 or 1 */
+  double K = 0.; /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*a_{today}^2*H_0^2\f$; */
+  int sgnK = 0;  /**< K/|K|: -1, 0 or 1 */
 
   //@}
 

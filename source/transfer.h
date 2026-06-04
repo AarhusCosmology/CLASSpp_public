@@ -91,10 +91,10 @@ struct transfers {
   double lcmb_pivot   = 0.1; /**< if lcmb_tilt non-zero, corresponding pivot
                           scale */
 
-  double selection_bias
-      [_SELECTION_NUM_MAX_]; /**< light-to-mass bias in the transfer function of density number count */
-  double selection_magnification_bias
-      [_SELECTION_NUM_MAX_]; /**< magnification bias in the transfer function of density number count */
+  double selection_bias[_SELECTION_NUM_MAX_] = {
+      1.}; /**< light-to-mass bias; element [0] default 1, rest 0 */
+  double selection_magnification_bias[_SELECTION_NUM_MAX_] = {
+      0.}; /**< magnification bias; default 0 */
 
   short has_nz_file = _FALSE_; /**< Has dN/dz (selection function) input file? */
   short has_nz_analytic =

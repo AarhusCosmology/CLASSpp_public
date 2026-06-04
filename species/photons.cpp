@@ -693,19 +693,3 @@ std::vector<Named> PhotonsSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   result.push_back({"Photons", std::make_unique<PhotonsSpecies>(*ctx.pba)});
   return result;
 }
-
-// ── T_cmb <-> Omega0_g conversions ───────────────────────────────────────────
-
-double PhotonsSpecies::Omega0gFromTcmb(double T_cmb, double h) {
-  const double sigma_B = 2. * pow(_PI_, 5) * pow(_k_B_, 4) / 15. / pow(_h_P_, 3) / pow(_c_, 2);
-  return (4. * sigma_B / _c_ * pow(T_cmb, 4.)) /
-         (3. * _c_ * _c_ * 1.e10 * h * h / _Mpc_over_m_ / _Mpc_over_m_ / 8. / _PI_ / _G_);
-}
-
-double PhotonsSpecies::TcmbFromOmega0g(double Omega0_g, double h) {
-  const double sigma_B = 2. * pow(_PI_, 5) * pow(_k_B_, 4) / 15. / pow(_h_P_, 3) / pow(_c_, 2);
-  return pow(Omega0_g *
-                 (3. * _c_ * _c_ * 1.e10 * h * h / _Mpc_over_m_ / _Mpc_over_m_ / 8. / _PI_ / _G_) /
-                 (4. * sigma_B / _c_),
-             0.25);
-}

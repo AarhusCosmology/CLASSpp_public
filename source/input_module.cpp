@@ -45,7 +45,7 @@ int readDoubleList(
  * If class is embedded into another code, you will probably prefer to
  * populate a 'file_content' structure directly and pass it to the
  * InputModule constructor, which then runs input_read_precisions,
- * input_default_params, ReadContext, ConstructSpecies, ReadDerived,
+ * ReadContext, ConstructSpecies, ReadDerived,
  * and WriteParameterFiles in sequence.
  */
 
@@ -173,7 +173,6 @@ InputModule::InputModule(FileContent& fc) : file_content_(fc) {
   file_content_.mark_all_unread();
   try {
     input_read_precisions();
-    input_default_params();
     ReadContext();
     ConstructSpecies();
     ReadDerived();
@@ -367,10 +366,10 @@ int InputModule::ReadCoupledCluster() {
 
   // ── CDM: parser value (or default), then synchronous-gauge minimum ───────────
   // Default CDM fallback, frozen at the default h=0.67556 (matches the historical
-  // input_default_params() pba->Omega0_cdm = 0.12038/h^2 and classyref). Must NOT use
-  // pba->h here: ReadCoupledCluster runs after the user's h/H0 is read, so dividing
-  // by the live h would let the default drift when h is set or 100*theta_s is shot
-  // (the omega_b/Omega0_g defaults are likewise frozen at default h in input_default_params).
+  // classyref value 0.12038/h^2). Must NOT use pba->h here: ReadCoupledCluster
+  // runs after the user's h/H0 is read, so dividing by the live h would let the
+  // default drift when h is set or 100*theta_s is shot
+  // (the omega_b/Omega0_g defaults are likewise frozen at default h in background.h).
   double omega0_cdm = 0.12038 / (0.67556 * 0.67556);
   bool cdm_user_set = false;
 
@@ -604,8 +603,8 @@ int InputModule::input_read_precisions() {
     strncpy(ppr->class_dir, __CLASSDIR__, _ARGUMENT_LENGTH_MAX_);
   }
 
-  /** - set string parameter defaults (require runtime path concatenation) */
-  class_call(input_default_precision(), error_message_, error_message_);
+  /** - resolve runtime data-file paths against class_dir (defaults are relative) */
+  ppr->ResolveDataPaths();
 
   const auto standard_ncdm_instances = file_content_.instances_with("type", "ncdm_standard");
   SynthesiseIdenticalScalarField(&file_content_,
@@ -616,6 +615,11 @@ int InputModule::input_read_precisions() {
 
   /** - parse all precision parameters from config file */
   ppr->parse(file_content_);
+
+  class_test(ppr->smallest_allowed_variation < 0,
+             ppr->error_message,
+             "smallest_allowed_variation = %e < 0",
+             ppr->smallest_allowed_variation);
 
   return _SUCCESS_;
 }
@@ -728,25 +732,25 @@ void InputModule::ReadContext() {
              "In input file, you can only enter one of T_cmb, Omega_g or omega_g, choose one");
 
   if (class_none_of_three(flag1, flag2, flag3)) {
-    pba->Omega0_g = PhotonsSpecies::Omega0gFromTcmb(pba->T_cmb, pba->h);
+    pba->Omega0_g = Omega0gFromTcmb(pba->T_cmb, pba->h);
   }
   else {
     if (flag1 == _TRUE_) {
       /** - Omega0_g = rho_g / rho_c0, each of them expressed in \f$ Kg/m/s^2 \f$*/
       /** - rho_g = (4 sigma_B / c) \f$ T^4 \f$*/
       /** - rho_c0 \f$ = 3 c^2 H_0^2 / (8 \pi G) \f$*/
-      pba->Omega0_g = PhotonsSpecies::Omega0gFromTcmb(param1, pba->h);
+      pba->Omega0_g = Omega0gFromTcmb(param1, pba->h);
       pba->T_cmb    = param1;
     }
 
     if (flag2 == _TRUE_) {
       pba->Omega0_g = param2;
-      pba->T_cmb    = PhotonsSpecies::TcmbFromOmega0g(pba->Omega0_g, pba->h);
+      pba->T_cmb    = TcmbFromOmega0g(pba->Omega0_g, pba->h);
     }
 
     if (flag3 == _TRUE_) {
       pba->Omega0_g = param3 / pba->h / pba->h;
-      pba->T_cmb    = PhotonsSpecies::TcmbFromOmega0g(pba->Omega0_g, pba->h);
+      pba->T_cmb    = TcmbFromOmega0g(pba->Omega0_g, pba->h);
     }
   }
 
@@ -2623,107 +2627,6 @@ void InputModule::ReadDerived() {
              ppr->l_max_ncdm);
 }
 
-/**
- * All default parameter values (for input parameters)
- *
- * @return the error status
- */
-
-int InputModule::input_default_params() {
-  background* pba = &background_; /* for cosmological background */
-  primordial* ppm = &primordial_; /* for primordial spectra */
-  transfers* ptr  = &transfers_;  /* for transfer functions */
-  spectra* psp    = &spectra_;    /* for output spectra */
-  output* pop     = &output_;
-
-  /** Define computed default parameter values that depend on other defaults.
-      Simple constant defaults are now set as in-struct default member initializers. */
-
-  /** - background structure: computed defaults */
-
-  /* 5.10.2014: default parameters matched to Planck 2013 + WP
-     best-fitting model, with ones small difference: the published
-     Planck 2013 + WP bestfit is with h=0.6704 and one massive
-     neutrino species with m_ncdm=0.06eV; here we assume only massless
-     neutrinos in the default model; for the CMB, taking m_ncdm = 0 or
-     0.06 eV makes practically no difference, provided that we adapt
-     the value of h in order ot get the same peak scale, i.e. the same
-     100*theta_s. The Planck 2013 + WP best-fitting model with
-     h=0.6704 gives 100*theta_s = 1.042143 (or equivalently
-     100*theta_MC=1.04119). By taking only massless neutrinos, one
-     gets the same 100*theta_s provided that h is increased to
-     0.67556. Hence, we take h=0.67556, N_ur=3.046, N_ncdm=0, and all
-     other parameters from the Planck2013 Cosmological Parameter
-     paper. */
-
-  pba->H0       = pba->h * 1.e5 / _c_;
-  pba->Omega0_g = PhotonsSpecies::Omega0gFromTcmb(pba->T_cmb, pba->h);
-  pba->Omega0_b = 0.022032 / pow(pba->h, 2);
-  // pba->Omega0_{ur,cdm,lambda,...} are no longer stored: those defaults live
-  // on the species (read from pfc or applied by ReadCoupledCluster).
-
-  /** - primordial structure: computed defaults */
-
-  ppm->n_t     = -ppm->r / 8. * (2. - ppm->r / 8. - ppm->n_s);
-  ppm->alpha_t = ppm->r / 8. * (ppm->r / 8. + ppm->n_s - 1.);
-
-  /** - transfer structure: array element defaults */
-
-  ptr->selection_bias[0]               = 1.;
-  ptr->selection_magnification_bias[0] = 0.;
-
-  /** - spectra structure: computed default */
-
-  psp->z_max_pk = pop->z_pk[0];
-
-  /** - perturbation structure: array element defaults */
-
-  perturbations_.selection_mean[0]  = 1.;
-  perturbations_.selection_width[0] = 0.1;
-
-  return _SUCCESS_;
-}
-
-/**
- * Initialize the precision parameter structure.
- *
- * All precision parameters used in the other modules are listed here
- * and assigned here a default value.
- *
- * @return the error status
- *
- */
-
-int InputModule::input_default_precision() {
-  precision* ppr = &precision_; /* for precision parameters */
-
-  /** Numeric and type precision parameters now have in-struct defaults
-      (via precisions.h macros). Only string parameters need runtime
-      path concatenation with class_dir. */
-
-  class_test(ppr->smallest_allowed_variation < 0,
-             ppr->error_message,
-             "smallest_allowed_variation = %e < 0",
-             ppr->smallest_allowed_variation);
-
-  /* String parameters require runtime path concatenation */
-  strncpy(ppr->sBBN_file, ppr->class_dir, sizeof(ppr->sBBN_file));
-  strcat(ppr->sBBN_file, "/bbn/sBBN_2017.dat");
-
-  strncpy(ppr->hyrec_Alpha_inf_file, ppr->class_dir, sizeof(ppr->hyrec_Alpha_inf_file));
-  strcat(ppr->hyrec_Alpha_inf_file, "/hyrec/Alpha_inf.dat");
-
-  strncpy(ppr->hyrec_R_inf_file, ppr->class_dir, sizeof(ppr->hyrec_R_inf_file));
-  strcat(ppr->hyrec_R_inf_file, "/hyrec/R_inf.dat");
-
-  strncpy(ppr->hyrec_two_photon_tables_file,
-          ppr->class_dir,
-          sizeof(ppr->hyrec_two_photon_tables_file));
-  strcat(ppr->hyrec_two_photon_tables_file, "/hyrec/two_photon_tables.dat");
-
-  return _SUCCESS_;
-}
-
 /** Overloaded helpers for type-dispatched precision parameter reading. */
 namespace {
 void read(const FileContent& fc, const char* name, double& v) {
@@ -2744,6 +2647,22 @@ void read_enum(const FileContent& fc, const char* name, E& v) {
     v = static_cast<E>(tmp);
 }
 }  // anonymous namespace
+
+void precision::ResolveDataPaths() {
+  // Prepend the runtime class_dir to each field's relative-path default, in
+  // place. snprintf is used for bounded, always-NUL-terminated concatenation
+  // (class_dir + relative can exceed sizeof(FileName) for deep install paths).
+  auto prepend_class_dir = [this](char* path, size_t size) {
+    FileName relative;
+    snprintf(relative, sizeof(relative), "%s", path);
+    snprintf(path, size, "%s%s", class_dir, relative);
+  };
+
+  prepend_class_dir(sBBN_file, sizeof(sBBN_file));
+  prepend_class_dir(hyrec_Alpha_inf_file, sizeof(hyrec_Alpha_inf_file));
+  prepend_class_dir(hyrec_R_inf_file, sizeof(hyrec_R_inf_file));
+  prepend_class_dir(hyrec_two_photon_tables_file, sizeof(hyrec_two_photon_tables_file));
+}
 
 void precision::parse(const FileContent& fc) {
   /* Background */

@@ -63,7 +63,7 @@ def is_comment_only_line(line):
             stripped.startswith('//@'))
 
 h_files = []
-ignored_dirs = {'.git', '.worktrees', '__pycache__'}
+ignored_dirs = {'.git', '.worktrees', 'worktrees', '__pycache__'}
 for subdir, dirs, files in os.walk(rootdir):
     dirs[:] = [d for d in dirs if d not in ignored_dirs]
     for file in files:
@@ -214,8 +214,12 @@ for file in h_files:
                     break
             index_line += 1
         else:
-            # Check for struct ended
-            if '};' in line:
+            # Check for struct ended. Match only the struct's closing brace
+            # (a line starting with '}'), not any line that merely contains
+            # '};' -- e.g. an in-struct array initializer such as
+            # `double selection_bias[N] = {1.};` would otherwise be mistaken
+            # for the end of the struct and truncate the remaining members.
+            if line.strip().startswith('}'):
                 structs.append('')
                 struct_found = False
                 index_line += 1

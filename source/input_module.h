@@ -87,8 +87,6 @@ class InputModule {
   void ReadDerived();          // phase iii: everything else + species-dependent reads
   void WriteParameterFiles();  // read/unread parameter dump (runs after ReadDerived)
   int input_read_precisions();
-  int input_default_params();
-  int input_default_precision();
 };
 
 /* macro for reading parameter values with routines from the parser */

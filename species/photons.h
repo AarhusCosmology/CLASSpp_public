@@ -26,14 +26,6 @@ class PhotonsSpecies : public BaseSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  /** Photon density parameter from CMB temperature.
-   *  Omega0_g = (4 sigma_B / c) T^4 / (3 c^2 1e10 h^2 / Mpc_over_m^2 / 8 pi G),
-   *  with sigma_B = 2 pi^5 k_B^4 / (15 h_P^3 c^2). Single source of truth for the
-   *  T_cmb <-> Omega0_g conversion previously inlined in InputModule. */
-  static double Omega0gFromTcmb(double T_cmb, double h);
-  /** Inverse of Omega0gFromTcmb. */
-  static double TcmbFromOmega0g(double Omega0_g, double h);
-
   double GetOmega0() const override {
     return pba_.Omega0_g;
   }

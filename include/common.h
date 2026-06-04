@@ -560,7 +560,7 @@ struct precision {
    * Big Bang Nucleosynthesis file path. The file specifies the predictions for
    * \f$ Y_\mathrm{He} \f$ for given \f$ \omega_b \f$ and \f$ N_\mathrm{eff} \f$.
    */
-  FileName sBBN_file;
+  FileName sBBN_file = "/bbn/sBBN_2017.dat";
 
   /*
    *  Thermodynamical quantities
@@ -660,10 +660,12 @@ struct precision {
   int thermo_rate_smoothing_radius =
       50; /**< Smoothing in redshift of the variation rate of \f$ \exp(-\kappa) \f$, g, and \f$ \frac{dg}{d\tau} \f$ that is used as a timescale afterwards */
 
-  FileName hyrec_Alpha_inf_file; /**< File containing the alpha parameter of hyrec */
-  FileName hyrec_R_inf_file;     /**< File containing the R_inf parameter of hyrec */
-  FileName
-      hyrec_two_photon_tables_file; /**< File containing the two-photon interaction parameter of hyrec */
+  FileName hyrec_Alpha_inf_file =
+      "/hyrec/Alpha_inf.dat"; /**< File containing the alpha parameter of hyrec */
+  FileName hyrec_R_inf_file =
+      "/hyrec/R_inf.dat"; /**< File containing the R_inf parameter of hyrec */
+  FileName hyrec_two_photon_tables_file =
+      "/hyrec/two_photon_tables.dat"; /**< File containing the two-photon interaction parameter of hyrec */
 
   double k_min_tau0 =
       0.1; /**< number defining k_min for the computation of Cl's and P(k)'s (dimensionless): (k_min tau_0), usually chosen much smaller than one */
@@ -1091,9 +1093,35 @@ struct precision {
   ErrorMsg error_message; /**< zone for writing error messages */
   //@}
 
+  /** Prepend the runtime class_dir to the relative data-file path defaults
+   *  (sBBN_file, hyrec_*). Call once after class_dir is set and before parse(),
+   *  so a user-supplied absolute override in parse() still replaces verbatim. */
+  void ResolveDataPaths();
+
   /** Parse precision parameters from a configuration file. */
   void parse(const FileContent& fc);
 };
+
+/** Photon density parameter from CMB temperature.
+ *  Omega0_g = (4 sigma_B / c) T^4 / (3 c^2 1e10 h^2 / Mpc_over_m^2 / 8 pi G),
+ *  with sigma_B = 2 pi^5 k_B^4 / (15 h_P^3 c^2). Single source of truth for the
+ *  T_cmb <-> Omega0_g conversion. Free function (not a PhotonsSpecies method) so
+ *  that background.h's default member initializer can call it without the
+ *  photons.h <-> background.h include cycle. */
+inline double Omega0gFromTcmb(double T_cmb, double h) {
+  const double sigma_B = 2. * pow(_PI_, 5) * pow(_k_B_, 4) / 15. / pow(_h_P_, 3) / pow(_c_, 2);
+  return (4. * sigma_B / _c_ * pow(T_cmb, 4.)) /
+         (3. * _c_ * _c_ * 1.e10 * h * h / _Mpc_over_m_ / _Mpc_over_m_ / 8. / _PI_ / _G_);
+}
+
+/** Inverse of Omega0gFromTcmb. */
+inline double TcmbFromOmega0g(double Omega0_g, double h) {
+  const double sigma_B = 2. * pow(_PI_, 5) * pow(_k_B_, 4) / 15. / pow(_h_P_, 3) / pow(_c_, 2);
+  return pow(Omega0_g *
+                 (3. * _c_ * _c_ * 1.e10 * h * h / _Mpc_over_m_ / _Mpc_over_m_ / 8. / _PI_ / _G_) /
+                 (4. * sigma_B / _c_),
+             0.25);
+}
 
 #ifdef __cplusplus
 extern "C" {
