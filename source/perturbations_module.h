@@ -16,11 +16,10 @@ class PerturbationsModule : public BaseModule {
                           double z,
                           int number_of_titles,
                           double* data) const;
-  int perturb_output_titles(enum file_format output_format,
-                            char titles[_MAXTITLESTRINGLENGTH_]) const;
+  int perturb_output_titles(enum file_format output_format, std::string& titles) const;
   int perturb_output_firstline_and_ic_suffix(int index_ic,
-                                             char first_line[_LINE_LENGTH_MAX_],
-                                             FileName ic_suffix) const;
+                                             std::string& first_line,
+                                             std::string& ic_suffix) const;
 
   /** Accessors that expose protected BaseModule pointers to species code. */
   const background* GetBackground() const noexcept {
@@ -189,12 +188,12 @@ class PerturbationsModule : public BaseModule {
       index_k_output_values_; /**< List of indices corresponding to k-values close to k_output_values for each mode.
                                      index_k_output_values[index_md*k_output_values_num+ik]*/
 
-  char scalar_titles_
-      [_MAXTITLESTRINGLENGTH_]; /**< _DELIMITER_ separated string of titles for scalar perturbation output files. */
-  char vector_titles_
-      [_MAXTITLESTRINGLENGTH_]; /**< _DELIMITER_ separated string of titles for vector perturbation output files. */
-  char tensor_titles_
-      [_MAXTITLESTRINGLENGTH_]; /**< _DELIMITER_ separated string of titles for tensor perturbation output files. */
+  std::string
+      scalar_titles_; /**< _DELIMITER_ separated string of titles for scalar perturbation output files. */
+  std::string
+      vector_titles_; /**< _DELIMITER_ separated string of titles for vector perturbation output files. */
+  std::string
+      tensor_titles_; /**< _DELIMITER_ separated string of titles for tensor perturbation output files. */
 
   std::vector<double> scalar_perturbations_data_
       [_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for scalars */

@@ -57,7 +57,7 @@ struct PerturbScalarContext {
 class PerturbColumnWriter {
  public:
   // Title mode (used from perturb_output_titles and perturb_prepare_k_output)
-  explicit PerturbColumnWriter(char* titles) : titles_(titles) {}
+  explicit PerturbColumnWriter(std::string& titles) : titles_(&titles) {}
 
   // Data mode for WriteOutputColumns: value = tk[tp_index]
   PerturbColumnWriter(double* dataptr, const double* tk, int& storeidx)
@@ -83,10 +83,10 @@ class PerturbColumnWriter {
   }
 
  private:
-  char* titles_     = nullptr;
-  double* dataptr_  = nullptr;
-  const double* tk_ = nullptr;
-  int* storeidx_    = nullptr;
+  std::string* titles_ = nullptr;
+  double* dataptr_     = nullptr;
+  const double* tk_    = nullptr;
+  int* storeidx_       = nullptr;
 };
 
 // ── PerturbSourceContext ─────────────────────────────────────────────────────

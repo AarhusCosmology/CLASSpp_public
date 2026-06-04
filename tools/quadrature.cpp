@@ -4,7 +4,6 @@
 /* Thomas Tram                            */
 /******************************************/
 #include "quadrature.h"
-#define _METHOD_CHOSEN_SIZE_ 40
 #define _N_COMB_LAG_ 16
 
 int get_qsampling_manual(double* x,
@@ -91,7 +90,7 @@ int get_qsampling(double* x,
   double a_comb, b_comb;
   double q_leg[4], w_leg[4];
   double q_lag[_N_COMB_LAG_], w_lag[_N_COMB_LAG_];
-  char method_chosen[_METHOD_CHOSEN_SIZE_];
+  std::string method_chosen;
   double qmin = 0., qmax = 0., qmaxm1 = 0.;
   std::vector<double> wcomb2;
   double delq;
@@ -327,17 +326,17 @@ int get_qsampling(double* x,
   }
   //printf("N_adapt=%d, N_combined=%d at level=%d, Nlag=%d\n",Nadapt,N_comb,level,NLag);
   if (adapt_converging == _TRUE_) {
-    snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Adaptive Gauss-Kronrod Quadrature");
+    method_chosen = "Adaptive Gauss-Kronrod Quadrature";
     /* Gather weights and xvalues from tree: */
     i = Nadapt - 1;
     get_leaf_x_and_w(root.get(), &i, x, w, _TRUE_);
   }
   else if (Laguerre_converging == _TRUE_) {
-    snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Gauss-Laguerre Quadrature");
+    method_chosen = "Gauss-Laguerre Quadrature";
     /* x and w is already populated in this case. */
   }
   else if (combined_converging == _TRUE_) {
-    snprintf(method_chosen, _METHOD_CHOSEN_SIZE_, "Combined Quadrature");
+    method_chosen = "Combined Quadrature";
     for (i = 0; i < N_comb_leg; i++) {
       x[i] = q_leg[i];
       w[i] = w_leg[i];

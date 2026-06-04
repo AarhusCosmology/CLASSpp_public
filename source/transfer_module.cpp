@@ -3554,8 +3554,11 @@ int TransferModule::transfer_global_selection_read() {
   nz_size_ = 0;
 
   if (ptr->has_nz_file == _TRUE_) {
-    input_file = fopen(ptr->nz_file_name, "r");
-    class_test(input_file == nullptr, error_message_, "Could not open file %s!", ptr->nz_file_name);
+    input_file = fopen(ptr->nz_file_name.c_str(), "r");
+    class_test(input_file == nullptr,
+               error_message_,
+               "Could not open file %s!",
+               ptr->nz_file_name.c_str());
 
     /* Find size of table */
     for (row = 0, status = 2; status == 2; row++) {
@@ -3589,11 +3592,11 @@ int TransferModule::transfer_global_selection_read() {
   nz_evo_size_ = 0;
 
   if (ptr->has_nz_evo_file == _TRUE_) {
-    input_file = fopen(ptr->nz_evo_file_name, "r");
+    input_file = fopen(ptr->nz_evo_file_name.c_str(), "r");
     class_test(input_file == nullptr,
                error_message_,
                "Could not open file %s!",
-               ptr->nz_evo_file_name);
+               ptr->nz_evo_file_name.c_str());
 
     /* Find size of table */
     for (row = 0, status = 2; status == 2; row++) {

@@ -31,7 +31,7 @@ class ThermodynamicsModule;  // forward declaration
  */
 class BackgroundColumnWriter {
  public:
-  explicit BackgroundColumnWriter(char* titles) : titles_(titles) {}
+  explicit BackgroundColumnWriter(std::string& titles) : titles_(&titles) {}
   BackgroundColumnWriter(double* dataptr, int& storeidx)
       : dataptr_(dataptr), storeidx_(&storeidx) {}
 
@@ -41,7 +41,7 @@ class BackgroundColumnWriter {
 
   void Add(const char* title, double value, bool condition = true) {
     if (titles_) {
-      class_store_columntitle(titles_, title, condition ? _TRUE_ : _FALSE_);
+      class_store_columntitle(*titles_, title, condition ? _TRUE_ : _FALSE_);
     }
     else if (dataptr_) {
       class_store_double(dataptr_, value, condition ? _TRUE_ : _FALSE_, (*storeidx_));
@@ -52,9 +52,9 @@ class BackgroundColumnWriter {
   }
 
  private:
-  char* titles_    = nullptr;
-  double* dataptr_ = nullptr;
-  int* storeidx_   = nullptr;
+  std::string* titles_ = nullptr;
+  double* dataptr_     = nullptr;
+  int* storeidx_       = nullptr;
 };
 struct perturbs;  // forward declaration
 
@@ -322,7 +322,7 @@ class BaseSpecies {
   }
 
   /** Write this species' tensor-mode output column titles. Default: no-op. */
-  virtual void WriteTensorOutputColumnTitles(char* /*tensor_titles*/) const {}
+  virtual void WriteTensorOutputColumnTitles(std::string& /*tensor_titles*/) const {}
 
   /** Contribute to the gravitational-wave source term (anisotropic stress) for tensor mode.
    *  Called after perturb_workspace::gw_source is reset to zero.  Default: no-op.

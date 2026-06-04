@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 #include "background_module.h"
 #include "cosmology.h"
@@ -62,14 +64,11 @@ int InputModule::file_content_from_arguments(int argc,
   FileContent fc_inputroot; /** - --> sum of fc_inoput and fc_root */
   FileContent* pfc_input;   /** - --> a pointer to either fc_root or fc_inputroot */
 
-  char input_file[_ARGUMENT_LENGTH_MAX_];
-  char precision_file[_ARGUMENT_LENGTH_MAX_];
-  const size_t tmp_file_size =
-      _ARGUMENT_LENGTH_MAX_ +
-      26;  // 26 is enough to extend the file name [...] with the characters "output/[...]%02d_parameters.ini" (as done below)
-  char tmp_file[tmp_file_size];
-  char extension[5];
-  FileArg stringoutput, inifilename;
+  std::string input_file;
+  std::string precision_file;
+  std::string tmp_file;
+  std::string extension;
+  std::string inifilename;
   int flag1, filenum;
 
   pfc_input = &fc_input;
@@ -79,30 +78,32 @@ int InputModule::file_content_from_arguments(int argc,
       arguments are passed, they will remain null and inform
       init_params() that all parameters take default values. */
 
-  fc                = FileContent();
-  fc_input          = FileContent();
-  fc_precision      = FileContent();
-  input_file[0]     = '\0';
-  precision_file[0] = '\0';
+  fc           = FileContent();
+  fc_input     = FileContent();
+  fc_precision = FileContent();
+  input_file.clear();
+  precision_file.clear();
 
   /** - If some arguments are passed, identify eventually some 'xxx.ini'
       and 'xxx.pre' files, and store their name. */
 
   if (argc > 1) {
     for (int i = 1; i < argc; i++) {
-      strncpy(extension, (argv[i] + strlen(argv[i]) - 4), 4);
-      extension[4] = '\0';
-      if (strcmp(extension, ".ini") == 0) {
-        class_test(input_file[0] != '\0',
+      {
+        size_t arglen = strlen(argv[i]);
+        extension     = (arglen >= 4) ? std::string(argv[i] + arglen - 4) : std::string(argv[i]);
+      }
+      if (extension == ".ini") {
+        class_test(!input_file.empty(),
                    errmsg,
                    "You have passed more than one input file with extension '.ini', choose one.");
-        strcpy(input_file, argv[i]);
+        input_file = argv[i];
       }
-      else if (strcmp(extension, ".pre") == 0) {
-        class_test(precision_file[0] != '\0',
+      else if (extension == ".pre") {
+        class_test(!precision_file.empty(),
                    errmsg,
                    "You have passed more than one precision with extension '.pre', choose one.");
-        strcpy(precision_file, argv[i]);
+        precision_file = argv[i];
       }
       else {
         fprintf(stdout,
@@ -115,38 +116,62 @@ int InputModule::file_content_from_arguments(int argc,
 
   /** - if there is an 'xxx.ini' file, read it and store its content. */
 
-  if (input_file[0] != '\0') {
-    class_call(parser_read_file(input_file, &fc_input, errmsg), errmsg, errmsg);
+  if (!input_file.empty()) {
+    class_call(parser_read_file(input_file.c_str(), &fc_input, errmsg), errmsg, errmsg);
 
     /** - check whether a root name has been set */
 
-    class_call(parser_read_string(&fc_input, "root", &stringoutput, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    {
+      // Only flag1 matters here (was "root" set?); the value is read again in ReadDerived.
+      std::string unused;
+      class_call(parser_read_string(&fc_input, "root", unused, &flag1, errmsg), errmsg, errmsg);
+    }
 
     /** - if root has not been set, use root=output/inputfilennameN_ */
 
     if (flag1 == _FALSE_) {
-      //printf("strlen-4 = %zu\n",strlen(input_file)-4);
-      strncpy(inifilename, input_file, strlen(input_file) - 4);
-      inifilename[strlen(input_file) - 4] = '\0';
+      inifilename = input_file.substr(0, input_file.size() - 4);
       for (filenum = 0; filenum < 100; filenum++) {
         std::error_code ec;
-        snprintf(tmp_file, tmp_file_size, "output/%s%02d_cl.dat", inifilename, filenum);
+        {
+          std::ostringstream oss;
+          oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
+              << "_cl.dat";
+          tmp_file = oss.str();
+        }
         if (std::filesystem::exists(tmp_file, ec))
           continue;
-        snprintf(tmp_file, tmp_file_size, "output/%s%02d_pk.dat", inifilename, filenum);
+        {
+          std::ostringstream oss;
+          oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
+              << "_pk.dat";
+          tmp_file = oss.str();
+        }
         if (std::filesystem::exists(tmp_file, ec))
           continue;
-        snprintf(tmp_file, tmp_file_size, "output/%s%02d_tk.dat", inifilename, filenum);
+        {
+          std::ostringstream oss;
+          oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
+              << "_tk.dat";
+          tmp_file = oss.str();
+        }
         if (std::filesystem::exists(tmp_file, ec))
           continue;
-        snprintf(tmp_file, tmp_file_size, "output/%s%02d_parameters.ini", inifilename, filenum);
+        {
+          std::ostringstream oss;
+          oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
+              << "_parameters.ini";
+          tmp_file = oss.str();
+        }
         if (std::filesystem::exists(tmp_file, ec))
           continue;
         break;
       }
-      snprintf(tmp_file, tmp_file_size, "output/%s%02d_", inifilename, filenum);
+      {
+        std::ostringstream oss;
+        oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum << "_";
+        tmp_file = oss.str();
+      }
       fc_root.set("root", tmp_file);
       class_call(parser_cat(&fc_input, &fc_root, &fc_inputroot, errmsg), errmsg, errmsg);
       pfc_input = &fc_inputroot;
@@ -155,14 +180,14 @@ int InputModule::file_content_from_arguments(int argc,
 
   /** - if there is an 'xxx.pre' file, read it and store its content. */
 
-  if (precision_file[0] != '\0')
+  if (!precision_file.empty())
 
-    class_call(parser_read_file(precision_file, &fc_precision, errmsg), errmsg, errmsg);
+    class_call(parser_read_file(precision_file.c_str(), &fc_precision, errmsg), errmsg, errmsg);
 
   /** - if one or two files were read, merge their contents in a
       single 'file_content' structure. */
 
-  if ((input_file[0] != '\0') || (precision_file[0] != '\0'))
+  if (!input_file.empty() || !precision_file.empty())
 
     class_call(parser_cat(pfc_input, &fc_precision, &fc, errmsg), errmsg, errmsg);
 
@@ -530,24 +555,22 @@ void InputModule::WriteParameterFiles() {
 
   int flag1;
 
-  char string1[_ARGUMENT_LENGTH_MAX_];
+  std::string string1;
 
   /** - eventually write all the read parameters in a file, unread parameters in another file, and warnings about unread parameters */
 
-  class_call(parser_read_string(pfc, "write parameters", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "write parameters", string1, &flag1, errmsg), errmsg, errmsg);
 
   if ((flag1 == _TRUE_) &&
-      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
-    output* pop = &output_;
-    char param_output_name[_LINE_LENGTH_MAX_];
-    char param_unused_name[_LINE_LENGTH_MAX_];
-    snprintf(param_output_name, _LINE_LENGTH_MAX_, "%s%s", pop->root, "parameters.ini");
-    snprintf(param_unused_name, _LINE_LENGTH_MAX_, "%s%s", pop->root, "unused_parameters");
+      ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
+    output* pop                   = &output_;
+    std::string param_output_name = pop->root + "parameters.ini";
+    std::string param_unused_name = pop->root + "unused_parameters";
 
     FILE* param_output;
     FILE* param_unused;
-    class_open(param_output, param_output_name, "w", errmsg);
-    class_open(param_unused, param_unused_name, "w", errmsg);
+    class_open(param_output, param_output_name.c_str(), "w", errmsg);
+    class_open(param_unused, param_unused_name.c_str(), "w", errmsg);
 
     fprintf(param_output, "# List of input/precision parameters actually read\n");
     fprintf(param_output, "# (all other parameters set to default values)\n");
@@ -575,10 +598,10 @@ void InputModule::WriteParameterFiles() {
     fclose(param_unused);
   }
 
-  class_call(parser_read_string(pfc, "write warnings", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "write warnings", string1, &flag1, errmsg), errmsg, errmsg);
 
   if ((flag1 == _TRUE_) &&
-      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+      ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
     pfc->for_each([](const std::string& name, const std::string& value, bool read) {
       if (!read)
         fprintf(stdout,
@@ -594,13 +617,13 @@ int InputModule::input_read_precisions() {
 
   class_call(parser_read_string(&file_content_,
                                 "class_dir",
-                                &(ppr->class_dir),
+                                ppr->class_dir,
                                 &flag1,
                                 error_message_),
              error_message_,
              error_message_);
   if (flag1 == _FALSE_) {
-    strncpy(ppr->class_dir, __CLASSDIR__, _ARGUMENT_LENGTH_MAX_);
+    ppr->class_dir = __CLASSDIR__;
   }
 
   /** - resolve runtime data-file paths against class_dir (defaults are relative) */
@@ -643,7 +666,7 @@ void InputModule::ReadContext() {
   double param1, param2, param3;
   int entries_read;
   int int1;
-  char string1[_ARGUMENT_LENGTH_MAX_];
+  std::string string1;
 
   int input_verbose = 0;
 
@@ -680,16 +703,18 @@ void InputModule::ReadContext() {
       that case, knowing the gauge is important e.g. for fixing the
       sampling in momentum space for non-cold dark matter) */
 
-  class_call(parser_read_string(pfc, "gauge", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "gauge", string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "newtonian") != nullptr) || (strstr(string1, "Newtonian") != nullptr) ||
-        (strstr(string1, "new") != nullptr)) {
+    if ((string1.find("newtonian") != std::string::npos) ||
+        (string1.find("Newtonian") != std::string::npos) ||
+        (string1.find("new") != std::string::npos)) {
       ppt->gauge = newtonian;
     }
 
-    if ((strstr(string1, "synchronous") != nullptr) || (strstr(string1, "sync") != nullptr) ||
-        (strstr(string1, "Synchronous") != nullptr)) {
+    if ((string1.find("synchronous") != std::string::npos) ||
+        (string1.find("sync") != std::string::npos) ||
+        (string1.find("Synchronous") != std::string::npos)) {
       ppt->gauge = synchronous;
     }
   }
@@ -900,8 +925,8 @@ void InputModule::ReadDerived() {
   int flag1, flag2, flag3;
   double param1, param2, param3;
   int int1;
-  char string1[_ARGUMENT_LENGTH_MAX_];
-  char string2[_ARGUMENT_LENGTH_MAX_];
+  std::string string1;
+  std::string string2;
   double k1    = 0.;
   double k2    = 0.;
   double prr1  = 0.;
@@ -922,10 +947,10 @@ void InputModule::ReadDerived() {
   /** (b) assign values to thermodynamics cosmological parameters */
 
   /** - primordial helium fraction */
-  class_call(parser_read_string(pfc, "YHe", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "YHe", string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "BBN") != nullptr) || (strstr(string1, "bbn") != nullptr)) {
+    if ((string1.find("BBN") != std::string::npos) || (string1.find("bbn") != std::string::npos)) {
       pth->YHe = _BBN_;
     }
     else {
@@ -934,43 +959,44 @@ void InputModule::ReadDerived() {
   }
 
   /** - recombination parameters */
-  class_call(parser_read_string(pfc, "recombination", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "recombination", string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "HYREC") != nullptr) || (strstr(string1, "hyrec") != nullptr) ||
-        (strstr(string1, "HyRec") != nullptr)) {
+    if ((string1.find("HYREC") != std::string::npos) ||
+        (string1.find("hyrec") != std::string::npos) ||
+        (string1.find("HyRec") != std::string::npos)) {
       pth->recombination = hyrec;
     }
   }
 
   /** - reionization parametrization */
-  class_call(parser_read_string(pfc, "reio_parametrization", &string1, &flag1, errmsg),
+  class_call(parser_read_string(pfc, "reio_parametrization", string1, &flag1, errmsg),
              errmsg,
              errmsg);
 
   if (flag1 == _TRUE_) {
     flag2 = _FALSE_;
-    if (strcmp(string1, "reio_none") == 0) {
+    if (string1 == "reio_none") {
       pth->reio_parametrization = reio_none;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "reio_camb") == 0) {
+    if (string1 == "reio_camb") {
       pth->reio_parametrization = reio_camb;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "reio_bins_tanh") == 0) {
+    if (string1 == "reio_bins_tanh") {
       pth->reio_parametrization = reio_bins_tanh;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "reio_half_tanh") == 0) {
+    if (string1 == "reio_half_tanh") {
       pth->reio_parametrization = reio_half_tanh;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "reio_many_tanh") == 0) {
+    if (string1 == "reio_many_tanh") {
       pth->reio_parametrization = reio_many_tanh;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "reio_inter") == 0) {
+    if (string1 == "reio_inter") {
       pth->reio_parametrization = reio_inter;
       flag2                     = _TRUE_;
     }
@@ -1087,20 +1113,20 @@ void InputModule::ReadDerived() {
     class_read_double("annihilation_f_halo", pth->annihilation_f_halo);
     class_read_double("annihilation_z_halo", pth->annihilation_z_halo);
 
-    class_call(parser_read_string(pfc, "on the spot", &(string1), &(flag1), errmsg),
-               errmsg,
-               errmsg);
+    class_call(parser_read_string(pfc, "on the spot", string1, &flag1, errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr)) {
+      if ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos)) {
         pth->has_on_the_spot = _TRUE_;
       }
       else {
-        if ((strstr(string1, "n") != nullptr) || (strstr(string1, "N") != nullptr)) {
+        if ((string1.find("n") != std::string::npos) || (string1.find("N") != std::string::npos)) {
           pth->has_on_the_spot = _FALSE_;
         }
         else {
-          class_stop(errmsg, "incomprehensible input '%s' for the field 'on the spot'", string1);
+          class_stop(errmsg,
+                     "incomprehensible input '%s' for the field 'on the spot'",
+                     string1.c_str());
         }
       }
     }
@@ -1108,22 +1134,22 @@ void InputModule::ReadDerived() {
 
   class_read_double("decay", pth->decay);
 
-  class_call(parser_read_string(pfc, "compute damping scale", &(string1), &(flag1), errmsg),
+  class_call(parser_read_string(pfc, "compute damping scale", string1, &flag1, errmsg),
              errmsg,
              errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr)) {
+    if ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos)) {
       pth->compute_damping_scale = _TRUE_;
     }
     else {
-      if ((strstr(string1, "n") != nullptr) || (strstr(string1, "N") != nullptr)) {
+      if ((string1.find("n") != std::string::npos) || (string1.find("N") != std::string::npos)) {
         pth->compute_damping_scale = _FALSE_;
       }
       else {
         class_stop(errmsg,
                    "incomprehensible input '%s' for the field 'compute damping scale'",
-                   string1);
+                   string1.c_str());
       }
     }
   }
@@ -1133,56 +1159,56 @@ void InputModule::ReadDerived() {
   ppt->has_perturbations = _FALSE_;
   ppt->has_cls           = _FALSE_;
 
-  class_call(parser_read_string(pfc, "output", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "output", string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "tCl") != nullptr) || (strstr(string1, "TCl") != nullptr) ||
-        (strstr(string1, "TCL") != nullptr)) {
+    if ((string1.find("tCl") != std::string::npos) || (string1.find("TCl") != std::string::npos) ||
+        (string1.find("TCL") != std::string::npos)) {
       ppt->has_cl_cmb_temperature = _TRUE_;
       ppt->has_perturbations      = _TRUE_;
       ppt->has_cls                = _TRUE_;
     }
 
-    if ((strstr(string1, "pCl") != nullptr) || (strstr(string1, "PCl") != nullptr) ||
-        (strstr(string1, "PCL") != nullptr)) {
+    if ((string1.find("pCl") != std::string::npos) || (string1.find("PCl") != std::string::npos) ||
+        (string1.find("PCL") != std::string::npos)) {
       ppt->has_cl_cmb_polarization = _TRUE_;
       ppt->has_perturbations       = _TRUE_;
       ppt->has_cls                 = _TRUE_;
     }
 
-    if ((strstr(string1, "lCl") != nullptr) || (strstr(string1, "LCl") != nullptr) ||
-        (strstr(string1, "LCL") != nullptr)) {
+    if ((string1.find("lCl") != std::string::npos) || (string1.find("LCl") != std::string::npos) ||
+        (string1.find("LCL") != std::string::npos)) {
       ppt->has_cl_cmb_lensing_potential = _TRUE_;
       ppt->has_perturbations            = _TRUE_;
       ppt->has_cls                      = _TRUE_;
     }
 
-    if ((strstr(string1, "nCl") != nullptr) || (strstr(string1, "NCl") != nullptr) ||
-        (strstr(string1, "NCL") != nullptr) || (strstr(string1, "dCl") != nullptr) ||
-        (strstr(string1, "DCl") != nullptr) || (strstr(string1, "DCL") != nullptr)) {
+    if ((string1.find("nCl") != std::string::npos) || (string1.find("NCl") != std::string::npos) ||
+        (string1.find("NCL") != std::string::npos) || (string1.find("dCl") != std::string::npos) ||
+        (string1.find("DCl") != std::string::npos) || (string1.find("DCL") != std::string::npos)) {
       ppt->has_cl_number_count = _TRUE_;
       ppt->has_perturbations   = _TRUE_;
       ppt->has_cls             = _TRUE_;
     }
 
-    if ((strstr(string1, "sCl") != nullptr) || (strstr(string1, "SCl") != nullptr) ||
-        (strstr(string1, "SCL") != nullptr)) {
+    if ((string1.find("sCl") != std::string::npos) || (string1.find("SCl") != std::string::npos) ||
+        (string1.find("SCL") != std::string::npos)) {
       ppt->has_cl_lensing_potential = _TRUE_;
       ppt->has_perturbations        = _TRUE_;
       ppt->has_cls                  = _TRUE_;
     }
 
-    if ((strstr(string1, "mPk") != nullptr) || (strstr(string1, "MPk") != nullptr) ||
-        (strstr(string1, "MPK") != nullptr)) {
+    if ((string1.find("mPk") != std::string::npos) || (string1.find("MPk") != std::string::npos) ||
+        (string1.find("MPK") != std::string::npos)) {
       ppt->has_pk_matter     = _TRUE_;
       ppt->has_perturbations = _TRUE_;
 
       /*if (pba->Omega0_ncdm_tot != 0.0){
-        class_call(parser_read_string(pfc,"pk_only_cdm_bar",&string1,&flag1,errmsg),
+        class_call(parser_read_string(pfc,"pk_only_cdm_bar",string1,&flag1,errmsg),
         errmsg,
         errmsg);
         if (flag1 == _TRUE_){
-        if((strstr(string1,"y") != nullptr) || (strstr(string1,"Y") != nullptr)){
+        if((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos)){
         ppt->pk_only_cdm_bar = _TRUE_;
         }
         else {
@@ -1192,33 +1218,33 @@ void InputModule::ReadDerived() {
         }*/
     }
 
-    if ((strstr(string1, "mTk") != nullptr) || (strstr(string1, "MTk") != nullptr) ||
-        (strstr(string1, "MTK") != nullptr) || (strstr(string1, "dTk") != nullptr) ||
-        (strstr(string1, "DTk") != nullptr) || (strstr(string1, "DTK") != nullptr)) {
+    if ((string1.find("mTk") != std::string::npos) || (string1.find("MTk") != std::string::npos) ||
+        (string1.find("MTK") != std::string::npos) || (string1.find("dTk") != std::string::npos) ||
+        (string1.find("DTk") != std::string::npos) || (string1.find("DTK") != std::string::npos)) {
       ppt->has_density_transfers = _TRUE_;
       ppt->has_perturbations     = _TRUE_;
     }
 
-    if ((strstr(string1, "vTk") != nullptr) || (strstr(string1, "VTk") != nullptr) ||
-        (strstr(string1, "VTK") != nullptr)) {
+    if ((string1.find("vTk") != std::string::npos) || (string1.find("VTk") != std::string::npos) ||
+        (string1.find("VTK") != std::string::npos)) {
       ppt->has_velocity_transfers = _TRUE_;
       ppt->has_perturbations      = _TRUE_;
     }
   }
 
   if (ppt->has_density_transfers == _TRUE_) {
-    class_call(parser_read_string(pfc, "extra metric transfer functions", &string1, &flag1, errmsg),
+    class_call(parser_read_string(pfc, "extra metric transfer functions", string1, &flag1, errmsg),
                errmsg,
                errmsg);
 
     if ((flag1 == _TRUE_) &&
-        ((strstr(string1, "y") != nullptr) || (strstr(string1, "y") != nullptr))) {
+        ((string1.find("y") != std::string::npos) || (string1.find("y") != std::string::npos))) {
       ppt->has_metricpotential_transfers = _TRUE_;
     }
   }
 
   if (ppt->has_cl_cmb_temperature == _TRUE_) {
-    class_call(parser_read_string(pfc, "temperature contributions", &string1, &flag1, errmsg),
+    class_call(parser_read_string(pfc, "temperature contributions", string1, &flag1, errmsg),
                errmsg,
                errmsg);
 
@@ -1229,15 +1255,17 @@ void InputModule::ReadDerived() {
       ppt->switch_dop  = 0;
       ppt->switch_pol  = 0;
 
-      if ((strstr(string1, "tsw") != nullptr) || (strstr(string1, "TSW") != nullptr))
+      if ((string1.find("tsw") != std::string::npos) || (string1.find("TSW") != std::string::npos))
         ppt->switch_sw = 1;
-      if ((strstr(string1, "eisw") != nullptr) || (strstr(string1, "EISW") != nullptr))
+      if ((string1.find("eisw") != std::string::npos) ||
+          (string1.find("EISW") != std::string::npos))
         ppt->switch_eisw = 1;
-      if ((strstr(string1, "lisw") != nullptr) || (strstr(string1, "LISW") != nullptr))
+      if ((string1.find("lisw") != std::string::npos) ||
+          (string1.find("LISW") != std::string::npos))
         ppt->switch_lisw = 1;
-      if ((strstr(string1, "dop") != nullptr) || (strstr(string1, "Dop") != nullptr))
+      if ((string1.find("dop") != std::string::npos) || (string1.find("Dop") != std::string::npos))
         ppt->switch_dop = 1;
-      if ((strstr(string1, "pol") != nullptr) || (strstr(string1, "Pol") != nullptr))
+      if ((string1.find("pol") != std::string::npos) || (string1.find("Pol") != std::string::npos))
         ppt->switch_pol = 1;
 
       class_test((ppt->switch_sw == 0) && (ppt->switch_eisw == 0) && (ppt->switch_lisw == 0) &&
@@ -1251,18 +1279,18 @@ void InputModule::ReadDerived() {
   }
 
   if (ppt->has_cl_number_count == _TRUE_) {
-    class_call(parser_read_string(pfc, "number count contributions", &string1, &flag1, errmsg),
+    class_call(parser_read_string(pfc, "number count contributions", string1, &flag1, errmsg),
                errmsg,
                errmsg);
 
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "density") != nullptr)
+      if (string1.find("density") != std::string::npos)
         ppt->has_nc_density = _TRUE_;
-      if (strstr(string1, "rsd") != nullptr)
+      if (string1.find("rsd") != std::string::npos)
         ppt->has_nc_rsd = _TRUE_;
-      if (strstr(string1, "lensing") != nullptr)
+      if (string1.find("lensing") != std::string::npos)
         ppt->has_nc_lens = _TRUE_;
-      if (strstr(string1, "gr") != nullptr)
+      if (string1.find("gr") != std::string::npos)
         ppt->has_nc_gr = _TRUE_;
 
       class_test((ppt->has_nc_density == _FALSE_) && (ppt->has_nc_rsd == _FALSE_) &&
@@ -1280,60 +1308,63 @@ void InputModule::ReadDerived() {
 
   if (ppt->has_perturbations == _TRUE_) {
     /* perturbed recombination */
-    class_call(parser_read_string(pfc, "perturbed recombination", &(string1), &(flag1), errmsg),
+    class_call(parser_read_string(pfc, "perturbed recombination", string1, &flag1, errmsg),
                errmsg,
                errmsg);
 
     if ((flag1 == _TRUE_) &&
-        ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+        ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
       ppt->has_perturbed_recombination = _TRUE_;
     }
 
     /* modes */
-    class_call(parser_read_string(pfc, "modes", &string1, &flag1, errmsg), errmsg, errmsg);
+    class_call(parser_read_string(pfc, "modes", string1, &flag1, errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
       /* if no modes are specified, the default is has_scalars=_TRUE_;
          but if they are specified we should reset has_scalars to _FALSE_ before reading */
       ppt->has_scalars = _FALSE_;
 
-      if ((strstr(string1, "s") != nullptr) || (strstr(string1, "S") != nullptr))
+      if ((string1.find("s") != std::string::npos) || (string1.find("S") != std::string::npos))
         ppt->has_scalars = _TRUE_;
 
-      if ((strstr(string1, "v") != nullptr) || (strstr(string1, "V") != nullptr))
+      if ((string1.find("v") != std::string::npos) || (string1.find("V") != std::string::npos))
         ppt->has_vectors = _TRUE_;
 
-      if ((strstr(string1, "t") != nullptr) || (strstr(string1, "T") != nullptr))
+      if ((string1.find("t") != std::string::npos) || (string1.find("T") != std::string::npos))
         ppt->has_tensors = _TRUE_;
 
       class_test(class_none_of_three(ppt->has_scalars, ppt->has_vectors, ppt->has_tensors),
                  errmsg,
                  "You wrote: modes='%s'. Could not identify any of the modes ('s', 'v', 't') in "
                  "such input",
-                 string1);
+                 string1.c_str());
     }
 
     if (ppt->has_scalars == _TRUE_) {
-      class_call(parser_read_string(pfc, "ic", &string1, &flag1, errmsg), errmsg, errmsg);
+      class_call(parser_read_string(pfc, "ic", string1, &flag1, errmsg), errmsg, errmsg);
 
       if (flag1 == _TRUE_) {
         /* if no initial conditions are specified, the default is has_ad=_TRUE_;
            but if they are specified we should reset has_ad to _FALSE_ before reading */
         ppt->has_ad = _FALSE_;
 
-        if ((strstr(string1, "ad") != nullptr) || (strstr(string1, "AD") != nullptr))
+        if ((string1.find("ad") != std::string::npos) || (string1.find("AD") != std::string::npos))
           ppt->has_ad = _TRUE_;
 
-        if ((strstr(string1, "bi") != nullptr) || (strstr(string1, "BI") != nullptr))
+        if ((string1.find("bi") != std::string::npos) || (string1.find("BI") != std::string::npos))
           ppt->has_bi = _TRUE_;
 
-        if ((strstr(string1, "cdi") != nullptr) || (strstr(string1, "CDI") != nullptr))
+        if ((string1.find("cdi") != std::string::npos) ||
+            (string1.find("CDI") != std::string::npos))
           ppt->has_cdi = _TRUE_;
 
-        if ((strstr(string1, "nid") != nullptr) || (strstr(string1, "NID") != nullptr))
+        if ((string1.find("nid") != std::string::npos) ||
+            (string1.find("NID") != std::string::npos))
           ppt->has_nid = _TRUE_;
 
-        if ((strstr(string1, "niv") != nullptr) || (strstr(string1, "NIV") != nullptr))
+        if ((string1.find("niv") != std::string::npos) ||
+            (string1.find("NIV") != std::string::npos))
           ppt->has_niv = _TRUE_;
 
         class_test(ppt->has_ad == _FALSE_ && ppt->has_bi == _FALSE_ && ppt->has_cdi == _FALSE_ &&
@@ -1341,7 +1372,7 @@ void InputModule::ReadDerived() {
                    errmsg,
                    "You wrote: ic='%s'. Could not identify any of the initial conditions ('ad', "
                    "'bi', 'cdi', 'nid', 'niv') in such input",
-                   string1);
+                   string1.c_str());
       }
     }
 
@@ -1374,31 +1405,31 @@ void InputModule::ReadDerived() {
 
   /** (d) define the primordial spectrum */
 
-  class_call(parser_read_string(pfc, "P_k_ini type", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "P_k_ini type", string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
     flag2 = _FALSE_;
-    if (strcmp(string1, "analytic_Pk") == 0) {
+    if (string1 == "analytic_Pk") {
       ppm->primordial_spec_type = analytic_Pk;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "two_scales") == 0) {
+    if (string1 == "two_scales") {
       ppm->primordial_spec_type = two_scales;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "inflation_V") == 0) {
+    if (string1 == "inflation_V") {
       ppm->primordial_spec_type = inflation_V;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "inflation_H") == 0) {
+    if (string1 == "inflation_H") {
       ppm->primordial_spec_type = inflation_H;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "inflation_V_end") == 0) {
+    if (string1 == "inflation_V_end") {
       ppm->primordial_spec_type = inflation_V_end;
       flag2                     = _TRUE_;
     }
-    if (strcmp(string1, "external_Pk") == 0) {
+    if (string1 == "external_Pk") {
       ppm->primordial_spec_type = external_Pk;
       flag2                     = _TRUE_;
     }
@@ -1445,24 +1476,22 @@ void InputModule::ReadDerived() {
 
         flag1 = _FALSE_;
 
-        class_call(parser_read_string(pfc, "special iso", &string1, &flag1, errmsg),
-                   errmsg,
-                   errmsg);
+        class_call(parser_read_string(pfc, "special iso", string1, &flag1, errmsg), errmsg, errmsg);
 
         /* axion case, only one iso parameter: piir1  */
-        if ((flag1 == _TRUE_) && (strstr(string1, "axion") != nullptr)) {
+        if ((flag1 == _TRUE_) && (string1.find("axion") != std::string::npos)) {
           n_iso = 1.;
           n_cor = 0.;
           c_cor = 0.;
         }
         /* curvaton case, only one iso parameter: piir1  */
-        else if ((flag1 == _TRUE_) && (strstr(string1, "anticurvaton") != nullptr)) {
+        else if ((flag1 == _TRUE_) && (string1.find("anticurvaton") != std::string::npos)) {
           n_iso = ppm->n_s;
           n_cor = 0.;
           c_cor = 1.;
         }
         /* inverted-correlation-curvaton case, only one iso parameter: piir1  */
-        else if ((flag1 == _TRUE_) && (strstr(string1, "curvaton") != nullptr)) {
+        else if ((flag1 == _TRUE_) && (string1.find("curvaton") != std::string::npos)) {
           n_iso = ppm->n_s;
           n_cor = 0.;
           c_cor = -1.;
@@ -1669,10 +1698,10 @@ void InputModule::ReadDerived() {
         ppt->has_tensors = _FALSE_;
       }
       else {
-        class_call(parser_read_string(pfc, "n_t", &string1, &flag1, errmsg), errmsg, errmsg);
+        class_call(parser_read_string(pfc, "n_t", string1, &flag1, errmsg), errmsg, errmsg);
 
-        if ((flag1 == _TRUE_) &&
-            !((strstr(string1, "SCC") != nullptr) || (strstr(string1, "scc") != nullptr))) {
+        if ((flag1 == _TRUE_) && !((string1.find("SCC") != std::string::npos) ||
+                                   (string1.find("scc") != std::string::npos))) {
           class_read_double("n_t", ppm->n_t);
         }
         else {
@@ -1680,10 +1709,10 @@ void InputModule::ReadDerived() {
           ppm->n_t = -ppm->r / 8. * (2. - ppm->r / 8. - ppm->n_s);
         }
 
-        class_call(parser_read_string(pfc, "alpha_t", &string1, &flag1, errmsg), errmsg, errmsg);
+        class_call(parser_read_string(pfc, "alpha_t", string1, &flag1, errmsg), errmsg, errmsg);
 
-        if ((flag1 == _TRUE_) &&
-            !((strstr(string1, "SCC") != nullptr) || (strstr(string1, "scc") != nullptr))) {
+        if ((flag1 == _TRUE_) && !((string1.find("SCC") != std::string::npos) ||
+                                   (string1.find("scc") != std::string::npos))) {
           class_read_double("alpha_t", ppm->alpha_t);
         }
         else {
@@ -1701,11 +1730,11 @@ void InputModule::ReadDerived() {
     double HSR0, HSR1, HSR2, HSR3, HSR4;
 
     if (ppm->primordial_spec_type == inflation_V) {
-      class_call(parser_read_string(pfc, "potential", &string1, &flag1, errmsg), errmsg, errmsg);
+      class_call(parser_read_string(pfc, "potential", string1, &flag1, errmsg), errmsg, errmsg);
 
       /* only polynomial coded so far: no need to interpret string1 **/
 
-      class_call(parser_read_string(pfc, "PSR_0", &string1, &flag1, errmsg), errmsg, errmsg);
+      class_call(parser_read_string(pfc, "PSR_0", string1, &flag1, errmsg), errmsg, errmsg);
 
       if (flag1 == _TRUE_) {
         PSR0 = 0.;
@@ -1741,7 +1770,7 @@ void InputModule::ReadDerived() {
       }
 
       else {
-        class_call(parser_read_string(pfc, "R_0", &string1, &flag1, errmsg), errmsg, errmsg);
+        class_call(parser_read_string(pfc, "R_0", string1, &flag1, errmsg), errmsg, errmsg);
 
         if (flag1 == _TRUE_) {
           R0 = 0.;
@@ -1781,7 +1810,7 @@ void InputModule::ReadDerived() {
     }
 
     else {
-      class_call(parser_read_string(pfc, "HSR_0", &string1, &flag1, errmsg), errmsg, errmsg);
+      class_call(parser_read_string(pfc, "HSR_0", string1, &flag1, errmsg), errmsg, errmsg);
 
       if (flag1 == _TRUE_) {
         HSR0 = 0.;
@@ -1817,13 +1846,13 @@ void InputModule::ReadDerived() {
   }
 
   else if (ppm->primordial_spec_type == inflation_V_end) {
-    class_call(parser_read_string(pfc, "full_potential", &string1, &flag1, errmsg), errmsg, errmsg);
+    class_call(parser_read_string(pfc, "full_potential", string1, &flag1, errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
-      if (strcmp(string1, "polynomial") == 0) {
+      if (string1 == "polynomial") {
         ppm->potential = polynomial;
       }
-      else if (strcmp(string1, "higgs_inflation") == 0) {
+      else if (string1 == "higgs_inflation") {
         ppm->potential = higgs_inflation;
       }
       else {
@@ -1840,9 +1869,9 @@ void InputModule::ReadDerived() {
     class_read_double("Vparam3", ppm->V3);
     class_read_double("Vparam4", ppm->V4);
 
-    class_call(parser_read_string(pfc, "ln_aH_ratio", &string1, &flag1, errmsg), errmsg, errmsg);
+    class_call(parser_read_string(pfc, "ln_aH_ratio", string1, &flag1, errmsg), errmsg, errmsg);
 
-    class_call(parser_read_string(pfc, "N_star", &string2, &flag2, errmsg), errmsg, errmsg);
+    class_call(parser_read_string(pfc, "N_star", string2, &flag2, errmsg), errmsg, errmsg);
 
     class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
                errmsg,
@@ -1850,7 +1879,8 @@ void InputModule::ReadDerived() {
                "compatible");
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "auto") != nullptr) || (strstr(string1, "AUTO") != nullptr)) {
+      if ((string1.find("auto") != std::string::npos) ||
+          (string1.find("AUTO") != std::string::npos)) {
         ppm->phi_pivot_method = ln_aH_ratio_auto;
       }
       else {
@@ -1864,15 +1894,15 @@ void InputModule::ReadDerived() {
       class_read_double("N_star", ppm->phi_pivot_target);
     }
 
-    class_call(parser_read_string(pfc, "inflation_behavior", &string1, &flag1, errmsg),
+    class_call(parser_read_string(pfc, "inflation_behavior", string1, &flag1, errmsg),
                errmsg,
                errmsg);
 
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "numerical") != nullptr) {
+      if (string1.find("numerical") != std::string::npos) {
         ppm->behavior = numerical;
       }
-      else if (strstr(string1, "analytical") != nullptr) {
+      else if (string1.find("analytical") != std::string::npos) {
         ppm->behavior = analytical;
       }
       else {
@@ -1882,8 +1912,8 @@ void InputModule::ReadDerived() {
   }
 
   else if (ppm->primordial_spec_type == external_Pk) {
-    class_call(parser_read_string(pfc, "command", &(string1), &(flag1), errmsg), errmsg, errmsg);
-    class_test(strlen(string1) == 0, errmsg, "You omitted to write a command for the external Pk");
+    class_call(parser_read_string(pfc, "command", string1, &flag1, errmsg), errmsg, errmsg);
+    class_test(string1.empty(), errmsg, "You omitted to write a command for the external Pk");
 
     ppm->command = string1;
     class_read_double("custom1", ppm->custom1);
@@ -1940,10 +1970,10 @@ void InputModule::ReadDerived() {
     }
   }
 
-  class_call(parser_read_string(pfc, "lensing", &(string1), &(flag1), errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "lensing", string1, &flag1, errmsg), errmsg, errmsg);
 
   if ((flag1 == _TRUE_) &&
-      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+      ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
     if ((ppt->has_scalars == _TRUE_) &&
         ((ppt->has_cl_cmb_temperature == _TRUE_) || (ppt->has_cl_cmb_polarization == _TRUE_)) &&
         (ppt->has_cl_cmb_lensing_potential == _TRUE_)) {
@@ -1997,32 +2027,32 @@ void InputModule::ReadDerived() {
 
   /** Do we want density and velocity transfer functions in Nbody gauge? */
   if ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_)) {
-    class_call(parser_read_string(pfc, "Nbody gauge transfer functions", &string1, &flag1, errmsg),
+    class_call(parser_read_string(pfc, "Nbody gauge transfer functions", string1, &flag1, errmsg),
                errmsg,
                errmsg);
 
     if ((flag1 == _TRUE_) &&
-        ((strstr(string1, "y") != nullptr) || (strstr(string1, "y") != nullptr))) {
+        ((string1.find("y") != std::string::npos) || (string1.find("y") != std::string::npos))) {
       ppt->has_Nbody_gauge_transfers = _TRUE_;
     }
   }
 
   /* deal with selection functions */
   if ((ppt->has_cl_number_count == _TRUE_) || (ppt->has_cl_lensing_potential == _TRUE_)) {
-    class_call(parser_read_string(pfc, "selection", &(string1), &(flag1), errmsg), errmsg, errmsg);
+    class_call(parser_read_string(pfc, "selection", string1, &flag1, errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "gaussian") != nullptr) {
+      if (string1.find("gaussian") != std::string::npos) {
         ppt->selection = gaussian;
       }
-      else if (strstr(string1, "tophat") != nullptr) {
+      else if (string1.find("tophat") != std::string::npos) {
         ppt->selection = tophat;
       }
-      else if (strstr(string1, "dirac") != nullptr) {
+      else if (string1.find("dirac") != std::string::npos) {
         ppt->selection = dirac;
       }
       else {
-        class_stop(errmsg, "In selection function input: type '%s' is unclear", string1);
+        class_stop(errmsg, "In selection function input: type '%s' is unclear", string1.c_str());
       }
     }
 
@@ -2163,12 +2193,10 @@ void InputModule::ReadDerived() {
                    ppt->selection_num - 1);
     }
 
-    class_call(parser_read_string(pfc, "dNdz_selection", &(string1), &(flag1), errmsg),
-               errmsg,
-               errmsg);
+    class_call(parser_read_string(pfc, "dNdz_selection", string1, &flag1, errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "analytic") != nullptr)) {
+      if ((string1.find("analytic") != std::string::npos)) {
         ptr->has_nz_analytic = _TRUE_;
       }
       else {
@@ -2177,12 +2205,10 @@ void InputModule::ReadDerived() {
       }
     }
 
-    class_call(parser_read_string(pfc, "dNdz_evolution", &(string1), &(flag1), errmsg),
-               errmsg,
-               errmsg);
+    class_call(parser_read_string(pfc, "dNdz_evolution", string1, &flag1, errmsg), errmsg, errmsg);
 
     if (flag1 == _TRUE_) {
-      if ((strstr(string1, "analytic") != nullptr)) {
+      if ((string1.find("analytic") != std::string::npos)) {
         ptr->has_nz_evo_analytic = _TRUE_;
       }
       else {
@@ -2253,41 +2279,39 @@ void InputModule::ReadDerived() {
   }
   /* end of z_max section */
 
-  class_call(parser_read_string(pfc, "root", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "root", string1, &flag1, errmsg), errmsg, errmsg);
   if (flag1 == _TRUE_) {
-    class_test(strlen(string1) > _FILENAMESIZE_ - 32,
-               errmsg,
-               "Root directory name is too long. Please install in other directory, or increase "
-               "_FILENAMESIZE_ in common.h");
-    strcpy(pop->root, string1);
+    pop->root = string1;
   }
 
-  class_call(parser_read_string(pfc, "headers", &(string1), &(flag1), errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "headers", string1, &flag1, errmsg), errmsg, errmsg);
 
   if ((flag1 == _TRUE_) &&
-      ((strstr(string1, "y") == nullptr) && (strstr(string1, "Y") == nullptr))) {
+      ((string1.find("y") == std::string::npos) && (string1.find("Y") == std::string::npos))) {
     pop->write_header = _FALSE_;
   }
 
-  class_call(parser_read_string(pfc, "format", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "format", string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
-    if ((strstr(string1, "class") != nullptr) || (strstr(string1, "CLASS") != nullptr))
+    if ((string1.find("class") != std::string::npos) ||
+        (string1.find("CLASS") != std::string::npos))
       pop->output_format = class_format;
     else {
-      if ((strstr(string1, "camb") != nullptr) || (strstr(string1, "CAMB") != nullptr))
+      if ((string1.find("camb") != std::string::npos) ||
+          (string1.find("CAMB") != std::string::npos))
         pop->output_format = camb_format;
       else
         class_stop(errmsg,
                    "You wrote: format='%s'. Could not identify any of the possible formats "
                    "('class', 'CLASS', 'camb', 'CAMB')",
-                   string1);
+                   string1.c_str());
     }
   }
 
   /** (f) parameter related to the non-linear spectra computation */
 
-  class_call(parser_read_string(pfc, "non linear", &(string1), &(flag1), errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "non linear", string1, &flag1, errmsg), errmsg, errmsg);
 
   if (flag1 == _TRUE_) {
     class_test(ppt->has_perturbations == _FALSE_,
@@ -2295,39 +2319,42 @@ void InputModule::ReadDerived() {
                "You requested non linear computation but no linear computation. You must set "
                "output to tCl or similar.");
 
-    if ((strstr(string1, "halofit") != nullptr) || (strstr(string1, "Halofit") != nullptr) ||
-        (strstr(string1, "HALOFIT") != nullptr)) {
+    if ((string1.find("halofit") != std::string::npos) ||
+        (string1.find("Halofit") != std::string::npos) ||
+        (string1.find("HALOFIT") != std::string::npos)) {
       pnl->method       = nl_halofit;
       ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
                               MAX(ppr->halofit_min_k_max, ppr->nonlinear_min_k_max));
       ppt->has_nl_corrections_based_on_delta_m = _TRUE_;
     }
-    if ((strstr(string1, "hmcode") != nullptr) || (strstr(string1, "HMCODE") != nullptr) ||
-        (strstr(string1, "HMcode") != nullptr) || (strstr(string1, "Hmcode") != nullptr)) {
+    if ((string1.find("hmcode") != std::string::npos) ||
+        (string1.find("HMCODE") != std::string::npos) ||
+        (string1.find("HMcode") != std::string::npos) ||
+        (string1.find("Hmcode") != std::string::npos)) {
       pnl->method       = nl_HMcode;
       ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
                               MAX(ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max));
       ppt->has_nl_corrections_based_on_delta_m = _TRUE_;
       class_read_int("extrapolation_method", pnl->extrapolation_method);
 
-      class_call(parser_read_string(pfc, "feedback model", &(string1), &(flag1), errmsg),
+      class_call(parser_read_string(pfc, "feedback model", string1, &flag1, errmsg),
                  errmsg,
                  errmsg);
 
       if (flag1 == _TRUE_) {
-        if (strstr(string1, "emu_dmonly") != nullptr) {
+        if (string1.find("emu_dmonly") != std::string::npos) {
           pnl->feedback = nl_emu_dmonly;
         }
-        if (strstr(string1, "owls_dmonly") != nullptr) {
+        if (string1.find("owls_dmonly") != std::string::npos) {
           pnl->feedback = nl_owls_dmonly;
         }
-        if (strstr(string1, "owls_ref") != nullptr) {
+        if (string1.find("owls_ref") != std::string::npos) {
           pnl->feedback = nl_owls_ref;
         }
-        if (strstr(string1, "owls_agn") != nullptr) {
+        if (string1.find("owls_agn") != std::string::npos) {
           pnl->feedback = nl_owls_agn;
         }
-        if (strstr(string1, "owls_dblim") != nullptr) {
+        if (string1.find("owls_dblim") != std::string::npos) {
           pnl->feedback = nl_owls_dblim;
         }
       }
@@ -2386,13 +2413,13 @@ void InputModule::ReadDerived() {
 
   if (ppt->has_tensors == _TRUE_) {
     /** - ---> Include ur and ncdm shear in tensor computation? */
-    class_call(parser_read_string(pfc, "tensor method", &string1, &flag1, errmsg), errmsg, errmsg);
+    class_call(parser_read_string(pfc, "tensor method", string1, &flag1, errmsg), errmsg, errmsg);
     if (flag1 == _TRUE_) {
-      if (strstr(string1, "photons") != nullptr)
+      if (string1.find("photons") != std::string::npos)
         ppt->tensor_method = tm_photons_only;
-      if (strstr(string1, "massless") != nullptr)
+      if (string1.find("massless") != std::string::npos)
         ppt->tensor_method = tm_massless_approximation;
-      if (strstr(string1, "exact") != nullptr)
+      if (string1.find("exact") != std::string::npos)
         ppt->tensor_method = tm_exact;
     }
   }
@@ -2483,7 +2510,7 @@ void InputModule::ReadDerived() {
 
   class_call(parser_read_string(pfc,
                                 "l_switch_limber_for_cl_density_over_z",
-                                &string1,
+                                string1,
                                 &flag1,
                                 errmsg),
              errmsg,
@@ -2503,21 +2530,21 @@ void InputModule::ReadDerived() {
 
   /** - (i.1.) shall we write background quantities in a file? */
 
-  class_call(parser_read_string(pfc, "write background", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "write background", string1, &flag1, errmsg), errmsg, errmsg);
 
   if ((flag1 == _TRUE_) &&
-      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+      ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
     pop->write_background = _TRUE_;
   }
 
   /** - (i.2.) shall we write thermodynamics quantities in a file? */
 
-  class_call(parser_read_string(pfc, "write thermodynamics", &string1, &flag1, errmsg),
+  class_call(parser_read_string(pfc, "write thermodynamics", string1, &flag1, errmsg),
              errmsg,
              errmsg);
 
   if ((flag1 == _TRUE_) &&
-      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+      ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
     pop->write_thermodynamics = _TRUE_;
   }
 
@@ -2549,10 +2576,10 @@ void InputModule::ReadDerived() {
 
   /** - (i.4.) shall we write primordial spectra in a file? */
 
-  class_call(parser_read_string(pfc, "write primordial", &string1, &flag1, errmsg), errmsg, errmsg);
+  class_call(parser_read_string(pfc, "write primordial", string1, &flag1, errmsg), errmsg, errmsg);
 
   if ((flag1 == _TRUE_) &&
-      ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+      ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
     pop->write_primordial = _TRUE_;
   }
 
@@ -2573,10 +2600,10 @@ void InputModule::ReadDerived() {
   if ((pnl->method == nl_halofit) && all_species_.count("Fluid")) {
     const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
     if ((fluid.fluid_eos() == CLP) && (fluid.wa_fld() != 0.)) {
-      class_call(parser_read_string(pfc, "pk_eq", &string1, &flag1, errmsg), errmsg, errmsg);
+      class_call(parser_read_string(pfc, "pk_eq", string1, &flag1, errmsg), errmsg, errmsg);
 
       if ((flag1 == _TRUE_) &&
-          ((strstr(string1, "y") != nullptr) || (strstr(string1, "Y") != nullptr))) {
+          ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
         pnl->has_pk_eq = _TRUE_;
       }
     }
@@ -2635,10 +2662,10 @@ void read(const FileContent& fc, const char* name, double& v) {
 void read(const FileContent& fc, const char* name, int& v) {
   fc.read_int(name, v);
 }
-void read(const FileContent& fc, const char* name, FileName& v) {
+void read(const FileContent& fc, const char* name, std::string& v) {
   std::string s;
   if (fc.read_string(name, s))
-    strncpy(v, s.c_str(), sizeof(FileName) - 1);
+    v = s;
 }
 template <typename E>
 void read_enum(const FileContent& fc, const char* name, E& v) {
@@ -2649,19 +2676,11 @@ void read_enum(const FileContent& fc, const char* name, E& v) {
 }  // anonymous namespace
 
 void precision::ResolveDataPaths() {
-  // Prepend the runtime class_dir to each field's relative-path default, in
-  // place. snprintf is used for bounded, always-NUL-terminated concatenation
-  // (class_dir + relative can exceed sizeof(FileName) for deep install paths).
-  auto prepend_class_dir = [this](char* path, size_t size) {
-    FileName relative;
-    snprintf(relative, sizeof(relative), "%s", path);
-    snprintf(path, size, "%s%s", class_dir, relative);
-  };
-
-  prepend_class_dir(sBBN_file, sizeof(sBBN_file));
-  prepend_class_dir(hyrec_Alpha_inf_file, sizeof(hyrec_Alpha_inf_file));
-  prepend_class_dir(hyrec_R_inf_file, sizeof(hyrec_R_inf_file));
-  prepend_class_dir(hyrec_two_photon_tables_file, sizeof(hyrec_two_photon_tables_file));
+  // Prepend the runtime class_dir to each field's relative-path default.
+  sBBN_file                    = class_dir + sBBN_file;
+  hyrec_Alpha_inf_file         = class_dir + hyrec_Alpha_inf_file;
+  hyrec_R_inf_file             = class_dir + hyrec_R_inf_file;
+  hyrec_two_photon_tables_file = class_dir + hyrec_two_photon_tables_file;
 }
 
 void precision::parse(const FileContent& fc) {

@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include <string>
+
 void class_protect_sprintf(char* dest, const char* tpl, ...) {
   va_list args;
   va_start(args, tpl);
@@ -20,13 +22,10 @@ void* class_protect_memcpy(void* dest, void* from, size_t sz) {
   return memcpy(dest, from, sz);
 }
 
-int get_number_of_titles(char* titlestring) {
-  int i;
+int get_number_of_titles(const std::string& titlestring) {
   int number_of_titles = 0;
-
-  for (i = 0; i < strlen(titlestring); i++) {
-    if (titlestring[i] == '\t')
+  for (char c : titlestring)
+    if (c == '\t')
       number_of_titles++;
-  }
   return number_of_titles;
 }

@@ -92,12 +92,8 @@ from libcpp.vector cimport vector
 
 definition_names = [
     '_MAX_NUMBER_OF_K_FILES_',
-    '_MAXTITLESTRINGLENGTH_',
-    '_FILENAMESIZE_',
-    '_LINE_LENGTH_MAX_',
     '_Z_PK_NUM_MAX_',
     '_SELECTION_NUM_MAX_',
-    '_ARGUMENT_LENGTH_MAX_',
     '_ERRORMSGSIZE_',
     '_TRUE_',
     '_FALSE_',
@@ -124,9 +120,7 @@ enums = []
 enums.append('cdef extern from "class.h":')
 enums.append('    pair[string, string] get_my_py_error_message()')
 enums.append('')
-enums.append('    ctypedef char FileArg[_ARGUMENT_LENGTH_MAX_]')
 enums.append('    ctypedef char ErrorMsg[_ERRORMSGSIZE_]')
-enums.append('    ctypedef char FileName[_FILENAMESIZE_]')
 enums.append('')
 enum_names = [
     'equation_of_state',
@@ -190,7 +184,7 @@ struct_names = [
     'thermo',
     'transfers',
 ]
-allowed_types = ['double', 'int', 'short', 'FileArg']
+allowed_types = ['double', 'int', 'short', 'std::string']
 
 for file in h_files:
     # Special treatment of common.h
@@ -263,7 +257,7 @@ class_names = ['FileContent', 'NonColdDarkMatter', 'InputModule', 'BackgroundMod
                 'ThermodynamicsModule', 'PerturbationsModule',
                 'PrimordialModule', 'NonlinearModule', 'TransferModule', 'SpectraModule', 'LensingModule',
                 'ClassConstants', 'NcdmSettings',]
-allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', 'FileArg',
+allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', 'std::string',
                  'std::map<std::string, std::vector<double>>',
                  'std::map<std::string, int>', 'std::shared_ptr<NonColdDarkMatter>',
                  'std::vector<std::vector<double>>', 'std::vector<std::vector<short>>',
@@ -351,8 +345,8 @@ for file in h_files:
 
         variable_name_begin = -1
         for index in range(len(typename), len(line)):
-            if line[index] == '*':
-                typename += '*'
+            if line[index] == '*' or line[index] == '&':
+                typename += line[index]
             elif line[index] != ' ':
                 variable_name_begin = index
                 break
@@ -425,5 +419,9 @@ with open(rootdir / 'cclassy.pxd', 'w', encoding='utf-8') as fid:
         for index_line in range(len(lines)):
             for key, val in definitions_dict.items():
                 lines[index_line] = lines[index_line].replace(key, val)
+            # Cython spells C++ types without the std:: prefix and uses [] for
+            # template brackets (e.g. std::string -> string). The classes section
+            # already does this inline; apply it to all sections (incl. structs).
+            lines[index_line] = lines[index_line].replace('std::', '').replace('<', '[').replace('>', ']')
         fid.write("\n".join(lines))
         fid.write("\n\n")

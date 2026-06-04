@@ -1617,7 +1617,8 @@ int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionizat
  */
 int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
   FILE* fA;
-  char line[_LINE_LENGTH_MAX_];
+  char* line     = nullptr;
+  size_t linecap = 0;
   char* left;
 
   int num_omegab = 0;
@@ -1685,10 +1686,10 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
      .....
   */
 
-  class_open(fA, ppr->sBBN_file, "r", error_message_);
+  class_open(fA, ppr->sBBN_file.c_str(), "r", error_message_);
 
   /* go through each line */
-  while (fgets(line, _LINE_LENGTH_MAX_ - 1, fA) != nullptr) {
+  while (getline(&line, &linecap, fA) != -1) {
     /* eliminate blank spaces at beginning of line */
     left = line;
     while (left[0] == ' ') {
@@ -1709,14 +1710,14 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
         class_test(sscanf(line, "%d %d", &num_omegab, &num_deltaN) != 2,
                    error_message_,
                    "could not read value of parameters (num_omegab,num_deltaN) in file %s\n",
-                   ppr->sBBN_file);
+                   ppr->sBBN_file.c_str());
 
         class_test(num_omegab <= 0 || num_deltaN <= 0,
                    error_message_,
                    "read num_omegab=%d, num_deltaN=%d in file %s, expected positive values\n",
                    num_omegab,
                    num_deltaN,
-                   ppr->sBBN_file);
+                   ppr->sBBN_file.c_str());
 
         omegab.resize(num_omegab);
         deltaN.resize(num_deltaN);
@@ -1735,11 +1736,12 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
                           &(YHe[array_line])) != 3,
                    error_message_,
                    "could not read value of parameters (omegab,deltaN,YHe) in file %s\n",
-                   ppr->sBBN_file);
+                   ppr->sBBN_file.c_str());
         array_line++;
       }
     }
   }
+  free(line);
 
   fclose(fA);
 
@@ -3273,20 +3275,22 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
 
   /* read in file */
 
-  class_open(fA, ppr->hyrec_Alpha_inf_file, "r", error_message_);
-  class_open(fR, ppr->hyrec_R_inf_file, "r", error_message_);
+  class_open(fA, ppr->hyrec_Alpha_inf_file.c_str(), "r", error_message_);
+  class_open(fR, ppr->hyrec_R_inf_file.c_str(), "r", error_message_);
 
   for (int i = 0; i < NTR; i++) {
     for (int j = 0; j < NTM; j++) {
       for (int l = 0; l <= 1; l++) {
         if (fscanf(fA, "%le", &(rate_table.logAlpha_tab[l][j][i])) != 1)
-          class_stop(error_message_, "Error reading hyrec data file %s", ppr->hyrec_Alpha_inf_file);
+          class_stop(error_message_,
+                     "Error reading hyrec data file %s",
+                     ppr->hyrec_Alpha_inf_file.c_str());
         rate_table.logAlpha_tab[l][j][i] = log(rate_table.logAlpha_tab[l][j][i]);
       }
     }
 
     if (fscanf(fR, "%le", &(rate_table.logR2p2s_tab[i])) != 1)
-      class_stop(error_message_, "Error reading hyrec data file %s", ppr->hyrec_R_inf_file);
+      class_stop(error_message_, "Error reading hyrec data file %s", ppr->hyrec_R_inf_file.c_str());
     rate_table.logR2p2s_tab[i] = log(rate_table.logR2p2s_tab[i]);
   }
   fclose(fA);
@@ -3294,7 +3298,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
 
   /* Read two-photon rate tables */
 
-  class_open(fA, ppr->hyrec_two_photon_tables_file, "r", error_message_);
+  class_open(fA, ppr->hyrec_two_photon_tables_file.c_str(), "r", error_message_);
 
   for (int b = 0; b < NVIRT; b++) {
     if ((fscanf(fA, "%le", &(twog_params.Eb_tab[b])) != 1) ||
@@ -3304,7 +3308,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
         (fscanf(fA, "%le", &(twog_params.A4s4d_tab[b])) != 1))
       class_stop(error_message_,
                  "Error reading hyrec data file %s",
-                 ppr->hyrec_two_photon_tables_file);
+                 ppr->hyrec_two_photon_tables_file.c_str());
   }
 
   fclose(fA);
@@ -4282,7 +4286,7 @@ int ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* prec
  * Subroutine for formatting thermodynamics output
  */
 
-int ThermodynamicsModule::thermodynamics_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const {
+int ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) const {
   class_store_columntitle(titles, "z", _TRUE_);
   class_store_columntitle(titles, "conf. time [Mpc]", _TRUE_);
   class_store_columntitle(titles, "x_e", _TRUE_);

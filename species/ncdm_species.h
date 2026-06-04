@@ -147,7 +147,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
                       const double*,
                       const PerturbationsModule&,
                       const perturb_workspace*) const override;
-  void WriteTensorOutputColumnTitles(char* tensor_titles) const override;
+  void WriteTensorOutputColumnTitles(std::string& tensor_titles) const override;
 
   /** Per-species offset into the NCDM source-slot block, assigned in lex order
    *  by PerturbationsModule when source indices are allocated. Used to compute

@@ -104,11 +104,13 @@ class InputModule {
       destination = (typeof(destination)) int1;                                    \
   } while (0);
 
-#define class_read_string(name, destination)                                             \
-  do {                                                                                   \
-    class_call(parser_read_string(pfc, name, &string1, &flag1, errmsg), errmsg, errmsg); \
-    if (flag1 == _TRUE_)                                                                 \
-      strcpy(destination, string1);                                                      \
+/* `destination` must be a std::string (the assignment below relies on it); legacy
+ * char[] fields are not supported by this macro. `string1` is a std::string local. */
+#define class_read_string(name, destination)                                            \
+  do {                                                                                  \
+    class_call(parser_read_string(pfc, name, string1, &flag1, errmsg), errmsg, errmsg); \
+    if (flag1 == _TRUE_)                                                                \
+      destination = string1;                                                            \
   } while (0);
 
 #define class_read_double_one_of_two(name1, name2, destination)                          \

@@ -374,7 +374,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format,
  */
 
 int PerturbationsModule::perturb_output_titles(enum file_format output_format,
-                                               char titles[_MAXTITLESTRINGLENGTH_]) const {
+                                               std::string& titles) const {
   if (output_format == class_format) {
     class_store_columntitle(titles, "k (h/Mpc)", _TRUE_);
     if (ppt->has_density_transfers == _TRUE_) {
@@ -434,36 +434,34 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format,
  */
 
 int PerturbationsModule::perturb_output_firstline_and_ic_suffix(int index_ic,
-                                                                char first_line[_LINE_LENGTH_MAX_],
-                                                                FileName ic_suffix) const {
-  first_line[0] = '\0';
-  ic_suffix[0]  = '\0';
+                                                                std::string& first_line,
+                                                                std::string& ic_suffix) const {
+  first_line.clear();
+  ic_suffix.clear();
 
   if ((ppt->has_ad == _TRUE_) && (index_ic == index_ic_ad_)) {
-    strcpy(ic_suffix, "ad");
-    strcpy(first_line, "for adiabatic (AD) mode (normalized to initial curvature=1) ");
+    ic_suffix  = "ad";
+    first_line = "for adiabatic (AD) mode (normalized to initial curvature=1) ";
   }
 
   if ((ppt->has_bi == _TRUE_) && (index_ic == index_ic_bi_)) {
-    strcpy(ic_suffix, "bi");
-    strcpy(first_line, "for baryon isocurvature (BI) mode (normalized to initial entropy=1)");
+    ic_suffix  = "bi";
+    first_line = "for baryon isocurvature (BI) mode (normalized to initial entropy=1)";
   }
 
   if ((ppt->has_cdi == _TRUE_) && (index_ic == index_ic_cdi_)) {
-    strcpy(ic_suffix, "cdi");
-    strcpy(first_line, "for CDM isocurvature (CDI) mode (normalized to initial entropy=1)");
+    ic_suffix  = "cdi";
+    first_line = "for CDM isocurvature (CDI) mode (normalized to initial entropy=1)";
   }
 
   if ((ppt->has_nid == _TRUE_) && (index_ic == index_ic_nid_)) {
-    strcpy(ic_suffix, "nid");
-    strcpy(first_line,
-           "for neutrino density isocurvature (NID) mode (normalized to initial entropy=1)");
+    ic_suffix  = "nid";
+    first_line = "for neutrino density isocurvature (NID) mode (normalized to initial entropy=1)";
   }
 
   if ((ppt->has_niv == _TRUE_) && (index_ic == index_ic_niv_)) {
-    strcpy(ic_suffix, "niv");
-    strcpy(first_line,
-           "for neutrino velocity isocurvature (NIV) mode (normalized to initial entropy=1)");
+    ic_suffix  = "niv";
+    first_line = "for neutrino velocity isocurvature (NIV) mode (normalized to initial entropy=1)";
   }
   return _SUCCESS_;
 }
@@ -2852,9 +2850,9 @@ int PerturbationsModule::perturb_solve(int index_md,
  */
 
 int PerturbationsModule::perturb_prepare_k_output() {
-  scalar_titles_[0] = '\0';
-  vector_titles_[0] = '\0';
-  tensor_titles_[0] = '\0';
+  scalar_titles_.clear();
+  vector_titles_.clear();
+  tensor_titles_.clear();
 
   if (ppt->k_output_values_num > 0) {
     /** Write titles for all perturbations that we would like to print/store. */

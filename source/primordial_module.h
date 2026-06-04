@@ -14,7 +14,7 @@ class PrimordialModule : public BaseModule {
                                enum linear_or_logarithmic mode,
                                double k,
                                double* pk) const;
-  int primordial_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const;
+  int primordial_output_titles(std::string& titles) const;
   int primordial_output_data(int number_of_titles, double* data) const;
 
   std::vector<int>

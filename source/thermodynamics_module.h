@@ -10,7 +10,7 @@ class ThermodynamicsModule : public BaseModule {
  public:
   ThermodynamicsModule(InputModulePtr input_module, BackgroundModulePtr background_module);
   ~ThermodynamicsModule();
-  int thermodynamics_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const;
+  int thermodynamics_output_titles(std::string& titles) const;
   int thermodynamics_output_data(int number_of_titles, double* data) const;
   int thermodynamics_at_z(
       double z, short inter_mode, int* last_index, double* pvecback, double* pvecthermo) const;

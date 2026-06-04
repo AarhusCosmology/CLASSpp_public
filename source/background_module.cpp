@@ -1239,7 +1239,7 @@ int BackgroundModule::background_find_equality() {
  *
  */
 
-int BackgroundModule::background_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const {
+int BackgroundModule::background_output_titles(std::string& titles) const {
   // ── Module header (always present) ──────────────────────────────────────
   class_store_columntitle(titles, "z", _TRUE_);
   class_store_columntitle(titles, "proper time [Gyr]", _TRUE_);

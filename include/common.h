@@ -60,10 +60,6 @@ typedef std::shared_ptr<const LensingModule> LensingModulePtr;
 typedef char ErrorMsg
     [_ERRORMSGSIZE_]; /**< Generic error messages (there is such a field in each structure) */
 
-#define _FILENAMESIZE_ \
-  256 /**< size of the string read in each line of the file (extra characters not taken into account) */
-typedef char FileName[_FILENAMESIZE_];
-
 #define _PI_ 3.1415926535897932384626433832795e0 /**< The number pi */
 
 #define _PIHALF_ 1.57079632679489661923132169164e0 /**< pi divided by 2 */
@@ -100,21 +96,12 @@ typedef char FileName[_FILENAMESIZE_];
 #define _COLUMNWIDTH_ \
   24 /**< Must be at least _OUTPUTPRECISION_+8 for guaranteed fixed width columns */
 
-#define _MAXTITLESTRINGLENGTH_ 8000 /**< Maximum number of characters in title strings */
-
 #define _DELIMITER_ "\t" /**< character used for delimiting titles in the title strings */
 
 #ifndef __CLASSDIR__
 #define __CLASSDIR__ \
   "." /**< The directory of CLASS. This is set to the absolute path to the CLASS directory so this is just a failsafe. */
 #endif
-
-#define _LINE_LENGTH_MAX_ \
-  1024 /**< size of the string read in each line of the file (extra characters not taken into account) */
-#define _ARGUMENT_LENGTH_MAX_ \
-  1024 /**< maximum size of each argument (name or value), including the final null character */
-
-typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 
 /**
  * @name Some conversion factors and fundamental constants needed by background module:
@@ -414,11 +401,10 @@ typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 #define class_store_columntitle(titlestring, title, condition) \
   {                                                            \
     if (condition == _TRUE_) {                                 \
-      strcat(titlestring, title);                              \
-      strcat(titlestring, _DELIMITER_);                        \
+      titlestring += title;                                    \
+      titlestring += _DELIMITER_;                              \
     }                                                          \
   }
-//,_MAXTITLESTRINGLENGTH_-strlen(titlestring)-1);
 
 #define class_store_double(storage, value, condition, dataindex) \
   {                                                              \
@@ -484,7 +470,7 @@ enum ncdmfa_method { ncdmfa_mb, ncdmfa_hu, ncdmfa_CLASS, ncdmfa_none };
  * steps, flags telling how the computation is to be performed, etc.
  */
 struct precision {
-  FileArg class_dir;
+  std::string class_dir;
 
   /*
    * Background Quantities
@@ -560,7 +546,7 @@ struct precision {
    * Big Bang Nucleosynthesis file path. The file specifies the predictions for
    * \f$ Y_\mathrm{He} \f$ for given \f$ \omega_b \f$ and \f$ N_\mathrm{eff} \f$.
    */
-  FileName sBBN_file = "/bbn/sBBN_2017.dat";
+  std::string sBBN_file = "/bbn/sBBN_2017.dat";
 
   /*
    *  Thermodynamical quantities
@@ -660,11 +646,11 @@ struct precision {
   int thermo_rate_smoothing_radius =
       50; /**< Smoothing in redshift of the variation rate of \f$ \exp(-\kappa) \f$, g, and \f$ \frac{dg}{d\tau} \f$ that is used as a timescale afterwards */
 
-  FileName hyrec_Alpha_inf_file =
+  std::string hyrec_Alpha_inf_file =
       "/hyrec/Alpha_inf.dat"; /**< File containing the alpha parameter of hyrec */
-  FileName hyrec_R_inf_file =
+  std::string hyrec_R_inf_file =
       "/hyrec/R_inf.dat"; /**< File containing the R_inf parameter of hyrec */
-  FileName hyrec_two_photon_tables_file =
+  std::string hyrec_two_photon_tables_file =
       "/hyrec/two_photon_tables.dat"; /**< File containing the two-photon interaction parameter of hyrec */
 
   double k_min_tau0 =
@@ -1129,9 +1115,13 @@ extern "C" {
 void class_protect_sprintf(char* dest, const char* tpl, ...);
 void class_protect_fprintf(FILE* dest, char* tpl, ...);
 void* class_protect_memcpy(void* dest, void* from, size_t sz);
-int get_number_of_titles(char* titlestring);
 #ifdef __cplusplus
 }
+
+/* Not in the extern "C" block: takes a std::string& (a C++ type), so it cannot
+ * have C language linkage; guarded by __cplusplus so C translation units never
+ * see this declaration. */
+int get_number_of_titles(const std::string& titlestring);
 #endif
 
 #endif

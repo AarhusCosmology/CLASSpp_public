@@ -13,7 +13,7 @@ class BackgroundModule : public BaseModule {
   double GetOmega0Species(const std::string& key) const;
   BackgroundModule(InputModulePtr input_module);
   ~BackgroundModule();
-  int background_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const;
+  int background_output_titles(std::string& titles) const;
   int background_output_data(int number_of_titles, double* data) const;
   int background_at_tau(
       double tau, short return_format, short inter_mode, int* last_index, double* pvecback) const;

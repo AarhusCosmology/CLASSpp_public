@@ -1106,12 +1106,11 @@ cdef class PyCosmology:
             vector[double] data
 
         background_module = deref(self._thisptr).GetBackgroundModule()
-        titles.resize(constvals.sMAXTITLESTRINGLENGTH)
-        status = deref(background_module).background_output_titles(<char*> titles.c_str())
+        status = deref(background_module).background_output_titles(titles)
         if status == constvals.sFAILURE:
             raise CosmoSevereError(deref(background_module).error_message_)
 
-        tmp = <bytes> titles.c_str()
+        tmp = <bytes> titles
         tmp = str(tmp.decode())
         names = tmp.strip("\t").split("\t")
         number_of_titles = len(names)
@@ -1149,12 +1148,11 @@ cdef class PyCosmology:
 
         thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
 
-        titles.resize(constvals.sMAXTITLESTRINGLENGTH)
-        status = deref(thermodynamics_module).thermodynamics_output_titles(<char*> titles.c_str())
+        status = deref(thermodynamics_module).thermodynamics_output_titles(titles)
         if status == constvals.sFAILURE:
             raise CosmoSevereError(deref(thermodynamics_module).error_message_)
 
-        tmp = <bytes> titles.c_str()
+        tmp = <bytes> titles
         tmp = str(tmp.decode())
         names = tmp.strip("\t").split("\t")
         number_of_titles = len(names)
@@ -1194,13 +1192,11 @@ cdef class PyCosmology:
 
         primordial_module = deref(self._thisptr).GetPrimordialModule()
 
-        titles.resize(constvals.sMAXTITLESTRINGLENGTH)
-
-        status = deref(primordial_module).primordial_output_titles(<char*> titles.c_str())
+        status = deref(primordial_module).primordial_output_titles(titles)
         if status == constvals.sFAILURE:
             raise CosmoSevereError(deref(primordial_module).error_message_)
 
-        tmp = <bytes> titles.c_str()
+        tmp = <bytes> titles
         tmp = str(tmp.decode())
         names = tmp.strip("\t").split("\t")
         number_of_titles = len(names)
@@ -1317,8 +1313,8 @@ cdef class PyCosmology:
         cdef:
             string titles
             vector[double] data
-            char ic_info[1024]
-            FileName ic_suffix
+            string ic_info
+            string ic_suffix
             file_format outf
             int status
             Py_ssize_t number_of_titles
@@ -1341,9 +1337,8 @@ cdef class PyCosmology:
 
         perturbations_module = deref(self._thisptr).GetPerturbationsModule()
         index_md = deref(perturbations_module).index_md_scalars_
-        titles.resize(constvals.sMAXTITLESTRINGLENGTH)
 
-        status = deref(perturbations_module).perturb_output_titles(outf, <char*> titles.c_str())
+        status = deref(perturbations_module).perturb_output_titles(outf, titles)
         if status == constvals.sFAILURE:
             raise CosmoSevereError(deref(perturbations_module).error_message_)
 

@@ -3,6 +3,7 @@
 #ifndef __TRANSFER__
 #define __TRANSFER__
 
+#include <string>
 #include <vector>
 
 #include "hyperspherical.h"
@@ -98,13 +99,13 @@ struct transfers {
 
   short has_nz_file = _FALSE_; /**< Has dN/dz (selection function) input file? */
   short has_nz_analytic =
-      _FALSE_;           /**< Use analytic form for dN/dz (selection function) distribution? */
-  FileName nz_file_name; /**< dN/dz (selection function) input file name */
+      _FALSE_;              /**< Use analytic form for dN/dz (selection function) distribution? */
+  std::string nz_file_name; /**< dN/dz (selection function) input file name */
 
   short has_nz_evo_file = _FALSE_; /**< Has dN/dz (evolution function) input file? */
   short has_nz_evo_analytic =
-      _FALSE_;               /**< Use analytic form for dN/dz (evolution function) distribution? */
-  FileName nz_evo_file_name; /**< dN/dz (evolution function) input file name */
+      _FALSE_; /**< Use analytic form for dN/dz (evolution function) distribution? */
+  std::string nz_evo_file_name; /**< dN/dz (evolution function) input file name */
 
   //@}
 

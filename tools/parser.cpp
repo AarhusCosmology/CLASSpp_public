@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <sstream>
 #include <stdexcept>
 
@@ -12,35 +13,32 @@
  *****************************************************************************/
 
 /* static */ FileContent FileContent::from_file(const std::string& filename) {
-  FILE* fp = std::fopen(filename.c_str(), "r");
-  if (!fp) {
-    throw std::invalid_argument("Cannot open file '" + filename + "': " + std::strerror(errno));
+  // std::ifstream is not guaranteed to set errno on failure, so reset it first
+  // and only report a strerror reason when the open actually set one.
+  errno = 0;
+  std::ifstream in(filename);
+  if (!in) {
+    const std::string reason = errno ? std::strerror(errno) : "unable to open file";
+    throw std::invalid_argument("Cannot open file '" + filename + "': " + reason);
   }
-
   FileContent fc;
   fc.filename_ = filename;
 
-  char line_buf[_LINE_LENGTH_MAX_];
-  while (std::fgets(line_buf, _LINE_LENGTH_MAX_, fp) != nullptr) {
+  std::string line;
+  while (std::getline(in, line)) {
     std::string name, value;
-    if (!parse_line(line_buf, name, value))
+    if (!parse_line(line, name, value))
       continue;
-
     if (fc.params_.count(name)) {
-      std::fclose(fp);
       throw std::invalid_argument("Multiple entries of parameter '" + name + "' in file '" +
                                   filename + "'");
     }
     fc.keys_.push_back(name);
     fc.params_[name] = value;
   }
-
   if (fc.params_.empty()) {
-    std::fclose(fp);
     throw std::invalid_argument("No readable input in file '" + filename + "'");
   }
-
-  std::fclose(fp);
   return fc;
 }
 
@@ -274,36 +272,6 @@ int parser_read_file(const char* filename, FileContent* pfc, ErrorMsg errmsg) {
   return _SUCCESS_;
 }
 
-int parser_init(FileContent* pfc, int /*size*/, const char* /*filename*/, ErrorMsg /*errmsg*/) {
-  /* With the new FileContent class the size is managed dynamically.
-   * Reset to a fresh instance without inserting any placeholder parameter,
-   * so the parameter map remains empty until real values are added. */
-  *pfc = FileContent();
-  return _SUCCESS_;
-}
-
-int parser_read_line(char* line, int* is_data, char* name, char* value, ErrorMsg errmsg) {
-  std::string sname, svalue;
-  if (!FileContent::parse_line(line, sname, svalue)) {
-    *is_data = _FALSE_;
-    return _SUCCESS_;
-  }
-  class_test(sname.size() >= _ARGUMENT_LENGTH_MAX_,
-             errmsg,
-             "name starting by '%s' too long; shorten it or increase _ARGUMENT_LENGTH_MAX_",
-             sname.c_str());
-  class_test(svalue.size() >= _ARGUMENT_LENGTH_MAX_,
-             errmsg,
-             "value starting by '%s' too long; shorten it or increase _ARGUMENT_LENGTH_MAX_",
-             svalue.c_str());
-  std::strncpy(name, sname.c_str(), _ARGUMENT_LENGTH_MAX_ - 1);
-  name[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
-  std::strncpy(value, svalue.c_str(), _ARGUMENT_LENGTH_MAX_ - 1);
-  value[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
-  *is_data                         = _TRUE_;
-  return _SUCCESS_;
-}
-
 int parser_read_int(FileContent* pfc, const char* name, int* value, int* found, ErrorMsg errmsg) {
   try {
     *found = pfc->read_int(name, *value) ? _TRUE_ : _FALSE_;
@@ -326,21 +294,12 @@ int parser_read_double(
 }
 
 int parser_read_string(
-    FileContent* pfc, const char* name, FileArg* value, int* found, ErrorMsg errmsg) {
-  std::string s;
+    FileContent* pfc, const char* name, std::string& value, int* found, ErrorMsg errmsg) {
   try {
-    *found = pfc->read_string(name, s) ? _TRUE_ : _FALSE_;
+    *found = pfc->read_string(name, value) ? _TRUE_ : _FALSE_;
   }
   catch (const std::exception& e) {
     class_stop(errmsg, "%s", e.what());
-  }
-  if (*found == _TRUE_) {
-    class_test(s.size() >= _ARGUMENT_LENGTH_MAX_,
-               errmsg,
-               "value of '%s' too long; increase _ARGUMENT_LENGTH_MAX_",
-               name);
-    std::strncpy(*value, s.c_str(), _ARGUMENT_LENGTH_MAX_ - 1);
-    (*value)[_ARGUMENT_LENGTH_MAX_ - 1] = '\0';
   }
   return _SUCCESS_;
 }

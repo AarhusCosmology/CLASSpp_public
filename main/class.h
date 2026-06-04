@@ -30,10 +30,8 @@
 
 class ClassConstants {
  public:
-  static constexpr int sMAXTITLESTRINGLENGTH = _MAXTITLESTRINGLENGTH_;
-  static constexpr int sFALSE                = _FALSE_;
-  static constexpr int sARGUMENT_LENGTH_MAX  = _ARGUMENT_LENGTH_MAX_;
-  static constexpr int sFAILURE              = _FAILURE_;
+  static constexpr int sFALSE   = _FALSE_;
+  static constexpr int sFAILURE = _FAILURE_;
 };
 
 #endif

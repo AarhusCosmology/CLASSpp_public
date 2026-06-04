@@ -2873,9 +2873,6 @@ int PrimordialModule::primordial_inflation_derivs_member(double tau,
 int PrimordialModule::primordial_external_spectrum_init() {
   /** Summary: */
 
-  char arguments[_ARGUMENT_LENGTH_MAX_];
-  char line[_LINE_LENGTH_MAX_];
-  char command_with_arguments[2 * _ARGUMENT_LENGTH_MAX_];
   FILE* process;
   int n_data_guess, n_data = 0;
   std::vector<double> k, pks, pkt;
@@ -2891,13 +2888,15 @@ int PrimordialModule::primordial_external_spectrum_init() {
     pkt.reserve(n_data_guess);
   /* Prepare the command */
   /* If the command is just a "cat", no arguments need to be passed */
+  std::string arguments;
   if (ppm->command.rfind("cat ", 0) == 0) {
-    snprintf(arguments, _ARGUMENT_LENGTH_MAX_, " ");
+    arguments = " ";
   }
   /* otherwise pass the list of arguments */
   else {
-    snprintf(arguments,
-             _ARGUMENT_LENGTH_MAX_,
+    char numbuf[256];  // scalar numeric scratch: 10 %g doubles fit easily
+    snprintf(numbuf,
+             sizeof(numbuf),
              " %g %g %g %g %g %g %g %g %g %g",
              ppm->custom1,
              ppm->custom2,
@@ -2909,25 +2908,24 @@ int PrimordialModule::primordial_external_spectrum_init() {
              ppm->custom8,
              ppm->custom9,
              ppm->custom10);
+    arguments = numbuf;
   }
   /* write the actual command in a string */
-  snprintf(command_with_arguments,
-           2 * _ARGUMENT_LENGTH_MAX_,
-           "%s %s",
-           ppm->command.c_str(),
-           arguments);
+  std::string command_with_arguments = ppm->command + " " + arguments;
   if (ppm->primordial_verbose > 0)
-    printf(" -> running: %s\n", command_with_arguments);
+    printf(" -> running: %s\n", command_with_arguments.c_str());
 
   /** - Launch the command and retrieve the output */
   /* Launch the process */
-  process = popen(command_with_arguments, "r");
+  process = popen(command_with_arguments.c_str(), "r");
   class_test(process == nullptr,
              error_message_,
              "The program failed to set the environment for the external command. Maybe you ran "
              "out of memory.");
   /* Read output and store it */
-  while (fgets(line, sizeof(line) - 1, process) != nullptr) {
+  char* line     = nullptr;
+  size_t linecap = 0;
+  while (getline(&line, &linecap, process) != -1) {
     if (ppt->has_tensors == _TRUE_) {
       sscanf(line, "%lf %lf %lf", &this_k, &this_pks, &this_pkt);
     }
@@ -2942,13 +2940,14 @@ int PrimordialModule::primordial_external_spectrum_init() {
     }
     n_data++;
     /* Check ascending order of the k's */
-    if (n_data > 1) {
-      class_test(k[n_data - 1] <= k[n_data - 2],
-                 error_message_,
+    if ((n_data > 1) && (k[n_data - 1] <= k[n_data - 2])) {
+      free(line);
+      class_stop(error_message_,
                  "The k's are not strictly sorted in ascending order, "
                  "as it is required for the calculation of the splines.\n");
     }
   }
+  free(line);
   /* Close the process */
   status = pclose(process);
   class_test(status != 0.,
@@ -3003,7 +3002,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
   return _SUCCESS_;
 }
 
-int PrimordialModule::primordial_output_titles(char titles[_MAXTITLESTRINGLENGTH_]) const {
+int PrimordialModule::primordial_output_titles(std::string& titles) const {
   class_store_columntitle(titles, "k [1/Mpc]", _TRUE_);
   class_store_columntitle(titles, "P_scalar(k)", _TRUE_);
   class_store_columntitle(titles, "P_tensor(k)", ppt->has_tensors);

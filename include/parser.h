@@ -124,17 +124,10 @@ extern "C" {
 
 int parser_read_file(const char* filename, FileContent* pfc, ErrorMsg errmsg);
 
-int parser_init(FileContent* pfc, int size, const char* filename, ErrorMsg errmsg);
-
-int parser_read_line(char* line, int* is_data, char* name, char* value, ErrorMsg errmsg);
-
 int parser_read_int(FileContent* pfc, const char* name, int* value, int* found, ErrorMsg errmsg);
 
 int parser_read_double(
     FileContent* pfc, const char* name, double* value, int* found, ErrorMsg errmsg);
-
-int parser_read_string(
-    FileContent* pfc, const char* name, FileArg* value, int* found, ErrorMsg errmsg);
 
 int parser_cat(const FileContent* pfc1,
                const FileContent* pfc2,
@@ -144,5 +137,10 @@ int parser_cat(const FileContent* pfc1,
 #ifdef __cplusplus
 }
 #endif
+
+/* Not inside the extern "C" block: this takes a std::string& (a C++ type), so it
+ * cannot have C language linkage. All callers are C++; no .c file includes this. */
+int parser_read_string(
+    FileContent* pfc, const char* name, std::string& value, int* found, ErrorMsg errmsg);
 
 #endif

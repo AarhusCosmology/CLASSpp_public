@@ -3,6 +3,8 @@
 #ifndef __OUTPUT__
 #define __OUTPUT__
 
+#include <string>
+
 #include "common.h"
 #include "lensing.h"
 
@@ -22,7 +24,7 @@
 struct output {
   //@{
 
-  char root[_FILENAMESIZE_ - 32] = "output/"; /**< root for all file names */
+  std::string root = "output/"; /**< root for all file names */
 
   //@}
 

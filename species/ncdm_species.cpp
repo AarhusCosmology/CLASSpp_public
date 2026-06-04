@@ -493,7 +493,7 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
 
 // ── Tensor output column titles ────────────────────────────────────────────
 
-void NCDMSpecies::WriteTensorOutputColumnTitles(char* tensor_titles) const {
+void NCDMSpecies::WriteTensorOutputColumnTitles(std::string& tensor_titles) const {
   const std::string& nm = name();
   std::string title     = "delta_" + nm;
   class_store_columntitle(tensor_titles, title.c_str(), _TRUE_);
