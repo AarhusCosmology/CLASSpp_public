@@ -60,6 +60,16 @@ int hyperspherical_HIS_create(int K,
                               ErrorMsg error_message);
 
 int hyperspherical_HIS_free(HyperInterpStruct* pHIS, ErrorMsg error_message);
+
+int hyperspherical_bessel_direct_vector(int K,
+                                        double beta,
+                                        int* lvec,
+                                        int nl,
+                                        double* xvec,
+                                        int nx,
+                                        double* Phi,
+                                        ErrorMsg error_message);
+
 int hyperspherical_forwards_recurrence(int K,
                                        int lmax,
                                        double beta,

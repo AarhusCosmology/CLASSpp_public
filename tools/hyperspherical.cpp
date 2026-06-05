@@ -28,7 +28,6 @@ int hyperspherical_HIS_create(int K,
   */
   double deltax, beta2, lambda, x, xfwd;
   int j, k, l, nx, lmax, l_recurrence_max;
-  int abort;
   int current_chunk, index_x;
 
   beta2  = beta * beta;
@@ -129,102 +128,89 @@ int hyperspherical_HIS_create(int K,
   }
 
   int xfwdidx = (xfwd - xmin) / deltax;
+  // Clamp into [0, nx]. When the classical turning point xfwd lies below xmin
+  // (small l: xfwd ~ sqrt(l(l+1))/beta can be < xmin, e.g. 0 for l=0), the raw
+  // value is negative and the forwards loop below would start at a negative j,
+  // indexing pHIS->x / phi / dphi / cotK out of bounds (an OOB read of x AND an
+  // OOB write of phi/dphi 3 elements before the buffer). This is latent in the
+  // transfer module (large multipoles keep xfwd > xmin) but is reachable when
+  // HIS_create is called directly with small l.
+  if (xfwdidx < 0)
+    xfwdidx = 0;
+  if (xfwdidx > nx)
+    xfwdidx = nx;
   //Calculate and assign Phi and dPhi values:
 
-  abort = _FALSE_;
+  std::vector<double> PhiL((lmax + 2) * _HYPER_CHUNK_);
 
-#pragma omp parallel shared(nx,                                                         \
-                                pHIS,                                                   \
-                                xfwd,                                                   \
-                                K,                                                      \
-                                l_recurrence_max,                                       \
-                                beta,                                                   \
-                                sqrtK,                                                  \
-                                one_over_sqrtK,                                         \
-                                lvec,                                                   \
-                                nl,                                                     \
-                                xfwdidx,                                                \
-                                abort,                                                  \
-                                error_message) private(j, k, l, current_chunk, index_x) \
-    firstprivate(lmax)
-  {
-    std::vector<double> PhiL((lmax + 2) * _HYPER_CHUNK_);
+  int hit_the_ceiling = ((K == 1) && ((int) (beta + 0.2) == (lmax + 1)));
+  if (hit_the_ceiling) {
+    /** Take care of special case lmax = beta-1.
+        The routine below will try to compute
+        Phi_{lmax+1} which is not allowed. However,
+        the purpose is to calculate the derivative
+        Phi'_{lmax}, and the formula is correct if we set Phi_{lmax+1} = 0.
+        Since PhiL uses a chunked layout PhiL[l*chunk + index_x], we
+        cannot simply set PhiL[lmax+1] = 0 (that was a scalar index).
+        Instead we substitute 0.0 at the point of use in the dphi formula.
+    */
+    lmax--;
+  }
 
-    int hit_the_ceiling = ((K == 1) && ((int) (beta + 0.2) == (lmax + 1)));
-    if (hit_the_ceiling) {
-      /** Take care of special case lmax = beta-1.
-          The routine below will try to compute
-          Phi_{lmax+1} which is not allowed. However,
-          the purpose is to calculate the derivative
-          Phi'_{lmax}, and the formula is correct if we set Phi_{lmax+1} = 0.
-          Since PhiL uses a chunked layout PhiL[l*chunk + index_x], we
-          cannot simply set PhiL[lmax+1] = 0 (that was a scalar index).
-          Instead we substitute 0.0 at the point of use in the dphi formula.
-      */
-      lmax--;
-    }
-
-#pragma omp for schedule(dynamic)
-
-    for (j = 0; j < MIN(nx, xfwdidx); j += _HYPER_CHUNK_) {
-      current_chunk = MIN(_HYPER_CHUNK_, MIN(nx, xfwdidx) - j);
-      //Use backwards method (chunk version for better SIMD utilization):
-      hyperspherical_backwards_recurrence_chunk(K,
-                                                MIN(l_recurrence_max, lmax) + 1,
-                                                beta,
-                                                pHIS->x.data() + j,
-                                                pHIS->sinK.data() + j,
-                                                pHIS->cotK.data() + j,
-                                                current_chunk,
-                                                sqrtK.data(),
-                                                one_over_sqrtK.data(),
-                                                PhiL.data());
-      //We have now populated PhiL at x, assign Phi and dPhi for all l in lvec:
-      for (k = 0; k <= index_recurrence_max; k++) {
-        l = lvec[k];
-        for (index_x = 0; index_x < current_chunk; index_x++) {
-          pHIS->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
-          double PhiL_plus_one =
-              ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l + 1) * current_chunk + index_x]);
-          pHIS->dphi[k * nx + j + index_x] = l * pHIS->cotK[j + index_x] *
-                                                 PhiL[l * current_chunk + index_x] -
-                                             sqrtK[l + 1] * PhiL_plus_one;
-        }
-      }
-    }
-
-#pragma omp for schedule(dynamic)
-
-    for (j = xfwdidx; j < nx; j += _HYPER_CHUNK_) {
-      //Use forwards method:
-      current_chunk = MIN(_HYPER_CHUNK_, nx - j);
-      hyperspherical_forwards_recurrence_chunk(K,
-                                               MIN(l_recurrence_max, lmax) + 1,
-                                               beta,
-                                               pHIS->x.data() + j,
-                                               pHIS->sinK.data() + j,
-                                               pHIS->cotK.data() + j,
-                                               current_chunk,
-                                               sqrtK.data(),
-                                               one_over_sqrtK.data(),
-                                               PhiL.data());
-
-      //We have now populated PhiL at x, assign Phi and dPhi for all l in lvec:
-      for (k = 0; k <= index_recurrence_max; k++) {
-        l = lvec[k];
-        for (index_x = 0; index_x < current_chunk; index_x++) {
-          pHIS->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
-          double PhiL_plus_one =
-              ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l + 1) * current_chunk + index_x]);
-          pHIS->dphi[k * nx + j + index_x] = l * pHIS->cotK[j + index_x] *
-                                                 PhiL[l * current_chunk + index_x] -
-                                             sqrtK[l + 1] * PhiL_plus_one;
-        }
+  for (j = 0; j < MIN(nx, xfwdidx); j += _HYPER_CHUNK_) {
+    current_chunk = MIN(_HYPER_CHUNK_, MIN(nx, xfwdidx) - j);
+    //Use backwards method (chunk version for better SIMD utilization):
+    hyperspherical_backwards_recurrence_chunk(K,
+                                              MIN(l_recurrence_max, lmax) + 1,
+                                              beta,
+                                              pHIS->x.data() + j,
+                                              pHIS->sinK.data() + j,
+                                              pHIS->cotK.data() + j,
+                                              current_chunk,
+                                              sqrtK.data(),
+                                              one_over_sqrtK.data(),
+                                              PhiL.data());
+    //We have now populated PhiL at x, assign Phi and dPhi for all l in lvec:
+    for (k = 0; k <= index_recurrence_max; k++) {
+      l = lvec[k];
+      for (index_x = 0; index_x < current_chunk; index_x++) {
+        pHIS->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
+        double PhiL_plus_one =
+            ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l + 1) * current_chunk + index_x]);
+        pHIS->dphi[k * nx + j + index_x] = l * pHIS->cotK[j + index_x] *
+                                               PhiL[l * current_chunk + index_x] -
+                                           sqrtK[l + 1] * PhiL_plus_one;
       }
     }
   }
-  if (abort == _TRUE_)
-    return _FAILURE_;
+
+  for (j = xfwdidx; j < nx; j += _HYPER_CHUNK_) {
+    //Use forwards method:
+    current_chunk = MIN(_HYPER_CHUNK_, nx - j);
+    hyperspherical_forwards_recurrence_chunk(K,
+                                             MIN(l_recurrence_max, lmax) + 1,
+                                             beta,
+                                             pHIS->x.data() + j,
+                                             pHIS->sinK.data() + j,
+                                             pHIS->cotK.data() + j,
+                                             current_chunk,
+                                             sqrtK.data(),
+                                             one_over_sqrtK.data(),
+                                             PhiL.data());
+
+    //We have now populated PhiL at x, assign Phi and dPhi for all l in lvec:
+    for (k = 0; k <= index_recurrence_max; k++) {
+      l = lvec[k];
+      for (index_x = 0; index_x < current_chunk; index_x++) {
+        pHIS->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
+        double PhiL_plus_one =
+            ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l + 1) * current_chunk + index_x]);
+        pHIS->dphi[k * nx + j + index_x] = l * pHIS->cotK[j + index_x] *
+                                               PhiL[l * current_chunk + index_x] -
+                                           sqrtK[l + 1] * PhiL_plus_one;
+      }
+    }
+  }
 
   for (k = 0; k < nl; k++) {
     hyperspherical_get_xmin_from_approx(K,
@@ -244,6 +230,134 @@ int hyperspherical_HIS_create(int K,
 int hyperspherical_HIS_free(HyperInterpStruct* pHIS, ErrorMsg error_message) {
   /** Free the Hyperspherical Interpolation Structure.
       Now handled by RAII. */
+  return _SUCCESS_;
+}
+
+int hyperspherical_bessel_direct_vector(int K,
+                                        double beta,
+                                        int* lvec,
+                                        int nl,
+                                        double* xvec,
+                                        int nx,
+                                        double* Phi,
+                                        ErrorMsg error_message) {
+  /** Evaluate Phi_l^beta(x) by direct forwards/backwards recurrence at each
+      requested x, for every requested l. Keeps the numerical considerations
+      that are otherwise spread across hyperspherical_HIS_create:
+        - closed-case (K=1) symmetry fold into [0, pi/2] via ClosedModY,
+        - turning-point stability (backwards below xfwd, forwards above),
+        - maximum l in the closed case (l < beta).
+      Phi is row-major: Phi[il*nx + ix]. */
+  int il, ix, l, lmax, intbeta = 0;
+  double beta2 = beta * beta, xfwd, folded_y, sinK, cotK;
+  int phisign, dphisign;
+
+  class_test((K != 0) && (K != 1) && (K != -1), error_message, "K must be -1, 0, or 1 (got %d)", K);
+  class_test(beta <= 0.0, error_message, "beta must be positive (got %g)", beta);
+
+  lmax = 0;
+  for (il = 0; il < nl; il++) {
+    class_test(lvec[il] < 0, error_message, "l must be non-negative (got %d)", lvec[il]);
+    if (lvec[il] > lmax)
+      lmax = lvec[il];
+  }
+
+  if (K == 1) {
+    intbeta = (int) (beta + 0.2);
+    class_test(fabs(beta - intbeta) > 1e-6,
+               error_message,
+               "closed case (K=1) requires integer beta (got %g)",
+               beta);
+    class_test(lmax >= intbeta,
+               error_message,
+               "closed case requires l < beta; got max l=%d, beta=%d",
+               lmax,
+               intbeta);
+  }
+
+  // The forwards recurrence unconditionally computes PhiL[1] (using
+  // one_over_sqrtK[1]) even when lmax == 0, so the arrays need at least 2
+  // entries. Beyond that, only sqrtK[0..lmax] are read. Sizing to
+  // max(lmax,1)+1 (rather than lmax+2/+3) keeps the fill loop below beta in the
+  // closed case (lmax = beta-1), avoiding sqrt(beta^2 - l^2) for l >= beta which
+  // would be a NaN.
+  int nsqrtK = (lmax >= 1) ? lmax : 1;
+  std::vector<double> sqrtK(nsqrtK + 1), one_over_sqrtK(nsqrtK + 1);
+  for (l = 0; l <= nsqrtK; l++) {
+    if (K == 0)
+      sqrtK[l] = beta;
+    else if (K == 1)
+      sqrtK[l] = sqrt(beta2 - (double) l * l);
+    else
+      sqrtK[l] = sqrt(beta2 + (double) l * l);
+    one_over_sqrtK[l] = 1.0 / sqrtK[l];
+  }
+
+  if (K == 0)
+    xfwd = sqrt(lmax * (lmax + 1.0)) / beta;
+  else if (K == 1)
+    xfwd = asin(sqrt(lmax * (lmax + 1.0)) / beta);
+  else
+    xfwd = asinh(sqrt(lmax * (lmax + 1.0)) / beta);
+
+  std::vector<double> PhiL(lmax + 2);
+
+  for (ix = 0; ix < nx; ix++) {
+    folded_y = xvec[ix];
+    if (K == 1) {
+      /* Fold y into [0, pi/2]. The geometric fold is l-independent; the l
+         argument to ClosedModY only controls its sign outputs, which are
+         discarded here and recomputed per-l below. */
+      ClosedModY(0, intbeta, &folded_y, &phisign, &dphisign);
+    }
+
+    if (K == 0) {
+      sinK = folded_y;
+      cotK = 1.0 / folded_y;
+    }
+    else if (K == 1) {
+      sinK = sin(folded_y);
+      cotK = 1.0 / tan(folded_y);
+    }
+    else {
+      sinK = sinh(folded_y);
+      cotK = 1.0 / tanh(folded_y);
+    }
+
+    if (folded_y < xfwd)
+      hyperspherical_backwards_recurrence(K,
+                                          lmax,
+                                          beta,
+                                          folded_y,
+                                          sinK,
+                                          cotK,
+                                          sqrtK.data(),
+                                          one_over_sqrtK.data(),
+                                          PhiL.data());
+    else
+      hyperspherical_forwards_recurrence(K,
+                                         lmax,
+                                         beta,
+                                         folded_y,
+                                         sinK,
+                                         cotK,
+                                         sqrtK.data(),
+                                         one_over_sqrtK.data(),
+                                         PhiL.data());
+
+    for (il = 0; il < nl; il++) {
+      l           = lvec[il];
+      double sign = 1.0;
+      if (K == 1) {
+        double tmp = xvec[ix];
+        phisign    = 1;
+        dphisign   = 1;
+        ClosedModY(l, intbeta, &tmp, &phisign, &dphisign);
+        sign = phisign;
+      }
+      Phi[il * nx + ix] = sign * PhiL[l];
+    }
+  }
   return _SUCCESS_;
 }
 
