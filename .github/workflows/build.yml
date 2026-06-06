@@ -15,8 +15,6 @@ jobs:
       run: cd main_class && make -j class
     - name: run class
       run: cd main_class && ./class explanatory.ini
-    - name: grey-body moments unit test
-      run: cd main_class && make test-greybody-moments && ./test-greybody-moments
 
   test_classy:
     runs-on:
@@ -66,6 +64,7 @@ jobs:
         source venv/bin/activate
         cd main_class/python
         TEST_LEVEL=1 COMPARE_OUTPUT_REF=0 python -m pytest -v -m test_scenario test_class.py
+        python -m pytest -v test_greybody.py
         deactivate
     - name: Remove virtual Python environment
       if: success() || failure()
