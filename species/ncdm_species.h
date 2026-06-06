@@ -168,6 +168,19 @@ class NCDMSpecies : public NCDMBaseSpecies {
   }
 
  protected:
+  // Deferred-init constructor for subclasses (e.g. GreyBodyNCDMSpecies) that
+  // must configure an overridden PSD before quadrature is built.
+  NCDMSpecies(FileContent* pfc,
+              const std::string& instance_name,
+              const NcdmSettings& settings,
+              const background* pba,
+              const BackgroundModule* bgm,
+              NCDMBaseSpecies::DeferInit);
+
+  // Standard-NCDM mass/Omega closure (factored out of the public constructor so
+  // GreyBodyNCDMSpecies can re-run it after rebuilding quadrature).
+  void ResolveMassOmegaClosure(const NcdmSettings& settings);
+
   double GetDlnf0Dlnq(int iq, const double* /*pvecback*/) const override {
     return dlnf0_dlnq_[iq];
   }

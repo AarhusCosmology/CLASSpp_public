@@ -15,6 +15,8 @@ jobs:
       run: cd main_class && make -j class
     - name: run class
       run: cd main_class && ./class explanatory.ini
+    - name: grey-body moments unit test
+      run: cd main_class && make test-greybody-moments && ./test-greybody-moments
 
   test_classy:
     runs-on:

@@ -10,7 +10,7 @@
 #include "species_input.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Constructor
+// Constructors + BuildQuadratureAndMass
 // ─────────────────────────────────────────────────────────────────────────────
 
 NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
@@ -20,6 +20,31 @@ NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
                                  const NcdmSettings& settings)
     : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h) {
   ReadParametersByInstance(pfc, instance_name, settings);
+  BuildQuadratureAndMass(settings);
+}
+
+NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
+                                 EnergyType energy_type,
+                                 FileContent* pfc,
+                                 const std::string& instance_name,
+                                 const NcdmSettings& settings,
+                                 DeferInit)
+    : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h) {
+  ReadParametersByInstance(pfc, instance_name, settings);
+  // Caller (subclass) is responsible for BuildQuadratureAndMass after setting up its PSD.
+}
+
+void NCDMBaseSpecies::BuildQuadratureAndMass(const NcdmSettings& settings) {
+  InitQuadrature(settings);
+
+  if (m_in_eV_ != 0.0) {
+    M_ = m_in_eV_ / _k_B_ * _eV_ / T_ / T_cmb_;
+    double rho_ncdm;
+    ComputeMomenta(0., nullptr, &rho_ncdm, nullptr, nullptr, nullptr);
+  }
+  else {
+    M_ = 0.;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,18 +105,6 @@ void NCDMBaseSpecies::ReadParametersByInstance(FileContent* pfc,
   if ((Omega0_ == 0.0) && (m_in_eV_ == 0.0)) {
     m_in_eV_ = 1.e-5;
   }
-
-  // The rest of the construction matches the legacy path.
-  InitQuadrature(settings);
-
-  if (m_in_eV_ != 0.0) {
-    M_ = m_in_eV_ / _k_B_ * _eV_ / T_ / T_cmb_;
-    double rho_ncdm;
-    ComputeMomenta(0., nullptr, &rho_ncdm, nullptr, nullptr, nullptr);
-  }
-  else {
-    M_ = 0.;
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,8 +150,17 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                error_message_);
   }
 
+  // Grey-body subclasses fill these and select a GB-specific default strategy;
+  // for all other species gb.active stays false and strategy == quadrature_strategy_.
+  GBQuadParams gb;
+  FillQuadratureParams(gb);
+  int strategy = quadrature_strategy_;
+  if (strategy == qm_auto && gb.active) {
+    strategy = DefaultQuadratureStrategy();
+  }
+
   // Handle perturbation quadrature
-  if (quadrature_strategy_ == qm_auto) {
+  if (strategy == qm_auto) {
     q_.resize(_QUADRATURE_MAX_);
     w_.resize(_QUADRATURE_MAX_);
     int q_size;
@@ -187,11 +209,12 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                                     dq_dummy.data(),
                                     input_q_size_,
                                     qmax_,
-                                    (enum quadrature_method) quadrature_strategy_,
+                                    (enum quadrature_method) strategy,
                                     pbadist.q.data(),
                                     pbadist.tablesize,
                                     DistributionFunction,
                                     &pbadist,
+                                    gb,
                                     error_message_),
                error_message_,
                error_message_);
@@ -247,13 +270,21 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
 void NCDMBaseSpecies::InitDistribution(FileContent* /*pfc*/, int /*species_index*/) {}
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EvaluatePsdAnalytic — virtual, overridable Fermi-Dirac PSD
+// ─────────────────────────────────────────────────────────────────────────────
+
+double NCDMBaseSpecies::EvaluatePsdAnalytic(double q) const {
+  // Fermi-Dirac with chemical potential.
+  return 1.0 / pow(2 * _PI_, 3) * (1. / (exp(q - ksi_) + 1.) + 1. / (exp(q + ksi_) + 1.));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DistributionFunction — static callback
 // ─────────────────────────────────────────────────────────────────────────────
 
 int NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
   auto* p                   = static_cast<DistributionParams*>(params);
   const NCDMBaseSpecies* sp = p->sp;
-  double ksi                = sp->ksi_;
 
   if (p->tablesize > 0) {
     int lastidx = p->tablesize - 1;
@@ -283,8 +314,7 @@ int NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
     }
   }
   else {
-    // Fermi-Dirac with chemical potential
-    *f0 = 1.0 / pow(2 * _PI_, 3) * (1. / (exp(q - ksi) + 1.) + 1. / (exp(q + ksi) + 1.));
+    *f0 = sp->EvaluatePsdAnalytic(q);
   }
   return _SUCCESS_;
 }

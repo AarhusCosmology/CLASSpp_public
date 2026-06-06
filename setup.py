@@ -90,6 +90,8 @@ source_files = (
         'dncdm_dr_species.cpp',
         'dncdm_species.cpp',
         'fluid.cpp',
+        'greybody_moments.cpp',
+        'greybody_ncdm_species.cpp',
         'idm_dr_idr_species.cpp',
         'idm_drmd_idr_drmd_species.cpp',
          'lambda.cpp',

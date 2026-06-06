@@ -13,7 +13,18 @@
 
 #include "common.h"
 
-enum quadrature_method { qm_auto, qm_Laguerre, qm_trapz_indefinite, qm_trapz };
+enum quadrature_method { qm_auto, qm_Laguerre, qm_trapz_indefinite, qm_trapz, qm_GB_Laguerre };
+
+/** Optional grey-body parameters threaded into manual quadrature. When
+ *  `active` is false the GB-specific methods are not used. Defined here (not in
+ *  a species header) so quadrature.cpp stays species-agnostic. Distinct from
+ *  greybody::GreyBodyParams (the moment-solver class) — this is just the few
+ *  coefficients the quadrature engine needs. */
+struct GBQuadParams {
+  bool active          = false;
+  double alpha         = 0.;
+  double x_times_alpha = 0.;
+};
 
 /* Structures for QSS */
 
@@ -49,6 +60,7 @@ int get_qsampling_manual(double* x,
                          int qsiz,
                          int (*function)(void* params_for_function, double q, double* f0),
                          void* params_for_function,
+                         const GBQuadParams& gb,
                          ErrorMsg errmsg);
 int sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx);
 int get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite);

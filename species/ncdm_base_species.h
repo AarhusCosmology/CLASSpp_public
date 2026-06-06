@@ -7,6 +7,7 @@
 #include "../species/base_species.h"
 #include "background.h"
 #include "parser.h"
+#include "quadrature.h"
 
 class BackgroundModule;
 
@@ -184,12 +185,46 @@ class NCDMBaseSpecies : public BaseSpecies {
    *  NCDMBaseSpecies returns the static w_[iq]; DNCDMSpecies overrides. */
   virtual double GetW0ForGwSource(int iq, const double* pvecback) const;
 
+  /** Analytic PSD f0(q) for the non-file case. Base: Fermi-Dirac with chemical
+   *  potential ksi_. GreyBodyNCDMSpecies overrides this. */
+  virtual double EvaluatePsdAnalytic(double q) const;
+
+  /** Default quadrature strategy when the user leaves quadrature_strategy_ at
+   *  qm_auto. Base: qm_auto (unchanged). GreyBodyNCDMSpecies returns a
+   *  GB-specific method. Wired into InitQuadrature in Task 5.1; not consulted
+   *  yet. */
+  virtual quadrature_method DefaultQuadratureStrategy() const {
+    return qm_auto;
+  }
+
+  /** Populate grey-body quadrature parameters. Base: leaves p.active == false. */
+  virtual void FillQuadratureParams(GBQuadParams& /*p*/) const {}
+
   // Constructor: reads parameters per-instance via SpeciesInput (dot-syntax).
   NCDMBaseSpecies(std::string name,
                   EnergyType energy_type,
                   FileContent* pfc,
                   const std::string& instance_name,
                   const NcdmSettings& settings);
+
+  /** Tag type selecting the deferred-init constructor: reads parameters but
+   *  does NOT build quadrature or mass, so a subclass can set up an overridden
+   *  PSD first and then call BuildQuadratureAndMass itself. */
+  struct DeferInit {};
+
+  NCDMBaseSpecies(std::string name,
+                  EnergyType energy_type,
+                  FileContent* pfc,
+                  const std::string& instance_name,
+                  const NcdmSettings& settings,
+                  DeferInit);
+
+  /** Build perturbation/background quadrature and the dimensionless mass M_.
+   *  Calls InitQuadrature (which dispatches the virtual PSD) then computes M_
+   *  from m_in_eV_. Call once, after the object is fully constructed. */
+  void BuildQuadratureAndMass(const NcdmSettings& settings);
+
+  void InitQuadrature(const NcdmSettings& settings);
 
   void SetOmega0(double Omega0, double h);
   void SetDegAndFactor(double deg);
@@ -246,7 +281,6 @@ class NCDMBaseSpecies : public BaseSpecies {
   void ReadParametersByInstance(FileContent* pfc,
                                 const std::string& instance_name,
                                 const NcdmSettings& settings);
-  void InitQuadrature(const NcdmSettings& settings);
   void InitDistribution(FileContent* pfc, int species_index);
 
   int ComputeMomentaMass(double M,

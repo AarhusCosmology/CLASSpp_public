@@ -16,6 +16,7 @@ int get_qsampling_manual(double* x,
                          int qsiz,
                          int (*function)(void* params_for_function, double q, double* f0),
                          void* params_for_function,
+                         const GBQuadParams& gb,
                          ErrorMsg errmsg) {
   double y, h, t;
   switch (method) {
@@ -28,6 +29,29 @@ int get_qsampling_manual(double* x,
       compute_Laguerre(x, dq, N, 0.0, b.data(), c.data(), _TRUE_);
       for (int i = 0; i < N; i++) {
         (*function)(params_for_function, x[i], &y);
+        w[i] = dq[i] * y;
+      }
+      return _SUCCESS_;
+    }
+    case (qm_GB_Laguerre): {
+      // Generalized Gauss-Laguerre on the GL weight q^(alpha+1) e^(-alpha x q),
+      // i.e. the integrand q^2 * f0 with the grey-body f0 ~ q^(alpha-1) e^(-alpha x q).
+      // The rule divides nodes by gb.x_times_alpha, so it is only meaningful for a
+      // grey-body species. Fail loudly if it was selected without valid GB params
+      // (e.g. quadrature_strategy=qm_GB_Laguerre on a non-grey-body species) rather
+      // than dividing by zero into NaN abscissas.
+      class_test(!gb.active || gb.x_times_alpha <= 0.,
+                 errmsg,
+                 "qm_GB_Laguerre requires grey-body parameters (active alpha*x > 0); it was "
+                 "selected for a species that did not provide them");
+      std::vector<double> b(N);
+      std::vector<double> c(N);
+      compute_Laguerre(x, dq, N, gb.alpha + 1., b.data(), c.data(), _TRUE_);
+      double scaling = 1. / gb.x_times_alpha;
+      for (int i = 0; i < N; i++) {
+        dq[i] *= pow(x[i], -(gb.alpha + 1.)) * scaling;  // bare weight (uses original node)
+        x[i]  *= scaling;                                // rescale node onto the alpha*x grid
+        (*function)(params_for_function, x[i], &y);      // y = f0(x[i])
         w[i] = dq[i] * y;
       }
       return _SUCCESS_;

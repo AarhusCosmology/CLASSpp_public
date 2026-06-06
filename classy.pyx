@@ -1863,6 +1863,12 @@ cdef class PyCosmology:
                 value = self.z_dec_drmd()
             elif name == 'f_idr_drmd':
                 value = self.f_idr_drmd()
+            elif name.endswith('.M_2') or name.endswith('.M_3') or name.endswith('.M_4') \
+                 or name.endswith('.alpha') or name.endswith('.q0') or name.endswith('.x'):
+                instance, _, field = name.rpartition('.')
+                background_module = deref(self._thisptr).GetBackgroundModule()
+                value = deref(background_module).GetSpeciesParam(
+                    instance.encode('utf-8'), field.encode('utf-8'))
             else:
                 raise CosmoSevereError("%s was not recognized as a derived parameter" % name)
             derived[name] = value

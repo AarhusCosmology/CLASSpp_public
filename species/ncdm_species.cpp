@@ -7,7 +7,7 @@
 #include "perturbations_module.h"
 #include "species/species_input.h"
 
-// ── Constructor ─────────────────────────────────────────────────────────────
+// ── Constructors ────────────────────────────────────────────────────────────
 
 NCDMSpecies::NCDMSpecies(FileContent* pfc,
                          const std::string& instance_name,
@@ -16,10 +16,29 @@ NCDMSpecies::NCDMSpecies(FileContent* pfc,
                          const BackgroundModule* bgm)
     : NCDMBaseSpecies(instance_name, EnergyType::Other, pfc, instance_name, settings), pba_(pba) {
   bgm_ = bgm;
+  ResolveMassOmegaClosure(settings);
+  // source_slot_ stays at its in-class default (-1) until
+  // PerturbationsModule::perturb_indices_of_perturbs() assigns it via SetSourceSlot.
+}
 
-  // Standard-NCDM closure: NCDMBaseSpecies::ReadParametersByInstance only
-  // computes M_ from m_in_eV_. Standard NCDM additionally needs the closure
-  // tying Omega0_ to m / factor / deg / M_:
+NCDMSpecies::NCDMSpecies(FileContent* pfc,
+                         const std::string& instance_name,
+                         const NcdmSettings& settings,
+                         const background* pba,
+                         const BackgroundModule* bgm,
+                         NCDMBaseSpecies::DeferInit defer)
+    : NCDMBaseSpecies(instance_name, EnergyType::Other, pfc, instance_name, settings, defer),
+      pba_(pba) {
+  bgm_ = bgm;
+  // No closure here: the subclass calls BuildQuadratureAndMass + ResolveMassOmegaClosure
+  // after configuring its PSD.
+}
+
+void NCDMSpecies::ResolveMassOmegaClosure(const NcdmSettings& settings) {
+  // At entry, NCDMBaseSpecies::BuildQuadratureAndMass has already set M_ from
+  // m_in_eV_; this step resolves Omega0_ (or rescales deg_/factor_) so the
+  // background density matches what was requested.
+  // Standard-NCDM closure tying Omega0_ to m / factor / deg / M_:
   //   - if m != 0 and Omega0 == 0: derive Omega0_ from rho_ncdm
   //   - if m != 0 and Omega0 != 0: rescale factor_ and deg_ by fnu_factor
   //   - if m == 0:                 derive M_ via MFromOmega and back-compute m_in_eV_
@@ -42,9 +61,6 @@ NCDMSpecies::NCDMSpecies(FileContent* pfc,
     M_       = MFromOmega(H0, GetOmega0(), settings.tol_M_ncdm);
     m_in_eV_ = _k_B_ / _eV_ * T_ * M_ * T_cmb_;
   }
-
-  // source_slot_ stays at its in-class default (-1) until
-  // PerturbationsModule::perturb_indices_of_perturbs() assigns it via SetSourceSlot.
 }
 
 // ── CreateAll factory ───────────────────────────────────────────────────────

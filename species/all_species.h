@@ -17,6 +17,7 @@
 #include "dcdm_dr_species.h"
 #include "dncdm_dr_species.h"
 #include "fluid.h"
+#include "greybody_ncdm_species.h"
 #include "idm_dr.h"
 #include "idm_dr_idr_species.h"
 #include "idm_drmd.h"
@@ -43,6 +44,7 @@ inline constexpr std::array kAllSpeciesFactories = {
     SpeciesFactoryEntry{"UR", &UltraRelativisticSpecies::CreateAll},
     SpeciesFactoryEntry{"DCDM_DR", &DCDM_DR_Species::CreateAll},
     SpeciesFactoryEntry{"NCDM", &NCDMSpecies::CreateAll},
+    SpeciesFactoryEntry{"NCDMGreyBody", &GreyBodyNCDMSpecies::CreateAll},
     SpeciesFactoryEntry{"DNCDM_DR", &DNCDM_DR_Species::CreateAll},
     SpeciesFactoryEntry{"NCDMInt", &NCDMInteractingSpecies::CreateAll},
     SpeciesFactoryEntry{"IDM_DR_IDR", &IDM_DR_IDR_Species::CreateAll},
