@@ -74,6 +74,8 @@
 
 #include "thermodynamics_module.h"
 
+#include <fstream>
+
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "background_module.h"
@@ -1616,10 +1618,8 @@ int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionizat
  * @return the error status
  */
 int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
-  FILE* fA;
-  char* line     = nullptr;
-  size_t linecap = 0;
-  char* left;
+  std::string line;
+  const char* left;
 
   int num_omegab = 0;
   int num_deltaN = 0;
@@ -1686,12 +1686,16 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
      .....
   */
 
-  class_open(fA, ppr->sBBN_file.c_str(), "r", error_message_);
+  std::ifstream bbn_file(ppr->sBBN_file);
+  class_test(!bbn_file.is_open(),
+             error_message_,
+             "could not open BBN file with name %s",
+             ppr->sBBN_file.c_str());
 
   /* go through each line */
-  while (getline(&line, &linecap, fA) != -1) {
+  while (std::getline(bbn_file, line)) {
     /* eliminate blank spaces at beginning of line */
-    left = line;
+    left = line.c_str();
     while (left[0] == ' ') {
       left++;
     }
@@ -1707,7 +1711,7 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
          YHe). */
       if ((num_omegab == 0) && (num_deltaN == 0)) {
         /* read (num_omegab, num_deltaN), infer size of arrays and allocate them */
-        class_test(sscanf(line, "%d %d", &num_omegab, &num_deltaN) != 2,
+        class_test(sscanf(line.c_str(), "%d %d", &num_omegab, &num_deltaN) != 2,
                    error_message_,
                    "could not read value of parameters (num_omegab,num_deltaN) in file %s\n",
                    ppr->sBBN_file.c_str());
@@ -1729,7 +1733,7 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
       }
       else {
         /* read (omegab, deltaN, YHe) */
-        class_test(sscanf(line,
+        class_test(sscanf(line.c_str(),
                           "%lg %lg %lg",
                           &(omegab[array_line % num_omegab]),
                           &(deltaN[array_line / num_omegab]),
@@ -1741,9 +1745,6 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
       }
     }
   }
-  free(line);
-
-  fclose(fA);
 
   /** - spline in one dimension (along deltaN) */
   class_call(array_spline_table_lines(deltaN.data(),

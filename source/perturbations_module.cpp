@@ -2446,9 +2446,9 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
 }
 
 /**
- * Free the perturb_workspace structure (with the exception of the
- * perturb_vector '-->pv' field, which is freed separately in
- * perturb_vector_free).
+ * Free the perturb_workspace structure. The perturb_vector '-->pv'
+ * field owns its memory via std::unique_ptr and is released
+ * automatically when the workspace is destroyed.
  *
  * @param index_md Input: index of mode under consideration (scalar/.../tensor)
  * @param ppw        Input: pointer to perturb_workspace structure to be freed
@@ -2834,7 +2834,7 @@ int PerturbationsModule::perturb_solve(int index_md,
 
   /** - free quantities allocated at the beginning of the routine */
 
-  class_call(perturb_vector_free(ppw->pv), error_message_, error_message_);
+  ppw->pv.reset();
 
   /* RAII: interval_approx, interval_limit cleaned up automatically */
 
@@ -3262,7 +3262,7 @@ int PerturbationsModule::perturb_vector_init(
 
   /** - allocate a new perturb_vector structure to which ppw-->pv will point at the end of the routine */
 
-  struct perturb_vector* ppv = new perturb_vector();
+  auto ppv = std::make_unique<perturb_vector>();
 
   // Create per-species layouts, one per all_species_ entry, in iteration order.
   ppv->species_layouts.reserve(all_species_.size());
@@ -3283,7 +3283,7 @@ int PerturbationsModule::perturb_vector_init(
       size_t i = 0;
       for (auto& entry : all_species_) {
         entry->RegisterPerturbationIndices(*ppv->species_layouts[i],
-                                           ppv,
+                                           ppv.get(),
                                            ppr,
                                            index_pt,
                                            ppw,
@@ -3319,7 +3319,7 @@ int PerturbationsModule::perturb_vector_init(
       size_t i = 0;
       for (auto& entry : all_species_) {
         entry->RegisterVectorPerturbationIndices(*ppv->species_layouts[i],
-                                                 ppv,
+                                                 ppv.get(),
                                                  ppr,
                                                  index_pt,
                                                  ppw,
@@ -3346,7 +3346,7 @@ int PerturbationsModule::perturb_vector_init(
       size_t i = 0;
       for (auto& entry : all_species_) {
         entry->RegisterTensorPerturbationIndices(*ppv->species_layouts[i],
-                                                 ppv,
+                                                 ppv.get(),
                                                  ppr,
                                                  index_pt,
                                                  ppw,
@@ -3468,7 +3468,7 @@ int PerturbationsModule::perturb_vector_init(
     /** - --> (b) let ppw-->pv points towards the perturb_vector structure
         that we just created */
 
-    ppw->pv = ppv;
+    ppw->pv = std::move(ppv);
 
     /** - --> (c) fill the vector ppw-->pv-->y with appropriate initial conditions */
 
@@ -3900,28 +3900,11 @@ int PerturbationsModule::perturb_vector_init(
       }
     }
 
-    /** - --> (d) free the previous vector of perturbations */
+    /** - --> (d) let ppw-->pv point towards the perturb_vector structure
+        that we just created; the move-assignment frees the previous one */
 
-    class_call(perturb_vector_free(ppw->pv), error_message_, error_message_);
-
-    /** - --> (e) let ppw-->pv points towards the perturb_vector structure
-        that we just created */
-
-    ppw->pv = ppv;
+    ppw->pv = std::move(ppv);
   }
-
-  return _SUCCESS_;
-}
-
-/**
- * Free the perturb_vector structure.
- *
- * @param pv        Input: pointer to perturb_vector structure to be freed
- * @return the error status
- */
-
-int PerturbationsModule::perturb_vector_free(perturb_vector* pv) {
-  delete pv;
 
   return _SUCCESS_;
 }
@@ -4336,9 +4319,9 @@ int PerturbationsModule::perturb_initial_conditions(
           const double rho        = sp->Rho(ppw->pvecback);
           const double rho_plus_p = rho + sp->P(ppw->pvecback);
           const auto& layout      = *ppw->pv->species_layouts[i];
-          delta_rho_ic        += rho * sp->Delta(layout, ppw->pv, ppw->pv->y, ppw->pvecback, ppw);
+          delta_rho_ic += rho * sp->Delta(layout, ppw->pv.get(), ppw->pv->y, ppw->pvecback, ppw);
           rho_plus_p_theta_ic += rho_plus_p *
-                                 sp->Theta(layout, ppw->pv, ppw->pv->y, ppw->pvecback, ppw);
+                                 sp->Theta(layout, ppw->pv.get(), ppw->pv->y, ppw->pvecback, ppw);
           ++i;
         }
       }
@@ -5299,13 +5282,13 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       const size_t g_tse2_i = all_species_.index_of("Photons");
       const size_t b_tse_i  = all_species_.index_of("Baryons");
       const double delta_g =
-          PH.Delta(*ppw->pv->species_layouts[g_tse2_i], ppw->pv, y, ppw->pvecback, ppw);
+          PH.Delta(*ppw->pv->species_layouts[g_tse2_i], ppw->pv.get(), y, ppw->pvecback, ppw);
       const double theta_g =
-          PH.Theta(*ppw->pv->species_layouts[g_tse2_i], ppw->pv, y, ppw->pvecback, ppw);
+          PH.Theta(*ppw->pv->species_layouts[g_tse2_i], ppw->pv.get(), y, ppw->pvecback, ppw);
       const double delta_b =
-          BA.Delta(*ppw->pv->species_layouts[b_tse_i], ppw->pv, y, ppw->pvecback, ppw);
+          BA.Delta(*ppw->pv->species_layouts[b_tse_i], ppw->pv.get(), y, ppw->pvecback, ppw);
       const double theta_b =
-          BA.Theta(*ppw->pv->species_layouts[b_tse_i], ppw->pv, y, ppw->pvecback, ppw);
+          BA.Theta(*ppw->pv->species_layouts[b_tse_i], ppw->pv.get(), y, ppw->pvecback, ppw);
 
       ppw->delta_rho        = rho_g * delta_g + rho_b * delta_b;
       ppw->rho_plus_p_theta = 4. / 3. * rho_g * theta_g + rho_b * theta_b;
@@ -5335,7 +5318,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
         if (sp->name() != "Photons" && sp->name() != "Baryons" &&
             !(sp->name() == "Fluid" && fluid_tse && fluid_tse->use_ppf() == _TRUE_))
           ppw->rho_plus_p_shear +=
-              sp->RhoPlusPShear(*ppw->pv->species_layouts[i], ppw->pv, y, ppw->pvecback, ppw);
+              sp->RhoPlusPShear(*ppw->pv->species_layouts[i], ppw->pv.get(), y, ppw->pvecback, ppw);
         ++i;
       }
     }
@@ -5361,15 +5344,16 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
         const double rho        = sp->Rho(ppw->pvecback);
         const double rho_plus_p = rho + sp->P(ppw->pvecback);
 
-        ppw->delta_rho        += rho * sp->Delta(layout, ppw->pv, y, ppw->pvecback, ppw);
-        ppw->rho_plus_p_theta += rho_plus_p * sp->Theta(layout, ppw->pv, y, ppw->pvecback, ppw);
-        ppw->delta_p          += sp->DeltaP(layout, ppw->pv, y, ppw->pvecback, ppw);
+        ppw->delta_rho        += rho * sp->Delta(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
+        ppw->rho_plus_p_theta += rho_plus_p *
+                                 sp->Theta(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
+        ppw->delta_p          += sp->DeltaP(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
         ppw->rho_plus_p_tot   += rho_plus_p;
 
         if (sp->IsMatterSpecies()) {
-          const double mrd  = sp->MatterRhoDelta(ppw->pv, y, ppw->pvecback, ppw);
+          const double mrd  = sp->MatterRhoDelta(ppw->pv.get(), y, ppw->pvecback, ppw);
           const double mr   = sp->MatterRho(ppw->pvecback);
-          const double mrpt = sp->MatterRhoPlusPTheta(ppw->pv, y, ppw->pvecback, ppw);
+          const double mrpt = sp->MatterRhoPlusPTheta(ppw->pv.get(), y, ppw->pvecback, ppw);
           const double mrpp = sp->MatterRhoPlusP(ppw->pvecback);
           if (sp->IsColdMatterSpecies()) {
             delta_rho_m        += mrd;
@@ -6277,7 +6261,7 @@ int PerturbationsModule::perturb_derivs_member(
   double* pvecback          = ppw->pvecback;
   double* pvecthermo        = ppw->pvecthermo;
   double* pvecmetric        = ppw->pvecmetric;
-  struct perturb_vector* pv = ppw->pv;
+  struct perturb_vector* pv = ppw->pv.get();
 
   /* multipole index, used throughout */
   int l;
@@ -6674,7 +6658,7 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y,
   double* pvecback          = ppw->pvecback;
   double* pvecthermo        = ppw->pvecthermo;
   double* pvecmetric        = ppw->pvecmetric;
-  struct perturb_vector* pv = ppw->pv;
+  struct perturb_vector* pv = ppw->pv.get();
 
   /** - compute related background quantities */
 

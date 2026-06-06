@@ -313,7 +313,7 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_scf = 0., theta_scf = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv;
+    const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback;
     const double* pvecmetric = ppw->pvecmetric;
     const double k           = ppw->scalar_ctx.k;

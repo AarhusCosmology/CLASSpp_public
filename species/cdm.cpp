@@ -211,7 +211,7 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_cdm = 0., theta_cdm = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv;
+    const perturb_vector* pv = ppw->pv.get();
     const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
     const double k     = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback;

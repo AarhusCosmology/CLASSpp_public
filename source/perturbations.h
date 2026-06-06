@@ -342,11 +342,14 @@ struct perturb_workspace {
 
   //@{
 
-  double* pvecback;          /**< background quantities */
-  double* pvecthermo;        /**< thermodynamics quantities */
-  double* pvecmetric;        /**< metric quantities */
-  struct perturb_vector* pv; /**< pointer to vector of integrated
-                                 perturbations and their
+  double* pvecback;   /**< background quantities */
+  double* pvecthermo; /**< thermodynamics quantities */
+  double* pvecmetric; /**< metric quantities */
+  /* Single owner of the perturb_vector; species methods receive a
+     non-owning raw pointer via pv.get() (used transiently while the
+     workspace is alive, never stored or shared). */
+  std::unique_ptr<perturb_vector> pv; /**< owning pointer to vector of
+                                 integrated perturbations and their
                                  time-derivatives */
 
   double delta_rho;        /**< total density perturbation (gives delta Too) */

@@ -23,6 +23,28 @@
 #define pclose(a) _pclose(a)
 #endif
 
+namespace {
+/* Read one line (including any trailing '\n') from a FILE* into `line`.
+ * Returns false only at end-of-stream with nothing read.
+ *
+ * The external-spectrum reader below consumes a popen() pipe, which yields a
+ * FILE* that cannot be wrapped in a std::ifstream. POSIX getline() would do the
+ * job but is unavailable in the MSVC runtime, so we read portably with fgetc. */
+bool read_line(FILE* file, std::string& line) {
+  line.clear();
+
+  int ch;
+  while ((ch = fgetc(file)) != EOF) {
+    line.push_back(static_cast<char>(ch));
+    if (ch == '\n') {
+      return true;
+    }
+  }
+
+  return !line.empty();
+}
+}  // namespace
+
 PrimordialModule::PrimordialModule(InputModulePtr input_module,
                                    PerturbationsModulePtr perturbation_module)
     : BaseModule(std::move(input_module)), perturbations_module_(perturbation_module) {
@@ -2923,14 +2945,13 @@ int PrimordialModule::primordial_external_spectrum_init() {
              "The program failed to set the environment for the external command. Maybe you ran "
              "out of memory.");
   /* Read output and store it */
-  char* line     = nullptr;
-  size_t linecap = 0;
-  while (getline(&line, &linecap, process) != -1) {
+  std::string line;
+  while (read_line(process, line)) {
     if (ppt->has_tensors == _TRUE_) {
-      sscanf(line, "%lf %lf %lf", &this_k, &this_pks, &this_pkt);
+      sscanf(line.c_str(), "%lf %lf %lf", &this_k, &this_pks, &this_pkt);
     }
     else {
-      sscanf(line, "%lf %lf", &this_k, &this_pks);
+      sscanf(line.c_str(), "%lf %lf", &this_k, &this_pks);
     }
     /* Store */
     k.push_back(this_k);
@@ -2941,13 +2962,11 @@ int PrimordialModule::primordial_external_spectrum_init() {
     n_data++;
     /* Check ascending order of the k's */
     if ((n_data > 1) && (k[n_data - 1] <= k[n_data - 2])) {
-      free(line);
       class_stop(error_message_,
                  "The k's are not strictly sorted in ascending order, "
                  "as it is required for the calculation of the splines.\n");
     }
   }
-  free(line);
   /* Close the process */
   status = pclose(process);
   class_test(status != 0.,

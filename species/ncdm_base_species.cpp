@@ -720,7 +720,7 @@ void NCDMBaseSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base
     return;
 
   const perturb_workspace* ppw = ppaw.ppw;
-  const perturb_vector* pv     = ppw->pv;
+  const perturb_vector* pv     = ppw->pv.get();
   const double* pvecback       = ppw->pvecback;
   const double* s_l            = ppw->s_l;
   const double k               = ppaw.k;

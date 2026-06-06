@@ -355,7 +355,7 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_ur = 0., theta_ur = 0., shear_ur = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv;
+    const perturb_vector* pv = ppw->pv.get();
     const double k           = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback;
     const double* pvecmetric = ppw->pvecmetric;

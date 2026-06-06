@@ -32,7 +32,7 @@ void IDM_DR_IDR_Species::WriteBackgroundData(const double* pvecback,
 }
 
 void IDM_DR_IDR_Species::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
-  perturb_vector* pv             = ctx.ppw->pv;
+  perturb_vector* pv             = ctx.ppw->pv.get();
   const PerturbationsModule* mod = ctx.p_mod;
   const perturbs* ppt            = mod->GetPerturbs();
   if (ctx.index_ic != mod->index_ic_ad_)
@@ -69,7 +69,7 @@ void IDM_DR_IDR_Species::FillSources(const double* y,
                                      PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv;
+  const perturb_vector* pv   = ppw->pv.get();
 
   // These sources are scalar-only
   if (ctx.index_md != p_mod->index_md_scalars_)
@@ -146,7 +146,7 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
   double delta_idr = 0., theta_idr = 0., shear_idr = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv;
+    const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback;
     const double* pvecmetric = ppw->pvecmetric;
     const double k           = ppw->scalar_ctx.k;
@@ -355,7 +355,7 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
                                            double* dy,
                                            const perturb_parameters_and_workspace& ppaw) {
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
+  const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   auto* pth_mod            = ppaw.perturbations_module->GetThermodynamicsModule().get();

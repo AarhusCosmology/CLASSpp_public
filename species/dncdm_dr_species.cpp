@@ -322,7 +322,7 @@ void DNCDM_DR_Species::FillSources(const double* y,
                                    PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv;
+  const perturb_vector* pv   = ppw->pv.get();
   const double* pvecback     = ppw->pvecback;
 
   const double a_prime_over_a = ctx.a_prime_over_a;

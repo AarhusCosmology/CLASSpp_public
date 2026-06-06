@@ -274,7 +274,6 @@ class PerturbationsModule : public BaseModule {
                                           int** interval_approx);
   int perturb_vector_init(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw, int* pa_old);
-  int perturb_vector_free(struct perturb_vector* pv);
   int perturb_initial_conditions(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw);
   int perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);

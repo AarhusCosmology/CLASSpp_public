@@ -268,7 +268,7 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
 
   const int n              = source_slot_;
   const double* pvecback   = ppw->pvecback;
-  const perturb_vector* pv = ppw->pv;
+  const perturb_vector* pv = ppw->pv.get();
   const double* y          = ppw->pv->y;
 
   // delta_ncdm[n]: density perturbation
@@ -459,7 +459,7 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_ncdm = 0., theta_ncdm = 0., shear_ncdm = 0., cs2_ncdm = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv;
+    const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback;
     const double* pvecmetric = ppw->pvecmetric;
     const double k           = ppw->scalar_ctx.k;

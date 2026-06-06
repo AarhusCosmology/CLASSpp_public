@@ -189,7 +189,7 @@ void DCDM_DR_Species::FillSources(const double* y,
                                   PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv;
+  const perturb_vector* pv   = ppw->pv.get();
   const double* pvecback     = ppw->pvecback;
 
   const double a_prime_over_a = ctx.a_prime_over_a;
@@ -273,7 +273,7 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
                                         double* dy,
                                         const perturb_parameters_and_workspace& ppaw) {
   const perturb_workspace* ppw    = ppaw.ppw;
-  const perturb_vector* pv        = ppw->pv;
+  const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   const auto& my_cd_lay = static_cast<const PerturbLayout&>(
