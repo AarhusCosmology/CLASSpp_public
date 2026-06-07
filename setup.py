@@ -114,7 +114,6 @@ source_files = (
         'evolver_rkck.cpp',
         'evolver_rkdp45.cpp',
         'exceptions.cpp',
-        'growTable.cpp',
         'hyperspherical.cpp',
         'parser.cpp',
         'quadrature.cpp',

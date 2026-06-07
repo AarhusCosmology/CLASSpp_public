@@ -2823,9 +2823,8 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
   std::vector<double> reio_vector;
   reio_vector.resize(preio->re_size);
 
-  /** - (b) create a growTable with gt_init() */
-  growTable gTable;
-  class_call(gt_init(&gTable), gTable.error_message, error_message_);
+  /** - (b) create a growing buffer holding the reionization table rows */
+  std::vector<double> reio_buffer;
 
   /** - (c) first line is taken from thermodynamics table, just before reionization starts */
 
@@ -2894,13 +2893,8 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
   /** - --> get baryon adiabatic sound speed */
   reio_vector[preio->index_re_cb2] = 5. / 3. * reio_vector[preio->index_re_wb];
 
-  /** - --> store these values in growing table */
-  class_call(gt_add(&gTable,
-                    _GT_END_,
-                    (void*) reio_vector.data(),
-                    sizeof(double) * (preio->re_size)),
-             gTable.error_message,
-             error_message_);
+  /** - --> store these values in growing buffer */
+  reio_buffer.insert(reio_buffer.end(), reio_vector.begin(), reio_vector.end());
 
   int number_of_redshifts = 1;
 
@@ -2978,12 +2972,7 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
       reio_vector[preio->index_re_dkappadtau] = dkappadz *
                                                 pvecback[background_module_->index_bg_H_];
 
-      class_call(gt_add(&gTable,
-                        _GT_END_,
-                        (void*) reio_vector.data(),
-                        sizeof(double) * (preio->re_size)),
-                 gTable.error_message,
-                 error_message_);
+      reio_buffer.insert(reio_buffer.end(), reio_vector.begin(), reio_vector.end());
 
       number_of_redshifts++;
 
@@ -3001,11 +2990,10 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
 
   preio->rt_size = number_of_redshifts;
 
-  /** - (g) retrieve data stored in the growTable with gt_getPtr() */
-  double* pData;
-  class_call(gt_getPtr(&gTable, (void**) &pData), gTable.error_message, error_message_);
+  /** - (g) retrieve data stored in the growing buffer */
+  double* pData = reio_buffer.data();
 
-  /** - (h) copy growTable to reionization_temporary_table (invert order of lines, so that redshift is growing, like in recombination table) */
+  /** - (h) copy buffer to reionization_temporary_table (invert order of lines, so that redshift is growing, like in recombination table) */
   for (int i = 0; i < preio->rt_size; i++) {
     void* memcopy_result = memcpy(preio->reionization_table.data() + i * preio->re_size,
                                   pData + (preio->rt_size - i - 1) * preio->re_size,
@@ -3015,8 +3003,9 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
                "cannot copy data back to reionization_temporary_table");
   }
 
-  /** - (i) free the growTable with gt_free() , free vector of reionization variables */
-  class_call(gt_free(&gTable), gTable.error_message, error_message_);
+  /** - (i) release the now-finished buffer (matches the previous gt_free() lifetime;
+   *        the data lives on in reionization_table) */
+  reio_buffer = std::vector<double>();
 
   /** - (j) another loop on z, to integrate equation for Tb and to compute cb2 */
   for (int i = preio->rt_size - 1; i > 0; i--) {

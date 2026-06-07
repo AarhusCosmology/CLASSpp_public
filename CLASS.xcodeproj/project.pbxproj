@@ -31,7 +31,6 @@
 		AFDC68B7240D9F6B0044B5A3 /* hyperspherical.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AA240D9F6B0044B5A3 /* hyperspherical.cpp */; };
 		AFDC68B8240D9F6B0044B5A3 /* sparse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AB240D9F6B0044B5A3 /* sparse.cpp */; };
 		AFDC68B9240D9F6B0044B5A3 /* dei_rkck.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AD240D9F6B0044B5A3 /* dei_rkck.cpp */; };
-		AFDC68BA240D9F6B0044B5A3 /* growTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */; };
 		AFDC68BB240D9F6B0044B5A3 /* quadrature.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */; };
 		AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */; };
 		0DEF0001240D9F6B0044B5A3 /* evolver_rkdp45.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0DEF0002240D9F6B0044B5A3 /* evolver_rkdp45.cpp */; };
@@ -132,7 +131,6 @@
 		AFDC68AB240D9F6B0044B5A3 /* sparse.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sparse.cpp; sourceTree = "<group>"; };
 		AFDC68AC240D9F6B0044B5A3 /* hermite3_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite3_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDC68AD240D9F6B0044B5A3 /* dei_rkck.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dei_rkck.cpp; sourceTree = "<group>"; };
-		AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = growTable.cpp; sourceTree = "<group>"; };
 		AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = quadrature.cpp; sourceTree = "<group>"; };
 		AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = evolver_rkck.cpp; sourceTree = "<group>"; };
 		0DEF0002240D9F6B0044B5A3 /* evolver_rkdp45.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = evolver_rkdp45.cpp; sourceTree = "<group>"; };
@@ -145,7 +143,6 @@
 		AFDE3DD8242BA2A80061A4DE /* quadrature.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = quadrature.h; sourceTree = "<group>"; };
 		AFDE3DD9242BA2A80061A4DE /* evolver_rkck.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = evolver_rkck.h; sourceTree = "<group>"; };
 		AFDE3DDA242BA2A80061A4DE /* arrays.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = arrays.h; sourceTree = "<group>"; };
-		AFDE3DDB242BA2A80061A4DE /* growTable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = growTable.h; sourceTree = "<group>"; };
 		AFDE3DDC242BA2A80061A4DE /* svnversion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = svnversion.h; sourceTree = "<group>"; };
 		AFDE3DDD242BA2A80061A4DE /* hermite4_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite4_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDE3DDE242BA2A80061A4DE /* hermite6_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite6_interpolation_csource.h; sourceTree = "<group>"; };
@@ -318,7 +315,6 @@
 				0DEF0002240D9F6B0044B5A3 /* evolver_rkdp45.cpp */,
 				AF1078F92424A86400A369F7 /* exceptions.cpp */,
 				AF1078F8241FB84F00A369F7 /* exceptions.h */,
-				AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */,
 				AFDC68AC240D9F6B0044B5A3 /* hermite3_interpolation_csource.h */,
 				AFDC68B2240D9F6B0044B5A3 /* hermite4_interpolation_csource.h */,
 				AFDC68A9240D9F6B0044B5A3 /* hermite6_interpolation_csource.h */,
@@ -350,7 +346,6 @@
 				AFDE3DE1242BA2A80061A4DE /* evolver_ndf15.h */,
 				AFDE3DD9242BA2A80061A4DE /* evolver_rkck.h */,
 				0DEF0003240D9F6B0044B5A3 /* evolver_rkdp45.h */,
-				AFDE3DDB242BA2A80061A4DE /* growTable.h */,
 				AFDE3DE3242BA2A80061A4DE /* hermite3_interpolation_csource.h */,
 				AFDE3DDD242BA2A80061A4DE /* hermite4_interpolation_csource.h */,
 				AFDE3DDE242BA2A80061A4DE /* hermite6_interpolation_csource.h */,
@@ -499,7 +494,6 @@
 				AF1078E3241D1F3B00A369F7 /* helium.c in Sources */,
 				AF1078E4241D1F3B00A369F7 /* hydrogen.c in Sources */,
 				AFDC68B9240D9F6B0044B5A3 /* dei_rkck.cpp in Sources */,
-				AFDC68BA240D9F6B0044B5A3 /* growTable.cpp in Sources */,
 				AFDC68C2240D9FB80044B5A3 /* class.cpp in Sources */,
 				AF1078FA2424A86400A369F7 /* exceptions.cpp in Sources */,
 				AF9F87302F8FB9720077F3A9 /* perturb_column_writer.cpp in Sources */,

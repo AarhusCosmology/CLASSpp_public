@@ -77,7 +77,7 @@ H_ALL = $(notdir $(wildcard include/*.h) $(wildcard tools/*.h) $(wildcard source
 %.opp: %.cpp .base $(H_ALL)
 	cd $(WRKDIR); $(CXX) $(OPTFLAG) $(CXXFLAG) $(INCLUDES) -c ../$< -o $*.opp
 
-TOOLS = growTable.opp dei_rkck.opp sparse.opp evolver_rkck.opp arrays.opp parser.opp quadrature.opp hyperspherical.opp common.opp trigonometric_integrals.opp exceptions.opp evolver_ndf15.opp evolver_rkdp45.opp
+TOOLS = dei_rkck.opp sparse.opp evolver_rkck.opp arrays.opp parser.opp quadrature.opp hyperspherical.opp common.opp trigonometric_integrals.opp exceptions.opp evolver_ndf15.opp evolver_rkdp45.opp
 
 SPECIES_OPP = base_species.opp cdm.opp photons.opp baryons.opp lambda.opp ultra_relativistic.opp fluid.opp dcdm.opp dark_radiation_species.opp ncdm_base_species.opp ncdm_species.opp ncdm_interacting_species.opp scalar_field.opp interacting_species.opp composite_species.opp species_collection.opp species_input.opp dcdm_dr_species.opp idm_dr_idr_species.opp idm_drmd_idr_drmd_species.opp dncdm_species.opp dncdm_dr_species.opp perturb_column_writer.opp greybody_ncdm_species.opp
 
