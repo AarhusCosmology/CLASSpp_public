@@ -86,6 +86,7 @@ SOURCE = input_module.opp background_module.opp thermodynamics_module.opp pertur
 OUTPUT = output_module.opp
 
 CLASS = class.opp
+CLASS_PROFILED = class_profiled.opp
 
 all: class classy
 
@@ -105,6 +106,9 @@ os.rename(file, new_file)'
 
 class: $(TOOLS) $(SPECIES_OPP) $(SOURCE) $(EXTERNAL) $(OUTPUT) $(CLASS)
 	$(CXX) $(OPTFLAG) $(LDFLAG) -o class $(addprefix build/,$(notdir $^)) $(LIBRARIES)
+
+class_profiled: $(TOOLS) $(SPECIES_OPP) $(SOURCE) $(EXTERNAL) $(OUTPUT) $(CLASS_PROFILED)
+	$(CXX) $(OPTFLAG) $(LDFLAG) -o class_profiled $(addprefix build/,$(notdir $^)) $(LIBRARIES)
 
 clean: .base
 	rm -rf $(WRKDIR);

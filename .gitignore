@@ -2,6 +2,7 @@ output/
 *~
 build/
 class
+class_profiled
 test-parser
 test-bisection
 *.prof
