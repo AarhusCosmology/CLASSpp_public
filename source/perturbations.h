@@ -9,6 +9,7 @@
 #include "../species/base_species.h"
 #include "evolver_ndf15.h"
 #include "evolver_rkck.h"
+#include "evolver_rkdp45.h"
 #include "thermodynamics.h"
 
 #define _scalars_ ((ppt->has_scalars == _TRUE_) && (index_md == index_md_scalars_))

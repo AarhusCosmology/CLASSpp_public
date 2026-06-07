@@ -112,6 +112,7 @@ source_files = (
         'dei_rkck.cpp',
         'evolver_ndf15.cpp',
         'evolver_rkck.cpp',
+        'evolver_rkdp45.cpp',
         'exceptions.cpp',
         'growTable.cpp',
         'hyperspherical.cpp',

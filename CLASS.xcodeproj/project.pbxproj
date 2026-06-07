@@ -34,6 +34,7 @@
 		AFDC68BA240D9F6B0044B5A3 /* growTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */; };
 		AFDC68BB240D9F6B0044B5A3 /* quadrature.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */; };
 		AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */; };
+		0DEF0001240D9F6B0044B5A3 /* evolver_rkdp45.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0DEF0002240D9F6B0044B5A3 /* evolver_rkdp45.cpp */; };
 		AFDC68BD240D9F6B0044B5A3 /* evolver_ndf15.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B1240D9F6B0044B5A3 /* evolver_ndf15.cpp */; };
 		AFDC68BE240D9F6B0044B5A3 /* parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B3240D9F6B0044B5A3 /* parser.cpp */; };
 		AFDC68BF240D9F6B0044B5A3 /* trigonometric_integrals.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AFDC68B4240D9F6B0044B5A3 /* trigonometric_integrals.cpp */; };
@@ -134,6 +135,7 @@
 		AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = growTable.cpp; sourceTree = "<group>"; };
 		AFDC68AF240D9F6B0044B5A3 /* quadrature.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = quadrature.cpp; sourceTree = "<group>"; };
 		AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = evolver_rkck.cpp; sourceTree = "<group>"; };
+		0DEF0002240D9F6B0044B5A3 /* evolver_rkdp45.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = evolver_rkdp45.cpp; sourceTree = "<group>"; };
 		AFDC68B1240D9F6B0044B5A3 /* evolver_ndf15.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = evolver_ndf15.cpp; sourceTree = "<group>"; };
 		AFDC68B2240D9F6B0044B5A3 /* hermite4_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite4_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDC68B3240D9F6B0044B5A3 /* parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = parser.cpp; sourceTree = "<group>"; };
@@ -149,6 +151,7 @@
 		AFDE3DDE242BA2A80061A4DE /* hermite6_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite6_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDE3DDF242BA2A80061A4DE /* sparse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = sparse.h; sourceTree = "<group>"; };
 		AFDE3DE1242BA2A80061A4DE /* evolver_ndf15.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = evolver_ndf15.h; sourceTree = "<group>"; };
+		0DEF0003240D9F6B0044B5A3 /* evolver_rkdp45.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = evolver_rkdp45.h; sourceTree = "<group>"; };
 		AFDE3DE2242BA2A80061A4DE /* hyperspherical.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hyperspherical.h; sourceTree = "<group>"; };
 		AFDE3DE3242BA2A80061A4DE /* hermite3_interpolation_csource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hermite3_interpolation_csource.h; sourceTree = "<group>"; };
 		AFDE3DE4242BA2A80061A4DE /* common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = common.h; sourceTree = "<group>"; };
@@ -312,6 +315,7 @@
 				AFDC68AD240D9F6B0044B5A3 /* dei_rkck.cpp */,
 				AFDC68B1240D9F6B0044B5A3 /* evolver_ndf15.cpp */,
 				AFDC68B0240D9F6B0044B5A3 /* evolver_rkck.cpp */,
+				0DEF0002240D9F6B0044B5A3 /* evolver_rkdp45.cpp */,
 				AF1078F92424A86400A369F7 /* exceptions.cpp */,
 				AF1078F8241FB84F00A369F7 /* exceptions.h */,
 				AFDC68AE240D9F6B0044B5A3 /* growTable.cpp */,
@@ -345,6 +349,7 @@
 				AFDE3DE7242BA2A80061A4DE /* dei_rkck.h */,
 				AFDE3DE1242BA2A80061A4DE /* evolver_ndf15.h */,
 				AFDE3DD9242BA2A80061A4DE /* evolver_rkck.h */,
+				0DEF0003240D9F6B0044B5A3 /* evolver_rkdp45.h */,
 				AFDE3DDB242BA2A80061A4DE /* growTable.h */,
 				AFDE3DE3242BA2A80061A4DE /* hermite3_interpolation_csource.h */,
 				AFDE3DDD242BA2A80061A4DE /* hermite4_interpolation_csource.h */,
@@ -489,6 +494,7 @@
 				AFDC689F240D9F500044B5A3 /* thermodynamics_module.cpp in Sources */,
 				AFDC68BE240D9F6B0044B5A3 /* parser.cpp in Sources */,
 				AFDC68BC240D9F6B0044B5A3 /* evolver_rkck.cpp in Sources */,
+				0DEF0001240D9F6B0044B5A3 /* evolver_rkdp45.cpp in Sources */,
 				AFDC68BD240D9F6B0044B5A3 /* evolver_ndf15.cpp in Sources */,
 				AF1078E3241D1F3B00A369F7 /* helium.c in Sources */,
 				AF1078E4241D1F3B00A369F7 /* hydrogen.c in Sources */,

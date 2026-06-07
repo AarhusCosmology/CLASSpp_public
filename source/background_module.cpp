@@ -893,6 +893,9 @@ int BackgroundModule::background_solve_evolver() {
   if (ppr->evolver == rk) {
     generic_evolver = &evolver_rk;
   }
+  else if (ppr->evolver == rkdp45) {
+    generic_evolver = &evolver_rkdp45;
+  }
 
   /* Size of vector to integrate is (bi_size_-1) rather than
    * (bi_size_), since a is not integrated.

@@ -426,8 +426,9 @@ typedef char ErrorMsg
  * list of evolver types for integrating perturbations over time
  */
 enum evolver_type {
-  rk,   /* Runge-Kutta integrator */
-  ndf15 /* stiff integrator */
+  rk,    /* Runge-Kutta integrator */
+  ndf15, /* stiff integrator */
+  rkdp45 /* Dormand-Prince 4(5) explicit adaptive integrator */
 };
 
 /**

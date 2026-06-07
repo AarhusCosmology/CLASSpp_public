@@ -2795,7 +2795,9 @@ int PerturbationsModule::perturb_solve(int index_md,
     if (ppr->evolver == rk) {
       generic_evolver = &evolver_rk;
     }
-    //    }
+    else if (ppr->evolver == rkdp45) {
+      generic_evolver = &evolver_rkdp45;
+    }
 
     class_call(generic_evolver(perturb_derivs,
                                interval_limit[index_interval],
