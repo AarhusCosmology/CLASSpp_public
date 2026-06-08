@@ -972,17 +972,10 @@ int NonlinearModule::nonlinear_init() {
   /** - preliminary tests */
 
   has_pk_matter_ = ppt->has_pk_matter;
-  /** --> This module only makes sense for dealing with scalar
-      perturbations, so it should do nothing if there are no
-      scalars */
-  if (ppt->has_scalars == _FALSE_) {
-    //TODO: See #20, modifying the input is not the proper way to do this.
-    const_cast<nonlinear*>(pnl)->method = nl_none;
-    if (pnl->nonlinear_verbose > 0) {
-      printf("No scalar modes requested. Nonlinear module skipped.\n");
-    }
-    return _SUCCESS_;
-  }
+  /** --> This module only makes sense for dealing with scalar perturbations.
+      When no scalars are requested the input module sets pnl->method to
+      nl_none (and has_pk_matter is _FALSE_), so the generic gate below skips
+      the module without mutating the input here (see issue #20). */
 
   /** --> Nothing to be done if we don't want the matter power spectrum */
   if ((has_pk_matter_ == _FALSE_) && (pnl->method == nl_none)) {

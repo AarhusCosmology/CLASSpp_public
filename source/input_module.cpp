@@ -2391,6 +2391,16 @@ void InputModule::ReadDerived() {
     }
   }
 
+  /* The nonlinear module deals only with scalar perturbations, so it is a
+     no-op when no scalars are requested. This is a deterministic function of
+     the input, so we resolve it here rather than mutating pnl->method from
+     inside the module (see issue #20). With no scalars, has_pk_matter is
+     already _FALSE_ (enforced above), so clearing method makes the nonlinear
+     module skip via its generic "nothing requested" gate. */
+  if (ppt->has_scalars == _FALSE_) {
+    pnl->method = nl_none;
+  }
+
   /** (g) amount of information sent to standard output (none if all set to zero) */
 
   class_read_int("background_verbose", pba->background_verbose);
