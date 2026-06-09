@@ -293,7 +293,7 @@ int evolver_ndf15(
   done    = _FALSE_;
   at_hmin = _FALSE_;
   while (done == _FALSE_) {
-    //class_test(stepstat[2] > 1e7, error_message,
+    //class_test(stepstat[2] > 1e7,
     //     "Too many steps in evolver! Current stepsize:%g, in interval: [%g:%g]\n",
     //     absh,t0,tfinal);
     hmin   = minimum_variation;
@@ -473,7 +473,6 @@ int evolver_ndf15(
           }
           else if (absh <= hmin) {
             class_test(absh <= hmin,
-                       error_message,
                        "Step size too small: step:%g, minimum:%g, in interval: [%g:%g]\n",
                        absh,
                        hmin,
@@ -509,7 +508,6 @@ int evolver_ndf15(
         stepstat[1] += 1;
         if (absh <= hmin) {
           class_test(absh <= hmin,
-                     error_message,
                      "Step size too small: step:%g, minimum:%g, in interval: [%g:%g]\n",
                      absh,
                      hmin,
@@ -1038,9 +1036,7 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq, ErrorMsg er
       /* AMD ordering is used here. The old q = NULL natural-ordering
 	 example is no longer valid now that q is a std::vector<int>. */
       funcreturn = sp_ludcmp(jac->Numerical.get(), jac->spJ.get(), 1e-3);
-      class_test(funcreturn == _FAILURE_,
-                 error_message,
-                 "Failure in sp_ludcmp. Possibly singular matrix!");
+      class_test(funcreturn == _FAILURE_, "Failure in sp_ludcmp. Possibly singular matrix!");
       jac->new_jacobian = _FALSE_;
     }
     else {
@@ -1059,9 +1055,7 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq, ErrorMsg er
     }
     /*Dense LU decomposition: */
     funcreturn = ludcmp(jac->LU, neq, jac->luidx, &luparity, jac->LUw);
-    class_test(funcreturn == _FAILURE_,
-               error_message,
-               "Failure in ludcmp. Possibly singular matrix!");
+    class_test(funcreturn == _FAILURE_, "Failure in ludcmp. Possibly singular matrix!");
   }
   return _SUCCESS_;
 }
@@ -1276,10 +1270,10 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F, Erro
     return _SUCCESS_;
   }
   else {
-    class_stop(error_message,
-               "Newton's method failed to converge. Try improving initial guess on the parameters, "
-               "decrease the tolerance requirements to Newtons method or increase the precision of "
-               "the input function.\n");
+    class_stop(
+        "Newton's method failed to converge. Try improving initial guess on the parameters, "
+        "decrease the tolerance requirements to Newtons method or increase the precision of "
+        "the input function.\n");
   }
 }
 

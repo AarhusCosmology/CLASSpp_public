@@ -304,6 +304,4 @@ class NCDMBaseSpecies : public BaseSpecies {
   double rho_nu_rel_ = 0.;
   double Omega0_     = 0.;
   double omega0_     = 0.;
-
-  mutable ErrorMsg error_message_;
 };

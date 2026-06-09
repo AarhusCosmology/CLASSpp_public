@@ -279,75 +279,87 @@ typedef char ErrorMsg
 #ifdef __cplusplus
 
 #undef class_call_except
-#define class_call_except(function,                                                       \
-                          error_message_from_function,                                    \
-                          error_message_output,                                           \
-                          list_of_commands)                                               \
-  {                                                                                       \
-    try {                                                                                 \
-      if ((function) == _FAILURE_) {                                                      \
-        class_call_message(error_message_output, #function, error_message_from_function); \
-        throw std::runtime_error(error_message_output);                                   \
-      }                                                                                   \
-    }                                                                                     \
-    catch (...) {                                                                         \
-      list_of_commands;                                                                   \
-      throw;                                                                              \
-    }                                                                                     \
+#define class_call_except(function, list_of_commands) \
+  {                                                   \
+    try {                                             \
+      (function);                                     \
+    }                                                 \
+    catch (...) {                                     \
+      list_of_commands;                               \
+      throw;                                          \
+    }                                                 \
   }
 
 #undef class_call
-#define class_call(function, error_message_from_function, error_message_output)         \
-  {                                                                                     \
-    if ((function) == _FAILURE_) {                                                      \
-      class_call_message(error_message_output, #function, error_message_from_function); \
-      throw std::runtime_error(error_message_output);                                   \
-    }                                                                                   \
+#define class_call(function, error_message_from_function, error_message_output) \
+  {                                                                             \
+    if ((function) == _FAILURE_) {                                              \
+      ErrorMsg _class_err_;                                                     \
+      class_call_message(_class_err_, #function, error_message_from_function);  \
+      throw std::runtime_error(_class_err_);                                    \
+    }                                                                           \
+  }
+
+/* New: for tools/ leaf functions that return _FAILURE_. Some leaves can return
+ * _FAILURE_ WITHOUT writing the buffer (e.g. quadrature qm_auto,
+ * hyperspherical_HIS_create default), so NUL-init it first to guarantee a valid
+ * string before it is read as %s in class_call_message. */
+#define class_call_failure(function, error_message_from_function)              \
+  {                                                                            \
+    (error_message_from_function)[0] = '\0';                                   \
+    if ((function) == _FAILURE_) {                                             \
+      ErrorMsg _class_err_;                                                    \
+      class_call_message(_class_err_, #function, error_message_from_function); \
+      throw std::runtime_error(_class_err_);                                   \
+    }                                                                          \
   }
 
 #undef class_test_except
-#define class_test_except(condition, error_message_output, list_of_commands, args, ...) \
-  {                                                                                     \
-    if (condition) {                                                                    \
-      class_test_message(error_message_output, #condition, args, ##__VA_ARGS__);        \
-      list_of_commands;                                                                 \
-      throw std::runtime_error(error_message_output);                                   \
-    }                                                                                   \
+#define class_test_except(condition, list_of_commands, args, ...)       \
+  {                                                                     \
+    if (condition) {                                                    \
+      ErrorMsg _class_err_;                                             \
+      class_test_message(_class_err_, #condition, args, ##__VA_ARGS__); \
+      list_of_commands;                                                 \
+      throw std::runtime_error(_class_err_);                            \
+    }                                                                   \
   }
 
 #undef class_test
-#define class_test(condition, error_message_output, args, ...)                   \
-  {                                                                              \
-    if (condition) {                                                             \
-      class_test_message(error_message_output, #condition, args, ##__VA_ARGS__); \
-      throw std::runtime_error(error_message_output);                            \
-    }                                                                            \
+#define class_test(condition, args, ...)                                \
+  {                                                                     \
+    if (condition) {                                                    \
+      ErrorMsg _class_err_;                                             \
+      class_test_message(_class_err_, #condition, args, ##__VA_ARGS__); \
+      throw std::runtime_error(_class_err_);                            \
+    }                                                                   \
   }
 
 #undef class_stop
-#define class_stop(error_message_output, args, ...)                                  \
-  {                                                                                  \
-    ErrorMsg Optional_arguments;                                                     \
-    class_protect_sprintf(Optional_arguments, args, ##__VA_ARGS__);                  \
-    class_build_error_string(error_message_output, "error; %s", Optional_arguments); \
-    throw std::runtime_error(error_message_output);                                  \
+#define class_stop(args, ...)                                             \
+  {                                                                       \
+    ErrorMsg _class_err_, _class_opt_args_;                               \
+    class_protect_sprintf(_class_opt_args_, args, ##__VA_ARGS__);         \
+    class_build_error_string(_class_err_, "error; %s", _class_opt_args_); \
+    throw std::runtime_error(_class_err_);                                \
   }
 
 #undef class_open
-#define class_open(pointer, filename, mode, error_output)                    \
+#define class_open(pointer, filename, mode)                                  \
   {                                                                          \
     pointer = fopen(filename, mode);                                         \
     if (pointer == nullptr) {                                                \
-      class_build_error_string(error_output,                                 \
+      ErrorMsg _class_err_;                                                  \
+      class_build_error_string(_class_err_,                                  \
                                "could not open %s with name %s and mode %s", \
                                #pointer,                                     \
                                filename,                                     \
                                #mode);                                       \
-      throw std::runtime_error(error_output);                                \
+      throw std::runtime_error(_class_err_);                                 \
     }                                                                        \
   }
 
-#endif /* __cplusplus exception overrides */
+#endif
 
 /* macro for defining indices (usually one, sometimes a block) */
 #define class_define_index(index, condition, running_index, number_of_indices) \
@@ -1073,11 +1085,6 @@ struct precision {
   //@{
   double smallest_allowed_variation =
       DBL_EPSILON; /**< machine-dependent, assigned automatically by the code */
-  //@}
-
-  /** @name - zone for writing error messages */
-  //@{
-  ErrorMsg error_message; /**< zone for writing error messages */
   //@}
 
   /** Prepend the runtime class_dir to the relative data-file path defaults

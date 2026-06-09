@@ -205,14 +205,12 @@ int BackgroundModule::background_at_tau(
   /** - check that tau is in the pre-computed range */
 
   class_test(tau < tau_table_[0],
-             error_message_,
              "out of range: tau=%e < tau_min=%e, you should decrease the precision parameter "
              "a_ini_over_a_today_default\n",
              tau,
              tau_table_[0]);
 
   class_test(tau > tau_table_[bt_size_ - 1],
-             error_message_,
              "out of range: tau=%e > tau_max=%e\n",
              tau,
              tau_table_[bt_size_ - 1]);
@@ -236,34 +234,41 @@ int BackgroundModule::background_at_tau(
       interpolation mode) */
 
   if (intermode == pba->inter_normal) {
-    class_call(array_interpolate_spline(const_cast<double*>(tau_table_.data()),
-                                        bt_size_,
-                                        const_cast<double*>(background_table_.data()),
-                                        const_cast<double*>(d2background_dtau2_table_.data()),
-                                        bg_size_,
-                                        tau,
-                                        last_index,
-                                        pvecback,
-                                        pvecback_size,
-                                        error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_spline(const_cast<double*>(tau_table_.data()),
+                                                  bt_size_,
+                                                  const_cast<double*>(background_table_.data()),
+                                                  const_cast<double*>(
+                                                      d2background_dtau2_table_.data()),
+                                                  bg_size_,
+                                                  tau,
+                                                  last_index,
+                                                  pvecback,
+                                                  pvecback_size,
+                                                  buf),
+                         buf);
+    }
   }
   if (intermode == pba->inter_closeby) {
-    class_call(array_interpolate_spline_growing_closeby(const_cast<double*>(tau_table_.data()),
-                                                        bt_size_,
-                                                        const_cast<double*>(
-                                                            background_table_.data()),
-                                                        const_cast<double*>(
-                                                            d2background_dtau2_table_.data()),
-                                                        bg_size_,
-                                                        tau,
-                                                        last_index,
-                                                        pvecback,
-                                                        pvecback_size,
-                                                        error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_spline_growing_closeby(const_cast<double*>(
+                                                                      tau_table_.data()),
+                                                                  bt_size_,
+                                                                  const_cast<double*>(
+                                                                      background_table_.data()),
+                                                                  const_cast<double*>(
+                                                                      d2background_dtau2_table_
+                                                                          .data()),
+                                                                  bg_size_,
+                                                                  tau,
+                                                                  last_index,
+                                                                  pvecback,
+                                                                  pvecback_size,
+                                                                  buf),
+                         buf);
+    }
   }
 
   return _SUCCESS_;
@@ -289,26 +294,27 @@ int BackgroundModule::background_tau_of_z(double z, double* tau) const {
 
   /** - check that \f$ z \f$ is in the pre-computed range */
   class_test(z < z_table_[bt_size_ - 1],
-             error_message_,
              "out of range: z=%e < z_min=%e\n",
              z,
              z_table_[bt_size_ - 1]);
 
-  class_test(z > z_table_[0], error_message_, "out of range: a=%e > a_max=%e\n", z, z_table_[0]);
+  class_test(z > z_table_[0], "out of range: a=%e > a_max=%e\n", z, z_table_[0]);
 
   /** - interpolate from pre-computed table with array_interpolate() */
-  class_call(array_interpolate_spline(const_cast<double*>(z_table_.data()),
-                                      bt_size_,
-                                      const_cast<double*>(tau_table_.data()),
-                                      const_cast<double*>(d2tau_dz2_table_.data()),
-                                      1,
-                                      z,
-                                      &last_index,
-                                      tau,
-                                      1,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_interpolate_spline(const_cast<double*>(z_table_.data()),
+                                                bt_size_,
+                                                const_cast<double*>(tau_table_.data()),
+                                                const_cast<double*>(d2tau_dz2_table_.data()),
+                                                1,
+                                                z,
+                                                &last_index,
+                                                tau,
+                                                1,
+                                                buf),
+                       buf);
+  }
 
   return _SUCCESS_;
 }
@@ -351,7 +357,7 @@ int BackgroundModule::background_functions(
   double rho_m    = 0.;
   double a_rel    = a / pba->a_today;
 
-  class_test(a_rel <= 0., error_message_, "a = %e instead of strictly positive", a_rel);
+  class_test(a_rel <= 0., "a = %e instead of strictly positive", a_rel);
 
   /** - pass value of \f$ a\f$ to output */
   pvecback[index_bg_a_] = a;
@@ -394,9 +400,7 @@ int BackgroundModule::background_functions(
   /* Fluid needs w_fld computed before calling ComputeBackground */
   if (all_species_.count("Fluid")) {
     double w_fld, dw_over_da_fld, integral_fld;
-    class_call(background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld),
-               error_message_,
-               error_message_);
+    background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld);
     static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
         .WriteWFld(w_fld, dw_over_da_fld, pvecback);
     all_species_.at("Fluid")->ComputeBackground(a_rel, pvecback_B, pvecback);
@@ -430,21 +434,16 @@ int BackgroundModule::background_functions(
   if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
     auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
     double Rint, csp2, Gint;
-    class_call(background_idm_drmd(a,
-                                   drmd.idm_drmd().Rho(pvecback) / drmd.idr_drmd().Rho(pvecback),
-                                   &Rint,
-                                   &csp2,
-                                   &Gint),
-               error_message_,
-               error_message_);
+    background_idm_drmd(a,
+                        drmd.idm_drmd().Rho(pvecback) / drmd.idr_drmd().Rho(pvecback),
+                        &Rint,
+                        &csp2,
+                        &Gint);
     pvecback[index_bg_G_over_aH_drmd_] = Gint / (pvecback[index_bg_H_] * a_rel);
   }
   /** - compute critical density */
   double rho_crit = rho_tot - pba->K / a / a;
-  class_test(rho_crit <= 0.,
-             error_message_,
-             "rho_crit = %e instead of strictly positive",
-             rho_crit);
+  class_test(rho_crit <= 0., "rho_crit = %e instead of strictly positive", rho_crit);
 
   /** - compute relativistic density to total density ratio */
   pvecback[index_bg_Omega_r_] = rho_r / rho_crit;
@@ -569,17 +568,14 @@ int BackgroundModule::background_init() {
   }
 
   /** - assign values to all indices in vectors of background quantities with background_indices()*/
-  class_call(background_indices(), error_message_, error_message_);
+  background_indices();
 
   /* fluid equation of state */
   if (all_species_.count("Fluid")) {
     double w_fld, dw_over_da, integral_fld;
-    class_call(background_w_fld(0., &w_fld, &dw_over_da, &integral_fld),
-               error_message_,
-               error_message_);
+    background_w_fld(0., &w_fld, &dw_over_da, &integral_fld);
 
     class_test(w_fld >= 1. / 3.,
-               error_message_,
                "Your choice for w(a--->0)=%g is suspicious, since it is bigger than -1/3 there "
                "cannot be radiation domination at early times\n",
                w_fld);
@@ -594,24 +590,20 @@ int BackgroundModule::background_init() {
   }
 
   /* check other quantities which would lead to segmentation fault if zero */
-  class_test(pba->a_today <= 0,
-             error_message_,
-             "input a_today = %e instead of strictly positive",
-             pba->a_today);
+  class_test(pba->a_today <= 0, "input a_today = %e instead of strictly positive", pba->a_today);
 
   class_test(_Gyr_over_Mpc_ <= 0,
-             error_message_,
              "_Gyr_over_Mpc = %e instead of strictly positive",
              _Gyr_over_Mpc_);
 
   /** - this function integrates the background over time, allocates
       and fills the background table */
-  class_call(background_solve_evolver(), error_message_, error_message_);
+  background_solve_evolver();
 
   /** - this function finds and stores a few derived parameters at radiation-matter equality */
-  class_call(background_find_equality(), error_message_, error_message_);
+  background_find_equality();
 
-  class_call(background_output_budget(), error_message_, error_message_);
+  background_output_budget();
 
   return _SUCCESS_;
 }
@@ -624,7 +616,7 @@ int BackgroundModule::background_init() {
  */
 
 int BackgroundModule::background_free() {
-  class_call(background_free_noinput(), error_message_, error_message_);
+  background_free_noinput();
 
   return _SUCCESS_;
 }
@@ -839,7 +831,6 @@ int BackgroundModule::background_indices() {
   /* index_bi_tau must be the last index, because tau is part of this vector for the purpose of being stored, */
   /* but it is not a quantity to be integrated (since integration is over tau itself) */
   class_test(index_bi_tau_ != index_bi - 1,
-             error_message_,
              "background integration requires index_bi_tau to be the last of all index_bi's");
 
   /* Set BackgroundModule pointer on all active species (default is no-op) */
@@ -864,9 +855,7 @@ int BackgroundModule::background_solve_evolver() {
   bpaw.pvecback = pvecback.data();
 
   /** - impose initial conditions with background_initial_conditions() */
-  class_call(background_initial_conditions(pvecback.data(), pvecback_integration.data()),
-             error_message_,
-             error_message_);
+  background_initial_conditions(pvecback.data(), pvecback_integration.data());
 
   /** - Determine output vector */
   double loga_ini   = log(pvecback_integration[index_bi_a_]);
@@ -900,24 +889,26 @@ int BackgroundModule::background_solve_evolver() {
   /* Size of vector to integrate is (bi_size_-1) rather than
    * (bi_size_), since a is not integrated.
    */
-  class_call(generic_evolver(background_derivs_loga,
-                             loga_ini,
-                             loga_final,
-                             pvecback_integration.data(),
-                             used_in_output.data(),
-                             bi_size_ - 1,
-                             &bpaw,
-                             ppr->tol_background_integration,
-                             ppr->smallest_allowed_variation,
-                             nullptr,
-                             ppr->perturb_integration_stepsize,
-                             loga.data(),
-                             bt_size_,
-                             background_add_line_to_bg_table,
-                             nullptr,
-                             error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(generic_evolver(background_derivs_loga,
+                                       loga_ini,
+                                       loga_final,
+                                       pvecback_integration.data(),
+                                       used_in_output.data(),
+                                       bi_size_ - 1,
+                                       &bpaw,
+                                       ppr->tol_background_integration,
+                                       ppr->smallest_allowed_variation,
+                                       nullptr,
+                                       ppr->perturb_integration_stepsize,
+                                       loga.data(),
+                                       bt_size_,
+                                       background_add_line_to_bg_table,
+                                       nullptr,
+                                       buf),
+                       buf);
+  }
 
   /** - deduce age of the Universe */
   /* -> age in Gyears */
@@ -968,25 +959,29 @@ int BackgroundModule::background_solve_evolver() {
   }
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
-  class_call(array_spline_table_lines(z_table_.data(),
-                                      bt_size_,
-                                      tau_table_.data(),
-                                      1,
-                                      d2tau_dz2_table_.data(),
-                                      _SPLINE_EST_DERIV_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_lines(z_table_.data(),
+                                                bt_size_,
+                                                tau_table_.data(),
+                                                1,
+                                                d2tau_dz2_table_.data(),
+                                                _SPLINE_EST_DERIV_,
+                                                buf),
+                       buf);
+  }
 
-  class_call(array_spline_table_lines(tau_table_.data(),
-                                      bt_size_,
-                                      background_table_.data(),
-                                      bg_size_,
-                                      d2background_dtau2_table_.data(),
-                                      _SPLINE_EST_DERIV_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_lines(tau_table_.data(),
+                                                bt_size_,
+                                                background_table_.data(),
+                                                bg_size_,
+                                                d2background_dtau2_table_.data(),
+                                                _SPLINE_EST_DERIV_,
+                                                buf),
+                       buf);
+  }
 
   /** - compute remaining "related parameters"
    *     - so-called "effective neutrino number", computed at earliest
@@ -1122,14 +1117,11 @@ int BackgroundModule::background_initial_conditions(
   }
 
   /* Infer pvecback from pvecback_integration */
-  class_call(background_functions(pvecback_integration, pba->normal_info, pvecback),
-             error_message_,
-             error_message_);
+  background_functions(pvecback_integration, pba->normal_info, pvecback);
 
   /* Just checking that our initial time indeed is deep enough in the radiation
      dominated regime */
   class_test(fabs(pvecback[index_bg_Omega_r_] - 1.) > ppr->tol_initial_Omega_r,
-             error_message_,
              "Omega_r = %e, not close enough to 1. Decrease a_ini_over_a_today_default in order to "
              "start from radiation domination.",
              pvecback[index_bg_Omega_r_]);
@@ -1139,7 +1131,6 @@ int BackgroundModule::background_initial_conditions(
       approximation for most purposes) */
 
   class_test(pvecback[index_bg_H_] <= 0.,
-             error_message_,
              "H = %e instead of strictly positive",
              pvecback[index_bg_H_]);
 
@@ -1208,13 +1199,11 @@ int BackgroundModule::background_find_equality() {
   while ((tau_plus - tau_minus) > ppr->tol_tau_eq) {
     tau_mid = 0.5 * (tau_plus + tau_minus);
 
-    class_call(background_at_tau(tau_mid,
-                                 pba->long_info,
-                                 pba->inter_closeby,
-                                 &index_tau_minus,
-                                 pvecback.data()),
-               error_message_,
-               error_message_);
+    background_at_tau(tau_mid,
+                      pba->long_info,
+                      pba->inter_closeby,
+                      &index_tau_minus,
+                      pvecback.data());
 
     Omega_m_over_Omega_r = pvecback[index_bg_Omega_m_] / pvecback[index_bg_Omega_r_];
 
@@ -1316,7 +1305,7 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
  * pointer. Here, this is just a pointer to the background structure
  * and to a background vector.
  *
- * - errors are not written to error_message_, but to a generic
+ * - errors are not written to a module error_message buffer, but to a generic
  * error_message passed in the list of arguments.
  *
  * @param tau                      Input: conformal time
@@ -1344,7 +1333,7 @@ int BackgroundModule::background_derivs_member(
   pvecback = pbpaw->pvecback;
 
   /** - calculate functions of \f$ a \f$ with background_functions() */
-  class_call(background_functions(y, pba->normal_info, pvecback), error_message_, error_message);
+  background_functions(y, pba->normal_info, pvecback);
 
   /** - Short hand notation */
   a = y[index_bi_a_];
@@ -1357,7 +1346,6 @@ int BackgroundModule::background_derivs_member(
   dy[index_bi_time_] = y[index_bi_a_];
 
   class_test(all_species_.photons().Rho(pvecback) <= 0.,
-             error_message,
              "rho_g = %e instead of strictly positive",
              all_species_.photons().Rho(pvecback));
 
@@ -1515,7 +1503,7 @@ int BackgroundModule::background_output_budget() {
  * pointer. Here, this is just a pointer to the background structure
  * and to a background vector.
  *
- * - errors are not written to pba->error_message, but to a generic
+ * - errors are not written to a module buffer, but to a generic
  * error_message passed in the list of arguments.
  *
  * @param loga                        Input: scale factor
@@ -1543,9 +1531,7 @@ int BackgroundModule::background_derivs_loga_member(
   y[index_bi_a_] = a;
 
   /** Get derivatives w.r.t. conformal time */
-  class_call(background_derivs_member(tau, y, dy, parameters_and_workspace, error_message),
-             error_message_,
-             error_message_);
+  background_derivs_member(tau, y, dy, parameters_and_workspace, error_message);
 
   /** Swap a and tau again */
   y[index_bi_a_] = tau;
@@ -1576,7 +1562,7 @@ int BackgroundModule::background_add_line_to_bg_table_member(double loga,
   double* pvecback = background_table_.data() + index_loga * bg_size_;
 
   // compute quantities depending only on {B} variables.
-  class_call(background_functions(y, pba->long_info, pvecback), error_message_, error_message_);
+  background_functions(y, pba->long_info, pvecback);
 
   pvecback[index_bg_time_] = y[index_bi_time_];
   pvecback[index_bg_rs_]   = y[index_bi_rs_];

@@ -47,8 +47,6 @@ struct spectra {
   short spectra_verbose =
       0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
-  ErrorMsg error_message; /**< zone for writing error messages */
-
   //@}
 };
 

@@ -20,7 +20,6 @@ int array_derive(double* array,
   double dx1, dx2, dy1, dy2, weight1, weight2;
 
   class_test((index_dydx == index_x) || (index_dydx == index_y),
-             errmsg,
              "output column %d must differ from input columns %d and %d",
              index_dydx,
              index_x,
@@ -34,7 +33,7 @@ int array_derive(double* array,
     dy1 = dy2;
     dx2 = array[(i + 1) * n_columns + index_x] - array[i * n_columns + index_x];
     dy2 = array[(i + 1) * n_columns + index_y] - array[i * n_columns + index_y];
-    class_test((dx1 == 0) || (dx2 == 0), errmsg, "stop to avoid division by zero");
+    class_test((dx1 == 0) || (dx2 == 0), "stop to avoid division by zero");
     weight1                           = dx2 * dx2;
     weight2                           = dx1 * dx1;
     array[i * n_columns + index_dydx] = (weight1 * dy1 + weight2 * dy2) /
@@ -63,16 +62,15 @@ int array_derive_spline(double* x_array,
   double h;
 
   class_test(index_dydx == index_y,
-             errmsg,
              "Output column %d must differ from input columns %d",
              index_dydx,
              index_y);
 
-  class_test(n_lines < 2, errmsg, "no possible derivation with less than two lines");
+  class_test(n_lines < 2, "no possible derivation with less than two lines");
 
   for (i = 0; i < n_lines - 1; i++) {
     h = x_array[i + 1] - x_array[i];
-    class_test(h == 0, errmsg, "h=0, stop to avoid division by zero");
+    class_test(h == 0, "h=0, stop to avoid division by zero");
 
     array[i * n_columns + index_dydx] =
         (array[(i + 1) * n_columns + index_y] - array[i * n_columns + index_y]) / h -
@@ -106,22 +104,20 @@ int array_derive_spline_table_line_to_line(double* x_array,
   double h;
 
   class_test(index_ddy == index_y,
-             errmsg,
              "Output column %d must differ from input columns %d",
              index_ddy,
              index_y);
 
   class_test(index_ddy == index_dy,
-             errmsg,
              "Output column %d must differ from input columns %d",
              index_ddy,
              index_dy);
 
-  class_test(n_lines < 2, errmsg, "no possible derivation with less than two lines");
+  class_test(n_lines < 2, "no possible derivation with less than two lines");
 
   for (i = 0; i < n_lines - 1; i++) {
     h = x_array[i + 1] - x_array[i];
-    class_test(h == 0, errmsg, "h=0, stop to avoid division by zero")
+    class_test(h == 0, "h=0, stop to avoid division by zero")
 
         array[i * n_columns + index_dy] =
             (array[(i + 1) * n_columns + index_y] - array[i * n_columns + index_y]) / h -
@@ -151,14 +147,14 @@ int array_derive1_order2_table_line_to_line(double* x_array,
   int i = 1;
   double dxp, dxm, dyp, dym;
 
-  class_test(n_lines < 2, errmsg, "routine called with n_lines=%d, should be at least 2");
+  class_test(n_lines < 2, "routine called with n_lines=%d, should be at least 2");
 
   dxp = x_array[2] - x_array[1];
   dxm = x_array[0] - x_array[1];
   dyp = *(array + 2 * n_columns + index_y) - *(array + 1 * n_columns + index_y);
   dym = *(array + 0 * n_columns + index_y) - *(array + 1 * n_columns + index_y);
 
-  class_test((dxp * dxm * (dxm - dxp)) == 0., errmsg, "stop to avoid division by zero");
+  class_test((dxp * dxm * (dxm - dxp)) == 0., "stop to avoid division by zero");
 
   *(array + 1 * n_columns + index_dy) = (dyp * dxm * dxm - dym * dxp * dxp) /
                                         (dxp * dxm * (dxm - dxp));
@@ -173,7 +169,7 @@ int array_derive1_order2_table_line_to_line(double* x_array,
     dyp = *(array + (i + 1) * n_columns + index_y) - *(array + i * n_columns + index_y);
     dym = *(array + (i - 1) * n_columns + index_y) - *(array + i * n_columns + index_y);
 
-    class_test((dxp * dxm * (dxm - dxp)) == 0., errmsg, "stop to avoid division by zero");
+    class_test((dxp * dxm * (dxm - dxp)) == 0., "stop to avoid division by zero");
 
     *(array + i * n_columns + index_dy) = (dyp * dxm * dxm - dym * dxp * dxp) /
                                           (dxp * dxm * (dxm - dxp));
@@ -204,7 +200,7 @@ int array_derive2_order2_table_line_to_line(double* x_array,
     dyp = *(array + (i + 1) * n_columns + index_y) - *(array + i * n_columns + index_y);
     dym = *(array + (i - 1) * n_columns + index_y) - *(array + i * n_columns + index_y);
 
-    class_test((dxp * dxm * (dxm - dxp)) == 0., errmsg, "stop to avoid division by zero");
+    class_test((dxp * dxm * (dxm - dxp)) == 0., "stop to avoid division by zero");
 
     *(array + i * n_columns + index_dy)  = (dyp * dxm * dxm - dym * dxp * dxp) /
                                            (dxp * dxm * (dxm - dxp));
@@ -269,7 +265,6 @@ int array_derive_two(double* array,
   double dx1, dx2, dy1, dy2, weight1, weight2;
 
   class_test((index_dydx == index_x) || (index_dydx == index_y),
-             errmsg,
              "Output column %d must differ from input columns %d and %d",
              index_dydx,
              index_x,
@@ -286,7 +281,7 @@ int array_derive_two(double* array,
     weight1 = dx2 * dx2;
     weight2 = dx1 * dx1;
 
-    class_test((dx1 == 0.) && (dx2 == 0.), errmsg, "stop to avoid division by zero");
+    class_test((dx1 == 0.) && (dx2 == 0.), "stop to avoid division by zero");
 
     *(array + i * n_columns + index_dydx)    = (weight1 * dy1 + weight2 * dy2) /
                                                (weight1 * dx1 + weight2 * dx2);
@@ -324,7 +319,7 @@ int array_spline(double* array,
   double dy_first;
   double dy_last;
 
-  class_test(n_lines < 3, errmsg, "n_lines=%d, while routine needs n_lines >= 3");
+  class_test(n_lines < 3, "n_lines=%d, while routine needs n_lines >= 3");
 
   if (spline_mode == _SPLINE_NATURAL_) {
     *(array + 0 * n_columns + index_ddydx2) = u[0] = 0.0;
@@ -349,7 +344,7 @@ int array_spline(double* array,
               dy_first);
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -404,7 +399,7 @@ int array_spline(double* array,
                            *(array + (n_lines - 2) * n_columns + index_x)));
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -451,7 +446,7 @@ int array_spline_table_line_to_line(double* x, /* vector of size x_size */
               dy_first);
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -488,7 +483,7 @@ int array_spline_table_line_to_line(double* x, /* vector of size x_size */
                                (x[n_lines - 1] - x[n_lines - 2]));
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -554,7 +549,7 @@ int array_spline_table_lines(double* x, /* vector of size x_size */
       }
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -605,7 +600,7 @@ int array_spline_table_lines(double* x, /* vector of size x_size */
       }
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -680,7 +675,7 @@ int array_logspline_table_lines(double* x, /* vector of size x_size */
       }
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -733,7 +728,7 @@ int array_logspline_table_lines(double* x, /* vector of size x_size */
       }
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -792,21 +787,9 @@ int array_spline_table_columns(double* x, /* vector of size x_size */
   }
   else {
     if (spline_mode == _SPLINE_EST_DERIV_) {
-      class_test(x[2] - x[0] == 0.,
-                 errmsg,
-                 "x[2]=%g, x[0]=%g, stop to avoid seg fault",
-                 x[2],
-                 x[0]);
-      class_test(x[1] - x[0] == 0.,
-                 errmsg,
-                 "x[1]=%g, x[0]=%g, stop to avoid seg fault",
-                 x[1],
-                 x[0]);
-      class_test(x[2] - x[1] == 0.,
-                 errmsg,
-                 "x[2]=%g, x[1]=%g, stop to avoid seg fault",
-                 x[2],
-                 x[1]);
+      class_test(x[2] - x[0] == 0., "x[2]=%g, x[0]=%g, stop to avoid seg fault", x[2], x[0]);
+      class_test(x[1] - x[0] == 0., "x[1]=%g, x[0]=%g, stop to avoid seg fault", x[1], x[0]);
+      class_test(x[2] - x[1] == 0., "x[2]=%g, x[1]=%g, stop to avoid seg fault", x[2], x[1]);
 
       for (index_y = 0; index_y < y_size; index_y++) {
         dy_first = ((x[2] - x[0]) * (x[2] - x[0]) *
@@ -824,7 +807,7 @@ int array_spline_table_columns(double* x, /* vector of size x_size */
       }
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -875,7 +858,7 @@ int array_spline_table_columns(double* x, /* vector of size x_size */
       }
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1061,7 +1044,7 @@ int array_spline_table_one_column(double* x, /* vector of size x_size */
                     dy_first);
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1106,7 +1089,7 @@ int array_spline_table_one_column(double* x, /* vector of size x_size */
                 (x[x_size - 1] - x[x_size - 2]));
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1173,7 +1156,7 @@ int array_logspline_table_one_column(double* x, /* vector of size x_size */
                     dy_first);
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1222,7 +1205,7 @@ int array_logspline_table_one_column(double* x, /* vector of size x_size */
                           (log(x[x_stop - 1]) - log(x[x_stop - 2])));
     }
     else {
-      class_stop(errmsg, "Spline mode not identified: %d", spline_mode);
+      class_stop("Spline mode not identified: %d", spline_mode);
     }
   }
 
@@ -1279,7 +1262,6 @@ int array_integrate_all_trapzd_or_spline(double* array,
   double h;
 
   class_test((index_start_spline < 0) || (index_start_spline >= n_lines),
-             errmsg,
              "index_start_spline outside of range");
 
   *result = 0;
@@ -1319,7 +1301,6 @@ int array_integrate(double* array,
   double sum;
 
   class_test((index_int_y_dx == index_x) || (index_int_y_dx == index_y),
-             errmsg,
              "Output column %d must differ from input columns %d and %d",
              index_int_y_dx,
              index_x,
@@ -1354,7 +1335,6 @@ int array_integrate_ratio(double* array,
 
   class_test((index_int_y1_over_y2_dx == index_x) || (index_int_y1_over_y2_dx == index_y1) ||
                  (index_int_y1_over_y2_dx == index_y2),
-             errmsg,
              "Output column %d must differ from input columns %d, %d and %d",
              index_int_y1_over_y2_dx,
              index_x,
@@ -1399,13 +1379,11 @@ int array_interpolate(double* array,
 
   if (*(array + inf * n_columns + index_x) < *(array + sup * n_columns + index_x)) {
     class_test(x < *(array + inf * n_columns + index_x),
-               errmsg,
                "x=%e < x_min=%e",
                x,
                *(array + inf * n_columns + index_x));
 
     class_test(x > *(array + sup * n_columns + index_x),
-               errmsg,
                "x=%e > x_max=%e",
                x,
                *(array + sup * n_columns + index_x));
@@ -1423,13 +1401,11 @@ int array_interpolate(double* array,
 
   else {
     class_test(x < *(array + sup * n_columns + index_x),
-               errmsg,
                "x=%e < x_min=%e",
                x,
                *(array + sup * n_columns + index_x));
 
     class_test(x > *(array + inf * n_columns + index_x),
-               errmsg,
                "x=%e > x_max=%e",
                x,
                *(array + inf * n_columns + index_x));
@@ -1481,9 +1457,9 @@ int array_interpolate_spline(double* x_array,
   sup = n_lines - 1;
 
   if (x_array[inf] < x_array[sup]) {
-    class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
+    class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
 
-    class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
+    class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1497,9 +1473,9 @@ int array_interpolate_spline(double* x_array,
   }
 
   else {
-    class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
+    class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
 
-    class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
+    class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1539,9 +1515,9 @@ int array_search_bisect(int n_lines, double* array, double c, int* last_index, E
   sup = n_lines - 1;
 
   if (array[inf] < array[sup]) {
-    class_test(c < array[inf], errmsg, "c=%e < y_min=%e", c, array[inf]);
+    class_test(c < array[inf], "c=%e < y_min=%e", c, array[inf]);
 
-    class_test(c > array[sup], errmsg, "c=%e > y_max=%e", c, array[sup]);
+    class_test(c > array[sup], "c=%e > y_max=%e", c, array[sup]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1555,9 +1531,9 @@ int array_search_bisect(int n_lines, double* array, double c, int* last_index, E
   }
 
   else {
-    class_test(c < array[sup], errmsg, "x=%e < x_min=%e", c, array[sup]);
+    class_test(c < array[sup], "x=%e < x_min=%e", c, array[sup]);
 
-    class_test(c > array[inf], errmsg, "x=%e > x_max=%e", c, array[inf]);
+    class_test(c > array[inf], "x=%e > x_max=%e", c, array[inf]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1596,9 +1572,9 @@ int array_interpolate_linear(double* x_array,
   sup = n_lines - 1;
 
   if (x_array[inf] < x_array[sup]) {
-    class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
+    class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
 
-    class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
+    class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1612,9 +1588,9 @@ int array_interpolate_linear(double* x_array,
   }
 
   else {
-    class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
+    class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
 
-    class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
+    class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1661,9 +1637,9 @@ int array_interpolate_logspline(double* x_array,
   sup = n_lines - 1;
 
   if (x_array[inf] < x_array[sup]) {
-    class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
+    class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
 
-    class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
+    class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1677,9 +1653,9 @@ int array_interpolate_logspline(double* x_array,
   }
 
   else {
-    class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
+    class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
 
-    class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
+    class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1729,9 +1705,9 @@ int array_interpolate_spline_one_column(
   sup = x_size - 1;
 
   if (x_array[inf] < x_array[sup]) {
-    class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
+    class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
 
-    class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
+    class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1745,9 +1721,9 @@ int array_interpolate_spline_one_column(
   }
 
   else {
-    class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
+    class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
 
-    class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
+    class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -1809,9 +1785,9 @@ int array_interpolate_extrapolate_spline_one_column(
     sup = x_size - 1;
 
     if (x_array[inf] < x_array[sup]) {
-      class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
+      class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
 
-      class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
+      class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
 
       while (sup - inf > 1) {
         mid = (int) (0.5 * (inf + sup));
@@ -1825,9 +1801,9 @@ int array_interpolate_extrapolate_spline_one_column(
     }
 
     else {
-      class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
+      class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
 
-      class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
+      class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
 
       while (sup - inf > 1) {
         mid = (int) (0.5 * (inf + sup));
@@ -1899,9 +1875,9 @@ int array_interpolate_extrapolate_logspline_loglinear_one_column(
     sup = x_stop - 1;
 
     if (x_array[inf] < x_array[sup]) {
-      class_test(x < x_array[inf], errmsg, "x=%e < x_min=%e", x, x_array[inf]);
+      class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
 
-      class_test(x > x_array[sup], errmsg, "x=%e > x_max=%e", x, x_array[sup]);
+      class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
 
       while (sup - inf > 1) {
         mid = (int) (0.5 * (inf + sup));
@@ -1915,9 +1891,9 @@ int array_interpolate_extrapolate_logspline_loglinear_one_column(
     }
 
     else {
-      class_test(x < x_array[sup], errmsg, "x=%e < x_min=%e", x, x_array[sup]);
+      class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
 
-      class_test(x > x_array[inf], errmsg, "x=%e > x_max=%e", x, x_array[inf]);
+      class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
 
       while (sup - inf > 1) {
         mid = (int) (0.5 * (inf + sup));
@@ -1964,13 +1940,12 @@ int array_interpolate_growing_closeby(double* array,
 
   while (x < *(array + inf * n_columns + index_x)) {
     inf--;
-    class_test(inf < 0, errmsg, "x=%e < x_min=%e", x, array[index_x]);
+    class_test(inf < 0, "x=%e < x_min=%e", x, array[index_x]);
   }
   sup = inf + 1;
   while (x > *(array + sup * n_columns + index_x)) {
     sup++;
     class_test(sup > (n_lines - 1),
-               errmsg,
                "x=%e > x_max=%e",
                x,
                array[(n_lines - 1) * n_columns + index_x]);
@@ -2012,13 +1987,12 @@ int array_interpolate_one_growing_closeby(double* array,
 
   while (x < *(array + inf * n_columns + index_x)) {
     inf--;
-    class_test(inf < 0, errmsg, "x=%e < x_min=%e", x, array[index_x]);
+    class_test(inf < 0, "x=%e < x_min=%e", x, array[index_x]);
   }
   sup = inf + 1;
   while (x > *(array + sup * n_columns + index_x)) {
     sup++;
     class_test(sup > (n_lines - 1),
-               errmsg,
                "x=%e > x_max=%e",
                x,
                array[(n_lines - 1) * n_columns + index_x]);
@@ -2056,27 +2030,26 @@ int array_interpolate_spline_growing_closeby(double* x_array,
 
   /*
   if (*last_index < 0) {
-    class_stop(errmsg, "problem with last_index =%d < 0", *last_index);
+    class_stop( "problem with last_index =%d < 0", *last_index);
   }
   if (*last_index > (n_lines-1)) {
-    class_stop(errmsg, "problem with last_index =%d > %d", *last_index,n_lines-1);
+    class_stop( "problem with last_index =%d > %d", *last_index,n_lines-1);
   }
   */
 
   inf = *last_index;
   class_test(inf < 0 || inf > (n_lines - 1),
-             errmsg,
              "*lastindex=%d out of range [0:%d]\n",
              inf,
              n_lines - 1);
   while (x < x_array[inf]) {
     inf--;
-    class_test(inf < 0, errmsg, "x=%e < x_min=%e", x, x_array[0]);
+    class_test(inf < 0, "x=%e < x_min=%e", x, x_array[0]);
   }
   sup = inf + 1;
   while (x > x_array[sup]) {
     sup++;
-    class_test(sup > (n_lines - 1), errmsg, "x=%e > x_max=%e", x, x_array[n_lines - 1]);
+    class_test(sup > (n_lines - 1), "x=%e > x_max=%e", x, x_array[n_lines - 1]);
   }
   inf = sup - 1;
 
@@ -2116,7 +2089,7 @@ int array_interpolate_spline_growing_hunt(double* x_array,
   inc = 1;
 
   if (x >= x_array[*last_index]) {
-    class_test(x > x_array[n_lines - 1], errmsg, "x=%e > x_max=%e", x, x_array[n_lines - 1]);
+    class_test(x > x_array[n_lines - 1], "x=%e > x_max=%e", x, x_array[n_lines - 1]);
     /* try closest neighboor upward */
     inf = *last_index;
     sup = inf + inc;
@@ -2143,7 +2116,7 @@ int array_interpolate_spline_growing_hunt(double* x_array,
     }
   }
   else {
-    class_test(x < x_array[0], errmsg, "x=%e < x_min=%e", x, x_array[0]);
+    class_test(x < x_array[0], "x=%e < x_min=%e", x, x_array[0]);
     /* try closest neighboor downward */
     sup = *last_index;
     inf = sup - inc;
@@ -2208,13 +2181,11 @@ int array_interpolate_two(double* array_x,
 
   if (array_x[inf * n_columns_x + index_x] < array_x[sup * n_columns_x + index_x]) {
     class_test(x < array_x[inf * n_columns_x + index_x],
-               errmsg,
                "x=%e < x_min=%e",
                x,
                array_x[inf * n_columns_x + index_x]);
 
     class_test(x > array_x[sup * n_columns_x + index_x],
-               errmsg,
                "x=%e > x_max=%e",
                x,
                array_x[sup * n_columns_x + index_x]);
@@ -2232,13 +2203,11 @@ int array_interpolate_two(double* array_x,
 
   else {
     class_test(x < *(array_x + sup * n_columns_x + index_x),
-               errmsg,
                "x=%e < x_min=%e",
                x,
                *(array_x + sup * n_columns_x + index_x));
 
     class_test(x > *(array_x + inf * n_columns_x + index_x),
-               errmsg,
                "x=%e > x_max=%e",
                x,
                *(array_x + inf * n_columns_x + index_x));
@@ -2285,13 +2254,11 @@ int array_interpolate_two_bis(double* array_x,
 
   if (array_x[inf * n_columns_x + index_x] < array_x[sup * n_columns_x + index_x]) {
     class_test(x < array_x[inf * n_columns_x + index_x],
-               errmsg,
                "x=%e < x_min=%e",
                x,
                array_x[inf * n_columns_x + index_x]);
 
     class_test(x > array_x[sup * n_columns_x + index_x],
-               errmsg,
                "x=%e > x_max=%e",
                x,
                array_x[sup * n_columns_x + index_x]);
@@ -2309,13 +2276,11 @@ int array_interpolate_two_bis(double* array_x,
 
   else {
     class_test(x < *(array_x + sup * n_columns_x + index_x),
-               errmsg,
                "x=%e < x_min=%e",
                x,
                *(array_x + sup * n_columns_x + index_x));
 
     class_test(x > *(array_x + inf * n_columns_x + index_x),
-               errmsg,
                "x=%e > x_max=%e",
                x,
                *(array_x + inf * n_columns_x + index_x));
@@ -2363,9 +2328,9 @@ int array_interpolate_two_arrays_one_column(
   sup = n_lines - 1;
 
   if (array_x[inf] < array_x[sup]) {
-    class_test(x < array_x[inf] - epsilon, errmsg, "x=%e < x_min=%e", x, array_x[inf]);
+    class_test(x < array_x[inf] - epsilon, "x=%e < x_min=%e", x, array_x[inf]);
 
-    class_test(x > array_x[sup] + epsilon, errmsg, "x=%e > x_max=%e", x, array_x[sup]);
+    class_test(x > array_x[sup] + epsilon, "x=%e > x_max=%e", x, array_x[sup]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -2379,9 +2344,9 @@ int array_interpolate_two_arrays_one_column(
   }
 
   else {
-    class_test(x < array_x[sup] - epsilon, errmsg, "x=%e < x_min=%e", x, array_x[sup]);
+    class_test(x < array_x[sup] - epsilon, "x=%e < x_min=%e", x, array_x[sup]);
 
-    class_test(x > array_x[inf] + epsilon, errmsg, "x=%e > x_max=%e", x, array_x[inf]);
+    class_test(x > array_x[inf] + epsilon, "x=%e > x_max=%e", x, array_x[inf]);
 
     while (sup - inf > 1) {
       mid = (int) (0.5 * (inf + sup));
@@ -2416,9 +2381,9 @@ int array_interpolate_equal(double* array,
   int index_minus, i;
   double x_step, x_minus, weight;
 
-  class_test(x < x_min, errmsg, "x out of bounds: x=%e,x_min=%e", x, x_min);
+  class_test(x < x_min, "x out of bounds: x=%e,x_min=%e", x, x_min);
 
-  class_test(x > x_max, errmsg, "x out of bounds: x=%e,x_max=%e", x, x_max);
+  class_test(x > x_max, "x out of bounds: x=%e,x_max=%e", x, x_max);
 
   x_step      = (x_max - x_min) / (n_lines - 1);
   index_minus = (int) ((x - x_min) / x_step);
@@ -2442,14 +2407,12 @@ int array_interpolate_cubic_equal(
   double frac;
 
   class_test((dx > 0 && (x < x0 || x > x0 + dx * (Nx - 1))),
-             errmsg,
              "x=%e out of range [%e %e]",
              x,
              x0,
              x0 + dx * (Nx - 1));
 
   class_test((dx < 0 && (x > x0 || x < x0 + dx * (Nx - 1))),
-             errmsg,
              "x=%e out of range [%e %e]",
              x,
              x0 + dx * (Nx - 1),
@@ -2634,7 +2597,7 @@ int array_smooth_trg(double* array,
       /*   case 8: */
 
     default:
-      class_stop(errmsg, "Non valid radius %d: please chose between 3 4 5 or 6\n", radius);
+      class_stop("Non valid radius %d: please chose between 3 4 5 or 6\n", radius);
       break;
   }
 

@@ -41,7 +41,6 @@ int get_qsampling_manual(double* x,
       // (e.g. quadrature_strategy=qm_GB_Laguerre on a non-grey-body species) rather
       // than dividing by zero into NaN abscissas.
       class_test(!gb.active || gb.x_times_alpha <= 0.,
-                 errmsg,
                  "qm_GB_Laguerre requires grey-body parameters (active alpha*x > 0); it was "
                  "selected for a species that did not provide them");
       std::vector<double> b(N);
@@ -376,13 +375,13 @@ int get_qsampling(double* x,
   }
   else {
     /* Failed to converge! */
-    class_stop(errmsg,
-               "get_qsampling fails to obtain a relative tolerance of %g as required using atmost "
-               "%d points. If the PSD is interpolated from a file, try increasing the resolution "
-               "and the q-interval (qmin;qmax) if possible, or decrease tol_ncdm/tol_ncdm_bg. As a "
-               "last resort, increase _QUADRATURE_MAX_/_QUADRATURE_MAX_BG_.",
-               rtol,
-               N_max);
+    class_stop(
+        "get_qsampling fails to obtain a relative tolerance of %g as required using at most "
+        "%d points. If the PSD is interpolated from a file, try increasing the resolution "
+        "and the q-interval (qmin;qmax) if possible, or decrease tol_ncdm/tol_ncdm_bg. As a "
+        "last resort, increase _QUADRATURE_MAX_/_QUADRATURE_MAX_BG_.",
+        rtol,
+        N_max);
   }
   /* Trim weights to avoid zero weights: */
   for (i = 0, zeroskip = 0; i < *N; i++) {
@@ -794,7 +793,6 @@ int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol, ErrorMs
       z  = z1 - p1 / pp;
       counter++;
       class_test(counter == _MAX_IT_,
-                 error_message,
                  "maximum number of iteration reached: increase either _MAX_IT_ or tol\n");
     } while (fabs(z - z1) > tol);
     mu[i - 1] = -z;

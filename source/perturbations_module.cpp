@@ -177,21 +177,24 @@ int PerturbationsModule::perturb_sources_at_tau(
         but actually never used by default version of CLASS */
 
   if ((logtau < ln_tau_[0]) || (ln_tau_size_ <= 1)) {
-    class_call(array_interpolate_two_bis(const_cast<double*>(tau_sampling_.data()),
-                                         1,
-                                         0,
-                                         const_cast<double*>(
-                                             sources_[index_md]
-                                                     [index_ic * tp_size_[index_md] + index_tp]
-                                                         .data()),
-                                         k_size_[index_md],
-                                         tau_size_,
-                                         tau,
-                                         psource,
-                                         k_size_[index_md],
-                                         error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_two_bis(const_cast<double*>(tau_sampling_.data()),
+                                                   1,
+                                                   0,
+                                                   const_cast<double*>(
+                                                       sources_[index_md]
+                                                               [index_ic * tp_size_[index_md] +
+                                                                index_tp]
+                                                                   .data()),
+                                                   k_size_[index_md],
+                                                   tau_size_,
+                                                   tau,
+                                                   psource,
+                                                   k_size_[index_md],
+                                                   buf),
+                         buf);
+    }
   }
 
   /** - more accurate spline interpolation at late times (z<z_max_pk),
@@ -199,20 +202,23 @@ int PerturbationsModule::perturb_sources_at_tau(
         functions T(k,z) or power spectra P(k,z) */
 
   else {
-    class_call(array_interpolate_spline(
-                   const_cast<double*>(ln_tau_.data()),
-                   ln_tau_size_,
-                   late_sources_[index_md][index_ic * tp_size_[index_md] + index_tp],
-                   const_cast<double*>(
-                       ddlate_sources_[index_md][index_ic * tp_size_[index_md] + index_tp].data()),
-                   k_size_[index_md],
-                   logtau,
-                   &last_index,
-                   psource,
-                   k_size_[index_md],
-                   error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_spline(
+                             const_cast<double*>(ln_tau_.data()),
+                             ln_tau_size_,
+                             late_sources_[index_md][index_ic * tp_size_[index_md] + index_tp],
+                             const_cast<double*>(
+                                 ddlate_sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
+                                     .data()),
+                             k_size_[index_md],
+                             logtau,
+                             &last_index,
+                             psource,
+                             k_size_[index_md],
+                             buf),
+                         buf);
+    }
   }
 
   return _SUCCESS_;
@@ -268,12 +274,9 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format,
   /* if 0 <= z_pk <= z_max_pk, interpolation needed, */
   else {
     /* check the time corresponding to the highest redshift requested in output plus one */
-    class_call(background_module_->background_tau_of_z(z, &tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z, &tau);
 
     class_test(log(tau) < ln_tau_[0],
-               error_message_,
                "Asking sources at a z bigger than z_max_pk, something probably went wrong\n");
 
     pvecsources.resize(k_size_[index_md]);
@@ -281,9 +284,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format,
     for (int index_k = 0; index_k < k_size_[index_md]; index_k++) {
       for (int index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
         for (int index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
-          class_call(perturb_sources_at_tau(index_md, index_ic, index_tp, tau, pvecsources.data()),
-                     error_message_,
-                     error_message_);
+          perturb_sources_at_tau(index_md, index_ic, index_tp, tau, pvecsources.data());
 
           tkfull[(index_k * ic_size_[index_md] + index_ic) * tp_size_[index_md] + index_tp] =
               pvecsources[index_k];
@@ -514,21 +515,18 @@ int PerturbationsModule::perturb_init() {
   }
 
   class_test((ppt->gauge == synchronous) && (all_species_.count("CDM") == 0),
-             error_message_,
              "In the synchronous gauge, it is not self-consistent to assume no CDM: the later is "
              "used to define the initial timelike hypersurface. You can either add a negligible "
              "amount of CDM or switch to newtonian gauge");
 
   class_test((ppr->tight_coupling_approximation < first_order_MB) ||
                  (ppr->tight_coupling_approximation > compromise_CLASS),
-             error_message_,
              "your tight_coupling_approximation is set to %d, out of range defined in "
              "perturbations.h",
              ppr->tight_coupling_approximation);
 
   class_test((ppr->radiation_streaming_approximation < rsa_null) ||
                  (ppr->radiation_streaming_approximation > rsa_none),
-             error_message_,
              "your radiation_streaming_approximation is set to %d, out of range defined in "
              "perturbations.h",
              ppr->radiation_streaming_approximation);
@@ -536,7 +534,6 @@ int PerturbationsModule::perturb_init() {
   if (all_species_.count("IDM_DR_IDR")) {
     class_test((ppr->idr_streaming_approximation < rsa_idr_none) ||
                    (ppr->idr_streaming_approximation > rsa_idr_MD),
-               error_message_,
                "your idr_radiation_streaming_approximation is set to %d, out of range defined in "
                "perturbations.h",
                ppr->idr_streaming_approximation);
@@ -544,7 +541,6 @@ int PerturbationsModule::perturb_init() {
 
   if (all_species_.count("UR")) {
     class_test((ppr->ur_fluid_approximation < ufa_mb) || (ppr->ur_fluid_approximation > ufa_none),
-               error_message_,
                "your ur_fluid_approximation is set to %d, out of range defined in perturbations.h",
                ppr->ur_fluid_approximation);
   }
@@ -552,7 +548,6 @@ int PerturbationsModule::perturb_init() {
   if (HasNcdm(all_species_)) {
     class_test((ppr->ncdm_fluid_approximation < ncdmfa_mb) ||
                    (ppr->ncdm_fluid_approximation > ncdmfa_none),
-               error_message_,
                "your ncdm_fluid_approximation is set to %d, out of range defined in "
                "perturbations.h",
                ppr->ncdm_fluid_approximation);
@@ -573,18 +568,10 @@ int PerturbationsModule::perturb_init() {
   if (all_species_.count("Fluid")) {
     const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
     /* check values of w_fld at initial time and today */
-    class_call(background_module_->background_w_fld(0., &w_fld_ini, &dw_over_da_fld, &integral_fld),
-               background_module_->error_message_,
-               error_message_);
-    class_call(background_module_->background_w_fld(pba->a_today,
-                                                    &w_fld_0,
-                                                    &dw_over_da_fld,
-                                                    &integral_fld),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_w_fld(0., &w_fld_ini, &dw_over_da_fld, &integral_fld);
+    background_module_->background_w_fld(pba->a_today, &w_fld_0, &dw_over_da_fld, &integral_fld);
 
     class_test(w_fld_ini >= 0.,
-               error_message_,
                "The fluid is meant to be negligible at early time, and unimportant for defining "
                "the initial conditions of other species. You are using parameters for which this "
                "assumption may break down, since at early times you have w_fld(a--->0) = %e >= 0",
@@ -592,14 +579,12 @@ int PerturbationsModule::perturb_init() {
 
     if (fluid.use_ppf() == _FALSE_) {
       class_test((w_fld_ini + 1.0) * (w_fld_0 + 1.0) <= 0.0,
-                 error_message_,
                  "w crosses -1 between the infinite past and today, and this would lead to "
                  "divergent perturbation equations for the fluid perturbations. Try to switch to "
                  "PPF scheme: use_ppf = yes");
 
       /* the next check is meaningful at least for w(a) = w0 + wa*(1-a/a0); for general formulas and with use_ppf=no, you may prefer to comment it out... */
       class_test((w_fld_0 == -1.) && (dw_over_da_fld == 0.),
-                 error_message_,
                  "Your choice of a fluid with (w0,wa)=(-1,0) is not valid due to instabilities in "
                  "the unphysical perturbations of such a fluid. Try instead with a plain "
                  "cosmological constant or with PPF scheme: use_ppf = yes");
@@ -609,7 +594,6 @@ int PerturbationsModule::perturb_init() {
   if (all_species_.count("DCDM_DR")) {
     class_test((ppt->has_cdi == _TRUE_) || (ppt->has_bi == _TRUE_) || (ppt->has_nid == _TRUE_) ||
                    (ppt->has_niv == _TRUE_),
-               error_message_,
                "Non-adiabatic initial conditions not coded in presence of decaying dark matter");
   }
 
@@ -623,19 +607,16 @@ int PerturbationsModule::perturb_init() {
   if (has_dncdm_dr) {
     class_test((ppt->has_cdi == _TRUE_) || (ppt->has_bi == _TRUE_) || (ppt->has_nid == _TRUE_) ||
                    (ppt->has_niv == _TRUE_),
-               error_message_,
                "Non-adiabatic initial conditions not coded in presence of decaying dark matter");
 
     class_test(ppr->l_max_dr_col > ppr->l_max_dr,
-               error_message_,
                "l_max_dr_col must be <= l_max_dr. Change your input accordingly.");
 
     class_test(ppr->l_max_dr_col > ppr->l_max_ncdm,
-               error_message_,
                "l_max_dr_col must be <= l_max_ncdm. Change your input accordingly.");
   }
 
-  class_test(ppt->has_vectors == _TRUE_, error_message_, "Vectors not coded yet");
+  class_test(ppt->has_vectors == _TRUE_, "Vectors not coded yet");
 
   if ((ppt->has_niv == _TRUE_) && (ppt->perturbations_verbose > 0)) {
     printf(
@@ -666,7 +647,6 @@ int PerturbationsModule::perturb_init() {
   }
 
   class_test((pba->h > _h_BIG_) || (pba->h < _h_SMALL_),
-             error_message_,
              "Your value of pba->h=%e is out of the bounds [%e , %e] and could cause a crash of "
              "the perturbation ODE integration. If you want to force this barrier, you may comment "
              "it out in perturbation.c",
@@ -676,7 +656,6 @@ int PerturbationsModule::perturb_init() {
 
   class_test((pba->Omega0_b * pba->h * pba->h < _omegab_SMALL_) ||
                  (pba->Omega0_b * pba->h * pba->h > _omegab_BIG_),
-             error_message_,
              "Your value of omega_b=%e is out of the bounds [%e , %e] and could cause a crash of "
              "the perturbation ODE integration. If you want to force this barrier, you may comment "
              "it out in perturbation.c",
@@ -717,11 +696,10 @@ int PerturbationsModule::perturb_init() {
 
   /** - initialize all indices and lists in perturbs structure using perturb_indices_of_perturbs() */
 
-  class_call(perturb_indices_of_perturbs(), error_message_, error_message_);
+  perturb_indices_of_perturbs();
 
   if (ppt->z_max_pk > thermodynamics_module_->z_rec_) {
     class_test(has_cmb_ == _TRUE_,
-               error_message_,
                "You requested a very high z_pk=%e, higher than z_rec=%e. This works very well when "
                "you don't ask for a calculation of the CMB source function(s). Remove any CMB from "
                "your output and try e.g. with 'output=mTk' or 'output=mTk,vTk'",
@@ -729,7 +707,6 @@ int PerturbationsModule::perturb_init() {
                thermodynamics_module_->z_rec_);
 
     class_test(has_source_delta_m_ == _TRUE_,
-               error_message_,
                "You requested a very high z_pk=%e, higher than z_rec=%e. This works very well when "
                "you ask for transfer functions only, e.g. with 'output=mTk' or 'output=mTk,vTk'. "
                "But if you need the total matter (e.g. with 'mPk', 'dCl', etc.) there is an issue "
@@ -749,11 +726,11 @@ int PerturbationsModule::perturb_init() {
   /** - define the common time sampling for all sources using
       perturb_timesampling_for_sources() */
 
-  class_call(perturb_timesampling_for_sources(), error_message_, error_message_);
+  perturb_timesampling_for_sources();
 
   /** - if we want to store perturbations for given k values, write titles and allocate storage */
 
-  class_call(perturb_prepare_k_output(), error_message_, error_message_);
+  perturb_prepare_k_output();
 
   /** - create an array of workspaces in multi-thread case */
 
@@ -788,11 +765,9 @@ int PerturbationsModule::perturb_init() {
             printf("\n");
           }
           struct perturb_workspace pw;
-          class_call(perturb_workspace_init(index_md, &pw), error_message_, error_message_);
-          class_call(perturb_solve(index_md, index_ic, index_k, &pw),
-                     error_message_,
-                     error_message_);
-          class_call(perturb_workspace_free(index_md, &pw), error_message_, error_message_);
+          perturb_workspace_init(index_md, &pw);
+          perturb_solve(index_md, index_ic, index_k, &pw);
+          perturb_workspace_free(index_md, &pw);
           return _SUCCESS_;
         }));
 
@@ -813,17 +788,21 @@ int PerturbationsModule::perturb_init() {
       for (index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
         for (index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
           future_output.push_back(task_system.AsyncTask([this, index_md, index_tp, index_ic]() {
-            class_call(array_spline_table_lines(
-                           ln_tau_.data(),
-                           ln_tau_size_,
-                           late_sources_[index_md][index_ic * tp_size_[index_md] + index_tp],
-                           k_size_[index_md],
-                           ddlate_sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
-                               .data(),
-                           _SPLINE_EST_DERIV_,
-                           error_message_),
-                       error_message_,
-                       error_message_);
+            {
+              ErrorMsg buf;
+              class_call_failure(
+                  array_spline_table_lines(ln_tau_.data(),
+                                           ln_tau_size_,
+                                           late_sources_[index_md]
+                                                        [index_ic * tp_size_[index_md] + index_tp],
+                                           k_size_[index_md],
+                                           ddlate_sources_[index_md]
+                                                          [index_ic * tp_size_[index_md] + index_tp]
+                                                              .data(),
+                                           _SPLINE_EST_DERIV_,
+                                           buf),
+                  buf);
+            }
             return _SUCCESS_;
           }));
         }
@@ -884,9 +863,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
   class_define_index(index_md_tensors_, ppt->has_tensors, index_md, 1);
   md_size_ = index_md;
 
-  class_test(index_md == 0,
-             error_message_,
-             "you should have at least one out of {scalars, vectors, tensors} !!!");
+  class_test(index_md == 0, "you should have at least one out of {scalars, vectors, tensors} !!!");
 
   /** - allocate array of number of types for each mode, tp_size_[index_md] */
 
@@ -992,7 +969,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
 
   /** - define k values with perturb_get_k_list() */
 
-  class_call(perturb_get_k_list(), error_message_, error_message_);
+  perturb_get_k_list();
 
   /** - loop over modes. Initialize flags and indices which are specific to each mode. */
 
@@ -1185,7 +1162,6 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
       tp_size_[index_md] = index_type;
 
       class_test(index_type == 0,
-                 error_message_,
                  "inconsistent input: you asked for scalars, so you should have at least one "
                  "non-zero scalar source type (temperature, polarization, lensing/gravitational "
                  "potential, ...). Please adjust your input.");
@@ -1201,7 +1177,6 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
       ic_size_[index_md] = index_ic;
 
       class_test(index_ic == 0,
-                 error_message_,
                  "you should have at least one adiabatic or isocurvature initial condition...} "
                  "!!!");
     }
@@ -1217,7 +1192,6 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
 
       /*
         class_test(index_type == 0,
-        error_message_,
         "inconsistent input: you asked for vectors, so you should have at least one non-zero vector source type (temperature or polarization). Please adjust your input.");
       */
 
@@ -1238,7 +1212,6 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
 
       /*
         class_test(index_type == 0,
-        error_message_,
         "inconsistent input: you asked for tensors, so you should have at least one non-zero tensor source type (temperature or polarization). Please adjust your input.");
       */
 
@@ -1301,29 +1274,23 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
     double tau_lower = thermodynamics_module_->tau_ini_;
 
-    class_call(background_module_->background_at_tau(tau_lower,
-                                                     pba->short_info,
-                                                     pba->inter_normal,
-                                                     &first_index_back,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau_lower,
+                                          pba->short_info,
+                                          pba->inter_normal,
+                                          &first_index_back,
+                                          pvecback.data());
 
-    class_call(thermodynamics_module_
-                   ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                             1., /* redshift z=1/a-1 */
-                                         thermodynamics_module_->inter_normal_,
-                                         &first_index_thermo,
-                                         pvecback.data(),
-                                         pvecthermo.data()),
-               thermodynamics_module_->error_message_,
-               error_message_);
+    thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                    1., /* redshift z=1/a-1 */
+                                                thermodynamics_module_->inter_normal_,
+                                                &first_index_thermo,
+                                                pvecback.data(),
+                                                pvecthermo.data());
 
     class_test(pvecback[background_module_->index_bg_a_] *
                        pvecback[background_module_->index_bg_H_] /
                        pvecthermo[thermodynamics_module_->index_th_dkappa_] >
                    ppr->start_sources_at_tau_c_over_tau_h,
-               error_message_,
                "your choice of initial time for computing sources is inappropriate: it corresponds "
                "to an earlier time than the one at which the integration of thermodynamical "
                "variables started (tau=%g). You should increase either "
@@ -1332,51 +1299,40 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
 
     double tau_upper = thermodynamics_module_->tau_rec_;
 
-    class_call(background_module_->background_at_tau(tau_upper,
-                                                     pba->short_info,
-                                                     pba->inter_normal,
-                                                     &first_index_back,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau_upper,
+                                          pba->short_info,
+                                          pba->inter_normal,
+                                          &first_index_back,
+                                          pvecback.data());
 
-    class_call(thermodynamics_module_
-                   ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                             1., /* redshift z=1/a-1 */
-                                         thermodynamics_module_->inter_normal_,
-                                         &first_index_thermo,
-                                         pvecback.data(),
-                                         pvecthermo.data()),
-               thermodynamics_module_->error_message_,
-               error_message_);
+    thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                    1., /* redshift z=1/a-1 */
+                                                thermodynamics_module_->inter_normal_,
+                                                &first_index_thermo,
+                                                pvecback.data(),
+                                                pvecthermo.data());
 
     class_test(pvecback[background_module_->index_bg_a_] *
                        pvecback[background_module_->index_bg_H_] /
                        pvecthermo[thermodynamics_module_->index_th_dkappa_] <
                    ppr->start_sources_at_tau_c_over_tau_h,
-               error_message_,
                "your choice of initial time for computing sources is inappropriate: it corresponds "
                "to a time after recombination. You should decrease "
                "'start_sources_at_tau_c_over_tau_h'\n");
 
     tau_ini = bisect_value(tau_lower, tau_upper, ppr->tol_tau_approx, [&](double tau_mid) {
-      class_call(background_module_->background_at_tau(tau_mid,
-                                                       pba->short_info,
-                                                       pba->inter_normal,
-                                                       &first_index_back,
-                                                       pvecback.data()),
-                 background_module_->error_message_,
-                 error_message_);
+      background_module_->background_at_tau(tau_mid,
+                                            pba->short_info,
+                                            pba->inter_normal,
+                                            &first_index_back,
+                                            pvecback.data());
 
-      class_call(thermodynamics_module_
-                     ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                               1., /* redshift z=1/a-1 */
-                                           thermodynamics_module_->inter_normal_,
-                                           &first_index_thermo,
-                                           pvecback.data(),
-                                           pvecthermo.data()),
-                 thermodynamics_module_->error_message_,
-                 error_message_);
+      thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                      1., /* redshift z=1/a-1 */
+                                                  thermodynamics_module_->inter_normal_,
+                                                  &first_index_thermo,
+                                                  pvecback.data(),
+                                                  pvecthermo.data());
 
       return pvecback[background_module_->index_bg_a_] * pvecback[background_module_->index_bg_H_] /
                  pvecthermo[thermodynamics_module_->index_th_dkappa_] >
@@ -1385,31 +1341,24 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
   }
   else {
     /* check the time corresponding to the highest redshift requested in output plus one */
-    class_call(background_module_->background_tau_of_z(ppt->z_max_pk + 1, &tau_ini),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(ppt->z_max_pk + 1, &tau_ini);
 
     /* obsolete: previous choice was to start always at recombination time */
     /* tau_ini = thermodynamics_module_->tau_rec_; */
 
     /* set values of first_index_back/thermo */
-    class_call(background_module_->background_at_tau(tau_ini,
-                                                     pba->short_info,
-                                                     pba->inter_normal,
-                                                     &first_index_back,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau_ini,
+                                          pba->short_info,
+                                          pba->inter_normal,
+                                          &first_index_back,
+                                          pvecback.data());
 
-    class_call(thermodynamics_module_
-                   ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                             1., /* redshift z=1/a-1 */
-                                         thermodynamics_module_->inter_normal_,
-                                         &first_index_thermo,
-                                         pvecback.data(),
-                                         pvecthermo.data()),
-               thermodynamics_module_->error_message_,
-               error_message_);
+    thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                    1., /* redshift z=1/a-1 */
+                                                thermodynamics_module_->inter_normal_,
+                                                &first_index_thermo,
+                                                pvecback.data(),
+                                                pvecthermo.data());
   }
 
   /** - (b) next sampling point = previous + ppr->perturb_sampling_stepsize * timescale_source, where:
@@ -1427,23 +1376,18 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
   double tau            = tau_ini;
 
   while (tau < background_module_->conformal_age_) {
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->short_info,
-                                                     pba->inter_closeby,
-                                                     &last_index_back,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->short_info,
+                                          pba->inter_closeby,
+                                          &last_index_back,
+                                          pvecback.data());
 
-    class_call(thermodynamics_module_
-                   ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                             1., /* redshift z=1/a-1 */
-                                         thermodynamics_module_->inter_closeby_,
-                                         &last_index_thermo,
-                                         pvecback.data(),
-                                         pvecthermo.data()),
-               thermodynamics_module_->error_message_,
-               error_message_);
+    thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                    1., /* redshift z=1/a-1 */
+                                                thermodynamics_module_->inter_closeby_,
+                                                &last_index_thermo,
+                                                pvecback.data(),
+                                                pvecthermo.data());
 
     if (has_cmb_ == _TRUE_) {
       /* variation rate of thermodynamics variables */
@@ -1469,16 +1413,13 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     }
 
     /* check it is non-zero */
-    class_test(timescale_source == 0.,
-               error_message_,
-               "null evolution rate, integration is diverging");
+    class_test(timescale_source == 0., "null evolution rate, integration is diverging");
 
     /* compute inverse rate */
     timescale_source = 1. / timescale_source;
 
     class_test(fabs(ppr->perturb_sampling_stepsize * timescale_source / tau) <
                    ppr->smallest_allowed_variation,
-               error_message_,
                "integration step =%e < machine precision : leads either to numerical error or "
                "infinite loop",
                ppr->perturb_sampling_stepsize * timescale_source);
@@ -1512,23 +1453,18 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
   tau               = tau_ini;
 
   while (tau < background_module_->conformal_age_) {
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->short_info,
-                                                     pba->inter_closeby,
-                                                     &last_index_back,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->short_info,
+                                          pba->inter_closeby,
+                                          &last_index_back,
+                                          pvecback.data());
 
-    class_call(thermodynamics_module_
-                   ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                             1., /* redshift z=1/a-1 */
-                                         thermodynamics_module_->inter_closeby_,
-                                         &last_index_thermo,
-                                         pvecback.data(),
-                                         pvecthermo.data()),
-               thermodynamics_module_->error_message_,
-               error_message_);
+    thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                    1., /* redshift z=1/a-1 */
+                                                thermodynamics_module_->inter_closeby_,
+                                                &last_index_thermo,
+                                                pvecback.data(),
+                                                pvecthermo.data());
 
     if (has_cmb_ == _TRUE_) {
       /* variation rate of thermodynamics variables */
@@ -1552,16 +1488,13 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     }
 
     /* check it is non-zero */
-    class_test(timescale_source == 0.,
-               error_message_,
-               "null evolution rate, integration is diverging");
+    class_test(timescale_source == 0., "null evolution rate, integration is diverging");
 
     /* compute inverse rate */
     timescale_source = 1. / timescale_source;
 
     class_test(fabs(ppr->perturb_sampling_stepsize * timescale_source / tau) <
                    ppr->smallest_allowed_variation,
-               error_message_,
                "integration step =%e < machine precision : leads either to numerical error or "
                "infinite loop",
                ppr->perturb_sampling_stepsize * timescale_source);
@@ -1582,7 +1515,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
       range 0<z<z_max_pk, and used for the intepolation of sources */
 
   /* if z_max_pk<0, return error */
-  class_test(ppt->z_max_pk < 0, error_message_, "asked for negative redshift z=%e", ppt->z_max_pk);
+  class_test(ppt->z_max_pk < 0, "asked for negative redshift z=%e", ppt->z_max_pk);
 
   /* if z_max_pk=0, there is just one value to store */
   if (ppt->z_max_pk == 0.) {
@@ -1594,13 +1527,10 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     /* find the first relevant value of tau (last value in the table tau_sampling before tau(z_max)) and infer the number of values of tau at which P(k) must be stored */
 
     double tau_lower;
-    class_call(background_module_->background_tau_of_z(ppt->z_max_pk, &tau_lower),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(ppt->z_max_pk, &tau_lower);
 
     int index_tau = 0;
     class_test((tau_lower <= tau_sampling_[index_tau]),
-               error_message_,
                "you asked for zmax=%e, i.e. taumin=%e, smaller than or equal to the first possible "
                "value =%e; it should be strictly bigger for a successfull interpolation",
                ppt->z_max_pk,
@@ -1612,7 +1542,6 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
     }
     index_tau--;
     class_test(index_tau < 0,
-               error_message_,
                "by construction, this should never happen, a bug must have been introduced "
                "somewhere");
 
@@ -1679,11 +1608,9 @@ int PerturbationsModule::perturb_get_k_list() {
 
   /** Summary: */
 
-  class_test(ppr->k_step_transition == 0., error_message_, "stop to avoid division by zero");
+  class_test(ppr->k_step_transition == 0., "stop to avoid division by zero");
 
-  class_test(thermodynamics_module_->rs_rec_ == 0.,
-             error_message_,
-             "stop to avoid division by zero");
+  class_test(thermodynamics_module_->rs_rec_ == 0., "stop to avoid division by zero");
 
   /** - allocate arrays related to k list for each mode */
 
@@ -1753,9 +1680,7 @@ int PerturbationsModule::perturb_get_k_list() {
          ClE would be marginally affected. */
 
       if ((ppt->has_cl_number_count == _TRUE_) || (ppt->has_cl_lensing_potential == _TRUE_)) {
-        class_call(background_module_->background_tau_of_z(ppt->selection_mean[0], &tau1),
-                   background_module_->error_message_,
-                   error_message_);
+        background_module_->background_tau_of_z(ppt->selection_mean[0], &tau1);
 
         k_max_cl[index_md_scalars_] = MAX(
             k_max_cl[index_md_scalars_],
@@ -1775,11 +1700,11 @@ int PerturbationsModule::perturb_get_k_list() {
 
     /** - --> test that result for k_min, k_max make sense */
 
-    class_test(k_min < 0., error_message_, "buggy definition of k_min");
+    class_test(k_min < 0., "buggy definition of k_min");
 
-    class_test(k_max < 0., error_message_, "buggy definition of k_max");
+    class_test(k_max < 0., "buggy definition of k_max");
 
-    class_test(k_max < k_min, error_message_, "buggy definition of k_min and/or k_max");
+    class_test(k_max < k_min, "buggy definition of k_min and/or k_max");
 
     /* if K>0, the transfer function will be calculated for discrete
        integer values of nu=3,4,5,... where nu=sqrt(k2+(1+m)K) and
@@ -1853,7 +1778,6 @@ int PerturbationsModule::perturb_get_k_list() {
       step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
 
       class_test(step / k < ppr->smallest_allowed_variation,
-                 error_message_,
                  "k step =%e < machine precision : leads either to numerical error or infinite "
                  "loop",
                  step * k_rec);
@@ -1861,7 +1785,6 @@ int PerturbationsModule::perturb_get_k_list() {
       k += step;
 
       class_test(k <= k_[index_md_scalars_][index_k - 1],
-                 error_message_,
                  "consecutive values of k should differ and should be in growing order");
 
       k_[index_md_scalars_][index_k] = k;
@@ -1967,11 +1890,11 @@ int PerturbationsModule::perturb_get_k_list() {
 
     /** - --> test that result for k_min, k_max make sense */
 
-    class_test(k_min < 0., error_message_, "buggy definition of k_min");
+    class_test(k_min < 0., "buggy definition of k_min");
 
-    class_test(k_max < 0., error_message_, "buggy definition of k_max");
+    class_test(k_max < 0., "buggy definition of k_max");
 
-    class_test(k_max < k_min, error_message_, "buggy definition of k_min and/or k_max");
+    class_test(k_max < k_min, "buggy definition of k_min and/or k_max");
 
     /* if K>0, the transfer function will be calculated for discrete
        integer values of nu=3,4,5,... where nu=sqrt(k2+(1+m)K) and
@@ -2023,7 +1946,6 @@ int PerturbationsModule::perturb_get_k_list() {
       step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
 
       class_test(step / k < ppr->smallest_allowed_variation,
-                 error_message_,
                  "k step =%e < machine precision : leads either to numerical error or infinite "
                  "loop",
                  step * k_rec);
@@ -2031,7 +1953,6 @@ int PerturbationsModule::perturb_get_k_list() {
       k += step;
 
       class_test(k <= k_[index_md_scalars_][index_k - 1],
-                 error_message_,
                  "consecutive values of k should differ and should be in growing order");
 
       k_[index_md_vectors_][index_k] = k;
@@ -2094,11 +2015,11 @@ int PerturbationsModule::perturb_get_k_list() {
 
     /** - --> test that result for k_min, k_max make sense */
 
-    class_test(k_min < 0., error_message_, "buggy definition of k_min");
+    class_test(k_min < 0., "buggy definition of k_min");
 
-    class_test(k_max < 0., error_message_, "buggy definition of k_max");
+    class_test(k_max < 0., "buggy definition of k_max");
 
-    class_test(k_max < k_min, error_message_, "buggy definition of k_min and/or k_max");
+    class_test(k_max < k_min, "buggy definition of k_min and/or k_max");
 
     /* if K>0, the transfer function will be calculated for discrete
        integer values of nu=3,4,5,... where nu=sqrt(k2+(1+m)K) and
@@ -2150,7 +2071,6 @@ int PerturbationsModule::perturb_get_k_list() {
       step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
 
       class_test(step / k < ppr->smallest_allowed_variation,
-                 error_message_,
                  "k step =%e < machine precision : leads either to numerical error or infinite "
                  "loop",
                  step * k_rec);
@@ -2158,7 +2078,6 @@ int PerturbationsModule::perturb_get_k_list() {
       k += step;
 
       class_test(k <= k_[index_md_tensors_][index_k - 1],
-                 error_message_,
                  "consecutive values of k should differ and should be in growing order");
 
       k_[index_md_tensors_][index_k] = k;
@@ -2543,7 +2462,7 @@ int PerturbationsModule::perturb_solve(int index_md,
   /** - get wavenumber value */
   k = k_[index_md][index_k];
 
-  class_test(k == 0., error_message_, "stop to avoid division by zero");
+  class_test(k == 0., "stop to avoid division by zero");
 
   /** - If non-zero curvature, update array of free-streaming coefficients ppw->s_l */
   if (pba->sgnK != 0) {
@@ -2563,22 +2482,18 @@ int PerturbationsModule::perturb_solve(int index_md,
   /* will be at least the first time in the background table */
   tau_lower = background_module_->tau_table_[0];
 
-  class_call(background_module_->background_at_tau(tau_lower,
-                                                   pba->normal_info,
-                                                   pba->inter_normal,
-                                                   &(ppw->last_index_back),
-                                                   ppw->pvecback),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau_lower,
+                                        pba->normal_info,
+                                        pba->inter_normal,
+                                        &(ppw->last_index_back),
+                                        ppw->pvecback);
 
-  class_call(thermodynamics_module_
-                 ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] - 1.,
-                                       thermodynamics_module_->inter_normal_,
-                                       &(ppw->last_index_thermo),
-                                       ppw->pvecback,
-                                       ppw->pvecthermo),
-             thermodynamics_module_->error_message_,
-             error_message_);
+  thermodynamics_module_->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
+                                                  1.,
+                                              thermodynamics_module_->inter_normal_,
+                                              &(ppw->last_index_thermo),
+                                              ppw->pvecback,
+                                              ppw->pvecthermo);
 
   /* check that this initial time is indeed OK given imposed
      conditions on kappa' and on k/aH */
@@ -2587,7 +2502,6 @@ int PerturbationsModule::perturb_solve(int index_md,
                      ppw->pvecback[background_module_->index_bg_H_] /
                      ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] >
                  ppr->start_small_k_at_tau_c_over_tau_h,
-             error_message_,
              "your choice of initial time for integrating wavenumbers is inappropriate: it "
              "corresponds to a time before that at which the background has been integrated. You "
              "should increase 'start_small_k_at_tau_c_over_tau_h' up to at least %g, or decrease "
@@ -2599,7 +2513,6 @@ int PerturbationsModule::perturb_solve(int index_md,
   class_test(k / ppw->pvecback[background_module_->index_bg_a_] /
                      ppw->pvecback[background_module_->index_bg_H_] >
                  ppr->start_large_k_at_tau_h_over_tau_k,
-             error_message_,
              "your choice of initial time for integrating wavenumbers is inappropriate: it "
              "corresponds to a time before that at which the background has been integrated. You "
              "should increase 'start_large_k_at_tau_h_over_tau_k' up to at least %g, or decrease "
@@ -2615,7 +2528,6 @@ int PerturbationsModule::perturb_solve(int index_md,
       const double p_ncdm   = ncdm_sp->P(ppw->pvecback);
       const double rho_ncdm = ncdm_sp->Rho(ppw->pvecback);
       class_test(fabs(p_ncdm / rho_ncdm - 1. / 3.) > ppr->tol_ncdm_initial_w,
-                 error_message_,
                  "your choice of initial time for integrating wavenumbers is inappropriate: it "
                  "corresponds to a time at which the ncdm species '%s' is not "
                  "ultra-relativistic anymore, with w=%g, p=%g and rho=%g\n",
@@ -2636,13 +2548,11 @@ int PerturbationsModule::perturb_solve(int index_md,
   while ((tau_upper - tau_lower) / tau_lower > ppr->tol_tau_approx) {
     is_early_enough = _TRUE_;
 
-    class_call(background_module_->background_at_tau(tau_mid,
-                                                     pba->normal_info,
-                                                     pba->inter_normal,
-                                                     &(ppw->last_index_back),
-                                                     ppw->pvecback),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau_mid,
+                                          pba->normal_info,
+                                          pba->inter_normal,
+                                          &(ppw->last_index_back),
+                                          ppw->pvecback);
 
     /* if there are non-cold relics, check that they are relativistic enough */
     if (HasNcdm(all_species_)) {
@@ -2658,15 +2568,13 @@ int PerturbationsModule::perturb_solve(int index_md,
 
     /* also check that the two conditions on (aH/kappa') and (aH/k) are fulfilled */
     if (is_early_enough == _TRUE_) {
-      class_call(thermodynamics_module_
-                     ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
-                                               1., /* redshift z=1/a-1 */
-                                           thermodynamics_module_->inter_normal_,
-                                           &(ppw->last_index_thermo),
-                                           ppw->pvecback,
-                                           ppw->pvecthermo),
-                 thermodynamics_module_->error_message_,
-                 error_message_);
+      thermodynamics_module_
+          ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
+                                    1., /* redshift z=1/a-1 */
+                                thermodynamics_module_->inter_normal_,
+                                &(ppw->last_index_thermo),
+                                ppw->pvecback,
+                                ppw->pvecthermo);
 
       if ((ppw->pvecback[background_module_->index_bg_a_] *
                ppw->pvecback[background_module_->index_bg_H_] /
@@ -2695,15 +2603,13 @@ int PerturbationsModule::perturb_solve(int index_md,
 
   ppw->inter_mode = pba->inter_normal;
 
-  class_call(perturb_find_approximation_number(index_md,
-                                               k,
-                                               ppw,
-                                               tau,
-                                               tau_sampling_[tau_actual_size - 1],
-                                               &interval_number,
-                                               interval_number_of.data()),
-             error_message_,
-             error_message_);
+  perturb_find_approximation_number(index_md,
+                                    k,
+                                    ppw,
+                                    tau,
+                                    tau_sampling_[tau_actual_size - 1],
+                                    &interval_number,
+                                    interval_number_of.data());
 
   interval_limit.resize(interval_number + 1);
 
@@ -2715,18 +2621,16 @@ int PerturbationsModule::perturb_solve(int index_md,
     std::vector<int*> interval_approx_ptrs(interval_number);
     for (int ii = 0; ii < interval_number; ii++)
       interval_approx_ptrs[ii] = interval_approx[ii].data();
-    class_call(perturb_find_approximation_switches(index_md,
-                                                   k,
-                                                   ppw,
-                                                   tau,
-                                                   tau_sampling_[tau_actual_size - 1],
-                                                   ppr->tol_tau_approx,
-                                                   interval_number,
-                                                   interval_number_of.data(),
-                                                   interval_limit.data(),
-                                                   interval_approx_ptrs.data()),
-               error_message_,
-               error_message_);
+    perturb_find_approximation_switches(index_md,
+                                        k,
+                                        ppw,
+                                        tau,
+                                        tau_sampling_[tau_actual_size - 1],
+                                        ppr->tol_tau_approx,
+                                        interval_number,
+                                        interval_number_of.data(),
+                                        interval_limit.data(),
+                                        interval_approx_ptrs.data());
   }
 
   /** - fill the structure containing all fixed parameters, indices
@@ -2780,14 +2684,12 @@ int PerturbationsModule::perturb_solve(int index_md,
         redistribute correctly the perturbations from the previous to
         the new vector of perturbations. */
 
-    class_call(perturb_vector_init(index_md,
-                                   index_ic,
-                                   k,
-                                   interval_limit[index_interval],
-                                   ppw,
-                                   previous_approx),
-               error_message_,
-               error_message_);
+    perturb_vector_init(index_md,
+                        index_ic,
+                        k,
+                        interval_limit[index_interval],
+                        ppw,
+                        previous_approx);
 
     /** - --> (d) integrate the perturbations over the current interval. */
 
@@ -2799,24 +2701,26 @@ int PerturbationsModule::perturb_solve(int index_md,
       generic_evolver = &evolver_rkdp45;
     }
 
-    class_call(generic_evolver(perturb_derivs,
-                               interval_limit[index_interval],
-                               interval_limit[index_interval + 1],
-                               ppw->pv->y,
-                               ppw->pv->used_in_sources,
-                               ppw->pv->pt_size,
-                               &ppaw,
-                               ppr->tol_perturb_integration,
-                               ppr->smallest_allowed_variation,
-                               perturb_timescale,
-                               ppr->perturb_integration_stepsize,
-                               tau_sampling_.data(),
-                               tau_actual_size,
-                               perturb_sources,
-                               perhaps_print_variables,
-                               error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(generic_evolver(perturb_derivs,
+                                         interval_limit[index_interval],
+                                         interval_limit[index_interval + 1],
+                                         ppw->pv->y,
+                                         ppw->pv->used_in_sources,
+                                         ppw->pv->pt_size,
+                                         &ppaw,
+                                         ppr->tol_perturb_integration,
+                                         ppr->smallest_allowed_variation,
+                                         perturb_timescale,
+                                         ppr->perturb_integration_stepsize,
+                                         tau_sampling_.data(),
+                                         tau_actual_size,
+                                         perturb_sources,
+                                         perhaps_print_variables,
+                                         buf),
+                         buf);
+    }
   }
 
   /** - if perturbations were printed in a file, close the file */
@@ -2940,16 +2844,15 @@ int PerturbationsModule::perturb_find_approximation_number(
   /** - loop over each approximation and add the number of approximation switching times */
 
   for (index_ap = 0; index_ap < ppw->ap_size; index_ap++) {
-    class_call(perturb_approximations(index_md, k, tau_ini, ppw), error_message_, error_message_);
+    perturb_approximations(index_md, k, tau_ini, ppw);
 
     flag_ini = ppw->approx[index_ap];
 
-    class_call(perturb_approximations(index_md, k, tau_end, ppw), error_message_, error_message_);
+    perturb_approximations(index_md, k, tau_end, ppw);
 
     flag_end = ppw->approx[index_ap];
 
     class_test(flag_end < flag_ini,
-               error_message_,
                "For each approximation scheme, the declaration of approximation labels in the "
                "enumeration must follow chronological order, e.g: enum approx_flags {flag1, flag2, "
                "flag3} with flag1 being the initial one and flag3 the final one");
@@ -3001,7 +2904,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
 
   interval_limit[0] = tau_ini;
 
-  class_call(perturb_approximations(index_md, k, tau_ini, ppw), error_message_, error_message_);
+  perturb_approximations(index_md, k, tau_ini, ppw);
 
   for (index_ap = 0; index_ap < ppw->ap_size; index_ap++)
     interval_approx[0][index_ap] = ppw->approx[index_ap];
@@ -3031,7 +2934,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
 
         for (index_switch = 0; index_switch < num_switch; index_switch++) {
           double mid = bisect_value(tau_min, tau_end, precision, [&](double m) {
-            class_call(perturb_approximations(index_md, k, m, ppw), error_message_, error_message_);
+            perturb_approximations(index_md, k, m, ppw);
             return ppw->approx[index_ap] > flag_ini + index_switch;
           });
 
@@ -3044,7 +2947,6 @@ int PerturbationsModule::perturb_find_approximation_switches(
     }
 
     class_test(index_switch_tot != (interval_number - 1),
-               error_message_,
                "bug in approximation switch search routine: should have %d = %d",
                index_switch_tot,
                interval_number - 1);
@@ -3068,20 +2970,17 @@ int PerturbationsModule::perturb_find_approximation_switches(
     interval_limit[index_switch_tot] = tau_end;
 
     class_test(index_switch_tot != interval_number,
-               error_message_,
                "most probably two approximation switching time were found to be equal, which "
                "cannot be handled\n");
 
     /** - store each approximation in chronological order */
 
     for (index_switch = 1; index_switch < interval_number; index_switch++) {
-      class_call(perturb_approximations(index_md,
-                                        k,
-                                        0.5 * (interval_limit[index_switch] +
-                                               interval_limit[index_switch + 1]),
-                                        ppw),
-                 error_message_,
-                 error_message_);
+      perturb_approximations(index_md,
+                             k,
+                             0.5 *
+                                 (interval_limit[index_switch] + interval_limit[index_switch + 1]),
+                             ppw);
 
       for (index_ap = 0; index_ap < ppw->ap_size; index_ap++) {
         interval_approx[index_switch][index_ap] = ppw->approx[index_ap];
@@ -3091,7 +2990,6 @@ int PerturbationsModule::perturb_find_approximation_switches(
            increase) */
         class_test(interval_approx[index_switch][index_ap] <
                        interval_approx[index_switch - 1][index_ap],
-                   error_message_,
                    "The approximation with label %d is not defined correctly: it goes backward "
                    "(from %d to %d) for k=%e and between tau=%e and %e; this cannot be handled\n",
                    index_ap,
@@ -3109,7 +3007,6 @@ int PerturbationsModule::perturb_find_approximation_switches(
           num_switching_at_given_time++;
       }
       class_test(num_switching_at_given_time != 1,
-                 error_message_,
                  "for k=%e, at tau=%g, you switch %d approximations at the same time, this cannot "
                  "be handled. Usually happens in two cases: triggers for different approximations "
                  "coincide, or one approx is reversible\n",
@@ -3208,7 +3105,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
 
     /* RAII: unsorted_tau_switch cleaned up automatically */
 
-    class_call(perturb_approximations(index_md, k, tau_end, ppw), error_message_, error_message_);
+    perturb_approximations(index_md, k, tau_end, ppw);
   }
 
   return _SUCCESS_;
@@ -3429,12 +3326,10 @@ int PerturbationsModule::perturb_vector_init(
           with initial conditions */
 
       class_test(ppw->approx[ppw->index_ap_rsa] == (int) rsa_on,
-                 error_message_,
                  "scalar initial conditions assume radiation streaming approximation turned off");
 
       if (all_species_.count("IDM_DR_IDR")) {
         class_test(ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on,
-                   error_message_,
                    "scalar initial conditions assume dark radiation approximation turned off");
       }
 
@@ -3442,28 +3337,23 @@ int PerturbationsModule::perturb_vector_init(
 
       if (all_species_.count("UR")) {
         class_test(ppw->approx[ppw->index_ap_ufa] == (int) ufa_on,
-                   error_message_,
                    "scalar initial conditions assume ur fluid approximation turned off");
       }
 
       if (HasNcdm(all_species_)) {
         class_test(ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on,
-                   error_message_,
                    "scalar initial conditions assume ncdm fluid approximation turned off");
       }
 
       class_test(ppw->approx[ppw->index_ap_tca] == (int) tca_off,
-                 error_message_,
                  "scalar initial conditions assume tight-coupling approximation turned on");
     }
 
     if (_tensors_) {
       class_test(ppw->approx[ppw->index_ap_tca] == (int) tca_off,
-                 error_message_,
                  "tensor initial conditions assume tight-coupling approximation turned on");
 
       class_test(ppw->approx[ppw->index_ap_rsa] == (int) rsa_on,
-                 error_message_,
                  "tensor initial conditions assume radiation streaming approximation turned off");
     }
 
@@ -3474,9 +3364,7 @@ int PerturbationsModule::perturb_vector_init(
 
     /** - --> (c) fill the vector ppw-->pv-->y with appropriate initial conditions */
 
-    class_call(perturb_initial_conditions(index_md, index_ic, k, tau, ppw),
-               error_message_,
-               error_message_);
+    perturb_initial_conditions(index_md, index_ic, k, tau, ppw);
   }
 
   /** - case of switching approximation while a wavenumber is being integrated */
@@ -3509,14 +3397,12 @@ int PerturbationsModule::perturb_vector_init(
 
       class_test((pa_old[ppw->index_ap_tca] == (int) tca_off) &&
                      (ppw->approx[ppw->index_ap_tca] == (int) tca_on),
-                 error_message_,
                  "at tau=%g: the tight-coupling approximation can be switched off, not on",
                  tau);
 
       if (all_species_.count("IDM_DR_IDR")) {
         class_test((pa_old[ppw->index_ap_tca] == (int) tca_idm_dr_off) &&
                        (ppw->approx[ppw->index_ap_tca] == (int) tca_idm_dr_on),
-                   error_message_,
                    "at tau=%g: the dark tight-coupling approximation can be switched off, not on",
                    tau);
       }
@@ -3524,7 +3410,6 @@ int PerturbationsModule::perturb_vector_init(
       if ((all_species_.count("IDM_DRMD_IDR_DRMD")) && (all_species_.count("IDM_DRMD_IDR_DRMD"))) {
         class_test((pa_old[ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_off) &&
                        (ppw->approx[ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_on),
-                   error_message_,
                    "at tau=%g: the dark tight-coupling approximation can be switched off, not on "
                    "(DRMD)",
                    tau);
@@ -3721,21 +3606,18 @@ int PerturbationsModule::perturb_vector_init(
 
           double Rint, csp2, Gint;
 
-          class_call(background_module_
-                         ->background_idm_drmd(a,
-                                               static_cast<IDM_DRMD_IDR_DRMD_Species&>(
-                                                   *all_species_.at("IDM_DRMD_IDR_DRMD"))
-                                                       .idm_drmd()
-                                                       .Rho(ppw->pvecback) /
-                                                   static_cast<IDM_DRMD_IDR_DRMD_Species&>(
-                                                       *all_species_.at("IDM_DRMD_IDR_DRMD"))
-                                                       .idr_drmd()
-                                                       .Rho(ppw->pvecback),
-                                               &Rint,
-                                               &csp2,
-                                               &Gint),
-                     background_module_->error_message_,
-                     background_module_->error_message_);
+          background_module_->background_idm_drmd(a,
+                                                  static_cast<IDM_DRMD_IDR_DRMD_Species&>(
+                                                      *all_species_.at("IDM_DRMD_IDR_DRMD"))
+                                                          .idm_drmd()
+                                                          .Rho(ppw->pvecback) /
+                                                      static_cast<IDM_DRMD_IDR_DRMD_Species&>(
+                                                          *all_species_.at("IDM_DRMD_IDR_DRMD"))
+                                                          .idr_drmd()
+                                                          .Rho(ppw->pvecback),
+                                                  &Rint,
+                                                  &csp2,
+                                                  &Gint);
 
           const size_t drm_swi     = all_species_.index_of("IDM_DRMD_IDR_DRMD");
           const auto& drm_old_full = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
@@ -3772,7 +3654,6 @@ int PerturbationsModule::perturb_vector_init(
 
       class_test((pa_old[ppw->index_ap_tca] == (int) tca_off) &&
                      (ppw->approx[ppw->index_ap_tca] == (int) tca_on),
-                 error_message_,
                  "at tau=%g: the tight-coupling approximation can be switched off, not on",
                  tau);
 
@@ -3842,7 +3723,6 @@ int PerturbationsModule::perturb_vector_init(
 
       class_test((pa_old[ppw->index_ap_tca] == (int) tca_off) &&
                      (ppw->approx[ppw->index_ap_tca] == (int) tca_on),
-                 error_message_,
                  "at tau=%g: the tight-coupling approximation can be switched off, not on",
                  tau);
 
@@ -3938,13 +3818,11 @@ int PerturbationsModule::perturb_initial_conditions(
         rho_m, rho_nu (= all relativistic except photons), and their
         ratio. */
 
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->normal_info,
-                                                     pba->inter_normal,
-                                                     &(ppw->last_index_back),
-                                                     ppw->pvecback),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->normal_info,
+                                          pba->inter_normal,
+                                          &(ppw->last_index_back),
+                                          ppw->pvecback);
 
     double a = ppw->pvecback[background_module_->index_bg_a_];
 
@@ -3984,7 +3862,7 @@ int PerturbationsModule::perturb_initial_conditions(
       rho_nu += sp->FreestreamingRho(ppw->pvecback);
     }
 
-    class_test(rho_r == 0., error_message_, "stop to avoid division by zero");
+    class_test(rho_r == 0., "stop to avoid division by zero");
 
     /* f_nu = Omega_nu(t_i) / Omega_r(t_i) */
     double fracnu = rho_nu / rho_r;
@@ -4129,15 +4007,12 @@ int PerturbationsModule::perturb_initial_conditions(
 
     if ((ppt->has_cdi == _TRUE_) && (index_ic == index_ic_cdi_)) {
       class_test((all_species_.count("IDM_DR_IDR") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
       class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)")
 
           class_test(all_species_.count("CDM") == 0,
-                     error_message_,
                      "not consistent to ask for CDI in absence of CDM!");
 
       ic_ctx.delta_g_ic = ppr->entropy_ini * fraccdm * om * tau * (-2. / 3. + om * tau / 4.);
@@ -4163,11 +4038,9 @@ int PerturbationsModule::perturb_initial_conditions(
 
     if ((ppt->has_bi == _TRUE_) && (index_ic == index_ic_bi_)) {
       class_test((all_species_.count("IDM_DR_IDR") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
       class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
 
       ic_ctx.delta_g_ic = ppr->entropy_ini * fracb * om * tau * (-2. / 3. + om * tau / 4.);
@@ -4193,15 +4066,12 @@ int PerturbationsModule::perturb_initial_conditions(
 
     if ((ppt->has_nid == _TRUE_) && (index_ic == index_ic_nid_)) {
       class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
-                 error_message_,
                  "not consistent to ask for NID in absence of ur or ncdm species!");
 
       class_test((all_species_.count("IDM_DR_IDR") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
       class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
 
       ic_ctx.delta_g_ic = ppr->entropy_ini * fracnu / fracg * (-1. + ktau_two / 6.);
@@ -4220,15 +4090,12 @@ int PerturbationsModule::perturb_initial_conditions(
 
     if ((ppt->has_niv == _TRUE_) && (index_ic == index_ic_niv_)) {
       class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
-                 error_message_,
                  "not consistent to ask for NIV in absence of ur or ncdm species!");
 
       class_test((all_species_.count("IDM_DR_IDR") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation");
 
       class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
-                 error_message_,
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
       ic_ctx.delta_g_ic = ppr->entropy_ini * k * tau * fracnu / fracg *
                           (1. - 3. / 16. * fracb * (2. + fracg) / fracg * om * tau);
@@ -4262,12 +4129,10 @@ int PerturbationsModule::perturb_initial_conditions(
 
     if (ppt->gauge == newtonian) {
       class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
-                 error_message_,
                  "Use synchronous gauge for the DRMD implementation as Netwonian gauge has not "
                  "been tested!");
 
       class_test((all_species_.count("ScalarField") != 0),
-                 error_message_,
                  "Scalar field (scf) perturbations are only implemented in the synchronous "
                  "gauge: the Newtonian-gauge Klein-Gordon source term is incomplete (it is "
                  "missing the psi' and -2 a^2 V_,phi psi contributions, which would require the "
@@ -4537,25 +4402,22 @@ int PerturbationsModule::perturb_approximations(int index_md,
 
   /** - compute Fourier mode time scale = \f$ \tau_k = 1/k \f$ */
 
-  class_test(k == 0., error_message_, "stop to avoid division by zero");
+  class_test(k == 0., "stop to avoid division by zero");
 
   tau_k = 1. / k;
 
   /** - evaluate background quantities with background_at_tau() and
       Hubble time scale \f$ \tau_h = a/a' \f$ */
 
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->normal_info,
-                                                   ppw->inter_mode,
-                                                   &(ppw->last_index_back),
-                                                   ppw->pvecback),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau,
+                                        pba->normal_info,
+                                        ppw->inter_mode,
+                                        &(ppw->last_index_back),
+                                        ppw->pvecback);
 
   class_test(ppw->pvecback[background_module_->index_bg_H_] *
                      ppw->pvecback[background_module_->index_bg_a_] ==
                  0.,
-             error_message_,
              "aH=0, stop to avoid division by zero");
 
   tau_h = 1. / (ppw->pvecback[background_module_->index_bg_H_] *
@@ -4566,15 +4428,13 @@ int PerturbationsModule::perturb_approximations(int index_md,
   if (_scalars_) {
     /** - --> (a) evaluate thermodynamical quantities with thermodynamics_module_->thermodynamics_at_z() */
 
-    class_call(thermodynamics_module_
-                   ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
-                                             1., /* redshift z=1/a-1 */
-                                         ppw->inter_mode,
-                                         &(ppw->last_index_thermo),
-                                         ppw->pvecback,
-                                         ppw->pvecthermo),
-               thermodynamics_module_->error_message_,
-               error_message_);
+    thermodynamics_module_
+        ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
+                                  1., /* redshift z=1/a-1 */
+                              ppw->inter_mode,
+                              &(ppw->last_index_thermo),
+                              ppw->pvecback,
+                              ppw->pvecthermo);
 
     /** - ---> (b.1.) if \f$ \kappa'=0 \f$, recombination is finished; tight-coupling approximation must be off */
 
@@ -4589,7 +4449,6 @@ int PerturbationsModule::perturb_approximations(int index_md,
       tau_c = 1. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
       class_test(tau_c < 0.,
-                 error_message_,
                  "tau_c = 1/kappa' should always be positive unless there is something wrong in "
                  "the thermodynamics module. However you have here tau_c=%e at z=%e, conformal "
                  "time=%e x_e=%e. (This could come from the interpolation of a too poorly sampled "
@@ -4618,7 +4477,6 @@ int PerturbationsModule::perturb_approximations(int index_md,
       }
       else {
         class_test(1. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] < 0.,
-                   error_message_,
                    "negative tau_idm_dr=1/dmu_idm_dr=%e at z=%e, conformal time=%e.\n",
                    1. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_],
                    1. / ppw->pvecback[background_module_->index_bg_a_] - 1.,
@@ -4645,21 +4503,18 @@ int PerturbationsModule::perturb_approximations(int index_md,
       double conformalH = ppw->pvecback[background_module_->index_bg_H_] *
                           ppw->pvecback[background_module_->index_bg_a_];
 
-      class_call(background_module_
-                     ->background_idm_drmd(ppw->pvecback[background_module_->index_bg_a_],
-                                           static_cast<IDM_DRMD_IDR_DRMD_Species&>(
-                                               *all_species_.at("IDM_DRMD_IDR_DRMD"))
-                                                   .idm_drmd()
-                                                   .Rho(ppw->pvecback) /
-                                               static_cast<IDM_DRMD_IDR_DRMD_Species&>(
-                                                   *all_species_.at("IDM_DRMD_IDR_DRMD"))
-                                                   .idr_drmd()
-                                                   .Rho(ppw->pvecback),
-                                           &Rint,
-                                           &csp2,
-                                           &Gint),
-                 background_module_->error_message_,
-                 background_module_->error_message_);
+      background_module_->background_idm_drmd(ppw->pvecback[background_module_->index_bg_a_],
+                                              static_cast<IDM_DRMD_IDR_DRMD_Species&>(
+                                                  *all_species_.at("IDM_DRMD_IDR_DRMD"))
+                                                      .idm_drmd()
+                                                      .Rho(ppw->pvecback) /
+                                                  static_cast<IDM_DRMD_IDR_DRMD_Species&>(
+                                                      *all_species_.at("IDM_DRMD_IDR_DRMD"))
+                                                      .idr_drmd()
+                                                      .Rho(ppw->pvecback),
+                                              &Rint,
+                                              &csp2,
+                                              &Gint);
 
       if (Gint > conformalH * ppr->idm_drmd_tight_coupling_trigger_G_over_aH) {
         ppw->approx[ppw->index_ap_tca_idm_drmd] = (int) tca_idm_drmd_on;
@@ -4737,15 +4592,13 @@ int PerturbationsModule::perturb_approximations(int index_md,
   if (_tensors_) {
     /** - --> (a) evaluate thermodynamical quantities with thermodynamics_module_->thermodynamics_at_z() */
 
-    class_call(thermodynamics_module_
-                   ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
-                                             1., /* redshift z=1/a-1 */
-                                         ppw->inter_mode,
-                                         &(ppw->last_index_thermo),
-                                         ppw->pvecback,
-                                         ppw->pvecthermo),
-               thermodynamics_module_->error_message_,
-               error_message_);
+    thermodynamics_module_
+        ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
+                                  1., /* redshift z=1/a-1 */
+                              ppw->inter_mode,
+                              &(ppw->last_index_thermo),
+                              ppw->pvecback,
+                              ppw->pvecthermo);
 
     /** - ---> (b.1.) if \f$ \kappa'=0 \f$, recombination is finished; tight-coupling approximation must be off */
 
@@ -4792,7 +4645,7 @@ int PerturbationsModule::perturb_approximations(int index_md,
  * is a bit special:
  * - fixed parameters and workspaces are passed through a generic pointer.
  *   generic_integrator() doesn't know the content of this pointer.
- * - the error management is a bit special: errors are not written as usual to thermodynamics_module_->error_message_, but to a generic
+ * - the error management is a bit special: errors are not written as usual to a module error_message buffer, but to a generic
  *   error_message passed in the list of arguments.
  *
  * @param tau                      Input: conformal time
@@ -4831,25 +4684,22 @@ int PerturbationsModule::perturb_timescale_member(double tau,
 
   /** - compute Fourier mode time scale = \f$ \tau_k = 1/k \f$ */
 
-  class_test(pppaw->k == 0., error_message_, "stop to avoid division by zero");
+  class_test(pppaw->k == 0., "stop to avoid division by zero");
 
   tau_k = 1. / pppaw->k;
 
   /** - evaluate background quantities with background_at_tau() and
       Hubble time scale \f$ \tau_h = a/a' \f$ */
 
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->normal_info,
-                                                   ppw->inter_mode,
-                                                   &(ppw->last_index_back),
-                                                   pvecback),
-             background_module_->error_message_,
-             error_message);
+  background_module_->background_at_tau(tau,
+                                        pba->normal_info,
+                                        ppw->inter_mode,
+                                        &(ppw->last_index_back),
+                                        pvecback);
 
   class_test(pvecback[background_module_->index_bg_H_] *
                      pvecback[background_module_->index_bg_a_] ==
                  0.,
-             error_message,
              "aH=0, stop to avoid division by zero");
 
   tau_h = 1. /
@@ -4864,15 +4714,12 @@ int PerturbationsModule::perturb_timescale_member(double tau,
       *timescale = MIN(tau_k, *timescale);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-      class_call(thermodynamics_module_
-                     ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                               1., /* redshift z=1/a-1 */
-                                           ppw->inter_mode,
-                                           &(ppw->last_index_thermo),
-                                           pvecback,
-                                           pvecthermo),
-                 thermodynamics_module_->error_message_,
-                 error_message);
+      thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                      1., /* redshift z=1/a-1 */
+                                                  ppw->inter_mode,
+                                                  &(ppw->last_index_thermo),
+                                                  pvecback,
+                                                  pvecthermo);
 
       if (pvecthermo[thermodynamics_module_->index_th_dkappa_] != 0.) {
         /** - -->  compute recombination time scale for photons, \f$ \tau_{\gamma} = 1/ \kappa' \f$ */
@@ -4890,15 +4737,12 @@ int PerturbationsModule::perturb_timescale_member(double tau,
     *timescale = MIN(tau_h, tau_k);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-      class_call(thermodynamics_module_
-                     ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                               1., /* redshift z=1/a-1 */
-                                           ppw->inter_mode,
-                                           &(ppw->last_index_thermo),
-                                           pvecback,
-                                           pvecthermo),
-                 thermodynamics_module_->error_message_,
-                 error_message);
+      thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                      1., /* redshift z=1/a-1 */
+                                                  ppw->inter_mode,
+                                                  &(ppw->last_index_thermo),
+                                                  pvecback,
+                                                  pvecthermo);
 
       if (pvecthermo[thermodynamics_module_->index_th_dkappa_] != 0.) {
         /** - -->  compute recombination time scale for photons, \f$ \tau_{\gamma} = 1/ \kappa' \f$ */
@@ -4916,15 +4760,12 @@ int PerturbationsModule::perturb_timescale_member(double tau,
     *timescale = MIN(tau_h, tau_k);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-      class_call(thermodynamics_module_
-                     ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                               1., /* redshift z=1/a-1 */
-                                           ppw->inter_mode,
-                                           &(ppw->last_index_thermo),
-                                           pvecback,
-                                           pvecthermo),
-                 thermodynamics_module_->error_message_,
-                 error_message);
+      thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                      1., /* redshift z=1/a-1 */
+                                                  ppw->inter_mode,
+                                                  &(ppw->last_index_thermo),
+                                                  pvecback,
+                                                  pvecthermo);
 
       if (pvecthermo[thermodynamics_module_->index_th_dkappa_] != 0.) {
         /** - --> compute recombination time scale for photons, \f$ \tau_{\gamma} = 1/ \kappa' \f$ */
@@ -4963,7 +4804,7 @@ int PerturbationsModule::perturb_einstein(
   double s2_squared     = 1. - 3. * pba->K / k2;
 
   /** - sum up perturbations from all species */
-  class_call(perturb_total_stress_energy(index_md, k, y, ppw), error_message_, error_message_);
+  perturb_total_stress_energy(index_md, k, y, ppw);
 
   /** - for scalar modes: */
 
@@ -5000,16 +4841,12 @@ int PerturbationsModule::perturb_einstein(
          because the result depends on h_prime) */
 
       if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
-        class_call(perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw),
-                   error_message_,
-                   error_message_);
+        perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw);
       }
 
       if ((all_species_.count("IDM_DR_IDR")) &&
           (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
-        class_call(perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw),
-                   error_message_,
-                   error_message_);
+        perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw);
       }
     }
 
@@ -5025,16 +4862,12 @@ int PerturbationsModule::perturb_einstein(
          because the result depends on h_prime) */
 
       if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
-        class_call(perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw),
-                   error_message_,
-                   error_message_);
+        perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw);
       }
 
       if ((all_species_.count("IDM_DR_IDR")) &&
           (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
-        class_call(perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw),
-                   error_message_,
-                   error_message_);
+        perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo, ppw);
 
         ppw->rho_plus_p_theta += 4. / 3. *
                                  static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
@@ -5390,9 +5223,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     /* fluid contribution */
     if (all_species_.count("Fluid")) {
       double w_fld, dw_over_da_fld, integral_fld;
-      class_call(background_module_->background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld),
-                 background_module_->error_message_,
-                 error_message_);
+      background_module_->background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld);
       double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
       const size_t fluid_i     = all_species_.index_of("Fluid");
@@ -5561,7 +5392,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
  * pointer.
  *
  * - the error management is a bit special: errors are not written as
- * usual to thermodynamics_module_->error_message_, but to a generic error_message passed
+ * usual to a module error_message buffer, but to a generic error_message passed
  * in the list of arguments.
  *
  * @param tau                      Input: conformal time
@@ -5597,23 +5428,19 @@ int PerturbationsModule::perturb_sources_member(double tau,
 
   /** - get background/thermo quantities in this point */
 
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->normal_info,
-                                                   pba->inter_closeby,
-                                                   &(ppw->last_index_back),
-                                                   pvecback),
-             background_module_->error_message_,
-             error_message);
+  background_module_->background_at_tau(tau,
+                                        pba->normal_info,
+                                        pba->inter_closeby,
+                                        &(ppw->last_index_back),
+                                        pvecback);
 
   double z = pba->a_today / pvecback[background_module_->index_bg_a_] - 1.;
 
-  class_call(thermodynamics_module_->thermodynamics_at_z(z,
-                                                         thermodynamics_module_->inter_closeby_,
-                                                         &(ppw->last_index_thermo),
-                                                         pvecback,
-                                                         pvecthermo),
-             thermodynamics_module_->error_message_,
-             error_message);
+  thermodynamics_module_->thermodynamics_at_z(z,
+                                              thermodynamics_module_->inter_closeby_,
+                                              &(ppw->last_index_thermo),
+                                              pvecback,
+                                              pvecthermo);
 
   double a_rel  = ppw->pvecback[background_module_->index_bg_a_] / pba->a_today;
   double a2_rel = a_rel * a_rel;
@@ -5631,7 +5458,7 @@ int PerturbationsModule::perturb_sources_member(double tau,
   if (_scalars_) {
     /** - --> compute metric perturbations */
 
-    class_call(perturb_einstein(index_md, k, tau, y, ppw), error_message_, error_message);
+    perturb_einstein(index_md, k, tau, y, ppw);
 
     /** - --> compute quantities depending on approximation schemes */
 
@@ -5771,10 +5598,10 @@ int PerturbationsModule::perturb_sources_member(double tau,
     }
 
     if (has_source_k2gamma_Nb_ == _TRUE_) {
-      class_stop(error_message_,
-                 "We need to compute the derivative of H_T_Nb_prime numerically. Written by T. "
-                 "Tram but not yet propagated here. See devel branch prior to merging with hmcode "
-                 "branch");
+      class_stop(
+          "We need to compute the derivative of H_T_Nb_prime numerically. Written by T. "
+          "Tram but not yet propagated here. See devel branch prior to merging with hmcode "
+          "branch");
     }
 
     /* Bardeen potential -PHI_H = phi in Newtonian gauge */
@@ -6010,26 +5837,21 @@ int PerturbationsModule::perturb_print_variables_member(
 
   /** - update background/thermo quantities in this point */
 
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->normal_info,
-                                                   pba->inter_closeby,
-                                                   &(ppw->last_index_back),
-                                                   pvecback),
-             background_module_->error_message_,
-             error_message);
+  background_module_->background_at_tau(tau,
+                                        pba->normal_info,
+                                        pba->inter_closeby,
+                                        &(ppw->last_index_back),
+                                        pvecback);
 
-  class_call(thermodynamics_module_
-                 ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] - 1.,
-                                       thermodynamics_module_->inter_closeby_,
-                                       &(ppw->last_index_thermo),
-                                       pvecback,
-                                       pvecthermo),
-             thermodynamics_module_->error_message_,
-             error_message);
+  thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] - 1.,
+                                              thermodynamics_module_->inter_closeby_,
+                                              &(ppw->last_index_thermo),
+                                              pvecback,
+                                              pvecthermo);
 
   /** - update metric perturbations in this point */
 
-  class_call(perturb_einstein(index_md, k, tau, y, ppw), error_message_, error_message);
+  perturb_einstein(index_md, k, tau, y, ppw);
 
   double a  = pvecback[background_module_->index_bg_a_];
   double a2 = a * a;
@@ -6178,7 +6000,6 @@ int PerturbationsModule::perturb_print_variables_member(
     /* Non-cold Dark Matter */
     if (evolve_tensor_ncdm_ == _TRUE_) {
       class_test(all_species_.count("DNCDM_DR") != 0,
-                 error_message_,
                  "Cannot evolve tensor modes with decaying NCDM species.");
       for (size_t i = 0; i < all_species_.size(); ++i) {
         const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
@@ -6236,7 +6057,7 @@ int PerturbationsModule::perturb_print_variables_member(
  * is a bit special:
  * - fixed parameters and workspaces are passed through a generic pointer.
  *   generic_integrator() doesn't know what the content of this pointer is.
- * - errors are not written as usual in thermodynamics_module_->error_message_, but in a generic
+ * - errors are not written as usual in a module error_message buffer, but in a generic
  *   error_message passed in the list of arguments.
  *
  * @param tau                      Input: conformal time
@@ -6273,26 +6094,21 @@ int PerturbationsModule::perturb_derivs_member(
 
   /** - get background/thermo quantities in this point */
 
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->normal_info,
-                                                   pba->inter_closeby,
-                                                   &(ppw->last_index_back),
-                                                   pvecback),
-             background_module_->error_message_,
-             error_message);
+  background_module_->background_at_tau(tau,
+                                        pba->normal_info,
+                                        pba->inter_closeby,
+                                        &(ppw->last_index_back),
+                                        pvecback);
 
-  class_call(thermodynamics_module_
-                 ->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                           1., /* redshift z=1/a-1 */
-                                       thermodynamics_module_->inter_closeby_,
-                                       &(ppw->last_index_thermo),
-                                       pvecback,
-                                       pvecthermo),
-             thermodynamics_module_->error_message_,
-             error_message);
+  thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
+                                                  1., /* redshift z=1/a-1 */
+                                              thermodynamics_module_->inter_closeby_,
+                                              &(ppw->last_index_thermo),
+                                              pvecback,
+                                              pvecthermo);
 
   /** - get metric perturbations with perturb_einstein() */
-  class_call(perturb_einstein(index_md, k, tau, y, ppw), error_message_, error_message);
+  perturb_einstein(index_md, k, tau, y, ppw);
 
   /** - compute related background quantities */
 
@@ -6804,14 +6620,13 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y,
   /** - ---> 2nd order as in CRS*/
   if (ppr->tight_coupling_approximation == (int) second_order_CRS) {
     if (ppt->gauge == newtonian) {
-      class_stop(error_message,
-                 "the second_order_CRS approach to tight-coupling is coded in synchronous gauge, "
-                 "not newtonian: change gauge or try another tight-coupling scheme");
+      class_stop(
+          "the second_order_CRS approach to tight-coupling is coded in synchronous gauge, "
+          "not newtonian: change gauge or try another tight-coupling scheme");
     }
 
     if (ppt->gauge == synchronous) {
       class_test(pba->sgnK != 0,
-                 error_message_,
                  "the second_order_CRS approach to tight-coupling is coded in the flat case only: "
                  "for non-flat try another tight-coupling scheme");
 
@@ -6876,9 +6691,9 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y,
   /** - ---> 2nd order like in CLASS paper */
   if (ppr->tight_coupling_approximation == (int) second_order_CLASS) {
     if (ppt->gauge == newtonian) {
-      class_stop(error_message,
-                 "the second_order_CLASS approach to tight-coupling is coded in synchronous gauge, "
-                 "not newtonian: change gauge or try another tight-coupling scheme");
+      class_stop(
+          "the second_order_CLASS approach to tight-coupling is coded in synchronous gauge, "
+          "not newtonian: change gauge or try another tight-coupling scheme");
     }
 
     if (ppt->gauge == synchronous) {
@@ -6958,7 +6773,6 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(
   double k2 = k * k;
 
   class_test(ppw->approx[ppw->index_ap_rsa] == (int) rsa_off,
-             error_message_,
              "this function should not have been called now, bug was introduced");
 
   // formulas below TBC for curvaturema

@@ -153,10 +153,7 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
       }
     }
     else {
-      int status = spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
-      ThrowRuntimeErrorIf(status != _SUCCESS_,
-                          "Error in SpectraModule::cl_output: %s",
-                          error_message_);
+      spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
       for (int index_ct = 0; index_ct < ct_size_; ++index_ct) {
         output_pointers[index_ct][l] = cl_tot[index_ct];
       }
@@ -207,10 +204,7 @@ std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) co
   }
   std::vector<double> cl_tot(ct_size_);
   for (int l = 2; l <= lmax; l++) {
-    int status = spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
-    ThrowRuntimeErrorIf(status != _SUCCESS_,
-                        "Error in SpectraModule::cl_output: %s",
-                        error_message_);
+    spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
     for (int i = 0; i < ct_size_; ++i) {
       data_vectors[i][l] = cl_tot[i];
     }
@@ -268,18 +262,20 @@ int SpectraModule::spectra_cl_at_l(
     index_md = 0;
     if ((int) l <= l_[l_size_[index_md] - 1]) {
       /* interpolate at l */
-      class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                          l_size_[index_md],
-                                          const_cast<double*>(cl_[index_md].data()),
-                                          const_cast<double*>(ddcl_[index_md].data()),
-                                          ct_size_,
-                                          l,
-                                          &last_index,
-                                          cl_tot,
-                                          ct_size_,
-                                          error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
+                                                    l_size_[index_md],
+                                                    const_cast<double*>(cl_[index_md].data()),
+                                                    const_cast<double*>(ddcl_[index_md].data()),
+                                                    ct_size_,
+                                                    l,
+                                                    &last_index,
+                                                    cl_tot,
+                                                    ct_size_,
+                                                    buf),
+                           buf);
+      }
 
       /* set to zero for the types such that l<l_max */
       for (index_ct = 0; index_ct < ct_size_; index_ct++)
@@ -305,18 +301,20 @@ int SpectraModule::spectra_cl_at_l(
         index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
         if (((int) l <= l_[l_size_[index_md] - 1]) &&
             (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_)) {
-          class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                              l_size_[index_md],
-                                              const_cast<double*>(cl_[index_md].data()),
-                                              const_cast<double*>(ddcl_[index_md].data()),
-                                              ic_ic_size_[index_md] * ct_size_,
-                                              l,
-                                              &last_index,
-                                              cl_md_ic[index_md],
-                                              ic_ic_size_[index_md] * ct_size_,
-                                              error_message_),
-                     error_message_,
-                     error_message_);
+          {
+            ErrorMsg buf;
+            class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
+                                                        l_size_[index_md],
+                                                        const_cast<double*>(cl_[index_md].data()),
+                                                        const_cast<double*>(ddcl_[index_md].data()),
+                                                        ic_ic_size_[index_md] * ct_size_,
+                                                        l,
+                                                        &last_index,
+                                                        cl_md_ic[index_md],
+                                                        ic_ic_size_[index_md] * ct_size_,
+                                                        buf),
+                               buf);
+          }
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++)
             if ((int) l > l_max_ct_[index_md][index_ct])
@@ -351,18 +349,20 @@ int SpectraModule::spectra_cl_at_l(
 
       if (ic_size_[index_md] == 1) {
         if ((int) l <= l_[l_size_[index_md] - 1]) {
-          class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                              l_size_[index_md],
-                                              const_cast<double*>(cl_[index_md].data()),
-                                              const_cast<double*>(ddcl_[index_md].data()),
-                                              ct_size_,
-                                              l,
-                                              &last_index,
-                                              cl_md[index_md],
-                                              ct_size_,
-                                              error_message_),
-                     error_message_,
-                     error_message_);
+          {
+            ErrorMsg buf;
+            class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
+                                                        l_size_[index_md],
+                                                        const_cast<double*>(cl_[index_md].data()),
+                                                        const_cast<double*>(ddcl_[index_md].data()),
+                                                        ct_size_,
+                                                        l,
+                                                        &last_index,
+                                                        cl_md[index_md],
+                                                        ct_size_,
+                                                        buf),
+                               buf);
+          }
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++)
             if ((int) l > l_max_ct_[index_md][index_ct])
@@ -381,18 +381,20 @@ int SpectraModule::spectra_cl_at_l(
       if (ic_size_[index_md] > 1) {
         if ((int) l <= l_[l_size_[index_md] - 1]) {
           /* interpolate all ic and ct */
-          class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                              l_size_[index_md],
-                                              const_cast<double*>(cl_[index_md].data()),
-                                              const_cast<double*>(ddcl_[index_md].data()),
-                                              ic_ic_size_[index_md] * ct_size_,
-                                              l,
-                                              &last_index,
-                                              cl_md_ic[index_md],
-                                              ic_ic_size_[index_md] * ct_size_,
-                                              error_message_),
-                     error_message_,
-                     error_message_);
+          {
+            ErrorMsg buf;
+            class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
+                                                        l_size_[index_md],
+                                                        const_cast<double*>(cl_[index_md].data()),
+                                                        const_cast<double*>(ddcl_[index_md].data()),
+                                                        ic_ic_size_[index_md] * ct_size_,
+                                                        l,
+                                                        &last_index,
+                                                        cl_md_ic[index_md],
+                                                        ic_ic_size_[index_md] * ct_size_,
+                                                        buf),
+                               buf);
+          }
 
           /* set to zero some of the components */
           for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
@@ -474,12 +476,12 @@ int SpectraModule::spectra_init() {
   /** - initialize indices and allocate some of the arrays in the
       spectra structure */
 
-  class_call(spectra_indices(), error_message_, error_message_);
+  spectra_indices();
 
   /** - deal with \f$ C_l\f$'s, if any */
 
   if (ppt->has_cls == _TRUE_) {
-    class_call(spectra_cls(), error_message_, error_message_);
+    spectra_cls();
   }
   else {
     ct_size_ = 0;
@@ -837,14 +839,11 @@ int SpectraModule::spectra_cls() {
     std::vector<double> primordial_pk_cached(transfer_module_->q_size_ * ic_ic_size_[index_md]);
     for (int index_q = 0; index_q < transfer_module_->q_size_; index_q++) {
       double k = transfer_module_->k_[index_md][index_q];
-      class_call(primordial_module_
-                     ->primordial_spectrum_at_k(index_md,
-                                                linear,
-                                                k,
-                                                &primordial_pk_cached[index_q *
-                                                                      ic_ic_size_[index_md]]),
-                 primordial_module_->error_message_,
-                 error_message_);
+      primordial_module_
+          ->primordial_spectrum_at_k(index_md,
+                                     linear,
+                                     k,
+                                     &primordial_pk_cached[index_q * ic_ic_size_[index_md]]);
     }
 
     /** - --> (c) loop over initial conditions */
@@ -870,17 +869,15 @@ int SpectraModule::spectra_cls() {
               std::vector<double> transfer_ic1(transfer_module_->tt_size_[index_md]);
               std::vector<double> transfer_ic2(transfer_module_->tt_size_[index_md]);
 
-              class_call(spectra_compute_cl(index_md,
-                                            index_ic1,
-                                            index_ic2,
-                                            index_l,
-                                            cl_integrand_num_columns,
-                                            cl_integrand.data(),
-                                            primordial_pk_cached.data(),
-                                            transfer_ic1.data(),
-                                            transfer_ic2.data()),
-                         error_message_,
-                         error_message_);
+              spectra_compute_cl(index_md,
+                                 index_ic1,
+                                 index_ic2,
+                                 index_l,
+                                 cl_integrand_num_columns,
+                                 cl_integrand.data(),
+                                 primordial_pk_cached.data(),
+                                 transfer_ic1.data(),
+                                 transfer_ic2.data());
 
               return _SUCCESS_;
             }));
@@ -908,15 +905,17 @@ int SpectraModule::spectra_cls() {
         compute second derivative of the array in which they are stored,
         in view of spline interpolation. */
 
-    class_call(array_spline_table_lines(l_.data(),
-                                        l_size_[index_md],
-                                        cl_[index_md].data(),
-                                        ic_ic_size_[index_md] * ct_size_,
-                                        ddcl_[index_md].data(),
-                                        _SPLINE_EST_DERIV_,
-                                        error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_lines(l_.data(),
+                                                  l_size_[index_md],
+                                                  cl_[index_md].data(),
+                                                  ic_ic_size_[index_md] * ct_size_,
+                                                  ddcl_[index_md].data(),
+                                                  _SPLINE_EST_DERIV_,
+                                                  buf),
+                         buf);
+    }
   }
 
   return _SUCCESS_;
@@ -1245,16 +1244,18 @@ int SpectraModule::spectra_compute_cl(int index_md,
     else {
       /* spline the integrand over the whole range of k's */
 
-      class_call(array_spline(cl_integrand,
-                              cl_integrand_num_columns,
-                              transfer_module_->q_size_,
-                              0,
-                              1 + index_ct,
-                              1 + ct_size_ + index_ct,
-                              _SPLINE_EST_DERIV_,
-                              error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_spline(cl_integrand,
+                                        cl_integrand_num_columns,
+                                        transfer_module_->q_size_,
+                                        0,
+                                        1 + index_ct,
+                                        1 + ct_size_ + index_ct,
+                                        _SPLINE_EST_DERIV_,
+                                        buf),
+                           buf);
+      }
 
       /* Technical point: we will now do a spline integral over the
          whole range of k's, excepted in the closed (K>0) case. In
@@ -1276,17 +1277,19 @@ int SpectraModule::spectra_compute_cl(int index_md,
                              transfer_module_->q_size_ - 1);
       }
 
-      class_call(array_integrate_all_trapzd_or_spline(cl_integrand,
-                                                      cl_integrand_num_columns,
-                                                      transfer_module_->q_size_,
-                                                      index_q_spline,
-                                                      0,
-                                                      1 + index_ct,
-                                                      1 + ct_size_ + index_ct,
-                                                      &clvalue,
-                                                      error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_integrate_all_trapzd_or_spline(cl_integrand,
+                                                                cl_integrand_num_columns,
+                                                                transfer_module_->q_size_,
+                                                                index_q_spline,
+                                                                0,
+                                                                1 + index_ct,
+                                                                1 + ct_size_ + index_ct,
+                                                                &clvalue,
+                                                                buf),
+                           buf);
+      }
 
       /* in the closed case, instead of an integral, we have a
          discrete sum. In practice, this does not matter: the previous
@@ -1341,15 +1344,8 @@ int SpectraModule::spectra_pk_at_z(
           " -> [WARNING:] You are calling the function spectra_pk_at_z() which is deprecated since "
           "v2.8. Try using nonlinear_pk_at_z() instead.\n");
 
-  class_call(nonlinear_module_->nonlinear_pks_at_z(mode,
-                                                   pk_linear,
-                                                   z,
-                                                   output_tot,
-                                                   output_ic,
-                                                   output_cb_tot,
-                                                   output_cb_ic),
-             nonlinear_module_->error_message_,
-             error_message_);
+  nonlinear_module_
+      ->nonlinear_pks_at_z(mode, pk_linear, z, output_tot, output_ic, output_cb_tot, output_cb_ic);
 
   return _SUCCESS_;
 }
@@ -1380,10 +1376,7 @@ int SpectraModule::spectra_pk_at_k_and_z(
           " -> [WARNING:] You are calling the function spectra_pk_at_k_and_z() which is deprecated "
           "since v2.8. Try using nonlinear_pk_linear_at_k_and_z() instead.\n");
 
-  class_call(nonlinear_module_
-                 ->nonlinear_pks_at_k_and_z(pk_linear, k, z, pk_tot, pk_ic, pk_cb_tot, pk_cb_ic),
-             nonlinear_module_->error_message_,
-             error_message_);
+  nonlinear_module_->nonlinear_pks_at_k_and_z(pk_linear, k, z, pk_tot, pk_ic, pk_cb_tot, pk_cb_ic);
 
   return _SUCCESS_;
 }
@@ -1409,15 +1402,8 @@ int SpectraModule::spectra_pk_nl_at_z(
           " -> [WARNING:] You are calling the function spectra_pk_nl_at_z() which is deprecated "
           "since v2.8. Try using nonlinear_pk_at_z() instead.\n");
 
-  class_call(nonlinear_module_->nonlinear_pks_at_z(mode,
-                                                   pk_nonlinear,
-                                                   z,
-                                                   output_tot,
-                                                   nullptr,
-                                                   output_cb_tot,
-                                                   nullptr),
-             nonlinear_module_->error_message_,
-             error_message_);
+  nonlinear_module_
+      ->nonlinear_pks_at_z(mode, pk_nonlinear, z, output_tot, nullptr, output_cb_tot, nullptr);
 
   return _SUCCESS_;
 }
@@ -1444,15 +1430,8 @@ int SpectraModule::spectra_pk_nl_at_k_and_z(
           " -> [WARNING:] You are calling the function spectra_pk_nl_at_k_and_z() which is "
           "deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.\n");
 
-  class_call(nonlinear_module_->nonlinear_pks_at_k_and_z(pk_nonlinear,
-                                                         k,
-                                                         z,
-                                                         pk_tot,
-                                                         nullptr,
-                                                         pk_cb_tot,
-                                                         nullptr),
-             nonlinear_module_->error_message_,
-             error_message_);
+  nonlinear_module_
+      ->nonlinear_pks_at_k_and_z(pk_nonlinear, k, z, pk_tot, nullptr, pk_cb_tot, nullptr);
 
   return _SUCCESS_;
 }
@@ -1495,15 +1474,13 @@ int SpectraModule::spectra_fast_pk_at_kvec_and_zvec(
   else
     pk_output = pk_linear;
 
-  class_call(nonlinear_module_->nonlinear_pks_at_kvec_and_zvec(pk_output,
-                                                               kvec,
-                                                               kvec_size,
-                                                               zvec,
-                                                               zvec_size,
-                                                               pk_tot_out,
-                                                               pk_cb_tot_out),
-             nonlinear_module_->error_message_,
-             error_message_);
+  nonlinear_module_->nonlinear_pks_at_kvec_and_zvec(pk_output,
+                                                    kvec,
+                                                    kvec_size,
+                                                    zvec,
+                                                    zvec_size,
+                                                    pk_tot_out,
+                                                    pk_cb_tot_out);
 
   return _SUCCESS_;
 }
@@ -1526,14 +1503,12 @@ int SpectraModule::spectra_sigma(double R, double z, double* sigma) {
           "v2.8. Try using nonlinear_sigmas_at_z() instead.\n");
 
   if (nonlinear_module_->has_pk_m_) {
-    class_call(nonlinear_module_
-                   ->nonlinear_sigma_at_z(R,
-                                          z,
-                                          nonlinear_module_->index_pk_m_,
-                                          80.,  // hardcoded, yes, but the function is deprecated...
-                                          sigma),
-               nonlinear_module_->error_message_,
-               error_message_);
+    nonlinear_module_
+        ->nonlinear_sigma_at_z(R,
+                               z,
+                               nonlinear_module_->index_pk_m_,
+                               80.,  // hardcoded, yes, but the function is deprecated...
+                               sigma);
   }
 
   return _SUCCESS_;
@@ -1557,14 +1532,12 @@ int SpectraModule::spectra_sigma_cb(double R, double z, double* sigma_cb) {
           "since v2.8. Try using nonlinear_sigmas_at_z() instead.\n");
 
   if (nonlinear_module_->has_pk_cb_) {
-    class_call(nonlinear_module_
-                   ->nonlinear_sigma_at_z(R,
-                                          z,
-                                          nonlinear_module_->index_pk_cb_,
-                                          80.,  // hardcoded, yes, but the function is deprecated...
-                                          sigma_cb),
-               nonlinear_module_->error_message_,
-               error_message_);
+    nonlinear_module_
+        ->nonlinear_sigma_at_z(R,
+                               z,
+                               nonlinear_module_->index_pk_cb_,
+                               80.,  // hardcoded, yes, but the function is deprecated...
+                               sigma_cb);
   }
 
   return _SUCCESS_;
@@ -1586,9 +1559,9 @@ int SpectraModule::spectra_tk_at_z(
     double*
         output /* array with argument output[(index_k*ic_size_[index_md]+index_ic)*psp->tr_size+index_tr] (must be already allocated) */
 ) {
-  class_stop(error_message_,
-             "The function spectra_tk_at_z() is obsolete, use instead perturb_sources_at_tau(), it "
-             "does the same");
+  class_stop(
+      "The function spectra_tk_at_z() is obsolete, use instead perturb_sources_at_tau(), it "
+      "does the same");
 
   return _SUCCESS_;
 }
@@ -1609,10 +1582,10 @@ int SpectraModule::spectra_tk_at_k_and_z(
     double*
         output /* array with argument output[index_ic*psp->tr_size+index_tr] (must be already allocated) */
 ) {
-  class_stop(error_message_,
-             "The function spectra_tk_at_k_and_z() is obsolete, use instead "
-             "perturb_sources_at_tau(), it does the same provided that you interpolate its output "
-             "at some wavenumber k");
+  class_stop(
+      "The function spectra_tk_at_k_and_z() is obsolete, use instead "
+      "perturb_sources_at_tau(), it does the same provided that you interpolate its output "
+      "at some wavenumber k");
 
   return _SUCCESS_;
 }

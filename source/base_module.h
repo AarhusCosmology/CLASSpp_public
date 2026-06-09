@@ -30,12 +30,9 @@ class BaseModule {
         ppt(&input_module->perturbations_), ppm(&input_module->primordial_),
         pnl(&input_module->nonlinear_), ptr(&input_module->transfers_),
         psp(&input_module->spectra_), ple(&input_module->lensing_), pop(&input_module->output_) {
-    input_module_     = std::move(input_module);
-    error_message_[0] = '\n';
+    input_module_ = std::move(input_module);
   }
   BaseModule(const BaseModule&) = delete;
-
-  mutable ErrorMsg error_message_;
 
  public:
   /** Const reference to the species owned by InputModule. Use .at("CDM")

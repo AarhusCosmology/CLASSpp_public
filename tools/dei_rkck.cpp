@@ -88,7 +88,6 @@ int generic_integrator(int (*derivs)(double x,
       return _SUCCESS_;
     }
     class_test(fabs(hnext / x1) <= hmin,
-               pgi->error_message,
                "Step size too small: step:%g, minimum:%g, in interval: [%g:%g]",
                fabs(hnext / x1),
                hmin,
@@ -97,11 +96,11 @@ int generic_integrator(int (*derivs)(double x,
     h = hnext;
   }
 
-  class_stop(pgi->error_message,
-             "Too many integration steps needed within interval [%g : %g],\n the system of "
-             "equations is probably buggy or featuring a discontinuity",
-             x1,
-             x2);
+  class_stop(
+      "Too many integration steps needed within interval [%g : %g],\n the system of "
+      "equations is probably buggy or featuring a discontinuity",
+      x1,
+      x2);
 }
 
 int rkqs(double* x,
@@ -130,7 +129,7 @@ int rkqs(double* x,
     htemp = _SAFETY_ * h * pow(errmax, _PSHRNK_);
     h     = (h >= 0.0 ? MAX(htemp, 0.1 * h) : MIN(htemp, 0.1 * h));
     xnew  = (*x) + h;
-    class_test(xnew == *x, pgi->error_message, "stepsize underflow at x=%e", xnew);
+    class_test(xnew == *x, "stepsize underflow at x=%e", xnew);
   }
   if (errmax > _ERRCON_)
     *hnext = _SAFETY_ * h * pow(errmax, _PGROW_);

@@ -34,7 +34,6 @@ int evolver_rk(
   short call_output;
 
   class_test(x_ini > x_sampling[x_size - 1],
-             error_message,
              "called with x=%e, last x_sampling=%e",
              x_ini,
              x_sampling[x_size - 1]);
@@ -61,7 +60,6 @@ int evolver_rk(
     timestep = timestep_over_timescale * timescale;
 
     class_test(fabs(timestep / x1) < minimum_variation,
-               error_message,
                "integration step =%e < machine precision : leads either to numerical error or "
                "infinite loop",
                fabs(timestep / x1));

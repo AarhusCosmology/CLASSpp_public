@@ -54,7 +54,6 @@ class InputModule {
    *  physics construction. Populated by ReadCoupledCluster alongside
    *  omega_budget_ and threaded through SpeciesBuildContext. */
   CoupledClusterInputs coupled_inputs_;
-  ErrorMsg error_message_;
 
  private:
   // Hook-based shooting (used by DoShooting). theta_s is identified by
@@ -118,7 +117,6 @@ class InputModule {
     class_call(parser_read_double(pfc, name1, &param1, &flag1, errmsg), errmsg, errmsg); \
     class_call(parser_read_double(pfc, name2, &param2, &flag2, errmsg), errmsg, errmsg); \
     class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),                                   \
-               errmsg,                                                                   \
                "In input file, you can only enter one of %s, %s, choose one",            \
                name1,                                                                    \
                name2);                                                                   \

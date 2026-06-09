@@ -34,7 +34,7 @@ int readDoubleList(
     *found = pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
   }
   catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
+    class_stop("%s", e.what());
   }
   return _SUCCESS_;
 }
@@ -95,13 +95,11 @@ int InputModule::file_content_from_arguments(int argc,
       }
       if (extension == ".ini") {
         class_test(!input_file.empty(),
-                   errmsg,
                    "You have passed more than one input file with extension '.ini', choose one.");
         input_file = argv[i];
       }
       else if (extension == ".pre") {
         class_test(!precision_file.empty(),
-                   errmsg,
                    "You have passed more than one precision with extension '.pre', choose one.");
         precision_file = argv[i];
       }
@@ -238,9 +236,10 @@ void InputModule::ConstructSpecies() {
   {
     int flag = _FALSE_;
     int val  = 0;
-    class_call(parser_read_int(&file_content_, "input_verbose", &val, &flag, error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(parser_read_int(&file_content_, "input_verbose", &val, &flag, buf), buf);
+    }
     if (flag == _TRUE_)
       input_verbose = val;
   }
@@ -318,7 +317,7 @@ void InputModule::ConstructSpecies() {
 }
 
 int InputModule::ReadCoupledCluster() {
-  char* errmsg        = error_message_;
+  ErrorMsg errmsg;
   FileContent* pfc    = &file_content_;
   precision* ppr      = &precision_;
   background* pba     = &background_;
@@ -343,7 +342,6 @@ int InputModule::ReadCoupledCluster() {
   class_call(parser_read_double(pfc, "N_dg", &param2, &flag2, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "xi_idr", &param3, &flag3, errmsg), errmsg, errmsg);
   class_test(class_at_least_two_of_three(flag1, flag2, flag3),
-             errmsg,
              "In input file, you can only enter one of N_idr, N_dg or xi_idr, choose one");
 
   double T_idr_local = 0.;
@@ -401,7 +399,6 @@ int InputModule::ReadCoupledCluster() {
   class_call(parser_read_double(pfc, "Omega_cdm", &param1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "omega_cdm", &param2, &flag2, errmsg), errmsg, errmsg);
   class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-             errmsg,
              "In input file, you can only enter one of Omega_cdm or omega_cdm, choose one");
   if (flag1 == _TRUE_) {
     omega0_cdm   = param1;
@@ -428,7 +425,6 @@ int InputModule::ReadCoupledCluster() {
   class_call(parser_read_double(pfc, "omega_idm_dr", &param2, &flag2, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "f_idm_dr", &param3, &flag3, errmsg), errmsg, errmsg);
   class_test(class_at_least_two_of_three(flag1, flag2, flag3),
-             errmsg,
              "In input file, you can only enter one of Omega_idm_dr, omega_idm_dr or f_idm_dr, "
              "choose one");
 
@@ -439,13 +435,11 @@ int InputModule::ReadCoupledCluster() {
 
   if (flag3 == _TRUE_) {
     class_test((param3 < 0.) || (param3 > 1.),
-               errmsg,
                "The fraction of interacting DM with DR must be between 0 and 1, you asked for "
                "f_idm_dr=%e",
                param3);
     const double cdm_for_frac = omega_budget_.cdm.value_or(0.);
     class_test((param3 > 0.) && (cdm_for_frac == 0.),
-               errmsg,
                "If you want a fraction of interacting DM with DR, to be consistent, you should not "
                "set the fraction of CDM to zero");
 
@@ -466,7 +460,6 @@ int InputModule::ReadCoupledCluster() {
   class_call(parser_read_double(pfc, "Omega_dcdmdr", &param1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "omega_dcdmdr", &param2, &flag2, errmsg), errmsg, errmsg);
   class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-             errmsg,
              "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose one");
   if (flag1 == _TRUE_)
     omega_budget_.dcdmdr = param1;
@@ -493,7 +486,6 @@ int InputModule::ReadCoupledCluster() {
   const int all_drmd = (flag1 == _TRUE_) && (flag2 == _TRUE_) && (flag3 == _TRUE_) &&
                        (flag4 == _TRUE_);
   class_test(any_drmd && !all_drmd,
-             errmsg,
              "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters are "
              "'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
 
@@ -508,7 +500,6 @@ int InputModule::ReadCoupledCluster() {
                              pba->Omega0_g;
     if (f_idm_drmd_local > 0) {
       class_test((z_stop_drmd > 200000.),
-                 errmsg,
                  "z_stop is chosen too large. If you want to probe z_stop > 1000000 you need to "
                  "start evolving perturbations earlier in CLASS by changing the precision "
                  "settings. Also you should check that the exponential suppression factor does not "
@@ -518,13 +509,11 @@ int InputModule::ReadCoupledCluster() {
 
   if (f_idm_drmd_local > 0) {
     class_test((f_idm_drmd_local > 1.),
-               errmsg,
                "The fraction of interacting DM with DR must be between 0 and 1, you asked for "
                "f_idm_drmd=%e",
                f_idm_drmd_local);
     const double cdm_for_drmd = omega_budget_.cdm.value_or(0.);
     class_test((cdm_for_drmd == 0.),
-               errmsg,
                "If you want a fraction of interacting DM with DRMD, to be consistent, you should "
                "not set the fraction of CDM to zero");
 
@@ -550,7 +539,7 @@ int InputModule::ReadCoupledCluster() {
  */
 
 void InputModule::WriteParameterFiles() {
-  char* errmsg     = error_message_;
+  ErrorMsg errmsg;
   FileContent* pfc = &file_content_;
 
   int flag1;
@@ -569,8 +558,8 @@ void InputModule::WriteParameterFiles() {
 
     FILE* param_output;
     FILE* param_unused;
-    class_open(param_output, param_output_name.c_str(), "w", errmsg);
-    class_open(param_unused, param_unused_name.c_str(), "w", errmsg);
+    class_open(param_output, param_output_name.c_str(), "w");
+    class_open(param_unused, param_unused_name.c_str(), "w");
 
     fprintf(param_output, "# List of input/precision parameters actually read\n");
     fprintf(param_output, "# (all other parameters set to default values)\n");
@@ -615,13 +604,11 @@ int InputModule::input_read_precisions() {
   precision* ppr = &precision_;
   int flag1;
 
-  class_call(parser_read_string(&file_content_,
-                                "class_dir",
-                                ppr->class_dir,
-                                &flag1,
-                                error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(parser_read_string(&file_content_, "class_dir", ppr->class_dir, &flag1, buf),
+                       buf);
+  }
   if (flag1 == _FALSE_) {
     ppr->class_dir = __CLASSDIR__;
   }
@@ -640,7 +627,6 @@ int InputModule::input_read_precisions() {
   ppr->parse(file_content_);
 
   class_test(ppr->smallest_allowed_variation < 0,
-             ppr->error_message,
              "smallest_allowed_variation = %e < 0",
              ppr->smallest_allowed_variation);
 
@@ -655,7 +641,7 @@ void InputModule::ReadContext() {
   /** Summary: */
 
   /** - define local variables */
-  char* errmsg     = error_message_;
+  ErrorMsg errmsg;
   FileContent* pfc = &file_content_;
   precision* ppr   = &precision_;      /* for precision parameters */
   background* pba  = &background_;     /* for cosmological background */
@@ -728,7 +714,6 @@ void InputModule::ReadContext() {
   class_call(parser_read_double(pfc, "H0", &param1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "h", &param2, &flag2, errmsg), errmsg, errmsg);
   class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
-             errmsg,
              "In input file, you cannot enter both h and H0, choose one");
   if (flag1 == _TRUE_) {
     pba->H0 = param1 * 1.e3 / _c_;
@@ -745,7 +730,6 @@ void InputModule::ReadContext() {
    *  has itself set the trial h. h keeps its default; DoShooting seeds and solves it. */
   class_call(parser_read_double(pfc, "100*theta_s", &param3, &flag3, errmsg), errmsg, errmsg);
   class_test((flag3 == _TRUE_) && (flag1 == _TRUE_ || flag2 == _TRUE_) && !pfc->is_shooting,
-             errmsg,
              "In input file, you cannot enter both 100*theta_s and h (or H0), choose one");
 
   /** - Omega_0_g (photons) and T_cmb */
@@ -753,7 +737,6 @@ void InputModule::ReadContext() {
   class_call(parser_read_double(pfc, "Omega_g", &param2, &flag2, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "omega_g", &param3, &flag3, errmsg), errmsg, errmsg);
   class_test(class_at_least_two_of_three(flag1, flag2, flag3),
-             errmsg,
              "In input file, you can only enter one of T_cmb, Omega_g or omega_g, choose one");
 
   if (class_none_of_three(flag1, flag2, flag3)) {
@@ -783,7 +766,6 @@ void InputModule::ReadContext() {
   class_call(parser_read_double(pfc, "Omega_b", &param1, &flag1, errmsg), errmsg, errmsg);
   class_call(parser_read_double(pfc, "omega_b", &param2, &flag2, errmsg), errmsg, errmsg);
   class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-             errmsg,
              "In input file, you can only enter one of Omega_b or omega_b, choose one");
   if (flag1 == _TRUE_)
     pba->Omega0_b = param1;
@@ -807,7 +789,6 @@ void InputModule::ReadContext() {
              errmsg);
   if (flag2 == _TRUE_) {
     class_test(flag1 == _TRUE_,
-               errmsg,
                "In input file, you cannot enter both log10_G_eff_ur and G_eff_ur, choose one");
     ppt->G_eff_ur = pow(10.0, ppt->G_eff_ur);
   }
@@ -851,7 +832,6 @@ void InputModule::ReadContext() {
   class_call(parser_read_double(pfc, "Omega_scf", &param3, &flag3, errmsg), errmsg, errmsg);
 
   class_test((flag1 == _TRUE_) && (flag2 == _TRUE_) && ((flag3 == _FALSE_) || (param3 >= 0.)),
-             errmsg,
              "In input file, either Omega_Lambda or Omega_fld must be left unspecified, except if "
              "Omega_scf is set and <0.0, in which case the contribution from the scalar field will "
              "be the free parameter.");
@@ -887,7 +867,6 @@ void InputModule::ReadContext() {
   /** - Test that the user have not specified Omega_scf = -1 but left either
       Omega_lambda or Omega_fld unspecified:*/
   class_test(((flag1 == _FALSE_) || (flag2 == _FALSE_)) && ((flag3 == _TRUE_) && (param3 < 0.)),
-             errmsg,
              "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar "
              "field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
@@ -909,7 +888,7 @@ void InputModule::ReadContext() {
  */
 void InputModule::ReadDerived() {
   /** - define local variables */
-  char* errmsg     = error_message_;
+  ErrorMsg errmsg;
   FileContent* pfc = &file_content_;
   precision* ppr   = &precision_;      /* for precision parameters */
   background* pba  = &background_;     /* for cosmological background */
@@ -1002,7 +981,6 @@ void InputModule::ReadDerived() {
     }
 
     class_test(flag2 == _FALSE_,
-               errmsg,
                "could not identify reionization_parametrization value, check that it is one of "
                "'reio_none', 'reio_camb', 'reio_bins_tanh', 'reio_half_tanh', 'reio_many_tanh', "
                "'reio_inter'...");
@@ -1013,7 +991,6 @@ void InputModule::ReadDerived() {
     class_call(parser_read_double(pfc, "z_reio", &param1, &flag1, errmsg), errmsg, errmsg);
     class_call(parser_read_double(pfc, "tau_reio", &param2, &flag2, errmsg), errmsg, errmsg);
     class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
-               errmsg,
                "In input file, you can only enter one of z_reio or tau_reio, choose one");
     if (flag1 == _TRUE_) {
       pth->z_reio        = param1;
@@ -1038,7 +1015,6 @@ void InputModule::ReadDerived() {
                errmsg);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->binned_reio_z_storage.size()) != pth->binned_reio_num,
-               errmsg,
                "Number of entries in binned_reio_z does not match expected number, %d.",
                pth->binned_reio_num);
     pth->binned_reio_z = pth->binned_reio_z_storage.data();
@@ -1047,7 +1023,6 @@ void InputModule::ReadDerived() {
                errmsg);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->binned_reio_xe_storage.size()) != pth->binned_reio_num,
-               errmsg,
                "Number of entries in binned_reio_xe does not match expected number, %d.",
                pth->binned_reio_num);
     pth->binned_reio_xe = pth->binned_reio_xe_storage.data();
@@ -1062,7 +1037,6 @@ void InputModule::ReadDerived() {
                errmsg);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->many_tanh_z_storage.size()) != pth->many_tanh_num,
-               errmsg,
                "Number of entries in many_tanh_z does not match expected number, %d.",
                pth->many_tanh_num);
     pth->many_tanh_z = pth->many_tanh_z_storage.data();
@@ -1071,7 +1045,6 @@ void InputModule::ReadDerived() {
                errmsg);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->many_tanh_xe_storage.size()) != pth->many_tanh_num,
-               errmsg,
                "Number of entries in many_tanh_xe does not match expected number, %d.",
                pth->many_tanh_num);
     pth->many_tanh_xe = pth->many_tanh_xe_storage.data();
@@ -1086,7 +1059,6 @@ void InputModule::ReadDerived() {
                errmsg);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->reio_inter_z_storage.size()) != pth->reio_inter_num,
-               errmsg,
                "Number of entries in reio_inter_z does not match expected number, %d.",
                pth->reio_inter_num);
     pth->reio_inter_z = pth->reio_inter_z_storage.data();
@@ -1095,7 +1067,6 @@ void InputModule::ReadDerived() {
                errmsg);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->reio_inter_xe_storage.size()) != pth->reio_inter_num,
-               errmsg,
                "Number of entries in reio_inter_xe does not match expected number, %d.",
                pth->reio_inter_num);
     pth->reio_inter_xe = pth->reio_inter_xe_storage.data();
@@ -1124,9 +1095,7 @@ void InputModule::ReadDerived() {
           pth->has_on_the_spot = _FALSE_;
         }
         else {
-          class_stop(errmsg,
-                     "incomprehensible input '%s' for the field 'on the spot'",
-                     string1.c_str());
+          class_stop("incomprehensible input '%s' for the field 'on the spot'", string1.c_str());
         }
       }
     }
@@ -1147,8 +1116,7 @@ void InputModule::ReadDerived() {
         pth->compute_damping_scale = _FALSE_;
       }
       else {
-        class_stop(errmsg,
-                   "incomprehensible input '%s' for the field 'compute damping scale'",
+        class_stop("incomprehensible input '%s' for the field 'compute damping scale'",
                    string1.c_str());
       }
     }
@@ -1270,7 +1238,6 @@ void InputModule::ReadDerived() {
 
       class_test((ppt->switch_sw == 0) && (ppt->switch_eisw == 0) && (ppt->switch_lisw == 0) &&
                      (ppt->switch_dop == 0) && (ppt->switch_pol == 0),
-                 errmsg,
                  "In the field 'output', you selected CMB temperature, but in the field "
                  "'temperature contributions', you removed all contributions");
 
@@ -1295,7 +1262,6 @@ void InputModule::ReadDerived() {
 
       class_test((ppt->has_nc_density == _FALSE_) && (ppt->has_nc_rsd == _FALSE_) &&
                      (ppt->has_nc_lens == _FALSE_) && (ppt->has_nc_gr == _FALSE_),
-                 errmsg,
                  "In the field 'output', you selected number count Cl's, but in the field 'number "
                  "count contributions', you removed all contributions");
     }
@@ -1335,7 +1301,6 @@ void InputModule::ReadDerived() {
         ppt->has_tensors = _TRUE_;
 
       class_test(class_none_of_three(ppt->has_scalars, ppt->has_vectors, ppt->has_tensors),
-                 errmsg,
                  "You wrote: modes='%s'. Could not identify any of the modes ('s', 'v', 't') in "
                  "such input",
                  string1.c_str());
@@ -1369,7 +1334,6 @@ void InputModule::ReadDerived() {
 
         class_test(ppt->has_ad == _FALSE_ && ppt->has_bi == _FALSE_ && ppt->has_cdi == _FALSE_ &&
                        ppt->has_nid == _FALSE_ && ppt->has_niv == _FALSE_,
-                   errmsg,
                    "You wrote: ic='%s'. Could not identify any of the initial conditions ('ad', "
                    "'bi', 'cdi', 'nid', 'niv') in such input",
                    string1.c_str());
@@ -1378,18 +1342,15 @@ void InputModule::ReadDerived() {
 
     else {
       class_test(ppt->has_cl_cmb_lensing_potential == _TRUE_,
-                 errmsg,
                  "Inconsistency: you want C_l's for cmb lensing potential, but no scalar modes\n");
 
       class_test(ppt->has_pk_matter == _TRUE_,
-                 errmsg,
                  "Inconsistency: you want P(k) of matter, but no scalar modes\n");
     }
 
     if (ppt->has_vectors == _TRUE_) {
       class_test(
           (ppt->has_cl_cmb_temperature == _FALSE_) && (ppt->has_cl_cmb_polarization == _FALSE_),
-          errmsg,
           "inconsistent input: you asked for vectors, so you should have at least one non-zero "
           "tensor source type (temperature or polarization). Please adjust your input.");
     }
@@ -1397,7 +1358,6 @@ void InputModule::ReadDerived() {
     if (ppt->has_tensors == _TRUE_) {
       class_test(
           (ppt->has_cl_cmb_temperature == _FALSE_) && (ppt->has_cl_cmb_polarization == _FALSE_),
-          errmsg,
           "inconsistent input: you asked for tensors, so you should have at least one non-zero "
           "tensor source type (temperature or polarization). Please adjust your input.");
     }
@@ -1434,7 +1394,6 @@ void InputModule::ReadDerived() {
       flag2                     = _TRUE_;
     }
     class_test(flag2 == _FALSE_,
-               errmsg,
                "could not identify primordial spectrum type, check that it is one of "
                "'analytic_pk', 'two_scales', 'inflation_V', 'inflation_H', 'external_Pk'...");
   }
@@ -1444,14 +1403,14 @@ void InputModule::ReadDerived() {
   if (ppm->primordial_spec_type == two_scales) {
     class_read_double("k1", k1);
     class_read_double("k2", k2);
-    class_test(k1 <= 0., errmsg, "enter strictly positive scale k1");
-    class_test(k2 <= 0., errmsg, "enter strictly positive scale k2");
+    class_test(k1 <= 0., "enter strictly positive scale k1");
+    class_test(k2 <= 0., "enter strictly positive scale k2");
 
     if (ppt->has_scalars == _TRUE_) {
       class_read_double("P_{RR}^1", prr1);
       class_read_double("P_{RR}^2", prr2);
-      class_test(prr1 <= 0., errmsg, "enter strictly positive scale P_{RR}^1");
-      class_test(prr2 <= 0., errmsg, "enter strictly positive scale P_{RR}^2");
+      class_test(prr1 <= 0., "enter strictly positive scale P_{RR}^1");
+      class_test(prr2 <= 0., "enter strictly positive scale P_{RR}^2");
 
       ppm->n_s = log(prr2 / prr1) / log(k2 / k1) + 1.;
       ppm->A_s = prr1 * exp((ppm->n_s - 1.) * log(ppm->k_pivot / k1));
@@ -1464,14 +1423,11 @@ void InputModule::ReadDerived() {
         class_read_double("|P_{RI}^2|", pri2);
 
         class_test(pii1 <= 0.,
-                   errmsg,
                    "since you request iso modes, you should have P_{ii}^1 strictly positive");
         class_test(pii2 < 0.,
-                   errmsg,
                    "since you request iso modes, you should have P_{ii}^2 positive or eventually "
                    "null");
         class_test(pri2 < 0.,
-                   errmsg,
                    "by definition, you should have |P_{ri}^2| positive or eventually null");
 
         flag1 = _FALSE_;
@@ -1503,36 +1459,26 @@ void InputModule::ReadDerived() {
             n_iso = ppm->n_s;
           }
           else {
-            class_test((pii1 == 0.) || (pii2 == 0.) || (pii1 * pii2 < 0.),
-                       errmsg,
-                       "should NEVER happen");
+            class_test((pii1 == 0.) || (pii2 == 0.) || (pii1 * pii2 < 0.), "should NEVER happen");
             n_iso = log(pii2 / pii1) / log(k2 / k1) + 1.;
           }
-          class_test(pri1 == 0,
-                     errmsg,
-                     "the general isocurvature case requires a non-zero P_{RI}^1");
+          class_test(pri1 == 0, "the general isocurvature case requires a non-zero P_{RI}^1");
           if (pri2 == 0.) {
             n_cor = 0.;
           }
           else {
-            class_test((pri1 == 0.) || (pri2 <= 0.) || (pii1 * pii2 < 0),
-                       errmsg,
-                       "should NEVER happen");
+            class_test((pri1 == 0.) || (pri2 <= 0.) || (pii1 * pii2 < 0), "should NEVER happen");
             n_cor = log(pri2 / fabs(pri1)) / log(k2 / k1) - 0.5 * (ppm->n_s + n_iso - 2.);
           }
-          class_test((pii1 * prr1 <= 0.), errmsg, "should NEVER happen");
+          class_test((pii1 * prr1 <= 0.), "should NEVER happen");
           class_test(fabs(pri1) / sqrt(pii1 * prr1) > 1,
-                     errmsg,
                      "too large ad-iso cross-correlation in k1");
           class_test(fabs(pri1) / sqrt(pii1 * prr1) * exp(n_cor * log(k2 / k1)) > 1,
-                     errmsg,
                      "too large ad-iso cross-correlation in k2");
           c_cor = -pri1 / sqrt(pii1 * prr1) * exp(n_cor * log(ppm->k_pivot / k1));
         }
         /* formula for f_iso valid in all cases */
-        class_test((pii1 == 0.) || (prr1 == 0.) || (pii1 * prr1 < 0.),
-                   errmsg,
-                   "should NEVER happen");
+        class_test((pii1 == 0.) || (prr1 == 0.) || (pii1 * prr1 < 0.), "should NEVER happen");
         f_iso = sqrt(pii1 / prr1) * exp(0.5 * (n_iso - ppm->n_s) * log(ppm->k_pivot / k1));
       }
 
@@ -1577,7 +1523,6 @@ void InputModule::ReadDerived() {
       class_call(parser_read_double(pfc, "sigma8", &param3, &flag3, errmsg), errmsg, errmsg);
       class_call(parser_read_double(pfc, "S8", &param4, &flag4, errmsg), errmsg, errmsg);
       class_test(class_at_least_two_of_four(flag1, flag2, flag3, flag4),
-                 errmsg,
                  "In input file, you can only enter one of A_s, ln10^{10}A_s, sigma8 and S8, "
                  "choose one");
       if (flag1 == _TRUE_)
@@ -1586,7 +1531,7 @@ void InputModule::ReadDerived() {
         ppm->A_s = exp(param2) * 1.e-10;
       else if (flag3 == _TRUE_) {
         ppm->sigma8 = param3;
-        class_test(param3 < 0., errmsg, "sigma8 should be non-negative");
+        class_test(param3 < 0., "sigma8 should be non-negative");
       }
       else if (flag4 == _TRUE_) {
         // CDM read from the built species (ReadDerived runs after ConstructSpecies).
@@ -1594,7 +1539,7 @@ void InputModule::ReadDerived() {
                                              ? all_species_.at("CDM")->GetOmega0()
                                              : 0.0;
         ppm->sigma8 = param4 / pow((pba->Omega0_b + Omega0_cdm_for_S8) / 0.3, 0.5);
-        class_test(param4 < 0., errmsg, "S8 should be non-negative");
+        class_test(param4 < 0., "S8 should be non-negative");
       }
 
       if (ppt->has_ad == _TRUE_) {
@@ -1749,12 +1694,8 @@ void InputModule::ReadDerived() {
         class_read_double("PSR_3", PSR3);
         class_read_double("PSR_4", PSR4);
 
-        class_test(PSR0 <= 0.,
-                   errmsg,
-                   "inconsistent parametrization of polynomial inflation potential");
-        class_test(PSR1 <= 0.,
-                   errmsg,
-                   "inconsistent parametrization of polynomial inflation potential");
+        class_test(PSR0 <= 0., "inconsistent parametrization of polynomial inflation potential");
+        class_test(PSR1 <= 0., "inconsistent parametrization of polynomial inflation potential");
 
         R0 = PSR0;
         R1 = PSR1 * 16. * _PI_;
@@ -1785,12 +1726,8 @@ void InputModule::ReadDerived() {
           class_read_double("R_3", R3);
           class_read_double("R_4", R4);
 
-          class_test(R0 <= 0.,
-                     errmsg,
-                     "inconsistent parametrization of polynomial inflation potential");
-          class_test(R1 <= 0.,
-                     errmsg,
-                     "inconsistent parametrization of polynomial inflation potential");
+          class_test(R0 <= 0., "inconsistent parametrization of polynomial inflation potential");
+          class_test(R1 <= 0., "inconsistent parametrization of polynomial inflation potential");
 
           ppm->V0 = R0 * R1 * 3. / 128. / _PI_;
           ppm->V1 = -sqrt(R1) * ppm->V0;
@@ -1839,9 +1776,7 @@ void InputModule::ReadDerived() {
         class_read_double("H_4", ppm->H4);
       }
 
-      class_test(ppm->H0 <= 0.,
-                 errmsg,
-                 "inconsistent parametrization of polynomial inflation potential");
+      class_test(ppm->H0 <= 0., "inconsistent parametrization of polynomial inflation potential");
     }
   }
 
@@ -1856,9 +1791,9 @@ void InputModule::ReadDerived() {
         ppm->potential = higgs_inflation;
       }
       else {
-        class_stop(errmsg,
-                   "did not recognize input parameter 'potential': should be one of 'polynomial' "
-                   "or 'higgs_inflation'");
+        class_stop(
+            "did not recognize input parameter 'potential': should be one of 'polynomial' "
+            "or 'higgs_inflation'");
       }
     }
 
@@ -1874,7 +1809,6 @@ void InputModule::ReadDerived() {
     class_call(parser_read_string(pfc, "N_star", string2, &flag2, errmsg), errmsg, errmsg);
 
     class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
-               errmsg,
                "In input file, you can only enter one of ln_aH_ratio or N_star, the two are not "
                "compatible");
 
@@ -1906,14 +1840,14 @@ void InputModule::ReadDerived() {
         ppm->behavior = analytical;
       }
       else {
-        class_stop(errmsg, "Your entry for 'inflation behavior' could not be understood");
+        class_stop("Your entry for 'inflation behavior' could not be understood");
       }
     }
   }
 
   else if (ppm->primordial_spec_type == external_Pk) {
     class_call(parser_read_string(pfc, "command", string1, &flag1, errmsg), errmsg, errmsg);
-    class_test(string1.empty(), errmsg, "You omitted to write a command for the external Pk");
+    class_test(string1.empty(), "You omitted to write a command for the external Pk");
 
     ppm->command = string1;
     class_read_double("custom1", ppm->custom1);
@@ -1932,20 +1866,16 @@ void InputModule::ReadDerived() {
   if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_H) ||
       (ppm->primordial_spec_type == inflation_V_end)) {
     class_test(ppt->has_scalars == _FALSE_,
-               errmsg,
                "inflationary module cannot work if you do not ask for scalar modes");
 
     class_test(ppt->has_vectors == _TRUE_,
-               errmsg,
                "inflationary module cannot work if you ask for vector modes");
 
     class_test(ppt->has_tensors == _FALSE_,
-               errmsg,
                "inflationary module cannot work if you do not ask for tensor modes");
 
     class_test(ppt->has_bi == _TRUE_ || ppt->has_cdi == _TRUE_ || ppt->has_nid == _TRUE_ ||
                    ppt->has_niv == _TRUE_,
-               errmsg,
                "inflationary module cannot work if you ask for isocurvature modes");
   }
 
@@ -1980,11 +1910,11 @@ void InputModule::ReadDerived() {
       ple->has_lensed_cls = _TRUE_;
     }
     else {
-      class_stop(errmsg,
-                 "you asked for lensed CMB Cls, but this requires a minimal number of options: "
-                 "'modes' should include 's', 'output' should include 'tCl' and/or 'pCL', and "
-                 "also, importantly, 'lCl', the CMB lensing potential spectrum. You forgot one of "
-                 "those in your input.");
+      class_stop(
+          "you asked for lensed CMB Cls, but this requires a minimal number of options: "
+          "'modes' should include 's', 'output' should include 'tCl' and/or 'pCL', and "
+          "also, importantly, 'lCl', the CMB lensing potential spectrum. You forgot one of "
+          "those in your input.");
     }
   }
 
@@ -1999,7 +1929,6 @@ void InputModule::ReadDerived() {
     class_call(parser_read_double(pfc, "P_k_max_h/Mpc", &param1, &flag1, errmsg), errmsg, errmsg);
     class_call(parser_read_double(pfc, "P_k_max_1/Mpc", &param2, &flag2, errmsg), errmsg, errmsg);
     class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
-               errmsg,
                "In input file, you cannot enter both P_k_max_h/Mpc and P_k_max_1/Mpc, choose one");
     if (flag1 == _TRUE_) {
       ppt->k_max_for_pk = param1 * pba->h;
@@ -2014,7 +1943,6 @@ void InputModule::ReadDerived() {
     if (flag1 == _TRUE_) {
       int1 = static_cast<int>(zPkValues.size());
       class_test(int1 > _Z_PK_NUM_MAX_,
-                 errmsg,
                  "you want to write some output for %d different values of z, hence you should "
                  "increase _Z_PK_NUM_MAX_ in include/output.h to at least this number",
                  int1);
@@ -2052,7 +1980,7 @@ void InputModule::ReadDerived() {
         ppt->selection = dirac;
       }
       else {
-        class_stop(errmsg, "In selection function input: type '%s' is unclear", string1.c_str());
+        class_stop("In selection function input: type '%s' is unclear", string1.c_str());
       }
     }
 
@@ -2065,7 +1993,6 @@ void InputModule::ReadDerived() {
       int1 = static_cast<int>(selectionValues.size());
 
       class_test(int1 > _SELECTION_NUM_MAX_,
-                 errmsg,
                  "you want to compute density Cl's for %d different bins, hence you should "
                  "increase _SELECTION_NUM_MAX_ in include/perturbations.h to at least this number",
                  int1);
@@ -2073,7 +2000,6 @@ void InputModule::ReadDerived() {
       ppt->selection_num = int1;
       for (i = 0; i < int1; i++) {
         class_test((selectionValues[i] < 0.) || (selectionValues[i] > 1000.),
-                   errmsg,
                    "input of selection functions: you asked for a mean redshift equal to %e, "
                    "sounds odd",
                    selectionValues[i]);
@@ -2082,7 +2008,6 @@ void InputModule::ReadDerived() {
       /* first set all widths to default; correct eventually later */
       for (i = 1; i < int1; i++) {
         class_test(ppt->selection_mean[i] <= ppt->selection_mean[i - 1],
-                   errmsg,
                    "input of selection functions: the list of mean redshifts must be passed in "
                    "growing order; you entered %e before %e",
                    ppt->selection_mean[i - 1],
@@ -2111,13 +2036,13 @@ void InputModule::ReadDerived() {
           }
         }
         else {
-          class_stop(errmsg,
-                     "In input for selection function, you asked for %d bin centers and %d bin "
-                     "widths; number of bins unclear; you should pass either one bin width (common "
-                     "to all bins) or %d bin widths",
-                     ppt->selection_num,
-                     int1,
-                     ppt->selection_num);
+          class_stop(
+              "In input for selection function, you asked for %d bin centers and %d bin "
+              "widths; number of bins unclear; you should pass either one bin width (common "
+              "to all bins) or %d bin widths",
+              ppt->selection_num,
+              int1,
+              ppt->selection_num);
         }
       }
 
@@ -2140,13 +2065,13 @@ void InputModule::ReadDerived() {
           }
         }
         else {
-          class_stop(errmsg,
-                     "In input for selection function, you asked for %d bin centers and %d bin "
-                     "biases; number of bins unclear; you should pass either one bin bias (common "
-                     "to all bins) or %d bin biases",
-                     ppt->selection_num,
-                     int1,
-                     ppt->selection_num);
+          class_stop(
+              "In input for selection function, you asked for %d bin centers and %d bin "
+              "biases; number of bins unclear; you should pass either one bin bias (common "
+              "to all bins) or %d bin biases",
+              ppt->selection_num,
+              int1,
+              ppt->selection_num);
         }
       }
 
@@ -2173,13 +2098,13 @@ void InputModule::ReadDerived() {
           }
         }
         else {
-          class_stop(errmsg,
-                     "In input for selection function, you asked for %d bin centers and %d bin "
-                     "biases; number of bins unclear; you should pass either one bin bias (common "
-                     "to all bins) or %d bin biases",
-                     ppt->selection_num,
-                     int1,
-                     ppt->selection_num);
+          class_stop(
+              "In input for selection function, you asked for %d bin centers and %d bin "
+              "biases; number of bins unclear; you should pass either one bin bias (common "
+              "to all bins) or %d bin biases",
+              ppt->selection_num,
+              int1,
+              ppt->selection_num);
         }
       }
     }
@@ -2187,8 +2112,7 @@ void InputModule::ReadDerived() {
     if (ppt->selection_num > 1) {
       class_read_int("non_diagonal", psp->non_diag);
       if ((psp->non_diag < 0) || (psp->non_diag >= ppt->selection_num))
-        class_stop(errmsg,
-                   "Input for non_diagonal is %d, while it is expected to be between 0 and %d\n",
+        class_stop("Input for non_diagonal is %d, while it is expected to be between 0 and %d\n",
                    psp->non_diag,
                    ppt->selection_num - 1);
     }
@@ -2220,7 +2144,6 @@ void InputModule::ReadDerived() {
     flag1 = _FALSE_;
     class_call(parser_read_double(pfc, "bias", &param1, &flag1, errmsg), errmsg, errmsg);
     class_test(flag1 == _TRUE_,
-               errmsg,
                "the input parameter 'bias' is obsolete, because you can now pass an independent "
                "light-to-mass bias for each bin/selection function. The new input name is "
                "'selection_bias'. It can be set to a single number (common bias for all bins) or "
@@ -2229,7 +2152,6 @@ void InputModule::ReadDerived() {
     flag1 = _FALSE_;
     class_call(parser_read_double(pfc, "s_bias", &param1, &flag1, errmsg), errmsg, errmsg);
     class_test(flag1 == _TRUE_,
-               errmsg,
                "the input parameter 's_bias' is obsolete, because you can now pass an independent "
                "magnitude bias for each bin/selection function. The new input name is "
                "'selection_magnitude_bias'. It can be set to a single number (common magnitude "
@@ -2302,10 +2224,10 @@ void InputModule::ReadDerived() {
           (string1.find("CAMB") != std::string::npos))
         pop->output_format = camb_format;
       else
-        class_stop(errmsg,
-                   "You wrote: format='%s'. Could not identify any of the possible formats "
-                   "('class', 'CLASS', 'camb', 'CAMB')",
-                   string1.c_str());
+        class_stop(
+            "You wrote: format='%s'. Could not identify any of the possible formats "
+            "('class', 'CLASS', 'camb', 'CAMB')",
+            string1.c_str());
     }
   }
 
@@ -2315,7 +2237,6 @@ void InputModule::ReadDerived() {
 
   if (flag1 == _TRUE_) {
     class_test(ppt->has_perturbations == _FALSE_,
-               errmsg,
                "You requested non linear computation but no linear computation. You must set "
                "output to tCl or similar.");
 
@@ -2363,7 +2284,6 @@ void InputModule::ReadDerived() {
       class_call(parser_read_double(pfc, "c_min", &param3, &flag3, errmsg), errmsg, errmsg);
 
       class_test(((flag1 == _TRUE_) && ((flag2 == _TRUE_) || (flag3 == _TRUE_))),
-                 errmsg,
                  "In input file, you cannot enter both a baryonic feedback model and a choice of "
                  "baryonic feedback parameters, choose one of both methods");
 
@@ -2442,7 +2362,6 @@ void InputModule::ReadDerived() {
 
   class_test(ppr->ur_fluid_trigger_tau_over_tau_k ==
                  ppr->radiation_streaming_trigger_tau_over_tau_k,
-             errmsg,
              "please choose different values for precision parameters "
              "ur_fluid_trigger_tau_over_tau_k and radiation_streaming_trigger_tau_over_tau_k, in "
              "order to avoid switching two approximation schemes at the same time");
@@ -2450,20 +2369,17 @@ void InputModule::ReadDerived() {
   if (omega_budget_.idr.value_or(0.) != 0.) {
     class_test(ppr->idr_streaming_trigger_tau_over_tau_k ==
                    ppr->radiation_streaming_trigger_tau_over_tau_k,
-               errmsg,
                "please choose different values for precision parameters "
                "dark_radiation_trigger_tau_over_tau_k and "
                "radiation_streaming_trigger_tau_over_tau_k, in order to avoid switching two "
                "approximation schemes at the same time");
 
     class_test(ppr->idr_streaming_trigger_tau_over_tau_k == ppr->ur_fluid_trigger_tau_over_tau_k,
-               errmsg,
                "please choose different values for precision parameters "
                "dark_radiation_trigger_tau_over_tau_k and ur_fluid_trigger_tau_over_tau_k, in "
                "order to avoid switching two approximation schemes at the same time");
 
     class_test(ppr->idr_streaming_trigger_tau_over_tau_k == ppr->ncdm_fluid_trigger_tau_over_tau_k,
-               errmsg,
                "please choose different values for precision parameters "
                "dark_radiation_trigger_tau_over_tau_k and ncdm_fluid_trigger_tau_over_tau_k, in "
                "order to avoid switching two approximation schemes at the same time");
@@ -2527,7 +2443,6 @@ void InputModule::ReadDerived() {
              errmsg);
 
   class_test(flag1 == _TRUE_,
-             errmsg,
              "You passed in input a precision parameter called "
              "l_switch_limber_for_cl_density_over_z. This syntax is deprecated since v2.5.0. "
              "Please use instead the two precision parameters l_switch_limber_for_nc_local_over_z, "
@@ -2566,7 +2481,6 @@ void InputModule::ReadDerived() {
   if (flag1 == _TRUE_) {
     int1 = static_cast<int>(kOutputValues.size());
     class_test(int1 > _MAX_NUMBER_OF_K_FILES_,
-               errmsg,
                "you want to write some output for %d different values of k, hence you should "
                "increase _MAX_NUMBER_OF_K_FILES_ in include/perturbations.h to at least this "
                "number",
@@ -2626,16 +2540,13 @@ void InputModule::ReadDerived() {
      unconditionally — a too-low l_max is a user-config error whether or not
      the species ends up active. */
   class_test(ppr->l_max_g < 4,
-             errmsg,
              "ppr->l_max_g should be at least 4, i.e. we must integrate at least over photon "
              "density, velocity, shear, third and fourth momentum");
-  class_test(ppr->l_max_pol_g < 4, errmsg, "ppr->l_max_pol_g should be at least 4");
+  class_test(ppr->l_max_pol_g < 4, "ppr->l_max_pol_g should be at least 4");
   class_test(ppr->l_max_ur < 4,
-             errmsg,
              "ppr->l_max_ur should be at least 4, i.e. we must integrate at least over "
              "neutrino/relic density, velocity, shear, third and fourth momentum");
   class_test(ppr->l_max_dr < 4,
-             errmsg,
              "ppr->l_max_dr should be at least 4, i.e. we must integrate at least over "
              "neutrino/relic density, velocity, shear, third and fourth momentum");
   // idr_nature now lives on the IDM_DR_IDR species. Preserve the original
@@ -2648,16 +2559,13 @@ void InputModule::ReadDerived() {
                                        .idr_nature()
                                  : idr_free_streaming;
   class_test((ppr->l_max_idr < 4) && (eff_idr_nature == idr_free_streaming),
-             errmsg,
              "ppr->l_max_idr should be at least 4, i.e. we must integrate at least over "
              "interacting dark radiation density, velocity, shear, third and fourth momentum");
   class_test(ppr->l_max_g_ten < 4,
-             errmsg,
              "ppr->l_max_g_ten should be at least 4, i.e. we must integrate at least over photon "
              "density, velocity, shear, third momentum");
-  class_test(ppr->l_max_pol_g_ten < 4, errmsg, "ppr->l_max_pol_g_ten should be at least 4");
+  class_test(ppr->l_max_pol_g_ten < 4, "ppr->l_max_pol_g_ten should be at least 4");
   class_test(ppr->l_max_ncdm < 4,
-             errmsg,
              "ppr->l_max_ncdm=%d should be at least 4, i.e. we must integrate at least "
              "over first four momenta of non-cold dark matter perturbed phase-space "
              "distribution",

@@ -43,3 +43,6 @@ cclassy.pxd
 classy/
 classy_community_ref.egg-info/
 .worktrees/
+
+# Local bit-identical baseline (machine-specific, never commit)
+python/baseline/

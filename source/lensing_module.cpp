@@ -100,10 +100,7 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
 
   std::vector<double> cl_lensed(lt_size_);
   for (int index_l = 0; index_l < l_values.size(); ++index_l) {
-    int status = lensing_cl_at_l(l_values[index_l], cl_lensed.data());
-    ThrowRuntimeErrorIf(status != _SUCCESS_,
-                        "Error in LensingModule::cl_output: %s",
-                        error_message_);
+    lensing_cl_at_l(l_values[index_l], cl_lensed.data());
     for (int i = 0; i < data_vectors.size(); ++i) {
       data_vectors[i][index_l + 2] = cl_lensed[indices[i]];
     }
@@ -122,25 +119,26 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
 
 int LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
   class_test(l > l_lensed_max_,
-             error_message_,
              "you asked for lensed Cls at l=%d, they were computed only up to l=%d, you should "
              "increase l_max_scalars or decrease the precision parameter delta_l_max",
              l,
              l_lensed_max_);
 
   int last_index;
-  class_call(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                      l_size_,
-                                      const_cast<double*>(cl_lens_.data()),
-                                      const_cast<double*>(ddcl_lens_.data()),
-                                      lt_size_,
-                                      l,
-                                      &last_index,
-                                      cl_lensed,
-                                      lt_size_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
+                                                l_size_,
+                                                const_cast<double*>(cl_lens_.data()),
+                                                const_cast<double*>(ddcl_lens_.data()),
+                                                lt_size_,
+                                                l,
+                                                &last_index,
+                                                cl_lensed,
+                                                lt_size_,
+                                                buf),
+                       buf);
+  }
 
   /* set to zero for the types such that l<l_max */
   for (int index_lt = 0; index_lt < lt_size_; index_lt++)
@@ -187,7 +185,7 @@ int LensingModule::lensing_init() {
   /** - initialize indices and allocate some of the arrays in the
       lensing structure */
 
-  class_call(lensing_indices(), error_message_, error_message_);
+  lensing_indices();
 
   /** - put all precision variables hare; will be stored later in precision structure */
   /** - Last element in \f$ \mu \f$ will be for \f$ \mu=1 \f$, needed for sigma2.
@@ -211,13 +209,15 @@ int LensingModule::lensing_init() {
   std::vector<double> w8(num_mu - 1);
 
   if (ppr->accurate_lensing == _TRUE_) {
-    class_call(quadrature_gauss_legendre(mu.data(),
-                                         w8.data(),
-                                         num_mu - 1,
-                                         ppr->tol_gauss_legendre,
-                                         error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(quadrature_gauss_legendre(mu.data(),
+                                                   w8.data(),
+                                                   num_mu - 1,
+                                                   ppr->tol_gauss_legendre,
+                                                   buf),
+                         buf);
+    }
   }
   else { /* Crude integration on [0,pi/16]: Riemann sum on theta */
 
@@ -337,7 +337,7 @@ int LensingModule::lensing_init() {
   }
 
   for (auto& task : dXX_tasks) {
-    class_call(task.get(), error_message_, error_message_);
+    task.get();
   }
 
   /** - compute \f$ Cgl(\mu)\f$, \f$ Cgl2(\mu) \f$ and sigma2(\f$\mu\f$) */
@@ -382,12 +382,7 @@ int LensingModule::lensing_init() {
   }
 
   for (int l = 2; l <= l_unlensed_max_; l++) {
-    class_call(spectra_module_->spectra_cl_at_l(l,
-                                                cl_unlensed.data(),
-                                                cl_md.data(),
-                                                cl_md_ic.data()),
-               psp->error_message,
-               error_message_);
+    spectra_module_->spectra_cl_at_l(l, cl_unlensed.data(), cl_md.data(), cl_md_ic.data());
     cl_tt[l] = cl_unlensed[index_lt_tt_];
     cl_pp[l] = cl_unlensed[index_lt_pp_];
     if (has_te_ == _TRUE_) {
@@ -549,50 +544,44 @@ int LensingModule::lensing_init() {
 
   /** - compute lensed \f$ C_l\f$'s by integration */
   if (has_tt_ == _TRUE_) {
-    class_call(lensing_lensed_cl_tt(ksi.data(), d00.data(), w8.data(), num_mu - 1),
-               error_message_,
-               error_message_);
+    lensing_lensed_cl_tt(ksi.data(), d00.data(), w8.data(), num_mu - 1);
     if (ppr->accurate_lensing == _FALSE_) {
-      class_call(lensing_addback_cl_tt(cl_tt.data()), error_message_, error_message_);
+      lensing_addback_cl_tt(cl_tt.data());
     }
   }
 
   if (has_te_ == _TRUE_) {
-    class_call(lensing_lensed_cl_te(ksiX.data(), d20.data(), w8.data(), num_mu - 1),
-               error_message_,
-               error_message_);
+    lensing_lensed_cl_te(ksiX.data(), d20.data(), w8.data(), num_mu - 1);
     if (ppr->accurate_lensing == _FALSE_) {
-      class_call(lensing_addback_cl_te(cl_te.data()), error_message_, error_message_);
+      lensing_addback_cl_te(cl_te.data());
     }
   }
 
   if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
-    class_call(lensing_lensed_cl_ee_bb(ksip.data(),
-                                       ksim.data(),
-                                       d22.data(),
-                                       d2m2.data(),
-                                       w8.data(),
-                                       num_mu - 1),
-               error_message_,
-               error_message_);
+    lensing_lensed_cl_ee_bb(ksip.data(),
+                            ksim.data(),
+                            d22.data(),
+                            d2m2.data(),
+                            w8.data(),
+                            num_mu - 1);
     if (ppr->accurate_lensing == _FALSE_) {
-      class_call(lensing_addback_cl_ee_bb(cl_ee.data(), cl_bb.data()),
-                 error_message_,
-                 error_message_);
+      lensing_addback_cl_ee_bb(cl_ee.data(), cl_bb.data());
     }
   }
 
   /** - spline computed \f$ C_l\f$'s in view of interpolation */
 
-  class_call(array_spline_table_lines(l_.data(),
-                                      l_size_,
-                                      cl_lens_.data(),
-                                      lt_size_,
-                                      ddcl_lens_.data(),
-                                      _SPLINE_EST_DERIV_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_lines(l_.data(),
+                                                l_size_,
+                                                cl_lens_.data(),
+                                                lt_size_,
+                                                ddcl_lens_.data(),
+                                                _SPLINE_EST_DERIV_,
+                                                buf),
+                       buf);
+  }
 
   /** - Exit **/
 
@@ -753,12 +742,10 @@ int LensingModule::lensing_indices() {
   }
 
   for (index_l = 0; index_l < l_size_; index_l++) {
-    class_call(spectra_module_->spectra_cl_at_l(l_[index_l],
-                                                &(cl_lens_[index_l * lt_size_]),
-                                                cl_md_ptrs.data(),
-                                                cl_md_ic_ptrs.data()),
-               psp->error_message,
-               error_message_);
+    spectra_module_->spectra_cl_at_l(l_[index_l],
+                                     &(cl_lens_[index_l * lt_size_]),
+                                     cl_md_ptrs.data(),
+                                     cl_md_ic_ptrs.data());
   }
 
   /* we want to output Cl_lensed up to the same l_max as Cl_unlensed

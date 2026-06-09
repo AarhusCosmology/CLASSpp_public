@@ -119,7 +119,7 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
   // If file-based PSD, read file and build spline table
   if (got_file_) {
     FILE* psdfile = fopen(psd_file_.c_str(), "r");
-    class_test(psdfile == nullptr, error_message_, "Could not open file %s!", psd_file_.c_str());
+    class_test(psdfile == nullptr, "Could not open file %s!", psd_file_.c_str());
     double tmp1, tmp2;
     int row = 0;
     while (fscanf(psdfile, "%lf %lf", &tmp1, &tmp2) == 2)
@@ -127,7 +127,6 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     rewind(psdfile);
     pbadist.tablesize = row;
     class_test(pbadist.tablesize < 2,
-               error_message_,
                "PSD file '%s' has %d data row(s); need at least 2 for spline interpolation",
                psd_file_.c_str(),
                row);
@@ -139,15 +138,17 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
       fscanf(psdfile, "%lf %lf", &pbadist.q[row], &pbadist.f0[row]);
     }
     fclose(psdfile);
-    class_call(array_spline_table_lines(pbadist.q.data(),
-                                        pbadist.tablesize,
-                                        pbadist.f0.data(),
-                                        1,
-                                        pbadist.d2f0.data(),
-                                        _SPLINE_EST_DERIV_,
-                                        error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_lines(pbadist.q.data(),
+                                                  pbadist.tablesize,
+                                                  pbadist.f0.data(),
+                                                  1,
+                                                  pbadist.d2f0.data(),
+                                                  _SPLINE_EST_DERIV_,
+                                                  buf),
+                         buf);
+    }
   }
 
   // Grey-body subclasses fill these and select a GB-specific default strategy;
@@ -164,38 +165,42 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     q_.resize(_QUADRATURE_MAX_);
     w_.resize(_QUADRATURE_MAX_);
     int q_size;
-    class_call(get_qsampling(q_.data(),
-                             w_.data(),
-                             &q_size,
-                             _QUADRATURE_MAX_,
-                             settings.tol_ncdm,
-                             pbadist.q.data(),
-                             pbadist.tablesize,
-                             TestFunction,
-                             DistributionFunction,
-                             &pbadist,
-                             error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(get_qsampling(q_.data(),
+                                       w_.data(),
+                                       &q_size,
+                                       _QUADRATURE_MAX_,
+                                       settings.tol_ncdm,
+                                       pbadist.q.data(),
+                                       pbadist.tablesize,
+                                       TestFunction,
+                                       DistributionFunction,
+                                       &pbadist,
+                                       buf),
+                         buf);
+    }
     q_.resize(q_size);
     w_.resize(q_size);
 
     q_bg_.resize(_QUADRATURE_MAX_BG_);
     w_bg_.resize(_QUADRATURE_MAX_BG_);
     int q_size_bg;
-    class_call(get_qsampling(q_bg_.data(),
-                             w_bg_.data(),
-                             &q_size_bg,
-                             _QUADRATURE_MAX_BG_,
-                             settings.tol_ncdm_bg,
-                             pbadist.q.data(),
-                             pbadist.tablesize,
-                             TestFunction,
-                             DistributionFunction,
-                             &pbadist,
-                             error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(get_qsampling(q_bg_.data(),
+                                       w_bg_.data(),
+                                       &q_size_bg,
+                                       _QUADRATURE_MAX_BG_,
+                                       settings.tol_ncdm_bg,
+                                       pbadist.q.data(),
+                                       pbadist.tablesize,
+                                       TestFunction,
+                                       DistributionFunction,
+                                       &pbadist,
+                                       buf),
+                         buf);
+    }
     q_bg_.resize(q_size_bg);
     w_bg_.resize(q_size_bg);
   }
@@ -204,20 +209,22 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     q_.resize(input_q_size_);
     w_.resize(input_q_size_);
     std::vector<double> dq_dummy(input_q_size_);
-    class_call(get_qsampling_manual(q_.data(),
-                                    w_.data(),
-                                    dq_dummy.data(),
-                                    input_q_size_,
-                                    qmax_,
-                                    (enum quadrature_method) strategy,
-                                    pbadist.q.data(),
-                                    pbadist.tablesize,
-                                    DistributionFunction,
-                                    &pbadist,
-                                    gb,
-                                    error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(get_qsampling_manual(q_.data(),
+                                              w_.data(),
+                                              dq_dummy.data(),
+                                              input_q_size_,
+                                              qmax_,
+                                              (enum quadrature_method) strategy,
+                                              pbadist.q.data(),
+                                              pbadist.tablesize,
+                                              DistributionFunction,
+                                              &pbadist,
+                                              gb,
+                                              buf),
+                         buf);
+    }
     q_bg_ = q_;
     w_bg_ = w_;
   }
@@ -227,7 +234,7 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
   for (int index_q = 0; index_q < static_cast<int>(q_.size()); index_q++) {
     double q = q_[index_q];
     double f0;
-    class_call(DistributionFunction(&pbadist, q, &f0), error_message_, error_message_);
+    DistributionFunction(&pbadist, q, &f0);
 
     double dq = 1., f0m2 = 0., f0p2 = 0.;
     for (int tolexp = _PSD_DERIVATIVE_EXP_MIN_; tolexp < _PSD_DERIVATIVE_EXP_MAX_; tolexp++) {
@@ -238,15 +245,15 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
       else
         dq = exp(tolexp) * (q_[index_q + 1] - q_[index_q - 1]);
 
-      class_call(DistributionFunction(&pbadist, q - 2 * dq, &f0m2), error_message_, error_message_);
-      class_call(DistributionFunction(&pbadist, q + 2 * dq, &f0p2), error_message_, error_message_);
+      DistributionFunction(&pbadist, q - 2 * dq, &f0m2);
+      DistributionFunction(&pbadist, q + 2 * dq, &f0p2);
       if (fabs((f0p2 - f0m2) / f0) > sqrt(DBL_EPSILON))
         break;
     }
 
     double f0m1, f0p1;
-    class_call(DistributionFunction(&pbadist, q - dq, &f0m1), error_message_, error_message_);
-    class_call(DistributionFunction(&pbadist, q + dq, &f0p1), error_message_, error_message_);
+    DistributionFunction(&pbadist, q - dq, &f0m1);
+    DistributionFunction(&pbadist, q + dq, &f0p1);
     double df0dq = (+f0m2 - 8 * f0m1 + 8 * f0p1 - f0p2) / 12.0 / dq;
     if (fabs(f0) == 0.)
       dlnf0_dlnq_[index_q] = -q;
@@ -299,18 +306,20 @@ int NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
       *f0            = f0last * exp(-(qlast - q) * df0last / f0last / dqlast);
     }
     else {
-      class_call(array_interpolate_spline(p->q.data(),
-                                          p->tablesize,
-                                          p->f0.data(),
-                                          p->d2f0.data(),
-                                          1,
-                                          q,
-                                          &p->last_index,
-                                          f0,
-                                          1,
-                                          const_cast<char*>(sp->error_message_)),
-                 const_cast<char*>(sp->error_message_),
-                 const_cast<char*>(sp->error_message_));
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_spline(p->q.data(),
+                                                    p->tablesize,
+                                                    p->f0.data(),
+                                                    p->d2f0.data(),
+                                                    1,
+                                                    q,
+                                                    &p->last_index,
+                                                    f0,
+                                                    1,
+                                                    buf),
+                           buf);
+      }
     }
   }
   else {
@@ -476,7 +485,6 @@ double NCDMBaseSpecies::MFromOmega(double H0, double Omega0, double tol_M_ncdm) 
   ComputeMomentaMass(M, 0., &n, &rho, nullptr, nullptr, nullptr);
 
   class_test(rho0 < rho,
-             const_cast<char*>(error_message_),
              "The value of Omega for this species, %g, is less than for a massless species! "
              "It should be at least %g. Check your input.",
              Omega0,
@@ -525,7 +533,6 @@ double NCDMBaseSpecies::GetIni(double a, double a_today, double tol_ncdm_initial
     a *= _SCALE_BACK_;
   }
   class_test(converged == false,
-             error_message_,
              "Search for initial scale factor a such that ncdm species is relativistic failed.");
   return a;
 }

@@ -93,7 +93,6 @@ void ScalarFieldSpecies::SetBackgroundInitialConditions(const BackgroundICContex
   }
   class_test(!isfinite(pvecback_integration[bi_phi_index()]) ||
                  !isfinite(pvecback_integration[bi_phi_prime_index()]),
-             bgm_->error_message_,
              "initial phi = %e phi_prime = %e -> check initial conditions",
              pvecback_integration[bi_phi_index()],
              pvecback_integration[bi_phi_prime_index()]);

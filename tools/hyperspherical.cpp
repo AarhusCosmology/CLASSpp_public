@@ -252,12 +252,12 @@ int hyperspherical_bessel_direct_vector(int K,
   double beta2 = beta * beta, xfwd, folded_y, sinK, cotK;
   int phisign, dphisign;
 
-  class_test((K != 0) && (K != 1) && (K != -1), error_message, "K must be -1, 0, or 1 (got %d)", K);
-  class_test(beta <= 0.0, error_message, "beta must be positive (got %g)", beta);
+  class_test((K != 0) && (K != 1) && (K != -1), "K must be -1, 0, or 1 (got %d)", K);
+  class_test(beta <= 0.0, "beta must be positive (got %g)", beta);
 
   lmax = 0;
   for (il = 0; il < nl; il++) {
-    class_test(lvec[il] < 0, error_message, "l must be non-negative (got %d)", lvec[il]);
+    class_test(lvec[il] < 0, "l must be non-negative (got %d)", lvec[il]);
     if (lvec[il] > lmax)
       lmax = lvec[il];
   }
@@ -265,11 +265,9 @@ int hyperspherical_bessel_direct_vector(int K,
   if (K == 1) {
     intbeta = (int) (beta + 0.2);
     class_test(fabs(beta - intbeta) > 1e-6,
-               error_message,
                "closed case (K=1) requires integer beta (got %g)",
                beta);
     class_test(lmax >= intbeta,
-               error_message,
                "closed case requires l < beta; got max l=%d, beta=%d",
                lmax,
                intbeta);

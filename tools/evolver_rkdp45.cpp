@@ -44,8 +44,8 @@ int evolver_rkdp45(
 
   /* Contract (shared with evolver_rk): x_sampling is a non-null array of
      output points, and tolerance > 0 (threshold below divides by it). */
-  class_test(x_sampling == nullptr, error_message, "rkdp45 requires a non-null x_sampling array");
-  class_test(tolerance <= 0., error_message, "rkdp45 requires tolerance > 0 (got %e)", tolerance);
+  class_test(x_sampling == nullptr, "rkdp45 requires a non-null x_sampling array");
+  class_test(tolerance <= 0., "rkdp45 requires tolerance > 0 (got %e)", tolerance);
 
   const int neq          = y_size;
   const double rtol      = tolerance;
@@ -141,7 +141,6 @@ int evolver_rkdp45(
     double h          = hnew;
     const double hmin = 100.0 * DBL_MIN * fabs(t);
     class_test(fabs(h) < hmin,
-               error_message,
                "rkdp45: step size %e fell below minimum %e at x=%e",
                fabs(h),
                hmin,

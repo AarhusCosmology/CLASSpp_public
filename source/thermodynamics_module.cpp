@@ -260,51 +260,59 @@ int ThermodynamicsModule::thermodynamics_at_z(
     /* some very specific cases require linear interpolation because of a break in the derivative of the functions */
     if (((pth->reio_parametrization == reio_half_tanh) && (z < 2 * z_reionization_)) ||
         ((pth->reio_parametrization == reio_inter) && (z < 50.))) {
-      class_call(array_interpolate_linear(const_cast<double*>(z_table_.data()),
-                                          tt_size_,
-                                          const_cast<double*>(thermodynamics_table_.data()),
-                                          th_size_,
-                                          z,
-                                          last_index,
-                                          pvecthermo,
-                                          th_size_,
-                                          error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_linear(const_cast<double*>(z_table_.data()),
+                                                    tt_size_,
+                                                    const_cast<double*>(
+                                                        thermodynamics_table_.data()),
+                                                    th_size_,
+                                                    z,
+                                                    last_index,
+                                                    pvecthermo,
+                                                    th_size_,
+                                                    buf),
+                           buf);
+      }
     }
 
     /* in the "normal" case, use spline interpolation */
     else {
       if (inter_mode == inter_normal_) {
-        class_call(array_interpolate_spline(const_cast<double*>(z_table_.data()),
-                                            tt_size_,
-                                            const_cast<double*>(thermodynamics_table_.data()),
-                                            const_cast<double*>(d2thermodynamics_dz2_table_.data()),
-                                            th_size_,
-                                            z,
-                                            last_index,
-                                            pvecthermo,
-                                            th_size_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_interpolate_spline(const_cast<double*>(z_table_.data()),
+                                                      tt_size_,
+                                                      const_cast<double*>(
+                                                          thermodynamics_table_.data()),
+                                                      const_cast<double*>(
+                                                          d2thermodynamics_dz2_table_.data()),
+                                                      th_size_,
+                                                      z,
+                                                      last_index,
+                                                      pvecthermo,
+                                                      th_size_,
+                                                      buf),
+                             buf);
+        }
       }
 
       if (inter_mode == inter_closeby_) {
-        class_call(array_interpolate_spline_growing_closeby(const_cast<double*>(z_table_.data()),
-                                                            tt_size_,
-                                                            const_cast<double*>(
-                                                                thermodynamics_table_.data()),
-                                                            const_cast<double*>(
-                                                                d2thermodynamics_dz2_table_.data()),
-                                                            th_size_,
-                                                            z,
-                                                            last_index,
-                                                            pvecthermo,
-                                                            th_size_,
-                                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_interpolate_spline_growing_closeby(
+                                 const_cast<double*>(z_table_.data()),
+                                 tt_size_,
+                                 const_cast<double*>(thermodynamics_table_.data()),
+                                 const_cast<double*>(d2thermodynamics_dz2_table_.data()),
+                                 th_size_,
+                                 z,
+                                 last_index,
+                                 pvecthermo,
+                                 th_size_,
+                                 buf),
+                             buf);
+        }
       }
     }
   }
@@ -354,7 +362,7 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /* Y_He */
   if (YHe_ == _BBN_) {
-    class_call(thermodynamics_helium_from_bbn(), error_message_, error_message_);
+    thermodynamics_helium_from_bbn();
     if (pth->thermodynamics_verbose > 0)
       printf(" with Y_He=%.4f\n", YHe_);
   }
@@ -364,7 +372,6 @@ int ThermodynamicsModule::thermodynamics_init() {
   }
 
   class_test((YHe_ < _YHE_SMALL_) || (YHe_ > _YHE_BIG_),
-             error_message_,
              "Y_He=%g out of bounds (%g<Y_He<%g)",
              YHe_,
              _YHE_SMALL_,
@@ -372,48 +379,38 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /** - check energy injection parameters */
 
-  class_test((pth->annihilation < 0), error_message_, "annihilation parameter cannot be negative");
+  class_test((pth->annihilation < 0), "annihilation parameter cannot be negative");
 
   class_test((pth->annihilation > 1.e-4),
-             error_message_,
              "annihilation parameter suspiciously large (%e, while typical bounds are in the range "
              "of 1e-7 to 1e-6)",
              pth->annihilation);
 
   class_test((pth->annihilation_variation > 0),
-             error_message_,
              "annihilation variation parameter must be negative (decreasing annihilation rate)");
 
-  class_test((pth->annihilation_z < 0),
-             error_message_,
-             "characteristic annihilation redshift cannot be negative");
+  class_test((pth->annihilation_z < 0), "characteristic annihilation redshift cannot be negative");
 
   class_test((pth->annihilation_zmin < 0),
-             error_message_,
              "characteristic annihilation redshift cannot be negative");
 
   class_test((pth->annihilation_zmax < 0),
-             error_message_,
              "characteristic annihilation redshift cannot be negative");
 
   class_test((pth->annihilation > 0) &&
                  (all_species_.count("CDM") == 0 && all_species_.count("IDM_DR_IDR") == 0),
-             error_message_,
              "CDM annihilation effects require the presence of CDM or IDM!");
 
   class_test((pth->annihilation_f_halo > 0) && (pth->recombination == recfast),
-             error_message_,
              "Switching on DM annihilation in halos requires using HyRec instead of RECFAST. "
              "Otherwise some values go beyond their range of validity in the RECFAST fits, and the "
              "thermodynamics module fails. Two solutions: add 'recombination = HyRec' to your "
              "input, or set 'annihilation_f_halo = 0.' (default).");
 
   class_test((pth->annihilation_f_halo < 0),
-             error_message_,
              "Parameter for DM annihilation in halos cannot be negative");
 
   class_test((pth->annihilation_z_halo < 0),
-             error_message_,
              "Parameter for DM annihilation in halos cannot be negative");
 
   if (pth->thermodynamics_verbose > 0)
@@ -425,16 +422,15 @@ int ThermodynamicsModule::thermodynamics_init() {
           "producing nan's. This is however masked by reionization if you are not in reio_none "
           "mode.");
 
-  class_test((pth->decay < 0), error_message_, "decay parameter cannot be negative");
+  class_test((pth->decay < 0), "decay parameter cannot be negative");
 
   class_test((pth->decay > 0) &&
                  (all_species_.count("CDM") == 0 && all_species_.count("IDM_DR_IDR") == 0),
-             error_message_,
              "CDM decay effects require the presence of CDM or IDM!");
 
   /* tests in order to prevent segmentation fault in the following */
-  class_test(_not4_ == 0., error_message_, "stop to avoid division by zero");
-  class_test(YHe_ == 1., error_message_, "stop to avoid division by zero");
+  class_test(_not4_ == 0., "stop to avoid division by zero");
+  class_test(YHe_ == 1., "stop to avoid division by zero");
 
   /** - initialize pointers */
 
@@ -443,7 +439,7 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /** - assign values to all indices in the structures with thermodynamics_indices()*/
 
-  class_call(thermodynamics_indices(preco, preio), error_message_, error_message_);
+  thermodynamics_indices(preco, preio);
 
   /** - allocate background vector */
 
@@ -451,16 +447,12 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /** - solve recombination and store values of \f$ z, x_e, d \kappa / d \tau, T_b, c_b^2 \f$ with thermodynamics_recombination() */
 
-  class_call_except(thermodynamics_recombination(preco, pvecback.data()),
-                    error_message_,
-                    error_message_, );
+  class_call_except(thermodynamics_recombination(preco, pvecback.data()), );
 
   /** - if there is reionization, solve reionization and store values of \f$ z, x_e, d \kappa / d \tau, T_b, c_b^2 \f$ with thermodynamics_reionization()*/
 
   if (pth->reio_parametrization != reio_none) {
-    class_call_except(thermodynamics_reionization(preco, preio, pvecback.data()),
-                      error_message_,
-                      error_message_, );
+    class_call_except(thermodynamics_reionization(preco, preio, pvecback.data()), );
   }
   else {
     preio->rt_size                    = 0;
@@ -470,17 +462,14 @@ int ThermodynamicsModule::thermodynamics_init() {
   /** - merge tables in recombination and reionization structures into
       a single table in thermo structure */
 
-  class_call(thermodynamics_merge_reco_and_reio(preco, preio), error_message_, error_message_);
+  thermodynamics_merge_reco_and_reio(preco, preio);
 
   /** - compute table of corresponding conformal times */
 
   tau_table.resize(tt_size_);
 
   for (index_tau = 0; index_tau < tt_size_; index_tau++) {
-    class_call(background_module_->background_tau_of_z(z_table_[index_tau],
-                                                       tau_table.data() + index_tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z_table_[index_tau], tau_table.data() + index_tau);
   }
 
   /** - store initial value of conformal time in the structure */
@@ -494,13 +483,11 @@ int ThermodynamicsModule::thermodynamics_init() {
   last_index_back = background_module_->bg_size_ - 1;
 
   for (index_tau = 0; index_tau < tt_size_; index_tau++) {
-    class_call(background_module_->background_at_tau(tau_table[index_tau],
-                                                     pba->normal_info,
-                                                     pba->inter_closeby,
-                                                     &last_index_back,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau_table[index_tau],
+                                          pba->normal_info,
+                                          pba->inter_closeby,
+                                          &last_index_back,
+                                          pvecback.data());
 
     R = 3. / 4. * all_species_.baryons().Rho(pvecback.data()) /
         all_species_.photons().Rho(pvecback.data());
@@ -544,28 +531,32 @@ int ThermodynamicsModule::thermodynamics_init() {
   }
 
   /** - --> second derivative of this rate, -[1/R * kappa']'', stored temporarily in column dddkappa */
-  class_call(array_spline_table_line_to_line(tau_table.data(),
-                                             tt_size_,
-                                             thermodynamics_table_.data(),
-                                             th_size_,
-                                             index_th_ddkappa_,
-                                             index_th_dddkappa_,
-                                             _SPLINE_EST_DERIV_,
-                                             error_message_),
-             error_message_,
-             error_message_);
-
-  /** - --> compute tau_d = [int_{tau_today}^{tau} dtau -dkappa_d/dtau] */
-  class_call(array_integrate_spline_table_line_to_line(tau_table.data(),
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_line_to_line(tau_table.data(),
                                                        tt_size_,
                                                        thermodynamics_table_.data(),
                                                        th_size_,
                                                        index_th_ddkappa_,
                                                        index_th_dddkappa_,
-                                                       index_th_tau_d_,
-                                                       error_message_),
-             error_message_,
-             error_message_);
+                                                       _SPLINE_EST_DERIV_,
+                                                       buf),
+                       buf);
+  }
+
+  /** - --> compute tau_d = [int_{tau_today}^{tau} dtau -dkappa_d/dtau] */
+  {
+    ErrorMsg buf;
+    class_call_failure(array_integrate_spline_table_line_to_line(tau_table.data(),
+                                                                 tt_size_,
+                                                                 thermodynamics_table_.data(),
+                                                                 th_size_,
+                                                                 index_th_ddkappa_,
+                                                                 index_th_dddkappa_,
+                                                                 index_th_tau_d_,
+                                                                 buf),
+                       buf);
+  }
 
   /* the temporary quantities stored in columns ddkappa and dddkappa
      will not be used anymore, so they can be overwritten by other
@@ -573,54 +564,62 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   if (all_species_.count("IDM_DR_IDR") > 0) {
     /** --> second derivative of idm_dr interaction rate (with idr), [Sinv*dmu_idm_dr]'', stored temporarily in column dddmu */
-    class_call(array_spline_table_line_to_line(tau_table.data(),
-                                               tt_size_,
-                                               thermodynamics_table_.data(),
-                                               th_size_,
-                                               index_th_ddmu_idm_dr_,
-                                               index_th_dddmu_idm_dr_,
-                                               _SPLINE_EST_DERIV_,
-                                               error_message_),
-               error_message_,
-               error_message_);
-
-    /** - --> compute optical depth of idm, tau_idm_dr = [int_{tau_today}^{tau} dtau [Sinv*dmu_idm_dr] ].
-              This step gives -tau_idm_dr. The resulty is mutiplied by -1 later on. */
-    class_call(array_integrate_spline_table_line_to_line(tau_table.data(),
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_line_to_line(tau_table.data(),
                                                          tt_size_,
                                                          thermodynamics_table_.data(),
                                                          th_size_,
                                                          index_th_ddmu_idm_dr_,
                                                          index_th_dddmu_idm_dr_,
-                                                         index_th_tau_idm_dr_,
-                                                         error_message_),
-               error_message_,
-               error_message_);
+                                                         _SPLINE_EST_DERIV_,
+                                                         buf),
+                         buf);
+    }
+
+    /** - --> compute optical depth of idm, tau_idm_dr = [int_{tau_today}^{tau} dtau [Sinv*dmu_idm_dr] ].
+              This step gives -tau_idm_dr. The resulty is mutiplied by -1 later on. */
+    {
+      ErrorMsg buf;
+      class_call_failure(array_integrate_spline_table_line_to_line(tau_table.data(),
+                                                                   tt_size_,
+                                                                   thermodynamics_table_.data(),
+                                                                   th_size_,
+                                                                   index_th_ddmu_idm_dr_,
+                                                                   index_th_dddmu_idm_dr_,
+                                                                   index_th_tau_idm_dr_,
+                                                                   buf),
+                         buf);
+    }
 
     /** - --> second derivative of idr interaction rate (with idm_dr), [dmu_idm_idr]'', stored temporarily in column dddmu */
-    class_call(array_spline_table_line_to_line(tau_table.data(),
-                                               tt_size_,
-                                               thermodynamics_table_.data(),
-                                               th_size_,
-                                               index_th_dmu_idm_dr_,
-                                               index_th_dddmu_idm_dr_,
-                                               _SPLINE_EST_DERIV_,
-                                               error_message_),
-               error_message_,
-               error_message_);
-
-    /** - --> compute optical depth of idr, tau_idr = [int_{tau_today}^{tau} dtau [dmu_idm_idr] ].
-              This step gives -tau_idr. The resulty is mutiplied by -1 later on. */
-    class_call(array_integrate_spline_table_line_to_line(tau_table.data(),
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_line_to_line(tau_table.data(),
                                                          tt_size_,
                                                          thermodynamics_table_.data(),
                                                          th_size_,
                                                          index_th_dmu_idm_dr_,
                                                          index_th_dddmu_idm_dr_,
-                                                         index_th_tau_idr_,
-                                                         error_message_),
-               error_message_,
-               error_message_);
+                                                         _SPLINE_EST_DERIV_,
+                                                         buf),
+                         buf);
+    }
+
+    /** - --> compute optical depth of idr, tau_idr = [int_{tau_today}^{tau} dtau [dmu_idm_idr] ].
+              This step gives -tau_idr. The resulty is mutiplied by -1 later on. */
+    {
+      ErrorMsg buf;
+      class_call_failure(array_integrate_spline_table_line_to_line(tau_table.data(),
+                                                                   tt_size_,
+                                                                   thermodynamics_table_.data(),
+                                                                   th_size_,
+                                                                   index_th_dmu_idm_dr_,
+                                                                   index_th_dddmu_idm_dr_,
+                                                                   index_th_tau_idr_,
+                                                                   buf),
+                         buf);
+    }
   }
 
   /** - --> compute damping scale:
@@ -639,13 +638,11 @@ int ThermodynamicsModule::thermodynamics_init() {
     for (index_tau = 0; index_tau < tt_size_; index_tau++) {
       tau_table_growing[index_tau] = tau_table[tt_size_ - 1 - index_tau];
 
-      class_call(background_module_->background_at_tau(tau_table_growing[index_tau],
-                                                       pba->normal_info,
-                                                       pba->inter_closeby,
-                                                       &last_index_back,
-                                                       pvecback.data()),
-                 background_module_->error_message_,
-                 error_message_);
+      background_module_->background_at_tau(tau_table_growing[index_tau],
+                                            pba->normal_info,
+                                            pba->inter_closeby,
+                                            &last_index_back,
+                                            pvecback.data());
 
       R = 3. / 4. * all_species_.baryons().Rho(pvecback.data()) /
           all_species_.photons().Rho(pvecback.data());
@@ -657,28 +654,32 @@ int ThermodynamicsModule::thermodynamics_init() {
     }
 
     /* compute second derivative of integrand, and store temporarily in column "dddkappa" */
-    class_call(array_spline_table_line_to_line(tau_table_growing.data(),
-                                               tt_size_,
-                                               thermodynamics_table_.data(),
-                                               th_size_,
-                                               index_th_ddkappa_,
-                                               index_th_dddkappa_,
-                                               _SPLINE_EST_DERIV_,
-                                               error_message_),
-               error_message_,
-               error_message_);
-
-    /* compute integral and store temporarily in column "g" */
-    class_call(array_integrate_spline_table_line_to_line(tau_table_growing.data(),
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_line_to_line(tau_table_growing.data(),
                                                          tt_size_,
                                                          thermodynamics_table_.data(),
                                                          th_size_,
                                                          index_th_ddkappa_,
                                                          index_th_dddkappa_,
-                                                         index_th_g_,
-                                                         error_message_),
-               error_message_,
-               error_message_);
+                                                         _SPLINE_EST_DERIV_,
+                                                         buf),
+                         buf);
+    }
+
+    /* compute integral and store temporarily in column "g" */
+    {
+      ErrorMsg buf;
+      class_call_failure(array_integrate_spline_table_line_to_line(tau_table_growing.data(),
+                                                                   tt_size_,
+                                                                   thermodynamics_table_.data(),
+                                                                   th_size_,
+                                                                   index_th_ddkappa_,
+                                                                   index_th_dddkappa_,
+                                                                   index_th_g_,
+                                                                   buf),
+                         buf);
+    }
 
     /* we could now write the result as r_d = 2pi * sqrt(integral),
        but we will first better acount for the contribution frokm the tau_ini boundary.
@@ -700,66 +701,76 @@ int ThermodynamicsModule::thermodynamics_init() {
   }  // end of damping scale calculation
 
   /** - --> second derivative with respect to tau of dkappa (in view of spline interpolation) */
-  class_call(array_spline_table_line_to_line(tau_table.data(),
-                                             tt_size_,
-                                             thermodynamics_table_.data(),
-                                             th_size_,
-                                             index_th_dkappa_,
-                                             index_th_dddkappa_,
-                                             _SPLINE_EST_DERIV_,
-                                             error_message_),
-             error_message_,
-             error_message_);
-
-  /** - --> first derivative with respect to tau of dkappa (using spline interpolation) */
-  class_call(array_derive_spline_table_line_to_line(tau_table.data(),
-                                                    tt_size_,
-                                                    thermodynamics_table_.data(),
-                                                    th_size_,
-                                                    index_th_dkappa_,
-                                                    index_th_dddkappa_,
-                                                    index_th_ddkappa_,
-                                                    error_message_),
-             error_message_,
-             error_message_);
-
-  /** - --> compute -kappa = [int_{tau_today}^{tau} dtau dkappa/dtau], store temporarily in column "g" */
-  class_call(array_integrate_spline_table_line_to_line(tau_table.data(),
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_line_to_line(tau_table.data(),
                                                        tt_size_,
                                                        thermodynamics_table_.data(),
                                                        th_size_,
                                                        index_th_dkappa_,
                                                        index_th_dddkappa_,
-                                                       index_th_g_,
-                                                       error_message_),
-             error_message_,
-             error_message_);
+                                                       _SPLINE_EST_DERIV_,
+                                                       buf),
+                       buf);
+  }
+
+  /** - --> first derivative with respect to tau of dkappa (using spline interpolation) */
+  {
+    ErrorMsg buf;
+    class_call_failure(array_derive_spline_table_line_to_line(tau_table.data(),
+                                                              tt_size_,
+                                                              thermodynamics_table_.data(),
+                                                              th_size_,
+                                                              index_th_dkappa_,
+                                                              index_th_dddkappa_,
+                                                              index_th_ddkappa_,
+                                                              buf),
+                       buf);
+  }
+
+  /** - --> compute -kappa = [int_{tau_today}^{tau} dtau dkappa/dtau], store temporarily in column "g" */
+  {
+    ErrorMsg buf;
+    class_call_failure(array_integrate_spline_table_line_to_line(tau_table.data(),
+                                                                 tt_size_,
+                                                                 thermodynamics_table_.data(),
+                                                                 th_size_,
+                                                                 index_th_dkappa_,
+                                                                 index_th_dddkappa_,
+                                                                 index_th_g_,
+                                                                 buf),
+                       buf);
+  }
 
   /** - --> derivatives of baryon sound speed (only computed if some non-minimal tight-coupling schemes is requested) */
   if (pth->compute_cb2_derivatives == _TRUE_) {
     /** - ---> second derivative with respect to tau of cb2 */
-    class_call(array_spline_table_line_to_line(tau_table.data(),
-                                               tt_size_,
-                                               thermodynamics_table_.data(),
-                                               th_size_,
-                                               index_th_cb2_,
-                                               index_th_ddcb2_,
-                                               _SPLINE_EST_DERIV_,
-                                               error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_line_to_line(tau_table.data(),
+                                                         tt_size_,
+                                                         thermodynamics_table_.data(),
+                                                         th_size_,
+                                                         index_th_cb2_,
+                                                         index_th_ddcb2_,
+                                                         _SPLINE_EST_DERIV_,
+                                                         buf),
+                         buf);
+    }
 
     /** - ---> first derivative with respect to tau of cb2 (using spline interpolation) */
-    class_call(array_derive_spline_table_line_to_line(tau_table.data(),
-                                                      tt_size_,
-                                                      thermodynamics_table_.data(),
-                                                      th_size_,
-                                                      index_th_cb2_,
-                                                      index_th_ddcb2_,
-                                                      index_th_dcb2_,
-                                                      error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_derive_spline_table_line_to_line(tau_table.data(),
+                                                                tt_size_,
+                                                                thermodynamics_table_.data(),
+                                                                th_size_,
+                                                                index_th_cb2_,
+                                                                index_th_ddcb2_,
+                                                                index_th_dcb2_,
+                                                                buf),
+                         buf);
+    }
   }
 
   /** - --> compute visibility: \f$ g= (d \kappa/d \tau) e^{- \kappa} \f$ */
@@ -796,7 +807,6 @@ int ThermodynamicsModule::thermodynamics_init() {
 
     /** - ---> compute variation rate */
     class_test(thermodynamics_table_[index_tau * th_size_ + index_th_dkappa_] == 0.,
-               error_message_,
                "variation rate diverges");
 
     thermodynamics_table_[index_tau * th_size_ + index_th_rate_] = sqrt(
@@ -824,14 +834,16 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /** - smooth the rate (details of smoothing unimportant: only the
       order of magnitude of the rate matters) */
-  class_call(array_smooth(thermodynamics_table_.data(),
-                          th_size_,
-                          tt_size_,
-                          index_th_rate_,
-                          ppr->thermo_rate_smoothing_radius,
-                          error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_smooth(thermodynamics_table_.data(),
+                                    th_size_,
+                                    tt_size_,
+                                    index_th_rate_,
+                                    ppr->thermo_rate_smoothing_radius,
+                                    buf),
+                       buf);
+  }
 
   /* - ---> fill columns for ddmu_idm_dr and dddmu_idm_dr with true values, and compute idm_dr temperature and sound speed */
   if (all_species_.count("IDM_DR_IDR") > 0) {
@@ -842,28 +854,32 @@ int ThermodynamicsModule::thermodynamics_init() {
     double z;
 
     /** - --> second derivative with respect to tau of dmu_idm_dr (in view of spline interpolation) */
-    class_call(array_spline_table_line_to_line(tau_table.data(),
-                                               tt_size_,
-                                               thermodynamics_table_.data(),
-                                               th_size_,
-                                               index_th_dmu_idm_dr_,
-                                               index_th_dddmu_idm_dr_,
-                                               _SPLINE_EST_DERIV_,
-                                               error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_line_to_line(tau_table.data(),
+                                                         tt_size_,
+                                                         thermodynamics_table_.data(),
+                                                         th_size_,
+                                                         index_th_dmu_idm_dr_,
+                                                         index_th_dddmu_idm_dr_,
+                                                         _SPLINE_EST_DERIV_,
+                                                         buf),
+                         buf);
+    }
 
     /** - --> first derivative with respect to tau of dmu_idm_dr (using spline interpolation) */
-    class_call(array_derive_spline_table_line_to_line(tau_table.data(),
-                                                      tt_size_,
-                                                      thermodynamics_table_.data(),
-                                                      th_size_,
-                                                      index_th_dmu_idm_dr_,
-                                                      index_th_dddmu_idm_dr_,
-                                                      index_th_ddmu_idm_dr_,
-                                                      error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_derive_spline_table_line_to_line(tau_table.data(),
+                                                                tt_size_,
+                                                                thermodynamics_table_.data(),
+                                                                th_size_,
+                                                                index_th_dmu_idm_dr_,
+                                                                index_th_dddmu_idm_dr_,
+                                                                index_th_ddmu_idm_dr_,
+                                                                buf),
+                         buf);
+    }
 
     /** - --> now compute idm_dr temperature and sound speed in various regimes */
 
@@ -871,17 +887,13 @@ int ThermodynamicsModule::thermodynamics_init() {
 
     z = z_table_[tt_size_ - 1];
 
-    class_call(background_module_->background_tau_of_z(z, &(tau)),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z, &(tau));
 
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->short_info,
-                                                     pba->inter_normal,
-                                                     &last_index_back,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->short_info,
+                                          pba->inter_normal,
+                                          &last_index_back,
+                                          pvecback.data());
 
     Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
                         pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
@@ -937,16 +949,12 @@ int ThermodynamicsModule::thermodynamics_init() {
         Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
                             pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                             pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-        class_call(background_module_->background_tau_of_z(z, &(tau)),
-                   background_module_->error_message_,
-                   error_message_);
-        class_call(background_module_->background_at_tau(tau,
-                                                         pba->short_info,
-                                                         pba->inter_normal,
-                                                         &last_index_back,
-                                                         pvecback.data()),
-                   background_module_->error_message_,
-                   error_message_);
+        background_module_->background_tau_of_z(z, &(tau));
+        background_module_->background_at_tau(tau,
+                                              pba->short_info,
+                                              pba->inter_normal,
+                                              &last_index_back,
+                                              pvecback.data());
         dTdz_idm_dr = T_idr_param;
       }
 
@@ -964,16 +972,12 @@ int ThermodynamicsModule::thermodynamics_init() {
                                comp_ref.idm_dr().a_idm_dr() *
                                pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                                pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-          class_call(background_module_->background_tau_of_z(z, &(tau)),
-                     background_module_->error_message_,
-                     error_message_);
-          class_call(background_module_->background_at_tau(tau,
-                                                           pba->short_info,
-                                                           pba->inter_normal,
-                                                           &last_index_back,
-                                                           pvecback.data()),
-                     background_module_->error_message_,
-                     error_message_);
+          background_module_->background_tau_of_z(z, &(tau));
+          background_module_->background_at_tau(tau,
+                                                pba->short_info,
+                                                pba->inter_normal,
+                                                &last_index_back,
+                                                pvecback.data());
           dTdz_idm_dr = 2. * pvecback[background_module_->index_bg_a_] * T_idm_dr -
                         Gamma_heat_idm_dr / (pvecback[background_module_->index_bg_H_]) *
                             (T_idr - T_idm_dr);
@@ -1005,16 +1009,12 @@ int ThermodynamicsModule::thermodynamics_init() {
                                  comp_ref.idm_dr().a_idm_dr() *
                                  pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                                  pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-            class_call(background_module_->background_tau_of_z(z, &(tau)),
-                       background_module_->error_message_,
-                       error_message_);
-            class_call(background_module_->background_at_tau(tau,
-                                                             pba->short_info,
-                                                             pba->inter_normal,
-                                                             &last_index_back,
-                                                             pvecback.data()),
-                       background_module_->error_message_,
-                       error_message_);
+            background_module_->background_tau_of_z(z, &(tau));
+            background_module_->background_at_tau(tau,
+                                                  pba->short_info,
+                                                  pba->inter_normal,
+                                                  &last_index_back,
+                                                  pvecback.data());
             dTdz_idm_dr = 2. * pvecback[background_module_->index_bg_a_] * T_idm_dr -
                           Gamma_heat_idm_dr / (pvecback[background_module_->index_bg_H_]) *
                               (T_idr - T_idm_dr);
@@ -1034,16 +1034,12 @@ int ThermodynamicsModule::thermodynamics_init() {
         Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
                             pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                             pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-        class_call(background_module_->background_tau_of_z(z, &(tau)),
-                   background_module_->error_message_,
-                   error_message_);
-        class_call(background_module_->background_at_tau(tau,
-                                                         pba->short_info,
-                                                         pba->inter_normal,
-                                                         &last_index_back,
-                                                         pvecback.data()),
-                   background_module_->error_message_,
-                   error_message_);
+        background_module_->background_tau_of_z(z, &(tau));
+        background_module_->background_at_tau(tau,
+                                              pba->short_info,
+                                              pba->inter_normal,
+                                              &last_index_back,
+                                              pvecback.data());
         dTdz_idm_dr = 2. / (1 + z) * T_idm_dr;
       }
 
@@ -1055,15 +1051,17 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /** - fill tables of second derivatives with respect to z (in view of spline interpolation) */
 
-  class_call(array_spline_table_lines(z_table_.data(),
-                                      tt_size_,
-                                      thermodynamics_table_.data(),
-                                      th_size_,
-                                      d2thermodynamics_dz2_table_.data(),
-                                      _SPLINE_EST_DERIV_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_lines(z_table_.data(),
+                                                tt_size_,
+                                                thermodynamics_table_.data(),
+                                                th_size_,
+                                                d2thermodynamics_dz2_table_.data(),
+                                                _SPLINE_EST_DERIV_,
+                                                buf),
+                       buf);
+  }
 
   /** - find maximum of g */
 
@@ -1074,7 +1072,6 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   class_test(thermodynamics_table_[(index_tau + 1) * th_size_ + index_th_g_] >
                  thermodynamics_table_[index_tau * th_size_ + index_th_g_],
-             error_message_,
              "found a recombination redshift greater or equal to the maximum value imposed in "
              "thermodynamics.h, z_rec_max=%g",
              _Z_REC_MAX_);
@@ -1097,30 +1094,24 @@ int ThermodynamicsModule::thermodynamics_init() {
                 thermodynamics_table_[(index_tau + 2) * th_size_ + index_th_g_]);
 
   class_test(z_rec_ + ppr->smallest_allowed_variation >= _Z_REC_MAX_,
-             error_message_,
              "found a recombination redshift greater or equal to the maximum value imposed in "
              "thermodynamics.h, z_rec_max=%g",
              _Z_REC_MAX_);
 
   class_test(z_rec_ - ppr->smallest_allowed_variation <= _Z_REC_MIN_,
-             error_message_,
              "found a recombination redshift smaller or equal to the maximum value imposed in "
              "thermodynamics.h, z_rec_min=%g",
              _Z_REC_MIN_);
 
   /** - find conformal recombination time using background_tau_of_z() **/
 
-  class_call(background_module_->background_tau_of_z(z_rec_, &(tau_rec_)),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z_rec_, &(tau_rec_));
 
-  class_call(background_module_->background_at_tau(tau_rec_,
-                                                   pba->long_info,
-                                                   pba->inter_normal,
-                                                   &last_index_back,
-                                                   pvecback.data()),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau_rec_,
+                                        pba->long_info,
+                                        pba->inter_normal,
+                                        &last_index_back,
+                                        pvecback.data());
 
   rs_rec_            = pvecback[background_module_->index_bg_rs_];
   ds_rec_            = rs_rec_ * pba->a_today / (1. + z_rec_);
@@ -1140,18 +1131,14 @@ int ThermodynamicsModule::thermodynamics_init() {
   /** - find time (always after recombination) at which tau_c/tau
       falls below some threshold, defining tau_free_streaming */
 
-  class_call(background_module_->background_tau_of_z(z_table_[index_tau], &tau),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z_table_[index_tau], &tau);
 
   while ((1. / thermodynamics_table_[(index_tau) *th_size_ + index_th_dkappa_] / tau <
           ppr->radiation_streaming_trigger_tau_c_over_tau) &&
          (index_tau > 0)) {
     index_tau--;
 
-    class_call(background_module_->background_tau_of_z(z_table_[index_tau], &tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z_table_[index_tau], &tau);
   }
 
   tau_free_streaming_ = tau;
@@ -1172,9 +1159,7 @@ int ThermodynamicsModule::thermodynamics_init() {
         index_tau = 0;
       }
 
-      class_call(background_module_->background_tau_of_z(z_table_[index_tau], &tau),
-                 background_module_->error_message_,
-                 error_message_);
+      background_module_->background_tau_of_z(z_table_[index_tau], &tau);
 
       while ((1. / thermodynamics_table_[(index_tau) *th_size_ + index_th_dmu_idm_dr_] / tau <
               ppr->idr_streaming_trigger_tau_c_over_tau) &&
@@ -1187,9 +1172,7 @@ int ThermodynamicsModule::thermodynamics_init() {
           index_tau++;
         }
 
-        class_call(background_module_->background_tau_of_z(z_table_[index_tau], &tau),
-                   background_module_->error_message_,
-                   error_message_);
+        background_module_->background_tau_of_z(z_table_[index_tau], &tau);
       }
 
       tau_idm_dr_fs           = tau;
@@ -1198,11 +1181,10 @@ int ThermodynamicsModule::thermodynamics_init() {
 
     /* case of idr alone without idm_dr */
     else {
-      index_tau                                = index_tau_fs - 1;
-      class_call(background_module_->background_tau_of_z(z_table_[index_tau], &tau),
-                 background_module_->error_message_,
-                 error_message_) tau_idm_dr_fs = tau;
-      tau_idr_free_streaming_                  = tau;
+      index_tau = index_tau_fs - 1;
+      background_module_->background_tau_of_z(z_table_[index_tau], &tau);
+      tau_idm_dr_fs           = tau;
+      tau_idr_free_streaming_ = tau;
     }
   }
 
@@ -1220,17 +1202,13 @@ int ThermodynamicsModule::thermodynamics_init() {
                  thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_exp_m_kappa_]) *
                 (z_table_[index_tau] - z_table_[index_tau - 1]);
 
-  class_call(background_module_->background_tau_of_z(z_star_, &(tau_star_)),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z_star_, &(tau_star_));
 
-  class_call(background_module_->background_at_tau(tau_star_,
-                                                   pba->long_info,
-                                                   pba->inter_normal,
-                                                   &last_index_back,
-                                                   pvecback.data()),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau_star_,
+                                        pba->long_info,
+                                        pba->inter_normal,
+                                        &last_index_back,
+                                        pvecback.data());
 
   rs_star_ = pvecback[background_module_->index_bg_rs_];
   ds_star_ = rs_star_ * pba->a_today / (1. + z_star_);
@@ -1259,17 +1237,13 @@ int ThermodynamicsModule::thermodynamics_init() {
               thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_d_]) *
              (z_table_[index_tau] - z_table_[index_tau - 1]);
 
-  class_call(background_module_->background_tau_of_z(z_d_, &(tau_d_)),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z_d_, &(tau_d_));
 
-  class_call(background_module_->background_at_tau(tau_d_,
-                                                   pba->long_info,
-                                                   pba->inter_normal,
-                                                   &last_index_back,
-                                                   pvecback.data()),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau_d_,
+                                        pba->long_info,
+                                        pba->inter_normal,
+                                        &last_index_back,
+                                        pvecback.data());
 
   rs_d_ = pvecback[background_module_->index_bg_rs_];
   ds_d_ = rs_d_ * pba->a_today / (1. + z_d_);
@@ -1292,9 +1266,7 @@ int ThermodynamicsModule::thermodynamics_init() {
                thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_idm_dr_]) *
               (z_table_[index_tau] - z_table_[index_tau - 1]);
 
-      class_call(background_module_->background_tau_of_z(z_idm_dr, &(tau_idm_dr)),
-                 background_module_->error_message_,
-                 error_message_);
+      background_module_->background_tau_of_z(z_idm_dr, &(tau_idm_dr));
 
       index_tau = 0;
 
@@ -1308,9 +1280,7 @@ int ThermodynamicsModule::thermodynamics_init() {
                           thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_idr_]) *
                          (z_table_[index_tau] - z_table_[index_tau - 1]);
 
-      class_call(background_module_->background_tau_of_z(z_idr, &(tau_idr)),
-                 background_module_->error_message_,
-                 error_message_);
+      background_module_->background_tau_of_z(z_idr, &(tau_idr));
     }
   }
 
@@ -1322,9 +1292,7 @@ int ThermodynamicsModule::thermodynamics_init() {
          (index_tau > 0))
     index_tau--;
 
-  class_call(background_module_->background_tau_of_z(z_table_[index_tau], &(tau_cut_)),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z_table_[index_tau], &(tau_cut_));
 
   /** - if verbose flag set to next-to-minimum value, print the main results */
 
@@ -1361,9 +1329,7 @@ int ThermodynamicsModule::thermodynamics_init() {
       if (pth->reio_z_or_tau == reio_z)
         printf(" -> reionization with optical depth = %f\n", tau_reionization_);
       double tau_reio;
-      class_call(background_module_->background_tau_of_z(z_reionization_, &tau_reio),
-                 background_module_->error_message_,
-                 error_message_);
+      background_module_->background_tau_of_z(z_reionization_, &tau_reio);
       printf("    corresponding to conformal time = %f Mpc\n", tau_reio);
     }
     if (pth->reio_parametrization == reio_bins_tanh) {
@@ -1645,17 +1611,13 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
   double z_bbn = 0.1 / (8.6173e-11 * pba->T_cmb) - 1.0;
 
   double tau_bbn;
-  class_call(background_module_->background_tau_of_z(z_bbn, &tau_bbn),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z_bbn, &tau_bbn);
 
-  class_call(background_module_->background_at_tau(tau_bbn,
-                                                   pba->long_info,
-                                                   pba->inter_normal,
-                                                   &last_index,
-                                                   pvecback.data()),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau_bbn,
+                                        pba->long_info,
+                                        pba->inter_normal,
+                                        &last_index,
+                                        pvecback.data());
 
   const double rho_g = all_species_.photons().Rho(pvecback.data());
   double Neff_bbn    = (pvecback[background_module_->index_bg_Omega_r_] *
@@ -1687,10 +1649,7 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
   */
 
   std::ifstream bbn_file(ppr->sBBN_file);
-  class_test(!bbn_file.is_open(),
-             error_message_,
-             "could not open BBN file with name %s",
-             ppr->sBBN_file.c_str());
+  class_test(!bbn_file.is_open(), "could not open BBN file with name %s", ppr->sBBN_file.c_str());
 
   /* go through each line */
   while (std::getline(bbn_file, line)) {
@@ -1712,12 +1671,10 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
       if ((num_omegab == 0) && (num_deltaN == 0)) {
         /* read (num_omegab, num_deltaN), infer size of arrays and allocate them */
         class_test(sscanf(line.c_str(), "%d %d", &num_omegab, &num_deltaN) != 2,
-                   error_message_,
                    "could not read value of parameters (num_omegab,num_deltaN) in file %s\n",
                    ppr->sBBN_file.c_str());
 
         class_test(num_omegab <= 0 || num_deltaN <= 0,
-                   error_message_,
                    "read num_omegab=%d, num_deltaN=%d in file %s, expected positive values\n",
                    num_omegab,
                    num_deltaN,
@@ -1738,7 +1695,6 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
                           &(omegab[array_line % num_omegab]),
                           &(deltaN[array_line / num_omegab]),
                           &(YHe[array_line])) != 3,
-                   error_message_,
                    "could not read value of parameters (omegab,deltaN,YHe) in file %s\n",
                    ppr->sBBN_file.c_str());
         array_line++;
@@ -1747,20 +1703,21 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
   }
 
   /** - spline in one dimension (along deltaN) */
-  class_call(array_spline_table_lines(deltaN.data(),
-                                      num_deltaN,
-                                      YHe.data(),
-                                      num_omegab,
-                                      ddYHe.data(),
-                                      _SPLINE_NATURAL_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_lines(deltaN.data(),
+                                                num_deltaN,
+                                                YHe.data(),
+                                                num_omegab,
+                                                ddYHe.data(),
+                                                _SPLINE_NATURAL_,
+                                                buf),
+                       buf);
+  }
 
   omega_b = pba->Omega0_b * pba->h * pba->h;
 
   class_test(omega_b < omegab[0],
-             error_message_,
 
              "You have asked for an unrealistic small value omega_b = %e. The corresponding value "
              "of the primordial helium fraction cannot be found in the interpolation table. If you "
@@ -1768,7 +1725,6 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
              omega_b);
 
   class_test(omega_b > omegab[num_omegab - 1],
-             error_message_,
 
              "You have asked for an unrealistic high value omega_b = %e. The corresponding value "
              "of the primordial helium fraction cannot be found in the interpolation table. If you "
@@ -1776,7 +1732,6 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
              omega_b);
 
   class_test(DeltaNeff < deltaN[0],
-             error_message_,
 
              "You have asked for an unrealistic small value of Delta N_eff = %e. The corresponding "
              "value of the primordial helium fraction cannot be found in the interpolation table. "
@@ -1785,7 +1740,6 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
              DeltaNeff);
 
   class_test(DeltaNeff > deltaN[num_deltaN - 1],
-             error_message_,
 
              "You have asked for an unrealistic high value of Delta N_eff = %e. The corresponding "
              "value of the primordial helium fraction cannot be found in the interpolation table. "
@@ -1794,43 +1748,49 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
              DeltaNeff);
 
   /** - interpolate in one dimension (along deltaN) */
-  class_call(array_interpolate_spline(deltaN.data(),
-                                      num_deltaN,
-                                      YHe.data(),
-                                      ddYHe.data(),
-                                      num_omegab,
-                                      DeltaNeff,
-                                      &last_index,
-                                      YHe_at_deltaN.data(),
-                                      num_omegab,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_interpolate_spline(deltaN.data(),
+                                                num_deltaN,
+                                                YHe.data(),
+                                                ddYHe.data(),
+                                                num_omegab,
+                                                DeltaNeff,
+                                                &last_index,
+                                                YHe_at_deltaN.data(),
+                                                num_omegab,
+                                                buf),
+                       buf);
+  }
 
   /** - spline in remaining dimension (along omegab) */
-  class_call(array_spline_table_lines(omegab.data(),
-                                      num_omegab,
-                                      YHe_at_deltaN.data(),
-                                      1,
-                                      ddYHe_at_deltaN.data(),
-                                      _SPLINE_NATURAL_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_lines(omegab.data(),
+                                                num_omegab,
+                                                YHe_at_deltaN.data(),
+                                                1,
+                                                ddYHe_at_deltaN.data(),
+                                                _SPLINE_NATURAL_,
+                                                buf),
+                       buf);
+  }
 
   /** - interpolate in remaining dimension (along omegab) */
-  class_call(array_interpolate_spline(omegab.data(),
-                                      num_omegab,
-                                      YHe_at_deltaN.data(),
-                                      ddYHe_at_deltaN.data(),
-                                      1,
-                                      omega_b,
-                                      &last_index,
-                                      &(YHe_),
-                                      1,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_interpolate_spline(omegab.data(),
+                                                num_omegab,
+                                                YHe_at_deltaN.data(),
+                                                ddYHe_at_deltaN.data(),
+                                                1,
+                                                omega_b,
+                                                &last_index,
+                                                &(YHe_),
+                                                1,
+                                                buf),
+                       buf);
+  }
 
   /** - deallocate arrays */
 
@@ -2154,9 +2114,7 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
         double width = preio->reionization_parameters[preio->index_reio_step_sharpness];
 
         double one_jump;
-        class_call(thermodynamics_tanh(z, center, before, after, width, &one_jump),
-                   error_message_,
-                   error_message_);
+        thermodynamics_tanh(z, center, before, after, width, &one_jump);
 
         *xe += one_jump;
       }
@@ -2176,7 +2134,7 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
 
     if (z > preio->reionization_parameters[preio->index_reio_first_z + preio->reio_num_z - 1]) {
       *xe = preio->reionization_parameters[preio->index_reio_first_xe + preio->reio_num_z - 1];
-      class_stop(error_message_, "Check: is it normal that we are here?");
+      class_stop("Check: is it normal that we are here?");
     }
 
     else {
@@ -2187,9 +2145,9 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
       double z_min = preio->reionization_parameters[preio->index_reio_first_z + i];
       double z_max = preio->reionization_parameters[preio->index_reio_first_z + i + 1];
 
-      class_test(z < z_min, error_message_, "");
+      class_test(z < z_min, "");
 
-      class_test(z > z_max, error_message_, "");
+      class_test(z > z_max, "");
 
       double x = (z - preio->reionization_parameters[preio->index_reio_first_z + i]) /
                  (preio->reionization_parameters[preio->index_reio_first_z + i + 1] -
@@ -2200,7 +2158,6 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
                  preio->reionization_parameters[preio->index_reio_first_xe + i]);
 
       class_test(*xe < 0.,
-                 error_message_,
                  "%e %e %e\n",
                  x,
                  preio->reionization_parameters[preio->index_reio_first_xe + i],
@@ -2210,10 +2167,7 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
     return _SUCCESS_;
   }
 
-  class_test(0 == 0,
-             error_message_,
-             "value of reio_parametrization=%d unclear",
-             pth->reio_parametrization);
+  class_test(0 == 0, "value of reio_parametrization=%d unclear", pth->reio_parametrization);
 }
 
 /**
@@ -2231,17 +2185,19 @@ int ThermodynamicsModule::thermodynamics_get_xe_before_reionization(recombinatio
                                                                     double* xe) {
   int last_index = 0;
 
-  class_call(array_interpolate_one_growing_closeby(preco->recombination_table.data(),
-                                                   preco->re_size,
-                                                   preco->rt_size,
-                                                   preco->index_re_z,
-                                                   z,
-                                                   &last_index,
-                                                   preco->index_re_xe,
-                                                   xe,
-                                                   error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_interpolate_one_growing_closeby(preco->recombination_table.data(),
+                                                             preco->re_size,
+                                                             preco->rt_size,
+                                                             preco->index_re_z,
+                                                             z,
+                                                             &last_index,
+                                                             preco->index_re_xe,
+                                                             xe,
+                                                             buf),
+                       buf);
+  }
 
   return _SUCCESS_;
 }
@@ -2306,15 +2262,12 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
         pth->helium_fullreio_width; /* helium_fullreio_width */
 
     class_test(preio->reionization_parameters[preio->index_reio_exponent] == 0,
-               error_message_,
                "stop to avoid division by zero");
 
     class_test(preio->reionization_parameters[preio->index_reio_width] == 0,
-               error_message_,
                "stop to avoid division by zero");
 
     class_test(preio->reionization_parameters[preio->index_helium_fullreio_width] == 0,
-               error_message_,
                "stop to avoid division by zero");
 
     /** - --> if reionization redshift given as an input, initialize the remaining values and fill reionization table*/
@@ -2346,22 +2299,17 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
       class_test(preio->reionization_parameters[preio->index_reio_start] >
                      ppr->reionization_z_start_max,
-                 error_message_,
                  "starting redshift for reionization > reionization_z_start_max = %e\n",
                  ppr->reionization_z_start_max);
 
       /* infer xe_before_reio */
-      class_call(thermodynamics_get_xe_before_reionization(
-                     preco,
-                     preio->reionization_parameters[preio->index_reio_start],
-                     &(preio->reionization_parameters[preio->index_reio_xe_before])),
-                 error_message_,
-                 error_message_);
+      thermodynamics_get_xe_before_reionization(
+          preco,
+          preio->reionization_parameters[preio->index_reio_start],
+          &(preio->reionization_parameters[preio->index_reio_xe_before]));
 
       /* fill reionization table */
-      class_call(thermodynamics_reionization_sample(preco, preio, pvecback),
-                 error_message_,
-                 error_message_);
+      thermodynamics_reionization_sample(preco, preio, pvecback);
 
       tau_reionization_ = preio->reionization_optical_depth;
     }
@@ -2374,7 +2322,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
       z_sup = ppr->reionization_z_start_max -
               ppr->reionization_start_factor * pth->reionization_width;
       class_test(z_sup < 0.,
-                 error_message_,
                  "parameters are such that reionization cannot take place before today while "
                  "starting after z_start_max; need to increase z_start_max");
 
@@ -2383,22 +2330,17 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
       /* maximum possible starting redshift */
       preio->reionization_parameters[preio->index_reio_start] = ppr->reionization_z_start_max;
       /* infer xe_before_reio */
-      class_call(thermodynamics_get_xe_before_reionization(
-                     preco,
-                     preio->reionization_parameters[preio->index_reio_start],
-                     &(preio->reionization_parameters[preio->index_reio_xe_before])),
-                 error_message_,
-                 error_message_);
+      thermodynamics_get_xe_before_reionization(
+          preco,
+          preio->reionization_parameters[preio->index_reio_start],
+          &(preio->reionization_parameters[preio->index_reio_xe_before]));
 
       /* fill reionization table */
-      class_call(thermodynamics_reionization_sample(preco, preio, pvecback),
-                 error_message_,
-                 error_message_);
+      thermodynamics_reionization_sample(preco, preio, pvecback);
 
       tau_sup = preio->reionization_optical_depth;
 
       class_test_except(tau_sup < tau_reionization_,
-                        error_message_,
                         ,
                         "parameters are such that reionization cannot start after z_start_max");
 
@@ -2432,23 +2374,18 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
         class_test(preio->reionization_parameters[preio->index_reio_start] >
                        ppr->reionization_z_start_max,
-                   error_message_,
                    "starting redshift for reionization > reionization_z_start_max = %e",
                    ppr->reionization_z_start_max);
 
         /* infer xe_before_reio */
-        class_call(thermodynamics_get_xe_before_reionization(
-                       preco,
-                       preio->reionization_parameters[preio->index_reio_start],
-                       &(preio->reionization_parameters[preio->index_reio_xe_before])),
-                   error_message_,
-                   error_message_);
+        thermodynamics_get_xe_before_reionization(
+            preco,
+            preio->reionization_parameters[preio->index_reio_start],
+            &(preio->reionization_parameters[preio->index_reio_xe_before]));
 
         /* clean and fill reionization table */
 
-        class_call(thermodynamics_reionization_sample(preco, preio, pvecback),
-                   error_message_,
-                   error_message_);
+        thermodynamics_reionization_sample(preco, preio, pvecback);
 
         double tau_mid = preio->reionization_optical_depth;
 
@@ -2465,7 +2402,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
         counter++;
         class_test(counter > _MAX_IT_,
-                   error_message_,
                    "while searching for reionization_optical_depth, maximum number of iterations "
                    "exceeded");
       }
@@ -2483,13 +2419,11 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     /* this algorithm requires at least two bin centers (i.e. at least
        4 values in the (z,xe) array, counting the edges). */
     class_test(pth->binned_reio_num < 2,
-               error_message_,
                "current implementation of binned reio requires at least two bin centers");
 
     /* check that this input can be interpreted by the code */
     for (int bin = 1; bin < pth->binned_reio_num; bin++) {
       class_test(pth->binned_reio_z[bin - 1] >= pth->binned_reio_z[bin],
-                 error_message_,
                  "value of reionization bin centers z_i expected to be passed in growing order: "
                  "%e, %e",
                  pth->binned_reio_z[bin - 1],
@@ -2521,7 +2455,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     /* check it's not too big */
     class_test(preio->reionization_parameters[preio->index_reio_start] >
                    ppr->reionization_z_start_max,
-               error_message_,
                "starting redshift for reionization = %e, reionization_z_start_max = %e, you must "
                "change the binning or increase reionization_z_start_max",
                preio->reionization_parameters[preio->index_reio_start],
@@ -2539,7 +2472,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     /* 6.06.2015: changed this test to simply imposing that the first z is at least zero */
     /*
       class_test(preio->reionization_parameters[preio->index_reio_first_z] < 0,
-      error_message_,
       "final redshift for reionization = %e, you must change the binning or redefine the way in which the code extrapolates below the first value of z_i",preio->reionization_parameters[preio->index_reio_first_z]);
     */
     if (preio->reionization_parameters[preio->index_reio_first_z] < 0) {
@@ -2547,14 +2479,10 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     }
 
     /* infer xe before reio */
-    class_call(thermodynamics_get_xe_before_reionization(
-                   preco,
-                   preio
-                       ->reionization_parameters[preio->index_reio_first_z + preio->reio_num_z - 1],
-                   &(preio->reionization_parameters[preio->index_reio_first_xe + preio->reio_num_z -
-                                                    1])),
-               error_message_,
-               error_message_);
+    thermodynamics_get_xe_before_reionization(
+        preco,
+        preio->reionization_parameters[preio->index_reio_first_z + preio->reio_num_z - 1],
+        &(preio->reionization_parameters[preio->index_reio_first_xe + preio->reio_num_z - 1]));
 
     /* infer xe after reio */
     preio->reionization_parameters[preio->index_reio_first_xe] =
@@ -2569,9 +2497,7 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
         pth->binned_reio_step_sharpness;
 
     /* fill reionization table */
-    class_call(thermodynamics_reionization_sample(preco, preio, pvecback),
-               error_message_,
-               error_message_);
+    thermodynamics_reionization_sample(preco, preio, pvecback);
 
     tau_reionization_ = preio->reionization_optical_depth;
 
@@ -2583,13 +2509,11 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
   if (pth->reio_parametrization == reio_many_tanh) {
     /* this algorithm requires at least one jump centers */
     class_test(pth->many_tanh_num < 1,
-               error_message_,
                "current implementation of reio_many_tanh requires at least one jump center");
 
     /* check that z input can be interpreted by the code */
     for (int bin = 1; bin < pth->many_tanh_num; bin++) {
       class_test(pth->many_tanh_z[bin - 1] >= pth->many_tanh_z[bin],
-                 error_message_,
                  "value of reionization bin centers z_i expected to be passed in growing order: "
                  "%e, %e",
                  pth->many_tanh_z[bin - 1],
@@ -2619,11 +2543,11 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
       }
       //other negative number is nonsense
       else {
-        class_stop(error_message_,
-                   "Your entry for many_tanh_xe[%d] is %e, this makes no sense (either positive or "
-                   "0,-1,-2)",
-                   bin - 1,
-                   pth->many_tanh_xe[bin - 1]);
+        class_stop(
+            "Your entry for many_tanh_xe[%d] is %e, this makes no sense (either positive or "
+            "0,-1,-2)",
+            bin - 1,
+            pth->many_tanh_xe[bin - 1]);
       }
 
       preio->reionization_parameters[preio->index_reio_first_xe + bin] = xe_actual;
@@ -2642,7 +2566,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     /* check it's not too big */
     class_test(preio->reionization_parameters[preio->index_reio_start] >
                    ppr->reionization_z_start_max,
-               error_message_,
                "starting redshift for reionization = %e, reionization_z_start_max = %e, you must "
                "change the binning or increase reionization_z_start_max",
                preio->reionization_parameters[preio->index_reio_start],
@@ -2660,14 +2583,10 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     }
 
     /* infer xe before reio */
-    class_call(thermodynamics_get_xe_before_reionization(
-                   preco,
-                   preio
-                       ->reionization_parameters[preio->index_reio_first_z + preio->reio_num_z - 1],
-                   &(preio->reionization_parameters[preio->index_reio_first_xe + preio->reio_num_z -
-                                                    1])),
-               error_message_,
-               error_message_);
+    thermodynamics_get_xe_before_reionization(
+        preco,
+        preio->reionization_parameters[preio->index_reio_first_z + preio->reio_num_z - 1],
+        &(preio->reionization_parameters[preio->index_reio_first_xe + preio->reio_num_z - 1]));
 
     /* infer xe after reio */
 
@@ -2685,16 +2604,13 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
     /* pass step sharpness parameter */
     class_test(pth->many_tanh_width <= 0,
-               error_message_,
                "many_tanh_width must be strictly positive, you passed %e",
                pth->many_tanh_width);
 
     preio->reionization_parameters[preio->index_reio_step_sharpness] = pth->many_tanh_width;
 
     /* fill reionization table */
-    class_call(thermodynamics_reionization_sample(preco, preio, pvecback),
-               error_message_,
-               error_message_);
+    thermodynamics_reionization_sample(preco, preio, pvecback);
 
     tau_reionization_ = preio->reionization_optical_depth;
 
@@ -2706,12 +2622,10 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
   if (pth->reio_parametrization == reio_inter) {
     /* this parametrization requires at least one point (z,xe) */
     class_test(pth->reio_inter_num < 1,
-               error_message_,
                "current implementation of reio_inter requires at least one point (z,xe)");
 
     /* this parametrization requires that the first z value is zero */
     class_test(pth->reio_inter_z[0] != 0.,
-               error_message_,
                "For reio_inter scheme, the first value of reio_inter_z[...]  should always be "
                "zero, you passed %e",
                pth->reio_inter_z[0]);
@@ -2719,7 +2633,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     /* check that z input can be interpreted by the code */
     for (int point = 1; point < pth->reio_inter_num; point++) {
       class_test(pth->reio_inter_z[point - 1] >= pth->reio_inter_z[point],
-                 error_message_,
                  "value of reionization bin centers z_i expected to be passed in growing order, "
                  "unlike: %e, %e",
                  pth->reio_inter_z[point - 1],
@@ -2730,7 +2643,6 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
        (the code will substitute it with the value that one would get in
        absence of reionization, as compute by the recombination code) */
     class_test(pth->reio_inter_xe[pth->reio_inter_num - 1] != 0.,
-               error_message_,
                "For reio_inter scheme, the last value of reio_inter_xe[...]  should always be "
                "zero, you passed %e",
                pth->reio_inter_xe[pth->reio_inter_num - 1]);
@@ -2756,11 +2668,11 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
       }
       //other negative number is nonsense
       else {
-        class_stop(error_message_,
-                   "Your entry for reio_inter_xe[%d] is %e, this makes no sense (either positive "
-                   "or 0,-1,-2)",
-                   point,
-                   pth->reio_inter_xe[point]);
+        class_stop(
+            "Your entry for reio_inter_xe[%d] is %e, this makes no sense (either positive "
+            "or 0,-1,-2)",
+            point,
+            pth->reio_inter_xe[point]);
       }
 
       preio->reionization_parameters[preio->index_reio_first_xe + point] = xe_actual;
@@ -2773,33 +2685,26 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     /* check it's not too big */
     class_test(preio->reionization_parameters[preio->index_reio_start] >
                    ppr->reionization_z_start_max,
-               error_message_,
                "starting redshift for reionization = %e, reionization_z_start_max = %e, you must "
                "change the binning or increase reionization_z_start_max",
                preio->reionization_parameters[preio->index_reio_start],
                ppr->reionization_z_start_max);
 
     /* infer xe before reio */
-    class_call(thermodynamics_get_xe_before_reionization(
-                   preco,
-                   preio
-                       ->reionization_parameters[preio->index_reio_first_z + preio->reio_num_z - 1],
-                   &(preio->reionization_parameters[preio->index_reio_first_xe + preio->reio_num_z -
-                                                    1])),
-               error_message_,
-               error_message_);
+    thermodynamics_get_xe_before_reionization(
+        preco,
+        preio->reionization_parameters[preio->index_reio_first_z + preio->reio_num_z - 1],
+        &(preio->reionization_parameters[preio->index_reio_first_xe + preio->reio_num_z - 1]));
 
     /* fill reionization table */
-    class_call(thermodynamics_reionization_sample(preco, preio, pvecback),
-               error_message_,
-               error_message_);
+    thermodynamics_reionization_sample(preco, preio, pvecback);
 
     tau_reionization_ = preio->reionization_optical_depth;
 
     return _SUCCESS_;
   }
 
-  class_test(0 == 0, error_message_, "value of reio_z_or_tau=%d unclear", pth->reio_z_or_tau);
+  class_test(0 == 0, "value of reio_z_or_tau=%d unclear", pth->reio_z_or_tau);
 }
 
 /**
@@ -2834,7 +2739,6 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
          preio->reionization_parameters[preio->index_reio_start]) {
     i++;
     class_test(i == ppr->recfast_Nz0,
-               error_message_,
                "reionization_z_start_max = %e > largest redshift in thermodynamics table",
                ppr->reionization_z_start_max);
   }
@@ -2846,32 +2750,26 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
 
   /** - --> get \f$ X_e \f$ */
   double xe;
-  class_call(thermodynamics_reionization_function(z, preio, &xe), error_message_, error_message_);
+  thermodynamics_reionization_function(z, preio, &xe);
 
   reio_vector[preio->index_re_xe] = xe;
 
   /** -  --> get \f$ d \kappa / d z = (d \kappa / d \tau) * (d \tau / d z) = - (d \kappa / d \tau) / H \f$ */
 
   double tau;
-  class_call(background_module_->background_tau_of_z(z, &tau),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z, &tau);
 
   int last_index_back;
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->short_info,
-                                                   pba->inter_normal,
-                                                   &last_index_back,
-                                                   pvecback),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau,
+                                        pba->short_info,
+                                        pba->inter_normal,
+                                        &last_index_back,
+                                        pvecback);
 
   reio_vector[preio->index_re_dkappadtau] = (1. + z) * (1. + z) * n_e_ * xe * _sigma_ *
                                             _Mpc_over_m_;
 
-  class_test(pvecback[background_module_->index_bg_H_] == 0.,
-             error_message_,
-             "stop to avoid division by zero");
+  class_test(pvecback[background_module_->index_bg_H_] == 0., "stop to avoid division by zero");
 
   reio_vector[preio->index_re_dkappadz] = reio_vector[preio->index_re_dkappadtau] /
                                           pvecback[background_module_->index_bg_H_];
@@ -2909,7 +2807,6 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
 
   while (z > 0.) {
     class_test(dz < ppr->smallest_allowed_variation,
-               error_message_,
                "stuck in the loop for reionization sampling, as if you were trying to impose a "
                "discontinuous evolution for xe(z)");
 
@@ -2919,25 +2816,17 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
       z_next = 0.;
 
     double xe_next;
-    class_call(thermodynamics_reionization_function(z_next, preio, &xe_next),
-               error_message_,
-               error_message_);
+    thermodynamics_reionization_function(z_next, preio, &xe_next);
 
-    class_call(background_module_->background_tau_of_z(z_next, &tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z_next, &tau);
 
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->short_info,
-                                                     pba->inter_normal,
-                                                     &last_index_back,
-                                                     pvecback),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->short_info,
+                                          pba->inter_normal,
+                                          &last_index_back,
+                                          pvecback);
 
-    class_test(pvecback[background_module_->index_bg_H_] == 0.,
-               error_message_,
-               "stop to avoid division by zero");
+    class_test(pvecback[background_module_->index_bg_H_] == 0., "stop to avoid division by zero");
 
     double dkappadz_next = (1. + z_next) * (1. + z_next) * n_e_ * xe_next * _sigma_ * _Mpc_over_m_ /
                            pvecback[background_module_->index_bg_H_];
@@ -2945,9 +2834,7 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
     double dkappadtau_next = (1. + z_next) * (1. + z_next) * n_e_ * xe_next * _sigma_ *
                              _Mpc_over_m_;
 
-    class_test((dkappadz == 0.) || (dkappadtau == 0.),
-               error_message_,
-               "stop to avoid division by zero");
+    class_test((dkappadz == 0.) || (dkappadtau == 0.), "stop to avoid division by zero");
 
     double relative_variation = fabs((dkappadz_next - dkappadz) / dkappadz) +
                                 fabs((dkappadtau_next - dkappadtau) / dkappadtau);
@@ -2961,7 +2848,6 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
       dkappadtau = dkappadtau_next;
 
       class_test((dkappadz == 0.) || (dkappadtau == 0.),
-                 error_message_,
                  "dkappadz=%e, dkappadtau=%e, stop to avoid division by zero",
                  dkappadz,
                  dkappadtau);
@@ -2999,7 +2885,6 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
                                   pData + (preio->rt_size - i - 1) * preio->re_size,
                                   preio->re_size * sizeof(double));
     class_test(memcopy_result != preio->reionization_table.data() + i * preio->re_size,
-               error_message_,
                "cannot copy data back to reionization_temporary_table");
   }
 
@@ -3011,17 +2896,13 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
   for (int i = preio->rt_size - 1; i > 0; i--) {
     z = preio->reionization_table[i * preio->re_size + preio->index_re_z];
 
-    class_call(background_module_->background_tau_of_z(z, &tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z, &tau);
 
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->normal_info,
-                                                     pba->inter_normal,
-                                                     &last_index_back,
-                                                     pvecback),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->normal_info,
+                                          pba->inter_normal,
+                                          &last_index_back,
+                                          pvecback);
 
     dz = (preio->reionization_table[i * preio->re_size + preio->index_re_z] -
           preio->reionization_table[(i - 1) * preio->re_size + preio->index_re_z]);
@@ -3046,9 +2927,8 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
 
     if (preco->annihilation > 0) {
       double energy_rate;
-      class_call(thermodynamics_energy_injection(preco, z, &energy_rate, error_message_),
-                 error_message_,
-                 error_message_);
+      ErrorMsg buf;
+      thermodynamics_energy_injection(preco, z, &energy_rate, buf);
 
       // old approximation from Chen and Kamionkowski:
       // chi_heat = (1.+2.*preio->reionization_table[i*preio->re_size+preio->index_re_xe])/3.;
@@ -3090,28 +2970,32 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
   }
 
   /** - --> spline \f$ d \tau / dz \f$ with respect to z in view of integrating for optical depth */
-  class_call(array_spline(preio->reionization_table.data(),
-                          preio->re_size,
-                          preio->rt_size,
-                          preio->index_re_z,
-                          preio->index_re_dkappadz,
-                          preio->index_re_d3kappadz3,
-                          _SPLINE_EST_DERIV_,
-                          error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline(preio->reionization_table.data(),
+                                    preio->re_size,
+                                    preio->rt_size,
+                                    preio->index_re_z,
+                                    preio->index_re_dkappadz,
+                                    preio->index_re_d3kappadz3,
+                                    _SPLINE_EST_DERIV_,
+                                    buf),
+                       buf);
+  }
 
   /** - --> integrate for optical depth */
-  class_call(array_integrate_all_spline(preio->reionization_table.data(),
-                                        preio->re_size,
-                                        preio->rt_size,
-                                        preio->index_re_z,
-                                        preio->index_re_dkappadz,
-                                        preio->index_re_d3kappadz3,
-                                        &(preio->reionization_optical_depth),
-                                        error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_integrate_all_spline(preio->reionization_table.data(),
+                                                  preio->re_size,
+                                                  preio->rt_size,
+                                                  preio->index_re_z,
+                                                  preio->index_re_dkappadz,
+                                                  preio->index_re_d3kappadz3,
+                                                  &(preio->reionization_optical_depth),
+                                                  buf),
+                       buf);
+  }
 
   return _SUCCESS_;
 }
@@ -3123,15 +3007,11 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
 
 int ThermodynamicsModule::thermodynamics_recombination(recombination* preco, double* pvecback) {
   if (pth->recombination == hyrec) {
-    class_call(thermodynamics_recombination_with_hyrec(preco, pvecback),
-               error_message_,
-               error_message_);
+    thermodynamics_recombination_with_hyrec(preco, pvecback);
   }
 
   if (pth->recombination == recfast) {
-    class_call(thermodynamics_recombination_with_recfast(preco, pvecback),
-               error_message_,
-               error_message_);
+    thermodynamics_recombination_with_recfast(preco, pvecback);
   }
 
   return _SUCCESS_;
@@ -3198,12 +3078,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
     param.odeh2                      = (Omega0_lambda_hyrec + Omega0_fld_hyrec) * pba->h * pba->h;
   }
   double w_fld, dw_over_da_fld, integral_fld;
-  class_call(background_module_->background_w_fld(pba->a_today,
-                                                  &w_fld,
-                                                  &dw_over_da_fld,
-                                                  &integral_fld),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_w_fld(pba->a_today, &w_fld, &dw_over_da_fld, &integral_fld);
   param.w0              = w_fld;
   param.wa              = -dw_over_da_fld * pba->a_today;
   param.Y               = YHe_;
@@ -3265,22 +3140,20 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
 
   /* read in file */
 
-  class_open(fA, ppr->hyrec_Alpha_inf_file.c_str(), "r", error_message_);
-  class_open(fR, ppr->hyrec_R_inf_file.c_str(), "r", error_message_);
+  class_open(fA, ppr->hyrec_Alpha_inf_file.c_str(), "r");
+  class_open(fR, ppr->hyrec_R_inf_file.c_str(), "r");
 
   for (int i = 0; i < NTR; i++) {
     for (int j = 0; j < NTM; j++) {
       for (int l = 0; l <= 1; l++) {
         if (fscanf(fA, "%le", &(rate_table.logAlpha_tab[l][j][i])) != 1)
-          class_stop(error_message_,
-                     "Error reading hyrec data file %s",
-                     ppr->hyrec_Alpha_inf_file.c_str());
+          class_stop("Error reading hyrec data file %s", ppr->hyrec_Alpha_inf_file.c_str());
         rate_table.logAlpha_tab[l][j][i] = log(rate_table.logAlpha_tab[l][j][i]);
       }
     }
 
     if (fscanf(fR, "%le", &(rate_table.logR2p2s_tab[i])) != 1)
-      class_stop(error_message_, "Error reading hyrec data file %s", ppr->hyrec_R_inf_file.c_str());
+      class_stop("Error reading hyrec data file %s", ppr->hyrec_R_inf_file.c_str());
     rate_table.logR2p2s_tab[i] = log(rate_table.logR2p2s_tab[i]);
   }
   fclose(fA);
@@ -3288,7 +3161,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
 
   /* Read two-photon rate tables */
 
-  class_open(fA, ppr->hyrec_two_photon_tables_file.c_str(), "r", error_message_);
+  class_open(fA, ppr->hyrec_two_photon_tables_file.c_str(), "r");
 
   for (int b = 0; b < NVIRT; b++) {
     if ((fscanf(fA, "%le", &(twog_params.Eb_tab[b])) != 1) ||
@@ -3296,9 +3169,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
         (fscanf(fA, "%le", &(twog_params.A2s_tab[b])) != 1) ||
         (fscanf(fA, "%le", &(twog_params.A3s3d_tab[b])) != 1) ||
         (fscanf(fA, "%le", &(twog_params.A4s4d_tab[b])) != 1))
-      class_stop(error_message_,
-                 "Error reading hyrec data file %s",
-                 ppr->hyrec_two_photon_tables_file.c_str());
+      class_stop("Error reading hyrec data file %s", ppr->hyrec_two_photon_tables_file.c_str());
   }
 
   fclose(fA);
@@ -3360,42 +3231,40 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
     /* get (xe,Tm) by interpolating in pre-computed tables */
 
     double xe;
-    class_call(array_interpolate_cubic_equal(-log(1. + param.zstart),
-                                             param.dlna,
-                                             xe_output,
-                                             param.nz,
-                                             -log(1. + z),
-                                             &xe,
-                                             error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_cubic_equal(-log(1. + param.zstart),
+                                                       param.dlna,
+                                                       xe_output,
+                                                       param.nz,
+                                                       -log(1. + z),
+                                                       &xe,
+                                                       buf),
+                         buf);
+    }
 
     double Tm;
-    class_call(array_interpolate_cubic_equal(-log(1. + param.zstart),
-                                             param.dlna,
-                                             Tm_output,
-                                             param.nz,
-                                             -log(1. + z),
-                                             &Tm,
-                                             error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_cubic_equal(-log(1. + param.zstart),
+                                                       param.dlna,
+                                                       Tm_output,
+                                                       param.nz,
+                                                       -log(1. + z),
+                                                       &Tm,
+                                                       buf),
+                         buf);
+    }
 
-    class_call(background_module_->background_tau_of_z(z, &tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z, &tau);
 
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->short_info,
-                                                     pba->inter_normal,
-                                                     &last_index_back,
-                                                     pvecback),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->short_info,
+                                          pba->inter_normal,
+                                          &last_index_back,
+                                          pvecback);
 
-    /*   class_call(thermodynamics_energy_injection(ppr,pba,preco,z,&energy_rate,error_message_),
-         error_message_,
-         error_message_);
+    /*   thermodynamics_energy_injection(ppr,pba,preco,z,&energy_rate,buf);
     */
 
     /* Hz is H in inverse seconds (while pvecback returns [H0/c] in inverse Mpcs) */
@@ -3440,10 +3309,10 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
 
 #else
 
-  class_stop(error_message_,
-             "you compiled without including the HyRec code, and now wish to use it. Either set "
-             "the input parameter 'recombination' to something else than 'HyRec', or recompile "
-             "after setting in the Makefile the appropriate path HYREC=... ");
+  class_stop(
+      "you compiled without including the HyRec code, and now wish to use it. Either set "
+      "the input parameter 'recombination' to something else than 'HyRec', or recompile "
+      "after setting in the Makefile the appropriate path HYREC=... ");
 
 #endif
 
@@ -3512,9 +3381,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
   preco->recombination_table.resize(preco->re_size * preco->rt_size);
 
   /** - initialize generic integrator with initialize_generic_integrator() */
-  class_call(initialize_generic_integrator(_RECFAST_INTEG_SIZE_, &gi),
-             gi.error_message,
-             error_message_);
+  class_call_failure(initialize_generic_integrator(_RECFAST_INTEG_SIZE_, &gi), gi.error_message);
 
   /** - read a few precision/cosmological parameters */
 
@@ -3541,7 +3408,6 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
 
   /* H fudging */
   class_test((ppr->recfast_Hswitch != _TRUE_) && (ppr->recfast_Hswitch != _FALSE_),
-             error_message_,
              "RECFAST error: unknown H fudging scheme");
   preco->fu = ppr->recfast_fudge_H;
   if (ppr->recfast_Hswitch == _TRUE_)
@@ -3549,7 +3415,6 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
 
   /* He fudging */
   class_test((ppr->recfast_Heswitch < 0) || (ppr->recfast_Heswitch > 6),
-             error_message_,
              "RECFAST error: unknown He fudging scheme");
 
   /* related quantities */
@@ -3599,7 +3464,6 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
   /** - impose initial conditions at early times */
 
   class_test(zinitial < ppr->recfast_z_He_3,
-             error_message_,
              "increase zinitial, otherwise should get initial conditions from recfast's get_init "
              "routine (less precise anyway)");
 
@@ -3746,16 +3610,15 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
              preco->Nnow;
       x_H0 = 0.5 * (sqrt(pow(rhs, 2) + 4. * rhs) - rhs);
 
-      class_call(generic_integrator(thermodynamics_derivs_with_recfast,
-                                    zstart,
-                                    zend,
-                                    y,
-                                    &tpaw,
-                                    ppr->tol_thermo_integration,
-                                    ppr->smallest_allowed_variation,
-                                    &gi),
-                 gi.error_message,
-                 error_message_);
+      class_call_failure(generic_integrator(thermodynamics_derivs_with_recfast,
+                                            zstart,
+                                            zend,
+                                            y,
+                                            &tpaw,
+                                            ppr->tol_thermo_integration,
+                                            ppr->smallest_allowed_variation,
+                                            &gi),
+                         gi.error_message);
 
       y[0] = x_H0;
 
@@ -3791,16 +3654,15 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
         x_H0 = 0.5 * (sqrt(pow(rhs, 2) + 4. * rhs) - rhs);
       }
 
-      class_call(generic_integrator(thermodynamics_derivs_with_recfast,
-                                    zstart,
-                                    zend,
-                                    y,
-                                    &tpaw,
-                                    ppr->tol_thermo_integration,
-                                    ppr->smallest_allowed_variation,
-                                    &gi),
-                 gi.error_message,
-                 error_message_);
+      class_call_failure(generic_integrator(thermodynamics_derivs_with_recfast,
+                                            zstart,
+                                            zend,
+                                            y,
+                                            &tpaw,
+                                            ppr->tol_thermo_integration,
+                                            ppr->smallest_allowed_variation,
+                                            &gi),
+                         gi.error_message);
 
       /* smoothed transition */
       if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
@@ -3830,9 +3692,10 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
     preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_Tb] = y[2];
 
     /* get dTb/dz=dy[2] */
-    class_call(thermodynamics_derivs_with_recfast(zend, y, dy, &tpaw, error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      thermodynamics_derivs_with_recfast(zend, y, dy, &tpaw, buf);
+    }
 
     /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
     preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_wb] =
@@ -3860,7 +3723,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
 
   /** - cleanup generic integrator with cleanup_generic_integrator() */
 
-  class_call(cleanup_generic_integrator(&gi), gi.error_message, error_message_);
+  class_call_failure(cleanup_generic_integrator(&gi), gi.error_message);
 
   return _SUCCESS_;
 }
@@ -3883,7 +3746,7 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
  *   generic_integrator() doesn't know its fine structure.
  *
  * - the error management is a bit special: errors are not written as
- *   usual to error_message_, but to a generic error_message
+ *   usual to a module error_message buffer, but to a generic error_message
  *   passed in the list of arguments.
  *
  * @param z                        Input: redshift
@@ -3912,18 +3775,14 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
   double Trad = preco->Tnow * (1. + z);
 
   double tau;
-  class_call(background_module_->background_tau_of_z(z, &tau),
-             background_module_->error_message_,
-             error_message);
+  background_module_->background_tau_of_z(z, &tau);
 
   int last_index_back;
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->short_info,
-                                                   pba->inter_normal,
-                                                   &last_index_back,
-                                                   pvecback),
-             background_module_->error_message_,
-             error_message);
+  background_module_->background_at_tau(tau,
+                                        pba->short_info,
+                                        pba->inter_normal,
+                                        &last_index_back,
+                                        pvecback);
 
   double energy_rate;
   class_call(thermodynamics_energy_injection(preco, z, &energy_rate, error_message),
@@ -4164,7 +4023,6 @@ int ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* prec
                                           preco->index_re_z] !=
                    preio->reionization_table[(preio->rt_size - 1) * preio->re_size +
                                              preio->index_re_z],
-               error_message_,
                "mismatch which should never happen");
   }
 
@@ -4314,9 +4172,7 @@ int ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, doubl
     z          = z_table_[index_z];
     storeidx   = 0;
 
-    class_call(background_module_->background_tau_of_z(z, &tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z, &tau);
 
     class_store_double(dataptr, z, _TRUE_, storeidx);
     class_store_double(dataptr, tau, _TRUE_, storeidx);

@@ -615,7 +615,6 @@ cdef class PyCosmology:
             Py_ssize_t i
             Py_ssize_t z_array_size
             double z
-            int status
             vector[double] pvecback
             double[::1] r
             double[::1] dzdr
@@ -638,13 +637,8 @@ cdef class PyCosmology:
 
         for i in range(z_array_size):
             z = z_array[i]
-            status = deref(background_module).background_tau_of_z(z, &tau)
-            if (status == constvals.sFAILURE):
-                raise CosmoSevereError(deref(background_module).error_message_)
-
-            status = deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
-            if (status == constvals.sFAILURE):
-                raise CosmoSevereError(deref(background_module).error_message_)
+            deref(background_module).background_tau_of_z(z, &tau)
+            deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
 
             # store r
             r[i] = pvecback[index_bg_conf_distance]
@@ -665,15 +659,12 @@ cdef class PyCosmology:
     cdef pk_general(self, double k, double z, int index_pk, pk_outputs linear_or_nonlinear):
         cdef:
             double pk
-            int status
 
         if (self.pt.has_pk_matter == constvals.sFALSE):
             raise CosmoSevereError("Power spectrum not computed. You must add mPk to the list of outputs.")
 
         nonlinear_module = deref(self._thisptr).GetNonlinearModule()
-        status = deref(nonlinear_module).nonlinear_pk_at_k_and_z(linear_or_nonlinear, k, z, index_pk, &pk, NULL)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(nonlinear_module).error_message_)
+        deref(nonlinear_module).nonlinear_pk_at_k_and_z(linear_or_nonlinear, k, z, index_pk, &pk, NULL)
         return pk
 
     cpdef pk(self, double k, double z):
@@ -867,7 +858,6 @@ cdef class PyCosmology:
         cdef:
             double sigma
             int index_pk_m
-            int status
 
         if self.pt.has_pk_matter == constvals.sFALSE:
             raise CosmoSevereError("Power spectrum not computed. In order to get sigma(R, z) you must add mPk to the list of outputs.")
@@ -876,9 +866,7 @@ cdef class PyCosmology:
 
         nonlinear_module = deref(self._thisptr).GetNonlinearModule()
         index_pk_m = deref(nonlinear_module).index_pk_m_
-        status = deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk_m, out_sigma, &sigma)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(nonlinear_module).error_message_)
+        deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk_m, out_sigma, &sigma)
 
         return sigma
 
@@ -898,7 +886,6 @@ cdef class PyCosmology:
         cdef:
             double sigma_cb
             int index_pk_cb
-            int status
 
         if self.pt.has_pk_matter == constvals.sFALSE:
             raise CosmoSevereError("Power spectrum not computed. In order to get sigma(R,z) you must add mPk to the list of outputs.")
@@ -911,9 +898,7 @@ cdef class PyCosmology:
         if (has_pk_cb == constvals.sFALSE):
             raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
 
-        status = deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk_cb, out_sigma, &sigma_cb)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(nonlinear_module).error_message_)
+        deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk_cb, out_sigma, &sigma_cb)
 
         return sigma_cb
 
@@ -933,7 +918,6 @@ cdef class PyCosmology:
             double pk_tilt
             int index_pk_m
             int k_size
-            int status
 
         if (self.pt.has_pk_matter == constvals.sFALSE):
             raise CosmoSevereError("Power spectrum not computed. In order to get pk_tilt(k, z) you must add mPk to the list of outputs.")
@@ -944,9 +928,7 @@ cdef class PyCosmology:
         index_pk_m = deref(nonlinear_module).index_pk_m_
         if (k_size < 2 or not (deref(nonlinear_module).ln_k_[1] <= ln_k <= deref(nonlinear_module).ln_k_[k_size - 2])):
             raise CosmoSevereError("In order to get pk_tilt at k=%e 1/Mpc, you should compute P(k,z) in a wider range of k's"%k)
-        status = deref(nonlinear_module).nonlinear_pk_tilt_at_k_and_z(pk_linear, k, z, index_pk_m, &pk_tilt)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(nonlinear_module).error_message_)
+        deref(nonlinear_module).nonlinear_pk_tilt_at_k_and_z(pk_linear, k, z, index_pk_m, &pk_tilt)
         return pk_tilt
 
 
@@ -1046,7 +1028,6 @@ cdef class PyCosmology:
             double tau
             int bg_size
             int last_index
-            int status
             short inter_normal
             short long_info
             vector[double] pvecback
@@ -1058,12 +1039,8 @@ cdef class PyCosmology:
         bg_size = deref(background_module).bg_size_
 
         pvecback.resize(bg_size)
-        status = deref(background_module).background_tau_of_z(z, &tau)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(background_module).error_message_)
-        status = deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(background_module).error_message_)
+        deref(background_module).background_tau_of_z(z, &tau)
+        deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
         output_value = pvecback[index_bg]
         return output_value
 
@@ -1073,7 +1050,6 @@ cdef class PyCosmology:
             int last_index
             vector[double] pvecback
             vector[double] pvecthermo
-            int status
             short long_info
             short inter_normal
             int bg_size
@@ -1094,16 +1070,9 @@ cdef class PyCosmology:
 
         inter_mode = deref(thermodynamics_module).inter_normal_
 
-        status = deref(background_module).background_tau_of_z(z, &tau)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(background_module).error_message_)
-        status = deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(background_module).error_message_)
-
-        status = deref(thermodynamics_module).thermodynamics_at_z(z, inter_mode, &last_index, &pvecback[0], &pvecthermo[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(thermodynamics_module).error_message_)
+        deref(background_module).background_tau_of_z(z, &tau)
+        deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
+        deref(thermodynamics_module).thermodynamics_at_z(z, inter_mode, &last_index, &pvecback[0], &pvecthermo[0])
 
         output_value = pvecthermo[index_th]
         return output_value
@@ -1206,7 +1175,6 @@ cdef class PyCosmology:
             int bg_size_short
             int index_bg_a
             int last_index
-            int status
             short inter_normal
             short short_info
             vector[double] pvecback
@@ -1219,9 +1187,7 @@ cdef class PyCosmology:
         index_bg_a = deref(background_module).index_bg_a_
 
         pvecback.resize(bg_size_short)
-        status = deref(background_module).background_at_tau(tau, short_info, inter_normal, &last_index, &pvecback[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(background_module).error_message_)
+        deref(background_module).background_at_tau(tau, short_info, inter_normal, &last_index, &pvecback[0])
         z = 1./pvecback[index_bg_a] - 1.
         return z
 
@@ -1322,15 +1288,12 @@ cdef class PyCosmology:
             double[:,::1] view
             int i
             int number_of_titles
-            int status
             int timesteps
             string titles
             vector[double] data
 
         background_module = deref(self._thisptr).GetBackgroundModule()
-        status = deref(background_module).background_output_titles(titles)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(background_module).error_message_)
+        deref(background_module).background_output_titles(titles)
 
         tmp = <bytes> titles
         tmp = str(tmp.decode())
@@ -1339,9 +1302,7 @@ cdef class PyCosmology:
         timesteps = deref(background_module).bt_size_
 
         data.resize(timesteps*number_of_titles)
-        status = deref(background_module).background_output_data(number_of_titles, &data[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(background_module).error_message_)
+        deref(background_module).background_output_data(number_of_titles, &data[0])
 
         background = {}
         view = <double[:timesteps,:number_of_titles]> &data[0]
@@ -1363,16 +1324,13 @@ cdef class PyCosmology:
             double[:,::1] view
             int i
             int number_of_titles
-            int status
             int timesteps
             string titles
             vector[double] data
 
         thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
 
-        status = deref(thermodynamics_module).thermodynamics_output_titles(titles)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(thermodynamics_module).error_message_)
+        deref(thermodynamics_module).thermodynamics_output_titles(titles)
 
         tmp = <bytes> titles
         tmp = str(tmp.decode())
@@ -1382,9 +1340,7 @@ cdef class PyCosmology:
 
         data.resize(timesteps*number_of_titles)
 
-        status = deref(thermodynamics_module).thermodynamics_output_data(number_of_titles, &data[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(thermodynamics_module).error_message_)
+        deref(thermodynamics_module).thermodynamics_output_data(number_of_titles, &data[0])
 
         thermodynamics = {}
         view = <double[:timesteps,:number_of_titles]> &data[0]
@@ -1405,7 +1361,6 @@ cdef class PyCosmology:
         cdef:
             string titles
             vector[double] data
-            int status
             int timesteps
             int number_of_titles
             double[:,::1] view
@@ -1414,9 +1369,7 @@ cdef class PyCosmology:
 
         primordial_module = deref(self._thisptr).GetPrimordialModule()
 
-        status = deref(primordial_module).primordial_output_titles(titles)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(primordial_module).error_message_)
+        deref(primordial_module).primordial_output_titles(titles)
 
         tmp = <bytes> titles
         tmp = str(tmp.decode())
@@ -1425,9 +1378,7 @@ cdef class PyCosmology:
         timesteps = deref(primordial_module).lnk_size_
 
         data.resize(timesteps*number_of_titles)
-        status = deref(primordial_module).primordial_output_data(number_of_titles, &data[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(primordial_module).error_message_)
+        deref(primordial_module).primordial_output_data(number_of_titles, &data[0])
 
         primordial = {}
         view = <double[:timesteps,:number_of_titles]> &data[0]
@@ -1538,7 +1489,6 @@ cdef class PyCosmology:
             string ic_info
             string ic_suffix
             file_format outf
-            int status
             Py_ssize_t number_of_titles
             Py_ssize_t timesteps
             Py_ssize_t size_ic_data
@@ -1560,9 +1510,7 @@ cdef class PyCosmology:
         perturbations_module = deref(self._thisptr).GetPerturbationsModule()
         index_md = deref(perturbations_module).index_md_scalars_
 
-        status = deref(perturbations_module).perturb_output_titles(outf, titles)
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(perturbations_module).error_message_)
+        deref(perturbations_module).perturb_output_titles(outf, titles)
 
         tmp = <bytes> titles
         tmp = str(tmp.decode())
@@ -1575,17 +1523,13 @@ cdef class PyCosmology:
 
         data.resize(size_ic_data*ic_num)
 
-        status = deref(perturbations_module).perturb_output_data(outf, z, number_of_titles, &data[0])
-        if status == constvals.sFAILURE:
-            raise CosmoSevereError(deref(perturbations_module).error_message_)
+        deref(perturbations_module).perturb_output_data(outf, z, number_of_titles, &data[0])
 
         transfers = {}
         view = <double[:ic_num,:timesteps,:number_of_titles]> &data[0]
 
         for index_ic in range(ic_num):
-            status = deref(perturbations_module).perturb_output_firstline_and_ic_suffix(index_ic, ic_info, ic_suffix)
-            if status == constvals.sFAILURE:
-                raise CosmoSevereError(deref(perturbations_module).error_message_)
+            deref(perturbations_module).perturb_output_firstline_and_ic_suffix(index_ic, ic_info, ic_suffix)
             ic_key = <bytes> ic_suffix
             ic_key = str(ic_key.decode())
 
@@ -1890,7 +1834,6 @@ cdef class PyCosmology:
         """
         cdef:
             Py_ssize_t index_z
-            int status
             double k_nl_val
             double k_nl_cb_val
             double[:] k_nl
@@ -1899,9 +1842,7 @@ cdef class PyCosmology:
         k_nl = k_nl_arr
         nonlinear_module = deref(self._thisptr).GetNonlinearModule()
         for index_z in range(z_size):
-            status = deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
-            if status == constvals.sFAILURE:
-                raise CosmoSevereError(deref(nonlinear_module).error_message_)
+            deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
             k_nl[index_z] = k_nl_val
 
         return k_nl_arr
@@ -1924,7 +1865,6 @@ cdef class PyCosmology:
         """
         cdef:
             Py_ssize_t index_z
-            int status
             double k_nl_val
             double k_nl_cb_val
             double[:] k_nl_cb
@@ -1933,9 +1873,7 @@ cdef class PyCosmology:
         k_nl_cb = k_nl_cb_arr
         nonlinear_module = deref(self._thisptr).GetNonlinearModule()
         for index_z in range(z_size):
-            status = deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
-            if status == constvals.sFAILURE:
-                raise CosmoSevereError(deref(nonlinear_module).error_message_)
+            deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
             k_nl_cb[index_z] = k_nl_cb_val
 
         return k_nl_cb_arr

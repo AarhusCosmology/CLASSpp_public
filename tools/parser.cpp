@@ -267,7 +267,7 @@ int parser_read_file(const char* filename, FileContent* pfc, ErrorMsg errmsg) {
     *pfc = FileContent::from_file(filename);
   }
   catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
+    class_stop("%s", e.what());
   }
   return _SUCCESS_;
 }
@@ -277,7 +277,7 @@ int parser_read_int(FileContent* pfc, const char* name, int* value, int* found, 
     *found = pfc->read_int(name, *value) ? _TRUE_ : _FALSE_;
   }
   catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
+    class_stop("%s", e.what());
   }
   return _SUCCESS_;
 }
@@ -288,7 +288,7 @@ int parser_read_double(
     *found = pfc->read_double(name, *value) ? _TRUE_ : _FALSE_;
   }
   catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
+    class_stop("%s", e.what());
   }
   return _SUCCESS_;
 }
@@ -299,7 +299,7 @@ int parser_read_string(
     *found = pfc->read_string(name, value) ? _TRUE_ : _FALSE_;
   }
   catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
+    class_stop("%s", e.what());
   }
   return _SUCCESS_;
 }
@@ -312,7 +312,7 @@ int parser_cat(const FileContent* pfc1,
     *pfc3 = *pfc1 + *pfc2;
   }
   catch (const std::exception& e) {
-    class_stop(errmsg, "%s", e.what());
+    class_stop("%s", e.what());
   }
   return _SUCCESS_;
 }

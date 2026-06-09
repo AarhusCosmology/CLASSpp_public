@@ -129,16 +129,13 @@ int NonlinearModule::nonlinear_pk_at_z(
   /** - interpolation in z */
   else {
     class_test(ln_tau_size_ == 1,
-               error_message_,
                "You are asking for the matter power spectrum at z=%e but the code was asked to "
                "store it only at z=0. You probably forgot to pass the input parameter z_max_pk "
                "(see explanatory.ini)",
                z);
 
     /** --> get value of contormal time tau */
-    class_call(background_module_->background_tau_of_z(z, &tau),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z, &tau);
 
     ln_tau     = log(tau);
     last_index = ln_tau_size_ - 1;
@@ -148,7 +145,6 @@ int NonlinearModule::nonlinear_pk_at_z(
     if (ln_tau <= ln_tau_[0]) {
       /** --> if ln(tau) much too small, raise an error */
       class_test(ln_tau < ln_tau_[0] - 100. * _EPSILON_,
-                 error_message_,
                  "requested z was not inside of tau tabulation range (Requested ln(tau_=%.10e, Min "
                  "%.10e). Solution might be to increase input parameter z_max_pk (see "
                  "explanatory.ini)",
@@ -176,7 +172,6 @@ int NonlinearModule::nonlinear_pk_at_z(
     else if (ln_tau >= ln_tau_[ln_tau_size_ - 1]) {
       /** --> if ln(tau) much too large, raise an error */
       class_test(ln_tau > ln_tau_[ln_tau_size_ - 1] + 100. * _EPSILON_,
-                 error_message_,
                  "requested z was not inside of tau tabulation range (Requested ln(tau_=%.10e, Max "
                  "%.10e) ",
                  ln_tau,
@@ -205,49 +200,61 @@ int NonlinearModule::nonlinear_pk_at_z(
     else {
       if (pk_output == pk_linear) {
         /** --> interpolate P_l(k) at tau from pre-computed array */
-        class_call(array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
-                                            ln_tau_size_,
-                                            const_cast<double*>(ln_pk_l_[index_pk].data()),
-                                            const_cast<double*>(ddln_pk_l_[index_pk].data()),
-                                            k_size_,
-                                            ln_tau,
-                                            &last_index,
-                                            out_pk,
-                                            k_size_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
+                                                      ln_tau_size_,
+                                                      const_cast<double*>(
+                                                          ln_pk_l_[index_pk].data()),
+                                                      const_cast<double*>(
+                                                          ddln_pk_l_[index_pk].data()),
+                                                      k_size_,
+                                                      ln_tau,
+                                                      &last_index,
+                                                      out_pk,
+                                                      k_size_,
+                                                      buf),
+                             buf);
+        }
 
         /** --> interpolate P_ic_l(k) at tau from pre-computed array */
         if (do_ic == _TRUE_) {
-          class_call(array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
-                                              ln_tau_size_,
-                                              const_cast<double*>(ln_pk_ic_l_[index_pk].data()),
-                                              const_cast<double*>(ddln_pk_ic_l_[index_pk].data()),
-                                              k_size_ * ic_ic_size_,
-                                              ln_tau,
-                                              &last_index,
-                                              out_pk_ic,
-                                              k_size_ * ic_ic_size_,
-                                              error_message_),
-                     error_message_,
-                     error_message_);
+          {
+            ErrorMsg buf;
+            class_call_failure(array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
+                                                        ln_tau_size_,
+                                                        const_cast<double*>(
+                                                            ln_pk_ic_l_[index_pk].data()),
+                                                        const_cast<double*>(
+                                                            ddln_pk_ic_l_[index_pk].data()),
+                                                        k_size_ * ic_ic_size_,
+                                                        ln_tau,
+                                                        &last_index,
+                                                        out_pk_ic,
+                                                        k_size_ * ic_ic_size_,
+                                                        buf),
+                               buf);
+          }
         }
       }
       else {
         /** --> interpolate P_nl(k) at tau from pre-computed array */
-        class_call(array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
-                                            ln_tau_size_,
-                                            const_cast<double*>(ln_pk_nl_[index_pk].data()),
-                                            const_cast<double*>(ddln_pk_nl_[index_pk].data()),
-                                            k_size_,
-                                            ln_tau,
-                                            &last_index,
-                                            out_pk,
-                                            k_size_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
+                                                      ln_tau_size_,
+                                                      const_cast<double*>(
+                                                          ln_pk_nl_[index_pk].data()),
+                                                      const_cast<double*>(
+                                                          ddln_pk_nl_[index_pk].data()),
+                                                      k_size_,
+                                                      ln_tau,
+                                                      &last_index,
+                                                      out_pk,
+                                                      k_size_,
+                                                      buf),
+                             buf);
+        }
       }
     }
   }
@@ -319,15 +326,11 @@ int NonlinearModule::nonlinear_pks_at_z(
     double* out_pk_cb_ic  // array out_pk_cb_ic[index_k * ic_ic_size_ + index_ic1_ic2]
 ) const {
   if (has_pk_cb_) {
-    class_call(nonlinear_pk_at_z(mode, pk_output, z, index_pk_cb_, out_pk_cb, out_pk_cb_ic),
-               error_message_,
-               error_message_);
+    nonlinear_pk_at_z(mode, pk_output, z, index_pk_cb_, out_pk_cb, out_pk_cb_ic);
   }
 
   if (has_pk_m_) {
-    class_call(nonlinear_pk_at_z(mode, pk_output, z, index_pk_m_, out_pk, out_pk_ic),
-               error_message_,
-               error_message_);
+    nonlinear_pk_at_z(mode, pk_output, z, index_pk_m_, out_pk, out_pk_ic);
   }
 
   return _SUCCESS_;
@@ -392,7 +395,6 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
       (the test for z will be done when calling nonlinear_pk_linear_at_z()) */
 
   class_test((k < 0.) || (k > exp(ln_k_[k_size_ - 1])),
-             error_message_,
              "k=%e out of bounds [%e:%e]",
              k,
              0.,
@@ -422,14 +424,12 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
       out_pk_ic_at_z.resize(k_size_ * ic_ic_size_);
     }
 
-    class_call(nonlinear_pk_at_z(linear,
-                                 pk_output,
-                                 z,
-                                 index_pk,
-                                 out_pk_at_z.data(),
-                                 do_ic == _TRUE_ ? out_pk_ic_at_z.data() : nullptr),
-               error_message_,
-               error_message_);
+    nonlinear_pk_at_z(linear,
+                      pk_output,
+                      z,
+                      index_pk,
+                      out_pk_at_z.data(),
+                      do_ic == _TRUE_ ? out_pk_ic_at_z.data() : nullptr);
 
     /** - deal with standard case kmin <= k <= kmax
         (just need to interpolate at the right k) */
@@ -440,55 +440,63 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 
       ddout_pk_at_z.resize(k_size_);
 
-      class_call(array_spline_table_lines(const_cast<double*>(ln_k_.data()),
-                                          k_size_,
-                                          out_pk_at_z.data(),
-                                          1,
-                                          ddout_pk_at_z.data(),
-                                          _SPLINE_NATURAL_,
-                                          error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_spline_table_lines(const_cast<double*>(ln_k_.data()),
+                                                    k_size_,
+                                                    out_pk_at_z.data(),
+                                                    1,
+                                                    ddout_pk_at_z.data(),
+                                                    _SPLINE_NATURAL_,
+                                                    buf),
+                           buf);
+      }
 
-      class_call(array_interpolate_spline(const_cast<double*>(ln_k_.data()),
-                                          k_size_,
-                                          out_pk_at_z.data(),
-                                          ddout_pk_at_z.data(),
-                                          1,
-                                          log(k),
-                                          &last_index,
-                                          out_pk,
-                                          1,
-                                          error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_spline(const_cast<double*>(ln_k_.data()),
+                                                    k_size_,
+                                                    out_pk_at_z.data(),
+                                                    ddout_pk_at_z.data(),
+                                                    1,
+                                                    log(k),
+                                                    &last_index,
+                                                    out_pk,
+                                                    1,
+                                                    buf),
+                           buf);
+      }
 
       if (do_ic == _TRUE_) {
         std::vector<double> ddout_pk_ic_at_z;
         ddout_pk_ic_at_z.resize(k_size_ * ic_ic_size_);
 
-        class_call(array_spline_table_lines(const_cast<double*>(ln_k_.data()),
-                                            k_size_,
-                                            out_pk_ic_at_z.data(),
-                                            ic_ic_size_,
-                                            ddout_pk_ic_at_z.data(),
-                                            _SPLINE_NATURAL_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_spline_table_lines(const_cast<double*>(ln_k_.data()),
+                                                      k_size_,
+                                                      out_pk_ic_at_z.data(),
+                                                      ic_ic_size_,
+                                                      ddout_pk_ic_at_z.data(),
+                                                      _SPLINE_NATURAL_,
+                                                      buf),
+                             buf);
+        }
 
-        class_call(array_interpolate_spline(const_cast<double*>(ln_k_.data()),
-                                            k_size_,
-                                            out_pk_ic_at_z.data(),
-                                            ddout_pk_ic_at_z.data(),
-                                            ic_ic_size_,
-                                            log(k),
-                                            &last_index,
-                                            out_pk_ic,
-                                            ic_ic_size_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_interpolate_spline(const_cast<double*>(ln_k_.data()),
+                                                      k_size_,
+                                                      out_pk_ic_at_z.data(),
+                                                      ddout_pk_ic_at_z.data(),
+                                                      ic_ic_size_,
+                                                      log(k),
+                                                      &last_index,
+                                                      out_pk_ic,
+                                                      ic_ic_size_,
+                                                      buf),
+                             buf);
+        }
       }
     }
 
@@ -520,12 +528,10 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
       std::vector<double> pk_primordial_k;
       pk_primordial_k.resize(ic_ic_size_);
 
-      class_call(primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
-                                                              linear,
-                                                              k,
-                                                              pk_primordial_k.data()),
-                 primordial_module_->error_message_,
-                 error_message_);
+      primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
+                                                   linear,
+                                                   k,
+                                                   pk_primordial_k.data());
 
       /* compute P_primordial(kmin) */
 
@@ -534,12 +540,10 @@ int NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
       std::vector<double> pk_primordial_kmin;
       pk_primordial_kmin.resize(ic_ic_size_);
 
-      class_call(primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
-                                                              linear,
-                                                              kmin,
-                                                              pk_primordial_kmin.data()),
-                 primordial_module_->error_message_,
-                 error_message_);
+      primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
+                                                   linear,
+                                                   kmin,
+                                                   pk_primordial_kmin.data());
 
       /* finally, infer P(k) */
 
@@ -587,14 +591,10 @@ int NonlinearModule::nonlinear_pks_at_k_and_z(
     double* out_pk_cb_ic  // array P__cb_ic(k)of index [index_ic1_ic2]
 ) const {
   if (has_pk_cb_) {
-    class_call(nonlinear_pk_at_k_and_z(pk_output, k, z, index_pk_cb_, out_pk_cb, out_pk_cb_ic),
-               error_message_,
-               error_message_);
+    nonlinear_pk_at_k_and_z(pk_output, k, z, index_pk_cb_, out_pk_cb, out_pk_cb_ic);
   }
   if (has_pk_m_) {
-    class_call(nonlinear_pk_at_k_and_z(pk_output, k, z, index_pk_m_, out_pk, out_pk_ic),
-               error_message_,
-               error_message_);
+    nonlinear_pk_at_k_and_z(pk_output, k, z, index_pk_m_, out_pk, out_pk_ic);
   }
 
   return _SUCCESS_;
@@ -660,50 +660,50 @@ int NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
 
   for (int index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
     if (has_pk_m_) {
-      class_call(nonlinear_pk_at_z(logarithmic,
-                                   pk_output,
-                                   zvec[index_zvec],
-                                   index_pk_m_,
-                                   &ln_pk_table[index_zvec * k_size_],
-                                   nullptr),
-                 error_message_,
-                 error_message_);
+      nonlinear_pk_at_z(logarithmic,
+                        pk_output,
+                        zvec[index_zvec],
+                        index_pk_m_,
+                        &ln_pk_table[index_zvec * k_size_],
+                        nullptr);
     }
     if (has_pk_m_) {
-      class_call(nonlinear_pk_at_z(logarithmic,
-                                   pk_output,
-                                   zvec[index_zvec],
-                                   index_pk_cb_,
-                                   &ln_pk_cb_table[index_zvec * k_size_],
-                                   nullptr),
-                 error_message_,
-                 error_message_);
+      nonlinear_pk_at_z(logarithmic,
+                        pk_output,
+                        zvec[index_zvec],
+                        index_pk_cb_,
+                        &ln_pk_cb_table[index_zvec * k_size_],
+                        nullptr);
     }
   }
 
   /** - Spline it for interpolation along k */
 
   if (has_pk_m_) {
-    class_call(array_spline_table_columns2(const_cast<double*>(ln_k_.data()),
-                                           k_size_,
-                                           ln_pk_table.data(),
-                                           zvec_size,
-                                           ddln_pk_table.data(),
-                                           _SPLINE_NATURAL_,
-                                           error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_columns2(const_cast<double*>(ln_k_.data()),
+                                                     k_size_,
+                                                     ln_pk_table.data(),
+                                                     zvec_size,
+                                                     ddln_pk_table.data(),
+                                                     _SPLINE_NATURAL_,
+                                                     buf),
+                         buf);
+    }
   }
   if (has_pk_cb_) {
-    class_call(array_spline_table_columns2(const_cast<double*>(ln_k_.data()),
-                                           k_size_,
-                                           ln_pk_cb_table.data(),
-                                           zvec_size,
-                                           ddln_pk_cb_table.data(),
-                                           _SPLINE_NATURAL_,
-                                           error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline_table_columns2(const_cast<double*>(ln_k_.data()),
+                                                     k_size_,
+                                                     ln_pk_cb_table.data(),
+                                                     zvec_size,
+                                                     ddln_pk_cb_table.data(),
+                                                     _SPLINE_NATURAL_,
+                                                     buf),
+                         buf);
+    }
   }
 
   /** - Construct ln(kvec): */
@@ -801,13 +801,9 @@ int NonlinearModule::nonlinear_pk_tilt_at_k_and_z(
 
   dlnk = ln_k_[k_size_ - 1] - ln_k_[k_size_ - 2];
 
-  class_call(nonlinear_pk_at_k_and_z(pk_output, k / (1. + dlnk), z, index_pk, &out_pk1, nullptr),
-             error_message_,
-             error_message_);
+  nonlinear_pk_at_k_and_z(pk_output, k / (1. + dlnk), z, index_pk, &out_pk1, nullptr);
 
-  class_call(nonlinear_pk_at_k_and_z(pk_output, k * (1. + dlnk), z, index_pk, &out_pk2, nullptr),
-             error_message_,
-             error_message_);
+  nonlinear_pk_at_k_and_z(pk_output, k * (1. + dlnk), z, index_pk, &out_pk2, nullptr);
 
   /* logarithmic derivative: n_eff = (logPk2 - logPk1)/(logk2-logk1) */
 
@@ -842,33 +838,31 @@ int NonlinearModule::nonlinear_sigmas_at_z(
 
   /** - get P(k,z) as a function of k, for the right z */
 
-  class_call(nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), nullptr),
-             error_message_,
-             error_message_);
+  nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), nullptr);
 
   /** - spline it along k */
 
-  class_call(array_spline_table_columns(const_cast<double*>(ln_k_.data()),
-                                        k_size_,
-                                        out_pk.data(),
-                                        1,
-                                        ddout_pk.data(),
-                                        _SPLINE_EST_DERIV_,
-                                        error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_columns(const_cast<double*>(ln_k_.data()),
+                                                  k_size_,
+                                                  out_pk.data(),
+                                                  1,
+                                                  ddout_pk.data(),
+                                                  _SPLINE_EST_DERIV_,
+                                                  buf),
+                       buf);
+  }
 
   /** - calll the function computing the sigmas */
 
-  class_call(nonlinear_sigmas(R,
-                              out_pk.data(),
-                              ddout_pk.data(),
-                              k_size_,
-                              ppr->sigma_k_per_decade,
-                              sigma_output,
-                              result),
-             error_message_,
-             error_message_);
+  nonlinear_sigmas(R,
+                   out_pk.data(),
+                   ddout_pk.data(),
+                   k_size_,
+                   ppr->sigma_k_per_decade,
+                   sigma_output,
+                   result);
 
   return _SUCCESS_;
 }
@@ -887,9 +881,7 @@ int NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_cb
 
   /** - convert input redshift into a conformal time */
 
-  class_call(background_module_->background_tau_of_z(z, &tau),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z, &tau);
 
   /** - interpolate the precomputed k_nl array at the needed valuetime */
 
@@ -898,18 +890,20 @@ int NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_cb
       *k_nl = k_nl_[index_pk_m_][0];
     }
     else {
-      class_call(array_interpolate_two(const_cast<double*>(tau_.data()),
-                                       1,
-                                       0,
-                                       const_cast<double*>(k_nl_[index_pk_m_].data()),
-                                       1,
-                                       tau_size_,
-                                       tau,
-                                       k_nl,
-                                       1,
-                                       error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_two(const_cast<double*>(tau_.data()),
+                                                 1,
+                                                 0,
+                                                 const_cast<double*>(k_nl_[index_pk_m_].data()),
+                                                 1,
+                                                 tau_size_,
+                                                 tau,
+                                                 k_nl,
+                                                 1,
+                                                 buf),
+                           buf);
+      }
     }
   }
 
@@ -920,18 +914,20 @@ int NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_cb
       *k_nl_cb = k_nl_[index_pk_cb_][0];
     }
     else {
-      class_call(array_interpolate_two(const_cast<double*>(tau_.data()),
-                                       1,
-                                       0,
-                                       const_cast<double*>(k_nl_[index_pk_cb_].data()),
-                                       1,
-                                       tau_size_,
-                                       tau,
-                                       k_nl_cb,
-                                       1,
-                                       error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_two(const_cast<double*>(tau_.data()),
+                                                 1,
+                                                 0,
+                                                 const_cast<double*>(k_nl_[index_pk_cb_].data()),
+                                                 1,
+                                                 tau_size_,
+                                                 tau,
+                                                 k_nl_cb,
+                                                 1,
+                                                 buf),
+                           buf);
+      }
     }
   }
 
@@ -997,7 +993,7 @@ int NonlinearModule::nonlinear_init() {
           "    extract the effective w(tau), Omega_m(tau) parameters required by the Pk_equal "
           "method\n");
     }
-    class_call(prepare_pk_eq(), error_message_, error_message_);
+    prepare_pk_eq();
   }
 
   /** --> check applicability of Halofit and HMcode */
@@ -1025,7 +1021,7 @@ int NonlinearModule::nonlinear_init() {
 
   /** - define indices in nonlinear structure (and allocate some arrays in the structure) */
 
-  class_call(nonlinear_indices(), error_message_, error_message_);
+  nonlinear_indices();
 
   /** - get the linear power spectrum at each time */
 
@@ -1049,39 +1045,40 @@ int NonlinearModule::nonlinear_init() {
     for (index_pk = 0; index_pk < pk_size_; index_pk++) {
       /** --> get the linear power spectrum for this time and this type */
 
-      class_call(nonlinear_pk_linear(index_pk,
-                                     index_tau_sources,
-                                     k_size_,
-                                     ln_pk_l_[index_pk].data() + index_tau * k_size_,
-                                     ln_pk_ic_l_[index_pk].data() +
-                                         index_tau * k_size_ * ic_ic_size_),
-                 error_message_,
-                 error_message_);
+      nonlinear_pk_linear(index_pk,
+                          index_tau_sources,
+                          k_size_,
+                          ln_pk_l_[index_pk].data() + index_tau * k_size_,
+                          ln_pk_ic_l_[index_pk].data() + index_tau * k_size_ * ic_ic_size_);
 
       /** --> if interpolation of \f$P(k,\tau)\f$ will be needed (as a
      function of tau), compute array of second derivatives in view of
      spline interpolation */
 
       if (ln_tau_size_ > 1) {
-        class_call(array_spline_table_lines(ln_tau_.data(),
-                                            ln_tau_size_,
-                                            ln_pk_l_[index_pk].data(),
-                                            k_size_,
-                                            ddln_pk_l_[index_pk].data(),
-                                            _SPLINE_EST_DERIV_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_spline_table_lines(ln_tau_.data(),
+                                                      ln_tau_size_,
+                                                      ln_pk_l_[index_pk].data(),
+                                                      k_size_,
+                                                      ddln_pk_l_[index_pk].data(),
+                                                      _SPLINE_EST_DERIV_,
+                                                      buf),
+                             buf);
+        }
 
-        class_call(array_spline_table_lines(ln_tau_.data(),
-                                            ln_tau_size_,
-                                            ln_pk_ic_l_[index_pk].data(),
-                                            k_size_ * ic_ic_size_,
-                                            ddln_pk_ic_l_[index_pk].data(),
-                                            _SPLINE_EST_DERIV_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_spline_table_lines(ln_tau_.data(),
+                                                      ln_tau_size_,
+                                                      ln_pk_ic_l_[index_pk].data(),
+                                                      k_size_ * ic_ic_size_,
+                                                      ddln_pk_ic_l_[index_pk].data(),
+                                                      _SPLINE_EST_DERIV_,
+                                                      buf),
+                             buf);
+        }
       }
     }
   }
@@ -1091,9 +1088,7 @@ int NonlinearModule::nonlinear_init() {
         convention using the linear power spectrum) */
 
   for (index_pk = 0; index_pk < pk_size_; index_pk++) {
-    class_call(nonlinear_sigmas_at_z(8. / pba->h, 0., index_pk, out_sigma, &(sigma8_[index_pk])),
-               error_message_,
-               error_message_);
+    nonlinear_sigmas_at_z(8. / pba->h, 0., index_pk, out_sigma, &(sigma8_[index_pk]));
   }
 
   if (pnl->nonlinear_verbose > 0) {
@@ -1146,11 +1141,11 @@ int NonlinearModule::nonlinear_init() {
     /** --> Then go through preliminary steps specific to HMcode */
 
     if (pnl->method == nl_HMcode) {
-      class_call(nonlinear_hmcode_workspace_init(pnw), error_message_, error_message_);
+      nonlinear_hmcode_workspace_init(pnw);
 
-      class_call(nonlinear_hmcode_dark_energy_correction(pnw), error_message_, error_message_);
+      nonlinear_hmcode_dark_energy_correction(pnw);
 
-      class_call(nonlinear_hmcode_baryonic_feedback(), error_message_, error_message_);
+      nonlinear_hmcode_baryonic_feedback();
     }
 
     /** --> Loop over decreasing time/growing redhsift. For each
@@ -1174,63 +1169,53 @@ int NonlinearModule::nonlinear_init() {
 
       for (index_pk = 0; index_pk < pk_size_; index_pk++) {
         /* get P_L(k) at this time */
-        class_call(nonlinear_pk_linear(index_pk,
-                                       index_tau,
-                                       k_size_extra_,
-                                       lnpk_l[index_pk].data(),
-                                       nullptr),
-                   error_message_,
-                   error_message_);
+        nonlinear_pk_linear(index_pk, index_tau, k_size_extra_, lnpk_l[index_pk].data(), nullptr);
 
         /* spline P_L(k) at this time along k */
-        class_call(array_spline_table_columns(ln_k_.data(),
-                                              k_size_extra_,
-                                              lnpk_l[index_pk].data(),
-                                              1,
-                                              ddlnpk_l[index_pk].data(),
-                                              _SPLINE_NATURAL_,
-                                              error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_spline_table_columns(ln_k_.data(),
+                                                        k_size_extra_,
+                                                        lnpk_l[index_pk].data(),
+                                                        1,
+                                                        ddlnpk_l[index_pk].data(),
+                                                        _SPLINE_NATURAL_,
+                                                        buf),
+                             buf);
+        }
 
         /* if we are still in a range of time where P_NL(k) should be computable */
         if (nl_corr_not_computable_at_this_k == _FALSE_) {
           /* get P_NL(k) at this time with Halofit */
           if (pnl->method == nl_halofit) {
-            class_call(nonlinear_halofit(index_pk,
-                                         tau_[index_tau],
-                                         pk_nl[index_pk].data(),
-                                         lnpk_l[index_pk].data(),
-                                         ddlnpk_l[index_pk].data(),
-                                         &(k_nl_[index_pk][index_tau]),
-                                         &nl_corr_not_computable_at_this_k),
-                       error_message_,
-                       error_message_);
+            nonlinear_halofit(index_pk,
+                              tau_[index_tau],
+                              pk_nl[index_pk].data(),
+                              lnpk_l[index_pk].data(),
+                              ddlnpk_l[index_pk].data(),
+                              &(k_nl_[index_pk][index_tau]),
+                              &nl_corr_not_computable_at_this_k);
           }
 
           /* get P_NL(k) at this time with HMcode */
           else if (pnl->method == nl_HMcode) {
             /* (preliminary step: fill table of sigma's, only for _cb if there is both _cb and _m) */
             if (index_pk == 0) {
-              class_call(nonlinear_hmcode_fill_sigtab(index_tau,
-                                                      lnpk_l[index_pk].data(),
-                                                      ddlnpk_l[index_pk].data(),
-                                                      pnw),
-                         error_message_,
-                         error_message_);
+              nonlinear_hmcode_fill_sigtab(index_tau,
+                                           lnpk_l[index_pk].data(),
+                                           ddlnpk_l[index_pk].data(),
+                                           pnw);
             }
 
-            class_call(nonlinear_hmcode(index_pk,
-                                        index_tau,
-                                        tau_[index_tau],
-                                        pk_nl[index_pk].data(),
-                                        lnpk_l,
-                                        ddlnpk_l,
-                                        &(k_nl_[index_pk][index_tau]),
-                                        &nl_corr_not_computable_at_this_k,
-                                        pnw),
-                       error_message_,
-                       error_message_);
+            nonlinear_hmcode(index_pk,
+                             index_tau,
+                             tau_[index_tau],
+                             pk_nl[index_pk].data(),
+                             lnpk_l,
+                             ddlnpk_l,
+                             &(k_nl_[index_pk][index_tau]),
+                             &nl_corr_not_computable_at_this_k,
+                             pnw);
           }
 
           /* infer and store R_NL=(P_NL/P_L)^1/2 */
@@ -1257,13 +1242,11 @@ int NonlinearModule::nonlinear_init() {
             /* send a warning to inform user about the corresponding value of redshift */
             if (pnl->nonlinear_verbose > 0) {
               pvecback.resize(background_module_->bg_size_);
-              class_call(background_module_->background_at_tau(tau_[index_tau],
-                                                               pba->short_info,
-                                                               pba->inter_normal,
-                                                               &last_index,
-                                                               pvecback.data()),
-                         background_module_->error_message_,
-                         error_message_);
+              background_module_->background_at_tau(tau_[index_tau],
+                                                    pba->short_info,
+                                                    pba->inter_normal,
+                                                    &last_index,
+                                                    pvecback.data());
               a = pvecback[background_module_->index_bg_a_];
               z = pba->a_today / a - 1.;
               fprintf(stdout,
@@ -1308,15 +1291,17 @@ int NonlinearModule::nonlinear_init() {
 
     if (ln_tau_size_ > 1) {
       for (index_pk = 0; index_pk < pk_size_; index_pk++) {
-        class_call(array_spline_table_lines(ln_tau_.data(),
-                                            ln_tau_size_,
-                                            ln_pk_nl_[index_pk].data(),
-                                            k_size_,
-                                            ddln_pk_nl_[index_pk].data(),
-                                            _SPLINE_EST_DERIV_,
-                                            error_message_),
-                   error_message_,
-                   error_message_);
+        {
+          ErrorMsg buf;
+          class_call_failure(array_spline_table_lines(ln_tau_.data(),
+                                                      ln_tau_size_,
+                                                      ln_pk_nl_[index_pk].data(),
+                                                      k_size_,
+                                                      ddln_pk_nl_[index_pk].data(),
+                                                      _SPLINE_EST_DERIV_,
+                                                      buf),
+                             buf);
+        }
       }
     }
 
@@ -1325,16 +1310,16 @@ int NonlinearModule::nonlinear_init() {
     /** --> free the nonlinear workspace */
 
     if (pnl->method == nl_HMcode) {
-      class_call(nonlinear_hmcode_workspace_free(pnw), error_message_, error_message_);
+      nonlinear_hmcode_workspace_free(pnw);
     }
   }
 
   /** - if the nl_method could not be identified */
   else {
-    class_stop(error_message_,
-               "Your non-linear method variable is set to %d, out of the range defined in "
-               "nonlinear.h",
-               pnl->method);
+    class_stop(
+        "Your non-linear method variable is set to %d, out of the range defined in "
+        "nonlinear.h",
+        pnl->method);
   }
 
   return _SUCCESS_;
@@ -1402,11 +1387,11 @@ int NonlinearModule::nonlinear_indices() {
 
   /** - get list of k values */
 
-  class_call(nonlinear_get_k_list(), error_message_, error_message_);
+  nonlinear_get_k_list();
 
   /** - get list of tau values */
 
-  class_call(nonlinear_get_tau_list(), error_message_, error_message_);
+  nonlinear_get_tau_list();
 
   /** - given previous indices, we can allocate the array of linear power spectrum values */
 
@@ -1484,7 +1469,6 @@ int NonlinearModule::nonlinear_get_k_list() {
       k = k_max * pow(10, (double) index_k / ppr->k_per_decade_for_pk);
     }
     class_test(index_k == _MAX_NUM_EXTRAPOLATION_,
-               error_message_,
                "could not reach extrapolated value k = %.10e starting from k = %.10e with "
                "k_per_decade of %.10e in _MAX_NUM_INTERPOLATION_=%i steps",
                ppr->hmcode_max_k_extra,
@@ -1649,8 +1633,7 @@ int NonlinearModule::nonlinear_get_source(int index_k,
        * here and switch to using it instead
        */
       case extrap_user_defined: {
-        class_stop(error_message_,
-                   "Method of source extrapolation 'user_defined' was not yet defined.");
+        class_stop("Method of source extrapolation 'user_defined' was not yet defined.");
         break;
       }
     }
@@ -1730,20 +1713,17 @@ int NonlinearModule::nonlinear_pk_linear(
     index_tp = perturbations_module_->index_tp_delta_cb_;
   }
   else {
-    class_stop(error_message_,
-               "P(k) is set neither to total matter nor to cold dark matter + baryons");
+    class_stop("P(k) is set neither to total matter nor to cold dark matter + baryons");
   }
 
   /** - loop over k values */
 
   for (int index_k = 0; index_k < k_size; index_k++) {
     /** --> get primordial spectrum */
-    class_call(primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
-                                                            logarithmic,
-                                                            ln_k_[index_k],
-                                                            primordial_pk.data()),
-               primordial_module_->error_message_,
-               error_message_);
+    primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
+                                                 logarithmic,
+                                                 ln_k_[index_k],
+                                                 primordial_pk.data());
 
     /** --> initialize a local variable for P_m(k) and P_cb(k) to zero */
     pk = 0.;
@@ -1763,14 +1743,12 @@ int NonlinearModule::nonlinear_pk_linear(
     for (int index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
       index_ic1_ic1 = index_symmetric_matrix(index_ic1, index_ic1, ic_size_);
 
-      class_call(nonlinear_get_source(index_k,
-                                      index_ic1,
-                                      index_tp,
-                                      index_tau,
-                                      perturbations_module_->sources_[index_md_scalars_],
-                                      &source_ic1),
-                 error_message_,
-                 error_message_);
+      nonlinear_get_source(index_k,
+                           index_ic1,
+                           index_tp,
+                           index_tau,
+                           perturbations_module_->sources_[index_md_scalars_],
+                           &source_ic1);
 
       pk_ic[index_ic1_ic1] = 2. * _PI_ * _PI_ / exp(3. * ln_k_[index_k]) * source_ic1 * source_ic1 *
                              exp(primordial_pk[index_ic1_ic1]);
@@ -1792,23 +1770,19 @@ int NonlinearModule::nonlinear_pk_linear(
         if (is_non_zero_[index_ic1_ic2] == _TRUE_) {
           double source_ic2;
 
-          class_call(nonlinear_get_source(index_k,
-                                          index_ic1,
-                                          index_tp,
-                                          index_tau,
-                                          perturbations_module_->sources_[index_md_scalars_],
-                                          &source_ic1),
-                     error_message_,
-                     error_message_);
+          nonlinear_get_source(index_k,
+                               index_ic1,
+                               index_tp,
+                               index_tau,
+                               perturbations_module_->sources_[index_md_scalars_],
+                               &source_ic1);
 
-          class_call(nonlinear_get_source(index_k,
-                                          index_ic2,
-                                          index_tp,
-                                          index_tau,
-                                          perturbations_module_->sources_[index_md_scalars_],
-                                          &source_ic2),
-                     error_message_,
-                     error_message_);
+          nonlinear_get_source(index_k,
+                               index_ic2,
+                               index_tp,
+                               index_tau,
+                               perturbations_module_->sources_[index_md_scalars_],
+                               &source_ic2);
 
           double cosine_correlation = primordial_pk[index_ic1_ic2] * SIGN(source_ic1) *
                                       SIGN(source_ic2);
@@ -1892,18 +1866,20 @@ int NonlinearModule::nonlinear_sigmas(double R,
       pk = exp(lnpk_l[0]);
     }
     else {
-      class_call(array_interpolate_spline(const_cast<double*>(ln_k_.data()),
-                                          k_size,
-                                          lnpk_l,
-                                          ddlnpk_l,
-                                          1,
-                                          log(k),
-                                          &last_index,
-                                          &lnpk,
-                                          1,
-                                          error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_spline(const_cast<double*>(ln_k_.data()),
+                                                    k_size,
+                                                    lnpk_l,
+                                                    ddlnpk_l,
+                                                    1,
+                                                    log(k),
+                                                    &last_index,
+                                                    &lnpk,
+                                                    1,
+                                                    buf),
+                           buf);
+      }
 
       pk = exp(lnpk);
     }
@@ -1952,30 +1928,34 @@ int NonlinearModule::nonlinear_sigmas(double R,
 
   /** - spline the integrand */
 
-  class_call(array_spline(array_for_sigma.data(),
-                          index_num,
-                          integrand_size,
-                          index_x,
-                          index_y,
-                          index_ddy,
-                          _SPLINE_EST_DERIV_,
-                          error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline(array_for_sigma.data(),
+                                    index_num,
+                                    integrand_size,
+                                    index_x,
+                                    index_y,
+                                    index_ddy,
+                                    _SPLINE_EST_DERIV_,
+                                    buf),
+                       buf);
+  }
 
   /** - integrate */
 
-  class_call(array_integrate_all_trapzd_or_spline(array_for_sigma.data(),
-                                                  index_num,
-                                                  integrand_size,
-                                                  0,  //integrand_size-1,
-                                                  index_x,
-                                                  index_y,
-                                                  index_ddy,
-                                                  result,
-                                                  error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_integrate_all_trapzd_or_spline(array_for_sigma.data(),
+                                                            index_num,
+                                                            integrand_size,
+                                                            0,  //integrand_size-1,
+                                                            index_x,
+                                                            index_y,
+                                                            index_ddy,
+                                                            result,
+                                                            buf),
+                       buf);
+  }
 
   /** - preperly normalize the final result */
 
@@ -2026,33 +2006,25 @@ int NonlinearModule::nonlinear_sigma_at_z(
 
   /** - get P(k,z) as a function of k, for the right z */
 
-  class_call(nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), nullptr),
-             error_message_,
-             error_message_);
+  nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), nullptr);
 
   /** - spline it along k */
 
-  class_call(array_spline_table_columns(const_cast<double*>(ln_k_.data()),
-                                        k_size_,
-                                        out_pk.data(),
-                                        1,
-                                        ddout_pk.data(),
-                                        _SPLINE_EST_DERIV_,
-                                        error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_columns(const_cast<double*>(ln_k_.data()),
+                                                  k_size_,
+                                                  out_pk.data(),
+                                                  1,
+                                                  ddout_pk.data(),
+                                                  _SPLINE_EST_DERIV_,
+                                                  buf),
+                       buf);
+  }
 
   /** - calll the function computing the sigmas */
 
-  class_call(nonlinear_sigmas(R,
-                              out_pk.data(),
-                              ddout_pk.data(),
-                              k_size_,
-                              k_per_decade,
-                              out_sigma,
-                              result),
-             error_message_,
-             error_message_);
+  nonlinear_sigmas(R, out_pk.data(), ddout_pk.data(), k_size_, k_per_decade, out_sigma, result);
 
   return _SUCCESS_;
 }
@@ -2133,28 +2105,20 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
     fnu = 0.;
   }
   else {
-    class_stop(error_message_,
-               "P(k) is set neither to total matter nor to cold dark matter + baryons");
+    class_stop("P(k) is set neither to total matter nor to cold dark matter + baryons");
   }
 
   if (pnl->has_pk_eq == _FALSE_) {
     /* default method to compute w0 = w_fld today, Omega_m(tau) and Omega_v=Omega_DE(tau),
        all required by HALFIT fitting formulas */
 
-    class_call(background_module_->background_w_fld(pba->a_today,
-                                                    &w0,
-                                                    &dw_over_da_fld,
-                                                    &integral_fld),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_w_fld(pba->a_today, &w0, &dw_over_da_fld, &integral_fld);
 
-    class_call(background_module_->background_at_tau(tau,
-                                                     pba->long_info,
-                                                     pba->inter_normal,
-                                                     &last_index,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau,
+                                          pba->long_info,
+                                          pba->inter_normal,
+                                          &last_index,
+                                          pvecback.data());
   }
   else {
     /* alternative method called Pk_equal, described in 0810.0190 and
@@ -2168,18 +2132,20 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
 
     w_and_Omega.resize(pk_eq_size_);
 
-    class_call(array_interpolate_spline(pk_eq_tau_.data(),
-                                        pk_eq_tau_size_,
-                                        pk_eq_w_and_Omega_.data(),
-                                        pk_eq_ddw_and_ddOmega_.data(),
-                                        pk_eq_size_,
-                                        tau,
-                                        &last_index,
-                                        w_and_Omega.data(),
-                                        pk_eq_size_,
-                                        error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_spline(pk_eq_tau_.data(),
+                                                  pk_eq_tau_size_,
+                                                  pk_eq_w_and_Omega_.data(),
+                                                  pk_eq_ddw_and_ddOmega_.data(),
+                                                  pk_eq_size_,
+                                                  tau,
+                                                  &last_index,
+                                                  w_and_Omega.data(),
+                                                  pk_eq_size_,
+                                                  buf),
+                         buf);
+    }
 
     w0 = w_and_Omega[index_pk_eq_w_];
   }
@@ -2218,31 +2184,31 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
       lnpk_integrand = lnpk_l[0];
     }
     else {
-      class_call(array_interpolate_spline(ln_k_.data(),
-                                          k_size_,
-                                          lnpk_l,
-                                          ddlnpk_l,
-                                          1,
-                                          log(k_integrand),
-                                          &last_index,
-                                          &lnpk_integrand,
-                                          1,
-                                          error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_spline(ln_k_.data(),
+                                                    k_size_,
+                                                    lnpk_l,
+                                                    ddlnpk_l,
+                                                    1,
+                                                    log(k_integrand),
+                                                    &last_index,
+                                                    &lnpk_integrand,
+                                                    1,
+                                                    buf),
+                           buf);
+      }
     }
 
     integrand_array[index_k * ia_size + index_ia_k]  = k_integrand;
     integrand_array[index_k * ia_size + index_ia_pk] = exp(lnpk_integrand);
   }
 
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->long_info,
-                                                   pba->inter_normal,
-                                                   &last_index,
-                                                   pvecback.data()),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau,
+                                        pba->long_info,
+                                        pba->inter_normal,
+                                        &last_index,
+                                        pvecback.data());
 
   Omega_m = pvecback[background_module_->index_bg_Omega_m_];
   Omega_v = 1. - pvecback[background_module_->index_bg_Omega_m_] -
@@ -2269,18 +2235,16 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
   R = sqrt(-log(ppr->halofit_sigma_precision)) /
       integrand_array[(integrand_size - 1) * ia_size + index_ia_k];
 
-  class_call(nonlinear_halofit_integrate(integrand_array.data(),
-                                         integrand_size,
-                                         ia_size,
-                                         index_ia_k,
-                                         index_ia_pk,
-                                         index_ia_sum,
-                                         index_ia_ddsum,
-                                         R,
-                                         halofit_integral_one,
-                                         &sum1),
-             error_message_,
-             error_message_);
+  nonlinear_halofit_integrate(integrand_array.data(),
+                              integrand_size,
+                              ia_size,
+                              index_ia_k,
+                              index_ia_pk,
+                              index_ia_sum,
+                              index_ia_ddsum,
+                              R,
+                              halofit_integral_one,
+                              &sum1);
 
   sigma = sqrt(sum1);
 
@@ -2310,23 +2274,20 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
   R = 1. / ppr->halofit_min_k_nonlinear;
 
   /* corresponding value of sigma_R */
-  class_call(nonlinear_halofit_integrate(integrand_array.data(),
-                                         integrand_size,
-                                         ia_size,
-                                         index_ia_k,
-                                         index_ia_pk,
-                                         index_ia_sum,
-                                         index_ia_ddsum,
-                                         R,
-                                         halofit_integral_one,
-                                         &sum1),
-             error_message_,
-             error_message_);
+  nonlinear_halofit_integrate(integrand_array.data(),
+                              integrand_size,
+                              ia_size,
+                              index_ia_k,
+                              index_ia_pk,
+                              index_ia_sum,
+                              index_ia_ddsum,
+                              R,
+                              halofit_integral_one,
+                              &sum1);
 
   sigma = sqrt(sum1);
 
   class_test(sigma > 1.,
-             error_message_,
              "Your input value for the precision parameter halofit_min_k_nonlinear=%e is too "
              "large, such that sigma(R=1/halofit_min_k_nonlinear)=% > 1. For self-consistency, it "
              "should have been <1. Decrease halofit_min_k_nonlinear",
@@ -2340,18 +2301,16 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
     rmid = pow(10, (xlogr2 + xlogr1) / 2.0);
     counter++;
 
-    class_call(nonlinear_halofit_integrate(integrand_array.data(),
-                                           integrand_size,
-                                           ia_size,
-                                           index_ia_k,
-                                           index_ia_pk,
-                                           index_ia_sum,
-                                           index_ia_ddsum,
-                                           rmid,
-                                           halofit_integral_one,
-                                           &sum1),
-               error_message_,
-               error_message_);
+    nonlinear_halofit_integrate(integrand_array.data(),
+                                integrand_size,
+                                ia_size,
+                                index_ia_k,
+                                index_ia_pk,
+                                index_ia_sum,
+                                index_ia_ddsum,
+                                rmid,
+                                halofit_integral_one,
+                                &sum1);
 
     sigma = sqrt(sum1);
 
@@ -2367,13 +2326,11 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
     /* The first version of this test woukld let the code continue: */
     /*
       class_test_except(counter > _MAX_IT_,
-      error_message_,
       free(pvecback);free(integrand_array),
       "could not converge within maximum allowed number of iterations");
     */
     /* ... but in this situation it sounds better to make it stop and return an error! */
     class_test(counter > _MAX_IT_,
-               error_message_,
                "could not converge within maximum allowed number of iterations");
 
   } while (fabs(diff) > ppr->halofit_tol_sigma);
@@ -2383,31 +2340,27 @@ int NonlinearModule::nonlinear_halofit(int index_pk,
   double sum2;
   double sum3;
 
-  class_call(nonlinear_halofit_integrate(integrand_array.data(),
-                                         integrand_size,
-                                         ia_size,
-                                         index_ia_k,
-                                         index_ia_pk,
-                                         index_ia_sum,
-                                         index_ia_ddsum,
-                                         rmid,
-                                         halofit_integral_two,
-                                         &sum2),
-             error_message_,
-             error_message_);
+  nonlinear_halofit_integrate(integrand_array.data(),
+                              integrand_size,
+                              ia_size,
+                              index_ia_k,
+                              index_ia_pk,
+                              index_ia_sum,
+                              index_ia_ddsum,
+                              rmid,
+                              halofit_integral_two,
+                              &sum2);
 
-  class_call(nonlinear_halofit_integrate(integrand_array.data(),
-                                         integrand_size,
-                                         ia_size,
-                                         index_ia_k,
-                                         index_ia_pk,
-                                         index_ia_sum,
-                                         index_ia_ddsum,
-                                         rmid,
-                                         halofit_integral_three,
-                                         &sum3),
-             error_message_,
-             error_message_);
+  nonlinear_halofit_integrate(integrand_array.data(),
+                              integrand_size,
+                              ia_size,
+                              index_ia_k,
+                              index_ia_pk,
+                              index_ia_sum,
+                              index_ia_ddsum,
+                              rmid,
+                              halofit_integral_three,
+                              &sum3);
 
   d1 = -sum2 / sum1;
   d2 = -sum2 * sum2 / sum1 / sum1 - sum3 / sum1;
@@ -2531,28 +2484,32 @@ int NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
   }
 
   /* fill in second derivatives */
-  class_call(array_spline(integrand_array,
-                          ia_size,
-                          integrand_size,
-                          index_ia_k,
-                          index_ia_sum,
-                          index_ia_ddsum,
-                          _SPLINE_NATURAL_,
-                          error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline(integrand_array,
+                                    ia_size,
+                                    integrand_size,
+                                    index_ia_k,
+                                    index_ia_sum,
+                                    index_ia_ddsum,
+                                    _SPLINE_NATURAL_,
+                                    buf),
+                       buf);
+  }
 
   /* integrate */
-  class_call(array_integrate_all_spline(integrand_array,
-                                        ia_size,
-                                        integrand_size,
-                                        index_ia_k,
-                                        index_ia_sum,
-                                        index_ia_ddsum,
-                                        sum,
-                                        error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_integrate_all_spline(integrand_array,
+                                                  ia_size,
+                                                  integrand_size,
+                                                  index_ia_k,
+                                                  index_ia_sum,
+                                                  index_ia_ddsum,
+                                                  sum,
+                                                  buf),
+                       buf);
+  }
 
   return _SUCCESS_;
 }
@@ -2656,13 +2613,11 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
   /** Call all the relevant background parameters at this tau */
   pvecback.resize(background_module_->bg_size_);
 
-  class_call(background_module_->background_at_tau(tau,
-                                                   pba->long_info,
-                                                   pba->inter_normal,
-                                                   &last_index,
-                                                   pvecback.data()),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_at_tau(tau,
+                                        pba->long_info,
+                                        pba->inter_normal,
+                                        &last_index,
+                                        pvecback.data());
 
   Omega_m = pvecback
       [background_module_
@@ -2686,35 +2641,29 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
 
   /** Get sigma(R=8 Mpc/h), sigma_disp(R=0), sigma_disp(R=100 Mpc/h) and write them into pnl structure */
 
-  class_call(nonlinear_sigmas(8. / pba->h,
-                              lnpk_l[index_pk].data(),
-                              ddlnpk_l[index_pk].data(),
-                              k_size_extra_,
-                              ppr->sigma_k_per_decade,
-                              out_sigma,
-                              &sigma8),
-             error_message_,
-             error_message_);
+  nonlinear_sigmas(8. / pba->h,
+                   lnpk_l[index_pk].data(),
+                   ddlnpk_l[index_pk].data(),
+                   k_size_extra_,
+                   ppr->sigma_k_per_decade,
+                   out_sigma,
+                   &sigma8);
 
-  class_call(nonlinear_sigmas(0.,
-                              lnpk_l[index_pk].data(),
-                              ddlnpk_l[index_pk].data(),
-                              k_size_extra_,
-                              ppr->sigma_k_per_decade,
-                              out_sigma_disp,
-                              &sigma_disp),
-             error_message_,
-             error_message_);
+  nonlinear_sigmas(0.,
+                   lnpk_l[index_pk].data(),
+                   ddlnpk_l[index_pk].data(),
+                   k_size_extra_,
+                   ppr->sigma_k_per_decade,
+                   out_sigma_disp,
+                   &sigma_disp);
 
-  class_call(nonlinear_sigmas(100. / pba->h,
-                              lnpk_l[index_pk].data(),
-                              ddlnpk_l[index_pk].data(),
-                              k_size_extra_,
-                              ppr->sigma_k_per_decade,
-                              out_sigma_disp,
-                              &sigma_disp100),
-             error_message_,
-             error_message_);
+  nonlinear_sigmas(100. / pba->h,
+                   lnpk_l[index_pk].data(),
+                   ddlnpk_l[index_pk].data(),
+                   k_size_extra_,
+                   ppr->sigma_k_per_decade,
+                   out_sigma_disp,
+                   &sigma_disp100);
 
   pnw->sigma_8[index_pk][index_tau]        = sigma8;
   pnw->sigma_disp[index_pk][index_tau]     = sigma_disp;
@@ -2762,31 +2711,35 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
     r_real[index_mass]   = r;
     r_virial[index_mass] = r_real[index_mass] / pow(Delta_v, 1. / 3.);
 
-    class_call(array_interpolate_spline(pnw->rtab,
-                                        nsig,
-                                        pnw->stab,
-                                        pnw->ddstab,
-                                        1,
-                                        r,
-                                        &last_index,
-                                        &sig,
-                                        1,
-                                        error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_spline(pnw->rtab,
+                                                  nsig,
+                                                  pnw->stab,
+                                                  pnw->ddstab,
+                                                  1,
+                                                  r,
+                                                  &last_index,
+                                                  &sig,
+                                                  1,
+                                                  buf),
+                         buf);
+    }
 
-    class_call(array_interpolate_spline(pnw->rtab,
-                                        nsig,
-                                        pnw->stab,
-                                        pnw->ddstab,
-                                        1,
-                                        r * fraction,
-                                        &last_index,
-                                        &sigf,
-                                        1,
-                                        error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_spline(pnw->rtab,
+                                                  nsig,
+                                                  pnw->stab,
+                                                  pnw->ddstab,
+                                                  1,
+                                                  r * fraction,
+                                                  &last_index,
+                                                  &sigf,
+                                                  1,
+                                                  buf),
+                         buf);
+    }
 
     nu                   = delta_c / sig;
     sigma_r[index_mass]  = sig;
@@ -2809,24 +2762,28 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
   }
 
   /* make a first guess for the nonlinear scale */
-  class_call(array_interpolate_two_arrays_one_column(nu_arr.data(),
-                                                     r_real.data(),
-                                                     1,
-                                                     0,
-                                                     ppr->nsteps_for_p1h_integral,
-                                                     nu_nl,
-                                                     &r_nl,
-                                                     error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_interpolate_two_arrays_one_column(nu_arr.data(),
+                                                               r_real.data(),
+                                                               1,
+                                                               0,
+                                                               ppr->nsteps_for_p1h_integral,
+                                                               nu_nl,
+                                                               &r_nl,
+                                                               buf),
+                       buf);
+  }
 
-  class_call(array_search_bisect(ppr->nsteps_for_p1h_integral,
-                                 nu_arr.data(),
-                                 nu_nl,
-                                 &index_nl,
-                                 error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_search_bisect(ppr->nsteps_for_p1h_integral,
+                                           nu_arr.data(),
+                                           nu_nl,
+                                           &index_nl,
+                                           buf),
+                       buf);
+  }
 
   r1 = r_real[index_nl - 1];
   r2 = r_real[index_nl + 2];
@@ -2841,15 +2798,13 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
     r_nl = (r1 + r2) / 2.;
     counter++;
 
-    class_call(nonlinear_sigmas(r_nl,
-                                lnpk_l[index_pk_cb].data(),
-                                ddlnpk_l[index_pk_cb].data(),
-                                k_size_extra_,
-                                ppr->sigma_k_per_decade,
-                                out_sigma,
-                                &sigma_nl),
-               error_message_,
-               error_message_);
+    nonlinear_sigmas(r_nl,
+                     lnpk_l[index_pk_cb].data(),
+                     ddlnpk_l[index_pk_cb].data(),
+                     k_size_extra_,
+                     ppr->sigma_k_per_decade,
+                     out_sigma,
+                     &sigma_nl);
 
     diff = sigma_nl - delta_c;
 
@@ -2861,7 +2816,6 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
     }
 
     class_test(counter > _MAX_IT_,
-               error_message_,
                "could not converge within maximum allowed number of iterations");
 
   } while (fabs(diff) > ppr->hmcode_tol_sigma);
@@ -2881,15 +2835,13 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
 
   /* call sigma_prime function at r_nl to find the effective spectral index n_eff */
 
-  class_call(nonlinear_sigmas(r_nl,
-                              lnpk_l[index_pk_cb].data(),
-                              ddlnpk_l[index_pk_cb].data(),
-                              k_size_extra_,
-                              ppr->sigma_k_per_decade,
-                              out_sigma_prime,
-                              &sigma_prime),
-             error_message_,
-             error_message_);
+  nonlinear_sigmas(r_nl,
+                   lnpk_l[index_pk_cb].data(),
+                   ddlnpk_l[index_pk_cb].data(),
+                   k_size_extra_,
+                   ppr->sigma_k_per_decade,
+                   out_sigma_prime,
+                   &sigma_prime);
 
   dlnsigdlnR = r_nl * pow(sigma_nl, -2) * sigma_prime;
   n_eff      = -3. - dlnsigdlnR;
@@ -2907,16 +2859,18 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
       g_form = 1.;
 
     //
-    class_call(array_interpolate_two_arrays_one_column(pnw->growtable,
-                                                       pnw->ztable,
-                                                       1,
-                                                       0,
-                                                       ng,
-                                                       g_form,
-                                                       &z_form,
-                                                       error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_two_arrays_one_column(pnw->growtable,
+                                                                 pnw->ztable,
+                                                                 1,
+                                                                 0,
+                                                                 ng,
+                                                                 g_form,
+                                                                 &z_form,
+                                                                 buf),
+                         buf);
+    }
     if (z_form < z_at_tau) {
       conc[index_mass] = c_min_;
     }
@@ -2939,13 +2893,15 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
    * where the integrand is 0 anyhow. This cut index is found here. */
   nu_cut = 10.;
   if (nu_cut < nu_arr[ppr->nsteps_for_p1h_integral - 1]) {
-    class_call(array_search_bisect(ppr->nsteps_for_p1h_integral,
-                                   nu_arr.data(),
-                                   nu_cut,
-                                   &index_cut,
-                                   error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_search_bisect(ppr->nsteps_for_p1h_integral,
+                                             nu_arr.data(),
+                                             nu_cut,
+                                             &index_cut,
+                                             buf),
+                         buf);
+    }
   }
   else {
     index_cut = ppr->nsteps_for_p1h_integral;
@@ -2969,16 +2925,12 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
     for (index_mass = 0; index_mass < index_cut;
          index_mass++) {  //Calculates the integrand for the ph1 integral at all nu values
       //get the nu^eta-value of the window
-      class_call(nonlinear_hmcode_window_nfw(pow(nu_arr[index_mass], eta) * k_[index_k],
-                                             r_virial[index_mass],
-                                             conc[index_mass],
-                                             &window_nfw),
-                 error_message_,
-                 error_message_);
+      nonlinear_hmcode_window_nfw(pow(nu_arr[index_mass], eta) * k_[index_k],
+                                  r_virial[index_mass],
+                                  conc[index_mass],
+                                  &window_nfw);
       //get the value of the halo mass function
-      class_call(nonlinear_hmcode_halomassfunction(nu_arr[index_mass], &gst),
-                 error_message_,
-                 error_message_);
+      nonlinear_hmcode_halomassfunction(nu_arr[index_mass], &gst);
 
       p1h_integrand[index_mass * index_ncol + index_nu] = nu_arr[index_mass];
 
@@ -2988,28 +2940,32 @@ int NonlinearModule::nonlinear_hmcode(int index_pk,
       //fprintf(stdout, "%d %e %e\n", index_cut, p1h_integrand[index_mass*index_ncol+index_nu], p1h_integrand[index_mass*index_ncol+index_y]);
       //}
     }
-    class_call(array_spline(p1h_integrand.data(),
-                            index_ncol,
-                            index_cut,
-                            index_nu,
-                            index_y,
-                            index_ddy,
-                            _SPLINE_EST_DERIV_,
-                            error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline(p1h_integrand.data(),
+                                      index_ncol,
+                                      index_cut,
+                                      index_nu,
+                                      index_y,
+                                      index_ddy,
+                                      _SPLINE_EST_DERIV_,
+                                      buf),
+                         buf);
+    }
 
-    class_call(array_integrate_all_trapzd_or_spline(p1h_integrand.data(),
-                                                    index_ncol,
-                                                    index_cut,
-                                                    index_cut - 1,  //0 or n-1
-                                                    index_nu,
-                                                    index_y,
-                                                    index_ddy,
-                                                    &pk_1h,
-                                                    error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_integrate_all_trapzd_or_spline(p1h_integrand.data(),
+                                                              index_ncol,
+                                                              index_cut,
+                                                              index_cut - 1,  //0 or n-1
+                                                              index_nu,
+                                                              index_y,
+                                                              index_ddy,
+                                                              &pk_1h,
+                                                              buf),
+                         buf);
+    }
 
     if (pow(k_[index_k] / k_star, 2) > 7.) {
       fac = 0.;  //prevents problems if (k/k*)^2 is large
@@ -3122,7 +3078,7 @@ int NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace*
 
   /** - fill table with scale independent growth factor */
 
-  class_call(nonlinear_hmcode_fill_growtab(pnw), error_message_, error_message_);
+  nonlinear_hmcode_fill_growtab(pnw);
 
   return _SUCCESS_;
 }
@@ -3158,35 +3114,19 @@ int NonlinearModule::nonlinear_hmcode_dark_energy_correction(struct nonlinear_wo
   if (all_species_.count("Fluid")) {
     pvecback.resize(background_module_->bg_size_);
 
-    class_call(background_module_->background_tau_of_z(pnl->z_infinity, &tau_growth),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(pnl->z_infinity, &tau_growth);
 
-    class_call(background_module_->background_at_tau(tau_growth,
-                                                     pba->long_info,
-                                                     pba->inter_normal,
-                                                     &last_index,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau_growth,
+                                          pba->long_info,
+                                          pba->inter_normal,
+                                          &last_index,
+                                          pvecback.data());
 
-    class_call(background_module_->background_w_fld(pba->a_today,
-                                                    &w0,
-                                                    &dw_over_da_fld,
-                                                    &integral_fld),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_w_fld(pba->a_today, &w0, &dw_over_da_fld, &integral_fld);
 
-    class_call(nonlinear_hmcode_growint(1. / (1. + pnl->z_infinity), -1., 0., &g_lcdm),
-               error_message_,
-               error_message_);
+    nonlinear_hmcode_growint(1. / (1. + pnl->z_infinity), -1., 0., &g_lcdm);
 
-    class_call(nonlinear_hmcode_growint(1. / (1. + pnl->z_infinity),
-                                        w0,
-                                        dw_over_da_fld * (-1.),
-                                        &g_wcdm),
-               error_message_,
-               error_message_);
+    nonlinear_hmcode_growint(1. / (1. + pnl->z_infinity), w0, dw_over_da_fld * (-1.), &g_wcdm);
 
     pnw->dark_energy_correction = pow(g_wcdm / g_lcdm, 1.5);
   }
@@ -3289,30 +3229,24 @@ int NonlinearModule::nonlinear_hmcode_fill_sigtab(int index_tau,
   for (i = 0; i < nsig; i++) {
     r = exp(log(rmin) + log(rmax / rmin) * i / (nsig - 1));
 
-    class_call(nonlinear_sigmas(r,
-                                lnpk_l,
-                                ddlnpk_l,
-                                k_size_extra_,
-                                ppr->sigma_k_per_decade,
-                                out_sigma,
-                                &sig),
-               error_message_,
-               error_message_);
+    nonlinear_sigmas(r, lnpk_l, ddlnpk_l, k_size_extra_, ppr->sigma_k_per_decade, out_sigma, &sig);
 
     sigtab[i * index_n + index_r]   = r;
     sigtab[i * index_n + index_sig] = sig;
   }
 
-  class_call(array_spline(sigtab.data(),
-                          index_n,
-                          nsig,
-                          index_r,
-                          index_sig,
-                          index_ddsig,
-                          _SPLINE_EST_DERIV_,
-                          error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline(sigtab.data(),
+                                    index_n,
+                                    nsig,
+                                    index_r,
+                                    index_sig,
+                                    index_ddsig,
+                                    _SPLINE_EST_DERIV_,
+                                    buf),
+                       buf);
+  }
   if (index_tau == tau_size_ - 1) {
     for (i = 0; i < nsig; i++) {
       pnw->rtab[i]   = sigtab[i * index_n + index_r];
@@ -3356,19 +3290,15 @@ int NonlinearModule::nonlinear_hmcode_fill_growtab(struct nonlinear_workspace* p
     pnw->ztable[index_scalefactor] = z;
 
     double tau_growth;
-    class_call(background_module_->background_tau_of_z(z, &tau_growth),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_tau_of_z(z, &tau_growth);
 
     pnw->tautable[index_scalefactor] = tau_growth;
 
-    class_call(background_module_->background_at_tau(tau_growth,
-                                                     pba->long_info,
-                                                     pba->inter_normal,
-                                                     &last_index,
-                                                     pvecback.data()),
-               background_module_->error_message_,
-               error_message_);
+    background_module_->background_at_tau(tau_growth,
+                                          pba->long_info,
+                                          pba->inter_normal,
+                                          &last_index,
+                                          pvecback.data());
 
     pnw->growtable[index_scalefactor] = pvecback[background_module_->index_bg_D_];
   }
@@ -3441,28 +3371,32 @@ int NonlinearModule::nonlinear_hmcode_growint(double a, double w0, double wa, do
       integrand[index_scalefactor * index_gcol + index_growth] = -pow(Omega_m, gamma) / scalefactor;
     }
 
-    class_call(array_spline(integrand.data(),
-                            index_gcol,
-                            ng,
-                            index_a,
-                            index_growth,
-                            index_ddgrowth,
-                            _SPLINE_EST_DERIV_,
-                            error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_spline(integrand.data(),
+                                      index_gcol,
+                                      ng,
+                                      index_a,
+                                      index_growth,
+                                      index_ddgrowth,
+                                      _SPLINE_EST_DERIV_,
+                                      buf),
+                         buf);
+    }
 
-    class_call(array_integrate_all_trapzd_or_spline(integrand.data(),
-                                                    index_gcol,
-                                                    ng,
-                                                    0,  //ng-1,
-                                                    index_a,
-                                                    index_growth,
-                                                    index_ddgrowth,
-                                                    growth,
-                                                    error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_integrate_all_trapzd_or_spline(integrand.data(),
+                                                              index_gcol,
+                                                              ng,
+                                                              0,  //ng-1,
+                                                              index_a,
+                                                              index_growth,
+                                                              index_ddgrowth,
+                                                              growth,
+                                                              buf),
+                         buf);
+    }
 
     *growth = exp(*growth);
   }
@@ -3488,16 +3422,28 @@ int NonlinearModule::nonlinear_hmcode_window_nfw(double k,
   double ks = k * rv / c;
 
   double si2;
-  class_call(sine_integral(ks * (1. + c), &si2, error_message_), error_message_, error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(sine_integral(ks * (1. + c), &si2, buf), buf);
+  }
 
   double si1;
-  class_call(sine_integral(ks, &si1, error_message_), error_message_, error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(sine_integral(ks, &si1, buf), buf);
+  }
 
   double ci2;
-  class_call(cosine_integral(ks * (1. + c), &ci2, error_message_), error_message_, error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(cosine_integral(ks * (1. + c), &ci2, buf), buf);
+  }
 
   double ci1;
-  class_call(cosine_integral(ks, &ci1, error_message_), error_message_, error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(cosine_integral(ks, &ci1, buf), buf);
+  }
 
   double p1 = cos(ks) * (ci2 - ci1);
   double p2 = sin(ks) * (si2 - si1);
@@ -3543,26 +3489,26 @@ int NonlinearModule::nonlinear_hmcode_sigma8_at_z(double z,
                                                   struct nonlinear_workspace* pnw) {
   double tau;
 
-  class_call(background_module_->background_tau_of_z(z, &tau),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z, &tau);
 
   if (tau_size_ == 1) {
     *sigma_8 = pnw->sigma_8[index_pk_m_][0];
   }
   else {
-    class_call(array_interpolate_two(tau_.data(),
-                                     1,
-                                     0,
-                                     pnw->sigma_8[index_pk_m_],
-                                     1,
-                                     tau_size_,
-                                     tau,
-                                     sigma_8,
-                                     1,
-                                     error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_two(tau_.data(),
+                                               1,
+                                               0,
+                                               pnw->sigma_8[index_pk_m_],
+                                               1,
+                                               tau_size_,
+                                               tau,
+                                               sigma_8,
+                                               1,
+                                               buf),
+                         buf);
+    }
   }
 
   if (has_pk_cb_) {
@@ -3570,18 +3516,20 @@ int NonlinearModule::nonlinear_hmcode_sigma8_at_z(double z,
       *sigma_8_cb = pnw->sigma_8[index_pk_cb_][0];
     }
     else {
-      class_call(array_interpolate_two(tau_.data(),
-                                       1,
-                                       0,
-                                       pnw->sigma_8[index_pk_cb_],
-                                       1,
-                                       tau_size_,
-                                       tau,
-                                       sigma_8_cb,
-                                       1,
-                                       error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_two(tau_.data(),
+                                                 1,
+                                                 0,
+                                                 pnw->sigma_8[index_pk_cb_],
+                                                 1,
+                                                 tau_size_,
+                                                 tau,
+                                                 sigma_8_cb,
+                                                 1,
+                                                 buf),
+                           buf);
+      }
     }
   }
   else {
@@ -3607,26 +3555,26 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp_at_z(double z,
                                                      struct nonlinear_workspace* pnw) {
   double tau;
 
-  class_call(background_module_->background_tau_of_z(z, &tau),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z, &tau);
 
   if (tau_size_ == 1) {
     *sigma_disp = pnw->sigma_disp[index_pk_m_][0];
   }
   else {
-    class_call(array_interpolate_two(tau_.data(),
-                                     1,
-                                     0,
-                                     pnw->sigma_disp[index_pk_m_],
-                                     1,
-                                     tau_size_,
-                                     tau,
-                                     sigma_disp,
-                                     1,
-                                     error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_two(tau_.data(),
+                                               1,
+                                               0,
+                                               pnw->sigma_disp[index_pk_m_],
+                                               1,
+                                               tau_size_,
+                                               tau,
+                                               sigma_disp,
+                                               1,
+                                               buf),
+                         buf);
+    }
   }
 
   if (has_pk_cb_) {
@@ -3634,18 +3582,20 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp_at_z(double z,
       *sigma_disp_cb = pnw->sigma_disp[index_pk_cb_][0];
     }
     else {
-      class_call(array_interpolate_two(tau_.data(),
-                                       1,
-                                       0,
-                                       pnw->sigma_disp[index_pk_cb_],
-                                       1,
-                                       tau_size_,
-                                       tau,
-                                       sigma_disp_cb,
-                                       1,
-                                       error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_two(tau_.data(),
+                                                 1,
+                                                 0,
+                                                 pnw->sigma_disp[index_pk_cb_],
+                                                 1,
+                                                 tau_size_,
+                                                 tau,
+                                                 sigma_disp_cb,
+                                                 1,
+                                                 buf),
+                           buf);
+      }
     }
   }
   else {
@@ -3671,26 +3621,26 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp100_at_z(double z,
                                                         struct nonlinear_workspace* pnw) {
   double tau;
 
-  class_call(background_module_->background_tau_of_z(z, &tau),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z, &tau);
 
   if (tau_size_ == 1) {
     *sigma_disp_100 = pnw->sigma_disp_100[index_pk_m_][0];
   }
   else {
-    class_call(array_interpolate_two(tau_.data(),
-                                     1,
-                                     0,
-                                     pnw->sigma_disp_100[index_pk_m_],
-                                     1,
-                                     tau_size_,
-                                     tau,
-                                     sigma_disp_100,
-                                     1,
-                                     error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_two(tau_.data(),
+                                               1,
+                                               0,
+                                               pnw->sigma_disp_100[index_pk_m_],
+                                               1,
+                                               tau_size_,
+                                               tau,
+                                               sigma_disp_100,
+                                               1,
+                                               buf),
+                         buf);
+    }
   }
 
   if (has_pk_cb_) {
@@ -3698,18 +3648,20 @@ int NonlinearModule::nonlinear_hmcode_sigmadisp100_at_z(double z,
       *sigma_disp_100_cb = pnw->sigma_disp_100[index_pk_cb_][0];
     }
     else {
-      class_call(array_interpolate_two(tau_.data(),
-                                       1,
-                                       0,
-                                       pnw->sigma_disp_100[index_pk_cb_],
-                                       1,
-                                       tau_size_,
-                                       tau,
-                                       sigma_disp_100_cb,
-                                       1,
-                                       error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_two(tau_.data(),
+                                                 1,
+                                                 0,
+                                                 pnw->sigma_disp_100[index_pk_cb_],
+                                                 1,
+                                                 tau_size_,
+                                                 tau,
+                                                 sigma_disp_100_cb,
+                                                 1,
+                                                 buf),
+                           buf);
+      }
     }
   }
   else {
@@ -3735,26 +3687,26 @@ int NonlinearModule::nonlinear_hmcode_sigmaprime_at_z(double z,
                                                       struct nonlinear_workspace* pnw) {
   double tau;
 
-  class_call(background_module_->background_tau_of_z(z, &tau),
-             background_module_->error_message_,
-             error_message_);
+  background_module_->background_tau_of_z(z, &tau);
 
   if (tau_size_ == 1) {
     *sigma_prime = pnw->sigma_prime[index_pk_m_][0];
   }
   else {
-    class_call(array_interpolate_two(tau_.data(),
-                                     1,
-                                     0,
-                                     pnw->sigma_prime[index_pk_m_],
-                                     1,
-                                     tau_size_,
-                                     tau,
-                                     sigma_prime,
-                                     1,
-                                     error_message_),
-               error_message_,
-               error_message_);
+    {
+      ErrorMsg buf;
+      class_call_failure(array_interpolate_two(tau_.data(),
+                                               1,
+                                               0,
+                                               pnw->sigma_prime[index_pk_m_],
+                                               1,
+                                               tau_size_,
+                                               tau,
+                                               sigma_prime,
+                                               1,
+                                               buf),
+                         buf);
+    }
   }
 
   if (has_pk_cb_) {
@@ -3762,18 +3714,20 @@ int NonlinearModule::nonlinear_hmcode_sigmaprime_at_z(double z,
       *sigma_prime_cb = pnw->sigma_prime[index_pk_cb_][0];
     }
     else {
-      class_call(array_interpolate_two(tau_.data(),
-                                       1,
-                                       0,
-                                       pnw->sigma_prime[index_pk_cb_],
-                                       1,
-                                       tau_size_,
-                                       tau,
-                                       sigma_prime_cb,
-                                       1,
-                                       error_message_),
-                 error_message_,
-                 error_message_);
+      {
+        ErrorMsg buf;
+        class_call_failure(array_interpolate_two(tau_.data(),
+                                                 1,
+                                                 0,
+                                                 pnw->sigma_prime[index_pk_cb_],
+                                                 1,
+                                                 tau_size_,
+                                                 tau,
+                                                 sigma_prime_cb,
+                                                 1,
+                                                 buf),
+                           buf);
+      }
     }
   }
   else {
@@ -3835,9 +3789,7 @@ int NonlinearModule::prepare_pk_eq() {
 
   for (index_pk_eq_z = 0; index_pk_eq_z < pk_eq_tau_size_; index_pk_eq_z++) {
     z[index_pk_eq_z] = exp(log(1. + ppr->pk_eq_z_max) / (pk_eq_tau_size_ - 1) * index_pk_eq_z) - 1.;
-    class_call(background_module->background_tau_of_z(z[index_pk_eq_z], &tau_of_z),
-               background_module->error_message_,
-               error_message_);
+    background_module->background_tau_of_z(z[index_pk_eq_z], &tau_of_z);
     pk_eq_tau_[index_pk_eq_z] = tau_of_z;
   }
 
@@ -3885,9 +3837,7 @@ int NonlinearModule::prepare_pk_eq() {
       background_module     = cosmology.GetBackgroundModule();
       thermodynamics_module = cosmology.GetThermodynamicsModule();
 
-      class_call(background_module->background_tau_of_z(z[index_pk_eq_z], &tau_of_z),
-                 background_module->error_message_,
-                 error_message_);
+      background_module->background_tau_of_z(z[index_pk_eq_z], &tau_of_z);
 
       delta_tau_eq = tau_of_z - thermodynamics_module->tau_rec_;
 
@@ -3901,13 +3851,11 @@ int NonlinearModule::prepare_pk_eq() {
     pk_eq_w_and_Omega_[pk_eq_size_ * index_pk_eq_z + index_pk_eq_w_] = w0_fld;
 
     pvecback.resize(background_module->bg_size_);
-    class_call(background_module->background_at_tau(tau_of_z,
-                                                    pba->long_info,
-                                                    pba->inter_normal,
-                                                    &last_index,
-                                                    pvecback.data()),
-               background_module->error_message_,
-               error_message_);
+    background_module->background_at_tau(tau_of_z,
+                                         pba->long_info,
+                                         pba->inter_normal,
+                                         &last_index,
+                                         pvecback.data());
     pk_eq_w_and_Omega_[pk_eq_size_ * index_pk_eq_z + index_pk_eq_Omega_m_] =
         pvecback[background_module->index_bg_Omega_m_];
   }
@@ -3929,15 +3877,17 @@ int NonlinearModule::prepare_pk_eq() {
 
   /** - spline the table for later interpolation */
 
-  class_call(array_spline_table_lines(pk_eq_tau_.data(),
-                                      pk_eq_tau_size_,
-                                      pk_eq_w_and_Omega_.data(),
-                                      pk_eq_size_,
-                                      pk_eq_ddw_and_ddOmega_.data(),
-                                      _SPLINE_NATURAL_,
-                                      error_message_),
-             error_message_,
-             error_message_);
+  {
+    ErrorMsg buf;
+    class_call_failure(array_spline_table_lines(pk_eq_tau_.data(),
+                                                pk_eq_tau_size_,
+                                                pk_eq_w_and_Omega_.data(),
+                                                pk_eq_size_,
+                                                pk_eq_ddw_and_ddOmega_.data(),
+                                                _SPLINE_NATURAL_,
+                                                buf),
+                       buf);
+  }
 
   return _SUCCESS_;
 }

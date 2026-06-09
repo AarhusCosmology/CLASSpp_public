@@ -43,9 +43,7 @@ void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0).
      The module previously passed the absolute a = a_rel*a_today (= ctx.a_ini). */
   double w_fld, dw_over_da_fld, integral_fld;
-  class_call(ComputeWFld(ctx.a_ini, &w_fld, &dw_over_da_fld, &integral_fld),
-             bgm_->error_message_,
-             bgm_->error_message_);
+  ComputeWFld(ctx.a_ini, &w_fld, &dw_over_da_fld, &integral_fld);
 
   /* Note: for complicated w_fld(a) functions with no simple
      analytic integral, this is the place were you should compute
@@ -207,9 +205,7 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
 
   double w_fld, dw_over_da, integral;
   auto* bgm = ctx.p_mod->GetBackgroundModule().get();
-  class_call(bgm->background_w_fld(ctx.a, &w_fld, &dw_over_da, &integral),
-             bgm->error_message_,
-             bgm->error_message_);
+  bgm->background_w_fld(ctx.a, &w_fld, &dw_over_da, &integral);
 
   y[layout.idx_delta] = -ctx.ktau_two / 4. * (1. + w_fld) * (4. - 3. * cs2_fld_) /
                         (4. - 6. * w_fld + 3. * cs2_fld_) * ctx.ppr->curvature_ini * ctx.s2_squared;
@@ -344,10 +340,10 @@ int FluidSpecies::ComputeWFld(double a,
       if (auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD"))
         Omega_m += static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**p).idm_drmd().GetOmega0();
       if (bgm_->all_species_.count("DCDM_DR"))
-        class_stop(bgm_->error_message_,
-                   "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
-                   "to code the calculation of a_eq in that case, but it would not be difficult to "
-                   "add it if necessary, should be a matter of 5 minutes");
+        class_stop(
+            "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
+            "to code the calculation of a_eq in that case, but it would not be difficult to "
+            "add it if necessary, should be a matter of 5 minutes");
       a_eq = Omega_r / Omega_m;  // assumes a flat universe with a=1 today
 
       // w_ede(a) taken from eq. (11) in 1706.00730
@@ -392,9 +388,9 @@ int FluidSpecies::ComputeWFld(double a,
                             wa_fld_ * (a / pba_.a_today - 1.));
       break;
     case EDE:
-      class_stop(bgm_->error_message_,
-                 "EDE implementation not finished: to finish it, read the comments in background.c "
-                 "just before this line\n");
+      class_stop(
+          "EDE implementation not finished: to finish it, read the comments in background.c "
+          "just before this line\n");
       break;
   }
 

@@ -270,7 +270,6 @@ keywords_to_be_ignored = ['static', 'constexpr', 'const']
 for file in h_files:
     file_lines = read_header_lines(file)
     class_name = ''
-    error_message_added = False
     index_line = 0
     while index_line < len(file_lines):
         line = file_lines[index_line]
@@ -283,7 +282,6 @@ for file in h_files:
                 if (('struct ' + s + ' ' in line or 'struct ' + s + '\n' in line) or
                     ('class ' + s + ' ' in line or 'class ' + s + '\n' in line)):
                     class_name = s
-                    error_message_added = False
                     classes.append('cdef extern from "' + os.path.basename(file) + '":')
                     classes.append('    cdef cppclass ' + s + ':')
                     break
@@ -291,10 +289,7 @@ for file in h_files:
             continue
 
         if 'private:' in line or '};' in line:
-            # Class just ended ended or we have reached the private section of the class
-            if 'Module' in class_name and not error_message_added:
-                # If module, add the inherited variable error_message_
-                classes.append('        ErrorMsg error_message_')
+            # Class just ended or we have reached the private section of the class
             class_name = ''
             classes.append('')
             index_line += 1
@@ -390,8 +385,6 @@ for file in h_files:
         out_line = '        ' + typename + ' ' + variable_name
         out_line = out_line.replace('std::','').replace('<', '[').replace('>',']')
         classes.append(out_line)
-        if typename == 'ErrorMsg' and variable_name == 'error_message_':
-            error_message_added = True
         index_line += 1
 
 

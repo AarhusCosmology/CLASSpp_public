@@ -46,14 +46,12 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(double* y, const PerturbI
         else {
           double Rint, csp2, Gint;
           auto* bgm = ctx.p_mod->GetBackgroundModule().get();
-          class_call(bgm->background_idm_drmd(ctx.ppw->pvecback[bgm->index_bg_a_],
-                                              idm_drmd_->Rho(ctx.ppw->pvecback) /
-                                                  idr_drmd_->Rho(ctx.ppw->pvecback),
-                                              &Rint,
-                                              &csp2,
-                                              &Gint),
-                     bgm->error_message_,
-                     bgm->error_message_);
+          bgm->background_idm_drmd(ctx.ppw->pvecback[bgm->index_bg_a_],
+                                   idm_drmd_->Rho(ctx.ppw->pvecback) /
+                                       idr_drmd_->Rho(ctx.ppw->pvecback),
+                                   &Rint,
+                                   &csp2,
+                                   &Gint);
           y[idm_drm_lay.idx_theta] = Gint / (4. + Gint) *
                                      ((idr_drm_lay.idx_theta >= 0) ? y[idr_drm_lay.idx_theta] : 0.);
         }
@@ -335,9 +333,7 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(double /*tau*/,
     return;
 
   double Rint, csp2, Gint;
-  class_call(bgm->background_idm_drmd(ctx.a, rho_idm_drmd / rho_idr_drmd, &Rint, &csp2, &Gint),
-             bgm->error_message_,
-             bgm->error_message_);
+  bgm->background_idm_drmd(ctx.a, rho_idm_drmd / rho_idr_drmd, &Rint, &csp2, &Gint);
 
   const auto& my_acc_lay = static_cast<const PerturbLayout&>(
       *pv->species_layouts[collection_index_]);
