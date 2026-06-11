@@ -26,7 +26,7 @@
 class InputModule {
  public:
   InputModule(FileContent& fc);
-  static int file_content_from_arguments(int argc, char** argv, FileContent& fc, ErrorMsg errmsg);
+  static int file_content_from_arguments(int argc, char** argv, FileContent& fc);
 
   /** Resolve any per-species / theta_s shooting targets by root-finding, returning a fully
    *  resolved module. No targets (or already inside a shooting context) → returns the input
@@ -67,8 +67,7 @@ class InputModule {
     // with the authoritative target (so the species never re-derives it from the file content).
     std::vector<std::string> target_species_keys;
   };
-  static int ShootingResidual(
-      double* x, int x_size, void* pworkspace, double* output, ErrorMsg error_message);
+  static int ShootingResidual(double* x, int x_size, void* pworkspace, double* output);
 
   void ConstructSpecies();
 
@@ -89,41 +88,41 @@ class InputModule {
 };
 
 /* macro for reading parameter values with routines from the parser */
-#define class_read_double(name, destination)                                            \
-  do {                                                                                  \
-    class_call(parser_read_double(pfc, name, &param1, &flag1, errmsg), errmsg, errmsg); \
-    if (flag1 == _TRUE_)                                                                \
-      destination = param1;                                                             \
+#define class_read_double(name, destination)        \
+  do {                                              \
+    parser_read_double(pfc, name, &param1, &flag1); \
+    if (flag1 == _TRUE_)                            \
+      destination = param1;                         \
   } while (0);
 
-#define class_read_int(name, destination)                                          \
-  do {                                                                             \
-    class_call(parser_read_int(pfc, name, &int1, &flag1, errmsg), errmsg, errmsg); \
-    if (flag1 == _TRUE_)                                                           \
-      destination = (typeof(destination)) int1;                                    \
+#define class_read_int(name, destination)       \
+  do {                                          \
+    parser_read_int(pfc, name, &int1, &flag1);  \
+    if (flag1 == _TRUE_)                        \
+      destination = (typeof(destination)) int1; \
   } while (0);
 
 /* `destination` must be a std::string (the assignment below relies on it); legacy
  * char[] fields are not supported by this macro. `string1` is a std::string local. */
-#define class_read_string(name, destination)                                            \
-  do {                                                                                  \
-    class_call(parser_read_string(pfc, name, string1, &flag1, errmsg), errmsg, errmsg); \
-    if (flag1 == _TRUE_)                                                                \
-      destination = string1;                                                            \
+#define class_read_string(name, destination)        \
+  do {                                              \
+    parser_read_string(pfc, name, string1, &flag1); \
+    if (flag1 == _TRUE_)                            \
+      destination = string1;                        \
   } while (0);
 
-#define class_read_double_one_of_two(name1, name2, destination)                          \
-  do {                                                                                   \
-    class_call(parser_read_double(pfc, name1, &param1, &flag1, errmsg), errmsg, errmsg); \
-    class_call(parser_read_double(pfc, name2, &param2, &flag2, errmsg), errmsg, errmsg); \
-    class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),                                   \
-               "In input file, you can only enter one of %s, %s, choose one",            \
-               name1,                                                                    \
-               name2);                                                                   \
-    if (flag1 == _TRUE_)                                                                 \
-      destination = param1;                                                              \
-    if (flag2 == _TRUE_)                                                                 \
-      destination = param2;                                                              \
+#define class_read_double_one_of_two(name1, name2, destination)               \
+  do {                                                                        \
+    parser_read_double(pfc, name1, &param1, &flag1);                          \
+    parser_read_double(pfc, name2, &param2, &flag2);                          \
+    class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),                        \
+               "In input file, you can only enter one of %s, %s, choose one", \
+               name1,                                                         \
+               name2);                                                        \
+    if (flag1 == _TRUE_)                                                      \
+      destination = param1;                                                   \
+    if (flag2 == _TRUE_)                                                      \
+      destination = param2;                                                   \
   } while (0);
 
 #define class_at_least_two_of_three(a, b, c)                              \

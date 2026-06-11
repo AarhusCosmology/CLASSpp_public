@@ -13,8 +13,7 @@ int array_derive(double* array,
                  int n_lines,
                  int index_x, /** from 0 to (n_columns-1) */
                  int index_y,
-                 int index_dydx,
-                 ErrorMsg errmsg) {
+                 int index_dydx) {
   int i;
 
   double dx1, dx2, dy1, dy2, weight1, weight2;
@@ -55,8 +54,7 @@ int array_derive_spline(double* x_array,
                         double* array_splined,
                         int n_columns,
                         int index_y,
-                        int index_dydx,
-                        ErrorMsg errmsg) {
+                        int index_dydx) {
   int i;
 
   double h;
@@ -97,8 +95,7 @@ int array_derive_spline_table_line_to_line(double* x_array,
                                            int n_columns,
                                            int index_y,
                                            int index_ddy,
-                                           int index_dy,
-                                           ErrorMsg errmsg) {
+                                           int index_dy) {
   int i;
 
   double h;
@@ -137,13 +134,8 @@ int array_derive_spline_table_line_to_line(double* x_array,
   return _SUCCESS_;
 }
 
-int array_derive1_order2_table_line_to_line(double* x_array,
-                                            int n_lines,
-                                            double* array,
-                                            int n_columns,
-                                            int index_y,
-                                            int index_dy,
-                                            ErrorMsg errmsg) {
+int array_derive1_order2_table_line_to_line(
+    double* x_array, int n_lines, double* array, int n_columns, int index_y, int index_dy) {
   int i = 1;
   double dxp, dxm, dyp, dym;
 
@@ -189,8 +181,7 @@ int array_derive2_order2_table_line_to_line(double* x_array,
                                             int n_columns,
                                             int index_y,
                                             int index_dy,
-                                            int index_ddy,
-                                            ErrorMsg errmsg) {
+                                            int index_ddy) {
   int i;
   double dxp, dxm, dyp, dym;
 
@@ -228,8 +219,7 @@ int array_integrate_spline_table_line_to_line(double* x_array,
                                               int n_columns,
                                               int index_y,
                                               int index_ddy,
-                                              int index_inty,
-                                              ErrorMsg errmsg) {
+                                              int index_inty) {
   int i;
 
   double h;
@@ -258,8 +248,7 @@ int array_derive_two(double* array,
                      int index_x, /** from 0 to (n_columns-1) */
                      int index_y,
                      int index_dydx,
-                     int index_ddydxdx,
-                     ErrorMsg errmsg) {
+                     int index_ddydxdx) {
   int i;
 
   double dx1, dx2, dy1, dy2, weight1, weight2;
@@ -310,8 +299,7 @@ int array_spline(double* array,
                  int index_x, /** from 0 to (n_columns-1) */
                  int index_y,
                  int index_ddydx2,
-                 short spline_mode,
-                 ErrorMsg errmsg) {
+                 short spline_mode) {
   int i, k;
   double p, qn, sig, un;
   std::vector<double> vec_u(n_lines - 1);
@@ -420,8 +408,7 @@ int array_spline_table_line_to_line(double* x, /* vector of size x_size */
                                     int n_columns,
                                     int index_y,
                                     int index_ddydx2,
-                                    short spline_mode,
-                                    ErrorMsg errmsg) {
+                                    short spline_mode) {
   int i, k;
   double p, qn, sig, un;
   std::vector<double> vec_u(n_lines - 1);
@@ -504,8 +491,7 @@ int array_spline_table_lines(double* x, /* vector of size x_size */
 						  y_array[index_x*y_size+index_y] */
                              int y_size,
                              double* ddy_array, /* array of size x_size*y_size */
-                             short spline_mode,
-                             ErrorMsg errmsg) {
+                             short spline_mode) {
   std::vector<double> vec_u((x_size - 1) * y_size);
   std::vector<double> vec_p(y_size);
   std::vector<double> vec_qn(y_size);
@@ -629,8 +615,7 @@ int array_logspline_table_lines(double* x, /* vector of size x_size */
 						  y_array[index_x*y_size+index_y] */
                                 int y_size,
                                 double* ddlny_array, /* array of size x_size*y_size */
-                                short spline_mode,
-                                ErrorMsg errmsg) {
+                                short spline_mode) {
   std::vector<double> vec_u((x_size - 1) * y_size);
   std::vector<double> vec_p(y_size);
   std::vector<double> vec_qn(y_size);
@@ -757,8 +742,7 @@ int array_spline_table_columns(double* x, /* vector of size x_size */
 					  y_array[index_y*x_size+index_x] */
                                int y_size,
                                double* ddy_array, /* array of size x_size*y_size */
-                               short spline_mode,
-                               ErrorMsg errmsg) {
+                               short spline_mode) {
   std::vector<double> vec_u((x_size - 1) * y_size);
   std::vector<double> vec_p(y_size);
   std::vector<double> vec_qn(y_size);
@@ -887,8 +871,7 @@ int array_spline_table_columns2(double* x, /* vector of size x_size */
 					  y_array[index_y*x_size+index_x] */
                                 int y_size,
                                 double* ddy_array, /* array of size x_size*y_size */
-                                short spline_mode,
-                                ErrorMsg errmsg) {
+                                short spline_mode) {
   std::vector<double> vec_u((x_size - 1) * y_size);
   std::vector<double> vec_p(y_size);
   std::vector<double> vec_qn(y_size);
@@ -1004,8 +987,7 @@ int array_spline_table_one_column(double* x, /* vector of size x_size */
                                   int y_size,
                                   int index_y,
                                   double* ddy_array, /* array of size x_size*y_size */
-                                  short spline_mode,
-                                  ErrorMsg errmsg) {
+                                  short spline_mode) {
   double p;
   double qn;
   double un;
@@ -1116,8 +1098,7 @@ int array_logspline_table_one_column(double* x, /* vector of size x_size */
                                      int y_size,
                                      int index_y,
                                      double* ddlogy_array, /* array of size x_size*y_size */
-                                     short spline_mode,
-                                     ErrorMsg errmsg) {
+                                     short spline_mode) {
   double p;
   double qn;
   double un;
@@ -1231,8 +1212,7 @@ int array_integrate_all_spline(double* array,
                                int index_x, /** from 0 to (n_columns-1) */
                                int index_y,
                                int index_ddy,
-                               double* result,
-                               ErrorMsg errmsg) {
+                               double* result) {
   int i;
   double h;
 
@@ -1256,8 +1236,7 @@ int array_integrate_all_trapzd_or_spline(double* array,
                                          int index_x, /** from 0 to (n_columns-1) */
                                          int index_y,
                                          int index_ddy,
-                                         double* result,
-                                         ErrorMsg errmsg) {
+                                         double* result) {
   int i;
   double h;
 
@@ -1295,8 +1274,7 @@ int array_integrate(double* array,
                     int n_lines,
                     int index_x, /** from 0 to (n_columns-1) */
                     int index_y,
-                    int index_int_y_dx,
-                    ErrorMsg errmsg) {
+                    int index_int_y_dx) {
   int i;
   double sum;
 
@@ -1328,8 +1306,7 @@ int array_integrate_ratio(double* array,
                           int index_x, /** from 0 to (n_columns-1) */
                           int index_y1,
                           int index_y2,
-                          int index_int_y1_over_y2_dx,
-                          ErrorMsg errmsg) {
+                          int index_int_y1_over_y2_dx) {
   int i;
   double sum;
 
@@ -1369,8 +1346,8 @@ int array_interpolate(double* array,
                       double x,
                       int* last_index,
                       double* result,
-                      int result_size, /** from 1 to n_columns */
-                      ErrorMsg errmsg) {
+                      int result_size) /** from 1 to n_columns */
+{
   int inf, sup, mid, i;
   double weight;
 
@@ -1448,8 +1425,8 @@ int array_interpolate_spline(double* x_array,
                              double x,
                              int* last_index,
                              double* result,
-                             int result_size, /** from 1 to n_columns */
-                             ErrorMsg errmsg) {
+                             int result_size) /** from 1 to n_columns */
+{
   int inf, sup, mid, i;
   double h, a, b;
 
@@ -1508,7 +1485,7 @@ int array_interpolate_spline(double* x_array,
   *
   * Called by nonlinear_HMcode()
   */
-int array_search_bisect(int n_lines, double* array, double c, int* last_index, ErrorMsg errmsg) {
+int array_search_bisect(int n_lines, double* array, double c, int* last_index) {
   int inf, sup, mid;
 
   inf = 0;
@@ -1563,8 +1540,8 @@ int array_interpolate_linear(double* x_array,
                              double x,
                              int* last_index,
                              double* result,
-                             int result_size, /** from 1 to n_columns */
-                             ErrorMsg errmsg) {
+                             int result_size) /** from 1 to n_columns */
+{
   int inf, sup, mid, i;
   double h, a, b;
 
@@ -1628,8 +1605,8 @@ int array_interpolate_logspline(double* x_array,
                                 double x,
                                 int* last_index,
                                 double* result,
-                                int result_size, /** from 1 to n_columns */
-                                ErrorMsg errmsg) {
+                                int result_size) /** from 1 to n_columns */
+{
   int inf, sup, mid, i;
   double h, a, b;
 
@@ -1697,8 +1674,8 @@ int array_interpolate_spline_one_column(
     int index_y,
     double* ddy_array, /* array of size x_size*y_size */
     double x,          /* input */
-    double* y,         /* output */
-    ErrorMsg errmsg) {
+    double* y)         /* output */
+{
   int inf, sup, mid;
 
   inf = 0;
@@ -1762,8 +1739,8 @@ int array_interpolate_extrapolate_spline_one_column(
     int index_y,
     double* ddy_array, /* array of size x_size*y_size */
     double x,          /* input */
-    double* y,         /* output */
-    ErrorMsg errmsg) {
+    double* y)         /* output */
+{
   int inf, sup, mid;
   double h, a, b;
 
@@ -1844,8 +1821,8 @@ int array_interpolate_extrapolate_logspline_loglinear_one_column(
     int index_y,
     double* ddlogy_array, /* array of size x_size*y_size */
     double x,             /* input */
-    double* y,            /* output */
-    ErrorMsg errmsg) {
+    double* y)            /* output */
+{
   int inf, sup, mid;
   double h, a, b;
 
@@ -1931,8 +1908,8 @@ int array_interpolate_growing_closeby(double* array,
                                       double x,
                                       int* last_index,
                                       double* result,
-                                      int result_size, /** from 1 to n_columns */
-                                      ErrorMsg errmsg) {
+                                      int result_size) /** from 1 to n_columns */
+{
   int inf, sup, i;
   double weight;
 
@@ -1978,8 +1955,7 @@ int array_interpolate_one_growing_closeby(double* array,
                                           double x,
                                           int* last_index,
                                           int index_y,
-                                          double* result,
-                                          ErrorMsg errmsg) {
+                                          double* result) {
   int inf, sup;
   double weight;
 
@@ -2023,8 +1999,8 @@ int array_interpolate_spline_growing_closeby(double* x_array,
                                              double x,
                                              int* last_index,
                                              double* result,
-                                             int result_size, /** from 1 to n_columns */
-                                             ErrorMsg errmsg) {
+                                             int result_size) /** from 1 to n_columns */
+{
   int inf, sup, i;
   double h, a, b;
 
@@ -2081,8 +2057,8 @@ int array_interpolate_spline_growing_hunt(double* x_array,
                                           double x,
                                           int* last_index,
                                           double* result,
-                                          int result_size, /** from 1 to n_columns */
-                                          ErrorMsg errmsg) {
+                                          int result_size) /** from 1 to n_columns */
+{
   int inf, sup, mid, i, inc;
   double h, a, b;
 
@@ -2171,8 +2147,8 @@ int array_interpolate_two(double* array_x,
                           int n_lines, /** must be the same for array_x and array_y */
                           double x,
                           double* result,
-                          int result_size, /** from 1 to n_columns_y */
-                          ErrorMsg errmsg) {
+                          int result_size) /** from 1 to n_columns_y */
+{
   int inf, sup, mid, i;
   double weight;
 
@@ -2244,8 +2220,8 @@ int array_interpolate_two_bis(double* array_x,
                               int n_lines, /** must be the same for array_x and array_y */
                               double x,
                               double* result,
-                              int result_size, /** from 1 to n_columns_y */
-                              ErrorMsg errmsg) {
+                              int result_size) /** from 1 to n_columns_y */
+{
   int inf, sup, mid, i;
   double weight;
 
@@ -2318,8 +2294,7 @@ int array_interpolate_two_arrays_one_column(
     int index_y, /* between 0 and (n_columns_y-1) */
     int n_lines, /** must be the same for array_x and array_y */
     double x,
-    double* result,
-    ErrorMsg errmsg) {
+    double* result) {
   int inf, sup, mid;
   double weight;
   double epsilon = 1e-9;
@@ -2376,8 +2351,7 @@ int array_interpolate_equal(double* array,
                             double x,
                             double x_min,
                             double x_max,
-                            double* result,
-                            ErrorMsg errmsg) {
+                            double* result) {
   int index_minus, i;
   double x_step, x_minus, weight;
 
@@ -2402,7 +2376,7 @@ int array_interpolate_equal(double* array,
  */
 
 int array_interpolate_cubic_equal(
-    double x0, double dx, double* yarray, int Nx, double x, double* result, ErrorMsg errmsg) {
+    double x0, double dx, double* yarray, int Nx, double x, double* result) {
   int i;
   double frac;
 
@@ -2443,8 +2417,7 @@ int array_interpolate_parabola(double x1,
                                double y3,
                                double* y,
                                double* dy,
-                               double* ddy,
-                               ErrorMsg errmsg) {
+                               double* ddy) {
   double a, b, c;
 
   /*
@@ -2503,8 +2476,8 @@ int array_smooth_trg(double* array,
                      int starting_k,
                      int eta_size,
                      int index_eta,
-                     int radius, /*3, 5 or 7 */
-                     ErrorMsg errmsg) {
+                     int radius) /*3, 5 or 7 */
+{
   std::vector<double> vec_smooth(k_size);
   double* smooth = vec_smooth.data();
   int i, j, jmin, jmax;
@@ -2621,8 +2594,7 @@ int array_smooth(double* array,
                  int n_columns,
                  int n_lines,
                  int index, /** from 0 to (n_columns-1) */
-                 int radius,
-                 ErrorMsg errmsg) {
+                 int radius) {
   std::vector<double> vec_smooth(n_lines);
   double* smooth = vec_smooth.data();
   int i, j, jmin, jmax;
@@ -2655,7 +2627,7 @@ int array_smooth(double* array,
  * @return the error status
  */
 
-int array_trapezoidal_weights(double* x, int n, double* w_trapz, ErrorMsg errmsg) {
+int array_trapezoidal_weights(double* x, int n, double* w_trapz) {
   int i;
 
   /* Case with just one point, w would normally be 0. */
@@ -2683,7 +2655,7 @@ int array_trapezoidal_weights(double* x, int n, double* w_trapz, ErrorMsg errmsg
  * @return the error status
  */
 
-int array_trapezoidal_mweights(double* x, int n, double* w_trapz, ErrorMsg errmsg) {
+int array_trapezoidal_mweights(double* x, int n, double* w_trapz) {
   int i;
 
   /* Case with just one point. */
@@ -2712,8 +2684,7 @@ int array_trapezoidal_mweights(double* x, int n, double* w_trapz, ErrorMsg errms
  * @return the error status
  */
 
-int array_trapezoidal_integral(
-    double* integrand, int n, double* w_trapz, double* I, ErrorMsg errmsg) {
+int array_trapezoidal_integral(double* integrand, int n, double* w_trapz, double* I) {
   int i;
   double res = 0.0;
   for (i = 0; i < n; i++) {
@@ -2735,7 +2706,7 @@ int array_trapezoidal_integral(
  */
 
 int array_trapezoidal_convolution(
-    double* integrand1, double* integrand2, int n, double* w_trapz, double* I, ErrorMsg errmsg) {
+    double* integrand1, double* integrand2, int n, double* w_trapz, double* I) {
   int i;
   double res = 0.0;
   for (i = 0; i < n; i++) {

@@ -114,12 +114,8 @@ class ThermodynamicsModule : public BaseModule {
   int thermodynamics_helium_from_bbn();
   int thermodynamics_onthespot_energy_injection(recombination* preco,
                                                 double z,
-                                                double* energy_rate,
-                                                ErrorMsg error_message);
-  int thermodynamics_energy_injection(recombination* preco,
-                                      double z,
-                                      double* energy_rate,
-                                      ErrorMsg error_message);
+                                                double* energy_rate);
+  int thermodynamics_energy_injection(recombination* preco, double z, double* energy_rate);
   int thermodynamics_reionization_function(double z, reionization* preio, double* xe);
   int thermodynamics_reionization(recombination* preco, reionization* preio, double* pvecback);
   int thermodynamics_reionization_sample(recombination* preco,
@@ -129,10 +125,14 @@ class ThermodynamicsModule : public BaseModule {
   int thermodynamics_recombination(recombination* preco, double* pvecback);
   int thermodynamics_recombination_with_hyrec(recombination* prec, double* pvecback);
   int thermodynamics_recombination_with_recfast(recombination* prec, double* pvecback);
-  int thermodynamics_derivs_with_recfast_member(
-      double z, double* y, double* dy, void* fixed_parameters, ErrorMsg error_message);
-  static int thermodynamics_derivs_with_recfast(
-      double z, double* y, double* dy, void* fixed_parameters, ErrorMsg error_message);
+  int thermodynamics_derivs_with_recfast_member(double z,
+                                                double* y,
+                                                double* dy,
+                                                void* fixed_parameters);
+  static int thermodynamics_derivs_with_recfast(double z,
+                                                double* y,
+                                                double* dy,
+                                                void* fixed_parameters);
   int thermodynamics_merge_reco_and_reio(recombination* preco, reionization* preio);
   int thermodynamics_tanh(
       double x, double center, double before, double after, double width, double* result);

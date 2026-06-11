@@ -129,15 +129,15 @@ cdef extern from "hyperspherical.h":
     int hyperspherical_HIS_create(int K, double beta, int nl, int* lvec,
                                   double xmin, double xmax, double sampling,
                                   int l_WKB, double phiminabs,
-                                  HyperInterpStruct* pHIS, char* error_message)
-    int hyperspherical_HIS_free(HyperInterpStruct* pHIS, char* error_message)
+                                  HyperInterpStruct* pHIS) except +
+    int hyperspherical_HIS_free(HyperInterpStruct* pHIS) except +
     int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS, int nxi,
                                                     int lnum, double* xinterp,
-                                                    double* Phi, double* dPhi, double* d2Phi)
+                                                    double* Phi, double* dPhi,
+                                                    double* d2Phi) except +
     int hyperspherical_bessel_direct_vector(int K, double beta, int* lvec, int nl,
-                                            double* xvec, int nx, double* Phi,
-                                            char* error_message)
-    int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi)
+                                            double* xvec, int nx, double* Phi) except +
+    int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) except +
 
 
 def _normalize_bessel_inputs(K, beta, l, x, method):
@@ -196,10 +196,7 @@ def hyperspherical_bessel_direct(K, beta, l, x):
     cdef int nl = lvec_arr.shape[0]
     cdef int nx = xvec_arr.shape[0]
     cdef np.ndarray[double, ndim=2] Phi = np.empty((nl, nx), dtype=np.double)
-    cdef char errmsg[2048]
-    if hyperspherical_bessel_direct_vector(Kc, betac, &lvec[0], nl,
-                                           &xvec[0], nx, &Phi[0, 0], errmsg) != 0:
-        raise CosmoSevereError(errmsg)
+    hyperspherical_bessel_direct_vector(Kc, betac, &lvec[0], nl, &xvec[0], nx, &Phi[0, 0])
     if scalar_l:
         return np.ascontiguousarray(Phi[0])
     return Phi
@@ -283,15 +280,13 @@ def hyperspherical_bessel_interpolate(K, beta, l, x, sampling=None, derivatives=
     # are left with garbage internal pointers, so the resize() calls inside
     # HIS_create corrupt the heap and produce sporadic NaNs.
     cdef HyperInterpStruct* his = new HyperInterpStruct()
-    cdef char errmsg[2048]
     cdef np.ndarray[double, ndim=2] Phi = np.empty((nl, nx), dtype=np.double)
     cdef np.ndarray[double, ndim=2] dPhi
     cdef np.ndarray[double, ndim=2] d2Phi
     cdef int i
     try:
-        if hyperspherical_HIS_create(Kc, betac, nl, &luniq[0], xmin, xmax, samp,
-                                     l_WKB, phiminabs, his, errmsg) != 0:
-            raise CosmoSevereError(errmsg)
+        hyperspherical_HIS_create(Kc, betac, nl, &luniq[0], xmin, xmax, samp,
+                                  l_WKB, phiminabs, his)
         if derivatives:
             dPhi = np.empty((nl, nx), dtype=np.double)
             d2Phi = np.empty((nl, nx), dtype=np.double)
@@ -303,7 +298,7 @@ def hyperspherical_bessel_interpolate(K, beta, l, x, sampling=None, derivatives=
                 hyperspherical_Hermite_interpolation_vector(his, nx, i, &xv[0],
                                                             &Phi[i, 0], NULL, NULL)
     finally:
-        hyperspherical_HIS_free(his, errmsg)
+        hyperspherical_HIS_free(his)
         del his
 
     # Map sorted-unique rows back to the requested l order.

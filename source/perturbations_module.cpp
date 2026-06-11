@@ -105,45 +105,40 @@ PerturbationsModule::~PerturbationsModule() {
 // Wrapper functions to pass non-static member functions
 int PerturbationsModule::perturb_timescale(double tau,
                                            void* parameters_and_workspace,
-                                           double* timescale,
-                                           ErrorMsg error_message) {
+                                           double* timescale) {
   auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   return pppaw->perturbations_module->perturb_timescale_member(tau,
                                                                parameters_and_workspace,
-                                                               timescale,
-                                                               error_message);
+                                                               timescale);
 }
 int PerturbationsModule::perturb_sources(double tau,
                                          double* pvecperturbations,
                                          double* pvecderivs,
                                          int index_tau,
-                                         void* parameters_and_workspace,
-                                         ErrorMsg error_message) {
+                                         void* parameters_and_workspace) {
   auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   return pppaw->perturbations_module->perturb_sources_member(tau,
                                                              pvecperturbations,
                                                              pvecderivs,
                                                              index_tau,
-                                                             parameters_and_workspace,
-                                                             error_message);
+                                                             parameters_and_workspace);
 }
-int PerturbationsModule::perturb_print_variables(
-    double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+int PerturbationsModule::perturb_print_variables(double tau,
+                                                 double* y,
+                                                 double* dy,
+                                                 void* parameters_and_workspace) {
   auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   return pppaw->perturbations_module->perturb_print_variables_member(tau,
                                                                      y,
                                                                      dy,
-                                                                     parameters_and_workspace,
-                                                                     error_message);
+                                                                     parameters_and_workspace);
 }
-int PerturbationsModule::perturb_derivs(
-    double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+int PerturbationsModule::perturb_derivs(double tau,
+                                        double* y,
+                                        double* dy,
+                                        void* parameters_and_workspace) {
   auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  return pppaw->perturbations_module->perturb_derivs_member(tau,
-                                                            y,
-                                                            dy,
-                                                            parameters_and_workspace,
-                                                            error_message);
+  return pppaw->perturbations_module->perturb_derivs_member(tau, y, dy, parameters_and_workspace);
 }
 
 /**
@@ -177,24 +172,17 @@ int PerturbationsModule::perturb_sources_at_tau(
         but actually never used by default version of CLASS */
 
   if ((logtau < ln_tau_[0]) || (ln_tau_size_ <= 1)) {
-    {
-      ErrorMsg buf;
-      class_call_failure(array_interpolate_two_bis(const_cast<double*>(tau_sampling_.data()),
-                                                   1,
-                                                   0,
-                                                   const_cast<double*>(
-                                                       sources_[index_md]
-                                                               [index_ic * tp_size_[index_md] +
-                                                                index_tp]
-                                                                   .data()),
-                                                   k_size_[index_md],
-                                                   tau_size_,
-                                                   tau,
-                                                   psource,
-                                                   k_size_[index_md],
-                                                   buf),
-                         buf);
-    }
+    array_interpolate_two_bis(const_cast<double*>(tau_sampling_.data()),
+                              1,
+                              0,
+                              const_cast<double*>(
+                                  sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
+                                      .data()),
+                              k_size_[index_md],
+                              tau_size_,
+                              tau,
+                              psource,
+                              k_size_[index_md]);
   }
 
   /** - more accurate spline interpolation at late times (z<z_max_pk),
@@ -202,10 +190,7 @@ int PerturbationsModule::perturb_sources_at_tau(
         functions T(k,z) or power spectra P(k,z) */
 
   else {
-    {
-      ErrorMsg buf;
-      class_call_failure(array_interpolate_spline(
-                             const_cast<double*>(ln_tau_.data()),
+    array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
                              ln_tau_size_,
                              late_sources_[index_md][index_ic * tp_size_[index_md] + index_tp],
                              const_cast<double*>(
@@ -215,10 +200,7 @@ int PerturbationsModule::perturb_sources_at_tau(
                              logtau,
                              &last_index,
                              psource,
-                             k_size_[index_md],
-                             buf),
-                         buf);
-    }
+                             k_size_[index_md]);
   }
 
   return _SUCCESS_;
@@ -789,19 +771,15 @@ int PerturbationsModule::perturb_init() {
         for (index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
           future_output.push_back(task_system.AsyncTask([this, index_md, index_tp, index_ic]() {
             {
-              ErrorMsg buf;
-              class_call_failure(
-                  array_spline_table_lines(ln_tau_.data(),
-                                           ln_tau_size_,
-                                           late_sources_[index_md]
-                                                        [index_ic * tp_size_[index_md] + index_tp],
-                                           k_size_[index_md],
-                                           ddlate_sources_[index_md]
-                                                          [index_ic * tp_size_[index_md] + index_tp]
-                                                              .data(),
-                                           _SPLINE_EST_DERIV_,
-                                           buf),
-                  buf);
+              array_spline_table_lines(ln_tau_.data(),
+                                       ln_tau_size_,
+                                       late_sources_[index_md]
+                                                    [index_ic * tp_size_[index_md] + index_tp],
+                                       k_size_[index_md],
+                                       ddlate_sources_[index_md]
+                                                      [index_ic * tp_size_[index_md] + index_tp]
+                                                          .data(),
+                                       _SPLINE_EST_DERIV_);
             }
             return _SUCCESS_;
           }));
@@ -2451,7 +2429,7 @@ int PerturbationsModule::perturb_solve(int index_md,
   int is_early_enough;
 
   /* Related to the perturbation output */
-  int (*perhaps_print_variables)(double, double*, double*, void*, char*);
+  int (*perhaps_print_variables)(double, double*, double*, void*);
   int index_ikout;
 
   /** - initialize indices relevant for back/thermo tables search */
@@ -2701,26 +2679,21 @@ int PerturbationsModule::perturb_solve(int index_md,
       generic_evolver = &evolver_rkdp45;
     }
 
-    {
-      ErrorMsg buf;
-      class_call_failure(generic_evolver(perturb_derivs,
-                                         interval_limit[index_interval],
-                                         interval_limit[index_interval + 1],
-                                         ppw->pv->y,
-                                         ppw->pv->used_in_sources,
-                                         ppw->pv->pt_size,
-                                         &ppaw,
-                                         ppr->tol_perturb_integration,
-                                         ppr->smallest_allowed_variation,
-                                         perturb_timescale,
-                                         ppr->perturb_integration_stepsize,
-                                         tau_sampling_.data(),
-                                         tau_actual_size,
-                                         perturb_sources,
-                                         perhaps_print_variables,
-                                         buf),
-                         buf);
-    }
+    generic_evolver(perturb_derivs,
+                    interval_limit[index_interval],
+                    interval_limit[index_interval + 1],
+                    ppw->pv->y,
+                    ppw->pv->used_in_sources,
+                    ppw->pv->pt_size,
+                    &ppaw,
+                    ppr->tol_perturb_integration,
+                    ppr->smallest_allowed_variation,
+                    perturb_timescale,
+                    ppr->perturb_integration_stepsize,
+                    tau_sampling_.data(),
+                    tau_actual_size,
+                    perturb_sources,
+                    perhaps_print_variables);
   }
 
   /** - if perturbations were printed in a file, close the file */
@@ -4656,8 +4629,7 @@ int PerturbationsModule::perturb_approximations(int index_md,
 
 int PerturbationsModule::perturb_timescale_member(double tau,
                                                   void* parameters_and_workspace,
-                                                  double* timescale,
-                                                  ErrorMsg error_message) {
+                                                  double* timescale) {
   /** Summary: */
 
   /** - define local variables */
@@ -5404,12 +5376,8 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
  * @return the error status
  */
 
-int PerturbationsModule::perturb_sources_member(double tau,
-                                                double* y,
-                                                double* dy,
-                                                int index_tau,
-                                                void* parameters_and_workspace,
-                                                ErrorMsg error_message) {
+int PerturbationsModule::perturb_sources_member(
+    double tau, double* y, double* dy, int index_tau, void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename structure fields (just to avoid heavy notations) */
@@ -5819,8 +5787,10 @@ int PerturbationsModule::perturb_sources_member(double tau,
  *
  */
 
-int PerturbationsModule::perturb_print_variables_member(
-    double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+int PerturbationsModule::perturb_print_variables_member(double tau,
+                                                        double* y,
+                                                        double* dy,
+                                                        void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename structure fields (just to avoid heavy notations) */
@@ -6067,8 +6037,10 @@ int PerturbationsModule::perturb_print_variables_member(
  * @param error_message            Output: error message
  */
 
-int PerturbationsModule::perturb_derivs_member(
-    double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+int PerturbationsModule::perturb_derivs_member(double tau,
+                                               double* y,
+                                               double* dy,
+                                               void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
@@ -6278,7 +6250,7 @@ int PerturbationsModule::perturb_derivs_member(
     /** - ---> photon temperature and baryon (species-delegated) */
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
-      class_call(perturb_tca_slip_and_shear(y, pppaw, error_message), error_message, error_message);
+      perturb_tca_slip_and_shear(y, pppaw);
     }
 
     {
@@ -6459,9 +6431,7 @@ int PerturbationsModule::perturb_derivs_member(
  * @param error_message            Output: error message
  */
 
-int PerturbationsModule::perturb_tca_slip_and_shear(double* y,
-                                                    void* parameters_and_workspace,
-                                                    ErrorMsg error_message) {
+int PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */

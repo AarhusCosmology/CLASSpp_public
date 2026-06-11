@@ -14,8 +14,7 @@
  * error control.
  */
 int evolver_rkdp45(
-    int (*derivs)(
-        double x, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message),
+    int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
     double x_ini,
     double x_end,
     double* y,
@@ -24,20 +23,12 @@ int evolver_rkdp45(
     void* parameters_and_workspace_for_derivs,
     double tolerance,
     double minimum_variation,
-    int (*evaluate_timescale)(
-        double x, void* parameters_and_workspace, double* timescale, ErrorMsg error_message),
+    int (*evaluate_timescale)(double x, void* parameters_and_workspace, double* timescale),
     double timestep_over_timescale,
     double* x_sampling,
     int x_size,
-    int (*output)(double x,
-                  double y[],
-                  double dy[],
-                  int index_x,
-                  void* parameters_and_workspace,
-                  ErrorMsg error_message),
-    int (*print_variables)(
-        double x, double y[], double dy[], void* parameters_and_workspace, ErrorMsg error_message),
-    ErrorMsg error_message) {
+    int (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
+    int (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
   (void) minimum_variation;
   (void) evaluate_timescale;
   (void) timestep_over_timescale;
@@ -105,9 +96,7 @@ int evolver_rkdp45(
   double t = x_ini;
 
   /* initialise k0 = f(t, y) */
-  class_call((*derivs)(t, y, ki.data(), parameters_and_workspace_for_derivs, error_message),
-             error_message,
-             error_message);
+  (*derivs)(t, y, ki.data(), parameters_and_workspace_for_derivs);
 
   const double hmax = fabs(x_end - x_ini) / 10.0;
   double absh;
@@ -159,13 +148,10 @@ int evolver_rkdp45(
       for (int j = 0; j < i; j++)
         for (int k = 0; k < neq; k++)
           ytemp[k] += h * ai[i][j] * ki[j * neq + k];
-      class_call((*derivs)(t + ci[i] * h,
-                           ytemp.data(),
-                           ki.data() + i * neq,
-                           parameters_and_workspace_for_derivs,
-                           error_message),
-                 error_message,
-                 error_message);
+      (*derivs)(t + ci[i] * h,
+                ytemp.data(),
+                ki.data() + i * neq,
+                parameters_and_workspace_for_derivs);
       for (int k = 0; k < neq; k++) {
         ynew[k] += h * bi[i] * ki[i * neq + k];
         err[k]  += h * bi_diff[i] * ki[i * neq + k];
@@ -196,13 +182,10 @@ int evolver_rkdp45(
 
     /* step accepted */
     if (print_variables != nullptr)
-      class_call((*print_variables)(t + h,
-                                    ynew.data(),
-                                    ki.data() + 6 * neq,
-                                    parameters_and_workspace_for_derivs,
-                                    error_message),
-                 error_message,
-                 error_message);
+      (*print_variables)(t + h,
+                         ynew.data(),
+                         ki.data() + 6 * neq,
+                         parameters_and_workspace_for_derivs);
 
     nofailed          = _TRUE_;
     hnew              = tdir * MAX(hmin, fabs(h) * MAX(0.1, 0.8 * pow(rtol / errmax, pow_grow)));
@@ -211,14 +194,7 @@ int evolver_rkdp45(
     /* emit output at all sampling points within (t, tnew] */
     for (; (idx < x_size) && ((tnew - x_sampling[idx]) * tdir >= 0.0); idx++) {
       if (tnew == x_sampling[idx]) {
-        class_call((*output)(tnew,
-                             ynew.data(),
-                             ki.data() + 6 * neq,
-                             idx,
-                             parameters_and_workspace_for_derivs,
-                             error_message),
-                   error_message,
-                   error_message);
+        (*output)(tnew, ynew.data(), ki.data() + 6 * neq, idx, parameters_and_workspace_for_derivs);
       }
       else {
         const double ti  = x_sampling[idx];
@@ -242,14 +218,7 @@ int evolver_rkdp45(
             }
           }
         }
-        class_call((*output)(ti,
-                             yinterp.data(),
-                             dyinterp.data(),
-                             idx,
-                             parameters_and_workspace_for_derivs,
-                             error_message),
-                   error_message,
-                   error_message);
+        (*output)(ti, yinterp.data(), dyinterp.data(), idx, parameters_and_workspace_for_derivs);
       }
     }
 

@@ -149,28 +149,24 @@ double BackgroundModule::GetSpeciesParam(const std::string& key, const std::stri
 }
 
 // Wrapper functions to pass non-static member functions
-int BackgroundModule::background_derivs_loga(
-    double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+int BackgroundModule::background_derivs_loga(double loga,
+                                             double* y,
+                                             double* dy,
+                                             void* parameters_and_workspace) {
   auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
   return pbpaw->background_module->background_derivs_loga_member(loga,
                                                                  y,
                                                                  dy,
-                                                                 parameters_and_workspace,
-                                                                 error_message);
+                                                                 parameters_and_workspace);
 }
-int BackgroundModule::background_add_line_to_bg_table(double loga,
-                                                      double* y,
-                                                      double* dy,
-                                                      int index_loga,
-                                                      void* parameters_and_workspace,
-                                                      ErrorMsg error_message) {
+int BackgroundModule::background_add_line_to_bg_table(
+    double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace) {
   auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
   return pbpaw->background_module->background_add_line_to_bg_table_member(loga,
                                                                           y,
                                                                           dy,
                                                                           index_loga,
-                                                                          parameters_and_workspace,
-                                                                          error_message);
+                                                                          parameters_and_workspace);
 }
 
 /**
@@ -234,41 +230,26 @@ int BackgroundModule::background_at_tau(
       interpolation mode) */
 
   if (intermode == pba->inter_normal) {
-    {
-      ErrorMsg buf;
-      class_call_failure(array_interpolate_spline(const_cast<double*>(tau_table_.data()),
-                                                  bt_size_,
-                                                  const_cast<double*>(background_table_.data()),
-                                                  const_cast<double*>(
-                                                      d2background_dtau2_table_.data()),
-                                                  bg_size_,
-                                                  tau,
-                                                  last_index,
-                                                  pvecback,
-                                                  pvecback_size,
-                                                  buf),
-                         buf);
-    }
+    array_interpolate_spline(const_cast<double*>(tau_table_.data()),
+                             bt_size_,
+                             const_cast<double*>(background_table_.data()),
+                             const_cast<double*>(d2background_dtau2_table_.data()),
+                             bg_size_,
+                             tau,
+                             last_index,
+                             pvecback,
+                             pvecback_size);
   }
   if (intermode == pba->inter_closeby) {
-    {
-      ErrorMsg buf;
-      class_call_failure(array_interpolate_spline_growing_closeby(const_cast<double*>(
-                                                                      tau_table_.data()),
-                                                                  bt_size_,
-                                                                  const_cast<double*>(
-                                                                      background_table_.data()),
-                                                                  const_cast<double*>(
-                                                                      d2background_dtau2_table_
-                                                                          .data()),
-                                                                  bg_size_,
-                                                                  tau,
-                                                                  last_index,
-                                                                  pvecback,
-                                                                  pvecback_size,
-                                                                  buf),
-                         buf);
-    }
+    array_interpolate_spline_growing_closeby(const_cast<double*>(tau_table_.data()),
+                                             bt_size_,
+                                             const_cast<double*>(background_table_.data()),
+                                             const_cast<double*>(d2background_dtau2_table_.data()),
+                                             bg_size_,
+                                             tau,
+                                             last_index,
+                                             pvecback,
+                                             pvecback_size);
   }
 
   return _SUCCESS_;
@@ -301,20 +282,15 @@ int BackgroundModule::background_tau_of_z(double z, double* tau) const {
   class_test(z > z_table_[0], "out of range: a=%e > a_max=%e\n", z, z_table_[0]);
 
   /** - interpolate from pre-computed table with array_interpolate() */
-  {
-    ErrorMsg buf;
-    class_call_failure(array_interpolate_spline(const_cast<double*>(z_table_.data()),
-                                                bt_size_,
-                                                const_cast<double*>(tau_table_.data()),
-                                                const_cast<double*>(d2tau_dz2_table_.data()),
-                                                1,
-                                                z,
-                                                &last_index,
-                                                tau,
-                                                1,
-                                                buf),
-                       buf);
-  }
+  array_interpolate_spline(const_cast<double*>(z_table_.data()),
+                           bt_size_,
+                           const_cast<double*>(tau_table_.data()),
+                           const_cast<double*>(d2tau_dz2_table_.data()),
+                           1,
+                           z,
+                           &last_index,
+                           tau,
+                           1);
 
   return _SUCCESS_;
 }
@@ -889,26 +865,21 @@ int BackgroundModule::background_solve_evolver() {
   /* Size of vector to integrate is (bi_size_-1) rather than
    * (bi_size_), since a is not integrated.
    */
-  {
-    ErrorMsg buf;
-    class_call_failure(generic_evolver(background_derivs_loga,
-                                       loga_ini,
-                                       loga_final,
-                                       pvecback_integration.data(),
-                                       used_in_output.data(),
-                                       bi_size_ - 1,
-                                       &bpaw,
-                                       ppr->tol_background_integration,
-                                       ppr->smallest_allowed_variation,
-                                       nullptr,
-                                       ppr->perturb_integration_stepsize,
-                                       loga.data(),
-                                       bt_size_,
-                                       background_add_line_to_bg_table,
-                                       nullptr,
-                                       buf),
-                       buf);
-  }
+  generic_evolver(background_derivs_loga,
+                  loga_ini,
+                  loga_final,
+                  pvecback_integration.data(),
+                  used_in_output.data(),
+                  bi_size_ - 1,
+                  &bpaw,
+                  ppr->tol_background_integration,
+                  ppr->smallest_allowed_variation,
+                  nullptr,
+                  ppr->perturb_integration_stepsize,
+                  loga.data(),
+                  bt_size_,
+                  background_add_line_to_bg_table,
+                  nullptr);
 
   /** - deduce age of the Universe */
   /* -> age in Gyears */
@@ -959,29 +930,19 @@ int BackgroundModule::background_solve_evolver() {
   }
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
-  {
-    ErrorMsg buf;
-    class_call_failure(array_spline_table_lines(z_table_.data(),
-                                                bt_size_,
-                                                tau_table_.data(),
-                                                1,
-                                                d2tau_dz2_table_.data(),
-                                                _SPLINE_EST_DERIV_,
-                                                buf),
-                       buf);
-  }
+  array_spline_table_lines(z_table_.data(),
+                           bt_size_,
+                           tau_table_.data(),
+                           1,
+                           d2tau_dz2_table_.data(),
+                           _SPLINE_EST_DERIV_);
 
-  {
-    ErrorMsg buf;
-    class_call_failure(array_spline_table_lines(tau_table_.data(),
-                                                bt_size_,
-                                                background_table_.data(),
-                                                bg_size_,
-                                                d2background_dtau2_table_.data(),
-                                                _SPLINE_EST_DERIV_,
-                                                buf),
-                       buf);
-  }
+  array_spline_table_lines(tau_table_.data(),
+                           bt_size_,
+                           background_table_.data(),
+                           bg_size_,
+                           d2background_dtau2_table_.data(),
+                           _SPLINE_EST_DERIV_);
 
   /** - compute remaining "related parameters"
    *     - so-called "effective neutrino number", computed at earliest
@@ -1061,12 +1022,10 @@ int BackgroundModule::background_solve_evolver() {
      In combined/initial modes the child only carries `deg`; without this its GetOmega0()
      stays 0, dropping it from fnu (GetOmega0NcdmTot) and the budget-print neutrino line.
      The DNCDM density is not an evolved bi_ variable, so read it from the today table row. */
-  {
-    const double* bg_today = background_table_.data() + (bt_size_ - 1) * bg_size_;
-    for (auto& [key, sp] : all_species_) {
-      if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-        dncdm_dr->dncdm().BackfillOmega0FromToday(bg_today, pba->H0, pba->h);
-    }
+  const double* bg_today = background_table_.data() + (bt_size_ - 1) * bg_size_;
+  for (auto& [key, sp] : all_species_) {
+    if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      dncdm_dr->dncdm().BackfillOmega0FromToday(bg_today, pba->H0, pba->h);
   }
 
   return _SUCCESS_;
@@ -1320,8 +1279,7 @@ int BackgroundModule::background_derivs_member(
     double* dy, /* vector with argument dy[index_bi]
                                                             (must be already allocated with
                                                             size bi_size_) */
-    void* parameters_and_workspace,
-    ErrorMsg error_message) {
+    void* parameters_and_workspace) {
   /** Summary: */
 
   /** - define local variables */
@@ -1518,8 +1476,7 @@ int BackgroundModule::background_derivs_loga_member(
     double* dy, /* vector with argument dy[index_bi]
                                                                  (must be already allocated with
                                                                  size bi_size_) */
-    void* parameters_and_workspace,
-    ErrorMsg error_message) {
+    void* parameters_and_workspace) {
   background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
       parameters_and_workspace);
   double* pvecback = pbpaw->pvecback;
@@ -1531,7 +1488,7 @@ int BackgroundModule::background_derivs_loga_member(
   y[index_bi_a_] = a;
 
   /** Get derivatives w.r.t. conformal time */
-  background_derivs_member(tau, y, dy, parameters_and_workspace, error_message);
+  background_derivs_member(tau, y, dy, parameters_and_workspace);
 
   /** Swap a and tau again */
   y[index_bi_a_] = tau;
@@ -1546,12 +1503,8 @@ int BackgroundModule::background_derivs_loga_member(
   return _SUCCESS_;
 }
 
-int BackgroundModule::background_add_line_to_bg_table_member(double loga,
-                                                             double* y,
-                                                             double* dy,
-                                                             int index_loga,
-                                                             void* parameters_and_workspace,
-                                                             ErrorMsg error_message) {
+int BackgroundModule::background_add_line_to_bg_table_member(
+    double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace) {
   double a       = exp(loga);
   double tau     = y[index_bi_a_];
   y[index_bi_a_] = a;
@@ -1575,8 +1528,10 @@ int BackgroundModule::background_add_line_to_bg_table_member(double loga,
   return _SUCCESS_;
 }
 
-int BackgroundModule::background_print_variables(
-    double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+int BackgroundModule::background_print_variables(double loga,
+                                                 double* y,
+                                                 double* dy,
+                                                 void* parameters_and_workspace) {
   background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
       parameters_and_workspace);
   double* pvecback     = pbpaw->pvecback;
@@ -1587,9 +1542,7 @@ int BackgroundModule::background_print_variables(
   y[bm.index_bi_a_] = a;
 
   /** - calculate functions of \f$ a \f$ with background_functions() */
-  class_call(bm.background_functions(y, bm.pba->normal_info, pvecback),
-             error_message,
-             error_message);
+  bm.background_functions(y, bm.pba->normal_info, pvecback);
 
   /** Swap a and tau again */
   y[bm.index_bi_a_] = tau;

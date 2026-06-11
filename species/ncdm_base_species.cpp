@@ -138,17 +138,12 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
       fscanf(psdfile, "%lf %lf", &pbadist.q[row], &pbadist.f0[row]);
     }
     fclose(psdfile);
-    {
-      ErrorMsg buf;
-      class_call_failure(array_spline_table_lines(pbadist.q.data(),
-                                                  pbadist.tablesize,
-                                                  pbadist.f0.data(),
-                                                  1,
-                                                  pbadist.d2f0.data(),
-                                                  _SPLINE_EST_DERIV_,
-                                                  buf),
-                         buf);
-    }
+    array_spline_table_lines(pbadist.q.data(),
+                             pbadist.tablesize,
+                             pbadist.f0.data(),
+                             1,
+                             pbadist.d2f0.data(),
+                             _SPLINE_EST_DERIV_);
   }
 
   // Grey-body subclasses fill these and select a GB-specific default strategy;
@@ -165,42 +160,32 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     q_.resize(_QUADRATURE_MAX_);
     w_.resize(_QUADRATURE_MAX_);
     int q_size;
-    {
-      ErrorMsg buf;
-      class_call_failure(get_qsampling(q_.data(),
-                                       w_.data(),
-                                       &q_size,
-                                       _QUADRATURE_MAX_,
-                                       settings.tol_ncdm,
-                                       pbadist.q.data(),
-                                       pbadist.tablesize,
-                                       TestFunction,
-                                       DistributionFunction,
-                                       &pbadist,
-                                       buf),
-                         buf);
-    }
+    get_qsampling(q_.data(),
+                  w_.data(),
+                  &q_size,
+                  _QUADRATURE_MAX_,
+                  settings.tol_ncdm,
+                  pbadist.q.data(),
+                  pbadist.tablesize,
+                  TestFunction,
+                  DistributionFunction,
+                  &pbadist);
     q_.resize(q_size);
     w_.resize(q_size);
 
     q_bg_.resize(_QUADRATURE_MAX_BG_);
     w_bg_.resize(_QUADRATURE_MAX_BG_);
     int q_size_bg;
-    {
-      ErrorMsg buf;
-      class_call_failure(get_qsampling(q_bg_.data(),
-                                       w_bg_.data(),
-                                       &q_size_bg,
-                                       _QUADRATURE_MAX_BG_,
-                                       settings.tol_ncdm_bg,
-                                       pbadist.q.data(),
-                                       pbadist.tablesize,
-                                       TestFunction,
-                                       DistributionFunction,
-                                       &pbadist,
-                                       buf),
-                         buf);
-    }
+    get_qsampling(q_bg_.data(),
+                  w_bg_.data(),
+                  &q_size_bg,
+                  _QUADRATURE_MAX_BG_,
+                  settings.tol_ncdm_bg,
+                  pbadist.q.data(),
+                  pbadist.tablesize,
+                  TestFunction,
+                  DistributionFunction,
+                  &pbadist);
     q_bg_.resize(q_size_bg);
     w_bg_.resize(q_size_bg);
   }
@@ -209,22 +194,17 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     q_.resize(input_q_size_);
     w_.resize(input_q_size_);
     std::vector<double> dq_dummy(input_q_size_);
-    {
-      ErrorMsg buf;
-      class_call_failure(get_qsampling_manual(q_.data(),
-                                              w_.data(),
-                                              dq_dummy.data(),
-                                              input_q_size_,
-                                              qmax_,
-                                              (enum quadrature_method) strategy,
-                                              pbadist.q.data(),
-                                              pbadist.tablesize,
-                                              DistributionFunction,
-                                              &pbadist,
-                                              gb,
-                                              buf),
-                         buf);
-    }
+    get_qsampling_manual(q_.data(),
+                         w_.data(),
+                         dq_dummy.data(),
+                         input_q_size_,
+                         qmax_,
+                         (enum quadrature_method) strategy,
+                         pbadist.q.data(),
+                         pbadist.tablesize,
+                         DistributionFunction,
+                         &pbadist,
+                         gb);
     q_bg_ = q_;
     w_bg_ = w_;
   }
@@ -306,20 +286,15 @@ int NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
       *f0            = f0last * exp(-(qlast - q) * df0last / f0last / dqlast);
     }
     else {
-      {
-        ErrorMsg buf;
-        class_call_failure(array_interpolate_spline(p->q.data(),
-                                                    p->tablesize,
-                                                    p->f0.data(),
-                                                    p->d2f0.data(),
-                                                    1,
-                                                    q,
-                                                    &p->last_index,
-                                                    f0,
-                                                    1,
-                                                    buf),
-                           buf);
-      }
+      array_interpolate_spline(p->q.data(),
+                               p->tablesize,
+                               p->f0.data(),
+                               p->d2f0.data(),
+                               1,
+                               q,
+                               &p->last_index,
+                               f0,
+                               1);
     }
   }
   else {

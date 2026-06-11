@@ -92,9 +92,9 @@ struct numjac_workspace {
 extern "C" {
 #endif
 
-int initialize_jacobian(struct jacobian* jac, int neq, ErrorMsg error_message);
+int initialize_jacobian(struct jacobian* jac, int neq);
 int uninitialize_jacobian(struct jacobian* jac);
-int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq, ErrorMsg error_message);
+int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq);
 int uninitialize_numjac_workspace(struct numjac_workspace* nj_ws);
 int calc_C(struct jacobian* jac);
 int interp_from_dif(double tinterp,
@@ -109,26 +109,21 @@ int interp_from_dif(double tinterp,
                     int* index,
                     int neq,
                     int output);
-int new_linearisation(struct jacobian* jac, double hinvGak, int neq, ErrorMsg error_message);
+int new_linearisation(struct jacobian* jac, double hinvGak, int neq);
 int adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k);
 void eqvec(double* datavec, double* emptyvec, int n);
 int lubksb(double** a, int n, int* indx, double b[]);
 int ludcmp(double** a, int n, int* indx, double* d, double* vv);
-int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F, ErrorMsg error_message),
+int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
                  double* x_inout,
                  double* dxdF,
                  int x_size,
                  double tolx,
                  double tolF,
                  void* param,
-                 int* fevals,
-                 ErrorMsg error_message);
+                 int* fevals);
 
-int numjac(int (*derivs)(double x,
-                         double* y,
-                         double* dy,
-                         void* parameters_and_workspace,
-                         ErrorMsg error_message),
+int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
            double t,
            double* y,
            double* fval,
@@ -137,12 +132,10 @@ int numjac(int (*derivs)(double x,
            double thresh,
            int neq,
            int* nfe,
-           void* parameters_and_workspace_for_derivs,
-           ErrorMsg error_message);
+           void* parameters_and_workspace_for_derivs);
 
 int evolver_ndf15(
-    int (*derivs)(
-        double x, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message),
+    int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
     double x_ini,
     double x_final,
     double* y_inout,
@@ -151,20 +144,14 @@ int evolver_ndf15(
     void* parameters_and_workspace_for_derivs,
     double rtol,
     double minimum_variation,
-    int (*timescale_and_approximation)(
-        double x, void* parameters_and_workspace, double* timescales, ErrorMsg error_message),
+    int (*timescale_and_approximation)(double x,
+                                       void* parameters_and_workspace,
+                                       double* timescales),
     double timestep_over_timescale,
     double* t_vec,
     int t_res,
-    int (*output)(double x,
-                  double y[],
-                  double dy[],
-                  int index_x,
-                  void* parameters_and_workspace,
-                  ErrorMsg error_message),
-    int (*print_variables)(
-        double x, double y[], double dy[], void* parameters_and_workspace, ErrorMsg error_message),
-    ErrorMsg error_message);
+    int (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
+    int (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace));
 
 #ifdef __cplusplus
 }

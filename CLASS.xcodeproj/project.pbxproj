@@ -93,7 +93,6 @@
 		EE5000010000000000000001 /* all_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = all_species.h; sourceTree = "<group>"; };
 		AF9F872D2F8FB9720077F3A9 /* perturb_column_writer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = perturb_column_writer.cpp; sourceTree = "<group>"; };
 		AF9F872E2F8FB9720077F3A9 /* perturb_source_context.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = perturb_source_context.h; sourceTree = "<group>"; };
-		AF9F872F2F8FB9720077F3A9 /* thermo_context.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thermo_context.h; sourceTree = "<group>"; };
 		AFA9047D241D19FB009B7DEE /* class.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = class.h; sourceTree = "<group>"; };
 		AFB5BC252F974BD000126D51 /* ncdm_base_species.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ncdm_base_species.h; sourceTree = "<group>"; };
 		AFB5BC262F974BD000126D51 /* ncdm_base_species.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ncdm_base_species.cpp; sourceTree = "<group>"; };
@@ -374,7 +373,6 @@
 				EE4000010000000000000001 /* greybody_ncdm_species.cpp */,
 				AF9F872D2F8FB9720077F3A9 /* perturb_column_writer.cpp */,
 				AF9F872E2F8FB9720077F3A9 /* perturb_source_context.h */,
-				AF9F872F2F8FB9720077F3A9 /* thermo_context.h */,
 				CC000001000000000000001A /* base_species.h */,
 				EE3000010000000000000001 /* base_species.cpp */,
 				CC000002000000000000001B /* perturb_context.h */,

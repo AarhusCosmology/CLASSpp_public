@@ -80,10 +80,11 @@ class PrimordialModule : public BaseModule {
   int primordial_inflation_derivs_member(double tau,
                                          double* y,
                                          double* dy,
-                                         void* parameters_and_workspace,
-                                         ErrorMsg error_message) const;
-  static int primordial_inflation_derivs(
-      double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
+                                         void* parameters_and_workspace) const;
+  static int primordial_inflation_derivs(double tau,
+                                         double* y,
+                                         double* dy,
+                                         void* parameters_and_workspace);
   int primordial_external_spectrum_init();
 
   PerturbationsModulePtr perturbations_module_;

@@ -370,29 +370,13 @@ void DNCDMSpecies::ComputeBackground(double a_rel, const double* pvecback_B, dou
     }
   }
   else {
-    {
-      ErrorMsg buf;
-      class_call_failure(array_spline_table_lines(lnq.data(),
-                                                  q_sz,
-                                                  lnf_dlnf_array.data(),
-                                                  1,
-                                                  ddlnf_array.data(),
-                                                  _SPLINE_EST_DERIV_,
-                                                  buf),
-                         buf);
-    }
-    {
-      ErrorMsg buf;
-      class_call_failure(array_derive_spline(lnq.data(),
-                                             q_sz,
-                                             lnf_dlnf_array.data(),
-                                             ddlnf_array.data(),
-                                             1,
-                                             0,
-                                             q_sz,
-                                             buf),
-                         buf);
-    }
+    array_spline_table_lines(lnq.data(),
+                             q_sz,
+                             lnf_dlnf_array.data(),
+                             1,
+                             ddlnf_array.data(),
+                             _SPLINE_EST_DERIV_);
+    array_derive_spline(lnq.data(), q_sz, lnf_dlnf_array.data(), ddlnf_array.data(), 1, 0, q_sz);
     for (int i = 0; i < q_sz; i++) {
       pvecback[index_bg_lnf_decay_dr1_ + i]  = lnf_dlnf_array[i];
       pvecback[index_bg_dlnfdlnq_decay_ + i] = lnf_dlnf_array[q_sz + i];

@@ -56,19 +56,12 @@ int hyperspherical_HIS_create(int K,
                               double sampling,
                               int l_WKB,
                               double phiminabs,
-                              HyperInterpStruct* pHIS,
-                              ErrorMsg error_message);
+                              HyperInterpStruct* pHIS);
 
-int hyperspherical_HIS_free(HyperInterpStruct* pHIS, ErrorMsg error_message);
+int hyperspherical_HIS_free(HyperInterpStruct* pHIS);
 
-int hyperspherical_bessel_direct_vector(int K,
-                                        double beta,
-                                        int* lvec,
-                                        int nl,
-                                        double* xvec,
-                                        int nx,
-                                        double* Phi,
-                                        ErrorMsg error_message);
+int hyperspherical_bessel_direct_vector(
+    int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi);
 
 int hyperspherical_forwards_recurrence(int K,
                                        int lmax,
@@ -152,147 +145,63 @@ int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS,
                                                 double* dPhi,
                                                 double* d2Phi);
 
-int hyperspherical_Hermite3_interpolation_vector_Phi(HyperInterpStruct* pHIS,
-                                                     int nxi,
-                                                     int lnum,
-                                                     double* xinterp,
-                                                     double* Phi,
-                                                     ErrorMsg error_message);
-int hyperspherical_Hermite3_interpolation_vector_dPhi(HyperInterpStruct* pHIS,
-                                                      int nxi,
-                                                      int lnum,
-                                                      double* xinterp,
-                                                      double* dPhi,
-                                                      ErrorMsg error_message);
-int hyperspherical_Hermite3_interpolation_vector_d2Phi(HyperInterpStruct* pHIS,
-                                                       int nxi,
-                                                       int lnum,
-                                                       double* xinterp,
-                                                       double* d2Phi,
-                                                       ErrorMsg error_message);
-int hyperspherical_Hermite3_interpolation_vector_PhidPhi(HyperInterpStruct* pHIS,
-                                                         int nxi,
-                                                         int lnum,
-                                                         double* xinterp,
-                                                         double* Phi,
-                                                         double* dPhi,
-                                                         ErrorMsg error_message);
-int hyperspherical_Hermite3_interpolation_vector_Phid2Phi(HyperInterpStruct* pHIS,
-                                                          int nxi,
-                                                          int lnum,
-                                                          double* xinterp,
-                                                          double* Phi,
-                                                          double* d2Phi,
-                                                          ErrorMsg error_message);
-int hyperspherical_Hermite3_interpolation_vector_dPhid2Phi(HyperInterpStruct* pHIS,
-                                                           int nxi,
-                                                           int lnum,
-                                                           double* xinterp,
-                                                           double* dPhi,
-                                                           double* d2Phi,
-                                                           ErrorMsg error_message);
+int hyperspherical_Hermite3_interpolation_vector_Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi);
+int hyperspherical_Hermite3_interpolation_vector_dPhi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi);
+int hyperspherical_Hermite3_interpolation_vector_d2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* d2Phi);
+int hyperspherical_Hermite3_interpolation_vector_PhidPhi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* dPhi);
+int hyperspherical_Hermite3_interpolation_vector_Phid2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* d2Phi);
+int hyperspherical_Hermite3_interpolation_vector_dPhid2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi, double* d2Phi);
 int hyperspherical_Hermite3_interpolation_vector_PhidPhid2Phi(HyperInterpStruct* pHIS,
                                                               int nxi,
                                                               int lnum,
                                                               double* xinterp,
                                                               double* Phi,
                                                               double* dPhi,
-                                                              double* d2Phi,
-                                                              ErrorMsg error_message);
-int hyperspherical_Hermite4_interpolation_vector_Phi(HyperInterpStruct* pHIS,
-                                                     int nxi,
-                                                     int lnum,
-                                                     double* xinterp,
-                                                     double* Phi,
-                                                     ErrorMsg error_message);
-int hyperspherical_Hermite4_interpolation_vector_dPhi(HyperInterpStruct* pHIS,
-                                                      int nxi,
-                                                      int lnum,
-                                                      double* xinterp,
-                                                      double* dPhi,
-                                                      ErrorMsg error_message);
-int hyperspherical_Hermite4_interpolation_vector_d2Phi(HyperInterpStruct* pHIS,
-                                                       int nxi,
-                                                       int lnum,
-                                                       double* xinterp,
-                                                       double* d2Phi,
-                                                       ErrorMsg error_message);
-int hyperspherical_Hermite4_interpolation_vector_PhidPhi(HyperInterpStruct* pHIS,
-                                                         int nxi,
-                                                         int lnum,
-                                                         double* xinterp,
-                                                         double* Phi,
-                                                         double* dPhi,
-                                                         ErrorMsg error_message);
-int hyperspherical_Hermite4_interpolation_vector_Phid2Phi(HyperInterpStruct* pHIS,
-                                                          int nxi,
-                                                          int lnum,
-                                                          double* xinterp,
-                                                          double* Phi,
-                                                          double* d2Phi,
-                                                          ErrorMsg error_message);
-int hyperspherical_Hermite4_interpolation_vector_dPhid2Phi(HyperInterpStruct* pHIS,
-                                                           int nxi,
-                                                           int lnum,
-                                                           double* xinterp,
-                                                           double* dPhi,
-                                                           double* d2Phi,
-                                                           ErrorMsg error_message);
+                                                              double* d2Phi);
+int hyperspherical_Hermite4_interpolation_vector_Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi);
+int hyperspherical_Hermite4_interpolation_vector_dPhi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi);
+int hyperspherical_Hermite4_interpolation_vector_d2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* d2Phi);
+int hyperspherical_Hermite4_interpolation_vector_PhidPhi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* dPhi);
+int hyperspherical_Hermite4_interpolation_vector_Phid2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* d2Phi);
+int hyperspherical_Hermite4_interpolation_vector_dPhid2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi, double* d2Phi);
 int hyperspherical_Hermite4_interpolation_vector_PhidPhid2Phi(HyperInterpStruct* pHIS,
                                                               int nxi,
                                                               int lnum,
                                                               double* xinterp,
                                                               double* Phi,
                                                               double* dPhi,
-                                                              double* d2Phi,
-                                                              ErrorMsg error_message);
-int hyperspherical_Hermite6_interpolation_vector_Phi(HyperInterpStruct* pHIS,
-                                                     int nxi,
-                                                     int lnum,
-                                                     double* xinterp,
-                                                     double* Phi,
-                                                     ErrorMsg error_message);
-int hyperspherical_Hermite6_interpolation_vector_dPhi(HyperInterpStruct* pHIS,
-                                                      int nxi,
-                                                      int lnum,
-                                                      double* xinterp,
-                                                      double* dPhi,
-                                                      ErrorMsg error_message);
-int hyperspherical_Hermite6_interpolation_vector_d2Phi(HyperInterpStruct* pHIS,
-                                                       int nxi,
-                                                       int lnum,
-                                                       double* xinterp,
-                                                       double* d2Phi,
-                                                       ErrorMsg error_message);
-int hyperspherical_Hermite6_interpolation_vector_PhidPhi(HyperInterpStruct* pHIS,
-                                                         int nxi,
-                                                         int lnum,
-                                                         double* xinterp,
-                                                         double* Phi,
-                                                         double* dPhi,
-                                                         ErrorMsg error_message);
-int hyperspherical_Hermite6_interpolation_vector_Phid2Phi(HyperInterpStruct* pHIS,
-                                                          int nxi,
-                                                          int lnum,
-                                                          double* xinterp,
-                                                          double* Phi,
-                                                          double* d2Phi,
-                                                          ErrorMsg error_message);
-int hyperspherical_Hermite6_interpolation_vector_dPhid2Phi(HyperInterpStruct* pHIS,
-                                                           int nxi,
-                                                           int lnum,
-                                                           double* xinterp,
-                                                           double* dPhi,
-                                                           double* d2Phi,
-                                                           ErrorMsg error_message);
+                                                              double* d2Phi);
+int hyperspherical_Hermite6_interpolation_vector_Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi);
+int hyperspherical_Hermite6_interpolation_vector_dPhi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi);
+int hyperspherical_Hermite6_interpolation_vector_d2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* d2Phi);
+int hyperspherical_Hermite6_interpolation_vector_PhidPhi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* dPhi);
+int hyperspherical_Hermite6_interpolation_vector_Phid2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* d2Phi);
+int hyperspherical_Hermite6_interpolation_vector_dPhid2Phi(
+    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi, double* d2Phi);
 int hyperspherical_Hermite6_interpolation_vector_PhidPhid2Phi(HyperInterpStruct* pHIS,
                                                               int nxi,
                                                               int lnum,
                                                               double* xinterp,
                                                               double* Phi,
                                                               double* dPhi,
-                                                              double* d2Phi,
-                                                              ErrorMsg error_message);
+                                                              double* d2Phi);
 
 #ifdef __cplusplus
 }

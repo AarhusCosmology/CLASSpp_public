@@ -72,13 +72,8 @@ int main(int argc, char** argv) {
   // run starts from an identical, all-unread parameter set.
   FileContent fc_master;
   {
-    ErrorMsg error_message;
     char* prof_argv[2] = {argv[0], argv[1]};
-    if (InputModule::file_content_from_arguments(2, prof_argv, fc_master, error_message) ==
-        _FAILURE_) {
-      printf("\n\nError parsing input:\n=>%s\n", error_message);
-      return _FAILURE_;
-    }
+    InputModule::file_content_from_arguments(2, prof_argv, fc_master);
   }
 
   // Module stage labels, in dependency order.

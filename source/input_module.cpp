@@ -28,8 +28,7 @@
 
 namespace {
 
-int readDoubleList(
-    FileContent* pfc, const char* name, std::vector<double>& values, int* found, ErrorMsg errmsg) {
+int readDoubleList(FileContent* pfc, const char* name, std::vector<double>& values, int* found) {
   try {
     *found = pfc->read_list_of_doubles(name, values) ? _TRUE_ : _FALSE_;
   }
@@ -51,10 +50,7 @@ int readDoubleList(
  * and WriteParameterFiles in sequence.
  */
 
-int InputModule::file_content_from_arguments(int argc,
-                                             char** argv,
-                                             FileContent& fc,
-                                             ErrorMsg errmsg) {
+int InputModule::file_content_from_arguments(int argc, char** argv, FileContent& fc) {
   /** Summary: */
 
   /** - define local variables */
@@ -115,14 +111,14 @@ int InputModule::file_content_from_arguments(int argc,
   /** - if there is an 'xxx.ini' file, read it and store its content. */
 
   if (!input_file.empty()) {
-    class_call(parser_read_file(input_file.c_str(), &fc_input, errmsg), errmsg, errmsg);
+    parser_read_file(input_file.c_str(), &fc_input);
 
     /** - check whether a root name has been set */
 
     {
       // Only flag1 matters here (was "root" set?); the value is read again in ReadDerived.
       std::string unused;
-      class_call(parser_read_string(&fc_input, "root", unused, &flag1, errmsg), errmsg, errmsg);
+      parser_read_string(&fc_input, "root", unused, &flag1);
     }
 
     /** - if root has not been set, use root=output/inputfilennameN_ */
@@ -171,7 +167,7 @@ int InputModule::file_content_from_arguments(int argc,
         tmp_file = oss.str();
       }
       fc_root.set("root", tmp_file);
-      class_call(parser_cat(&fc_input, &fc_root, &fc_inputroot, errmsg), errmsg, errmsg);
+      parser_cat(&fc_input, &fc_root, &fc_inputroot);
       pfc_input = &fc_inputroot;
     }
   }
@@ -179,15 +175,13 @@ int InputModule::file_content_from_arguments(int argc,
   /** - if there is an 'xxx.pre' file, read it and store its content. */
 
   if (!precision_file.empty())
-
-    class_call(parser_read_file(precision_file.c_str(), &fc_precision, errmsg), errmsg, errmsg);
+    parser_read_file(precision_file.c_str(), &fc_precision);
 
   /** - if one or two files were read, merge their contents in a
       single 'file_content' structure. */
 
   if (!input_file.empty() || !precision_file.empty())
-
-    class_call(parser_cat(pfc_input, &fc_precision, &fc, errmsg), errmsg, errmsg);
+    parser_cat(pfc_input, &fc_precision, &fc);
 
   return _SUCCESS_;
 }
@@ -236,10 +230,7 @@ void InputModule::ConstructSpecies() {
   {
     int flag = _FALSE_;
     int val  = 0;
-    {
-      ErrorMsg buf;
-      class_call_failure(parser_read_int(&file_content_, "input_verbose", &val, &flag, buf), buf);
-    }
+    parser_read_int(&file_content_, "input_verbose", &val, &flag);
     if (flag == _TRUE_)
       input_verbose = val;
   }
@@ -317,7 +308,6 @@ void InputModule::ConstructSpecies() {
 }
 
 int InputModule::ReadCoupledCluster() {
-  ErrorMsg errmsg;
   FileContent* pfc    = &file_content_;
   precision* ppr      = &precision_;
   background* pba     = &background_;
@@ -338,9 +328,9 @@ int InputModule::ReadCoupledCluster() {
   double stat_f_idr = 7. / 8.;
   class_read_double("stat_f_idr", stat_f_idr);
 
-  class_call(parser_read_double(pfc, "N_idr", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "N_dg", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "xi_idr", &param3, &flag3, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "N_idr", &param1, &flag1);
+  parser_read_double(pfc, "N_dg", &param2, &flag2);
+  parser_read_double(pfc, "xi_idr", &param3, &flag3);
   class_test(class_at_least_two_of_three(flag1, flag2, flag3),
              "In input file, you can only enter one of N_idr, N_dg or xi_idr, choose one");
 
@@ -396,8 +386,8 @@ int InputModule::ReadCoupledCluster() {
   double omega0_cdm = 0.12038 / (0.67556 * 0.67556);
   bool cdm_user_set = false;
 
-  class_call(parser_read_double(pfc, "Omega_cdm", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_cdm", &param2, &flag2, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "Omega_cdm", &param1, &flag1);
+  parser_read_double(pfc, "omega_cdm", &param2, &flag2);
   class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
              "In input file, you can only enter one of Omega_cdm or omega_cdm, choose one");
   if (flag1 == _TRUE_) {
@@ -421,9 +411,9 @@ int InputModule::ReadCoupledCluster() {
     omega_budget_.cdm = omega0_cdm;
 
   // ── IDM_DR: Omega_idm_dr / omega_idm_dr / f_idm_dr ───────────────────────────
-  class_call(parser_read_double(pfc, "Omega_idm_dr", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_idm_dr", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "f_idm_dr", &param3, &flag3, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "Omega_idm_dr", &param1, &flag1);
+  parser_read_double(pfc, "omega_idm_dr", &param2, &flag2);
+  parser_read_double(pfc, "f_idm_dr", &param3, &flag3);
   class_test(class_at_least_two_of_three(flag1, flag2, flag3),
              "In input file, you can only enter one of Omega_idm_dr, omega_idm_dr or f_idm_dr, "
              "choose one");
@@ -457,8 +447,8 @@ int InputModule::ReadCoupledCluster() {
   // ── DCDM_DR: Omega_dcdmdr / omega_dcdmdr ────────────────────────────────────
   // Gamma_dcdm and Omega_ini_dcdm are physics params owned by DCDMSpecies;
   // they are parsed in DCDM_DR_Species::CreateAll, not here.
-  class_call(parser_read_double(pfc, "Omega_dcdmdr", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_dcdmdr", &param2, &flag2, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "Omega_dcdmdr", &param1, &flag1);
+  parser_read_double(pfc, "omega_dcdmdr", &param2, &flag2);
   class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
              "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose one");
   if (flag1 == _TRUE_)
@@ -470,12 +460,10 @@ int InputModule::ReadCoupledCluster() {
   // These fields now live on IDM_DRMD_IDR_DRMD_Species; we parse them locally here
   // only for the budget math (delta_Neff_drmd → omega_budget_.idr_drmd;
   // f_idm_drmd → omega_budget_.idm_drmd with the CDM subtraction).
-  class_call(parser_read_double(pfc, "z_stop", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "G_over_aH_drmd_ini", &param2, &flag2, errmsg),
-             errmsg,
-             errmsg);
-  class_call(parser_read_double(pfc, "f_idm_drmd", &param3, &flag3, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "delta_Neff_drmd", &param4, &flag4, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "z_stop", &param1, &flag1);
+  parser_read_double(pfc, "G_over_aH_drmd_ini", &param2, &flag2);
+  parser_read_double(pfc, "f_idm_drmd", &param3, &flag3);
+  parser_read_double(pfc, "delta_Neff_drmd", &param4, &flag4);
 
   const double z_stop_drmd           = (flag1 == _TRUE_) ? param1 : 0.;
   const double f_idm_drmd_local      = (flag3 == _TRUE_) ? param3 : 0.;
@@ -539,7 +527,6 @@ int InputModule::ReadCoupledCluster() {
  */
 
 void InputModule::WriteParameterFiles() {
-  ErrorMsg errmsg;
   FileContent* pfc = &file_content_;
 
   int flag1;
@@ -548,7 +535,7 @@ void InputModule::WriteParameterFiles() {
 
   /** - eventually write all the read parameters in a file, unread parameters in another file, and warnings about unread parameters */
 
-  class_call(parser_read_string(pfc, "write parameters", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "write parameters", string1, &flag1);
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -587,7 +574,7 @@ void InputModule::WriteParameterFiles() {
     fclose(param_unused);
   }
 
-  class_call(parser_read_string(pfc, "write warnings", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "write warnings", string1, &flag1);
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -604,11 +591,7 @@ int InputModule::input_read_precisions() {
   precision* ppr = &precision_;
   int flag1;
 
-  {
-    ErrorMsg buf;
-    class_call_failure(parser_read_string(&file_content_, "class_dir", ppr->class_dir, &flag1, buf),
-                       buf);
-  }
+  parser_read_string(&file_content_, "class_dir", ppr->class_dir, &flag1);
   if (flag1 == _FALSE_) {
     ppr->class_dir = __CLASSDIR__;
   }
@@ -641,7 +624,6 @@ void InputModule::ReadContext() {
   /** Summary: */
 
   /** - define local variables */
-  ErrorMsg errmsg;
   FileContent* pfc = &file_content_;
   precision* ppr   = &precision_;      /* for precision parameters */
   background* pba  = &background_;     /* for cosmological background */
@@ -664,7 +646,7 @@ void InputModule::ReadContext() {
   if (input_verbose > 0)
     printf("Reading input parameters\n");
 
-  class_call(parser_read_int(pfc, "threads", &int1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_int(pfc, "threads", &int1, &flag1);
   if (flag1 == _TRUE_) {
     pba->number_of_threads = int1;
   }
@@ -689,7 +671,7 @@ void InputModule::ReadContext() {
       that case, knowing the gauge is important e.g. for fixing the
       sampling in momentum space for non-cold dark matter) */
 
-  class_call(parser_read_string(pfc, "gauge", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "gauge", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     if ((string1.find("newtonian") != std::string::npos) ||
@@ -711,8 +693,8 @@ void InputModule::ReadContext() {
   class_read_double("a_today", pba->a_today);
 
   /** - h (dimensionless) and [\f$ H_0/c\f$] in \f$ Mpc^{-1} = h / 2997.9... = h * 10^5 / c \f$ */
-  class_call(parser_read_double(pfc, "H0", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "h", &param2, &flag2, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "H0", &param1, &flag1);
+  parser_read_double(pfc, "h", &param2, &flag2);
   class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
              "In input file, you cannot enter both h and H0, choose one");
   if (flag1 == _TRUE_) {
@@ -728,14 +710,14 @@ void InputModule::ReadContext() {
    *  DoShooting). Consume it here so the unread-parameter check passes, and reject
    *  combining it with a direct h/H0 — except inside a shooting build, where DoShooting
    *  has itself set the trial h. h keeps its default; DoShooting seeds and solves it. */
-  class_call(parser_read_double(pfc, "100*theta_s", &param3, &flag3, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "100*theta_s", &param3, &flag3);
   class_test((flag3 == _TRUE_) && (flag1 == _TRUE_ || flag2 == _TRUE_) && !pfc->is_shooting,
              "In input file, you cannot enter both 100*theta_s and h (or H0), choose one");
 
   /** - Omega_0_g (photons) and T_cmb */
-  class_call(parser_read_double(pfc, "T_cmb", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "Omega_g", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_g", &param3, &flag3, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "T_cmb", &param1, &flag1);
+  parser_read_double(pfc, "Omega_g", &param2, &flag2);
+  parser_read_double(pfc, "omega_g", &param3, &flag3);
   class_test(class_at_least_two_of_three(flag1, flag2, flag3),
              "In input file, you can only enter one of T_cmb, Omega_g or omega_g, choose one");
 
@@ -763,8 +745,8 @@ void InputModule::ReadContext() {
   }
 
   /** - Omega_0_b (baryons) */
-  class_call(parser_read_double(pfc, "Omega_b", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "omega_b", &param2, &flag2, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "Omega_b", &param1, &flag1);
+  parser_read_double(pfc, "omega_b", &param2, &flag2);
   class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
              "In input file, you can only enter one of Omega_b or omega_b, choose one");
   if (flag1 == _TRUE_)
@@ -775,18 +757,16 @@ void InputModule::ReadContext() {
   // NOTE: N_ur / N_eff / Omega_ur / omega_ur parsing has been moved to
   // UltraRelativisticSpecies::CreateAll, which reads pfc directly.
 
-  class_call(parser_read_double(pfc, "ceff2_ur", &param1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "ceff2_ur", &param1, &flag1);
   if (flag1 == _TRUE_)
     ppt->three_ceff2_ur = 3. * param1;
 
-  class_call(parser_read_double(pfc, "cvis2_ur", &param1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "cvis2_ur", &param1, &flag1);
   if (flag1 == _TRUE_)
     ppt->three_cvis2_ur = 3. * param1;
 
-  class_call(parser_read_double(pfc, "G_eff_ur", &ppt->G_eff_ur, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "log10_G_eff_ur", &ppt->G_eff_ur, &flag2, errmsg),
-             errmsg,
-             errmsg);
+  parser_read_double(pfc, "G_eff_ur", &ppt->G_eff_ur, &flag1);
+  parser_read_double(pfc, "log10_G_eff_ur", &ppt->G_eff_ur, &flag2);
   if (flag2 == _TRUE_) {
     class_test(flag1 == _TRUE_,
                "In input file, you cannot enter both log10_G_eff_ur and G_eff_ur, choose one");
@@ -798,7 +778,7 @@ void InputModule::ReadContext() {
   // CoupledClusterInputs; IDM/IDR interaction physics parameters
   // (a_idm_dr/nindex/idr_nature/m_idm/b_idr/alpha/beta) are parsed
   // exclusively in IDM_DR_IDR_Species::CreateAll.
-  class_call(ReadCoupledCluster(), errmsg, errmsg);
+  ReadCoupledCluster();
 
   // The idm/idr interaction parameters (a_idm_dr/nindex/idr_nature/m_idm/b_idr/
   // alpha/beta) and the "non-zero IDR density" validation are now owned and
@@ -827,9 +807,9 @@ void InputModule::ReadContext() {
 
   /** - Omega_0_lambda (cosmological constant), Omega0_fld (dark energy fluid), Omega0_scf (scalar field) */
 
-  class_call(parser_read_double(pfc, "Omega_Lambda", &param1, &flag1, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "Omega_fld", &param2, &flag2, errmsg), errmsg, errmsg);
-  class_call(parser_read_double(pfc, "Omega_scf", &param3, &flag3, errmsg), errmsg, errmsg);
+  parser_read_double(pfc, "Omega_Lambda", &param1, &flag1);
+  parser_read_double(pfc, "Omega_fld", &param2, &flag2);
+  parser_read_double(pfc, "Omega_scf", &param3, &flag3);
 
   class_test((flag1 == _TRUE_) && (flag2 == _TRUE_) && ((flag3 == _FALSE_) || (param3 >= 0.)),
              "In input file, either Omega_Lambda or Omega_fld must be left unspecified, except if "
@@ -888,7 +868,6 @@ void InputModule::ReadContext() {
  */
 void InputModule::ReadDerived() {
   /** - define local variables */
-  ErrorMsg errmsg;
   FileContent* pfc = &file_content_;
   precision* ppr   = &precision_;      /* for precision parameters */
   background* pba  = &background_;     /* for cosmological background */
@@ -926,7 +905,7 @@ void InputModule::ReadDerived() {
   /** (b) assign values to thermodynamics cosmological parameters */
 
   /** - primordial helium fraction */
-  class_call(parser_read_string(pfc, "YHe", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "YHe", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     if ((string1.find("BBN") != std::string::npos) || (string1.find("bbn") != std::string::npos)) {
@@ -938,7 +917,7 @@ void InputModule::ReadDerived() {
   }
 
   /** - recombination parameters */
-  class_call(parser_read_string(pfc, "recombination", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "recombination", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     if ((string1.find("HYREC") != std::string::npos) ||
@@ -949,9 +928,7 @@ void InputModule::ReadDerived() {
   }
 
   /** - reionization parametrization */
-  class_call(parser_read_string(pfc, "reio_parametrization", string1, &flag1, errmsg),
-             errmsg,
-             errmsg);
+  parser_read_string(pfc, "reio_parametrization", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     flag2 = _FALSE_;
@@ -988,8 +965,8 @@ void InputModule::ReadDerived() {
 
   /** - reionization parameters if reio_parametrization=reio_camb */
   if ((pth->reio_parametrization == reio_camb) || (pth->reio_parametrization == reio_half_tanh)) {
-    class_call(parser_read_double(pfc, "z_reio", &param1, &flag1, errmsg), errmsg, errmsg);
-    class_call(parser_read_double(pfc, "tau_reio", &param2, &flag2, errmsg), errmsg, errmsg);
+    parser_read_double(pfc, "z_reio", &param1, &flag1);
+    parser_read_double(pfc, "tau_reio", &param2, &flag2);
     class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
                "In input file, you can only enter one of z_reio or tau_reio, choose one");
     if (flag1 == _TRUE_) {
@@ -1010,17 +987,13 @@ void InputModule::ReadDerived() {
   /** - reionization parameters if reio_parametrization=reio_bins_tanh */
   if (pth->reio_parametrization == reio_bins_tanh) {
     class_read_int("binned_reio_num", pth->binned_reio_num);
-    class_call(readDoubleList(pfc, "binned_reio_z", pth->binned_reio_z_storage, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    readDoubleList(pfc, "binned_reio_z", pth->binned_reio_z_storage, &flag1);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->binned_reio_z_storage.size()) != pth->binned_reio_num,
                "Number of entries in binned_reio_z does not match expected number, %d.",
                pth->binned_reio_num);
     pth->binned_reio_z = pth->binned_reio_z_storage.data();
-    class_call(readDoubleList(pfc, "binned_reio_xe", pth->binned_reio_xe_storage, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    readDoubleList(pfc, "binned_reio_xe", pth->binned_reio_xe_storage, &flag1);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->binned_reio_xe_storage.size()) != pth->binned_reio_num,
                "Number of entries in binned_reio_xe does not match expected number, %d.",
@@ -1032,17 +1005,13 @@ void InputModule::ReadDerived() {
   /** - reionization parameters if reio_parametrization=reio_many_tanh */
   if (pth->reio_parametrization == reio_many_tanh) {
     class_read_int("many_tanh_num", pth->many_tanh_num);
-    class_call(readDoubleList(pfc, "many_tanh_z", pth->many_tanh_z_storage, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    readDoubleList(pfc, "many_tanh_z", pth->many_tanh_z_storage, &flag1);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->many_tanh_z_storage.size()) != pth->many_tanh_num,
                "Number of entries in many_tanh_z does not match expected number, %d.",
                pth->many_tanh_num);
     pth->many_tanh_z = pth->many_tanh_z_storage.data();
-    class_call(readDoubleList(pfc, "many_tanh_xe", pth->many_tanh_xe_storage, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    readDoubleList(pfc, "many_tanh_xe", pth->many_tanh_xe_storage, &flag1);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->many_tanh_xe_storage.size()) != pth->many_tanh_num,
                "Number of entries in many_tanh_xe does not match expected number, %d.",
@@ -1054,17 +1023,13 @@ void InputModule::ReadDerived() {
   /** - reionization parameters if reio_parametrization=reio_many_tanh */
   if (pth->reio_parametrization == reio_inter) {
     class_read_int("reio_inter_num", pth->reio_inter_num);
-    class_call(readDoubleList(pfc, "reio_inter_z", pth->reio_inter_z_storage, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    readDoubleList(pfc, "reio_inter_z", pth->reio_inter_z_storage, &flag1);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->reio_inter_z_storage.size()) != pth->reio_inter_num,
                "Number of entries in reio_inter_z does not match expected number, %d.",
                pth->reio_inter_num);
     pth->reio_inter_z = pth->reio_inter_z_storage.data();
-    class_call(readDoubleList(pfc, "reio_inter_xe", pth->reio_inter_xe_storage, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    readDoubleList(pfc, "reio_inter_xe", pth->reio_inter_xe_storage, &flag1);
     class_test(flag1 == _FALSE_ ||
                    static_cast<int>(pth->reio_inter_xe_storage.size()) != pth->reio_inter_num,
                "Number of entries in reio_inter_xe does not match expected number, %d.",
@@ -1084,7 +1049,7 @@ void InputModule::ReadDerived() {
     class_read_double("annihilation_f_halo", pth->annihilation_f_halo);
     class_read_double("annihilation_z_halo", pth->annihilation_z_halo);
 
-    class_call(parser_read_string(pfc, "on the spot", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "on the spot", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos)) {
@@ -1103,9 +1068,7 @@ void InputModule::ReadDerived() {
 
   class_read_double("decay", pth->decay);
 
-  class_call(parser_read_string(pfc, "compute damping scale", string1, &flag1, errmsg),
-             errmsg,
-             errmsg);
+  parser_read_string(pfc, "compute damping scale", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     if ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos)) {
@@ -1127,7 +1090,7 @@ void InputModule::ReadDerived() {
   ppt->has_perturbations = _FALSE_;
   ppt->has_cls           = _FALSE_;
 
-  class_call(parser_read_string(pfc, "output", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "output", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     if ((string1.find("tCl") != std::string::npos) || (string1.find("TCl") != std::string::npos) ||
@@ -1201,9 +1164,7 @@ void InputModule::ReadDerived() {
   }
 
   if (ppt->has_density_transfers == _TRUE_) {
-    class_call(parser_read_string(pfc, "extra metric transfer functions", string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    parser_read_string(pfc, "extra metric transfer functions", string1, &flag1);
 
     if ((flag1 == _TRUE_) &&
         ((string1.find("y") != std::string::npos) || (string1.find("y") != std::string::npos))) {
@@ -1212,9 +1173,7 @@ void InputModule::ReadDerived() {
   }
 
   if (ppt->has_cl_cmb_temperature == _TRUE_) {
-    class_call(parser_read_string(pfc, "temperature contributions", string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    parser_read_string(pfc, "temperature contributions", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       ppt->switch_sw   = 0;
@@ -1246,9 +1205,7 @@ void InputModule::ReadDerived() {
   }
 
   if (ppt->has_cl_number_count == _TRUE_) {
-    class_call(parser_read_string(pfc, "number count contributions", string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    parser_read_string(pfc, "number count contributions", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if (string1.find("density") != std::string::npos)
@@ -1274,9 +1231,7 @@ void InputModule::ReadDerived() {
 
   if (ppt->has_perturbations == _TRUE_) {
     /* perturbed recombination */
-    class_call(parser_read_string(pfc, "perturbed recombination", string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    parser_read_string(pfc, "perturbed recombination", string1, &flag1);
 
     if ((flag1 == _TRUE_) &&
         ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -1284,7 +1239,7 @@ void InputModule::ReadDerived() {
     }
 
     /* modes */
-    class_call(parser_read_string(pfc, "modes", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "modes", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       /* if no modes are specified, the default is has_scalars=_TRUE_;
@@ -1307,7 +1262,7 @@ void InputModule::ReadDerived() {
     }
 
     if (ppt->has_scalars == _TRUE_) {
-      class_call(parser_read_string(pfc, "ic", string1, &flag1, errmsg), errmsg, errmsg);
+      parser_read_string(pfc, "ic", string1, &flag1);
 
       if (flag1 == _TRUE_) {
         /* if no initial conditions are specified, the default is has_ad=_TRUE_;
@@ -1365,7 +1320,7 @@ void InputModule::ReadDerived() {
 
   /** (d) define the primordial spectrum */
 
-  class_call(parser_read_string(pfc, "P_k_ini type", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "P_k_ini type", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     flag2 = _FALSE_;
@@ -1432,7 +1387,7 @@ void InputModule::ReadDerived() {
 
         flag1 = _FALSE_;
 
-        class_call(parser_read_string(pfc, "special iso", string1, &flag1, errmsg), errmsg, errmsg);
+        parser_read_string(pfc, "special iso", string1, &flag1);
 
         /* axion case, only one iso parameter: piir1  */
         if ((flag1 == _TRUE_) && (string1.find("axion") != std::string::npos)) {
@@ -1518,10 +1473,10 @@ void InputModule::ReadDerived() {
     if (ppt->has_scalars == _TRUE_) {
       int flag4;
       double param4;
-      class_call(parser_read_double(pfc, "A_s", &param1, &flag1, errmsg), errmsg, errmsg);
-      class_call(parser_read_double(pfc, "ln10^{10}A_s", &param2, &flag2, errmsg), errmsg, errmsg);
-      class_call(parser_read_double(pfc, "sigma8", &param3, &flag3, errmsg), errmsg, errmsg);
-      class_call(parser_read_double(pfc, "S8", &param4, &flag4, errmsg), errmsg, errmsg);
+      parser_read_double(pfc, "A_s", &param1, &flag1);
+      parser_read_double(pfc, "ln10^{10}A_s", &param2, &flag2);
+      parser_read_double(pfc, "sigma8", &param3, &flag3);
+      parser_read_double(pfc, "S8", &param4, &flag4);
       class_test(class_at_least_two_of_four(flag1, flag2, flag3, flag4),
                  "In input file, you can only enter one of A_s, ln10^{10}A_s, sigma8 and S8, "
                  "choose one");
@@ -1643,7 +1598,7 @@ void InputModule::ReadDerived() {
         ppt->has_tensors = _FALSE_;
       }
       else {
-        class_call(parser_read_string(pfc, "n_t", string1, &flag1, errmsg), errmsg, errmsg);
+        parser_read_string(pfc, "n_t", string1, &flag1);
 
         if ((flag1 == _TRUE_) && !((string1.find("SCC") != std::string::npos) ||
                                    (string1.find("scc") != std::string::npos))) {
@@ -1654,7 +1609,7 @@ void InputModule::ReadDerived() {
           ppm->n_t = -ppm->r / 8. * (2. - ppm->r / 8. - ppm->n_s);
         }
 
-        class_call(parser_read_string(pfc, "alpha_t", string1, &flag1, errmsg), errmsg, errmsg);
+        parser_read_string(pfc, "alpha_t", string1, &flag1);
 
         if ((flag1 == _TRUE_) && !((string1.find("SCC") != std::string::npos) ||
                                    (string1.find("scc") != std::string::npos))) {
@@ -1675,11 +1630,11 @@ void InputModule::ReadDerived() {
     double HSR0, HSR1, HSR2, HSR3, HSR4;
 
     if (ppm->primordial_spec_type == inflation_V) {
-      class_call(parser_read_string(pfc, "potential", string1, &flag1, errmsg), errmsg, errmsg);
+      parser_read_string(pfc, "potential", string1, &flag1);
 
       /* only polynomial coded so far: no need to interpret string1 **/
 
-      class_call(parser_read_string(pfc, "PSR_0", string1, &flag1, errmsg), errmsg, errmsg);
+      parser_read_string(pfc, "PSR_0", string1, &flag1);
 
       if (flag1 == _TRUE_) {
         PSR0 = 0.;
@@ -1711,7 +1666,7 @@ void InputModule::ReadDerived() {
       }
 
       else {
-        class_call(parser_read_string(pfc, "R_0", string1, &flag1, errmsg), errmsg, errmsg);
+        parser_read_string(pfc, "R_0", string1, &flag1);
 
         if (flag1 == _TRUE_) {
           R0 = 0.;
@@ -1747,7 +1702,7 @@ void InputModule::ReadDerived() {
     }
 
     else {
-      class_call(parser_read_string(pfc, "HSR_0", string1, &flag1, errmsg), errmsg, errmsg);
+      parser_read_string(pfc, "HSR_0", string1, &flag1);
 
       if (flag1 == _TRUE_) {
         HSR0 = 0.;
@@ -1781,7 +1736,7 @@ void InputModule::ReadDerived() {
   }
 
   else if (ppm->primordial_spec_type == inflation_V_end) {
-    class_call(parser_read_string(pfc, "full_potential", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "full_potential", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if (string1 == "polynomial") {
@@ -1804,9 +1759,9 @@ void InputModule::ReadDerived() {
     class_read_double("Vparam3", ppm->V3);
     class_read_double("Vparam4", ppm->V4);
 
-    class_call(parser_read_string(pfc, "ln_aH_ratio", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "ln_aH_ratio", string1, &flag1);
 
-    class_call(parser_read_string(pfc, "N_star", string2, &flag2, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "N_star", string2, &flag2);
 
     class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
                "In input file, you can only enter one of ln_aH_ratio or N_star, the two are not "
@@ -1828,9 +1783,7 @@ void InputModule::ReadDerived() {
       class_read_double("N_star", ppm->phi_pivot_target);
     }
 
-    class_call(parser_read_string(pfc, "inflation_behavior", string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    parser_read_string(pfc, "inflation_behavior", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if (string1.find("numerical") != std::string::npos) {
@@ -1846,7 +1799,7 @@ void InputModule::ReadDerived() {
   }
 
   else if (ppm->primordial_spec_type == external_Pk) {
-    class_call(parser_read_string(pfc, "command", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "command", string1, &flag1);
     class_test(string1.empty(), "You omitted to write a command for the external Pk");
 
     ppm->command = string1;
@@ -1900,7 +1853,7 @@ void InputModule::ReadDerived() {
     }
   }
 
-  class_call(parser_read_string(pfc, "lensing", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "lensing", string1, &flag1);
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -1926,8 +1879,8 @@ void InputModule::ReadDerived() {
 
   if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) ||
       (ppt->has_velocity_transfers == _TRUE_)) {
-    class_call(parser_read_double(pfc, "P_k_max_h/Mpc", &param1, &flag1, errmsg), errmsg, errmsg);
-    class_call(parser_read_double(pfc, "P_k_max_1/Mpc", &param2, &flag2, errmsg), errmsg, errmsg);
+    parser_read_double(pfc, "P_k_max_h/Mpc", &param1, &flag1);
+    parser_read_double(pfc, "P_k_max_1/Mpc", &param2, &flag2);
     class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
                "In input file, you cannot enter both P_k_max_h/Mpc and P_k_max_1/Mpc, choose one");
     if (flag1 == _TRUE_) {
@@ -1938,7 +1891,7 @@ void InputModule::ReadDerived() {
     }
 
     std::vector<double> zPkValues;
-    class_call(readDoubleList(pfc, "z_pk", zPkValues, &flag1, errmsg), errmsg, errmsg);
+    readDoubleList(pfc, "z_pk", zPkValues, &flag1);
 
     if (flag1 == _TRUE_) {
       int1 = static_cast<int>(zPkValues.size());
@@ -1955,9 +1908,7 @@ void InputModule::ReadDerived() {
 
   /** Do we want density and velocity transfer functions in Nbody gauge? */
   if ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_)) {
-    class_call(parser_read_string(pfc, "Nbody gauge transfer functions", string1, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    parser_read_string(pfc, "Nbody gauge transfer functions", string1, &flag1);
 
     if ((flag1 == _TRUE_) &&
         ((string1.find("y") != std::string::npos) || (string1.find("y") != std::string::npos))) {
@@ -1967,7 +1918,7 @@ void InputModule::ReadDerived() {
 
   /* deal with selection functions */
   if ((ppt->has_cl_number_count == _TRUE_) || (ppt->has_cl_lensing_potential == _TRUE_)) {
-    class_call(parser_read_string(pfc, "selection", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "selection", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if (string1.find("gaussian") != std::string::npos) {
@@ -1985,9 +1936,7 @@ void InputModule::ReadDerived() {
     }
 
     std::vector<double> selectionValues;
-    class_call(readDoubleList(pfc, "selection_mean", selectionValues, &flag1, errmsg),
-               errmsg,
-               errmsg);
+    readDoubleList(pfc, "selection_mean", selectionValues, &flag1);
 
     if ((flag1 == _TRUE_) && !selectionValues.empty()) {
       int1 = static_cast<int>(selectionValues.size());
@@ -2018,9 +1967,7 @@ void InputModule::ReadDerived() {
       }
 
       selectionValues.clear();
-      class_call(readDoubleList(pfc, "selection_width", selectionValues, &flag1, errmsg),
-                 errmsg,
-                 errmsg);
+      readDoubleList(pfc, "selection_width", selectionValues, &flag1);
 
       if ((flag1 == _TRUE_) && !selectionValues.empty()) {
         int1 = static_cast<int>(selectionValues.size());
@@ -2047,9 +1994,7 @@ void InputModule::ReadDerived() {
       }
 
       selectionValues.clear();
-      class_call(readDoubleList(pfc, "selection_bias", selectionValues, &flag1, errmsg),
-                 errmsg,
-                 errmsg);
+      readDoubleList(pfc, "selection_bias", selectionValues, &flag1);
 
       if ((flag1 == _TRUE_) && !selectionValues.empty()) {
         int1 = static_cast<int>(selectionValues.size());
@@ -2076,13 +2021,7 @@ void InputModule::ReadDerived() {
       }
 
       selectionValues.clear();
-      class_call(readDoubleList(pfc,
-                                "selection_magnification_bias",
-                                selectionValues,
-                                &flag1,
-                                errmsg),
-                 errmsg,
-                 errmsg);
+      readDoubleList(pfc, "selection_magnification_bias", selectionValues, &flag1);
 
       if ((flag1 == _TRUE_) && !selectionValues.empty()) {
         int1 = static_cast<int>(selectionValues.size());
@@ -2117,7 +2056,7 @@ void InputModule::ReadDerived() {
                    ppt->selection_num - 1);
     }
 
-    class_call(parser_read_string(pfc, "dNdz_selection", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "dNdz_selection", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if ((string1.find("analytic") != std::string::npos)) {
@@ -2129,7 +2068,7 @@ void InputModule::ReadDerived() {
       }
     }
 
-    class_call(parser_read_string(pfc, "dNdz_evolution", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "dNdz_evolution", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if ((string1.find("analytic") != std::string::npos)) {
@@ -2142,7 +2081,7 @@ void InputModule::ReadDerived() {
     }
 
     flag1 = _FALSE_;
-    class_call(parser_read_double(pfc, "bias", &param1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_double(pfc, "bias", &param1, &flag1);
     class_test(flag1 == _TRUE_,
                "the input parameter 'bias' is obsolete, because you can now pass an independent "
                "light-to-mass bias for each bin/selection function. The new input name is "
@@ -2150,7 +2089,7 @@ void InputModule::ReadDerived() {
                "as many numbers as the number of bins");
 
     flag1 = _FALSE_;
-    class_call(parser_read_double(pfc, "s_bias", &param1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_double(pfc, "s_bias", &param1, &flag1);
     class_test(flag1 == _TRUE_,
                "the input parameter 's_bias' is obsolete, because you can now pass an independent "
                "magnitude bias for each bin/selection function. The new input name is "
@@ -2163,7 +2102,7 @@ void InputModule::ReadDerived() {
   if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) ||
       (ppt->has_velocity_transfers == _TRUE_) || (ppt->has_cl_number_count == _TRUE_) ||
       (ppt->has_cl_lensing_potential == _TRUE_)) {
-    class_call(parser_read_double(pfc, "z_max_pk", &param1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_double(pfc, "z_max_pk", &param1, &flag1);
 
     if (flag1 == _TRUE_) {
       ppt->z_max_pk = param1;
@@ -2201,19 +2140,19 @@ void InputModule::ReadDerived() {
   }
   /* end of z_max section */
 
-  class_call(parser_read_string(pfc, "root", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "root", string1, &flag1);
   if (flag1 == _TRUE_) {
     pop->root = string1;
   }
 
-  class_call(parser_read_string(pfc, "headers", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "headers", string1, &flag1);
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") == std::string::npos) && (string1.find("Y") == std::string::npos))) {
     pop->write_header = _FALSE_;
   }
 
-  class_call(parser_read_string(pfc, "format", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "format", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     if ((string1.find("class") != std::string::npos) ||
@@ -2233,7 +2172,7 @@ void InputModule::ReadDerived() {
 
   /** (f) parameter related to the non-linear spectra computation */
 
-  class_call(parser_read_string(pfc, "non linear", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "non linear", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     class_test(ppt->has_perturbations == _FALSE_,
@@ -2258,9 +2197,7 @@ void InputModule::ReadDerived() {
       ppt->has_nl_corrections_based_on_delta_m = _TRUE_;
       class_read_int("extrapolation_method", pnl->extrapolation_method);
 
-      class_call(parser_read_string(pfc, "feedback model", string1, &flag1, errmsg),
-                 errmsg,
-                 errmsg);
+      parser_read_string(pfc, "feedback model", string1, &flag1);
 
       if (flag1 == _TRUE_) {
         if (string1.find("emu_dmonly") != std::string::npos) {
@@ -2280,8 +2217,8 @@ void InputModule::ReadDerived() {
         }
       }
 
-      class_call(parser_read_double(pfc, "eta_0", &param2, &flag2, errmsg), errmsg, errmsg);
-      class_call(parser_read_double(pfc, "c_min", &param3, &flag3, errmsg), errmsg, errmsg);
+      parser_read_double(pfc, "eta_0", &param2, &flag2);
+      parser_read_double(pfc, "c_min", &param3, &flag3);
 
       class_test(((flag1 == _TRUE_) && ((flag2 == _TRUE_) || (flag3 == _TRUE_))),
                  "In input file, you cannot enter both a baryonic feedback model and a choice of "
@@ -2303,7 +2240,7 @@ void InputModule::ReadDerived() {
         pnl->eta_0 = 0.98 - 0.12 * pnl->c_min;
       }
 
-      class_call(parser_read_double(pfc, "z_infinity", &param1, &flag1, errmsg), errmsg, errmsg);
+      parser_read_double(pfc, "z_infinity", &param1, &flag1);
 
       if (flag1 == _TRUE_) {
         class_read_double("z_infinity", pnl->z_infinity);
@@ -2343,7 +2280,7 @@ void InputModule::ReadDerived() {
 
   if (ppt->has_tensors == _TRUE_) {
     /** - ---> Include ur and ncdm shear in tensor computation? */
-    class_call(parser_read_string(pfc, "tensor method", string1, &flag1, errmsg), errmsg, errmsg);
+    parser_read_string(pfc, "tensor method", string1, &flag1);
     if (flag1 == _TRUE_) {
       if (string1.find("photons") != std::string::npos)
         ppt->tensor_method = tm_photons_only;
@@ -2434,13 +2371,7 @@ void InputModule::ReadDerived() {
       "q_logstep_trans",
       ppr->q_logstep_spline);  // obsolete precision parameter: read for compatibility with old precision files
 
-  class_call(parser_read_string(pfc,
-                                "l_switch_limber_for_cl_density_over_z",
-                                string1,
-                                &flag1,
-                                errmsg),
-             errmsg,
-             errmsg);
+  parser_read_string(pfc, "l_switch_limber_for_cl_density_over_z", string1, &flag1);
 
   class_test(flag1 == _TRUE_,
              "You passed in input a precision parameter called "
@@ -2455,7 +2386,7 @@ void InputModule::ReadDerived() {
 
   /** - (i.1.) shall we write background quantities in a file? */
 
-  class_call(parser_read_string(pfc, "write background", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "write background", string1, &flag1);
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -2464,9 +2395,7 @@ void InputModule::ReadDerived() {
 
   /** - (i.2.) shall we write thermodynamics quantities in a file? */
 
-  class_call(parser_read_string(pfc, "write thermodynamics", string1, &flag1, errmsg),
-             errmsg,
-             errmsg);
+  parser_read_string(pfc, "write thermodynamics", string1, &flag1);
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -2476,7 +2405,7 @@ void InputModule::ReadDerived() {
   /** - (i.3.) shall we write perturbation quantities in files? */
 
   std::vector<double> kOutputValues;
-  class_call(readDoubleList(pfc, "k_output_values", kOutputValues, &flag1, errmsg), errmsg, errmsg);
+  readDoubleList(pfc, "k_output_values", kOutputValues, &flag1);
 
   if (flag1 == _TRUE_) {
     int1 = static_cast<int>(kOutputValues.size());
@@ -2500,7 +2429,7 @@ void InputModule::ReadDerived() {
 
   /** - (i.4.) shall we write primordial spectra in a file? */
 
-  class_call(parser_read_string(pfc, "write primordial", string1, &flag1, errmsg), errmsg, errmsg);
+  parser_read_string(pfc, "write primordial", string1, &flag1);
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -2524,7 +2453,7 @@ void InputModule::ReadDerived() {
   if ((pnl->method == nl_halofit) && all_species_.count("Fluid")) {
     const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
     if ((fluid.fluid_eos() == CLP) && (fluid.wa_fld() != 0.)) {
-      class_call(parser_read_string(pfc, "pk_eq", string1, &flag1, errmsg), errmsg, errmsg);
+      parser_read_string(pfc, "pk_eq", string1, &flag1);
 
       if ((flag1 == _TRUE_) &&
           ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
@@ -2815,8 +2744,7 @@ int class_version(char* version) {
 
 // ── Hook-based shooting (the species-owned replacement for the enum dispatch) ──
 
-int InputModule::ShootingResidual(
-    double* x, int x_size, void* pworkspace, double* output, ErrorMsg /*error_message*/) {
+int InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, double* output) {
   auto* w = static_cast<ShootingWorkspace*>(pworkspace);
 
   // Write each trial unknown into the file content.
@@ -2866,7 +2794,6 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
     return input_module;
 
   FileContent& fc = input_module->file_content_;
-  ErrorMsg errmsg = "";  // initialized so a failure that skips writing it can't surface garbage
 
   ShootingWorkspace w(fc);
   std::vector<double> xguess, dxdF;
@@ -2875,7 +2802,7 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
   {
     double tv;
     int flag = _FALSE_;
-    parser_read_double(&fc, "100*theta_s", &tv, &flag, errmsg);
+    parser_read_double(&fc, "100*theta_s", &tv, &flag);
     if (flag == _TRUE_) {
       w.targets.push_back({"100*theta_s", "h", tv});
       w.target_species_keys.emplace_back();  // module-level: no owning species
@@ -2932,17 +2859,14 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
   // Solve (fzero_Newton handles n>=1 and writes the solution back into xguess).
   fc.is_shooting = true;
   int fevals     = 0;
-  if (fzero_Newton(ShootingResidual,
-                   xguess.data(),
-                   dxdF.data(),
-                   static_cast<int>(w.targets.size()),
-                   1e-3,
-                   1e-3,
-                   &w,
-                   &fevals,
-                   errmsg) != _SUCCESS_) {
-    throw std::runtime_error(std::string("Shooting (DoShooting) failed: ") + errmsg);
-  }
+  fzero_Newton(ShootingResidual,
+               xguess.data(),
+               dxdF.data(),
+               static_cast<int>(w.targets.size()),
+               1e-3,
+               1e-3,
+               &w,
+               &fevals);
 
   // Write the resolved unknowns; build and return a fresh, fully-resolved module.
   for (size_t i = 0; i < w.targets.size(); ++i) {
@@ -2951,13 +2875,4 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
     fc.set(w.targets[i].unknown_param, buf);
   }
   return std::make_shared<InputModule>(fc);
-}
-
-int input_prepare_pk_eq(const struct precision* ppr_input,
-                        const struct background* pba_input,
-                        const struct thermo* pth_input,
-                        struct nonlinear* pnl,
-                        int input_verbose,
-                        ErrorMsg errmsg) {
-  return _SUCCESS_;
 }

@@ -159,20 +159,15 @@ int PrimordialModule::primordial_spectrum_at_k(
   /** - otherwise, interpolate in the pre-computed table */
 
   else {
-    {
-      ErrorMsg buf;
-      class_call_failure(array_interpolate_spline(const_cast<double*>(lnk_.data()),
-                                                  lnk_size_,
-                                                  const_cast<double*>(lnpk_[index_md].data()),
-                                                  const_cast<double*>(ddlnpk_[index_md].data()),
-                                                  ic_ic_size_[index_md],
-                                                  lnk,
-                                                  &last_index,
-                                                  output,
-                                                  ic_ic_size_[index_md],
-                                                  buf),
-                         buf);
-    }
+    array_interpolate_spline(const_cast<double*>(lnk_.data()),
+                             lnk_size_,
+                             const_cast<double*>(lnpk_[index_md].data()),
+                             const_cast<double*>(ddlnpk_[index_md].data()),
+                             ic_ic_size_[index_md],
+                             lnk,
+                             &last_index,
+                             output,
+                             ic_ic_size_[index_md]);
 
     /* if mode==logarithmic, output is already in the correct format. Otherwise, apply necessary transformation. */
 
@@ -271,7 +266,13 @@ int PrimordialModule::primordial_init() {
     if (ppm->primordial_verbose > 0)
       printf(" (analytic spectrum)\n");
 
-    class_call_except(primordial_analytic_spectrum_init(), primordial_free());
+    try {
+      primordial_analytic_spectrum_init();
+    }
+    catch (...) {
+      primordial_free();
+      throw;
+    }
 
     for (int index_k = 0; index_k < lnk_size_; index_k++) {
       k = exp(lnk_[index_k]);
@@ -348,7 +349,13 @@ int PrimordialModule::primordial_init() {
     if (ppm->primordial_verbose > 0)
       printf(" (simulating inflation)\n");
 
-    class_call_except(primordial_inflation_solve_inflation(), primordial_free());
+    try {
+      primordial_inflation_solve_inflation();
+    }
+    catch (...) {
+      primordial_free();
+      throw;
+    }
   }
 
   /** - deal with the case of external calculation of \f$ P_k \f$*/
@@ -368,7 +375,13 @@ int PrimordialModule::primordial_init() {
     if (ppm->primordial_verbose > 0)
       printf(" (Pk calculated externally)\n");
 
-    class_call_except(primordial_external_spectrum_init(), primordial_free());
+    try {
+      primordial_external_spectrum_init();
+    }
+    catch (...) {
+      primordial_free();
+      throw;
+    }
   }
 
   else {
@@ -378,17 +391,12 @@ int PrimordialModule::primordial_init() {
   /** - compute second derivative of each \f$ \ln{P_k} \f$ versus lnk with spline, in view of interpolation */
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
-    {
-      ErrorMsg buf;
-      class_call_failure(array_spline_table_lines(lnk_.data(),
-                                                  lnk_size_,
-                                                  lnpk_[index_md].data(),
-                                                  ic_ic_size_[index_md],
-                                                  ddlnpk_[index_md].data(),
-                                                  _SPLINE_EST_DERIV_,
-                                                  buf),
-                         buf);
-    }
+    array_spline_table_lines(lnk_.data(),
+                             lnk_size_,
+                             lnpk_[index_md].data(),
+                             ic_ic_size_[index_md],
+                             ddlnpk_[index_md].data(),
+                             _SPLINE_EST_DERIV_);
   }
 
   /** - derive spectral parameters from numerically computed spectra
@@ -1420,7 +1428,6 @@ int PrimordialModule::primordial_inflation_one_k(
   double curvature_old;
   double curvature_new;
   double dlnPdN;
-  ErrorMsg buf;
 
   struct primordial_inflation_parameters_and_workspace pipaw{this};
   struct generic_integrator_workspace gi;
@@ -1433,7 +1440,7 @@ int PrimordialModule::primordial_inflation_one_k(
   pipaw.time      = conformal;
   pipaw.k         = k;
 
-  class_call_failure(initialize_generic_integrator(pipaw.N, &gi), gi.error_message);
+  initialize_generic_integrator(pipaw.N, &gi);
 
   /* initial conditions for the perturbations, Bunch-Davies vacuum */
   y[index_in_ksi_re_]  = 1. / sqrt(2. * k);
@@ -1455,7 +1462,7 @@ int PrimordialModule::primordial_inflation_one_k(
   tau_end = 0;
 
   /** - compute derivative of initial vector and infer first value of adaptive time-step */
-  primordial_inflation_derivs(tau_end, y, dy, &pipaw, buf);
+  primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
   dtau = ppr->primordial_inflation_pt_stepsize * 2. * _PI_ /
          MAX(sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k);
@@ -1473,18 +1480,17 @@ int PrimordialModule::primordial_inflation_one_k(
                dtau / tau_start);
 
     /* evolve the system */
-    class_call_failure(generic_integrator(primordial_inflation_derivs,
-                                          tau_start,
-                                          tau_end,
-                                          y,
-                                          &pipaw,
-                                          ppr->primordial_inflation_tol_integration,
-                                          ppr->smallest_allowed_variation,
-                                          &gi),
-                       gi.error_message);
+    generic_integrator(primordial_inflation_derivs,
+                       tau_start,
+                       tau_end,
+                       y,
+                       &pipaw,
+                       ppr->primordial_inflation_tol_integration,
+                       ppr->smallest_allowed_variation,
+                       &gi);
 
     /* compute derivatives at tau_end, useful to infer new time step and spectra */
-    primordial_inflation_derivs(tau_end, y, dy, &pipaw, buf);
+    primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
     /* new time step */
     dtau = ppr->primordial_inflation_pt_stepsize * 2. * _PI_ /
@@ -1510,7 +1516,7 @@ int PrimordialModule::primordial_inflation_one_k(
            (fabs(dlnPdN) > ppr->primordial_inflation_tol_curvature));
 
   /** - clean the generic integrator */
-  class_call_failure(cleanup_generic_integrator(&gi), gi.error_message);
+  cleanup_generic_integrator(&gi);
 
   /** - store final value of curvature for this wavenumber */
   *curvature = curvature_new;
@@ -1673,7 +1679,6 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
   double quantity = 0.;
   double V, dV, ddV;
   double sign_dtau = 0.;
-  ErrorMsg buf;
 
   pipaw.N = in_bg_size_;
 
@@ -1695,7 +1700,7 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
       break;
   }
 
-  class_call_failure(initialize_generic_integrator(pipaw.N, &gi), gi.error_message);
+  initialize_generic_integrator(pipaw.N, &gi);
 
   /* at starting point, compute eventually epsilon */
 
@@ -1707,7 +1712,7 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
 
   tau_end = 0;
 
-  primordial_inflation_derivs(tau_end, y, dy, &pipaw, buf);
+  primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
   // compute timestep (if time = conformal, dtau is the conformal time step,
   // if time = proper, dtau is in fact dt, the proper time step)
@@ -1781,34 +1786,40 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
                "to numerical error or infinite loop",
                dtau / tau_start);
 
-    class_call_failure(generic_integrator(primordial_inflation_derivs,
-                                          tau_start,
-                                          tau_end,
-                                          y,
-                                          &pipaw,
-                                          ppr->primordial_inflation_tol_integration,
-                                          ppr->smallest_allowed_variation,
-                                          &gi),
-                       gi.error_message);
+    generic_integrator(primordial_inflation_derivs,
+                       tau_start,
+                       tau_end,
+                       y,
+                       &pipaw,
+                       ppr->primordial_inflation_tol_integration,
+                       ppr->smallest_allowed_variation,
+                       &gi);
 
     /* eventually, check that epsilon is not becoming greater than one */
 
     if (check_epsilon == _TRUE_) {
       epsilon_old = epsilon;
 
-      class_call_except(primordial_inflation_get_epsilon(y[index_in_phi_], &epsilon),
-                        cleanup_generic_integrator(&gi));
+      try {
+        primordial_inflation_get_epsilon(y[index_in_phi_], &epsilon);
+      }
+      catch (...) {
+        cleanup_generic_integrator(&gi);
+        throw;
+      }
 
-      class_test_except((epsilon > 1) && (epsilon_old <= 1),
-                        cleanup_generic_integrator(&gi),
-                        "Inflaton evolution crosses the border from epsilon<1 to epsilon>1 at "
-                        "phi=%g. Inflation disrupted during the observable e-folds",
-                        y[index_in_phi_]);
+      if ((epsilon > 1) && (epsilon_old <= 1)) {
+        cleanup_generic_integrator(&gi);
+        class_stop(
+            "Inflaton evolution crosses the border from epsilon<1 to epsilon>1 at "
+            "phi=%g. Inflation disrupted during the observable e-folds",
+            y[index_in_phi_]);
+      }
     }
 
     /* recompute new value of next conformal time step */
 
-    primordial_inflation_derivs(tau_end, y, dy, &pipaw, buf);
+    primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
     // compute timestep (if time = conformal, dtau is the conformal time step,
     // if time = proper, dtau is in fact dt, the proper time step)
@@ -1853,7 +1864,7 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
 
   /* won't use the integrator anymore */
 
-  class_call_failure(cleanup_generic_integrator(&gi), gi.error_message);
+  cleanup_generic_integrator(&gi);
 
   /* Perform one last step with a simple trapezoidal integral. This
      will bring exactly phi or a forward to phi_stop or a_stop, or
@@ -1907,7 +1918,7 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
     y[index_in_dphi_] += dy[index_in_dphi_] * dtau;
 
   // this last step updates also the dy[]
-  primordial_inflation_derivs(tau_end, y, dy, &pipaw, buf);
+  primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
   // uncomment if you want to test that the routine really reached the point at which d2a/dt2=0
   /*
@@ -1915,8 +1926,7 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
     primordial_inflation_derivs(tau_end,
     y,
     dy,
-    &pipaw,
-    buf);
+    &pipaw);
 
     aH = dy[index_in_a_]/y[index_in_a_];
     quantity = (-aH*aH + 4*_PI_*y[index_in_dphi_]*y[index_in_dphi_])/y[index_in_a_]/y[index_in_a_];
@@ -2448,39 +2458,36 @@ int PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy)
   return _SUCCESS_;
 }
 
-int PrimordialModule::primordial_inflation_derivs(
-    double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message) {
+int PrimordialModule::primordial_inflation_derivs(double tau,
+                                                  double* y,
+                                                  double* dy,
+                                                  void* parameters_and_workspace) {
   primordial_inflation_parameters_and_workspace* ppipaw =
       static_cast<primordial_inflation_parameters_and_workspace*>(parameters_and_workspace);
   const PrimordialModule& primordial_module = *(ppipaw->primordial_module);
-  return primordial_module.primordial_inflation_derivs_member(tau,
-                                                              y,
-                                                              dy,
-                                                              parameters_and_workspace,
-                                                              error_message);
+  return primordial_module.primordial_inflation_derivs_member(tau, y, dy, parameters_and_workspace);
 }
 
 /**
  * Routine returning derivative of system of background/perturbation
  * variables. Like other routines used by the generic integrator
  * (background_derivs, thermodynamics_derivs, perturb_derivs), this
- * routine has a generic list of arguments, and a slightly different
- * error management, with the error message returned directly in an
- * ErrMsg field.
+ * routine has a generic list of arguments.
  *
- * @param tau                      Input: time (not used explicitly inside the routine, but requested by the generic integrator)
- * @param y                        Input/output: running vector of background variables, already allocated and initialized
- * @param dy                       Input: running vector of background derivatives, already allocated
+ * @param tau                      Input: time (not used explicitly inside the routine, but
+ *                                         requested by the generic integrator)
+ * @param y                        Input/output: running vector of background variables, already
+ *                                               allocated and initialized
+ * @param dy                       Input: running vector of background derivatives, already
+ *                                        allocated
  * @param parameters_and_workspace Input: all necessary input variables apart from y
- * @param error_message            Output: error message
  * @return the error status
  */
 
 int PrimordialModule::primordial_inflation_derivs_member(double tau,
                                                          double* y,
                                                          double* dy,
-                                                         void* parameters_and_workspace,
-                                                         ErrorMsg error_message) const {
+                                                         void* parameters_and_workspace) const {
   struct primordial_inflation_parameters_and_workspace* ppipaw;
 
   ppipaw = (struct primordial_inflation_parameters_and_workspace*) parameters_and_workspace;

@@ -129,27 +129,24 @@ class BackgroundModule : public BaseModule {
   int background_solve_evolver();
   int background_initial_conditions(double* pvecback, double* pvecback_integration);
   int background_find_equality();
-  int background_derivs_member(
-      double z, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  int background_derivs_loga_member(
-      double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  static int background_derivs_loga(
-      double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  int background_add_line_to_bg_table_member(double loga,
-                                             double* y,
-                                             double* dy,
-                                             int index_loga,
-                                             void* parameters_and_workspace,
-                                             ErrorMsg error_message);
-  static int background_add_line_to_bg_table(double loga,
-                                             double* y,
-                                             double* dy,
-                                             int index_loga,
-                                             void* parameters_and_workspace,
-                                             ErrorMsg error_message);
+  int background_derivs_member(double z, double* y, double* dy, void* parameters_and_workspace);
+  int background_derivs_loga_member(double loga,
+                                    double* y,
+                                    double* dy,
+                                    void* parameters_and_workspace);
+  static int background_derivs_loga(double loga,
+                                    double* y,
+                                    double* dy,
+                                    void* parameters_and_workspace);
+  int background_add_line_to_bg_table_member(
+      double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);
+  static int background_add_line_to_bg_table(
+      double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);
   int background_output_budget();
-  static int background_print_variables(
-      double loga, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
+  static int background_print_variables(double loga,
+                                        double* y,
+                                        double* dy,
+                                        void* parameters_and_workspace);
 
   /** @name - all indices for the vector of background quantities to be integrated (=bi)
    *

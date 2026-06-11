@@ -16,8 +16,7 @@ int get_qsampling_manual(double* x,
                          int qsiz,
                          int (*function)(void* params_for_function, double q, double* f0),
                          void* params_for_function,
-                         const GBQuadParams& gb,
-                         ErrorMsg errmsg) {
+                         const GBQuadParams& gb) {
   double y, h, t;
   switch (method) {
     case (qm_auto):
@@ -93,8 +92,7 @@ int get_qsampling(double* x,
                   int qsiz,
                   int (*test)(void* params_for_function, double q, double* psi),
                   int (*function)(void* params_for_function, double q, double* f0),
-                  void* params_for_function,
-                  ErrorMsg errmsg) {
+                  void* params_for_function) {
   /* This routine returns the fewest possible number of abscissas and weights under
      the requirement that a test function folded with the neutrino distribution function
      can be integrated to an accuracy of rtol. If the distribution function is Fermi-Dirac
@@ -144,16 +142,7 @@ int get_qsampling(double* x,
   }
 
   /* First do the adaptive quadrature - this will also give the value of the integral: */
-  gk_adapt(root,
-           (*test),
-           (*function),
-           params_for_function,
-           rtol * 1e-4,
-           1,
-           0.0,
-           1.0,
-           _TRUE_,
-           errmsg);
+  gk_adapt(root, (*test), (*function), params_for_function, rtol * 1e-4, 1, 0.0, 1.0, _TRUE_);
   /* Do a leaf count: */
   leaf_count(root.get());
   /* I can get the integral now: */
@@ -224,8 +213,7 @@ int get_qsampling(double* x,
              1,
              qmin,
              qmax,
-             _FALSE_,
-             errmsg);
+             _FALSE_);
     /* Do a leaf count: */
     leaf_count(root_comb.get());
     /* Starting from the top, move down in levels until tolerance is met: */
@@ -519,8 +507,7 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
              int treemode,
              double a,
              double b,
-             int isindefinite,
-             ErrorMsg errmsg) {
+             int isindefinite) {
   /* Do adaptive Gauss-Kronrod quadrature, while building the
      recurrence tree. If treemode!=0, store x-values and weights aswell.
      At first call, a and b should be 0 and 1 if isdefinite==_TRUE_. */
@@ -549,8 +536,7 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
              treemode,
              a,
              mid,
-             isindefinite,
-             errmsg);
+             isindefinite);
     //printf("%g->",mid);
     gk_adapt(node->right,
              (*test),
@@ -560,8 +546,7 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
              treemode,
              mid,
              b,
-             isindefinite,
-             errmsg);
+             isindefinite);
     /* Update integral and error in this node and return: */
     /* Actually, it is more convenient just to keep the nodes own estimate of the
        integral for our purposes.
@@ -772,7 +757,7 @@ int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
  * From Numerical recipes
  **/
 
-int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol, ErrorMsg error_message) {
+int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol) {
   int m, j, i, counter;
   double z1, z, pp, p3, p2, p1;
 
@@ -810,8 +795,7 @@ int quadrature_in_rectangle(double xl,
                             int* n,
                             std::vector<double>& x,
                             std::vector<double>& y,
-                            std::vector<double>& w,
-                            ErrorMsg error_message) {
+                            std::vector<double>& w) {
   double xl_tile, xr_tile, yl_tile, yr_tile;
   int N;
 
@@ -826,28 +810,13 @@ int quadrature_in_rectangle(double xl,
   x.resize(N);
   y.resize(N);
   w.resize(N);
-  class_call(cubature_order_eleven(xl_tile,
-                                   xr_tile,
-                                   yl_tile,
-                                   yr_tile,
-                                   x.data(),
-                                   y.data(),
-                                   w.data(),
-                                   error_message),
-             error_message,
-             error_message);
+  cubature_order_eleven(xl_tile, xr_tile, yl_tile, yr_tile, x.data(), y.data(), w.data());
 
   return _SUCCESS_;
 }
 
-int cubature_order_eleven(double xl,
-                          double xr,
-                          double yl,
-                          double yr,
-                          double* x,
-                          double* y,
-                          double* w,
-                          ErrorMsg error_message) {
+int cubature_order_eleven(
+    double xl, double xr, double yl, double yr, double* x, double* y, double* w) {
   double wi[6] = {0.48020763350723814563e-01,
                   0.66071329164550595674e-01,
                   0.97386777358668164196e-01,

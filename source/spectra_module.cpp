@@ -262,20 +262,15 @@ int SpectraModule::spectra_cl_at_l(
     index_md = 0;
     if ((int) l <= l_[l_size_[index_md] - 1]) {
       /* interpolate at l */
-      {
-        ErrorMsg buf;
-        class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                                    l_size_[index_md],
-                                                    const_cast<double*>(cl_[index_md].data()),
-                                                    const_cast<double*>(ddcl_[index_md].data()),
-                                                    ct_size_,
-                                                    l,
-                                                    &last_index,
-                                                    cl_tot,
-                                                    ct_size_,
-                                                    buf),
-                           buf);
-      }
+      array_interpolate_spline(const_cast<double*>(l_.data()),
+                               l_size_[index_md],
+                               const_cast<double*>(cl_[index_md].data()),
+                               const_cast<double*>(ddcl_[index_md].data()),
+                               ct_size_,
+                               l,
+                               &last_index,
+                               cl_tot,
+                               ct_size_);
 
       /* set to zero for the types such that l<l_max */
       for (index_ct = 0; index_ct < ct_size_; index_ct++)
@@ -301,20 +296,15 @@ int SpectraModule::spectra_cl_at_l(
         index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
         if (((int) l <= l_[l_size_[index_md] - 1]) &&
             (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_)) {
-          {
-            ErrorMsg buf;
-            class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                                        l_size_[index_md],
-                                                        const_cast<double*>(cl_[index_md].data()),
-                                                        const_cast<double*>(ddcl_[index_md].data()),
-                                                        ic_ic_size_[index_md] * ct_size_,
-                                                        l,
-                                                        &last_index,
-                                                        cl_md_ic[index_md],
-                                                        ic_ic_size_[index_md] * ct_size_,
-                                                        buf),
-                               buf);
-          }
+          array_interpolate_spline(const_cast<double*>(l_.data()),
+                                   l_size_[index_md],
+                                   const_cast<double*>(cl_[index_md].data()),
+                                   const_cast<double*>(ddcl_[index_md].data()),
+                                   ic_ic_size_[index_md] * ct_size_,
+                                   l,
+                                   &last_index,
+                                   cl_md_ic[index_md],
+                                   ic_ic_size_[index_md] * ct_size_);
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++)
             if ((int) l > l_max_ct_[index_md][index_ct])
@@ -349,20 +339,15 @@ int SpectraModule::spectra_cl_at_l(
 
       if (ic_size_[index_md] == 1) {
         if ((int) l <= l_[l_size_[index_md] - 1]) {
-          {
-            ErrorMsg buf;
-            class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                                        l_size_[index_md],
-                                                        const_cast<double*>(cl_[index_md].data()),
-                                                        const_cast<double*>(ddcl_[index_md].data()),
-                                                        ct_size_,
-                                                        l,
-                                                        &last_index,
-                                                        cl_md[index_md],
-                                                        ct_size_,
-                                                        buf),
-                               buf);
-          }
+          array_interpolate_spline(const_cast<double*>(l_.data()),
+                                   l_size_[index_md],
+                                   const_cast<double*>(cl_[index_md].data()),
+                                   const_cast<double*>(ddcl_[index_md].data()),
+                                   ct_size_,
+                                   l,
+                                   &last_index,
+                                   cl_md[index_md],
+                                   ct_size_);
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++)
             if ((int) l > l_max_ct_[index_md][index_ct])
@@ -381,20 +366,15 @@ int SpectraModule::spectra_cl_at_l(
       if (ic_size_[index_md] > 1) {
         if ((int) l <= l_[l_size_[index_md] - 1]) {
           /* interpolate all ic and ct */
-          {
-            ErrorMsg buf;
-            class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                                        l_size_[index_md],
-                                                        const_cast<double*>(cl_[index_md].data()),
-                                                        const_cast<double*>(ddcl_[index_md].data()),
-                                                        ic_ic_size_[index_md] * ct_size_,
-                                                        l,
-                                                        &last_index,
-                                                        cl_md_ic[index_md],
-                                                        ic_ic_size_[index_md] * ct_size_,
-                                                        buf),
-                               buf);
-          }
+          array_interpolate_spline(const_cast<double*>(l_.data()),
+                                   l_size_[index_md],
+                                   const_cast<double*>(cl_[index_md].data()),
+                                   const_cast<double*>(ddcl_[index_md].data()),
+                                   ic_ic_size_[index_md] * ct_size_,
+                                   l,
+                                   &last_index,
+                                   cl_md_ic[index_md],
+                                   ic_ic_size_[index_md] * ct_size_);
 
           /* set to zero some of the components */
           for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
@@ -905,17 +885,12 @@ int SpectraModule::spectra_cls() {
         compute second derivative of the array in which they are stored,
         in view of spline interpolation. */
 
-    {
-      ErrorMsg buf;
-      class_call_failure(array_spline_table_lines(l_.data(),
-                                                  l_size_[index_md],
-                                                  cl_[index_md].data(),
-                                                  ic_ic_size_[index_md] * ct_size_,
-                                                  ddcl_[index_md].data(),
-                                                  _SPLINE_EST_DERIV_,
-                                                  buf),
-                         buf);
-    }
+    array_spline_table_lines(l_.data(),
+                             l_size_[index_md],
+                             cl_[index_md].data(),
+                             ic_ic_size_[index_md] * ct_size_,
+                             ddcl_[index_md].data(),
+                             _SPLINE_EST_DERIV_);
   }
 
   return _SUCCESS_;
@@ -1244,18 +1219,13 @@ int SpectraModule::spectra_compute_cl(int index_md,
     else {
       /* spline the integrand over the whole range of k's */
 
-      {
-        ErrorMsg buf;
-        class_call_failure(array_spline(cl_integrand,
-                                        cl_integrand_num_columns,
-                                        transfer_module_->q_size_,
-                                        0,
-                                        1 + index_ct,
-                                        1 + ct_size_ + index_ct,
-                                        _SPLINE_EST_DERIV_,
-                                        buf),
-                           buf);
-      }
+      array_spline(cl_integrand,
+                   cl_integrand_num_columns,
+                   transfer_module_->q_size_,
+                   0,
+                   1 + index_ct,
+                   1 + ct_size_ + index_ct,
+                   _SPLINE_EST_DERIV_);
 
       /* Technical point: we will now do a spline integral over the
          whole range of k's, excepted in the closed (K>0) case. In
@@ -1277,19 +1247,14 @@ int SpectraModule::spectra_compute_cl(int index_md,
                              transfer_module_->q_size_ - 1);
       }
 
-      {
-        ErrorMsg buf;
-        class_call_failure(array_integrate_all_trapzd_or_spline(cl_integrand,
-                                                                cl_integrand_num_columns,
-                                                                transfer_module_->q_size_,
-                                                                index_q_spline,
-                                                                0,
-                                                                1 + index_ct,
-                                                                1 + ct_size_ + index_ct,
-                                                                &clvalue,
-                                                                buf),
-                           buf);
-      }
+      array_integrate_all_trapzd_or_spline(cl_integrand,
+                                           cl_integrand_num_columns,
+                                           transfer_module_->q_size_,
+                                           index_q_spline,
+                                           0,
+                                           1 + index_ct,
+                                           1 + ct_size_ + index_ct,
+                                           &clvalue);
 
       /* in the closed case, instead of an integral, we have a
          discrete sum. In practice, this does not matter: the previous

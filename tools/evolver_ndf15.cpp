@@ -63,8 +63,7 @@
 #include "sparse.h"
 
 int evolver_ndf15(
-    int (*derivs)(
-        double x, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message),
+    int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
     double x_ini,
     double x_final,
     double* y_inout,
@@ -73,20 +72,14 @@ int evolver_ndf15(
     void* parameters_and_workspace_for_derivs,
     double rtol,
     double minimum_variation,
-    int (*timescale_and_approximation)(
-        double x, void* parameters_and_workspace, double* timescales, ErrorMsg error_message),
+    int (*timescale_and_approximation)(double x,
+                                       void* parameters_and_workspace,
+                                       double* timescales),
     double timestep_over_timescale,
     double* t_vec,
     int tres,
-    int (*output)(double x,
-                  double y[],
-                  double dy[],
-                  int index_x,
-                  void* parameters_and_workspace,
-                  ErrorMsg error_message),
-    int (*print_variables)(
-        double x, double y[], double dy[], void* parameters_and_workspace, ErrorMsg error_message),
-    ErrorMsg error_message) {
+    int (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
+    int (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
   /* Constants: */
   double G[5]     = {1.0, 3.0 / 2.0, 11.0 / 6.0, 25.0 / 12.0, 137.0 / 60.0};
   double alpha[5] = {-37.0 / 200, -1.0 / 9.0, -8.23e-2, -4.15e-2, 0};
@@ -154,10 +147,10 @@ int evolver_ndf15(
   ynew = y_inout - 1; /* This way y_inout is always up to date. */
 
   /*Initialize the jacobian:*/
-  class_call(initialize_jacobian(&jac, neq, error_message), error_message, error_message);
+  initialize_jacobian(&jac, neq);
 
   /* Initialize workspace for numjac: */
-  class_call(initialize_numjac_workspace(&nj_ws, neq, error_message), error_message, error_message);
+  initialize_numjac_workspace(&nj_ws, neq);
 
   /* Initialize some method parameters:*/
   for (ii = 0; ii < 5; ii++) {
@@ -197,9 +190,7 @@ int evolver_ndf15(
   for (ii = 0; ii < 6; ii++)
     stepstat[ii] = 0;
 
-  class_call((*derivs)(t0, y + 1, f0 + 1, parameters_and_workspace_for_derivs, error_message),
-             error_message,
-             error_message);
+  (*derivs)(t0, y + 1, f0 + 1, parameters_and_workspace_for_derivs);
   stepstat[2] += 1;
   if ((tfinal - t0) < 0.0) {
     tdir = -1;
@@ -211,19 +202,16 @@ int evolver_ndf15(
   t    = t0;
 
   nfenj = 0;
-  class_call(numjac((*derivs),
-                    t,
-                    y,
-                    f0,
-                    &jac,
-                    &nj_ws,
-                    abstol,
-                    neq,
-                    &nfenj,
-                    parameters_and_workspace_for_derivs,
-                    error_message),
-             error_message,
-             error_message);
+  numjac((*derivs),
+         t,
+         y,
+         f0,
+         &jac,
+         &nj_ws,
+         abstol,
+         neq,
+         &nfenj,
+         parameters_and_workspace_for_derivs);
   stepstat[3] += 1;
   stepstat[2] += nfenj;
   Jcurrent     = _TRUE_; /* True */
@@ -246,13 +234,7 @@ int evolver_ndf15(
   h    = tdir * absh;
   tdel = (t + tdir * MIN(sqrt(eps) * MAX(fabs(t), fabs(t + h)), absh)) - t;
 
-  class_call((*derivs)(t + tdel,
-                       y + 1,
-                       tempvec1 + 1,
-                       parameters_and_workspace_for_derivs,
-                       error_message),
-             error_message,
-             error_message);
+  (*derivs)(t + tdel, y + 1, tempvec1 + 1, parameters_and_workspace_for_derivs);
   stepstat[2] += 1;
 
   /*I assume that a full jacobi matrix is always calculated in the beginning...*/
@@ -285,7 +267,7 @@ int evolver_ndf15(
 
   hinvGak = h * invGa[k - 1];
   nconhk  = 0; /*steps taken with current h and k*/
-  class_call(new_linearisation(&jac, hinvGak, neq, error_message), error_message, error_message);
+  new_linearisation(&jac, hinvGak, neq);
   stepstat[4] += 1;
   havrate      = _FALSE_; /*false*/
 
@@ -320,9 +302,7 @@ int evolver_ndf15(
       adjust_stepsize(dif, (absh / abshlast), neq, k);
       hinvGak = h * invGa[k - 1];
       nconhk  = 0;
-      class_call(new_linearisation(&jac, hinvGak, neq, error_message),
-                 error_message,
-                 error_message);
+      new_linearisation(&jac, hinvGak, neq);
       stepstat[4] += 1;
       havrate      = _FALSE_;
     }
@@ -372,13 +352,7 @@ int evolver_ndf15(
           for (ii = 1; ii <= neq; ii++) {
             tempvec1[ii] = (psi[ii] + difkp1[ii]);
           }
-          class_call((*derivs)(tnew,
-                               ynew + 1,
-                               f0 + 1,
-                               parameters_and_workspace_for_derivs,
-                               error_message),
-                     error_message,
-                     error_message);
+          (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
           stepstat[2] += 1;
           for (j = 1; j <= neq; j++) {
             rhs[j] = hinvGak * f0[j] - tempvec1[j];
@@ -446,27 +420,18 @@ int evolver_ndf15(
           stepstat[1] += 1;
           /*	! Speed up the iteration by forming new linearization or reducing h. */
           if (Jcurrent == _FALSE_) {
-            class_call((*derivs)(t,
-                                 y + 1,
-                                 f0 + 1,
-                                 parameters_and_workspace_for_derivs,
-                                 error_message),
-                       error_message,
-                       error_message);
+            (*derivs)(t, y + 1, f0 + 1, parameters_and_workspace_for_derivs);
             nfenj = 0;
-            class_call(numjac((*derivs),
-                              t,
-                              y,
-                              f0,
-                              &jac,
-                              &nj_ws,
-                              abstol,
-                              neq,
-                              &nfenj,
-                              parameters_and_workspace_for_derivs,
-                              error_message),
-                       error_message,
-                       error_message);
+            numjac((*derivs),
+                   t,
+                   y,
+                   f0,
+                   &jac,
+                   &nj_ws,
+                   abstol,
+                   neq,
+                   &nfenj,
+                   parameters_and_workspace_for_derivs);
             stepstat[3] += 1;
             stepstat[2] += (nfenj + 1);
             Jcurrent     = _TRUE_;
@@ -489,9 +454,7 @@ int evolver_ndf15(
             nconhk  = 0;
           }
           /* A new linearisation is needed in both cases */
-          class_call(new_linearisation(&jac, hinvGak, neq, error_message),
-                     error_message,
-                     error_message);
+          new_linearisation(&jac, hinvGak, neq);
           stepstat[4] += 1;
           havrate      = _FALSE_;
         }
@@ -542,9 +505,7 @@ int evolver_ndf15(
         adjust_stepsize(dif, (absh / abshlast), neq, k);
         hinvGak = h * invGa[k - 1];
         nconhk  = 0;
-        class_call(new_linearisation(&jac, hinvGak, neq, error_message),
-                   error_message,
-                   error_message);
+        new_linearisation(&jac, hinvGak, neq);
         stepstat[4] += 1;
         havrate      = _FALSE_;
       }
@@ -569,21 +530,13 @@ int evolver_ndf15(
     while ((next < tres) && (tdir * (tnew - t_vec[next]) >= 0.0)) {
       /* Do we need to write output? */
       if (tnew == t_vec[next]) {
-        class_call((*output)(t_vec[next],
-                             ynew + 1,
-                             f0 + 1,
-                             next,
-                             parameters_and_workspace_for_derivs,
-                             error_message),
-                   error_message,
-                   error_message);
+        (*output)(t_vec[next], ynew + 1, f0 + 1, next, parameters_and_workspace_for_derivs);
         // MODIFICATION BY LUC
         // All print_variables have been moved to the end of time step
         /*
 	if (print_variables != nullptr){
-	  class_call((*print_variables)(t_vec[next],ynew+1,f0+1,
-					parameters_and_workspace_for_derivs,error_message),
-		     error_message,error_message);
+	  (*print_variables)(t_vec[next],ynew+1,f0+1,
+					parameters_and_workspace_for_derivs);
 	}
 */
       }
@@ -602,14 +555,11 @@ int evolver_ndf15(
                         neq,
                         2);
 
-        class_call((*output)(t_vec[next],
-                             yinterp + 1,
-                             ypinterp + 1,
-                             next,
-                             parameters_and_workspace_for_derivs,
-                             error_message),
-                   error_message,
-                   error_message);
+        (*output)(t_vec[next],
+                  yinterp + 1,
+                  ypinterp + 1,
+                  next,
+                  parameters_and_workspace_for_derivs);
       }
       next++;
     }
@@ -679,21 +629,9 @@ int evolver_ndf15(
 
     // MODIFICATION BY LUC
     if (print_variables != nullptr) {
-      class_call((*derivs)(tnew,
-                           ynew + 1,
-                           f0 + 1,
-                           parameters_and_workspace_for_derivs,
-                           error_message),
-                 error_message,
-                 error_message);
+      (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
 
-      class_call((*print_variables)(tnew,
-                                    ynew + 1,
-                                    f0 + 1,
-                                    parameters_and_workspace_for_derivs,
-                                    error_message),
-                 error_message,
-                 error_message);
+      (*print_variables)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
     }
     // end of modification
   }
@@ -701,19 +639,11 @@ int evolver_ndf15(
   /* a last call is compulsory to ensure that all quantitites in
      y,dy,parameters_and_workspace_for_derivs are updated to the
      last point in the covered range */
-  class_call((*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs, error_message),
-             error_message,
-             error_message);
+  (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
 
   if (print_variables != nullptr) {
     /** If we are printing variables, we must store the final point */
-    class_call((*print_variables)(tnew,
-                                  ynew + 1,
-                                  f0 + 1,
-                                  parameters_and_workspace_for_derivs,
-                                  error_message),
-               error_message,
-               error_message);
+    (*print_variables)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
   }
 
   if (verbose > 0) {
@@ -1000,7 +930,7 @@ int adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
   return _SUCCESS_;
 }
 
-int new_linearisation(struct jacobian* jac, double hinvGak, int neq, ErrorMsg error_message) {
+int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
   double luparity, *Ax;
   int i, j, *Ap, *Ai, funcreturn;
   if (jac->use_sparse == 1) {
@@ -1136,15 +1066,14 @@ int ludcmp(double** a, int n, int* indx, double* d, double* vv) {
   return _SUCCESS_;
 }
 
-int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F, ErrorMsg error_message),
+int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
                  double* x_inout,
                  double* dxdF,
                  int x_size,
                  double tolx,
                  double tolF,
                  void* param,
-                 int* fevals,
-                 ErrorMsg error_message) {
+                 int* fevals) {
   /**Given an initial guess x[1..n] for a root in n dimensions,
      take ntrial Newton-Raphson steps to improve the root.
      Stop if the root converges in either summed absolute
@@ -1182,7 +1111,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F, Erro
 
   for (int k = 1; k <= ntrial; k++) {
     //printf("x = [%f, %f], delx = [%e, %e]\n", x_inout[0],x_inout[1],delx[0],delx[1]);
-    class_call(func(x_inout, x_size, param, F0, error_message), error_message, error_message);
+    func(x_inout, x_size, param, F0);
     //printf("F0 = [%f, %f]\n",F0[0],F0[1]);
     *fevals = *fevals + 1;
 
@@ -1214,7 +1143,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F, Erro
       for (int func_iter = 0; func_iter < 10; ++func_iter) {
         x_inout[i - 1] = x_inout_backup[i - 1] + delx[i - 1];
         try {
-          return_function = func(x_inout, x_size, param, Fdel, error_message);
+          return_function = func(x_inout, x_size, param, Fdel);
           (*fevals)++;
         }
         catch (...) {
@@ -1282,11 +1211,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F, Erro
 /* "numjac", "initialize_jacobian", "uninitialize_jacobian",					*/
 /* "initialize_numjac_workspace", "uninitialize_numjac_workspace".		*/
 /**********************************************************************/
-int numjac(int (*derivs)(double x,
-                         double* y,
-                         double* dy,
-                         void* parameters_and_workspace,
-                         ErrorMsg error_message),
+int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
            double t,
            double* y,
            double* fval,
@@ -1295,8 +1220,7 @@ int numjac(int (*derivs)(double x,
            double thresh,
            int neq,
            int* nfe,
-           void* parameters_and_workspace_for_derivs,
-           ErrorMsg error_message) {
+           void* parameters_and_workspace_for_derivs) {
   /*	Routine that computes the jacobian numerically. It is based on the numjac
 	implementation in MATLAB, but a feature for recognising sparsity in the
 	jacobian and taking advantage of that has been added.
@@ -1399,13 +1323,7 @@ int numjac(int (*derivs)(double x,
     for (i = 1; i <= neq; i++) {
       nj_ws->yydel[i] = nj_ws->ydel_Fdel[i][j];
     }
-    class_call((*derivs)(t,
-                         nj_ws->yydel + 1,
-                         nj_ws->ffdel + 1,
-                         parameters_and_workspace_for_derivs,
-                         error_message),
-               error_message,
-               error_message);
+    (*derivs)(t, nj_ws->yydel + 1, nj_ws->ffdel + 1, parameters_and_workspace_for_derivs);
 
     *nfe += 1;
     for (i = 1; i <= neq; i++)
@@ -1499,13 +1417,7 @@ int numjac(int (*derivs)(double x,
             del2 = -fabs(del2);
           }
           nj_ws->yydel[j] = y[j] + del2;
-          class_call((*derivs)(t,
-                               nj_ws->yydel + 1,
-                               nj_ws->ffdel + 1,
-                               parameters_and_workspace_for_derivs,
-                               error_message),
-                     error_message,
-                     error_message);
+          (*derivs)(t, nj_ws->yydel + 1, nj_ws->ffdel + 1, parameters_and_workspace_for_derivs);
           *nfe            += 1;
           nj_ws->yydel[j]  = y[j];
           int rowmax2      = 1;
@@ -1632,7 +1544,7 @@ int numjac(int (*derivs)(double x,
   return _SUCCESS_;
 } /* End of numjac */
 
-int initialize_jacobian(struct jacobian* jac, int neq, ErrorMsg error_message) {
+int initialize_jacobian(struct jacobian* jac, int neq) {
   int i;
 
   if (neq > 15) {
@@ -1714,7 +1626,7 @@ int uninitialize_jacobian(struct jacobian* jac) {
   return _SUCCESS_;
 }
 
-int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq, ErrorMsg error_message) {
+int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq) {
   int neqp = neq + 1;
   /* Allocate vectors and matrices using RAII backing storage: */
 

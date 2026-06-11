@@ -48,8 +48,7 @@ int get_qsampling(double* x,
                   int qsiz,
                   int (*test)(void* params_for_function, double q, double* psi),
                   int (*function)(void* params_for_function, double q, double* f0),
-                  void* params_for_function,
-                  ErrorMsg errmsg);
+                  void* params_for_function);
 int get_qsampling_manual(double* x,
                          double* w,
                          double* dq,
@@ -60,8 +59,7 @@ int get_qsampling_manual(double* x,
                          int qsiz,
                          int (*function)(void* params_for_function, double q, double* f0),
                          void* params_for_function,
-                         const GBQuadParams& gb,
-                         ErrorMsg errmsg);
+                         const GBQuadParams& gb);
 int sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx);
 int get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite);
 int reduce_tree(qss_node* node, int level);
@@ -75,8 +73,7 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
              int treemode,
              double a,
              double b,
-             int isindefinite,
-             ErrorMsg errmsg);
+             int isindefinite);
 int compute_Hermite(double* x, double* w, int N, int alpha, double* b, double* c);
 int compute_Laguerre(
     double* x, double* w, int N, double alpha, double* b, double* c, int totalweight);
@@ -89,9 +86,9 @@ int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
             int isindefinite);
 double testfun(double x);
 
-int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol, ErrorMsg error_message);
+int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol);
 
-int quadrature_gauss_legendre_2D(int n, double* x, double* y, double* w, ErrorMsg error_message);
+int quadrature_gauss_legendre_2D(int n, double* x, double* y, double* w);
 
 int quadrature_in_rectangle(double xl,
                             double xr,
@@ -100,16 +97,9 @@ int quadrature_in_rectangle(double xl,
                             int* n,
                             std::vector<double>& x,
                             std::vector<double>& y,
-                            std::vector<double>& w,
-                            ErrorMsg error_message);
+                            std::vector<double>& w);
 
-int cubature_order_eleven(double xl,
-                          double xr,
-                          double yl,
-                          double yr,
-                          double* x,
-                          double* y,
-                          double* w,
-                          ErrorMsg error_message);
+int cubature_order_eleven(
+    double xl, double xr, double yl, double yr, double* x, double* y, double* w);
 
 #endif

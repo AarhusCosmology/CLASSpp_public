@@ -262,7 +262,7 @@ bool FileContent::read_list_of_strings(const std::string& name,
  * without modification.
  *****************************************************************************/
 
-int parser_read_file(const char* filename, FileContent* pfc, ErrorMsg errmsg) {
+int parser_read_file(const char* filename, FileContent* pfc) {
   try {
     *pfc = FileContent::from_file(filename);
   }
@@ -272,7 +272,7 @@ int parser_read_file(const char* filename, FileContent* pfc, ErrorMsg errmsg) {
   return _SUCCESS_;
 }
 
-int parser_read_int(FileContent* pfc, const char* name, int* value, int* found, ErrorMsg errmsg) {
+int parser_read_int(FileContent* pfc, const char* name, int* value, int* found) {
   try {
     *found = pfc->read_int(name, *value) ? _TRUE_ : _FALSE_;
   }
@@ -282,8 +282,7 @@ int parser_read_int(FileContent* pfc, const char* name, int* value, int* found, 
   return _SUCCESS_;
 }
 
-int parser_read_double(
-    FileContent* pfc, const char* name, double* value, int* found, ErrorMsg errmsg) {
+int parser_read_double(FileContent* pfc, const char* name, double* value, int* found) {
   try {
     *found = pfc->read_double(name, *value) ? _TRUE_ : _FALSE_;
   }
@@ -293,8 +292,7 @@ int parser_read_double(
   return _SUCCESS_;
 }
 
-int parser_read_string(
-    FileContent* pfc, const char* name, std::string& value, int* found, ErrorMsg errmsg) {
+int parser_read_string(FileContent* pfc, const char* name, std::string& value, int* found) {
   try {
     *found = pfc->read_string(name, value) ? _TRUE_ : _FALSE_;
   }
@@ -304,10 +302,7 @@ int parser_read_string(
   return _SUCCESS_;
 }
 
-int parser_cat(const FileContent* pfc1,
-               const FileContent* pfc2,
-               FileContent* pfc3,
-               ErrorMsg errmsg) {
+int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3) {
   try {
     *pfc3 = *pfc1 + *pfc2;
   }

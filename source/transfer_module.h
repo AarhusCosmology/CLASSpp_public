@@ -212,8 +212,7 @@ class TransferModule : public BaseModule {
                         double xmax,
                         double xtol,
                         int* index_l_left,
-                        int* index_l_right,
-                        ErrorMsg error_message);
+                        int* index_l_right);
   int transfer_precompute_selection(double tau_rec, int tau_size_max, std::vector<double>& window);
   int transfer_f_evo(double* pvecback, int last_index, double cotKgen, double* f_evo);
 

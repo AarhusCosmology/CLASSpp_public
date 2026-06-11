@@ -122,17 +122,13 @@ class FileContent {
 extern "C" {
 #endif
 
-int parser_read_file(const char* filename, FileContent* pfc, ErrorMsg errmsg);
+int parser_read_file(const char* filename, FileContent* pfc);
 
-int parser_read_int(FileContent* pfc, const char* name, int* value, int* found, ErrorMsg errmsg);
+int parser_read_int(FileContent* pfc, const char* name, int* value, int* found);
 
-int parser_read_double(
-    FileContent* pfc, const char* name, double* value, int* found, ErrorMsg errmsg);
+int parser_read_double(FileContent* pfc, const char* name, double* value, int* found);
 
-int parser_cat(const FileContent* pfc1,
-               const FileContent* pfc2,
-               FileContent* pfc3,
-               ErrorMsg errmsg);
+int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3);
 
 #ifdef __cplusplus
 }
@@ -140,7 +136,6 @@ int parser_cat(const FileContent* pfc1,
 
 /* Not inside the extern "C" block: this takes a std::string& (a C++ type), so it
  * cannot have C language linkage. All callers are C++; no .c file includes this. */
-int parser_read_string(
-    FileContent* pfc, const char* name, std::string& value, int* found, ErrorMsg errmsg);
+int parser_read_string(FileContent* pfc, const char* name, std::string& value, int* found);
 
 #endif

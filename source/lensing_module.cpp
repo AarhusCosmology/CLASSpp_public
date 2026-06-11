@@ -125,20 +125,15 @@ int LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
              l_lensed_max_);
 
   int last_index;
-  {
-    ErrorMsg buf;
-    class_call_failure(array_interpolate_spline(const_cast<double*>(l_.data()),
-                                                l_size_,
-                                                const_cast<double*>(cl_lens_.data()),
-                                                const_cast<double*>(ddcl_lens_.data()),
-                                                lt_size_,
-                                                l,
-                                                &last_index,
-                                                cl_lensed,
-                                                lt_size_,
-                                                buf),
-                       buf);
-  }
+  array_interpolate_spline(const_cast<double*>(l_.data()),
+                           l_size_,
+                           const_cast<double*>(cl_lens_.data()),
+                           const_cast<double*>(ddcl_lens_.data()),
+                           lt_size_,
+                           l,
+                           &last_index,
+                           cl_lensed,
+                           lt_size_);
 
   /* set to zero for the types such that l<l_max */
   for (int index_lt = 0; index_lt < lt_size_; index_lt++)
@@ -209,15 +204,7 @@ int LensingModule::lensing_init() {
   std::vector<double> w8(num_mu - 1);
 
   if (ppr->accurate_lensing == _TRUE_) {
-    {
-      ErrorMsg buf;
-      class_call_failure(quadrature_gauss_legendre(mu.data(),
-                                                   w8.data(),
-                                                   num_mu - 1,
-                                                   ppr->tol_gauss_legendre,
-                                                   buf),
-                         buf);
-    }
+    quadrature_gauss_legendre(mu.data(), w8.data(), num_mu - 1, ppr->tol_gauss_legendre);
   }
   else { /* Crude integration on [0,pi/16]: Riemann sum on theta */
 
@@ -571,17 +558,12 @@ int LensingModule::lensing_init() {
 
   /** - spline computed \f$ C_l\f$'s in view of interpolation */
 
-  {
-    ErrorMsg buf;
-    class_call_failure(array_spline_table_lines(l_.data(),
-                                                l_size_,
-                                                cl_lens_.data(),
-                                                lt_size_,
-                                                ddcl_lens_.data(),
-                                                _SPLINE_EST_DERIV_,
-                                                buf),
-                       buf);
-  }
+  array_spline_table_lines(l_.data(),
+                           l_size_,
+                           cl_lens_.data(),
+                           lt_size_,
+                           ddcl_lens_.data(),
+                           _SPLINE_EST_DERIV_);
 
   /** - Exit **/
 

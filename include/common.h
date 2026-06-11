@@ -154,33 +154,13 @@ typedef char ErrorMsg
   class_build_error_string(err_out, "error in %s;\n=>%s", extra, err_mess);
 
 /* macro for calling function and returning error if it failed */
-#define class_call_except(function,                                                     \
-                          error_message_from_function,                                  \
-                          error_message_output,                                         \
-                          list_of_commands)                                             \
+#define class_call(function, error_message_from_function, error_message_output)         \
   {                                                                                     \
     if (function == _FAILURE_) {                                                        \
       class_call_message(error_message_output, #function, error_message_from_function); \
-      list_of_commands;                                                                 \
       return _FAILURE_;                                                                 \
     }                                                                                   \
   }
-
-/* macro for trying to call function */
-#define class_call_try(function,                                                        \
-                       error_message_from_function,                                     \
-                       error_message_output,                                            \
-                       list_of_commands)                                                \
-  {                                                                                     \
-    if (function == _FAILURE_) {                                                        \
-      class_call_message(error_message_output, #function, error_message_from_function); \
-      list_of_commands;                                                                 \
-    }                                                                                   \
-  }
-
-/* macro for calling function and returning error if it failed */
-#define class_call(function, error_message_from_function, error_message_output) \
-  class_call_except(function, error_message_from_function, error_message_output, )
 
 /* same in parallel region */
 #define class_call_parallel(function, error_message_from_function, error_message_output)  \
@@ -200,18 +180,6 @@ typedef char ErrorMsg
     ErrorMsg Optional_arguments;                                                                \
     class_protect_sprintf(Optional_arguments, args, ##__VA_ARGS__);                             \
     class_build_error_string(err_out, "condition (%s) is true; %s", extra, Optional_arguments); \
-  }
-
-/* macro for testing condition and returning error if condition is true;
-   args is a variable list of optional arguments, e.g.: args="x=%d",x
-   args cannot be empty, if there is nothing to pass use args="" */
-#define class_test_except(condition, error_message_output, list_of_commands, args, ...) \
-  {                                                                                     \
-    if (condition) {                                                                    \
-      class_test_message(error_message_output, #condition, args);                       \
-      list_of_commands;                                                                 \
-      return _FAILURE_;                                                                 \
-    }                                                                                   \
   }
 
 #define class_test(condition, error_message_output, args, ...)    \
@@ -269,26 +237,12 @@ typedef char ErrorMsg
  * - class_call: if the callee returns _FAILURE_ (C function), builds
  *   the error chain and throws. If the callee itself throws (C++
  *   function), the exception propagates naturally.
- * - class_call_except / class_test_except: execute cleanup commands
- *   before re-throwing.
  * - class_open: throws on file open failure.
  *
  * The C definitions above remain active for .c utility files
  * (arrays.c, hyperspherical.c, etc.).
  */
 #ifdef __cplusplus
-
-#undef class_call_except
-#define class_call_except(function, list_of_commands) \
-  {                                                   \
-    try {                                             \
-      (function);                                     \
-    }                                                 \
-    catch (...) {                                     \
-      list_of_commands;                               \
-      throw;                                          \
-    }                                                 \
-  }
 
 #undef class_call
 #define class_call(function, error_message_from_function, error_message_output) \
@@ -298,31 +252,6 @@ typedef char ErrorMsg
       class_call_message(_class_err_, #function, error_message_from_function);  \
       throw std::runtime_error(_class_err_);                                    \
     }                                                                           \
-  }
-
-/* New: for tools/ leaf functions that return _FAILURE_. Some leaves can return
- * _FAILURE_ WITHOUT writing the buffer (e.g. quadrature qm_auto,
- * hyperspherical_HIS_create default), so NUL-init it first to guarantee a valid
- * string before it is read as %s in class_call_message. */
-#define class_call_failure(function, error_message_from_function)              \
-  {                                                                            \
-    (error_message_from_function)[0] = '\0';                                   \
-    if ((function) == _FAILURE_) {                                             \
-      ErrorMsg _class_err_;                                                    \
-      class_call_message(_class_err_, #function, error_message_from_function); \
-      throw std::runtime_error(_class_err_);                                   \
-    }                                                                          \
-  }
-
-#undef class_test_except
-#define class_test_except(condition, list_of_commands, args, ...)       \
-  {                                                                     \
-    if (condition) {                                                    \
-      ErrorMsg _class_err_;                                             \
-      class_test_message(_class_err_, #condition, args, ##__VA_ARGS__); \
-      list_of_commands;                                                 \
-      throw std::runtime_error(_class_err_);                            \
-    }                                                                   \
   }
 
 #undef class_test

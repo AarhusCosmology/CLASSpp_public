@@ -328,11 +328,7 @@ The full CLASS has become a `Cosmology` class. The main function reads:
 int main(int argc, char **argv) {
 
   FileContent fc;
-  ErrorMsg error_message;
-  if (InputModule::file_content_from_arguments(argc, argv, fc, error_message) == _FAILURE_) {
-    printf("\n\nError running input_init_from_arguments \n=>%s\n", error_message);
-    return _FAILURE_;
-  }
+  InputModule::file_content_from_arguments(argc, argv, fc);
 
   Cosmology cosmology{fc};
 

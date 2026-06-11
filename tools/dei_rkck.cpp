@@ -45,18 +45,15 @@ int cleanup_generic_integrator(struct generic_integrator_workspace* pgi) {
   return _SUCCESS_;
 }
 
-int generic_integrator(int (*derivs)(double x,
-                                     double y[],
-                                     double yprime[],
-                                     void* parameters_and_workspace,
-                                     ErrorMsg error_message),
-                       double x1,
-                       double x2,
-                       double ystart[],
-                       void* parameters_and_workspace_for_derivs,
-                       double eps,
-                       double hmin,
-                       struct generic_integrator_workspace* pgi)
+int generic_integrator(
+    int (*derivs)(double x, double y[], double yprime[], void* parameters_and_workspace),
+    double x1,
+    double x2,
+    double ystart[],
+    void* parameters_and_workspace_for_derivs,
+    double eps,
+    double hmin,
+    struct generic_integrator_workspace* pgi)
 
 {
   int nstp, i;
@@ -68,20 +65,12 @@ int generic_integrator(int (*derivs)(double x,
   for (i = 0; i < pgi->n; i++)
     pgi->y[i] = ystart[i];
   for (nstp = 1; nstp <= _MAXSTP_; nstp++) {
-    class_call((*derivs)(x,
-                         pgi->y,
-                         pgi->dydx,
-                         parameters_and_workspace_for_derivs,
-                         pgi->error_message),
-               pgi->error_message,
-               pgi->error_message);
+    (*derivs)(x, pgi->y, pgi->dydx, parameters_and_workspace_for_derivs);
     for (i = 0; i < pgi->n; i++)
       pgi->yscal[i] = fabs(pgi->y[i]) + fabs(pgi->dydx[i] * h) + _TINY_;
     if ((x + h - x2) * (x + h - x1) > 0.0)
       h = x2 - x;
-    class_call(rkqs(&x, h, eps, &hdid, &hnext, derivs, parameters_and_workspace_for_derivs, pgi),
-               pgi->error_message,
-               pgi->error_message);
+    rkqs(&x, h, eps, &hdid, &hnext, derivs, parameters_and_workspace_for_derivs, pgi);
     if ((x - x2) * (x2 - x1) >= 0.0) {
       for (i = 0; i < pgi->n; i++)
         ystart[i] = pgi->y[i];
@@ -108,8 +97,7 @@ int rkqs(double* x,
          double eps,
          double* hdid,
          double* hnext,
-         int (*derivs)(
-             double, double[], double[], void* parameters_and_workspace, ErrorMsg error_message),
+         int (*derivs)(double, double[], double[], void*),
          void* parameters_and_workspace_for_derivs,
          struct generic_integrator_workspace* pgi) {
   int i;
@@ -117,9 +105,7 @@ int rkqs(double* x,
 
   h = htry;
   for (;;) {
-    class_call(rkck(*x, h, derivs, parameters_and_workspace_for_derivs, pgi),
-               pgi->error_message,
-               pgi->error_message);
+    rkck(*x, h, derivs, parameters_and_workspace_for_derivs, pgi);
     errmax = 0.0;
     for (i = 0; i < pgi->n; i++)
       errmax = MAX(errmax, fabs(pgi->yerr[i] / pgi->yscal[i]));
@@ -144,8 +130,7 @@ int rkqs(double* x,
 
 int rkck(double x,
          double h,
-         int (*derivs)(
-             double, double[], double[], void* parameters_and_workspace, ErrorMsg error_message),
+         int (*derivs)(double, double[], double[], void*),
          void* parameters_and_workspace_for_derivs,
          struct generic_integrator_workspace* pgi) {
   int i;
@@ -153,61 +138,31 @@ int rkck(double x,
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + _RKCK_b21_ * h * pgi->dydx[i];
 
-  class_call((*derivs)(x + _RKCK_a2_ * h,
-                       pgi->ytemp,
-                       pgi->ak2,
-                       parameters_and_workspace_for_derivs,
-                       pgi->error_message),
-             pgi->error_message,
-             pgi->error_message);
+  (*derivs)(x + _RKCK_a2_ * h, pgi->ytemp, pgi->ak2, parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b31_ * pgi->dydx[i] + _RKCK_b32_ * pgi->ak2[i]);
 
-  class_call((*derivs)(x + _RKCK_a3_ * h,
-                       pgi->ytemp,
-                       pgi->ak3,
-                       parameters_and_workspace_for_derivs,
-                       pgi->error_message),
-             pgi->error_message,
-             pgi->error_message);
+  (*derivs)(x + _RKCK_a3_ * h, pgi->ytemp, pgi->ak3, parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b41_ * pgi->dydx[i] + _RKCK_b42_ * pgi->ak2[i] +
                                      _RKCK_b43_ * pgi->ak3[i]);
 
-  class_call((*derivs)(x + _RKCK_a4_ * h,
-                       pgi->ytemp,
-                       pgi->ak4,
-                       parameters_and_workspace_for_derivs,
-                       pgi->error_message),
-             pgi->error_message,
-             pgi->error_message);
+  (*derivs)(x + _RKCK_a4_ * h, pgi->ytemp, pgi->ak4, parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b51_ * pgi->dydx[i] + _RKCK_b52_ * pgi->ak2[i] +
                                      _RKCK_b53_ * pgi->ak3[i] + _RKCK_b54_ * pgi->ak4[i]);
 
-  class_call((*derivs)(x + _RKCK_a5_ * h,
-                       pgi->ytemp,
-                       pgi->ak5,
-                       parameters_and_workspace_for_derivs,
-                       pgi->error_message),
-             pgi->error_message,
-             pgi->error_message);
+  (*derivs)(x + _RKCK_a5_ * h, pgi->ytemp, pgi->ak5, parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b61_ * pgi->dydx[i] + _RKCK_b62_ * pgi->ak2[i] +
                                      _RKCK_b63_ * pgi->ak3[i] + _RKCK_b64_ * pgi->ak4[i] +
                                      _RKCK_b65_ * pgi->ak5[i]);
 
-  class_call((*derivs)(x + _RKCK_a6_ * h,
-                       pgi->ytemp,
-                       pgi->ak6,
-                       parameters_and_workspace_for_derivs,
-                       pgi->error_message),
-             pgi->error_message,
-             pgi->error_message);
+  (*derivs)(x + _RKCK_a6_ * h, pgi->ytemp, pgi->ak6, parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_c1_ * pgi->dydx[i] + _RKCK_c3_ * pgi->ak3[i] +

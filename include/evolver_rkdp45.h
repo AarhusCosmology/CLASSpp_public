@@ -13,8 +13,7 @@ extern "C" {
 #endif
 
 int evolver_rkdp45(
-    int (*derivs)(
-        double x, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message),
+    int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
     double x_ini,
     double x_end,
     double* y,
@@ -23,20 +22,12 @@ int evolver_rkdp45(
     void* parameters_and_workspace_for_derivs,
     double tolerance,
     double minimum_variation,
-    int (*evaluate_timescale)(
-        double x, void* parameters_and_workspace, double* timescale, ErrorMsg error_message),
+    int (*evaluate_timescale)(double x, void* parameters_and_workspace, double* timescale),
     double timestep_over_timescale,
     double* x_sampling,
     int x_size,
-    int (*output)(double x,
-                  double y[],
-                  double dy[],
-                  int index_x,
-                  void* parameters_and_workspace,
-                  ErrorMsg error_message),
-    int (*print_variables)(
-        double x, double y[], double dy[], void* parameters_and_workspace, ErrorMsg error_message),
-    ErrorMsg error_message);
+    int (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
+    int (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace));
 
 #ifdef __cplusplus
 }

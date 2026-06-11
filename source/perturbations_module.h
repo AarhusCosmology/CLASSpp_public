@@ -279,35 +279,29 @@ class PerturbationsModule : public BaseModule {
   int perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);
   int perturb_einstein(int index_md, double k, double tau, double* y, perturb_workspace* ppw);
   int perturb_total_stress_energy(int index_md, double k, double* y, perturb_workspace* ppw);
-  int perturb_timescale_member(double tau,
-                               void* parameters_and_workspace,
-                               double* timescale,
-                               ErrorMsg error_message);
-  static int perturb_timescale(double tau,
-                               void* parameters_and_workspace,
-                               double* timescale,
-                               ErrorMsg error_message);
+  int perturb_timescale_member(double tau, void* parameters_and_workspace, double* timescale);
+  static int perturb_timescale(double tau, void* parameters_and_workspace, double* timescale);
   int perturb_sources_member(double tau,
                              double* pvecperturbations,
                              double* pvecderivs,
                              int index_tau,
-                             void* parameters_and_workspace,
-                             ErrorMsg error_message);
+                             void* parameters_and_workspace);
   static int perturb_sources(double tau,
                              double* pvecperturbations,
                              double* pvecderivs,
                              int index_tau,
-                             void* parameters_and_workspace,
-                             ErrorMsg error_message);
-  int perturb_print_variables_member(
-      double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  static int perturb_print_variables(
-      double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  int perturb_derivs_member(
-      double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  static int perturb_derivs(
-      double tau, double* y, double* dy, void* parameters_and_workspace, ErrorMsg error_message);
-  int perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace, ErrorMsg error_message);
+                             void* parameters_and_workspace);
+  int perturb_print_variables_member(double tau,
+                                     double* y,
+                                     double* dy,
+                                     void* parameters_and_workspace);
+  static int perturb_print_variables(double tau,
+                                     double* y,
+                                     double* dy,
+                                     void* parameters_and_workspace);
+  int perturb_derivs_member(double tau, double* y, double* dy, void* parameters_and_workspace);
+  static int perturb_derivs(double tau, double* y, double* dy, void* parameters_and_workspace);
+  int perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace);
   int perturb_rsa_delta_and_theta(
       double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
   int perturb_rsa_idr_delta_and_theta(

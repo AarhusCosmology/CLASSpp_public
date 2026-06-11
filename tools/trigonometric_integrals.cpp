@@ -6,7 +6,7 @@
 #include "trigonometric_integrals.h"
 
 /** this is the Cosine Integral function Ci(x) */
-int cosine_integral(double x, double* Ci, ErrorMsg error_message) {
+int cosine_integral(double x, double* Ci) {
   double x2, y, f, g, ci8;
   double em_const = 0.577215664901532861e0;
 
@@ -83,7 +83,7 @@ int cosine_integral(double x, double* Ci, ErrorMsg error_message) {
 }
 
 /** this is the Sine Integral function Si(x) */
-int sine_integral(double x, double* Si, ErrorMsg error_message) {
+int sine_integral(double x, double* Si) {
   double x2, y, f, g, si8;
   double pi8 = 3.1415926535897932384626433;
 
