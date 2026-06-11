@@ -513,8 +513,14 @@ class DumpIniFiles(TestClass):
             return
         path = os.path.join(self.faulty_figs_path, self.name)
         self.store_ini_file(path)
-        self.scenario.update({'gauge':'Newtonian'})
-        self.store_ini_file(path + 'N')
+        # The scalar field (scf) has no valid Newtonian counterpart: the
+        # Newtonian-gauge Klein-Gordon source is incomplete and is intentionally
+        # rejected (see TestScenario.test_scenario's scf_present guard). Emitting
+        # an N-variant here would produce an .ini that is guaranteed to throw
+        # under Valgrind, so skip it.
+        if 'Omega_scf' not in self.scenario:
+            self.scenario.update({'gauge':'Newtonian'})
+            self.store_ini_file(path + 'N')
 
 
 @pytest.mark.test_scenario

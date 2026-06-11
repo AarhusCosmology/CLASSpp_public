@@ -6,7 +6,78 @@
  */
 
 #include "hyperspherical.h"
+
+#include <algorithm>
 #define REFINE 10
+
+namespace {
+
+double stable_sinc(double arg) {
+  double arg2 = arg * arg;
+  if (fabs(arg) < 1e-4) {
+    double arg4 = arg2 * arg2;
+    return 1.0 - arg2 / 6.0 + arg4 / 120.0;
+  }
+  return sin(arg) / arg;
+}
+
+double stable_sinc_minus_cos(double arg) {
+  double arg2 = arg * arg;
+  if (fabs(arg) < 1e-3) {
+    double arg4 = arg2 * arg2;
+    return arg2 / 3.0 - arg4 / 30.0 + arg4 * arg2 / 840.0;
+  }
+  return stable_sinc(arg) - cos(arg);
+}
+
+void hyperspherical_phi01_exact(
+    int K, double beta, double x, double sinK, double cotK, double* phi0, double* phi1) {
+  double beta2 = beta * beta;
+  double arg   = beta * x;
+  double arg2  = arg * arg;
+  double sinc  = stable_sinc(arg);
+
+  if (K == 0) {
+    *phi0 = sinc;
+    if (fabs(arg) <= 1e-3) {
+      double arg4 = arg2 * arg2;
+      *phi1       = arg * (1.0 / 3.0 - arg2 / 30.0 + arg4 / 840.0);
+    }
+    else {
+      *phi1 = stable_sinc_minus_cos(arg) / arg;
+    }
+    return;
+  }
+
+  double root1 = sqrt(std::max(0.0, beta2 - (double) K));
+  if (fabs(x) < 1e-4) {
+    double x2 = x * x;
+    double x4 = x2 * x2;
+    if (fabs(arg) < 1e-4) {
+      *phi0 = 1.0 - x2 * (beta2 - K) / 6.0;
+      *phi1 = x * root1 / 3.0 * (1.0 - (3.0 * beta2 - 7.0 * K) * x2 / 30.0);
+      return;
+    }
+
+    double chi_over_sin = 1.0 + K * x2 / 6.0 + 7.0 * x4 / 360.0;
+    double chi_cot_m1   = -K * x2 / 3.0 - x4 / 45.0;
+    *phi0               = sinc * chi_over_sin;
+    *phi1 = (stable_sinc_minus_cos(arg) + sinc * chi_cot_m1) * chi_over_sin / (root1 * x);
+    return;
+  }
+
+  double chi_over_sin = x / sinK;
+  double chi_cot_m1   = x * cotK - 1.0;
+  *phi0               = sinc * chi_over_sin;
+  if (root1 > 0.0) {
+    *phi1 = (stable_sinc_minus_cos(arg) + sinc * chi_cot_m1) * chi_over_sin / (root1 * x);
+  }
+  else {
+    *phi1 = 0.0;
+  }
+}
+
+}  // namespace
 
 int hyperspherical_HIS_create(int K,
                               double beta,
@@ -555,8 +626,7 @@ int hyperspherical_forwards_recurrence(int K,
                                        double* one_over_sqrtK,
                                        double* PhiL) {
   int l;
-  PhiL[0] = 1.0 / beta * sin(beta * x) / sinK;
-  PhiL[1] = PhiL[0] * (cotK - beta / tan(beta * x)) * one_over_sqrtK[1];
+  hyperspherical_phi01_exact(K, beta, x, sinK, cotK, PhiL, PhiL + 1);
   for (l = 2; l <= lmax; l++) {
     PhiL[l] = ((2 * l - 1) * cotK * PhiL[l - 1] - PhiL[l - 2] * sqrtK[l - 1]) * one_over_sqrtK[l];
   }
@@ -576,9 +646,13 @@ int hyperspherical_forwards_recurrence_chunk(int K,
   int l;
   int index_x;
   for (index_x = 0; index_x < chunk; index_x++) {
-    PhiL[index_x]         = 1.0 / beta * sin(beta * x[index_x]) / sinK[index_x];
-    PhiL[chunk + index_x] = PhiL[index_x] * (cotK[index_x] - beta / tan(beta * x[index_x])) *
-                            one_over_sqrtK[1];
+    hyperspherical_phi01_exact(K,
+                               beta,
+                               x[index_x],
+                               sinK[index_x],
+                               cotK[index_x],
+                               PhiL + index_x,
+                               PhiL + chunk + index_x);
   }
   for (l = 2; l <= lmax; l++) {
     for (index_x = 0; index_x < chunk; index_x++)
@@ -598,10 +672,11 @@ int hyperspherical_backwards_recurrence(int K,
                                         double* sqrtK,
                                         double* one_over_sqrtK,
                                         double* PhiL) {
-  double phi0, phi1, phipr1 = 0.0, phi, phi_plus_1_times_sqrtK, phi_minus_1, scaling;
+  double phi0_exact, phi1_exact, phi_top, phipr1 = 0.0, phi, phi_plus_1_times_sqrtK, phi_minus_1,
+                                          phi1_down = 0.0, phi0_down, scaling;
   int l, k, isign;
   int funcreturn = _FAILURE_;
-  phi0           = sin(beta * x) / (beta * sinK);
+  hyperspherical_phi01_exact(K, beta, x, sinK, cotK, &phi0_exact, &phi1_exact);
 
   //printf("in backwards. x = %g\n",x);
   if (K == 1) {
@@ -611,19 +686,19 @@ int hyperspherical_backwards_recurrence(int K,
     if (funcreturn == _FAILURE_) {
       CF1_from_Gegenbauer(lmax, (int) (beta + 0.2), sinK, cotK, &phipr1);
     }
-    phi1 = 1.0;
+    phi_top = 1.0;
   }
   else {
     get_CF1(K, lmax, beta, cotK, &phipr1, &isign);
-    phi1    = isign;
-    phipr1 *= phi1;
-    //printf("isign = %d, phi1 = %g, phipr1 = %g\n",isign,phi1,phipr1);
+    phi_top  = isign;
+    phipr1  *= phi_top;
+    //printf("isign = %d, phi_top = %g, phipr1 = %g\n",isign,phi_top,phipr1);
   }
 
-  PhiL[lmax] = phi1;
-  phi        = phi1;
+  PhiL[lmax] = phi_top;
+  phi        = phi_top;
   //  phi_plus_1 = 1/sqrtK[lmax+1]*(lmax*cotK*phi1-phipr1);
-  phi_plus_1_times_sqrtK = lmax * cotK * phi1 - phipr1;
+  phi_plus_1_times_sqrtK = lmax * cotK * phi_top - phipr1;
 
   int l_ini, l_align;
   l_align = lmax - lmax % _HYPER_BLOCK_;
@@ -632,6 +707,8 @@ int hyperspherical_backwards_recurrence(int K,
   for (l = lmax; l > l_align; l--) {
     //    phi_minus_1 = ( (2*l+1)*cotK*phi-phi_plus_1_times_sqrtK )/sqrtK[l];
     phi_minus_1 = ((2 * l + 1) * cotK * phi - phi_plus_1_times_sqrtK) * one_over_sqrtK[l];
+    if (l == 1)
+      phi1_down = phi;
     phi_plus_1_times_sqrtK = phi * sqrtK[l];
     phi                    = phi_minus_1;
     PhiL[l - 1]            = phi;
@@ -640,6 +717,8 @@ int hyperspherical_backwards_recurrence(int K,
     for (l = l_ini; l > (l_ini - _HYPER_BLOCK_); l--) {
       //    phi_minus_1 = ( (2*l+1)*cotK*phi-phi_plus_1_times_sqrtK )/sqrtK[l];
       phi_minus_1 = ((2 * l + 1) * cotK * phi - phi_plus_1_times_sqrtK) * one_over_sqrtK[l];
+      if (l == 1)
+        phi1_down = phi;
       phi_plus_1_times_sqrtK = phi * sqrtK[l];
       phi                    = phi_minus_1;
       PhiL[l - 1]            = phi;
@@ -650,6 +729,7 @@ int hyperspherical_backwards_recurrence(int K,
       //Rescale whole Phi vector until this point:
       for (k = l; k <= lmax; k++)
         PhiL[k] *= _ONE_OVER_HYPER_OVERFLOW_;
+      phi1_down *= _ONE_OVER_HYPER_OVERFLOW_;
     }
   }
 
@@ -670,7 +750,26 @@ int hyperspherical_backwards_recurrence(int K,
     }
   }
   */
-  scaling = phi0 / phi;
+  phi0_down = phi;
+  // Antony Lewis highlighted exact-angle failures at chi = pi/4 and pi/2 in
+  // https://github.com/lesgourg/class_public/issues/662. When phi0 is tiny at
+  // those points, normalize Miller recurrence with the safer exact phi1 seed.
+  if (fabs(phi0_exact) >= fabs(phi1_exact)) {
+    if (fabs(phi0_down) > 1e-280) {
+      scaling = phi0_exact / phi0_down;
+    }
+    else {
+      scaling = phi1_exact / phi1_down;
+    }
+  }
+  else {
+    if (fabs(phi1_down) > 1e-280) {
+      scaling = phi1_exact / phi1_down;
+    }
+    else {
+      scaling = phi0_exact / phi0_down;
+    }
+  }
   for (k = 0; k <= lmax; k++)
     PhiL[k] *= scaling;
   return _SUCCESS_;
@@ -686,11 +785,11 @@ int hyperspherical_backwards_recurrence_chunk(int K,
                                               double* sqrtK,
                                               double* one_over_sqrtK,
                                               double* PhiL) {
-  double phi0, phi1, phipr1 = 0.0;
+  double phi0_exact, phi1_exact, phi_top, phipr1 = 0.0;
   int l, k, isign;
   int funcreturn = _FAILURE_;
   int index_x;
-  double scalevec[_HYPER_CHUNK_] = {0};
+  double scalevec[_HYPER_CHUNK_] = {0}, phi1_down[_HYPER_CHUNK_] = {0};
 
   for (index_x = 0; index_x < chunk; index_x++) {
     if (K == 1) {
@@ -700,17 +799,17 @@ int hyperspherical_backwards_recurrence_chunk(int K,
       if (funcreturn == _FAILURE_) {
         CF1_from_Gegenbauer(lmax, (int) (beta + 0.2), sinK[index_x], cotK[index_x], &phipr1);
       }
-      phi1 = 1.0;
+      phi_top = 1.0;
     }
     else {
       get_CF1(K, lmax, beta, cotK[index_x], &phipr1, &isign);
-      phi1    = isign;
-      phipr1 *= phi1;
+      phi_top  = isign;
+      phipr1  *= phi_top;
     }
 
-    PhiL[lmax * chunk + index_x]       = phi1;
+    PhiL[lmax * chunk + index_x]       = phi_top;
     PhiL[(lmax - 1) * chunk + index_x] = one_over_sqrtK[lmax] *
-                                         ((lmax + 1) * cotK[index_x] * phi1 + phipr1);
+                                         ((lmax + 1) * cotK[index_x] * phi_top + phipr1);
   }
   for (l = lmax - 2; l >= 0; l--) {
     //Use recurrence Phi_{l} = --Phi_{l+1} + -- Phi_{l+2}
@@ -718,6 +817,8 @@ int hyperspherical_backwards_recurrence_chunk(int K,
       PhiL[l * chunk + index_x] = one_over_sqrtK[l + 1] *
                                   ((2 * l + 3) * cotK[index_x] * PhiL[(l + 1) * chunk + index_x] -
                                    sqrtK[l + 2] * PhiL[(l + 2) * chunk + index_x]);
+      if (l == 0)
+        phi1_down[index_x] = PhiL[chunk + index_x];
     }
 
     /* Check if any entry in the chunk has overflowed — the original code only
@@ -739,11 +840,35 @@ int hyperspherical_backwards_recurrence_chunk(int K,
           PhiL[k * chunk + index_x] *= scalevec[index_x];
         }
       }
+      for (index_x = 0; index_x < chunk; index_x++) {
+        phi1_down[index_x] *= scalevec[index_x];
+      }
     }
   }
   for (index_x = 0; index_x < chunk; index_x++) {
-    phi0              = sin(beta * x[index_x]) / (beta * sinK[index_x]);
-    scalevec[index_x] = phi0 / PhiL[index_x];
+    hyperspherical_phi01_exact(K,
+                               beta,
+                               x[index_x],
+                               sinK[index_x],
+                               cotK[index_x],
+                               &phi0_exact,
+                               &phi1_exact);
+    if (fabs(phi0_exact) >= fabs(phi1_exact)) {
+      if (fabs(PhiL[index_x]) > 1e-280) {
+        scalevec[index_x] = phi0_exact / PhiL[index_x];
+      }
+      else {
+        scalevec[index_x] = phi1_exact / phi1_down[index_x];
+      }
+    }
+    else {
+      if (fabs(phi1_down[index_x]) > 1e-280) {
+        scalevec[index_x] = phi1_exact / phi1_down[index_x];
+      }
+      else {
+        scalevec[index_x] = phi0_exact / PhiL[index_x];
+      }
+    }
   }
   for (k = 0; k <= lmax; k++) {
     for (index_x = 0; index_x < chunk; index_x++) {
