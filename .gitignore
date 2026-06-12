@@ -17,25 +17,18 @@ RealSpaceInterface/cache/
 .DS_Store
 doc/manual/html
 doc/manual/latex
-ppCLASS.xcodeproj/project.xcworkspace
-ppCLASS.xcodeproj/xcshareddata
-ppCLASS.xcodeproj/xcuserdata
 include/tmp
 python/classy.cpp
 .ipynb_checkpoints/*
 python/cclassy.pxd
 python/faulty_figs
 .ipynb_checkpoints
-CLASS.xcodeproj/project.xcworkspace/xcuserdata
-CLASS.xcodeproj/project.xcworkspace/contents.xcworkspacedata
-CLASS.xcodeproj/xcshareddata/xcschemes/CLASS.xcscheme
 classy.cpp
 classy_community.egg-info/
 dist/
 *.so
 *.bak
 *.bat
-CLASS.xcodeproj/xcuserdata/
 main/class.c
 cclassy.pxd
 
@@ -46,3 +39,4 @@ classy_community_ref.egg-info/
 
 # Local bit-identical baseline (machine-specific, never commit)
 python/baseline/
+build-xcode/

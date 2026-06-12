@@ -4,11 +4,18 @@
 # In[1]:
 
 
+import argparse
 import os
-import subprocess
 import pathlib
 
 rootdir = pathlib.Path(__file__).parent
+
+_argparser = argparse.ArgumentParser(description='Generate cclassy.pxd from the C++ headers.')
+_argparser.add_argument('--output-dir', type=pathlib.Path, default=rootdir,
+                        help='Directory to write cclassy.pxd into (default: repo root).')
+# parse_known_args: tolerate being run via runpy with foreign argv.
+_args, _ = _argparser.parse_known_args()
+outdir = _args.output_dir
 
 
 def read_header_lines(path):
@@ -63,14 +70,9 @@ def is_comment_only_line(line):
             stripped.startswith('//@'))
 
 h_files = []
-ignored_dirs = {'.git', '.worktrees', 'worktrees', '__pycache__'}
-for subdir, dirs, files in os.walk(rootdir):
-    dirs[:] = [d for d in dirs if d not in ignored_dirs]
-    for file in files:
-        ext = os.path.splitext(file)[-1].lower()
-        if ext != '.h':
-            continue
-        h_files.append(os.path.join(subdir, file))
+header_dirs = ['include', 'main', 'source', 'species', 'tools']
+for d in header_dirs:
+    h_files.extend(sorted((rootdir / d).glob('*.h')))
 
 
 # In[2]:
@@ -187,10 +189,6 @@ struct_names = [
 allowed_types = ['double', 'int', 'short', 'std::string']
 
 for file in h_files:
-    # Special treatment of common.h
-    if file == 'common.h':
-        subprocess.run(['gcc', '-E', rootdir+'/include/common.h','-o', rootdir+'/include/tmp'])
-        file = rootdir+'/include/tmp'
     file_lines = read_header_lines(file)
     struct_found = False
     index_line = 0
@@ -405,7 +403,7 @@ for m in modules:
 
 # In[8]:
 
-with open(rootdir / 'cclassy.pxd', 'w', encoding='utf-8') as fid:
+with open(outdir / 'cclassy.pxd', 'w', encoding='utf-8') as fid:
     fid.write(preample)
     for lines in [enums, structs, classes]:
         # Replace defined variables:

@@ -1,123 +1,33 @@
-#Some Makefile for CLASS.
-#Julien Lesgourgues, 28.11.2011
+# Thin convenience shim. The build system is CMakeLists.txt; see README.md.
+BUILD_DIR ?= build/cmake
 
-MDIR := $(shell pwd)
-WRKDIR = $(MDIR)/build
+.PHONY: all class class_profiled classy test test-parser test-bisection test-photons clean
 
-.base:
-	if ! [ -e $(WRKDIR) ]; then mkdir $(WRKDIR) ; mkdir $(WRKDIR)/lib; fi;
-	touch build/.base
+# The real parallelism happens inside `cmake --build --parallel`; serialize
+# the shim targets so `make -j class class_profiled` cannot run two CMake
+# builds in the same build directory at once.
+.NOTPARALLEL:
 
-vpath %.h source:tools:main:include:species
-vpath %.c source:tools:main
-vpath %.cpp source:tools:main:species
-vpath %.o build
-vpath %.opp build
-vpath .base build
+all: class
 
-########################################################
-###### LINES TO ADAPT TO YOUR PLATEFORM ################
-########################################################
+$(BUILD_DIR)/CMakeCache.txt:
+	cmake -S . -B $(BUILD_DIR)
 
-# your C compiler:
-CC        = gcc
-CXX       = g++
+class class_profiled test-parser test-bisection test-photons: $(BUILD_DIR)/CMakeCache.txt
+	cmake --build $(BUILD_DIR) --target $@ --parallel
 
-# Optimization flag. The default uses -O3 which auto-vectorizes using the
-# baseline SIMD for your architecture (SSE2 on x86-64, NEON on ARM64).
-# On heterogeneous clusters where the build host may differ from the compute
-# nodes, avoid -march=native to prevent illegal-instruction crashes.
-# To enable AVX2+FMA (available on all x86 nodes since ~2015, 256-bit SIMD):
-#   make SIMD_FLAGS="-mavx2 -mfma"
-SIMD_FLAGS ?=
-OPTFLAG = -O3 $(SIMD_FLAGS) #-ffast-math
+# Single cmake invocation so `make -j test` cannot race parallel builds
+# of the same build directory.
+test: $(BUILD_DIR)/CMakeCache.txt
+	cmake --build $(BUILD_DIR) --target test-parser --target test-bisection --target test-photons --parallel
+	ctest --test-dir $(BUILD_DIR) --output-on-failure
 
-# all other compilation flags
-CCFLAG = -g -fPIC
-CXXFLAG = $(CCFLAG) -std=c++17
-LDFLAG = -g -fPIC
-LIBRARIES = -lm -lpthread
-
-# leave blank to compile without HyRec, or put path to HyRec directory
-# (with no slash at the end: e.g. hyrec or ../hyrec)
-HYREC = hyrec
-
-########################################################
-###### IN PRINCIPLE THE REST SHOULD BE LEFT UNCHANGED ##
-########################################################
-
-# pass current working directory to the code
-CCFLAG += -D__CLASSDIR__='"$(MDIR)"'
-
-# where to find include files *.h
-INCLUDES = -I../include -I../tools -I../source -I../
-
-# automatically add external programs if needed. First, initialize to blank.
-EXTERNAL =
-
-# eventually update flags for including HyRec
-ifneq ($(HYREC),)
-vpath %.c $(HYREC)
-CCFLAG += -DHYREC
-#LDFLAGS += -DHYREC
-INCLUDES += -I../hyrec
-EXTERNAL += hyrectools.o helium.o hydrogen.o history.o
-endif
-.SUFFIXES: .c .cpp .o .opp .h
-
-# We could let gcc generate dependency information automatically, see this link:
-# https://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
-# However, a clean build of CLASS is so fast that we just rebuild everything if *any*
-# .h-file changed.
-H_ALL = $(notdir $(wildcard include/*.h) $(wildcard tools/*.h) $(wildcard source/*.h) $(wildcard species/*.h))
-
-%.o: %.c .base $(H_ALL)
-	cd $(WRKDIR);$(CC) $(OPTFLAG) $(CCFLAG) $(INCLUDES) -c ../$< -o $*.o
-
-%.opp: %.cpp .base $(H_ALL)
-	cd $(WRKDIR); $(CXX) $(OPTFLAG) $(CXXFLAG) $(INCLUDES) -c ../$< -o $*.opp
-
-TOOLS = dei_rkck.opp sparse.opp evolver_rkck.opp arrays.opp parser.opp quadrature.opp hyperspherical.opp common.opp trigonometric_integrals.opp exceptions.opp evolver_ndf15.opp evolver_rkdp45.opp
-
-SPECIES_OPP = base_species.opp cdm.opp photons.opp baryons.opp lambda.opp ultra_relativistic.opp fluid.opp dcdm.opp dark_radiation_species.opp ncdm_base_species.opp ncdm_species.opp ncdm_interacting_species.opp scalar_field.opp interacting_species.opp composite_species.opp species_collection.opp species_input.opp dcdm_dr_species.opp idm_dr_idr_species.opp idm_drmd_idr_drmd_species.opp dncdm_species.opp dncdm_dr_species.opp perturb_column_writer.opp greybody_ncdm_species.opp
-
-SOURCE = input_module.opp background_module.opp thermodynamics_module.opp perturbations_module.opp primordial_module.opp nonlinear_module.opp transfer_module.opp spectra_module.opp lensing_module.opp cosmology.opp
-
-OUTPUT = output_module.opp
-
-CLASS = class.opp
-CLASS_PROFILED = class_profiled.opp
-
-all: class classy
-
-# Use following line for faster installation if build dependencies (Cython, setuptools, numpy,..) are already installed:
-# pip install --no-build-isolation 
-# The Python one-liner below renames the compiled library to include the Python version number. This is neccessary
-# due to bug introduced in MontePython 3.6, see https://github.com/brinckmann/montepython_public/issues/371
-
+# Builds + installs classy via pip (scikit-build-core -> CMake), then recreates
+# the python/build/lib.* layout MontePython expects.
 classy:
-	rm -rf python/build && mkdir python/build
+	rm -rf python/build && mkdir -p python/build
 	pip install .
-	cp -r build/lib* python/build
-	python -c 'import sys; import os; import glob; \
-file=glob.glob(os.path.join("python/build", "lib.*"))[0]; \
-new_file=file.replace("lib.", "lib." + sys.version + "."); \
-os.rename(file, new_file)'
+	python scripts/montepython_layout.py
 
-class: $(TOOLS) $(SPECIES_OPP) $(SOURCE) $(EXTERNAL) $(OUTPUT) $(CLASS)
-	$(CXX) $(OPTFLAG) $(LDFLAG) -o class $(addprefix build/,$(notdir $^)) $(LIBRARIES)
-
-class_profiled: $(TOOLS) $(SPECIES_OPP) $(SOURCE) $(EXTERNAL) $(OUTPUT) $(CLASS_PROFILED)
-	$(CXX) $(OPTFLAG) $(LDFLAG) -o class_profiled $(addprefix build/,$(notdir $^)) $(LIBRARIES)
-
-clean: .base
-	rm -rf $(WRKDIR);
-
-test-parser: parser.opp common.opp exceptions.opp trigonometric_integrals.opp species_input.opp
-	$(CXX) $(OPTFLAG) $(CXXFLAG) -Iinclude -Itools -Isource -I. tools/parser_test.cpp $(addprefix build/,$(notdir $^)) -o test-parser $(LIBRARIES)
-
-test-bisection:
-	$(CXX) $(OPTFLAG) $(CXXFLAG) -Iinclude -Itools -Isource -I. tools/bisection_test.cpp -o test-bisection $(LIBRARIES)
-
-test-photons: photons.opp base_species.opp perturb_column_writer.opp
-	$(CXX) $(OPTFLAG) $(CXXFLAG) -Iinclude -Itools -Isource -Ispecies -I. species/photons_formula_test.cpp $(addprefix build/,$(notdir $^)) -o test-photons $(LIBRARIES)
+clean:
+	rm -rf $(BUILD_DIR)

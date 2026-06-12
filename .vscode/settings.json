@@ -1,0 +1,11 @@
+{
+  "cmake.buildDirectory": "${workspaceFolder}/build/cmake",
+  "cmake.debugConfig": {
+    "args": ["explanatory.ini"],
+    "cwd": "${workspaceFolder}"
+  },
+  "cmake.runConfig": {
+    "args": ["explanatory.ini"],
+    "cwd": "${workspaceFolder}"
+  }
+}

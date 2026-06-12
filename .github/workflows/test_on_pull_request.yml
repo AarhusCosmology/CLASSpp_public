@@ -29,9 +29,14 @@ jobs:
       run: |
         source venv/bin/activate
         cd ref_class
-        sed -i.bak "s/Extension('classy'/Extension('classyref'/g" setup.py
         sed -i.bak 's/"classy-community"/"classy-community-ref"/g' pyproject.toml
-        pip install .
+        if [ -f setup.py ]; then
+          # Pre-CMake master: rename the extension in setup.py.
+          sed -i.bak "s/Extension('classy'/Extension('classyref'/g" setup.py
+          pip install .
+        else
+          pip install . --config-settings=cmake.define.CLASS_PYTHON_MODULE_NAME=classyref
+        fi
         deactivate
     - name: Testing 🤖
       run: |

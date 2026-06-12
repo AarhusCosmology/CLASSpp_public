@@ -28,55 +28,53 @@ That said, the benefits of Rust compared to C++ are primarily in multithreaded c
 
 Regarding other languages, anyone are encouraged to write a new Einstein--Boltzmann solver!
 
-## Installation
+## Installing the Python wrapper
 
 To install CLASS for use exclusively through the Python wrapper `classy`, use one of the following options:
 
-1. **Installation from PyPI:**  
+1. **Installation from PyPI:**
 ```
 pip install classy-community
 ```
-2. **Installation from GitHub:**  
+2. **Installation from GitHub:**
 ```
 pip install 'classy-community @ git+https://github.com/AarhusCosmology/CLASSpp_public.git'
-```  
-or  
+```
+or
 ```
 pip install 'classy-community @ git+https://github.com/AarhusCosmology/CLASSpp_public.git@5d8b27678fae945080080cdaeb3a40857fa49deb'
-```  
+```
 for a specific version.
-3. **Installation from sources:**  
+3. **Installation from sources:**
 ```
 git clone https://github.com/AarhusCosmology/CLASSpp_public
 pip install .
 ```
 
-On MacOS and Anaconda, the path to the archiver `ar` can be wrong. *If you get an error*, do
+## Building
 
-```bash
-export AR=/usr/bin/ar
-```
-and try again.
+CLASS uses CMake. Quick start:
 
-## Installing the command line application:
-If you want to run CLASS from the command line, you need to clone the repository and build the executable using one of the following two options:
+    make class          # CLI binary ./class (thin shim around CMake)
+    make classy         # Python wrapper: pip install . + MontePython layout
+    make test           # C++ unit tests via CTest
 
-1. **Build using GNU Make:**  
-```
-make -j
-```  
-Optionally modify the Makefile to specify compiler flags etc.
-2. **Build using Xcode command-line tools on MacOS:**  
-```
-xcodebuild -configuration Release SYMROOT=$PWD
-```  
-or  
-```
-xcodebuild -configuration Debug SYMROOT=$PWD
-```  
-for the debug build. The executable `class` will be stored in `./Release/` and `./Debug/` respectively. Consider copying/moving it to the project root.
-3. **Build using Xcode GUI:**  
-The code can be build, profiled and debugged using Xcode by opening the project file.
+or directly:
+
+    cmake -S . -B build/cmake && cmake --build build/cmake --parallel
+    pip install .       # Python wrapper (scikit-build-core)
+
+For faster repeated Python installs with build dependencies preinstalled
+(cython, numpy, scikit-build-core): `pip install --no-build-isolation .`
+
+IDE projects are generated, not committed:
+
+    cmake -S . -B build-xcode -G Xcode    # Xcode (run schemes are preconfigured
+                                          # to run from the repo root with
+                                          # explanatory.ini)
+
+VS Code: install the CMake Tools extension; .vscode/settings.json already
+points it at build/cmake and sets the launch args/cwd.
 
 
 To check that the code runs, type:

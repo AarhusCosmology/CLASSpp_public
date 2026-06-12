@@ -11,10 +11,14 @@ jobs:
       uses: actions/checkout@v4
       with:
         path: main_class
+    - name: cmake version
+      run: cmake --version
     - name: make
-      run: cd main_class && make -j class
+      run: cd main_class && make class
     - name: run class
       run: cd main_class && ./class explanatory.ini
+    - name: unit tests
+      run: cd main_class && make test
 
   test_classy:
     runs-on:

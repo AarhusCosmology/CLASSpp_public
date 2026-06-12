@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools", "wheel", "Cython", "numpy"]
+requires = ["scikit-build-core>=0.11", "cython>=3.0", "numpy"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "classy-community"
@@ -9,7 +10,8 @@ authors = [
 ]
 description = "Python interface to the C++ community-edition of the cosmological Boltzmann code CLASS"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
+license-files = ["COPYING.txt", "LICENSE.txt", "AUTHORS.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -19,3 +21,27 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/AarhusCosmology/CLASSpp_public"
 "Bug Tracker" = "https://github.com/AarhusCosmology/CLASSpp_public/issues"
+
+[tool.scikit-build]
+cmake.version = ">=3.21"
+wheel.packages = []
+# sdist: scikit-build-core includes the source tree minus .gitignore matches.
+# Exclude local clutter that is not gitignored; everything the build needs
+# (sources, headers, generate_wrapper.py, classy.pyx, bbn/hyrec data,
+# CMakeLists.txt) is included by default. /scripts stays in: the sdist ships
+# the Makefile, whose classy target calls scripts/montepython_layout.py.
+sdist.exclude = [
+  "/doc",
+  "/docs",
+  "/notebooks",
+  "/test",
+  "/python",
+  "/.claude",
+  "/.github/copilot-instructions.md",
+  "/new-build-system-kickoff.md",
+  "/test-greybody-moments",
+  "/test-photons",
+  "/CPU",
+  "*.dSYM",
+  "*.ipynb",
+]
