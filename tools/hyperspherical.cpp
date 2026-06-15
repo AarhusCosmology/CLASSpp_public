@@ -79,23 +79,17 @@ void hyperspherical_phi01_exact(
 
 }  // namespace
 
-int hyperspherical_HIS_create(int K,
-                              double beta,
-                              int nl,
-                              int* lvec,
-                              double xmin,
-                              double xmax,
-                              double sampling,
-                              int l_WKB,
-                              double phiminabs,
-                              HyperInterpStruct* pHIS) {
-  /** Allocate storage for Hyperspherical Interpolation Structure (HIS).
-      Then, compute the values of Phi and dPhi and complete the interpolation
-      structure.
-      Change to accomodate shared memory approach: Allocate all memory in a
-      single call, and return the pointer as ppHIS. All pointers inside are
-      then relative to ppHIS.
-  */
+HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K,
+                                                                           double beta,
+                                                                           int nl,
+                                                                           const int* lvec,
+                                                                           double xmin,
+                                                                           double xmax,
+                                                                           double sampling,
+                                                                           int l_WKB,
+                                                                           double phiminabs) {
+  /** Size the std::vector members for this geometry, then compute the values
+      of Phi and dPhi to complete the interpolation structure. */
   double deltax, beta2, lambda, x, xfwd;
   int j, k, l, nx, lmax, l_recurrence_max;
   int current_chunk, index_x;
@@ -109,32 +103,32 @@ int hyperspherical_HIS_create(int K,
   //fprintf(stderr,"dx=%e\n",deltax);
   //fprintf(stderr,"%e %e\n",beta,sampling);
   //Set scalar values:
-  pHIS->beta    = beta;
-  pHIS->delta_x = deltax;
-  pHIS->l_size  = nl;
-  pHIS->x_size  = nx;
-  pHIS->K       = K;
+  this->beta    = beta;
+  this->delta_x = deltax;
+  this->l_size  = nl;
+  this->x_size  = nx;
+  this->K       = K;
   //Set pointervalues in pHIS:
 
-  pHIS->l.resize(nl);
-  pHIS->chi_at_phimin.resize(nl);
-  pHIS->x.resize(nx);
-  pHIS->sinK.resize(nx);
-  pHIS->cotK.resize(nx);
-  pHIS->phi.resize(nx * nl);
-  pHIS->dphi.resize(nx * nl);
+  this->l.resize(nl);
+  this->chi_at_phimin.resize(nl);
+  this->x.resize(nx);
+  this->sinK.resize(nx);
+  this->cotK.resize(nx);
+  this->phi.resize(nx * nl);
+  this->dphi.resize(nx * nl);
 
   //Order needed for trig interpolation: (We are using Taylor's remainder theorem)
   if (0.5 * deltax * deltax < _TRIG_PRECISSION_)
-    pHIS->trig_order = 1;
+    this->trig_order = 1;
   else if ((pow(deltax, 4) / 24.0) < _TRIG_PRECISSION_)
-    pHIS->trig_order = 3;
+    this->trig_order = 3;
   else
-    pHIS->trig_order = 5;
+    this->trig_order = 5;
 
   //Copy lvector:
   for (j = 0; j < nl; j++) {
-    pHIS->l[j] = lvec[j];
+    this->l[j] = lvec[j];
   }
   //Allocate sqrtK, and PhiL:
   std::vector<double> sqrtK(lmax + 3);
@@ -158,9 +152,9 @@ int hyperspherical_HIS_create(int K,
       xfwd = sqrt(l_recurrence_max * (l_recurrence_max + 1.0)) / beta;
       for (j = 0; j < nx; j++) {
         x             = xmin + j * deltax;
-        pHIS->x[j]    = x;
-        pHIS->sinK[j] = x;
-        pHIS->cotK[j] = 1.0 / x;
+        this->x[j]    = x;
+        this->sinK[j] = x;
+        this->cotK[j] = 1.0 / x;
       }
       for (l = 0; l <= (lmax + 2); l++) {
         sqrtK[l]          = beta;
@@ -171,9 +165,9 @@ int hyperspherical_HIS_create(int K,
       xfwd = asin(sqrt(l_recurrence_max * (l_recurrence_max + 1.0)) / beta);
       for (j = 0; j < nx; j++) {
         x             = xmin + j * deltax;
-        pHIS->x[j]    = x;
-        pHIS->sinK[j] = sin(x);
-        pHIS->cotK[j] = 1.0 / tan(x);
+        this->x[j]    = x;
+        this->sinK[j] = sin(x);
+        this->cotK[j] = 1.0 / tan(x);
       }
       for (l = 0; l <= (lmax + 2); l++) {
         sqrtK[l]          = sqrt(beta2 - l * l);
@@ -184,9 +178,9 @@ int hyperspherical_HIS_create(int K,
       xfwd = asinh(sqrt(l_recurrence_max * (l_recurrence_max + 1.0)) / beta);
       for (j = 0; j < nx; j++) {
         x             = xmin + j * deltax;
-        pHIS->x[j]    = x;
-        pHIS->sinK[j] = sinh(x);
-        pHIS->cotK[j] = 1.0 / tanh(x);
+        this->x[j]    = x;
+        this->sinK[j] = sinh(x);
+        this->cotK[j] = 1.0 / tanh(x);
       }
       for (l = 0; l <= (lmax + 2); l++) {
         sqrtK[l]          = sqrt(beta2 + l * l);
@@ -201,10 +195,10 @@ int hyperspherical_HIS_create(int K,
   // Clamp into [0, nx]. When the classical turning point xfwd lies below xmin
   // (small l: xfwd ~ sqrt(l(l+1))/beta can be < xmin, e.g. 0 for l=0), the raw
   // value is negative and the forwards loop below would start at a negative j,
-  // indexing pHIS->x / phi / dphi / cotK out of bounds (an OOB read of x AND an
+  // indexing this->x / phi / dphi / cotK out of bounds (an OOB read of x AND an
   // OOB write of phi/dphi 3 elements before the buffer). This is latent in the
   // transfer module (large multipoles keep xfwd > xmin) but is reachable when
-  // HIS_create is called directly with small l.
+  // the constructor is called directly with small l.
   if (xfwdidx < 0)
     xfwdidx = 0;
   if (xfwdidx > nx)
@@ -233,9 +227,9 @@ int hyperspherical_HIS_create(int K,
     hyperspherical_backwards_recurrence_chunk(K,
                                               MIN(l_recurrence_max, lmax) + 1,
                                               beta,
-                                              pHIS->x.data() + j,
-                                              pHIS->sinK.data() + j,
-                                              pHIS->cotK.data() + j,
+                                              this->x.data() + j,
+                                              this->sinK.data() + j,
+                                              this->cotK.data() + j,
                                               current_chunk,
                                               sqrtK.data(),
                                               one_over_sqrtK.data(),
@@ -244,10 +238,10 @@ int hyperspherical_HIS_create(int K,
     for (k = 0; k <= index_recurrence_max; k++) {
       l = lvec[k];
       for (index_x = 0; index_x < current_chunk; index_x++) {
-        pHIS->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
+        this->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
         double PhiL_plus_one =
             ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l + 1) * current_chunk + index_x]);
-        pHIS->dphi[k * nx + j + index_x] = l * pHIS->cotK[j + index_x] *
+        this->dphi[k * nx + j + index_x] = l * this->cotK[j + index_x] *
                                                PhiL[l * current_chunk + index_x] -
                                            sqrtK[l + 1] * PhiL_plus_one;
       }
@@ -260,9 +254,9 @@ int hyperspherical_HIS_create(int K,
     hyperspherical_forwards_recurrence_chunk(K,
                                              MIN(l_recurrence_max, lmax) + 1,
                                              beta,
-                                             pHIS->x.data() + j,
-                                             pHIS->sinK.data() + j,
-                                             pHIS->cotK.data() + j,
+                                             this->x.data() + j,
+                                             this->sinK.data() + j,
+                                             this->cotK.data() + j,
                                              current_chunk,
                                              sqrtK.data(),
                                              one_over_sqrtK.data(),
@@ -272,10 +266,10 @@ int hyperspherical_HIS_create(int K,
     for (k = 0; k <= index_recurrence_max; k++) {
       l = lvec[k];
       for (index_x = 0; index_x < current_chunk; index_x++) {
-        pHIS->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
+        this->phi[k * nx + j + index_x] = PhiL[l * current_chunk + index_x];
         double PhiL_plus_one =
             ((hit_the_ceiling && l > lmax) ? 0.0 : PhiL[(l + 1) * current_chunk + index_x]);
-        pHIS->dphi[k * nx + j + index_x] = l * pHIS->cotK[j + index_x] *
+        this->dphi[k * nx + j + index_x] = l * this->cotK[j + index_x] *
                                                PhiL[l * current_chunk + index_x] -
                                            sqrtK[l + 1] * PhiL_plus_one;
       }
@@ -288,19 +282,11 @@ int hyperspherical_HIS_create(int K,
                                         beta,
                                         0.,
                                         phiminabs,
-                                        pHIS->chi_at_phimin.data() + k,
+                                        this->chi_at_phimin.data() + k,
                                         nullptr);
   }
 
   //hyperspherical_get_xmin(pHIS,1.e-4,phiminabs,pHIS->chi_at_phimin);
-
-  return _SUCCESS_;
-}
-
-int hyperspherical_HIS_free(HyperInterpStruct* pHIS) {
-  /** Free the Hyperspherical Interpolation Structure.
-      Now handled by RAII. */
-  return _SUCCESS_;
 }
 
 int hyperspherical_bessel_direct_vector(

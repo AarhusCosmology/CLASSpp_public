@@ -269,7 +269,7 @@ void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& bas
     return;
 
   // ── delta_ur ───────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_ur_ == _TRUE_) {
+  if (p_mod->has_source_delta_ur_) {
     const double delta_ur = (layout.idx_delta >= 0) ? y[layout.idx_delta] : ppw->rsa_delta_ur;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -281,7 +281,7 @@ void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& bas
   }
 
   // ── theta_ur ───────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_ur_ == _TRUE_) {
+  if (p_mod->has_source_theta_ur_) {
     const double theta_ur = (layout.idx_theta >= 0) ? y[layout.idx_theta] : ppw->rsa_theta_ur;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -336,9 +336,9 @@ void UltraRelativisticSpecies::WriteOutputColumns(
   const background* pba = mod.GetBackground();
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_ur", mod.index_tp_delta_ur_, _TRUE_);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_ur", mod.index_tp_theta_ur_, _TRUE_);
   }
   else if (fmt == camb_format) {

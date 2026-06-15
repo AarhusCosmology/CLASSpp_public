@@ -84,19 +84,19 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   const auto& my_lay     = static_cast<const PerturbLayout&>(base);
   const auto& idm_dr_lay = my_lay.idm_dr;
   const auto& idr_lay    = my_lay.idr;
-  if (p_mod->has_source_delta_idm_dr_ == _TRUE_) {
+  if (p_mod->has_source_delta_idm_dr_) {
     set_source(p_mod->index_tp_delta_idm_dr_,
                y[idm_dr_lay.idx_delta] +
                    3. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  if (p_mod->has_source_theta_idm_dr_ == _TRUE_) {
+  if (p_mod->has_source_theta_idm_dr_) {
     set_source(p_mod->index_tp_theta_idm_dr_,
                y[idm_dr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
 
   // ── IDR ───────────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_idr_ == _TRUE_) {
+  if (p_mod->has_source_delta_idr_) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
       set_source(p_mod->index_tp_delta_idr_,
                  y[idr_lay.idx_delta] +
@@ -107,7 +107,7 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                      4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  if (p_mod->has_source_theta_idr_ == _TRUE_) {
+  if (p_mod->has_source_theta_idr_) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
       set_source(p_mod->index_tp_theta_idr_,
                  y[idr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
@@ -123,11 +123,11 @@ void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
                                             BaseSpecies::TransferColumnSection section) const {
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_) {
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_idm_dr", mod.index_tp_delta_idm_dr_, has_idm_dr() ? _TRUE_ : _FALSE_);
       w.Add("d_idr", mod.index_tp_delta_idr_, has_idr() ? _TRUE_ : _FALSE_);
     }
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_) {
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_idm_dr", mod.index_tp_theta_idm_dr_, has_idm_dr() ? _TRUE_ : _FALSE_);
       w.Add("t_idr", mod.index_tp_theta_idr_, has_idr() ? _TRUE_ : _FALSE_);
     }

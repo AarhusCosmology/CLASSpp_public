@@ -9,9 +9,7 @@
  *
  * The following functions can be called from other modules:
  *
- * -# primordial_init() at the beginning (anytime after perturb_init() and before spectra_init())
  * -# primordial_spectrum_at_k() at any time for computing P(k) at any k
- * -# primordial_free() at the end
  */
 
 #include "primordial_module.h"
@@ -51,9 +49,7 @@ PrimordialModule::PrimordialModule(InputModulePtr input_module,
   primordial_init();
 }
 
-PrimordialModule::~PrimordialModule() {
-  primordial_free();
-}
+PrimordialModule::~PrimordialModule() {}
 
 /**
  * Primordial spectra for arbitrary argument and for all initial conditions.
@@ -75,10 +71,8 @@ PrimordialModule::~PrimordialModule() {
  * the non-diagonal elements contain the cross-correlation angle \f$ P_{12}/\sqrt{P_{11} P_{22}}\f$
  * (from -1 to 1) instead of \f$\ln{P_{12}}\f$
  *
- * This function can be
- * called from whatever module at whatever time, provided that
- * primordial_init() has been called before, and primordial_free() has not
- * been called yet.
+ * This function can be called from whatever module at whatever time,
+ * valid for the lifetime of the module instance.
  *
  * @param index_md   Input: index of mode (scalar, tensor, ...)
  * @param mode       Input: linear or logarithmic
@@ -87,7 +81,7 @@ PrimordialModule::~PrimordialModule() {
  * @return the error status
  */
 
-int PrimordialModule::primordial_spectrum_at_k(
+void PrimordialModule::primordial_spectrum_at_k(
     int index_md,
     enum linear_or_logarithmic mode,
     double input,
@@ -191,8 +185,6 @@ int PrimordialModule::primordial_spectrum_at_k(
       }
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -201,7 +193,7 @@ int PrimordialModule::primordial_spectrum_at_k(
  * @return the error status
  */
 
-int PrimordialModule::primordial_init() {
+void PrimordialModule::primordial_init() {
   /** Summary: */
 
   /** - define local variables */
@@ -215,11 +207,11 @@ int PrimordialModule::primordial_init() {
 
   /** - check that we really need to compute the primordial spectra */
 
-  if (ppt->has_perturbations == _FALSE_) {
+  if (!ppt->has_perturbations) {
     lnk_size_ = 0;
     if (ppm->primordial_verbose > 0)
       printf("No perturbations requested. Primordial module skipped.\n");
-    return _SUCCESS_;
+    return;
   }
   else {
     if (ppm->primordial_verbose > 0)
@@ -266,13 +258,7 @@ int PrimordialModule::primordial_init() {
     if (ppm->primordial_verbose > 0)
       printf(" (analytic spectrum)\n");
 
-    try {
-      primordial_analytic_spectrum_init();
-    }
-    catch (...) {
-      primordial_free();
-      throw;
-    }
+    primordial_analytic_spectrum_init();
 
     for (int index_k = 0; index_k < lnk_size_; index_k++) {
       k = exp(lnk_[index_k]);
@@ -349,39 +335,25 @@ int PrimordialModule::primordial_init() {
     if (ppm->primordial_verbose > 0)
       printf(" (simulating inflation)\n");
 
-    try {
-      primordial_inflation_solve_inflation();
-    }
-    catch (...) {
-      primordial_free();
-      throw;
-    }
+    primordial_inflation_solve_inflation();
   }
 
   /** - deal with the case of external calculation of \f$ P_k \f$*/
 
   else if (ppm->primordial_spec_type == external_Pk) {
-    class_test(ppt->has_scalars == _FALSE_,
+    class_test(!ppt->has_scalars,
                "external Pk module cannot work if you do not ask for scalar modes");
 
-    class_test(ppt->has_vectors == _TRUE_,
-               "external Pk module cannot work if you ask for vector modes");
+    class_test(ppt->has_vectors, "external Pk module cannot work if you ask for vector modes");
 
-    class_test(ppt->has_bi == _TRUE_ || ppt->has_cdi == _TRUE_ || ppt->has_nid == _TRUE_ ||
-                   ppt->has_niv == _TRUE_,
+    class_test(ppt->has_bi || ppt->has_cdi || ppt->has_nid || ppt->has_niv,
                "external Pk module cannot work if you ask for isocurvature modes (but that could "
                "be implemented easily in the future!)");
 
     if (ppm->primordial_verbose > 0)
       printf(" (Pk calculated externally)\n");
 
-    try {
-      primordial_external_spectrum_init();
-    }
-    catch (...) {
-      primordial_free();
-      throw;
-    }
+    primordial_external_spectrum_init();
   }
 
   else {
@@ -406,7 +378,7 @@ int PrimordialModule::primordial_init() {
     double dlnk = log(10.) / ppr->k_per_decade_primordial;
     double lnpk_pivot, lnpk_minus, lnpk_plus, lnpk_minusminus, lnpk_plusplus;
 
-    if (ppt->has_scalars == _TRUE_) {
+    if (ppt->has_scalars) {
       primordial_spectrum_at_k(perturbations_module_->index_md_scalars_,
                                logarithmic,
                                log(ppm->k_pivot),
@@ -462,7 +434,7 @@ int PrimordialModule::primordial_init() {
         printf(" -> A_s=%g  n_s=%g  alpha_s=%g\n", A_s_, n_s_, alpha_s_);
     }
 
-    if (ppt->has_tensors == _TRUE_) {
+    if (ppt->has_tensors) {
       primordial_spectrum_at_k(perturbations_module_->index_md_tensors_,
                                logarithmic,
                                log(ppm->k_pivot),
@@ -486,8 +458,6 @@ int PrimordialModule::primordial_init() {
         printf(" -> r=%g  n_t=%g  alpha_t=%g\n", r_, n_t_, alpha_t_);
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -498,20 +468,13 @@ int PrimordialModule::primordial_init() {
  * @return the error status
  */
 
-int PrimordialModule::primordial_free() {
-  if (lnk_size_ > 0) {
-  }
-
-  return _SUCCESS_;
-}
-
 /**
  * This routine defines indices and allocates tables in the primordial structure
  *
  * @return the error status
  */
 
-int PrimordialModule::primordial_indices() {
+void PrimordialModule::primordial_indices() {
   md_size_ = perturbations_module_->md_size_;
 
   lnpk_.resize(perturbations_module_->md_size_);
@@ -535,8 +498,6 @@ int PrimordialModule::primordial_indices() {
 
     is_non_zero_[index_md].resize(ic_ic_size_[index_md]);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -549,7 +510,7 @@ int PrimordialModule::primordial_indices() {
  * @return the error status
  */
 
-int PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k_per_decade) {
+void PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k_per_decade) {
   class_test((kmin <= 0.) || (kmax <= kmin), "inconsistent values of kmin=%e, kmax=%e", kmin, kmax);
 
   lnk_size_ = (int) (log(kmax / kmin) / log(10.) * k_per_decade) + 2;
@@ -558,8 +519,6 @@ int PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k
 
   for (int i = 0; i < lnk_size_; i++)
     lnk_[i] = log(kmin) + i * log(10.) / k_per_decade;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -571,7 +530,7 @@ int PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k
  * @return the error status
  */
 
-int PrimordialModule::primordial_analytic_spectrum_init() {
+void PrimordialModule::primordial_analytic_spectrum_init() {
   int index_md, index_ic1, index_ic2;
   int index_ic1_ic2, index_ic1_ic1, index_ic2_ic2;
   double one_amplitude   = 0.;
@@ -598,31 +557,31 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
 
     for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
       if (_scalarsEXT_) {
-        if ((ppt->has_ad == _TRUE_) && (index_ic1 == perturbations_module_->index_ic_ad_)) {
+        if ((ppt->has_ad) && (index_ic1 == perturbations_module_->index_ic_ad_)) {
           one_amplitude = A_s_;
           one_tilt      = n_s_;
           one_running   = alpha_s_;
         }
 
-        if ((ppt->has_bi == _TRUE_) && (index_ic1 == perturbations_module_->index_ic_bi_)) {
+        if ((ppt->has_bi) && (index_ic1 == perturbations_module_->index_ic_bi_)) {
           one_amplitude = A_s_ * ppm->f_bi * ppm->f_bi;
           one_tilt      = ppm->n_bi;
           one_running   = ppm->alpha_bi;
         }
 
-        if ((ppt->has_cdi == _TRUE_) && (index_ic1 == perturbations_module_->index_ic_cdi_)) {
+        if ((ppt->has_cdi) && (index_ic1 == perturbations_module_->index_ic_cdi_)) {
           one_amplitude = A_s_ * ppm->f_cdi * ppm->f_cdi;
           one_tilt      = ppm->n_cdi;
           one_running   = ppm->alpha_cdi;
         }
 
-        if ((ppt->has_nid == _TRUE_) && (index_ic1 == perturbations_module_->index_ic_nid_)) {
+        if ((ppt->has_nid) && (index_ic1 == perturbations_module_->index_ic_nid_)) {
           one_amplitude = A_s_ * ppm->f_nid * ppm->f_nid;
           one_tilt      = ppm->n_nid;
           one_running   = ppm->alpha_nid;
         }
 
-        if ((ppt->has_niv == _TRUE_) && (index_ic1 == perturbations_module_->index_ic_niv_)) {
+        if ((ppt->has_niv) && (index_ic1 == perturbations_module_->index_ic_niv_)) {
           one_amplitude = A_s_ * ppm->f_niv * ppm->f_niv;
           one_tilt      = ppm->n_niv;
           one_running   = ppm->alpha_niv;
@@ -656,7 +615,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
     for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
       for (index_ic2 = index_ic1 + 1; index_ic2 < ic_size_[index_md]; index_ic2++) {
         if (_scalarsEXT_) {
-          if ((ppt->has_ad == _TRUE_) && (ppt->has_bi == _TRUE_) &&
+          if ((ppt->has_ad) && (ppt->has_bi) &&
               (((index_ic1 == perturbations_module_->index_ic_ad_) &&
                 (index_ic2 == perturbations_module_->index_ic_bi_)) ||
                ((index_ic1 == perturbations_module_->index_ic_ad_) &&
@@ -666,7 +625,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_ad_bi;
           }
 
-          if ((ppt->has_ad == _TRUE_) && (ppt->has_cdi == _TRUE_) &&
+          if ((ppt->has_ad) && (ppt->has_cdi) &&
               (((index_ic1 == perturbations_module_->index_ic_ad_) &&
                 (index_ic2 == perturbations_module_->index_ic_cdi_)) ||
                ((index_ic2 == perturbations_module_->index_ic_ad_) &&
@@ -676,7 +635,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_ad_cdi;
           }
 
-          if ((ppt->has_ad == _TRUE_) && (ppt->has_nid == _TRUE_) &&
+          if ((ppt->has_ad) && (ppt->has_nid) &&
               (((index_ic1 == perturbations_module_->index_ic_ad_) &&
                 (index_ic2 == perturbations_module_->index_ic_nid_)) ||
                ((index_ic2 == perturbations_module_->index_ic_ad_) &&
@@ -686,7 +645,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_ad_nid;
           }
 
-          if ((ppt->has_ad == _TRUE_) && (ppt->has_niv == _TRUE_) &&
+          if ((ppt->has_ad) && (ppt->has_niv) &&
               (((index_ic1 == perturbations_module_->index_ic_ad_) &&
                 (index_ic2 == perturbations_module_->index_ic_niv_)) ||
                ((index_ic2 == perturbations_module_->index_ic_ad_) &&
@@ -696,7 +655,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_ad_niv;
           }
 
-          if ((ppt->has_bi == _TRUE_) && (ppt->has_cdi == _TRUE_) &&
+          if ((ppt->has_bi) && (ppt->has_cdi) &&
               (((index_ic1 == perturbations_module_->index_ic_bi_) &&
                 (index_ic2 == perturbations_module_->index_ic_cdi_)) ||
                ((index_ic2 == perturbations_module_->index_ic_bi_) &&
@@ -706,7 +665,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_bi_cdi;
           }
 
-          if ((ppt->has_bi == _TRUE_) && (ppt->has_nid == _TRUE_) &&
+          if ((ppt->has_bi) && (ppt->has_nid) &&
               (((index_ic1 == perturbations_module_->index_ic_bi_) &&
                 (index_ic2 == perturbations_module_->index_ic_nid_)) ||
                ((index_ic2 == perturbations_module_->index_ic_bi_) &&
@@ -716,7 +675,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_bi_nid;
           }
 
-          if ((ppt->has_bi == _TRUE_) && (ppt->has_niv == _TRUE_) &&
+          if ((ppt->has_bi) && (ppt->has_niv) &&
               (((index_ic1 == perturbations_module_->index_ic_bi_) &&
                 (index_ic2 == perturbations_module_->index_ic_niv_)) ||
                ((index_ic2 == perturbations_module_->index_ic_bi_) &&
@@ -726,7 +685,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_bi_niv;
           }
 
-          if ((ppt->has_cdi == _TRUE_) && (ppt->has_nid == _TRUE_) &&
+          if ((ppt->has_cdi) && (ppt->has_nid) &&
               (((index_ic1 == perturbations_module_->index_ic_cdi_) &&
                 (index_ic2 == perturbations_module_->index_ic_nid_)) ||
                ((index_ic2 == perturbations_module_->index_ic_cdi_) &&
@@ -736,7 +695,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_cdi_nid;
           }
 
-          if ((ppt->has_cdi == _TRUE_) && (ppt->has_niv == _TRUE_) &&
+          if ((ppt->has_cdi) && (ppt->has_niv) &&
               (((index_ic1 == perturbations_module_->index_ic_cdi_) &&
                 (index_ic2 == perturbations_module_->index_ic_niv_)) ||
                ((index_ic2 == perturbations_module_->index_ic_cdi_) &&
@@ -746,7 +705,7 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
             one_running     = ppm->alpha_cdi_niv;
           }
 
-          if ((ppt->has_nid == _TRUE_) && (ppt->has_niv == _TRUE_) &&
+          if ((ppt->has_nid) && (ppt->has_niv) &&
               (((index_ic1 == perturbations_module_->index_ic_nid_) &&
                 (index_ic2 == perturbations_module_->index_ic_niv_)) ||
                ((index_ic2 == perturbations_module_->index_ic_nid_) &&
@@ -784,8 +743,6 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
       }
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -800,10 +757,10 @@ int PrimordialModule::primordial_analytic_spectrum_init() {
  * @return the error status
  */
 
-int PrimordialModule::primordial_analytic_spectrum(int index_md,
-                                                   int index_ic1_ic2,
-                                                   double k,
-                                                   double* pk) const {
+void PrimordialModule::primordial_analytic_spectrum(int index_md,
+                                                    int index_ic1_ic2,
+                                                    double k,
+                                                    double* pk) const {
   if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
     *pk = amplitude_[index_md][index_ic1_ic2] *
           exp((tilt_[index_md][index_ic1_ic2] - 1.) * log(k / ppm->k_pivot) +
@@ -812,8 +769,6 @@ int PrimordialModule::primordial_analytic_spectrum(int index_md,
   else {
     *pk = 0.;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -826,10 +781,10 @@ int PrimordialModule::primordial_analytic_spectrum(int index_md,
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_potential(double phi,
-                                                     double* V,
-                                                     double* dV,
-                                                     double* ddV) const {
+void PrimordialModule::primordial_inflation_potential(double phi,
+                                                      double* V,
+                                                      double* dV,
+                                                      double* ddV) const {
   double e, de, dde, mu, dmu, ddmu, l, dl, ddl, p, dp, ddp;
 
   switch (ppm->potential) {
@@ -894,8 +849,6 @@ int PrimordialModule::primordial_inflation_potential(double phi,
       class_stop("ppm->potential=%d different from all known cases", ppm->potential);
       break;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -908,15 +861,13 @@ int PrimordialModule::primordial_inflation_potential(double phi,
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_hubble(
+void PrimordialModule::primordial_inflation_hubble(
     double phi, double* H, double* dH, double* ddH, double* dddH) const {
   *H    = ppm->H0 + phi * ppm->H1 + pow(phi, 2) / 2. * ppm->H2 + pow(phi, 3) / 6. * ppm->H3 +
           pow(phi, 4) / 24. * ppm->H4;
   *dH   = ppm->H1 + phi * ppm->H2 + pow(phi, 2) / 2. * ppm->H3 + pow(phi, 3) / 6. * ppm->H4;
   *ddH  = ppm->H2 + phi * ppm->H3 + pow(phi, 2) / 2. * ppm->H4;
   *dddH = ppm->H3 + phi * ppm->H4;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -924,7 +875,7 @@ int PrimordialModule::primordial_inflation_hubble(
  *
  * @return the error status
  */
-int PrimordialModule::primordial_inflation_indices() {
+void PrimordialModule::primordial_inflation_indices() {
   int index_in;
 
   index_in = 0;
@@ -963,8 +914,6 @@ int PrimordialModule::primordial_inflation_indices() {
 
   /* size of perturbation vector */
   in_size_ = index_in;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -976,7 +925,7 @@ int PrimordialModule::primordial_inflation_indices() {
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_solve_inflation() {
+void PrimordialModule::primordial_inflation_solve_inflation() {
   /** Summary: */
   /** - define local variables */
   std::vector<double> y(in_size_);
@@ -1254,8 +1203,6 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
 
   if (ppm->primordial_verbose > 1)
     printf(" (observable power spectrum goes from %e to %e)\n", phi_min_, phi_max_);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1268,7 +1215,7 @@ int PrimordialModule::primordial_inflation_solve_inflation() {
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
+void PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
   std::vector<double> y(in_size_);
   std::vector<double> dy(in_size_);
 
@@ -1312,8 +1259,6 @@ int PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
       _TRUE_;
   is_non_zero_[perturbations_module_->index_md_tensors_][perturbations_module_->index_ic_ten_] =
       _TRUE_;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1324,18 +1269,18 @@ int PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_spectra(double* y_ini) {
+void PrimordialModule::primordial_inflation_spectra(double* y_ini) {
   Tools::TaskSystem task_system(pba->number_of_threads);
-  std::vector<std::future<int>> future_output;
+  std::vector<std::future<void>> future_output;
 
   /* loop over Fourier wavenumbers */
   for (int index_k = 0; index_k < lnk_size_; index_k++) {
     future_output.push_back(task_system.AsyncTask([this, y_ini, index_k]() {
       primordial_inflation_one_wavenumber(y_ini, index_k);
-      return _SUCCESS_;
+      return;
     }));
   }
-  for (std::future<int>& future : future_output) {
+  for (std::future<void>& future : future_output) {
     future.get();
   }
   future_output.clear();
@@ -1344,8 +1289,6 @@ int PrimordialModule::primordial_inflation_spectra(double* y_ini) {
       _TRUE_;
   is_non_zero_[perturbations_module_->index_md_tensors_][perturbations_module_->index_ic_ten_] =
       _TRUE_;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1359,7 +1302,7 @@ int PrimordialModule::primordial_inflation_spectra(double* y_ini) {
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int index_k) {
+void PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int index_k) {
   double k;
   double curvature, tensors;
   std::vector<double> y(in_size_);
@@ -1401,8 +1344,6 @@ int PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int ind
   /* 	    lnk_[index_k], */
   /* 	    lnpk_[perturbations_module_->index_md_scalars_][index_k], */
   /* 	    lnpk_[perturbations_module_->index_md_tensors_][index_k]); */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1417,7 +1358,7 @@ int PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int ind
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_one_k(
+void PrimordialModule::primordial_inflation_one_k(
     double k, double* y, double* dy, double* curvature, double* tensor) {
   /** Summary: */
 
@@ -1526,8 +1467,6 @@ int PrimordialModule::primordial_inflation_one_k(
   *tensor = 32. * k * k * k / _PI_ * ah2 / y[index_in_a_] / y[index_in_a_];
 
   //fprintf(stdout,"%g %g %g %g %g\n",k,*curvature,*tensor,*tensor/(*curvature),dlnPdN);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1553,7 +1492,7 @@ int PrimordialModule::primordial_inflation_one_k(
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_find_attractor(
+void PrimordialModule::primordial_inflation_find_attractor(
     double phi_0, double precision, double* y, double* dy, double* H_0, double* dphidt_0) {
   double V_0, dV_0, ddV_0;
   double V = 0., dV = 0., ddV = 0.;
@@ -1628,8 +1567,6 @@ int PrimordialModule::primordial_inflation_find_attractor(
   if (ppm->primordial_verbose > 1) {
     printf(" (attractor found in phi=%g with phi'=%g, H=%g)\n", phi_0, *dphidt_0, *H_0);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1664,13 +1601,13 @@ int PrimordialModule::primordial_inflation_find_attractor(
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_evolve_background(double* y,
-                                                             double* dy,
-                                                             enum target_quantity target,
-                                                             double stop,
-                                                             short check_epsilon,
-                                                             enum integration_direction direction,
-                                                             enum time_definition time) {
+void PrimordialModule::primordial_inflation_evolve_background(double* y,
+                                                              double* dy,
+                                                              enum target_quantity target,
+                                                              double stop,
+                                                              short check_epsilon,
+                                                              enum integration_direction direction,
+                                                              enum time_definition time) {
   struct primordial_inflation_parameters_and_workspace pipaw{this};
   struct generic_integrator_workspace gi;
   double tau_start, tau_end, dtau = 0.;
@@ -1934,8 +1871,6 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
     printf(" (-d2a/dt2 /a = %e)\n",quantity);
     }
   */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1952,10 +1887,10 @@ int PrimordialModule::primordial_inflation_evolve_background(double* y,
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_check_potential(double phi,
-                                                           double* V,
-                                                           double* dV,
-                                                           double* ddV) {
+void PrimordialModule::primordial_inflation_check_potential(double phi,
+                                                            double* V,
+                                                            double* dV,
+                                                            double* ddV) {
   primordial_inflation_potential(phi, V, dV, ddV);
 
   class_test(*V <= 0.,
@@ -1968,8 +1903,6 @@ int PrimordialModule::primordial_inflation_check_potential(double phi,
              "This potential cannot be treated by this code",
              phi,
              *dV);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1988,15 +1921,13 @@ int PrimordialModule::primordial_inflation_check_potential(double phi,
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_check_hubble(
+void PrimordialModule::primordial_inflation_check_hubble(
     double phi, double* H, double* dH, double* ddH, double* dddH) {
   primordial_inflation_hubble(phi, H, dH, ddH, dddH);
 
   class_test(*H < 0., "this H(phi) is not physical. H = %e", *H);
 
   class_test(*dH > 0., "this H(phi) is not decreasing with growing phi. dH/dphi = %e", *dH);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2007,7 +1938,7 @@ int PrimordialModule::primordial_inflation_check_hubble(
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_get_epsilon(double phi, double* epsilon) {
+void PrimordialModule::primordial_inflation_get_epsilon(double phi, double* epsilon) {
   double V, dV, ddV;
   double H, dH, ddH, dddH;
 
@@ -2033,8 +1964,6 @@ int PrimordialModule::primordial_inflation_get_epsilon(double phi, double* epsil
                  ppm->primordial_spec_type);
       break;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2045,7 +1974,7 @@ int PrimordialModule::primordial_inflation_get_epsilon(double phi, double* epsil
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy) {
+void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy) {
   /** Summary: */
 
   /** - define local variables */
@@ -2454,8 +2383,6 @@ int PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy)
              log(y[0] / a_pivot));
     }
   }
-
-  return _SUCCESS_;
 }
 
 int PrimordialModule::primordial_inflation_derivs(double tau,
@@ -2672,7 +2599,7 @@ int PrimordialModule::primordial_inflation_derivs_member(double tau,
  * @return the error status
  */
 
-int PrimordialModule::primordial_external_spectrum_init() {
+void PrimordialModule::primordial_external_spectrum_init() {
   /** Summary: */
 
   FILE* process;
@@ -2686,7 +2613,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
   n_data_guess = 100;
   k.reserve(n_data_guess);
   pks.reserve(n_data_guess);
-  if (ppt->has_tensors == _TRUE_)
+  if (ppt->has_tensors)
     pkt.reserve(n_data_guess);
   /* Prepare the command */
   /* If the command is just a "cat", no arguments need to be passed */
@@ -2726,7 +2653,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
   /* Read output and store it */
   std::string line;
   while (read_line(process, line)) {
-    if (ppt->has_tensors == _TRUE_) {
+    if (ppt->has_tensors) {
       sscanf(line.c_str(), "%lf %lf %lf", &this_k, &this_pks, &this_pkt);
     }
     else {
@@ -2735,7 +2662,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
     /* Store */
     k.push_back(this_k);
     pks.push_back(this_pks);
-    if (ppt->has_tensors == _TRUE_) {
+    if (ppt->has_tensors) {
       pkt.push_back(this_pkt);
     }
     n_data++;
@@ -2769,7 +2696,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
   lnk_.resize(lnk_size_);
   lnpk_[perturbations_module_->index_md_scalars_].resize(lnk_size_);
   ddlnpk_[perturbations_module_->index_md_scalars_].resize(lnk_size_);
-  if (ppt->has_tensors == _TRUE_) {
+  if (ppt->has_tensors) {
     lnpk_[perturbations_module_->index_md_tensors_].resize(lnk_size_);
     ddlnpk_[perturbations_module_->index_md_tensors_].resize(lnk_size_);
   };
@@ -2777,7 +2704,7 @@ int PrimordialModule::primordial_external_spectrum_init() {
   for (int index_k = 0; index_k < lnk_size_; index_k++) {
     lnk_[index_k]                                            = log(k[index_k]);
     lnpk_[perturbations_module_->index_md_scalars_][index_k] = log(pks[index_k]);
-    if (ppt->has_tensors == _TRUE_)
+    if (ppt->has_tensors)
       lnpk_[perturbations_module_->index_md_tensors_][index_k] = log(pkt[index_k]);
     /* DEBUG (with tensors)
        fprintf(stderr,"Storing[%d(+1) of %d]: \n k = %g == %g\n pks = %g == %g\n pkt = %g == %g\n",
@@ -2790,22 +2717,18 @@ int PrimordialModule::primordial_external_spectrum_init() {
   /** - Tell CLASS that there are scalar (and tensor) modes */
   is_non_zero_[perturbations_module_->index_md_scalars_][perturbations_module_->index_ic_ad_] =
       _TRUE_;
-  if (ppt->has_tensors == _TRUE_)
+  if (ppt->has_tensors)
     is_non_zero_[perturbations_module_->index_md_tensors_][perturbations_module_->index_ic_ten_] =
         _TRUE_;
-
-  return _SUCCESS_;
 }
 
-int PrimordialModule::primordial_output_titles(std::string& titles) const {
+void PrimordialModule::primordial_output_titles(std::string& titles) const {
   class_store_columntitle(titles, "k [1/Mpc]", _TRUE_);
   class_store_columntitle(titles, "P_scalar(k)", _TRUE_);
   class_store_columntitle(titles, "P_tensor(k)", ppt->has_tensors);
-
-  return _SUCCESS_;
 }
 
-int PrimordialModule::primordial_output_data(int number_of_titles, double* data) const {
+void PrimordialModule::primordial_output_data(int number_of_titles, double* data) const {
   int index_k, storeidx;
   double* dataptr;
 
@@ -2823,6 +2746,4 @@ int PrimordialModule::primordial_output_data(int number_of_titles, double* data)
                        ppt->has_tensors,
                        storeidx);
   }
-
-  return _SUCCESS_;
 }

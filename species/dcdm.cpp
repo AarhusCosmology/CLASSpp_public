@@ -159,9 +159,9 @@ void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   const background* pba = mod.GetBackground();
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_dcdm", mod.index_tp_delta_dcdm_, _TRUE_);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_dcdm", mod.index_tp_theta_dcdm_, _TRUE_);
   }
 }

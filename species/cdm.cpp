@@ -147,7 +147,7 @@ void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
     return;
 
   // ── delta_cdm ──────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_cdm_ == _TRUE_) {
+  if (p_mod->has_source_delta_cdm_) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_delta_cdm_,
@@ -158,7 +158,7 @@ void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 
   // ── theta_cdm ──────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_cdm_ == _TRUE_) {
+  if (p_mod->has_source_theta_cdm_) {
     const double theta_cdm = (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -176,9 +176,9 @@ void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   const background* pba = mod.GetBackground();
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_cdm", mod.index_tp_delta_cdm_, _TRUE_);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_cdm", mod.index_tp_theta_cdm_, (ppt->gauge != synchronous));
   }
   else if (fmt == camb_format) {

@@ -19,7 +19,7 @@ FluidSpecies::FluidSpecies(const background& pba,
                            double wa_fld,
                            double cs2_fld,
                            double Omega_EDE,
-                           short use_ppf,
+                           bool use_ppf,
                            double c_gamma_over_c_fld)
     : BaseSpecies("Fluid", EnergyType::DarkEnergy), pba_(pba), Omega0_fld_(omega0_fld),
       fluid_eos_(fluid_eos), w0_fld_(w0_fld), wa_fld_(wa_fld), cs2_fld_(cs2_fld),
@@ -109,7 +109,7 @@ void FluidSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                const perturb_workspace* /*ppw*/,
                                                int /*gauge*/) {
   auto& layout = static_cast<PerturbLayout&>(base);
-  if (use_ppf_ == _FALSE_) {
+  if (!use_ppf_) {
     class_define_index(layout.idx_delta, _TRUE_, index_pt, 1);
     class_define_index(layout.idx_theta, _TRUE_, index_pt, 1);
   }
@@ -133,7 +133,7 @@ void FluidSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double metric_continuity = ctx.metric_continuity;
   const double metric_euler      = ctx.metric_euler;
 
-  if (use_ppf_ == _FALSE_) {
+  if (!use_ppf_) {
     const double w_fld          = ppw->pvecback[index_bg_w_fld_];
     const double dw_over_da_fld = ppw->pvecback[index_bg_dw_over_da_fld_];
     const double w_prime_fld    = dw_over_da_fld * a_prime_over_a * a;
@@ -167,7 +167,7 @@ void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& /*layout*/,
     return;
 
   // ── delta_fld ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_fld_ == _TRUE_) {
+  if (p_mod->has_source_delta_fld_) {
     const double w_fld = W(pvecback);
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -180,7 +180,7 @@ void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& /*layout*/,
   }
 
   // ── theta_fld ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_fld_ == _TRUE_) {
+  if (p_mod->has_source_theta_fld_) {
     const double w_fld = W(pvecback);
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -198,7 +198,7 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
   const auto& layout = static_cast<const PerturbLayout&>(base);
   if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
     return;
-  if (use_ppf_ == _TRUE_)
+  if (use_ppf_)
     return;
   if (layout.idx_delta < 0 || layout.idx_theta < 0)
     return;
@@ -221,9 +221,9 @@ void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   const background* pba = mod.GetBackground();
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_fld", mod.index_tp_delta_fld_, _TRUE_);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_fld", mod.index_tp_theta_fld_, _TRUE_);
   }
 }
@@ -589,7 +589,7 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   }
 
   // ── PPF flag + sound-speed param ──────────────────────────────────────────
-  short use_ppf             = _TRUE_;
+  bool use_ppf              = true;
   double c_gamma_over_c_fld = 0.4;
   std::string ppf_str;
   if (ctx.pfc->read_string("use_ppf", ppf_str)) {
@@ -597,7 +597,7 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
                   ? _TRUE_
                   : _FALSE_;
   }
-  if (use_ppf == _TRUE_)
+  if (use_ppf)
     ctx.pfc->read_double("c_gamma_over_c_fld", c_gamma_over_c_fld);
 
   result.push_back({"Fluid",

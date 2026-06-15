@@ -26,7 +26,7 @@
 class InputModule {
  public:
   InputModule(FileContent& fc);
-  static int file_content_from_arguments(int argc, char** argv, FileContent& fc);
+  static void file_content_from_arguments(int argc, char** argv, FileContent& fc);
 
   /** Resolve any per-species / theta_s shooting targets by root-finding, returning a fully
    *  resolved module. No targets (or already inside a shooting context) → returns the input
@@ -79,12 +79,12 @@ class InputModule {
    *  owned by their species and parsed in each species' CreateAll; this
    *  function also stores them in coupled_inputs_ so factories need not re-parse.
    *  Called from ReadContext. */
-  int ReadCoupledCluster();
+  void ReadCoupledCluster();
 
   void ReadContext();          // phase i: inputs needed to build species
   void ReadDerived();          // phase iii: everything else + species-dependent reads
   void WriteParameterFiles();  // read/unread parameter dump (runs after ReadDerived)
-  int input_read_precisions();
+  void input_read_precisions();
 };
 
 /* macro for reading parameter values with routines from the parser */

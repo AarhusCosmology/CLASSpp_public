@@ -272,7 +272,7 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   const double* y          = ppw->pv->y;
 
   // delta_ncdm[n]: density perturbation
-  if (p_mod->has_source_delta_ncdm_ == _TRUE_) {
+  if (p_mod->has_source_delta_ncdm_) {
     const double w = pvecback[index_bg_p_] / pvecback[index_bg_rho_];
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -285,7 +285,7 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   }
 
   // theta_ncdm[n]: velocity perturbation
-  if (p_mod->has_source_theta_ncdm_ == _TRUE_) {
+  if (p_mod->has_source_theta_ncdm_) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_theta_ncdm1_ + n,
@@ -439,9 +439,9 @@ void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_" + nm, mod.index_tp_delta_ncdm1_ + n, _TRUE_);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_" + nm, mod.index_tp_theta_ncdm1_ + n, _TRUE_);
   }
   else if (fmt == camb_format) {

@@ -125,12 +125,8 @@ cdef extern from "cosmology.h":
 
 cdef extern from "hyperspherical.h":
     cdef cppclass HyperInterpStruct:
-        pass
-    int hyperspherical_HIS_create(int K, double beta, int nl, int* lvec,
-                                  double xmin, double xmax, double sampling,
-                                  int l_WKB, double phiminabs,
-                                  HyperInterpStruct* pHIS) except +
-    int hyperspherical_HIS_free(HyperInterpStruct* pHIS) except +
+        HyperInterpStruct(int K, double beta, int nl, int* lvec, double xmin,
+                          double xmax, double sampling, int l_WKB, double phiminabs) except +
     int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS, int nxi,
                                                     int lnum, double* xinterp,
                                                     double* Phi, double* dPhi,
@@ -274,19 +270,17 @@ def hyperspherical_bessel_interpolate(K, beta, l, x, sampling=None, derivatives=
     cdef int l_WKB = int(luniq[nl - 1]) + 1
     cdef double phiminabs = 1.0e-10
 
-    # Heap-allocate with `new` so the C++ constructor runs and the struct's
-    # std::vector members start in a valid (empty) state. A stack `cdef
-    # HyperInterpStruct his` is treated by Cython as a raw POD blob: the vectors
-    # are left with garbage internal pointers, so the resize() calls inside
-    # HIS_create corrupt the heap and produce sporadic NaNs.
-    cdef HyperInterpStruct* his = new HyperInterpStruct()
+    # Heap-allocate with `new` so the C++ constructor runs and fills the
+    # struct. A stack `cdef HyperInterpStruct his` would bypass the constructor
+    # (Cython zero-initializes the raw bytes), leaving the std::vector members
+    # in an invalid state and producing sporadic NaNs/heap corruption.
+    cdef HyperInterpStruct* his = new HyperInterpStruct(Kc, betac, nl, &luniq[0], xmin, xmax,
+                                                        samp, l_WKB, phiminabs)
     cdef np.ndarray[double, ndim=2] Phi = np.empty((nl, nx), dtype=np.double)
     cdef np.ndarray[double, ndim=2] dPhi
     cdef np.ndarray[double, ndim=2] d2Phi
     cdef int i
     try:
-        hyperspherical_HIS_create(Kc, betac, nl, &luniq[0], xmin, xmax, samp,
-                                  l_WKB, phiminabs, his)
         if derivatives:
             dPhi = np.empty((nl, nx), dtype=np.double)
             d2Phi = np.empty((nl, nx), dtype=np.double)
@@ -298,7 +292,6 @@ def hyperspherical_bessel_interpolate(K, beta, l, x, sampling=None, derivatives=
                 hyperspherical_Hermite_interpolation_vector(his, nx, i, &xv[0],
                                                             &Phi[i, 0], NULL, NULL)
     finally:
-        hyperspherical_HIS_free(his)
         del his
 
     # Map sorted-unique rows back to the requested l order.

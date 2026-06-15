@@ -14,24 +14,23 @@ class LensingModule : public BaseModule {
   ~LensingModule();
   std::map<std::string, std::vector<double>> cl_output(int lmax) const;
   std::map<std::string, std::vector<double>> cl_output_computed() const;
-  int lensing_cl_at_l(int l, double* cl_lensed) const;
+  void lensing_cl_at_l(int l, double* cl_lensed) const;
 
   int l_unlensed_max_; /**< last multipole in all calculations (same as in spectra module)*/
   int l_lensed_max_;   /**< last multipole at which lensed spectra are computed */
 
  private:
-  int lensing_init();
-  int lensing_free();
-  int lensing_indices();
+  void lensing_init();
+  void lensing_indices();
   std::map<std::string, std::vector<double>> cl_output_at_l_values(
       const std::vector<int>& l_values) const;
-  int lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, int nmu);
-  int lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, int nmu);
-  int lensing_lensed_cl_ee_bb(
+  void lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, int nmu);
+  void lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, int nmu);
+  void lensing_lensed_cl_ee_bb(
       double* ksip, double* ksim, double** d22, double** d2m2, double* w8, int nmu);
-  int lensing_addback_cl_tt(double* cl_tt);
-  int lensing_addback_cl_te(double* cl_te);
-  int lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb);
+  void lensing_addback_cl_tt(double* cl_tt);
+  void lensing_addback_cl_te(double* cl_te);
+  void lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb);
   int lensing_X000(double* mu, int num_mu, int lmax, double* sigma2, double** X000);
   int lensing_Xp000(double* mu, int num_mu, int lmax, double* sigma2, double** Xp000);
   int lensing_X220(double* mu, int num_mu, int lmax, double* sigma2, double** X220);
@@ -40,33 +39,33 @@ class LensingModule : public BaseModule {
   int lensing_X121(double* mu, int num_mu, int lmax, double* sigma2, double** X121);
   int lensing_X132(double* mu, int num_mu, int lmax, double* sigma2, double** X132);
   int lensing_X242(double* mu, int num_mu, int lmax, double* sigma2, double** X242);
-  int lensing_d00(double* mu, int num_mu, int lmax, double** d00);
-  int lensing_d11(double* mu, int num_mu, int lmax, double** d11);
-  int lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1);
-  int lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2);
-  int lensing_d22(double* mu, int num_mu, int lmax, double** d22);
-  int lensing_d20(double* mu, int num_mu, int lmax, double** d20);
-  int lensing_d31(double* mu, int num_mu, int lmax, double** d3m1);
-  int lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1);
-  int lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3);
-  int lensing_d40(double* mu, int num_mu, int lmax, double** d40);
-  int lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2);
-  int lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4);
+  void lensing_d00(double* mu, int num_mu, int lmax, double** d00);
+  void lensing_d11(double* mu, int num_mu, int lmax, double** d11);
+  void lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1);
+  void lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2);
+  void lensing_d22(double* mu, int num_mu, int lmax, double** d22);
+  void lensing_d20(double* mu, int num_mu, int lmax, double** d20);
+  void lensing_d31(double* mu, int num_mu, int lmax, double** d3m1);
+  void lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1);
+  void lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3);
+  void lensing_d40(double* mu, int num_mu, int lmax, double** d40);
+  void lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2);
+  void lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4);
 
   /** @name - information on number of type of C_l's (TT, TE...) */
 
   //@{
 
-  int has_tt_; /**< do we want lensed \f$ C_l^{TT}\f$? (T = temperature) */
-  int has_ee_; /**< do we want lensed \f$ C_l^{EE}\f$? (E = E-polarization) */
-  int has_te_; /**< do we want lensed \f$ C_l^{TE}\f$? */
-  int has_bb_; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
-  int has_pp_; /**< do we want \f$ C_l^{\phi\phi}\f$? (\f$ \phi \f$ = CMB lensing potential) */
-  int has_tp_; /**< do we want \f$ C_l^{T\phi}\f$? */
-  int has_dd_; /**< do we want \f$ C_l^{dd}\f$? (d = matter density) */
-  int has_td_; /**< do we want \f$ C_l^{Td}\f$? */
-  int has_ll_; /**< do we want \f$ C_l^{ll}\f$? (l = lensing potential) */
-  int has_tl_; /**< do we want \f$ C_l^{Tl}\f$? */
+  bool has_tt_; /**< do we want lensed \f$ C_l^{TT}\f$? (T = temperature) */
+  bool has_ee_; /**< do we want lensed \f$ C_l^{EE}\f$? (E = E-polarization) */
+  bool has_te_; /**< do we want lensed \f$ C_l^{TE}\f$? */
+  bool has_bb_; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
+  bool has_pp_; /**< do we want \f$ C_l^{\phi\phi}\f$? (\f$ \phi \f$ = CMB lensing potential) */
+  bool has_tp_; /**< do we want \f$ C_l^{T\phi}\f$? */
+  bool has_dd_; /**< do we want \f$ C_l^{dd}\f$? (d = matter density) */
+  bool has_td_; /**< do we want \f$ C_l^{Td}\f$? */
+  bool has_ll_; /**< do we want \f$ C_l^{ll}\f$? (l = lensing potential) */
+  bool has_tl_; /**< do we want \f$ C_l^{Tl}\f$? */
 
   int index_lt_tt_; /**< index for type \f$ C_l^{TT} \f$*/
   int index_lt_ee_; /**< index for type \f$ C_l^{EE} \f$*/

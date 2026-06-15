@@ -10,9 +10,9 @@ class ThermodynamicsModule : public BaseModule {
  public:
   ThermodynamicsModule(InputModulePtr input_module, BackgroundModulePtr background_module);
   ~ThermodynamicsModule();
-  int thermodynamics_output_titles(std::string& titles) const;
-  int thermodynamics_output_data(int number_of_titles, double* data) const;
-  int thermodynamics_at_z(
+  void thermodynamics_output_titles(std::string& titles) const;
+  void thermodynamics_output_data(int number_of_titles, double* data) const;
+  void thermodynamics_at_z(
       double z, short inter_mode, int* last_index, double* pvecback, double* pvecthermo) const;
 
   const thermo* GetThermodynamics() const {
@@ -108,23 +108,22 @@ class ThermodynamicsModule : public BaseModule {
   //@}
 
  private:
-  int thermodynamics_init();
-  int thermodynamics_free();
-  int thermodynamics_indices(recombination* preco, reionization* preio);
-  int thermodynamics_helium_from_bbn();
-  int thermodynamics_onthespot_energy_injection(recombination* preco,
-                                                double z,
-                                                double* energy_rate);
-  int thermodynamics_energy_injection(recombination* preco, double z, double* energy_rate);
-  int thermodynamics_reionization_function(double z, reionization* preio, double* xe);
-  int thermodynamics_reionization(recombination* preco, reionization* preio, double* pvecback);
-  int thermodynamics_reionization_sample(recombination* preco,
-                                         reionization* preio,
-                                         double* pvecback);
-  int thermodynamics_get_xe_before_reionization(recombination* preco, double z, double* xe);
-  int thermodynamics_recombination(recombination* preco, double* pvecback);
-  int thermodynamics_recombination_with_hyrec(recombination* prec, double* pvecback);
-  int thermodynamics_recombination_with_recfast(recombination* prec, double* pvecback);
+  void thermodynamics_init();
+  void thermodynamics_indices(recombination* preco, reionization* preio);
+  void thermodynamics_helium_from_bbn();
+  void thermodynamics_onthespot_energy_injection(recombination* preco,
+                                                 double z,
+                                                 double* energy_rate);
+  void thermodynamics_energy_injection(recombination* preco, double z, double* energy_rate);
+  void thermodynamics_reionization_function(double z, reionization* preio, double* xe);
+  void thermodynamics_reionization(recombination* preco, reionization* preio, double* pvecback);
+  void thermodynamics_reionization_sample(recombination* preco,
+                                          reionization* preio,
+                                          double* pvecback);
+  void thermodynamics_get_xe_before_reionization(recombination* preco, double z, double* xe);
+  void thermodynamics_recombination(recombination* preco, double* pvecback);
+  void thermodynamics_recombination_with_hyrec(recombination* prec, double* pvecback);
+  void thermodynamics_recombination_with_recfast(recombination* prec, double* pvecback);
   int thermodynamics_derivs_with_recfast_member(double z,
                                                 double* y,
                                                 double* dy,
@@ -133,8 +132,8 @@ class ThermodynamicsModule : public BaseModule {
                                                 double* y,
                                                 double* dy,
                                                 void* fixed_parameters);
-  int thermodynamics_merge_reco_and_reio(recombination* preco, reionization* preio);
-  int thermodynamics_tanh(
+  void thermodynamics_merge_reco_and_reio(recombination* preco, reionization* preio);
+  void thermodynamics_tanh(
       double x, double center, double before, double after, double width, double* result);
 
   BackgroundModulePtr background_module_;

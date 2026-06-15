@@ -50,7 +50,7 @@ int readDoubleList(FileContent* pfc, const char* name, std::vector<double>& valu
  * and WriteParameterFiles in sequence.
  */
 
-int InputModule::file_content_from_arguments(int argc, char** argv, FileContent& fc) {
+void InputModule::file_content_from_arguments(int argc, char** argv, FileContent& fc) {
   /** Summary: */
 
   /** - define local variables */
@@ -182,8 +182,6 @@ int InputModule::file_content_from_arguments(int argc, char** argv, FileContent&
 
   if (!input_file.empty() || !precision_file.empty())
     parser_cat(pfc_input, &fc_precision, &fc);
-
-  return _SUCCESS_;
 }
 
 InputModule::InputModule(FileContent& fc) : file_content_(fc) {
@@ -307,7 +305,7 @@ void InputModule::ConstructSpecies() {
   }
 }
 
-int InputModule::ReadCoupledCluster() {
+void InputModule::ReadCoupledCluster() {
   FileContent* pfc    = &file_content_;
   precision* ppr      = &precision_;
   background* pba     = &background_;
@@ -514,8 +512,6 @@ int InputModule::ReadCoupledCluster() {
     omega_budget_.idm_drmd = new_idm_drmd;
     omega_budget_.cdm      = new_cdm;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -587,7 +583,7 @@ void InputModule::WriteParameterFiles() {
     });
   }
 }
-int InputModule::input_read_precisions() {
+void InputModule::input_read_precisions() {
   precision* ppr = &precision_;
   int flag1;
 
@@ -612,8 +608,6 @@ int InputModule::input_read_precisions() {
   class_test(ppr->smallest_allowed_variation < 0,
              "smallest_allowed_variation = %e < 0",
              ppr->smallest_allowed_variation);
-
-  return _SUCCESS_;
 }
 /**
  * Phase i: read the non-species inputs that building the species needs
@@ -1053,11 +1047,11 @@ void InputModule::ReadDerived() {
 
     if (flag1 == _TRUE_) {
       if ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos)) {
-        pth->has_on_the_spot = _TRUE_;
+        pth->has_on_the_spot = true;
       }
       else {
         if ((string1.find("n") != std::string::npos) || (string1.find("N") != std::string::npos)) {
-          pth->has_on_the_spot = _FALSE_;
+          pth->has_on_the_spot = false;
         }
         else {
           class_stop("incomprehensible input '%s' for the field 'on the spot'", string1.c_str());
@@ -1072,11 +1066,11 @@ void InputModule::ReadDerived() {
 
   if (flag1 == _TRUE_) {
     if ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos)) {
-      pth->compute_damping_scale = _TRUE_;
+      pth->compute_damping_scale = true;
     }
     else {
       if ((string1.find("n") != std::string::npos) || (string1.find("N") != std::string::npos)) {
-        pth->compute_damping_scale = _FALSE_;
+        pth->compute_damping_scale = false;
       }
       else {
         class_stop("incomprehensible input '%s' for the field 'compute damping scale'",
@@ -1087,52 +1081,52 @@ void InputModule::ReadDerived() {
 
   /** (c) define which perturbations and sources should be computed, and down to which scale */
 
-  ppt->has_perturbations = _FALSE_;
-  ppt->has_cls           = _FALSE_;
+  ppt->has_perturbations = false;
+  ppt->has_cls           = false;
 
   parser_read_string(pfc, "output", string1, &flag1);
 
   if (flag1 == _TRUE_) {
     if ((string1.find("tCl") != std::string::npos) || (string1.find("TCl") != std::string::npos) ||
         (string1.find("TCL") != std::string::npos)) {
-      ppt->has_cl_cmb_temperature = _TRUE_;
-      ppt->has_perturbations      = _TRUE_;
-      ppt->has_cls                = _TRUE_;
+      ppt->has_cl_cmb_temperature = true;
+      ppt->has_perturbations      = true;
+      ppt->has_cls                = true;
     }
 
     if ((string1.find("pCl") != std::string::npos) || (string1.find("PCl") != std::string::npos) ||
         (string1.find("PCL") != std::string::npos)) {
-      ppt->has_cl_cmb_polarization = _TRUE_;
-      ppt->has_perturbations       = _TRUE_;
-      ppt->has_cls                 = _TRUE_;
+      ppt->has_cl_cmb_polarization = true;
+      ppt->has_perturbations       = true;
+      ppt->has_cls                 = true;
     }
 
     if ((string1.find("lCl") != std::string::npos) || (string1.find("LCl") != std::string::npos) ||
         (string1.find("LCL") != std::string::npos)) {
-      ppt->has_cl_cmb_lensing_potential = _TRUE_;
-      ppt->has_perturbations            = _TRUE_;
-      ppt->has_cls                      = _TRUE_;
+      ppt->has_cl_cmb_lensing_potential = true;
+      ppt->has_perturbations            = true;
+      ppt->has_cls                      = true;
     }
 
     if ((string1.find("nCl") != std::string::npos) || (string1.find("NCl") != std::string::npos) ||
         (string1.find("NCL") != std::string::npos) || (string1.find("dCl") != std::string::npos) ||
         (string1.find("DCl") != std::string::npos) || (string1.find("DCL") != std::string::npos)) {
-      ppt->has_cl_number_count = _TRUE_;
-      ppt->has_perturbations   = _TRUE_;
-      ppt->has_cls             = _TRUE_;
+      ppt->has_cl_number_count = true;
+      ppt->has_perturbations   = true;
+      ppt->has_cls             = true;
     }
 
     if ((string1.find("sCl") != std::string::npos) || (string1.find("SCl") != std::string::npos) ||
         (string1.find("SCL") != std::string::npos)) {
-      ppt->has_cl_lensing_potential = _TRUE_;
-      ppt->has_perturbations        = _TRUE_;
-      ppt->has_cls                  = _TRUE_;
+      ppt->has_cl_lensing_potential = true;
+      ppt->has_perturbations        = true;
+      ppt->has_cls                  = true;
     }
 
     if ((string1.find("mPk") != std::string::npos) || (string1.find("MPk") != std::string::npos) ||
         (string1.find("MPK") != std::string::npos)) {
-      ppt->has_pk_matter     = _TRUE_;
-      ppt->has_perturbations = _TRUE_;
+      ppt->has_pk_matter     = true;
+      ppt->has_perturbations = true;
 
       /*if (pba->Omega0_ncdm_tot != 0.0){
         class_call(parser_read_string(pfc,"pk_only_cdm_bar",string1,&flag1,errmsg),
@@ -1152,27 +1146,27 @@ void InputModule::ReadDerived() {
     if ((string1.find("mTk") != std::string::npos) || (string1.find("MTk") != std::string::npos) ||
         (string1.find("MTK") != std::string::npos) || (string1.find("dTk") != std::string::npos) ||
         (string1.find("DTk") != std::string::npos) || (string1.find("DTK") != std::string::npos)) {
-      ppt->has_density_transfers = _TRUE_;
-      ppt->has_perturbations     = _TRUE_;
+      ppt->has_density_transfers = true;
+      ppt->has_perturbations     = true;
     }
 
     if ((string1.find("vTk") != std::string::npos) || (string1.find("VTk") != std::string::npos) ||
         (string1.find("VTK") != std::string::npos)) {
-      ppt->has_velocity_transfers = _TRUE_;
-      ppt->has_perturbations      = _TRUE_;
+      ppt->has_velocity_transfers = true;
+      ppt->has_perturbations      = true;
     }
   }
 
-  if (ppt->has_density_transfers == _TRUE_) {
+  if (ppt->has_density_transfers) {
     parser_read_string(pfc, "extra metric transfer functions", string1, &flag1);
 
     if ((flag1 == _TRUE_) &&
         ((string1.find("y") != std::string::npos) || (string1.find("y") != std::string::npos))) {
-      ppt->has_metricpotential_transfers = _TRUE_;
+      ppt->has_metricpotential_transfers = true;
     }
   }
 
-  if (ppt->has_cl_cmb_temperature == _TRUE_) {
+  if (ppt->has_cl_cmb_temperature) {
     parser_read_string(pfc, "temperature contributions", string1, &flag1);
 
     if (flag1 == _TRUE_) {
@@ -1204,38 +1198,38 @@ void InputModule::ReadDerived() {
     }
   }
 
-  if (ppt->has_cl_number_count == _TRUE_) {
+  if (ppt->has_cl_number_count) {
     parser_read_string(pfc, "number count contributions", string1, &flag1);
 
     if (flag1 == _TRUE_) {
       if (string1.find("density") != std::string::npos)
-        ppt->has_nc_density = _TRUE_;
+        ppt->has_nc_density = true;
       if (string1.find("rsd") != std::string::npos)
-        ppt->has_nc_rsd = _TRUE_;
+        ppt->has_nc_rsd = true;
       if (string1.find("lensing") != std::string::npos)
-        ppt->has_nc_lens = _TRUE_;
+        ppt->has_nc_lens = true;
       if (string1.find("gr") != std::string::npos)
-        ppt->has_nc_gr = _TRUE_;
+        ppt->has_nc_gr = true;
 
-      class_test((ppt->has_nc_density == _FALSE_) && (ppt->has_nc_rsd == _FALSE_) &&
-                     (ppt->has_nc_lens == _FALSE_) && (ppt->has_nc_gr == _FALSE_),
+      class_test((!ppt->has_nc_density) && (!ppt->has_nc_rsd) && (!ppt->has_nc_lens) &&
+                     (!ppt->has_nc_gr),
                  "In the field 'output', you selected number count Cl's, but in the field 'number "
                  "count contributions', you removed all contributions");
     }
 
     else {
       /* default: only the density contribution */
-      ppt->has_nc_density = _TRUE_;
+      ppt->has_nc_density = true;
     }
   }
 
-  if (ppt->has_perturbations == _TRUE_) {
+  if (ppt->has_perturbations) {
     /* perturbed recombination */
     parser_read_string(pfc, "perturbed recombination", string1, &flag1);
 
     if ((flag1 == _TRUE_) &&
         ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
-      ppt->has_perturbed_recombination = _TRUE_;
+      ppt->has_perturbed_recombination = true;
     }
 
     /* modes */
@@ -1244,16 +1238,16 @@ void InputModule::ReadDerived() {
     if (flag1 == _TRUE_) {
       /* if no modes are specified, the default is has_scalars=_TRUE_;
          but if they are specified we should reset has_scalars to _FALSE_ before reading */
-      ppt->has_scalars = _FALSE_;
+      ppt->has_scalars = false;
 
       if ((string1.find("s") != std::string::npos) || (string1.find("S") != std::string::npos))
-        ppt->has_scalars = _TRUE_;
+        ppt->has_scalars = true;
 
       if ((string1.find("v") != std::string::npos) || (string1.find("V") != std::string::npos))
-        ppt->has_vectors = _TRUE_;
+        ppt->has_vectors = true;
 
       if ((string1.find("t") != std::string::npos) || (string1.find("T") != std::string::npos))
-        ppt->has_tensors = _TRUE_;
+        ppt->has_tensors = true;
 
       class_test(class_none_of_three(ppt->has_scalars, ppt->has_vectors, ppt->has_tensors),
                  "You wrote: modes='%s'. Could not identify any of the modes ('s', 'v', 't') in "
@@ -1261,34 +1255,33 @@ void InputModule::ReadDerived() {
                  string1.c_str());
     }
 
-    if (ppt->has_scalars == _TRUE_) {
+    if (ppt->has_scalars) {
       parser_read_string(pfc, "ic", string1, &flag1);
 
       if (flag1 == _TRUE_) {
         /* if no initial conditions are specified, the default is has_ad=_TRUE_;
            but if they are specified we should reset has_ad to _FALSE_ before reading */
-        ppt->has_ad = _FALSE_;
+        ppt->has_ad = false;
 
         if ((string1.find("ad") != std::string::npos) || (string1.find("AD") != std::string::npos))
-          ppt->has_ad = _TRUE_;
+          ppt->has_ad = true;
 
         if ((string1.find("bi") != std::string::npos) || (string1.find("BI") != std::string::npos))
-          ppt->has_bi = _TRUE_;
+          ppt->has_bi = true;
 
         if ((string1.find("cdi") != std::string::npos) ||
             (string1.find("CDI") != std::string::npos))
-          ppt->has_cdi = _TRUE_;
+          ppt->has_cdi = true;
 
         if ((string1.find("nid") != std::string::npos) ||
             (string1.find("NID") != std::string::npos))
-          ppt->has_nid = _TRUE_;
+          ppt->has_nid = true;
 
         if ((string1.find("niv") != std::string::npos) ||
             (string1.find("NIV") != std::string::npos))
-          ppt->has_niv = _TRUE_;
+          ppt->has_niv = true;
 
-        class_test(ppt->has_ad == _FALSE_ && ppt->has_bi == _FALSE_ && ppt->has_cdi == _FALSE_ &&
-                       ppt->has_nid == _FALSE_ && ppt->has_niv == _FALSE_,
+        class_test(!ppt->has_ad && !ppt->has_bi && !ppt->has_cdi && !ppt->has_nid && !ppt->has_niv,
                    "You wrote: ic='%s'. Could not identify any of the initial conditions ('ad', "
                    "'bi', 'cdi', 'nid', 'niv') in such input",
                    string1.c_str());
@@ -1296,25 +1289,25 @@ void InputModule::ReadDerived() {
     }
 
     else {
-      class_test(ppt->has_cl_cmb_lensing_potential == _TRUE_,
+      class_test(ppt->has_cl_cmb_lensing_potential,
                  "Inconsistency: you want C_l's for cmb lensing potential, but no scalar modes\n");
 
-      class_test(ppt->has_pk_matter == _TRUE_,
+      class_test(ppt->has_pk_matter,
                  "Inconsistency: you want P(k) of matter, but no scalar modes\n");
     }
 
-    if (ppt->has_vectors == _TRUE_) {
-      class_test(
-          (ppt->has_cl_cmb_temperature == _FALSE_) && (ppt->has_cl_cmb_polarization == _FALSE_),
-          "inconsistent input: you asked for vectors, so you should have at least one non-zero "
-          "tensor source type (temperature or polarization). Please adjust your input.");
+    if (ppt->has_vectors) {
+      class_test((!ppt->has_cl_cmb_temperature) && (!ppt->has_cl_cmb_polarization),
+                 "inconsistent input: you asked for vectors, so you should have at least one "
+                 "non-zero "
+                 "tensor source type (temperature or polarization). Please adjust your input.");
     }
 
-    if (ppt->has_tensors == _TRUE_) {
-      class_test(
-          (ppt->has_cl_cmb_temperature == _FALSE_) && (ppt->has_cl_cmb_polarization == _FALSE_),
-          "inconsistent input: you asked for tensors, so you should have at least one non-zero "
-          "tensor source type (temperature or polarization). Please adjust your input.");
+    if (ppt->has_tensors) {
+      class_test((!ppt->has_cl_cmb_temperature) && (!ppt->has_cl_cmb_polarization),
+                 "inconsistent input: you asked for tensors, so you should have at least one "
+                 "non-zero "
+                 "tensor source type (temperature or polarization). Please adjust your input.");
     }
   }
 
@@ -1361,7 +1354,7 @@ void InputModule::ReadDerived() {
     class_test(k1 <= 0., "enter strictly positive scale k1");
     class_test(k2 <= 0., "enter strictly positive scale k2");
 
-    if (ppt->has_scalars == _TRUE_) {
+    if (ppt->has_scalars) {
       class_read_double("P_{RR}^1", prr1);
       class_read_double("P_{RR}^2", prr2);
       class_test(prr1 <= 0., "enter strictly positive scale P_{RR}^1");
@@ -1370,8 +1363,7 @@ void InputModule::ReadDerived() {
       ppm->n_s = log(prr2 / prr1) / log(k2 / k1) + 1.;
       ppm->A_s = prr1 * exp((ppm->n_s - 1.) * log(ppm->k_pivot / k1));
 
-      if ((ppt->has_bi == _TRUE_) || (ppt->has_cdi == _TRUE_) || (ppt->has_nid == _TRUE_) ||
-          (ppt->has_niv == _TRUE_)) {
+      if ((ppt->has_bi) || (ppt->has_cdi) || (ppt->has_nid) || (ppt->has_niv)) {
         class_read_double("P_{II}^1", pii1);
         class_read_double("P_{II}^2", pii2);
         class_read_double("P_{RI}^1", pri1);
@@ -1437,28 +1429,28 @@ void InputModule::ReadDerived() {
         f_iso = sqrt(pii1 / prr1) * exp(0.5 * (n_iso - ppm->n_s) * log(ppm->k_pivot / k1));
       }
 
-      if (ppt->has_bi == _TRUE_) {
+      if (ppt->has_bi) {
         ppm->f_bi    = f_iso;
         ppm->n_bi    = n_iso;
         ppm->c_ad_bi = c_cor;
         ppm->n_ad_bi = n_cor;
       }
 
-      if (ppt->has_cdi == _TRUE_) {
+      if (ppt->has_cdi) {
         ppm->f_cdi    = f_iso;
         ppm->n_cdi    = n_iso;
         ppm->c_ad_cdi = c_cor;
         ppm->n_ad_cdi = n_cor;
       }
 
-      if (ppt->has_nid == _TRUE_) {
+      if (ppt->has_nid) {
         ppm->f_nid    = f_iso;
         ppm->n_nid    = n_iso;
         ppm->c_ad_nid = c_cor;
         ppm->n_ad_nid = n_cor;
       }
 
-      if (ppt->has_niv == _TRUE_) {
+      if (ppt->has_niv) {
         ppm->f_niv    = f_iso;
         ppm->n_niv    = n_iso;
         ppm->c_ad_niv = c_cor;
@@ -1470,7 +1462,7 @@ void InputModule::ReadDerived() {
   }
 
   else if (ppm->primordial_spec_type == analytic_Pk) {
-    if (ppt->has_scalars == _TRUE_) {
+    if (ppt->has_scalars) {
       int flag4;
       double param4;
       parser_read_double(pfc, "A_s", &param1, &flag1);
@@ -1497,105 +1489,105 @@ void InputModule::ReadDerived() {
         class_test(param4 < 0., "S8 should be non-negative");
       }
 
-      if (ppt->has_ad == _TRUE_) {
+      if (ppt->has_ad) {
         class_read_double("n_s", ppm->n_s);
         class_read_double("alpha_s", ppm->alpha_s);
       }
 
-      if (ppt->has_bi == _TRUE_) {
+      if (ppt->has_bi) {
         class_read_double("f_bi", ppm->f_bi);
         class_read_double("n_bi", ppm->n_bi);
         class_read_double("alpha_bi", ppm->alpha_bi);
       }
 
-      if (ppt->has_cdi == _TRUE_) {
+      if (ppt->has_cdi) {
         class_read_double("f_cdi", ppm->f_cdi);
         class_read_double("n_cdi", ppm->n_cdi);
         class_read_double("alpha_cdi", ppm->alpha_cdi);
       }
 
-      if (ppt->has_nid == _TRUE_) {
+      if (ppt->has_nid) {
         class_read_double("f_nid", ppm->f_nid);
         class_read_double("n_nid", ppm->n_nid);
         class_read_double("alpha_nid", ppm->alpha_nid);
       }
 
-      if (ppt->has_niv == _TRUE_) {
+      if (ppt->has_niv) {
         class_read_double("f_niv", ppm->f_niv);
         class_read_double("n_niv", ppm->n_niv);
         class_read_double("alpha_niv", ppm->alpha_niv);
       }
 
-      if ((ppt->has_ad == _TRUE_) && (ppt->has_bi == _TRUE_)) {
+      if ((ppt->has_ad) && (ppt->has_bi)) {
         class_read_double_one_of_two("c_ad_bi", "c_bi_ad", ppm->c_ad_bi);
         class_read_double_one_of_two("n_ad_bi", "n_bi_ad", ppm->n_ad_bi);
         class_read_double_one_of_two("alpha_ad_bi", "alpha_bi_ad", ppm->alpha_ad_bi);
       }
 
-      if ((ppt->has_ad == _TRUE_) && (ppt->has_cdi == _TRUE_)) {
+      if ((ppt->has_ad) && (ppt->has_cdi)) {
         class_read_double_one_of_two("c_ad_cdi", "c_cdi_ad", ppm->c_ad_cdi);
         class_read_double_one_of_two("n_ad_cdi", "n_cdi_ad", ppm->n_ad_cdi);
         class_read_double_one_of_two("alpha_ad_cdi", "alpha_cdi_ad", ppm->alpha_ad_cdi);
       }
 
-      if ((ppt->has_ad == _TRUE_) && (ppt->has_nid == _TRUE_)) {
+      if ((ppt->has_ad) && (ppt->has_nid)) {
         class_read_double_one_of_two("c_ad_nid", "c_nid_ad", ppm->c_ad_nid);
         class_read_double_one_of_two("n_ad_nid", "n_nid_ad", ppm->n_ad_nid);
         class_read_double_one_of_two("alpha_ad_nid", "alpha_nid_ad", ppm->alpha_ad_nid);
       }
 
-      if ((ppt->has_ad == _TRUE_) && (ppt->has_niv == _TRUE_)) {
+      if ((ppt->has_ad) && (ppt->has_niv)) {
         class_read_double_one_of_two("c_ad_niv", "c_niv_ad", ppm->c_ad_niv);
         class_read_double_one_of_two("n_ad_niv", "n_niv_ad", ppm->n_ad_niv);
         class_read_double_one_of_two("alpha_ad_niv", "alpha_niv_ad", ppm->alpha_ad_niv);
       }
 
-      if ((ppt->has_bi == _TRUE_) && (ppt->has_cdi == _TRUE_)) {
+      if ((ppt->has_bi) && (ppt->has_cdi)) {
         class_read_double_one_of_two("c_bi_cdi", "c_cdi_bi", ppm->c_bi_cdi);
         class_read_double_one_of_two("n_bi_cdi", "n_cdi_bi", ppm->n_bi_cdi);
         class_read_double_one_of_two("alpha_bi_cdi", "alpha_cdi_bi", ppm->alpha_bi_cdi);
       }
 
-      if ((ppt->has_bi == _TRUE_) && (ppt->has_nid == _TRUE_)) {
+      if ((ppt->has_bi) && (ppt->has_nid)) {
         class_read_double_one_of_two("c_bi_nid", "c_nid_bi", ppm->c_bi_nid);
         class_read_double_one_of_two("n_bi_nid", "n_nid_bi", ppm->n_bi_nid);
         class_read_double_one_of_two("alpha_bi_nid", "alpha_nid_bi", ppm->alpha_bi_nid);
       }
 
-      if ((ppt->has_bi == _TRUE_) && (ppt->has_niv == _TRUE_)) {
+      if ((ppt->has_bi) && (ppt->has_niv)) {
         class_read_double_one_of_two("c_bi_niv", "c_niv_bi", ppm->c_bi_niv);
         class_read_double_one_of_two("n_bi_niv", "n_niv_bi", ppm->n_bi_niv);
         class_read_double_one_of_two("alpha_bi_niv", "alpha_niv_bi", ppm->alpha_bi_niv);
       }
 
-      if ((ppt->has_cdi == _TRUE_) && (ppt->has_nid == _TRUE_)) {
+      if ((ppt->has_cdi) && (ppt->has_nid)) {
         class_read_double_one_of_two("c_cdi_nid", "c_nid_cdi", ppm->c_cdi_nid);
         class_read_double_one_of_two("n_cdi_nid", "n_nid_cdi", ppm->n_cdi_nid);
         class_read_double_one_of_two("alpha_cdi_nid", "alpha_nid_cdi", ppm->alpha_cdi_nid);
       }
 
-      if ((ppt->has_cdi == _TRUE_) && (ppt->has_niv == _TRUE_)) {
+      if ((ppt->has_cdi) && (ppt->has_niv)) {
         class_read_double_one_of_two("c_cdi_niv", "c_niv_cdi", ppm->c_cdi_niv);
         class_read_double_one_of_two("n_cdi_niv", "n_niv_cdi", ppm->n_cdi_niv);
         class_read_double_one_of_two("alpha_cdi_niv", "alpha_niv_cdi", ppm->alpha_cdi_niv);
       }
 
-      if ((ppt->has_nid == _TRUE_) && (ppt->has_niv == _TRUE_)) {
+      if ((ppt->has_nid) && (ppt->has_niv)) {
         class_read_double_one_of_two("c_nid_niv", "c_niv_nid", ppm->c_nid_niv);
         class_read_double_one_of_two("n_nid_niv", "n_niv_nid", ppm->n_nid_niv);
         class_read_double_one_of_two("alpha_nid_niv", "alpha_niv_nid", ppm->alpha_nid_niv);
       }
     }
 
-    if (ppt->has_tensors == _TRUE_) {
+    if (ppt->has_tensors) {
       class_read_double("r", ppm->r);
 
-      if (ppt->has_scalars == _FALSE_) {
+      if (!ppt->has_scalars) {
         class_read_double("A_s", ppm->A_s);
       }
 
       if (ppm->r <= 0) {
-        ppt->has_tensors = _FALSE_;
+        ppt->has_tensors = false;
       }
       else {
         parser_read_string(pfc, "n_t", string1, &flag1);
@@ -1818,37 +1810,35 @@ void InputModule::ReadDerived() {
   /* Tests moved from primordial module: */
   if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_H) ||
       (ppm->primordial_spec_type == inflation_V_end)) {
-    class_test(ppt->has_scalars == _FALSE_,
+    class_test(!ppt->has_scalars,
                "inflationary module cannot work if you do not ask for scalar modes");
 
-    class_test(ppt->has_vectors == _TRUE_,
-               "inflationary module cannot work if you ask for vector modes");
+    class_test(ppt->has_vectors, "inflationary module cannot work if you ask for vector modes");
 
-    class_test(ppt->has_tensors == _FALSE_,
+    class_test(!ppt->has_tensors,
                "inflationary module cannot work if you do not ask for tensor modes");
 
-    class_test(ppt->has_bi == _TRUE_ || ppt->has_cdi == _TRUE_ || ppt->has_nid == _TRUE_ ||
-                   ppt->has_niv == _TRUE_,
+    class_test(ppt->has_bi || ppt->has_cdi || ppt->has_nid || ppt->has_niv,
                "inflationary module cannot work if you ask for isocurvature modes");
   }
 
   /** (e) parameters for final spectra */
 
-  if (ppt->has_cls == _TRUE_) {
-    if (ppt->has_scalars == _TRUE_) {
-      if ((ppt->has_cl_cmb_temperature == _TRUE_) || (ppt->has_cl_cmb_polarization == _TRUE_) ||
-          (ppt->has_cl_cmb_lensing_potential == _TRUE_))
+  if (ppt->has_cls) {
+    if (ppt->has_scalars) {
+      if ((ppt->has_cl_cmb_temperature) || (ppt->has_cl_cmb_polarization) ||
+          (ppt->has_cl_cmb_lensing_potential))
         class_read_double("l_max_scalars", ppt->l_scalar_max);
 
-      if ((ppt->has_cl_lensing_potential == _TRUE_) || (ppt->has_cl_number_count == _TRUE_))
+      if ((ppt->has_cl_lensing_potential) || (ppt->has_cl_number_count))
         class_read_double("l_max_lss", ppt->l_lss_max);
     }
 
-    if (ppt->has_vectors == _TRUE_) {
+    if (ppt->has_vectors) {
       class_read_double("l_max_vectors", ppt->l_vector_max);
     }
 
-    if (ppt->has_tensors == _TRUE_) {
+    if (ppt->has_tensors) {
       class_read_double("l_max_tensors", ppt->l_tensor_max);
     }
   }
@@ -1857,10 +1847,9 @@ void InputModule::ReadDerived() {
 
   if ((flag1 == _TRUE_) &&
       ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
-    if ((ppt->has_scalars == _TRUE_) &&
-        ((ppt->has_cl_cmb_temperature == _TRUE_) || (ppt->has_cl_cmb_polarization == _TRUE_)) &&
-        (ppt->has_cl_cmb_lensing_potential == _TRUE_)) {
-      ple->has_lensed_cls = _TRUE_;
+    if ((ppt->has_scalars) && ((ppt->has_cl_cmb_temperature) || (ppt->has_cl_cmb_polarization)) &&
+        (ppt->has_cl_cmb_lensing_potential)) {
+      ple->has_lensed_cls = true;
     }
     else {
       class_stop(
@@ -1871,14 +1860,13 @@ void InputModule::ReadDerived() {
     }
   }
 
-  if ((ppt->has_scalars == _TRUE_) && (ppt->has_cl_cmb_lensing_potential == _TRUE_)) {
+  if ((ppt->has_scalars) && (ppt->has_cl_cmb_lensing_potential)) {
     class_read_double("lcmb_rescale", ptr->lcmb_rescale);
     class_read_double("lcmb_tilt", ptr->lcmb_tilt);
     class_read_double("lcmb_pivot", ptr->lcmb_pivot);
   }
 
-  if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) ||
-      (ppt->has_velocity_transfers == _TRUE_)) {
+  if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
     parser_read_double(pfc, "P_k_max_h/Mpc", &param1, &flag1);
     parser_read_double(pfc, "P_k_max_1/Mpc", &param2, &flag2);
     class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
@@ -1907,17 +1895,17 @@ void InputModule::ReadDerived() {
   }
 
   /** Do we want density and velocity transfer functions in Nbody gauge? */
-  if ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_)) {
+  if ((ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
     parser_read_string(pfc, "Nbody gauge transfer functions", string1, &flag1);
 
     if ((flag1 == _TRUE_) &&
         ((string1.find("y") != std::string::npos) || (string1.find("y") != std::string::npos))) {
-      ppt->has_Nbody_gauge_transfers = _TRUE_;
+      ppt->has_Nbody_gauge_transfers = true;
     }
   }
 
   /* deal with selection functions */
-  if ((ppt->has_cl_number_count == _TRUE_) || (ppt->has_cl_lensing_potential == _TRUE_)) {
+  if ((ppt->has_cl_number_count) || (ppt->has_cl_lensing_potential)) {
     parser_read_string(pfc, "selection", string1, &flag1);
 
     if (flag1 == _TRUE_) {
@@ -2060,10 +2048,10 @@ void InputModule::ReadDerived() {
 
     if (flag1 == _TRUE_) {
       if ((string1.find("analytic") != std::string::npos)) {
-        ptr->has_nz_analytic = _TRUE_;
+        ptr->has_nz_analytic = true;
       }
       else {
-        ptr->has_nz_file = _TRUE_;
+        ptr->has_nz_file = true;
         class_read_string("dNdz_selection", ptr->nz_file_name);
       }
     }
@@ -2072,10 +2060,10 @@ void InputModule::ReadDerived() {
 
     if (flag1 == _TRUE_) {
       if ((string1.find("analytic") != std::string::npos)) {
-        ptr->has_nz_evo_analytic = _TRUE_;
+        ptr->has_nz_evo_analytic = true;
       }
       else {
-        ptr->has_nz_evo_file = _TRUE_;
+        ptr->has_nz_evo_file = true;
         class_read_string("dNdz_evolution", ptr->nz_evo_file_name);
       }
     }
@@ -2099,9 +2087,8 @@ void InputModule::ReadDerived() {
   /* end of selection function section */
 
   /* deal with z_max issues */
-  if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) ||
-      (ppt->has_velocity_transfers == _TRUE_) || (ppt->has_cl_number_count == _TRUE_) ||
-      (ppt->has_cl_lensing_potential == _TRUE_)) {
+  if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers) ||
+      (ppt->has_cl_number_count) || (ppt->has_cl_lensing_potential)) {
     parser_read_double(pfc, "z_max_pk", &param1, &flag1);
 
     if (flag1 == _TRUE_) {
@@ -2110,14 +2097,13 @@ void InputModule::ReadDerived() {
     else {
       ppt->z_max_pk = 0.;
 
-      if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) ||
-          (ppt->has_velocity_transfers == _TRUE_)) {
+      if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
         for (i = 0; i < pop->z_pk_num; i++) {
           ppt->z_max_pk = MAX(ppt->z_max_pk, pop->z_pk[i]);
         }
       }
 
-      if ((ppt->has_cl_number_count == _TRUE_) || (ppt->has_cl_lensing_potential == _TRUE_)) {
+      if ((ppt->has_cl_number_count) || (ppt->has_cl_lensing_potential)) {
         for (int bin = 0; bin < ppt->selection_num; bin++) {
           /* the few lines below should be consistent with their counterpart in transfer.c, in transfer_selection_times() */
           if (ppt->selection == gaussian) {
@@ -2175,7 +2161,7 @@ void InputModule::ReadDerived() {
   parser_read_string(pfc, "non linear", string1, &flag1);
 
   if (flag1 == _TRUE_) {
-    class_test(ppt->has_perturbations == _FALSE_,
+    class_test(!ppt->has_perturbations,
                "You requested non linear computation but no linear computation. You must set "
                "output to tCl or similar.");
 
@@ -2185,7 +2171,7 @@ void InputModule::ReadDerived() {
       pnl->method       = nl_halofit;
       ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
                               MAX(ppr->halofit_min_k_max, ppr->nonlinear_min_k_max));
-      ppt->has_nl_corrections_based_on_delta_m = _TRUE_;
+      ppt->has_nl_corrections_based_on_delta_m = true;
     }
     if ((string1.find("hmcode") != std::string::npos) ||
         (string1.find("HMCODE") != std::string::npos) ||
@@ -2194,7 +2180,7 @@ void InputModule::ReadDerived() {
       pnl->method       = nl_HMcode;
       ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
                               MAX(ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max));
-      ppt->has_nl_corrections_based_on_delta_m = _TRUE_;
+      ppt->has_nl_corrections_based_on_delta_m = true;
       class_read_int("extrapolation_method", pnl->extrapolation_method);
 
       parser_read_string(pfc, "feedback model", string1, &flag1);
@@ -2254,7 +2240,7 @@ void InputModule::ReadDerived() {
      inside the module (see issue #20). With no scalars, has_pk_matter is
      already _FALSE_ (enforced above), so clearing method makes the nonlinear
      module skip via its generic "nothing requested" gate. */
-  if (ppt->has_scalars == _FALSE_) {
+  if (!ppt->has_scalars) {
     pnl->method = nl_none;
   }
 
@@ -2278,7 +2264,7 @@ void InputModule::ReadDerived() {
 
   class_read_int("output_verbose", pop->output_verbose);
 
-  if (ppt->has_tensors == _TRUE_) {
+  if (ppt->has_tensors) {
     /** - ---> Include ur and ncdm shear in tensor computation? */
     parser_read_string(pfc, "tensor method", string1, &flag1);
     if (flag1 == _TRUE_) {
@@ -2294,7 +2280,7 @@ void InputModule::ReadDerived() {
   /** - ---> derivatives of baryon sound speed only computed if some non-minimal tight-coupling schemes is requested */
   if ((ppr->tight_coupling_approximation == (int) first_order_CLASS) ||
       (ppr->tight_coupling_approximation == (int) second_order_CLASS)) {
-    pth->compute_cb2_derivatives = _TRUE_;
+    pth->compute_cb2_derivatives = true;
   }
 
   class_test(ppr->ur_fluid_trigger_tau_over_tau_k ==
@@ -2381,7 +2367,7 @@ void InputModule::ReadDerived() {
              "better performance.");
 
   /** (i) Write values in file */
-  if (ple->has_lensed_cls == _TRUE_)
+  if (ple->has_lensed_cls)
     ppt->l_scalar_max += ppr->delta_l_max;
 
   /** - (i.1.) shall we write background quantities in a file? */
@@ -2457,7 +2443,7 @@ void InputModule::ReadDerived() {
 
       if ((flag1 == _TRUE_) &&
           ((string1.find("y") != std::string::npos) || (string1.find("Y") != std::string::npos))) {
-        pnl->has_pk_eq = _TRUE_;
+        pnl->has_pk_eq = true;
       }
     }
   }

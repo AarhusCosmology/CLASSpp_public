@@ -67,9 +67,7 @@
  *
  * In summary, the following functions can be called from other modules:
  *
- * -# thermodynamics_init() at the beginning (but after background_init())
- * -# thermodynamics_at_z() at any later time
- * -# thermodynamics_free() at the end, when no more calls to thermodynamics_at_z() are needed
+ * -# thermodynamics_at_z() at any time during the module's lifetime
  */
 
 #include "thermodynamics_module.h"
@@ -90,9 +88,7 @@ ThermodynamicsModule::ThermodynamicsModule(InputModulePtr input_module,
   thermodynamics_init();
 }
 
-ThermodynamicsModule::~ThermodynamicsModule() {
-  thermodynamics_free();
-}
+ThermodynamicsModule::~ThermodynamicsModule() {}
 
 // Wrapper functions to pass non-static member functions
 int ThermodynamicsModule::thermodynamics_derivs_with_recfast(double z,
@@ -120,7 +116,7 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast(double z,
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_at_z(
+void ThermodynamicsModule::thermodynamics_at_z(
     double z, short inter_mode, int* last_index, double* pvecback, double* pvecthermo) const {
   /** Summary: */
 
@@ -145,7 +141,7 @@ int ThermodynamicsModule::thermodynamics_at_z(
         thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_d_] *
         pow((1 + z) / (1. + z_table_[tt_size_ - 1]), 2);
 
-    if (pth->compute_damping_scale == _TRUE_) {
+    if (pth->compute_damping_scale) {
       /* r_d scales like (1+z)**-3/2 */
       pvecthermo[index_th_r_d_] = thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_r_d_] *
                                   pow((1 + z) / (1. + z_table_[tt_size_ - 1]), -1.5);
@@ -186,7 +182,7 @@ int ThermodynamicsModule::thermodynamics_at_z(
     pvecthermo[index_th_cb2_] = pvecthermo[index_th_wb_] * 4. / 3.;
 
     /* derivatives of baryon sound speed (only computed if some non-minimal tight-coupling schemes is requested) */
-    if (pth->compute_cb2_derivatives == _TRUE_) {
+    if (pth->compute_cb2_derivatives) {
       /* since cb2 proportional to (1+z) or 1/a, its derivative wrt conformal time is given by dcb2 = - a H cb2 */
       pvecthermo[index_th_dcb2_] = -pvecback[background_module_->index_bg_H_] *
                                    pvecback[background_module_->index_bg_a_] *
@@ -299,7 +295,6 @@ int ThermodynamicsModule::thermodynamics_at_z(
       }
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -308,7 +303,7 @@ int ThermodynamicsModule::thermodynamics_at_z(
  *
  * @return the error status
  */
-int ThermodynamicsModule::thermodynamics_init() {
+void ThermodynamicsModule::thermodynamics_init() {
   /** Summary: */
 
   /** - define local variables */
@@ -584,7 +579,7 @@ int ThermodynamicsModule::thermodynamics_init() {
       different from Wayne Hu (WH)'s thesis eq. (5.59):
       the factor 16/15 in CT is 4/5 in WH */
 
-  if (pth->compute_damping_scale == _TRUE_) {
+  if (pth->compute_damping_scale) {
     tau_table_growing.resize(tt_size_);
 
     /* compute integrand and store temporarily in column "ddkappa" */
@@ -671,7 +666,7 @@ int ThermodynamicsModule::thermodynamics_init() {
                                             index_th_g_);
 
   /** - --> derivatives of baryon sound speed (only computed if some non-minimal tight-coupling schemes is requested) */
-  if (pth->compute_cb2_derivatives == _TRUE_) {
+  if (pth->compute_cb2_derivatives) {
     /** - ---> second derivative with respect to tau of cb2 */
     array_spline_table_line_to_line(tau_table.data(),
                                     tt_size_,
@@ -1019,7 +1014,7 @@ int ThermodynamicsModule::thermodynamics_init() {
 
   /** - find damping scale at recombination (using linear interpolation) */
 
-  if (pth->compute_damping_scale == _TRUE_) {
+  if (pth->compute_damping_scale) {
     rd_rec_ = (z_table_[index_tau + 1] - z_rec_) / (z_table_[index_tau + 1] - z_table_[index_tau]) *
                   thermodynamics_table_[(index_tau) *th_size_ + index_th_r_d_] +
               (z_rec_ - z_table_[index_tau]) / (z_table_[index_tau + 1] - z_table_[index_tau]) *
@@ -1113,7 +1108,7 @@ int ThermodynamicsModule::thermodynamics_init() {
   da_star_ = pvecback[background_module_->index_bg_ang_distance_];
   ra_star_ = da_star_ * (1. + z_star_) / pba->a_today;
 
-  if (pth->compute_damping_scale == _TRUE_) {
+  if (pth->compute_damping_scale) {
     rd_star_ = (z_table_[index_tau + 1] - z_star_) /
                    (z_table_[index_tau + 1] - z_table_[index_tau]) *
                    thermodynamics_table_[(index_tau) *th_size_ + index_th_r_d_] +
@@ -1212,7 +1207,7 @@ int ThermodynamicsModule::thermodynamics_init() {
     printf("    with comoving sound horizon = %f Mpc\n", rs_rec_);
     printf("    angular diameter distance = %f Mpc\n", da_rec_);
     printf("    and sound horizon angle 100*theta_s = %f\n", 100. * rs_rec_ / ra_rec_);
-    if (pth->compute_damping_scale == _TRUE_) {
+    if (pth->compute_damping_scale) {
       printf("    and with comoving photon damping scale = %f Mpc\n", rd_rec_);
       printf("    or comoving damping wavenumber k_d = %f 1/Mpc\n", 2. * _PI_ / rd_rec_);
     }
@@ -1248,8 +1243,6 @@ int ThermodynamicsModule::thermodynamics_init() {
              tau_idm_dr_fs);
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1258,10 +1251,6 @@ int ThermodynamicsModule::thermodynamics_init() {
  *
  * @return the error status
  */
-
-int ThermodynamicsModule::thermodynamics_free() {
-  return _SUCCESS_;
-}
 
 /**
  * Assign value to each relevant index in vectors of thermodynamical quantities,
@@ -1273,7 +1262,7 @@ int ThermodynamicsModule::thermodynamics_free() {
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionization* preio) {
+void ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionization* preio) {
   /** Summary: */
 
   /** - define local variables */
@@ -1331,7 +1320,7 @@ int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionizat
   }
 
   /* derivatives of baryon sound speed (only computed if some non-minimal tight-coupling schemes is requested) */
-  if (pth->compute_cb2_derivatives == _TRUE_) {
+  if (pth->compute_cb2_derivatives) {
     index_th_dcb2_ = index;
     index++;
     index_th_ddcb2_ = index;
@@ -1341,7 +1330,7 @@ int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionizat
   index_th_rate_ = index;
   index++;
 
-  if (pth->compute_damping_scale == _TRUE_) {
+  if (pth->compute_damping_scale) {
     index_th_r_d_ = index;
     index++;
   }
@@ -1466,8 +1455,6 @@ int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionizat
 
   inter_normal_  = 0;
   inter_closeby_ = 1;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1481,7 +1468,7 @@ int ThermodynamicsModule::thermodynamics_indices(recombination* preco, reionizat
  *
  * @return the error status
  */
-int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
+void ThermodynamicsModule::thermodynamics_helium_from_bbn() {
   std::string line;
   const char* left;
 
@@ -1671,8 +1658,6 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
                            1);
 
   /** - deallocate arrays */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1688,9 +1673,9 @@ int ThermodynamicsModule::thermodynamics_helium_from_bbn() {
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombination* preco,
-                                                                    double z,
-                                                                    double* energy_rate) {
+void ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombination* preco,
+                                                                     double z,
+                                                                     double* energy_rate) {
   /*redshift-dependent annihilation parameter*/
 
   double annihilation_at_z;
@@ -1737,8 +1722,6 @@ int ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombinatio
                      (pow((1. + z), 3) * annihilation_at_z + preco->annihilation_f_halo * erfc) +
                  rho_cdm_today * pow((1 + z), 3) * preco->decay;
   /* energy density rate in J/m^3/s (remember that annihilation_at_z is in m^3/s/Kg and decay in s^-1) */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1754,13 +1737,13 @@ int ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombinatio
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco,
-                                                          double z,
-                                                          double* energy_rate) {
+void ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco,
+                                                           double z,
+                                                           double* energy_rate) {
   if (preco->annihilation > 0) {
     double result;
 
-    if (preco->has_on_the_spot == _FALSE_) {
+    if (!preco->has_on_the_spot) {
       /* number of hydrogen nuclei today in m**-3 */
       double nH0 = 3. * preco->H0 * preco->H0 * pba->Omega0_b / (8. * _PI_ * _G_ * _m_H_) *
                    (1. - preco->YHe);
@@ -1824,8 +1807,6 @@ int ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco,
   else {
     *energy_rate = 0.;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1838,9 +1819,9 @@ int ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco,
  * @param xe    Output: \f$ X_e(z) \f$
  */
 
-int ThermodynamicsModule::thermodynamics_reionization_function(double z,
-                                                               reionization* preio,
-                                                               double* xe) {
+void ThermodynamicsModule::thermodynamics_reionization_function(double z,
+                                                                reionization* preio,
+                                                                double* xe) {
   /** Summary: */
 
   /** - define local variables */
@@ -1893,7 +1874,7 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
       }
     }
 
-    return _SUCCESS_;
+    return;
   }
 
   /** - implementation of binned ionization function similar to astro-ph/0606552 */
@@ -1955,7 +1936,7 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
                  preio->reionization_parameters[preio->index_reio_first_xe + i]);
     }
 
-    return _SUCCESS_;
+    return;
   }
 
   /** - implementation of many tanh jumps */
@@ -1992,7 +1973,7 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
       *xe = preio->reionization_parameters[preio->index_reio_first_xe];
     }
 
-    return _SUCCESS_;
+    return;
   }
 
   /** - implementation of reio_inter */
@@ -2032,7 +2013,7 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
                  preio->reionization_parameters[preio->index_reio_first_xe + i + 1]);
     }
 
-    return _SUCCESS_;
+    return;
   }
 
   class_test(0 == 0, "value of reio_parametrization=%d unclear", pth->reio_parametrization);
@@ -2048,9 +2029,9 @@ int ThermodynamicsModule::thermodynamics_reionization_function(double z,
  * @param xe    Output: \f$ X_e(z) \f$ at z
  */
 
-int ThermodynamicsModule::thermodynamics_get_xe_before_reionization(recombination* preco,
-                                                                    double z,
-                                                                    double* xe) {
+void ThermodynamicsModule::thermodynamics_get_xe_before_reionization(recombination* preco,
+                                                                     double z,
+                                                                     double* xe) {
   int last_index = 0;
 
   array_interpolate_one_growing_closeby(preco->recombination_table.data(),
@@ -2061,8 +2042,6 @@ int ThermodynamicsModule::thermodynamics_get_xe_before_reionization(recombinatio
                                         &last_index,
                                         preco->index_re_xe,
                                         xe);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2078,9 +2057,9 @@ int ThermodynamicsModule::thermodynamics_get_xe_before_reionization(recombinatio
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
-                                                      reionization* preio,
-                                                      double* pvecback) {
+void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
+                                                       reionization* preio,
+                                                       double* pvecback) {
   /** Summary: */
 
   /** - define local variables */
@@ -2273,7 +2252,7 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
       z_reionization_ = preio->reionization_parameters[preio->index_reio_redshift];
     }
 
-    return _SUCCESS_;
+    return;
   }
 
   /** - (b) if reionization implemented with reio_bins_tanh scheme */
@@ -2364,7 +2343,7 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
     tau_reionization_ = preio->reionization_optical_depth;
 
-    return _SUCCESS_;
+    return;
   }
 
   /** - (c) if reionization implemented with reio_many_tanh scheme */
@@ -2477,7 +2456,7 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
     tau_reionization_ = preio->reionization_optical_depth;
 
-    return _SUCCESS_;
+    return;
   }
 
   /** - (d) if reionization implemented with reio_inter scheme */
@@ -2564,7 +2543,7 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
     tau_reionization_ = preio->reionization_optical_depth;
 
-    return _SUCCESS_;
+    return;
   }
 
   class_test(0 == 0, "value of reio_z_or_tau=%d unclear", pth->reio_z_or_tau);
@@ -2580,9 +2559,9 @@ int ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* preco,
-                                                             reionization* preio,
-                                                             double* pvecback) {
+void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* preco,
+                                                              reionization* preio,
+                                                              double* pvecback) {
   /** Summary: */
 
   double Yp = YHe_;
@@ -2848,8 +2827,6 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
                              preio->index_re_dkappadz,
                              preio->index_re_d3kappadz3,
                              &(preio->reionization_optical_depth));
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2857,7 +2834,7 @@ int ThermodynamicsModule::thermodynamics_reionization_sample(recombination* prec
  *
  */
 
-int ThermodynamicsModule::thermodynamics_recombination(recombination* preco, double* pvecback) {
+void ThermodynamicsModule::thermodynamics_recombination(recombination* preco, double* pvecback) {
   if (pth->recombination == hyrec) {
     thermodynamics_recombination_with_hyrec(preco, pvecback);
   }
@@ -2865,8 +2842,6 @@ int ThermodynamicsModule::thermodynamics_recombination(recombination* preco, dou
   if (pth->recombination == recfast) {
     thermodynamics_recombination_with_recfast(preco, pvecback);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2887,8 +2862,8 @@ int ThermodynamicsModule::thermodynamics_recombination(recombination* preco, dou
  * @param pvecback Input: pointer to an allocated (but empty) vector of background variables
  */
 
-int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination* preco,
-                                                                  double* pvecback) {
+void ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination* preco,
+                                                                   double* pvecback) {
   /** Summary: */
 #ifdef HYREC
 
@@ -3157,8 +3132,6 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
       "after setting in the Makefile the appropriate path HYREC=... ");
 
 #endif
-
-  return _SUCCESS_;
 }
 
 /**
@@ -3203,8 +3176,8 @@ int ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination*
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombination* preco,
-                                                                    double* pvecback) {
+void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombination* preco,
+                                                                     double* pvecback) {
   /** Summary: */
 
   /** - define local variables */
@@ -3561,8 +3534,6 @@ int ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinatio
   /** - cleanup generic integrator with cleanup_generic_integrator() */
 
   cleanup_generic_integrator(&gi);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -3843,8 +3814,8 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
  * @return the error status
  */
 
-int ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* preco,
-                                                             reionization* preio) {
+void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* preco,
+                                                              reionization* preio) {
   /** Summary: */
 
   /** - define local variables */
@@ -3961,15 +3932,13 @@ int ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* prec
     preio->reionization_table.clear();
     preio->reionization_table.shrink_to_fit();
   }
-
-  return _SUCCESS_;
 }
 
 /**
  * Subroutine for formatting thermodynamics output
  */
 
-int ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) const {
+void ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) const {
   class_store_columntitle(titles, "z", _TRUE_);
   class_store_columntitle(titles, "conf. time [Mpc]", _TRUE_);
   class_store_columntitle(titles, "x_e", _TRUE_);
@@ -3991,11 +3960,9 @@ int ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) cons
     class_store_columntitle(titles, "T_idm_dr", _TRUE_);
     class_store_columntitle(titles, "dmu_idr", _TRUE_);
   }
-
-  return _SUCCESS_;
 }
 
-int ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, double* data) const {
+void ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, double* data) const {
   int storeidx;
   double *dataptr, *pvecthermo;
   double z, tau;
@@ -4031,13 +3998,9 @@ int ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, doubl
       class_store_double(dataptr, pvecthermo[index_th_dmu_idr_], _TRUE_, storeidx);
     }
   }
-
-  return _SUCCESS_;
 }
 
-int ThermodynamicsModule::thermodynamics_tanh(
+void ThermodynamicsModule::thermodynamics_tanh(
     double x, double center, double before, double after, double width, double* result) {
   *result = before + (after - before) * (tanh((x - center) / width) + 1.) / 2.;
-
-  return _SUCCESS_;
 }

@@ -71,7 +71,7 @@ struct nonlinear {
 
   //@}
 
-  short has_pk_eq = _FALSE_; /**< flag: will we use the pk_eq method? */
+  bool has_pk_eq = false; /**< flag: will we use the pk_eq method? */
 
   /** @name - technical parameters */
 

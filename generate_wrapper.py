@@ -186,7 +186,7 @@ struct_names = [
     'thermo',
     'transfers',
 ]
-allowed_types = ['double', 'int', 'short', 'std::string']
+allowed_types = ['double', 'int', 'short', 'bool', 'std::string']
 
 for file in h_files:
     file_lines = read_header_lines(file)

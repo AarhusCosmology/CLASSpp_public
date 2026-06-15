@@ -32,6 +32,17 @@ typedef struct HypersphericalInterpolationStructure {
   std::vector<double> cotK;           //Vector of cot_K(xvec)
   std::vector<double> phi;            //array of size nl*nx. [y_{l1}(x1) t_{l1}(x2)...]
   std::vector<double> dphi;           //Same as phivec, but containing derivatives.
+
+  HypersphericalInterpolationStructure() = default;
+  HypersphericalInterpolationStructure(int K,
+                                       double beta,
+                                       int nl,
+                                       const int* lvec,
+                                       double xmin,
+                                       double xmax,
+                                       double sampling,
+                                       int l_WKB,
+                                       double phiminabs);
 } HyperInterpStruct;
 
 struct WKB_parameters {
@@ -47,19 +58,6 @@ struct WKB_parameters {
 #ifdef __cplusplus
 extern "C" {
 #endif
-int hyperspherical_HIS_create(int K,
-                              double beta,
-                              int nl,
-                              int* lvec,
-                              double xmin,
-                              double xmax,
-                              double sampling,
-                              int l_WKB,
-                              double phiminabs,
-                              HyperInterpStruct* pHIS);
-
-int hyperspherical_HIS_free(HyperInterpStruct* pHIS);
-
 int hyperspherical_bessel_direct_vector(
     int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi);
 

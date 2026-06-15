@@ -83,19 +83,19 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
   const auto& my_src_lay      = static_cast<const PerturbLayout&>(base);
   const auto& idm_drm_src_lay = my_src_lay.idm_drmd;
   const auto& idr_drm_src_lay = my_src_lay.idr_drmd;
-  if (p_mod->has_source_delta_idm_drmd_ == _TRUE_) {
+  if (p_mod->has_source_delta_idm_drmd_) {
     set_source(p_mod->index_tp_delta_idm_drmd_,
                y[idm_drm_src_lay.idx_delta] +
                    3. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  if (p_mod->has_source_theta_idm_drmd_ == _TRUE_) {
+  if (p_mod->has_source_theta_idm_drmd_) {
     set_source(p_mod->index_tp_theta_idm_drmd_,
                y[idm_drm_src_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
 
   // ── IDR_DRMD ──────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_idr_drmd_ == _TRUE_) {
+  if (p_mod->has_source_delta_idr_drmd_) {
     set_source(p_mod->index_tp_delta_idr_drmd_,
                y[idr_drm_src_lay.idx_delta] +
                    4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
@@ -103,7 +103,7 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
 
   // The original perturb_sources_member allocates this slot but never writes it.
   // Write zero explicitly to avoid relying on zero-initialization of the source table.
-  if (p_mod->has_source_theta_idr_drmd_ == _TRUE_) {
+  if (p_mod->has_source_theta_idr_drmd_) {
     set_source(p_mod->index_tp_theta_idr_drmd_, 0.);
   }
 }
@@ -115,11 +115,11 @@ void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(
     BaseSpecies::TransferColumnSection section) const {
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_) {
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_idm_drmd", mod.index_tp_delta_idm_drmd_, has_idm_drmd());
       w.Add("d_idr_drmd", mod.index_tp_delta_idr_drmd_, has_idr_drmd());
     }
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_) {
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_idm_drmd", mod.index_tp_theta_idm_drmd_, has_idm_drmd());
       w.Add("t_idr_drmd", mod.index_tp_theta_idr_drmd_, has_idr_drmd());
     }

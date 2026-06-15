@@ -36,7 +36,7 @@ class FluidSpecies : public BaseSpecies {
                double wa_fld,
                double cs2_fld,
                double Omega_EDE,
-               short use_ppf,
+               bool use_ppf,
                double c_gamma_over_c_fld);
 
   double GetOmega0() const override {
@@ -58,7 +58,7 @@ class FluidSpecies : public BaseSpecies {
   double Omega_EDE() const {
     return Omega_EDE_;
   }
-  short use_ppf() const {
+  bool use_ppf() const {
     return use_ppf_;
   }
   double c_gamma_over_c_fld() const {
@@ -206,7 +206,7 @@ class FluidSpecies : public BaseSpecies {
   double wa_fld_               = 0.;
   double cs2_fld_              = 1.;
   double Omega_EDE_            = 0.;
-  short use_ppf_               = _TRUE_;
+  bool use_ppf_                = true;
   double c_gamma_over_c_fld_   = 0.4;
 
   int index_bg_rho_fld_        = -1;

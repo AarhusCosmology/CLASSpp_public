@@ -10,12 +10,12 @@ class PrimordialModule : public BaseModule {
   PrimordialModule(InputModulePtr input_module, PerturbationsModulePtr perturbation_module);
   ~PrimordialModule();
 
-  int primordial_spectrum_at_k(int index_md,
-                               enum linear_or_logarithmic mode,
-                               double k,
-                               double* pk) const;
-  int primordial_output_titles(std::string& titles) const;
-  int primordial_output_data(int number_of_titles, double* data) const;
+  void primordial_spectrum_at_k(int index_md,
+                                enum linear_or_logarithmic mode,
+                                double k,
+                                double* pk) const;
+  void primordial_output_titles(std::string& titles) const;
+  void primordial_output_data(int number_of_titles, double* data) const;
 
   std::vector<int>
       ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
@@ -47,36 +47,35 @@ class PrimordialModule : public BaseModule {
   double alpha_t_;
 
  private:
-  int primordial_init();
-  int primordial_free();
-  int primordial_indices();
-  int primordial_get_lnk_list(double kmin, double kmax, double k_per_decade);
-  int primordial_analytic_spectrum_init();
-  int primordial_analytic_spectrum(int index_md, int index_ic1_ic2, double k, double* pk) const;
-  int primordial_inflation_potential(double phi, double* V, double* dV, double* ddV) const;
-  int primordial_inflation_hubble(
+  void primordial_init();
+  void primordial_indices();
+  void primordial_get_lnk_list(double kmin, double kmax, double k_per_decade);
+  void primordial_analytic_spectrum_init();
+  void primordial_analytic_spectrum(int index_md, int index_ic1_ic2, double k, double* pk) const;
+  void primordial_inflation_potential(double phi, double* V, double* dV, double* ddV) const;
+  void primordial_inflation_hubble(
       double phi, double* H, double* dH, double* ddH, double* dddH) const;
-  int primordial_inflation_indices();
-  int primordial_inflation_solve_inflation();
-  int primordial_inflation_analytic_spectra(double* y_ini);
-  int primordial_inflation_spectra(double* y_ini);
-  int primordial_inflation_one_wavenumber(double* y_ini, int index_k);
-  int primordial_inflation_one_k(
+  void primordial_inflation_indices();
+  void primordial_inflation_solve_inflation();
+  void primordial_inflation_analytic_spectra(double* y_ini);
+  void primordial_inflation_spectra(double* y_ini);
+  void primordial_inflation_one_wavenumber(double* y_ini, int index_k);
+  void primordial_inflation_one_k(
       double k, double* y, double* dy, double* curvature, double* tensor);
-  int primordial_inflation_find_attractor(
+  void primordial_inflation_find_attractor(
       double phi_0, double precision, double* y, double* dy, double* H_0, double* dphidt_0);
-  int primordial_inflation_evolve_background(double* y,
-                                             double* dy,
-                                             enum target_quantity target,
-                                             double stop,
-                                             short check_epsilon,
-                                             enum integration_direction direction,
-                                             enum time_definition time);
-  int primordial_inflation_check_potential(double phi, double* V, double* dV, double* ddV);
-  int primordial_inflation_check_hubble(
+  void primordial_inflation_evolve_background(double* y,
+                                              double* dy,
+                                              enum target_quantity target,
+                                              double stop,
+                                              short check_epsilon,
+                                              enum integration_direction direction,
+                                              enum time_definition time);
+  void primordial_inflation_check_potential(double phi, double* V, double* dV, double* ddV);
+  void primordial_inflation_check_hubble(
       double phi, double* H, double* dH, double* ddH, double* dddH);
-  int primordial_inflation_get_epsilon(double phi, double* epsilon);
-  int primordial_inflation_find_phi_pivot(double* y, double* dy);
+  void primordial_inflation_get_epsilon(double phi, double* epsilon);
+  void primordial_inflation_find_phi_pivot(double* y, double* dy);
   int primordial_inflation_derivs_member(double tau,
                                          double* y,
                                          double* dy,
@@ -85,7 +84,7 @@ class PrimordialModule : public BaseModule {
                                          double* y,
                                          double* dy,
                                          void* parameters_and_workspace);
-  int primordial_external_spectrum_init();
+  void primordial_external_spectrum_init();
 
   PerturbationsModulePtr perturbations_module_;
 

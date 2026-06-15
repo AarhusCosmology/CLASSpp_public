@@ -16,7 +16,7 @@ class ScalarFieldSpecies : public BaseSpecies {
                      double omega0_scf,
                      std::vector<double> scf_parameters,
                      int scf_tuning_index,
-                     short attractor_ic_scf,
+                     bool attractor_ic_scf,
                      double phi_ini_scf,
                      double phi_prime_ini_scf);
 
@@ -30,7 +30,7 @@ class ScalarFieldSpecies : public BaseSpecies {
   int scf_tuning_index() const {
     return scf_tuning_index_;
   }
-  short attractor_ic_scf() const {
+  bool attractor_ic_scf() const {
     return attractor_ic_scf_;
   }
   double phi_ini_scf() const {
@@ -203,7 +203,7 @@ class ScalarFieldSpecies : public BaseSpecies {
   double Omega0_scf_           = 0.;
   std::vector<double> scf_parameters_;
   int scf_tuning_index_     = 0;
-  short attractor_ic_scf_   = _TRUE_;
+  bool attractor_ic_scf_    = true;
   double phi_ini_scf_       = 1.;
   double phi_prime_ini_scf_ = 1.;
 };

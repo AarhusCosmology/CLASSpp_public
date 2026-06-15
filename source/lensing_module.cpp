@@ -10,9 +10,7 @@
  *
  * The following functions can be called from other modules:
  *
- * -# lensing_init() at the beginning (but after spectra_init())
  * -# lensing_cl_at_l() at any time for computing Cl_lensed at any l
- * -# lensing_free() at the end
  */
 
 #include "lensing_module.h"
@@ -31,8 +29,7 @@
  * sums over all initial conditions for each mode, and over all modes.
  *
  * This function can be called from whatever module at whatever time,
- * provided that lensing_init() has been called before, and
- * lensing_free() has not been called yet.
+ * valid for the lifetime of the module instance.
  *
  */
 
@@ -41,9 +38,7 @@ LensingModule::LensingModule(InputModulePtr input_module, SpectraModulePtr spect
   lensing_init();
 }
 
-LensingModule::~LensingModule() {
-  lensing_free();
-}
+LensingModule::~LensingModule() {}
 
 std::map<std::string, std::vector<double>> LensingModule::cl_output(int lmax) const {
   ThrowRuntimeErrorIf((lmax > l_lensed_max_) || (lmax < 0),
@@ -69,8 +64,7 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_computed() c
 
 std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
     const std::vector<int>& l_values) const {
-  ThrowRuntimeErrorIf(ple->has_lensed_cls == _FALSE_,
-                      "No lensed Cls was computed, adjust your inputs.\n");
+  ThrowRuntimeErrorIf(!ple->has_lensed_cls, "No lensed Cls was computed, adjust your inputs.\n");
 
   std::map<std::string, int> index_map;
 
@@ -117,7 +111,7 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
   return output;
 }
 
-int LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
+void LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
   class_test(l > l_lensed_max_,
              "you asked for lensed Cls at l=%d, they were computed only up to l=%d, you should "
              "increase l_max_scalars or decrease the precision parameter delta_l_max",
@@ -139,8 +133,6 @@ int LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
   for (int index_lt = 0; index_lt < lt_size_; index_lt++)
     if ((int) l > l_max_lt_[index_lt])
       cl_lensed[index_lt] = 0.;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -150,7 +142,7 @@ int LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
  * @return the error status
  */
 
-int LensingModule::lensing_init() {
+void LensingModule::lensing_init() {
   /** Summary: */
   /** - Define local variables */
 
@@ -162,10 +154,10 @@ int LensingModule::lensing_init() {
 
   /** - check that we really want to compute at least one spectrum */
 
-  if (ple->has_lensed_cls == _FALSE_) {
+  if (!ple->has_lensed_cls) {
     if (ple->lensing_verbose > 0)
       printf("No lensing requested. Lensing module skipped.\n");
-    return _SUCCESS_;
+    return;
   }
   else {
     if (ple->lensing_verbose > 0) {
@@ -226,7 +218,7 @@ int LensingModule::lensing_init() {
   icount += 4 * num_mu * (l_unlensed_max_ + 1);
 
   std::vector<double*> d20, d3m1, d4m2;
-  if (has_te_ == _TRUE_) {
+  if (has_te_) {
     d20.resize(num_mu);
     d3m1.resize(num_mu);
     d4m2.resize(num_mu);
@@ -234,7 +226,7 @@ int LensingModule::lensing_init() {
   }
 
   std::vector<double*> d22, d31, d3m3, d40, d4m4;
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+  if (has_ee_ || has_bb_) {
     d22.resize(num_mu);
     d31.resize(num_mu);
     d3m3.resize(num_mu);
@@ -257,7 +249,7 @@ int LensingModule::lensing_init() {
   }
   icount += 4 * num_mu * (l_unlensed_max_ + 1);
 
-  if (has_te_ == _TRUE_) {
+  if (has_te_) {
     for (int index_mu = 0; index_mu < num_mu; index_mu++) {
       d20[index_mu]  = &(buf_dxx[icount + (index_mu + 0 * num_mu) * (l_unlensed_max_ + 1)]);
       d3m1[index_mu] = &(buf_dxx[icount + (index_mu + 1 * num_mu) * (l_unlensed_max_ + 1)]);
@@ -266,7 +258,7 @@ int LensingModule::lensing_init() {
     icount += 3 * num_mu * (l_unlensed_max_ + 1);
   }
 
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+  if (has_ee_ || has_bb_) {
     for (int index_mu = 0; index_mu < num_mu; index_mu++) {
       d22[index_mu]  = &(buf_dxx[icount + (index_mu + 0 * num_mu) * (l_unlensed_max_ + 1)]);
       d31[index_mu]  = &(buf_dxx[icount + (index_mu + 1 * num_mu) * (l_unlensed_max_ + 1)]);
@@ -287,7 +279,7 @@ int LensingModule::lensing_init() {
   icount += l_unlensed_max_ + 1;
   sqrt5   = &(buf_dxx[icount]);
   Tools::TaskSystem task_system(pba->number_of_threads);
-  std::vector<std::future<int>> dXX_tasks;
+  std::vector<std::future<void>> dXX_tasks;
 
   dXX_tasks.push_back(task_system.AsyncTask(
       [&]() { return lensing_d00(mu.data(), num_mu, l_unlensed_max_, d00.data()); }));
@@ -301,7 +293,7 @@ int LensingModule::lensing_init() {
   dXX_tasks.push_back(task_system.AsyncTask(
       [&]() { return lensing_d2m2(mu.data(), num_mu, l_unlensed_max_, d2m2.data()); }));
 
-  if (has_te_ == _TRUE_) {
+  if (has_te_) {
     dXX_tasks.push_back(task_system.AsyncTask(
         [&]() { return lensing_d20(mu.data(), num_mu, l_unlensed_max_, d20.data()); }));
     dXX_tasks.push_back(task_system.AsyncTask(
@@ -310,7 +302,7 @@ int LensingModule::lensing_init() {
         [&]() { return lensing_d4m2(mu.data(), num_mu, l_unlensed_max_, d4m2.data()); }));
   }
 
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+  if (has_ee_ || has_bb_) {
     dXX_tasks.push_back(task_system.AsyncTask(
         [&]() { return lensing_d22(mu.data(), num_mu, l_unlensed_max_, d22.data()); }));
     dXX_tasks.push_back(task_system.AsyncTask(
@@ -340,11 +332,11 @@ int LensingModule::lensing_init() {
   /** - Locally store unlensed temperature \f$ cl_{tt}\f$ and potential \f$ cl_{pp}\f$ spectra **/
   std::vector<double> cl_tt(l_unlensed_max_ + 1);
   std::vector<double> cl_te;
-  if (has_te_ == _TRUE_) {
+  if (has_te_) {
     cl_te.resize(l_unlensed_max_ + 1);
   }
   std::vector<double> cl_ee, cl_bb;
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+  if (has_ee_ || has_bb_) {
     cl_ee.resize(l_unlensed_max_ + 1);
     cl_bb.resize(l_unlensed_max_ + 1);
   }
@@ -372,10 +364,10 @@ int LensingModule::lensing_init() {
     spectra_module_->spectra_cl_at_l(l, cl_unlensed.data(), cl_md.data(), cl_md_ic.data());
     cl_tt[l] = cl_unlensed[index_lt_tt_];
     cl_pp[l] = cl_unlensed[index_lt_pp_];
-    if (has_te_ == _TRUE_) {
+    if (has_te_) {
       cl_te[l] = cl_unlensed[index_lt_te_];
     }
-    if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+    if (has_ee_ || has_bb_) {
       cl_ee[l] = cl_unlensed[index_lt_ee_];
       cl_bb[l] = cl_unlensed[index_lt_bb_];
     }
@@ -405,19 +397,19 @@ int LensingModule::lensing_init() {
 
   /** - --> ksi is for TT **/
   std::vector<double> ksi;
-  if (has_tt_ == _TRUE_) {
+  if (has_tt_) {
     ksi.assign(num_mu - 1, 0.0);
   }
 
   /** - --> ksiX is for TE **/
   std::vector<double> ksiX;
-  if (has_te_ == _TRUE_) {
+  if (has_te_) {
     ksiX.assign(num_mu - 1, 0.0);
   }
 
   /** - --> ksip, ksim for EE, BB **/
   std::vector<double> ksip, ksim;
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+  if (has_ee_ || has_bb_) {
     ksip.assign(num_mu - 1, 0.0);
     ksim.assign(num_mu - 1, 0.0);
   }
@@ -452,7 +444,7 @@ int LensingModule::lensing_init() {
       double X_p022 = 0.;
       double X_022  = 0.;
 
-      if (has_te_ == _TRUE_ || has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+      if (has_te_ || has_ee_ || has_bb_) {
         /* X_022 = exp(-(fac-1.)*sigma2[index_mu]); */
         X_022  = X_000 * (1 + sigma2[index_mu] * (1 + 0.5 * sigma2[index_mu])); /* Order 2 */
         X_p022 = -(fac - 1.) * X_022; /* Old versions were missing the
@@ -462,7 +454,7 @@ int LensingModule::lensing_init() {
 
         /* X_242 = 0.25*sqrt4[l] * exp(-(fac-5./2.)*sigma2[index_mu]); */
         X_242 = 0.25 * sqrt4[l] * X_000; /* Order 0 */
-        if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+        if (has_ee_ || has_bb_) {
           /* X_121 = - 0.5*sqrt2[l] * exp(-(fac-2./3.)*sigma2[index_mu]);
              X_132 = - 0.5*sqrt3[l] * exp(-(fac-5./3.)*sigma2[index_mu]); */
           X_121 = -0.5 * sqrt2[l] * X_000 * (1 + 2. / 3. * sigma2[index_mu]); /* Order 1 */
@@ -470,7 +462,7 @@ int LensingModule::lensing_init() {
         }
       }
 
-      if (has_tt_ == _TRUE_) {
+      if (has_tt_) {
         double res = fac1 * cl_tt[l];
 
         double lens = (X_000 * X_000 * d00[index_mu][l] +
@@ -485,7 +477,7 @@ int LensingModule::lensing_init() {
         ksi[index_mu] += res;
       }
 
-      if (has_te_ == _TRUE_) {
+      if (has_te_) {
         double resX = fac1 * cl_te[l];
 
         double lens = (X_022 * X_000 * d20[index_mu][l] +
@@ -501,7 +493,7 @@ int LensingModule::lensing_init() {
         ksiX[index_mu] += resX;
       }
 
-      if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+      if (has_ee_ || has_bb_) {
         double resp = fac1 * (cl_ee[l] + cl_bb[l]);
         double resm = fac1 * (cl_ee[l] - cl_bb[l]);
 
@@ -530,21 +522,21 @@ int LensingModule::lensing_init() {
   }
 
   /** - compute lensed \f$ C_l\f$'s by integration */
-  if (has_tt_ == _TRUE_) {
+  if (has_tt_) {
     lensing_lensed_cl_tt(ksi.data(), d00.data(), w8.data(), num_mu - 1);
     if (ppr->accurate_lensing == _FALSE_) {
       lensing_addback_cl_tt(cl_tt.data());
     }
   }
 
-  if (has_te_ == _TRUE_) {
+  if (has_te_) {
     lensing_lensed_cl_te(ksiX.data(), d20.data(), w8.data(), num_mu - 1);
     if (ppr->accurate_lensing == _FALSE_) {
       lensing_addback_cl_te(cl_te.data());
     }
   }
 
-  if (has_ee_ == _TRUE_ || has_bb_ == _TRUE_) {
+  if (has_ee_ || has_bb_) {
     lensing_lensed_cl_ee_bb(ksip.data(),
                             ksim.data(),
                             d22.data(),
@@ -566,8 +558,6 @@ int LensingModule::lensing_init() {
                            _SPLINE_EST_DERIV_);
 
   /** - Exit **/
-
-  return _SUCCESS_;
 }
 
 /**
@@ -579,97 +569,93 @@ int LensingModule::lensing_init() {
  * @return the error status
  */
 
-int LensingModule::lensing_free() {
-  return _SUCCESS_;
-}
-
 /**
  * This routine defines indices and allocates tables in the lensing structure
  *
  * @return the error status
  */
 
-int LensingModule::lensing_indices() {
+void LensingModule::lensing_indices() {
   /* indices of all Cl types (lensed and unlensed) */
 
-  if (spectra_module_->has_tt_ == _TRUE_) {
-    has_tt_      = _TRUE_;
+  if (spectra_module_->has_tt_) {
+    has_tt_      = true;
     index_lt_tt_ = spectra_module_->index_ct_tt_;
   }
   else {
-    has_tt_ = _FALSE_;
+    has_tt_ = false;
   }
 
-  if (spectra_module_->has_ee_ == _TRUE_) {
-    has_ee_      = _TRUE_;
+  if (spectra_module_->has_ee_) {
+    has_ee_      = true;
     index_lt_ee_ = spectra_module_->index_ct_ee_;
   }
   else {
-    has_ee_ = _FALSE_;
+    has_ee_ = false;
   }
 
-  if (spectra_module_->has_te_ == _TRUE_) {
-    has_te_      = _TRUE_;
+  if (spectra_module_->has_te_) {
+    has_te_      = true;
     index_lt_te_ = spectra_module_->index_ct_te_;
   }
   else {
-    has_te_ = _FALSE_;
+    has_te_ = false;
   }
 
-  if (spectra_module_->has_bb_ == _TRUE_) {
-    has_bb_      = _TRUE_;
+  if (spectra_module_->has_bb_) {
+    has_bb_      = true;
     index_lt_bb_ = spectra_module_->index_ct_bb_;
   }
   else {
-    has_bb_ = _FALSE_;
+    has_bb_ = false;
   }
 
-  if (spectra_module_->has_pp_ == _TRUE_) {
-    has_pp_      = _TRUE_;
+  if (spectra_module_->has_pp_) {
+    has_pp_      = true;
     index_lt_pp_ = spectra_module_->index_ct_pp_;
   }
   else {
-    has_pp_ = _FALSE_;
+    has_pp_ = false;
   }
 
-  if (spectra_module_->has_tp_ == _TRUE_) {
-    has_tp_      = _TRUE_;
+  if (spectra_module_->has_tp_) {
+    has_tp_      = true;
     index_lt_tp_ = spectra_module_->index_ct_tp_;
   }
   else {
-    has_tp_ = _FALSE_;
+    has_tp_ = false;
   }
 
-  if (spectra_module_->has_dd_ == _TRUE_) {
-    has_dd_      = _TRUE_;
+  if (spectra_module_->has_dd_) {
+    has_dd_      = true;
     index_lt_dd_ = spectra_module_->index_ct_dd_;
   }
   else {
-    has_dd_ = _FALSE_;
+    has_dd_ = false;
   }
 
-  if (spectra_module_->has_td_ == _TRUE_) {
-    has_td_      = _TRUE_;
+  if (spectra_module_->has_td_) {
+    has_td_      = true;
     index_lt_td_ = spectra_module_->index_ct_td_;
   }
   else {
-    has_td_ = _FALSE_;
+    has_td_ = false;
   }
 
-  if (spectra_module_->has_ll_ == _TRUE_) {
-    has_ll_      = _TRUE_;
+  if (spectra_module_->has_ll_) {
+    has_ll_      = true;
     index_lt_ll_ = spectra_module_->index_ct_ll_;
   }
   else {
-    has_ll_ = _FALSE_;
+    has_ll_ = false;
   }
 
-  if (spectra_module_->has_tl_ == _TRUE_) {
-    has_tl_      = _TRUE_;
+  if (spectra_module_->has_tl_) {
+    has_tl_      = true;
     index_lt_tl_ = spectra_module_->index_ct_tl_;
   }
   else {
-    has_tl_ = _FALSE_;
+    has_tl_ = false;
   }
 
   lt_size_ = spectra_module_->ct_size_;
@@ -744,14 +730,12 @@ int LensingModule::lensing_indices() {
       l_max_lt_[index_lt] = MAX(l_max_lt_[index_lt],
                                 spectra_module_->l_max_ct_[index_md][index_lt]);
 
-      if ((has_bb_ == _TRUE_) && (has_ee_ == _TRUE_) && (index_lt == index_lt_bb_)) {
+      if ((has_bb_) && (has_ee_) && (index_lt == index_lt_bb_)) {
         l_max_lt_[index_lt] = MAX(l_max_lt_[index_lt],
                                   spectra_module_->l_max_ct_[index_md][index_lt_ee_]);
       }
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -764,7 +748,7 @@ int LensingModule::lensing_indices() {
  * @return the error status
  */
 
-int LensingModule::lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, int nmu) {
+void LensingModule::lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, int nmu) {
   /** Integration by Gauss-Legendre quadrature. **/
 
   for (int index_l = 0; index_l < l_size_; index_l++) {
@@ -774,8 +758,6 @@ int LensingModule::lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, i
     }
     cl_lens_[index_l * lt_size_ + index_lt_tt_] = cle * 2.0 * _PI_;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -786,12 +768,11 @@ int LensingModule::lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, i
  * @return the error status
  */
 
-int LensingModule::lensing_addback_cl_tt(double* cl_tt) {
+void LensingModule::lensing_addback_cl_tt(double* cl_tt) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = (int) l_[index_l];
     cl_lens_[index_l * lt_size_ + index_lt_tt_] += cl_tt[l];
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -804,7 +785,7 @@ int LensingModule::lensing_addback_cl_tt(double* cl_tt) {
  * @return the error status
  */
 
-int LensingModule::lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, int nmu) {
+void LensingModule::lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, int nmu) {
   /** Integration by Gauss-Legendre quadrature. **/
 
   for (int index_l = 0; index_l < l_size_; index_l++) {
@@ -814,8 +795,6 @@ int LensingModule::lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, 
     }
     cl_lens_[index_l * lt_size_ + index_lt_te_] = clte * 2.0 * _PI_;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -827,12 +806,11 @@ int LensingModule::lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, 
  * @return the error status
  */
 
-int LensingModule::lensing_addback_cl_te(double* cl_te) {
+void LensingModule::lensing_addback_cl_te(double* cl_te) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = (int) l_[index_l];
     cl_lens_[index_l * lt_size_ + index_lt_te_] += cl_te[l];
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -847,7 +825,7 @@ int LensingModule::lensing_addback_cl_te(double* cl_te) {
  * @return the error status
  */
 
-int LensingModule::lensing_lensed_cl_ee_bb(
+void LensingModule::lensing_lensed_cl_ee_bb(
     double* ksip, double* ksim, double** d22, double** d2m2, double* w8, int nmu) {
   /** Integration by Gauss-Legendre quadrature. **/
 
@@ -860,8 +838,6 @@ int LensingModule::lensing_lensed_cl_ee_bb(
     cl_lens_[index_l * lt_size_ + index_lt_ee_] = (clp + clm) * _PI_;
     cl_lens_[index_l * lt_size_ + index_lt_bb_] = (clp - clm) * _PI_;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -874,13 +850,12 @@ int LensingModule::lensing_lensed_cl_ee_bb(
  * @return the error status
  */
 
-int LensingModule::lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb) {
+void LensingModule::lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = (int) l_[index_l];
     cl_lens_[index_l * lt_size_ + index_lt_ee_] += cl_ee[l];
     cl_lens_[index_l * lt_size_ + index_lt_bb_] += cl_bb[l];
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -896,7 +871,7 @@ int LensingModule::lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) {
+void LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax);
 
   for (int l = 1; l < lmax; l++) {
@@ -919,7 +894,6 @@ int LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) {
       dl                   = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -935,7 +909,7 @@ int LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) {
+void LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
@@ -960,7 +934,6 @@ int LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) {
       dl                   = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -976,7 +949,7 @@ int LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1) {
+void LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
@@ -1001,7 +974,6 @@ int LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1)
       dl                    = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1017,7 +989,7 @@ int LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1)
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2) {
+void LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
@@ -1042,7 +1014,6 @@ int LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2)
       dl                    = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1058,7 +1029,7 @@ int LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2)
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) {
+void LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
@@ -1083,7 +1054,6 @@ int LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) {
       dl                   = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1099,7 +1069,7 @@ int LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) {
+void LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) {
   std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
@@ -1122,7 +1092,6 @@ int LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) {
       dl                   = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1138,7 +1107,7 @@ int LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) {
+void LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 3; l < lmax; l++) {
     double ll = (double) l;
@@ -1166,7 +1135,6 @@ int LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) {
       dl                   = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1182,7 +1150,7 @@ int LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1) {
+void LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 3; l < lmax; l++) {
     double ll = (double) l;
@@ -1210,7 +1178,6 @@ int LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1)
       dl                    = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1226,7 +1193,7 @@ int LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1)
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3) {
+void LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 3; l < lmax; l++) {
     double ll = (double) l;
@@ -1253,7 +1220,6 @@ int LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3)
       dl                    = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1269,7 +1235,7 @@ int LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3)
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) {
+void LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) {
   std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
   for (int l = 4; l < lmax; l++) {
     double ll = (double) l;
@@ -1295,7 +1261,6 @@ int LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) {
       dl                   = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1311,7 +1276,7 @@ int LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2) {
+void LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 4; l < lmax; l++) {
     double ll = (double) l;
@@ -1341,7 +1306,6 @@ int LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2)
       dl                    = dlp1;
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -1357,7 +1321,7 @@ int LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2)
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-int LensingModule::lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4) {
+void LensingModule::lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4) {
   std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
   for (int l = 4; l < lmax; l++) {
     double ll = (double) l;
@@ -1385,5 +1349,4 @@ int LensingModule::lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4)
       dl                    = dlp1;
     }
   }
-  return _SUCCESS_;
 }

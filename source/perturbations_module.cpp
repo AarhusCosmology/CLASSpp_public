@@ -19,9 +19,7 @@
  *
  * Hence the following functions can be called from other modules:
  *
- * -# perturb_init() at the beginning (but after background_init() and thermodynamics_init())
- * -# perturb_sources_at_tau() at any later time
- * -# perturb_free() at the end, when no more calls to perturb_sources_at_tau() are needed
+ * -# perturb_sources_at_tau() at any time during the module's lifetime
  */
 
 #include "perturbations_module.h"
@@ -98,9 +96,7 @@ PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
   perturb_init();
 }
 
-PerturbationsModule::~PerturbationsModule() {
-  perturb_free();
-}
+PerturbationsModule::~PerturbationsModule() {}
 
 // Wrapper functions to pass non-static member functions
 int PerturbationsModule::perturb_timescale(double tau,
@@ -155,7 +151,7 @@ int PerturbationsModule::perturb_derivs(double tau,
  * @return the error status
  */
 
-int PerturbationsModule::perturb_sources_at_tau(
+void PerturbationsModule::perturb_sources_at_tau(
     int index_md, int index_ic, int index_tp, double tau, double* psource) const {
   /** Summary: */
 
@@ -202,8 +198,6 @@ int PerturbationsModule::perturb_sources_at_tau(
                              psource,
                              k_size_[index_md]);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -218,10 +212,10 @@ int PerturbationsModule::perturb_sources_at_tau(
  * @return the error status
  */
 
-int PerturbationsModule::perturb_output_data(enum file_format output_format,
-                                             double z,
-                                             int number_of_titles,
-                                             double* data) const {
+void PerturbationsModule::perturb_output_data(enum file_format output_format,
+                                              double z,
+                                              int number_of_titles,
+                                              double* data) const {
   double k, k_over_h, k2;
   std::vector<double> tkfull;
   double* tk;
@@ -292,7 +286,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format,
       /* indices for species associated with a velocity transfer function in Fourier space */
 
       if (output_format == class_format) {
-        if (ppt->has_density_transfers == _TRUE_) {
+        if (ppt->has_density_transfers) {
           PerturbColumnWriter w(dataptr, tk, storeidx);
           for (auto& [name, sp] : all_species_)
             sp->WriteOutputColumns(w,
@@ -313,7 +307,7 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format,
                              storeidx);
           class_store_double(dataptr, tk[index_tp_k2gamma_Nb_], has_source_k2gamma_Nb_, storeidx);
         }
-        if (ppt->has_velocity_transfers == _TRUE_) {
+        if (ppt->has_velocity_transfers) {
           PerturbColumnWriter w(dataptr, tk, storeidx);
           for (auto& [name, sp] : all_species_)
             sp->WriteOutputColumns(w,
@@ -343,8 +337,6 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format,
   }
 
   /* RAII: tkfull cleaned up automatically */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -356,11 +348,11 @@ int PerturbationsModule::perturb_output_data(enum file_format output_format,
  * @return the error status
  */
 
-int PerturbationsModule::perturb_output_titles(enum file_format output_format,
-                                               std::string& titles) const {
+void PerturbationsModule::perturb_output_titles(enum file_format output_format,
+                                                std::string& titles) const {
   if (output_format == class_format) {
     class_store_columntitle(titles, "k (h/Mpc)", _TRUE_);
-    if (ppt->has_density_transfers == _TRUE_) {
+    if (ppt->has_density_transfers) {
       PerturbColumnWriter w(titles);
       for (auto& [name, sp] : all_species_)
         sp->WriteOutputColumns(w,
@@ -378,7 +370,7 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format,
       class_store_columntitle(titles, "H_T_Nb_prime", has_source_H_T_Nb_prime_);
       class_store_columntitle(titles, "k2gamma_Nb", has_source_k2gamma_Nb_);
     }
-    if (ppt->has_velocity_transfers == _TRUE_) {
+    if (ppt->has_velocity_transfers) {
       PerturbColumnWriter w(titles);
       for (auto& [name, sp] : all_species_)
         sp->WriteOutputColumns(w,
@@ -401,8 +393,6 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format,
     }
     class_store_columntitle(titles, "-T_tot/k2", _TRUE_);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -416,37 +406,36 @@ int PerturbationsModule::perturb_output_titles(enum file_format output_format,
  *
  */
 
-int PerturbationsModule::perturb_output_firstline_and_ic_suffix(int index_ic,
-                                                                std::string& first_line,
-                                                                std::string& ic_suffix) const {
+void PerturbationsModule::perturb_output_firstline_and_ic_suffix(int index_ic,
+                                                                 std::string& first_line,
+                                                                 std::string& ic_suffix) const {
   first_line.clear();
   ic_suffix.clear();
 
-  if ((ppt->has_ad == _TRUE_) && (index_ic == index_ic_ad_)) {
+  if ((ppt->has_ad) && (index_ic == index_ic_ad_)) {
     ic_suffix  = "ad";
     first_line = "for adiabatic (AD) mode (normalized to initial curvature=1) ";
   }
 
-  if ((ppt->has_bi == _TRUE_) && (index_ic == index_ic_bi_)) {
+  if ((ppt->has_bi) && (index_ic == index_ic_bi_)) {
     ic_suffix  = "bi";
     first_line = "for baryon isocurvature (BI) mode (normalized to initial entropy=1)";
   }
 
-  if ((ppt->has_cdi == _TRUE_) && (index_ic == index_ic_cdi_)) {
+  if ((ppt->has_cdi) && (index_ic == index_ic_cdi_)) {
     ic_suffix  = "cdi";
     first_line = "for CDM isocurvature (CDI) mode (normalized to initial entropy=1)";
   }
 
-  if ((ppt->has_nid == _TRUE_) && (index_ic == index_ic_nid_)) {
+  if ((ppt->has_nid) && (index_ic == index_ic_nid_)) {
     ic_suffix  = "nid";
     first_line = "for neutrino density isocurvature (NID) mode (normalized to initial entropy=1)";
   }
 
-  if ((ppt->has_niv == _TRUE_) && (index_ic == index_ic_niv_)) {
+  if ((ppt->has_niv) && (index_ic == index_ic_niv_)) {
     ic_suffix  = "niv";
     first_line = "for neutrino velocity isocurvature (NIV) mode (normalized to initial entropy=1)";
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -468,7 +457,7 @@ int PerturbationsModule::perturb_output_firstline_and_ic_suffix(int index_ic,
  * @return the error status
  */
 
-int PerturbationsModule::perturb_init() {
+void PerturbationsModule::perturb_init() {
   /** Summary: */
 
   /** - define local variables */
@@ -486,10 +475,10 @@ int PerturbationsModule::perturb_init() {
 
   /** - perform preliminary checks */
 
-  if (ppt->has_perturbations == _FALSE_) {
+  if (!ppt->has_perturbations) {
     if (ppt->perturbations_verbose > 0)
       printf("No sources requested. Perturbation module skipped.\n");
-    return _SUCCESS_;
+    return;
   }
   else {
     if (ppt->perturbations_verbose > 0)
@@ -534,7 +523,7 @@ int PerturbationsModule::perturb_init() {
                "perturbations.h",
                ppr->ncdm_fluid_approximation);
 
-    if (ppt->has_nc_density == _TRUE_) {
+    if (ppt->has_nc_density) {
       if (ppt->perturbations_verbose > 0) {
         fprintf(stdout,
                 " -> [WARNING:] You request the number count Cl's in presence of non-cold dark "
@@ -559,7 +548,7 @@ int PerturbationsModule::perturb_init() {
                "assumption may break down, since at early times you have w_fld(a--->0) = %e >= 0",
                w_fld_ini);
 
-    if (fluid.use_ppf() == _FALSE_) {
+    if (!fluid.use_ppf()) {
       class_test((w_fld_ini + 1.0) * (w_fld_0 + 1.0) <= 0.0,
                  "w crosses -1 between the infinite past and today, and this would lead to "
                  "divergent perturbation equations for the fluid perturbations. Try to switch to "
@@ -574,8 +563,7 @@ int PerturbationsModule::perturb_init() {
   }
 
   if (all_species_.count("DCDM_DR")) {
-    class_test((ppt->has_cdi == _TRUE_) || (ppt->has_bi == _TRUE_) || (ppt->has_nid == _TRUE_) ||
-                   (ppt->has_niv == _TRUE_),
+    class_test((ppt->has_cdi) || (ppt->has_bi) || (ppt->has_nid) || (ppt->has_niv),
                "Non-adiabatic initial conditions not coded in presence of decaying dark matter");
   }
 
@@ -587,8 +575,7 @@ int PerturbationsModule::perturb_init() {
     }
   }
   if (has_dncdm_dr) {
-    class_test((ppt->has_cdi == _TRUE_) || (ppt->has_bi == _TRUE_) || (ppt->has_nid == _TRUE_) ||
-                   (ppt->has_niv == _TRUE_),
+    class_test((ppt->has_cdi) || (ppt->has_bi) || (ppt->has_nid) || (ppt->has_niv),
                "Non-adiabatic initial conditions not coded in presence of decaying dark matter");
 
     class_test(ppr->l_max_dr_col > ppr->l_max_dr,
@@ -598,15 +585,15 @@ int PerturbationsModule::perturb_init() {
                "l_max_dr_col must be <= l_max_ncdm. Change your input accordingly.");
   }
 
-  class_test(ppt->has_vectors == _TRUE_, "Vectors not coded yet");
+  class_test(ppt->has_vectors, "Vectors not coded yet");
 
-  if ((ppt->has_niv == _TRUE_) && (ppt->perturbations_verbose > 0)) {
+  if ((ppt->has_niv) && (ppt->perturbations_verbose > 0)) {
     printf(
         "Warning: the niv initial conditions in CLASS (and also in CAMB) should still be "
         "double-checked: if you want to do it and send feedback, you are welcome!\n");
   }
 
-  if (ppt->has_tensors == _TRUE_) {
+  if (ppt->has_tensors) {
     evolve_tensor_ur_   = _FALSE_;
     evolve_tensor_ncdm_ = _FALSE_;
 
@@ -681,14 +668,14 @@ int PerturbationsModule::perturb_init() {
   perturb_indices_of_perturbs();
 
   if (ppt->z_max_pk > thermodynamics_module_->z_rec_) {
-    class_test(has_cmb_ == _TRUE_,
+    class_test(has_cmb_,
                "You requested a very high z_pk=%e, higher than z_rec=%e. This works very well when "
                "you don't ask for a calculation of the CMB source function(s). Remove any CMB from "
                "your output and try e.g. with 'output=mTk' or 'output=mTk,vTk'",
                ppt->z_max_pk,
                thermodynamics_module_->z_rec_);
 
-    class_test(has_source_delta_m_ == _TRUE_,
+    class_test(has_source_delta_m_,
                "You requested a very high z_pk=%e, higher than z_rec=%e. This works very well when "
                "you ask for transfer functions only, e.g. with 'output=mTk' or 'output=mTk,vTk'. "
                "But if you need the total matter (e.g. with 'mPk', 'dCl', etc.) there is an issue "
@@ -718,7 +705,7 @@ int PerturbationsModule::perturb_init() {
 
   /** - loop over modes (scalar, tensors, etc). For each mode: */
   Tools::TaskSystem task_system(pba->number_of_threads);
-  std::vector<std::future<int>> future_output;
+  std::vector<std::future<void>> future_output;
 
   for (index_md = 0; index_md < md_size_; index_md++) {
     if (ppt->perturbations_verbose > 1)
@@ -749,8 +736,7 @@ int PerturbationsModule::perturb_init() {
           struct perturb_workspace pw;
           perturb_workspace_init(index_md, &pw);
           perturb_solve(index_md, index_ic, index_k, &pw);
-          perturb_workspace_free(index_md, &pw);
-          return _SUCCESS_;
+          return;
         }));
 
       } /* end of loop over wavenumbers */
@@ -760,7 +746,7 @@ int PerturbationsModule::perturb_init() {
   } /* end loop over modes */
   /** - spline the source array with respect to the time variable */
 
-  for (std::future<int>& future : future_output) {
+  for (std::future<void>& future : future_output) {
     future.get();
   }
   future_output.clear();
@@ -781,7 +767,7 @@ int PerturbationsModule::perturb_init() {
                                                           .data(),
                                        _SPLINE_EST_DERIV_);
             }
-            return _SUCCESS_;
+            return;
           }));
         }
 
@@ -789,12 +775,10 @@ int PerturbationsModule::perturb_init() {
 
     } /* end of loop over mode */
 
-    for (std::future<int>& future : future_output) {
+    for (std::future<void>& future : future_output) {
       future.get();
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -806,19 +790,13 @@ int PerturbationsModule::perturb_init() {
  * @return the error status
  */
 
-int PerturbationsModule::perturb_free() {
-  /* RAII: all std::vector members are automatically cleaned up */
-
-  return _SUCCESS_;
-}
-
 /**
  * Initialize all indices and allocate most arrays in perturbs structure.
  *
  * @return the error status
  */
 
-int PerturbationsModule::perturb_indices_of_perturbs() {
+void PerturbationsModule::perturb_indices_of_perturbs() {
   /** Summary: */
 
   /** - define local variables */
@@ -865,53 +843,53 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
 
   /** - initialization of all flags to false (will eventually be set to true later) */
 
-  has_cmb_ = _FALSE_;
-  has_lss_ = _FALSE_;
+  has_cmb_ = false;
+  has_lss_ = false;
 
-  has_source_t_              = _FALSE_;
-  has_source_p_              = _FALSE_;
-  has_source_delta_m_        = _FALSE_;
-  has_source_delta_cb_       = _FALSE_;
-  has_source_delta_tot_      = _FALSE_;
-  has_source_delta_g_        = _FALSE_;
-  has_source_delta_b_        = _FALSE_;
-  has_source_delta_cdm_      = _FALSE_;
-  has_source_delta_dcdm_     = _FALSE_;
-  has_source_delta_fld_      = _FALSE_;
-  has_source_delta_scf_      = _FALSE_;
-  has_source_delta_dr_       = _FALSE_;
-  has_source_delta_ur_       = _FALSE_;
-  has_source_delta_idr_      = _FALSE_;
-  has_source_delta_idr_drmd_ = _FALSE_;
-  has_source_delta_idm_dr_   = _FALSE_;
-  has_source_delta_idm_drmd_ = _FALSE_;
-  has_source_delta_ncdm_     = _FALSE_;
-  has_source_theta_m_        = _FALSE_;
-  has_source_theta_cb_       = _FALSE_;
-  has_source_theta_tot_      = _FALSE_;
-  has_source_theta_g_        = _FALSE_;
-  has_source_theta_b_        = _FALSE_;
-  has_source_theta_cdm_      = _FALSE_;
-  has_source_theta_dcdm_     = _FALSE_;
-  has_source_theta_fld_      = _FALSE_;
-  has_source_theta_scf_      = _FALSE_;
-  has_source_theta_dr_       = _FALSE_;
-  has_source_theta_ur_       = _FALSE_;
-  has_source_theta_idr_      = _FALSE_;
-  has_source_theta_idr_drmd_ = _FALSE_;
-  has_source_theta_idm_dr_   = _FALSE_;
-  has_source_theta_idm_drmd_ = _FALSE_;
-  has_source_theta_ncdm_     = _FALSE_;
-  has_source_phi_            = _FALSE_;
-  has_source_phi_prime_      = _FALSE_;
-  has_source_phi_plus_psi_   = _FALSE_;
-  has_source_psi_            = _FALSE_;
-  has_source_h_              = _FALSE_;
-  has_source_h_prime_        = _FALSE_;
-  has_source_eta_            = _FALSE_;
-  has_source_eta_prime_      = _FALSE_;
-  has_source_H_T_Nb_prime_   = _FALSE_;
-  has_source_k2gamma_Nb_     = _FALSE_;
+  has_source_t_              = false;
+  has_source_p_              = false;
+  has_source_delta_m_        = false;
+  has_source_delta_cb_       = false;
+  has_source_delta_tot_      = false;
+  has_source_delta_g_        = false;
+  has_source_delta_b_        = false;
+  has_source_delta_cdm_      = false;
+  has_source_delta_dcdm_     = false;
+  has_source_delta_fld_      = false;
+  has_source_delta_scf_      = false;
+  has_source_delta_dr_       = false;
+  has_source_delta_ur_       = false;
+  has_source_delta_idr_      = false;
+  has_source_delta_idr_drmd_ = false;
+  has_source_delta_idm_dr_   = false;
+  has_source_delta_idm_drmd_ = false;
+  has_source_delta_ncdm_     = false;
+  has_source_theta_m_        = false;
+  has_source_theta_cb_       = false;
+  has_source_theta_tot_      = false;
+  has_source_theta_g_        = false;
+  has_source_theta_b_        = false;
+  has_source_theta_cdm_      = false;
+  has_source_theta_dcdm_     = false;
+  has_source_theta_fld_      = false;
+  has_source_theta_scf_      = false;
+  has_source_theta_dr_       = false;
+  has_source_theta_ur_       = false;
+  has_source_theta_idr_      = false;
+  has_source_theta_idr_drmd_ = false;
+  has_source_theta_idm_dr_   = false;
+  has_source_theta_idm_drmd_ = false;
+  has_source_theta_ncdm_     = false;
+  has_source_phi_            = false;
+  has_source_phi_prime_      = false;
+  has_source_phi_plus_psi_   = false;
+  has_source_psi_            = false;
+  has_source_h_              = false;
+  has_source_h_prime_        = false;
+  has_source_eta_            = false;
+  has_source_eta_prime_      = false;
+  has_source_H_T_Nb_prime_   = false;
+  has_source_k2gamma_Nb_     = false;
 
   /** - source flags and indices, for sources that all modes have in
       common (temperature, polarization, ...). For temperature, the
@@ -919,14 +897,14 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
       for scalars and vectors. For polarization, the term e is always
       non-zero, while the term b is only for vectors and tensors. */
 
-  if (ppt->has_cl_cmb_temperature == _TRUE_) {
-    has_source_t_ = _TRUE_;
-    has_cmb_      = _TRUE_;
+  if (ppt->has_cl_cmb_temperature) {
+    has_source_t_ = true;
+    has_cmb_      = true;
   }
 
-  if (ppt->has_cl_cmb_polarization == _TRUE_) {
-    has_source_p_ = _TRUE_;
-    has_cmb_      = _TRUE_;
+  if (ppt->has_cl_cmb_polarization) {
+    has_source_p_ = true;
+    has_cmb_      = true;
   }
 
   index_type = 0;
@@ -957,133 +935,133 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
     if (_scalars_) {
       /** - --> source flags and indices, for sources that are specific to scalars */
 
-      if ((ppt->has_cl_cmb_lensing_potential == _TRUE_) || (ppt->has_cl_lensing_potential)) {
-        has_lss_                 = _TRUE_;
-        has_source_phi_plus_psi_ = _TRUE_;
+      if ((ppt->has_cl_cmb_lensing_potential) || (ppt->has_cl_lensing_potential)) {
+        has_lss_                 = true;
+        has_source_phi_plus_psi_ = true;
       }
 
-      if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_nl_corrections_based_on_delta_m)) {
-        has_lss_            = _TRUE_;
-        has_source_delta_m_ = _TRUE_;
+      if ((ppt->has_pk_matter) || (ppt->has_nl_corrections_based_on_delta_m)) {
+        has_lss_            = true;
+        has_source_delta_m_ = true;
 
         if (HasNcdm(all_species_)) {
-          has_source_delta_cb_ = _TRUE_;
+          has_source_delta_cb_ = true;
         }
       }
 
-      if (ppt->has_density_transfers == _TRUE_) {
-        has_lss_              = _TRUE_;
-        has_source_delta_tot_ = _TRUE_;
-        has_source_delta_g_   = _TRUE_;
-        has_source_delta_b_   = _TRUE_;
+      if (ppt->has_density_transfers) {
+        has_lss_              = true;
+        has_source_delta_tot_ = true;
+        has_source_delta_g_   = true;
+        has_source_delta_b_   = true;
         if (all_species_.count("CDM"))
-          has_source_delta_cdm_ = _TRUE_;
+          has_source_delta_cdm_ = true;
         if (all_species_.count("DCDM_DR"))
-          has_source_delta_dcdm_ = _TRUE_;
+          has_source_delta_dcdm_ = true;
         if (all_species_.count("Fluid"))
-          has_source_delta_fld_ = _TRUE_;
+          has_source_delta_fld_ = true;
         if (all_species_.count("ScalarField"))
-          has_source_delta_scf_ = _TRUE_;
+          has_source_delta_scf_ = true;
         if (all_species_.count("UR"))
-          has_source_delta_ur_ = _TRUE_;
+          has_source_delta_ur_ = true;
         if (all_species_.count("IDM_DR_IDR"))
-          has_source_delta_idr_ = _TRUE_;
+          has_source_delta_idr_ = true;
         if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_delta_idr_drmd_ = _TRUE_;
+          has_source_delta_idr_drmd_ = true;
         if (all_species_.count("IDM_DR_IDR"))
-          has_source_delta_idm_dr_ = _TRUE_;
+          has_source_delta_idm_dr_ = true;
         if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_delta_idm_drmd_ = _TRUE_;
+          has_source_delta_idm_drmd_ = true;
         if (n_dr_species > 0)
-          has_source_delta_dr_ = _TRUE_;
+          has_source_delta_dr_ = true;
         if (HasNcdm(all_species_))
-          has_source_delta_ncdm_ = _TRUE_;
+          has_source_delta_ncdm_ = true;
         // Thanks to the following lines, (phi,psi) are also stored as sources
         // (Obtained directly in newtonian gauge, infereed from (h,eta) in synchronous gauge).
         // If density transfer functions are requested in the (default) CLASS format,
         // (phi, psi) will be appended to the delta_i's in the final output.
-        has_source_phi_ = _TRUE_;
-        has_source_psi_ = _TRUE_;
+        has_source_phi_ = true;
+        has_source_psi_ = true;
       }
 
-      if (ppt->has_velocity_transfers == _TRUE_) {
-        has_lss_              = _TRUE_;
-        has_source_theta_tot_ = _TRUE_;
-        has_source_theta_g_   = _TRUE_;
-        has_source_theta_b_   = _TRUE_;
+      if (ppt->has_velocity_transfers) {
+        has_lss_              = true;
+        has_source_theta_tot_ = true;
+        has_source_theta_g_   = true;
+        has_source_theta_b_   = true;
         if ((all_species_.count("CDM")) && (ppt->gauge != synchronous))
-          has_source_theta_cdm_ = _TRUE_;
+          has_source_theta_cdm_ = true;
         if (all_species_.count("DCDM_DR"))
-          has_source_theta_dcdm_ = _TRUE_;
+          has_source_theta_dcdm_ = true;
         if (all_species_.count("Fluid"))
-          has_source_theta_fld_ = _TRUE_;
+          has_source_theta_fld_ = true;
         if (all_species_.count("ScalarField"))
-          has_source_theta_scf_ = _TRUE_;
+          has_source_theta_scf_ = true;
         if (all_species_.count("UR"))
-          has_source_theta_ur_ = _TRUE_;
+          has_source_theta_ur_ = true;
         if (all_species_.count("IDM_DR_IDR"))
-          has_source_theta_idr_ = _TRUE_;
+          has_source_theta_idr_ = true;
         if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_theta_idr_drmd_ = _TRUE_;
+          has_source_theta_idr_drmd_ = true;
         if (all_species_.count("IDM_DR_IDR"))
-          has_source_theta_idm_dr_ = _TRUE_;
+          has_source_theta_idm_dr_ = true;
         if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_theta_idm_drmd_ = _TRUE_;
+          has_source_theta_idm_drmd_ = true;
         if (n_dr_species > 0)
-          has_source_theta_dr_ = _TRUE_;
+          has_source_theta_dr_ = true;
         if (HasNcdm(all_species_))
-          has_source_theta_ncdm_ = _TRUE_;
+          has_source_theta_ncdm_ = true;
       }
 
-      if (ppt->has_cl_number_count == _TRUE_) {
-        has_lss_ = _TRUE_;
-        if (ppt->has_nc_density == _TRUE_) {
-          has_source_delta_m_ = _TRUE_;
+      if (ppt->has_cl_number_count) {
+        has_lss_ = true;
+        if (ppt->has_nc_density) {
+          has_source_delta_m_ = true;
         }
-        if (ppt->has_nc_rsd == _TRUE_) {
-          has_source_theta_m_ = _TRUE_;
+        if (ppt->has_nc_rsd) {
+          has_source_theta_m_ = true;
           if (HasNcdm(all_species_))
             /* we may not need theta_cb at all, rsd always defined for
                the total matter, but at least this is made
                available */
-            has_source_theta_cb_ = _TRUE_;
+            has_source_theta_cb_ = true;
         }
 
-        if (ppt->has_nc_lens == _TRUE_) {
-          has_source_phi_plus_psi_ = _TRUE_;
+        if (ppt->has_nc_lens) {
+          has_source_phi_plus_psi_ = true;
         }
-        if (ppt->has_nc_gr == _TRUE_) {
-          has_source_phi_          = _TRUE_;
-          has_source_psi_          = _TRUE_;
-          has_source_phi_prime_    = _TRUE_;
-          has_source_phi_plus_psi_ = _TRUE_;
+        if (ppt->has_nc_gr) {
+          has_source_phi_          = true;
+          has_source_psi_          = true;
+          has_source_phi_prime_    = true;
+          has_source_phi_plus_psi_ = true;
         }
       }
 
-      if (ppt->has_metricpotential_transfers == _TRUE_) {
+      if (ppt->has_metricpotential_transfers) {
         if (ppt->gauge == newtonian) {
-          has_source_phi_       = _TRUE_;
-          has_source_psi_       = _TRUE_;
-          has_source_phi_prime_ = _TRUE_;
+          has_source_phi_       = true;
+          has_source_psi_       = true;
+          has_source_phi_prime_ = true;
         }
         if (ppt->gauge == synchronous) {
-          has_source_h_         = _TRUE_;
-          has_source_h_prime_   = _TRUE_;
-          has_source_eta_       = _TRUE_;
-          has_source_eta_prime_ = _TRUE_;
+          has_source_h_         = true;
+          has_source_h_prime_   = true;
+          has_source_eta_       = true;
+          has_source_eta_prime_ = true;
         }
-        has_source_H_T_Nb_prime_ = _TRUE_;
-        has_source_k2gamma_Nb_   = _TRUE_;
+        has_source_H_T_Nb_prime_ = true;
+        has_source_k2gamma_Nb_   = true;
       }
 
-      if (ppt->has_Nbody_gauge_transfers == _TRUE_) {
+      if (ppt->has_Nbody_gauge_transfers) {
         if (ppt->gauge == synchronous) {
-          has_source_h_prime_   = _TRUE_;
-          has_source_eta_prime_ = _TRUE_;
+          has_source_h_prime_   = true;
+          has_source_eta_prime_ = true;
         }
-        has_source_H_T_Nb_prime_ = _TRUE_;
+        has_source_H_T_Nb_prime_ = true;
         /** gamma is not neccessary for converting output to Nbody gauge but is included anyway. */
-        has_source_k2gamma_Nb_ = _TRUE_;
+        has_source_k2gamma_Nb_ = true;
       }
 
       index_type = index_type_common;
@@ -1206,8 +1184,6 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
     late_sources_[index_md].resize(ic_size_[index_md] * tp_size_[index_md]);
     ddlate_sources_[index_md].resize(ic_size_[index_md] * tp_size_[index_md]);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1220,7 +1196,7 @@ int PerturbationsModule::perturb_indices_of_perturbs() {
  * @return the error status
  */
 
-int PerturbationsModule::perturb_timesampling_for_sources() {
+void PerturbationsModule::perturb_timesampling_for_sources() {
   /** Summary: */
 
   double timescale_source;
@@ -1245,7 +1221,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
   int first_index_thermo;
   double tau_ini;
 
-  if ((has_cmb_ == _TRUE_) || (ppt->has_perturbed_recombination == _TRUE_)) {
+  if ((has_cmb_) || (ppt->has_perturbed_recombination)) {
     /* using bisection, search time tau such that the ratio of thermo
        to Hubble time scales tau_c/tau_h=aH/kappa' is equal to
        start_sources_at_tau_c_over_tau_h */
@@ -1367,7 +1343,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
                                                 pvecback.data(),
                                                 pvecthermo.data());
 
-    if (has_cmb_ == _TRUE_) {
+    if (has_cmb_) {
       /* variation rate of thermodynamics variables */
       double rate_thermo = pvecthermo[thermodynamics_module_->index_th_rate_];
 
@@ -1444,7 +1420,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
                                                 pvecback.data(),
                                                 pvecthermo.data());
 
-    if (has_cmb_ == _TRUE_) {
+    if (has_cmb_) {
       /* variation rate of thermodynamics variables */
       double rate_thermo = pvecthermo[thermodynamics_module_->index_th_rate_];
 
@@ -1563,8 +1539,6 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
       }
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1574,7 +1548,7 @@ int PerturbationsModule::perturb_timesampling_for_sources() {
  * @return the error status
  */
 
-int PerturbationsModule::perturb_get_k_list() {
+void PerturbationsModule::perturb_get_k_list() {
   int index_k, index_k_output, index_mode;
   double k, k_min = 0., k_rec, step, tau1;
   std::vector<double> k_max_cmb;
@@ -1602,7 +1576,7 @@ int PerturbationsModule::perturb_get_k_list() {
 
   /** - scalar modes */
 
-  if (ppt->has_scalars == _TRUE_) {
+  if (ppt->has_scalars) {
     /* first value */
     if (pba->sgnK == 0) {
       /* K<0 (flat)  : start close to zero */
@@ -1631,7 +1605,7 @@ int PerturbationsModule::perturb_get_k_list() {
     k_max_cl[index_md_scalars_]  = k_min;
     k_max                        = k_min;
 
-    if (ppt->has_cls == _TRUE_) {
+    if (ppt->has_cls) {
       /* find k_max_cmb[index_md_scalars_] : */
 
       /* choose a k_max_cmb[index_md_scalars_] corresponding to a wavelength on the last
@@ -1657,7 +1631,7 @@ int PerturbationsModule::perturb_get_k_list() {
          large l. We don't do it by default, because the lensed ClT,
          ClE would be marginally affected. */
 
-      if ((ppt->has_cl_number_count == _TRUE_) || (ppt->has_cl_lensing_potential == _TRUE_)) {
+      if ((ppt->has_cl_number_count) || (ppt->has_cl_lensing_potential)) {
         background_module_->background_tau_of_z(ppt->selection_mean[0], &tau1);
 
         k_max_cl[index_md_scalars_] = MAX(
@@ -1671,9 +1645,8 @@ int PerturbationsModule::perturb_get_k_list() {
 
     /* find k_max: */
 
-    if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) ||
-        (ppt->has_velocity_transfers == _TRUE_) ||
-        (ppt->has_nl_corrections_based_on_delta_m == _TRUE_))
+    if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers) ||
+        (ppt->has_nl_corrections_based_on_delta_m))
       k_max = MAX(k_max, ppt->k_max_for_pk);
 
     /** - --> test that result for k_min, k_max make sense */
@@ -1822,7 +1795,7 @@ int PerturbationsModule::perturb_get_k_list() {
 
   /** - vector modes */
 
-  if (ppt->has_vectors == _TRUE_) {
+  if (ppt->has_vectors) {
     /* first value */
     if (pba->sgnK == 0) {
       /* K<0 (flat)  : start close to zero */
@@ -1851,7 +1824,7 @@ int PerturbationsModule::perturb_get_k_list() {
     k_max_cl[index_md_vectors_]  = k_min;
     k_max                        = k_min;
 
-    if (ppt->has_cls == _TRUE_) {
+    if (ppt->has_cls) {
       /* find k_max_cmb: */
 
       /* choose a k_max_cmb corresponding to a wavelength on the last
@@ -1947,7 +1920,7 @@ int PerturbationsModule::perturb_get_k_list() {
 
   /** - tensor modes */
 
-  if (ppt->has_tensors == _TRUE_) {
+  if (ppt->has_tensors) {
     /* first value */
     if (pba->sgnK == 0) {
       /* K<0 (flat)  : start close to zero */
@@ -1976,7 +1949,7 @@ int PerturbationsModule::perturb_get_k_list() {
     k_max_cl[index_md_tensors_]  = k_min;
     k_max                        = k_min;
 
-    if (ppt->has_cls == _TRUE_) {
+    if (ppt->has_cls) {
       /* find k_max_cmb[index_md_tensors_]: */
 
       /* choose a k_max_cmb[index_md_tensors_] corresponding to a wavelength on the last
@@ -2144,21 +2117,21 @@ int PerturbationsModule::perturb_get_k_list() {
 
   k_min_ = _HUGE_;
   k_max_ = 0.;
-  if (ppt->has_scalars == _TRUE_) {
+  if (ppt->has_scalars) {
     k_min_ = MIN(k_min_,
                  k_[index_md_scalars_][0]); /* first value, inferred from perturbations structure */
     k_max_ = MAX(k_max_,
                  k_[index_md_scalars_][k_size_[index_md_scalars_] -
                                        1]); /* last value, inferred from perturbations structure */
   }
-  if (ppt->has_vectors == _TRUE_) {
+  if (ppt->has_vectors) {
     k_min_ = MIN(k_min_,
                  k_[index_md_vectors_][0]); /* first value, inferred from perturbations structure */
     k_max_ = MAX(k_max_,
                  k_[index_md_vectors_][k_size_[index_md_vectors_] -
                                        1]); /* last value, inferred from perturbations structure */
   }
-  if (ppt->has_tensors == _TRUE_) {
+  if (ppt->has_tensors) {
     k_min_ = MIN(k_min_,
                  k_[index_md_tensors_][0]); /* first value, inferred from perturbations structure */
     k_max_ = MAX(k_max_,
@@ -2167,8 +2140,6 @@ int PerturbationsModule::perturb_get_k_list() {
   }
 
   /* RAII: k_max_cmb and k_max_cl cleaned up automatically */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2184,7 +2155,7 @@ int PerturbationsModule::perturb_get_k_list() {
  * @return the error status
  */
 
-int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace* ppw) {
+void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace* ppw) {
   /** Summary: */
 
   /** - define local variables */
@@ -2338,8 +2309,6 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
   }
 
   /** - allocate fields where some of the perturbations are stored */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2351,10 +2320,6 @@ int PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace*
  * @param ppw        Input: pointer to perturb_workspace structure to be freed
  * @return the error status
  */
-
-int PerturbationsModule::perturb_workspace_free(int index_md, perturb_workspace* ppw) {
-  return _SUCCESS_;
-}
 
 /**
  * Solve the perturbation evolution for a given mode, initial
@@ -2376,10 +2341,10 @@ int PerturbationsModule::perturb_workspace_free(int index_md, perturb_workspace*
  * @return the error status
  */
 
-int PerturbationsModule::perturb_solve(int index_md,
-                                       int index_ic,
-                                       int index_k,
-                                       perturb_workspace* ppw) {
+void PerturbationsModule::perturb_solve(int index_md,
+                                        int index_ic,
+                                        int index_k,
+                                        perturb_workspace* ppw) {
   /** Summary: */
 
   /** - define local variables */
@@ -2716,8 +2681,6 @@ int PerturbationsModule::perturb_solve(int index_md,
   ppw->pv.reset();
 
   /* RAII: interval_approx, interval_limit cleaned up automatically */
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2728,14 +2691,14 @@ int PerturbationsModule::perturb_solve(int index_md,
  * @return the error status
  */
 
-int PerturbationsModule::perturb_prepare_k_output() {
+void PerturbationsModule::perturb_prepare_k_output() {
   scalar_titles_.clear();
   vector_titles_.clear();
   tensor_titles_.clear();
 
   if (ppt->k_output_values_num > 0) {
     /** Write titles for all perturbations that we would like to print/store. */
-    if (ppt->has_scalars == _TRUE_) {
+    if (ppt->has_scalars) {
       class_store_columntitle(scalar_titles_, "tau [Mpc]", _TRUE_);
       class_store_columntitle(scalar_titles_, "a", _TRUE_);
       {
@@ -2752,7 +2715,7 @@ int PerturbationsModule::perturb_prepare_k_output() {
       number_of_scalar_titles_ = get_number_of_titles(scalar_titles_);
     }
 
-    if (ppt->has_tensors == _TRUE_) {
+    if (ppt->has_tensors) {
       class_store_columntitle(tensor_titles_, "tau [Mpc]", _TRUE_);
       class_store_columntitle(tensor_titles_, "a", _TRUE_);
       class_store_columntitle(tensor_titles_, "delta_g", _TRUE_);
@@ -2776,7 +2739,6 @@ int PerturbationsModule::perturb_prepare_k_output() {
       number_of_tensor_titles_ = get_number_of_titles(tensor_titles_);
     }
   }
-  return _SUCCESS_;
 }
 
 /**
@@ -2794,7 +2756,7 @@ int PerturbationsModule::perturb_prepare_k_output() {
  * @return the error status
  */
 
-int PerturbationsModule::perturb_find_approximation_number(
+void PerturbationsModule::perturb_find_approximation_number(
     int index_md,
     double k,
     perturb_workspace* ppw,
@@ -2834,8 +2796,6 @@ int PerturbationsModule::perturb_find_approximation_number(
 
     interval_number_of[index_ap] = flag_end - flag_ini + 1;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -2855,7 +2815,7 @@ int PerturbationsModule::perturb_find_approximation_number(
  * @return the error status
  */
 
-int PerturbationsModule::perturb_find_approximation_switches(
+void PerturbationsModule::perturb_find_approximation_switches(
     int index_md,
     double k,
     perturb_workspace* ppw,
@@ -3080,8 +3040,6 @@ int PerturbationsModule::perturb_find_approximation_switches(
 
     perturb_approximations(index_md, k, tau_end, ppw);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -3122,7 +3080,7 @@ int PerturbationsModule::perturb_find_approximation_switches(
  * @return the error status
  */
 
-int PerturbationsModule::perturb_vector_init(
+void PerturbationsModule::perturb_vector_init(
     int index_md,
     int index_ic,
     double k,
@@ -3167,8 +3125,7 @@ int PerturbationsModule::perturb_vector_init(
     /* perturbed_recombination — owned by the module (extension of the
        baryon-photon system, not a standalone species). Indices defined
        once TCA is off. */
-    if ((ppt->has_perturbed_recombination == _TRUE_) &&
-        (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+    if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       class_define_index(ppv->index_pt_perturbed_recombination_delta_temp, _TRUE_, index_pt, 1);
       class_define_index(ppv->index_pt_perturbed_recombination_delta_chi, _TRUE_, index_pt, 1);
     }
@@ -3448,7 +3405,7 @@ int PerturbationsModule::perturb_vector_init(
 
         /* perturbed recombination */
         /* the initial conditions are set when tca is switched off (current block) */
-        if (ppt->has_perturbed_recombination == _TRUE_) {
+        if (ppt->has_perturbed_recombination) {
           const size_t b_pr_i  = all_species_.index_of("Baryons");
           const auto& b_pr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
               *ppv->species_layouts[b_pr_i]);
@@ -3462,8 +3419,7 @@ int PerturbationsModule::perturb_vector_init(
       /* perturbed recombination */
       /* For any other transition in the approximation scheme, we should just copy the value of the perturbations, provided tca is already off (otherwise the indices are not yet allocated). For instance, we do not want to copy the values in the (k,tau) region where both UFA and TCA are engaged.*/
 
-      if ((ppt->has_perturbed_recombination == _TRUE_) &&
-          (pa_old[ppw->index_ap_tca] == (int) tca_off)) {
+      if ((ppt->has_perturbed_recombination) && (pa_old[ppw->index_ap_tca] == (int) tca_off)) {
         ppv->y[ppv->index_pt_perturbed_recombination_delta_temp] =
             ppw->pv->y[ppw->pv->index_pt_perturbed_recombination_delta_temp];
         ppv->y[ppv->index_pt_perturbed_recombination_delta_chi] =
@@ -3760,8 +3716,6 @@ int PerturbationsModule::perturb_vector_init(
 
     ppw->pv = std::move(ppv);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -3778,7 +3732,7 @@ int PerturbationsModule::perturb_vector_init(
  * @return the error status
  */
 
-int PerturbationsModule::perturb_initial_conditions(
+void PerturbationsModule::perturb_initial_conditions(
     int index_md, int index_ic, double k, double tau, perturb_workspace* ppw) {
   /** Summary: */
 
@@ -3919,7 +3873,7 @@ int PerturbationsModule::perturb_initial_conditions(
 
     /** - --> (b.1.) adiabatic */
 
-    if ((ppt->has_ad == _TRUE_) && (index_ic == index_ic_ad_)) {
+    if ((ppt->has_ad) && (index_ic == index_ic_ad_)) {
       /* The following formulas are valid at leading order in
          (k*tau) and (om*tau), and order zero in
          tight-coupling. Identical to first order terms in CRS,
@@ -3978,7 +3932,7 @@ int PerturbationsModule::perturb_initial_conditions(
 
     /** - --> (b.2.) Cold dark matter Isocurvature */
 
-    if ((ppt->has_cdi == _TRUE_) && (index_ic == index_ic_cdi_)) {
+    if ((ppt->has_cdi) && (index_ic == index_ic_cdi_)) {
       class_test((all_species_.count("IDM_DR_IDR") != 0),
                  "only adiabatic ic in presence of interacting dark radiation");
 
@@ -4009,7 +3963,7 @@ int PerturbationsModule::perturb_initial_conditions(
 
     /** - --> (b.3.) Baryon Isocurvature */
 
-    if ((ppt->has_bi == _TRUE_) && (index_ic == index_ic_bi_)) {
+    if ((ppt->has_bi) && (index_ic == index_ic_bi_)) {
       class_test((all_species_.count("IDM_DR_IDR") != 0),
                  "only adiabatic ic in presence of interacting dark radiation");
 
@@ -4037,7 +3991,7 @@ int PerturbationsModule::perturb_initial_conditions(
 
     /** - --> (b.4.) Neutrino density Isocurvature */
 
-    if ((ppt->has_nid == _TRUE_) && (index_ic == index_ic_nid_)) {
+    if ((ppt->has_nid) && (index_ic == index_ic_nid_)) {
       class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
                  "not consistent to ask for NID in absence of ur or ncdm species!");
 
@@ -4061,7 +4015,7 @@ int PerturbationsModule::perturb_initial_conditions(
 
     /** - --> (b.5.) Neutrino velocity Isocurvature */
 
-    if ((ppt->has_niv == _TRUE_) && (index_ic == index_ic_niv_)) {
+    if ((ppt->has_niv) && (index_ic == index_ic_niv_)) {
       class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
                  "not consistent to ask for NIV in absence of ur or ncdm species!");
 
@@ -4321,8 +4275,6 @@ int PerturbationsModule::perturb_initial_conditions(
       }
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -4358,10 +4310,10 @@ int PerturbationsModule::perturb_initial_conditions(
  * @return the error status
  */
 
-int PerturbationsModule::perturb_approximations(int index_md,
-                                                double k,
-                                                double tau,
-                                                perturb_workspace* ppw) {
+void PerturbationsModule::perturb_approximations(int index_md,
+                                                 double k,
+                                                 double tau,
+                                                 perturb_workspace* ppw) {
   /** Summary: */
 
   /** - define local variables */
@@ -4604,8 +4556,6 @@ int PerturbationsModule::perturb_approximations(int index_md,
       ppw->approx[ppw->index_ap_rsa] = (int) rsa_off;
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -4679,7 +4629,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
 
   /** - for scalars modes: */
 
-  if ((ppt->has_scalars == _TRUE_) && (pppaw->index_md == index_md_scalars_)) {
+  if ((ppt->has_scalars) && (pppaw->index_md == index_md_scalars_)) {
     *timescale = tau_h;
 
     if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (HasNcdm(all_species_)))
@@ -4705,7 +4655,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
 
   /** - for vector modes: */
 
-  if ((ppt->has_vectors == _TRUE_) && (pppaw->index_md == index_md_vectors_)) {
+  if ((ppt->has_vectors) && (pppaw->index_md == index_md_vectors_)) {
     *timescale = MIN(tau_h, tau_k);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
@@ -4728,7 +4678,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
 
   /** - for tensor modes: */
 
-  if ((ppt->has_tensors == _TRUE_) && (pppaw->index_md == index_md_tensors_)) {
+  if ((ppt->has_tensors) && (pppaw->index_md == index_md_tensors_)) {
     *timescale = MIN(tau_h, tau_k);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
@@ -4763,7 +4713,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
  * @return the error status
  */
 
-int PerturbationsModule::perturb_einstein(
+void PerturbationsModule::perturb_einstein(
     int index_md, double k, double tau, double* y, perturb_workspace* ppw) {
   /** Summary: */
 
@@ -4905,7 +4855,7 @@ int PerturbationsModule::perturb_einstein(
        gauge-independent variables (you could comment this out if you
        really want gauge-dependent results) */
 
-    if (has_source_delta_m_ == _TRUE_) {
+    if (has_source_delta_m_) {
       ppw->delta_m += 3. * ppw->pvecback[background_module_->index_bg_a_] *
                       ppw->pvecback[background_module_->index_bg_H_] * ppw->theta_m / k2;
       // note: until 2.4.3 there was a typo, the factor was (-2 H'/H) instead
@@ -4919,18 +4869,18 @@ int PerturbationsModule::perturb_einstein(
       // of decaying dark matter.
     }
 
-    if (has_source_delta_cb_ == _TRUE_) {
+    if (has_source_delta_cb_) {
       ppw->delta_cb += 3. * ppw->pvecback[background_module_->index_bg_a_] *
                        ppw->pvecback[background_module_->index_bg_H_] * ppw->theta_cb /
                        k2;  //check gauge transformation
     }
 
-    if (has_source_theta_m_ == _TRUE_) {
+    if (has_source_theta_m_) {
       if (ppt->gauge == synchronous) {
         ppw->theta_m += ppw->pvecmetric[ppw->index_mt_alpha] * k2;
       }
     }
-    if (has_source_theta_cb_ == _TRUE_) {
+    if (has_source_theta_cb_) {
       if (ppt->gauge == synchronous) {
         ppw->theta_cb += ppw->pvecmetric[ppw->index_mt_alpha] * k2;  //check gauge transformation
       }
@@ -4968,14 +4918,12 @@ int PerturbationsModule::perturb_einstein(
                                                     (k2 + 2. * pba->K) * y[ppw->pv->index_pt_gw] +
                                                     ppw->gw_source;
   }
-
-  return _SUCCESS_;
 }
 
-int PerturbationsModule::perturb_total_stress_energy(int index_md,
-                                                     double k,
-                                                     double* y,
-                                                     perturb_workspace* ppw) {
+void PerturbationsModule::perturb_total_stress_energy(int index_md,
+                                                      double k,
+                                                      double* y,
+                                                      perturb_workspace* ppw) {
   /** Summary: */
 
   /** - wavenumber and scale factor related quantities */
@@ -5043,8 +4991,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     const auto& b_tse_pre_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
         *ppw->pv->species_layouts[b_tse_pre_i]);
 
-    if ((ppt->has_perturbed_recombination == _TRUE_) &&
-        (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+    if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       delta_p_b_over_rho_b = ppw->pvecthermo[thermodynamics_module_->index_th_wb_] *
                              (y[b_tse_pre_lay.idx_delta] +
                               y[ppw->pv->index_pt_perturbed_recombination_delta_temp]);
@@ -5103,11 +5050,11 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       ppw->delta_p = 1. / 3. * rho_g * delta_g + rho_b * ppw->scalar_ctx.delta_p_b_over_rho_b;
       ppw->rho_plus_p_tot = 4. / 3. * rho_g + rho_b;
 
-      if (has_source_delta_m_ == _TRUE_) {
+      if (has_source_delta_m_) {
         delta_rho_m = rho_b * delta_b;
         rho_m       = rho_b;
       }
-      if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) {
+      if ((has_source_delta_m_) || (has_source_theta_m_)) {
         rho_plus_p_theta_m = rho_b * theta_b;
         rho_plus_p_m       = rho_b;
       }
@@ -5123,7 +5070,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       size_t i = 0;
       for (const auto& sp : all_species_) {
         if (sp->name() != "Photons" && sp->name() != "Baryons" &&
-            !(sp->name() == "Fluid" && fluid_tse && fluid_tse->use_ppf() == _TRUE_))
+            !(sp->name() == "Fluid" && fluid_tse && fluid_tse->use_ppf()))
           ppw->rho_plus_p_shear +=
               sp->RhoPlusPShear(*ppw->pv->species_layouts[i], ppw->pv.get(), y, ppw->pvecback, ppw);
         ++i;
@@ -5180,10 +5127,10 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
     }
 
     /* delta_cb / theta_cb: cold-matter tally only (excludes NCDM/DNCDM). */
-    if ((has_source_delta_m_ == _TRUE_) && (has_source_delta_cb_ == _TRUE_))
+    if ((has_source_delta_m_) && (has_source_delta_cb_))
       ppw->delta_cb = delta_rho_m / rho_m;
-    if (((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_)) &&
-        ((has_source_delta_cb_ == _TRUE_) || (has_source_theta_cb_ == _TRUE_)))
+    if (((has_source_delta_m_) || (has_source_theta_m_)) &&
+        ((has_source_delta_cb_) || (has_source_theta_cb_)))
       ppw->theta_cb = rho_plus_p_theta_m / rho_plus_p_m;
 
     /* Fold warm matter into full matter tally for delta_m / theta_m below. */
@@ -5205,7 +5152,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
          above guarantees find() returns non-null, so this deref is safe. */
       const FluidSpecies* fluid_tse = static_cast<const FluidSpecies*>(
           all_species_.find("Fluid")->get());
-      if (fluid_tse->use_ppf() == _FALSE_) {
+      if (!fluid_tse->use_ppf()) {
         ppw->delta_rho_fld        = all_species_.at("Fluid")->Rho(ppw->pvecback) *
                                     y[fluid_layout.idx_delta];
         ppw->rho_plus_p_theta_fld = (1. + w_fld) * all_species_.at("Fluid")->Rho(ppw->pvecback) *
@@ -5235,7 +5182,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
        will be transformed later on into the gauge-independent variable D
        = delta_m - 2H'/H \theta_m/k^2 .  */
 
-    if (has_source_delta_m_ == _TRUE_)
+    if (has_source_delta_m_)
       ppw->delta_m = delta_rho_m / rho_m;
 
     /* store theta_m in the current gauge. In perturb_einstein, this
@@ -5244,7 +5191,7 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
        the delta_m source only, because the gauge-invariant delta_m
        involves theta_m in the current gauge. */
 
-    if ((has_source_delta_m_ == _TRUE_) || (has_source_theta_m_ == _TRUE_))
+    if ((has_source_delta_m_) || (has_source_theta_m_))
       ppw->theta_m = rho_plus_p_theta_m / rho_plus_p_m;
 
     /* could include Lambda contribution to rho_tot (not done to match CMBFAST/CAMB definition) */
@@ -5346,8 +5293,6 @@ int PerturbationsModule::perturb_total_stress_energy(int index_md,
       }
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -5455,7 +5400,7 @@ int PerturbationsModule::perturb_sources_member(
     /** - --> for each type, compute source terms */
 
     /* scalar temperature */
-    if (has_source_t_ == _TRUE_) {
+    if (has_source_t_) {
       /* check whether integrated Sachs-Wolf term should be included */
       int switch_isw = 1;
       if ((ppt->switch_eisw == 0) && (z >= ppt->eisw_lisw_split_z)) {
@@ -5535,7 +5480,7 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* scalar polarization */
-    if (has_source_p_ == _TRUE_) {
+    if (has_source_p_) {
       /* all gauges. Note that the correct formula for the E source
          should have a minus sign, as shown in Hu & White. We put a
          plus sign to comply with the 'historical convention'
@@ -5549,7 +5494,7 @@ int PerturbationsModule::perturb_sources_member(
     /* H_T_prime in N-body gauge. (H_T=3zeta where zeta is the comoving curvature perturbation.).
        See equation A.5 in 1811.00904.*/
     double H_T_Nb_prime = 0.;
-    if (has_source_H_T_Nb_prime_ == _TRUE_) {
+    if (has_source_H_T_Nb_prime_) {
       double rho_plus_p_tot = (pvecback[background_module_->index_bg_rho_tot_] +
                                pvecback[background_module_->index_bg_p_tot_]);
       H_T_Nb_prime = 3 * a_prime_over_a / rho_plus_p_tot *
@@ -5559,13 +5504,13 @@ int PerturbationsModule::perturb_sources_member(
                       ppw->rho_plus_p_shear);
       _set_source_(index_tp_H_T_Nb_prime_) = H_T_Nb_prime;
       /** gamma in Nbody gauge, see Eq. A.2 in 1811.00904. */
-      if (has_source_k2gamma_Nb_ == _TRUE_) {
+      if (has_source_k2gamma_Nb_) {
         _set_source_(index_tp_k2gamma_Nb_) = -a_prime_over_a * H_T_Nb_prime +
                                              9. / 2. * a2_rel * ppw->rho_plus_p_shear;
       }
     }
 
-    if (has_source_k2gamma_Nb_ == _TRUE_) {
+    if (has_source_k2gamma_Nb_) {
       class_stop(
           "We need to compute the derivative of H_T_Nb_prime numerically. Written by T. "
           "Tram but not yet propagated here. See devel branch prior to merging with hmcode "
@@ -5573,7 +5518,7 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* Bardeen potential -PHI_H = phi in Newtonian gauge */
-    if (has_source_phi_ == _TRUE_) {
+    if (has_source_phi_) {
       if (ppt->gauge == newtonian)
         _set_source_(index_tp_phi_) = y[ppw->pv->index_pt_phi];
 
@@ -5583,7 +5528,7 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* its derivative phi' */
-    if (has_source_phi_prime_ == _TRUE_) {
+    if (has_source_phi_prime_) {
       if (ppt->gauge == newtonian)
         _set_source_(index_tp_phi_prime_) = dy[ppw->pv->index_pt_phi];
 
@@ -5594,7 +5539,7 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* diff of Bardeen potentials PHI_A-PHI_H = psi + phi in newtonian gauge */
-    if (has_source_phi_plus_psi_ == _TRUE_) {
+    if (has_source_phi_plus_psi_) {
       if (ppt->gauge == newtonian)
         _set_source_(index_tp_phi_plus_psi_) = y[ppw->pv->index_pt_phi] +
                                                pvecmetric[ppw->index_mt_psi];
@@ -5605,7 +5550,7 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* Bardeen potential PHI_A = psi in newtonian gauge */
-    if (has_source_psi_ == _TRUE_) {
+    if (has_source_psi_) {
       if (ppt->gauge == newtonian)
         _set_source_(index_tp_psi_) = pvecmetric[ppw->index_mt_psi];
 
@@ -5617,37 +5562,37 @@ int PerturbationsModule::perturb_sources_member(
     /* the metric potentials h and eta in synchronous gauge */
     if (ppt->gauge == synchronous) {
       /* cdm is always on in synchronous gauge, see error message above that checks gauge and has_cdm */
-      if (has_source_h_ == _TRUE_) {
+      if (has_source_h_) {
         const size_t cdm_i  = all_species_.index_of("CDM");
         const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(
             *ppw->pv->species_layouts[cdm_i]);
         _set_source_(index_tp_h_) = -2 * y[cdm_lay.idx_delta];
       }
 
-      if (has_source_h_prime_ == _TRUE_)
+      if (has_source_h_prime_)
         _set_source_(index_tp_h_prime_) = pvecmetric[ppw->index_mt_h_prime];
 
-      if (has_source_eta_ == _TRUE_)
+      if (has_source_eta_)
         _set_source_(index_tp_eta_) = y[ppw->pv->index_pt_eta];
 
-      if (has_source_eta_prime_ == _TRUE_)
+      if (has_source_eta_prime_)
         _set_source_(index_tp_eta_prime_) = dy[ppw->pv->index_pt_eta];
     }
 
     /* total matter overdensity (gauge-invariant, defined as in arXiv:1307.1459) */
-    if (has_source_delta_m_ == _TRUE_) {
+    if (has_source_delta_m_) {
       _set_source_(index_tp_delta_m_) = ppw->delta_m;
     }
 
     /* cdm and baryon over density */
-    if (has_source_delta_cb_ == _TRUE_) {
+    if (has_source_delta_cb_) {
       _set_source_(index_tp_delta_cb_) = ppw->delta_cb;
     }
 
     /* compute the corrections that have to be applied to each (delta_i, theta_i) in N-body gauge */
     double theta_over_k2;
     double theta_shift;
-    if (ppt->has_Nbody_gauge_transfers == _TRUE_) {
+    if (ppt->has_Nbody_gauge_transfers) {
       theta_over_k2 = ppw->rho_plus_p_theta / (pvecback[background_module_->index_bg_rho_tot_] +
                                                pvecback[background_module_->index_bg_p_tot_]);
       theta_shift   = H_T_Nb_prime;
@@ -5674,7 +5619,7 @@ int PerturbationsModule::perturb_sources_member(
     src_ctx.theta_shift    = theta_shift;
 
     /* delta_tot */
-    if (has_source_delta_tot_ == _TRUE_) {
+    if (has_source_delta_tot_) {
       /** We follow the (debatable) CMBFAST/CAMB convention of not including rho_lambda in rho_tot */
       double rho_tot;
       if (all_species_.count("Lambda")) {
@@ -5702,7 +5647,7 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* total velocity  */
-    if (has_source_theta_tot_ == _TRUE_) {
+    if (has_source_theta_tot_) {
       _set_source_(index_tp_theta_tot_) = ppw->rho_plus_p_theta /
                                               (pvecback[background_module_->index_bg_rho_tot_] +
                                                pvecback[background_module_->index_bg_p_tot_]) +
@@ -5710,17 +5655,17 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* total matter velocity (gauge-invariant, defined as in arXiv:1307.1459) */
-    if (has_source_theta_m_ == _TRUE_) {
+    if (has_source_theta_m_) {
       _set_source_(index_tp_theta_m_) = ppw->theta_m;
     }
 
     /* cdm and baryon velocity */
-    if (has_source_theta_cb_ == _TRUE_) {
+    if (has_source_theta_cb_) {
       _set_source_(index_tp_theta_cb_) = ppw->theta_cb;
     }
 
     /* total velocity */
-    if (has_source_theta_tot_ == _TRUE_) {
+    if (has_source_theta_tot_) {
       _set_source_(index_tp_theta_tot_) = ppw->rho_plus_p_theta / ppw->rho_plus_p_tot +
                                           theta_shift;  // N-body gauge correction
     }
@@ -5749,14 +5694,14 @@ int PerturbationsModule::perturb_sources_member(
     }
 
     /* tensor temperature */
-    if (has_source_t_ == _TRUE_) {
+    if (has_source_t_) {
       _set_source_(index_tp_t2_) = -y[ppw->pv->index_pt_gwdot] *
                                        pvecthermo[thermodynamics_module_->index_th_exp_m_kappa_] +
                                    pvecthermo[thermodynamics_module_->index_th_g_] * P;
     }
 
     /* tensor polarization */
-    if (has_source_p_ == _TRUE_) {
+    if (has_source_p_) {
       /* Note that the correct formula for the polarization source
          should have a minus sign, as shown in Hu & White. We put a
          plus sign to comply with the 'historical convention'
@@ -5829,8 +5774,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
   /** - calculate perturbed recombination */
 
   double delta_temp = 0., delta_chi = 0.;
-  if ((ppt->has_perturbed_recombination == _TRUE_) &&
-      (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+  if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
     delta_temp = y[ppw->pv->index_pt_perturbed_recombination_delta_temp];
     delta_chi  = y[ppw->pv->index_pt_perturbed_recombination_delta_chi];
   }
@@ -6139,8 +6083,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
 
     /** - --> (b) perturbed recombination **/
 
-    if ((ppt->has_perturbed_recombination == _TRUE_) &&
-        (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+    if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       delta_temp = y[ppw->pv->index_pt_perturbed_recombination_delta_temp];
       delta_p_b_over_rho_b =
           pvecthermo[thermodynamics_module_->index_th_wb_] *
@@ -6273,8 +6216,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     /* perturbed recombination */
     /* computes the derivatives of delta x_e and delta T_b */
 
-    if ((ppt->has_perturbed_recombination == _TRUE_) &&
-        (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+    if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       /* alpha * n_H is in inverse seconds, so we have to multiply it by Mpc_in_sec */
       dy[ppw->pv->index_pt_perturbed_recombination_delta_chi] =
           -alpha_rec * a * chi * n_H * (delta_alpha_rec + delta_chi + delta_b) * _Mpc_over_m_ / _c_;
@@ -6431,7 +6373,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
  * @param error_message            Output: error message
  */
 
-int PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace) {
+void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
@@ -6722,8 +6664,6 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters_
 
   ppw->tca_shear_g = shear_g;
   ppw->tca_slip    = slip;
-
-  return _SUCCESS_;
 }
 
 /**
@@ -6738,7 +6678,7 @@ int PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters_
  * @param ppw                      Input/Output: in input, fixed parameters (e.g. indices); in output, delta and theta
  */
 
-int PerturbationsModule::perturb_rsa_delta_and_theta(
+void PerturbationsModule::perturb_rsa_delta_and_theta(
     double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {
   double k2 = k * k;
 
@@ -6843,8 +6783,6 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(
     ppw->rho_plus_p_theta += 4. / 3. * all_species_.at("UR")->Rho(ppw->pvecback) *
                              ppw->rsa_theta_ur;
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -6858,7 +6796,7 @@ int PerturbationsModule::perturb_rsa_delta_and_theta(
  * @param ppw                      Input/Output: in input, fixed parameters (e.g. indices); in output, delta and theta
  */
 
-int PerturbationsModule::perturb_rsa_idr_delta_and_theta(
+void PerturbationsModule::perturb_rsa_idr_delta_and_theta(
     double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {
   /* - define local variables */
 
@@ -6884,6 +6822,4 @@ int PerturbationsModule::perturb_rsa_idr_delta_and_theta(
       ppw->rsa_theta_idr = -0.5 * ppw->pvecmetric[ppw->index_mt_h_prime];
     }
   }
-
-  return _SUCCESS_;
 }

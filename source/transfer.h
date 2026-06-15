@@ -97,14 +97,14 @@ struct transfers {
   double selection_magnification_bias[_SELECTION_NUM_MAX_] = {
       0.}; /**< magnification bias; default 0 */
 
-  short has_nz_file = _FALSE_; /**< Has dN/dz (selection function) input file? */
-  short has_nz_analytic =
-      _FALSE_;              /**< Use analytic form for dN/dz (selection function) distribution? */
+  bool has_nz_file = false; /**< Has dN/dz (selection function) input file? */
+  bool has_nz_analytic =
+      false;                /**< Use analytic form for dN/dz (selection function) distribution? */
   std::string nz_file_name; /**< dN/dz (selection function) input file name */
 
-  short has_nz_evo_file = _FALSE_; /**< Has dN/dz (evolution function) input file? */
-  short has_nz_evo_analytic =
-      _FALSE_; /**< Use analytic form for dN/dz (evolution function) distribution? */
+  bool has_nz_evo_file = false; /**< Has dN/dz (evolution function) input file? */
+  bool has_nz_evo_analytic =
+      false; /**< Use analytic form for dN/dz (evolution function) distribution? */
   std::string nz_evo_file_name; /**< dN/dz (evolution function) input file name */
 
   //@}
@@ -113,8 +113,8 @@ struct transfers {
 
   //@{
 
-  short initialise_HIS_cache =
-      _FALSE_; /**< only true if we are using CLASS for setting up a cache of HIS structures */
+  bool initialise_HIS_cache =
+      false; /**< only true if we are using CLASS for setting up a cache of HIS structures */
 
   short transfer_verbose =
       0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
@@ -136,8 +136,6 @@ struct transfer_workspace {
 
   HyperInterpStruct
       HIS; /**< structure containing all hyperspherical bessel functions (flat case) or all hyperspherical bessel functions for a given value of beta=q/sqrt(|K|) (non-flat case). HIS = Hyperspherical Interpolation Structure. */
-
-  int HIS_allocated; /**< flag specifying whether the previous structure has been allocated */
 
   HyperInterpStruct*
       pBIS; /**< pointer to structure containing all the spherical bessel functions of the flat case (used even in the non-flat case, for approximation schemes). pBIS = pointer to Bessel Interpolation Structure. */

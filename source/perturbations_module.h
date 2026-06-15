@@ -12,14 +12,14 @@ class PerturbationsModule : public BaseModule {
                       BackgroundModulePtr background_module,
                       ThermodynamicsModulePtr thermodynamics_module);
   ~PerturbationsModule();
-  int perturb_output_data(enum file_format output_format,
-                          double z,
-                          int number_of_titles,
-                          double* data) const;
-  int perturb_output_titles(enum file_format output_format, std::string& titles) const;
-  int perturb_output_firstline_and_ic_suffix(int index_ic,
-                                             std::string& first_line,
-                                             std::string& ic_suffix) const;
+  void perturb_output_data(enum file_format output_format,
+                           double z,
+                           int number_of_titles,
+                           double* data) const;
+  void perturb_output_titles(enum file_format output_format, std::string& titles) const;
+  void perturb_output_firstline_and_ic_suffix(int index_ic,
+                                              std::string& first_line,
+                                              std::string& ic_suffix) const;
 
   /** Accessors that expose protected BaseModule pointers to species code. */
   const background* GetBackground() const noexcept {
@@ -125,61 +125,61 @@ class PerturbationsModule : public BaseModule {
   std::vector<int>
       tp_size_; /**< number of types tp_size[index_md] included in computation for each mode */
 
-  short has_source_t_;          /**< do we need source for CMB temperature? */
-  short has_source_p_;          /**< do we need source for CMB polarization? */
-  short has_source_delta_m_;    /**< do we need source for delta of total matter? */
-  short has_source_delta_cb_;   /**< do we ALSO need source for delta of ONLY cdm and baryon? */
-  short has_source_delta_tot_;  /**< do we need source for delta total? */
-  short has_source_delta_g_;    /**< do we need source for delta of gammas? */
-  short has_source_delta_b_;    /**< do we need source for delta of baryons? */
-  short has_source_delta_cdm_;  /**< do we need source for delta of cold dark matter? */
-  short has_source_delta_dcdm_; /**< do we need source for delta of DCDM? */
-  short has_source_delta_fld_;  /**< do we need source for delta of dark energy? */
-  short has_source_delta_scf_;  /**< do we need source for delta from scalar field? */
-  short has_source_delta_dr_;   /**< do we need source for delta of decay radiation? */
-  short
+  bool has_source_t_;          /**< do we need source for CMB temperature? */
+  bool has_source_p_;          /**< do we need source for CMB polarization? */
+  bool has_source_delta_m_;    /**< do we need source for delta of total matter? */
+  bool has_source_delta_cb_;   /**< do we ALSO need source for delta of ONLY cdm and baryon? */
+  bool has_source_delta_tot_;  /**< do we need source for delta total? */
+  bool has_source_delta_g_;    /**< do we need source for delta of gammas? */
+  bool has_source_delta_b_;    /**< do we need source for delta of baryons? */
+  bool has_source_delta_cdm_;  /**< do we need source for delta of cold dark matter? */
+  bool has_source_delta_dcdm_; /**< do we need source for delta of DCDM? */
+  bool has_source_delta_fld_;  /**< do we need source for delta of dark energy? */
+  bool has_source_delta_scf_;  /**< do we need source for delta from scalar field? */
+  bool has_source_delta_dr_;   /**< do we need source for delta of decay radiation? */
+  bool
       has_source_delta_ur_; /**< do we need source for delta of ultra-relativistic neutrinos/relics? */
-  short has_source_delta_idr_; /**< do we need source for delta of interacting dark radiation? */
-  short
+  bool has_source_delta_idr_; /**< do we need source for delta of interacting dark radiation? */
+  bool
       has_source_delta_idm_dr_; /**< do we need source for delta of interacting dark matter (with dr)? */
-  short
+  bool
       has_source_delta_idr_drmd_; /**< do we need source for delta of interacting dark radiation? (with drmd) */
-  short
+  bool
       has_source_delta_idm_drmd_; /**< do we need source for delta of interacting dark matter (with drmd)? */
-  short
+  bool
       has_source_delta_ncdm_; /**< do we need source for delta of all non-cold dark matter species (e.g. massive neutrinos)? */
-  short has_source_theta_m_;    /**< do we need source for theta of total matter? */
-  short has_source_theta_cb_;   /**< do we ALSO need source for theta of ONLY cdm and baryon? */
-  short has_source_theta_tot_;  /**< do we need source for theta total? */
-  short has_source_theta_g_;    /**< do we need source for theta of gammas? */
-  short has_source_theta_b_;    /**< do we need source for theta of baryons? */
-  short has_source_theta_cdm_;  /**< do we need source for theta of cold dark matter? */
-  short has_source_theta_dcdm_; /**< do we need source for theta of DCDM? */
-  short has_source_theta_fld_;  /**< do we need source for theta of dark energy? */
-  short has_source_theta_scf_;  /**< do we need source for theta of scalar field? */
-  short
+  bool has_source_theta_m_;    /**< do we need source for theta of total matter? */
+  bool has_source_theta_cb_;   /**< do we ALSO need source for theta of ONLY cdm and baryon? */
+  bool has_source_theta_tot_;  /**< do we need source for theta total? */
+  bool has_source_theta_g_;    /**< do we need source for theta of gammas? */
+  bool has_source_theta_b_;    /**< do we need source for theta of baryons? */
+  bool has_source_theta_cdm_;  /**< do we need source for theta of cold dark matter? */
+  bool has_source_theta_dcdm_; /**< do we need source for theta of DCDM? */
+  bool has_source_theta_fld_;  /**< do we need source for theta of dark energy? */
+  bool has_source_theta_scf_;  /**< do we need source for theta of scalar field? */
+  bool
       has_source_theta_dr_; /**< do we need source for theta of ultra-relativistic neutrinos/relics? */
-  short
+  bool
       has_source_theta_ur_; /**< do we need source for theta of ultra-relativistic neutrinos/relics? */
-  short has_source_theta_idr_; /**< do we need source for theta of interacting dark radiation? */
-  short
+  bool has_source_theta_idr_; /**< do we need source for theta of interacting dark radiation? */
+  bool
       has_source_theta_idm_dr_; /**< do we need source for theta of interacting dark matter (with dr)? */
-  short
+  bool
       has_source_theta_idr_drmd_; /**< do we need source for theta of interacting dark radiation (with drmd)? */
-  short
+  bool
       has_source_theta_idm_drmd_; /**< do we need source for theta of interacting dark matter (with drmd)? */
-  short
+  bool
       has_source_theta_ncdm_; /**< do we need source for theta of all non-cold dark matter species (e.g. massive neutrinos)? */
-  short has_source_phi_;          /**< do we need source for metric fluctuation phi? */
-  short has_source_phi_prime_;    /**< do we need source for metric fluctuation phi'? */
-  short has_source_phi_plus_psi_; /**< do we need source for metric fluctuation (phi+psi)? */
-  short has_source_psi_;          /**< do we need source for metric fluctuation psi? */
-  short has_source_h_;            /**< do we need source for metric fluctuation h? */
-  short has_source_h_prime_;      /**< do we need source for metric fluctuation h'? */
-  short has_source_eta_;          /**< do we need source for metric fluctuation eta? */
-  short has_source_eta_prime_;    /**< do we need source for metric fluctuation eta'? */
-  short has_source_H_T_Nb_prime_; /**< do we need source for metric fluctuation H_T_Nb'? */
-  short
+  bool has_source_phi_;          /**< do we need source for metric fluctuation phi? */
+  bool has_source_phi_prime_;    /**< do we need source for metric fluctuation phi'? */
+  bool has_source_phi_plus_psi_; /**< do we need source for metric fluctuation (phi+psi)? */
+  bool has_source_psi_;          /**< do we need source for metric fluctuation psi? */
+  bool has_source_h_;            /**< do we need source for metric fluctuation h? */
+  bool has_source_h_prime_;      /**< do we need source for metric fluctuation h'? */
+  bool has_source_eta_;          /**< do we need source for metric fluctuation eta? */
+  bool has_source_eta_prime_;    /**< do we need source for metric fluctuation eta'? */
+  bool has_source_H_T_Nb_prime_; /**< do we need source for metric fluctuation H_T_Nb'? */
+  bool
       has_source_k2gamma_Nb_; /**< do we need source for metric fluctuation gamma in Nbody gauge? */
 
   /** @name - arrays storing the evolution of all sources for given k values, passed as k_output_values */
@@ -244,41 +244,39 @@ class PerturbationsModule : public BaseModule {
   double k_max_;                       /**< maximum value (over all modes) */
 
  private:
-  int perturb_sources_at_tau(
+  void perturb_sources_at_tau(
       int index_md, int index_ic, int index_tp, double tau, double* pvecsources) const;
-  int perturb_init();
-  int perturb_free();
-  int perturb_indices_of_perturbs();
-  int perturb_timesampling_for_sources();
-  int perturb_get_k_list();
-  int perturb_workspace_init(int index_md, perturb_workspace* ppw);
-  int perturb_workspace_free(int index_md, perturb_workspace* ppw);
-  int perturb_solve(int index_md, int index_ic, int index_k, perturb_workspace* ppw);
-  int perturb_prepare_k_output();
-  int perturb_find_approximation_number(int index_md,
-                                        double k,
-                                        perturb_workspace* ppw,
-                                        double tau_ini,
-                                        double tau_end,
-                                        int* interval_number,
-                                        int* interval_number_of);
-  int perturb_find_approximation_switches(int index_md,
-                                          double k,
-                                          perturb_workspace* ppw,
-                                          double tau_ini,
-                                          double tau_end,
-                                          double precision,
-                                          int interval_number,
-                                          int* interval_number_of,
-                                          double* interval_limit,
-                                          int** interval_approx);
-  int perturb_vector_init(
+  void perturb_init();
+  void perturb_indices_of_perturbs();
+  void perturb_timesampling_for_sources();
+  void perturb_get_k_list();
+  void perturb_workspace_init(int index_md, perturb_workspace* ppw);
+  void perturb_solve(int index_md, int index_ic, int index_k, perturb_workspace* ppw);
+  void perturb_prepare_k_output();
+  void perturb_find_approximation_number(int index_md,
+                                         double k,
+                                         perturb_workspace* ppw,
+                                         double tau_ini,
+                                         double tau_end,
+                                         int* interval_number,
+                                         int* interval_number_of);
+  void perturb_find_approximation_switches(int index_md,
+                                           double k,
+                                           perturb_workspace* ppw,
+                                           double tau_ini,
+                                           double tau_end,
+                                           double precision,
+                                           int interval_number,
+                                           int* interval_number_of,
+                                           double* interval_limit,
+                                           int** interval_approx);
+  void perturb_vector_init(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw, int* pa_old);
-  int perturb_initial_conditions(
+  void perturb_initial_conditions(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw);
-  int perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);
-  int perturb_einstein(int index_md, double k, double tau, double* y, perturb_workspace* ppw);
-  int perturb_total_stress_energy(int index_md, double k, double* y, perturb_workspace* ppw);
+  void perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);
+  void perturb_einstein(int index_md, double k, double tau, double* y, perturb_workspace* ppw);
+  void perturb_total_stress_energy(int index_md, double k, double* y, perturb_workspace* ppw);
   int perturb_timescale_member(double tau, void* parameters_and_workspace, double* timescale);
   static int perturb_timescale(double tau, void* parameters_and_workspace, double* timescale);
   int perturb_sources_member(double tau,
@@ -301,10 +299,10 @@ class PerturbationsModule : public BaseModule {
                                      void* parameters_and_workspace);
   int perturb_derivs_member(double tau, double* y, double* dy, void* parameters_and_workspace);
   static int perturb_derivs(double tau, double* y, double* dy, void* parameters_and_workspace);
-  int perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace);
-  int perturb_rsa_delta_and_theta(
+  void perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace);
+  void perturb_rsa_delta_and_theta(
       double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
-  int perturb_rsa_idr_delta_and_theta(
+  void perturb_rsa_idr_delta_and_theta(
       double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
 
   BackgroundModulePtr background_module_;
@@ -319,8 +317,8 @@ class PerturbationsModule : public BaseModule {
 
   //@{
 
-  short has_cmb_; /**< do we need CMB-related sources (temperature, polarization) ? */
-  short has_lss_; /**< do we need LSS-related sources (lensing potential, ...) ? */
+  bool has_cmb_; /**< do we need CMB-related sources (temperature, polarization) ? */
+  bool has_lss_; /**< do we need LSS-related sources (lensing potential, ...) ? */
 
   //@}
 

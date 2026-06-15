@@ -22,7 +22,7 @@ struct lensing {
 
   //@{
 
-  short has_lensed_cls = _FALSE_; /**< do we need to compute lensed \f$ C_l\f$'s at all ? */
+  bool has_lensed_cls = false; /**< do we need to compute lensed \f$ C_l\f$'s at all ? */
 
   //@}
 

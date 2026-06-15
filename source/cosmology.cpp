@@ -52,10 +52,10 @@ PrimordialModulePtr& Cosmology::GetPrimordialModule() {
       auto nl =
           NonlinearModule(GetInputModule(), GetBackgroundModule(), GetPerturbationsModule(), pm);
       double sigma8 = 0;
-      if (nl.has_pk_m_ == _TRUE_) {
+      if (nl.has_pk_m_) {
         sigma8 = nl.sigma8_[nl.index_pk_m_];
       }
-      else if (nl.has_pk_cb_ == _TRUE_) {
+      else if (nl.has_pk_cb_) {
         sigma8 = nl.sigma8_[nl.index_pk_cb_];
       }
       else {

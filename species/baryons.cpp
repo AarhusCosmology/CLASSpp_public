@@ -153,7 +153,7 @@ void BaryonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double a_prime_over_a = ctx.a_prime_over_a;
 
   // ── delta_b: baryon density transfer ─────────────────────────────────────
-  if (p_mod->has_source_delta_b_ == _TRUE_) {
+  if (p_mod->has_source_delta_b_) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_delta_b_,
@@ -164,7 +164,7 @@ void BaryonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 
   // ── theta_b: baryon velocity transfer ────────────────────────────────────
-  if (p_mod->has_source_theta_b_ == _TRUE_) {
+  if (p_mod->has_source_theta_b_) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           p_mod->index_tp_theta_b_,
@@ -180,9 +180,9 @@ void BaryonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                         BaseSpecies::TransferColumnSection section) const {
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_b", mod.index_tp_delta_b_, true);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_b", mod.index_tp_theta_b_, true);
   }
 }

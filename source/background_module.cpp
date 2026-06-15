@@ -69,9 +69,7 @@
  *
  * In summary, the following functions can be called from other modules:
  *
- * -# background_init() at the beginning
- * -# background_at_tau(), background_tau_of_z() at any later time
- * -# background_free() at the end, when no more calls to the previous functions are needed
+ * -# background_at_tau(), background_tau_of_z() at any time during the module's lifetime
  */
 
 #include "background_module.h"
@@ -109,9 +107,7 @@ BackgroundModule::BackgroundModule(InputModulePtr input_module) : BaseModule(inp
   background_init();
 }
 
-BackgroundModule::~BackgroundModule() {
-  background_free();
-}
+BackgroundModule::~BackgroundModule() {}
 
 double BackgroundModule::GetOmega0Species(const std::string& key) const {
   // Top-level species first.
@@ -183,7 +179,7 @@ int BackgroundModule::background_add_line_to_bg_table(
  * @return the error status
  */
 
-int BackgroundModule::background_at_tau(
+void BackgroundModule::background_at_tau(
     double tau,
     short return_format,
     short intermode,
@@ -251,8 +247,6 @@ int BackgroundModule::background_at_tau(
                                              pvecback,
                                              pvecback_size);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -265,7 +259,7 @@ int BackgroundModule::background_at_tau(
  * @return the error status
  */
 
-int BackgroundModule::background_tau_of_z(double z, double* tau) const {
+void BackgroundModule::background_tau_of_z(double z, double* tau) const {
   /** Summary: */
 
   /** - define local variables */
@@ -291,8 +285,6 @@ int BackgroundModule::background_tau_of_z(double z, double* tau) const {
                            &last_index,
                            tau,
                            1);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -311,7 +303,7 @@ int BackgroundModule::background_tau_of_z(double z, double* tau) const {
  * @return the error status
  */
 
-int BackgroundModule::background_functions(
+void BackgroundModule::background_functions(
     double* pvecback_B, /* Vector containing all {B} quantities. */
     short return_format,
     double*
@@ -436,8 +428,6 @@ int BackgroundModule::background_functions(
     /*  */
     /*  */
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -469,7 +459,7 @@ int BackgroundModule::background_w_fld(double a,
   return _SUCCESS_;
 }
 
-int BackgroundModule::background_idm_drmd(
+void BackgroundModule::background_idm_drmd(
     double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const {
   double z         = 1.0 / a - 1.0;
   double R_int_tmp = 3.0 / 4.0 * rho_idm_over_rho_idr;
@@ -480,8 +470,6 @@ int BackgroundModule::background_idm_drmd(
     *Gint = 0;
   else
     *Gint = Gamma0_drmd_ / R_int_tmp * exp(-(1.0 + z_stop_) / (1 + z));
-
-  return _SUCCESS_;
 }
 
 /**
@@ -491,7 +479,7 @@ int BackgroundModule::background_idm_drmd(
  * @return the error status
  */
 
-int BackgroundModule::background_init() {
+void BackgroundModule::background_init() {
   /** Summary: */
 
   /** - in verbose mode, provide some information */
@@ -580,8 +568,6 @@ int BackgroundModule::background_init() {
   background_find_equality();
 
   background_output_budget();
-
-  return _SUCCESS_;
 }
 
 /**
@@ -591,29 +577,13 @@ int BackgroundModule::background_init() {
  * @return the error status
  */
 
-int BackgroundModule::background_free() {
-  background_free_noinput();
-
-  return _SUCCESS_;
-}
-
-/**
- * Free only the memory space NOT allocated through the input module
- *
- * @return the error status
- */
-
-int BackgroundModule::background_free_noinput() const {
-  return _SUCCESS_;
-}
-
 /**
  * Assign value to each relevant index in vectors of background quantities.
  *
  * @return the error status
  */
 
-int BackgroundModule::background_indices() {
+void BackgroundModule::background_indices() {
   /** Summary: */
 
   /** - define local variables */
@@ -812,11 +782,9 @@ int BackgroundModule::background_indices() {
   /* Set BackgroundModule pointer on all active species (default is no-op) */
   for (const auto& [name, sp] : all_species_)
     sp->SetBackgroundModule(this);
-
-  return _SUCCESS_;
 }
 
-int BackgroundModule::background_solve_evolver() {
+void BackgroundModule::background_solve_evolver() {
   /** Summary: */
 
   /** - define local variables */
@@ -1027,8 +995,6 @@ int BackgroundModule::background_solve_evolver() {
     if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
       dncdm_dr->dncdm().BackfillOmega0FromToday(bg_today, pba->H0, pba->h);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1039,7 +1005,7 @@ int BackgroundModule::background_solve_evolver() {
  * @return the error status
  */
 
-int BackgroundModule::background_initial_conditions(
+void BackgroundModule::background_initial_conditions(
     double*
         pvecback, /* vector with argument pvecback[index_bg] (must be already allocated, normal format is sufficient) */
     double*
@@ -1121,8 +1087,6 @@ int BackgroundModule::background_initial_conditions(
   /** - set initial value of D and D' in RD. D will be renormalised later, but D' must be correct. */
   pvecback_integration[index_bi_D_]       = 1;
   pvecback_integration[index_bi_D_prime_] = 2 * a * pvecback[index_bg_H_];
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1132,7 +1096,7 @@ int BackgroundModule::background_initial_conditions(
  * @return the error status
  */
 
-int BackgroundModule::background_find_equality() {
+void BackgroundModule::background_find_equality() {
   double Omega_m_over_Omega_r = 0.;
 
   /* first bracket the right tau value between two consecutive indices in the table */
@@ -1181,8 +1145,6 @@ int BackgroundModule::background_find_equality() {
     printf(" -> radiation/matter equality at z = %f\n", z_eq_);
     printf("    corresponding to conformal time = %f Mpc\n", tau_eq_);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1190,7 +1152,7 @@ int BackgroundModule::background_find_equality() {
  *
  */
 
-int BackgroundModule::background_output_titles(std::string& titles) const {
+void BackgroundModule::background_output_titles(std::string& titles) const {
   // ── Module header (always present) ──────────────────────────────────────
   class_store_columntitle(titles, "z", _TRUE_);
   class_store_columntitle(titles, "proper time [Gyr]", _TRUE_);
@@ -1213,11 +1175,9 @@ int BackgroundModule::background_output_titles(std::string& titles) const {
   class_store_columntitle(titles, "(.)p_tot_prime", _TRUE_);
   class_store_columntitle(titles, "gr.fac. D", _TRUE_);
   class_store_columntitle(titles, "gr.fac. f", _TRUE_);
-
-  return _SUCCESS_;
 }
 
-int BackgroundModule::background_output_data(int number_of_titles, double* data) const {
+void BackgroundModule::background_output_data(int number_of_titles, double* data) const {
   for (int index_tau = 0; index_tau < bt_size_; index_tau++) {
     double* dataptr  = data + index_tau * number_of_titles;
     double* pvecback = const_cast<double*>(background_table_.data()) + index_tau * bg_size_;
@@ -1249,8 +1209,6 @@ int BackgroundModule::background_output_data(int number_of_titles, double* data)
     class_store_double(dataptr, pvecback[index_bg_D_], _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_f_], _TRUE_, storeidx);
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1348,7 +1306,7 @@ int BackgroundModule::background_derivs_member(
  * @return the error status
  */
 
-int BackgroundModule::background_output_budget() {
+void BackgroundModule::background_output_budget() {
   if (pba->background_verbose > 1) {
     double budget_matter    = 0;
     double budget_radiation = 0;
@@ -1446,8 +1404,6 @@ int BackgroundModule::background_output_budget() {
 
     printf(" -------------------------------------------------------------------- \n");
   }
-
-  return _SUCCESS_;
 }
 
 /**

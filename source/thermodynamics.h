@@ -77,11 +77,11 @@ struct thermo {
 
   double z_reio = 11.357; /**< if above set to z,   input value of reionization redshift */
 
-  short compute_cb2_derivatives =
-      _FALSE_; /**< do we want to include in computation derivatives of baryon sound speed? */
+  bool compute_cb2_derivatives =
+      false; /**< do we want to include in computation derivatives of baryon sound speed? */
 
-  short compute_damping_scale =
-      _FALSE_; /**< do we want to compute the simplest analytic approximation to the photon damping (or diffusion) scale? */
+  bool compute_damping_scale =
+      false; /**< do we want to compute the simplest analytic approximation to the photon damping (or diffusion) scale? */
 
   /** parameters for reio_camb */
 
@@ -134,8 +134,8 @@ struct thermo {
   double annihilation =
       0.; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
 
-  short has_on_the_spot =
-      _TRUE_; /**< flag to specify if we want to use the on-the-spot approximation **/
+  bool has_on_the_spot =
+      true; /**< flag to specify if we want to use the on-the-spot approximation **/
 
   double decay = 0.; /**< parameter describing CDM decay (f/tau, see e.g. 1109.6322)*/
 
@@ -240,7 +240,7 @@ struct recombination {
   double
       annihilation; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
 
-  short has_on_the_spot; /**< flag to specify if we want to use the on-the-spot approximation **/
+  bool has_on_the_spot; /**< flag to specify if we want to use the on-the-spot approximation **/
 
   double decay; /**< parameter describing CDM decay (f/tau, see e.g. 1109.6322)*/
 

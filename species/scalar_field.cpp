@@ -15,7 +15,7 @@ ScalarFieldSpecies::ScalarFieldSpecies(const background& pba,
                                        double omega0_scf,
                                        std::vector<double> scf_parameters,
                                        int scf_tuning_index,
-                                       short attractor_ic_scf,
+                                       bool attractor_ic_scf,
                                        double phi_ini_scf,
                                        double phi_prime_ini_scf)
     : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba), Omega0_scf_(omega0_scf),
@@ -69,7 +69,7 @@ void ScalarFieldSpecies::SetBackgroundInitialConditions(const BackgroundICContex
   double* pvecback_integration = ctx.pvecback_integration;
   const double rho_rad         = ctx.rho_rad;
   double scf_lambda            = scf_parameters()[0];
-  if (attractor_ic_scf() == _TRUE_) {
+  if (attractor_ic_scf()) {
     const double attractor_denom = 3 * pow(scf_lambda, 2) - 12;
     if (attractor_denom < 0) {
       /** - --> If there is no attractor solution for scf_lambda, assign some value. Otherwise would give a nan.*/
@@ -222,7 +222,7 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                     ctx.k;  // PerturbSourceContext has no k2 field (unlike PerturbScalarContext)
 
   // ── delta_scf ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_scf_ == _TRUE_) {
+  if (p_mod->has_source_delta_scf_) {
     double delta_rho_scf;
     const perturbs* ppt = p_mod->GetPerturbs();
     if (ppt->gauge == synchronous) {
@@ -249,7 +249,7 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 
   // ── theta_scf ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_scf_ == _TRUE_) {
+  if (p_mod->has_source_theta_scf_) {
     const double rho_plus_p_theta_scf = 1. / 3. * k2 / a2_rel * phi_prime_bg * y[layout.idx_phi];
 
     p_mod->SetSourceValue(ctx.index_md,
@@ -297,9 +297,9 @@ void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   const background* pba = mod.GetBackground();
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers == _TRUE_)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_scf", mod.index_tp_delta_scf_, _TRUE_);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers == _TRUE_)
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t__scf", mod.index_tp_theta_scf_, _TRUE_);
   }
 }
@@ -537,16 +537,16 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   }
 
   // ── attractor_ic_scf (y/n string) ────────────────────────────────────────
-  short attractor_ic_scf   = _TRUE_;
+  bool attractor_ic_scf    = true;
   double phi_ini_scf       = 1.;
   double phi_prime_ini_scf = 1.;
   std::string attr_str;
   if (ctx.pfc->read_string("attractor_ic_scf", attr_str)) {
     if (attr_str.find("y") != std::string::npos || attr_str.find("Y") != std::string::npos) {
-      attractor_ic_scf = _TRUE_;
+      attractor_ic_scf = true;
     }
     else {
-      attractor_ic_scf = _FALSE_;
+      attractor_ic_scf = false;
       if (scf_parameters.size() < 2) {
         throw std::invalid_argument(
             "Since you are not using attractor initial conditions, you must specify phi and "

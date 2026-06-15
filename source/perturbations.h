@@ -12,17 +12,14 @@
 #include "evolver_rkdp45.h"
 #include "thermodynamics.h"
 
-#define _scalars_ ((ppt->has_scalars == _TRUE_) && (index_md == index_md_scalars_))
-#define _vectors_ ((ppt->has_vectors == _TRUE_) && (index_md == index_md_vectors_))
-#define _tensors_ ((ppt->has_tensors == _TRUE_) && (index_md == index_md_tensors_))
+#define _scalars_ (ppt->has_scalars && (index_md == index_md_scalars_))
+#define _vectors_ (ppt->has_vectors && (index_md == index_md_vectors_))
+#define _tensors_ (ppt->has_tensors && (index_md == index_md_tensors_))
 
 //TODO: Remove those when possible!
-#define _scalarsEXT_ \
-  ((ppt->has_scalars == _TRUE_) && (index_md == perturbations_module_->index_md_scalars_))
-#define _vectorsEXT_ \
-  ((ppt->has_vectors == _TRUE_) && (index_md == perturbations_module_->index_md_vectors_))
-#define _tensorsEXT_ \
-  ((ppt->has_tensors == _TRUE_) && (index_md == perturbations_module_->index_md_tensors_))
+#define _scalarsEXT_ (ppt->has_scalars && (index_md == perturbations_module_->index_md_scalars_))
+#define _vectorsEXT_ (ppt->has_vectors && (index_md == perturbations_module_->index_md_vectors_))
+#define _tensorsEXT_ (ppt->has_tensors && (index_md == perturbations_module_->index_md_tensors_))
 
 #define _set_source_(index) \
   sources_[index_md][index_ic * tp_size_[index_md] + index][index_tau * k_size_[index_md] + index_k]
@@ -111,52 +108,52 @@ struct perturbs {
 
   //@{
 
-  short has_perturbations; /**< do we need to compute perturbations at all ? */
+  bool has_perturbations; /**< do we need to compute perturbations at all ? */
 
-  short
+  bool
       has_cls; /**< do we need any harmonic space spectrum \f$ C_l \f$ (and hence Bessel functions, transfer functions, ...)? */
 
-  short has_scalars = _TRUE_;  /**< do we need scalars? */
-  short has_vectors = _FALSE_; /**< do we need vectors? */
-  short has_tensors = _FALSE_; /**< do we need tensors? */
+  bool has_scalars = true;  /**< do we need scalars? */
+  bool has_vectors = false; /**< do we need vectors? */
+  bool has_tensors = false; /**< do we need tensors? */
 
-  short has_ad  = _TRUE_;  /**< do we need adiabatic mode? */
-  short has_bi  = _FALSE_; /**< do we need isocurvature bi mode? */
-  short has_cdi = _FALSE_; /**< do we need isocurvature cdi mode? */
-  short has_nid = _FALSE_; /**< do we need isocurvature nid mode? */
-  short has_niv = _FALSE_; /**< do we need isocurvature niv mode? */
+  bool has_ad  = true;  /**< do we need adiabatic mode? */
+  bool has_bi  = false; /**< do we need isocurvature bi mode? */
+  bool has_cdi = false; /**< do we need isocurvature cdi mode? */
+  bool has_nid = false; /**< do we need isocurvature nid mode? */
+  bool has_niv = false; /**< do we need isocurvature niv mode? */
 
   /* perturbed recombination */
   /** Do we want to consider perturbed temperature and ionization fraction? */
-  short has_perturbed_recombination = _FALSE_;
+  bool has_perturbed_recombination = false;
   /** Neutrino contribution to tensors */
   enum tensor_methods tensor_method =
       tm_massless_approximation; /**< way to treat neutrinos in tensor perturbations(neglect, approximate as massless, take exact equations) */
 
-  short has_cl_cmb_temperature  = _FALSE_; /**< do we need \f$ C_l \f$'s for CMB temperature? */
-  short has_cl_cmb_polarization = _FALSE_; /**< do we need \f$ C_l \f$'s for CMB polarization? */
-  short has_cl_cmb_lensing_potential =
-      _FALSE_; /**< do we need \f$ C_l \f$'s for CMB lensing potential? */
-  short has_cl_lensing_potential =
-      _FALSE_; /**< do we need \f$ C_l \f$'s for galaxy lensing potential? */
-  short has_cl_number_count = _FALSE_; /**< do we need \f$ C_l \f$'s for density number count? */
-  short has_pk_matter       = _FALSE_; /**< do we need matter Fourier spectrum? */
-  short has_density_transfers =
-      _FALSE_; /**< do we need to output individual matter density transfer functions? */
-  short has_velocity_transfers =
-      _FALSE_; /**< do we need to output individual matter velocity transfer functions? */
-  short has_metricpotential_transfers =
-      _FALSE_; /**< do we need to output individual transfer functions for scalar metric perturbations? */
-  short has_Nbody_gauge_transfers =
-      _FALSE_; /**< should we convert density and velocity transfer functions to Nbody gauge? */
+  bool has_cl_cmb_temperature  = false; /**< do we need \f$ C_l \f$'s for CMB temperature? */
+  bool has_cl_cmb_polarization = false; /**< do we need \f$ C_l \f$'s for CMB polarization? */
+  bool has_cl_cmb_lensing_potential =
+      false; /**< do we need \f$ C_l \f$'s for CMB lensing potential? */
+  bool has_cl_lensing_potential =
+      false;                        /**< do we need \f$ C_l \f$'s for galaxy lensing potential? */
+  bool has_cl_number_count = false; /**< do we need \f$ C_l \f$'s for density number count? */
+  bool has_pk_matter       = false; /**< do we need matter Fourier spectrum? */
+  bool has_density_transfers =
+      false; /**< do we need to output individual matter density transfer functions? */
+  bool has_velocity_transfers =
+      false; /**< do we need to output individual matter velocity transfer functions? */
+  bool has_metricpotential_transfers =
+      false; /**< do we need to output individual transfer functions for scalar metric perturbations? */
+  bool has_Nbody_gauge_transfers =
+      false; /**< should we convert density and velocity transfer functions to Nbody gauge? */
 
-  short has_nl_corrections_based_on_delta_m =
-      _FALSE_; /**< do we want to compute non-linear corrections with an algorithm relying on delta_m (like halofit)? */
+  bool has_nl_corrections_based_on_delta_m =
+      false; /**< do we want to compute non-linear corrections with an algorithm relying on delta_m (like halofit)? */
 
-  short has_nc_density = _FALSE_; /**< in dCl, do we want density terms ? */
-  short has_nc_rsd     = _FALSE_; /**< in dCl, do we want redshift space distortion terms ? */
-  short has_nc_lens    = _FALSE_; /**< in dCl, do we want lensing terms ? */
-  short has_nc_gr      = _FALSE_; /**< in dCl, do we want gravity terms ? */
+  bool has_nc_density = false; /**< in dCl, do we want density terms ? */
+  bool has_nc_rsd     = false; /**< in dCl, do we want redshift space distortion terms ? */
+  bool has_nc_lens    = false; /**< in dCl, do we want lensing terms ? */
+  bool has_nc_gr      = false; /**< in dCl, do we want gravity terms ? */
 
   int l_scalar_max = 2500; /**< maximum l value for CMB scalars \f$ C_l \f$'s */
   int l_vector_max = 500;  /**< maximum l value for CMB vectors \f$ C_l \f$'s */

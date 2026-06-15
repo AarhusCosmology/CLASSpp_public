@@ -16,7 +16,7 @@ class SpectraModule : public BaseModule {
                 NonlinearModulePtr nonlinear_module,
                 TransferModulePtr transfer_module);
   ~SpectraModule();
-  int spectra_cl_at_l(double l, double* cl, double** cl_md, double** cl_md_ic) const;
+  void spectra_cl_at_l(double l, double* cl, double** cl_md, double** cl_md_ic) const;
   std::map<std::string, int> cl_output_index_map() const;
   std::map<std::string, std::vector<double>> cl_output(int lmax) const;
   void cl_output_no_copy(int lmax, std::vector<double*>& output_pointers) const;
@@ -37,19 +37,19 @@ class SpectraModule : public BaseModule {
 
   //@{
 
-  int has_tt_; /**< do we want \f$ C_l^{TT}\f$? (T = temperature) */
-  int has_ee_; /**< do we want \f$ C_l^{EE}\f$? (E = E-polarization) */
-  int has_te_; /**< do we want \f$ C_l^{TE}\f$? */
-  int has_bb_; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
-  int has_pp_; /**< do we want \f$ C_l^{\phi\phi}\f$? (\f$ \phi \f$ = CMB lensing potential) */
-  int has_tp_; /**< do we want \f$ C_l^{T\phi}\f$? */
-  int has_ep_; /**< do we want \f$ C_l^{E\phi}\f$? */
-  int has_dd_; /**< do we want \f$ C_l^{dd}\f$? (d = density) */
-  int has_td_; /**< do we want \f$ C_l^{Td}\f$? */
-  int has_pd_; /**< do we want \f$ C_l^{\phi d}\f$? */
-  int has_ll_; /**< do we want \f$ C_l^{ll}\f$? (l = galaxy lensing potential) */
-  int has_tl_; /**< do we want \f$ C_l^{Tl}\f$? */
-  int has_dl_; /**< do we want \f$ C_l^{dl}\f$? */
+  bool has_tt_; /**< do we want \f$ C_l^{TT}\f$? (T = temperature) */
+  bool has_ee_; /**< do we want \f$ C_l^{EE}\f$? (E = E-polarization) */
+  bool has_te_; /**< do we want \f$ C_l^{TE}\f$? */
+  bool has_bb_; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
+  bool has_pp_; /**< do we want \f$ C_l^{\phi\phi}\f$? (\f$ \phi \f$ = CMB lensing potential) */
+  bool has_tp_; /**< do we want \f$ C_l^{T\phi}\f$? */
+  bool has_ep_; /**< do we want \f$ C_l^{E\phi}\f$? */
+  bool has_dd_; /**< do we want \f$ C_l^{dd}\f$? (d = density) */
+  bool has_td_; /**< do we want \f$ C_l^{Td}\f$? */
+  bool has_pd_; /**< do we want \f$ C_l^{\phi d}\f$? */
+  bool has_ll_; /**< do we want \f$ C_l^{ll}\f$? (l = galaxy lensing potential) */
+  bool has_tl_; /**< do we want \f$ C_l^{Tl}\f$? */
+  bool has_dl_; /**< do we want \f$ C_l^{dl}\f$? */
 
   int index_ct_tt_; /**< index for type \f$ C_l^{TT} \f$*/
   int index_ct_ee_; /**< index for type \f$ C_l^{EE} \f$*/
@@ -88,46 +88,45 @@ class SpectraModule : public BaseModule {
                     better interpolation with no boundary effects */
 
  private:
-  int spectra_init();
-  int spectra_free();
-  int spectra_indices();
-  int spectra_cls();
-  int spectra_compute_cl(int index_md,
-                         int index_ic1,
-                         int index_ic2,
-                         int index_l,
-                         int cl_integrand_num_columns,
-                         double* cl_integrand,
-                         double* primordial_pk_cached,
-                         double* transfer_ic1,
-                         double* transfer_ic2);
+  void spectra_init();
+  void spectra_indices();
+  void spectra_cls();
+  void spectra_compute_cl(int index_md,
+                          int index_ic1,
+                          int index_ic2,
+                          int index_l,
+                          int cl_integrand_num_columns,
+                          double* cl_integrand,
+                          double* primordial_pk_cached,
+                          double* transfer_ic1,
+                          double* transfer_ic2);
   int spectra_k_and_tau();
   /* deprecated functions (since v2.8) */
-  int spectra_pk_at_z(enum linear_or_logarithmic mode,
-                      double z,
-                      double* output_tot,
-                      double* output_ic,
-                      double* output_cb_tot,
-                      double* output_cb_ic);
-  int spectra_pk_at_k_and_z(
+  void spectra_pk_at_z(enum linear_or_logarithmic mode,
+                       double z,
+                       double* output_tot,
+                       double* output_ic,
+                       double* output_cb_tot,
+                       double* output_cb_ic);
+  void spectra_pk_at_k_and_z(
       double k, double z, double* pk, double* pk_ic, double* pk_cb, double* pk_cb_ic);
-  int spectra_pk_nl_at_z(enum linear_or_logarithmic mode,
-                         double z,
-                         double* output_tot,
-                         double* output_cb_tot);
-  int spectra_pk_nl_at_k_and_z(double k, double z, double* pk_tot, double* pk_cb_tot);
-  int spectra_fast_pk_at_kvec_and_zvec(double* kvec,
-                                       int kvec_size,
-                                       double* zvec,
-                                       int zvec_size,
-                                       double* pk_tot_out,
-                                       double* pk_cb_tot_out,
-                                       int nonlinear);
-  int spectra_sigma(double R, double z, double* sigma);
-  int spectra_sigma_cb(double R, double z, double* sigma_cb);
+  void spectra_pk_nl_at_z(enum linear_or_logarithmic mode,
+                          double z,
+                          double* output_tot,
+                          double* output_cb_tot);
+  void spectra_pk_nl_at_k_and_z(double k, double z, double* pk_tot, double* pk_cb_tot);
+  void spectra_fast_pk_at_kvec_and_zvec(double* kvec,
+                                        int kvec_size,
+                                        double* zvec,
+                                        int zvec_size,
+                                        double* pk_tot_out,
+                                        double* pk_cb_tot_out,
+                                        int nonlinear);
+  void spectra_sigma(double R, double z, double* sigma);
+  void spectra_sigma_cb(double R, double z, double* sigma_cb);
   /* deprecated functions (since v2.1) */
-  int spectra_tk_at_z(double z, double* output);
-  int spectra_tk_at_k_and_z(double k, double z, double* output);
+  void spectra_tk_at_z(double z, double* output);
+  void spectra_tk_at_k_and_z(double k, double z, double* output);
 
   PerturbationsModulePtr perturbations_module_;
   PrimordialModulePtr primordial_module_;
