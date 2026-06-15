@@ -25,12 +25,6 @@ class NCDMInteractingSpecies : public NCDMSpecies {
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  /** Legacy PerturbDerivs: no-op — superseded by layout-based path above. */
-  void PerturbDerivs(double /*tau*/,
-                     const double* /*y*/,
-                     double* /*dy*/,
-                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
-
   double GetGeff() const {
     return G_eff_;
   }

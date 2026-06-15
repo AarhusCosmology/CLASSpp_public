@@ -67,17 +67,9 @@ class DCDMSpecies : public BaseSpecies {
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
-  void PerturbDerivs(double /*tau*/,
-                     const double* /*y*/,
-                     double* /*dy*/,
-                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
 
   double Delta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
-  double Delta(const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
@@ -87,39 +79,22 @@ class DCDMSpecies : public BaseSpecies {
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
 
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* /*pv*/,
-                const double* /*y*/,
-                const double* /*pvecback*/,
-                const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
   double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
                        const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;
-  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,

@@ -62,7 +62,6 @@ class IDM_DRSpecies : public BaseSpecies {
 
   // ── Perturbation index registration ────────────────────────────────────────
 
-  /** Layout-based override (primary path). */
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
                                    const precision* ppr,
@@ -72,57 +71,35 @@ class IDM_DRSpecies : public BaseSpecies {
 
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 
-  /** Layout-based PerturbDerivs (primary path). */
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  /** Legacy PerturbDerivs. */
-  void PerturbDerivs(double tau,
-                     const double* y,
-                     double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
-
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  /** Layout-based Delta (primary). */
   double Delta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  /** Legacy Delta: unreachable — composite IDM_DR_IDR always dispatches the
-      layout-aware Delta() on its IDM_DR child. */
-  double Delta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
-  /** Layout-based Theta (primary). */
   double Theta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  /** Legacy Theta: unreachable — see Delta. */
-  double Theta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
-  double DeltaP(const perturb_vector* /*pv*/,
+  double DeltaP(const BaseSpecies::PerturbLayout& /*layout*/,
+                const perturb_vector* /*pv*/,
                 const double* /*y*/,
                 const double* /*pvecback*/,
                 const perturb_workspace* /*ppw*/) const override {
     return 0.;
   }
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& /*layout*/,
+                       const perturb_vector* /*pv*/,
                        const double* /*y*/,
                        const double* /*pvecback*/,
                        const perturb_workspace* /*ppw*/) const override {

@@ -17,13 +17,15 @@ void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundData(const double* pvecback,
   w.Add("G_over_aH_drmd", pvecback[bgm_->index_bg_G_over_aH_drmd_]);
 }
 
-void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
-  perturb_vector* pv             = ctx.ppw->pv.get();
+void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                                       double* y,
+                                                       const PerturbIcContext& ctx) {
+  // Children have no IC logic; all ICs live on this composite.
   const PerturbationsModule* mod = ctx.p_mod;
   if (ctx.index_ic != mod->index_ic_ad_)
     return;
 
-  const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  const auto& my_lay      = static_cast<const PerturbLayout&>(base);
   const auto& idm_drm_lay = my_lay.idm_drmd;
   const auto& idr_drm_lay = my_lay.idr_drmd;
 
@@ -63,12 +65,11 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(double* y, const PerturbI
   }
 }
 
-void IDM_DRMD_IDR_DRMD_Species::FillSources(const double* y,
+void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& base,
+                                            const double* y,
                                             const double* /*dy*/,
                                             PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
-  perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv.get();
 
   // These sources are scalar-only
   if (ctx.index_md != p_mod->index_md_scalars_)
@@ -79,8 +80,7 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const double* y,
   };
 
   // ── IDM_DRMD ──────────────────────────────────────────────────────────────
-  const auto& my_src_lay = static_cast<const PerturbLayout&>(
-      *pv->species_layouts[collection_index_]);
+  const auto& my_src_lay      = static_cast<const PerturbLayout&>(base);
   const auto& idm_drm_src_lay = my_src_lay.idm_drmd;
   const auto& idr_drm_src_lay = my_src_lay.idr_drmd;
   if (p_mod->has_source_delta_idm_drmd_ == _TRUE_) {
@@ -218,13 +218,6 @@ void IDM_DRMD_IDR_DRMD_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& 
   idm_drmd_->PerturbDerivs(my.idm_drmd, tau, y, dy, ppaw);
   idr_drmd_->PerturbDerivs(my.idr_drmd, tau, y, dy, ppaw);
   AddCouplingDerivs(tau, y, dy, ppaw);
-}
-
-void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& /*base*/,
-                                                       double* y,
-                                                       const PerturbIcContext& ctx) {
-  // Children have no IC logic; all ICs live on this composite.
-  ApplyInitialConditions(y, ctx);
 }
 
 void IDM_DRMD_IDR_DRMD_Species::PerturbSynchronousToNewtonian(

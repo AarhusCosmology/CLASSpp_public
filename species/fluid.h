@@ -150,16 +150,6 @@ class FluidSpecies : public BaseSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
-  // Legacy signatures: no-op (Fluid is migrated; legacy call sites dual-write is in layout overrides).
-  void PerturbDerivs(double /*tau*/,
-                     const double* /*y*/,
-                     double* /*dy*/,
-                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
-  void FillSources(const double* /*y*/,
-                   const double* /*dy*/,
-                   PerturbSourceContext& /*ctx*/) override {}
-  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
-
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   // Layout-based read virtuals: do the real work.
@@ -183,32 +173,6 @@ class FluidSpecies : public BaseSpecies {
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-
-  // Legacy read virtuals: no-op stubs (migrated species use layout-based overrides).
-  double Delta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-  double Theta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-  double DeltaP(const perturb_vector* /*pv*/,
-                const double* /*y*/,
-                const double* /*pvecback*/,
-                const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

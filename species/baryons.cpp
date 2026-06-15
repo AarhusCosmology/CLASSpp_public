@@ -5,7 +5,7 @@
 #include "perturbations_module.h"
 #include "thermodynamics_module.h"
 
-// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+// ── RegisterPerturbationIndices ──────────────
 
 void BaryonsSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                  perturb_vector* pv,
@@ -32,7 +32,7 @@ void BaryonsSpecies::RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayou
   layout.idx_theta = index_pt++; /* v_b^{(1)} */
 }
 
-// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+// ── PerturbDerivs ────────────────────────────
 
 void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                    double /*tau*/,
@@ -78,7 +78,7 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-// ── Stress-energy observables (layout-based, primary path) ─────────────────
+// ── Stress-energy observables ─────────────────
 
 double BaryonsSpecies::Delta(const BaseSpecies::PerturbLayout& base,
                              const perturb_vector* /*pv*/,
@@ -106,14 +106,7 @@ double BaryonsSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,
   return pvecback[index_bg_rho_] * ppw->scalar_ctx.delta_p_b_over_rho_b;
 }
 
-double BaryonsSpecies::DeltaP(const perturb_vector* /*pv*/,
-                              const double* /*y*/,
-                              const double* pvecback,
-                              const perturb_workspace* ppw) const {
-  return pvecback[index_bg_rho_] * ppw->scalar_ctx.delta_p_b_over_rho_b;
-}
-
-// ── ApplyInitialConditions (layout-based, primary path) ───────────────────
+// ── ApplyInitialConditions ───────────────────
 
 void BaryonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                             double* y,
@@ -145,7 +138,7 @@ void BaryonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& ba
   }
 }
 
-// ── FillSources (layout-based, primary path) ──────────────────────────────
+// ── FillSources ──────────────────────────────
 
 void BaryonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                                  const double* y,

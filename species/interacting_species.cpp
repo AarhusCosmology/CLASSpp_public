@@ -12,7 +12,7 @@
 
 // ── IDM_DR ─────────────────────────────────────────────────────────────────
 
-// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+// ── RegisterPerturbationIndices ──────────────
 
 void IDM_DRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                 perturb_vector* /*pv*/,
@@ -29,7 +29,7 @@ void IDM_DRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base
   ++index_pt;
 }
 
-// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+// ── PerturbDerivs ────────────────────────────
 
 void IDM_DRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                   double /*tau*/,
@@ -47,17 +47,7 @@ void IDM_DRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
 }
 
-// ── PerturbDerivs (legacy path: unreachable — IDM_DR is composite-only) ───
-
-void IDM_DRSpecies::PerturbDerivs(double /*tau*/,
-                                  const double* /*y*/,
-                                  double* /*dy*/,
-                                  const perturb_parameters_and_workspace& /*ppaw*/) {
-  /* Unreachable: IDM_DR_IDR_Species always dispatches the layout-aware
-     PerturbDerivs(layout, ...) overload on its IDM_DR child. */
-}
-
-// ── Stress-energy observables (layout-based, primary path) ─────────────────
+// ── Stress-energy observables ──────────────────────────────────────────────
 
 double IDM_DRSpecies::Delta(const BaseSpecies::PerturbLayout& base,
                             const perturb_vector* /*pv*/,
@@ -103,7 +93,7 @@ void IDM_DRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayo
 
 // ── IDR ───────────────────────────────────────────────────────────────────
 
-// ── RegisterPerturbationIndices (layout-based, primary path) ───────────────
+// ── RegisterPerturbationIndices ───────────────
 
 void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                              perturb_vector* pv,
@@ -147,7 +137,7 @@ void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   }
 }
 
-// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+// ── PerturbDerivs ────────────────────────────
 
 void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                double /*tau*/,
@@ -211,17 +201,7 @@ void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-// ── PerturbDerivs (legacy path: unreachable — IDR is composite-only) ───────
-
-void IDRSpecies::PerturbDerivs(double /*tau*/,
-                               const double* /*y*/,
-                               double* /*dy*/,
-                               const perturb_parameters_and_workspace& /*ppaw*/) {
-  /* Unreachable: IDM_DR_IDR_Species always dispatches the layout-aware
-     PerturbDerivs(layout, ...) overload on its IDR child. */
-}
-
-// ── Stress-energy observables (layout-based, primary path) ─────────────────
+// ── Stress-energy observables ──────────────────────────────────────────────
 
 double IDRSpecies::Delta(const BaseSpecies::PerturbLayout& base,
                          const perturb_vector* /*pv*/,
@@ -340,7 +320,7 @@ double IDRSpecies::TcaShearIdr(const PerturbLayout& layout,
 
 // ── IDM_DRMD ───────────────────────────────────────────────────────────────
 
-// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+// ── RegisterPerturbationIndices ──────────────
 
 void IDM_DRMDSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                   perturb_vector* /*pv*/,
@@ -357,7 +337,7 @@ void IDM_DRMDSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& ba
   ++index_pt;
 }
 
-// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+// ── PerturbDerivs ────────────────────────────
 
 void IDM_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                     double /*tau*/,
@@ -373,17 +353,7 @@ void IDM_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
 }
 
-// ── PerturbDerivs (legacy path: unreachable — IDM_DRMD is composite-only) ─
-
-void IDM_DRMDSpecies::PerturbDerivs(double /*tau*/,
-                                    const double* /*y*/,
-                                    double* /*dy*/,
-                                    const perturb_parameters_and_workspace& /*ppaw*/) {
-  /* Unreachable: IDM_DRMD_IDR_DRMD_Species always dispatches the layout-aware
-     PerturbDerivs(layout, ...) overload on its IDM_DRMD child. */
-}
-
-// ── Stress-energy observables (layout-based, primary path) ─────────────────
+// ── Stress-energy observables ──────────────────────────────────────────────
 
 double IDM_DRMDSpecies::Delta(const BaseSpecies::PerturbLayout& base,
                               const perturb_vector* /*pv*/,
@@ -429,7 +399,7 @@ void IDM_DRMDSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLa
 
 // ── IDR_DRMD ───────────────────────────────────────────────────────────────
 
-// ── RegisterPerturbationIndices (layout-based, primary path) ──────────────
+// ── RegisterPerturbationIndices ──────────────
 
 void IDR_DRMDSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                   perturb_vector* /*pv*/,
@@ -446,7 +416,7 @@ void IDR_DRMDSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& ba
   ++index_pt;
 }
 
-// ── PerturbDerivs (layout-based, primary path) ────────────────────────────
+// ── PerturbDerivs ────────────────────────────
 
 void IDR_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                     double /*tau*/,
@@ -462,17 +432,7 @@ void IDR_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_theta] = 0.25 * ctx.k2 * y[layout.idx_delta] + ctx.metric_euler;
 }
 
-// ── PerturbDerivs (legacy path: unreachable — IDR_DRMD is composite-only) ─
-
-void IDR_DRMDSpecies::PerturbDerivs(double /*tau*/,
-                                    const double* /*y*/,
-                                    double* /*dy*/,
-                                    const perturb_parameters_and_workspace& /*ppaw*/) {
-  /* Unreachable: IDM_DRMD_IDR_DRMD_Species always dispatches the layout-aware
-     PerturbDerivs(layout, ...) overload on its IDR_DRMD child. */
-}
-
-// ── Stress-energy observables (layout-based, primary path) ─────────────────
+// ── Stress-energy observables ──────────────────────────────────────────────
 
 double IDR_DRMDSpecies::Delta(const BaseSpecies::PerturbLayout& base,
                               const perturb_vector* /*pv*/,

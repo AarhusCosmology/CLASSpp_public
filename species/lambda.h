@@ -41,30 +41,35 @@ class LambdaSpecies : public BaseSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  // ── Perturbations ──────────────────────────────────────────────────────────
-  void PerturbDerivs(double /*tau*/,
+  // ── Perturbations (Lambda is homogeneous: everything vanishes) ────────────
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& /*layout*/,
+                     double /*tau*/,
                      const double* /*y*/,
                      double* /*dy*/,
                      const perturb_parameters_and_workspace& /*ppaw*/) override {}
-  double Delta(const perturb_vector* /*pv*/,
+  double Delta(const BaseSpecies::PerturbLayout& /*layout*/,
+               const perturb_vector* /*pv*/,
                const double* /*y*/,
                const double* /*pvecback*/,
                const perturb_workspace* /*ppw*/) const override {
     return 0.;
   }
-  double Theta(const perturb_vector* /*pv*/,
+  double Theta(const BaseSpecies::PerturbLayout& /*layout*/,
+               const perturb_vector* /*pv*/,
                const double* /*y*/,
                const double* /*pvecback*/,
                const perturb_workspace* /*ppw*/) const override {
     return 0.;
   }
-  double DeltaP(const perturb_vector* /*pv*/,
+  double DeltaP(const BaseSpecies::PerturbLayout& /*layout*/,
+                const perturb_vector* /*pv*/,
                 const double* /*y*/,
                 const double* /*pvecback*/,
                 const perturb_workspace* /*ppw*/) const override {
     return 0.;
   }
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& /*layout*/,
+                       const perturb_vector* /*pv*/,
                        const double* /*y*/,
                        const double* /*pvecback*/,
                        const perturb_workspace* /*ppw*/) const override {

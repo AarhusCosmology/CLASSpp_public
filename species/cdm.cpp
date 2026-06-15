@@ -85,14 +85,6 @@ double CDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
   return y[layout.idx_delta];
 }
 
-double CDMSpecies::Delta(const perturb_vector* pv,
-                         const double* y,
-                         const double* pvecback,
-                         const perturb_workspace* ppw) const {
-  // Legacy override: route through the layout via collection_index_.
-  return Delta(*pv->species_layouts[collection_index_], pv, y, pvecback, ppw);
-}
-
 double CDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
                          const perturb_vector* /*pv*/,
                          const double* y,
@@ -100,14 +92,6 @@ double CDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
                          const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
-}
-
-double CDMSpecies::Theta(const perturb_vector* pv,
-                         const double* y,
-                         const double* pvecback,
-                         const perturb_workspace* ppw) const {
-  // Legacy override: route through the layout via collection_index_.
-  return Theta(*pv->species_layouts[collection_index_], pv, y, pvecback, ppw);
 }
 
 double CDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,

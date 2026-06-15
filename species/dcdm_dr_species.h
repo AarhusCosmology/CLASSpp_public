@@ -98,7 +98,10 @@ class DCDM_DR_Species : public CompositeSpecies {
                              const double* pvecback,
                              const perturb_workspace* ppw) const override;
 
-  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) override;
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

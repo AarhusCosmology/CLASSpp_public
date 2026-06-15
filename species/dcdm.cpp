@@ -96,18 +96,6 @@ double DCDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
   return y[layout.idx_delta];
 }
 
-double DCDMSpecies::Delta(const perturb_vector* /*pv*/,
-                          const double* /*y*/,
-                          const double* /*pvecback*/,
-                          const perturb_workspace* /*ppw*/) const {
-  // Unreachable on the matter dispatch path: DCDM_DR_Species overrides
-  // MatterRhoDelta/Delta(layout,...) to use the nested my.dcdm layout, and DCDM
-  // never lives as a top-level species so its collection_index_ is never set.
-  // The legacy (pv,...) override is retained only to satisfy the pure-virtual
-  // signature on BaseSpecies; returning 0 is safe.
-  return 0.;
-}
-
 double DCDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
                           const perturb_vector* /*pv*/,
                           const double* y,
@@ -115,14 +103,6 @@ double DCDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
                           const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   return y[layout.idx_theta];
-}
-
-double DCDMSpecies::Theta(const perturb_vector* /*pv*/,
-                          const double* /*y*/,
-                          const double* /*pvecback*/,
-                          const perturb_workspace* /*ppw*/) const {
-  // Unreachable on the matter dispatch path; see comment on Delta(pv,...).
-  return 0.;
 }
 
 double DCDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,

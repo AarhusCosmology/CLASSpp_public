@@ -51,50 +51,27 @@ class NCDMSpecies : public NCDMBaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  // Layout-based PerturbDerivs.
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  /** Legacy PerturbDerivs: no-op — superseded by layout-based path above. */
-  void PerturbDerivs(double /*tau*/,
-                     const double* /*y*/,
-                     double* /*dy*/,
-                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
-
-  // Layout-based FillSources.
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) override;
 
-  /** Legacy FillSources: no-op — superseded by layout-based path above. */
-  void FillSources(const double* /*y*/,
-                   const double* /*dy*/,
-                   PerturbSourceContext& /*ctx*/) override {}
-
-  // Layout-based ApplyInitialConditions.
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  /** Legacy ApplyInitialConditions: no-op — superseded by layout-based path above. */
-  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
-
-  // Layout-based stress-energy observables. Legacy versions throw — all
-  // callers go through the layout-based path.
+  // Stress-energy observables.
   double Delta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-
-  double Delta(const perturb_vector*,
-               const double*,
-               const double*,
-               const perturb_workspace*) const override;
 
   double Theta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
@@ -102,32 +79,17 @@ class NCDMSpecies : public NCDMBaseSpecies {
                const double* pvecback,
                const perturb_workspace* ppw) const override;
 
-  double Theta(const perturb_vector*,
-               const double*,
-               const double*,
-               const perturb_workspace*) const override;
-
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
 
-  double DeltaP(const perturb_vector*,
-                const double*,
-                const double*,
-                const perturb_workspace*) const override;
-
   double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
                        const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-
-  double RhoPlusPShear(const perturb_vector*,
-                       const double*,
-                       const double*,
-                       const perturb_workspace*) const override;
 
   // FA-collapse switch hook.
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,

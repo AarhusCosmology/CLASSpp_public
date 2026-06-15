@@ -127,8 +127,7 @@ class DNCDM_DR_Species : public CompositeSpecies {
                        const perturb_workspace* ppw) const override;
 
   /** Matter (warm DNCDM only) contribution. DR is radiation and contributes 0.
-   *  Routes to the layout-based dncdm Delta/Theta (the inherited legacy pv-only
-   *  composite path would hit DNCDMSpecies' unreachable legacy overloads). */
+   *  Forwards the nested my.dncdm sub-layout to the dncdm child's Delta/Theta. */
   double MatterRhoDelta(const perturb_vector* pv,
                         const double* y,
                         const double* pvecback,
@@ -138,7 +137,10 @@ class DNCDM_DR_Species : public CompositeSpecies {
                              const double* pvecback,
                              const perturb_workspace* ppw) const override;
 
-  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) override;
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

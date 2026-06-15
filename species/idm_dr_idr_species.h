@@ -136,9 +136,10 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
                              const double* pvecback,
                              const perturb_workspace* ppw) const override;
 
-  void FillSources(const double* y, const double* dy, PerturbSourceContext& ctx) override;
-  void ApplyInitialConditions(double* y, const PerturbIcContext& ctx) override;
-
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) override;
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,

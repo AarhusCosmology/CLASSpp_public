@@ -57,7 +57,6 @@ class IDR_DRMDSpecies : public BaseSpecies {
 
   // ── Perturbation index registration ────────────────────────────────────────
 
-  /** Layout-based override (primary path). */
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
                                    const precision* ppr,
@@ -67,64 +66,34 @@ class IDR_DRMDSpecies : public BaseSpecies {
 
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 
-  /** Layout-based PerturbDerivs (primary path). */
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  /** Legacy PerturbDerivs. */
-  void PerturbDerivs(double tau,
-                     const double* y,
-                     double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
-
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  /** Layout-based Delta (primary). */
   double Delta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  /** Legacy Delta: unreachable — IDR_DRMD is composite-only. */
-  double Delta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
-  /** Layout-based Theta (primary). */
   double Theta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  /** Legacy Theta: unreachable — see Delta. */
-  double Theta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
-  /** Layout-based DeltaP (primary). */
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  /** Legacy DeltaP: unreachable — see Delta. */
-  double DeltaP(const perturb_vector* /*pv*/,
-                const double* /*y*/,
-                const double* /*pvecback*/,
-                const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& /*layout*/,
+                       const perturb_vector* /*pv*/,
                        const double* /*y*/,
                        const double* /*pvecback*/,
                        const perturb_workspace* /*ppw*/) const override {

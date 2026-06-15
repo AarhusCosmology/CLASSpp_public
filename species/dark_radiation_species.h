@@ -73,25 +73,11 @@ class DarkRadiationSpecies : public BaseSpecies {
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  /** Legacy PerturbDerivs: no-op — composite routes through layout-based path. */
-  void PerturbDerivs(double /*tau*/,
-                     const double* /*y*/,
-                     double* /*dy*/,
-                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
-
   double Delta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-
-  /** Legacy Delta: no-op — composite routes through layout-based path. */
-  double Delta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
   double Theta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
@@ -99,41 +85,17 @@ class DarkRadiationSpecies : public BaseSpecies {
                const double* pvecback,
                const perturb_workspace* ppw) const override;
 
-  /** Legacy Theta: no-op — composite routes through layout-based path. */
-  double Theta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
 
-  /** Legacy DeltaP: no-op — composite routes through layout-based path. */
-  double DeltaP(const perturb_vector* /*pv*/,
-                const double* /*y*/,
-                const double* /*pvecback*/,
-                const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-
   double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
                        const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-
-  /** Legacy RhoPlusPShear: no-op — composite routes through layout-based path. */
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
@@ -145,9 +107,6 @@ class DarkRadiationSpecies : public BaseSpecies {
                               double* y,
                               const PerturbIcContext& ctx,
                               double decay_corr) const;
-
-  /** Legacy IC: no-op — composite routes through layout-based path. */
-  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
                                      const BaseSpecies::PerturbLayout& new_layout,

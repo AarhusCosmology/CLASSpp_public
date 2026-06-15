@@ -279,47 +279,28 @@ class BaseSpecies {
    * Contribute to dy for the scalar perturbation ODE at conformal time tau.
    * The PerturbScalarContext inside ppaw->ppw has pre-computed metric terms,
    * cross-species state (delta_g, theta_g, theta_b, ...), and approximation flags.
+   * The layout is this species' PerturbLayout slot (ppw->pv->species_layouts[i]);
+   * composites receive their own layout and pass nested sub-layouts to children.
    */
-  virtual void PerturbDerivs(double tau,
+  virtual void PerturbDerivs(const PerturbLayout& layout,
+                             double tau,
                              const double* y,
                              double* dy,
                              const perturb_parameters_and_workspace& ppaw) = 0;
 
-  virtual void PerturbDerivs(const PerturbLayout& /*layout*/,
-                             double tau,
-                             const double* y,
-                             double* dy,
-                             const perturb_parameters_and_workspace& ppaw) {
-    PerturbDerivs(tau, y, dy, ppaw);
-  }
-
   /** Contribute to dy for the vector perturbation ODE. Default: no-op. */
-  virtual void PerturbVectorDerivs(double /*tau*/,
+  virtual void PerturbVectorDerivs(const PerturbLayout& /*layout*/,
+                                   double /*tau*/,
                                    const double* /*y*/,
                                    double* /*dy*/,
                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
-
-  virtual void PerturbVectorDerivs(const PerturbLayout& /*layout*/,
-                                   double tau,
-                                   const double* y,
-                                   double* dy,
-                                   const perturb_parameters_and_workspace& ppaw) {
-    PerturbVectorDerivs(tau, y, dy, ppaw);
-  }
 
   /** Contribute to dy for the tensor perturbation ODE. Default: no-op. */
-  virtual void PerturbTensorDerivs(double /*tau*/,
+  virtual void PerturbTensorDerivs(const PerturbLayout& /*layout*/,
+                                   double /*tau*/,
                                    const double* /*y*/,
                                    double* /*dy*/,
                                    const perturb_parameters_and_workspace& /*ppaw*/) {}
-
-  virtual void PerturbTensorDerivs(const PerturbLayout& /*layout*/,
-                                   double tau,
-                                   const double* y,
-                                   double* dy,
-                                   const perturb_parameters_and_workspace& ppaw) {
-    PerturbTensorDerivs(tau, y, dy, ppaw);
-  }
 
   /** Write this species' tensor-mode output column titles. Default: no-op. */
   virtual void WriteTensorOutputColumnTitles(std::string& /*tensor_titles*/) const {}
@@ -335,66 +316,41 @@ class BaseSpecies {
 
   /**
    * Fractional density perturbation delta = delta_rho / rho.
-   * @param pv       Per-thread perturbation vector; read index_pt_* from here (NOT from species members).
+   * @param layout   This species' PerturbLayout slot (ppw->pv->species_layouts[i]);
+   *                 composites receive their own layout and pass nested
+   *                 sub-layouts to children.
+   * @param pv       Per-thread perturbation vector.
    * @param y        Current ODE state vector (ppw->pv->y).
    * @param pvecback Per-thread background vector (ppw->pvecback).
    * @param ppw      Per-thread workspace; provides scalar_ctx, accumulated stress-energy,
    *                 pvecthermo, and approximation flags for species that need them.
    */
-  virtual double Delta(const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const = 0;
-
-  virtual double Delta(const PerturbLayout& /*layout*/,
+  virtual double Delta(const PerturbLayout& layout,
                        const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
-                       const perturb_workspace* ppw) const {
-    return Delta(pv, y, pvecback, ppw);
-  }
+                       const perturb_workspace* ppw) const = 0;
 
   /** Velocity divergence theta. */
-  virtual double Theta(const perturb_vector* pv,
+  virtual double Theta(const PerturbLayout& layout,
+                       const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const = 0;
 
-  virtual double Theta(const PerturbLayout& /*layout*/,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const {
-    return Theta(pv, y, pvecback, ppw);
-  }
-
   /** Pressure perturbation delta_p. */
-  virtual double DeltaP(const perturb_vector* pv,
+  virtual double DeltaP(const PerturbLayout& layout,
+                        const perturb_vector* pv,
                         const double* y,
                         const double* pvecback,
                         const perturb_workspace* ppw) const = 0;
 
-  virtual double DeltaP(const PerturbLayout& /*layout*/,
-                        const perturb_vector* pv,
-                        const double* y,
-                        const double* pvecback,
-                        const perturb_workspace* ppw) const {
-    return DeltaP(pv, y, pvecback, ppw);
-  }
-
   /** (rho + p) * sigma: anisotropic stress contribution to Einstein equations. */
-  virtual double RhoPlusPShear(const perturb_vector* pv,
-                               const double* y,
-                               const double* pvecback,
-                               const perturb_workspace* ppw) const = 0;
-
-  virtual double RhoPlusPShear(const PerturbLayout& /*layout*/,
+  virtual double RhoPlusPShear(const PerturbLayout& layout,
                                const perturb_vector* pv,
                                const double* y,
                                const double* pvecback,
-                               const perturb_workspace* ppw) const {
-    return RhoPlusPShear(pv, y, pvecback, ppw);
-  }
+                               const perturb_workspace* ppw) const = 0;
 
   // ── Stage 1: Output ──────────────────────────────────────────────────────
 
@@ -432,34 +388,25 @@ class BaseSpecies {
    * Use ctx.p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, ctx.p_mod->index_tp_XXX_,
    *                               ctx.index_tau, ctx.index_k, value).
    * All addressing (index_md, index_ic, index_k, index_tau) is in ctx.
+   * Default: no-op.
    */
-  virtual void FillSources(const double* /*y*/,
+  virtual void FillSources(const PerturbLayout& /*layout*/,
+                           const double* /*y*/,
                            const double* /*dy*/,
                            PerturbSourceContext& /*ctx*/) {}
-
-  virtual void FillSources(const PerturbLayout& /*layout*/,
-                           const double* y,
-                           const double* dy,
-                           PerturbSourceContext& ctx) {
-    FillSources(y, dy, ctx);
-  }
 
   // ── Stage 3: Initial conditions ───────────────────────────────────────────
 
   /**
    * Write synchronous-gauge initial conditions for this species into y[].
-   * y[] == ppw->pv->y. Use ctx.ppw->pv->index_pt_* for index lookup.
-   * The module pre-computes ctx.delta_g_ic, ctx.delta_ur, etc.; species use them.
+   * y[] == ppw->pv->y. The module pre-computes ctx.delta_g_ic, ctx.delta_ur, etc.
    * Guard each IC type: if (ctx.index_ic == ctx.p_mod->index_ic_ad_) { ... }
    * Newtonian gauge transformation is handled by the module after this loop.
+   * Default: no-op.
    */
-  virtual void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) {}
-
   virtual void ApplyInitialConditions(const PerturbLayout& /*layout*/,
-                                      double* y,
-                                      const PerturbIcContext& ctx) {
-    ApplyInitialConditions(y, ctx);
-  }
+                                      double* /*y*/,
+                                      const PerturbIcContext& /*ctx*/) {}
 
   /**
    * Copy perturbation state from one layout to another across an approximation switch.
@@ -574,9 +521,9 @@ class BaseSpecies {
   }
 
   /** Rho * Delta contribution to delta_rho_m. Default: Rho*Delta if IsMatterSpecies, else 0.
-      Prefers the layout-based Delta variant when a species_layouts slot is owned
-      (i.e. for first-class species registered via SpeciesCollection::freeze).
-      Composite children with no collection_index_ fall back to the legacy variant.
+      Uses the species' own layout slot (pv->species_layouts[collection_index_]); only
+      valid for first-class species registered via SpeciesCollection::freeze.
+      Composites override to tally matter children via their nested sub-layouts.
       Defined out-of-line in base_species.cpp because it dereferences
       perturb_vector, which is forward-declared here. */
   virtual double MatterRhoDelta(const perturb_vector* pv,

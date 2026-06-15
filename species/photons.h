@@ -86,32 +86,17 @@ class PhotonsSpecies : public BaseSpecies {
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  void PerturbDerivs(double /*tau*/,
-                     const double* /*y*/,
-                     double* /*dy*/,
-                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
-
   void PerturbVectorDerivs(const BaseSpecies::PerturbLayout& layout,
                            double tau,
                            const double* y,
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) override;
 
-  void PerturbVectorDerivs(double /*tau*/,
-                           const double* /*y*/,
-                           double* /*dy*/,
-                           const perturb_parameters_and_workspace& /*ppaw*/) override {}
-
   void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
                            double tau,
                            const double* y,
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) override;
-
-  void PerturbTensorDerivs(double /*tau*/,
-                           const double* /*y*/,
-                           double* /*dy*/,
-                           const perturb_parameters_and_workspace& /*ppaw*/) override {}
 
   // ── Source filling and initial conditions ──────────────────────────────────
 
@@ -120,15 +105,9 @@ class PhotonsSpecies : public BaseSpecies {
                    const double* dy,
                    PerturbSourceContext& ctx) override;
 
-  void FillSources(const double* /*y*/,
-                   const double* /*dy*/,
-                   PerturbSourceContext& /*ctx*/) override {}
-
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;
-
-  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,
@@ -176,27 +155,11 @@ class PhotonsSpecies : public BaseSpecies {
                const double* pvecback,
                const perturb_workspace* ppw) const override;
 
-  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
-  double Delta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-
   double Theta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-
-  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
-  double Theta(const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
   /** δp_g = δρ_g / 3 = ρ_g * δ_g / 3. Returns 0 when RSA is active. */
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
@@ -205,27 +168,11 @@ class PhotonsSpecies : public BaseSpecies {
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
 
-  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
-  double DeltaP(const perturb_vector* /*pv*/,
-                const double* /*y*/,
-                const double* /*pvecback*/,
-                const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-
   double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
                        const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-
-  /** Legacy no-op: all callers have been migrated to the layout-based variant. */
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
  private:
   const background& pba_;

@@ -95,35 +95,20 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  // Layout-based scalar PerturbDerivs (called by DNCDM_DR_Species composite
-  // with my.dncdm). The legacy (non-layout) overload throws — no real path
-  // exercises it (the composite always passes a layout).
+  // Scalar PerturbDerivs (called by DNCDM_DR_Species composite with my.dncdm).
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  void PerturbDerivs(double tau,
-                     const double* y,
-                     double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
-
-  // Layout-based ApplyInitialConditions.
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  /** Legacy ApplyInitialConditions: no-op — superseded by layout-based path above. */
-  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
-
-  // Layout-based stress-energy observables. Legacy versions STAY FUNCTIONAL.
+  // Stress-energy observables.
   double Delta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
-  double Delta(const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
@@ -133,27 +118,15 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
 
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
 
   double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
                        const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv,
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;

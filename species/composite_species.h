@@ -9,17 +9,23 @@
  * CompositeSpecies: a BaseSpecies that owns N child species and acts as a
  * single all_species_ entry for a physically coupled sector.
  *
- * Background methods sum over children.
+ * Background methods sum over children. The perturbation interface (layout
+ * signatures) is implemented by each concrete composite: its PerturbLayout
+ * nests one sub-layout per child, and every method forwards the matching
+ * sub-layout to the child, e.g. child->Delta(my.child_layout, ...).
+ *
+ * Conventions concrete composites must follow so the Einstein equations
+ * get the right totals:
+ *   Delta  = rho-weighted average:      Rho() * Delta() == sum_i(rho_i * delta_i)
+ *   Theta  = (rho+p)-weighted average:  (Rho()+P()) * Theta() == sum_i((rho_i+p_i) * theta_i)
+ *   DeltaP / RhoPlusPShear = direct sums over children.
+ *   MatterRhoDelta / MatterRhoPlusPTheta = sums over matter children only
+ *   (the BaseSpecies default would tally the whole composite, including
+ *   radiation children — always override these in mixed composites).
+ *
  * PerturbDerivs runs a two-phase dispatch:
  *   1. Each child's PerturbDerivs (free-streaming terms)
  *   2. AddCouplingDerivs (coupling terms — override in concrete subclasses)
- *
- * Delta returns the rho-weighted average so that
- *   Rho() * Delta() == sum_i(rho_i * delta_i)
- * Theta returns the (rho+p)-weighted average so that
- *   (Rho()+P()) * Theta() == sum_i((rho_i+p_i) * theta_i)
- * DeltaP and RhoPlusPShear return the direct sum over children.
- * These are what the Einstein equations need.
  */
 class CompositeSpecies : public BaseSpecies {
  public:
@@ -67,50 +73,10 @@ class CompositeSpecies : public BaseSpecies {
   double DpDloga(const double* pvecback) const override;
   double FreestreamingRho(const double* pvecback) const override;
 
-  // ── Perturbations ────────────────────────────────────────────────────────
-  void PerturbDerivs(double tau,
-                     const double* y,
-                     double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
-  void PerturbVectorDerivs(double tau,
-                           const double* y,
-                           double* dy,
-                           const perturb_parameters_and_workspace& ppaw) override;
-  void PerturbTensorDerivs(double tau,
-                           const double* y,
-                           double* dy,
-                           const perturb_parameters_and_workspace& ppaw) override;
-
-  // Weighted averages: see class doc-comment above for weighting details.
-  double Delta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
-  double Theta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
   // ── Matter tally ────────────────────────────────────────────────────────
   bool IsMatterSpecies() const override;
   bool IsColdMatterSpecies() const override;
   double MatterRho(const double* pvecback) const override;
-  double MatterRhoDelta(const perturb_vector* pv,
-                        const double* y,
-                        const double* pvecback,
-                        const perturb_workspace* ppw) const override;
-  double MatterRhoPlusPTheta(const perturb_vector* pv,
-                             const double* y,
-                             const double* pvecback,
-                             const perturb_workspace* ppw) const override;
   double MatterRhoPlusP(const double* pvecback) const override;
 
  protected:

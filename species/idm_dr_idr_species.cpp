@@ -31,14 +31,15 @@ void IDM_DR_IDR_Species::WriteBackgroundData(const double* pvecback,
   w.Add("(.)rho_idm_dr", idm_dr().Rho(pvecback));
 }
 
-void IDM_DR_IDR_Species::ApplyInitialConditions(double* y, const PerturbIcContext& ctx) {
-  perturb_vector* pv             = ctx.ppw->pv.get();
+void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                                double* y,
+                                                const PerturbIcContext& ctx) {
+  // Children have no IC logic; all ICs live on this composite.
   const PerturbationsModule* mod = ctx.p_mod;
-  const perturbs* ppt            = mod->GetPerturbs();
   if (ctx.index_ic != mod->index_ic_ad_)
     return;
 
-  const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  const auto& my_lay     = static_cast<const PerturbLayout&>(base);
   const auto& idm_dr_lay = my_lay.idm_dr;
   const auto& idr_lay    = my_lay.idr;
 
@@ -64,12 +65,12 @@ void IDM_DR_IDR_Species::ApplyInitialConditions(double* y, const PerturbIcContex
   }
 }
 
-void IDM_DR_IDR_Species::FillSources(const double* y,
+void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
+                                     const double* y,
                                      const double* /*dy*/,
                                      PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv.get();
 
   // These sources are scalar-only
   if (ctx.index_md != p_mod->index_md_scalars_)
@@ -80,7 +81,7 @@ void IDM_DR_IDR_Species::FillSources(const double* y,
   };
 
   // ── IDM_DR ────────────────────────────────────────────────────────────────
-  const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  const auto& my_lay     = static_cast<const PerturbLayout&>(base);
   const auto& idm_dr_lay = my_lay.idm_dr;
   const auto& idr_lay    = my_lay.idr;
   if (p_mod->has_source_delta_idm_dr_ == _TRUE_) {
@@ -257,13 +258,6 @@ void IDM_DR_IDR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   idm_dr_->PerturbDerivs(my.idm_dr, tau, y, dy, ppaw);
   idr_->PerturbDerivs(my.idr, tau, y, dy, ppaw);
   AddCouplingDerivs(tau, y, dy, ppaw);
-}
-
-void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& /*base*/,
-                                                double* y,
-                                                const PerturbIcContext& ctx) {
-  // Children have no IC logic; all ICs live on this composite.
-  ApplyInitialConditions(y, ctx);
 }
 
 void IDM_DR_IDR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,

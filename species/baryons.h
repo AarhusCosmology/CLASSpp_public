@@ -76,11 +76,6 @@ class BaryonsSpecies : public BaseSpecies {
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  void PerturbDerivs(double /*tau*/,
-                     const double* /*y*/,
-                     double* /*dy*/,
-                     const perturb_parameters_and_workspace& /*ppaw*/) override {}
-
   // ── Source filling and initial conditions ──────────────────────────────────
 
   void FillSources(const BaseSpecies::PerturbLayout& layout,
@@ -88,15 +83,9 @@ class BaryonsSpecies : public BaseSpecies {
                    const double* dy,
                    PerturbSourceContext& ctx) override;
 
-  void FillSources(const double* /*y*/,
-                   const double* /*dy*/,
-                   PerturbSourceContext& /*ctx*/) override {}
-
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;
-
-  void ApplyInitialConditions(double* /*y*/, const PerturbIcContext& /*ctx*/) override {}
 
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,
@@ -126,26 +115,12 @@ class BaryonsSpecies : public BaseSpecies {
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  /** Legacy override: routes through the layout via collection_index_. */
-  double Delta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override {
-    return Delta(*pv->species_layouts[collection_index_], pv, y, pvecback, ppw);
-  }
 
   double Theta(const BaseSpecies::PerturbLayout& layout,
                const perturb_vector* pv,
                const double* y,
                const double* pvecback,
                const perturb_workspace* ppw) const override;
-  /** Legacy override: routes through the layout via collection_index_. */
-  double Theta(const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override {
-    return Theta(*pv->species_layouts[collection_index_], pv, y, pvecback, ppw);
-  }
 
   /** Baryon pressure perturbation: rho_b * (delta_p_b / rho_b) from pre-computed context. */
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
@@ -153,12 +128,9 @@ class BaryonsSpecies : public BaseSpecies {
                 const double* y,
                 const double* pvecback,
                 const perturb_workspace* ppw) const override;
-  double DeltaP(const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
 
-  double RhoPlusPShear(const perturb_vector* /*pv*/,
+  double RhoPlusPShear(const BaseSpecies::PerturbLayout& /*layout*/,
+                       const perturb_vector* /*pv*/,
                        const double* /*y*/,
                        const double* /*pvecback*/,
                        const perturb_workspace* /*ppw*/) const override {

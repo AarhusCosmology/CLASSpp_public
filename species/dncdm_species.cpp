@@ -507,16 +507,6 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void DNCDMSpecies::PerturbDerivs(double /*tau*/,
-                                 const double* /*y*/,
-                                 double* /*dy*/,
-                                 const perturb_parameters_and_workspace& /*ppaw*/) {
-  // Legacy non-layout PerturbDerivs is unreachable: the composite
-  // (DNCDM_DR_Species) calls the layout-based variant directly with my.dncdm.
-  throw std::logic_error(
-      "DNCDMSpecies::PerturbDerivs(tau,...) is unreachable — composite must pass layout");
-}
-
 void DNCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                           double* y,
                                           const PerturbIcContext& ctx) {
@@ -605,44 +595,6 @@ double DNCDMSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
   const double k = ppw->scalar_ctx.k;
   auto [d, t, s] = RescaledPerturbations(layout, a, k, ppw);
   return (Rho(pvecback) + P(pvecback)) * s;
-}
-
-// ── Integrated observables (legacy — composite always passes layout via the
-// layout-based overrides, so these legacy overloads are unreachable on the
-// real call paths and exist only to satisfy the pure-virtual contract from
-// BaseSpecies). The composite (DNCDM_DR_Species) overrides the layout-based
-// Delta/Theta/etc. and forwards `my.dncdm` to the layout-based DNCDMSpecies
-// overloads above. CompositeSpecies's legacy fallback chains through here
-// only when no caller knows the layout — no such call site exists today. ──
-
-double DNCDMSpecies::Delta(const perturb_vector* /*pv*/,
-                           const double* /*y*/,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error("DNCDMSpecies::Delta(pv,...) is unreachable — composite must pass layout");
-}
-
-double DNCDMSpecies::Theta(const perturb_vector* /*pv*/,
-                           const double* /*y*/,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error("DNCDMSpecies::Theta(pv,...) is unreachable — composite must pass layout");
-}
-
-double DNCDMSpecies::DeltaP(const perturb_vector* /*pv*/,
-                            const double* /*y*/,
-                            const double* /*pvecback*/,
-                            const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error(
-      "DNCDMSpecies::DeltaP(pv,...) is unreachable — composite must pass layout");
-}
-
-double DNCDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/,
-                                   const double* /*y*/,
-                                   const double* /*pvecback*/,
-                                   const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error(
-      "DNCDMSpecies::RhoPlusPShear(pv,...) is unreachable — composite must pass layout");
 }
 
 std::tuple<double, double, double> DNCDMSpecies::RescaledPerturbations(

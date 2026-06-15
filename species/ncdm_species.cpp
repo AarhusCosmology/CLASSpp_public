@@ -628,39 +628,6 @@ double NCDMSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
   return 2.0 / 3.0 * factor * rho_plus_p_shear_ncdm;
 }
 
-// ── Integrated observables (legacy — unreachable; layout-based overrides
-// above are used everywhere. These exist only to satisfy the pure-virtual
-// contract on BaseSpecies). ──
-
-double NCDMSpecies::Delta(const perturb_vector* /*pv*/,
-                          const double* /*y*/,
-                          const double* /*pvecback*/,
-                          const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error("NCDMSpecies::Delta(pv,...) is unreachable — caller must pass layout");
-}
-
-double NCDMSpecies::Theta(const perturb_vector* /*pv*/,
-                          const double* /*y*/,
-                          const double* /*pvecback*/,
-                          const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error("NCDMSpecies::Theta(pv,...) is unreachable — caller must pass layout");
-}
-
-double NCDMSpecies::DeltaP(const perturb_vector* /*pv*/,
-                           const double* /*y*/,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error("NCDMSpecies::DeltaP(pv,...) is unreachable — caller must pass layout");
-}
-
-double NCDMSpecies::RhoPlusPShear(const perturb_vector* /*pv*/,
-                                  const double* /*y*/,
-                                  const double* /*pvecback*/,
-                                  const perturb_workspace* /*ppw*/) const {
-  throw std::logic_error(
-      "NCDMSpecies::RhoPlusPShear(pv,...) is unreachable — caller must pass layout");
-}
-
 // ── CopyPerturbationsAcrossSwitch (FA-collapse) ─────────────────────────────
 
 void NCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,

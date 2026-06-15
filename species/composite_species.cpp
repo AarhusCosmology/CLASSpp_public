@@ -71,81 +71,10 @@ double CompositeSpecies::FreestreamingRho(const double* pvecback) const {
   return rho;
 }
 
-void CompositeSpecies::PerturbDerivs(double tau,
-                                     const double* y,
-                                     double* dy,
-                                     const perturb_parameters_and_workspace& ppaw) {
-  for (auto& child : children_)
-    child->PerturbDerivs(tau, y, dy, ppaw);
-  AddCouplingDerivs(tau, y, dy, ppaw);
-}
-
-void CompositeSpecies::PerturbVectorDerivs(double tau,
-                                           const double* y,
-                                           double* dy,
-                                           const perturb_parameters_and_workspace& ppaw) {
-  for (auto& child : children_)
-    child->PerturbVectorDerivs(tau, y, dy, ppaw);
-}
-
-void CompositeSpecies::PerturbTensorDerivs(double tau,
-                                           const double* y,
-                                           double* dy,
-                                           const perturb_parameters_and_workspace& ppaw) {
-  for (auto& child : children_)
-    child->PerturbTensorDerivs(tau, y, dy, ppaw);
-}
-
-double CompositeSpecies::Delta(const perturb_vector* pv,
-                               const double* y,
-                               const double* pvecback,
-                               const perturb_workspace* ppw) const {
-  double rho_delta = 0., rho_total = 0.;
-  for (const auto& child : children_) {
-    const double rho  = child->Rho(pvecback);
-    rho_delta        += rho * child->Delta(pv, y, pvecback, ppw);
-    rho_total        += rho;
-  }
-  return (rho_total > 0.) ? rho_delta / rho_total : 0.;
-}
-
-double CompositeSpecies::Theta(const perturb_vector* pv,
-                               const double* y,
-                               const double* pvecback,
-                               const perturb_workspace* ppw) const {
-  double rho_plus_p_theta = 0., rho_plus_p_total = 0.;
-  for (const auto& child : children_) {
-    const double rho_plus_p  = child->Rho(pvecback) + child->P(pvecback);
-    rho_plus_p_theta        += rho_plus_p * child->Theta(pv, y, pvecback, ppw);
-    rho_plus_p_total        += rho_plus_p;
-  }
-  return (rho_plus_p_total > 0.) ? rho_plus_p_theta / rho_plus_p_total : 0.;
-}
-
-double CompositeSpecies::DeltaP(const perturb_vector* pv,
-                                const double* y,
-                                const double* pvecback,
-                                const perturb_workspace* ppw) const {
-  double dp = 0.;
-  for (const auto& child : children_)
-    dp += child->DeltaP(pv, y, pvecback, ppw);
-  return dp;
-}
-
 void CompositeSpecies::AddCouplingDerivs(double /*tau*/,
                                          const double* /*y*/,
                                          double* /*dy*/,
                                          const perturb_parameters_and_workspace& /*ppaw*/) {}
-
-double CompositeSpecies::RhoPlusPShear(const perturb_vector* pv,
-                                       const double* y,
-                                       const double* pvecback,
-                                       const perturb_workspace* ppw) const {
-  double s = 0.;
-  for (const auto& child : children_)
-    s += child->RhoPlusPShear(pv, y, pvecback, ppw);
-  return s;
-}
 
 bool CompositeSpecies::IsMatterSpecies() const {
   for (const auto& child : children_)
@@ -166,26 +95,6 @@ double CompositeSpecies::MatterRho(const double* pvecback) const {
   for (const auto& child : children_)
     r += child->MatterRho(pvecback);
   return r;
-}
-
-double CompositeSpecies::MatterRhoDelta(const perturb_vector* pv,
-                                        const double* y,
-                                        const double* pvecback,
-                                        const perturb_workspace* ppw) const {
-  double rd = 0.;
-  for (const auto& child : children_)
-    rd += child->MatterRhoDelta(pv, y, pvecback, ppw);
-  return rd;
-}
-
-double CompositeSpecies::MatterRhoPlusPTheta(const perturb_vector* pv,
-                                             const double* y,
-                                             const double* pvecback,
-                                             const perturb_workspace* ppw) const {
-  double rpt = 0.;
-  for (const auto& child : children_)
-    rpt += child->MatterRhoPlusPTheta(pv, y, pvecback, ppw);
-  return rpt;
 }
 
 double CompositeSpecies::MatterRhoPlusP(const double* pvecback) const {

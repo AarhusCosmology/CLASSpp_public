@@ -317,12 +317,12 @@ double DNCDM_DR_Species::MatterRhoPlusPTheta(const perturb_vector* pv,
 
 // ── Output ────────────────────────────────────────────────────────────────────
 
-void DNCDM_DR_Species::FillSources(const double* y,
+void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
+                                   const double* y,
                                    const double* /*dy*/,
                                    PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const perturb_vector* pv   = ppw->pv.get();
   const double* pvecback     = ppw->pvecback;
 
   const double a_prime_over_a = ctx.a_prime_over_a;
@@ -331,7 +331,7 @@ void DNCDM_DR_Species::FillSources(const double* y,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+  const auto& my = static_cast<const PerturbLayout&>(base);
 
   // ── delta_dr (this channel's slot) ───────────────────────────────────────────
   // r_dr == 0 when the channel carries no DR (e.g. Gamma == 0); write 0 then,
