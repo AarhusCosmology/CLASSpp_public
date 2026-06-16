@@ -2464,21 +2464,8 @@ void PerturbationsModule::perturb_solve(int index_md,
                  ppw->pvecback[background_module_->index_bg_H_]);
 
   if (HasNcdm(all_species_)) {
-    for (auto& [name, sp] : all_species_) {
-      auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-      if (!ncdm_sp)
-        continue;
-      const double p_ncdm   = ncdm_sp->P(ppw->pvecback);
-      const double rho_ncdm = ncdm_sp->Rho(ppw->pvecback);
-      class_test(fabs(p_ncdm / rho_ncdm - 1. / 3.) > ppr->tol_ncdm_initial_w,
-                 "your choice of initial time for integrating wavenumbers is inappropriate: it "
-                 "corresponds to a time at which the ncdm species '%s' is not "
-                 "ultra-relativistic anymore, with w=%g, p=%g and rho=%g\n",
-                 ncdm_sp->name().c_str(),
-                 p_ncdm / rho_ncdm,
-                 p_ncdm,
-                 rho_ncdm);
-    }
+    for (auto& sp : all_species_)
+      sp->CheckUltraRelativisticAtIc(ppw->pvecback, ppr->tol_ncdm_initial_w);
   }
 
   /* is at most the time at which sources must be sampled */
@@ -2499,12 +2486,8 @@ void PerturbationsModule::perturb_solve(int index_md,
 
     /* if there are non-cold relics, check that they are relativistic enough */
     if (HasNcdm(all_species_)) {
-      for (auto& [name, sp] : all_species_) {
-        auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-        if (!ncdm_sp)
-          continue;
-        if (fabs(ncdm_sp->P(ppw->pvecback) / ncdm_sp->Rho(ppw->pvecback) - 1. / 3.) >
-            ppr->tol_ncdm_initial_w)
+      for (auto& sp : all_species_) {
+        if (!sp->IsUltraRelativisticAtIc(ppw->pvecback, ppr->tol_ncdm_initial_w))
           is_early_enough = _FALSE_;
       }
     }
@@ -2732,7 +2715,7 @@ void PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(tensor_titles_, "l4_ur", evolve_tensor_ur_);
 
       if (evolve_tensor_ncdm_ == _TRUE_) {
-        for (auto* sp : NcdmFamily(all_species_))
+        for (auto& sp : all_species_)
           sp->WriteTensorOutputColumnTitles(tensor_titles_);
       }
 
@@ -5261,13 +5244,8 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
           rho_relativistic += (*ur)->Rho(ppw->pvecback);
 
         if (HasNcdm(all_species_)) {
-          for (auto& [name, sp] : all_species_) {
-            auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-            if (!ncdm_sp)
-              continue;
-            /* (3 p_ncdm1) is the "relativistic" contribution to rho_ncdm1 */
-            rho_relativistic += 3. * ncdm_sp->P(ppw->pvecback);
-          }
+          for (auto& sp : all_species_)
+            rho_relativistic += sp->TensorMasslessRelativisticRho(ppw->pvecback);
         }
       }
 

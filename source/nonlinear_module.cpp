@@ -18,7 +18,6 @@
 
 #include "../species/fluid.h"
 #include "../species/idm_dr_idr_species.h"
-#include "../species/ncdm_species.h"
 #include "background_module.h"
 #include "cosmology.h"
 #include "perturbations_module.h"
@@ -914,18 +913,8 @@ void NonlinearModule::nonlinear_init() {
 
   /** --> check applicability of Halofit and HMcode */
   if (pnl->method > nl_none) {
-    for (auto& [name, sp] : all_species_) {
-      auto* ncdm_sp = dynamic_cast<NCDMSpecies*>(sp.get());
-      if (!ncdm_sp)
-        continue;
-      double m_ncdm_in_electronvolt = ncdm_sp->GetMassInElectronvolt();
-      if (m_ncdm_in_electronvolt > _M_EV_TOO_BIG_FOR_HALOFIT_)
-        fprintf(stdout,
-                "Warning: Halofit and HMcode are proved to work for CDM, and also with a small "
-                "HDM component. But it sounds like you are running with a WDM component of mass "
-                "%f eV, which makes the use of Halofit suspicious.\n",
-                m_ncdm_in_electronvolt);
-    }
+    for (auto& sp : all_species_)
+      sp->WarnIfTooHeavyForHalofit(_M_EV_TOO_BIG_FOR_HALOFIT_);
     if (all_species_.count("IDM_DR_IDR") &&
         static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
       fprintf(stdout,

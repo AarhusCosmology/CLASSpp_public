@@ -775,6 +775,31 @@ class TestReviewRegressions(TestClass):
             candidate.struct_cleanup()
             candidate.empty()
 
+    def test_dncdm_dr_computes(self):
+        """#308 guard: a decaying-NCDM (DNCDM_DR) run still computes after the
+        relativistic-IC check is forwarded to the wrapped DNCDM child."""
+        cosmo = Class()
+        try:
+            cosmo.set({
+                'output': 'tCl',
+                'l_max_scalars': 200,
+                'N_ur': 3.046,
+                'omega_b': 0.022032,
+                'omega_cdm': 0.12038,
+                # Pin YHe to skip BBN; this is a compute guard, not a precision test.
+                'YHe': 0.25,
+                'dncdm1.type': 'ncdm_decay_dr',
+                'dncdm1.m': 1.0,
+                'dncdm1.T': 0.71611,
+                'dncdm1.Gamma': 1e3,
+                'dncdm1.Omega_ini': 0.001,
+            })
+            cosmo.compute()
+            self.assertTrue(cosmo.raw_cl(100)['tt'].size > 0)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
     def test_theta_s_shooting_matches_reference(self):
         # The most common shoot: 100*theta_s varies h (module-level target in DoShooting).
         # Candidate (lazy DoShooting) must match the reference (ctor-shooting) within tol.

@@ -596,6 +596,33 @@ void NCDMBaseSpecies::PrintMassInfo() const {
          m_in_eV_ * deg_ / omega0_);
 }
 
+void NCDMBaseSpecies::CheckUltraRelativisticAtIc(const double* pvecback, double tol) const {
+  const double p_ncdm   = P(pvecback);
+  const double rho_ncdm = Rho(pvecback);
+  class_test(fabs(p_ncdm / rho_ncdm - 1. / 3.) > tol,
+             "your choice of initial time for integrating wavenumbers is inappropriate: it "
+             "corresponds to a time at which the ncdm species '%s' is not "
+             "ultra-relativistic anymore, with w=%g, p=%g and rho=%g\n",
+             name().c_str(),
+             p_ncdm / rho_ncdm,
+             p_ncdm,
+             rho_ncdm);
+}
+
+bool NCDMBaseSpecies::IsUltraRelativisticAtIc(const double* pvecback, double tol) const {
+  return fabs(P(pvecback) / Rho(pvecback) - 1. / 3.) <= tol;
+}
+
+void NCDMBaseSpecies::WarnIfTooHeavyForHalofit(double m_ev_threshold) const {
+  const double m_ncdm_in_electronvolt = GetMassInElectronvolt();
+  if (m_ncdm_in_electronvolt > m_ev_threshold)
+    fprintf(stdout,
+            "Warning: Halofit and HMcode are proved to work for CDM, and also with a small "
+            "HDM component. But it sounds like you are running with a WDM component of mass "
+            "%f eV, which makes the use of Halofit suspicious.\n",
+            m_ncdm_in_electronvolt);
+}
+
 void NCDMBaseSpecies::PrintOmegaInfo() const {
   printf("-> %-26s Omega = %-15g , omega = %-15g\n", "Neutrino Species", Omega0_, omega0_);
 }

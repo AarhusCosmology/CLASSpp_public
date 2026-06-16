@@ -124,8 +124,21 @@ class NCDMBaseSpecies : public BaseSpecies {
     return factor_;
   }
 
-  void PrintNeffInfo() const;
-  void PrintMassInfo() const;
+  void PrintNeffInfo() const override;
+  void PrintMassInfo() const override;
+
+  double NeutrinoOmega0() const override {
+    return GetOmega0();
+  }
+  double NeffContribution(double z) const override {
+    return GetNeff(z);
+  }
+  double TensorMasslessRelativisticRho(const double* pvecback) const override {
+    return 3. * P(pvecback);
+  }
+  void CheckUltraRelativisticAtIc(const double* pvecback, double tol) const override;
+  bool IsUltraRelativisticAtIc(const double* pvecback, double tol) const override;
+  void WarnIfTooHeavyForHalofit(double m_ev_threshold) const override;
   void PrintOmegaInfo() const;
 
   void SetDeg_from_Omega_ini(double z_ini, double H0, double Omega_ini);

@@ -509,6 +509,56 @@ class BaseSpecies {
     return 0.;
   }
 
+  // ── NCDM/DR-family hooks (#308) ───────────────────────────────────────────
+  // Neutral defaults let modules loop over all_species_ and call these directly
+  // instead of downcasting; composites forward/sum over their children.
+
+  /** Dark-radiation energy density today, read from the integrated background
+   *  vector. Default 0; DarkRadiationSpecies returns its own; composites sum. */
+  virtual double DarkRadiationRhoToday(const double* /*pvecback_integration*/) const {
+    return 0.;
+  }
+
+  /** This species' contribution to Omega0 of the neutrino/NCDM sector (fnu).
+   *  Default 0; NCDM returns GetOmega0(); composites sum children. */
+  virtual double NeutrinoOmega0() const {
+    return 0.;
+  }
+
+  /** Contribution to N_eff at redshift z. Default 0; NCDM returns GetNeff(z);
+   *  composites sum children. */
+  virtual double NeffContribution(double /*z*/) const {
+    return 0.;
+  }
+
+  /** Verbose N_eff line (background_verbose). Default no-op; NCDM prints;
+   *  composites forward to children. */
+  virtual void PrintNeffInfo() const {}
+  /** Verbose mass/omega line (background_verbose). Default no-op; NCDM prints;
+   *  composites forward to children. */
+  virtual void PrintMassInfo() const {}
+
+  /** Contribution to the tensor-mode "relativistic" density in the massless
+   *  approximation. Default 0; NCDM returns 3*P; composites sum. */
+  virtual double TensorMasslessRelativisticRho(const double* /*pvecback*/) const {
+    return 0.;
+  }
+
+  /** Initial-time ultra-relativistic check (throws via class_test on failure).
+   *  Default no-op; NCDM checks |w-1/3|; composites forward to children. */
+  virtual void CheckUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const {}
+
+  /** Initial-time ultra-relativistic predicate. Default true; NCDM checks
+   *  |w-1/3| <= tol; composites AND over children. */
+  virtual bool IsUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const {
+    return true;
+  }
+
+  /** Warn (stdout) if this species is too heavy for Halofit/HMcode. The policy
+   *  threshold is passed by the nonlinear module. Default no-op; NCDM compares
+   *  its mass; composites forward. */
+  virtual void WarnIfTooHeavyForHalofit(double /*m_ev_threshold*/) const {}
+
   /** Earliest a/a_today this species needs integration to start from.
    *  Default: returns a_proposed unchanged. NCDM species may pull it earlier. */
   virtual double BackgroundAIni(double a_proposed, double /*a_today*/, double /*tol*/) const {

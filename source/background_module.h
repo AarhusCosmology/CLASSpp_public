@@ -22,12 +22,8 @@ class BackgroundModule : public BaseModule {
   void background_idm_drmd(
       double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
 
-  // Per-species NCDM accessors (n indexes NCDM-family species in all_species_ lex order)
+  // Number of NCDM-family species present in all_species_ (incl. DNCDM children).
   int GetNcdmCount() const;
-  double GetNcdmDeg(int n) const;
-  double GetNcdmMassInEV(int n) const;
-  int GetNcdmQSize(int n) const;
-  double GetNcdmQ(int n, int q_id) const;
 
   /** Sum of GetOmega0() across all NCDM-family species (NCDM, NCDMInteracting,
    *  and the DNCDMSpecies child of every DNCDM_DR_Species composite). */

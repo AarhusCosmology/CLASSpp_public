@@ -1065,37 +1065,6 @@ cdef class PyCosmology:
         output_value = pvecthermo[index_th]
         return output_value
 
-    cpdef get_ncdm(self):
-        """
-        Return an array of data related to the NonColdDarkMatter module.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        ncdm : dictionary containing the following quantities related to the NonColdDarkMatter module:
-        -> q : list of vectors of q-values
-        -> q_size : list of sizes of the corresponding q-vectors
-        -> deg : list of degeneracy parameters
-        """
-        cdef:
-            dict ncdm_dict
-            int q_size
-
-        ibg = deref(self._thisptr).GetBackgroundModule()
-
-        ncdm_dict = {}
-        for ncdm_id in range(deref(ibg).GetNcdmCount()):
-            q_size = deref(ibg).GetNcdmQSize(ncdm_id)
-            ncdm_dict[f"deg[{ncdm_id}]"]      = deref(ibg).GetNcdmDeg(ncdm_id)
-            ncdm_dict[f"m_ncdm[{ncdm_id}]"]   = deref(ibg).GetNcdmMassInEV(ncdm_id)
-            ncdm_dict[f"q_size[{ncdm_id}]"]   = q_size
-            for q_id in range(q_size):
-                ncdm_dict[f"q[{ncdm_id}][{q_id}]"] = deref(ibg).GetNcdmQ(ncdm_id, q_id)
-
-        return ncdm_dict
-
     cpdef angular_distance(self, double z):
         """
         angular_distance(z)

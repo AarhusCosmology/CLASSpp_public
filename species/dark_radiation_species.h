@@ -120,6 +120,9 @@ class DarkRadiationSpecies : public BaseSpecies {
   int bi_rho_index() const {
     return index_bi_rho_;
   }
+  double DarkRadiationRhoToday(const double* pvecback_integration) const override {
+    return pvecback_integration[index_bi_rho_];
+  }
   int pt_F0_index() const {
     return index_pt_F0_;
   }

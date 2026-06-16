@@ -53,6 +53,60 @@ class CompositeSpecies : public BaseSpecies {
     return sum;
   }
 
+  /** Sums DarkRadiationRhoToday() over all children. */
+  double DarkRadiationRhoToday(const double* pvecback_integration) const override {
+    double sum = 0.0;
+    for (const auto& c : children_)
+      sum += c->DarkRadiationRhoToday(pvecback_integration);
+    return sum;
+  }
+
+  /** Sums NeutrinoOmega0() over children (matter NCDM children contribute). */
+  double NeutrinoOmega0() const override {
+    double sum = 0.0;
+    for (const auto& c : children_)
+      sum += c->NeutrinoOmega0();
+    return sum;
+  }
+
+  /** Sums NeffContribution() over children. */
+  double NeffContribution(double z) const override {
+    double sum = 0.0;
+    for (const auto& c : children_)
+      sum += c->NeffContribution(z);
+    return sum;
+  }
+
+  void PrintNeffInfo() const override {
+    for (const auto& c : children_)
+      c->PrintNeffInfo();
+  }
+  void PrintMassInfo() const override {
+    for (const auto& c : children_)
+      c->PrintMassInfo();
+  }
+
+  double TensorMasslessRelativisticRho(const double* pvecback) const override {
+    double sum = 0.0;
+    for (const auto& c : children_)
+      sum += c->TensorMasslessRelativisticRho(pvecback);
+    return sum;
+  }
+  void CheckUltraRelativisticAtIc(const double* pvecback, double tol) const override {
+    for (const auto& c : children_)
+      c->CheckUltraRelativisticAtIc(pvecback, tol);
+  }
+  bool IsUltraRelativisticAtIc(const double* pvecback, double tol) const override {
+    for (const auto& c : children_)
+      if (!c->IsUltraRelativisticAtIc(pvecback, tol))
+        return false;
+    return true;
+  }
+  void WarnIfTooHeavyForHalofit(double m_ev_threshold) const override {
+    for (const auto& c : children_)
+      c->WarnIfTooHeavyForHalofit(m_ev_threshold);
+  }
+
   /** Threads a_proposed through all children (e.g. a wrapped DNCDM child
    *  may pull the earliest integration start earlier). */
   double BackgroundAIni(double a_proposed, double a_today, double tol) const override {
