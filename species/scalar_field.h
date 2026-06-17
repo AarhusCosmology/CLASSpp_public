@@ -72,9 +72,6 @@ class ScalarFieldSpecies : public BaseSpecies {
   double P(const double* pvecback) const override {
     return pvecback[index_bg_p_];
   }
-  double DpDloga(const double* /*pvecback*/) const override {
-    return 0.;
-  }
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
@@ -172,9 +169,11 @@ class ScalarFieldSpecies : public BaseSpecies {
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
 
-  /** Compute p'_scf, write it into pvecback, and return its value.
-   *  Called by BackgroundModule after ComputeBackground to update p_tot_prime. */
-  double ComputePPrimeAndWrite(double a, double* pvecback) const;
+  double PPrime(double a,
+                double H,
+                const double* pvecback_B,
+                const double* pvecback) const override;
+  void FinalizeBackground(double a, double H, const double* pvecback_B, double* pvecback) override;
 
   int bi_phi_index() const {
     return index_bi_phi_scf_;

@@ -85,11 +85,13 @@ double FluidSpecies::P(const double* pvecback) const {
   return pvecback[index_bg_w_fld_] * pvecback[index_bg_rho_fld_];
 }
 
-double FluidSpecies::DpDloga(const double* pvecback) const {
+double FluidSpecies::PPrime(double a,
+                            double H,
+                            const double* /*pvecback_B*/,
+                            const double* pvecback) const {
   const double w_fld          = pvecback[index_bg_w_fld_];
   const double dw_over_da_fld = pvecback[index_bg_dw_over_da_fld_];
-  const double a              = pvecback[bgm_->index_bg_a_];
-  return (a * dw_over_da_fld - 3. * (1. + w_fld) * w_fld) * pvecback[index_bg_rho_fld_];
+  return a * H * (a * dw_over_da_fld - 3. * (1. + w_fld) * w_fld) * pvecback[index_bg_rho_fld_];
 }
 
 void FluidSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {

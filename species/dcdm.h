@@ -52,7 +52,6 @@ class DCDMSpecies : public BaseSpecies {
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
-  double DpDloga(const double* pvecback) const override;
   double RhoDotOverRho(const double* pvecback, double a_prime_over_a) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────

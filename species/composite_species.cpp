@@ -63,11 +63,14 @@ double CompositeSpecies::P(const double* pvecback) const {
   return p;
 }
 
-double CompositeSpecies::DpDloga(const double* pvecback) const {
-  double dp = 0.;
+double CompositeSpecies::PPrime(double a,
+                                double H,
+                                const double* pvecback_B,
+                                const double* pvecback) const {
+  double pp = 0.;
   for (const auto& child : children_)
-    dp += child->DpDloga(pvecback);
-  return dp;
+    pp += child->PPrime(a, H, pvecback_B, pvecback);
+  return pp;
 }
 
 double CompositeSpecies::FreestreamingRho(const double* pvecback) const {

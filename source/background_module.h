@@ -49,18 +49,6 @@ class BackgroundModule : public BaseModule {
 
   /* end of vector in short format, now quantities in normal format */
 
-  int index_bg_G_over_aH_drmd_;  //**G/(aH) in drmd model */
-  int index_bg_Gamma0_drmd_;     //**interaction rate today in drmd model */
-
-  int index_bg_phi_scf_;       /**< scalar field value */
-  int index_bg_phi_prime_scf_; /**< scalar field derivative wrt conformal time */
-  int index_bg_V_scf_;         /**< scalar field potential V */
-  int index_bg_dV_scf_;        /**< scalar field potential derivative V' */
-  int index_bg_ddV_scf_;       /**< scalar field potential second derivative V'' */
-
-  int index_bg_number_ncdm1_;   /**< number density of first ncdm species (others contiguous) */
-  int index_bg_pseudo_p_ncdm1_; /**< another statistical momentum useful in ncdma approximation */
-
   int index_bg_rho_tot_;     /**< Total density */
   int index_bg_p_tot_;       /**< Total pressure */
   int index_bg_p_tot_prime_; /**< Conf. time derivative of total pressure */
@@ -110,11 +98,12 @@ class BackgroundModule : public BaseModule {
   double Omega0_idr_drmd_;
   double Omega0_idm_drmd_;
   double Omega0_idm_;
-  double G_over_aH_tmp_;
-  double Gamma0_drmd_;
-  double f_idr_drmd_;
-  double z_stop_ = 0.;  ///< cached from IDM_DRMD_IDR_DRMD_Species at setup
-  double z_dec_drmd_;
+
+  // DRMD diagnostics exposed to the Python wrapper. The data now lives on
+  // IDM_DRMD_IDR_DRMD_Species (#319); these delegate to it (neutral values if
+  // no DRMD species is present).
+  double f_idr_drmd() const;
+  double z_dec_drmd() const;
 
  private:
   void background_functions(double* pvecback_B, short return_format, double* pvecback);

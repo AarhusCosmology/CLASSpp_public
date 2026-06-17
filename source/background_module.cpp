@@ -315,15 +315,9 @@ void BackgroundModule::background_functions(
   double a       = pvecback_B[index_bi_a_];
   double rho_tot = 0.;
   double p_tot   = 0.;
-  /* Since we only know a_prime_over_a after we have rho_tot,
-     it is not possible to simply sum up p_tot_prime directly.
-     Instead we sum up dp_dloga = p_prime/a_prime_over_a. The formula is
-     p_prime = a_prime_over_a * dp_dloga = a_prime_over_a * Sum [ (w_prime/a_prime_over_a -3(1+w)w)rho].
-     Note: The scalar field contribution must be added in the end, as an exception!*/
-  double dp_dloga = 0.;
-  double rho_r    = 0.;
-  double rho_m    = 0.;
-  double a_rel    = a / pba->a_today;
+  double rho_r   = 0.;
+  double rho_m   = 0.;
+  double a_rel   = a / pba->a_today;
 
   class_test(a_rel <= 0., "a = %e instead of strictly positive", a_rel);
 
@@ -338,7 +332,6 @@ void BackgroundModule::background_functions(
     const double p    = sp.P(pvecback);
     rho_tot          += rho;
     p_tot            += p;
-    dp_dloga         += sp.DpDloga(pvecback);
     switch (sp.energy_type()) {
       case BaseSpecies::EnergyType::Radiation:
         rho_r += rho;
@@ -380,6 +373,7 @@ void BackgroundModule::background_functions(
       that densities are all expressed in units of \f$ [3c^2/8\pi G] \f$, ie
       \f$ \rho_{class} = [8 \pi G \rho_{physical} / 3 c^2]\f$ */
   pvecback[index_bg_H_] = sqrt(rho_tot - pba->K / a / a);
+  const double H        = pvecback[index_bg_H_];
 
   /** - compute derivative of H with respect to conformal time */
   pvecback[index_bg_H_prime_] = -3. / 2. * (rho_tot + p_tot) * a + pba->K / a;
@@ -390,25 +384,17 @@ void BackgroundModule::background_functions(
   /* Total pressure */
   pvecback[index_bg_p_tot_] = p_tot;
 
-  /* Derivative of total pressure w.r.t. conformal time */
-  pvecback[index_bg_p_tot_prime_] = a * pvecback[index_bg_H_] * dp_dloga;
-  if (all_species_.count("ScalarField")) {
-    /** The contribution of scf was not added to dp_dloga, add p_scf_prime here: */
-    pvecback[index_bg_p_tot_prime_] += static_cast<ScalarFieldSpecies&>(
-                                           *all_species_.at("ScalarField"))
-                                           .ComputePPrimeAndWrite(a, pvecback);
+  /* Derivative of total pressure w.r.t. conformal time: accumulated post-H so
+     each species applies a' / a = a*H itself (the scalar field's p' is not of
+     the a*H*dp/dlna form). FinalizeBackground writes any H-dependent owned slot
+     (e.g. scf p_prime_scf). */
+  double p_tot_prime = 0.;
+  for (const auto& [name, sp] : all_species_) {
+    p_tot_prime += sp->PPrime(a, H, pvecback_B, pvecback);
+    sp->FinalizeBackground(a, H, pvecback_B, pvecback);
   }
+  pvecback[index_bg_p_tot_prime_] = p_tot_prime;
 
-  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-    auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
-    double Rint, csp2, Gint;
-    background_idm_drmd(a,
-                        drmd.idm_drmd().Rho(pvecback) / drmd.idr_drmd().Rho(pvecback),
-                        &Rint,
-                        &csp2,
-                        &Gint);
-    pvecback[index_bg_G_over_aH_drmd_] = Gint / (pvecback[index_bg_H_] * a_rel);
-  }
   /** - compute critical density */
   double rho_crit = rho_tot - pba->K / a / a;
   class_test(rho_crit <= 0., "rho_crit = %e instead of strictly positive", rho_crit);
@@ -461,15 +447,22 @@ int BackgroundModule::background_w_fld(double a,
 
 void BackgroundModule::background_idm_drmd(
     double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const {
-  double z         = 1.0 / a - 1.0;
-  double R_int_tmp = 3.0 / 4.0 * rho_idm_over_rho_idr;
-  *Rint            = R_int_tmp;
-  *csp2            = 1.0 / 3.0 / (1.0 + R_int_tmp);
+  static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
+      .ComputeIdmDrmd(a, rho_idm_over_rho_idr, Rint, csp2, Gint);
+}
 
-  if ((1.0 + z_stop_) / (1 + z) > 100)  // To avoid numerical problems in exp()
-    *Gint = 0;
-  else
-    *Gint = Gamma0_drmd_ / R_int_tmp * exp(-(1.0 + z_stop_) / (1 + z));
+double BackgroundModule::f_idr_drmd() const {
+  if (!all_species_.count("IDM_DRMD_IDR_DRMD"))
+    return 0.;
+  return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
+      .f_idr_drmd();
+}
+
+double BackgroundModule::z_dec_drmd() const {
+  if (!all_species_.count("IDM_DRMD_IDR_DRMD"))
+    return -1.;
+  return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
+      .z_dec_drmd();
 }
 
 /**
@@ -517,17 +510,6 @@ void BackgroundModule::background_init() {
       printf(
           " -> total N_eff = %g (sumed over ultra-relativistic species, ncdm and dark radiation)\n",
           Neff);
-    }
-  }
-
-  //Initialize parameters for calculating decoupling in DRMD
-  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-    auto& c = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
-    if (c.has_idr_drmd() && c.has_idm_drmd()) {
-      // Set to a large number, so it's larger than the current G_over_aH_drmd_local
-      G_over_aH_tmp_ = 1e20;
-      // Set to -1, so it doesn't print the value unless calculated.
-      z_dec_drmd_ = -1.0;
     }
   }
 
@@ -607,81 +589,11 @@ void BackgroundModule::background_indices() {
   /* - end of indices in the short vector of background values */
   bg_size_short_ = index_bg;
 
-  // ── Photons (always) ──────────────────────────────────────────────────────
-  all_species_.photons().RegisterBackgroundIndices(index_bg);
+  // ── Every species registers its own background indices (flat loop) ──────────
+  for (auto& [name, sp] : all_species_)
+    sp->RegisterBackgroundIndices(index_bg);
 
-  // ── Baryons (always) ──────────────────────────────────────────────────────
-  all_species_.baryons().RegisterBackgroundIndices(index_bg);
-
-  // ── CDM (optional) ────────────────────────────────────────────────────────
-  if (all_species_.count("CDM"))
-    all_species_.at("CDM")->RegisterBackgroundIndices(index_bg);
-
-  // ── IDM_DRMD + IDR_DRMD composite (optional) ──────────────────────────────
-  if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-    all_species_.at("IDM_DRMD_IDR_DRMD")->RegisterBackgroundIndices(index_bg);
-
-  // Module physics indices for DRMD (not species-dependent densities)
-  class_define_index(index_bg_G_over_aH_drmd_,
-                     all_species_.count("IDM_DRMD_IDR_DRMD"),
-                     index_bg,
-                     1);
-  class_define_index(index_bg_Gamma0_drmd_, all_species_.count("IDM_DRMD_IDR_DRMD"), index_bg, 1);
-
-  // ── NCDM (optional, in lex iteration order matching all_species_) ────────
-  index_bg_number_ncdm1_ = index_bg_pseudo_p_ncdm1_ = -1;
-  {
-    NCDMSpecies* first_ncdm = nullptr;
-    for (auto& [name, sp] : all_species_) {
-      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) {
-        if (first_ncdm == nullptr) {
-          first_ncdm             = n;
-          index_bg_number_ncdm1_ = index_bg;
-        }
-        n->RegisterBackgroundIndices(index_bg);
-      }
-    }
-    if (first_ncdm != nullptr)
-      index_bg_pseudo_p_ncdm1_ = first_ncdm->bg_pseudo_p_index();
-  }
-
-  // ── DNCDM_DR composites (optional, in lex iteration order) ───────────────
-  for (auto& [name, sp] : all_species_) {
-    if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-      d->RegisterBackgroundIndices(index_bg);
-  }
-
-  // ── DCDM_DR composite (optional) ─────────────────────────────────────────
-  if (all_species_.count("DCDM_DR")) {
-    auto& dcdm_dr = static_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
-    dcdm_dr.RegisterBackgroundIndices(index_bg);
-  }
-
-  // ── ScalarField (optional) — module caches arithmetic offsets for dV/V/ddV
-  index_bg_phi_scf_ = index_bg_phi_prime_scf_ = index_bg_V_scf_ = index_bg_dV_scf_ =
-      index_bg_ddV_scf_                                         = -1;
-  if (all_species_.count("ScalarField")) {
-    index_bg_phi_scf_ = index_bg;
-    all_species_.at("ScalarField")->RegisterBackgroundIndices(index_bg);
-    index_bg_phi_prime_scf_ = index_bg_phi_scf_ + 1;
-    index_bg_V_scf_         = index_bg_phi_scf_ + 2;
-    index_bg_dV_scf_        = index_bg_phi_scf_ + 3;
-    index_bg_ddV_scf_       = index_bg_phi_scf_ + 4;
-  }
-
-  // ── Lambda (optional) ─────────────────────────────────────────────────────
-  if (all_species_.count("Lambda"))
-    all_species_.at("Lambda")->RegisterBackgroundIndices(index_bg);
-
-  // ── Fluid (optional) ──────────────────────────────────────────────────────
-  if (all_species_.count("Fluid"))
-    all_species_.at("Fluid")->RegisterBackgroundIndices(index_bg);
-
-  // ── UR (optional) ─────────────────────────────────────────────────────────
-  if (all_species_.count("UR"))
-    all_species_.at("UR")->RegisterBackgroundIndices(index_bg);
-
-  // ── Module aggregate indices (unchanged) ──────────────────────────────────
+  // ── Module aggregate indices ──────────────────────────────────────────────
   /* - index for total density */
   class_define_index(index_bg_rho_tot_, _TRUE_, index_bg, 1);
 
@@ -693,10 +605,6 @@ void BackgroundModule::background_indices() {
 
   /* - index for Omega_r (relativistic density fraction) */
   class_define_index(index_bg_Omega_r_, _TRUE_, index_bg, 1);
-
-  // ── IDM_DR + IDR composite (optional) ────────────────────────────────────
-  if (all_species_.count("IDM_DR_IDR"))
-    all_species_.at("IDM_DR_IDR")->RegisterBackgroundIndices(index_bg);
 
   /* - put here additional ingredients that you want to appear in the
      normal vector */
@@ -882,17 +790,12 @@ void BackgroundModule::background_solve_evolver() {
     bg_table_row[index_bg_lum_distance_] = pba->a_today * comoving_radius * (1. + z_table_[i]);
     /** Normalise D(z=0)=1 */
     bg_table_row[index_bg_D_] /= D_today;
-
-    /* DRMD -- Find the decoupling redshift where Gint = aH */
-
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      double G_over_aH_local = background_table_[i * bg_size_ + index_bg_G_over_aH_drmd_];
-      if (pow(G_over_aH_local - 1.0, 2.0) < pow(G_over_aH_tmp_ - 1.0, 2.0)) {
-        G_over_aH_tmp_ = G_over_aH_local;
-        z_dec_drmd_    = z_table_[i];
-      }
-    }
   }
+
+  /* Let species run table-scope analysis now that the full background table is
+     filled (e.g. DRMD decoupling redshift). */
+  for (auto& [name, sp] : all_species_)
+    sp->ProcessBackgroundTable(background_table_.data(), bt_size_, bg_size_, z_table_.data());
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
   array_spline_table_lines(z_table_.data(),
@@ -942,19 +845,18 @@ void BackgroundModule::background_solve_evolver() {
              dcdm_dr_comp2.dcdm().Omega_ini_dcdm() / pba->Omega0_b);
     }
     if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      const auto& drmd_verbose = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(
-          *all_species_.at("IDM_DRMD_IDR_DRMD"));
+      auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
       printf(" -> Dark Radiation Matter Decoupling details: (DRMD)\n");
       printf(
           "     -> values: (initial) Gamma0 = %f 1/Mpc, zstop= %e,f_idr_drmd=%e, and f_idm= %e \n",
-          Gamma0_drmd_,
-          z_stop_,
-          f_idr_drmd_,
-          drmd_verbose.f_idm_drmd());
-      printf("     -> dark radiation Delta N_eff (DRMD) %e\n", drmd_verbose.delta_Neff_drmd());
+          drmd.Gamma0_drmd_ic(),
+          drmd.z_stop(),
+          drmd.f_idr_drmd(),
+          drmd.f_idm_drmd());
+      printf("     -> dark radiation Delta N_eff (DRMD) %e\n", drmd.delta_Neff_drmd());
 
-      if (z_dec_drmd_ > 0)
-        printf("     -> decoupling occurred at z=%f \n", z_dec_drmd_);
+      if (drmd.z_dec_drmd() > 0)
+        printf("     -> decoupling occurred at z=%f \n", drmd.z_dec_drmd());
       else
         printf("     -> no decoupling occurred.\n");
     }
@@ -1056,19 +958,13 @@ void BackgroundModule::background_initial_conditions(
              "H = %e instead of strictly positive",
              pvecback[index_bg_H_]);
 
-  /** - compute Gamma0, f_idr_drmd, and z_stop_ for the DRMD scenario */
   if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-    auto& drmd_ic = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
-    const double rho_idr_drmd = drmd_ic.idr_drmd().Rho(pvecback);
-    const double rho_idm_drmd = drmd_ic.idm_drmd().Rho(pvecback);
-    f_idr_drmd_               = rho_idr_drmd / pvecback[index_bg_rho_tot_];
-    z_stop_                   = drmd_ic.z_stop();
-    Gamma0_drmd_              = 0.;
-    if (rho_idm_drmd > 0. && rho_idr_drmd > 0.) {
-      Gamma0_drmd_ = 3. / 4. * drmd_ic.G_over_aH_drmd() * rho_idm_drmd / rho_idr_drmd * a /
-                     pba->a_today * pvecback[index_bg_H_];
-      // Recall that Gamma0 = G * R =const with our conventions (for z >> zstop where the exponential can be set to unity )
-    }
+    static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
+        .InitializeDrmdBackground(pvecback[index_bg_rho_tot_],
+                                  pvecback[index_bg_H_],
+                                  a,
+                                  pba->a_today,
+                                  pvecback);
   }
 
   pvecback_integration[index_bi_time_] = 1. / (2. * pvecback[index_bg_H_]);

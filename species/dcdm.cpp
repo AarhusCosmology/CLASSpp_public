@@ -48,9 +48,6 @@ double DCDMSpecies::Rho(const double* pvecback) const {
 double DCDMSpecies::P(const double* /*pvecback*/) const {
   return 0.;
 }
-double DCDMSpecies::DpDloga(const double* /*pvecback*/) const {
-  return 0.;
-}
 
 double DCDMSpecies::RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {
   // ρ̇/ρ = -a(3H + Γ) = -3ℋ - aΓ  (same physics as BackgroundDerivs).

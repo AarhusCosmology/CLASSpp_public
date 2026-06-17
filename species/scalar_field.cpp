@@ -127,13 +127,20 @@ void ScalarFieldSpecies::BackgroundDerivs(double /*tau*/,
   dy[index_bi_phi_prime_scf_] = -a * (2. * H * phi_prime + a * dV_scf(phi));
 }
 
-double ScalarFieldSpecies::ComputePPrimeAndWrite(double a, double* pvecback) const {
-  const double phi_prime          = pvecback[index_bg_phi_prime_scf_];
-  const double H                  = pvecback[bgm_->index_bg_H_];
-  const double dV                 = pvecback[index_bg_dV_scf_];
-  const double p_prime            = phi_prime * (-phi_prime * H / a - 2. / 3. * dV);
-  pvecback[index_bg_p_prime_scf_] = p_prime;
-  return p_prime;
+double ScalarFieldSpecies::PPrime(double a,
+                                  double H,
+                                  const double* pvecback_B,
+                                  const double* /*pvecback*/) const {
+  const double phi       = pvecback_B[index_bi_phi_scf_];
+  const double phi_prime = pvecback_B[index_bi_phi_prime_scf_];
+  return phi_prime * (-phi_prime * H / a - 2. / 3. * dV_scf(phi));
+}
+
+void ScalarFieldSpecies::FinalizeBackground(double a,
+                                            double H,
+                                            const double* pvecback_B,
+                                            double* pvecback) {
+  pvecback[index_bg_p_prime_scf_] = PPrime(a, H, pvecback_B, pvecback);
 }
 
 void ScalarFieldSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
@@ -191,8 +198,8 @@ void ScalarFieldSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
   /* Use BackgroundModule's canonical pvecback slots for background quantities */
   auto bgm                  = ppaw.perturbations_module->GetBackgroundModule();
-  const double phi_prime_bg = ppw->pvecback[bgm->index_bg_phi_prime_scf_];
-  const double ddV_bg       = ppw->pvecback[bgm->index_bg_ddV_scf_];
+  const double phi_prime_bg = ppw->pvecback[index_bg_phi_prime_scf_];
+  const double ddV_bg       = ppw->pvecback[index_bg_ddV_scf_];
 
   const double k2                = ctx.k2;
   const double a2                = ctx.a2;
@@ -219,8 +226,8 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const double phi_prime_bg = pvecback[bgm->index_bg_phi_prime_scf_];
-  const double dV_bg        = pvecback[bgm->index_bg_dV_scf_];
+  const double phi_prime_bg = pvecback[index_bg_phi_prime_scf_];
+  const double dV_bg        = pvecback[index_bg_dV_scf_];
   const double rho_scf      = Rho(pvecback);
   const double p_scf        = P(pvecback);
   const double a2_rel       = ctx.a2_rel;
@@ -286,8 +293,8 @@ void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::Pertur
   const auto& l               = static_cast<const PerturbLayout&>(base);
   const double* pvecback      = ctx.ppw->pvecback;
   const BackgroundModule* bgm = ctx.p_mod->GetBackgroundModule().get();
-  const double phi_prime      = pvecback[bgm->index_bg_phi_prime_scf_];
-  const double phi_scf        = pvecback[bgm->index_bg_phi_scf_];
+  const double phi_prime      = pvecback[index_bg_phi_prime_scf_];
+  const double phi_scf        = pvecback[index_bg_phi_scf_];
   if (l.idx_phi >= 0)
     y[l.idx_phi] += ctx.alpha * phi_prime;
   if (l.idx_phi_prime >= 0)
@@ -327,8 +334,8 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
     const double a2          = ppw->scalar_ctx.a2;
     const perturbs* ppt      = mod.GetPerturbs();
 
-    const double phi_prime_bg = pvecback[mod.GetBackgroundModule()->index_bg_phi_prime_scf_];
-    const double dV_bg        = pvecback[mod.GetBackgroundModule()->index_bg_dV_scf_];
+    const double phi_prime_bg = pvecback[index_bg_phi_prime_scf_];
+    const double dV_bg        = pvecback[index_bg_dV_scf_];
     const double rho_scf      = Rho(pvecback);
     const double p_scf        = P(pvecback);
 

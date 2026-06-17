@@ -55,8 +55,11 @@ class DarkRadiationSpecies : public BaseSpecies {
   double P(const double* pvecback) const override {
     return pvecback[index_bg_rho_] / 3.;
   }
-  double DpDloga(const double* pvecback) const override {
-    return -4. / 3. * pvecback[index_bg_rho_];
+  double PPrime(double a,
+                double H,
+                const double* /*pvecback_B*/,
+                const double* pvecback) const override {
+    return a * H * (-4. / 3. * pvecback[index_bg_rho_]);
   }
 
   // ── Perturbations ────────────────────────────────────────────────────────────

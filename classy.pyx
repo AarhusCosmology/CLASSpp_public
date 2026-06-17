@@ -980,11 +980,11 @@ cdef class PyCosmology:
 
     cpdef f_idr_drmd(self):
         bam = deref(self._thisptr).GetBackgroundModule()
-        return deref(bam).f_idr_drmd_
+        return deref(bam).f_idr_drmd()
 
     cpdef z_dec_drmd(self):
         bam = deref(self._thisptr).GetBackgroundModule()
-        return deref(bam).z_dec_drmd_
+        return deref(bam).z_dec_drmd()
 
     cpdef k_eq(self):
         bam = deref(self._thisptr).GetBackgroundModule()

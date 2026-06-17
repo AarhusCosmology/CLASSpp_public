@@ -33,7 +33,10 @@ class UltraRelativisticSpecies : public BaseSpecies {
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
-  double DpDloga(const double* pvecback) const override;
+  double PPrime(double a,
+                double H,
+                const double* pvecback_B,
+                const double* pvecback) const override;
 
   bool IsFreestreaming() const override {
     return true;

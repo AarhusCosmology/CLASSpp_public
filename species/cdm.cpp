@@ -25,10 +25,6 @@ double CDMSpecies::P(const double* /*pvecback*/) const {
   return 0.;
 }
 
-double CDMSpecies::DpDloga(const double* /*pvecback*/) const {
-  return 0.;
-}
-
 void CDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
   w.Add("(.)rho_cdm", 0.);
 }

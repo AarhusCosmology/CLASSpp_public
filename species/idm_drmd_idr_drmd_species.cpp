@@ -1,5 +1,7 @@
 #include "idm_drmd_idr_drmd_species.h"
 
+#include <cmath>
+
 #include "background_module.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -14,7 +16,58 @@ void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundData(const double* pvecback,
                                                     BackgroundColumnWriter& w) const {
   w.Add("(.)rho_idr_drmd", idr_drmd().Rho(pvecback));
   w.Add("(.)rho_idm_drmd", idm_drmd().Rho(pvecback));
-  w.Add("G_over_aH_drmd", pvecback[bgm_->index_bg_G_over_aH_drmd_]);
+  w.Add("G_over_aH_drmd", pvecback[index_bg_G_over_aH_drmd_]);
+}
+
+void IDM_DRMD_IDR_DRMD_Species::RegisterBackgroundIndices(int& index_bg) {
+  CompositeSpecies::RegisterBackgroundIndices(index_bg);  // children: idm_drmd, idr_drmd
+  class_define_index(index_bg_G_over_aH_drmd_, _TRUE_, index_bg, 1);
+}
+
+void IDM_DRMD_IDR_DRMD_Species::ComputeIdmDrmd(
+    double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const {
+  const double z         = 1.0 / a - 1.0;
+  const double R_int_tmp = 3.0 / 4.0 * rho_idm_over_rho_idr;
+  *Rint                  = R_int_tmp;
+  *csp2                  = 1.0 / 3.0 / (1.0 + R_int_tmp);
+  if ((1.0 + z_stop_) / (1.0 + z) > 100)  // avoid exp() overflow
+    *Gint = 0.;
+  else
+    *Gint = Gamma0_drmd_ic_ / R_int_tmp * exp(-(1.0 + z_stop_) / (1.0 + z));
+}
+
+void IDM_DRMD_IDR_DRMD_Species::InitializeDrmdBackground(
+    double rho_tot, double H, double a, double a_today, const double* pvecback) {
+  const double rho_idr = idr_drmd_->Rho(pvecback);
+  const double rho_idm = idm_drmd_->Rho(pvecback);
+  f_idr_drmd_          = rho_idr / rho_tot;
+  Gamma0_drmd_ic_      = 0.;
+  if (rho_idm > 0. && rho_idr > 0.)
+    Gamma0_drmd_ic_ = 3. / 4. * G_over_aH_drmd_ * rho_idm / rho_idr * a / a_today * H;
+}
+
+void IDM_DRMD_IDR_DRMD_Species::FinalizeBackground(double a,
+                                                   double H,
+                                                   const double* /*pvecback_B*/,
+                                                   double* pvecback) {
+  double Rint, csp2, Gint;
+  const double a_rel = a / pba_.a_today;
+  ComputeIdmDrmd(a, idm_drmd_->Rho(pvecback) / idr_drmd_->Rho(pvecback), &Rint, &csp2, &Gint);
+  pvecback[index_bg_G_over_aH_drmd_] = Gint / (H * a_rel);
+}
+
+void IDM_DRMD_IDR_DRMD_Species::ProcessBackgroundTable(const double* background_table,
+                                                       int n_rows,
+                                                       int row_stride,
+                                                       const double* z_table) {
+  // Decoupling redshift: the row where G_over_aH is closest to 1.
+  for (int i = 0; i < n_rows; i++) {
+    const double g = background_table[i * row_stride + index_bg_G_over_aH_drmd_];
+    if (pow(g - 1.0, 2.0) < pow(G_over_aH_tmp_ - 1.0, 2.0)) {
+      G_over_aH_tmp_ = g;
+      z_dec_drmd_    = z_table[i];
+    }
+  }
 }
 
 void IDM_DRMD_IDR_DRMD_Species::RegisterTransferSourceIndices(int& index_tp,
@@ -56,12 +109,11 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
         else {
           double Rint, csp2, Gint;
           auto* bgm = ctx.p_mod->GetBackgroundModule().get();
-          bgm->background_idm_drmd(ctx.ppw->pvecback[bgm->index_bg_a_],
-                                   idm_drmd_->Rho(ctx.ppw->pvecback) /
-                                       idr_drmd_->Rho(ctx.ppw->pvecback),
-                                   &Rint,
-                                   &csp2,
-                                   &Gint);
+          ComputeIdmDrmd(ctx.ppw->pvecback[bgm->index_bg_a_],
+                         idm_drmd_->Rho(ctx.ppw->pvecback) / idr_drmd_->Rho(ctx.ppw->pvecback),
+                         &Rint,
+                         &csp2,
+                         &Gint);
           y[idm_drm_lay.idx_theta] = Gint / (4. + Gint) *
                                      ((idr_drm_lay.idx_theta >= 0) ? y[idr_drm_lay.idx_theta] : 0.);
         }
@@ -323,18 +375,17 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(double /*tau*/,
   const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  auto* bgm              = ppaw.perturbations_module->GetBackgroundModule().get();
   const double* pvecback = ppw->pvecback;
 
   const double rho_idm_drmd = idm_drmd_->Rho(pvecback);
   const double rho_idr_drmd = idr_drmd_->Rho(pvecback);
 
-  // Guard against zero densities to avoid division by zero in background_idm_drmd.
+  // Guard against zero densities to avoid division by zero in ComputeIdmDrmd.
   if (rho_idm_drmd <= 0. || rho_idr_drmd <= 0.)
     return;
 
   double Rint, csp2, Gint;
-  bgm->background_idm_drmd(ctx.a, rho_idm_drmd / rho_idr_drmd, &Rint, &csp2, &Gint);
+  ComputeIdmDrmd(ctx.a, rho_idm_drmd / rho_idr_drmd, &Rint, &csp2, &Gint);
 
   const auto& my_acc_lay = static_cast<const PerturbLayout&>(
       *pv->species_layouts[collection_index_]);

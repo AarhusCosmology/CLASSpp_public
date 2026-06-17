@@ -181,12 +181,22 @@ class BaseSpecies {
   virtual double P(const double* pvecback) const = 0;
 
   /**
-   * d(p)/d(ln a): used by BackgroundModule to compute H' and dp_tot_prime.
-   * For radiation (rho ~ a^-4): dp/dloga = -4/3 * rho.
-   * For matter (p=0): 0.
-   * For Lambda (p=-rho=-const): 0.
+   * Post-Friedmann. This species' conformal-time pressure derivative p'
+   * (a' / a = a*H). pvecback_B is the ODE state (IN); pvecback is fully
+   * populated through H. Default 0 (matter / Lambda).
    */
-  virtual double DpDloga(const double* pvecback) const = 0;
+  virtual double PPrime(double a,
+                        double H,
+                        const double* pvecback_B,
+                        const double* pvecback) const {
+    return 0.;
+  }
+
+  /**
+   * Post-Friedmann. Write this species' H-dependent owned output slots.
+   * H passed explicitly so the hook need not re-read it. Default no-op.
+   */
+  virtual void FinalizeBackground(double a, double H, const double* pvecback_B, double* pvecback) {}
 
   // ── Background output ─────────────────────────────────────────────────────
 
@@ -233,6 +243,15 @@ class BaseSpecies {
    */
   virtual void WriteBackgroundData(const double* /*pvecback*/,
                                    BackgroundColumnWriter& /*writer*/) const {}
+
+  /**
+   * Called once after the full background table is built. Lets a species run
+   * table-scope analysis over its own columns. Default no-op.
+   */
+  virtual void ProcessBackgroundTable(const double* /*background_table*/,
+                                      int /*n_rows*/,
+                                      int /*row_stride*/,
+                                      const double* /*z_table*/) {}
 
   /**
    * Returns true if this species' PerturbDerivs must run AFTER all other

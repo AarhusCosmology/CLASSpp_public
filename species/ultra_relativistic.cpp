@@ -33,8 +33,11 @@ double UltraRelativisticSpecies::P(const double* pvecback) const {
   return pvecback[index_bg_rho_] / 3.;
 }
 
-double UltraRelativisticSpecies::DpDloga(const double* pvecback) const {
-  return -4. / 3. * pvecback[index_bg_rho_];
+double UltraRelativisticSpecies::PPrime(double a,
+                                        double H,
+                                        const double* /*pvecback_B*/,
+                                        const double* pvecback) const {
+  return a * H * (-4. / 3. * pvecback[index_bg_rho_]);
 }
 
 void UltraRelativisticSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {

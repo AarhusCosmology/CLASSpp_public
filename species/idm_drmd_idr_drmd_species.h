@@ -66,6 +66,30 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
     return has_idr_drmd_;
   }
 
+  int bg_G_over_aH_index() const {
+    return index_bg_G_over_aH_drmd_;
+  }
+  double f_idr_drmd() const {
+    return f_idr_drmd_;
+  }
+  double Gamma0_drmd_ic() const {
+    return Gamma0_drmd_ic_;
+  }
+  double z_dec_drmd() const {
+    return z_dec_drmd_;
+  }
+
+  void RegisterBackgroundIndices(int& index_bg) override;
+  void ComputeIdmDrmd(
+      double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
+  void InitializeDrmdBackground(
+      double rho_tot, double H, double a, double a_today, const double* pvecback);
+  void FinalizeBackground(double a, double H, const double* pvecback_B, double* pvecback) override;
+  void ProcessBackgroundTable(const double* background_table,
+                              int n_rows,
+                              int row_stride,
+                              const double* z_table) override;
+
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
@@ -172,4 +196,10 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   int index_tp_theta_idm_drmd_ = -1;
   int index_tp_delta_idr_drmd_ = -1;
   int index_tp_theta_idr_drmd_ = -1;
+
+  int index_bg_G_over_aH_drmd_ = -1;    // bg-table slot (this species owns it)
+  double Gamma0_drmd_ic_       = 0.;    // interaction rate today, computed at IC time
+  double f_idr_drmd_           = 0.;    // idr/rho_tot fraction at IC (verbose diagnostic)
+  double z_dec_drmd_           = -1.0;  // decoupling redshift (G_over_aH closest to 1); -1 = none
+  double G_over_aH_tmp_        = 1e20;  // running |G_over_aH - 1| scan tracker
 };

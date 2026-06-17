@@ -81,8 +81,11 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   double P(const double* pvecback) const override {
     return pvecback[index_bg_p_];
   }
-  double DpDloga(const double* pvecback) const override {
-    return pvecback[index_bg_pseudo_p_] - 5. * pvecback[index_bg_p_];
+  double PPrime(double a,
+                double H,
+                const double* /*pvecback_B*/,
+                const double* pvecback) const override {
+    return a * H * (pvecback[index_bg_pseudo_p_] - 5. * pvecback[index_bg_p_]);
   }
 
   // ── Perturbations ────────────────────────────────────────────────────────

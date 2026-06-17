@@ -125,7 +125,10 @@ class CompositeSpecies : public BaseSpecies {
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
-  double DpDloga(const double* pvecback) const override;
+  double PPrime(double a,
+                double H,
+                const double* pvecback_B,
+                const double* pvecback) const override;
   double FreestreamingRho(const double* pvecback) const override;
 
   // ── Matter tally ────────────────────────────────────────────────────────

@@ -37,7 +37,6 @@ class CDMSpecies : public BaseSpecies {
   void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
-  double DpDloga(const double* pvecback) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;

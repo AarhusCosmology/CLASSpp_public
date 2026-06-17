@@ -45,9 +45,6 @@ class IDM_DRSpecies : public BaseSpecies {
   double P(const double* /*pvecback*/) const override {
     return 0.;
   }
-  double DpDloga(const double* /*pvecback*/) const override {
-    return 0.;
-  }
 
   // ── PerturbLayout ──────────────────────────────────────────────────────────
 

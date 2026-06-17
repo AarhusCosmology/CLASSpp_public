@@ -24,10 +24,6 @@ double LambdaSpecies::P(const double* pvecback) const {
   return -pvecback[index_bg_rho_lambda_];
 }
 
-double LambdaSpecies::DpDloga(const double* /*pvecback*/) const {
-  return 0.;
-}
-
 void LambdaSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
   w.Add("(.)rho_lambda", 0.);
 }
