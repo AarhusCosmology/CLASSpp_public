@@ -71,43 +71,17 @@ class PerturbationsModule : public BaseModule {
      terms that we call 0,1,2 (since the strategy in class v > 1.7 is
      to avoid the integration by part that would reduce the source to
      a single term) */
-  int index_tp_t0_;           /**< index value for temperature (j=0 term) */
-  int index_tp_t1_;           /**< index value for temperature (j=1 term) */
-  int index_tp_t2_;           /**< index value for temperature (j=2 term) */
-  int index_tp_p_;            /**< index value for polarization */
-  int index_tp_delta_tot_;    /**< index value for total density fluctuation */
-  int index_tp_delta_g_;      /**< index value for delta of gammas */
-  int index_tp_delta_b_;      /**< index value for delta of baryons */
-  int index_tp_delta_cdm_;    /**< index value for delta of cold dark matter */
-  int index_tp_delta_dcdm_;   /**< index value for delta of DCDM */
-  int index_tp_delta_fld_;    /**< index value for delta of dark energy */
-  int index_tp_delta_scf_;    /**< index value for delta of scalar field */
-  int index_tp_delta_dr_;     /**< index value for delta of decay radiation */
-  int index_tp_delta_ur_;     /**< index value for delta of ultra-relativistic neutrinos/relics */
-  int index_tp_delta_idr_;    /**< index value for delta of interacting dark radiation */
-  int index_tp_delta_idm_dr_; /**< index value for delta of interacting dark matter (with dr)*/
-  int index_tp_delta_idr_drmd_; /**< index value for delta of interacting dark radiation (with drmd) */
-  int index_tp_delta_idm_drmd_; /**< index value for delta of interacting dark matter (with drmd)*/
-  int index_tp_delta_ncdm1_; /**< index value for delta of first non-cold dark matter species (e.g. massive neutrinos) */
+  int index_tp_t0_;        /**< index value for temperature (j=0 term) */
+  int index_tp_t1_;        /**< index value for temperature (j=1 term) */
+  int index_tp_t2_;        /**< index value for temperature (j=2 term) */
+  int index_tp_p_;         /**< index value for polarization */
+  int index_tp_delta_tot_; /**< index value for total density fluctuation */
   int index_tp_perturbed_recombination_delta_temp_; /**< Gas temperature perturbation */
   int index_tp_perturbed_recombination_delta_chi_;  /**< Inionization fraction perturbation */
 
-  int index_tp_theta_m_;        /**< index value for matter velocity fluctuation */
-  int index_tp_theta_cb_;       /**< index value for theta cb */
-  int index_tp_theta_tot_;      /**< index value for total velocity fluctuation */
-  int index_tp_theta_g_;        /**< index value for theta of gammas */
-  int index_tp_theta_b_;        /**< index value for theta of baryons */
-  int index_tp_theta_cdm_;      /**< index value for theta of cold dark matter */
-  int index_tp_theta_dcdm_;     /**< index value for theta of DCDM */
-  int index_tp_theta_fld_;      /**< index value for theta of dark energy */
-  int index_tp_theta_scf_;      /**< index value for theta of scalar field */
-  int index_tp_theta_ur_;       /**< index value for theta of ultra-relativistic neutrinos/relics */
-  int index_tp_theta_idr_;      /**< index value for theta of interacting dark radiation */
-  int index_tp_theta_idm_dr_;   /**< index value for theta of interacting dark matter (with dr)*/
-  int index_tp_theta_idr_drmd_; /**< index value for delta of interacting dark radiation (DRMD) */
-  int index_tp_theta_idm_drmd_; /**< index value for theta of interacting dark matter (with drmd)*/
-  int index_tp_theta_dr_;       /**< index value for F1 of decay radiation */
-  int index_tp_theta_ncdm1_; /**< index value for theta of first non-cold dark matter species (e.g. massive neutrinos) */
+  int index_tp_theta_m_;   /**< index value for matter velocity fluctuation */
+  int index_tp_theta_cb_;  /**< index value for theta cb */
+  int index_tp_theta_tot_; /**< index value for total velocity fluctuation */
 
   int index_tp_phi_;          /**< index value for metric fluctuation phi */
   int index_tp_phi_prime_;    /**< index value for metric fluctuation phi' */
@@ -125,51 +99,14 @@ class PerturbationsModule : public BaseModule {
   std::vector<int>
       tp_size_; /**< number of types tp_size[index_md] included in computation for each mode */
 
-  bool has_source_t_;          /**< do we need source for CMB temperature? */
-  bool has_source_p_;          /**< do we need source for CMB polarization? */
-  bool has_source_delta_m_;    /**< do we need source for delta of total matter? */
-  bool has_source_delta_cb_;   /**< do we ALSO need source for delta of ONLY cdm and baryon? */
-  bool has_source_delta_tot_;  /**< do we need source for delta total? */
-  bool has_source_delta_g_;    /**< do we need source for delta of gammas? */
-  bool has_source_delta_b_;    /**< do we need source for delta of baryons? */
-  bool has_source_delta_cdm_;  /**< do we need source for delta of cold dark matter? */
-  bool has_source_delta_dcdm_; /**< do we need source for delta of DCDM? */
-  bool has_source_delta_fld_;  /**< do we need source for delta of dark energy? */
-  bool has_source_delta_scf_;  /**< do we need source for delta from scalar field? */
-  bool has_source_delta_dr_;   /**< do we need source for delta of decay radiation? */
-  bool
-      has_source_delta_ur_; /**< do we need source for delta of ultra-relativistic neutrinos/relics? */
-  bool has_source_delta_idr_; /**< do we need source for delta of interacting dark radiation? */
-  bool
-      has_source_delta_idm_dr_; /**< do we need source for delta of interacting dark matter (with dr)? */
-  bool
-      has_source_delta_idr_drmd_; /**< do we need source for delta of interacting dark radiation? (with drmd) */
-  bool
-      has_source_delta_idm_drmd_; /**< do we need source for delta of interacting dark matter (with drmd)? */
-  bool
-      has_source_delta_ncdm_; /**< do we need source for delta of all non-cold dark matter species (e.g. massive neutrinos)? */
-  bool has_source_theta_m_;    /**< do we need source for theta of total matter? */
-  bool has_source_theta_cb_;   /**< do we ALSO need source for theta of ONLY cdm and baryon? */
-  bool has_source_theta_tot_;  /**< do we need source for theta total? */
-  bool has_source_theta_g_;    /**< do we need source for theta of gammas? */
-  bool has_source_theta_b_;    /**< do we need source for theta of baryons? */
-  bool has_source_theta_cdm_;  /**< do we need source for theta of cold dark matter? */
-  bool has_source_theta_dcdm_; /**< do we need source for theta of DCDM? */
-  bool has_source_theta_fld_;  /**< do we need source for theta of dark energy? */
-  bool has_source_theta_scf_;  /**< do we need source for theta of scalar field? */
-  bool
-      has_source_theta_dr_; /**< do we need source for theta of ultra-relativistic neutrinos/relics? */
-  bool
-      has_source_theta_ur_; /**< do we need source for theta of ultra-relativistic neutrinos/relics? */
-  bool has_source_theta_idr_; /**< do we need source for theta of interacting dark radiation? */
-  bool
-      has_source_theta_idm_dr_; /**< do we need source for theta of interacting dark matter (with dr)? */
-  bool
-      has_source_theta_idr_drmd_; /**< do we need source for theta of interacting dark radiation (with drmd)? */
-  bool
-      has_source_theta_idm_drmd_; /**< do we need source for theta of interacting dark matter (with drmd)? */
-  bool
-      has_source_theta_ncdm_; /**< do we need source for theta of all non-cold dark matter species (e.g. massive neutrinos)? */
+  bool has_source_t_;            /**< do we need source for CMB temperature? */
+  bool has_source_p_;            /**< do we need source for CMB polarization? */
+  bool has_source_delta_m_;      /**< do we need source for delta of total matter? */
+  bool has_source_delta_cb_;     /**< do we ALSO need source for delta of ONLY cdm and baryon? */
+  bool has_source_delta_tot_;    /**< do we need source for delta total? */
+  bool has_source_theta_m_;      /**< do we need source for theta of total matter? */
+  bool has_source_theta_cb_;     /**< do we ALSO need source for theta of ONLY cdm and baryon? */
+  bool has_source_theta_tot_;    /**< do we need source for theta total? */
   bool has_source_phi_;          /**< do we need source for metric fluctuation phi? */
   bool has_source_phi_prime_;    /**< do we need source for metric fluctuation phi'? */
   bool has_source_phi_plus_psi_; /**< do we need source for metric fluctuation (phi+psi)? */

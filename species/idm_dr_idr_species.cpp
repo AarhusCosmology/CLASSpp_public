@@ -12,6 +12,14 @@
 #include "thermodynamics.h"
 #include "thermodynamics_module.h"
 
+void IDM_DR_IDR_Species::RegisterTransferSourceIndices(int& index_tp,
+                                                       const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_idm_dr_, ctx.wants_density && has_idm_dr(), index_tp, 1);
+  class_define_index(index_tp_delta_idr_, ctx.wants_density && has_idr(), index_tp, 1);
+  class_define_index(index_tp_theta_idm_dr_, ctx.wants_velocity && has_idm_dr(), index_tp, 1);
+  class_define_index(index_tp_theta_idr_, ctx.wants_velocity && has_idr(), index_tp, 1);
+}
+
 std::optional<double> IDM_DR_IDR_Species::GetParam(const std::string& name) const {
   if (name == "T_idr")
     return idr().T_idr();
@@ -84,35 +92,35 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   const auto& my_lay     = static_cast<const PerturbLayout&>(base);
   const auto& idm_dr_lay = my_lay.idm_dr;
   const auto& idr_lay    = my_lay.idr;
-  if (p_mod->has_source_delta_idm_dr_) {
-    set_source(p_mod->index_tp_delta_idm_dr_,
+  if (index_tp_delta_idm_dr_ >= 0) {
+    set_source(index_tp_delta_idm_dr_,
                y[idm_dr_lay.idx_delta] +
                    3. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  if (p_mod->has_source_theta_idm_dr_) {
-    set_source(p_mod->index_tp_theta_idm_dr_,
+  if (index_tp_theta_idm_dr_ >= 0) {
+    set_source(index_tp_theta_idm_dr_,
                y[idm_dr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
 
   // ── IDR ───────────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_idr_) {
+  if (index_tp_delta_idr_ >= 0) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
-      set_source(p_mod->index_tp_delta_idr_,
+      set_source(index_tp_delta_idr_,
                  y[idr_lay.idx_delta] +
                      4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
     else
-      set_source(p_mod->index_tp_delta_idr_,
+      set_source(index_tp_delta_idr_,
                  ppw->rsa_delta_idr +
                      4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  if (p_mod->has_source_theta_idr_) {
+  if (index_tp_theta_idr_ >= 0) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
-      set_source(p_mod->index_tp_theta_idr_,
+      set_source(index_tp_theta_idr_,
                  y[idr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
     else
-      set_source(p_mod->index_tp_theta_idr_,
+      set_source(index_tp_theta_idr_,
                  ppw->rsa_theta_idr + ctx.theta_shift);  // N-body gauge correction
   }
 }
@@ -124,17 +132,17 @@ void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_idm_dr", mod.index_tp_delta_idm_dr_, has_idm_dr() ? _TRUE_ : _FALSE_);
-      w.Add("d_idr", mod.index_tp_delta_idr_, has_idr() ? _TRUE_ : _FALSE_);
+      w.Add("d_idm_dr", index_tp_delta_idm_dr_, index_tp_delta_idm_dr_ >= 0);
+      w.Add("d_idr", index_tp_delta_idr_, index_tp_delta_idr_ >= 0);
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_idm_dr", mod.index_tp_theta_idm_dr_, has_idm_dr() ? _TRUE_ : _FALSE_);
-      w.Add("t_idr", mod.index_tp_theta_idr_, has_idr() ? _TRUE_ : _FALSE_);
+      w.Add("t_idm_dr", index_tp_theta_idm_dr_, index_tp_theta_idm_dr_ >= 0);
+      w.Add("t_idr", index_tp_theta_idr_, index_tp_theta_idr_ >= 0);
     }
   }
   else if (fmt == camb_format) {
     if (section != TransferColumnSection::velocity)
-      w.Add("-T_idm_dr/k2", mod.index_tp_delta_idm_dr_, _TRUE_);
+      w.Add("-T_idm_dr/k2", index_tp_delta_idm_dr_, index_tp_delta_idm_dr_ >= 0);
   }
 }
 

@@ -799,3 +799,11 @@ void NCDMBaseSpecies::ContributeTensorGwSource(const BaseSpecies::PerturbLayout&
   gwncdm         *= -_SQRT6_ * 4 * a2 * factor;
   ppw->gw_source += gwncdm;
 }
+
+// ── Transfer-source registration (#309) ──────────────────────────────────────
+
+void NCDMBaseSpecies::RegisterTransferSourceIndices(int& index_tp,
+                                                    const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
+}

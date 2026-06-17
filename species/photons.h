@@ -57,6 +57,8 @@ class PhotonsSpecies : public BaseSpecies {
 
   // ── Perturbation index registration ────────────────────────────────────────
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
                                    const precision* ppr,
@@ -176,4 +178,7 @@ class PhotonsSpecies : public BaseSpecies {
 
  private:
   const background& pba_;
+
+  int index_tp_delta_ = -1;  // #309 transfer-source slot
+  int index_tp_theta_ = -1;
 };

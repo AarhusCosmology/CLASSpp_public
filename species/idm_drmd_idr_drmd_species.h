@@ -69,6 +69,8 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+
   // ── Perturbations ──────────────────────────────────────────────────────────
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
@@ -165,4 +167,9 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   double G_over_aH_drmd_       = 0.;
   double delta_Neff_drmd_      = 0.;
   double z_stop_               = 0.;
+
+  int index_tp_delta_idm_drmd_ = -1;  // #309 transfer-source slots (composite-owned)
+  int index_tp_theta_idm_drmd_ = -1;
+  int index_tp_delta_idr_drmd_ = -1;
+  int index_tp_theta_idr_drmd_ = -1;
 };

@@ -10,6 +10,12 @@ void CompositeSpecies::RegisterIntegrationIndices(int& index_bi) {
     child->RegisterIntegrationIndices(index_bi);
 }
 
+void CompositeSpecies::RegisterTransferSourceIndices(int& index_tp,
+                                                     const SourceRequestContext& ctx) {
+  for (auto& child : children_)
+    child->RegisterTransferSourceIndices(index_tp, ctx);
+}
+
 void CompositeSpecies::SetBackgroundModule(const BackgroundModule* bgm) {
   for (auto& child : children_)
     child->SetBackgroundModule(bgm);

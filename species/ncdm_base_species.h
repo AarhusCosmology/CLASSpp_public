@@ -151,6 +151,8 @@ class NCDMBaseSpecies : public BaseSpecies {
     ppt_ = ppt;
   }
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+
   // ── Layout-based tensor register (shared by NCDM and DNCDM) ──────────────
   void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                          perturb_vector* pv,
@@ -189,6 +191,9 @@ class NCDMBaseSpecies : public BaseSpecies {
                                      const PerturbIcContext& ctx) override;
 
  protected:
+  int index_tp_delta_ = -1;  // #309 transfer-source slot (this ncdm flavor)
+  int index_tp_theta_ = -1;
+
   /** Return d ln f_0 / d ln q for momentum bin iq.
    *  NCDMSpecies reads a static table; DNCDMSpecies reads pvecback.
    *  Used by PerturbTensorDerivs. */

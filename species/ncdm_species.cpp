@@ -17,8 +17,6 @@ NCDMSpecies::NCDMSpecies(FileContent* pfc,
     : NCDMBaseSpecies(instance_name, EnergyType::Other, pfc, instance_name, settings), pba_(pba) {
   bgm_ = bgm;
   ResolveMassOmegaClosure(settings);
-  // source_slot_ stays at its in-class default (-1) until
-  // PerturbationsModule::perturb_indices_of_perturbs() assigns it via SetSourceSlot.
 }
 
 NCDMSpecies::NCDMSpecies(FileContent* pfc,
@@ -266,17 +264,16 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const int n              = source_slot_;
   const double* pvecback   = ppw->pvecback;
   const perturb_vector* pv = ppw->pv.get();
   const double* y          = ppw->pv->y;
 
   // delta_ncdm[n]: density perturbation
-  if (p_mod->has_source_delta_ncdm_) {
+  if (index_tp_delta_ >= 0) {
     const double w = pvecback[index_bg_p_] / pvecback[index_bg_rho_];
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_delta_ncdm1_ + n,
+                          index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
                           Delta(layout, pv, y, pvecback, ppw) +
@@ -285,10 +282,10 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   }
 
   // theta_ncdm[n]: velocity perturbation
-  if (p_mod->has_source_theta_ncdm_) {
+  if (index_tp_theta_ >= 0) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_theta_ncdm1_ + n,
+                          index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
                           Theta(layout, pv, y, pvecback, ppw) + ctx.theta_shift);
@@ -434,20 +431,19 @@ void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      const PerturbationsModule& mod,
                                      enum file_format fmt,
                                      BaseSpecies::TransferColumnSection section) const {
-  const int n           = source_slot_;
   const std::string& nm = name();
 
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_" + nm, mod.index_tp_delta_ncdm1_ + n, _TRUE_);
+      w.Add("d_" + nm, index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_" + nm, mod.index_tp_theta_ncdm1_ + n, _TRUE_);
+      w.Add("t_" + nm, index_tp_theta_, index_tp_theta_ >= 0);
   }
   else if (fmt == camb_format) {
-    // camb_format: single aggregate column emitted only for n==0
-    if (section != TransferColumnSection::velocity && n == 0)
-      w.Add("-T_ncdm/k2", mod.index_tp_delta_ncdm1_, _TRUE_);
+    // camb_format: per-flavor column (intentional change from aggregate, #309)
+    if (section != TransferColumnSection::velocity)
+      w.Add("-T_" + nm + "/k2", index_tp_delta_, index_tp_delta_ >= 0);
   }
 }
 

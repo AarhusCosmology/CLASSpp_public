@@ -35,6 +35,7 @@ class CompositeSpecies : public BaseSpecies {
   // ── Registration ────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
   // ── Omega0 (closure) ────────────────────────────────────────────────────
   /** Sums GetOmega0() over all children. */
   double GetOmega0() const override {

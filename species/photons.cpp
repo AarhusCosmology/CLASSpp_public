@@ -504,17 +504,17 @@ void PhotonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   else
     delta_g = y[layout.idx_delta];
 
-  if (p_mod->has_source_delta_g_) {
-    set_source(p_mod->index_tp_delta_g_, delta_g + 4. * ctx.a_prime_over_a * ctx.theta_over_k2);
+  if (index_tp_delta_ >= 0) {
+    set_source(index_tp_delta_, delta_g + 4. * ctx.a_prime_over_a * ctx.theta_over_k2);
   }
 
-  if (p_mod->has_source_theta_g_) {
+  if (index_tp_theta_ >= 0) {
     double theta_g;
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)
       theta_g = y[layout.idx_theta];
     else
       theta_g = ppw->rsa_theta_g;
-    set_source(p_mod->index_tp_theta_g_, theta_g + ctx.theta_shift);
+    set_source(index_tp_theta_, theta_g + ctx.theta_shift);
   }
 }
 
@@ -566,6 +566,11 @@ void PhotonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLay
 
 // ── Output ────────────────────────────────────────────────────────────────────
 
+void PhotonsSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
+}
+
 void PhotonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                         const PerturbationsModule& mod,
                                         enum file_format fmt,
@@ -573,9 +578,9 @@ void PhotonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_g", mod.index_tp_delta_g_, true);
+      w.Add("d_g", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_g", mod.index_tp_theta_g_, true);
+      w.Add("t_g", index_tp_theta_, index_tp_theta_ >= 0);
   }
   // camb_format: photons not written separately
 }

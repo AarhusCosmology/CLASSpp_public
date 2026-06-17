@@ -37,6 +37,11 @@ void CDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWri
   w.Add("(.)rho_cdm", pvecback[index_bg_rho_cdm_]);
 }
 
+void CDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity && ctx.gauge != synchronous, index_tp, 1);
+}
+
 void CDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                              perturb_vector* pv,
                                              const precision* /*ppr*/,
@@ -147,10 +152,10 @@ void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
     return;
 
   // ── delta_cdm ──────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_cdm_) {
+  if (index_tp_delta_ >= 0) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_delta_cdm_,
+                          index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
                           y[layout.idx_delta] +
@@ -158,11 +163,11 @@ void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 
   // ── theta_cdm ──────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_cdm_) {
+  if (index_tp_theta_ >= 0) {
     const double theta_cdm = (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_theta_cdm_,
+                          index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
                           theta_cdm + ctx.theta_shift);  // N-body gauge correction
@@ -177,13 +182,13 @@ void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_cdm", mod.index_tp_delta_cdm_, _TRUE_);
+      w.Add("d_cdm", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_cdm", mod.index_tp_theta_cdm_, (ppt->gauge != synchronous));
+      w.Add("t_cdm", index_tp_theta_, index_tp_theta_ >= 0);
   }
   else if (fmt == camb_format) {
     if (section != TransferColumnSection::velocity)
-      w.Add("-T_cdm/k2", mod.index_tp_delta_cdm_, _TRUE_);
+      w.Add("-T_cdm/k2", index_tp_delta_, index_tp_delta_ >= 0);
   }
 }
 

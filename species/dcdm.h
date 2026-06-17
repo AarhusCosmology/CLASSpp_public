@@ -106,6 +106,14 @@ class DCDMSpecies : public BaseSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+  int transfer_delta_index() const {
+    return index_tp_delta_;
+  }
+  int transfer_theta_index() const {
+    return index_tp_theta_;
+  }
+
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,
@@ -129,4 +137,7 @@ class DCDMSpecies : public BaseSpecies {
 
   // Background indices
   int index_bg_rho_dcdm_ = -1;
+
+  int index_tp_delta_ = -1;  // #309 transfer-source slot
+  int index_tp_theta_ = -1;
 };

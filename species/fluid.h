@@ -122,6 +122,8 @@ class FluidSpecies : public BaseSpecies {
 
   // ── Perturbations ──────────────────────────────────────────────────────────
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+
   // Layout-based signatures: do the real work.
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
@@ -213,4 +215,7 @@ class FluidSpecies : public BaseSpecies {
   int index_bg_w_fld_          = -1;
   int index_bg_dw_over_da_fld_ = -1;
   int index_bi_rho_fld_        = -1;
+
+  int index_tp_delta_ = -1;  // #309 transfer-source slot
+  int index_tp_theta_ = -1;
 };

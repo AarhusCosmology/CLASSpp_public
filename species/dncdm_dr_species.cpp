@@ -336,7 +336,7 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   // ── delta_dr (this channel's slot) ───────────────────────────────────────────
   // r_dr == 0 when the channel carries no DR (e.g. Gamma == 0); write 0 then,
   // matching DarkRadiationSpecies::Delta's rho_dr <= 0 convention (avoids 0/0).
-  if (p_mod->has_source_delta_dr_) {
+  if (dr_sp_->transfer_delta_index() >= 0) {
     const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.)
                             ? y[my.dr.idx_F0] / r_dr +
@@ -344,21 +344,21 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                             : 0.;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_delta_dr_ + dr_sp_->source_slot(),
+                          dr_sp_->transfer_delta_index(),
                           ctx.index_tau,
                           ctx.index_k,
                           src);
   }
 
   // ── theta_dr (this channel's slot) ───────────────────────────────────────────
-  if (p_mod->has_source_theta_dr_) {
+  if (dr_sp_->transfer_theta_index() >= 0) {
     const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[my.dr.idx_F0 + 1] / r_dr +
                                           ctx.theta_shift  // N-body gauge correction
                                     : 0.;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_theta_dr_ + dr_sp_->source_slot(),
+                          dr_sp_->transfer_theta_index(),
                           ctx.index_tau,
                           ctx.index_k,
                           src);
@@ -372,11 +372,14 @@ void DNCDM_DR_Species::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt != class_format)
     return;
   const perturbs* ppt = mod.GetPerturbs();
-  const int slot      = dr_sp_->source_slot();
   if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-    w.Add("d_" + dr_sp_->name(), mod.index_tp_delta_dr_ + slot, mod.has_source_delta_dr_);
+    w.Add("d_" + dr_sp_->name(),
+          dr_sp_->transfer_delta_index(),
+          dr_sp_->transfer_delta_index() >= 0);
   if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-    w.Add("t_" + dr_sp_->name(), mod.index_tp_theta_dr_ + slot, mod.has_source_theta_dr_);
+    w.Add("t_" + dr_sp_->name(),
+          dr_sp_->transfer_theta_index(),
+          dr_sp_->transfer_theta_index() >= 0);
 }
 
 void DNCDM_DR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,

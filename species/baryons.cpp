@@ -153,10 +153,10 @@ void BaryonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double a_prime_over_a = ctx.a_prime_over_a;
 
   // ── delta_b: baryon density transfer ─────────────────────────────────────
-  if (p_mod->has_source_delta_b_) {
+  if (index_tp_delta_ >= 0) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_delta_b_,
+                          index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
                           y[layout.idx_delta] +
@@ -164,14 +164,19 @@ void BaryonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 
   // ── theta_b: baryon velocity transfer ────────────────────────────────────
-  if (p_mod->has_source_theta_b_) {
+  if (index_tp_theta_ >= 0) {
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_theta_b_,
+                          index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
                           y[layout.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
+}
+
+void BaryonsSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
 }
 
 void BaryonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
@@ -181,9 +186,9 @@ void BaryonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_b", mod.index_tp_delta_b_, true);
+      w.Add("d_b", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_b", mod.index_tp_theta_b_, true);
+      w.Add("t_b", index_tp_theta_, index_tp_theta_ >= 0);
   }
 }
 

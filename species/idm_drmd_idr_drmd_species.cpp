@@ -17,6 +17,14 @@ void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundData(const double* pvecback,
   w.Add("G_over_aH_drmd", pvecback[bgm_->index_bg_G_over_aH_drmd_]);
 }
 
+void IDM_DRMD_IDR_DRMD_Species::RegisterTransferSourceIndices(int& index_tp,
+                                                              const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_idm_drmd_, ctx.wants_density && has_idm_drmd(), index_tp, 1);
+  class_define_index(index_tp_delta_idr_drmd_, ctx.wants_density && has_idr_drmd(), index_tp, 1);
+  class_define_index(index_tp_theta_idm_drmd_, ctx.wants_velocity && has_idm_drmd(), index_tp, 1);
+  class_define_index(index_tp_theta_idr_drmd_, ctx.wants_velocity && has_idr_drmd(), index_tp, 1);
+}
+
 void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                                        double* y,
                                                        const PerturbIcContext& ctx) {
@@ -83,28 +91,28 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
   const auto& my_src_lay      = static_cast<const PerturbLayout&>(base);
   const auto& idm_drm_src_lay = my_src_lay.idm_drmd;
   const auto& idr_drm_src_lay = my_src_lay.idr_drmd;
-  if (p_mod->has_source_delta_idm_drmd_) {
-    set_source(p_mod->index_tp_delta_idm_drmd_,
+  if (index_tp_delta_idm_drmd_ >= 0) {
+    set_source(index_tp_delta_idm_drmd_,
                y[idm_drm_src_lay.idx_delta] +
                    3. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  if (p_mod->has_source_theta_idm_drmd_) {
-    set_source(p_mod->index_tp_theta_idm_drmd_,
+  if (index_tp_theta_idm_drmd_ >= 0) {
+    set_source(index_tp_theta_idm_drmd_,
                y[idm_drm_src_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
 
   // ── IDR_DRMD ──────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_idr_drmd_) {
-    set_source(p_mod->index_tp_delta_idr_drmd_,
+  if (index_tp_delta_idr_drmd_ >= 0) {
+    set_source(index_tp_delta_idr_drmd_,
                y[idr_drm_src_lay.idx_delta] +
                    4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
   // The original perturb_sources_member allocates this slot but never writes it.
   // Write zero explicitly to avoid relying on zero-initialization of the source table.
-  if (p_mod->has_source_theta_idr_drmd_) {
-    set_source(p_mod->index_tp_theta_idr_drmd_, 0.);
+  if (index_tp_theta_idr_drmd_ >= 0) {
+    set_source(index_tp_theta_idr_drmd_, 0.);
   }
 }
 
@@ -116,12 +124,12 @@ void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_idm_drmd", mod.index_tp_delta_idm_drmd_, has_idm_drmd());
-      w.Add("d_idr_drmd", mod.index_tp_delta_idr_drmd_, has_idr_drmd());
+      w.Add("d_idm_drmd", index_tp_delta_idm_drmd_, index_tp_delta_idm_drmd_ >= 0);
+      w.Add("d_idr_drmd", index_tp_delta_idr_drmd_, index_tp_delta_idr_drmd_ >= 0);
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_idm_drmd", mod.index_tp_theta_idm_drmd_, has_idm_drmd());
-      w.Add("t_idr_drmd", mod.index_tp_theta_idr_drmd_, has_idr_drmd());
+      w.Add("t_idm_drmd", index_tp_theta_idm_drmd_, index_tp_theta_idm_drmd_ >= 0);
+      w.Add("t_idr_drmd", index_tp_theta_idr_drmd_, index_tp_theta_idr_drmd_ >= 0);
     }
   }
 }

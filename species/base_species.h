@@ -254,6 +254,16 @@ class BaseSpecies {
 
   // ── Per-species layout signatures ───────────────────────────────────────
 
+  /**
+   * Register this species' transfer-source (index_tp) slots. Set once in
+   * perturb_indices_of_perturbs() before the k-loop; mirrors
+   * RegisterBackgroundIndices (k-independent, cached in a plain species member).
+   * Takes no PerturbLayout — that absence marks it as non-per-k state.
+   * Default: no-op (species that emit no transfer functions).
+   */
+  virtual void RegisterTransferSourceIndices(int& /*index_tp*/,
+                                             const SourceRequestContext& /*ctx*/) {}
+
   virtual void RegisterPerturbationIndices(PerturbLayout& /*layout*/,
                                            perturb_vector* /*pv*/,
                                            const precision* /*ppr*/,

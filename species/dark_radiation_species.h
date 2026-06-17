@@ -127,21 +127,20 @@ class DarkRadiationSpecies : public BaseSpecies {
     return index_pt_F0_;
   }
 
-  /** Per-species offset into the index_tp_{delta,theta}_dr_ source block, assigned
-   *  in lex order by PerturbationsModule. Used by the parent composite to write this
-   *  channel's transfer source and label its output column. -1 until assigned. */
-  void SetSourceSlot(int s) {
-    source_slot_ = s;
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+  int transfer_delta_index() const {
+    return index_tp_delta_;
   }
-  int source_slot() const {
-    return source_slot_;
+  int transfer_theta_index() const {
+    return index_tp_theta_;
   }
 
  private:
   const background* pba_;
   const BackgroundModule* bgm_;
 
-  int index_bi_rho_ = -1;
-  int index_pt_F0_  = -1;
-  int source_slot_  = -1;  // assigned in lex order by PerturbationsModule
+  int index_bi_rho_   = -1;
+  int index_pt_F0_    = -1;
+  int index_tp_delta_ = -1;  // #309 transfer-source slot
+  int index_tp_theta_ = -1;
 };

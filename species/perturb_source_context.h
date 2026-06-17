@@ -45,6 +45,16 @@ struct PerturbScalarContext {
   int gauge = 0;
 };
 
+/**
+ * Output requests a species needs in order to decide which transfer-source
+ * slots to register. Plain const input, not per-k state (see issue #309).
+ */
+struct SourceRequestContext {
+  bool wants_density;   // ppt->has_density_transfers
+  bool wants_velocity;  // ppt->has_velocity_transfers
+  int gauge;            // possible_gauges; CDM registers theta only when != synchronous
+};
+
 // ── PerturbColumnWriter ──────────────────────────────────────────────────────
 /**
  * Thin helper that handles both title-writing and data-writing in one pass.

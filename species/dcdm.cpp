@@ -152,6 +152,11 @@ void DCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout
     new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }
 
+void DCDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
+}
+
 void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      const PerturbationsModule& mod,
                                      enum file_format fmt,
@@ -160,9 +165,9 @@ void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_dcdm", mod.index_tp_delta_dcdm_, _TRUE_);
+      w.Add("d_dcdm", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_dcdm", mod.index_tp_theta_dcdm_, _TRUE_);
+      w.Add("t_dcdm", index_tp_theta_, index_tp_theta_ >= 0);
   }
 }
 

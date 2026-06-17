@@ -159,6 +159,12 @@ void ScalarFieldSpecies::WriteBackgroundData(const double* pvecback,
   w.Add("V''_scf", pvecback[index_bg_ddV_scf_]);
 }
 
+void ScalarFieldSpecies::RegisterTransferSourceIndices(int& index_tp,
+                                                       const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
+}
+
 void ScalarFieldSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                      perturb_vector* /*pv*/,
                                                      const precision* /*ppr*/,
@@ -222,7 +228,7 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                     ctx.k;  // PerturbSourceContext has no k2 field (unlike PerturbScalarContext)
 
   // ── delta_scf ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_scf_) {
+  if (index_tp_delta_ >= 0) {
     double delta_rho_scf;
     const perturbs* ppt = p_mod->GetPerturbs();
     if (ppt->gauge == synchronous) {
@@ -242,19 +248,19 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
     }
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_delta_scf_,
+                          index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
                           delta_rho_scf / rho_scf);
   }
 
   // ── theta_scf ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_scf_) {
+  if (index_tp_theta_ >= 0) {
     const double rho_plus_p_theta_scf = 1. / 3. * k2 / a2_rel * phi_prime_bg * y[layout.idx_phi];
 
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_theta_scf_,
+                          index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
                           rho_plus_p_theta_scf / (rho_scf + p_scf) +
@@ -298,9 +304,9 @@ void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_scf", mod.index_tp_delta_scf_, _TRUE_);
+      w.Add("d_scf", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t__scf", mod.index_tp_theta_scf_, _TRUE_);
+      w.Add("t__scf", index_tp_theta_, index_tp_theta_ >= 0);
   }
 }
 

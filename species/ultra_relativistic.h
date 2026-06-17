@@ -43,6 +43,8 @@ class UltraRelativisticSpecies : public BaseSpecies {
 
   // ── Perturbations ──────────────────────────────────────────────────────────
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+
   /** Per-species layout holding perturbation slot indices for UR. */
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     int idx_delta = -1;  ///< index_pt_delta_ur
@@ -143,4 +145,7 @@ class UltraRelativisticSpecies : public BaseSpecies {
  private:
   double Omega0_ur_;
   double H0_;
+
+  int index_tp_delta_ = -1;  // #309 transfer-source slot
+  int index_tp_theta_ = -1;
 };

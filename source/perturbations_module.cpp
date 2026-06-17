@@ -56,31 +56,6 @@ bool HasNcdm(const SpeciesCollection& all_species) {
   return false;
 }
 
-/** Number of DR-emitting composites (each owns one DarkRadiationSpecies channel):
- *  the DCDM_DR composite plus every DNCDM_DR composite. Sizes the per-species
- *  index_tp_{delta,theta}_dr_ source block (replaces the old pba->N_decay_dr). */
-int DrSpeciesCount(const SpeciesCollection& all_species) {
-  int n = 0;
-  for (const auto& sp : all_species) {
-    if (dynamic_cast<DCDM_DR_Species*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-      ++n;
-  }
-  return n;
-}
-
-/** Flat list of NCDMBaseSpecies* in all_species_ lex iteration order. For
- *  DNCDM_DR_Species composites the wrapped DNCDMSpecies child is returned. */
-std::vector<NCDMBaseSpecies*> NcdmFamily(const SpeciesCollection& all_species) {
-  std::vector<NCDMBaseSpecies*> result;
-  for (const auto& sp : all_species) {
-    if (auto* n = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
-      result.push_back(n);
-    else if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-      result.push_back(&d->dncdm());
-  }
-  return result;
-}
-
 }  // namespace
 
 PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
@@ -632,37 +607,6 @@ void PerturbationsModule::perturb_init() {
              _omegab_SMALL_,
              _omegab_BIG_);
 
-  /** - assign each NCDMSpecies its source-slot offset into the
-   *  index_tp_{delta,theta}_ncdm1_ block (lex order matching all_species_).
-   *  DNCDMSpecies has no FillSources and so consumes a slot but never writes
-   *  to it. */
-  {
-    int slot = 0;
-    for (auto& [name, sp] : all_species_) {
-      if (auto* n = dynamic_cast<NCDMSpecies*>(sp.get())) {
-        n->SetSourceSlot(slot++);
-      }
-      else if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
-        ++slot;
-      }
-    }
-  }
-
-  /** - assign each DR-emitting composite's DR child its source-slot offset into
-   *  the index_tp_{delta,theta}_dr_ block (lex order matching all_species_).
-   *  Each composite writes its own channel's DR transfer at that slot. */
-  {
-    int slot = 0;
-    for (auto& [name, sp] : all_species_) {
-      if (auto* d = dynamic_cast<DCDM_DR_Species*>(sp.get())) {
-        d->dr().SetSourceSlot(slot++);
-      }
-      else if (auto* d = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
-        d->dr().SetSourceSlot(slot++);
-      }
-    }
-  }
-
   /** - initialize all indices and lists in perturbs structure using perturb_indices_of_perturbs() */
 
   perturb_indices_of_perturbs();
@@ -806,11 +750,6 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
   int index_ic;
   int index_type_common;
 
-  // Number of DR-emitting composites (DCDM_DR + each DNCDM_DR). Drives both the
-  // has_source_{delta,theta}_dr_ gating and the index_tp_{delta,theta}_dr_ block
-  // sizes, so it must be the single source of truth for the two to agree.
-  const int n_dr_species = DrSpeciesCount(all_species_);
-
   /** - count modes (scalar, vector, tensor) and assign corresponding indices */
 
   index_md = 0;
@@ -846,50 +785,24 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
   has_cmb_ = false;
   has_lss_ = false;
 
-  has_source_t_              = false;
-  has_source_p_              = false;
-  has_source_delta_m_        = false;
-  has_source_delta_cb_       = false;
-  has_source_delta_tot_      = false;
-  has_source_delta_g_        = false;
-  has_source_delta_b_        = false;
-  has_source_delta_cdm_      = false;
-  has_source_delta_dcdm_     = false;
-  has_source_delta_fld_      = false;
-  has_source_delta_scf_      = false;
-  has_source_delta_dr_       = false;
-  has_source_delta_ur_       = false;
-  has_source_delta_idr_      = false;
-  has_source_delta_idr_drmd_ = false;
-  has_source_delta_idm_dr_   = false;
-  has_source_delta_idm_drmd_ = false;
-  has_source_delta_ncdm_     = false;
-  has_source_theta_m_        = false;
-  has_source_theta_cb_       = false;
-  has_source_theta_tot_      = false;
-  has_source_theta_g_        = false;
-  has_source_theta_b_        = false;
-  has_source_theta_cdm_      = false;
-  has_source_theta_dcdm_     = false;
-  has_source_theta_fld_      = false;
-  has_source_theta_scf_      = false;
-  has_source_theta_dr_       = false;
-  has_source_theta_ur_       = false;
-  has_source_theta_idr_      = false;
-  has_source_theta_idr_drmd_ = false;
-  has_source_theta_idm_dr_   = false;
-  has_source_theta_idm_drmd_ = false;
-  has_source_theta_ncdm_     = false;
-  has_source_phi_            = false;
-  has_source_phi_prime_      = false;
-  has_source_phi_plus_psi_   = false;
-  has_source_psi_            = false;
-  has_source_h_              = false;
-  has_source_h_prime_        = false;
-  has_source_eta_            = false;
-  has_source_eta_prime_      = false;
-  has_source_H_T_Nb_prime_   = false;
-  has_source_k2gamma_Nb_     = false;
+  has_source_t_            = false;
+  has_source_p_            = false;
+  has_source_delta_m_      = false;
+  has_source_delta_cb_     = false;
+  has_source_delta_tot_    = false;
+  has_source_theta_m_      = false;
+  has_source_theta_cb_     = false;
+  has_source_theta_tot_    = false;
+  has_source_phi_          = false;
+  has_source_phi_prime_    = false;
+  has_source_phi_plus_psi_ = false;
+  has_source_psi_          = false;
+  has_source_h_            = false;
+  has_source_h_prime_      = false;
+  has_source_eta_          = false;
+  has_source_eta_prime_    = false;
+  has_source_H_T_Nb_prime_ = false;
+  has_source_k2gamma_Nb_   = false;
 
   /** - source flags and indices, for sources that all modes have in
       common (temperature, polarization, ...). For temperature, the
@@ -952,30 +865,6 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       if (ppt->has_density_transfers) {
         has_lss_              = true;
         has_source_delta_tot_ = true;
-        has_source_delta_g_   = true;
-        has_source_delta_b_   = true;
-        if (all_species_.count("CDM"))
-          has_source_delta_cdm_ = true;
-        if (all_species_.count("DCDM_DR"))
-          has_source_delta_dcdm_ = true;
-        if (all_species_.count("Fluid"))
-          has_source_delta_fld_ = true;
-        if (all_species_.count("ScalarField"))
-          has_source_delta_scf_ = true;
-        if (all_species_.count("UR"))
-          has_source_delta_ur_ = true;
-        if (all_species_.count("IDM_DR_IDR"))
-          has_source_delta_idr_ = true;
-        if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_delta_idr_drmd_ = true;
-        if (all_species_.count("IDM_DR_IDR"))
-          has_source_delta_idm_dr_ = true;
-        if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_delta_idm_drmd_ = true;
-        if (n_dr_species > 0)
-          has_source_delta_dr_ = true;
-        if (HasNcdm(all_species_))
-          has_source_delta_ncdm_ = true;
         // Thanks to the following lines, (phi,psi) are also stored as sources
         // (Obtained directly in newtonian gauge, infereed from (h,eta) in synchronous gauge).
         // If density transfer functions are requested in the (default) CLASS format,
@@ -987,30 +876,6 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       if (ppt->has_velocity_transfers) {
         has_lss_              = true;
         has_source_theta_tot_ = true;
-        has_source_theta_g_   = true;
-        has_source_theta_b_   = true;
-        if ((all_species_.count("CDM")) && (ppt->gauge != synchronous))
-          has_source_theta_cdm_ = true;
-        if (all_species_.count("DCDM_DR"))
-          has_source_theta_dcdm_ = true;
-        if (all_species_.count("Fluid"))
-          has_source_theta_fld_ = true;
-        if (all_species_.count("ScalarField"))
-          has_source_theta_scf_ = true;
-        if (all_species_.count("UR"))
-          has_source_theta_ur_ = true;
-        if (all_species_.count("IDM_DR_IDR"))
-          has_source_theta_idr_ = true;
-        if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_theta_idr_drmd_ = true;
-        if (all_species_.count("IDM_DR_IDR"))
-          has_source_theta_idm_dr_ = true;
-        if (all_species_.count("IDM_DRMD_IDR_DRMD"))
-          has_source_theta_idm_drmd_ = true;
-        if (n_dr_species > 0)
-          has_source_theta_dr_ = true;
-        if (HasNcdm(all_species_))
-          has_source_theta_ncdm_ = true;
       }
 
       if (ppt->has_cl_number_count) {
@@ -1070,41 +935,18 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       class_define_index(index_tp_delta_m_, has_source_delta_m_, index_type, 1);
       class_define_index(index_tp_delta_cb_, has_source_delta_cb_, index_type, 1);
       class_define_index(index_tp_delta_tot_, has_source_delta_tot_, index_type, 1);
-      class_define_index(index_tp_delta_g_, has_source_delta_g_, index_type, 1);
-      class_define_index(index_tp_delta_b_, has_source_delta_b_, index_type, 1);
-      class_define_index(index_tp_delta_cdm_, has_source_delta_cdm_, index_type, 1);
-      class_define_index(index_tp_delta_dcdm_, has_source_delta_dcdm_, index_type, 1);
-      class_define_index(index_tp_delta_fld_, has_source_delta_fld_, index_type, 1);
-      class_define_index(index_tp_delta_scf_, has_source_delta_scf_, index_type, 1);
-      class_define_index(index_tp_delta_dr_, has_source_delta_dr_, index_type, n_dr_species);
-      class_define_index(index_tp_delta_ur_, has_source_delta_ur_, index_type, 1);
-      class_define_index(index_tp_delta_idr_, has_source_delta_idr_, index_type, 1);
-      class_define_index(index_tp_delta_idr_drmd_, has_source_delta_idr_drmd_, index_type, 1);
-      class_define_index(index_tp_delta_idm_dr_, has_source_delta_idm_dr_, index_type, 1);
-      class_define_index(index_tp_delta_idm_drmd_, has_source_delta_idm_drmd_, index_type, 1);
-      class_define_index(index_tp_delta_ncdm1_,
-                         has_source_delta_ncdm_,
-                         index_type,
-                         static_cast<int>(NcdmFamily(all_species_).size()));
       class_define_index(index_tp_theta_m_, has_source_theta_m_, index_type, 1);
       class_define_index(index_tp_theta_cb_, has_source_theta_cb_, index_type, 1);
       class_define_index(index_tp_theta_tot_, has_source_theta_tot_, index_type, 1);
-      class_define_index(index_tp_theta_g_, has_source_theta_g_, index_type, 1);
-      class_define_index(index_tp_theta_b_, has_source_theta_b_, index_type, 1);
-      class_define_index(index_tp_theta_cdm_, has_source_theta_cdm_, index_type, 1);
-      class_define_index(index_tp_theta_dcdm_, has_source_theta_dcdm_, index_type, 1);
-      class_define_index(index_tp_theta_fld_, has_source_theta_fld_, index_type, 1);
-      class_define_index(index_tp_theta_scf_, has_source_theta_scf_, index_type, 1);
-      class_define_index(index_tp_theta_dr_, has_source_theta_dr_, index_type, n_dr_species);
-      class_define_index(index_tp_theta_ur_, has_source_theta_ur_, index_type, 1);
-      class_define_index(index_tp_theta_idr_, has_source_theta_idr_, index_type, 1);
-      class_define_index(index_tp_theta_idr_drmd_, has_source_theta_idr_drmd_, index_type, 1);
-      class_define_index(index_tp_theta_idm_dr_, has_source_theta_idm_dr_, index_type, 1);
-      class_define_index(index_tp_theta_idm_drmd_, has_source_theta_idm_drmd_, index_type, 1);
-      class_define_index(index_tp_theta_ncdm1_,
-                         has_source_theta_ncdm_,
-                         index_type,
-                         static_cast<int>(NcdmFamily(all_species_).size()));
+      // Per-species transfer sources register themselves here, between the
+      // module-owned head (T/P, delta_m/cb/tot, theta_m/cb/tot) and the metric
+      // tail. Replaces the old per-species index block + the SetSourceSlot
+      // dynamic_cast loops (issue #309).
+      const SourceRequestContext src_ctx{ppt->has_density_transfers,
+                                         ppt->has_velocity_transfers,
+                                         ppt->gauge};
+      for (auto& [name, sp] : all_species_)
+        sp->RegisterTransferSourceIndices(index_type, src_ctx);
       class_define_index(index_tp_phi_, has_source_phi_, index_type, 1);
       class_define_index(index_tp_phi_prime_, has_source_phi_prime_, index_type, 1);
       class_define_index(index_tp_phi_plus_psi_, has_source_phi_plus_psi_, index_type, 1);

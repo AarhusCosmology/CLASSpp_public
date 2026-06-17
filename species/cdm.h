@@ -40,6 +40,7 @@ class CDMSpecies : public BaseSpecies {
   double DpDloga(const double* pvecback) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
                                    const precision* ppr,
@@ -103,4 +104,7 @@ class CDMSpecies : public BaseSpecies {
   double Omega0_cdm_;
   double H0_;
   int index_bg_rho_cdm_ = -1;
+
+  int index_tp_delta_ = -1;  // #309 transfer-source slot
+  int index_tp_theta_ = -1;  // registered only when gauge != synchronous
 };

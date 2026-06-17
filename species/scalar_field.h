@@ -89,6 +89,7 @@ class ScalarFieldSpecies : public BaseSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
                                    const precision* ppr,
@@ -192,15 +193,18 @@ class ScalarFieldSpecies : public BaseSpecies {
 
   const background& pba_;
   const BackgroundModule* bgm_ = nullptr;
-  int index_bg_phi_scf_        = -1;
-  int index_bg_phi_prime_scf_  = -1;
-  int index_bg_V_scf_          = -1;
-  int index_bg_dV_scf_         = -1;
-  int index_bg_ddV_scf_        = -1;
-  int index_bg_p_prime_scf_    = -1;
-  int index_bi_phi_scf_        = -1;
-  int index_bi_phi_prime_scf_  = -1;
-  double Omega0_scf_           = 0.;
+  int index_tp_delta_          = -1;  // #309 transfer-source slot
+  int index_tp_theta_          = -1;
+
+  int index_bg_phi_scf_       = -1;
+  int index_bg_phi_prime_scf_ = -1;
+  int index_bg_V_scf_         = -1;
+  int index_bg_dV_scf_        = -1;
+  int index_bg_ddV_scf_       = -1;
+  int index_bg_p_prime_scf_   = -1;
+  int index_bi_phi_scf_       = -1;
+  int index_bi_phi_prime_scf_ = -1;
+  double Omega0_scf_          = 0.;
   std::vector<double> scf_parameters_;
   int scf_tuning_index_     = 0;
   bool attractor_ic_scf_    = true;

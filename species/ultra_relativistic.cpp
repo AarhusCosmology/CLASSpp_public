@@ -48,6 +48,12 @@ void UltraRelativisticSpecies::WriteBackgroundData(const double* pvecback,
 
 // ── Perturbations ─────────────────────────────────────────────────────────────
 
+void UltraRelativisticSpecies::RegisterTransferSourceIndices(int& index_tp,
+                                                             const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
+}
+
 void UltraRelativisticSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                            perturb_vector* /*pv*/,
                                                            const precision* ppr,
@@ -269,11 +275,11 @@ void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& bas
     return;
 
   // ── delta_ur ───────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_ur_) {
+  if (index_tp_delta_ >= 0) {
     const double delta_ur = (layout.idx_delta >= 0) ? y[layout.idx_delta] : ppw->rsa_delta_ur;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_delta_ur_,
+                          index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
                           delta_ur +
@@ -281,11 +287,11 @@ void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& bas
   }
 
   // ── theta_ur ───────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_ur_) {
+  if (index_tp_theta_ >= 0) {
     const double theta_ur = (layout.idx_theta >= 0) ? y[layout.idx_theta] : ppw->rsa_theta_ur;
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_theta_ur_,
+                          index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
                           theta_ur + ctx.theta_shift);  // N-body gauge correction
@@ -337,13 +343,13 @@ void UltraRelativisticSpecies::WriteOutputColumns(
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_ur", mod.index_tp_delta_ur_, _TRUE_);
+      w.Add("d_ur", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_ur", mod.index_tp_theta_ur_, _TRUE_);
+      w.Add("t_ur", index_tp_theta_, index_tp_theta_ >= 0);
   }
   else if (fmt == camb_format) {
     if (section != TransferColumnSection::velocity)
-      w.Add("-T_ur/k2", mod.index_tp_delta_ur_, _TRUE_);
+      w.Add("-T_ur/k2", index_tp_delta_, index_tp_delta_ >= 0);
   }
 }
 

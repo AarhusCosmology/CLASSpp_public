@@ -36,6 +36,11 @@ void FluidSpecies::RegisterIntegrationIndices(int& index_bi) {
   class_define_index(index_bi_rho_fld_, _TRUE_, index_bi, 1);
 }
 
+void FluidSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
+}
+
 void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
   /* rho_fld today */
   const double rho_fld_today = GetOmega0() * pow(pba_.H0, 2);
@@ -167,11 +172,11 @@ void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& /*layout*/,
     return;
 
   // ── delta_fld ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_delta_fld_) {
+  if (index_tp_delta_ >= 0) {
     const double w_fld = W(pvecback);
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_delta_fld_,
+                          index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
                           ppw->delta_rho_fld / Rho(pvecback) +
@@ -180,11 +185,11 @@ void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& /*layout*/,
   }
 
   // ── theta_fld ─────────────────────────────────────────────────────────────
-  if (p_mod->has_source_theta_fld_) {
+  if (index_tp_theta_ >= 0) {
     const double w_fld = W(pvecback);
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
-                          p_mod->index_tp_theta_fld_,
+                          index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
                           ppw->rho_plus_p_theta_fld / (1. + w_fld) / Rho(pvecback) +
@@ -222,9 +227,9 @@ void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_fld", mod.index_tp_delta_fld_, _TRUE_);
+      w.Add("d_fld", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_fld", mod.index_tp_theta_fld_, _TRUE_);
+      w.Add("t_fld", index_tp_theta_, index_tp_theta_ >= 0);
   }
 }
 

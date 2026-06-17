@@ -34,6 +34,12 @@ void DarkRadiationSpecies::BackgroundDerivs(double /*tau*/,
 
 // ── Perturbations ──────────────────────────────────────────────────────────
 
+void DarkRadiationSpecies::RegisterTransferSourceIndices(int& index_tp,
+                                                         const SourceRequestContext& ctx) {
+  class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
+  class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
+}
+
 void DarkRadiationSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                        perturb_vector* /*pv*/,
                                                        const precision* ppr,

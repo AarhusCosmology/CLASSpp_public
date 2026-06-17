@@ -64,6 +64,8 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
     return has_idr_;
   }
 
+  void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
+
   void SetPerturbs(const perturbs* ppt) override {
     ppt_ = ppt;
     CompositeSpecies::SetPerturbs(ppt);
@@ -167,4 +169,9 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
   bool has_idm_dr_     = false;
   bool has_idr_        = false;
   const perturbs* ppt_ = nullptr;
+
+  int index_tp_delta_idm_dr_ = -1;  // #309 transfer-source slots (composite-owned)
+  int index_tp_theta_idm_dr_ = -1;
+  int index_tp_delta_idr_    = -1;
+  int index_tp_theta_idr_    = -1;
 };
