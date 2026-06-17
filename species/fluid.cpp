@@ -452,25 +452,28 @@ void FluidSpecies::ComputePpf(double k,
     alpha_prime  = 0.;
     metric_euler = k2 * y[ppw->pv->index_pt_phi] - 4.5 * a2 * ppw->rho_plus_p_shear;
   }
-  ppw->S_fld = Rho(ppw->pvecback) * (1. + w_fld) * 1.5 * a2 / k2 / a_prime_over_a *
-               (ppw->rho_plus_p_theta / ppw->rho_plus_p_tot + k2 * alpha);
+  // S quantity sourcing Gamma_prime evolution in the PPF scheme (eq. 15 of
+  // 0808.3125); a ComputePpf-internal temporary, not stored on the workspace.
+  const double S_fld = Rho(ppw->pvecback) * (1. + w_fld) * 1.5 * a2 / k2 / a_prime_over_a *
+                       (ppw->rho_plus_p_theta / ppw->rho_plus_p_tot + k2 * alpha);
   // note that the last terms in the ratio do not include fld, that's correct, it's the whole point of the PPF scheme
   /** We must now check the stiffenss criterion again and set Gamma_prime_fld accordingly. */
   if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max) {
     ppw->Gamma_prime_fld = 0.;
   }
   else {
-    ppw->Gamma_prime_fld = a_prime_over_a * (ppw->S_fld / (1. + c_gamma_k_H_square) -
+    ppw->Gamma_prime_fld = a_prime_over_a * (S_fld / (1. + c_gamma_k_H_square) -
                                              (1. + c_gamma_k_H_square) * Gamma_fld);
   }
   double Gamma_prime_plus_a_prime_over_a_Gamma = ppw->Gamma_prime_fld + a_prime_over_a * Gamma_fld;
   // delta and theta in both gauges gauge:
-  ppw->rho_plus_p_theta_fld =
-      Rho(ppw->pvecback) * (1. + w_fld) * ppw->rho_plus_p_theta / ppw->rho_plus_p_tot -
-      k2 * 2. / 3. * a_prime_over_a / a2 / (1 + 4.5 * a2 / k2 / s2sq * ppw->rho_plus_p_tot) *
-          (ppw->S_fld - Gamma_prime_plus_a_prime_over_a_Gamma / a_prime_over_a);
-  ppw->delta_rho_fld = -2. / 3. * k2 * s2sq / a2 * Gamma_fld -
-                       3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta_fld;
+  ppw->rho_plus_p_theta_fld = Rho(ppw->pvecback) * (1. + w_fld) * ppw->rho_plus_p_theta /
+                                  ppw->rho_plus_p_tot -
+                              k2 * 2. / 3. * a_prime_over_a / a2 /
+                                  (1 + 4.5 * a2 / k2 / s2sq * ppw->rho_plus_p_tot) *
+                                  (S_fld - Gamma_prime_plus_a_prime_over_a_Gamma / a_prime_over_a);
+  ppw->delta_rho_fld        = -2. / 3. * k2 * s2sq / a2 * Gamma_fld -
+                              3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta_fld;
 
   /** Now construct the pressure perturbation, see 1903.xxxxx. */
   /** Construct energy density and pressure for DE (_fld) and the rest (_t).
@@ -499,7 +502,7 @@ void FluidSpecies::ComputePpf(double k,
                          (p_t_prime * theta_t - k2 * ppw->delta_p + k2 * ppw->rho_plus_p_shear) /
                              ppw->rho_plus_p_tot +
                          metric_euler;
-  double S             = ppw->S_fld;
+  double S             = S_fld;
   double S_prime       = -Z_prime / Z * S +
                          1. / Z * (rho_fld_prime + p_fld_prime) * (theta_t + k2 * alpha) +
                          1. / Z * (rho_fld + p_fld) * (theta_t_prime + k2 * alpha_prime);

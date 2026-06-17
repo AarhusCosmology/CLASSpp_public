@@ -110,7 +110,7 @@ class FluidSpecies : public BaseSpecies {
 
   /**
    * Compute PPF fluid contribution. Writes ppw->delta_rho_fld,
-   * rho_plus_p_theta_fld, delta_p_fld, S_fld, Gamma_prime_fld (module then
+   * rho_plus_p_theta_fld, delta_p_fld, Gamma_prime_fld (module then
    * accumulates into rho/theta/p totals). Only called when use_ppf() == _TRUE_.
    * Moved from PerturbationsModule — PPF is fluid-specific physics that depends
    * on the rest of the universe (rho_plus_p_theta, rho_plus_p_shear, delta_rho

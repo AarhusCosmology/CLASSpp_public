@@ -362,6 +362,13 @@ struct perturb_workspace {
   double vector_source_pi; /**< first stress-energy source term in Einstein's vector equations */
   double vector_source_v;  /**< second stress-energy source term in Einstein's vector equations */
 
+  /* Module-owned approximation closures. Computed by the perturbations module
+     (perturb_tca_slip_and_shear and perturb_rsa_* / perturb_rsa_idr_*, the
+     latter run inside perturb_einstein after the metric solve because they
+     depend on h'/phi') and then read — read-only — by the relevant species
+     (photons, ultra-relativistic, IDM_DR). These are not per-species private
+     state despite the species-suffixed names: they live here because the module
+     owns the approximation machinery and several consumers cross species. */
   double tca_shear_g;  /**< photon shear in tight-coupling approximation */
   double tca_slip;     /**< photon-baryon slip in tight-coupling approximation */
   double rsa_delta_g;  /**< photon density in radiation streaming approximation */
@@ -373,22 +380,23 @@ struct perturb_workspace {
   double
       rsa_theta_idr; /**< interacting dark radiation velocity in dark radiation streaming approximation */
 
-  double theta_idm_drmd; /**< interacting dark matter velocity (DRMD)*/
-  double
-      theta_idm_prime_drmd; /**< derivative of interacting dark matter velocity in regard to conformal time (DRMD) */
-
   double delta_m; /**< relative density perturbation of all non-relativistic species */
   double theta_m; /**< velocity divergence theta of all non-relativistic species */
 
   double delta_cb; /**< relative density perturbation of only cdm and baryon */
   double theta_cb; /**< velocity divergence theta of only cdm and baryon */
 
+  /* Module-owned PPF dark-energy closure. Written by FluidSpecies::ComputePpf
+     during stress-energy assembly (it depends on the totals of every other
+     species), then read back by the module totals and by the fluid's own
+     derivs/sources. PPF fluid is defined relative to the global stress-energy,
+     so this is genuine module-level coupling state, not fluid-private scratch.
+     (The S quantity of eq. 15 in 0808.3125 is a ComputePpf-internal temporary,
+     no longer stored here.) */
   double delta_rho_fld; /**< density perturbation of fluid, not so trivial in PPF scheme */
   double delta_p_fld;   /**< pressure perturbation of fluid, very non-trivial in PPF scheme */
   double rho_plus_p_theta_fld; /**< velocity divergence of fluid, not so trivial in PPF scheme */
-  double
-      S_fld; /**< S quantity sourcing Gamma_prime evolution in PPF scheme (equivalent to eq. 15 in 0808.3125) */
-  double Gamma_prime_fld; /**< Gamma_prime in PPF scheme (equivalent to eq. 14 in 0808.3125) */
+  double Gamma_prime_fld;      /**< Gamma_prime in PPF scheme (equivalent to eq. 14 in 0808.3125) */
 
   FILE* perturb_output_file; /**< filepointer to output file*/
   int index_ikout;           /**< index for output k value (when k_output_values is set) */
