@@ -179,43 +179,41 @@ GreyBodyNCDMSpecies::GreyBodyNCDMSpecies(FileContent* pfc,
     : NCDMSpecies(pfc, instance_name, settings, pba, bgm, NCDMBaseSpecies::DeferInit{}) {
   SpeciesInput input(pfc, instance_name);
 
-  std::string mode;
-  if (!input.read_string("parameterization", mode)) {
+  auto mode_opt = input.get<std::string>("parameterization");
+  if (!mode_opt) {
     throw std::invalid_argument("grey-body species '" + instance_name +
                                 "': required field 'parameterization' is missing "
                                 "(set it to 'direct' or 'moments')");
   }
+  const std::string& mode = *mode_opt;
   if (mode != "direct" && mode != "moments") {
     throw std::invalid_argument("grey-body species '" + instance_name +
                                 "': parameterization must be 'direct' or 'moments'");
   }
 
   if (mode == "direct") {
-    double alpha = 0., q0 = 0., x = 0.;
-    bool ok  = input.read_double("alpha", alpha);
-    ok      &= input.read_double("q0", q0);
-    ok      &= input.read_double("x", x);
-    if (!ok) {
+    auto alpha = input.get<double>("alpha");
+    auto q0    = input.get<double>("q0");
+    auto x     = input.get<double>("x");
+    if (!(alpha && q0 && x)) {
       throw std::invalid_argument("grey-body species '" + instance_name +
                                   "': direct mode requires alpha, q0, x");
     }
-    gb_ = greybody::GreyBodyParams::FromDirect(alpha, x, q0);
+    gb_ = greybody::GreyBodyParams::FromDirect(*alpha, *x, *q0);
   }
   else {
-    double r = 0., M2 = 0., M3 = 0.;
-    bool ok  = input.read_double("r", r);
-    ok      &= input.read_double("M2", M2);
-    ok      &= input.read_double("M3", M3);
-    if (!ok) {
+    auto r  = input.get<double>("r");
+    auto M2 = input.get<double>("M2");
+    auto M3 = input.get<double>("M3");
+    if (!(r && M2 && M3)) {
       throw std::invalid_argument("grey-body species '" + instance_name +
                                   "': moments mode requires r, M2, M3");
     }
-    gb_ = greybody::GreyBodyParams::FromMoments(r, M2, M3);
+    gb_ = greybody::GreyBodyParams::FromMoments(*r, *M2, *M3);
 
     // Optional mass-via-M2 convenience: m = m_M2 / M2.
-    double m_M2 = 0.;
-    if (input.read_double("m_M2", m_M2)) {
-      m_in_eV_ = m_M2 / M2;
+    if (auto m_M2 = input.get<double>("m_M2")) {
+      m_in_eV_ = *m_M2 / *M2;
     }
     if (m_in_eV_ != 0.0 && m_in_eV_ < 0.01) {
       throw std::invalid_argument(
@@ -301,8 +299,7 @@ std::vector<Named> GreyBodyNCDMSpecies::CreateAll(const SpeciesBuildContext& ctx
   std::vector<Named> result;
   result.reserve(instances.size());
   for (const auto& name : instances) {
-    std::string unused_type;
-    ctx.pfc->read_string(name + ".type", unused_type);
+    (void) ctx.pfc->get<std::string>(name + ".type");
     auto sp =
         std::make_unique<GreyBodyNCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
     result.push_back({name, std::move(sp)});

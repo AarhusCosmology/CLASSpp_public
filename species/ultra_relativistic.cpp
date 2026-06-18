@@ -435,8 +435,14 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
   // (a) Try to read N_ur (and deprecated N_eff alias).
   double n_ur    = 0.;
   double n_eff   = 0.;
-  bool flag_nur  = ctx.pfc->read_double("N_ur", n_ur);
-  bool flag_neff = ctx.pfc->read_double("N_eff", n_eff);
+  auto n_ur_opt  = ctx.pfc->get<double>("N_ur");
+  auto n_eff_opt = ctx.pfc->get<double>("N_eff");
+  bool flag_nur  = n_ur_opt.has_value();
+  bool flag_neff = n_eff_opt.has_value();
+  if (flag_nur)
+    n_ur = *n_ur_opt;
+  if (flag_neff)
+    n_eff = *n_eff_opt;
 
   // N_eff is a deprecated synonym for N_ur — only one may be present.
   if (flag_nur && flag_neff)
@@ -454,8 +460,14 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
   // (b) Try to read Omega_ur and omega_ur.
   double omega_ur_big   = 0.;  // Omega_ur
   double omega_ur_small = 0.;  // omega_ur (= Omega_ur * h^2)
-  bool flag_Omega       = ctx.pfc->read_double("Omega_ur", omega_ur_big);
-  bool flag_omega       = ctx.pfc->read_double("omega_ur", omega_ur_small);
+  auto omega_big_opt    = ctx.pfc->get<double>("Omega_ur");
+  auto omega_small_opt  = ctx.pfc->get<double>("omega_ur");
+  bool flag_Omega       = omega_big_opt.has_value();
+  bool flag_omega       = omega_small_opt.has_value();
+  if (flag_Omega)
+    omega_ur_big = *omega_big_opt;
+  if (flag_omega)
+    omega_ur_small = *omega_small_opt;
 
   // At most one of the three forms may be specified.
   const int n_specified = (flag_nur ? 1 : 0) + (flag_Omega ? 1 : 0) + (flag_omega ? 1 : 0);

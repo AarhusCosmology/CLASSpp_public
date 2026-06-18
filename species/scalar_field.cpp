@@ -493,7 +493,10 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   //       which is handled separately by ConstructSpecies via the override path.)
 
   double omega_scf_val   = 0.;
-  bool omega_scf_present = ctx.pfc->read_double("Omega_scf", omega_scf_val);
+  auto omega_scf_opt     = ctx.pfc->get<double>("Omega_scf");
+  bool omega_scf_present = omega_scf_opt.has_value();
+  if (omega_scf_present)
+    omega_scf_val = *omega_scf_opt;
 
   double omega0_scf     = 0.;
   bool shooting_allowed = false;
@@ -515,7 +518,8 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   // ── scf_parameters (variable-length list) ────────────────────────────────
   std::vector<double> scf_parameters;
   try {
-    ctx.pfc->read_list_of_doubles("scf_parameters", scf_parameters);
+    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>("scf_parameters"))
+      scf_parameters = *scf_params_opt;
   }
   catch (const std::exception& e) {
     throw std::invalid_argument(std::string("scf_parameters parse error: ") + e.what());
@@ -523,7 +527,7 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
 
   // ── scf_tuning_index + bounds check ──────────────────────────────────────
   int scf_tuning_index = 0;
-  ctx.pfc->read_int("scf_tuning_index", scf_tuning_index);
+  scf_tuning_index     = ctx.pfc->get_or("scf_tuning_index", scf_tuning_index);
   if (scf_tuning_index >= static_cast<int>(scf_parameters.size())) {
     throw std::invalid_argument(
         "Tuning index scf_tuning_index = " + std::to_string(scf_tuning_index) +
@@ -533,9 +537,8 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
 
   // scf_shooting_parameter (when present) OVERWRITES the slot at tuning_index.
   // This is the resolved value DoShooting writes back into the fc for the final build.
-  double scf_shooting_param = 0.;
-  if (ctx.pfc->read_double("scf_shooting_parameter", scf_shooting_param))
-    scf_parameters[scf_tuning_index] = scf_shooting_param;
+  if (auto scf_shooting_opt = ctx.pfc->get<double>("scf_shooting_parameter"))
+    scf_parameters[scf_tuning_index] = *scf_shooting_opt;
 
   // Preserve the legacy SCF parser warning: lambda<3 in the exponential-quintessence
   // potential won't track unless overwritten by the shooter / tuning function.
@@ -553,8 +556,8 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   bool attractor_ic_scf    = true;
   double phi_ini_scf       = 1.;
   double phi_prime_ini_scf = 1.;
-  std::string attr_str;
-  if (ctx.pfc->read_string("attractor_ic_scf", attr_str)) {
+  if (auto attr_opt = ctx.pfc->get<std::string>("attractor_ic_scf")) {
+    const std::string& attr_str = *attr_opt;
     if (attr_str.find("y") != std::string::npos || attr_str.find("Y") != std::string::npos) {
       attractor_ic_scf = true;
     }
@@ -583,8 +586,7 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   // scf_shooting_parameter absent. The nonzero check matches the historic shooting
   // condition (a zero target meant "no shooting").
   if (shooting_allowed) {
-    double unknown_val          = 0.;
-    bool shooting_param_present = ctx.pfc->read_double("scf_shooting_parameter", unknown_val);
+    bool shooting_param_present = ctx.pfc->get<double>("scf_shooting_parameter").has_value();
 
     if (!shooting_param_present) {
       composite->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};

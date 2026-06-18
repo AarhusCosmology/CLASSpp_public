@@ -40,18 +40,15 @@ static void test_species_input_prefixing() {
   SpeciesInput input(&fc, "nu1");
   assert(input.instance_name() == "nu1");
 
-  double m = 0.;
-  assert(input.read_double("m", m));
-  assert(m == 0.06);
+  auto m = input.get<double>("m");
+  assert(m && *m == 0.06);
   assert(fc.was_read("nu1.m"));
 
-  double missing = 0.;
-  assert(!input.read_double("deg", missing));
+  assert(!input.get<double>("deg").has_value());
   assert(!fc.was_read("nu1.deg"));
 
-  std::string t;
-  assert(input.read_string("type", t));
-  assert(t == "ncdm_standard");
+  auto t = input.get<std::string>("type");
+  assert(t && *t == "ncdm_standard");
 }
 
 static void test_species_input_required_throws() {
@@ -60,7 +57,7 @@ static void test_species_input_required_throws() {
   SpeciesInput input(&fc, "nu1");
   bool threw = false;
   try {
-    (void) input.required_double("m");
+    (void) input.require<double>("m");
   }
   catch (const std::invalid_argument& e) {
     threw           = true;
@@ -71,9 +68,61 @@ static void test_species_input_required_throws() {
   assert(threw);
 }
 
+static void test_get_typed() {
+  FileContent fc;
+  fc.set("an_int", "42");
+  fc.set("a_double", "0.067");
+  fc.set("a_string", "hello");
+  fc.set("a_list", "1.0,2.5,3");
+
+  assert(fc.get<int>("an_int") == 42);
+  assert(fc.get<double>("a_double") == 0.067);
+  assert(fc.get<std::string>("a_string").value() == "hello");
+  auto l = fc.get<std::vector<double>>("a_list");
+  assert(l && l->size() == 3 && (*l)[1] == 2.5);
+
+  fc.set("int_list", "10,20,30");
+  auto il = fc.get<std::vector<int>>("int_list");
+  assert(il && il->size() == 3 && (*il)[2] == 30);
+
+  fc.set("str_list", "a,b,c");
+  auto sl = fc.get<std::vector<std::string>>("str_list");
+  assert(sl && sl->size() == 3 && (*sl)[0] == "a");
+
+  assert(fc.get_or("missing_int", 42) == 42);  // get_or<int> template path
+
+  // Absent -> nullopt, and absence is not marked read.
+  assert(!fc.get<int>("missing").has_value());
+  assert(!fc.was_read("missing"));
+
+  // A successful get marks the key read (parity with the old read_*).
+  assert(fc.was_read("an_int"));
+
+  // get_or: present returns value, absent returns fallback.
+  assert(fc.get_or("a_double", 1.0) == 0.067);
+  assert(fc.get_or("missing", 1.0) == 1.0);
+  assert(fc.get_or("a_string", "fallback") == "hello");  // const char* overload
+  assert(fc.get_or("missing_str", "fallback") == "fallback");
+}
+
+static void test_get_parse_error_throws() {
+  FileContent fc;
+  fc.set("bad_int", "not_a_number");
+  bool threw = false;
+  try {
+    (void) fc.get<int>("bad_int");
+  }
+  catch (const std::exception&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 int main() {
   test_instances_with_basic();
   test_species_input_prefixing();
   test_species_input_required_throws();
+  test_get_typed();
+  test_get_parse_error_throws();
   return 0;
 }

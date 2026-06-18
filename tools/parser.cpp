@@ -117,81 +117,90 @@ void FileContent::for_each(
   }
 }
 
-bool FileContent::read_int(const std::string& name, int& value) const {
+// ---------------------------------------------------------------------------
+// Explicit specializations of get<T> — the single source of truth for parsing
+// ---------------------------------------------------------------------------
+
+template <>
+std::optional<int> FileContent::get<int>(const std::string& name) const {
   auto it = params_.find(name);
   if (it == params_.end())
-    return false;
-  if (std::sscanf(it->second.c_str(), "%d", &value) != 1) {
+    return std::nullopt;
+  int value;
+  if (std::sscanf(it->second.c_str(), "%d", &value) != 1)
     throw std::invalid_argument("Cannot read integer value of parameter '" + name + "' in file '" +
                                 filename_ + "'");
-  }
   read_params_.insert(name);
-  return true;
+  return value;
 }
 
-bool FileContent::read_double(const std::string& name, double& value) const {
+template <>
+std::optional<double> FileContent::get<double>(const std::string& name) const {
   auto it = params_.find(name);
   if (it == params_.end())
-    return false;
-  if (std::sscanf(it->second.c_str(), "%lg", &value) != 1) {
+    return std::nullopt;
+  double value;
+  if (std::sscanf(it->second.c_str(), "%lg", &value) != 1)
     throw std::invalid_argument("Cannot read double value of parameter '" + name + "' in file '" +
                                 filename_ + "'");
-  }
   read_params_.insert(name);
-  return true;
+  return value;
 }
 
-bool FileContent::read_string(const std::string& name, std::string& value) const {
+template <>
+std::optional<std::string> FileContent::get<std::string>(const std::string& name) const {
   auto it = params_.find(name);
   if (it == params_.end())
-    return false;
-  value = it->second;
+    return std::nullopt;
   read_params_.insert(name);
-  return true;
+  return it->second;
 }
 
-bool FileContent::read_list_of_doubles(const std::string& name, std::vector<double>& values) const {
+template <>
+std::optional<std::vector<double>> FileContent::get<std::vector<double>>(
+    const std::string& name) const {
   auto it = params_.find(name);
   if (it == params_.end())
-    return false;
-
+    return std::nullopt;
   const auto parts = split_csv(it->second);
-  values.resize(parts.size());
-  for (std::size_t i = 0; i < parts.size(); ++i) {
-    if (std::sscanf(parts[i].c_str(), "%lg", &values[i]) != 1) {
+  std::vector<double> values(parts.size());
+  for (std::size_t i = 0; i < parts.size(); ++i)
+    if (std::sscanf(parts[i].c_str(), "%lg", &values[i]) != 1)
       throw std::invalid_argument("Cannot read double entry " + std::to_string(i + 1) +
                                   " of parameter '" + name + "' in file '" + filename_ + "'");
-    }
-  }
   read_params_.insert(name);
-  return true;
+  return values;
 }
 
-bool FileContent::read_list_of_integers(const std::string& name, std::vector<int>& values) const {
+template <>
+std::optional<std::vector<int>> FileContent::get<std::vector<int>>(const std::string& name) const {
   auto it = params_.find(name);
   if (it == params_.end())
-    return false;
-
+    return std::nullopt;
   const auto parts = split_csv(it->second);
-  values.resize(parts.size());
-  for (std::size_t i = 0; i < parts.size(); ++i) {
-    if (std::sscanf(parts[i].c_str(), "%d", &values[i]) != 1) {
+  std::vector<int> values(parts.size());
+  for (std::size_t i = 0; i < parts.size(); ++i)
+    if (std::sscanf(parts[i].c_str(), "%d", &values[i]) != 1)
       throw std::invalid_argument("Cannot read integer entry " + std::to_string(i + 1) +
                                   " of parameter '" + name + "' in file '" + filename_ + "'");
-    }
-  }
   read_params_.insert(name);
-  return true;
+  return values;
 }
 
-bool FileContent::read_list_of_strings(const std::string& name,
-                                       std::vector<std::string>& values) const {
+template <>
+std::optional<std::vector<std::string>> FileContent::get<std::vector<std::string>>(
+    const std::string& name) const {
   auto it = params_.find(name);
   if (it == params_.end())
-    return false;
-  values = split_csv(it->second);
+    return std::nullopt;
   read_params_.insert(name);
-  return true;
+  return split_csv(it->second);
+}
+
+std::string FileContent::get_or(const std::string& name, const char* fallback) const {
+  if (auto v = get<std::string>(name))
+    return *v;
+  return std::string(fallback);
 }
 
 /* static */ bool FileContent::parse_line(const std::string& line,
@@ -257,44 +266,11 @@ bool FileContent::read_list_of_strings(const std::string& name,
 
 /*****************************************************************************
  * Legacy C-style wrapper functions
- * These delegate to the FileContent class so that existing call-sites in
- * input_module.cpp (which use the class_call / class_test macros) keep working
- * without modification.
  *****************************************************************************/
 
 int parser_read_file(const char* filename, FileContent* pfc) {
   try {
     *pfc = FileContent::from_file(filename);
-  }
-  catch (const std::exception& e) {
-    class_stop("%s", e.what());
-  }
-  return _SUCCESS_;
-}
-
-int parser_read_int(FileContent* pfc, const char* name, int* value, int* found) {
-  try {
-    *found = pfc->read_int(name, *value) ? _TRUE_ : _FALSE_;
-  }
-  catch (const std::exception& e) {
-    class_stop("%s", e.what());
-  }
-  return _SUCCESS_;
-}
-
-int parser_read_double(FileContent* pfc, const char* name, double* value, int* found) {
-  try {
-    *found = pfc->read_double(name, *value) ? _TRUE_ : _FALSE_;
-  }
-  catch (const std::exception& e) {
-    class_stop("%s", e.what());
-  }
-  return _SUCCESS_;
-}
-
-int parser_read_string(FileContent* pfc, const char* name, std::string& value, int* found) {
-  try {
-    *found = pfc->read_string(name, value) ? _TRUE_ : _FALSE_;
   }
   catch (const std::exception& e) {
     class_stop("%s", e.what());

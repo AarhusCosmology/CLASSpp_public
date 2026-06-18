@@ -385,9 +385,8 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
                                                              : 0.);
   double omega0_dcdmdr                   = omega0_dcdmdr_from_budget;
   {
-    double tmp;
-    bool exists = (omega0_dcdmdr != 0.) || ctx.pfc->read_double("Omega_ini_dcdm", tmp) ||
-                  ctx.pfc->read_double("omega_ini_dcdm", tmp);
+    bool exists = (omega0_dcdmdr != 0.) || ctx.pfc->get<double>("Omega_ini_dcdm").has_value() ||
+                  ctx.pfc->get<double>("omega_ini_dcdm").has_value();
     if (!exists)
       return result;
   }
@@ -396,15 +395,23 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
   // Gamma_dcdm is read in km/(s·Mpc) and converted to Mpc^-1 (same as the
   // original input_module code path).  Default 0 keeps the legacy semantics.
   double Gamma_dcdm = 0.;
-  if (ctx.pfc->read_double("Gamma_dcdm", Gamma_dcdm))
+  if (auto gamma_opt = ctx.pfc->get<double>("Gamma_dcdm")) {
+    Gamma_dcdm  = *gamma_opt;
     Gamma_dcdm *= 1.e3 / _c_;
+  }
 
   // Omega_ini_dcdm: direct (Omega_ini_dcdm) XOR rescaled (omega_ini_dcdm = Omega*h^2).
   // The two are mutually exclusive (replicates ReadCoupledOmegaBudget's class_test).
   double Omega_ini_dcdm     = 0.;
   double omega_ini_dcdm_val = 0.;
-  bool has_Omega_ini        = ctx.pfc->read_double("Omega_ini_dcdm", Omega_ini_dcdm);
-  bool has_omega_ini        = ctx.pfc->read_double("omega_ini_dcdm", omega_ini_dcdm_val);
+  auto omega_ini_opt        = ctx.pfc->get<double>("Omega_ini_dcdm");
+  auto omega_ini_small_opt  = ctx.pfc->get<double>("omega_ini_dcdm");
+  bool has_Omega_ini        = omega_ini_opt.has_value();
+  bool has_omega_ini        = omega_ini_small_opt.has_value();
+  if (has_Omega_ini)
+    Omega_ini_dcdm = *omega_ini_opt;
+  if (has_omega_ini)
+    omega_ini_dcdm_val = *omega_ini_small_opt;
   if (has_Omega_ini && has_omega_ini)
     throw std::invalid_argument(
         "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, choose one");
@@ -430,9 +437,12 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
 
   for (const auto& ts : kTargets) {
     double target_val    = 0.;
-    double unknown_val   = 0.;
-    bool target_present  = ctx.pfc->read_double(ts.target_name, target_val);
-    bool unknown_present = ctx.pfc->read_double(ts.unknown_param, unknown_val);
+    auto target_opt      = ctx.pfc->get<double>(ts.target_name);
+    auto unknown_opt     = ctx.pfc->get<double>(ts.unknown_param);
+    bool target_present  = target_opt.has_value();
+    bool unknown_present = unknown_opt.has_value();
+    if (target_present)
+      target_val = *target_opt;
     if (target_present && !unknown_present) {
       shooting_target = {ts.target_name, ts.unknown_param, target_val};
       needs_shooting  = true;

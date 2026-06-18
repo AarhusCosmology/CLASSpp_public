@@ -56,37 +56,35 @@ void NCDMBaseSpecies::ReadParametersByInstance(FileContent* pfc,
                                                const NcdmSettings& settings) {
   SpeciesInput input(pfc, instance_name);
 
-  // Common scalar fields. read_double / read_int leave the destination unchanged
-  // on miss, so each member keeps its in-class default. (Defaults that were
-  // previously fixed-up here, like T_ncdm_default = 0.71611, must already be set
-  // as in-class member initialisers — see Task 4.)
-  input.read_double("m", m_in_eV_);
-  input.read_double("T", T_);
-  input.read_double("deg", deg_);
-  input.read_double("Omega", Omega0_);
-  input.read_double("omega", omega0_);
-  input.read_double("ksi", ksi_);
-  input.read_int("quadrature_strategy", quadrature_strategy_);
-  input.read_int("momenta_bins", input_q_size_);
-  input.read_double("max_q", qmax_);
+  // Common scalar fields. get_or() leaves the member at its in-class default on a
+  // miss, so defaults like T_ncdm_default = 0.71611 are set as in-class member
+  // initialisers rather than fixed up here.
+  m_in_eV_             = input.get_or("m", m_in_eV_);
+  T_                   = input.get_or("T", T_);
+  deg_                 = input.get_or("deg", deg_);
+  Omega0_              = input.get_or("Omega", Omega0_);
+  omega0_              = input.get_or("omega", omega0_);
+  ksi_                 = input.get_or("ksi", ksi_);
+  quadrature_strategy_ = input.get_or("quadrature_strategy", quadrature_strategy_);
+  input_q_size_        = input.get_or("momenta_bins", input_q_size_);
+  qmax_                = input.get_or("max_q", qmax_);
 
   // psd_parameters: variable-length list (single instance, comma-separated values).
-  std::vector<double> psd_params;
-  if (input.read_list_of_doubles("psd_parameters", psd_params)) {
-    psd_parameters_ = std::move(psd_params);
+  if (auto psd_params = input.get<std::vector<double>>("psd_parameters")) {
+    psd_parameters_ = std::move(*psd_params);
   }
 
   // PSD file: a single-instance flag and an optional filename.
-  int use_psd_file = 0;
-  input.read_int("use_psd_file", use_psd_file);
-  got_file_ = (use_psd_file != 0);
+  int use_psd_file = input.get_or("use_psd_file", 0);
+  got_file_        = (use_psd_file != 0);
   if (got_file_) {
-    std::string filename;
-    if (!input.read_string("psd_filename", filename)) {
+    if (auto filename = input.get<std::string>("psd_filename")) {
+      psd_file_ = std::move(*filename);
+    }
+    else {
       throw std::invalid_argument("species '" + instance_name +
                                   "': use_psd_file=1 but psd_filename is missing");
     }
-    psd_file_ = std::move(filename);
   }
 
   // Resolve omega/Omega conflict (matches existing semantics).

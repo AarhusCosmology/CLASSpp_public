@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -19,14 +21,29 @@ class SpeciesInput {
     return instance_name_;
   }
 
-  bool read_double(const std::string& field, double& out);
-  bool read_int(const std::string& field, int& out);
-  bool read_string(const std::string& field, std::string& out);
-  bool read_list_of_doubles(const std::string& field, std::vector<double>& out);
+  /** Typed accessor: the value if "<instance>.<field>" is present (marking it
+   *  read), or std::nullopt if absent. Delegates to FileContent::get<T>. */
+  template <class T>
+  std::optional<T> get(const std::string& field) const {
+    return pfc_->get<T>(qualify(field));
+  }
 
-  double required_double(const std::string& field);
-  int required_int(const std::string& field);
-  std::string required_string(const std::string& field);
+  /** Read-with-default: get<T>(field) if present, else @p fallback. */
+  template <class T>
+  T get_or(const std::string& field, T fallback) const {
+    if (auto v = get<T>(field))
+      return *v;
+    return fallback;
+  }
+
+  /** Required accessor: throws std::invalid_argument if the field is absent. */
+  template <class T>
+  T require(const std::string& field) const {
+    if (auto v = get<T>(field))
+      return *v;
+    throw std::invalid_argument("species '" + instance_name_ + "': missing required field '" +
+                                field + "'");
+  }
 
  private:
   std::string qualify(const std::string& field) const;

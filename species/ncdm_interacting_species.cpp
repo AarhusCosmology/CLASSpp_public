@@ -26,8 +26,7 @@ constexpr double kExactHierarchyL2Correction = 64.0;
 
 void RejectLegacyInteractingKeys(FileContent& pfc) {
   for (const char* key : kLegacyInteractingKeys) {
-    std::string unused;
-    if (pfc.read_string(key, unused)) {
+    if (pfc.get<std::string>(key).has_value()) {
       throw std::invalid_argument(
           std::string("'") + key + "' is no longer supported. Use dot-syntax: " +
           "'<instance>.<dot-name> = ...' with '<instance>.type = ncdm_self_interacting'.");
@@ -47,24 +46,22 @@ NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
     : NCDMSpecies(pfc, instance_name, settings, pba, bgm) {
   SpeciesInput input(pfc, instance_name);
 
-  double G_eff_value      = 0.;
-  double log10G_eff_value = 0.;
-  bool has_G              = input.read_double("G_eff", G_eff_value);
-  bool has_lG             = input.read_double("log10G_eff", log10G_eff_value);
+  auto G_eff_value      = input.get<double>("G_eff");
+  auto log10G_eff_value = input.get<double>("log10G_eff");
 
-  if (has_G && has_lG) {
+  if (G_eff_value && log10G_eff_value) {
     throw std::invalid_argument("species '" + instance_name +
                                 "': specify exactly one of G_eff or log10G_eff");
   }
-  if (has_G) {
-    G_eff_ = G_eff_value;
+  if (G_eff_value) {
+    G_eff_ = *G_eff_value;
   }
-  else if (has_lG) {
-    G_eff_ = std::pow(10.0, log10G_eff_value);
+  else if (log10G_eff_value) {
+    G_eff_ = std::pow(10.0, *log10G_eff_value);
   }
 
-  std::string use_alpha_correction_string = "false";
-  input.read_string("use_alpha_correction", use_alpha_correction_string);
+  std::string use_alpha_correction_string = input.get_or<std::string>("use_alpha_correction",
+                                                                      "false");
 
   if (use_alpha_correction_string == "True" || use_alpha_correction_string == "true" ||
       use_alpha_correction_string == "yes") {
@@ -90,8 +87,7 @@ std::vector<Named> NCDMInteractingSpecies::CreateAll(const SpeciesBuildContext& 
   std::vector<Named> result;
   result.reserve(instances.size());
   for (const auto& name : instances) {
-    std::string unused_type;
-    ctx.pfc->read_string(name + ".type", unused_type);  // mark consumed
+    (void) ctx.pfc->get<std::string>(name + ".type");  // mark consumed
 
     auto sp = std::make_unique<NCDMInteractingSpecies>(ctx.pfc,
                                                        name,

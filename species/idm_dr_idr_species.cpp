@@ -476,8 +476,8 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     //    child).  Thermodynamics and perturbation modules consume these values
     //    via the species' typed accessors. ──
     int input_verbose = 0;
-    ctx.pfc->read_int("input_verbose", input_verbose);
-    const double h2 = ctx.pba->h * ctx.pba->h;
+    input_verbose     = ctx.pfc->get_or("input_verbose", input_verbose);
+    const double h2   = ctx.pba->h * ctx.pba->h;
 
     // a_idm_dr / a_dark / Gamma_0_nadm — at most one may be set.
     double a_idm_dr      = 0.;
@@ -487,9 +487,18 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     int idr_nature       = idr_free_streaming;  // perturbs struct default (== 0)
 
     double a_param = 0., a_dark = 0., gamma0 = 0.;
-    const bool f_a  = ctx.pfc->read_double("a_idm_dr", a_param);
-    const bool f_ad = ctx.pfc->read_double("a_dark", a_dark);
-    const bool f_g  = ctx.pfc->read_double("Gamma_0_nadm", gamma0);
+    auto a_param_opt = ctx.pfc->get<double>("a_idm_dr");
+    auto a_dark_opt  = ctx.pfc->get<double>("a_dark");
+    auto gamma0_opt  = ctx.pfc->get<double>("Gamma_0_nadm");
+    const bool f_a   = a_param_opt.has_value();
+    const bool f_ad  = a_dark_opt.has_value();
+    const bool f_g   = gamma0_opt.has_value();
+    if (f_a)
+      a_param = *a_param_opt;
+    if (f_ad)
+      a_dark = *a_dark_opt;
+    if (f_g)
+      gamma0 = *gamma0_opt;
     if (((int) f_a + (int) f_ad + (int) f_g) >= 2)
       throw std::invalid_argument(
           "In input file, you can only enter one of a_idm_dr, a_dark or Gamma_0_nadm, choose one");
@@ -533,8 +542,14 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     else {
       // nindex_dark / nindex_idm_dr — at most one may be set.
       double nd_dark = 0., nd_idm = 0.;
-      const bool h_nd_dark = ctx.pfc->read_double("nindex_dark", nd_dark);
-      const bool h_nd_idm  = ctx.pfc->read_double("nindex_idm_dr", nd_idm);
+      auto nd_dark_opt     = ctx.pfc->get<double>("nindex_dark");
+      auto nd_idm_opt      = ctx.pfc->get<double>("nindex_idm_dr");
+      const bool h_nd_dark = nd_dark_opt.has_value();
+      const bool h_nd_idm  = nd_idm_opt.has_value();
+      if (h_nd_dark)
+        nd_dark = *nd_dark_opt;
+      if (h_nd_idm)
+        nd_idm = *nd_idm_opt;
       if (h_nd_dark && h_nd_idm)
         throw std::invalid_argument(
             "In input file, you can only enter one of nindex_dark, nindex_idm_dr, choose one");
@@ -543,8 +558,8 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
       if (h_nd_idm)
         nindex_idm_dr = nd_idm;
 
-      std::string nature;
-      if (ctx.pfc->read_string("idr_nature", nature)) {
+      if (auto nature_opt = ctx.pfc->get<std::string>("idr_nature")) {
+        const std::string& nature = *nature_opt;
         if (nature.find("free_streaming") != std::string::npos ||
             nature.find("Free_Streaming") != std::string::npos ||
             nature.find("Free_streaming") != std::string::npos ||
@@ -562,8 +577,14 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     // m_idm / m_dm — at most one may be set.
     {
       double m1 = 0., m2 = 0.;
-      const bool found_m_idm = ctx.pfc->read_double("m_idm", m1);
-      const bool found_m_dm  = ctx.pfc->read_double("m_dm", m2);
+      auto m1_opt            = ctx.pfc->get<double>("m_idm");
+      auto m2_opt            = ctx.pfc->get<double>("m_dm");
+      const bool found_m_idm = m1_opt.has_value();
+      const bool found_m_dm  = m2_opt.has_value();
+      if (found_m_idm)
+        m1 = *m1_opt;
+      if (found_m_dm)
+        m2 = *m2_opt;
       if (found_m_idm && found_m_dm)
         throw std::invalid_argument(
             "In input file, you can only enter one of m_idm, m_dm, choose one");
@@ -576,8 +597,14 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     // b_dark / b_idr — at most one may be set.
     {
       double b1 = 0., b2 = 0.;
-      const bool found_b_dark = ctx.pfc->read_double("b_dark", b1);
-      const bool found_b_idr  = ctx.pfc->read_double("b_idr", b2);
+      auto b1_opt             = ctx.pfc->get<double>("b_dark");
+      auto b2_opt             = ctx.pfc->get<double>("b_idr");
+      const bool found_b_dark = b1_opt.has_value();
+      const bool found_b_idr  = b2_opt.has_value();
+      if (found_b_dark)
+        b1 = *b1_opt;
+      if (found_b_idr)
+        b2 = *b2_opt;
       if (found_b_dark && found_b_idr)
         throw std::invalid_argument(
             "In input file, you can only enter one of b_dark, b_idr, choose one");
@@ -595,10 +622,11 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     // alpha_idm_dr / alpha_dark — list, default 1.5, resized to n_idr_coeff.
     std::vector<double> alpha_idm_dr;
     {
-      bool found = ctx.pfc->read_list_of_doubles("alpha_idm_dr", alpha_idm_dr);
-      if (!found)
-        found = ctx.pfc->read_list_of_doubles("alpha_dark", alpha_idm_dr);
-      if (found) {
+      auto alpha = ctx.pfc->get<std::vector<double>>("alpha_idm_dr");
+      if (!alpha)
+        alpha = ctx.pfc->get<std::vector<double>>("alpha_dark");
+      if (alpha) {
+        alpha_idm_dr           = *alpha;
         const int entries_read = static_cast<int>(alpha_idm_dr.size());
         if (entries_read != n_idr_coeff)
           alpha_idm_dr.resize(n_idr_coeff, alpha_idm_dr[entries_read - 1]);
@@ -611,10 +639,11 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     // beta_idr / beta_dark — list, default 1.5, resized to n_idr_coeff.
     std::vector<double> beta_idr;
     {
-      bool found = ctx.pfc->read_list_of_doubles("beta_idr", beta_idr);
-      if (!found)
-        found = ctx.pfc->read_list_of_doubles("beta_dark", beta_idr);
-      if (found) {
+      auto beta = ctx.pfc->get<std::vector<double>>("beta_idr");
+      if (!beta)
+        beta = ctx.pfc->get<std::vector<double>>("beta_dark");
+      if (beta) {
+        beta_idr               = *beta;
         const int entries_read = static_cast<int>(beta_idr.size());
         if (entries_read != n_idr_coeff)
           beta_idr.resize(n_idr_coeff, beta_idr[entries_read - 1]);

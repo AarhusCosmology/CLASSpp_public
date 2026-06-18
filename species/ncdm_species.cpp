@@ -102,8 +102,14 @@ bool any_dot_key_with_prefix(const FileContent& pfc, const std::string& prefix) 
 void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
   // 1. Resolve N from N_ncdm / N_ncdm_standard.
   int N1 = 0, N2 = 0;
-  bool has1 = pfc.read_int("N_ncdm_standard", N1);
-  bool has2 = pfc.read_int("N_ncdm", N2);
+  auto n1_opt = pfc.get<int>("N_ncdm_standard");
+  auto n2_opt = pfc.get<int>("N_ncdm");
+  bool has1   = n1_opt.has_value();
+  bool has2   = n2_opt.has_value();
+  if (has1)
+    N1 = *n1_opt;
+  if (has2)
+    N2 = *n2_opt;
 
   if (has1 && has2) {
     throw std::invalid_argument(
@@ -126,10 +132,11 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
 
   // 3. For each legacy CSV field, broadcast or distribute per instance.
   for (const auto& fm : kLegacyStandardFields) {
-    std::string raw_value;
-    if (!pfc.read_string(fm.legacy, raw_value)) {
+    auto raw_opt = pfc.get<std::string>(fm.legacy);
+    if (!raw_opt) {
       continue;
     }
+    const std::string& raw_value = *raw_opt;
 
     std::vector<std::string> values = FileContent::split_csv(raw_value);
     if (values.empty()) {
@@ -144,8 +151,8 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
       std::vector<int> use_flags(N, 0);
       int enabled = 0;
       for (int i = 1; i <= N; ++i) {
-        int flag = 0;
-        pfc.read_int("ncdm__" + std::to_string(i) + ".use_psd_file", flag);
+        int flag         = 0;
+        flag             = pfc.get_or("ncdm__" + std::to_string(i) + ".use_psd_file", flag);
         use_flags[i - 1] = flag;
         if (flag != 0) {
           ++enabled;
@@ -201,8 +208,7 @@ std::vector<Named> NCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   result.reserve(instances.size());
   for (const auto& name : instances) {
     // Mark <instance>.type as consumed (instances_with does not mark anything as read)
-    std::string unused_type;
-    ctx.pfc->read_string(name + ".type", unused_type);
+    (void) ctx.pfc->get<std::string>(name + ".type");
 
     auto sp = std::make_unique<NCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
     result.push_back({name, std::move(sp)});

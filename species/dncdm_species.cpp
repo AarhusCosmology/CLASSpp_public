@@ -34,8 +34,7 @@ constexpr const char* kLegacyDecayDrKeys[] = {
 
 void RejectLegacyDecayDrKeys(FileContent& pfc) {
   for (const char* key : kLegacyDecayDrKeys) {
-    std::string unused;
-    if (pfc.read_string(key, unused)) {
+    if (pfc.get<std::string>(key).has_value()) {
       throw std::invalid_argument(
           std::string("'") + key + "' is no longer supported. Use dot-syntax: " +
           "'<instance>.<dot-name> = ...' with '<instance>.type = ncdm_decay_dr'.");
@@ -84,16 +83,13 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   SpeciesInput input(pfc, instance_name);
 
   // Read decay rate (exactly one of these must be specified)
-  double Gamma_value         = 0.;
-  double log10Gamma_value    = 0.;
-  double lifetime_value      = 0.;
-  double log10lifetime_value = 0.;
-  bool has_G                 = input.read_double("Gamma", Gamma_value);
-  bool has_lG                = input.read_double("log10Gamma", log10Gamma_value);
-  bool has_lt                = input.read_double("lifetime", lifetime_value);
-  bool has_llt               = input.read_double("log10lifetime", log10lifetime_value);
+  auto Gamma_value         = input.get<double>("Gamma");
+  auto log10Gamma_value    = input.get<double>("log10Gamma");
+  auto lifetime_value      = input.get<double>("lifetime");
+  auto log10lifetime_value = input.get<double>("log10lifetime");
 
-  int n_provided = (int) has_G + (int) has_lG + (int) has_lt + (int) has_llt;
+  int n_provided = (int) Gamma_value.has_value() + (int) log10Gamma_value.has_value() +
+                   (int) lifetime_value.has_value() + (int) log10lifetime_value.has_value();
   if (n_provided != 1) {
     throw std::invalid_argument(
         "species '" + instance_name +
@@ -101,17 +97,17 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   }
 
   double Gamma_raw = 0.;
-  if (has_G) {
-    Gamma_raw = Gamma_value;
+  if (Gamma_value) {
+    Gamma_raw = *Gamma_value;
   }
-  else if (has_lG) {
-    Gamma_raw = std::pow(10., log10Gamma_value);
+  else if (log10Gamma_value) {
+    Gamma_raw = std::pow(10., *log10Gamma_value);
   }
-  else if (has_lt) {
-    Gamma_raw = 1. / lifetime_value / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
+  else if (lifetime_value) {
+    Gamma_raw = 1. / *lifetime_value / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
   }
-  else {  // has_llt
-    double lifetime = std::pow(10., log10lifetime_value);
+  else {  // log10lifetime
+    double lifetime = std::pow(10., *log10lifetime_value);
     Gamma_raw       = 1. / lifetime / (365 * 24 * 60 * 60) * _Mpc_over_m_ * 1e-3;
   }
   Gamma_ = Gamma_raw * (1.e3 / _c_);
@@ -121,8 +117,7 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   // Semantics: at most one of {deg, Omega_ini, omega_ini, Neff_ini, Omega_dncdmdr}
   // (resolved later by ConstructSpecies / DoShooting). Bare today-matter Omega/omega is
   // rejected: it leaves the decay radiation out of the flatness budget.
-  double omega_reject = 0.;
-  if (input.read_double("Omega", omega_reject) || input.read_double("omega", omega_reject)) {
+  if (input.get<double>("Omega").has_value() || input.get<double>("omega").has_value()) {
     throw std::invalid_argument(
         "species '" + instance_name +
         "': a decaying species (ncdm_decay_dr) cannot be normalized by today-matter "
@@ -132,18 +127,25 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
         "'Omega_dncdmdr'/'omega_dncdmdr' to pin the combined matter+radiation density today.");
   }
 
-  double deg_local           = 0.;
-  double Omega_ini_local     = 0.;
-  double omega_ini_local     = 0.;
-  double Neff_ini_local      = 0.;
-  double Omega_dncdmdr_local = 0.;
-  double omega_dncdmdr_local = 0.;
-  bool has_deg               = input.read_double("deg", deg_local);
-  bool has_Omega_ini         = input.read_double("Omega_ini", Omega_ini_local);
-  bool has_omega_ini         = input.read_double("omega_ini", omega_ini_local);
-  bool has_Neff_ini          = input.read_double("Neff_ini", Neff_ini_local);
-  bool has_Omega_dncdmdr     = input.read_double("Omega_dncdmdr", Omega_dncdmdr_local);
-  bool has_omega_dncdmdr     = input.read_double("omega_dncdmdr", omega_dncdmdr_local);
+  auto deg_opt           = input.get<double>("deg");
+  auto Omega_ini_opt     = input.get<double>("Omega_ini");
+  auto omega_ini_opt     = input.get<double>("omega_ini");
+  auto Neff_ini_opt      = input.get<double>("Neff_ini");
+  auto Omega_dncdmdr_opt = input.get<double>("Omega_dncdmdr");
+  auto omega_dncdmdr_opt = input.get<double>("omega_dncdmdr");
+
+  double deg_local           = deg_opt.value_or(0.);
+  double Omega_ini_local     = Omega_ini_opt.value_or(0.);
+  double omega_ini_local     = omega_ini_opt.value_or(0.);
+  double Neff_ini_local      = Neff_ini_opt.value_or(0.);
+  double Omega_dncdmdr_local = Omega_dncdmdr_opt.value_or(0.);
+  double omega_dncdmdr_local = omega_dncdmdr_opt.value_or(0.);
+  bool has_deg               = deg_opt.has_value();
+  bool has_Omega_ini         = Omega_ini_opt.has_value();
+  bool has_omega_ini         = omega_ini_opt.has_value();
+  bool has_Neff_ini          = Neff_ini_opt.has_value();
+  bool has_Omega_dncdmdr     = Omega_dncdmdr_opt.has_value();
+  bool has_omega_dncdmdr     = omega_dncdmdr_opt.has_value();
   if (has_Omega_dncdmdr && has_omega_dncdmdr) {
     throw std::invalid_argument("species '" + instance_name +
                                 "': specify exactly one of Omega_dncdmdr, omega_dncdmdr");
@@ -227,8 +229,7 @@ std::vector<DNCDMSpecies::Named> DNCDMSpecies::CreateAll(const SpeciesBuildConte
   std::vector<Named> result;
   result.reserve(instances.size());
   for (const auto& name : instances) {
-    std::string unused_type;
-    ctx.pfc->read_string(name + ".type", unused_type);  // mark consumed
+    (void) ctx.pfc->get<std::string>(name + ".type");  // mark consumed
 
     auto sp = std::make_unique<DNCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
     ApplyDncdmInitialClosure(*sp, ctx);

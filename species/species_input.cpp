@@ -17,44 +17,6 @@ std::string SpeciesInput::qualify(const std::string& field) const {
   return instance_name_ + "." + field;
 }
 
-bool SpeciesInput::read_double(const std::string& field, double& out) {
-  return pfc_->read_double(qualify(field), out);
-}
-bool SpeciesInput::read_int(const std::string& field, int& out) {
-  return pfc_->read_int(qualify(field), out);
-}
-bool SpeciesInput::read_string(const std::string& field, std::string& out) {
-  return pfc_->read_string(qualify(field), out);
-}
-bool SpeciesInput::read_list_of_doubles(const std::string& field, std::vector<double>& out) {
-  return pfc_->read_list_of_doubles(qualify(field), out);
-}
-
-double SpeciesInput::required_double(const std::string& field) {
-  double v = 0.;
-  if (!read_double(field, v)) {
-    throw std::invalid_argument("species '" + instance_name_ + "': missing required field '" +
-                                field + "'");
-  }
-  return v;
-}
-int SpeciesInput::required_int(const std::string& field) {
-  int v = 0;
-  if (!read_int(field, v)) {
-    throw std::invalid_argument("species '" + instance_name_ + "': missing required field '" +
-                                field + "'");
-  }
-  return v;
-}
-std::string SpeciesInput::required_string(const std::string& field) {
-  std::string v;
-  if (!read_string(field, v)) {
-    throw std::invalid_argument("species '" + instance_name_ + "': missing required field '" +
-                                field + "'");
-  }
-  return v;
-}
-
 namespace {
 
 int ParseIntValue(const std::string& value, const std::string& field_name) {
@@ -75,7 +37,8 @@ std::vector<std::string> CollectInstanceFieldValues(FileContent* pfc,
   std::vector<std::string> values(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     SpeciesInput input(pfc, instances[i]);
-    input.read_string(field, values[i]);
+    if (auto v = input.get<std::string>(field))
+      values[i] = *v;
   }
   return values;
 }
@@ -114,8 +77,8 @@ bool SynthesiseIdenticalScalarField(FileContent* pfc,
     }
   }
 
-  std::string existing_value;
-  if (pfc->read_string(legacy_key, existing_value) && existing_value != first) {
+  auto existing_value = pfc->get<std::string>(legacy_key);
+  if (existing_value.has_value() && *existing_value != first) {
     throw std::invalid_argument("input sets both '" + legacy_key + "' and dot-syntax field '" +
                                 dot_field + "' with different values");
   }

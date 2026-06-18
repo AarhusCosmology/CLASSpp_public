@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -52,24 +53,21 @@ class FileContent {
     return filename_;
   }
 
-  /** Read an integer parameter.  Returns true and marks the key as read when
-   *  found; returns false when absent.  Throws on parse error. */
-  bool read_int(const std::string& name, int& value) const;
+  /** Typed accessor: the value if @p name is present (marking it read), or
+   *  std::nullopt if absent. Throws on a present-but-unparseable value.
+   *  Supported T: int, double, std::string, std::vector<{int,double,std::string}>. */
+  template <class T>
+  std::optional<T> get(const std::string& name) const;
 
-  /** Read a double parameter. */
-  bool read_double(const std::string& name, double& value) const;
-
-  /** Read a string parameter. */
-  bool read_string(const std::string& name, std::string& value) const;
-
-  /** Read a comma-separated list of doubles. Allocates and fills @p values. */
-  bool read_list_of_doubles(const std::string& name, std::vector<double>& values) const;
-
-  /** Read a comma-separated list of integers. Allocates and fills @p values. */
-  bool read_list_of_integers(const std::string& name, std::vector<int>& values) const;
-
-  /** Read a comma-separated list of strings. Fills @p values. */
-  bool read_list_of_strings(const std::string& name, std::vector<std::string>& values) const;
+  /** Read-with-default: get<T>(name) if present, else @p fallback. */
+  template <class T>
+  T get_or(const std::string& name, T fallback) const {
+    if (auto v = get<T>(name))
+      return *v;
+    return fallback;
+  }
+  /** Overload so a string-literal fallback does not deduce T = const char*. */
+  std::string get_or(const std::string& name, const char* fallback) const;
 
   /** Mark every parameter as unread (used before a shooting iteration). */
   void mark_all_unread() const {
@@ -113,9 +111,25 @@ class FileContent {
   static std::vector<std::string> split_csv(const std::string& s);
 };
 
+// Explicit specialization declarations — definitions are in parser.cpp.
+// These prevent implicit instantiation from the primary template in any TU.
+template <>
+std::optional<int> FileContent::get<int>(const std::string& name) const;
+template <>
+std::optional<double> FileContent::get<double>(const std::string& name) const;
+template <>
+std::optional<std::string> FileContent::get<std::string>(const std::string& name) const;
+template <>
+std::optional<std::vector<double>> FileContent::get<std::vector<double>>(
+    const std::string& name) const;
+template <>
+std::optional<std::vector<int>> FileContent::get<std::vector<int>>(const std::string& name) const;
+template <>
+std::optional<std::vector<std::string>> FileContent::get<std::vector<std::string>>(
+    const std::string& name) const;
+
 /**************************************************************/
-/* Legacy C-style free functions - thin wrappers kept for     */
-/* backward compatibility with existing call-sites.           */
+/* Legacy C-style free functions.                             */
 /**************************************************************/
 
 #ifdef __cplusplus
@@ -124,18 +138,10 @@ extern "C" {
 
 int parser_read_file(const char* filename, FileContent* pfc);
 
-int parser_read_int(FileContent* pfc, const char* name, int* value, int* found);
-
-int parser_read_double(FileContent* pfc, const char* name, double* value, int* found);
-
 int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3);
 
 #ifdef __cplusplus
 }
 #endif
-
-/* Not inside the extern "C" block: this takes a std::string& (a C++ type), so it
- * cannot have C language linkage. All callers are C++; no .c file includes this. */
-int parser_read_string(FileContent* pfc, const char* name, std::string& value, int* found);
 
 #endif

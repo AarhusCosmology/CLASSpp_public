@@ -579,15 +579,15 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
     omega0_fld = *ctx.omega0_closure_override;
   }
   else {
-    ctx.pfc->read_double("Omega_fld", omega0_fld);
+    omega0_fld = ctx.pfc->get_or("Omega_fld", omega0_fld);
   }
   if (omega0_fld == 0.)
     return result;
 
   // ── fluid_equation_of_state (string-keyed enum) ────────────────────────────
   equation_of_state fluid_eos = CLP;
-  std::string eos_str;
-  if (ctx.pfc->read_string("fluid_equation_of_state", eos_str)) {
+  if (auto eos_opt = ctx.pfc->get<std::string>("fluid_equation_of_state")) {
+    const std::string& eos_str = *eos_opt;
     if (eos_str.find("CLP") != std::string::npos || eos_str.find("clp") != std::string::npos) {
       fluid_eos = CLP;
     }
@@ -606,27 +606,27 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   double cs2_fld   = 1.;
   double Omega_EDE = 0.;
   if (fluid_eos == CLP) {
-    ctx.pfc->read_double("w0_fld", w0_fld);
-    ctx.pfc->read_double("wa_fld", wa_fld);
-    ctx.pfc->read_double("cs2_fld", cs2_fld);
+    w0_fld  = ctx.pfc->get_or("w0_fld", w0_fld);
+    wa_fld  = ctx.pfc->get_or("wa_fld", wa_fld);
+    cs2_fld = ctx.pfc->get_or("cs2_fld", cs2_fld);
   }
   else {  // EDE
-    ctx.pfc->read_double("w0_fld", w0_fld);
-    ctx.pfc->read_double("Omega_EDE", Omega_EDE);
-    ctx.pfc->read_double("cs2_fld", cs2_fld);
+    w0_fld    = ctx.pfc->get_or("w0_fld", w0_fld);
+    Omega_EDE = ctx.pfc->get_or("Omega_EDE", Omega_EDE);
+    cs2_fld   = ctx.pfc->get_or("cs2_fld", cs2_fld);
   }
 
   // ── PPF flag + sound-speed param ──────────────────────────────────────────
   bool use_ppf              = true;
   double c_gamma_over_c_fld = 0.4;
-  std::string ppf_str;
-  if (ctx.pfc->read_string("use_ppf", ppf_str)) {
+  if (auto ppf_opt = ctx.pfc->get<std::string>("use_ppf")) {
+    const std::string& ppf_str = *ppf_opt;
     use_ppf = (ppf_str.find("y") != std::string::npos || ppf_str.find("Y") != std::string::npos)
                   ? _TRUE_
                   : _FALSE_;
   }
   if (use_ppf)
-    ctx.pfc->read_double("c_gamma_over_c_fld", c_gamma_over_c_fld);
+    c_gamma_over_c_fld = ctx.pfc->get_or("c_gamma_over_c_fld", c_gamma_over_c_fld);
 
   result.push_back({"Fluid",
                     std::make_unique<FluidSpecies>(*ctx.pba,
