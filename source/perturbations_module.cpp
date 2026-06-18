@@ -68,6 +68,13 @@ PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
     sp->SetThermodynamicsModule(thermodynamics_module_.get());
     sp->SetPerturbs(ppt);
   }
+  /* Cache the single PPF fluid (the one downcast, localized here). use_ppf is a
+     construction-fixed input; at most one "Fluid" can exist. */
+  if (auto* p = all_species_.find("Fluid")) {
+    auto* f = static_cast<FluidSpecies*>(p->get());
+    if (f->use_ppf())
+      ppf_fluid_ = f;
+  }
   perturb_init();
 }
 
@@ -512,7 +519,6 @@ void PerturbationsModule::perturb_init() {
   }
 
   if (all_species_.count("Fluid")) {
-    const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
     /* check values of w_fld at initial time and today */
     background_module_->background_w_fld(0., &w_fld_ini, &dw_over_da_fld, &integral_fld);
     background_module_->background_w_fld(pba->a_today, &w_fld_0, &dw_over_da_fld, &integral_fld);
@@ -523,7 +529,7 @@ void PerturbationsModule::perturb_init() {
                "assumption may break down, since at early times you have w_fld(a--->0) = %e >= 0",
                w_fld_ini);
 
-    if (!fluid.use_ppf()) {
+    if (!ppf_fluid()) {  // a non-PPF fluid is present (single-fluid: count && !ppf)
       class_test((w_fld_ini + 1.0) * (w_fld_0 + 1.0) <= 0.0,
                  "w crosses -1 between the infinite past and today, and this would lead to "
                  "divergent perturbation equations for the fluid perturbations. Try to switch to "
@@ -4885,17 +4891,13 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
       }
     }
 
-    /* Pass 1: accumulate rho_plus_p_shear over all sectors except photons,
-       baryons, and (PPF) fluid. Photons are already in ppw->rho_plus_p_shear
-       from the photon/baryon block above; baryons contribute zero shear. */
+    /* Pass 1: accumulate rho_plus_p_shear over all sectors except photons and
+       baryons (handled in the dedicated block above). Both PPF (always 0) and
+       non-PPF fluid contribute 0 from RhoPlusPShear, so no fluid skip needed. */
     {
-      const FluidSpecies* fluid_tse = nullptr;
-      if (auto* p = all_species_.find("Fluid"))
-        fluid_tse = static_cast<const FluidSpecies*>(p->get());
       size_t i = 0;
       for (const auto& sp : all_species_) {
-        if (sp->name() != "Photons" && sp->name() != "Baryons" &&
-            !(sp->name() == "Fluid" && fluid_tse && fluid_tse->use_ppf()))
+        if (sp->name() != "Photons" && sp->name() != "Baryons")
           ppw->rho_plus_p_shear +=
               sp->RhoPlusPShear(*ppw->pv->species_layouts[i], ppw->pv.get(), y, ppw->pvecback, ppw);
         ++i;
@@ -4905,7 +4907,12 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     /* Pass 2: accumulate delta_rho, rho_plus_p_theta, delta_p, rho_plus_p_tot,
        and the matter tally. Cold matter (baryons, CDM, IDM_DRMD, DCDM) and warm
        matter (NCDM/DNCDM) are kept in separate accumulators so we can snapshot
-       delta_cb / theta_cb (cold only) and delta_m / theta_m (cold + warm). */
+       delta_cb / theta_cb (cold only) and delta_m / theta_m (cold + warm).
+       A PPF fluid flows through here too but contributes 0 to delta_rho/
+       rho_plus_p_theta/delta_p (its idx_delta/idx_theta are unregistered, so
+       Delta/Theta/DeltaP return 0); only its background rho+P enters
+       rho_plus_p_tot. Its perturbed contribution is added afterwards via the
+       ppf_fluid() ComputePpf extra. */
     double delta_rho_m_warm        = 0.;
     double rho_m_warm              = 0.;
     double rho_plus_p_theta_m_warm = 0.;
@@ -4914,9 +4921,9 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     {
       size_t i = 0;
       for (const auto& sp : all_species_) {
-        if (sp->name() == "Photons" || sp->name() == "Baryons" || sp->name() == "Fluid") {
+        if (sp->name() == "Photons" || sp->name() == "Baryons") {
           ++i;
-          continue;  // Photons/Baryons have dedicated paths; Fluid handled below (PPF special case)
+          continue;  // Photons/Baryons have dedicated paths above
         }
 
         const auto& layout      = *ppw->pv->species_layouts[i];
@@ -4964,44 +4971,17 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     rho_plus_p_theta_m += rho_plus_p_theta_m_warm;
     rho_plus_p_m       += rho_plus_p_m_warm;
 
-    /* fluid contribution */
-    if (all_species_.count("Fluid")) {
-      double w_fld, dw_over_da_fld, integral_fld;
-      background_module_->background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld);
-      double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
-
-      const size_t fluid_i     = all_species_.index_of("Fluid");
-      const auto& fluid_layout = static_cast<const FluidSpecies::PerturbLayout&>(
-          *ppw->pv->species_layouts[fluid_i]);
-      /* Local lookup colocated with its dereference: all_species_.count("Fluid")
-         above guarantees find() returns non-null, so this deref is safe. */
-      const FluidSpecies* fluid_tse = static_cast<const FluidSpecies*>(
-          all_species_.find("Fluid")->get());
-      if (!fluid_tse->use_ppf()) {
-        ppw->delta_rho_fld        = all_species_.at("Fluid")->Rho(ppw->pvecback) *
-                                    y[fluid_layout.idx_delta];
-        ppw->rho_plus_p_theta_fld = (1. + w_fld) * all_species_.at("Fluid")->Rho(ppw->pvecback) *
-                                    y[fluid_layout.idx_theta];
-        double ca2_fld            = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
-        /** We must gauge transform the pressure perturbation from the fluid rest-frame to the gauge we are working in */
-        const double cs2 = fluid_tse->cs2_fld();
-        ppw->delta_p_fld = cs2 * ppw->delta_rho_fld +
-                           (cs2 - ca2_fld) *
-                               (3 * a_prime_over_a * ppw->rho_plus_p_theta_fld / k / k);
-      }
-      else {
-        auto& fluid = static_cast<FluidSpecies&>(*all_species_.at("Fluid"));
-        fluid.ComputePpf(k, a, a_prime_over_a, ppr, y, ppw);
-      }
-
+    /* PPF fluid extra: a modified-gravity closure defined relative to the rest of
+       the universe, so it runs after the totals are assembled. A PPF fluid
+       contributed 0 to the perturbation totals in the loop above (its idx_delta/
+       idx_theta are unregistered); ComputePpf now fills delta_rho_fld etc. A
+       non-PPF fluid is an ordinary species handled entirely in the loop above. */
+    if (auto* f = ppf_fluid()) {
+      f->ComputePpf(k, a, a_prime_over_a, ppr, y, ppw);
       ppw->delta_rho        += ppw->delta_rho_fld;
       ppw->rho_plus_p_theta += ppw->rho_plus_p_theta_fld;
       ppw->delta_p          += ppw->delta_p_fld;
-
-      ppw->rho_plus_p_tot += (1. + w_fld) * all_species_.at("Fluid")->Rho(ppw->pvecback);
     }
-
-    /* don't add more species here, add them before the fluid contribution: because of the PPF scheme, the fluid must be the last one! */
 
     /* store delta_m in the current gauge. In perturb_einstein, this
        will be transformed later on into the gauge-independent variable D

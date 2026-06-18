@@ -60,10 +60,14 @@ void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   ctx.pvecback_integration[bi_rho_index()] = rho_fld_today * exp(integral_fld);
 }
 
-void FluidSpecies::ComputeBackground(double /*a_rel*/, const double* pvecback_B, double* pvecback) {
-  /* w_fld and dw_over_da_fld are pre-computed by BackgroundModule::background_functions()
-     (with checked error handling) and written to pvecback before this call. */
-  pvecback[index_bg_rho_fld_] = pvecback_B[index_bi_rho_fld_];
+void FluidSpecies::ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) {
+  // a == a_rel (a_today == 1). Compute w(a) ourselves rather than having the
+  // module pre-fill the slots.
+  double w_fld, dw_over_da_fld, integral_fld;
+  ComputeWFld(a_rel, &w_fld, &dw_over_da_fld, &integral_fld);
+  pvecback[index_bg_w_fld_]          = w_fld;
+  pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
+  pvecback[index_bg_rho_fld_]        = pvecback_B[index_bi_rho_fld_];
 }
 
 void FluidSpecies::BackgroundDerivs(double /*tau*/,
@@ -102,11 +106,6 @@ void FluidSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const 
 void FluidSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
   w.Add("(.)rho_fld", pvecback[index_bg_rho_fld_]);
   w.Add("(.)w_fld", pvecback[index_bg_w_fld_]);
-}
-
-void FluidSpecies::WriteWFld(double w_fld, double dw_over_da_fld, double* pvecback) const {
-  pvecback[index_bg_w_fld_]          = w_fld;
-  pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
 }
 
 void FluidSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
@@ -160,14 +159,14 @@ void FluidSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& /*layout*/,
-                               const double* /*y*/,
+void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
+                               const double* y,
                                const double* /*dy*/,
                                PerturbSourceContext& ctx) {
-  PerturbationsModule* p_mod  = ctx.p_mod;
-  perturb_workspace* ppw      = ctx.ppw;
-  const BackgroundModule* bgm = p_mod->GetBackgroundModule().get();
-  const double* pvecback      = ppw->pvecback;
+  const auto& layout         = static_cast<const PerturbLayout&>(base);
+  PerturbationsModule* p_mod = ctx.p_mod;
+  perturb_workspace* ppw     = ctx.ppw;
+  const double* pvecback     = ppw->pvecback;
 
   // Fluid sources are scalar-only
   if (ctx.index_md != p_mod->index_md_scalars_)
@@ -176,26 +175,29 @@ void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& /*layout*/,
   // ── delta_fld ─────────────────────────────────────────────────────────────
   if (index_tp_delta_ >= 0) {
     const double w_fld = W(pvecback);
+    // PPF: delta_rho_fld is published by ComputePpf. Non-PPF: delta = y[idx_delta].
+    const double delta_fld = use_ppf_ ? ppw->delta_rho_fld / Rho(pvecback) : y[layout.idx_delta];
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
-                          ppw->delta_rho_fld / Rho(pvecback) +
-                              3. * ctx.a_prime_over_a * (1. + w_fld) *
-                                  ctx.theta_over_k2);  // N-body gauge correction
+                          delta_fld + 3. * ctx.a_prime_over_a * (1. + w_fld) *
+                                          ctx.theta_over_k2);  // N-body gauge correction
   }
 
   // ── theta_fld ─────────────────────────────────────────────────────────────
   if (index_tp_theta_ >= 0) {
     const double w_fld = W(pvecback);
+    // PPF: rho_plus_p_theta_fld is published by ComputePpf. Non-PPF: theta = y[idx_theta].
+    const double theta_fld = use_ppf_ ? ppw->rho_plus_p_theta_fld / (1. + w_fld) / Rho(pvecback)
+                                      : y[layout.idx_theta];
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
                           index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
-                          ppw->rho_plus_p_theta_fld / (1. + w_fld) / Rho(pvecback) +
-                              ctx.theta_shift);  // N-body gauge correction
+                          theta_fld + ctx.theta_shift);  // N-body gauge correction
   }
 }
 
@@ -237,15 +239,26 @@ void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 
 void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
                                   double /*tau*/,
-                                  const double* /*y*/,
+                                  const double* y,
                                   const PerturbationsModule& mod,
                                   const perturb_workspace* ppw) const {
   double delta_rho_fld = 0., rho_plus_p_theta_fld = 0., delta_p_fld = 0.;
 
   if (!w.IsTitleMode()) {
-    delta_rho_fld        = ppw->delta_rho_fld;
-    rho_plus_p_theta_fld = ppw->rho_plus_p_theta_fld;
-    delta_p_fld          = ppw->delta_p_fld;
+    if (use_ppf_) {
+      delta_rho_fld        = ppw->delta_rho_fld;
+      rho_plus_p_theta_fld = ppw->rho_plus_p_theta_fld;
+      delta_p_fld          = ppw->delta_p_fld;
+    }
+    else {
+      const auto& layout = static_cast<const PerturbLayout&>(
+          *ppw->pv->species_layouts[collection_index_]);
+      const double rho     = Rho(ppw->pvecback);
+      delta_rho_fld        = rho * Delta(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
+      rho_plus_p_theta_fld = (rho + P(ppw->pvecback)) *
+                             Theta(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
+      delta_p_fld          = DeltaP(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
+    }
   }
 
   w.Add("delta_rho_fld", delta_rho_fld, true);
@@ -422,6 +435,11 @@ void FluidSpecies::ComputePpf(double k,
   ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
   const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
+  // The PPF closure is defined relative to the rest of the universe. The module's
+  // runtime rho_plus_p_tot now INCLUDES this fluid (it flows through the generic
+  // loop), so subtract our own background rho+p here.
+  const double rho_plus_p_tot_rest = ppw->rho_plus_p_tot - Rho(ppw->pvecback) * (1. + w_fld);
+
   double s2sq               = ppw->s_l[2] * ppw->s_l[2];
   double c_gamma_k_H_square = pow(c_gamma_over_c_fld_ * k / a_prime_over_a, 2) * cs2_fld_;
   /** The equation is too stiff for Runge-Kutta when c_gamma_k_H_square is large.
@@ -455,7 +473,7 @@ void FluidSpecies::ComputePpf(double k,
   // S quantity sourcing Gamma_prime evolution in the PPF scheme (eq. 15 of
   // 0808.3125); a ComputePpf-internal temporary, not stored on the workspace.
   const double S_fld = Rho(ppw->pvecback) * (1. + w_fld) * 1.5 * a2 / k2 / a_prime_over_a *
-                       (ppw->rho_plus_p_theta / ppw->rho_plus_p_tot + k2 * alpha);
+                       (ppw->rho_plus_p_theta / rho_plus_p_tot_rest + k2 * alpha);
   // note that the last terms in the ratio do not include fld, that's correct, it's the whole point of the PPF scheme
   /** We must now check the stiffenss criterion again and set Gamma_prime_fld accordingly. */
   if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max) {
@@ -468,9 +486,9 @@ void FluidSpecies::ComputePpf(double k,
   double Gamma_prime_plus_a_prime_over_a_Gamma = ppw->Gamma_prime_fld + a_prime_over_a * Gamma_fld;
   // delta and theta in both gauges gauge:
   ppw->rho_plus_p_theta_fld = Rho(ppw->pvecback) * (1. + w_fld) * ppw->rho_plus_p_theta /
-                                  ppw->rho_plus_p_tot -
+                                  rho_plus_p_tot_rest -
                               k2 * 2. / 3. * a_prime_over_a / a2 /
-                                  (1 + 4.5 * a2 / k2 / s2sq * ppw->rho_plus_p_tot) *
+                                  (1 + 4.5 * a2 / k2 / s2sq * rho_plus_p_tot_rest) *
                                   (S_fld - Gamma_prime_plus_a_prime_over_a_Gamma / a_prime_over_a);
   ppw->delta_rho_fld        = -2. / 3. * k2 * s2sq / a2 * Gamma_fld -
                               3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta_fld;
@@ -497,10 +515,10 @@ void FluidSpecies::ComputePpf(double k,
   double Z_prime = Z * (ppw->pvecback[bgm_->index_bg_H_prime_] / ppw->pvecback[bgm_->index_bg_H_] -
                         a_prime_over_a);
   /** Construct theta_t and its derivative from the Euler equation */
-  double theta_t       = ppw->rho_plus_p_theta / ppw->rho_plus_p_tot;
+  double theta_t       = ppw->rho_plus_p_theta / rho_plus_p_tot_rest;
   double theta_t_prime = -a_prime_over_a * theta_t -
                          (p_t_prime * theta_t - k2 * ppw->delta_p + k2 * ppw->rho_plus_p_shear) /
-                             ppw->rho_plus_p_tot +
+                             rho_plus_p_tot_rest +
                          metric_euler;
   double S             = S_fld;
   double S_prime       = -Z_prime / Z * S +

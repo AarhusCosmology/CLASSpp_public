@@ -261,14 +261,6 @@ class BaseSpecies {
     return false;
   }
 
-  /**
-   * Returns true if this species' ComputeBackground must be deferred.
-   * Used for FluidSpecies which needs w_fld evaluated before it can run.
-   */
-  virtual bool RequiresDeferredBackground() const {
-    return false;
-  }
-
   // ── Perturbations ─────────────────────────────────────────────────────────
 
   // ── Per-species layout signatures ───────────────────────────────────────

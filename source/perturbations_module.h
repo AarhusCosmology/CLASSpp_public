@@ -6,8 +6,17 @@
 #include "base_module.h"
 #include "input_module.h"
 
+class FluidSpecies;
+
 class PerturbationsModule : public BaseModule {
  public:
+  // The single PPF fluid, or nullptr. PPF is a modified-gravity closure defined
+  // relative to the whole universe (intrinsically singular), so the module owns
+  // it; non-PPF fluids are ordinary species. Resolved once in the ctor.
+  FluidSpecies* ppf_fluid() const {
+    return ppf_fluid_;
+  }
+
   PerturbationsModule(InputModulePtr input_module,
                       BackgroundModulePtr background_module,
                       ThermodynamicsModulePtr thermodynamics_module);
@@ -244,6 +253,7 @@ class PerturbationsModule : public BaseModule {
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;
+  FluidSpecies* ppf_fluid_ = nullptr;
 
   short
       evolve_tensor_ur_; /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */

@@ -348,24 +348,11 @@ void BackgroundModule::background_functions(
     }
   };
 
-  /* Compute background for all species in the map, except Fluid
-     (needs w_fld setup). Each species writes to its own pvecback
-     slots; accumulation order is irrelevant. */
+  /* Compute background for all species. Each species writes its own pvecback
+     slots; the Fluid computes its own w(a) in ComputeBackground. */
   for (const auto& [name, sp] : all_species_) {
-    if (name == "Fluid")
-      continue;
     sp->ComputeBackground(a_rel, pvecback_B, pvecback);
     accumulate(*sp);
-  }
-
-  /* Fluid needs w_fld computed before calling ComputeBackground */
-  if (all_species_.count("Fluid")) {
-    double w_fld, dw_over_da_fld, integral_fld;
-    background_w_fld(a, &w_fld, &dw_over_da_fld, &integral_fld);
-    static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
-        .WriteWFld(w_fld, dw_over_da_fld, pvecback);
-    all_species_.at("Fluid")->ComputeBackground(a_rel, pvecback_B, pvecback);
-    accumulate(*all_species_.at("Fluid"));
   }
 
   /** - compute expansion rate H from Friedmann equation: this is the

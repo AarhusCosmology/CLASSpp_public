@@ -83,17 +83,9 @@ class FluidSpecies : public BaseSpecies {
   bool RequiresDeferredPerturbDerivs() const override {
     return true;
   }
-  bool RequiresDeferredBackground() const override {
-    return true;
-  }
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
-
-  /** Called by BackgroundModule::background_functions() before ComputeBackground().
-   *  Writes w_fld and dw/da (already computed by BackgroundModule) into pvecback
-   *  using FluidSpecies's private indices. */
-  void WriteWFld(double w_fld, double dw_over_da_fld, double* pvecback) const;
 
   /** Returns w_fld from pvecback. Used by perturbations to read the cached value. */
   double W(const double* pvecback) const {
