@@ -39,7 +39,13 @@ void SpeciesCollection::freeze() {
   }
   photons_ = photons_slot->get();
   baryons_ = baryons_slot->get();
-  frozen_  = true;
+  for (std::size_t i = 0; i < species_.size(); ++i) {
+    if (species_[i].key == "Photons")
+      photons_index_ = i;
+    if (species_[i].key == "Baryons")
+      baryons_index_ = i;
+  }
+  frozen_ = true;
 }
 
 namespace {

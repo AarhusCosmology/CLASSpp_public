@@ -253,14 +253,6 @@ class BaseSpecies {
                                       int /*row_stride*/,
                                       const double* /*z_table*/) {}
 
-  /**
-   * Returns true if this species' PerturbDerivs must run AFTER all other
-   * species in a second pass. Used for PPF fluid (FluidSpecies).
-   */
-  virtual bool RequiresDeferredPerturbDerivs() const {
-    return false;
-  }
-
   // ── Perturbations ─────────────────────────────────────────────────────────
 
   // ── Per-species layout signatures ───────────────────────────────────────

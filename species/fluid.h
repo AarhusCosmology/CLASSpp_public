@@ -80,9 +80,6 @@ class FluidSpecies : public BaseSpecies {
                 double H,
                 const double* pvecback_B,
                 const double* pvecback) const override;
-  bool RequiresDeferredPerturbDerivs() const override {
-    return true;
-  }
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;

@@ -253,6 +253,22 @@ struct perturb_vector {
   // Each thread allocates its own pv, so this storage is per-thread.
   std::vector<std::unique_ptr<BaseSpecies::PerturbLayout>> species_layouts;
 
+  // Non-owning view into species_layouts: the species that registered ≥1
+  // perturbation variable in THIS pv's mode (no-ops like Lambda excluded), in
+  // lex-key order. Consumed by the scalar/vector/tensor RHS dispatch loops.
+  struct ActiveSpecies {
+    BaseSpecies* species;
+    BaseSpecies::PerturbLayout* layout;
+  };
+  std::vector<ActiveSpecies> active_species;
+
+  // Always-present species, resolved once per pv (non-owning, into
+  // species_layouts). Base-typed because perturbations.h cannot see the nested
+  // PhotonsSpecies/BaryonsSpecies::PerturbLayout types (photons.h/baryons.h
+  // include perturbations.h). Read sites static_cast to the concrete type.
+  BaseSpecies::PerturbLayout* photon_layout = nullptr;
+  BaseSpecies::PerturbLayout* baryon_layout = nullptr;
+
   /* Photons bare fields removed — use pv->species_layouts[g_i] (PhotonsSpecies::PerturbLayout). */
   /* Baryons bare fields removed — use pv->species_layouts[b_i] (BaryonsSpecies::PerturbLayout). */
   /* CDM bare fields removed — use pv->species_layouts[cdm_i] (CDMSpecies::PerturbLayout). */

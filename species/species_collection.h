@@ -120,6 +120,14 @@ class SpeciesCollection {
     assert(frozen_ && baryons_);
     return *baryons_;
   }
+  std::size_t photons_index() const {
+    assert(frozen_);
+    return photons_index_;
+  }
+  std::size_t baryons_index() const {
+    assert(frozen_);
+    return baryons_index_;
+  }
 
   // ── Iteration / size ────────────────────────────────────────────────────
   Container::iterator begin() {
@@ -155,7 +163,9 @@ class SpeciesCollection {
 
  private:
   Container species_;
-  BaseSpecies* photons_ = nullptr;
-  BaseSpecies* baryons_ = nullptr;
-  bool frozen_          = false;
+  BaseSpecies* photons_      = nullptr;
+  BaseSpecies* baryons_      = nullptr;
+  std::size_t photons_index_ = 0;
+  std::size_t baryons_index_ = 0;
+  bool frozen_               = false;
 };

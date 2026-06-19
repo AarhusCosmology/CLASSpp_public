@@ -25,6 +25,7 @@
 #include "perturbations_module.h"
 
 #include <algorithm>
+#include <cassert>
 
 #include "../species/baryons.h"
 #include "../species/cdm.h"
@@ -2938,6 +2939,12 @@ void PerturbationsModule::perturb_vector_init(
     ppv->species_layouts.push_back(all_species_[i]->CreatePerturbLayout());
   }
 
+  // Hot-path: resolve the always-present photon/baryon layouts once per pv
+  // (non-owning, base-typed views into species_layouts).
+  ppv->photon_layout = ppv->species_layouts[all_species_.photons_index()].get();
+  ppv->baryon_layout = ppv->species_layouts[all_species_.baryons_index()].get();
+  assert(ppv->photon_layout && ppv->baryon_layout);
+
   /** - define all indices in this new vector (depends on approximation scheme, described by the input structure ppw-->pa) */
 
   int index_pt = 0;
@@ -2950,12 +2957,15 @@ void PerturbationsModule::perturb_vector_init(
     {
       size_t i = 0;
       for (auto& entry : all_species_) {
+        const int before = index_pt;
         entry->RegisterPerturbationIndices(*ppv->species_layouts[i],
                                            ppv.get(),
                                            ppr,
                                            index_pt,
                                            ppw,
                                            static_cast<int>(ppt->gauge));
+        if (index_pt > before)
+          ppv->active_species.push_back({entry.get(), ppv->species_layouts[i].get()});
         ++i;
       }
     }
@@ -2985,12 +2995,15 @@ void PerturbationsModule::perturb_vector_init(
     {
       size_t i = 0;
       for (auto& entry : all_species_) {
+        const int before = index_pt;
         entry->RegisterVectorPerturbationIndices(*ppv->species_layouts[i],
                                                  ppv.get(),
                                                  ppr,
                                                  index_pt,
                                                  ppw,
                                                  static_cast<int>(ppt->gauge));
+        if (index_pt > before)
+          ppv->active_species.push_back({entry.get(), ppv->species_layouts[i].get()});
         ++i;
       }
     }
@@ -3012,12 +3025,15 @@ void PerturbationsModule::perturb_vector_init(
     {
       size_t i = 0;
       for (auto& entry : all_species_) {
+        const int before = index_pt;
         entry->RegisterTensorPerturbationIndices(*ppv->species_layouts[i],
                                                  ppv.get(),
                                                  ppr,
                                                  index_pt,
                                                  ppw,
                                                  static_cast<int>(ppt->gauge));
+        if (index_pt > before)
+          ppv->active_species.push_back({entry.get(), ppv->species_layouts[i].get()});
         ++i;
       }
     }
@@ -4660,9 +4676,8 @@ void PerturbationsModule::perturb_einstein(
       /* eventually, infer first-order tight-coupling approximation for photon
          shear, then correct the total shear */
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
-        const size_t g_ein_i  = all_species_.index_of("Photons");
         const auto& g_ein_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[g_ein_i]);
+            *ppw->pv->photon_layout);
         shear_g = 16. / 45. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
                   (y[g_ein_lay.idx_theta] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
 
@@ -4792,9 +4807,8 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - ---> (a.1.) photons */
 
-    const size_t g_tse_i  = all_species_.index_of("Photons");
     const auto& g_tse_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-        *ppw->pv->species_layouts[g_tse_i]);
+        *ppw->pv->photon_layout);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
       if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
@@ -4831,9 +4845,8 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - ---> (a.2.) baryon pressure perturbation */
 
-    const size_t b_tse_pre_i  = all_species_.index_of("Baryons");
     const auto& b_tse_pre_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
-        *ppw->pv->species_layouts[b_tse_pre_i]);
+        *ppw->pv->baryon_layout);
 
     if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       delta_p_b_over_rho_b = ppw->pvecthermo[thermodynamics_module_->index_th_wb_] *
@@ -4877,22 +4890,14 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
       const double rho_g = PH.Rho(ppw->pvecback.data());
       const double rho_b = BA.Rho(ppw->pvecback.data());
 
-      const size_t g_tse2_i = all_species_.index_of("Photons");
-      const size_t b_tse_i  = all_species_.index_of("Baryons");
-      const double delta_g  = PH.Delta(*ppw->pv->species_layouts[g_tse2_i],
-                                       ppw->pv.get(),
-                                       y,
-                                       ppw->pvecback.data(),
-                                       ppw);
-      const double theta_g  = PH.Theta(*ppw->pv->species_layouts[g_tse2_i],
-                                       ppw->pv.get(),
-                                       y,
-                                       ppw->pvecback.data(),
-                                       ppw);
+      const double delta_g =
+          PH.Delta(*ppw->pv->photon_layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+      const double theta_g =
+          PH.Theta(*ppw->pv->photon_layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
       const double delta_b =
-          BA.Delta(*ppw->pv->species_layouts[b_tse_i], ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+          BA.Delta(*ppw->pv->baryon_layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
       const double theta_b =
-          BA.Theta(*ppw->pv->species_layouts[b_tse_i], ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+          BA.Theta(*ppw->pv->baryon_layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
 
       ppw->delta_rho        = rho_g * delta_g + rho_b * delta_b;
       ppw->rho_plus_p_theta = 4. / 3. * rho_g * theta_g + rho_b * theta_b;
@@ -5032,9 +5037,8 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - --> photon contribution to vector sources: */
     {
-      const size_t g_vec_i  = all_species_.index_of("Photons");
       const auto& g_vec_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-          *ppw->pv->species_layouts[g_vec_i]);
+          *ppw->pv->photon_layout);
       if (ppw->approx[ppw->index_ap_rsa] ==
           (int) rsa_off) { /* if radiation streaming approximation is off */
         if (ppw->approx[ppw->index_ap_tca] ==
@@ -5065,9 +5069,8 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
         (int) rsa_off) { /* if radiation streaming approximation is off */
       if (ppw->approx[ppw->index_ap_tca] ==
           (int) tca_off) { /* if tight-coupling approximation is off */
-        const size_t g_tens_i  = all_species_.index_of("Photons");
         const auto& g_tens_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[g_tens_i]);
+            *ppw->pv->photon_layout);
         ppw->gw_source += (-_SQRT6_ * 4 * a2 * all_species_.photons().Rho(ppw->pvecback.data()) *
                            (1. / 15. * y[g_tens_lay.idx_delta] +
                             4. / 21. * y[g_tens_lay.idx_shear] +
@@ -5198,12 +5201,10 @@ int PerturbationsModule::perturb_sources_member(
 
     /** - --> compute quantities depending on approximation schemes */
 
-    const size_t g_src_i  = all_species_.index_of("Photons");
     const auto& g_src_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-        *ppw->pv->species_layouts[g_src_i]);
-    const size_t b_src_i  = all_species_.index_of("Baryons");
+        *ppw->pv->photon_layout);
     const auto& b_src_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
-        *ppw->pv->species_layouts[b_src_i]);
+        *ppw->pv->baryon_layout);
 
     double delta_g;
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
@@ -5499,9 +5500,8 @@ int PerturbationsModule::perturb_sources_member(
     /** - --> compute quantities depending on approximation schemes */
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
-        const size_t g_tsrc_i  = all_species_.index_of("Photons");
         const auto& g_tsrc_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[g_tsrc_i]);
+            *ppw->pv->photon_layout);
         P = -(1. / 10. * y[g_tsrc_lay.idx_delta] + 2. / 7. * y[g_tsrc_lay.idx_shear] +
               3. / 70. * y[g_tsrc_lay.idx_delta + 4] - 3. / 5. * y[g_tsrc_lay.idx_pol0] +
               6. / 7. * y[g_tsrc_lay.idx_pol2] - 3. / 70. * y[g_tsrc_lay.idx_pol0 + 4]) /
@@ -5666,9 +5666,8 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
     double l4_ur = 0.;
 
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-      const size_t g_pv_i  = all_species_.index_of("Photons");
       const auto& g_pv_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-          *ppw->pv->species_layouts[g_pv_i]);
+          *ppw->pv->photon_layout);
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
         delta_g = y[g_pv_lay.idx_delta];
         shear_g = y[g_pv_lay.idx_shear];
@@ -5886,20 +5885,16 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     double Tb_in_K = 0.;
 
     /** - --> (a) define short-cut notations for the scalar perturbations */
-    const size_t g_dr_i  = all_species_.index_of("Photons");
-    const auto& g_dr_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-        *pv->species_layouts[g_dr_i]);
+    const auto& g_dr_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(*pv->photon_layout);
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
       delta_g = y[g_dr_lay.idx_delta];
       theta_g = y[g_dr_lay.idx_theta];
     }
 
-    const size_t b_dr_i  = all_species_.index_of("Baryons");
-    const auto& b_dr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
-        *pv->species_layouts[b_dr_i]);
-    double delta_b = y[b_dr_lay.idx_delta];
-    double theta_b = y[b_dr_lay.idx_theta];
-    double cb2     = pvecthermo[thermodynamics_module_->index_th_cb2_];
+    const auto& b_dr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(*pv->baryon_layout);
+    double delta_b       = y[b_dr_lay.idx_delta];
+    double theta_b       = y[b_dr_lay.idx_theta];
+    double cb2           = pvecthermo[thermodynamics_module_->index_th_cb2_];
     double delta_p_b_over_rho_b =
         cb2 *
         delta_b; /* for baryons, (delta p)/rho with Ma & Bertschinger approximation: sound speed = adiabatic sound speed */
@@ -6019,26 +6014,16 @@ int PerturbationsModule::perturb_derivs_member(double tau,
       perturb_tca_slip_and_shear(y, pppaw);
     }
 
-    {
-      const size_t baryons_idx = all_species_.index_of("Baryons");
-      all_species_.baryons().PerturbDerivs(*ppw->pv->species_layouts[baryons_idx],
-                                           tau,
-                                           y,
-                                           dy,
-                                           *pppaw);
-    }
-    {
-      const size_t photons_idx = all_species_.index_of("Photons");
-      all_species_.photons().PerturbDerivs(*ppw->pv->species_layouts[photons_idx],
-                                           tau,
-                                           y,
-                                           dy,
-                                           *pppaw);
-    }
+    /* Species contributions to the scalar perturbation ODE — single pass over
+       the active (non-no-op) species in lex order. Photons/baryons are ordinary
+       entries; the PPF fluid too (its dy[idx_Gamma] = Gamma_prime_fld is valid
+       here because ComputePpf already ran in perturb_einstein() above). Order is
+       free: each species reads scalar_ctx/y and writes only its own dy. */
+    for (const auto& [species, layout] : pv->active_species)
+      species->PerturbDerivs(*layout, tau, y, dy, *pppaw);
 
-    /* perturbed recombination */
-    /* computes the derivatives of delta x_e and delta T_b */
-
+    /* perturbed recombination — derivatives of delta x_e and delta T_b. Runs
+       after the species loop because it reads dy[baryon.idx_delta]. */
     if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
       /* alpha * n_H is in inverse seconds, so we have to multiply it by Mpc_in_sec */
       dy[ppw->pv->index_pt_perturbed_recombination_delta_chi] =
@@ -6053,25 +6038,6 @@ int PerturbationsModule::perturb_derivs_member(double tau,
                    (delta_g + delta_chi * (1. + fHe) / (1. + chi + fHe)) +
                pba->T_cmb * pba->a_today / a / pvecthermo[thermodynamics_module_->index_th_Tb_] *
                    (delta_temp - 1. / 4. * delta_g));
-    }
-
-    /* Species contributions to the perturbation ODE (scalars) */
-    {
-      size_t i = 0;
-      for (auto& sp : all_species_) {
-        if (sp->name() != "Photons" && sp->name() != "Baryons" &&
-            !sp->RequiresDeferredPerturbDerivs())
-          sp->PerturbDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
-        ++i;
-      }
-    }
-    {
-      size_t i = 0;
-      for (auto& sp : all_species_) {
-        if (sp->RequiresDeferredPerturbDerivs())
-          sp->PerturbDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
-        ++i;
-      }
     }
 
     /** - --> metric */
@@ -6092,13 +6058,11 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     /** - --> baryon velocity */
 
     /* delta_g is needed by the baryon theta equation; use sentinel-safe read */
-    const size_t g_vec_dr_i  = all_species_.index_of("Photons");
     const auto& g_vec_dr_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-        *pv->species_layouts[g_vec_dr_i]);
+        *pv->photon_layout);
     const double delta_g_vec = (g_vec_dr_lay.idx_delta >= 0) ? y[g_vec_dr_lay.idx_delta] : 0.;
-    const size_t b_vec_dr_i  = all_species_.index_of("Baryons");
     const auto& b_vec_dr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
-        *pv->species_layouts[b_vec_dr_i]);
+        *pv->baryon_layout);
 
     if (ppt->gauge == possible_gauges::synchronous) {
       dy[b_vec_dr_lay.idx_theta] = -(1 - 3. * cb2) * a_prime_over_a * y[b_vec_dr_lay.idx_theta] -
@@ -6116,13 +6080,8 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     }
 
     /** - --> species Boltzmann hierarchies (vector modes) */
-    {
-      size_t i = 0;
-      for (auto& sp : all_species_) {
-        sp->PerturbVectorDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
-        ++i;
-      }
-    }
+    for (const auto& [species, layout] : pv->active_species)
+      species->PerturbVectorDerivs(*layout, tau, y, dy, *pppaw);
 
     if (ppt->gauge == possible_gauges::synchronous) {
       /* Vector metric perturbation in synchronous gauge: */
@@ -6137,13 +6096,8 @@ int PerturbationsModule::perturb_derivs_member(double tau,
   /** - tensor modes: */
   if (_tensors_) {
     /** - --> species Boltzmann hierarchies (tensor modes) */
-    {
-      size_t i = 0;
-      for (auto& sp : all_species_) {
-        sp->PerturbTensorDerivs(*ppw->pv->species_layouts[i], tau, y, dy, *pppaw);
-        ++i;
-      }
-    }
+    for (const auto& [species, layout] : pv->active_species)
+      species->PerturbTensorDerivs(*layout, tau, y, dy, *pppaw);
 
     /** - --> relativistic-neutrino tensor hierarchy (pv-owned: ur and/or
         massless-approximated ncdm), sourced by the gravitational waves. */
@@ -6223,12 +6177,8 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   double s2_squared = 1. - 3. * pba->K / k2;
 
   /** - --> (a) define short-cut notations for the scalar perturbations */
-  const size_t g_tca_i  = all_species_.index_of("Photons");
-  const auto& g_tca_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-      *pv->species_layouts[g_tca_i]);
-  const size_t b_tca_i  = all_species_.index_of("Baryons");
-  const auto& b_tca_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
-      *pv->species_layouts[b_tca_i]);
+  const auto& g_tca_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(*pv->photon_layout);
+  const auto& b_tca_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(*pv->baryon_layout);
   double delta_g = 0., theta_g = 0.;
   if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
     delta_g = y[g_tca_lay.idx_delta];
@@ -6510,9 +6460,8 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
 
   // formulas below TBC for curvaturema
 
-  const size_t b_rsa_i  = all_species_.index_of("Baryons");
   const auto& b_rsa_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
-      *ppw->pv->species_layouts[b_rsa_i]);
+      *ppw->pv->baryon_layout);
 
   /* newtonian gauge */
   if (ppt->gauge == possible_gauges::newtonian) {
