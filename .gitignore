@@ -39,4 +39,23 @@ classy_community_ref.egg-info/
 
 # Local bit-identical baseline (machine-specific, never commit)
 python/baseline/
+python/baseline_ref/
 build-xcode/
+
+# In-source CMake configure/build artifacts (CMake + Xcode generator)
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+CLASSpp.xcodeproj/
+Debug/
+Release/
+
+# Extra test binaries (CMake targets built in-source)
+test-photons
+test-greybody-moments
+
+# Local agent/tooling state
+.claude/

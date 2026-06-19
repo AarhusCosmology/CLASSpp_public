@@ -270,9 +270,9 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const double* pvecback   = ppw->pvecback;
+  const double* pvecback   = ppw->pvecback.data();
   const perturb_vector* pv = ppw->pv.get();
-  const double* y          = ppw->pv->y;
+  const double* y          = ppw->pv->y.data();
 
   // delta_ncdm[n]: density perturbation
   if (index_tp_delta_ >= 0) {
@@ -338,7 +338,7 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
-  const double* s_l               = ppw->s_l;
+  const double* s_l               = ppw->s_l.data();
   const double k                  = ctx.k;
   const double a2                 = ctx.a2;
   const double a_prime_over_a     = ctx.a_prime_over_a;
@@ -348,7 +348,7 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double metric_ufa_class   = ctx.metric_ufa_class;
   const double cotKgen            = ctx.cotKgen;
 
-  const double* pvecback = ppw->pvecback;
+  const double* pvecback = ppw->pvecback.data();
 
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
 
@@ -462,8 +462,8 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback;
-    const double* pvecmetric = ppw->pvecmetric;
+    const double* pvecback   = ppw->pvecback.data();
+    const double* pvecmetric = ppw->pvecmetric.data();
     const double k           = ppw->scalar_ctx.k;
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];

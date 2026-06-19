@@ -8,33 +8,19 @@
 struct generic_integrator_workspace {
   int n;
 
-  double* yscal;
-  double* y;
-  double* dydx;
+  std::vector<double> yscal;
+  std::vector<double> y;
+  std::vector<double> dydx;
 
-  double* yerr;
-  double* ytempo;
+  std::vector<double> yerr;
+  std::vector<double> ytempo;
 
-  double* ak2;
-  double* ak3;
-  double* ak4;
-  double* ak5;
-  double* ak6;
-  double* ytemp;
-
-  std::vector<double> yscal_storage;
-  std::vector<double> y_storage;
-  std::vector<double> dydx_storage;
-
-  std::vector<double> yerr_storage;
-  std::vector<double> ytempo_storage;
-
-  std::vector<double> ak2_storage;
-  std::vector<double> ak3_storage;
-  std::vector<double> ak4_storage;
-  std::vector<double> ak5_storage;
-  std::vector<double> ak6_storage;
-  std::vector<double> ytemp_storage;
+  std::vector<double> ak2;
+  std::vector<double> ak3;
+  std::vector<double> ak4;
+  std::vector<double> ak5;
+  std::vector<double> ak6;
+  std::vector<double> ytemp;
 
   double stepmin;
 };

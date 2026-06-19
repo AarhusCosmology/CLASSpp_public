@@ -220,7 +220,7 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   PerturbationsModule* p_mod  = ctx.p_mod;
   perturb_workspace* ppw      = ctx.ppw;
   const BackgroundModule* bgm = p_mod->GetBackgroundModule().get();
-  const double* pvecback      = ppw->pvecback;
+  const double* pvecback      = ppw->pvecback.data();
 
   // Scalar field sources are scalar-only
   if (ctx.index_md != p_mod->index_md_scalars_)
@@ -291,7 +291,7 @@ void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::Pertur
                                                        double* y,
                                                        const PerturbIcContext& ctx) {
   const auto& l               = static_cast<const PerturbLayout&>(base);
-  const double* pvecback      = ctx.ppw->pvecback;
+  const double* pvecback      = ctx.ppw->pvecback.data();
   const BackgroundModule* bgm = ctx.p_mod->GetBackgroundModule().get();
   const double phi_prime      = pvecback[index_bg_phi_prime_scf_];
   const double phi_scf        = pvecback[index_bg_phi_scf_];
@@ -326,8 +326,8 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback;
-    const double* pvecmetric = ppw->pvecmetric;
+    const double* pvecback   = ppw->pvecback.data();
+    const double* pvecmetric = ppw->pvecmetric.data();
     const double k           = ppw->scalar_ctx.k;
     const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];

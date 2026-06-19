@@ -476,7 +476,7 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
-  const double* s_l               = ppw->s_l;
+  const double* s_l               = ppw->s_l.data();
   const double k                  = ctx.k;
   const double a2                 = ctx.a2;
   const double metric_continuity  = ctx.metric_continuity;
@@ -484,7 +484,7 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double metric_shear       = ctx.metric_shear;
   const double cotKgen            = ctx.cotKgen;
 
-  const double* pvecback = ppw->pvecback;
+  const double* pvecback = ppw->pvecback.data();
   const double M_ncdm    = M_;
   const int lmax         = layout.l_max;
 
@@ -515,7 +515,7 @@ void DNCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
   if (layout.q_size <= 0 || layout.index_per_q.empty())
     return;
 
-  const double* pvecback = ctx.ppw->pvecback;
+  const double* pvecback = ctx.ppw->pvecback.data();
   for (int index_q = 0; index_q < layout.q_size; ++index_q) {
     const int idx           = layout.index_per_q[index_q];
     const double q          = q_[index_q];
@@ -609,7 +609,7 @@ std::tuple<double, double, double> DNCDMSpecies::RescaledPerturbations(
   double rho_plus_p_theta_scaled = 0.;
   double rho_plus_p_shear_scaled = 0.;
 
-  const double* lnf_array = ppw->pvecback + bg_lnf_index();
+  const double* lnf_array = ppw->pvecback.data() + bg_lnf_index();
   const double lnN        = GetRescalingFactor(lnf_array);
 
   for (int index_q = 0; index_q < q_size(); index_q++) {

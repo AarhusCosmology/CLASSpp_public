@@ -11,11 +11,11 @@
 
 struct jacobian {
   /*Stuff for normal method: */
-  double** dfdy;
-  double* jacvec; /*Stores experience gained from subsequent calls */
-  double** LU;
-  double* LUw;
-  int* luidx;
+  std::vector<double*> dfdy;  /* row pointers into dfdy_data_vec */
+  std::vector<double> jacvec; /*Stores experience gained from subsequent calls */
+  std::vector<double*> LU;    /* row pointers into LU_data_vec */
+  std::vector<double> LUw;
+  std::vector<int> luidx;
   /*Sparse stuff:*/
   int use_sparse;
   int sparse_stuff_initialized;
@@ -26,63 +26,39 @@ struct jacobian {
   int has_pattern;
   int new_jacobian; /* True if sp_ludcmp has not been run on the current jacobian. */
   int cnzmax;
-  int* col_group;              /* Column grouping. Groups go from 0 to max_group*/
-  int* col_wi;                 /* Workarray for column grouping*/
+  std::vector<int> col_group;  /* Column grouping. Groups go from 0 to max_group*/
+  std::vector<int> col_wi;     /* Workarray for column grouping*/
   int max_group;               /*Number of columngroups -1 */
   std::unique_ptr<sp_mat> spJ; /* Stores the matrix we want to decompose */
-  double* xjac;                /*Stores the values of the sparse jacobian. (Same pattern as spJ) */
+  std::vector<double> xjac;    /*Stores the values of the sparse jacobian. (Same pattern as spJ) */
   std::unique_ptr<sp_num> Numerical; /*Stores the LU decomposition.*/
-  int* Cp; /* Stores the column pointers of the spJ+spJ' sparsity pattern. */
-  int* Ci; /* Stores the row indices of the  spJ+spJ' sparsity pattern. */
+  std::vector<int> Cp; /* Stores the column pointers of the spJ+spJ' sparsity pattern. */
+  std::vector<int> Ci; /* Stores the row indices of the  spJ+spJ' sparsity pattern. */
 
-  /* RAII backing storage — raw pointers above alias into these vectors */
-  std::vector<double*> dfdy_rows_vec;
+  /* Contiguous flat backing for the 2D row-pointer arrays above */
   std::vector<double> dfdy_data_vec;
-  std::vector<double> jacvec_vec;
-  std::vector<double*> LU_rows_vec;
   std::vector<double> LU_data_vec;
-  std::vector<double> LUw_vec;
-  std::vector<int> luidx_vec;
-  std::vector<double> xjac_vec;
-  std::vector<int> col_group_vec;
-  std::vector<int> col_wi_vec;
-  std::vector<int> Cp_vec;
-  std::vector<int> Ci_vec;
 };
 
 struct numjac_workspace {
-  /* Raw pointer API (aliases into backing vectors below) */
-  double* yscale;
-  double* del;
-  double* Difmax;
-  double* absFdelRm;
-  double* absFvalue;
-  double* absFvalueRm;
-  double* Fscale;
-  double* ffdel;
-  double* yydel;
-  double* tmp;
+  std::vector<double> yscale;
+  std::vector<double> del;
+  std::vector<double> Difmax;
+  std::vector<double> absFdelRm;
+  std::vector<double> absFvalue;
+  std::vector<double> absFvalueRm;
+  std::vector<double> Fscale;
+  std::vector<double> ffdel;
+  std::vector<double> yydel;
+  std::vector<double> tmp;
 
-  double** ydel_Fdel;
+  std::vector<double*> ydel_Fdel; /* row pointers into ydel_Fdel_data_vec */
 
-  int* logj;
-  int* Rowmax;
+  std::vector<int> logj;
+  std::vector<int> Rowmax;
 
-  /* RAII backing storage */
-  std::vector<double> yscale_vec;
-  std::vector<double> del_vec;
-  std::vector<double> Difmax_vec;
-  std::vector<double> absFdelRm_vec;
-  std::vector<double> absFvalue_vec;
-  std::vector<double> absFvalueRm_vec;
-  std::vector<double> Fscale_vec;
-  std::vector<double> ffdel_vec;
-  std::vector<double> yydel_vec;
-  std::vector<double> tmp_vec;
-  std::vector<double*> ydel_Fdel_rows_vec;
+  /* Contiguous flat backing for ydel_Fdel */
   std::vector<double> ydel_Fdel_data_vec;
-  std::vector<int> logj_vec;
-  std::vector<int> Rowmax_vec;
 };
 
 /**

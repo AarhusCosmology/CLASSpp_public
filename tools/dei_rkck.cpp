@@ -9,29 +9,17 @@ int initialize_generic_integrator(int n_dim, struct generic_integrator_workspace
 
   pgi->n = n_dim;
 
-  pgi->yscal_storage.resize(n_dim);
-  pgi->y_storage.resize(n_dim);
-  pgi->dydx_storage.resize(n_dim);
-  pgi->yerr_storage.resize(n_dim);
-  pgi->ytempo_storage.resize(n_dim);
-  pgi->ak2_storage.resize(n_dim);
-  pgi->ak3_storage.resize(n_dim);
-  pgi->ak4_storage.resize(n_dim);
-  pgi->ak5_storage.resize(n_dim);
-  pgi->ak6_storage.resize(n_dim);
-  pgi->ytemp_storage.resize(n_dim);
-
-  pgi->yscal  = pgi->yscal_storage.data();
-  pgi->y      = pgi->y_storage.data();
-  pgi->dydx   = pgi->dydx_storage.data();
-  pgi->yerr   = pgi->yerr_storage.data();
-  pgi->ytempo = pgi->ytempo_storage.data();
-  pgi->ak2    = pgi->ak2_storage.data();
-  pgi->ak3    = pgi->ak3_storage.data();
-  pgi->ak4    = pgi->ak4_storage.data();
-  pgi->ak5    = pgi->ak5_storage.data();
-  pgi->ak6    = pgi->ak6_storage.data();
-  pgi->ytemp  = pgi->ytemp_storage.data();
+  pgi->yscal.resize(n_dim);
+  pgi->y.resize(n_dim);
+  pgi->dydx.resize(n_dim);
+  pgi->yerr.resize(n_dim);
+  pgi->ytempo.resize(n_dim);
+  pgi->ak2.resize(n_dim);
+  pgi->ak3.resize(n_dim);
+  pgi->ak4.resize(n_dim);
+  pgi->ak5.resize(n_dim);
+  pgi->ak6.resize(n_dim);
+  pgi->ytemp.resize(n_dim);
 
   return _SUCCESS_;
 }
@@ -65,7 +53,7 @@ int generic_integrator(
   for (i = 0; i < pgi->n; i++)
     pgi->y[i] = ystart[i];
   for (nstp = 1; nstp <= _MAXSTP_; nstp++) {
-    (*derivs)(x, pgi->y, pgi->dydx, parameters_and_workspace_for_derivs);
+    (*derivs)(x, pgi->y.data(), pgi->dydx.data(), parameters_and_workspace_for_derivs);
     for (i = 0; i < pgi->n; i++)
       pgi->yscal[i] = fabs(pgi->y[i]) + fabs(pgi->dydx[i] * h) + _TINY_;
     if ((x + h - x2) * (x + h - x1) > 0.0)
@@ -138,31 +126,46 @@ int rkck(double x,
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + _RKCK_b21_ * h * pgi->dydx[i];
 
-  (*derivs)(x + _RKCK_a2_ * h, pgi->ytemp, pgi->ak2, parameters_and_workspace_for_derivs);
+  (*derivs)(x + _RKCK_a2_ * h,
+            pgi->ytemp.data(),
+            pgi->ak2.data(),
+            parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b31_ * pgi->dydx[i] + _RKCK_b32_ * pgi->ak2[i]);
 
-  (*derivs)(x + _RKCK_a3_ * h, pgi->ytemp, pgi->ak3, parameters_and_workspace_for_derivs);
+  (*derivs)(x + _RKCK_a3_ * h,
+            pgi->ytemp.data(),
+            pgi->ak3.data(),
+            parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b41_ * pgi->dydx[i] + _RKCK_b42_ * pgi->ak2[i] +
                                      _RKCK_b43_ * pgi->ak3[i]);
 
-  (*derivs)(x + _RKCK_a4_ * h, pgi->ytemp, pgi->ak4, parameters_and_workspace_for_derivs);
+  (*derivs)(x + _RKCK_a4_ * h,
+            pgi->ytemp.data(),
+            pgi->ak4.data(),
+            parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b51_ * pgi->dydx[i] + _RKCK_b52_ * pgi->ak2[i] +
                                      _RKCK_b53_ * pgi->ak3[i] + _RKCK_b54_ * pgi->ak4[i]);
 
-  (*derivs)(x + _RKCK_a5_ * h, pgi->ytemp, pgi->ak5, parameters_and_workspace_for_derivs);
+  (*derivs)(x + _RKCK_a5_ * h,
+            pgi->ytemp.data(),
+            pgi->ak5.data(),
+            parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b61_ * pgi->dydx[i] + _RKCK_b62_ * pgi->ak2[i] +
                                      _RKCK_b63_ * pgi->ak3[i] + _RKCK_b64_ * pgi->ak4[i] +
                                      _RKCK_b65_ * pgi->ak5[i]);
 
-  (*derivs)(x + _RKCK_a6_ * h, pgi->ytemp, pgi->ak6, parameters_and_workspace_for_derivs);
+  (*derivs)(x + _RKCK_a6_ * h,
+            pgi->ytemp.data(),
+            pgi->ak6.data(),
+            parameters_and_workspace_for_derivs);
 
   for (i = 0; i < pgi->n; i++)
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_c1_ * pgi->dydx[i] + _RKCK_c3_ * pgi->ak3[i] +

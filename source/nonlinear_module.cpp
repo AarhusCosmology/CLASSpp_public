@@ -2528,12 +2528,20 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
     r_real[index_mass]   = r;
     r_virial[index_mass] = r_real[index_mass] / pow(Delta_v, 1. / 3.);
 
-    array_interpolate_spline(pnw->rtab, nsig, pnw->stab, pnw->ddstab, 1, r, &last_index, &sig, 1);
-
-    array_interpolate_spline(pnw->rtab,
+    array_interpolate_spline(pnw->rtab.data(),
                              nsig,
-                             pnw->stab,
-                             pnw->ddstab,
+                             pnw->stab.data(),
+                             pnw->ddstab.data(),
+                             1,
+                             r,
+                             &last_index,
+                             &sig,
+                             1);
+
+    array_interpolate_spline(pnw->rtab.data(),
+                             nsig,
+                             pnw->stab.data(),
+                             pnw->ddstab.data(),
                              1,
                              r * fraction,
                              &last_index,
@@ -2645,7 +2653,13 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
       g_form = 1.;
 
     //
-    array_interpolate_two_arrays_one_column(pnw->growtable, pnw->ztable, 1, 0, ng, g_form, &z_form);
+    array_interpolate_two_arrays_one_column(pnw->growtable.data(),
+                                            pnw->ztable.data(),
+                                            1,
+                                            0,
+                                            ng,
+                                            g_form,
+                                            &z_form);
     if (z_form < z_at_tau) {
       conc[index_mass] = c_min_;
     }
@@ -2794,42 +2808,32 @@ void NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace
 
   /** - allocate arrays of the nonlinear workspace */
 
-  pnw->rtab_storage.resize(ppr->n_hmcode_tables);
-  pnw->stab_storage.resize(ppr->n_hmcode_tables);
-  pnw->ddstab_storage.resize(ppr->n_hmcode_tables);
-  pnw->rtab   = pnw->rtab_storage.data();
-  pnw->stab   = pnw->stab_storage.data();
-  pnw->ddstab = pnw->ddstab_storage.data();
+  pnw->rtab.resize(ppr->n_hmcode_tables);
+  pnw->stab.resize(ppr->n_hmcode_tables);
+  pnw->ddstab.resize(ppr->n_hmcode_tables);
 
   ng = ppr->n_hmcode_tables;
 
-  pnw->growtable_storage.resize(ng);
-  pnw->ztable_storage.resize(ng);
-  pnw->tautable_storage.resize(ng);
-  pnw->growtable = pnw->growtable_storage.data();
-  pnw->ztable    = pnw->ztable_storage.data();
-  pnw->tautable  = pnw->tautable_storage.data();
+  pnw->growtable.resize(ng);
+  pnw->ztable.resize(ng);
+  pnw->tautable.resize(ng);
 
   pnw->sigma_8_storage.assign(pk_size_, std::vector<double>(tau_size_));
   pnw->sigma_disp_storage.assign(pk_size_, std::vector<double>(tau_size_));
   pnw->sigma_disp_100_storage.assign(pk_size_, std::vector<double>(tau_size_));
   pnw->sigma_prime_storage.assign(pk_size_, std::vector<double>(tau_size_));
 
-  pnw->sigma_8_rows.resize(pk_size_);
-  pnw->sigma_disp_rows.resize(pk_size_);
-  pnw->sigma_disp_100_rows.resize(pk_size_);
-  pnw->sigma_prime_rows.resize(pk_size_);
+  pnw->sigma_8.resize(pk_size_);
+  pnw->sigma_disp.resize(pk_size_);
+  pnw->sigma_disp_100.resize(pk_size_);
+  pnw->sigma_prime.resize(pk_size_);
 
   for (int index_pk = 0; index_pk < pk_size_; index_pk++) {
-    pnw->sigma_8_rows[index_pk]        = pnw->sigma_8_storage[index_pk].data();
-    pnw->sigma_disp_rows[index_pk]     = pnw->sigma_disp_storage[index_pk].data();
-    pnw->sigma_disp_100_rows[index_pk] = pnw->sigma_disp_100_storage[index_pk].data();
-    pnw->sigma_prime_rows[index_pk]    = pnw->sigma_prime_storage[index_pk].data();
+    pnw->sigma_8[index_pk]        = pnw->sigma_8_storage[index_pk].data();
+    pnw->sigma_disp[index_pk]     = pnw->sigma_disp_storage[index_pk].data();
+    pnw->sigma_disp_100[index_pk] = pnw->sigma_disp_100_storage[index_pk].data();
+    pnw->sigma_prime[index_pk]    = pnw->sigma_prime_storage[index_pk].data();
   }
-  pnw->sigma_8        = pnw->sigma_8_rows.data();
-  pnw->sigma_disp     = pnw->sigma_disp_rows.data();
-  pnw->sigma_disp_100 = pnw->sigma_disp_100_rows.data();
-  pnw->sigma_prime    = pnw->sigma_prime_rows.data();
 
   /** - fill table with scale independent growth factor */
 

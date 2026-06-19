@@ -156,8 +156,8 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback;
-    const double* pvecmetric = ppw->pvecmetric;
+    const double* pvecback   = ppw->pvecback.data();
+    const double* pvecmetric = ppw->pvecmetric.data();
     const double k           = ppw->scalar_ctx.k;
     const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
@@ -361,8 +361,8 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   auto* pth_mod            = ppaw.perturbations_module->GetThermodynamicsModule().get();
-  const double* pvecback   = ppw->pvecback;
-  const double* pvecthermo = ppw->pvecthermo;
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecthermo = ppw->pvecthermo.data();
   auto* ppt                = ppaw.perturbations_module->GetPerturbs();
 
   const double dmu_idm_dr = pvecthermo[pth_mod->index_th_dmu_idm_dr_];

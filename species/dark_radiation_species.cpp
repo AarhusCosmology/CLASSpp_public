@@ -61,7 +61,7 @@ void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
-  const double* s_l               = ppw->s_l;
+  const double* s_l               = ppw->s_l.data();
   const double k                  = ctx.k;
   const double metric_continuity  = ctx.metric_continuity;
   const double metric_euler       = ctx.metric_euler;
@@ -69,7 +69,7 @@ void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double cotKgen            = ctx.cotKgen;
   const double s2_squared         = ctx.s2_squared;
   const double a                  = ctx.a;
-  const double* pvecback          = ppw->pvecback;
+  const double* pvecback          = ppw->pvecback.data();
   const int base_idx              = layout.idx_F0;
   const int lmax                  = layout.l_max;
   double r_dr = pvecback[index_bg_rho_] * (a * a) * (a * a) / (pba_->H0 * pba_->H0);
@@ -174,7 +174,7 @@ void DarkRadiationSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayo
   if (layout.idx_F0 < 0)
     return;
 
-  const double* pvecback   = ctx.ppw->pvecback;
+  const double* pvecback   = ctx.ppw->pvecback.data();
   const double r_prefactor = std::pow(std::pow(ctx.a / pba_->a_today, 2) / pba_->H0, 2);
   const double r_dr        = r_prefactor * pvecback[index_bg_rho_];
 
@@ -193,7 +193,7 @@ void DarkRadiationSpecies::PerturbNewtonianReseed(const PerturbLayout& layout,
                                                   double decay_corr) const {
   if (layout.idx_F0 < 0)
     return;
-  const double* pvecback = ctx.ppw->pvecback;
+  const double* pvecback = ctx.ppw->pvecback.data();
   const double r_dr      = std::pow(std::pow(ctx.a / pba_->a_today, 2) / pba_->H0, 2) *
                            pvecback[index_bg_rho_];
   const double delta_dr  = ctx.delta_dr + (-4. * ctx.a_prime_over_a + decay_corr) * ctx.alpha;

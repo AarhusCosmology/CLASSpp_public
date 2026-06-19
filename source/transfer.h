@@ -148,51 +148,37 @@ struct transfer_workspace {
 
   //@{
 
-  int tau_size;                 /**< number of discrete time values for a given type */
-  int tau_size_max;             /**< maximum number of discrete time values for all types */
-  double* interpolated_sources; /**< interpolated_sources[index_tau]:
+  int tau_size;     /**< number of discrete time values for a given type */
+  int tau_size_max; /**< maximum number of discrete time values for all types */
+  std::vector<double> interpolated_sources; /**< interpolated_sources[index_tau]:
                                     sources interpolated from the
                                     perturbation module at the right
                                     value of k */
-  double* sources;              /**< sources[index_tau]: sources
+  std::vector<double> sources;              /**< sources[index_tau]: sources
                                     used in transfer module, possibly
                                     differing from those in the
                                     perturbation module by some
                                     resampling or rescaling */
-  double* tau0_minus_tau;       /**< tau0_minus_tau[index_tau]: values of (tau0 - tau) */
-  double*
+  std::vector<double> tau0_minus_tau; /**< tau0_minus_tau[index_tau]: values of (tau0 - tau) */
+  std::vector<double>
       w_trapz; /**< w_trapz[index_tau]: values of weights in trapezoidal integration (related to time steps) */
-  double* chi;     /**< chi[index_tau]: value of argument of bessel
+  std::vector<double> chi;     /**< chi[index_tau]: value of argument of bessel
                                     function: k(tau0-tau) (flat case)
                                     or sqrt(|K|)(tau0-tau) (non-flat
                                     case) */
-  double* cscKgen; /**< cscKgen[index_tau]: useful trigonometric function */
-  double* cotKgen; /**< cotKgen[index_tau]: useful trigonometric function */
+  std::vector<double> cscKgen; /**< cscKgen[index_tau]: useful trigonometric function */
+  std::vector<double> cotKgen; /**< cotKgen[index_tau]: useful trigonometric function */
 
   /** Pre-allocated temporary buffers for transfer_radial_function and transfer_integrate.
    *  Size tau_size_max. Avoids repeated malloc/free in the hot per-(k,l) loop. */
-  double* Phi;              /**< Phi[index_tau]: Bessel function values */
-  double* dPhi;             /**< dPhi[index_tau]: first derivative of Bessel function */
-  double* d2Phi;            /**< d2Phi[index_tau]: second derivative of Bessel function */
-  double* chireverse;       /**< chireverse[index_tau]: reversed chi grid */
-  double* rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
-  double* radial_function;  /**< radial_function[index_tau]: output of transfer_radial_function */
-  double* chi_full_reverse; /**< workspace: reversed chi array */
-
-  std::vector<double> interpolated_sources_storage;
-  std::vector<double> sources_storage;
-  std::vector<double> tau0_minus_tau_storage;
-  std::vector<double> w_trapz_storage;
-  std::vector<double> chi_storage;
-  std::vector<double> cscKgen_storage;
-  std::vector<double> cotKgen_storage;
-  std::vector<double> phi_storage;
-  std::vector<double> dphi_storage;
-  std::vector<double> d2phi_storage;
-  std::vector<double> chireverse_storage;
-  std::vector<double> rescale_function_storage;
-  std::vector<double> radial_function_storage;
-  std::vector<double> chi_full_reverse_storage;
+  std::vector<double> Phi;        /**< Phi[index_tau]: Bessel function values */
+  std::vector<double> dPhi;       /**< dPhi[index_tau]: first derivative of Bessel function */
+  std::vector<double> d2Phi;      /**< d2Phi[index_tau]: second derivative of Bessel function */
+  std::vector<double> chireverse; /**< chireverse[index_tau]: reversed chi grid */
+  std::vector<double> rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
+  std::vector<double>
+      radial_function; /**< radial_function[index_tau]: output of transfer_radial_function */
+  std::vector<double> chi_full_reverse; /**< workspace: reversed chi array */
 
   //@}
 

@@ -295,15 +295,12 @@ struct perturb_vector {
 
   int pt_size; /**< size of perturbation vector */
 
-  double* y;  /**< vector of perturbations to be integrated */
-  double* dy; /**< time-derivative of the same vector */
-  std::vector<double> y_storage;
-  std::vector<double> dy_storage;
+  std::vector<double> y;  /**< vector of perturbations to be integrated */
+  std::vector<double> dy; /**< time-derivative of the same vector */
 
-  int* used_in_sources; /**< boolean array specifying which
+  std::vector<int> used_in_sources; /**< boolean array specifying which
                            perturbations enter in the calculation of
                            source functions */
-  std::vector<int> used_in_sources_storage;
 };
 
 /**
@@ -340,9 +337,9 @@ struct perturb_workspace {
 
   //@{
 
-  double* pvecback;   /**< background quantities */
-  double* pvecthermo; /**< thermodynamics quantities */
-  double* pvecmetric; /**< metric quantities */
+  std::vector<double> pvecback;   /**< background quantities */
+  std::vector<double> pvecthermo; /**< thermodynamics quantities */
+  std::vector<double> pvecmetric; /**< metric quantities */
   /* Single owner of the perturb_vector; species methods receive a
      non-owning raw pointer via pv.get() (used transiently while the
      workspace is alive, never stored or shared). */
@@ -434,8 +431,8 @@ struct perturb_workspace {
   int index_ap_ncdmfa;       /**< index for ncdm fluid approximation */
   int ap_size;               /**< number of relevant approximations for a given mode */
 
-  int* approx; /**< array of approximation flags holding at a given time: approx[index_ap] */
-  std::vector<int> approx_storage;
+  std::vector<int>
+      approx; /**< array of approximation flags holding at a given time: approx[index_ap] */
 
   //@}
 
@@ -444,14 +441,10 @@ struct perturb_workspace {
   //@{
 
   int max_l_max; /**< maximum l_max for any multipole */
-  double* s_l;   /**< array of freestreaming coefficients \f$ s_l = \sqrt{1-K*(l^2-1)/k^2} \f$*/
+  std::vector<double>
+      s_l; /**< array of freestreaming coefficients \f$ s_l = \sqrt{1-K*(l^2-1)/k^2} \f$*/
   double
       cotKgen; /**< generalised cot(sqrt(|K|)*tau)/k, for closing free-streaming hierarchies; valid for all modes */
-  std::vector<double> s_l_storage;
-
-  std::vector<double> pvecback_storage;
-  std::vector<double> pvecthermo_storage;
-  std::vector<double> pvecmetric_storage;
 
   //@}
 };

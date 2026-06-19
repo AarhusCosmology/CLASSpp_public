@@ -962,18 +962,16 @@ void InputModule::ReadDerived() {
   if (pth->reio_parametrization == reio_bins_tanh) {
     int found;
     pth->binned_reio_num = pfc->get_or("binned_reio_num", pth->binned_reio_num);
-    readDoubleList(pfc, "binned_reio_z", pth->binned_reio_z_storage, &found);
+    readDoubleList(pfc, "binned_reio_z", pth->binned_reio_z, &found);
     class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->binned_reio_z_storage.size()) != pth->binned_reio_num,
+                   static_cast<int>(pth->binned_reio_z.size()) != pth->binned_reio_num,
                "Number of entries in binned_reio_z does not match expected number, %d.",
                pth->binned_reio_num);
-    pth->binned_reio_z = pth->binned_reio_z_storage.data();
-    readDoubleList(pfc, "binned_reio_xe", pth->binned_reio_xe_storage, &found);
+    readDoubleList(pfc, "binned_reio_xe", pth->binned_reio_xe, &found);
     class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->binned_reio_xe_storage.size()) != pth->binned_reio_num,
+                   static_cast<int>(pth->binned_reio_xe.size()) != pth->binned_reio_num,
                "Number of entries in binned_reio_xe does not match expected number, %d.",
                pth->binned_reio_num);
-    pth->binned_reio_xe             = pth->binned_reio_xe_storage.data();
     pth->binned_reio_step_sharpness = pfc->get_or("binned_reio_step_sharpness",
                                                   pth->binned_reio_step_sharpness);
   }
@@ -982,18 +980,14 @@ void InputModule::ReadDerived() {
   if (pth->reio_parametrization == reio_many_tanh) {
     int found;
     pth->many_tanh_num = pfc->get_or("many_tanh_num", pth->many_tanh_num);
-    readDoubleList(pfc, "many_tanh_z", pth->many_tanh_z_storage, &found);
-    class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->many_tanh_z_storage.size()) != pth->many_tanh_num,
+    readDoubleList(pfc, "many_tanh_z", pth->many_tanh_z, &found);
+    class_test(found == _FALSE_ || static_cast<int>(pth->many_tanh_z.size()) != pth->many_tanh_num,
                "Number of entries in many_tanh_z does not match expected number, %d.",
                pth->many_tanh_num);
-    pth->many_tanh_z = pth->many_tanh_z_storage.data();
-    readDoubleList(pfc, "many_tanh_xe", pth->many_tanh_xe_storage, &found);
-    class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->many_tanh_xe_storage.size()) != pth->many_tanh_num,
+    readDoubleList(pfc, "many_tanh_xe", pth->many_tanh_xe, &found);
+    class_test(found == _FALSE_ || static_cast<int>(pth->many_tanh_xe.size()) != pth->many_tanh_num,
                "Number of entries in many_tanh_xe does not match expected number, %d.",
                pth->many_tanh_num);
-    pth->many_tanh_xe    = pth->many_tanh_xe_storage.data();
     pth->many_tanh_width = pfc->get_or("many_tanh_width", pth->many_tanh_width);
   }
 
@@ -1001,18 +995,16 @@ void InputModule::ReadDerived() {
   if (pth->reio_parametrization == reio_inter) {
     int found;
     pth->reio_inter_num = pfc->get_or("reio_inter_num", pth->reio_inter_num);
-    readDoubleList(pfc, "reio_inter_z", pth->reio_inter_z_storage, &found);
+    readDoubleList(pfc, "reio_inter_z", pth->reio_inter_z, &found);
     class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->reio_inter_z_storage.size()) != pth->reio_inter_num,
+                   static_cast<int>(pth->reio_inter_z.size()) != pth->reio_inter_num,
                "Number of entries in reio_inter_z does not match expected number, %d.",
                pth->reio_inter_num);
-    pth->reio_inter_z = pth->reio_inter_z_storage.data();
-    readDoubleList(pfc, "reio_inter_xe", pth->reio_inter_xe_storage, &found);
+    readDoubleList(pfc, "reio_inter_xe", pth->reio_inter_xe, &found);
     class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->reio_inter_xe_storage.size()) != pth->reio_inter_num,
+                   static_cast<int>(pth->reio_inter_xe.size()) != pth->reio_inter_num,
                "Number of entries in reio_inter_xe does not match expected number, %d.",
                pth->reio_inter_num);
-    pth->reio_inter_xe = pth->reio_inter_xe_storage.data();
   }
 
   /** - energy injection parameters from CDM annihilation/decay */

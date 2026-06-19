@@ -97,11 +97,9 @@ struct thermo {
 
   int binned_reio_num = 0; /**< with how many bins do we want to describe reionization? */
 
-  double* binned_reio_z = nullptr; /**< central z value for each bin */
-  std::vector<double> binned_reio_z_storage;
+  std::vector<double> binned_reio_z; /**< central z value for each bin */
 
-  double* binned_reio_xe = nullptr; /**< imposed \f$ X_e(z)\f$ value at center of each bin */
-  std::vector<double> binned_reio_xe_storage;
+  std::vector<double> binned_reio_xe; /**< imposed \f$ X_e(z)\f$ value at center of each bin */
 
   double binned_reio_step_sharpness =
       0.3; /**< sharpness of tanh() step interpolating between binned values */
@@ -110,12 +108,10 @@ struct thermo {
 
   int many_tanh_num = 0; /**< with how many jumps do we want to describe reionization? */
 
-  double* many_tanh_z = nullptr; /**< central z value for each tanh jump */
-  std::vector<double> many_tanh_z_storage;
+  std::vector<double> many_tanh_z; /**< central z value for each tanh jump */
 
-  double* many_tanh_xe =
-      nullptr; /**< imposed \f$ X_e(z)\f$ value at the end of each jump (ie at later times)*/
-  std::vector<double> many_tanh_xe_storage;
+  std::vector<double>
+      many_tanh_xe; /**< imposed \f$ X_e(z)\f$ value at the end of each jump (ie at later times)*/
 
   double many_tanh_width = 0.5; /**< sharpness of tanh() steps */
 
@@ -123,11 +119,9 @@ struct thermo {
 
   int reio_inter_num = 0; /**< with how many jumps do we want to describe reionization? */
 
-  double* reio_inter_z = nullptr; /**< discrete z values */
-  std::vector<double> reio_inter_z_storage;
+  std::vector<double> reio_inter_z; /**< discrete z values */
 
-  double* reio_inter_xe = nullptr; /**< discrete \f$ X_e(z)\f$ values */
-  std::vector<double> reio_inter_xe_storage;
+  std::vector<double> reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
 
   /** parameters for energy injection */
 

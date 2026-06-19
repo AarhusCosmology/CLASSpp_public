@@ -364,7 +364,7 @@ int evolver_ndf15(
           }
           else {
             eqvec(rhs, del, neq);
-            lubksb(jac.LU, neq, jac.luidx, del);
+            lubksb(jac.LU.data(), neq, jac.luidx.data(), del);
           }
 
           stepstat[5] += 1;
@@ -684,8 +684,8 @@ int calc_C(struct jacobian* jac) {
   int duplicate;
   int *Ci, *Cp, *Ai, *Ap;
   n  = jac->Numerical->n;
-  Ci = jac->Ci;
-  Cp = jac->Cp;
+  Ci = jac->Ci.data();
+  Cp = jac->Cp.data();
   Ai = jac->spJ->Ai.data();
   Ap = jac->spJ->Ap.data();
   /* Calculate sparse pattern for C = J + J'. We can use jac->Numerical->xi as
@@ -957,8 +957,8 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
       /* Find the sparsity pattern C = J + J':*/
       calc_C(jac);
       /* Calculate the optimal ordering: */
-      sp_amd(jac->Cp,
-             jac->Ci,
+      sp_amd(jac->Cp.data(),
+             jac->Ci.data(),
              neq,
              jac->cnzmax,
              jac->Numerical->q.data(),
@@ -984,7 +984,7 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
       }
     }
     /*Dense LU decomposition: */
-    funcreturn = ludcmp(jac->LU, neq, jac->luidx, &luparity, jac->LUw);
+    funcreturn = ludcmp(jac->LU.data(), neq, jac->luidx.data(), &luparity, jac->LUw.data());
     class_test(funcreturn == _FAILURE_, "Failure in ludcmp. Possibly singular matrix!");
   }
   return _SUCCESS_;
@@ -1236,8 +1236,8 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
   double **dFdy, *fac;
   int *Ap = nullptr, *Ai = nullptr;
 
-  dFdy = jac->dfdy; /* Assign pointer to dfdy directly for easier notation. */
-  fac  = jac->jacvec;
+  dFdy = jac->dfdy.data(); /* Assign pointer to dfdy directly for easier notation. */
+  fac  = jac->jacvec.data();
   if (jac->use_sparse) {
     Ap = jac->spJ->Ap.data();
     Ai = jac->spJ->Ai.data();
@@ -1288,7 +1288,7 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
     /* printf("\n Sparse calculation..neq=%d, has grouping=%d",neq,jac->has_grouping);*/
     /* Everything done sparse'ly. Do we have a grouping? */
     if (jac->has_grouping == 0) {
-      jac->max_group    = column_grouping(jac->spJ.get(), jac->col_group, jac->col_wi);
+      jac->max_group = column_grouping(jac->spJ.get(), jac->col_group.data(), jac->col_wi.data());
       jac->has_grouping = 1;
     }
     colmax = jac->max_group + 1;
@@ -1323,7 +1323,10 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
     for (i = 1; i <= neq; i++) {
       nj_ws->yydel[i] = nj_ws->ydel_Fdel[i][j];
     }
-    (*derivs)(t, nj_ws->yydel + 1, nj_ws->ffdel + 1, parameters_and_workspace_for_derivs);
+    (*derivs)(t,
+              nj_ws->yydel.data() + 1,
+              nj_ws->ffdel.data() + 1,
+              parameters_and_workspace_for_derivs);
 
     *nfe += 1;
     for (i = 1; i <= neq; i++)
@@ -1417,7 +1420,10 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
             del2 = -fabs(del2);
           }
           nj_ws->yydel[j] = y[j] + del2;
-          (*derivs)(t, nj_ws->yydel + 1, nj_ws->ffdel + 1, parameters_and_workspace_for_derivs);
+          (*derivs)(t,
+                    nj_ws->yydel.data() + 1,
+                    nj_ws->ffdel.data() + 1,
+                    parameters_and_workspace_for_derivs);
           *nfe            += 1;
           nj_ws->yydel[j]  = y[j];
           int rowmax2      = 1;
@@ -1567,42 +1573,32 @@ int initialize_jacobian(struct jacobian* jac, int neq) {
   /*Setup memory for the pointers of the dense method:*/
 
   jac->dfdy_data_vec.assign(neq * neq + 1, 0.0);
-  jac->dfdy_rows_vec.resize(neq + 1);
-  jac->dfdy    = jac->dfdy_rows_vec.data();
+  jac->dfdy.resize(neq + 1);
   jac->dfdy[0] = nullptr;
   jac->dfdy[1] = jac->dfdy_data_vec.data();
   for (i = 2; i <= neq; i++)
     jac->dfdy[i] = jac->dfdy[i - 1] + neq; /* Set row pointers... */
 
   jac->LU_data_vec.assign(neq * neq + 1, 0.0);
-  jac->LU_rows_vec.resize(neq + 1);
-  jac->LU    = jac->LU_rows_vec.data();
+  jac->LU.resize(neq + 1);
   jac->LU[0] = nullptr;
   jac->LU[1] = jac->LU_data_vec.data();
   for (i = 2; i <= neq; i++)
     jac->LU[i] = jac->LU[i - 1] + neq; /* Set row pointers... */
 
-  jac->LUw_vec.resize(neq + 1);
-  jac->LUw = jac->LUw_vec.data();
-  jac->jacvec_vec.resize(neq + 1);
-  jac->jacvec = jac->jacvec_vec.data();
-  jac->luidx_vec.resize(neq + 1);
-  jac->luidx = jac->luidx_vec.data();
+  jac->LUw.resize(neq + 1);
+  jac->jacvec.resize(neq + 1);
+  jac->luidx.resize(neq + 1);
 
   /*Setup memory for the sparse method, if used: */
   if (jac->use_sparse) {
     jac->sparse_stuff_initialized = 1;
 
-    jac->xjac_vec.resize(jac->max_nonzero);
-    jac->xjac = jac->xjac_vec.data();
-    jac->col_group_vec.resize(neq);
-    jac->col_group = jac->col_group_vec.data();
-    jac->col_wi_vec.resize(neq);
-    jac->col_wi = jac->col_wi_vec.data();
-    jac->Cp_vec.resize(neq + 1);
-    jac->Cp = jac->Cp_vec.data();
-    jac->Ci_vec.resize(jac->cnzmax);
-    jac->Ci = jac->Ci_vec.data();
+    jac->xjac.resize(jac->max_nonzero);
+    jac->col_group.resize(neq);
+    jac->col_wi.resize(neq);
+    jac->Cp.resize(neq + 1);
+    jac->Ci.resize(jac->cnzmax);
 
     jac->Numerical = std::make_unique<sp_num>(neq);
 
@@ -1630,39 +1626,26 @@ int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq) {
   int neqp = neq + 1;
   /* Allocate vectors and matrices using RAII backing storage: */
 
-  nj_ws->yscale_vec.resize(neqp);
-  nj_ws->yscale = nj_ws->yscale_vec.data();
-  nj_ws->del_vec.resize(neqp);
-  nj_ws->del = nj_ws->del_vec.data();
-  nj_ws->Difmax_vec.resize(neqp);
-  nj_ws->Difmax = nj_ws->Difmax_vec.data();
-  nj_ws->absFdelRm_vec.resize(neqp);
-  nj_ws->absFdelRm = nj_ws->absFdelRm_vec.data();
-  nj_ws->absFvalue_vec.resize(neqp);
-  nj_ws->absFvalue = nj_ws->absFvalue_vec.data();
-  nj_ws->absFvalueRm_vec.resize(neqp);
-  nj_ws->absFvalueRm = nj_ws->absFvalueRm_vec.data();
-  nj_ws->Fscale_vec.resize(neqp);
-  nj_ws->Fscale = nj_ws->Fscale_vec.data();
-  nj_ws->ffdel_vec.resize(neqp);
-  nj_ws->ffdel = nj_ws->ffdel_vec.data();
-  nj_ws->yydel_vec.resize(neqp);
-  nj_ws->yydel = nj_ws->yydel_vec.data();
-  nj_ws->tmp_vec.resize(neqp);
-  nj_ws->tmp = nj_ws->tmp_vec.data();
+  nj_ws->yscale.resize(neqp);
+  nj_ws->del.resize(neqp);
+  nj_ws->Difmax.resize(neqp);
+  nj_ws->absFdelRm.resize(neqp);
+  nj_ws->absFvalue.resize(neqp);
+  nj_ws->absFvalueRm.resize(neqp);
+  nj_ws->Fscale.resize(neqp);
+  nj_ws->ffdel.resize(neqp);
+  nj_ws->yydel.resize(neqp);
+  nj_ws->tmp.resize(neqp);
 
   nj_ws->ydel_Fdel_data_vec.assign(neq * neq + 1, 0.0);
-  nj_ws->ydel_Fdel_rows_vec.resize(neq + 1);
-  nj_ws->ydel_Fdel    = nj_ws->ydel_Fdel_rows_vec.data();
+  nj_ws->ydel_Fdel.resize(neq + 1);
   nj_ws->ydel_Fdel[0] = nullptr;
   nj_ws->ydel_Fdel[1] = nj_ws->ydel_Fdel_data_vec.data();
   for (int i = 2; i <= neq; i++)
     nj_ws->ydel_Fdel[i] = nj_ws->ydel_Fdel[i - 1] + neq; /* Set row pointers... */
 
-  nj_ws->logj_vec.resize(neqp);
-  nj_ws->logj = nj_ws->logj_vec.data();
-  nj_ws->Rowmax_vec.resize(neqp);
-  nj_ws->Rowmax = nj_ws->Rowmax_vec.data();
+  nj_ws->logj.resize(neqp);
+  nj_ws->Rowmax.resize(neqp);
 
   /* Done allocating stuff */
   return _SUCCESS_;

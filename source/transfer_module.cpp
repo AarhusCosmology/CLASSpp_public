@@ -1330,11 +1330,11 @@ void TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt,
 
   /** - store the sources in the workspace and define all
       fields in this workspace */
-  interpolated_sources = ptw->interpolated_sources;
-  tau0_minus_tau       = ptw->tau0_minus_tau;
-  w_trapz              = ptw->w_trapz;
+  interpolated_sources = ptw->interpolated_sources.data();
+  tau0_minus_tau       = ptw->tau0_minus_tau.data();
+  w_trapz              = ptw->w_trapz.data();
   tau_size             = &(ptw->tau_size);
-  sources              = ptw->sources;
+  sources              = ptw->sources.data();
 
   /** - loop over all modes. For each mode */
 
@@ -2441,9 +2441,9 @@ void TransferModule::transfer_integrate(struct transfer_workspace* ptw,
 
   /** - define local variables */
 
-  double* tau0_minus_tau = ptw->tau0_minus_tau;
-  double* w_trapz        = ptw->w_trapz;
-  double* sources        = ptw->sources;
+  double* tau0_minus_tau = ptw->tau0_minus_tau.data();
+  double* w_trapz        = ptw->w_trapz.data();
+  double* sources        = ptw->sources.data();
 
   /* minimum value of \f$ (\tau0-\tau) \f$ at which \f$ j_l(k[\tau_0-\tau]) \f$ is known, given that \f$ j_l(x) \f$ is sampled above some finite value \f$ x_{\min} \f$ (below which it can be approximated by zero) */
   double tau0_minus_tau_min_bessel;
@@ -2525,7 +2525,7 @@ void TransferModule::transfer_integrate(struct transfer_workspace* ptw,
   }
 
   /** - Compute the radial function: */
-  double* radial_function = ptw->radial_function;
+  double* radial_function = ptw->radial_function.data();
 
   transfer_radial_function(ptw,
                            k,
@@ -2609,8 +2609,8 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
       return;
     }
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau,
-                                ptw->sources,
+    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
+                                ptw->sources.data(),
                                 ptw->tau_size,
                                 tau0_minus_tau_limber,
                                 &S);
@@ -2638,14 +2638,14 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
       return;
     }
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau,
-                                ptw->sources,
+    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
+                                ptw->sources.data(),
                                 ptw->tau_size,
                                 (l + 1.5) / q,
                                 &Sp);
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau,
-                                ptw->sources,
+    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
+                                ptw->sources.data(),
                                 ptw->tau_size,
                                 (l - 0.5) / q,
                                 &Sm);
@@ -2661,20 +2661,20 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
       return;
     }
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau,
-                                ptw->sources,
+    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
+                                ptw->sources.data(),
                                 ptw->tau_size,
                                 (l + 2.5) / q,
                                 &Sp);
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau,
-                                ptw->sources,
+    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
+                                ptw->sources.data(),
                                 ptw->tau_size,
                                 (l - 1.5) / q,
                                 &Sm);
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau,
-                                ptw->sources,
+    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
+                                ptw->sources.data(),
                                 ptw->tau_size,
                                 (l + 0.5) / q,
                                 &S);
@@ -2920,15 +2920,15 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                               double* radial_function,
                                               radial_function_type radial_type) {
   HyperInterpStruct* pHIS;
-  double* chi     = ptw->chi;
-  double* cscKgen = ptw->cscKgen;
-  double* cotKgen = ptw->cotKgen;
+  double* chi     = ptw->chi.data();
+  double* cscKgen = ptw->cscKgen.data();
+  double* cotKgen = ptw->cotKgen.data();
   int j;
-  double* Phi              = ptw->Phi;
-  double* dPhi             = ptw->dPhi;
-  double* d2Phi            = ptw->d2Phi;
-  double* chireverse       = ptw->chireverse;
-  double* rescale_function = ptw->rescale_function;
+  double* Phi              = ptw->Phi.data();
+  double* dPhi             = ptw->dPhi.data();
+  double* d2Phi            = ptw->d2Phi.data();
+  double* chireverse       = ptw->chireverse.data();
+  double* rescale_function = ptw->rescale_function.data();
   double K = 0., k2 = 1.0;
   double sqrt_absK_over_k;
   double absK_over_k2;
@@ -3011,7 +3011,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
 
   //Reverse chi
   if (ptw->sgnK == 0) {
-    chireverse = ptw->chi_full_reverse + (ptw->tau_size - x_size);
+    chireverse = ptw->chi_full_reverse.data() + (ptw->tau_size - x_size);
     for (j = 0; j < x_size; j++) {
       rescale_function[j] = 1.;
     }
@@ -3361,35 +3361,20 @@ void TransferModule::transfer_workspace_init(struct transfer_workspace* ptw,
   ptw->tau0_minus_tau_cut  = tau0_minus_tau_cut;
   ptw->neglect_late_source = _FALSE_;
 
-  ptw->interpolated_sources_storage.resize(perturb_tau_size);
-  ptw->sources_storage.resize(tau_size_max);
-  ptw->tau0_minus_tau_storage.resize(tau_size_max);
-  ptw->w_trapz_storage.resize(tau_size_max);
-  ptw->chi_storage.resize(tau_size_max);
-  ptw->cscKgen_storage.resize(tau_size_max);
-  ptw->cotKgen_storage.resize(tau_size_max);
-  ptw->phi_storage.resize(tau_size_max);
-  ptw->dphi_storage.resize(tau_size_max);
-  ptw->d2phi_storage.resize(tau_size_max);
-  ptw->chireverse_storage.resize(tau_size_max);
-  ptw->rescale_function_storage.resize(tau_size_max);
-  ptw->radial_function_storage.resize(tau_size_max);
-  ptw->chi_full_reverse_storage.resize(tau_size_max);
-
-  ptw->interpolated_sources = ptw->interpolated_sources_storage.data();
-  ptw->sources              = ptw->sources_storage.data();
-  ptw->tau0_minus_tau       = ptw->tau0_minus_tau_storage.data();
-  ptw->w_trapz              = ptw->w_trapz_storage.data();
-  ptw->chi                  = ptw->chi_storage.data();
-  ptw->cscKgen              = ptw->cscKgen_storage.data();
-  ptw->cotKgen              = ptw->cotKgen_storage.data();
-  ptw->Phi                  = ptw->phi_storage.data();
-  ptw->dPhi                 = ptw->dphi_storage.data();
-  ptw->d2Phi                = ptw->d2phi_storage.data();
-  ptw->chireverse           = ptw->chireverse_storage.data();
-  ptw->rescale_function     = ptw->rescale_function_storage.data();
-  ptw->radial_function      = ptw->radial_function_storage.data();
-  ptw->chi_full_reverse     = ptw->chi_full_reverse_storage.data();
+  ptw->interpolated_sources.resize(perturb_tau_size);
+  ptw->sources.resize(tau_size_max);
+  ptw->tau0_minus_tau.resize(tau_size_max);
+  ptw->w_trapz.resize(tau_size_max);
+  ptw->chi.resize(tau_size_max);
+  ptw->cscKgen.resize(tau_size_max);
+  ptw->cotKgen.resize(tau_size_max);
+  ptw->Phi.resize(tau_size_max);
+  ptw->dPhi.resize(tau_size_max);
+  ptw->d2Phi.resize(tau_size_max);
+  ptw->chireverse.resize(tau_size_max);
+  ptw->rescale_function.resize(tau_size_max);
+  ptw->radial_function.resize(tau_size_max);
+  ptw->chi_full_reverse.resize(tau_size_max);
 }
 
 void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int index_q, double tau0) {

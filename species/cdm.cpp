@@ -199,8 +199,8 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
     const perturb_vector* pv = ppw->pv.get();
     const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
     const double k     = ppw->scalar_ctx.k;
-    const double* pvecback   = ppw->pvecback;
-    const double* pvecmetric = ppw->pvecmetric;
+    const double* pvecback   = ppw->pvecback.data();
+    const double* pvecmetric = ppw->pvecmetric.data();
 
     delta_cdm           = y[layout.idx_delta];
     const perturbs* ppt = mod.GetPerturbs();
@@ -231,7 +231,7 @@ void CDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout&
                                                double* y,
                                                const PerturbIcContext& ctx) {
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 void CDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,

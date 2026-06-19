@@ -166,7 +166,7 @@ void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const auto& layout         = static_cast<const PerturbLayout&>(base);
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const double* pvecback     = ppw->pvecback;
+  const double* pvecback     = ppw->pvecback.data();
 
   // Fluid sources are scalar-only
   if (ctx.index_md != p_mod->index_md_scalars_)
@@ -253,11 +253,11 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
     else {
       const auto& layout = static_cast<const PerturbLayout&>(
           *ppw->pv->species_layouts[collection_index_]);
-      const double rho     = Rho(ppw->pvecback);
-      delta_rho_fld        = rho * Delta(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
-      rho_plus_p_theta_fld = (rho + P(ppw->pvecback)) *
-                             Theta(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
-      delta_p_fld          = DeltaP(layout, ppw->pv.get(), y, ppw->pvecback, ppw);
+      const double rho     = Rho(ppw->pvecback.data());
+      delta_rho_fld        = rho * Delta(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+      rho_plus_p_theta_fld = (rho + P(ppw->pvecback.data())) *
+                             Theta(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+      delta_p_fld          = DeltaP(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
     }
   }
 
@@ -438,7 +438,7 @@ void FluidSpecies::ComputePpf(double k,
   // The PPF closure is defined relative to the rest of the universe. The module's
   // runtime rho_plus_p_tot now INCLUDES this fluid (it flows through the generic
   // loop), so subtract our own background rho+p here.
-  const double rho_plus_p_tot_rest = ppw->rho_plus_p_tot - Rho(ppw->pvecback) * (1. + w_fld);
+  const double rho_plus_p_tot_rest = ppw->rho_plus_p_tot - Rho(ppw->pvecback.data()) * (1. + w_fld);
 
   double s2sq               = ppw->s_l[2] * ppw->s_l[2];
   double c_gamma_k_H_square = pow(c_gamma_over_c_fld_ * k / a_prime_over_a, 2) * cs2_fld_;
@@ -472,7 +472,7 @@ void FluidSpecies::ComputePpf(double k,
   }
   // S quantity sourcing Gamma_prime evolution in the PPF scheme (eq. 15 of
   // 0808.3125); a ComputePpf-internal temporary, not stored on the workspace.
-  const double S_fld = Rho(ppw->pvecback) * (1. + w_fld) * 1.5 * a2 / k2 / a_prime_over_a *
+  const double S_fld = Rho(ppw->pvecback.data()) * (1. + w_fld) * 1.5 * a2 / k2 / a_prime_over_a *
                        (ppw->rho_plus_p_theta / rho_plus_p_tot_rest + k2 * alpha);
   // note that the last terms in the ratio do not include fld, that's correct, it's the whole point of the PPF scheme
   /** We must now check the stiffenss criterion again and set Gamma_prime_fld accordingly. */
@@ -485,7 +485,7 @@ void FluidSpecies::ComputePpf(double k,
   }
   double Gamma_prime_plus_a_prime_over_a_Gamma = ppw->Gamma_prime_fld + a_prime_over_a * Gamma_fld;
   // delta and theta in both gauges gauge:
-  ppw->rho_plus_p_theta_fld = Rho(ppw->pvecback) * (1. + w_fld) * ppw->rho_plus_p_theta /
+  ppw->rho_plus_p_theta_fld = Rho(ppw->pvecback.data()) * (1. + w_fld) * ppw->rho_plus_p_theta /
                                   rho_plus_p_tot_rest -
                               k2 * 2. / 3. * a_prime_over_a / a2 /
                                   (1 + 4.5 * a2 / k2 / s2sq * rho_plus_p_tot_rest) *
@@ -496,7 +496,7 @@ void FluidSpecies::ComputePpf(double k,
   /** Now construct the pressure perturbation, see 1903.xxxxx. */
   /** Construct energy density and pressure for DE (_fld) and the rest (_t).
       Also compute derivatives. */
-  double rho_fld       = Rho(ppw->pvecback);
+  double rho_fld       = Rho(ppw->pvecback.data());
   double p_fld         = w_fld * rho_fld;
   double rho_fld_prime = -3 * a_prime_over_a * (rho_fld + p_fld);
   double p_fld_prime   = w_prime_fld * rho_fld - 3 * a_prime_over_a * (1 + w_fld) * p_fld;
@@ -548,7 +548,7 @@ void FluidSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayou
   // the helper is a no-op. delta uses the universal ρ̇/ρ shift = -3(1+w)ℋα, which
   // corrects the historical opposite-sign bug.
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 void FluidSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,

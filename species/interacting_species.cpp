@@ -73,7 +73,7 @@ void IDM_DRSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayo
                                                   double* y,
                                                   const PerturbIcContext& ctx) {
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 // ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
@@ -152,7 +152,7 @@ void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   if (layout.idx_delta < 0)
     return;
 
-  const double* s_l    = ppw->s_l;
+  const double* s_l    = ppw->s_l.data();
   const double k       = ctx.k;
   const double cotKgen = ctx.cotKgen;
 
@@ -258,7 +258,7 @@ void IDRSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout&
   // delta/theta shift; shear/l3 gauge-invariant. idm_dr's synchronous theta is
   // already theta_ur (tight-coupling lock), so the universal += reproduces it.
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 // ── CopyPerturbationsAcrossSwitch ──────────────────────────────────────────
@@ -379,7 +379,7 @@ void IDM_DRMDSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
                                                     double* y,
                                                     const PerturbIcContext& ctx) {
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 // ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
@@ -467,7 +467,7 @@ void IDR_DRMDSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
                                                     double* y,
                                                     const PerturbIcContext& ctx) {
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 // ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────

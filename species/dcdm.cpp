@@ -133,7 +133,7 @@ void DCDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout
                                                 const PerturbIcContext& ctx) {
   // delta += (ρ̇/ρ)·α with ρ̇/ρ = -3ℋ - aΓ (decay-aware RhoDotOverRho), theta += k²·α.
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 void DCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
@@ -179,8 +179,8 @@ void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
     const perturb_vector* pv = ppw->pv.get();
     const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
     const double k     = ppw->scalar_ctx.k;
-    const double* pvecback   = ppw->pvecback;
-    const double* pvecmetric = ppw->pvecmetric;
+    const double* pvecback   = ppw->pvecback.data();
+    const double* pvecmetric = ppw->pvecmetric.data();
 
     delta_dcdm = y[layout.idx_delta];
     theta_dcdm = y[layout.idx_theta];

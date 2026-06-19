@@ -110,7 +110,8 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
           double Rint, csp2, Gint;
           auto* bgm = ctx.p_mod->GetBackgroundModule().get();
           ComputeIdmDrmd(ctx.ppw->pvecback[bgm->index_bg_a_],
-                         idm_drmd_->Rho(ctx.ppw->pvecback) / idr_drmd_->Rho(ctx.ppw->pvecback),
+                         idm_drmd_->Rho(ctx.ppw->pvecback.data()) /
+                             idr_drmd_->Rho(ctx.ppw->pvecback.data()),
                          &Rint,
                          &csp2,
                          &Gint);
@@ -196,8 +197,8 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback;
-    const double* pvecmetric = ppw->pvecmetric;
+    const double* pvecback   = ppw->pvecback.data();
+    const double* pvecmetric = ppw->pvecmetric.data();
     const double k           = ppw->scalar_ctx.k;
     const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
@@ -375,7 +376,7 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(double /*tau*/,
   const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  const double* pvecback = ppw->pvecback;
+  const double* pvecback = ppw->pvecback.data();
 
   const double rho_idm_drmd = idm_drmd_->Rho(pvecback);
   const double rho_idr_drmd = idr_drmd_->Rho(pvecback);

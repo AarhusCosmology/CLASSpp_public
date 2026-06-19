@@ -133,7 +133,7 @@ void PhotonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
-  const double* s_l               = ppw->s_l;
+  const double* s_l               = ppw->s_l.data();
 
   const double k                 = ppaw.k;
   const double k2                = k * k;
@@ -240,7 +240,7 @@ void PhotonsSpecies::PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
                                          const perturb_parameters_and_workspace& ppaw) {
   const auto& layout           = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw = ppaw.ppw;
-  const double* s_l            = ppw->s_l;
+  const double* s_l            = ppw->s_l.data();
 
   /* Nothing to do when RSA or TCA is active (indices not registered). */
   if (layout.idx_delta < 0)
@@ -336,7 +336,7 @@ void PhotonsSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
                                          const perturb_parameters_and_workspace& ppaw) {
   const auto& layout           = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw = ppaw.ppw;
-  const double* s_l            = ppw->s_l;
+  const double* s_l            = ppw->s_l.data();
 
   /* Nothing to do when RSA or TCA is active (indices not registered). */
   if (layout.idx_delta < 0)
@@ -524,7 +524,7 @@ void PhotonsSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLay
                                                    double* y,
                                                    const PerturbIcContext& ctx) {
   const auto& l = static_cast<const PerturbLayout&>(base);
-  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback, ctx);
+  ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
 
 // ── Switch-copy hook ──────────────────────────────────────────────────────────
@@ -600,9 +600,9 @@ void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
     // scalar_ctx.k is always current here: the evolver sets it in perturb_derivs_member
     // before the print callback fires, so it equals pppaw->k at this call site.
     const double k           = ppw->scalar_ctx.k;
-    const double* pvecthermo = ppw->pvecthermo;
-    const double* pvecback   = ppw->pvecback;
-    const double* pvecmetric = ppw->pvecmetric;
+    const double* pvecthermo = ppw->pvecthermo.data();
+    const double* pvecback   = ppw->pvecback.data();
+    const double* pvecmetric = ppw->pvecmetric.data();
 
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
       delta_g = y[g_lay.idx_delta];

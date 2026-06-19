@@ -690,7 +690,7 @@ void NCDMBaseSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
   const auto& layout = static_cast<const PerturbLayout&>(base);
   if (layout.q_size <= 0 || layout.index_per_q.empty())
     return;
-  const double* pvecback = ctx.ppw->pvecback;
+  const double* pvecback = ctx.ppw->pvecback.data();
   const double delta_ur  = ctx.delta_ur - 4. * ctx.a_prime_over_a * ctx.alpha;
   const double theta_ur  = ctx.theta_ur + ctx.k * ctx.k * ctx.alpha;
   const int lmax         = layout.l_max;
@@ -728,8 +728,8 @@ void NCDMBaseSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base
 
   const perturb_workspace* ppw = ppaw.ppw;
   const perturb_vector* pv     = ppw->pv.get();
-  const double* pvecback       = ppw->pvecback;
-  const double* s_l            = ppw->s_l;
+  const double* pvecback       = ppw->pvecback.data();
+  const double* s_l            = ppw->s_l.data();
   const double k               = ppaw.k;
   const double a               = pvecback[bgm_->index_bg_a_];
   const double a2              = a * a;
@@ -778,7 +778,7 @@ void NCDMBaseSpecies::ContributeTensorGwSource(const BaseSpecies::PerturbLayout&
                                                const double* y,
                                                perturb_workspace* ppw) const {
   const auto& layout     = static_cast<const PerturbLayout&>(base);
-  const double* pvecback = ppw->pvecback;
+  const double* pvecback = ppw->pvecback.data();
   const double a2        = a * a;
   const double factor    = factor_ * std::pow(a_today / a, 4);
 

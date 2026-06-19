@@ -101,7 +101,7 @@ void DCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
                                                     const PerturbIcContext& ctx) {
   const auto& my = static_cast<const PerturbLayout&>(base);
   dcdm_->PerturbSynchronousToNewtonian(my.dcdm, y, ctx);  // matter+decay via RhoDotOverRho
-  const double* pvecback  = ctx.ppw->pvecback;
+  const double* pvecback  = ctx.ppw->pvecback.data();
   const double rho_dr     = dr_sp_->Rho(pvecback);
   const double decay_corr = (rho_dr > 0.)
                                 ? ctx.a * dcdm_->Gamma_dcdm() * dcdm_->Rho(pvecback) / rho_dr
@@ -190,7 +190,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                                   PerturbSourceContext& ctx) {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
-  const double* pvecback     = ppw->pvecback;
+  const double* pvecback     = ppw->pvecback.data();
 
   const double a_prime_over_a = ctx.a_prime_over_a;
   const double a2_rel         = ctx.a2_rel;
@@ -284,7 +284,7 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
   if (my_cd_lay.dcdm.idx_delta < 0 || my_cd_lay.dr.idx_F0 < 0)
     return;
 
-  const double* pvecback = ppw->pvecback;
+  const double* pvecback = ppw->pvecback.data();
   const double a         = ctx.a;
   const double k         = ctx.k;
 
