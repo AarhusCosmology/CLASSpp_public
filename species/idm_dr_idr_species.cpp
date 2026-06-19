@@ -127,9 +127,9 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
 
 void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
                                             const PerturbationsModule& mod,
-                                            enum file_format fmt,
+                                            file_format fmt,
                                             BaseSpecies::TransferColumnSection section) const {
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_idm_dr", index_tp_delta_idm_dr_, index_tp_delta_idm_dr_ >= 0);
@@ -140,7 +140,7 @@ void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
       w.Add("t_idr", index_tp_theta_idr_, index_tp_theta_idr_ >= 0);
     }
   }
-  else if (fmt == camb_format) {
+  else if (fmt == file_format::camb_format) {
     if (section != TransferColumnSection::velocity)
       w.Add("-T_idm_dr/k2", index_tp_delta_idm_dr_, index_tp_delta_idm_dr_ >= 0);
   }
@@ -192,7 +192,7 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
       }
     }
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha = pvecmetric[ppw->index_mt_alpha];
       if (has_idm_dr()) {
         delta_idm_dr -= 3. * H * a * alpha;

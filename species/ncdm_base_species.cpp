@@ -1,5 +1,6 @@
 #include "ncdm_base_species.h"
 
+#include <algorithm>
 #include <cfloat>  // DBL_EPSILON, DBL_MAX
 #include <cmath>
 #include <cstring>
@@ -217,7 +218,7 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     double dq = 1., f0m2 = 0., f0p2 = 0.;
     for (int tolexp = _PSD_DERIVATIVE_EXP_MIN_; tolexp < _PSD_DERIVATIVE_EXP_MAX_; tolexp++) {
       if (index_q == 0)
-        dq = MIN((0.5 - DBL_EPSILON) * q, 2 * exp(tolexp) * (q_[index_q + 1] - q));
+        dq = std::min((0.5 - DBL_EPSILON) * q, 2 * exp(tolexp) * (q_[index_q + 1] - q));
       else if (index_q == static_cast<int>(q_.size()) - 1)
         dq = exp(tolexp) * 2.0 * (q_[index_q] - q_[index_q - 1]);
       else

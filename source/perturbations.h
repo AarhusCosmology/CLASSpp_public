@@ -64,7 +64,7 @@ enum tensor_methods { tm_photons_only, tm_massless_approximation, tm_exact };
 
 //@{
 
-enum possible_gauges {
+enum class possible_gauges {
   newtonian,  /**< newtonian (or longitudinal) gauge */
   synchronous /**< synchronous gauge with \f$ \theta_{cdm} = 0 \f$ by convention */
 };
@@ -203,7 +203,8 @@ struct perturbs {
 
   //@{
 
-  enum possible_gauges gauge = synchronous; /**< gauge in which to perform this calculation */
+  possible_gauges gauge =
+      possible_gauges::synchronous; /**< gauge in which to perform this calculation */
 
   //@}
 

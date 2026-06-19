@@ -96,7 +96,6 @@ definition_names = [
     '_MAX_NUMBER_OF_K_FILES_',
     '_Z_PK_NUM_MAX_',
     '_SELECTION_NUM_MAX_',
-    '_ERRORMSGSIZE_',
     '_TRUE_',
     '_FALSE_',
     '_SUCCESS_',
@@ -121,8 +120,6 @@ for file in h_files:
 enums = []
 enums.append('cdef extern from "class.h":')
 enums.append('    pair[string, string] get_my_py_error_message()')
-enums.append('')
-enums.append('    ctypedef char ErrorMsg[_ERRORMSGSIZE_]')
 enums.append('')
 enum_names = [
     'equation_of_state',
@@ -160,6 +157,20 @@ for file in h_files:
                     line = line.strip()
                     line = line.replace('{',':').replace('}','').replace(';','')
                     enums.append('    ctypedef ' + line)
+                    break
+                elif 'enum class ' + s + ' ' in line or 'enum class ' + s + '\n' in line:
+                    # C++ scoped enum — emit Cython 'cdef enum class' form
+                    enums.append('    cdef enum class ' + s + ':')
+                    if '}' not in line:
+                        # Multi-line: collect values on subsequent lines
+                        enum_found = True
+                    else:
+                        # Single-line: extract values between { }
+                        body = line[line.index('{') + 1 : line.index('}')]
+                        for val in body.split(','):
+                            val = val.strip().split()[0] if val.strip() else ''
+                            if val:
+                                enums.append('        ' + val)
                     break
         else:
             # Check for multiline enum ended
@@ -242,6 +253,10 @@ for file in h_files:
                     if len(words) > 3 and words[3].startswith('['):
                         variable_name += words[3].strip(';')
                     structs.append('        ' + words[1] + ' ' + variable_name)
+                elif len(words)>1 and words[0] in enum_names:
+                    # Scoped enum field: 'file_format output_format = ...'
+                    variable_name = words[1].strip(';')
+                    structs.append('        ' + words[0] + ' ' + variable_name)
                 index_line += 1
 
 
@@ -255,7 +270,7 @@ class_names = ['FileContent', 'NonColdDarkMatter', 'InputModule', 'BackgroundMod
                 'ThermodynamicsModule', 'PerturbationsModule',
                 'PrimordialModule', 'NonlinearModule', 'TransferModule', 'SpectraModule', 'LensingModule',
                 'ClassConstants', 'NcdmSettings',]
-allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'ErrorMsg', 'std::string',
+allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'std::string',
                  'std::map<std::string, std::vector<double>>',
                  'std::map<std::string, int>', 'std::shared_ptr<NonColdDarkMatter>',
                  'std::vector<std::vector<double>>', 'std::vector<std::vector<short>>',

@@ -1,5 +1,7 @@
 #include "dei_rkck.h"
 
+#include <algorithm>
+
 /**
  * Initialize the integrator
  *
@@ -96,12 +98,12 @@ int rkqs(double* x,
     rkck(*x, h, derivs, parameters_and_workspace_for_derivs, pgi);
     errmax = 0.0;
     for (i = 0; i < pgi->n; i++)
-      errmax = MAX(errmax, fabs(pgi->yerr[i] / pgi->yscal[i]));
+      errmax = std::max(errmax, fabs(pgi->yerr[i] / pgi->yscal[i]));
     errmax /= eps;
     if (errmax <= 1.0)
       break;
     htemp = _SAFETY_ * h * pow(errmax, _PSHRNK_);
-    h     = (h >= 0.0 ? MAX(htemp, 0.1 * h) : MIN(htemp, 0.1 * h));
+    h     = (h >= 0.0 ? std::max(htemp, 0.1 * h) : std::min(htemp, 0.1 * h));
     xnew  = (*x) + h;
     class_test(xnew == *x, "stepsize underflow at x=%e", xnew);
   }

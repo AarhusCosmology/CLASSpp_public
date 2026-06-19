@@ -35,7 +35,11 @@ void CDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWri
 
 void CDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
   class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
-  class_define_index(index_tp_theta_, ctx.wants_velocity && ctx.gauge != synchronous, index_tp, 1);
+  class_define_index(index_tp_theta_,
+                     ctx.wants_velocity &&
+                         ctx.gauge != static_cast<int>(possible_gauges::synchronous),
+                     index_tp,
+                     1);
 }
 
 void CDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
@@ -49,10 +53,10 @@ void CDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   layout.idx_delta = index_pt;
   ++index_pt;
 
-  /* theta_cdm is a dynamical variable only in Newtonian gauge (gauge==0);
+  /* theta_cdm is a dynamical variable only in Newtonian gauge;
      in synchronous gauge it is zero by definition. Sentinel -1 signals absent. */
   layout.idx_theta = -1;
-  if (gauge == 0) {
+  if (gauge == static_cast<int>(possible_gauges::newtonian)) {
     layout.idx_theta = index_pt;
     ++index_pt;
   }
@@ -66,9 +70,9 @@ void CDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
-  const int gauge                 = (int) ppaw.perturbations_module->GetPerturbs()->gauge;
+  const auto gauge                = ppaw.perturbations_module->GetPerturbs()->gauge;
 
-  if (gauge == 0) { /* newtonian */
+  if (gauge == possible_gauges::newtonian) {
     dy[layout.idx_delta] = -(y[layout.idx_theta] + ctx.metric_continuity);
     dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
   }
@@ -172,17 +176,17 @@ void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
 
 void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                     const PerturbationsModule& mod,
-                                    enum file_format fmt,
+                                    file_format fmt,
                                     BaseSpecies::TransferColumnSection section) const {
   const background* pba = mod.GetBackground();
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_cdm", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_cdm", index_tp_theta_, index_tp_theta_ >= 0);
   }
-  else if (fmt == camb_format) {
+  else if (fmt == file_format::camb_format) {
     if (section != TransferColumnSection::velocity)
       w.Add("-T_cdm/k2", index_tp_delta_, index_tp_delta_ >= 0);
   }
@@ -204,7 +208,7 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
 
     delta_cdm           = y[layout.idx_delta];
     const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       theta_cdm = 0.;
     }
     else {
@@ -212,7 +216,7 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
     }
 
     // Converting synchronous variables to Newtonian
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha  = pvecmetric[ppw->index_mt_alpha];
       const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
       const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];

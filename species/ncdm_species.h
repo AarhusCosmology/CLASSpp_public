@@ -105,7 +105,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
   void WriteOutputColumns(PerturbColumnWriter&,
                           const PerturbationsModule&,
-                          enum file_format,
+                          file_format,
                           TransferColumnSection) const override;
   void PrintVariables(PerturbColumnWriter&,
                       double,

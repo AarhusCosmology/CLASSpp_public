@@ -367,9 +367,9 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
 
 void DNCDM_DR_Species::WriteOutputColumns(PerturbColumnWriter& w,
                                           const PerturbationsModule& mod,
-                                          enum file_format fmt,
+                                          file_format fmt,
                                           BaseSpecies::TransferColumnSection section) const {
-  if (fmt != class_format)
+  if (fmt != file_format::class_format)
     return;
   const perturbs* ppt = mod.GetPerturbs();
   if (section != TransferColumnSection::velocity && ppt->has_density_transfers)

@@ -44,8 +44,8 @@ struct output {
 
   short write_header = _TRUE_; /**< flag stating whether we should write a header in output files */
 
-  enum file_format output_format =
-      class_format; /**< which format for output files (definitions, order of columns, etc.) */
+  /** which format for output files (definitions, order of columns, etc.) */
+  file_format output_format = file_format::class_format;
 
   short write_background     = _FALSE_; /**< flag for outputing background evolution in file */
   short write_thermodynamics = _FALSE_; /**< flag for outputing thermodynamical evolution in file */

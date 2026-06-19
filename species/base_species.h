@@ -385,7 +385,7 @@ class BaseSpecies {
   virtual void WriteOutputColumns(
       PerturbColumnWriter& /*writer*/,
       const PerturbationsModule& /*mod*/,
-      enum file_format /*fmt*/,
+      file_format /*fmt*/,
       TransferColumnSection /*section*/ = TransferColumnSection::all) const {}
 
   /**

@@ -144,7 +144,7 @@ class PhotonsSpecies : public BaseSpecies {
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,
-      enum file_format fmt,
+      file_format fmt,
       TransferColumnSection section = TransferColumnSection::all) const override;
   void PrintVariables(PerturbColumnWriter& writer,
                       double tau,

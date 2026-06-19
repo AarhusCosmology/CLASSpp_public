@@ -181,9 +181,9 @@ void BaryonsSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRe
 
 void BaryonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                         const PerturbationsModule& mod,
-                                        enum file_format fmt,
+                                        file_format fmt,
                                         BaseSpecies::TransferColumnSection section) const {
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_b", index_tp_delta_, index_tp_delta_ >= 0);
@@ -211,7 +211,7 @@ void BaryonsSpecies::PrintVariables(PerturbColumnWriter& w,
 
     // Converting synchronous variables to Newtonian
     const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha  = pvecmetric[ppw->index_mt_alpha];
       const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
       const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];

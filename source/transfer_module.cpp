@@ -23,6 +23,8 @@
 
 #include "transfer_module.h"
 
+#include <algorithm>
+
 #include "background_module.h"
 #include "nonlinear_module.h"
 #include "perturbations_module.h"
@@ -560,14 +562,14 @@ void TransferModule::transfer_get_l_list() {
     if (ppt->has_scalars) {
       if ((ppt->has_cl_cmb_temperature) || (ppt->has_cl_cmb_polarization) ||
           (ppt->has_cl_cmb_lensing_potential))
-        l_max = MAX(ppt->l_scalar_max, l_max);
+        l_max = std::max(ppt->l_scalar_max, l_max);
 
       if ((ppt->has_cl_lensing_potential) || (ppt->has_cl_number_count))
-        l_max = MAX(ppt->l_lss_max, l_max);
+        l_max = std::max(ppt->l_lss_max, l_max);
     }
 
     if (ppt->has_tensors)
-      l_max = MAX(ppt->l_tensor_max, l_max);
+      l_max = std::max(ppt->l_tensor_max, l_max);
   }
 
   /** - allocate and fill l array */
@@ -576,17 +578,19 @@ void TransferModule::transfer_get_l_list() {
 
   index_l   = 0;
   current_l = 2;
-  increment = MAX((int) (current_l *
-                         (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
-                  1);
+  increment =
+      std::max((int) (current_l *
+                      (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+               1);
 
   while (((current_l + increment) < l_max) &&
          (increment < ppr->l_linstep * thermodynamics_module_->angular_rescaling_)) {
     index_l++;
     current_l += increment;
-    increment  = MAX((int) (current_l *
-                            (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
-                     1);
+    increment =
+        std::max((int) (current_l *
+                        (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+                 1);
   }
 
   /** - when the logarithmic step becomes larger than some linear step,
@@ -615,16 +619,18 @@ void TransferModule::transfer_get_l_list() {
   index_l = 0;
   l_[0]   = 2;
   increment =
-      MAX((int) (l_[0] * (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
-          1);
+      std::max((int) (l_[0] *
+                      (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+               1);
 
   while (((l_[index_l] + increment) < l_max) &&
          (increment < ppr->l_linstep * thermodynamics_module_->angular_rescaling_)) {
     index_l++;
     l_[index_l] = l_[index_l - 1] + increment;
-    increment = MAX((int) (l_[index_l] *
-                           (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
-                    1);
+    increment =
+        std::max((int) (l_[index_l] *
+                        (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+                 1);
   }
 
   increment = ppr->l_linstep * thermodynamics_module_->angular_rescaling_;
@@ -699,7 +705,7 @@ void TransferModule::transfer_get_l_list() {
       if (l_size_tt_[index_md][index_tt] < l_size_max_)
         l_size_tt_[index_md][index_tt]++;
 
-      l_size_[index_md] = MAX(l_size_[index_md], l_size_tt_[index_md][index_tt]);
+      l_size_[index_md] = std::max(l_size_[index_md], l_size_tt_[index_md][index_tt]);
     }
   }
 }
@@ -734,9 +740,9 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
     q_max = 0.;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-      q_max =
-          MAX(q_max,
-              perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
+      q_max = std::max(q_max,
+                       perturbations_module_
+                           ->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
     }
 
     K = 0;
@@ -749,16 +755,16 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
     double k_max = 0.;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-      k_max =
-          MAX(k_max,
-              perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
+      k_max = std::max(k_max,
+                       perturbations_module_
+                           ->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
     }
 
     q_max = sqrt(k_max * k_max + K);
     if (ppt->has_vectors)
-      q_max = MIN(q_max, sqrt(k_max * k_max + 2. * K));
+      q_max = std::min(q_max, sqrt(k_max * k_max + 2. * K));
     if (ppt->has_tensors)
-      q_max = MIN(q_max, sqrt(k_max * k_max + 3. * K));
+      q_max = std::min(q_max, sqrt(k_max * k_max + 3. * K));
   }
 
   /* first and last value in closed case*/
@@ -769,9 +775,9 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
 
     q_max = 0.;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
-      q_max =
-          MAX(q_max,
-              perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
+      q_max = std::max(q_max,
+                       perturbations_module_
+                           ->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1]);
     }
   }
 
@@ -784,40 +790,40 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
   /* slightly conservative estimate of number of values */
 
   if (sgnK == 1) {
-    q_approximation = MIN(ppr->hyper_flat_approximation_nu, (q_max / sqrt(K))) * sqrt(K);
+    q_approximation = std::min(ppr->hyper_flat_approximation_nu, (q_max / sqrt(K))) * sqrt(K);
 
     /* max contribution from integer nu values */
     q_threshold = ppr->q_linstep / q_logstep_trapzd;
 
     q_step     = 1. + 0.5 * q_period * q_logstep_trapzd;
-    q_size_max = (int) (log(MIN(q_approximation, q_threshold) / q_min) / log(q_step) + 1);
+    q_size_max = (int) (log(std::min(q_approximation, q_threshold) / q_min) / log(q_step) + 1);
 
-    q_step      = MAX(q_period * ppr->q_linstep, 1 * sqrt(K));
-    q_size_max += (int) (1.1 * (q_approximation - MIN(q_min, 10 * q_threshold)) / q_step +
+    q_step      = std::max(q_period * ppr->q_linstep, 1 * sqrt(K));
+    q_size_max += (int) (1.1 * (q_approximation - std::min(q_min, 10 * q_threshold)) / q_step +
                          18 * q_threshold / q_step + 1);
 
     /* max contribution from non-integer nu values */
     q_threshold = ppr->q_linstep / q_logstep_spline;
 
     q_step      = 1. + 0.5 * q_period * q_logstep_spline;
-    q_size_max += (int) (log(MIN(q_max, q_threshold) / q_approximation) / log(q_step) + 1);
+    q_size_max += (int) (log(std::min(q_max, q_threshold) / q_approximation) / log(q_step) + 1);
 
     q_step      = q_period * ppr->q_linstep;
-    q_size_max += (int) (1.1 * (q_max - MIN(q_max, 10 * q_threshold)) / q_step +
+    q_size_max += (int) (1.1 * (q_max - std::min(q_max, 10 * q_threshold)) / q_step +
                          18 * q_threshold / q_step + 1);
 
     /* cap at 2^25 (~3*10^7) to prevent runaway allocations */
-    q_size_max = MIN(q_size_max, 1 << 25);
+    q_size_max = std::min(q_size_max, 1 << 25);
   }
   else {
     /* max contribution from non-integer nu values */
     q_threshold = ppr->q_linstep / q_logstep_spline;
 
     q_step     = 1. + 0.5 * q_period * q_logstep_spline;
-    q_size_max = (int) (log(MIN(q_max, q_threshold) / q_min) / log(q_step) + 1);
+    q_size_max = (int) (log(std::min(q_max, q_threshold) / q_min) / log(q_step) + 1);
 
     q_step      = q_period * ppr->q_linstep;
-    q_size_max += (int) (1.1 * (q_max - MIN(q_max, 10 * q_threshold)) / q_step +
+    q_size_max += (int) (1.1 * (q_max - std::min(q_max, 10 * q_threshold)) / q_step +
                          18 * q_threshold / q_step + 1);
   }
 
@@ -1117,7 +1123,7 @@ void TransferModule::transfer_source_tau_size_max(double tau_rec, double tau0, i
     for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
       transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size_tt);
 
-      *tau_size_max = MAX(*tau_size_max, tau_size_tt);
+      *tau_size_max = std::max(*tau_size_max, tau_size_tt);
     }
   }
 }
@@ -1223,9 +1229,10 @@ void TransferModule::transfer_source_tau_size(
            [Delta tau]=2pi/k_max. This gives the number below.
         */
         *tau_size =
-            MAX(*tau_size,
-                (int) ((tau_max - tau_min) / ((tau0 - tau_mean) / MIN(l_limber, ppt->l_lss_max))) *
-                    ppr->selection_sampling_bessel);
+            std::max(*tau_size,
+                     (int) ((int) ((tau_max - tau_min) /
+                                   ((tau0 - tau_mean) / std::min(l_limber, ppt->l_lss_max))) *
+                            ppr->selection_sampling_bessel));
       }
     }
 
@@ -1256,11 +1263,12 @@ void TransferModule::transfer_source_tau_size(
          (necessary for next step) */
       if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr)) {
         /* Even if G5 is integrated along the line-of-sight, we do not apply the same Limber criteria as for the other integrated terms, because here we have the derivative of the Bessel.  */
-        l_limber  = ppr->l_switch_limber_for_nc_local_over_z * ppt->selection_mean[bin];
-        *tau_size = MAX(*tau_size,
-                        (int) ((tau0 - tau_min) /
-                               ((tau0 - tau_mean) / 2. / MIN(l_limber, ppt->l_lss_max))) *
-                            ppr->selection_sampling_bessel);
+        l_limber = ppr->l_switch_limber_for_nc_local_over_z * ppt->selection_mean[bin];
+        *tau_size =
+            std::max(*tau_size,
+                     (int) ((int) ((tau0 - tau_min) /
+                                   ((tau0 - tau_mean) / 2. / std::min(l_limber, ppt->l_lss_max))) *
+                            ppr->selection_sampling_bessel));
       }
       else {
         l_limber = ppr->l_switch_limber_for_nc_los_over_z * ppt->selection_mean[bin];
@@ -1272,10 +1280,11 @@ void TransferModule::transfer_source_tau_size(
            We need to cut the interval (tau_0-tau_min) in pieces of size
            [Delta tau]=2pi/k_max. This gives the number below.
         */
-        *tau_size = MAX(*tau_size,
-                        (int) ((tau0 - tau_min) /
-                               ((tau0 - tau_mean) / 2. / MIN(l_limber, ppt->l_lss_max))) *
-                            ppr->selection_sampling_bessel_los);
+        *tau_size =
+            std::max(*tau_size,
+                     (int) ((int) ((tau0 - tau_min) /
+                                   ((tau0 - tau_mean) / 2. / std::min(l_limber, ppt->l_lss_max))) *
+                            ppr->selection_sampling_bessel_los));
       }
     }
   }
@@ -2148,13 +2157,14 @@ void TransferModule::transfer_selection_times(int bin,
   /* higher edge of time interval for this bin */
 
   if (ppt->selection == gaussian) {
-    z = MAX(ppt->selection_mean[bin] - ppt->selection_width[bin] * ppr->selection_cut_at_sigma, 0.);
+    z = std::max(ppt->selection_mean[bin] - ppt->selection_width[bin] * ppr->selection_cut_at_sigma,
+                 0.);
   }
   if (ppt->selection == tophat) {
-    z = MAX(ppt->selection_mean[bin] -
-                (1. + ppr->selection_cut_at_sigma * ppr->selection_tophat_edge) *
-                    ppt->selection_width[bin],
-            0.);
+    z = std::max(ppt->selection_mean[bin] -
+                     (1. + ppr->selection_cut_at_sigma * ppr->selection_tophat_edge) *
+                         ppt->selection_width[bin],
+                 0.);
   }
   if (ppt->selection == dirac) {
     z = ppt->selection_mean[bin];
@@ -2164,7 +2174,7 @@ void TransferModule::transfer_selection_times(int bin,
 
   /* central value of time interval for this bin */
 
-  z = MAX(ppt->selection_mean[bin], 0.);
+  z = std::max(ppt->selection_mean[bin], 0.);
 
   background_module_->background_tau_of_z(z, tau_mean);
 }
@@ -3025,23 +3035,25 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       else {
         if (ptw->sgnK == 1) {
           rescale_function[j] =
-              MIN(rescale_amplitude *
-                      (1 +
-                       0.34 * atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp) +
-                       2.00 *
-                           pow(atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp),
-                               2)),
-                  chireverse[j] / rescale_argument / sin(chireverse[j] / rescale_argument));
+              std::min(rescale_amplitude *
+                           (1 +
+                            0.34 * atan(l_[index_l] / nu) *
+                                (chireverse[j] / rescale_argument - chi_tp) +
+                            2.00 * pow(atan(l_[index_l] / nu) *
+                                           (chireverse[j] / rescale_argument - chi_tp),
+                                       2)),
+                       chireverse[j] / rescale_argument / sin(chireverse[j] / rescale_argument));
         }
         else {
           rescale_function[j] =
-              MAX(rescale_amplitude *
-                      (1 -
-                       0.38 * atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp) +
-                       0.40 *
-                           pow(atan(l_[index_l] / nu) * (chireverse[j] / rescale_argument - chi_tp),
-                               2)),
-                  chireverse[j] / rescale_argument / sinh(chireverse[j] / rescale_argument));
+              std::max(rescale_amplitude *
+                           (1 -
+                            0.38 * atan(l_[index_l] / nu) *
+                                (chireverse[j] / rescale_argument - chi_tp) +
+                            0.40 * pow(atan(l_[index_l] / nu) *
+                                           (chireverse[j] / rescale_argument - chi_tp),
+                                       2)),
+                       chireverse[j] / rescale_argument / sinh(chireverse[j] / rescale_argument));
         }
       }
     }
@@ -3394,7 +3406,7 @@ void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int ind
     nu   = q_[index_q] / sqrt_absK;
 
     if (ptw->sgnK == 1) {
-      xmax = MIN(xmax, _PI_ / 2.0 - ppr->hyper_x_min);  //We only need solution on [0;pi/2]
+      xmax = std::min(xmax, _PI_ / 2.0 - ppr->hyper_x_min);  //We only need solution on [0;pi/2]
 
       int_nu = (int) (nu + 0.2);
       new_nu = (double) int_nu;
@@ -3487,35 +3499,26 @@ void TransferModule::transfer_get_lmax(
   int multiplier;
   int right_boundary_checked = _FALSE_;
   int hil = 0, hir = 0, bini = 0;
-  class_call(get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals), "", "");
+  class_call(get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals));
   if (x_nonzero >= xmax) {
     //printf("None relevant\n");
     //x at left boundary is already larger than xmax.
-    *index_l_right = MAX(lsize - 1, 1);
+    *index_l_right = std::max(lsize - 1, 1);
     return;
   }
-  class_call(get_xmin_generic(sgnK, lvec[lsize - 1], nu, xtol, phiminabs, &x_nonzero, &fevals),
-             "",
-             "");
+  class_call(get_xmin_generic(sgnK, lvec[lsize - 1], nu, xtol, phiminabs, &x_nonzero, &fevals));
 
   if (x_nonzero < xmax) {
     //All Bessels are relevant
     //printf("All relevant\n");
-    *index_l_left = MAX(0, (lsize - 2));
+    *index_l_left = std::max(0, (lsize - 2));
     return;
   }
   /* Hunt for left boundary: */
   for (multiplier = 1;; multiplier *= 5) {
     hil++;
-    class_call(get_xmin_generic(sgnK,
-                                lvec[*index_l_left],
-                                nu,
-                                xtol,
-                                phiminabs,
-                                &x_nonzero,
-                                &fevals),
-               "",
-               "");
+    class_call(
+        get_xmin_generic(sgnK, lvec[*index_l_left], nu, xtol, phiminabs, &x_nonzero, &fevals));
     //printf("Hunt left, iter = %d, x_nonzero=%g\n",hil,x_nonzero);
     if (x_nonzero <= xmax) {
       //Boundary found
@@ -3538,15 +3541,8 @@ void TransferModule::transfer_get_lmax(
     for (multiplier = 1;; multiplier *= 5) {
       hir++;
       //printf("right iteration %d,index_l_right:%d\n",hir,*index_l_right);
-      class_call(get_xmin_generic(sgnK,
-                                  lvec[*index_l_right],
-                                  nu,
-                                  xtol,
-                                  phiminabs,
-                                  &x_nonzero,
-                                  &fevals),
-                 "",
-                 "");
+      class_call(
+          get_xmin_generic(sgnK, lvec[*index_l_right], nu, xtol, phiminabs, &x_nonzero, &fevals));
       if (x_nonzero >= xmax) {
         //Boundary found
         break;
@@ -3572,9 +3568,7 @@ void TransferModule::transfer_get_lmax(
     bini++;
     index_l_mid = (int) (0.5 * ((*index_l_right) + (*index_l_left)));
     //printf("left:%d, mid=%d, right=%d\n",*index_l_left,index_l_mid,*index_l_right);
-    class_call(get_xmin_generic(sgnK, lvec[index_l_mid], nu, xtol, phiminabs, &x_nonzero, &fevals),
-               "",
-               "");
+    class_call(get_xmin_generic(sgnK, lvec[index_l_mid], nu, xtol, phiminabs, &x_nonzero, &fevals));
     if (x_nonzero < xmax)
       *index_l_left = index_l_mid;
     else

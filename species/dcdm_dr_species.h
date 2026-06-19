@@ -106,7 +106,7 @@ class DCDM_DR_Species : public CompositeSpecies {
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,
-      enum file_format fmt,
+      file_format fmt,
       TransferColumnSection section = TransferColumnSection::all) const override;
 
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,

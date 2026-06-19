@@ -435,19 +435,19 @@ void NCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
 
 void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      const PerturbationsModule& mod,
-                                     enum file_format fmt,
+                                     file_format fmt,
                                      BaseSpecies::TransferColumnSection section) const {
   const std::string& nm = name();
 
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_" + nm, index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_" + nm, index_tp_theta_, index_tp_theta_ >= 0);
   }
-  else if (fmt == camb_format) {
-    // camb_format: per-flavor column (intentional change from aggregate, #309)
+  else if (fmt == file_format::camb_format) {
+    // file_format::camb_format: per-flavor column (intentional change from aggregate, #309)
     if (section != TransferColumnSection::velocity)
       w.Add("-T_" + nm + "/k2", index_tp_delta_, index_tp_delta_ >= 0);
   }
@@ -483,7 +483,7 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
     cs2_ncdm = (std::abs(delta_rho_ncdm) > eps) ? delta_p_ncdm / delta_rho_ncdm : 0.;
 
     const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha_corr = pvecmetric[ppw->index_mt_alpha];
       // Store pre-correction delta for cs2 update
       const double delta_ncdm_syn  = delta_ncdm;

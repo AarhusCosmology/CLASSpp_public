@@ -14,6 +14,8 @@
 
 #include "primordial_module.h"
 
+#include <algorithm>
+
 #include "thread_pool.h"
 
 #ifdef _WIN32
@@ -1406,7 +1408,7 @@ void PrimordialModule::primordial_inflation_one_k(
   primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
   dtau = ppr->primordial_inflation_pt_stepsize * 2. * _PI_ /
-         MAX(sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k);
+         std::max(sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k);
 
   /** - loop over time */
   do {
@@ -1435,7 +1437,7 @@ void PrimordialModule::primordial_inflation_one_k(
 
     /* new time step */
     dtau = ppr->primordial_inflation_pt_stepsize * 2. * _PI_ /
-           MAX(sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k);
+           std::max(sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k);
 
     /* new aH */
     aH = dy[index_in_a_] / y[index_in_a_];
@@ -1656,7 +1658,7 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
   if ((direction == forward) && ((ppm->primordial_spec_type == inflation_V) ||
                                  (ppm->primordial_spec_type == inflation_V_end))) {
     dtau = ppr->primordial_inflation_bg_stepsize *
-           MIN(y[index_in_a_] / dy[index_in_a_], fabs(y[index_in_dphi_] / dy[index_in_dphi_]));
+           std::min(y[index_in_a_] / dy[index_in_a_], fabs(y[index_in_dphi_] / dy[index_in_dphi_]));
   }
   else {
     // minus sign for backward in time
@@ -1763,7 +1765,8 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
     if ((direction == forward) && ((ppm->primordial_spec_type == inflation_V) ||
                                    (ppm->primordial_spec_type == inflation_V_end))) {
       dtau = ppr->primordial_inflation_bg_stepsize *
-             MIN(y[index_in_a_] / dy[index_in_a_], fabs(y[index_in_dphi_] / dy[index_in_dphi_]));
+             std::min(y[index_in_a_] / dy[index_in_a_],
+                      fabs(y[index_in_dphi_] / dy[index_in_dphi_]));
     }
     else {
       // minus sign for backward in time

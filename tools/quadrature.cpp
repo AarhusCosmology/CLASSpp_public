@@ -4,6 +4,8 @@
 /* Thomas Tram                            */
 /******************************************/
 #include "quadrature.h"
+
+#include <algorithm>
 #define _N_COMB_LAG_ 16
 
 int get_qsampling_manual(double* x,
@@ -187,7 +189,7 @@ int get_qsampling(double* x,
     (*function)(params_for_function, qmax, &y2);
 
     b_comb = (y1 / y2 - 1.0) / (qmax - qmaxm1);
-    b_comb = MAX(b_comb, 1e-100);
+    b_comb = std::max(b_comb, 1e-100);
     //c_comb = -b_comb*qmax;
     a_comb = y2 * exp(b_comb * qmax);
     // printf("f(q) = %g*exp(-%g*q) \n",a_comb,b_comb);
@@ -262,8 +264,8 @@ int get_qsampling(double* x,
   }
 
   /* Search for the minimal Laguerre quadrature rule: */
-  NLag_max = MIN(N_max, 80);
-  for (NLag = NL; NLag <= NLag_max; NLag = MIN(NLag_max, NLag + 10)) {
+  NLag_max = std::min(N_max, 80);
+  for (NLag = NL; NLag <= NLag_max; NLag = std::min(NLag_max, NLag + 10)) {
     /* Evaluate integral: */
     compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), _TRUE_);
     ILag = 0.0;

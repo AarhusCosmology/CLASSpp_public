@@ -1,5 +1,6 @@
 #include "ultra_relativistic.h"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -187,10 +188,10 @@ void UltraRelativisticSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& b
     /* ── UFA: fluid approximation for shear only ──────────────────────── */
     const int method = ppr->ur_fluid_approximation;
 
-    if (method == (int) ufa_mb) {
+    if (method == static_cast<int>(ufa_method::ufa_mb)) {
       dy[idx_shear] = -3. / tau * y[idx_shear] + 2. / 3. * (y[idx_theta] + metric_shear);
     }
-    else if (method == (int) ufa_hu) {
+    else if (method == static_cast<int>(ufa_method::ufa_hu)) {
       dy[idx_shear] = -3. * a_prime_over_a * y[idx_shear] + 2. / 3. * (y[idx_theta] + metric_shear);
     }
     else { /* ufa_CLASS (default) */
@@ -340,17 +341,17 @@ void UltraRelativisticSpecies::CopyPerturbationsAcrossSwitch(
 void UltraRelativisticSpecies::WriteOutputColumns(
     PerturbColumnWriter& w,
     const PerturbationsModule& mod,
-    enum file_format fmt,
+    file_format fmt,
     BaseSpecies::TransferColumnSection section) const {
   const background* pba = mod.GetBackground();
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_ur", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_ur", index_tp_theta_, index_tp_theta_ >= 0);
   }
-  else if (fmt == camb_format) {
+  else if (fmt == file_format::camb_format) {
     if (section != TransferColumnSection::velocity)
       w.Add("-T_ur/k2", index_tp_delta_, index_tp_delta_ >= 0);
   }
@@ -383,7 +384,7 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
 
     // Synchronous → Newtonian gauge conversion (relativistic: factor 4)
     const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha  = pvecmetric[ppw->index_mt_alpha];
       const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
       const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];

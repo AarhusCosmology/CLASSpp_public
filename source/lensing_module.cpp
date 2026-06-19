@@ -15,6 +15,7 @@
 
 #include "lensing_module.h"
 
+#include <algorithm>
 #include <numeric>
 
 #include "spectra_module.h"
@@ -727,12 +728,12 @@ void LensingModule::lensing_indices() {
   for (int index_lt = 0; index_lt < lt_size_; index_lt++) {
     l_max_lt_[index_lt] = 0;
     for (int index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
-      l_max_lt_[index_lt] = MAX(l_max_lt_[index_lt],
-                                spectra_module_->l_max_ct_[index_md][index_lt]);
+      l_max_lt_[index_lt] = std::max(l_max_lt_[index_lt],
+                                     spectra_module_->l_max_ct_[index_md][index_lt]);
 
       if ((has_bb_) && (has_ee_) && (index_lt == index_lt_bb_)) {
-        l_max_lt_[index_lt] = MAX(l_max_lt_[index_lt],
-                                  spectra_module_->l_max_ct_[index_md][index_lt_ee_]);
+        l_max_lt_[index_lt] = std::max(l_max_lt_[index_lt],
+                                       spectra_module_->l_max_ct_[index_md][index_lt_ee_]);
       }
     }
   }

@@ -15,6 +15,8 @@
 
 #include "output_module.h"
 
+#include <algorithm>
+
 #include "background_module.h"
 #include "lensing_module.h"
 #include "nonlinear_module.h"
@@ -662,7 +664,7 @@ void OutputModule::output_tk() {
 
   int index_md = perturbations_module_->index_md_scalars_;
 
-  if (pop->output_format == camb_format) {
+  if (pop->output_format == file_format::camb_format) {
     int n_ncdm_family = 0;
     for (auto& [name, sp] : all_species_) {
       if (dynamic_cast<NCDMBaseSpecies*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get()))
@@ -724,7 +726,7 @@ void OutputModule::output_tk() {
       class_open(tkfile, file_name.c_str(), "w");
 
       if (pop->write_header == _TRUE_) {
-        if (pop->output_format == class_format) {
+        if (pop->output_format == file_format::class_format) {
           fprintf(tkfile,
                   "# Transfer functions T_i(k) %sat redshift z=%g\n",
                   first_line.c_str(),
@@ -758,7 +760,7 @@ void OutputModule::output_tk() {
           }
           fprintf(tkfile, "#\n");
         }
-        else if (pop->output_format == camb_format) {
+        else if (pop->output_format == file_format::camb_format) {
           fprintf(tkfile,
                   "# Rescaled matter transfer functions [-T_i(k)/k^2] %sat redshift z=%g\n",
                   first_line.c_str(),
@@ -1021,17 +1023,17 @@ void OutputModule::output_open_cl_file(FILE** clfile,
   if (pop->write_header == _TRUE_) {
     /** - First we deal with the entries that are dependent of format type */
 
-    if (pop->output_format == class_format) {
+    if (pop->output_format == file_format::class_format) {
       fprintf(*clfile, "# dimensionless %s\n", first_line);
     }
-    if (pop->output_format == camb_format) {
+    if (pop->output_format == file_format::camb_format) {
       fprintf(*clfile, "# %s (units: [microK]^2)\n", first_line);
     }
 
     fprintf(*clfile, "# for l=2 to %d, i.e. number of multipoles equal to %d\n", lmax, lmax - 1);
     fprintf(*clfile, "#\n");
 
-    if (pop->output_format == class_format) {
+    if (pop->output_format == file_format::class_format) {
       fprintf(*clfile,
               "# -> if you prefer output in CAMB/HealPix/LensPix units/order, set 'format' to "
               "'camb' in input file\n");
@@ -1041,11 +1043,11 @@ void OutputModule::output_open_cl_file(FILE** clfile,
             "# -> if you don't want to see such a header, set 'headers' to 'no' in input file\n");
 
     if (spectra_module_->has_pp_) {
-      if (pop->output_format == class_format) {
+      if (pop->output_format == file_format::class_format) {
         fprintf(*clfile,
                 "# -> for CMB lensing (phi), these are C_l^phi-phi for the lensing potential.\n");
       }
-      if (pop->output_format == camb_format) {
+      if (pop->output_format == file_format::camb_format) {
         fprintf(*clfile, "# -> for CMB lensing (d), these are C_l^dd for the deflection field.\n");
       }
     }
@@ -1065,7 +1067,7 @@ void OutputModule::output_open_cl_file(FILE** clfile,
     fprintf(*clfile, "#\n");
 
     fprintf(*clfile, "# 1:l ");
-    if (pop->output_format == class_format) {
+    if (pop->output_format == file_format::class_format) {
       class_fprintf_columntitle(*clfile, "TT", spectra_module_->has_tt_, colnum);
       class_fprintf_columntitle(*clfile, "EE", spectra_module_->has_ee_, colnum);
       class_fprintf_columntitle(*clfile, "TE", spectra_module_->has_te_, colnum);
@@ -1074,7 +1076,7 @@ void OutputModule::output_open_cl_file(FILE** clfile,
       class_fprintf_columntitle(*clfile, "TPhi", spectra_module_->has_tp_, colnum);
       class_fprintf_columntitle(*clfile, "Ephi", spectra_module_->has_ep_, colnum);
     }
-    else if (pop->output_format == camb_format) {
+    else if (pop->output_format == file_format::camb_format) {
       class_fprintf_columntitle(*clfile, "TT", spectra_module_->has_tt_, colnum);
       class_fprintf_columntitle(*clfile, "EE", spectra_module_->has_ee_, colnum);
       class_fprintf_columntitle(*clfile, "BB", spectra_module_->has_bb_, colnum);
@@ -1089,7 +1091,7 @@ void OutputModule::output_open_cl_file(FILE** clfile,
     if (spectra_module_->has_dd_) {
       for (index_d1 = 0; index_d1 < spectra_module_->d_size_; index_d1++) {
         for (index_d2 = index_d1;
-             index_d2 <= MIN(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
+             index_d2 <= std::min(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
              index_d2++) {
           snprintf(tmp, tmp_size, "dens[%d]-dens[%d]", index_d1 + 1, index_d2 + 1);
           class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
@@ -1111,7 +1113,7 @@ void OutputModule::output_open_cl_file(FILE** clfile,
     if (spectra_module_->has_ll_) {
       for (index_d1 = 0; index_d1 < spectra_module_->d_size_; index_d1++) {
         for (index_d2 = index_d1;
-             index_d2 <= MIN(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
+             index_d2 <= std::min(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
              index_d2++) {
           snprintf(tmp, tmp_size, "lens[%d]-lens[%d]", index_d1 + 1, index_d2 + 1);
           class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
@@ -1126,8 +1128,8 @@ void OutputModule::output_open_cl_file(FILE** clfile,
     }
     if (spectra_module_->has_dl_) {
       for (index_d1 = 0; index_d1 < spectra_module_->d_size_; index_d1++) {
-        for (index_d2 = MAX(index_d1 - psp->non_diag, 0);
-             index_d2 <= MIN(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
+        for (index_d2 = std::max(index_d1 - psp->non_diag, 0);
+             index_d2 <= std::min(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
              index_d2++) {
           snprintf(tmp, tmp_size, "dens[%d]-lens[%d]", index_d1 + 1, index_d2 + 1);
           class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
@@ -1166,14 +1168,14 @@ void OutputModule::output_one_line_of_cl(FILE* clfile,
     fprintf(clfile, "%4d ", (int) l);
   }
 
-  if (pop->output_format == class_format) {
+  if (pop->output_format == file_format::class_format) {
     for (index_ct = 0; index_ct < ct_size; index_ct++) {
       class_fprintf_double(clfile, factor * cl[index_ct], _TRUE_);
     }
     fprintf(clfile, "\n");
   }
 
-  if (pop->output_format == camb_format) {
+  if (pop->output_format == file_format::camb_format) {
     class_fprintf_double(clfile,
                          factor * pow(pba->T_cmb * 1.e6, 2) * cl[spectra_module_->index_ct_tt_],
                          spectra_module_->has_tt_);

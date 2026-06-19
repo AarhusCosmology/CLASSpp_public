@@ -238,7 +238,7 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   if (index_tp_delta_ >= 0) {
     double delta_rho_scf;
     const perturbs* ppt = p_mod->GetPerturbs();
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       delta_rho_scf = 1. / 3. *
                           (1. / a2_rel * phi_prime_bg * y[layout.idx_phi_prime] +
                            dV_bg * y[layout.idx_phi]) +
@@ -305,10 +305,10 @@ void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::Pertur
 
 void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                             const PerturbationsModule& mod,
-                                            enum file_format fmt,
+                                            file_format fmt,
                                             BaseSpecies::TransferColumnSection section) const {
   const background* pba = mod.GetBackground();
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_scf", index_tp_delta_, index_tp_delta_ >= 0);
@@ -342,7 +342,7 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
     const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
 
     double delta_rho_scf = 0.;
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       delta_rho_scf =
           1. / 3. * (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi]);
     }
@@ -359,7 +359,7 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
     delta_scf = delta_rho_scf / rho_scf;
     theta_scf = rho_plus_p_theta_scf / (rho_scf + p_scf);
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha  = pvecmetric[ppw->index_mt_alpha];
       const double w_scf  = p_scf / rho_scf;
       delta_scf          += alpha * (-3. * H * (1. + w_scf));
@@ -388,7 +388,7 @@ double ScalarFieldSpecies::Delta(const BaseSpecies::PerturbLayout& base,
   double delta_rho = (1. / 3.) *
                      (1. / a2 * phi_prime * y[layout.idx_phi_prime] + dV * y[layout.idx_phi]);
 
-  if (ppw->scalar_ctx.gauge == newtonian) {
+  if (ppw->scalar_ctx.gauge == static_cast<int>(possible_gauges::newtonian)) {
     double psi  = y[pv->index_pt_phi] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
     delta_rho  -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }
@@ -427,7 +427,7 @@ double ScalarFieldSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
   double delta_p = (1. / 3.) *
                    (1. / a2 * phi_prime * y[layout.idx_phi_prime] - dV * y[layout.idx_phi]);
 
-  if (ppw->scalar_ctx.gauge == newtonian) {
+  if (ppw->scalar_ctx.gauge == static_cast<int>(possible_gauges::newtonian)) {
     double psi  = y[ppw->pv->index_pt_phi] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
     delta_p    -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }

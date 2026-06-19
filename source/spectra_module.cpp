@@ -12,6 +12,8 @@
 
 #include "spectra_module.h"
 
+#include <algorithm>
+
 #include "nonlinear_module.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
@@ -51,7 +53,7 @@ std::map<std::string, int> SpectraModule::cl_output_index_map() const {
   int index = static_cast<int>(index_map.size());
   if (has_dd_) {
     for (int index_d1 = 0; index_d1 < d_size_; index_d1++) {
-      for (int index_d2 = index_d1; index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1);
+      for (int index_d2 = index_d1; index_d2 <= std::min(index_d1 + psp->non_diag, d_size_ - 1);
            index_d2++) {
         std::string key = "dens[" + std::to_string(index_d1 + 1) + "]-dens[" +
                           std::to_string(index_d2 + 1) + "]";
@@ -73,7 +75,7 @@ std::map<std::string, int> SpectraModule::cl_output_index_map() const {
   }
   if (has_ll_) {
     for (int index_d1 = 0; index_d1 < d_size_; index_d1++) {
-      for (int index_d2 = index_d1; index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1);
+      for (int index_d2 = index_d1; index_d2 <= std::min(index_d1 + psp->non_diag, d_size_ - 1);
            index_d2++) {
         std::string key = "lens[" + std::to_string(index_d1 + 1) + "]-lens[" +
                           std::to_string(index_d2 + 1) + "]";
@@ -89,8 +91,8 @@ std::map<std::string, int> SpectraModule::cl_output_index_map() const {
   }
   if (has_dl_) {
     for (int index_d1 = 0; index_d1 < d_size_; index_d1++) {
-      for (int index_d2 = MAX(index_d1 - psp->non_diag, 0);
-           index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1);
+      for (int index_d2 = std::max(index_d1 - psp->non_diag, 0);
+           index_d2 <= std::min(index_d1 + psp->non_diag, d_size_ - 1);
            index_d2++) {
         std::string key = "dens[" + std::to_string(index_d1 + 1) + "]-lens[" +
                           std::to_string(index_d2 + 1) + "]";
@@ -688,13 +690,13 @@ void SpectraModule::spectra_indices() {
 
       if (has_td_)
         for (index_ct = index_ct_td_; index_ct < index_ct_td_ + d_size_; index_ct++)
-          l_max_ct_[perturbations_module_->index_md_scalars_][index_ct] = MIN(ppt->l_scalar_max,
-                                                                              ppt->l_lss_max);
+          l_max_ct_[perturbations_module_->index_md_scalars_][index_ct] =
+              std::min(ppt->l_scalar_max, ppt->l_lss_max);
 
       if (has_pd_)
         for (index_ct = index_ct_pd_; index_ct < index_ct_pd_ + d_size_; index_ct++)
-          l_max_ct_[perturbations_module_->index_md_scalars_][index_ct] = MIN(ppt->l_scalar_max,
-                                                                              ppt->l_lss_max);
+          l_max_ct_[perturbations_module_->index_md_scalars_][index_ct] =
+              std::min(ppt->l_scalar_max, ppt->l_lss_max);
 
       if (has_ll_)
         for (index_ct = index_ct_ll_;
@@ -706,8 +708,8 @@ void SpectraModule::spectra_indices() {
 
       if (has_tl_)
         for (index_ct = index_ct_tl_; index_ct < index_ct_tl_ + d_size_; index_ct++)
-          l_max_ct_[perturbations_module_->index_md_scalars_][index_ct] = MIN(ppt->l_scalar_max,
-                                                                              ppt->l_lss_max);
+          l_max_ct_[perturbations_module_->index_md_scalars_][index_ct] =
+              std::min(ppt->l_scalar_max, ppt->l_lss_max);
 
       if (has_dl_)
         for (index_ct = index_ct_dl_;
@@ -734,8 +736,8 @@ void SpectraModule::spectra_indices() {
     for (int index_md = 0; index_md < md_size_; index_md++) {
       l_max_[index_md] = 0.;
       for (index_ct = 0.; index_ct < ct_size_; index_ct++)
-        l_max_[index_md] = MAX(l_max_[index_md], l_max_ct_[index_md][index_ct]);
-      l_max_tot_ = MAX(l_max_tot_, l_max_[index_md]);
+        l_max_[index_md] = std::max(l_max_[index_md], l_max_ct_[index_md][index_ct]);
+      l_max_tot_ = std::max(l_max_tot_, l_max_[index_md]);
     }
   }
 }
@@ -1106,7 +1108,7 @@ void SpectraModule::spectra_compute_cl(int index_md,
     if (_scalarsEXT_ && (has_dd_)) {
       index_ct = 0;
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
-        for (index_d2 = index_d1; index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1);
+        for (index_d2 = index_d1; index_d2 <= std::min(index_d1 + psp->non_diag, d_size_ - 1);
              index_d2++) {
           cl_integrand[index_q * cl_integrand_num_columns + 1 + index_ct_dd_ + index_ct] =
               primordial_pk_value * transfer_ic1_nc[index_d1] * transfer_ic2_nc[index_d2] * factor;
@@ -1138,7 +1140,7 @@ void SpectraModule::spectra_compute_cl(int index_md,
     if (_scalarsEXT_ && (has_ll_)) {
       index_ct = 0;
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
-        for (index_d2 = index_d1; index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1);
+        for (index_d2 = index_d1; index_d2 <= std::min(index_d1 + psp->non_diag, d_size_ - 1);
              index_d2++) {
           cl_integrand[index_q * cl_integrand_num_columns + 1 + index_ct_ll_ + index_ct] =
               primordial_pk_value * transfer_ic1[transfer_module_->index_tt_lensing_ + index_d1] *
@@ -1161,8 +1163,8 @@ void SpectraModule::spectra_compute_cl(int index_md,
     if (_scalarsEXT_ && (has_dl_)) {
       index_ct = 0;
       for (index_d1 = 0; index_d1 < d_size_; index_d1++) {
-        for (index_d2 = MAX(index_d1 - psp->non_diag, 0);
-             index_d2 <= MIN(index_d1 + psp->non_diag, d_size_ - 1);
+        for (index_d2 = std::max(index_d1 - psp->non_diag, 0);
+             index_d2 <= std::min(index_d1 + psp->non_diag, d_size_ - 1);
              index_d2++) {
           cl_integrand[index_q * cl_integrand_num_columns + 1 + index_ct_dl_ + index_ct] =
               primordial_pk_value * transfer_ic1_nc[index_d1] *
@@ -1216,8 +1218,8 @@ void SpectraModule::spectra_compute_cl(int index_md,
          integration everywhere. */
 
       if (pba->sgnK == 1) {
-        index_q_spline = MIN(transfer_module_->index_q_flat_approximation_,
-                             transfer_module_->q_size_ - 1);
+        index_q_spline = std::min(transfer_module_->index_q_flat_approximation_,
+                                  transfer_module_->q_size_ - 1);
       }
 
       array_integrate_all_trapzd_or_spline(cl_integrand,

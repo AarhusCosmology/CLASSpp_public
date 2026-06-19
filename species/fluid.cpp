@@ -225,10 +225,10 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
 
 void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                       const PerturbationsModule& mod,
-                                      enum file_format fmt,
+                                      file_format fmt,
                                       BaseSpecies::TransferColumnSection section) const {
   const background* pba = mod.GetBackground();
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_fld", index_tp_delta_, index_tp_delta_ >= 0);
@@ -455,7 +455,7 @@ void FluidSpecies::ComputePpf(double k,
   }
 
   double alpha, alpha_prime, metric_euler;
-  if (ppw->scalar_ctx.gauge == synchronous) {
+  if (ppw->scalar_ctx.gauge == static_cast<int>(possible_gauges::synchronous)) {
     alpha        = (y[ppw->pv->index_pt_eta] +
                     1.5 * a2 / k2 / s2sq *
                         (ppw->delta_rho + 3 * a_prime_over_a / k2 * ppw->rho_plus_p_theta) -

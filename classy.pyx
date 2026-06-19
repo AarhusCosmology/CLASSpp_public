@@ -1460,9 +1460,9 @@ cdef class PyCosmology:
             return {}
 
         if output_format == 'camb':
-            outf = camb_format
+            outf = file_format.camb_format
         else:
-            outf = class_format
+            outf = file_format.class_format
 
         perturbations_module = deref(self._thisptr).GetPerturbationsModule()
         index_md = deref(perturbations_module).index_md_scalars_

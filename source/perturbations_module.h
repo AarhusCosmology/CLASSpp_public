@@ -21,11 +21,11 @@ class PerturbationsModule : public BaseModule {
                       BackgroundModulePtr background_module,
                       ThermodynamicsModulePtr thermodynamics_module);
   ~PerturbationsModule();
-  void perturb_output_data(enum file_format output_format,
+  void perturb_output_data(file_format output_format,
                            double z,
                            int number_of_titles,
                            double* data) const;
-  void perturb_output_titles(enum file_format output_format, std::string& titles) const;
+  void perturb_output_titles(file_format output_format, std::string& titles) const;
   void perturb_output_firstline_and_ic_suffix(int index_ic,
                                               std::string& first_line,
                                               std::string& ic_suffix) const;

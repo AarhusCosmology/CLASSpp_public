@@ -14,6 +14,8 @@
 
 #include "sparse.h"
 
+#include <algorithm>
+
 #include "common.h"
 
 sparse_matrix::sparse_matrix(int ncols, int nrows, int maxnz)
@@ -341,8 +343,8 @@ int sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
 		and that the diagonal elements has been removed. C must be large enough,
 		C->max_nonzero >= (6/5)*(C->Ap[n]) + 2n. Work array W must be 8*(n+1).
 	*/
-  dense = MAX(16, 10 * sqrt((double) n));
-  dense = MIN(n - 2, dense);
+  dense = (int) std::max(16.0, 10 * sqrt((double) n));
+  dense = std::min(n - 2, dense);
   cnz   = Cp[n];
   /*	Assign pointers to positions in work array:*/
   len    = W;
@@ -527,7 +529,7 @@ int sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
         elen[i]  = -1;
       }
       else {
-        degree[i]  = MIN(degree[i], d);
+        degree[i]  = std::min(degree[i], d);
         Ci[pn]     = Ci[p3];
         Ci[p3]     = Ci[p1];
         Ci[p1]     = k;
@@ -539,7 +541,7 @@ int sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
       }
     }
     degree[k] = dk;
-    lemax     = MAX(lemax, dk);
+    lemax     = std::max(lemax, dk);
     mark      = sp_wclear(mark + lemax, lemax, w, n);
     /* Supernode detection: */
     for (pk = pk1; pk < pk2; pk++) {
@@ -583,13 +585,13 @@ int sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
         continue;
       nv[i] = nvi;
       d     = degree[i] + dk - nvi;
-      d     = MIN(d, (n - nel - nvi));
+      d     = std::min(d, (n - nel - nvi));
       if (head[d] != -1)
         last[head[d]] = i;
       next[i]   = head[d];
       last[i]   = -1;
       head[d]   = i;
-      mindeg    = MIN(mindeg, d);
+      mindeg    = std::min(mindeg, d);
       degree[i] = d;
       Ci[p++]   = i;
     }

@@ -718,10 +718,10 @@ void BackgroundModule::background_solve_evolver() {
   d2background_dtau2_table_.resize(bt_size_ * bg_size_);
 
   auto generic_evolver = &evolver_ndf15;
-  if (ppr->evolver == rk) {
+  if (ppr->evolver == evolver_type::rk) {
     generic_evolver = &evolver_rk;
   }
-  else if (ppr->evolver == rkdp45) {
+  else if (ppr->evolver == evolver_type::rkdp45) {
     generic_evolver = &evolver_rkdp45;
   }
 
@@ -1345,7 +1345,7 @@ int BackgroundModule::background_add_line_to_bg_table_member(
   double tau     = y[index_bi_a_];
   y[index_bi_a_] = a;
 
-  z_table_[index_loga]   = MAX(0., pba->a_today / exp(loga) - 1.);
+  z_table_[index_loga]   = std::max(0., pba->a_today / exp(loga) - 1.);
   tau_table_[index_loga] = tau;
 
   double* pvecback = background_table_.data() + index_loga * bg_size_;

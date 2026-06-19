@@ -225,8 +225,9 @@ void InputModule::ConstructSpecies() {
   // The ncdm perturbation momentum grid is gauge-dependent: synchronous gauge
   // converges with far fewer q-bins than Newtonian (synchronous reaches sub-0.1%
   // P(k) at ~5 bins, Newtonian needs ~11). Use the gauge-appropriate tolerance.
-  ncdm_settings.tol_ncdm    = (perturbations_.gauge == newtonian) ? precision_.tol_ncdm_newtonian
-                                                                  : precision_.tol_ncdm_synchronous;
+  ncdm_settings.tol_ncdm    = (perturbations_.gauge == possible_gauges::newtonian)
+                                  ? precision_.tol_ncdm_newtonian
+                                  : precision_.tol_ncdm_synchronous;
   ncdm_settings.tol_ncdm_bg = precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = precision_.tol_M_ncdm;
 
@@ -408,7 +409,7 @@ void InputModule::ReadCoupledCluster() {
   // to Omega0_cdm_min_synchronous. Track presence: the gauge minimum kicks in
   // even if the user supplied nothing, so the budget slot becomes present.
   bool cdm_present = cdm_user_set || omega0_cdm != 0.;
-  if ((ppt->gauge == synchronous) && (omega0_cdm == 0.)) {
+  if ((ppt->gauge == possible_gauges::synchronous) && (omega0_cdm == 0.)) {
     omega0_cdm  = ppr->Omega0_cdm_min_synchronous;
     cdm_present = true;
   }
@@ -441,7 +442,7 @@ void InputModule::ReadCoupledCluster() {
     double new_idm_dr = *f_idm_dr * cdm_for_frac;
     double new_cdm    = cdm_for_frac - new_idm_dr;
     // avoid CDM=0 in synchronous gauge after the subtraction
-    if ((ppt->gauge == synchronous) && (new_cdm == 0.)) {
+    if ((ppt->gauge == possible_gauges::synchronous) && (new_cdm == 0.)) {
       new_cdm    += ppr->Omega0_cdm_min_synchronous;
       new_idm_dr -= ppr->Omega0_cdm_min_synchronous;
     }
@@ -510,7 +511,7 @@ void InputModule::ReadCoupledCluster() {
 
     double new_idm_drmd = f_idm_drmd_local * cdm_for_drmd;
     double new_cdm      = cdm_for_drmd - new_idm_drmd;
-    if ((ppt->gauge == synchronous) && (new_cdm == 0.)) {
+    if ((ppt->gauge == possible_gauges::synchronous) && (new_cdm == 0.)) {
       new_cdm      += ppr->Omega0_cdm_min_synchronous;
       new_idm_drmd -= ppr->Omega0_cdm_min_synchronous;
     }
@@ -660,13 +661,13 @@ void InputModule::ReadContext() {
     if ((gauge->find("newtonian") != std::string::npos) ||
         (gauge->find("Newtonian") != std::string::npos) ||
         (gauge->find("new") != std::string::npos)) {
-      ppt->gauge = newtonian;
+      ppt->gauge = possible_gauges::newtonian;
     }
 
     if ((gauge->find("synchronous") != std::string::npos) ||
         (gauge->find("sync") != std::string::npos) ||
         (gauge->find("Synchronous") != std::string::npos)) {
-      ppt->gauge = synchronous;
+      ppt->gauge = possible_gauges::synchronous;
     }
   }
 
@@ -2049,7 +2050,7 @@ void InputModule::ReadDerived() {
 
       if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
         for (i = 0; i < pop->z_pk_num; i++) {
-          ppt->z_max_pk = MAX(ppt->z_max_pk, pop->z_pk[i]);
+          ppt->z_max_pk = std::max(ppt->z_max_pk, pop->z_pk[i]);
         }
       }
 
@@ -2068,7 +2069,7 @@ void InputModule::ReadDerived() {
           if (ppt->selection == dirac) {
             z_max = ppt->selection_mean[bin];
           }
-          ppt->z_max_pk = MAX(ppt->z_max_pk, z_max);
+          ppt->z_max_pk = std::max(ppt->z_max_pk, z_max);
         }
       }
     }
@@ -2089,11 +2090,11 @@ void InputModule::ReadDerived() {
   if (auto format = pfc->get<std::string>("format")) {
     if ((format->find("class") != std::string::npos) ||
         (format->find("CLASS") != std::string::npos))
-      pop->output_format = class_format;
+      pop->output_format = file_format::class_format;
     else {
       if ((format->find("camb") != std::string::npos) ||
           (format->find("CAMB") != std::string::npos))
-        pop->output_format = camb_format;
+        pop->output_format = file_format::camb_format;
       else
         class_stop(
             "You wrote: format='%s'. Could not identify any of the possible formats "
@@ -2113,8 +2114,8 @@ void InputModule::ReadDerived() {
         (non_linear->find("Halofit") != std::string::npos) ||
         (non_linear->find("HALOFIT") != std::string::npos)) {
       pnl->method       = nl_halofit;
-      ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
-                              MAX(ppr->halofit_min_k_max, ppr->nonlinear_min_k_max));
+      ppt->k_max_for_pk = std::max(ppt->k_max_for_pk,
+                                   std::max(ppr->halofit_min_k_max, ppr->nonlinear_min_k_max));
       ppt->has_nl_corrections_based_on_delta_m = true;
     }
     if ((non_linear->find("hmcode") != std::string::npos) ||
@@ -2122,8 +2123,8 @@ void InputModule::ReadDerived() {
         (non_linear->find("HMcode") != std::string::npos) ||
         (non_linear->find("Hmcode") != std::string::npos)) {
       pnl->method       = nl_HMcode;
-      ppt->k_max_for_pk = MAX(ppt->k_max_for_pk,
-                              MAX(ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max));
+      ppt->k_max_for_pk = std::max(ppt->k_max_for_pk,
+                                   std::max(ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max));
       ppt->has_nl_corrections_based_on_delta_m = true;
       pnl->extrapolation_method =
           (enum source_extrapolation) pfc->get_or<int>("extrapolation_method",
@@ -2190,7 +2191,7 @@ void InputModule::ReadDerived() {
 
   /** (g) amount of information sent to standard output (none if all set to zero) */
 
-  // get_or<int> then narrow to short; matches the old class_read_int (typeof) cast.
+  // get_or<int> then narrow to short; matches the old class_read_int narrowing cast.
   pba->background_verbose = pfc->get_or<int>("background_verbose", pba->background_verbose);
 
   pth->thermodynamics_verbose = pfc->get_or<int>("thermodynamics_verbose",
@@ -2224,8 +2225,8 @@ void InputModule::ReadDerived() {
   }
 
   /** - ---> derivatives of baryon sound speed only computed if some non-minimal tight-coupling schemes is requested */
-  if ((ppr->tight_coupling_approximation == (int) first_order_CLASS) ||
-      (ppr->tight_coupling_approximation == (int) second_order_CLASS)) {
+  if ((ppr->tight_coupling_approximation == static_cast<int>(tca_method::first_order_CLASS)) ||
+      (ppr->tight_coupling_approximation == static_cast<int>(tca_method::second_order_CLASS))) {
     pth->compute_cb2_derivatives = true;
   }
 
@@ -2726,7 +2727,7 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
   ncdm_settings.h     = input_module->background_.h;
   ncdm_settings.T_cmb = input_module->background_.T_cmb;
   // Gauge-dependent ncdm momentum tolerance (see ConstructSpecies for rationale).
-  ncdm_settings.tol_ncdm    = (input_module->perturbations_.gauge == newtonian)
+  ncdm_settings.tol_ncdm    = (input_module->perturbations_.gauge == possible_gauges::newtonian)
                                   ? input_module->precision_.tol_ncdm_newtonian
                                   : input_module->precision_.tol_ncdm_synchronous;
   ncdm_settings.tol_ncdm_bg = input_module->precision_.tol_ncdm_bg;

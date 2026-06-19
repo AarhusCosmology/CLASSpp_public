@@ -79,6 +79,8 @@
 #include "background_module.h"
 
 #ifdef HYREC
+#include <algorithm>
+
 #include "hyrec.h"
 #endif
 
@@ -2704,8 +2706,8 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
 
       number_of_redshifts++;
 
-      dz = MIN(0.9 * (ppr->reionization_sampling / relative_variation), 5.) * dz;
-      dz = MIN(dz, dz_max);
+      dz = std::min(0.9 * (ppr->reionization_sampling / relative_variation), 5.) * dz;
+      dz = std::min(dz, dz_max);
     }
     else {
       /* do not accept the step and update dz */
@@ -2780,7 +2782,7 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
       xe = preio->reionization_table[i * preio->re_size + preio->index_re_xe];
       double chi_heat;
       if (xe < 1.)
-        chi_heat = MIN(0.996857 * (1. - pow(1. - pow(xe, 0.300134), 1.51035)), 1);
+        chi_heat = std::min(0.996857 * (1. - pow(1. - pow(xe, 0.300134), 1.51035)), 1.0);
       else
         chi_heat = 1.;
 
@@ -3791,7 +3793,7 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
     // coefficient as revised by Slatyer et al. 2013 (in fact it is a fit by Vivian Poulin of columns 1 and 2 in Table V of Slatyer et al. 2013)
     double chi_heat = 0.;
     if (x < 1.)
-      chi_heat = MIN(0.996857 * (1. - pow(1. - pow(x, 0.300134), 1.51035)), 1);
+      chi_heat = std::min(0.996857 * (1. - pow(1. - pow(x, 0.300134), 1.51035)), 1.0);
     else
       chi_heat = 1.;
 

@@ -246,7 +246,7 @@ void PhotonsSpecies::PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
   if (layout.idx_delta < 0)
     return;
 
-  const int gauge      = ppaw.perturbations_module->GetPerturbs()->gauge;
+  const auto gauge     = ppaw.perturbations_module->GetPerturbs()->gauge;
   const double k       = ppaw.k;
   const double k2      = k * k;
   const double cotKgen = ppw->cotKgen;
@@ -272,7 +272,7 @@ void PhotonsSpecies::PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
       *ppw->pv->species_layouts[b_phv_i]);
   const double theta_b_vec = y[b_phv_lay.idx_theta];
 
-  if (gauge == synchronous) {
+  if (gauge == possible_gauges::synchronous) {
     dy[layout.idx_delta] = -4. / 3. * theta_g - dkappa * (delta_g + 2. * _SQRT2_ * theta_b_vec);
 
     dy[layout.idx_theta] = k2 * (delta_g / 4. - s_l[2] * shear_g) -
@@ -573,16 +573,16 @@ void PhotonsSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRe
 
 void PhotonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                         const PerturbationsModule& mod,
-                                        enum file_format fmt,
+                                        file_format fmt,
                                         BaseSpecies::TransferColumnSection section) const {
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_g", index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
       w.Add("t_g", index_tp_theta_, index_tp_theta_ >= 0);
   }
-  // camb_format: photons not written separately
+  // file_format::camb_format: photons not written separately
 }
 
 void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
@@ -629,7 +629,7 @@ void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
 
     // Synchronous → Newtonian gauge conversion
     const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha  = pvecmetric[ppw->index_mt_alpha];
       const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
       const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];

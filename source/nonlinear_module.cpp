@@ -13,6 +13,8 @@
 
 #include "nonlinear_module.h"
 
+#include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 
@@ -1119,10 +1121,10 @@ void NonlinearModule::nonlinear_init() {
           /* otherwise we met the first problematic value of time */
           else {
             /* store the index of that value */
-            index_tau_min_nl_ =
-                MIN(tau_size_ - 1,
+            index_tau_min_nl_ = std::
+                min(tau_size_ - 1,
                     index_tau +
-                        1);  //this MIN() ensures that index_tau_min_nl is never out of bounds
+                        1);  //this std::min() ensures that index_tau_min_nl is never out of bounds
 
             /* store R_NL=1 for that time */
             for (int index_k = 0; index_k < k_size_; index_k++) {
@@ -1651,8 +1653,9 @@ void NonlinearModule::nonlinear_pk_linear(
                                perturbations_module_->sources_[index_md_scalars_],
                                &source_ic2);
 
-          double cosine_correlation = primordial_pk[index_ic1_ic2] * SIGN(source_ic1) *
-                                      SIGN(source_ic2);
+          double cosine_correlation = primordial_pk[index_ic1_ic2] *
+                                      std::copysign(1.0, source_ic1) *
+                                      std::copysign(1.0, source_ic2);
 
           pk_ic[index_ic1_ic2] = cosine_correlation *
                                  sqrt(pk_ic[index_ic1_ic1] * pk_ic[index_ic2_ic2]);

@@ -172,9 +172,9 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
 void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(
     PerturbColumnWriter& w,
     const PerturbationsModule& mod,
-    enum file_format fmt,
+    file_format fmt,
     BaseSpecies::TransferColumnSection section) const {
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_idm_drmd", index_tp_delta_idm_drmd_, index_tp_delta_idm_drmd_ >= 0);
@@ -218,7 +218,7 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
       theta_idr_drmd = y[idr_drm_pr_lay.idx_theta];
     }
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha = pvecmetric[ppw->index_mt_alpha];
       if (has_idm_drmd()) {
         delta_idm_drmd -= 3. * H * a * alpha;

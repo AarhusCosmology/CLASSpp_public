@@ -98,7 +98,7 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
   lmax   = lvec[nl - 1];
   lambda = 2 * _PI_ / beta;
   nx     = (int) ((xmax - xmin) * sampling / lambda);
-  nx     = MAX(nx, 2);
+  nx     = std::max(nx, 2);
   deltax = (xmax - xmin) / (nx - 1.0);
   //fprintf(stderr,"dx=%e\n",deltax);
   //fprintf(stderr,"%e %e\n",beta,sampling);
@@ -221,11 +221,11 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
     lmax--;
   }
 
-  for (j = 0; j < MIN(nx, xfwdidx); j += _HYPER_CHUNK_) {
-    current_chunk = MIN(_HYPER_CHUNK_, MIN(nx, xfwdidx) - j);
+  for (j = 0; j < std::min(nx, xfwdidx); j += _HYPER_CHUNK_) {
+    current_chunk = std::min(_HYPER_CHUNK_, std::min(nx, xfwdidx) - j);
     //Use backwards method (chunk version for better SIMD utilization):
     hyperspherical_backwards_recurrence_chunk(K,
-                                              MIN(l_recurrence_max, lmax) + 1,
+                                              std::min(l_recurrence_max, lmax) + 1,
                                               beta,
                                               this->x.data() + j,
                                               this->sinK.data() + j,
@@ -250,9 +250,9 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
 
   for (j = xfwdidx; j < nx; j += _HYPER_CHUNK_) {
     //Use forwards method:
-    current_chunk = MIN(_HYPER_CHUNK_, nx - j);
+    current_chunk = std::min(_HYPER_CHUNK_, nx - j);
     hyperspherical_forwards_recurrence_chunk(K,
-                                             MIN(l_recurrence_max, lmax) + 1,
+                                             std::min(l_recurrence_max, lmax) + 1,
                                              beta,
                                              this->x.data() + j,
                                              this->sinK.data() + j,
@@ -501,8 +501,8 @@ int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS,
     if ((x > right_border) || (x < left_border)) {
       if ((x > next_border) || (x < left_border)) {
         current_border_idx = ((int) ((x - xmin) / deltax)) + 1;
-        current_border_idx = MAX(1, current_border_idx);
-        current_border_idx = MIN(nx - 1, current_border_idx);
+        current_border_idx = std::max(1, current_border_idx);
+        current_border_idx = std::min(nx - 1, current_border_idx);
         //printf("Current border index at jump: %d\n",current_border_idx);
         //max operation takes care of case x = xmin,
         //min operation takes care of case x = xmax.
@@ -535,9 +535,9 @@ int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS,
         d3ym = d3yp;
         d4ym = d4yp;
       }
-      left_border  = xvec[MAX(0, current_border_idx - 1)];
+      left_border  = xvec[std::max(0, current_border_idx - 1)];
       right_border = xvec[current_border_idx];
-      next_border  = xvec[MIN(nx - 1, current_border_idx + 1)];
+      next_border  = xvec[std::min(nx - 1, current_border_idx + 1)];
       //Evaluate right derivatives and calculate coefficients:
       cotKp  = cotK[current_border_idx];
       sinKp  = sinK[current_border_idx];
@@ -1348,7 +1348,7 @@ int hyperspherical_get_xmin_from_Airy(
     }
     Fnew    = PhiWKB_minus_phiminabs(xnew, &wkbstruct);
     *fevals = (*fevals) + 1;
-  } while (SIGN(Fnew) == (SIGN(Fold)));
+  } while (std::copysign(1.0, Fnew) == std::copysign(1.0, Fold));
 
   if (Fnew <= 0.0) {
     xleft  = xnew;
@@ -1434,17 +1434,17 @@ int fzero_ridder(double (*func)(double, void*),
         //printf("Success 2, ans=%g\n",ans);
         return _SUCCESS_;
       }
-      if (NRSIGN(fm, fnew) != fm) {
+      if (std::copysign(fm, fnew) != fm) {
         xl = xm;
         fl = fm;
         xh = ans;
         fh = fnew;
       }
-      else if (NRSIGN(fl, fnew) != fl) {
+      else if (std::copysign(fl, fnew) != fl) {
         xh = ans;
         fh = fnew;
       }
-      else if (NRSIGN(fh, fnew) != fh) {
+      else if (std::copysign(fh, fnew) != fh) {
         xl = ans;
         fl = fnew;
       }
@@ -1873,6 +1873,8 @@ int hyperspherical_Hermite6_interpolation_vector_PhidPhid2Phi(HyperInterpStruct*
 #define HERMITE_DO_PHI
 #define HERMITE_DO_DPHI
 #define HERMITE_DO_D2PHI
+#include <cmath>
+
 #include "hermite6_interpolation_csource.h"
   return _SUCCESS_;
 }

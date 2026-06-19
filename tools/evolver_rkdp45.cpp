@@ -1,5 +1,6 @@
 #include "evolver_rkdp45.h"
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <vector>
@@ -101,7 +102,7 @@ int evolver_rkdp45(
   const double hmax = fabs(x_end - x_ini) / 10.0;
   double absh;
   if (x_size > 1)
-    absh = MIN(hmax, fabs(x_sampling[1] - x_sampling[0]));
+    absh = std::min(hmax, fabs(x_sampling[1] - x_sampling[0]));
   else
     absh = hmax;
   if (absh == 0.0)
@@ -110,8 +111,8 @@ int evolver_rkdp45(
   /* initial step from derivative scale */
   double rh = 0.0;
   for (int k = 0; k < neq; k++) {
-    double maxtmp = MAX(fabs(y[k]), threshold);
-    rh            = MAX(rh, fabs(ki[k]) / maxtmp);
+    double maxtmp = std::max(fabs(y[k]), threshold);
+    rh            = std::max(rh, fabs(ki[k]) / maxtmp);
   }
   rh /= 0.8 * pow(rtol, pow_grow);
   if (absh * rh > 1.0)
@@ -160,7 +161,7 @@ int evolver_rkdp45(
 
     double errmax = 0.0;
     for (int k = 0; k < neq; k++) {
-      double errtemp = fabs(err[k] / MAX(threshold, fabs(ynew[k])));
+      double errtemp = fabs(err[k] / std::max(threshold, fabs(ynew[k])));
       if (errtemp > errmax)
         errmax = errtemp;
     }
@@ -172,10 +173,10 @@ int evolver_rkdp45(
        * where nofailed was never set, making the halving path dead code.) */
       if (nofailed == _TRUE_) {
         nofailed = _FALSE_;
-        hnew     = tdir * MAX(hmin, fabs(h) * MAX(0.1, 0.8 * pow(rtol / errmax, pow_grow)));
+        hnew = tdir * std::max(hmin, fabs(h) * std::max(0.1, 0.8 * pow(rtol / errmax, pow_grow)));
       }
       else {
-        hnew = tdir * MAX(hmin, 0.5 * fabs(h));
+        hnew = tdir * std::max(hmin, 0.5 * fabs(h));
       }
       continue;
     }
@@ -187,8 +188,8 @@ int evolver_rkdp45(
                          ki.data() + 6 * neq,
                          parameters_and_workspace_for_derivs);
 
-    nofailed          = _TRUE_;
-    hnew              = tdir * MAX(hmin, fabs(h) * MAX(0.1, 0.8 * pow(rtol / errmax, pow_grow)));
+    nofailed = _TRUE_;
+    hnew     = tdir * std::max(hmin, fabs(h) * std::max(0.1, 0.8 * pow(rtol / errmax, pow_grow)));
     const double tnew = t + h;
 
     /* emit output at all sampling points within (t, tnew] */

@@ -194,7 +194,7 @@ void PerturbationsModule::perturb_sources_at_tau(
  * @return the error status
  */
 
-void PerturbationsModule::perturb_output_data(enum file_format output_format,
+void PerturbationsModule::perturb_output_data(file_format output_format,
                                               double z,
                                               int number_of_titles,
                                               double* data) const {
@@ -267,13 +267,13 @@ void PerturbationsModule::perturb_output_data(enum file_format output_format,
 
       /* indices for species associated with a velocity transfer function in Fourier space */
 
-      if (output_format == class_format) {
+      if (output_format == file_format::class_format) {
         if (ppt->has_density_transfers) {
           PerturbColumnWriter w(dataptr, tk, storeidx);
           for (auto& [name, sp] : all_species_)
             sp->WriteOutputColumns(w,
                                    *this,
-                                   (enum file_format) output_format,
+                                   output_format,
                                    BaseSpecies::TransferColumnSection::density);
           class_store_double(dataptr, tk[index_tp_delta_tot_], has_source_delta_tot_, storeidx);
           class_store_double(dataptr, tk[index_tp_phi_], has_source_phi_, storeidx);
@@ -294,19 +294,19 @@ void PerturbationsModule::perturb_output_data(enum file_format output_format,
           for (auto& [name, sp] : all_species_)
             sp->WriteOutputColumns(w,
                                    *this,
-                                   (enum file_format) output_format,
+                                   output_format,
                                    BaseSpecies::TransferColumnSection::velocity);
           class_store_double(dataptr, tk[index_tp_theta_tot_], has_source_theta_tot_, storeidx);
         }
       }
-      else if (output_format == camb_format) {
+      else if (output_format == file_format::camb_format) {
         /* rescale and reorder the matter transfer functions following the CMBFAST/CAMB convention */
         {
           PerturbColumnWriter w(dataptr, tk, storeidx);
           for (auto& [name, sp] : all_species_)
             sp->WriteOutputColumns(w,
                                    *this,
-                                   (enum file_format) output_format,
+                                   output_format,
                                    BaseSpecies::TransferColumnSection::density);
         }
         class_store_double_or_default(dataptr,
@@ -330,16 +330,16 @@ void PerturbationsModule::perturb_output_data(enum file_format output_format,
  * @return the error status
  */
 
-void PerturbationsModule::perturb_output_titles(enum file_format output_format,
+void PerturbationsModule::perturb_output_titles(file_format output_format,
                                                 std::string& titles) const {
-  if (output_format == class_format) {
+  if (output_format == file_format::class_format) {
     class_store_columntitle(titles, "k (h/Mpc)", _TRUE_);
     if (ppt->has_density_transfers) {
       PerturbColumnWriter w(titles);
       for (auto& [name, sp] : all_species_)
         sp->WriteOutputColumns(w,
                                *this,
-                               (enum file_format) output_format,
+                               output_format,
                                BaseSpecies::TransferColumnSection::density);
       class_store_columntitle(titles, "d_tot", _TRUE_);
       class_store_columntitle(titles, "phi", has_source_phi_);
@@ -357,20 +357,20 @@ void PerturbationsModule::perturb_output_titles(enum file_format output_format,
       for (auto& [name, sp] : all_species_)
         sp->WriteOutputColumns(w,
                                *this,
-                               (enum file_format) output_format,
+                               output_format,
                                BaseSpecies::TransferColumnSection::velocity);
       class_store_columntitle(titles, "t_tot", _TRUE_);
     }
   }
 
-  else if (output_format == camb_format) {
+  else if (output_format == file_format::camb_format) {
     class_store_columntitle(titles, "k (h/Mpc)", _TRUE_);
     {
       PerturbColumnWriter w(titles);
       for (auto& [name, sp] : all_species_)
         sp->WriteOutputColumns(w,
                                *this,
-                               (enum file_format) output_format,
+                               output_format,
                                BaseSpecies::TransferColumnSection::density);
     }
     class_store_columntitle(titles, "-T_tot/k2", _TRUE_);
@@ -467,40 +467,44 @@ void PerturbationsModule::perturb_init() {
       printf("Computing sources\n");
   }
 
-  class_test((ppt->gauge == synchronous) && (all_species_.count("CDM") == 0),
+  class_test((ppt->gauge == possible_gauges::synchronous) && (all_species_.count("CDM") == 0),
              "In the synchronous gauge, it is not self-consistent to assume no CDM: the later is "
              "used to define the initial timelike hypersurface. You can either add a negligible "
              "amount of CDM or switch to newtonian gauge");
 
-  class_test((ppr->tight_coupling_approximation < first_order_MB) ||
-                 (ppr->tight_coupling_approximation > compromise_CLASS),
+  class_test((ppr->tight_coupling_approximation < static_cast<int>(tca_method::first_order_MB)) ||
+                 (ppr->tight_coupling_approximation >
+                  static_cast<int>(tca_method::compromise_CLASS)),
              "your tight_coupling_approximation is set to %d, out of range defined in "
              "perturbations.h",
              ppr->tight_coupling_approximation);
 
-  class_test((ppr->radiation_streaming_approximation < rsa_null) ||
-                 (ppr->radiation_streaming_approximation > rsa_none),
+  class_test((ppr->radiation_streaming_approximation < static_cast<int>(rsa_method::rsa_null)) ||
+                 (ppr->radiation_streaming_approximation > static_cast<int>(rsa_method::rsa_none)),
              "your radiation_streaming_approximation is set to %d, out of range defined in "
              "perturbations.h",
              ppr->radiation_streaming_approximation);
 
   if (all_species_.count("IDM_DR_IDR")) {
-    class_test((ppr->idr_streaming_approximation < rsa_idr_none) ||
-                   (ppr->idr_streaming_approximation > rsa_idr_MD),
+    class_test((ppr->idr_streaming_approximation <
+                static_cast<int>(rsa_idr_method::rsa_idr_none)) ||
+                   (ppr->idr_streaming_approximation >
+                    static_cast<int>(rsa_idr_method::rsa_idr_MD)),
                "your idr_radiation_streaming_approximation is set to %d, out of range defined in "
                "perturbations.h",
                ppr->idr_streaming_approximation);
   }
 
   if (all_species_.count("UR")) {
-    class_test((ppr->ur_fluid_approximation < ufa_mb) || (ppr->ur_fluid_approximation > ufa_none),
+    class_test((ppr->ur_fluid_approximation < static_cast<int>(ufa_method::ufa_mb)) ||
+                   (ppr->ur_fluid_approximation > static_cast<int>(ufa_method::ufa_none)),
                "your ur_fluid_approximation is set to %d, out of range defined in perturbations.h",
                ppr->ur_fluid_approximation);
   }
 
   if (HasNcdm(all_species_)) {
-    class_test((ppr->ncdm_fluid_approximation < ncdmfa_mb) ||
-                   (ppr->ncdm_fluid_approximation > ncdmfa_none),
+    class_test((ppr->ncdm_fluid_approximation < static_cast<int>(ncdmfa_method::ncdmfa_mb)) ||
+                   (ppr->ncdm_fluid_approximation > static_cast<int>(ncdmfa_method::ncdmfa_none)),
                "your ncdm_fluid_approximation is set to %d, out of range defined in "
                "perturbations.h",
                ppr->ncdm_fluid_approximation);
@@ -910,12 +914,12 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       }
 
       if (ppt->has_metricpotential_transfers) {
-        if (ppt->gauge == newtonian) {
+        if (ppt->gauge == possible_gauges::newtonian) {
           has_source_phi_       = true;
           has_source_psi_       = true;
           has_source_phi_prime_ = true;
         }
-        if (ppt->gauge == synchronous) {
+        if (ppt->gauge == possible_gauges::synchronous) {
           has_source_h_         = true;
           has_source_h_prime_   = true;
           has_source_eta_       = true;
@@ -926,7 +930,7 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       }
 
       if (ppt->has_Nbody_gauge_transfers) {
-        if (ppt->gauge == synchronous) {
+        if (ppt->gauge == possible_gauges::synchronous) {
           has_source_h_prime_   = true;
           has_source_eta_prime_ = true;
         }
@@ -950,7 +954,7 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       // dynamic_cast loops (issue #309).
       const SourceRequestContext src_ctx{ppt->has_density_transfers,
                                          ppt->has_velocity_transfers,
-                                         ppt->gauge};
+                                         static_cast<int>(ppt->gauge)};
       for (auto& [name, sp] : all_species_)
         sp->RegisterTransferSourceIndices(index_type, src_ctx);
       class_define_index(index_tp_phi_, has_source_phi_, index_type, 1);
@@ -1482,7 +1486,7 @@ void PerturbationsModule::perturb_get_k_list() {
       if ((ppt->has_cl_number_count) || (ppt->has_cl_lensing_potential)) {
         background_module_->background_tau_of_z(ppt->selection_mean[0], &tau1);
 
-        k_max_cl[index_md_scalars_] = MAX(
+        k_max_cl[index_md_scalars_] = std::max(
             k_max_cl[index_md_scalars_],
             ppr->k_max_tau0_over_l_max * ppt->l_lss_max /
                 (background_module_->conformal_age_ -
@@ -1495,7 +1499,7 @@ void PerturbationsModule::perturb_get_k_list() {
 
     if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers) ||
         (ppt->has_nl_corrections_based_on_delta_m))
-      k_max = MAX(k_max, ppt->k_max_for_pk);
+      k_max = std::max(k_max, ppt->k_max_for_pk);
 
     /** - --> test that result for k_min, k_max make sense */
 
@@ -1527,19 +1531,21 @@ void PerturbationsModule::perturb_get_k_list() {
     if ((all_species_.count("IDM_DR_IDR")) && (idmdr_nindex >= 2)) {
       k_[index_md_scalars_].resize(
           (int) ((k_max_cmb[index_md_scalars_] - k_min) / k_rec /
-                 MIN(ppr->k_step_super, ppr->k_step_sub)) +
-          (int) (MAX(ppr->k_per_decade_for_pk * ppr->idmdr_boost_k_per_decade_for_pk * idmdr_nindex,
-                     ppr->k_per_decade_for_bao) *
+                 std::min(ppr->k_step_super, ppr->k_step_sub)) +
+          (int) (std::max(ppr->k_per_decade_for_pk * ppr->idmdr_boost_k_per_decade_for_pk *
+                              idmdr_nindex,
+                          ppr->k_per_decade_for_bao) *
                  log(k_max / k_min) / log(10.)) +
           3);
     }
 
     else {
-      k_[index_md_scalars_].resize((int) ((k_max_cmb[index_md_scalars_] - k_min) / k_rec /
-                                          MIN(ppr->k_step_super, ppr->k_step_sub)) +
-                                   (int) (MAX(ppr->k_per_decade_for_pk, ppr->k_per_decade_for_bao) *
-                                          log(k_max / k_min) / log(10.)) +
-                                   3);
+      k_[index_md_scalars_].resize(
+          (int) ((k_max_cmb[index_md_scalars_] - k_min) / k_rec /
+                 std::min(ppr->k_step_super, ppr->k_step_sub)) +
+          (int) (std::max(ppr->k_per_decade_for_pk, ppr->k_per_decade_for_bao) *
+                 log(k_max / k_min) / log(10.)) +
+          3);
     }
 
     /* first value */
@@ -1707,7 +1713,7 @@ void PerturbationsModule::perturb_get_k_list() {
 
     /* allocate array with, for the moment, the largest possible size */
     k_[index_md_vectors_].resize((int) ((k_max_cmb[index_md_vectors_] - k_min) / k_rec /
-                                        MIN(ppr->k_step_super, ppr->k_step_sub)) +
+                                        std::min(ppr->k_step_super, ppr->k_step_sub)) +
                                  1);
 
     /* first value */
@@ -1832,7 +1838,7 @@ void PerturbationsModule::perturb_get_k_list() {
 
     /* allocate array with, for the moment, the largest possible size */
     k_[index_md_tensors_].resize((int) ((k_max_cmb[index_md_tensors_] - k_min) / k_rec /
-                                        MIN(ppr->k_step_super, ppr->k_step_sub)) +
+                                        std::min(ppr->k_step_super, ppr->k_step_sub)) +
                                  1);
 
     /* first value */
@@ -1936,12 +1942,12 @@ void PerturbationsModule::perturb_get_k_list() {
       index_k = newk_size - 1;
       while (k_[index_mode][index_k] > k_max_cl[index_mode])
         index_k--;
-      k_size_cl_[index_mode] = MIN(index_k + 2, k_size_[index_mode]);
+      k_size_cl_[index_mode] = std::min(index_k + 2, k_size_[index_mode]);
 
       index_k = newk_size - 1;
       while (k_[index_mode][index_k] > k_max_cmb[index_mode])
         index_k--;
-      k_size_cmb_[index_mode] = MIN(index_k + 2, k_size_[index_mode]);
+      k_size_cmb_[index_mode] = std::min(index_k + 2, k_size_[index_mode]);
 
       /** - --> The two MIN statements are here because in a normal run, the cl and cmb
           arrays contain a single k value larger than their respective k_max.
@@ -1966,23 +1972,29 @@ void PerturbationsModule::perturb_get_k_list() {
   k_min_ = _HUGE_;
   k_max_ = 0.;
   if (ppt->has_scalars) {
-    k_min_ = MIN(k_min_,
+    k_min_ =
+        std::min(k_min_,
                  k_[index_md_scalars_][0]); /* first value, inferred from perturbations structure */
-    k_max_ = MAX(k_max_,
+    k_max_ =
+        std::max(k_max_,
                  k_[index_md_scalars_][k_size_[index_md_scalars_] -
                                        1]); /* last value, inferred from perturbations structure */
   }
   if (ppt->has_vectors) {
-    k_min_ = MIN(k_min_,
+    k_min_ =
+        std::min(k_min_,
                  k_[index_md_vectors_][0]); /* first value, inferred from perturbations structure */
-    k_max_ = MAX(k_max_,
+    k_max_ =
+        std::max(k_max_,
                  k_[index_md_vectors_][k_size_[index_md_vectors_] -
                                        1]); /* last value, inferred from perturbations structure */
   }
   if (ppt->has_tensors) {
-    k_min_ = MIN(k_min_,
+    k_min_ =
+        std::min(k_min_,
                  k_[index_md_tensors_][0]); /* first value, inferred from perturbations structure */
-    k_max_ = MAX(k_max_,
+    k_max_ =
+        std::max(k_max_,
                  k_[index_md_tensors_][k_size_[index_md_tensors_] -
                                        1]); /* last value, inferred from perturbations structure */
   }
@@ -2014,25 +2026,25 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
 
   /** - Compute maximum l_max for any multipole */;
   if (_scalars_) {
-    ppw->max_l_max = MAX(ppr->l_max_g, ppr->l_max_pol_g);
+    ppw->max_l_max = std::max(ppr->l_max_g, ppr->l_max_pol_g);
     if (all_species_.count("UR"))
-      ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ur);
+      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ur);
     if ((all_species_.count("IDM_DR_IDR")) &&
         (static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
              .idr()
              .idr_nature() == idr_free_streaming))
-      ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_idr);
+      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_idr);
     if (HasNcdm(all_species_))
-      ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ncdm);
+      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ncdm);
     if (all_species_.count("DCDM_DR"))
-      ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_dr);
+      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_dr);
   }
   if (_tensors_) {
-    ppw->max_l_max = MAX(ppr->l_max_g_ten, ppr->l_max_pol_g_ten);
+    ppw->max_l_max = std::max(ppr->l_max_g_ten, ppr->l_max_pol_g_ten);
     if (all_species_.count("UR"))
-      ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ur);
+      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ur);
     if (HasNcdm(all_species_))
-      ppw->max_l_max = MAX(ppw->max_l_max, ppr->l_max_ncdm);
+      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ncdm);
   }
 
   /** - Allocate \f$ s_l\f$[ ] array for freestreaming of multipoles (see arXiv:1305.3261) and initialize
@@ -2052,7 +2064,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
   if (_scalars_) {
     /* newtonian gauge */
 
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       class_define_index(ppw->index_mt_psi, _TRUE_, index_mt, 1);       /* psi */
       class_define_index(ppw->index_mt_phi_prime, _TRUE_, index_mt, 1); /* phi' */
     }
@@ -2061,7 +2073,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
        quantities to be integrated, while here we only consider
        quantities obeying to constraint equations) */
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       class_define_index(ppw->index_mt_h_prime, _TRUE_, index_mt, 1);       /* h' */
       class_define_index(ppw->index_mt_h_prime_prime, _TRUE_, index_mt, 1); /* h'' */
       class_define_index(ppw->index_mt_eta_prime, _TRUE_, index_mt, 1);     /* eta' */
@@ -2076,11 +2088,11 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
   if (_vectors_) {
     /* newtonian gauge */
 
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       class_define_index(ppw->index_mt_V_prime, _TRUE_, index_mt, 1);
     }
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       class_define_index(ppw->index_mt_hv_prime_prime, _TRUE_, index_mt, 1);
     }
   }
@@ -2253,7 +2265,7 @@ void PerturbationsModule::perturb_solve(int index_md,
   /** - If non-zero curvature, update array of free-streaming coefficients ppw->s_l */
   if (pba->sgnK != 0) {
     for (l = 0; l <= ppw->max_l_max; l++) {
-      ppw->s_l[l] = sqrt(MAX(1.0 - pba->K * (l * l - 1.0) / k / k, 0.));
+      ppw->s_l[l] = sqrt(std::max(1.0 - pba->K * (l * l - 1.0) / k / k, 0.));
     }
   }
 
@@ -2463,10 +2475,10 @@ void PerturbationsModule::perturb_solve(int index_md,
     /** - --> (d) integrate the perturbations over the current interval. */
 
     auto generic_evolver = &evolver_ndf15;
-    if (ppr->evolver == rk) {
+    if (ppr->evolver == evolver_type::rk) {
       generic_evolver = &evolver_rk;
     }
-    else if (ppr->evolver == rkdp45) {
+    else if (ppr->evolver == evolver_type::rkdp45) {
       generic_evolver = &evolver_rkdp45;
     }
 
@@ -2943,7 +2955,7 @@ void PerturbationsModule::perturb_vector_init(
                                            ppr,
                                            index_pt,
                                            ppw,
-                                           ppt->gauge);
+                                           static_cast<int>(ppt->gauge));
         ++i;
       }
     }
@@ -2959,13 +2971,13 @@ void PerturbationsModule::perturb_vector_init(
     /* metric (only quantities to be integrated, not those obeying constraint equations) */
 
     /* metric perturbation eta of synchronous gauge */
-    class_define_index(ppv->index_pt_eta, ppt->gauge == synchronous, index_pt, 1);
+    class_define_index(ppv->index_pt_eta, ppt->gauge == possible_gauges::synchronous, index_pt, 1);
 
     /* metric perturbation phi of newtonian gauge ( we could fix it
        using Einstein equations as a constraint equation for phi, but
        integration is numerically more stable if we actually evolve
        phi) */
-    class_define_index(ppv->index_pt_phi, ppt->gauge == newtonian, index_pt, 1);
+    class_define_index(ppv->index_pt_phi, ppt->gauge == possible_gauges::newtonian, index_pt, 1);
   }
 
   if (_vectors_) {
@@ -2978,16 +2990,16 @@ void PerturbationsModule::perturb_vector_init(
                                                  ppr,
                                                  index_pt,
                                                  ppw,
-                                                 ppt->gauge);
+                                                 static_cast<int>(ppt->gauge));
         ++i;
       }
     }
 
     /** - (a) metric perturbations V or \f$ h_v \f$ depending on gauge */
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       class_define_index(ppv->index_pt_hv_prime, _TRUE_, index_pt, 1);
     }
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       class_define_index(ppv->index_pt_V, _TRUE_, index_pt, 1);
     }
   }
@@ -3005,7 +3017,7 @@ void PerturbationsModule::perturb_vector_init(
                                                  ppr,
                                                  index_pt,
                                                  ppw,
-                                                 ppt->gauge);
+                                                 static_cast<int>(ppt->gauge));
         ++i;
       }
     }
@@ -3179,10 +3191,10 @@ void PerturbationsModule::perturb_vector_init(
           + DR hierarchies included). Below we will treat other variables case by
           case. */
 
-      if (ppt->gauge == synchronous)
+      if (ppt->gauge == possible_gauges::synchronous)
         ppv->y[ppv->index_pt_eta] = ppw->pv->y[ppw->pv->index_pt_eta];
 
-      if (ppt->gauge == newtonian)
+      if (ppt->gauge == possible_gauges::newtonian)
         ppv->y[ppv->index_pt_phi] = ppw->pv->y[ppw->pv->index_pt_phi];
 
       /* -- case of switching off tight coupling
@@ -3418,10 +3430,10 @@ void PerturbationsModule::perturb_vector_init(
           the approximation switching is. We treat them here. Below
           we will treat other variables case by case. */
 
-      if (ppt->gauge == synchronous) {
+      if (ppt->gauge == possible_gauges::synchronous) {
         ppv->y[ppv->index_pt_hv_prime] = ppw->pv->y[ppw->pv->index_pt_hv_prime];
       }
-      if (ppt->gauge == newtonian) {
+      if (ppt->gauge == possible_gauges::newtonian) {
         ppv->y[ppv->index_pt_V] = ppw->pv->y[ppw->pv->index_pt_V];
       }
 
@@ -3678,7 +3690,7 @@ void PerturbationsModule::perturb_initial_conditions(
     ic_ctx.a                = a;
     ic_ctx.a_prime_over_a   = a_prime_over_a;
     ic_ctx.index_ic         = index_ic;
-    ic_ctx.gauge            = ppt->gauge;
+    ic_ctx.gauge            = static_cast<int>(ppt->gauge);
     ic_ctx.ppw              = ppw;
     ic_ctx.ppr              = ppr;
     ic_ctx.p_mod            = this;
@@ -3875,13 +3887,13 @@ void PerturbationsModule::perturb_initial_conditions(
 
     /** - (c) If the needed gauge is really the synchronous gauge, we need to affect the previously computed value of eta to the actual variable eta */
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       ppw->pv->y[ppw->pv->index_pt_eta] = eta;
     }
 
     /** - (d) If the needed gauge is the newtonian gauge, we must compute alpha and then perform a gauge transformation for each variable */
 
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
                  "Use synchronous gauge for the DRMD implementation as Netwonian gauge has not "
                  "been tested!");
@@ -3923,7 +3935,7 @@ void PerturbationsModule::perturb_initial_conditions(
          scalar field correctly returns 0 from its zero IC field perturbation (its
          Newtonian-branch metric terms would need workspace state not valid at IC).
          scalar_ctx is re-set in perturb_total_stress_energy before the ODE uses it. */
-      ppw->scalar_ctx.gauge = synchronous;
+      ppw->scalar_ctx.gauge = static_cast<int>(possible_gauges::synchronous);
       ppw->scalar_ctx.a     = a;
       ppw->scalar_ctx.a2    = a * a;
       ppw->scalar_ctx.k     = k;
@@ -4284,7 +4296,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
 
     if ((tau / tau_k > ppr->radiation_streaming_trigger_tau_over_tau_k) &&
         (tau > thermodynamics_module_->tau_free_streaming_) &&
-        (ppr->radiation_streaming_approximation != rsa_none)) {
+        (ppr->radiation_streaming_approximation != static_cast<int>(rsa_method::rsa_none))) {
       ppw->approx[ppw->index_ap_rsa] = (int) rsa_on;
     }
     else {
@@ -4299,7 +4311,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
         if ((tau / tau_k > ppr->idr_streaming_trigger_tau_over_tau_k) &&
             ((tau > thermodynamics_module_->tau_idr_free_streaming_) &&
              (idm_idr.idm_dr().nindex_idm_dr() >= 2)) &&
-            (ppr->idr_streaming_approximation != rsa_idr_none)) {
+            (ppr->idr_streaming_approximation != static_cast<int>(rsa_idr_method::rsa_idr_none))) {
           ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_on;
         }
 
@@ -4312,7 +4324,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
         /* IDR alone (no IDM_DR): simpler threshold */
         if ((tau / tau_k > ppr->idr_streaming_trigger_tau_over_tau_k) &&
             (tau > thermodynamics_module_->tau_idr_free_streaming_) &&
-            (ppr->idr_streaming_approximation != rsa_idr_none)) {
+            (ppr->idr_streaming_approximation != static_cast<int>(rsa_idr_method::rsa_idr_none))) {
           ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_on;
         }
 
@@ -4324,7 +4336,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
 
     if (all_species_.count("UR")) {
       if ((tau / tau_k > ppr->ur_fluid_trigger_tau_over_tau_k) &&
-          (ppr->ur_fluid_approximation != ufa_none)) {
+          (ppr->ur_fluid_approximation != static_cast<int>(ufa_method::ufa_none))) {
         ppw->approx[ppw->index_ap_ufa] = (int) ufa_on;
       }
       else {
@@ -4334,7 +4346,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
 
     if (HasNcdm(all_species_)) {
       if ((tau / tau_k > ppr->ncdm_fluid_trigger_tau_over_tau_k) &&
-          (ppr->ncdm_fluid_approximation != ncdmfa_none)) {
+          (ppr->ncdm_fluid_approximation != static_cast<int>(ncdmfa_method::ncdmfa_none))) {
         ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_on;
       }
       else {
@@ -4380,7 +4392,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
 
     if ((tau / tau_k > ppr->radiation_streaming_trigger_tau_over_tau_k) &&
         (tau > thermodynamics_module_->tau_free_streaming_) &&
-        (ppr->radiation_streaming_approximation != rsa_none)) {
+        (ppr->radiation_streaming_approximation != static_cast<int>(rsa_method::rsa_none))) {
       ppw->approx[ppw->index_ap_rsa] = (int) rsa_on;
     }
     else {
@@ -4464,7 +4476,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
     *timescale = tau_h;
 
     if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (HasNcdm(all_species_)))
-      *timescale = MIN(tau_k, *timescale);
+      *timescale = std::min(tau_k, *timescale);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
       thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
@@ -4479,7 +4491,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
 
         tau_c = 1. / pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
-        *timescale = MIN(tau_c, *timescale);
+        *timescale = std::min(tau_c, *timescale);
       }
     }
   }
@@ -4487,7 +4499,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
   /** - for vector modes: */
 
   if ((ppt->has_vectors) && (pppaw->index_md == index_md_vectors_)) {
-    *timescale = MIN(tau_h, tau_k);
+    *timescale = std::min(tau_h, tau_k);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
       thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
@@ -4502,7 +4514,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
 
         tau_c = 1. / pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
-        *timescale = MIN(tau_c, *timescale);
+        *timescale = std::min(tau_c, *timescale);
       }
     }
   }
@@ -4510,7 +4522,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
   /** - for tensor modes: */
 
   if ((ppt->has_tensors) && (pppaw->index_md == index_md_tensors_)) {
-    *timescale = MIN(tau_h, tau_k);
+    *timescale = std::min(tau_h, tau_k);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
       thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
@@ -4525,7 +4537,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
 
         tau_c = 1. / pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
-        *timescale = MIN(tau_c, *timescale);
+        *timescale = std::min(tau_c, *timescale);
       }
     }
   }
@@ -4568,7 +4580,7 @@ void PerturbationsModule::perturb_einstein(
     /** - --> infer metric perturbations from Einstein equations */
 
     /* newtonian gauge */
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       /* in principle we could get phi from the constrain equation:
 
          ppw->pvecmetric[ppw->index_mt_phi] = -1.5 * (a2/k2/k2/s2/s2) * (k2 * delta_rho + 3.*a_prime_over_a * rho_plus_p_theta);
@@ -4604,7 +4616,7 @@ void PerturbationsModule::perturb_einstein(
     }
 
     /* synchronous gauge */
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       /* first equation involving total density fluctuation */
       ppw->pvecmetric[ppw->index_mt_h_prime] = (k2 * s2_squared * y[ppw->pv->index_pt_eta] +
                                                 1.5 * a2 * ppw->delta_rho) /
@@ -4708,12 +4720,12 @@ void PerturbationsModule::perturb_einstein(
     }
 
     if (has_source_theta_m_) {
-      if (ppt->gauge == synchronous) {
+      if (ppt->gauge == possible_gauges::synchronous) {
         ppw->theta_m += ppw->pvecmetric[ppw->index_mt_alpha] * k2;
       }
     }
     if (has_source_theta_cb_) {
-      if (ppt->gauge == synchronous) {
+      if (ppt->gauge == possible_gauges::synchronous) {
         ppw->theta_cb += ppw->pvecmetric[ppw->index_mt_alpha] * k2;  //check gauge transformation
       }
     }
@@ -4721,12 +4733,12 @@ void PerturbationsModule::perturb_einstein(
   /** - for vector modes */
 
   if (_vectors_) {
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       ppw->pvecmetric[ppw->index_mt_V_prime] = -2. * a_prime_over_a * y[ppw->pv->index_pt_V] -
                                                3. * ppw->vector_source_pi / k;
     }
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       // assuming    vector_source_pi = p_class a^2 pi_T^{(1)} and  vector_source_v = (rho_class+p_class)a^2 v^{(1)}
 
       // from Hu and White:
@@ -4800,7 +4812,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
       /** - ----> (a.1.3.) tight coupling approximation */
 
       /* first-order tight-coupling approximation for photon shear */
-      if (ppt->gauge == newtonian) {
+      if (ppt->gauge == possible_gauges::newtonian) {
         shear_g = 16. / 45. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
                   y[g_tse_lay.idx_theta];
       }
@@ -4841,7 +4853,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     ppw->scalar_ctx.k2                   = k2;
     ppw->scalar_ctx.a                    = a;
     ppw->scalar_ctx.a2                   = a2;
-    ppw->scalar_ctx.gauge                = ppt->gauge;
+    ppw->scalar_ctx.gauge                = static_cast<int>(ppt->gauge);
     if (all_species_.count("IDM_DR_IDR")) {
       ppw->scalar_ctx.idr_nature =
           static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).idr().idr_nature();
@@ -5232,7 +5244,7 @@ int PerturbationsModule::perturb_sources_member(
 
       /* newtonian gauge: slightly more complicated form, but more efficient numerically */
 
-      if (ppt->gauge == newtonian) {
+      if (ppt->gauge == possible_gauges::newtonian) {
         _set_source_(index_tp_t0_) =
             ppt->switch_sw * pvecthermo[thermodynamics_module_->index_th_g_] *
                 (delta_g / 4. + pvecmetric[ppw->index_mt_psi]) +
@@ -5263,7 +5275,7 @@ int PerturbationsModule::perturb_sources_member(
 
       /* synchronous gauge: slightly more complicated form, but more efficient numerically */
 
-      if (ppt->gauge == synchronous) {
+      if (ppt->gauge == possible_gauges::synchronous) {
         _set_source_(index_tp_t0_) =
             ppt->switch_sw * pvecthermo[thermodynamics_module_->index_th_g_] *
                 (delta_g / 4. + pvecmetric[ppw->index_mt_alpha_prime]) +
@@ -5330,20 +5342,20 @@ int PerturbationsModule::perturb_sources_member(
 
     /* Bardeen potential -PHI_H = phi in Newtonian gauge */
     if (has_source_phi_) {
-      if (ppt->gauge == newtonian)
+      if (ppt->gauge == possible_gauges::newtonian)
         _set_source_(index_tp_phi_) = y[ppw->pv->index_pt_phi];
 
-      if (ppt->gauge == synchronous)
+      if (ppt->gauge == possible_gauges::synchronous)
         _set_source_(index_tp_phi_) = y[ppw->pv->index_pt_eta] -
                                       a_prime_over_a * pvecmetric[ppw->index_mt_alpha];
     }
 
     /* its derivative phi' */
     if (has_source_phi_prime_) {
-      if (ppt->gauge == newtonian)
+      if (ppt->gauge == possible_gauges::newtonian)
         _set_source_(index_tp_phi_prime_) = dy[ppw->pv->index_pt_phi];
 
-      if (ppt->gauge == synchronous)
+      if (ppt->gauge == possible_gauges::synchronous)
         _set_source_(index_tp_phi_prime_) = dy[ppw->pv->index_pt_eta] -
                                             a_prime_over_a_prime * pvecmetric[ppw->index_mt_alpha] -
                                             a_prime_over_a * pvecmetric[ppw->index_mt_alpha_prime];
@@ -5351,27 +5363,27 @@ int PerturbationsModule::perturb_sources_member(
 
     /* diff of Bardeen potentials PHI_A-PHI_H = psi + phi in newtonian gauge */
     if (has_source_phi_plus_psi_) {
-      if (ppt->gauge == newtonian)
+      if (ppt->gauge == possible_gauges::newtonian)
         _set_source_(index_tp_phi_plus_psi_) = y[ppw->pv->index_pt_phi] +
                                                pvecmetric[ppw->index_mt_psi];
 
-      if (ppt->gauge == synchronous)
+      if (ppt->gauge == possible_gauges::synchronous)
         _set_source_(index_tp_phi_plus_psi_) = y[ppw->pv->index_pt_eta] +
                                                pvecmetric[ppw->index_mt_alpha_prime];
     }
 
     /* Bardeen potential PHI_A = psi in newtonian gauge */
     if (has_source_psi_) {
-      if (ppt->gauge == newtonian)
+      if (ppt->gauge == possible_gauges::newtonian)
         _set_source_(index_tp_psi_) = pvecmetric[ppw->index_mt_psi];
 
-      if (ppt->gauge == synchronous)
+      if (ppt->gauge == possible_gauges::synchronous)
         _set_source_(index_tp_psi_) = a_prime_over_a * pvecmetric[ppw->index_mt_alpha] +
                                       pvecmetric[ppw->index_mt_alpha_prime];
     }
 
     /* the metric potentials h and eta in synchronous gauge */
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       /* cdm is always on in synchronous gauge, see error message above that checks gauge and has_cdm */
       if (has_source_h_) {
         const size_t cdm_i  = all_species_.index_of("CDM");
@@ -5407,7 +5419,7 @@ int PerturbationsModule::perturb_sources_member(
       theta_over_k2 = ppw->rho_plus_p_theta / (pvecback[background_module_->index_bg_rho_tot_] +
                                                pvecback[background_module_->index_bg_p_tot_]);
       theta_shift   = H_T_Nb_prime;
-      if (ppt->gauge == synchronous)
+      if (ppt->gauge == possible_gauges::synchronous)
         theta_shift += pvecmetric[ppw->index_mt_alpha] * k * k;
     }
     else {
@@ -5602,7 +5614,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
   /** - for scalar modes */
   if (_scalars_) {
     /* gravitational potentials (phi and psi written directly to output columns) */
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       alpha = pvecmetric[ppw->index_mt_alpha];
       psi = pvecback[background_module_->index_bg_H_] * pvecback[background_module_->index_bg_a_] *
                 alpha +
@@ -5610,7 +5622,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
       phi = y[ppw->pv->index_pt_eta] - pvecback[background_module_->index_bg_H_] *
                                            pvecback[background_module_->index_bg_a_] * alpha;
     }
-    else if (ppt->gauge == newtonian) {
+    else if (ppt->gauge == possible_gauges::newtonian) {
       psi = pvecmetric[ppw->index_mt_psi];
       phi = y[ppw->pv->index_pt_phi];
     }
@@ -5952,7 +5964,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
         - In the ufa_class approximation, the leading-order source term is (h_prime/2) in synchronous gauge,
         (-3 (phi_prime+psi_prime)) in newtonian gauge: we approximate the later by (-6 phi_prime) */
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       metric_continuity = pvecmetric[ppw->index_mt_h_prime] / 2.;
       metric_euler      = 0.;
       metric_shear      = k2 * pvecmetric[ppw->index_mt_alpha];
@@ -5960,7 +5972,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
       metric_ufa_class = pvecmetric[ppw->index_mt_h_prime] / 2.;
     }
 
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       metric_continuity = -3. * pvecmetric[ppw->index_mt_phi_prime];
       metric_euler      = k2 * pvecmetric[ppw->index_mt_psi];
       metric_shear      = 0.;
@@ -6064,11 +6076,11 @@ int PerturbationsModule::perturb_derivs_member(double tau,
 
     /** - --> metric */
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       dy[pv->index_pt_eta] = pvecmetric[ppw->index_mt_eta_prime];
     }
 
-    if (ppt->gauge == newtonian) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       dy[pv->index_pt_phi] = pvecmetric[ppw->index_mt_phi_prime];
     }
   }
@@ -6088,13 +6100,13 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     const auto& b_vec_dr_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(
         *pv->species_layouts[b_vec_dr_i]);
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       dy[b_vec_dr_lay.idx_theta] = -(1 - 3. * cb2) * a_prime_over_a * y[b_vec_dr_lay.idx_theta] -
                                    pvecthermo[thermodynamics_module_->index_th_dkappa_] *
                                        (_SQRT2_ / 4. * delta_g_vec + y[b_vec_dr_lay.idx_theta]);
     }
 
-    else if (ppt->gauge == newtonian) {
+    else if (ppt->gauge == possible_gauges::newtonian) {
       dy[b_vec_dr_lay.idx_theta] = -(1 - 3. * cb2) * a_prime_over_a * y[b_vec_dr_lay.idx_theta] -
                                    _SQRT2_ / 4. *
                                        pvecthermo[thermodynamics_module_->index_th_dkappa_] *
@@ -6112,11 +6124,11 @@ int PerturbationsModule::perturb_derivs_member(double tau,
       }
     }
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       /* Vector metric perturbation in synchronous gauge: */
       dy[pv->index_pt_hv_prime] = pvecmetric[ppw->index_mt_hv_prime_prime];
     }
-    else if (ppt->gauge == newtonian) {
+    else if (ppt->gauge == possible_gauges::newtonian) {
       /* Vector metric perturbation in Newtonian gauge: */
       dy[pv->index_pt_V] = pvecmetric[ppw->index_mt_V_prime];
     }
@@ -6235,11 +6247,11 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
                    tau_c;           /* its first derivative wrt conformal time */
   double F       = tau_c / (1 + R); /* F = tau_c/(1+R) */
   double F_prime = 0., F_prime_prime = 0.;
-  if (ppr->tight_coupling_approximation >= (int) second_order_CLASS) {
+  if (ppr->tight_coupling_approximation >= static_cast<int>(tca_method::second_order_CLASS)) {
     F_prime = dtau_c / (1 + R) +
               tau_c * a_prime_over_a * R / (1 + R) /
                   (1 + R); /*F' needed by second_order_CLASS and compromise_CLASS */
-    if (ppr->tight_coupling_approximation == (int) second_order_CLASS) {
+    if (ppr->tight_coupling_approximation == static_cast<int>(tca_method::second_order_CLASS)) {
       F_prime_prime = (-pvecthermo[thermodynamics_module_->index_th_dddkappa_] * tau_c *
                            tau_c /* F'' needed by second_order_CLASS only */
                        + 2. * pvecthermo[thermodynamics_module_->index_th_ddkappa_] *
@@ -6272,14 +6284,14 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
 
   double metric_continuity = 0., metric_euler = 0., metric_shear = 0., metric_shear_prime = 0.;
 
-  if (ppt->gauge == synchronous) {
+  if (ppt->gauge == possible_gauges::synchronous) {
     metric_continuity  = pvecmetric[ppw->index_mt_h_prime] / 2.;
     metric_euler       = 0.;
     metric_shear       = k2 * pvecmetric[ppw->index_mt_alpha];
     metric_shear_prime = k2 * pvecmetric[ppw->index_mt_alpha_prime];
   }
 
-  if (ppt->gauge == newtonian) {
+  if (ppt->gauge == possible_gauges::newtonian) {
     metric_continuity  = -3. * pvecmetric[ppw->index_mt_phi_prime];
     metric_euler       = k2 * pvecmetric[ppw->index_mt_psi];
     metric_shear       = 0.;
@@ -6294,7 +6306,7 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
 
   /** - ---> like Ma & Bertschinger */
   double slip = 0.;
-  if (ppr->tight_coupling_approximation == (int) first_order_MB) {
+  if (ppr->tight_coupling_approximation == static_cast<int>(tca_method::first_order_MB)) {
     slip = 2. * R / (1. + R) * a_prime_over_a * (theta_b - theta_g) +
            F * (-a_primeprime_over_a * theta_b +
                 k2 * (-a_prime_over_a * delta_g / 2. + cb2 * (-theta_b - metric_continuity) -
@@ -6303,8 +6315,8 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   }
 
   /** - ---> relax assumption dkappa~a\f$^{-2}\f$ (like in CAMB) */
-  if ((ppr->tight_coupling_approximation == (int) first_order_CAMB) ||
-      (ppr->tight_coupling_approximation == (int) compromise_CLASS)) {
+  if ((ppr->tight_coupling_approximation == static_cast<int>(tca_method::first_order_CAMB)) ||
+      (ppr->tight_coupling_approximation == static_cast<int>(tca_method::compromise_CLASS))) {
     slip = (dtau_c / tau_c - 2. * a_prime_over_a / (1. + R)) * (theta_b - theta_g) +
            F * (-a_primeprime_over_a * theta_b +
                 k2 * (-a_prime_over_a * delta_g / 2. + cb2 * (-theta_b - metric_continuity) -
@@ -6313,8 +6325,8 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   }
 
   /** - ---> also relax assumption cb2~a\f$^{-1}\f$ */
-  if ((ppr->tight_coupling_approximation == (int) first_order_CLASS) ||
-      (ppr->tight_coupling_approximation == (int) second_order_CLASS)) {
+  if ((ppr->tight_coupling_approximation == static_cast<int>(tca_method::first_order_CLASS)) ||
+      (ppr->tight_coupling_approximation == static_cast<int>(tca_method::second_order_CLASS))) {
     slip = (dtau_c / tau_c - 2. * a_prime_over_a / (1. + R)) * (theta_b - theta_g) +
            F * (-a_primeprime_over_a * theta_b +
                 k2 * (-a_prime_over_a * delta_g / 2. +
@@ -6341,14 +6353,14 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
       16. / 45. * (tau_c * (theta_prime + metric_shear_prime) + dtau_c * (theta_g + metric_shear));
 
   /** - ---> 2nd order as in CRS*/
-  if (ppr->tight_coupling_approximation == (int) second_order_CRS) {
-    if (ppt->gauge == newtonian) {
+  if (ppr->tight_coupling_approximation == static_cast<int>(tca_method::second_order_CRS)) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       class_stop(
           "the second_order_CRS approach to tight-coupling is coded in synchronous gauge, "
           "not newtonian: change gauge or try another tight-coupling scheme");
     }
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       class_test(pba->sgnK != 0,
                  "the second_order_CRS approach to tight-coupling is coded in the flat case only: "
                  "for non-flat try another tight-coupling scheme");
@@ -6412,14 +6424,14 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   }
 
   /** - ---> 2nd order like in CLASS paper */
-  if (ppr->tight_coupling_approximation == (int) second_order_CLASS) {
-    if (ppt->gauge == newtonian) {
+  if (ppr->tight_coupling_approximation == static_cast<int>(tca_method::second_order_CLASS)) {
+    if (ppt->gauge == possible_gauges::newtonian) {
       class_stop(
           "the second_order_CLASS approach to tight-coupling is coded in synchronous gauge, "
           "not newtonian: change gauge or try another tight-coupling scheme");
     }
 
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       /* zero order for theta_b'' = theta_g'' */
       double theta_prime_prime =
           ((R - 1.) * a_prime_over_a * theta_prime -
@@ -6459,7 +6471,7 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   }
 
   /** - ---> add only the most important 2nd order terms */
-  if (ppr->tight_coupling_approximation == (int) compromise_CLASS) {
+  if (ppr->tight_coupling_approximation == static_cast<int>(tca_method::compromise_CLASS)) {
     /* slip at second order (only leading second-order terms) */
     slip = (1. - 2. * a_prime_over_a * F) * slip +
            F * k2 *
@@ -6503,8 +6515,8 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
       *ppw->pv->species_layouts[b_rsa_i]);
 
   /* newtonian gauge */
-  if (ppt->gauge == newtonian) {
-    if (ppr->radiation_streaming_approximation == rsa_null) {
+  if (ppt->gauge == possible_gauges::newtonian) {
+    if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
       ppw->rsa_delta_g = 0.;
       ppw->rsa_theta_g = 0.;
     }
@@ -6513,7 +6525,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
       ppw->rsa_theta_g = 6. * ppw->pvecmetric[ppw->index_mt_phi_prime];
     }
 
-    if (ppr->radiation_streaming_approximation == rsa_MD_with_reio) {
+    if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_MD_with_reio)) {
       ppw->rsa_delta_g += -4. / k2 * ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
                           y[b_rsa_lay.idx_theta];
 
@@ -6528,7 +6540,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
     }
 
     if (all_species_.count("UR")) {
-      if (ppr->radiation_streaming_approximation == rsa_null) {
+      if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
         ppw->rsa_delta_ur = 0.;
         ppw->rsa_theta_ur = 0.;
       }
@@ -6540,8 +6552,8 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
   }
 
   /* synchronous gauge */
-  if (ppt->gauge == synchronous) {
-    if (ppr->radiation_streaming_approximation == rsa_null) {
+  if (ppt->gauge == possible_gauges::synchronous) {
+    if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
       ppw->rsa_delta_g = 0.;
       ppw->rsa_theta_g = 0.;
     }
@@ -6552,7 +6564,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
       ppw->rsa_theta_g = -0.5 * ppw->pvecmetric[ppw->index_mt_h_prime];
     }
 
-    if (ppr->radiation_streaming_approximation == rsa_MD_with_reio) {
+    if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_MD_with_reio)) {
       ppw->rsa_delta_g += -4. / k2 * ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
                           (y[b_rsa_lay.idx_theta] + 0.5 * ppw->pvecmetric[ppw->index_mt_h_prime]);
 
@@ -6569,7 +6581,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
     }
 
     if (all_species_.count("UR")) {
-      if (ppr->radiation_streaming_approximation == rsa_null) {
+      if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
         ppw->rsa_delta_ur = 0.;
         ppw->rsa_theta_ur = 0.;
       }
@@ -6619,14 +6631,14 @@ void PerturbationsModule::perturb_rsa_idr_delta_and_theta(
   // formulas below TBC for curvaturema
 
   /* newtonian gauge */
-  if (ppt->gauge == newtonian) {
+  if (ppt->gauge == possible_gauges::newtonian) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on) {
       ppw->rsa_delta_idr = -4. * y[ppw->pv->index_pt_phi];
       ppw->rsa_theta_idr = 6. * ppw->pvecmetric[ppw->index_mt_phi_prime];
     }
   }
 
-  if (ppt->gauge == synchronous) {
+  if (ppt->gauge == possible_gauges::synchronous) {
     if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on) {
       ppw->rsa_delta_idr = 4. / k2 *
                            (a_prime_over_a * ppw->pvecmetric[ppw->index_mt_h_prime] -

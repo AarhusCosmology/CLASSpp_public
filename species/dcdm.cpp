@@ -156,10 +156,10 @@ void DCDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceReque
 
 void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      const PerturbationsModule& mod,
-                                     enum file_format fmt,
+                                     file_format fmt,
                                      BaseSpecies::TransferColumnSection section) const {
   const background* pba = mod.GetBackground();
-  if (fmt == class_format) {
+  if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
       w.Add("d_dcdm", index_tp_delta_, index_tp_delta_ >= 0);
@@ -187,7 +187,7 @@ void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
 
     // Synchronous → Newtonian gauge conversion for DCDM (matter + decay term)
     const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous) {
       const double alpha  = pvecmetric[ppw->index_mt_alpha];
       const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
       const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
