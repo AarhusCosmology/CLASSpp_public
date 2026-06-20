@@ -19,10 +19,6 @@
  *   Delta  = rho-weighted average:      Rho() * Delta() == sum_i(rho_i * delta_i)
  *   Theta  = (rho+p)-weighted average:  (Rho()+P()) * Theta() == sum_i((rho_i+p_i) * theta_i)
  *   DeltaP / RhoPlusPShear = direct sums over children.
- *   MatterRhoDelta / MatterRhoPlusPTheta = sums over matter children only
- *   (the BaseSpecies default would tally the whole composite, including
- *   radiation children — always override these in mixed composites).
- *
  * PerturbDerivs runs a two-phase dispatch:
  *   1. Each child's PerturbDerivs (free-streaming terms)
  *   2. AddCouplingDerivs (coupling terms — override in concrete subclasses)
@@ -132,10 +128,8 @@ class CompositeSpecies : public BaseSpecies {
   double FreestreamingRho(const double* pvecback) const override;
 
   // ── Matter tally ────────────────────────────────────────────────────────
-  bool IsMatterSpecies() const override;
+  bool ClustersAsMatter() const override;
   bool IsColdMatterSpecies() const override;
-  double MatterRho(const double* pvecback) const override;
-  double MatterRhoPlusP(const double* pvecback) const override;
 
  protected:
   std::vector<std::unique_ptr<BaseSpecies>> children_;

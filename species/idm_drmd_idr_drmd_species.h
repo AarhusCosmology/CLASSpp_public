@@ -117,17 +117,17 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 
-  double Delta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
+                  const perturb_vector* pv,
+                  const double* y,
+                  const double* pvecback,
+                  const perturb_workspace* ppw) const override;
 
-  double Theta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
 
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,
@@ -140,16 +140,6 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
                        const double* y,
                        const double* pvecback,
                        const perturb_workspace* ppw) const override;
-
-  /** Matter (IDM_DRMD only) contribution. IDR_DRMD is radiation and contributes 0. */
-  double MatterRhoDelta(const perturb_vector* pv,
-                        const double* y,
-                        const double* pvecback,
-                        const perturb_workspace* ppw) const override;
-  double MatterRhoPlusPTheta(const perturb_vector* pv,
-                             const double* y,
-                             const double* pvecback,
-                             const perturb_workspace* ppw) const override;
 
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,

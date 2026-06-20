@@ -46,18 +46,18 @@ class LambdaSpecies : public BaseSpecies {
                      const double* /*y*/,
                      double* /*dy*/,
                      const perturb_parameters_and_workspace& /*ppaw*/) override {}
-  double Delta(const BaseSpecies::PerturbLayout& /*layout*/,
-               const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
+  double DeltaRho(const BaseSpecies::PerturbLayout& /*layout*/,
+                  const perturb_vector* /*pv*/,
+                  const double* /*y*/,
+                  const double* /*pvecback*/,
+                  const perturb_workspace* /*ppw*/) const override {
     return 0.;
   }
-  double Theta(const BaseSpecies::PerturbLayout& /*layout*/,
-               const perturb_vector* /*pv*/,
-               const double* /*y*/,
-               const double* /*pvecback*/,
-               const perturb_workspace* /*ppw*/) const override {
+  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& /*layout*/,
+                       const perturb_vector* /*pv*/,
+                       const double* /*y*/,
+                       const double* /*pvecback*/,
+                       const perturb_workspace* /*ppw*/) const override {
     return 0.;
   }
   double DeltaP(const BaseSpecies::PerturbLayout& /*layout*/,

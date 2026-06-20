@@ -327,29 +327,19 @@ class BaseSpecies {
                                         const double* /*y*/,
                                         perturb_workspace* /*ppw*/) const {}
 
-  /**
-   * Fractional density perturbation delta = delta_rho / rho.
-   * @param layout   This species' PerturbLayout slot (ppw->pv->species_layouts[i]);
-   *                 composites receive their own layout and pass nested
-   *                 sub-layouts to children.
-   * @param pv       Per-thread perturbation vector.
-   * @param y        Current ODE state vector (ppw->pv->y).
-   * @param pvecback Per-thread background vector (ppw->pvecback).
-   * @param ppw      Per-thread workspace; provides scalar_ctx, accumulated stress-energy,
-   *                 pvecthermo, and approximation flags for species that need them.
-   */
-  virtual double Delta(const PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const = 0;
+  /** Density contribution to the stress-energy tensor, δρ = ρ·δ. */
+  virtual double DeltaRho(const PerturbLayout& layout,
+                          const perturb_vector* pv,
+                          const double* y,
+                          const double* pvecback,
+                          const perturb_workspace* ppw) const = 0;
 
-  /** Velocity divergence theta. */
-  virtual double Theta(const PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const = 0;
+  /** Momentum density (ρ+P)·θ. */
+  virtual double RhoPlusPTheta(const PerturbLayout& layout,
+                               const perturb_vector* pv,
+                               const double* y,
+                               const double* pvecback,
+                               const perturb_workspace* ppw) const = 0;
 
   /** Pressure perturbation delta_p. */
   virtual double DeltaP(const PerturbLayout& layout,
@@ -496,19 +486,6 @@ class BaseSpecies {
                                        const perturb_workspace* /*ppw*/,
                                        int* /*used_in_sources*/) const {}
 
-  // ── Matter tally ──────────────────────────────────────────────────────────
-
-  /**
-   * True iff this sector participates in the matter tally (delta_m, theta_m,
-   * and the delta_cb / theta_cb passes that cap out in perturb_total_stress_energy).
-   * Default: based on EnergyType::Matter. Overrides: IDM_DR returns false
-   * (preserves a pre-existing asymmetry in the matter tally — see follow-up issue).
-   * Composites return true iff any child is matter.
-   */
-  virtual bool IsMatterSpecies() const {
-    return energy_type_ == EnergyType::Matter;
-  }
-
   /**
    * Returns the species' contribution to Omega0 (used for budget closure during
    * construction). For composites, this defaults to summing children. For
@@ -578,41 +555,31 @@ class BaseSpecies {
     return a_proposed;
   }
 
-  /** Rho contribution to the matter tally. Default: Rho() if IsMatterSpecies, else 0. */
-  virtual double MatterRho(const double* pvecback) const {
-    return IsMatterSpecies() ? Rho(pvecback) : 0.;
-  }
-
-  /** Rho * Delta contribution to delta_rho_m. Default: Rho*Delta if IsMatterSpecies, else 0.
-      Uses the species' own layout slot (pv->species_layouts[collection_index_]); only
-      valid for first-class species registered via SpeciesCollection::freeze.
-      Composites override to tally matter children via their nested sub-layouts.
-      Defined out-of-line in base_species.cpp because it dereferences
-      perturb_vector, which is forward-declared here. */
-  virtual double MatterRhoDelta(const perturb_vector* pv,
-                                const double* y,
-                                const double* pvecback,
-                                const perturb_workspace* ppw) const;
-
-  /** (Rho+P) * Theta contribution to rho_plus_p_theta_m. Out-of-line; see above. */
-  virtual double MatterRhoPlusPTheta(const perturb_vector* pv,
-                                     const double* y,
-                                     const double* pvecback,
-                                     const perturb_workspace* ppw) const;
-
-  /** Rho+P contribution to rho_plus_p_m. */
-  virtual double MatterRhoPlusP(const double* pvecback) const {
-    return IsMatterSpecies() ? Rho(pvecback) + P(pvecback) : 0.;
+  /**
+   * True iff this species' clustering participates in the total matter tally
+   * (delta_m / theta_m and the P_m(k) source). This is the axis-2 (perturbation)
+   * counterpart to EnergyType, which only drives the axis-1 background rho_r/rho_m
+   * split: a quintessence scalar field is EnergyType::Other (radiation-like early,
+   * so the background needs its rho-3P split) yet does NOT cluster as matter, so it
+   * must stay out of P_m(k). A member's contribution is computed generically (its
+   * matter density is rho-3P and its density perturbation is delta_rho-3*delta_p),
+   * so this predicate only governs membership, not the value. Default: cold matter
+   * (energy_type==Matter).
+   * Overrides: NCDM/DNCDM (warm matter) return true; composites scan children; a
+   * clustering scalar-field dark-matter model would override to true.
+   */
+  virtual bool ClustersAsMatter() const {
+    return energy_type_ == EnergyType::Matter;
   }
 
   /**
    * True iff this sector participates in the cold-matter tally (delta_cb,
-   * theta_cb). Cold matter excludes NCDM/DNCDM (which are "warm" matter) but
-   * otherwise mirrors IsMatterSpecies. Default: IsMatterSpecies. Overrides:
+   * theta_cb). Cold matter excludes NCDM/DNCDM (which are "warm" matter).
+   * Default: energy_type_ == EnergyType::Matter. Overrides:
    * NCDMBaseSpecies returns false; composites scan children.
    */
   virtual bool IsColdMatterSpecies() const {
-    return IsMatterSpecies();
+    return energy_type_ == EnergyType::Matter;
   }
 
  protected:

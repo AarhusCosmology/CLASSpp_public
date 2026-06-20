@@ -49,22 +49,22 @@ void IDM_DRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDM_DRSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                            const perturb_vector* /*pv*/,
-                            const double* y,
-                            const double* /*pvecback*/,
-                            const perturb_workspace* /*ppw*/) const {
+double IDM_DRSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                               const perturb_vector* /*pv*/,
+                               const double* y,
+                               const double* pvecback,
+                               const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_delta];
+  return pvecback[index_bg_rho_] * y[layout.idx_delta];
 }
 
-double IDM_DRSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                            const perturb_vector* /*pv*/,
-                            const double* y,
-                            const double* /*pvecback*/,
-                            const perturb_workspace* /*ppw*/) const {
+double IDM_DRSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                    const perturb_vector* /*pv*/,
+                                    const double* y,
+                                    const double* pvecback,
+                                    const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_theta];
+  return pvecback[index_bg_rho_] * y[layout.idx_theta];
 }
 
 // ── PerturbSynchronousToNewtonian ─────────────────────────────────────────
@@ -203,26 +203,26 @@ void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDRSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                         const perturb_vector* /*pv*/,
-                         const double* y,
-                         const double* /*pvecback*/,
-                         const perturb_workspace* /*ppw*/) const {
+double IDRSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                            const perturb_vector* /*pv*/,
+                            const double* y,
+                            const double* pvecback,
+                            const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   /* RSA active (idx_delta < 0): IDR delta is handled by rsa_delta_idr in ppw.
      Return 0 to avoid double-counting. */
-  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
+  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
 }
 
-double IDRSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                         const perturb_vector* /*pv*/,
-                         const double* y,
-                         const double* /*pvecback*/,
-                         const perturb_workspace* /*ppw*/) const {
+double IDRSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* /*pv*/,
+                                 const double* y,
+                                 const double* pvecback,
+                                 const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   /* RSA active (idx_theta < 0): IDR theta is handled by rsa_theta_idr in ppw.
      Return 0 to avoid double-counting. */
-  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
+  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
 }
 
 double IDRSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
@@ -355,22 +355,22 @@ void IDM_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDM_DRMDSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* /*pv*/,
-                              const double* y,
-                              const double* /*pvecback*/,
-                              const perturb_workspace* /*ppw*/) const {
+double IDM_DRMDSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* /*pv*/,
+                                 const double* y,
+                                 const double* pvecback,
+                                 const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_delta];
+  return pvecback[index_bg_rho_] * y[layout.idx_delta];
 }
 
-double IDM_DRMDSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* /*pv*/,
-                              const double* y,
-                              const double* /*pvecback*/,
-                              const perturb_workspace* /*ppw*/) const {
+double IDM_DRMDSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                      const perturb_vector* /*pv*/,
+                                      const double* y,
+                                      const double* pvecback,
+                                      const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_theta];
+  return pvecback[index_bg_rho_] * y[layout.idx_theta];
 }
 
 // ── PerturbSynchronousToNewtonian ─────────────────────────────────────────
@@ -434,22 +434,22 @@ void IDR_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDR_DRMDSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* /*pv*/,
-                              const double* y,
-                              const double* /*pvecback*/,
-                              const perturb_workspace* /*ppw*/) const {
+double IDR_DRMDSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* /*pv*/,
+                                 const double* y,
+                                 const double* pvecback,
+                                 const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
+  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
 }
 
-double IDR_DRMDSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* /*pv*/,
-                              const double* y,
-                              const double* /*pvecback*/,
-                              const perturb_workspace* /*ppw*/) const {
+double IDR_DRMDSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                      const perturb_vector* /*pv*/,
+                                      const double* y,
+                                      const double* pvecback,
+                                      const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
+  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
 }
 
 double IDR_DRMDSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,

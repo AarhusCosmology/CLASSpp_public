@@ -259,6 +259,8 @@ struct perturb_vector {
   struct ActiveSpecies {
     BaseSpecies* species;
     BaseSpecies::PerturbLayout* layout;
+    bool clusters_as_matter;  // ClustersAsMatter()    (delta_m/theta_m membership)
+    bool is_cold;             // IsColdMatterSpecies() (delta_cb bucket)
   };
   std::vector<ActiveSpecies> active_species;
 

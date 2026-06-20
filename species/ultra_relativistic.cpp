@@ -210,25 +210,25 @@ void UltraRelativisticSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& b
   }
 }
 
-double UltraRelativisticSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                                       const perturb_vector* /*pv*/,
-                                       const double* y,
-                                       const double* /*pvecback*/,
-                                       const perturb_workspace* /*ppw*/) const {
+double UltraRelativisticSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                          const perturb_vector* /*pv*/,
+                                          const double* y,
+                                          const double* pvecback,
+                                          const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   /* RSA active (idx_delta < 0): UR delta is handled by perturb_rsa_delta_and_theta,
      which adds rsa_delta_ur to ppw->delta_rho directly. Return 0 to avoid double-counting. */
-  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
+  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
 }
 
-double UltraRelativisticSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                                       const perturb_vector* /*pv*/,
-                                       const double* y,
-                                       const double* /*pvecback*/,
-                                       const perturb_workspace* /*ppw*/) const {
+double UltraRelativisticSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                               const perturb_vector* /*pv*/,
+                                               const double* y,
+                                               const double* pvecback,
+                                               const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   /* RSA active (idx_theta < 0): UR theta is handled by perturb_rsa_delta_and_theta. Return 0. */
-  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
+  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
 }
 
 double UltraRelativisticSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,

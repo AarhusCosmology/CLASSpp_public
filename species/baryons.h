@@ -109,17 +109,17 @@ class BaryonsSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  double Delta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
+                  const perturb_vector* pv,
+                  const double* y,
+                  const double* pvecback,
+                  const perturb_workspace* ppw) const override;
 
-  double Theta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
 
   /** Baryon pressure perturbation: rho_b * (delta_p_b / rho_b) from pre-computed context. */
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
@@ -136,8 +136,17 @@ class BaryonsSpecies : public BaseSpecies {
     return 0.;
   }
 
+  void SetThermodynamicsModule(const ThermodynamicsModule* thm) override {
+    thm_ = thm;
+  }
+  void SetPerturbs(const perturbs* ppt) override {
+    ppt_ = ppt;
+  }
+
  private:
   const background& pba_;
+  const ThermodynamicsModule* thm_ = nullptr;
+  const perturbs* ppt_             = nullptr;
 
   int index_tp_delta_ = -1;  // #309 transfer-source slot
   int index_tp_theta_ = -1;

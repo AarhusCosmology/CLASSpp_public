@@ -160,8 +160,9 @@ void PhotonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_delta] = -4. / 3. * (theta_g + metric_continuity);
 
   if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
-    /* TCA: photon theta sourced by baryon theta derivative (already set by BaryonsSpecies) */
-    const double delta_p_b_over_rho_b = ctx.delta_p_b_over_rho_b;
+    /* TCA: photon theta sourced by baryon theta derivative (already set by BaryonsSpecies).
+       In TCA, perturbed recombination is off (tca_off guard in DeltaP), so cb2 * delta_b. */
+    const double delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_cb2_] * ctx.delta_b;
     dy[layout.idx_theta] =
         -(dy[ctx.b_idx_theta] + a_prime_over_a * theta_b - k2 * delta_p_b_over_rho_b) / R +
         k2 * (0.25 * delta_g - s2_squared * ppw->tca_shear_g) + (1. + R) / R * metric_euler;
@@ -407,22 +408,22 @@ void PhotonsSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ─────────────────────────────────────────────────
 
-double PhotonsSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                             const perturb_vector* /*pv*/,
-                             const double* y,
-                             const double* /*pvecback*/,
-                             const perturb_workspace* /*ppw*/) const {
+double PhotonsSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                const perturb_vector* /*pv*/,
+                                const double* y,
+                                const double* pvecback,
+                                const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
+  return (layout.idx_delta >= 0) ? pvecback[index_bg_rho_] * y[layout.idx_delta] : 0.;
 }
 
-double PhotonsSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                             const perturb_vector* /*pv*/,
-                             const double* y,
-                             const double* /*pvecback*/,
-                             const perturb_workspace* /*ppw*/) const {
+double PhotonsSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                     const perturb_vector* /*pv*/,
+                                     const double* y,
+                                     const double* pvecback,
+                                     const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
+  return (layout.idx_theta >= 0) ? 4. / 3. * pvecback[index_bg_rho_] * y[layout.idx_theta] : 0.;
 }
 
 double PhotonsSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
@@ -441,11 +442,14 @@ double PhotonsSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
                                      const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   const double rho_g = pvecback[index_bg_rho_];
-  /* Use TCA-corrected shear_g from the pre-computed context when the shear
-     perturbation is not independently evolved (TCA or RSA modes). */
-  if (layout.idx_shear < 0)
-    return 4. / 3. * rho_g * ppw->scalar_ctx.shear_g;
-  return 4. / 3. * rho_g * y[layout.idx_shear];
+  if (layout.idx_shear >= 0)
+    return 4. / 3. * rho_g * y[layout.idx_shear];  // no approximation
+  if (ppw->approx[ppw->index_ap_tca] == (int) tca_off)
+    return 0.;                                    // RSA: shear neglected
+  if (ppt_->gauge == possible_gauges::newtonian)  // TCA, 1st order
+    return 4. / 3. * rho_g *
+           (16. / 45. / ppw->pvecthermo[thm_->index_th_dkappa_] * y[layout.idx_theta]);
+  return 0.;  // synchronous TCA: re-set later in perturb_einstein
 }
 
 // ── ApplyInitialConditions ────────────────────────────────────────────────────

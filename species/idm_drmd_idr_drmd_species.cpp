@@ -288,60 +288,24 @@ void IDM_DRMD_IDR_DRMD_Species::PerturbSynchronousToNewtonian(
   idr_drmd_->PerturbSynchronousToNewtonian(my.idr_drmd, y, ctx);
 }
 
-double IDM_DRMD_IDR_DRMD_Species::Delta(const BaseSpecies::PerturbLayout& base,
-                                        const perturb_vector* pv,
-                                        const double* y,
-                                        const double* pvecback,
-                                        const perturb_workspace* ppw) const {
-  const auto& my       = static_cast<const PerturbLayout&>(base);
-  const double rho_idm = idm_drmd_->Rho(pvecback);
-  const double rho_idr = idr_drmd_->Rho(pvecback);
-  const double rho_tot = rho_idm + rho_idr;
-  if (rho_tot <= 0.)
-    return 0.;
-  return (rho_idm * idm_drmd_->Delta(my.idm_drmd, pv, y, pvecback, ppw) +
-          rho_idr * idr_drmd_->Delta(my.idr_drmd, pv, y, pvecback, ppw)) /
-         rho_tot;
+double IDM_DRMD_IDR_DRMD_Species::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                           const perturb_vector* pv,
+                                           const double* y,
+                                           const double* pvecback,
+                                           const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  return idm_drmd_->DeltaRho(my.idm_drmd, pv, y, pvecback, ppw) +
+         idr_drmd_->DeltaRho(my.idr_drmd, pv, y, pvecback, ppw);
 }
 
-double IDM_DRMD_IDR_DRMD_Species::Theta(const BaseSpecies::PerturbLayout& base,
-                                        const perturb_vector* pv,
-                                        const double* y,
-                                        const double* pvecback,
-                                        const perturb_workspace* ppw) const {
-  const auto& my       = static_cast<const PerturbLayout&>(base);
-  const double rpp_idm = idm_drmd_->Rho(pvecback) + idm_drmd_->P(pvecback);
-  const double rpp_idr = idr_drmd_->Rho(pvecback) + idr_drmd_->P(pvecback);
-  const double rpp_tot = rpp_idm + rpp_idr;
-  if (rpp_tot <= 0.)
-    return 0.;
-  return (rpp_idm * idm_drmd_->Theta(my.idm_drmd, pv, y, pvecback, ppw) +
-          rpp_idr * idr_drmd_->Theta(my.idr_drmd, pv, y, pvecback, ppw)) /
-         rpp_tot;
-}
-
-double IDM_DRMD_IDR_DRMD_Species::MatterRhoDelta(const perturb_vector* pv,
-                                                 const double* y,
-                                                 const double* pvecback,
-                                                 const perturb_workspace* ppw) const {
-  if (collection_index_ >= pv->species_layouts.size())
-    return 0.;
-  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-  return idm_drmd_->IsMatterSpecies()
-             ? idm_drmd_->Rho(pvecback) * idm_drmd_->Delta(my.idm_drmd, pv, y, pvecback, ppw)
-             : 0.;
-}
-
-double IDM_DRMD_IDR_DRMD_Species::MatterRhoPlusPTheta(const perturb_vector* pv,
-                                                      const double* y,
-                                                      const double* pvecback,
-                                                      const perturb_workspace* ppw) const {
-  if (collection_index_ >= pv->species_layouts.size())
-    return 0.;
-  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-  return idm_drmd_->IsMatterSpecies() ? (idm_drmd_->Rho(pvecback) + idm_drmd_->P(pvecback)) *
-                                            idm_drmd_->Theta(my.idm_drmd, pv, y, pvecback, ppw)
-                                      : 0.;
+double IDM_DRMD_IDR_DRMD_Species::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                                const perturb_vector* pv,
+                                                const double* y,
+                                                const double* pvecback,
+                                                const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  return idm_drmd_->RhoPlusPTheta(my.idm_drmd, pv, y, pvecback, ppw) +
+         idr_drmd_->RhoPlusPTheta(my.idr_drmd, pv, y, pvecback, ppw);
 }
 
 double IDM_DRMD_IDR_DRMD_Species::DeltaP(const BaseSpecies::PerturbLayout& base,

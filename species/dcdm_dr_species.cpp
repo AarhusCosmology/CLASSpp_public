@@ -109,60 +109,24 @@ void DCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
   dr_sp_->PerturbNewtonianReseed(my.dr, y, ctx, decay_corr);
 }
 
-double DCDM_DR_Species::Delta(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* pv,
-                              const double* y,
-                              const double* pvecback,
-                              const perturb_workspace* ppw) const {
-  const auto& my       = static_cast<const PerturbLayout&>(base);
-  const double rho_d   = dcdm_->Rho(pvecback);
-  const double rho_dr  = dr_sp_->Rho(pvecback);
-  const double rho_tot = rho_d + rho_dr;
-  if (rho_tot <= 0.)
-    return 0.;
-  return (rho_d * dcdm_->Delta(my.dcdm, pv, y, pvecback, ppw) +
-          rho_dr * dr_sp_->Delta(my.dr, pv, y, pvecback, ppw)) /
-         rho_tot;
+double DCDM_DR_Species::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                 const perturb_vector* pv,
+                                 const double* y,
+                                 const double* pvecback,
+                                 const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  return dcdm_->DeltaRho(my.dcdm, pv, y, pvecback, ppw) +
+         dr_sp_->DeltaRho(my.dr, pv, y, pvecback, ppw);
 }
 
-double DCDM_DR_Species::Theta(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* pv,
-                              const double* y,
-                              const double* pvecback,
-                              const perturb_workspace* ppw) const {
-  const auto& my       = static_cast<const PerturbLayout&>(base);
-  const double rpp_d   = dcdm_->Rho(pvecback) + dcdm_->P(pvecback);
-  const double rpp_dr  = dr_sp_->Rho(pvecback) + dr_sp_->P(pvecback);
-  const double rpp_tot = rpp_d + rpp_dr;
-  if (rpp_tot <= 0.)
-    return 0.;
-  return (rpp_d * dcdm_->Theta(my.dcdm, pv, y, pvecback, ppw) +
-          rpp_dr * dr_sp_->Theta(my.dr, pv, y, pvecback, ppw)) /
-         rpp_tot;
-}
-
-double DCDM_DR_Species::MatterRhoDelta(const perturb_vector* pv,
-                                       const double* y,
-                                       const double* pvecback,
-                                       const perturb_workspace* ppw) const {
-  if (collection_index_ >= pv->species_layouts.size())
-    return 0.;
-  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-  return dcdm_->IsMatterSpecies()
-             ? dcdm_->Rho(pvecback) * dcdm_->Delta(my.dcdm, pv, y, pvecback, ppw)
-             : 0.;
-}
-
-double DCDM_DR_Species::MatterRhoPlusPTheta(const perturb_vector* pv,
-                                            const double* y,
-                                            const double* pvecback,
-                                            const perturb_workspace* ppw) const {
-  if (collection_index_ >= pv->species_layouts.size())
-    return 0.;
-  const auto& my = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-  return dcdm_->IsMatterSpecies() ? (dcdm_->Rho(pvecback) + dcdm_->P(pvecback)) *
-                                        dcdm_->Theta(my.dcdm, pv, y, pvecback, ppw)
-                                  : 0.;
+double DCDM_DR_Species::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                      const perturb_vector* pv,
+                                      const double* y,
+                                      const double* pvecback,
+                                      const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  return dcdm_->RhoPlusPTheta(my.dcdm, pv, y, pvecback, ppw) +
+         dr_sp_->RhoPlusPTheta(my.dr, pv, y, pvecback, ppw);
 }
 
 double DCDM_DR_Species::DeltaP(const BaseSpecies::PerturbLayout& base,

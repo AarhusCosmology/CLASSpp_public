@@ -108,6 +108,9 @@ class PerturbationsModule : public BaseModule {
   std::vector<int>
       tp_size_; /**< number of types tp_size[index_md] included in computation for each mode */
 
+  int idr_nature_ =
+      idr_free_streaming; /**< cached IDR nature (free-streaming or fluid); set once in constructor */
+
   bool has_source_t_;            /**< do we need source for CMB temperature? */
   bool has_source_p_;            /**< do we need source for CMB polarization? */
   bool has_source_delta_m_;      /**< do we need source for delta of total matter? */

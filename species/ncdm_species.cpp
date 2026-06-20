@@ -282,7 +282,7 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
                           index_tp_delta_,
                           ctx.index_tau,
                           ctx.index_k,
-                          Delta(layout, pv, y, pvecback, ppw) +
+                          DeltaRho(layout, pv, y, pvecback, ppw) / pvecback[index_bg_rho_] +
                               3. * ctx.a_prime_over_a * (1. + w) *
                                   ctx.theta_over_k2);  // N-body gauge correction
   }
@@ -294,7 +294,9 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
                           index_tp_theta_,
                           ctx.index_tau,
                           ctx.index_k,
-                          Theta(layout, pv, y, pvecback, ppw) + ctx.theta_shift);
+                          RhoPlusPTheta(layout, pv, y, pvecback, ppw) /
+                                  (pvecback[index_bg_rho_] + pvecback[index_bg_p_]) +
+                              ctx.theta_shift);
   }
 }
 
@@ -474,8 +476,8 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
     const double w_ncdm      = (rho_ncdm_bg > 0.) ? p_ncdm_bg / rho_ncdm_bg : 0.;
 
     const auto& layout = *pv->species_layouts[collection_index_];
-    delta_ncdm         = Delta(layout, pv, y, pvecback, ppw);
-    theta_ncdm         = Theta(layout, pv, y, pvecback, ppw);
+    delta_ncdm = (rho_ncdm_bg > 0.) ? DeltaRho(layout, pv, y, pvecback, ppw) / rho_ncdm_bg : 0.;
+    theta_ncdm = (rho_plus_p > 0.) ? RhoPlusPTheta(layout, pv, y, pvecback, ppw) / rho_plus_p : 0.;
     shear_ncdm = (rho_plus_p > 0.) ? RhoPlusPShear(layout, pv, y, pvecback, ppw) / rho_plus_p : 0.;
     const double delta_p_ncdm   = DeltaP(layout, pv, y, pvecback, ppw);
     const double delta_rho_ncdm = rho_ncdm_bg * delta_ncdm;
@@ -523,54 +525,49 @@ void NCDMSpecies::WriteTensorOutputColumnTitles(std::string& tensor_titles) cons
 
 // ── Integrated observables (layout-based) ──────────────────────────────────
 
-double NCDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                          const perturb_vector* /*pv*/,
-                          const double* y,
-                          const double* pvecback,
-                          const perturb_workspace* ppw) const {
+double NCDMSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                             const perturb_vector* /*pv*/,
+                             const double* y,
+                             const double* pvecback,
+                             const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
   if (layout.index_per_q.empty())
     return 0.;
 
-  const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
-  if (fa_on)
-    return y[layout.index_per_q[0]];
+  if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on)
+    return pvecback[index_bg_rho_] * y[layout.index_per_q[0]];
 
   const double a        = ppw->scalar_ctx.a;
   double rho_delta_ncdm = 0.0;
   for (int iq = 0; iq < layout.q_size; ++iq) {
-    const double w0       = w_[iq];
     const double q        = q_[iq];
     const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
-    rho_delta_ncdm       += q * q * epsilon * w0 * y[layout.index_per_q[iq]];
+    rho_delta_ncdm       += q * q * epsilon * w_[iq] * y[layout.index_per_q[iq]];
   }
-  const double factor = factor_ * std::pow(pba_->a_today / a, 4);
-  return rho_delta_ncdm * factor / pvecback[index_bg_rho_];
+  return rho_delta_ncdm * factor_ *
+         std::pow(pba_->a_today / a, 4);  // was … / pvecback[index_bg_rho_]
 }
 
-double NCDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                          const perturb_vector* /*pv*/,
-                          const double* y,
-                          const double* pvecback,
-                          const perturb_workspace* ppw) const {
+double NCDMSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                  const perturb_vector* /*pv*/,
+                                  const double* y,
+                                  const double* pvecback,
+                                  const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
   if (layout.index_per_q.empty())
     return 0.;
 
-  const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
-  if (fa_on)
-    return y[layout.index_per_q[0] + 1];
+  if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on)
+    return (pvecback[index_bg_rho_] + pvecback[index_bg_p_]) * y[layout.index_per_q[0] + 1];
 
   const double a               = ppw->scalar_ctx.a;
   double rho_plus_p_theta_ncdm = 0.0;
   for (int iq = 0; iq < layout.q_size; ++iq) {
-    const double w0        = w_[iq];
     const double q         = q_[iq];
-    rho_plus_p_theta_ncdm += q * q * q * w0 * y[layout.index_per_q[iq] + 1];
+    rho_plus_p_theta_ncdm += q * q * q * w_[iq] * y[layout.index_per_q[iq] + 1];
   }
-  const double factor = factor_ * std::pow(pba_->a_today / a, 4);
-  const double k      = ppw->scalar_ctx.k;
-  return rho_plus_p_theta_ncdm * k * factor / (pvecback[index_bg_rho_] + pvecback[index_bg_p_]);
+  return rho_plus_p_theta_ncdm * ppw->scalar_ctx.k * factor_ *
+         std::pow(pba_->a_today / a, 4);  // was … / (ρ+p)
 }
 
 double NCDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,

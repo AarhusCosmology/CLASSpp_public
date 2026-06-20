@@ -43,13 +43,12 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  const double k2                   = ppaw.k * ppaw.k;
-  const double a_prime_over_a       = ctx.a_prime_over_a;
-  const double metric_continuity    = ctx.metric_continuity;
-  const double metric_euler         = ctx.metric_euler;
-  const double R                    = ctx.R;
-  const double s2_squared           = ctx.s2_squared;
-  const double delta_p_b_over_rho_b = ctx.delta_p_b_over_rho_b;
+  const double k2                = ppaw.k * ppaw.k;
+  const double a_prime_over_a    = ctx.a_prime_over_a;
+  const double metric_continuity = ctx.metric_continuity;
+  const double metric_euler      = ctx.metric_euler;
+  const double R                 = ctx.R;
+  const double s2_squared        = ctx.s2_squared;
 
   const double theta_b = y[layout.idx_theta];
   /* theta_g from context: RSA-corrected photon velocity */
@@ -58,6 +57,15 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
   const double dkappa =
       ppw->pvecthermo[ppaw.perturbations_module->GetThermodynamicsModule()->index_th_dkappa_];
+
+  /* baryon pressure perturbation / rho (same logic as BaryonsSpecies::DeltaP) */
+  double delta_p_b_over_rho_b;
+  if (ppt_->has_perturbed_recombination && ppw->approx[ppw->index_ap_tca] == (int) tca_off)
+    delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_wb_] *
+                           (y[layout.idx_delta] +
+                            y[ppw->pv->index_pt_perturbed_recombination_delta_temp]);
+  else
+    delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_cb2_] * y[layout.idx_delta];
 
   /* density equation */
   dy[layout.idx_delta] = -(theta_b + metric_continuity);
@@ -80,30 +88,35 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ─────────────────
 
-double BaryonsSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                             const perturb_vector* /*pv*/,
-                             const double* y,
-                             const double* /*pvecback*/,
-                             const perturb_workspace* /*ppw*/) const {
+double BaryonsSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                const perturb_vector* /*pv*/,
+                                const double* y,
+                                const double* pvecback,
+                                const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_delta];
+  return pvecback[index_bg_rho_] * y[layout.idx_delta];
 }
 
-double BaryonsSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                             const perturb_vector* /*pv*/,
-                             const double* y,
-                             const double* /*pvecback*/,
-                             const perturb_workspace* /*ppw*/) const {
+double BaryonsSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                     const perturb_vector* /*pv*/,
+                                     const double* y,
+                                     const double* pvecback,
+                                     const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_theta];
+  return pvecback[index_bg_rho_] * y[layout.idx_theta];
 }
 
-double BaryonsSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,
-                              const perturb_vector* /*pv*/,
-                              const double* /*y*/,
+double BaryonsSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
+                              const perturb_vector* pv,
+                              const double* y,
                               const double* pvecback,
                               const perturb_workspace* ppw) const {
-  return pvecback[index_bg_rho_] * ppw->scalar_ctx.delta_p_b_over_rho_b;
+  const auto& layout = static_cast<const BaryonsSpecies::PerturbLayout&>(base);
+  const double rho_b = pvecback[index_bg_rho_];
+  if (ppt_->has_perturbed_recombination && ppw->approx[ppw->index_ap_tca] == (int) tca_off)
+    return rho_b * ppw->pvecthermo[thm_->index_th_wb_] *
+           (y[layout.idx_delta] + y[pv->index_pt_perturbed_recombination_delta_temp]);
+  return rho_b * ppw->pvecthermo[thm_->index_th_cb2_] * y[layout.idx_delta];
 }
 
 // ── ApplyInitialConditions ───────────────────

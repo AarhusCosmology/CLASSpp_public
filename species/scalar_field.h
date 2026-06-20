@@ -131,17 +131,17 @@ class ScalarFieldSpecies : public BaseSpecies {
    * In Newtonian gauge, includes the metric perturbation psi computed from
    * the accumulated rho_plus_p_shear available in ppw.
    */
-  double Delta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
+                  const perturb_vector* pv,
+                  const double* y,
+                  const double* pvecback,
+                  const perturb_workspace* ppw) const override;
 
-  double Theta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
 
   double DeltaP(const BaseSpecies::PerturbLayout& layout,
                 const perturb_vector* pv,

@@ -253,10 +253,8 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
     else {
       const auto& layout = static_cast<const PerturbLayout&>(
           *ppw->pv->species_layouts[collection_index_]);
-      const double rho     = Rho(ppw->pvecback.data());
-      delta_rho_fld        = rho * Delta(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
-      rho_plus_p_theta_fld = (rho + P(ppw->pvecback.data())) *
-                             Theta(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+      delta_rho_fld        = DeltaRho(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+      rho_plus_p_theta_fld = RhoPlusPTheta(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
       delta_p_fld          = DeltaP(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
     }
   }
@@ -266,21 +264,21 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("delta_p_fld", delta_p_fld, true);
 }
 
-double FluidSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                           const perturb_vector* /*pv*/,
-                           const double* y,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* /*ppw*/) const {
+double FluidSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                              const perturb_vector* /*pv*/,
+                              const double* y,
+                              const double* pvecback,
+                              const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_delta >= 0) ? y[layout.idx_delta] : 0.;
+  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
 }
-double FluidSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                           const perturb_vector* /*pv*/,
-                           const double* y,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* /*ppw*/) const {
+double FluidSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                   const perturb_vector* /*pv*/,
+                                   const double* y,
+                                   const double* pvecback,
+                                   const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
+  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
 }
 double FluidSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
                             const perturb_vector* /*pv*/,

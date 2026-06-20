@@ -27,8 +27,6 @@ struct PerturbScalarContext {
   double cotKgen = 0., s2_squared = 1.;
   /** photon delta/theta (RSA-corrected) */
   double delta_g = 0., theta_g = 0.;
-  /** photon shear (TCA-corrected: 16/45/dkappa*theta_g in Newtonian gauge) */
-  double shear_g = 0.;
   /** baryon delta/theta */
   double delta_b = 0., theta_b = 0.;
   /** baryon theta index in the perturb_vector y/dy arrays (used by photons TCA) */
@@ -39,8 +37,6 @@ struct PerturbScalarContext {
   double R = 0.;
   /** baryon sound speed squared */
   double cb2 = 0.;
-  /** baryon pressure perturbation / rho */
-  double delta_p_b_over_rho_b = 0.;
   /** gauge: 0 = newtonian, 1 = synchronous (mirrors possible_gauges enum) */
   int gauge = 0;
 };

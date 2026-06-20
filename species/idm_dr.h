@@ -76,17 +76,17 @@ class IDM_DRSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  double Delta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
+                  const perturb_vector* pv,
+                  const double* y,
+                  const double* pvecback,
+                  const perturb_workspace* ppw) const override;
 
-  double Theta(const BaseSpecies::PerturbLayout& layout,
-               const perturb_vector* pv,
-               const double* y,
-               const double* pvecback,
-               const perturb_workspace* ppw) const override;
+  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
+                       const perturb_vector* pv,
+                       const double* y,
+                       const double* pvecback,
+                       const perturb_workspace* ppw) const override;
 
   double DeltaP(const BaseSpecies::PerturbLayout& /*layout*/,
                 const perturb_vector* /*pv*/,
@@ -114,15 +114,6 @@ class IDM_DRSpecies : public BaseSpecies {
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
-
-  /**
-   * IDM_DR is excluded from the matter tally by current convention. This is
-   * an asymmetry (IDM_DRMD, DCDM, NCDM are all included) that predates this
-   * refactor — see follow-up issue.
-   */
-  bool IsMatterSpecies() const override {
-    return false;
-  }
 
  private:
   const background& pba_;

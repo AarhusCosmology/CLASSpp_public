@@ -85,9 +85,9 @@ void CompositeSpecies::AddCouplingDerivs(double /*tau*/,
                                          double* /*dy*/,
                                          const perturb_parameters_and_workspace& /*ppaw*/) {}
 
-bool CompositeSpecies::IsMatterSpecies() const {
+bool CompositeSpecies::ClustersAsMatter() const {
   for (const auto& child : children_)
-    if (child->IsMatterSpecies())
+    if (child->ClustersAsMatter())
       return true;
   return false;
 }
@@ -97,18 +97,4 @@ bool CompositeSpecies::IsColdMatterSpecies() const {
     if (child->IsColdMatterSpecies())
       return true;
   return false;
-}
-
-double CompositeSpecies::MatterRho(const double* pvecback) const {
-  double r = 0.;
-  for (const auto& child : children_)
-    r += child->MatterRho(pvecback);
-  return r;
-}
-
-double CompositeSpecies::MatterRhoPlusP(const double* pvecback) const {
-  double rp = 0.;
-  for (const auto& child : children_)
-    rp += child->MatterRhoPlusP(pvecback);
-  return rp;
 }

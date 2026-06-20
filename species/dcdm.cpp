@@ -84,22 +84,22 @@ void DCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
 }
 
-double DCDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                          const perturb_vector* /*pv*/,
-                          const double* y,
-                          const double* /*pvecback*/,
-                          const perturb_workspace* /*ppw*/) const {
+double DCDMSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                             const perturb_vector* /*pv*/,
+                             const double* y,
+                             const double* pvecback,
+                             const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_delta];
+  return pvecback[index_bg_rho_] * y[layout.idx_delta];
 }
 
-double DCDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                          const perturb_vector* /*pv*/,
-                          const double* y,
-                          const double* /*pvecback*/,
-                          const perturb_workspace* /*ppw*/) const {
+double DCDMSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                  const perturb_vector* /*pv*/,
+                                  const double* y,
+                                  const double* pvecback,
+                                  const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return y[layout.idx_theta];
+  return pvecback[index_bg_rho_] * y[layout.idx_theta];
 }
 
 double DCDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,

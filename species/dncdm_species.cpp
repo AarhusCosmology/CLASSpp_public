@@ -535,32 +535,28 @@ void DNCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
 
 // ── Integrated observables (layout-based) ──────────────────────────────────
 
-double DNCDMSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                           const perturb_vector* /*pv*/,
-                           const double* /*y*/,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* ppw) const {
+double DNCDMSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                              const perturb_vector* /*pv*/,
+                              const double* /*y*/,
+                              const double* pvecback,
+                              const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
   if (layout.q_size <= 0 || layout.index_per_q.empty())
     return 0.;
-  const double a = ppw->scalar_ctx.a;
-  const double k = ppw->scalar_ctx.k;
-  auto [d, t, s] = RescaledPerturbations(layout, a, k, ppw);
-  return d;
+  auto [d, t, s] = RescaledPerturbations(layout, ppw->scalar_ctx.a, ppw->scalar_ctx.k, ppw);
+  return Rho(pvecback) * d;
 }
 
-double DNCDMSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                           const perturb_vector* /*pv*/,
-                           const double* /*y*/,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* ppw) const {
+double DNCDMSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                   const perturb_vector* /*pv*/,
+                                   const double* /*y*/,
+                                   const double* pvecback,
+                                   const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
   if (layout.q_size <= 0 || layout.index_per_q.empty())
     return 0.;
-  const double a = ppw->scalar_ctx.a;
-  const double k = ppw->scalar_ctx.k;
-  auto [d, t, s] = RescaledPerturbations(layout, a, k, ppw);
-  return t;
+  auto [d, t, s] = RescaledPerturbations(layout, ppw->scalar_ctx.a, ppw->scalar_ctx.k, ppw);
+  return (Rho(pvecback) + P(pvecback)) * t;
 }
 
 double DNCDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,

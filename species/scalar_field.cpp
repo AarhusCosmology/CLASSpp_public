@@ -371,15 +371,12 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_scf", theta_scf, true);
 }
 
-double ScalarFieldSpecies::Delta(const BaseSpecies::PerturbLayout& base,
-                                 const perturb_vector* pv,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* ppw) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  const double rho   = pvecback[index_bg_rho_];
-  if (rho == 0.)
-    return 0.;
+double ScalarFieldSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
+                                    const perturb_vector* pv,
+                                    const double* y,
+                                    const double* pvecback,
+                                    const perturb_workspace* ppw) const {
+  const auto& layout     = static_cast<const PerturbLayout&>(base);
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
   const double dV        = pvecback[index_bg_dV_scf_];
   const double a2        = ppw->scalar_ctx.a2;
@@ -393,24 +390,19 @@ double ScalarFieldSpecies::Delta(const BaseSpecies::PerturbLayout& base,
     delta_rho  -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }
 
-  return delta_rho / rho;
+  return delta_rho;
 }
 
-double ScalarFieldSpecies::Theta(const BaseSpecies::PerturbLayout& base,
-                                 const perturb_vector* pv,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* ppw) const {
-  const auto& layout      = static_cast<const PerturbLayout&>(base);
-  const double rho        = pvecback[index_bg_rho_];
-  const double p          = pvecback[index_bg_p_];
-  const double rho_plus_p = rho + p;
-  if (rho_plus_p == 0.)
-    return 0.;
+double ScalarFieldSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
+                                         const perturb_vector* /*pv*/,
+                                         const double* y,
+                                         const double* pvecback,
+                                         const perturb_workspace* ppw) const {
+  const auto& layout     = static_cast<const PerturbLayout&>(base);
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
   const double a2        = ppw->scalar_ctx.a2;
   const double k2        = ppw->scalar_ctx.k2;
-  return (1. / 3.) * k2 / a2 * phi_prime * y[layout.idx_phi] / rho_plus_p;
+  return (1. / 3.) * k2 / a2 * phi_prime * y[layout.idx_phi];
 }
 
 double ScalarFieldSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
