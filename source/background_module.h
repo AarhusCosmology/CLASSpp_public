@@ -121,6 +121,7 @@ class BackgroundModule : public BaseModule {
                                     double* y,
                                     double* dy,
                                     void* parameters_and_workspace);
+  static int background_timescale(double loga, void* parameters_and_workspace, double* timescale);
   int background_add_line_to_bg_table_member(
       double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);
   static int background_add_line_to_bg_table(

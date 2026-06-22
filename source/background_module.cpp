@@ -166,6 +166,26 @@ int BackgroundModule::background_add_line_to_bg_table(
 }
 
 /**
+ * Evolution timescale for the background integration. This only exists to feed
+ * the legacy explicit Runge-Kutta evolver (evolver=rk), which asks the caller
+ * for a step size rather than judging the evolution speed itself; the stiff
+ * ndf15 default and the modern rkdp45 evolver size their own steps and ignore
+ * it. The background is integrated in loga (see background_derivs_loga_member),
+ * where a unit step is the natural variation scale, so the timescale is simply
+ * constant. evolver_rk then advances in steps of timestep_over_timescale, which
+ * exceeds the requested output spacing, so it effectively integrates from one
+ * output point to the next under the control of tol_background_integration.
+ */
+int BackgroundModule::background_timescale(double loga,
+                                           void* parameters_and_workspace,
+                                           double* timescale) {
+  (void) loga;
+  (void) parameters_and_workspace;
+  *timescale = 1.;
+  return _SUCCESS_;
+}
+
+/**
  * Background quantities at given conformal time tau.
  *
  * Evaluates all background quantities at a given value of
@@ -737,7 +757,7 @@ void BackgroundModule::background_solve_evolver() {
                   &bpaw,
                   ppr->tol_background_integration,
                   ppr->smallest_allowed_variation,
-                  nullptr,
+                  background_timescale,
                   ppr->perturb_integration_stepsize,
                   loga.data(),
                   bt_size_,
