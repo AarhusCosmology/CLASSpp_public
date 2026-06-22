@@ -312,27 +312,28 @@ int evolver_ndf15(
     for (;;) {
       gotynew = _FALSE_; /* is ynew evaluated yet?*/
       while (gotynew == _FALSE_) {
-        /*Compute the constant terms in the equation for ynew.
-	  Next FOR lop is just: psi = matmul(dif(:,1:k),(G(1:k) * invGa(k)))*/
-        for (ii = 1; ii <= neq; ii++) {
-          psi[ii] = 0.0;
-          for (jj = 1; jj <= k; jj++) {
-            psi[ii] += dif[ii][jj] * G[jj - 1] * invGa[k - 1];
-          }
-        }
         /* Predict a solution at t+h. */
         tnew = t + h;
         if (done == _TRUE_) {
           tnew = tfinal; /*Hit end point exactly. */
         }
         h = tnew - t; /* Purify h. */
+        /* Fused single pass over each dif row. Previously three separate reads of
+           every dif row: psi = matmul(dif(:,1:k), G(1:k)*invGa(k)),
+           pred = y + sum_j dif(:,j), and eqvec(pred -> ynew). The per-element
+           operation order is preserved, so this is bit-identical. */
         for (ii = 1; ii <= neq; ii++) {
-          pred[ii] = y[ii];
+          double pred_ii = y[ii];
+          double psi_ii  = 0.0;
           for (jj = 1; jj <= k; jj++) {
-            pred[ii] += dif[ii][jj];
+            double d  = dif[ii][jj];
+            pred_ii  += d;
+            psi_ii   += d * G[jj - 1] * invGa[k - 1];
           }
+          pred[ii] = pred_ii;
+          psi[ii]  = psi_ii;
+          ynew[ii] = pred_ii; /* former eqvec(pred, ynew, neq) */
         }
-        eqvec(pred, ynew, neq);
 
         /*The difference, difkp1, between pred and the final accepted
 	  ynew is equal to the backward difference of ynew of order
@@ -350,13 +351,13 @@ int evolver_ndf15(
         /* Iterate with simplified Newton method. */
         tooslow = _FALSE_;
         for (iter = 1; iter <= maxit; iter++) {
-          for (ii = 1; ii <= neq; ii++) {
-            tempvec1[ii] = (psi[ii] + difkp1[ii]);
-          }
+          /* derivs touches only f0; psi and difkp1 are unchanged across the call,
+             so the old tempvec1 = psi + difkp1 prepass is unnecessary. Folded into
+             rhs below, keeping the (psi + difkp1) grouping => bit-identical. */
           (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
           stepstat[2] += 1;
           for (j = 1; j <= neq; j++) {
-            rhs[j] = hinvGak * f0[j] - tempvec1[j];
+            rhs[j] = hinvGak * f0[j] - (psi[j] + difkp1[j]);
           }
 
           /*Solve the linear system A*x=del by using the LU decomposition stored in jac.*/
@@ -370,11 +371,11 @@ int evolver_ndf15(
 
           stepstat[5] += 1;
           newnrm       = 0.0;
+          /* Fused: the newnrm reduction (over del) and the difkp1/ynew update are
+             independent per element, so one pass suffices. Bit-identical. */
           for (j = 1; j <= neq; j++) {
-            maxtmp = fabs(del[j] * invwt[j]);
-            newnrm = std::max(newnrm, maxtmp);
-          }
-          for (j = 1; j <= neq; j++) {
+            maxtmp     = fabs(del[j] * invwt[j]);
+            newnrm     = std::max(newnrm, maxtmp);
             difkp1[j] += del[j];
             ynew[j]    = pred[j] + difkp1[j];
           }
@@ -517,14 +518,17 @@ int evolver_ndf15(
     /* End of conditionless FOR loop */
     stepstat[0] += 1;
 
-    /* Update dif: */
-    for (jj = 1; jj <= neq; jj++) {
-      dif[jj][k + 2] = difkp1[jj] - dif[jj][k + 1];
-      dif[jj][k + 1] = difkp1[jj];
-    }
-    for (j = k; j >= 1; j--) {
-      for (ii = 1; ii <= neq; ii++) {
-        dif[ii][j] += dif[ii][j + 1];
+    /* Update dif: one row-local pass. Previously two passes, the second of which
+       (j outer, ii inner) strode through memory by one full row per element since
+       dif is row-major -- it touched every row's cache line k separate times. There
+       is no cross-row dependency and the per-row order (set k+2, k+1, then the
+       j=k..1 recurrence) is preserved, so this is bit-identical. */
+    for (ii = 1; ii <= neq; ii++) {
+      double* difi = dif[ii];
+      difi[k + 2]  = difkp1[ii] - difi[k + 1];
+      difi[k + 1]  = difkp1[ii];
+      for (j = k; j >= 1; j--) {
+        difi[j] += difi[j + 1];
       }
     }
     /** Output **/
