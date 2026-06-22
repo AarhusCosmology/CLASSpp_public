@@ -69,19 +69,32 @@ PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
     sp->SetThermodynamicsModule(thermodynamics_module_.get());
     sp->SetPerturbs(ppt);
   }
-  /* Cache idr_nature once (avoids per-RHS string-map lookup). */
-  if (all_species_.count("IDM_DR_IDR"))
-    idr_nature_ =
-        static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).idr().idr_nature();
+  ResolveSpecies();
+  perturb_init();
+}
 
-  /* Cache the single PPF fluid (the one downcast, localized here). use_ppf is a
-     construction-fixed input; at most one "Fluid" can exist. */
+void PerturbationsModule::ResolveSpecies() {
+  if (auto* p = all_species_.find("IDM_DR_IDR")) {
+    resolved_.idm_dr_idr       = static_cast<const IDM_DR_IDR_Species*>(p->get());
+    resolved_.idm_dr_idr_index = all_species_.index_of("IDM_DR_IDR");
+    resolved_.idr_nature       = resolved_.idm_dr_idr->idr().idr_nature();
+  }
+  if (auto* p = all_species_.find("IDM_DRMD_IDR_DRMD"))
+    resolved_.idm_drmd = static_cast<const IDM_DRMD_IDR_DRMD_Species*>(p->get());
+
+  if (auto* p = all_species_.find("UR"))
+    resolved_.ur = p->get();
+  if (auto* p = all_species_.find("Lambda"))
+    resolved_.lambda = p->get();
+
+  resolved_.has_ncdm  = HasNcdm(all_species_);
+  resolved_.cdm_index = all_species_.index_of("CDM");
+
   if (auto* p = all_species_.find("Fluid")) {
     auto* f = static_cast<FluidSpecies*>(p->get());
     if (f->use_ppf())
-      ppf_fluid_ = f;
+      resolved_.ppf_fluid = f;
   }
-  perturb_init();
 }
 
 PerturbationsModule::~PerturbationsModule() {}
@@ -2948,6 +2961,8 @@ void PerturbationsModule::perturb_vector_init(
   // (non-owning, base-typed views into species_layouts).
   ppv->photon_layout = ppv->species_layouts[all_species_.photons_index()].get();
   ppv->baryon_layout = ppv->species_layouts[all_species_.baryons_index()].get();
+  if (resolved_.cdm_index < all_species_.size())
+    ppv->cdm_layout = ppv->species_layouts[resolved_.cdm_index].get();
   assert(ppv->photon_layout && ppv->baryon_layout);
 
   /** - define all indices in this new vector (depends on approximation scheme, described by the input structure ppw-->pa) */
@@ -4264,9 +4279,8 @@ void PerturbationsModule::perturb_approximations(int index_md,
       }
     }
 
-    if (all_species_.count("IDM_DR_IDR")) {
-      const auto& idm_dr_idr = static_cast<const IDM_DR_IDR_Species&>(
-          *all_species_.at("IDM_DR_IDR"));
+    if (resolved_.idm_dr_idr) {
+      const auto& idm_dr_idr = *resolved_.idm_dr_idr;
       if (ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] == 0.) {
         ppw->approx[ppw->index_ap_tca_idm_dr] = (int) tca_idm_dr_off;
       }
@@ -4293,23 +4307,18 @@ void PerturbationsModule::perturb_approximations(int index_md,
     }
 
     /* DRMD -- Here, we decide when to switch off the tight coupling approximation between iDR (still self-interacting!) and idm */
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    if (resolved_.idm_drmd) {
       double Rint, csp2, Gint;
       double conformalH = ppw->pvecback[background_module_->index_bg_H_] *
                           ppw->pvecback[background_module_->index_bg_a_];
 
-      background_module_->background_idm_drmd(ppw->pvecback[background_module_->index_bg_a_],
-                                              static_cast<IDM_DRMD_IDR_DRMD_Species&>(
-                                                  *all_species_.at("IDM_DRMD_IDR_DRMD"))
-                                                      .idm_drmd()
-                                                      .Rho(ppw->pvecback.data()) /
-                                                  static_cast<IDM_DRMD_IDR_DRMD_Species&>(
-                                                      *all_species_.at("IDM_DRMD_IDR_DRMD"))
-                                                      .idr_drmd()
-                                                      .Rho(ppw->pvecback.data()),
-                                              &Rint,
-                                              &csp2,
-                                              &Gint);
+      background_module_
+          ->background_idm_drmd(ppw->pvecback[background_module_->index_bg_a_],
+                                resolved_.idm_drmd->idm_drmd().Rho(ppw->pvecback.data()) /
+                                    resolved_.idm_drmd->idr_drmd().Rho(ppw->pvecback.data()),
+                                &Rint,
+                                &csp2,
+                                &Gint);
 
       if (Gint > conformalH * ppr->idm_drmd_tight_coupling_trigger_G_over_aH) {
         ppw->approx[ppw->index_ap_tca_idm_drmd] = (int) tca_idm_drmd_on;
@@ -4331,8 +4340,8 @@ void PerturbationsModule::perturb_approximations(int index_md,
     }
 
     /* interacting dark radiation free streaming approximation*/
-    if (all_species_.count("IDM_DR_IDR")) {
-      auto& idm_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
+    if (resolved_.idm_dr_idr) {
+      const auto& idm_idr = *resolved_.idm_dr_idr;
       if (idm_idr.idm_dr().IsPresent()) {
         /* IDM_DR component present: apply nindex_idm_dr threshold */
         if ((tau / tau_k > ppr->idr_streaming_trigger_tau_over_tau_k) &&
@@ -4361,7 +4370,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
       }
     }
 
-    if (all_species_.count("UR")) {
+    if (resolved_.ur) {
       if ((tau / tau_k > ppr->ur_fluid_trigger_tau_over_tau_k) &&
           (ppr->ur_fluid_approximation != static_cast<int>(ufa_method::ufa_none))) {
         ppw->approx[ppw->index_ap_ufa] = (int) ufa_on;
@@ -4371,7 +4380,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
       }
     }
 
-    if (HasNcdm(all_species_)) {
+    if (resolved_.has_ncdm) {
       if ((tau / tau_k > ppr->ncdm_fluid_trigger_tau_over_tau_k) &&
           (ppr->ncdm_fluid_approximation != static_cast<int>(ncdmfa_method::ncdmfa_none))) {
         ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_on;
@@ -4502,7 +4511,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
   if ((ppt->has_scalars) && (pppaw->index_md == index_md_scalars_)) {
     *timescale = tau_h;
 
-    if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (HasNcdm(all_species_)))
+    if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (resolved_.has_ncdm))
       *timescale = std::min(tau_k, *timescale);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
@@ -4636,8 +4645,7 @@ void PerturbationsModule::perturb_einstein(
         perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
       }
 
-      if ((all_species_.count("IDM_DR_IDR")) &&
-          (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
+      if (resolved_.idm_dr_idr && (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
         perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
       }
     }
@@ -4657,14 +4665,10 @@ void PerturbationsModule::perturb_einstein(
         perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
       }
 
-      if ((all_species_.count("IDM_DR_IDR")) &&
-          (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
+      if (resolved_.idm_dr_idr && (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
         perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
 
-        ppw->rho_plus_p_theta += 4. / 3. *
-                                 static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
-                                     .idr()
-                                     .Rho(ppw->pvecback.data()) *
+        ppw->rho_plus_p_theta += 4. / 3. * resolved_.idm_dr_idr->idr().Rho(ppw->pvecback.data()) *
                                  ppw->rsa_theta_idr;
       }
 
@@ -4696,22 +4700,15 @@ void PerturbationsModule::perturb_einstein(
                                  shear_g;
       }
 
-      if ((all_species_.count("IDM_DR_IDR")) &&
-          (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
-        const size_t idr_th_i  = all_species_.index_of("IDM_DR_IDR");
+      if (resolved_.idm_dr_idr && (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
         const auto& idr_th_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                     *ppw->pv->species_layouts[idr_th_i])
+                                     *ppw->pv->species_layouts[resolved_.idm_dr_idr_index])
                                      .idr;
         shear_idr = 0.5 * 8. / 15. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
-                    static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
-                        .idr()
-                        .alpha_idm_dr()[0] *
+                    resolved_.idm_dr_idr->idr().alpha_idm_dr()[0] *
                     (y[idr_th_lay.idx_theta] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
 
-        ppw->rho_plus_p_shear += 4. / 3. *
-                                 static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
-                                     .idr()
-                                     .Rho(ppw->pvecback.data()) *
+        ppw->rho_plus_p_shear += 4. / 3. * resolved_.idm_dr_idr->idr().Rho(ppw->pvecback.data()) *
                                  shear_idr;
       }
 
@@ -4814,7 +4811,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     ppw->scalar_ctx.a          = a;
     ppw->scalar_ctx.a2         = a2;
     ppw->scalar_ctx.gauge      = static_cast<int>(ppt->gauge);
-    ppw->scalar_ctx.idr_nature = idr_nature_;
+    ppw->scalar_ctx.idr_nature = resolved_.idr_nature;
 
     ppw->delta_rho        = 0.;
     ppw->rho_plus_p_theta = 0.;
@@ -4931,15 +4928,15 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
       double rho_relativistic = 0.;
 
       if (ppt->tensor_method == tm_exact) {
-        if (auto* ur = all_species_.find("UR"))
-          rho_relativistic += (*ur)->Rho(ppw->pvecback.data());
+        if (resolved_.ur)
+          rho_relativistic += resolved_.ur->Rho(ppw->pvecback.data());
       }
 
       if (ppt->tensor_method == tm_massless_approximation) {
-        if (auto* ur = all_species_.find("UR"))
-          rho_relativistic += (*ur)->Rho(ppw->pvecback.data());
+        if (resolved_.ur)
+          rho_relativistic += resolved_.ur->Rho(ppw->pvecback.data());
 
-        if (HasNcdm(all_species_)) {
+        if (resolved_.has_ncdm) {
           for (auto& sp : all_species_)
             rho_relativistic += sp->TensorMasslessRelativisticRho(ppw->pvecback.data());
         }
@@ -5235,9 +5232,7 @@ int PerturbationsModule::perturb_sources_member(
     if (ppt->gauge == possible_gauges::synchronous) {
       /* cdm is always on in synchronous gauge, see error message above that checks gauge and has_cdm */
       if (has_source_h_) {
-        const size_t cdm_i  = all_species_.index_of("CDM");
-        const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[cdm_i]);
+        const auto& cdm_lay = static_cast<const CDMSpecies::PerturbLayout&>(*ppw->pv->cdm_layout);
         _set_source_(index_tp_h_) = -2 * y[cdm_lay.idx_delta];
       }
 
@@ -5294,9 +5289,8 @@ int PerturbationsModule::perturb_sources_member(
     if (has_source_delta_tot_) {
       /** We follow the (debatable) CMBFAST/CAMB convention of not including rho_lambda in rho_tot */
       double rho_tot;
-      if (all_species_.count("Lambda")) {
-        rho_tot = pvecback[background_module_->index_bg_rho_tot_] -
-                  all_species_.at("Lambda")->Rho(pvecback);
+      if (resolved_.lambda) {
+        rho_tot = pvecback[background_module_->index_bg_rho_tot_] - resolved_.lambda->Rho(pvecback);
       }
       else {
         rho_tot = pvecback[background_module_->index_bg_rho_tot_];
@@ -6328,7 +6322,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
                                 k2 * y[ppw->pv->index_pt_phi]));
     }
 
-    if (all_species_.count("UR")) {
+    if (resolved_.ur) {
       if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
         ppw->rsa_delta_ur = 0.;
         ppw->rsa_theta_ur = 0.;
@@ -6369,7 +6363,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
                 k2 * y[ppw->pv->index_pt_eta]));
     }
 
-    if (all_species_.count("UR")) {
+    if (resolved_.ur) {
       if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
         ppw->rsa_delta_ur = 0.;
         ppw->rsa_theta_ur = 0.;
@@ -6390,11 +6384,11 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
   ppw->rho_plus_p_theta += 4. / 3. * all_species_.photons().Rho(ppw->pvecback.data()) *
                            ppw->rsa_theta_g;
 
-  if (all_species_.count("UR")) {
-    ppw->delta_rho += all_species_.at("UR")->Rho(ppw->pvecback.data()) * ppw->rsa_delta_ur;
-    ppw->delta_p += 1. / 3. * all_species_.at("UR")->Rho(ppw->pvecback.data()) * ppw->rsa_delta_ur;
-    ppw->rho_plus_p_theta += 4. / 3. * all_species_.at("UR")->Rho(ppw->pvecback.data()) *
-                             ppw->rsa_theta_ur;
+  if (resolved_.ur) {
+    const double rho_ur    = resolved_.ur->Rho(ppw->pvecback.data());
+    ppw->delta_rho        += rho_ur * ppw->rsa_delta_ur;
+    ppw->delta_p          += 1. / 3. * rho_ur * ppw->rsa_delta_ur;
+    ppw->rho_plus_p_theta += 4. / 3. * rho_ur * ppw->rsa_theta_ur;
   }
 }
 

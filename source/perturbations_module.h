@@ -7,6 +7,30 @@
 #include "input_module.h"
 
 class FluidSpecies;
+class IDM_DR_IDR_Species;
+class IDM_DRMD_IDR_DRMD_Species;
+
+/* Resolved-once views into PerturbationsModule's frozen all_species_ collection.
+   The module owns several numerical approximation schemes (TCA/RSA/UFA/ncdmfa),
+   the Einstein/metric equations, and output conventions that legitimately
+   reference specific named species; these handles give that module-owned logic
+   O(1) access to the relevant species' data, replacing per-step/per-sample/per-k
+   O(n) string-keyed scans of all_species_ (frozen after construction) and the
+   per-step downcasts that accompanied them. Resolved by ResolveSpecies() in the
+   ctor. Defined at file scope (not nested in the class) so the cclassy.pxd
+   generator (generate_wrapper.py) does not mistake its closing brace for the end
+   of the PerturbationsModule class and truncate the harvested member list. */
+struct ResolvedSpecies {
+  const IDM_DR_IDR_Species* idm_dr_idr = nullptr;               // TCA-idm_dr, RSA-idr
+  std::size_t idm_dr_idr_index = static_cast<std::size_t>(-1);  // its species_layouts[] index
+  const IDM_DRMD_IDR_DRMD_Species* idm_drmd = nullptr;          // TCA-idm_drmd
+  FluidSpecies* ppf_fluid                   = nullptr;          // PPF fluid (absorbs ppf_fluid_)
+  const BaseSpecies* ur                     = nullptr;          // UFA, RSA-ur, tensor rho
+  const BaseSpecies* lambda                 = nullptr;          // excluded from rho_tot (delta_tot)
+  bool has_ncdm                             = false;            // ncdmfa scheme present
+  int idr_nature                            = idr_free_streaming;  // absorbs idr_nature_
+  std::size_t cdm_index = static_cast<std::size_t>(-1);            // h source (sync gauge)
+};
 
 class PerturbationsModule : public BaseModule {
  public:
@@ -14,7 +38,7 @@ class PerturbationsModule : public BaseModule {
   // relative to the whole universe (intrinsically singular), so the module owns
   // it; non-PPF fluids are ordinary species. Resolved once in the ctor.
   FluidSpecies* ppf_fluid() const {
-    return ppf_fluid_;
+    return resolved_.ppf_fluid;
   }
 
   PerturbationsModule(InputModulePtr input_module,
@@ -108,8 +132,11 @@ class PerturbationsModule : public BaseModule {
   std::vector<int>
       tp_size_; /**< number of types tp_size[index_md] included in computation for each mode */
 
-  int idr_nature_ =
-      idr_free_streaming; /**< cached IDR nature (free-streaming or fluid); set once in constructor */
+  // Resolved-once views into the frozen all_species_ collection (ResolvedSpecies
+  // is defined at file scope above). Resolved by ResolveSpecies() in the ctor.
+  ResolvedSpecies resolved_;
+
+  void ResolveSpecies(); /**< resolve `resolved_` once; called from the ctor */
 
   bool has_source_t_;            /**< do we need source for CMB temperature? */
   bool has_source_p_;            /**< do we need source for CMB polarization? */
@@ -256,8 +283,6 @@ class PerturbationsModule : public BaseModule {
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;
-  FluidSpecies* ppf_fluid_ = nullptr;
-
   short
       evolve_tensor_ur_; /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */
   short

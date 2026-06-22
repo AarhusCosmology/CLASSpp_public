@@ -270,6 +270,7 @@ struct perturb_vector {
   // include perturbations.h). Read sites static_cast to the concrete type.
   BaseSpecies::PerturbLayout* photon_layout = nullptr;
   BaseSpecies::PerturbLayout* baryon_layout = nullptr;
+  BaseSpecies::PerturbLayout* cdm_layout    = nullptr;
 
   /* Photons bare fields removed — use pv->species_layouts[g_i] (PhotonsSpecies::PerturbLayout). */
   /* Baryons bare fields removed — use pv->species_layouts[b_i] (BaryonsSpecies::PerturbLayout). */
