@@ -3980,13 +3980,10 @@ void PerturbationsModule::perturb_initial_conditions(
             continue;
           }
           const auto& layout = *ppw->pv->species_layouts[i];
-          delta_rho_ic +=
-              sp->DeltaRho(layout, ppw->pv.get(), ppw->pv->y.data(), ppw->pvecback.data(), ppw);
-          rho_plus_p_theta_ic += sp->RhoPlusPTheta(layout,
-                                                   ppw->pv.get(),
-                                                   ppw->pv->y.data(),
-                                                   ppw->pvecback.data(),
-                                                   ppw);
+          const auto se =
+              sp->StressEnergy(layout, ppw->pv.get(), ppw->pv->y.data(), ppw->pvecback.data(), ppw);
+          delta_rho_ic        += se.delta_rho;
+          rho_plus_p_theta_ic += se.rho_plus_p_theta;
           ++i;
         }
       }
@@ -4829,33 +4826,29 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     } cold, warm;
     const bool tally = has_source_delta_m_ || has_source_theta_m_;
 
-    /* Pre-pass: the total anisotropic stress rho_plus_p_shear must be fully
-       accumulated before the main loop runs, because ScalarFieldSpecies'
-       DeltaRho/DeltaP (Newtonian gauge) read it to form psi. The former
-       two-pass structure guaranteed this; a single accumulation loop would feed
-       the scalar field a partial sum, since it sorts (lex) before its UR/NCDM
-       shear sources. */
-    for (const auto& e : pv->active_species)
-      ppw->rho_plus_p_shear += e.species->RhoPlusPShear(*e.layout, pv, y, pb, ppw);
-
+    /* Single pass: each species returns all six stress-energy quantities in one
+       virtual call. rho_plus_p_shear is accumulated here too (the former
+       separate pre-pass was needed only by ScalarFieldSpecies' Newtonian-gauge
+       DeltaRho/DeltaP, which is a hard class_test error at init — see issue
+       #285; any future Newtonian-scf fix must restore the complete shear before
+       the scalar field reads it, e.g. by ordering it last or reinstating a
+       pre-pass). Accumulation order over active_species is unchanged, so totals
+       are bit-identical. */
     for (const auto& e : pv->active_species) {
-      const auto& L     = *e.layout;
-      const double rho  = e.species->Rho(pb);
-      const double p    = e.species->P(pb);
-      const double rpp  = rho + p;
-      const double drho = e.species->DeltaRho(L, pv, y, pb, ppw);
-      const double dp   = e.species->DeltaP(L, pv, y, pb, ppw);
-      const double rppt = e.species->RhoPlusPTheta(L, pv, y, pb, ppw);
+      const BaseSpecies::StressEnergyContribution se =
+          e.species->StressEnergy(*e.layout, pv, y, pb, ppw);
+      const double rpp = se.rho + se.p;
 
-      ppw->delta_rho        += drho;
-      ppw->rho_plus_p_theta += rppt;
-      ppw->delta_p          += dp;
+      ppw->delta_rho        += se.delta_rho;
+      ppw->rho_plus_p_theta += se.rho_plus_p_theta;
+      ppw->rho_plus_p_shear += se.rho_plus_p_shear;
+      ppw->delta_p          += se.delta_p;
       ppw->rho_plus_p_tot   += rpp;
 
       if (tally && e.clusters_as_matter) {
-        const double m_rho   = rho - 3. * p;
-        const double m_drho  = drho - 3. * dp;
-        const double m_rppt  = (rpp > 0.) ? m_rho * rppt / rpp : 0.;
+        const double m_rho   = se.rho - 3. * se.p;
+        const double m_drho  = se.delta_rho - 3. * se.delta_p;
+        const double m_rppt  = (rpp > 0.) ? m_rho * se.rho_plus_p_theta / rpp : 0.;
         Tally& t             = e.is_cold ? cold : warm;
         t.drho              += m_drho;
         t.rho               += m_rho;

@@ -41,39 +41,23 @@ class LambdaSpecies : public BaseSpecies {
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
   // ── Perturbations (Lambda is homogeneous: everything vanishes) ────────────
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& /*layout*/,
+                                        const perturb_vector* /*pv*/,
+                                        const double* /*y*/,
+                                        const double* pvecback,
+                                        const perturb_workspace* /*ppw*/) const override {
+    StressEnergyContribution se;
+    se.rho = Rho(pvecback);
+    se.p   = P(pvecback);
+    // All perturbation fields are zero (Lambda is homogeneous).
+    return se;
+  }
+
   void PerturbDerivs(const BaseSpecies::PerturbLayout& /*layout*/,
                      double /*tau*/,
                      const double* /*y*/,
                      double* /*dy*/,
                      const perturb_parameters_and_workspace& /*ppaw*/) override {}
-  double DeltaRho(const BaseSpecies::PerturbLayout& /*layout*/,
-                  const perturb_vector* /*pv*/,
-                  const double* /*y*/,
-                  const double* /*pvecback*/,
-                  const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& /*layout*/,
-                       const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-  double DeltaP(const BaseSpecies::PerturbLayout& /*layout*/,
-                const perturb_vector* /*pv*/,
-                const double* /*y*/,
-                const double* /*pvecback*/,
-                const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& /*layout*/,
-                       const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
 
  private:
   double Omega0_lambda_;

@@ -109,30 +109,14 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  // Stress-energy observables.
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
-  double DeltaP(const BaseSpecies::PerturbLayout& layout,
-                const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
+  /** Fused override: one RescaledPerturbations call for delta/theta/shear;
+   *  DeltaP uses its own independent loop (different weights), matching the
+   *  individual methods' per-term expressions and operand order exactly. */
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   bool IsFreestreaming() const override {
     return true;

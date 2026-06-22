@@ -60,32 +60,11 @@ class IDM_DRMDSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
-  double DeltaP(const BaseSpecies::PerturbLayout& /*layout*/,
-                const perturb_vector* /*pv*/,
-                const double* /*y*/,
-                const double* /*pvecback*/,
-                const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& /*layout*/,
-                       const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,

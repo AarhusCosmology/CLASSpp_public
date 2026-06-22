@@ -113,44 +113,16 @@ void DNCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbL
   dr_sp_->PerturbNewtonianReseed(my.dr, y, ctx, decay_corr);
 }
 
-double DNCDM_DR_Species::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                                  const perturb_vector* pv,
-                                  const double* y,
-                                  const double* pvecback,
-                                  const perturb_workspace* ppw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  return dncdm_->DeltaRho(my.dncdm, pv, y, pvecback, ppw) +
-         dr_sp_->DeltaRho(my.dr, pv, y, pvecback, ppw);
-}
-
-double DNCDM_DR_Species::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                       const perturb_vector* pv,
-                                       const double* y,
-                                       const double* pvecback,
-                                       const perturb_workspace* ppw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  return dncdm_->RhoPlusPTheta(my.dncdm, pv, y, pvecback, ppw) +
-         dr_sp_->RhoPlusPTheta(my.dr, pv, y, pvecback, ppw);
-}
-
-double DNCDM_DR_Species::DeltaP(const BaseSpecies::PerturbLayout& base,
-                                const perturb_vector* pv,
-                                const double* y,
-                                const double* pvecback,
-                                const perturb_workspace* ppw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  return dncdm_->DeltaP(my.dncdm, pv, y, pvecback, ppw) +
-         dr_sp_->DeltaP(my.dr, pv, y, pvecback, ppw);
-}
-
-double DNCDM_DR_Species::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
-                                       const perturb_vector* pv,
-                                       const double* y,
-                                       const double* pvecback,
-                                       const perturb_workspace* ppw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  return dncdm_->RhoPlusPShear(my.dncdm, pv, y, pvecback, ppw) +
-         dr_sp_->RhoPlusPShear(my.dr, pv, y, pvecback, ppw);
+BaseSpecies::StressEnergyContribution DNCDM_DR_Species::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* pv,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* ppw) const {
+  const auto& my               = static_cast<const PerturbLayout&>(base);
+  StressEnergyContribution se  = dncdm_->StressEnergy(my.dncdm, pv, y, pvecback, ppw);
+  se                          += dr_sp_->StressEnergy(my.dr, pv, y, pvecback, ppw);
+  return se;
 }
 
 // ── Coupling derivs ───────────────────────────────────────────────────────────

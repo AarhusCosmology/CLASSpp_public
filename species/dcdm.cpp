@@ -84,38 +84,21 @@ void DCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
 }
 
-double DCDMSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                             const perturb_vector* /*pv*/,
-                             const double* y,
-                             const double* pvecback,
-                             const perturb_workspace* /*ppw*/) const {
+BaseSpecies::StressEnergyContribution DCDMSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_delta];
-}
-
-double DCDMSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                  const perturb_vector* /*pv*/,
-                                  const double* y,
-                                  const double* pvecback,
-                                  const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_theta];
-}
-
-double DCDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,
-                           const perturb_vector* /*pv*/,
-                           const double* /*y*/,
-                           const double* /*pvecback*/,
-                           const perturb_workspace* /*ppw*/) const {
-  return 0.;
-}
-
-double DCDMSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& /*base*/,
-                                  const perturb_vector* /*pv*/,
-                                  const double* /*y*/,
-                                  const double* /*pvecback*/,
-                                  const perturb_workspace* /*ppw*/) const {
-  return 0.;
+  StressEnergyContribution se;
+  se.rho              = pvecback[index_bg_rho_dcdm_];
+  se.p                = 0.;
+  se.delta_rho        = pvecback[index_bg_rho_] * y[layout.idx_delta];
+  se.rho_plus_p_theta = pvecback[index_bg_rho_] * y[layout.idx_theta];
+  se.delta_p          = 0.;
+  se.rho_plus_p_shear = 0.;
+  return se;
 }
 
 void DCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,

@@ -253,9 +253,10 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
     else {
       const auto& layout = static_cast<const PerturbLayout&>(
           *ppw->pv->species_layouts[collection_index_]);
-      delta_rho_fld        = DeltaRho(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
-      rho_plus_p_theta_fld = RhoPlusPTheta(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
-      delta_p_fld          = DeltaP(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+      const auto se        = StressEnergy(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+      delta_rho_fld        = se.delta_rho;
+      rho_plus_p_theta_fld = se.rho_plus_p_theta;
+      delta_p_fld          = se.delta_p;
     }
   }
 
@@ -264,55 +265,56 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("delta_p_fld", delta_p_fld, true);
 }
 
-double FluidSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* /*pv*/,
-                              const double* y,
-                              const double* pvecback,
-                              const perturb_workspace* /*ppw*/) const {
+BaseSpecies::StressEnergyContribution FluidSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
-}
-double FluidSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                   const perturb_vector* /*pv*/,
-                                   const double* y,
-                                   const double* pvecback,
-                                   const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
-}
-double FluidSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
-                            const perturb_vector* /*pv*/,
-                            const double* y,
-                            const double* pvecback,
-                            const perturb_workspace* ppw) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  // PPF uses a dedicated path (ComputePpf); this method is not called for
-  // PPF — the module skips FluidSpecies in the main loop when use_ppf.
-  if (layout.idx_delta < 0 || layout.idx_theta < 0)
-    return 0.;
+  StressEnergyContribution se;
 
-  const double k2             = ppw->scalar_ctx.k2;
-  const double a              = ppw->scalar_ctx.a;
-  const double a_prime_over_a = pvecback[bgm_->index_bg_H_] * a;
+  // rho, p
+  se.rho = pvecback[index_bg_rho_fld_];
+  se.p   = pvecback[index_bg_w_fld_] * pvecback[index_bg_rho_fld_];
 
-  double w_fld, dw_over_da_fld, integral_fld;
-  ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
-  const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
+  // delta_rho: body of DeltaRho
+  se.delta_rho = (layout.idx_delta >= 0) ? pvecback[index_bg_rho_fld_] * y[layout.idx_delta] : 0.;
 
-  const double rho                  = Rho(pvecback);
-  const double delta_rho_fld        = rho * y[layout.idx_delta];
-  const double rho_plus_p_theta_fld = (1. + w_fld) * rho * y[layout.idx_theta];
-  const double ca2_fld              = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
+  // rho_plus_p_theta: body of RhoPlusPTheta
+  se.rho_plus_p_theta = (layout.idx_theta >= 0)
+                            ? (pvecback[index_bg_rho_fld_] +
+                               pvecback[index_bg_w_fld_] * pvecback[index_bg_rho_fld_]) *
+                                  y[layout.idx_theta]
+                            : 0.;
 
-  return cs2_fld_ * delta_rho_fld +
-         (cs2_fld_ - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
-}
-double FluidSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& /*base*/,
-                                   const perturb_vector* /*pv*/,
-                                   const double* /*y*/,
-                                   const double* /*pvecback*/,
-                                   const perturb_workspace* /*ppw*/) const {
-  return 0.;
+  // delta_p: body of DeltaP (PPF uses a dedicated path; this branch is only reached
+  // for non-PPF fluid where idx_delta and idx_theta are registered).
+  if (layout.idx_delta < 0 || layout.idx_theta < 0) {
+    se.delta_p = 0.;
+  }
+  else {
+    const double k2             = ppw->scalar_ctx.k2;
+    const double a              = ppw->scalar_ctx.a;
+    const double a_prime_over_a = pvecback[bgm_->index_bg_H_] * a;
+
+    double w_fld, dw_over_da_fld, integral_fld;
+    ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
+    const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
+
+    const double rho                  = pvecback[index_bg_rho_fld_];
+    const double delta_rho_fld        = rho * y[layout.idx_delta];
+    const double rho_plus_p_theta_fld = (1. + w_fld) * rho * y[layout.idx_theta];
+    const double ca2_fld              = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
+
+    se.delta_p = cs2_fld_ * delta_rho_fld +
+                 (cs2_fld_ - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
+  }
+
+  // rho_plus_p_shear: always 0 for fluid
+  se.rho_plus_p_shear = 0.;
+
+  return se;
 }
 
 int FluidSpecies::ComputeWFld(double a,

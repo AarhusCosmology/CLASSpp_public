@@ -126,36 +126,11 @@ class ScalarFieldSpecies : public BaseSpecies {
   double ComputeShootingResidual(const ShootingResidualContext& ctx,
                                  const ShootingTarget& target) const override;
 
-  /**
-   * Gauge-dependent fractional density perturbation delta_rho_scf / rho_scf.
-   * In Newtonian gauge, includes the metric perturbation psi computed from
-   * the accumulated rho_plus_p_shear available in ppw.
-   */
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
-  double DeltaP(const BaseSpecies::PerturbLayout& layout,
-                const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& /*layout*/,
-                       const perturb_vector* /*pv*/,
-                       const double* /*y*/,
-                       const double* /*pvecback*/,
-                       const perturb_workspace* /*ppw*/) const override {
-    return 0.;
-  }
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

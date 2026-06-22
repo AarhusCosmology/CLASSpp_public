@@ -146,27 +146,11 @@ class FluidSpecies : public BaseSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  // Layout-based read virtuals: do the real work.
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-  double DeltaP(const BaseSpecies::PerturbLayout& layout,
-                const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,

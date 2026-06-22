@@ -154,30 +154,11 @@ class PhotonsSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
-  /** δp_g = δρ_g / 3 = ρ_g * δ_g / 3. Returns 0 when RSA is active. */
-  double DeltaP(const BaseSpecies::PerturbLayout& layout,
-                const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   void SetThermodynamicsModule(const ThermodynamicsModule* thm) override {
     thm_ = thm;

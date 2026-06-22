@@ -75,29 +75,11 @@ class UltraRelativisticSpecies : public BaseSpecies {
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) override;
 
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
-  double DeltaP(const BaseSpecies::PerturbLayout& layout,
-                const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,

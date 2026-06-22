@@ -18,7 +18,7 @@
  * get the right totals:
  *   Delta  = rho-weighted average:      Rho() * Delta() == sum_i(rho_i * delta_i)
  *   Theta  = (rho+p)-weighted average:  (Rho()+P()) * Theta() == sum_i((rho_i+p_i) * theta_i)
- *   DeltaP / RhoPlusPShear = direct sums over children.
+ *   delta_p / rho_plus_p_shear = summed inside StressEnergy.
  * PerturbDerivs runs a two-phase dispatch:
  *   1. Each child's PerturbDerivs (free-streaming terms)
  *   2. AddCouplingDerivs (coupling terms — override in concrete subclasses)

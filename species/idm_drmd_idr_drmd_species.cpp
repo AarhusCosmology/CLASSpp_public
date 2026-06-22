@@ -288,48 +288,16 @@ void IDM_DRMD_IDR_DRMD_Species::PerturbSynchronousToNewtonian(
   idr_drmd_->PerturbSynchronousToNewtonian(my.idr_drmd, y, ctx);
 }
 
-double IDM_DRMD_IDR_DRMD_Species::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                                           const perturb_vector* pv,
-                                           const double* y,
-                                           const double* pvecback,
-                                           const perturb_workspace* ppw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  return idm_drmd_->DeltaRho(my.idm_drmd, pv, y, pvecback, ppw) +
-         idr_drmd_->DeltaRho(my.idr_drmd, pv, y, pvecback, ppw);
-}
-
-double IDM_DRMD_IDR_DRMD_Species::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                                const perturb_vector* pv,
-                                                const double* y,
-                                                const double* pvecback,
-                                                const perturb_workspace* ppw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  return idm_drmd_->RhoPlusPTheta(my.idm_drmd, pv, y, pvecback, ppw) +
-         idr_drmd_->RhoPlusPTheta(my.idr_drmd, pv, y, pvecback, ppw);
-}
-
-double IDM_DRMD_IDR_DRMD_Species::DeltaP(const BaseSpecies::PerturbLayout& base,
-                                         const perturb_vector* pv,
-                                         const double* y,
-                                         const double* pvecback,
-                                         const perturb_workspace* ppw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  // IDM_DRMD has DeltaP == 0; only IDR_DRMD contributes.
-  return idr_drmd_->DeltaP(my.idr_drmd, pv, y, pvecback, ppw);
-}
-
-double IDM_DRMD_IDR_DRMD_Species::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
-                                                const perturb_vector* pv,
-                                                const double* y,
-                                                const double* pvecback,
-                                                const perturb_workspace* ppw) const {
-  // IDM_DRMD and IDR_DRMD both have RhoPlusPShear == 0.
-  (void) base;
-  (void) pv;
-  (void) y;
-  (void) pvecback;
-  (void) ppw;
-  return 0.;
+BaseSpecies::StressEnergyContribution IDM_DRMD_IDR_DRMD_Species::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* pv,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* ppw) const {
+  const auto& my               = static_cast<const PerturbLayout&>(base);
+  StressEnergyContribution se  = idm_drmd_->StressEnergy(my.idm_drmd, pv, y, pvecback, ppw);
+  se                          += idr_drmd_->StressEnergy(my.idr_drmd, pv, y, pvecback, ppw);
+  return se;
 }
 
 void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(double /*tau*/,

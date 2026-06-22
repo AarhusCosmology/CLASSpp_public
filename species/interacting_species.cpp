@@ -49,22 +49,21 @@ void IDM_DRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDM_DRSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                               const perturb_vector* /*pv*/,
-                               const double* y,
-                               const double* pvecback,
-                               const perturb_workspace* /*ppw*/) const {
+BaseSpecies::StressEnergyContribution IDM_DRSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_delta];
-}
-
-double IDM_DRSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                    const perturb_vector* /*pv*/,
-                                    const double* y,
-                                    const double* pvecback,
-                                    const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_theta];
+  // IDM_DR is cold (P = 0, delta_p = 0, shear = 0)
+  const double rho = pvecback[index_bg_rho_];
+  return {rho,
+          /*p=*/0.,
+          /*delta_rho=*/rho * y[layout.idx_delta],
+          /*rho_plus_p_theta=*/rho * y[layout.idx_theta],
+          /*delta_p=*/0.,
+          /*rho_plus_p_shear=*/0.};
 }
 
 // ── PerturbSynchronousToNewtonian ─────────────────────────────────────────
@@ -203,51 +202,40 @@ void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDRSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                            const perturb_vector* /*pv*/,
-                            const double* y,
-                            const double* pvecback,
-                            const perturb_workspace* /*ppw*/) const {
+BaseSpecies::StressEnergyContribution IDRSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  /* RSA active (idx_delta < 0): IDR delta is handled by rsa_delta_idr in ppw.
-     Return 0 to avoid double-counting. */
-  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
-}
+  /* RSA active when idx_delta < 0: delta/theta handled analytically; return
+     zero contributions to avoid double-counting. */
+  const double rho = Rho(pvecback);  // pvecback[index_bg_rho_]
+  const double p   = rho / 3.;       // P = rho/3 for radiation
 
-double IDRSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                 const perturb_vector* /*pv*/,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  /* RSA active (idx_theta < 0): IDR theta is handled by rsa_theta_idr in ppw.
-     Return 0 to avoid double-counting. */
-  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
-}
+  StressEnergyContribution sec;
+  sec.rho = rho;
+  sec.p   = p;
 
-double IDRSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
-                          const perturb_vector* /*pv*/,
-                          const double* y,
-                          const double* pvecback,
-                          const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  /* delta_p = c_s^2 * delta_rho = (1/3) * rho * delta */
-  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] / 3. : 0.;
-}
+  if (layout.idx_delta >= 0) {
+    sec.delta_rho = rho * y[layout.idx_delta];
+    sec.delta_p   = rho * y[layout.idx_delta] / 3.;
+  }
+  if (layout.idx_theta >= 0) {
+    sec.rho_plus_p_theta = (rho + p) * y[layout.idx_theta];
+  }
 
-double IDRSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
-                                 const perturb_vector* /*pv*/,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* ppw) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (ppw->scalar_ctx.idr_nature != idr_free_streaming)
-    return 0.;
+  if (ppw->scalar_ctx.idr_nature == idr_free_streaming) {
+    /* Use layout slot if shear is registered; fall back to TCA formula otherwise
+       (matches RhoPlusPShear logic exactly). */
+    const double shear_idr = (layout.idx_shear >= 0) ? y[layout.idx_shear]
+                                                     : TcaShearIdr(layout, y, ppw);
+    sec.rho_plus_p_shear   = 4. / 3. * rho * shear_idr;
+  }
+  /* else: fluid idr — rho_plus_p_shear stays 0. */
 
-  /* Use layout slot if shear is registered; fall back to TCA formula otherwise. */
-  const double shear_idr = (layout.idx_shear >= 0) ? y[layout.idx_shear]
-                                                   : TcaShearIdr(layout, y, ppw);
-  return 4. / 3. * Rho(pvecback) * shear_idr;
+  return sec;
 }
 
 // ── PerturbSynchronousToNewtonian ──────────────────────────────────────────
@@ -355,22 +343,21 @@ void IDM_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDM_DRMDSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                                 const perturb_vector* /*pv*/,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* /*ppw*/) const {
+BaseSpecies::StressEnergyContribution IDM_DRMDSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_delta];
-}
-
-double IDM_DRMDSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                      const perturb_vector* /*pv*/,
-                                      const double* y,
-                                      const double* pvecback,
-                                      const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_theta];
+  // IDM_DRMD is cold (P = 0, delta_p = 0, shear = 0)
+  const double rho = pvecback[index_bg_rho_];
+  return {rho,
+          /*p=*/0.,
+          /*delta_rho=*/rho * y[layout.idx_delta],
+          /*rho_plus_p_theta=*/rho * y[layout.idx_theta],
+          /*delta_p=*/0.,
+          /*rho_plus_p_shear=*/0.};
 }
 
 // ── PerturbSynchronousToNewtonian ─────────────────────────────────────────
@@ -434,31 +421,29 @@ void IDR_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
 // ── Stress-energy observables ──────────────────────────────────────────────
 
-double IDR_DRMDSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                                 const perturb_vector* /*pv*/,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* /*ppw*/) const {
+BaseSpecies::StressEnergyContribution IDR_DRMDSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
-}
+  // IDR_DRMD: radiation (p = rho/3), no shear term
+  const double rho = pvecback[index_bg_rho_];
+  const double p   = rho / 3.;
 
-double IDR_DRMDSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                      const perturb_vector* /*pv*/,
-                                      const double* y,
-                                      const double* pvecback,
-                                      const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
-}
-
-double IDR_DRMDSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
-                               const perturb_vector* /*pv*/,
-                               const double* y,
-                               const double* pvecback,
-                               const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_delta >= 0) ? pvecback[index_bg_rho_] * y[layout.idx_delta] / 3. : 0.;
+  StressEnergyContribution sec;
+  sec.rho = rho;
+  sec.p   = p;
+  if (layout.idx_delta >= 0) {
+    sec.delta_rho = rho * y[layout.idx_delta];
+    sec.delta_p   = rho * y[layout.idx_delta] / 3.;
+  }
+  if (layout.idx_theta >= 0) {
+    sec.rho_plus_p_theta = (rho + p) * y[layout.idx_theta];
+  }
+  /* rho_plus_p_shear = 0. always (no shear slot registered) */
+  return sec;
 }
 
 // ── PerturbSynchronousToNewtonian ─────────────────────────────────────────

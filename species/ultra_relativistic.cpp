@@ -70,7 +70,7 @@ void UltraRelativisticSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbL
   const int l_max_full = layout.l_max;
 
   /* If radiation streaming approximation is on, no UR variables are integrated.
-     Sentinel -1 signals RSA to Delta/Theta/DeltaP/RhoPlusPShear. */
+     Sentinel -1 signals RSA to StressEnergy. */
   if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
     layout.idx_delta = -1;
     layout.idx_theta = -1;
@@ -210,45 +210,28 @@ void UltraRelativisticSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& b
   }
 }
 
-double UltraRelativisticSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                                          const perturb_vector* /*pv*/,
-                                          const double* y,
-                                          const double* pvecback,
-                                          const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  /* RSA active (idx_delta < 0): UR delta is handled by perturb_rsa_delta_and_theta,
-     which adds rsa_delta_ur to ppw->delta_rho directly. Return 0 to avoid double-counting. */
-  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] : 0.;
-}
-
-double UltraRelativisticSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                               const perturb_vector* /*pv*/,
-                                               const double* y,
-                                               const double* pvecback,
-                                               const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  /* RSA active (idx_theta < 0): UR theta is handled by perturb_rsa_delta_and_theta. Return 0. */
-  return (layout.idx_theta >= 0) ? (Rho(pvecback) + P(pvecback)) * y[layout.idx_theta] : 0.;
-}
-
-double UltraRelativisticSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
-                                        const perturb_vector* /*pv*/,
-                                        const double* y,
-                                        const double* pvecback,
-                                        const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  /* delta_p = c_s^2 * delta_rho = (1/3) * rho * delta */
-  return (layout.idx_delta >= 0) ? Rho(pvecback) * y[layout.idx_delta] / 3. : 0.;
-}
-
-double UltraRelativisticSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
-                                               const perturb_vector* /*pv*/,
-                                               const double* y,
-                                               const double* pvecback,
-                                               const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  /* (rho + p) * sigma = 4/3 * rho_ur * shear_ur */
-  return (layout.idx_shear >= 0) ? 4. / 3. * Rho(pvecback) * y[layout.idx_shear] : 0.;
+// Direct fused override: one dispatch, no inner virtual calls. Reproduces each
+// individual function bit-for-bit (UR: P = rho/3).
+BaseSpecies::StressEnergyContribution UltraRelativisticSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* /*ppw*/) const {
+  const auto& layout  = static_cast<const PerturbLayout&>(base);
+  const double rho_ur = pvecback[index_bg_rho_];
+  StressEnergyContribution se;
+  se.rho = rho_ur;
+  se.p   = rho_ur / 3.;
+  if (layout.idx_delta >= 0) {
+    se.delta_rho = rho_ur * y[layout.idx_delta];
+    se.delta_p   = rho_ur * y[layout.idx_delta] / 3.;
+  }
+  if (layout.idx_theta >= 0)
+    se.rho_plus_p_theta = (rho_ur + se.p) * y[layout.idx_theta];
+  if (layout.idx_shear >= 0)
+    se.rho_plus_p_shear = 4. / 3. * rho_ur * y[layout.idx_shear];
+  return se;
 }
 
 void UltraRelativisticSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,

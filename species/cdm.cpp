@@ -81,38 +81,21 @@ void CDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-double CDMSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                            const perturb_vector* /*pv*/,
-                            const double* y,
-                            const double* pvecback,
-                            const perturb_workspace* /*ppw*/) const {
+// Direct fused override: one dispatch, no inner virtual calls. Each field
+// reproduces its individual function bit-for-bit (P, delta_p, shear ≡ 0).
+BaseSpecies::StressEnergyContribution CDMSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* /*ppw*/) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_delta];
-}
-
-double CDMSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                 const perturb_vector* /*pv*/,
-                                 const double* y,
-                                 const double* pvecback,
-                                 const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return (layout.idx_theta >= 0) ? pvecback[index_bg_rho_] * y[layout.idx_theta] : 0.;
-}
-
-double CDMSpecies::DeltaP(const BaseSpecies::PerturbLayout& /*base*/,
-                          const perturb_vector* /*pv*/,
-                          const double* /*y*/,
-                          const double* /*pvecback*/,
-                          const perturb_workspace* /*ppw*/) const {
-  return 0.;
-}
-
-double CDMSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& /*base*/,
-                                 const perturb_vector* /*pv*/,
-                                 const double* /*y*/,
-                                 const double* /*pvecback*/,
-                                 const perturb_workspace* /*ppw*/) const {
-  return 0.;
+  StressEnergyContribution se;
+  se.rho              = pvecback[index_bg_rho_cdm_];
+  se.delta_rho        = pvecback[index_bg_rho_] * y[layout.idx_delta];
+  se.rho_plus_p_theta = (layout.idx_theta >= 0) ? pvecback[index_bg_rho_] * y[layout.idx_theta]
+                                                : 0.;
+  return se;
 }
 
 void CDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,

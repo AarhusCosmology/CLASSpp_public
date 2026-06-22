@@ -67,7 +67,7 @@ struct perturbs;  // forward declaration
  *  - computes its background density/pressure in ComputeBackground()
  *  - optionally provides ODE contributions in BackgroundDerivs()
  *  - provides perturbation equations in PerturbDerivs()
- *  - exposes Delta/Theta/DeltaP/RhoPlusPShear for the Einstein equations
+ *  - exposes StressEnergy for the Einstein equations
  *
  * The collection in BaseModule is a const SpeciesCollection&. Use .at("CDM")
  * (throws if absent) or .find("CDM") (returns pointer-or-nullptr); iterate
@@ -327,33 +327,34 @@ class BaseSpecies {
                                         const double* /*y*/,
                                         perturb_workspace* /*ppw*/) const {}
 
-  /** Density contribution to the stress-energy tensor, δρ = ρ·δ. */
-  virtual double DeltaRho(const PerturbLayout& layout,
-                          const perturb_vector* pv,
-                          const double* y,
-                          const double* pvecback,
-                          const perturb_workspace* ppw) const = 0;
+  /** The scalar stress-energy contribution of one species at one ODE step
+   *  (Ma & Bertschinger). Returned by value: six doubles, RVO'd into registers
+   *  at -O3 (the by-reference accumulator variant was measured to give nothing). */
+  struct StressEnergyContribution {
+    double rho              = 0.;  // background ρ
+    double p                = 0.;  // background P
+    double delta_rho        = 0.;  // δρ
+    double rho_plus_p_theta = 0.;  // (ρ+P)θ
+    double delta_p          = 0.;  // δp
+    double rho_plus_p_shear = 0.;  // (ρ+P)σ
 
-  /** Momentum density (ρ+P)·θ. */
-  virtual double RhoPlusPTheta(const PerturbLayout& layout,
-                               const perturb_vector* pv,
-                               const double* y,
-                               const double* pvecback,
-                               const perturb_workspace* ppw) const = 0;
+    StressEnergyContribution& operator+=(const StressEnergyContribution& o) {
+      rho              += o.rho;
+      p                += o.p;
+      delta_rho        += o.delta_rho;
+      rho_plus_p_theta += o.rho_plus_p_theta;
+      delta_p          += o.delta_p;
+      rho_plus_p_shear += o.rho_plus_p_shear;
+      return *this;
+    }
+  };
 
-  /** Pressure perturbation delta_p. */
-  virtual double DeltaP(const PerturbLayout& layout,
-                        const perturb_vector* pv,
-                        const double* y,
-                        const double* pvecback,
-                        const perturb_workspace* ppw) const = 0;
-
-  /** (rho + p) * sigma: anisotropic stress contribution to Einstein equations. */
-  virtual double RhoPlusPShear(const PerturbLayout& layout,
-                               const perturb_vector* pv,
-                               const double* y,
-                               const double* pvecback,
-                               const perturb_workspace* ppw) const = 0;
+  /** All scalar stress-energy perturbations in one call. */
+  virtual StressEnergyContribution StressEnergy(const PerturbLayout& layout,
+                                                const perturb_vector* pv,
+                                                const double* y,
+                                                const double* pvecback,
+                                                const perturb_workspace* ppw) const = 0;
 
   // ── Stage 1: Output ──────────────────────────────────────────────────────
 

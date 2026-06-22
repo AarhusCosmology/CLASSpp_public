@@ -69,30 +69,16 @@ class NCDMSpecies : public NCDMBaseSpecies {
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  // Stress-energy observables.
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
-  double DeltaP(const BaseSpecies::PerturbLayout& layout,
-                const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
+  /** Fused override: eliminates four virtual dispatches.  Handles the FA
+   *  approximation branch with a single check, then runs ONE fused q-loop
+   *  that accumulates all four quantities in a single pass (epsilon and the
+   *  (a0/a)^4 factor computed once per bin). ULP-equivalent to the four
+   *  individual methods — benign reduction drift, validated <0.1% on Cl/P(k). */
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   // FA-collapse switch hook.
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,

@@ -58,7 +58,7 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double dkappa =
       ppw->pvecthermo[ppaw.perturbations_module->GetThermodynamicsModule()->index_th_dkappa_];
 
-  /* baryon pressure perturbation / rho (same logic as BaryonsSpecies::DeltaP) */
+  /* baryon pressure perturbation / rho (same logic as StressEnergy delta_p branch) */
   double delta_p_b_over_rho_b;
   if (ppt_->has_perturbed_recombination && ppw->approx[ppw->index_ap_tca] == (int) tca_off)
     delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_wb_] *
@@ -86,37 +86,26 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-// ── Stress-energy observables ─────────────────
-
-double BaryonsSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                                const perturb_vector* /*pv*/,
-                                const double* y,
-                                const double* pvecback,
-                                const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_delta];
-}
-
-double BaryonsSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                     const perturb_vector* /*pv*/,
-                                     const double* y,
-                                     const double* pvecback,
-                                     const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  return pvecback[index_bg_rho_] * y[layout.idx_theta];
-}
-
-double BaryonsSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
-                              const perturb_vector* pv,
-                              const double* y,
-                              const double* pvecback,
-                              const perturb_workspace* ppw) const {
+// Direct fused override: one dispatch, no inner virtual calls. Reproduces each
+// individual function bit-for-bit (baryons: P ≡ 0, ρ+P = ρ, no shear).
+BaseSpecies::StressEnergyContribution BaryonsSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* pv,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const BaryonsSpecies::PerturbLayout&>(base);
   const double rho_b = pvecback[index_bg_rho_];
+  StressEnergyContribution se;
+  se.rho              = rho_b;
+  se.delta_rho        = rho_b * y[layout.idx_delta];
+  se.rho_plus_p_theta = rho_b * y[layout.idx_theta];
   if (ppt_->has_perturbed_recombination && ppw->approx[ppw->index_ap_tca] == (int) tca_off)
-    return rho_b * ppw->pvecthermo[thm_->index_th_wb_] *
-           (y[layout.idx_delta] + y[pv->index_pt_perturbed_recombination_delta_temp]);
-  return rho_b * ppw->pvecthermo[thm_->index_th_cb2_] * y[layout.idx_delta];
+    se.delta_p = rho_b * ppw->pvecthermo[thm_->index_th_wb_] *
+                 (y[layout.idx_delta] + y[pv->index_pt_perturbed_recombination_delta_temp]);
+  else
+    se.delta_p = rho_b * ppw->pvecthermo[thm_->index_th_cb2_] * y[layout.idx_delta];
+  return se;
 }
 
 // ── ApplyInitialConditions ───────────────────

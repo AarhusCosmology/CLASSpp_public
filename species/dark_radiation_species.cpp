@@ -106,61 +106,32 @@ void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
  *   delta_rho_dr = rho_dr * F0 / f,  where f = rho_dr * a^4 / H0^2
  * so delta_rho_dr = (H0/a^2)^2 * F0 = rho_dr_over_f * F0.
  */
-double DarkRadiationSpecies::DeltaRho(const BaseSpecies::PerturbLayout& base,
-                                      const perturb_vector* /*pv*/,
-                                      const double* y,
-                                      const double* pvecback,
-                                      const perturb_workspace* /*ppw*/) const {
+BaseSpecies::StressEnergyContribution DarkRadiationSpecies::StressEnergy(
+    const BaseSpecies::PerturbLayout& base,
+    const perturb_vector* /*pv*/,
+    const double* y,
+    const double* pvecback,
+    const perturb_workspace* ppw) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_F0 < 0 || pvecback[index_bg_rho_] <= 0.)
-    return 0.;
-  double a             = pvecback[bgm_->index_bg_a_];
-  double a2            = a * a;
-  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return rho_dr_over_f * y[layout.idx_F0];  // was … / pvecback[index_bg_rho_]
-}
+  StressEnergyContribution se;
+  se.rho = pvecback[index_bg_rho_];
+  se.p   = pvecback[index_bg_rho_] / 3.;
 
-double DarkRadiationSpecies::RhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
-                                           const perturb_vector* /*pv*/,
-                                           const double* y,
-                                           const double* pvecback,
-                                           const perturb_workspace* ppw) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_F0 < 0 || pvecback[index_bg_rho_] <= 0.)
-    return 0.;
-  double a             = pvecback[bgm_->index_bg_a_];
-  double a2            = a * a;
-  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  double k             = ppw->scalar_ctx.k;
-  return k * rho_dr_over_f * y[layout.idx_F0 + 1];  // (ρ+P)θ; the /ρ and 4/3·(3/4) cancel
-}
-
-double DarkRadiationSpecies::DeltaP(const BaseSpecies::PerturbLayout& base,
-                                    const perturb_vector* /*pv*/,
-                                    const double* y,
-                                    const double* pvecback,
-                                    const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
   if (layout.idx_F0 < 0)
-    return 0.;
-  double a             = pvecback[bgm_->index_bg_a_];
-  double a2            = a * a;
-  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return rho_dr_over_f * y[layout.idx_F0] / 3.;
-}
+    return se;
+  const double a             = pvecback[bgm_->index_bg_a_];
+  const double a2            = a * a;
+  const double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
+  // δρ and (ρ+P)θ also vanish for ρ≤0 (legacy of their old /ρ form); δp and
+  // (ρ+P)σ never divided by ρ, so they guard on idx_F0 only.
+  const bool rho_pos = pvecback[index_bg_rho_] > 0.;
 
-double DarkRadiationSpecies::RhoPlusPShear(const BaseSpecies::PerturbLayout& base,
-                                           const perturb_vector* /*pv*/,
-                                           const double* y,
-                                           const double* pvecback,
-                                           const perturb_workspace* /*ppw*/) const {
-  const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_F0 < 0)
-    return 0.;
-  double a             = pvecback[bgm_->index_bg_a_];
-  double a2            = a * a;
-  double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
-  return 2. / 3. * rho_dr_over_f * y[layout.idx_F0 + 2];
+  se.delta_rho        = rho_pos ? rho_dr_over_f * y[layout.idx_F0] : 0.;
+  se.rho_plus_p_theta = rho_pos ? ppw->scalar_ctx.k * rho_dr_over_f * y[layout.idx_F0 + 1] : 0.;
+  se.delta_p          = rho_dr_over_f * y[layout.idx_F0] / 3.;
+  se.rho_plus_p_shear = 2. / 3. * rho_dr_over_f * y[layout.idx_F0 + 2];
+
+  return se;
 }
 
 void DarkRadiationSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,

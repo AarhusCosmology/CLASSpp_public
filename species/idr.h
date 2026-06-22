@@ -118,8 +118,8 @@ class IDRSpecies : public BaseSpecies {
 
   /**
    * IDR shear under TCA with IDM_DR. Returns the TCA shear prediction if all
-   * TCA guards are satisfied; otherwise returns 0. Called by the layout-aware
-   * RhoPlusPShear (when shear_idr is not in the y-vector) and by external code
+   * TCA guards are satisfied; otherwise returns 0. Called by StressEnergy
+   * (when shear_idr is not in the y-vector) and by external code
    * that needs the TCA shear (perturb_vector_init, IDM_DR_IDR_Species::PrintVariables).
    *
    * `layout` must be the IDR child's PerturbLayout (nested inside the
@@ -149,29 +149,11 @@ class IDRSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  double DeltaRho(const BaseSpecies::PerturbLayout& layout,
-                  const perturb_vector* pv,
-                  const double* y,
-                  const double* pvecback,
-                  const perturb_workspace* ppw) const override;
-
-  double RhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
-
-  double DeltaP(const BaseSpecies::PerturbLayout& layout,
-                const perturb_vector* pv,
-                const double* y,
-                const double* pvecback,
-                const perturb_workspace* ppw) const override;
-
-  double RhoPlusPShear(const BaseSpecies::PerturbLayout& layout,
-                       const perturb_vector* pv,
-                       const double* y,
-                       const double* pvecback,
-                       const perturb_workspace* ppw) const override;
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
 
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,
