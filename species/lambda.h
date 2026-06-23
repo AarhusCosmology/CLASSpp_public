@@ -34,7 +34,7 @@ class LambdaSpecies : public BaseSpecies {
   void RegisterBackgroundIndices(int& index_bg) override;
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
-  void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
+  void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
 

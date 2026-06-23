@@ -19,8 +19,8 @@ class IDM_DRMDSpecies : public BaseSpecies {
     index_bg_rho_ = index_bg++;
   }
 
-  void ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) override {
-    pvecback[index_bg_rho_] = Omega0_idm_drmd_ * pba_.H0 * pba_.H0 / (a_rel * a_rel * a_rel);
+  void ComputeBackground(double a, const double* /*pvecback_B*/, double* pvecback) override {
+    pvecback[index_bg_rho_] = Omega0_idm_drmd_ * pba_.H0 * pba_.H0 / (a * a * a);
   }
 
   double Rho(const double* pvecback) const override {

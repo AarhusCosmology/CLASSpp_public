@@ -42,14 +42,14 @@ void DCDM_DR_Species::SetBackgroundInitialConditions(const BackgroundICContext& 
   // Then add the DR initial condition from DCDM decay.  This method only runs
   // when a DCDM_DR_Species exists, so the legacy pba->has_dcdm guard is gone.
   // Total radiation Omega0 at a_ini, recovered from the module-wide rho_rad
-  // (rho_rad = Omega_rad * H0^2 / a_rel^4). This includes every radiation-like
+  // (rho_rad = Omega_rad * H0^2 / a_ini^4). This includes every radiation-like
   // species (photons, UR, IDR, ...) consistently and needs no cross-species lookup.
-  const double Omega_rad    = ctx.rho_rad * std::pow(ctx.a_rel, 4) / std::pow(pba_->H0, 2);
+  const double Omega_rad    = ctx.rho_rad * std::pow(ctx.a_ini, 4) / std::pow(pba_->H0, 2);
   const double rho_dcdm_ini = ctx.pvecback_integration[dcdm_->bi_rho_index()];
-  double f = 1. / 3. * std::pow(ctx.a_rel, 6) * rho_dcdm_ini * dcdm_->Gamma_dcdm() /
+  double f = 1. / 3. * std::pow(ctx.a_ini, 6) * rho_dcdm_ini * dcdm_->Gamma_dcdm() /
              std::pow(pba_->H0, 3) / std::sqrt(Omega_rad);
   ctx.pvecback_integration[dr_sp_->bi_rho_index()] = f * std::pow(pba_->H0, 2) /
-                                                     std::pow(ctx.a_rel, 4);
+                                                     std::pow(ctx.a_ini, 4);
 }
 
 void DCDM_DR_Species::BackgroundDerivs(double tau,
@@ -130,7 +130,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   const double* pvecback     = ppw->pvecback.data();
 
   const double a_prime_over_a = ctx.a_prime_over_a;
-  const double a2_rel         = ctx.a2_rel;
+  const double a2             = ctx.a2;
 
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
@@ -145,7 +145,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                           ctx.index_tau,
                           ctx.index_k,
                           y[my_lay.dcdm.idx_delta] +
-                              (3. * a_prime_over_a + ctx.a_rel * dcdm_->Gamma_dcdm()) *
+                              (3. * a_prime_over_a + ctx.a * dcdm_->Gamma_dcdm()) *
                                   ctx.theta_over_k2);  // N-body gauge correction
   }
 
@@ -163,7 +163,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   // r_dr == 0 when the channel carries no DR (e.g. Gamma_dcdm == 0); write 0 then,
   // matching DarkRadiationSpecies::Delta's rho_dr <= 0 convention (avoids 0/0).
   if (dr_sp_->transfer_delta_index() >= 0) {
-    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
+    const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.)
                             ? y[my_lay.dr.idx_F0] / r_dr +
                                   4. * a_prime_over_a * ctx.theta_over_k2  // N-body gauge corr.
@@ -178,7 +178,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
 
   // ── theta_dr (this channel's slot) ───────────────────────────────────────────
   if (dr_sp_->transfer_theta_index() >= 0) {
-    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
+    const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[my_lay.dr.idx_F0 + 1] / r_dr +
                                           ctx.theta_shift  // N-body gauge correction
                                     : 0.;

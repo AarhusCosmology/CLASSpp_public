@@ -36,14 +36,16 @@ void IDM_DRMD_IDR_DRMD_Species::ComputeIdmDrmd(
     *Gint = Gamma0_drmd_ic_ / R_int_tmp * exp(-(1.0 + z_stop_) / (1.0 + z));
 }
 
-void IDM_DRMD_IDR_DRMD_Species::InitializeDrmdBackground(
-    double rho_tot, double H, double a, double a_today, const double* pvecback) {
+void IDM_DRMD_IDR_DRMD_Species::InitializeDrmdBackground(double rho_tot,
+                                                         double H,
+                                                         double a,
+                                                         const double* pvecback) {
   const double rho_idr = idr_drmd_->Rho(pvecback);
   const double rho_idm = idm_drmd_->Rho(pvecback);
   f_idr_drmd_          = rho_idr / rho_tot;
   Gamma0_drmd_ic_      = 0.;
   if (rho_idm > 0. && rho_idr > 0.)
-    Gamma0_drmd_ic_ = 3. / 4. * G_over_aH_drmd_ * rho_idm / rho_idr * a / a_today * H;
+    Gamma0_drmd_ic_ = 3. / 4. * G_over_aH_drmd_ * rho_idm / rho_idr * a * H;
 }
 
 void IDM_DRMD_IDR_DRMD_Species::FinalizeBackground(double a,
@@ -51,9 +53,8 @@ void IDM_DRMD_IDR_DRMD_Species::FinalizeBackground(double a,
                                                    const double* /*pvecback_B*/,
                                                    double* pvecback) {
   double Rint, csp2, Gint;
-  const double a_rel = a / pba_.a_today;
   ComputeIdmDrmd(a, idm_drmd_->Rho(pvecback) / idr_drmd_->Rho(pvecback), &Rint, &csp2, &Gint);
-  pvecback[index_bg_G_over_aH_drmd_] = Gint / (H * a_rel);
+  pvecback[index_bg_G_over_aH_drmd_] = Gint / (H * a);
 }
 
 void IDM_DRMD_IDR_DRMD_Species::ProcessBackgroundTable(const double* background_table,

@@ -495,11 +495,11 @@ double NCDMBaseSpecies::GetNeff(double z) const {
   return rho_ncdm_rel / rho_nu_rel_;
 }
 
-double NCDMBaseSpecies::GetIni(double a, double a_today, double tol_ncdm_initial_w) const {
+double NCDMBaseSpecies::GetIni(double a, double tol_ncdm_initial_w) const {
   double rho_ncdm, p_ncdm;
   bool converged = false;
   for (int counter = 0; counter < _MAX_IT_; counter++) {
-    ComputeMomenta(a_today / a - 1.0, nullptr, &rho_ncdm, &p_ncdm, nullptr, nullptr);
+    ComputeMomenta(1. / a - 1.0, nullptr, &rho_ncdm, &p_ncdm, nullptr, nullptr);
     if (fabs(p_ncdm / rho_ncdm - 1. / 3.) <= tol_ncdm_initial_w) {
       converged = true;
       break;
@@ -775,13 +775,12 @@ double NCDMBaseSpecies::GetW0ForGwSource(int iq, const double* /*pvecback*/) con
 
 void NCDMBaseSpecies::ContributeTensorGwSource(const BaseSpecies::PerturbLayout& base,
                                                double a,
-                                               double a_today,
                                                const double* y,
                                                perturb_workspace* ppw) const {
   const auto& layout     = static_cast<const PerturbLayout&>(base);
   const double* pvecback = ppw->pvecback.data();
   const double a2        = a * a;
-  const double factor    = factor_ * std::pow(a_today / a, 4);
+  const double factor    = factor_ * std::pow(1. / a, 4);
 
   double gwncdm = 0.;
   for (int iq = 0; iq < layout.q_size; ++iq) {

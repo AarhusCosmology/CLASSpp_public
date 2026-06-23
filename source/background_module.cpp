@@ -337,9 +337,8 @@ void BackgroundModule::background_functions(
   double p_tot   = 0.;
   double rho_r   = 0.;
   double rho_m   = 0.;
-  double a_rel   = a / pba->a_today;
 
-  class_test(a_rel <= 0., "a = %e instead of strictly positive", a_rel);
+  class_test(a <= 0., "a = %e instead of strictly positive", a);
 
   /** - pass value of \f$ a\f$ to output */
   pvecback[index_bg_a_] = a;
@@ -371,7 +370,7 @@ void BackgroundModule::background_functions(
   /* Compute background for all species. Each species writes its own pvecback
      slots; the Fluid computes its own w(a) in ComputeBackground. */
   for (const auto& [name, sp] : all_species_) {
-    sp->ComputeBackground(a_rel, pvecback_B, pvecback);
+    sp->ComputeBackground(a, pvecback_B, pvecback);
     accumulate(*sp);
   }
 
@@ -541,9 +540,6 @@ void BackgroundModule::background_init() {
     for (auto& sp : all_species_)
       sp->PrintMassInfo();
   }
-
-  /* check other quantities which would lead to segmentation fault if zero */
-  class_test(pba->a_today <= 0, "input a_today = %e instead of strictly positive", pba->a_today);
 
   class_test(_Gyr_over_Mpc_ <= 0,
              "_Gyr_over_Mpc = %e instead of strictly positive",
@@ -718,7 +714,7 @@ void BackgroundModule::background_solve_evolver() {
 
   /** - Determine output vector */
   double loga_ini   = log(pvecback_integration[index_bi_a_]);
-  double loga_final = log(pba->a_today);
+  double loga_final = 0.;
   bt_size_          = (loga_final - loga_ini) / ppr->back_integration_stepsize;
   std::vector<double> loga(bt_size_);
   std::vector<int> used_in_output(bt_size_);
@@ -793,8 +789,8 @@ void BackgroundModule::background_solve_evolver() {
       comoving_radius = sinh(sqrt(-pba->K) * conformal_distance) / sqrt(-pba->K);
     }
 
-    bg_table_row[index_bg_ang_distance_] = pba->a_today * comoving_radius / (1. + z_table_[i]);
-    bg_table_row[index_bg_lum_distance_] = pba->a_today * comoving_radius * (1. + z_table_[i]);
+    bg_table_row[index_bg_ang_distance_] = comoving_radius / (1. + z_table_[i]);
+    bg_table_row[index_bg_lum_distance_] = comoving_radius * (1. + z_table_[i]);
     /** Normalise D(z=0)=1 */
     bg_table_row[index_bg_D_] /= D_today;
   }
@@ -920,13 +916,13 @@ void BackgroundModule::background_initial_conditions(
   /** Summary: */
 
   /** - fix initial value of \f$ a \f$ */
-  double a = ppr->a_ini_over_a_today_default * pba->a_today;
+  double a = ppr->a_ini_over_a_today_default;
 
   /** Allow any species to pull the integration start earlier than the default
       (e.g. NCDM must be relativistic at a_ini; relevant for some WDM models). */
 
   for (auto& [name, sp] : all_species_)
-    a = sp->BackgroundAIni(a, pba->a_today, ppr->tol_ncdm_initial_w);
+    a = sp->BackgroundAIni(a, ppr->tol_ncdm_initial_w);
 
   pvecback_integration[index_bi_a_] = a;
 
@@ -934,12 +930,11 @@ void BackgroundModule::background_initial_conditions(
   double Omega_rad = pba->Omega0_g;
   for (auto& [name, sp] : all_species_)
     Omega_rad += sp->GetRadiationOmega0();
-  double rho_rad = Omega_rad * pow(pba->H0, 2) / pow(a / pba->a_today, 4);
+  double rho_rad = Omega_rad * pow(pba->H0, 2) / pow(a, 4);
   /* Set initial conditions for all species background ODE variables.  Each
      species owns its own integration offsets and IC math (DCDM, DNCDM, Fluid,
      ScalarField, ...); the module only supplies the shared context. */
   BackgroundICContext ic;
-  ic.a_rel                = a / pba->a_today;
   ic.a_ini                = a;
   ic.rho_rad              = rho_rad;
   ic.pvecback_integration = pvecback_integration;
@@ -967,11 +962,7 @@ void BackgroundModule::background_initial_conditions(
 
   if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
     static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
-        .InitializeDrmdBackground(pvecback[index_bg_rho_tot_],
-                                  pvecback[index_bg_H_],
-                                  a,
-                                  pba->a_today,
-                                  pvecback);
+        .InitializeDrmdBackground(pvecback[index_bg_rho_tot_], pvecback[index_bg_H_], a, pvecback);
   }
 
   pvecback_integration[index_bi_time_] = 1. / (2. * pvecback[index_bg_H_]);
@@ -1038,7 +1029,7 @@ void BackgroundModule::background_find_equality() {
 
   a_eq_   = pvecback[index_bg_a_];
   H_eq_   = pvecback[index_bg_H_];
-  z_eq_   = pba->a_today / a_eq_ - 1.;
+  z_eq_   = 1. / a_eq_ - 1.;
   tau_eq_ = tau_mid;
 
   if (pba->background_verbose > 0) {
@@ -1084,7 +1075,7 @@ void BackgroundModule::background_output_data(int number_of_titles, double* data
     int storeidx     = 0;
 
     // ── Module header ──────────────────────────────────────────────────────
-    class_store_double(dataptr, pba->a_today / pvecback[index_bg_a_] - 1., _TRUE_, storeidx);
+    class_store_double(dataptr, 1. / pvecback[index_bg_a_] - 1., _TRUE_, storeidx);
     class_store_double(dataptr, pvecback[index_bg_time_] / _Gyr_over_Mpc_, _TRUE_, storeidx);
     class_store_double(dataptr,
                        conformal_age_ - pvecback[index_bg_conf_distance_],
@@ -1365,7 +1356,7 @@ int BackgroundModule::background_add_line_to_bg_table_member(
   double tau     = y[index_bi_a_];
   y[index_bi_a_] = a;
 
-  z_table_[index_loga]   = std::max(0., pba->a_today / exp(loga) - 1.);
+  z_table_[index_loga]   = std::max(0., 1. / a - 1.);
   tau_table_[index_loga] = tau;
 
   double* pvecback = background_table_.data() + index_loga * bg_size_;

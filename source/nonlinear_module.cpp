@@ -1140,7 +1140,7 @@ void NonlinearModule::nonlinear_init() {
                                                     &last_index,
                                                     pvecback.data());
               a = pvecback[background_module_->index_bg_a_];
-              z = pba->a_today / a - 1.;
+              z = 1. / a - 1.;
               fprintf(stdout,
                       " -> [WARNING:] Non-linear corrections could not be computed at redshift "
                       "z=%5.2f and higher.\n    This is because k_max is too small for the "
@@ -1956,7 +1956,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
     /* default method to compute w0 = w_fld today, Omega_m(tau) and Omega_v=Omega_DE(tau),
        all required by HALFIT fitting formulas */
 
-    background_module_->background_w_fld(pba->a_today, &w0, &dw_over_da_fld, &integral_fld);
+    background_module_->background_w_fld(1., &w0, &dw_over_da_fld, &integral_fld);
 
     background_module_->background_at_tau(tau,
                                           pba->long_info,
@@ -2049,7 +2049,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
             pvecback[background_module_->index_bg_Omega_r_];
 
   // for debugging:
-  //printf("Call Halofit at z=%e\n", pba->a_today/pvecback[background_module_->index_bg_a_] - 1.);
+  //printf("Call Halofit at z=%e\n", 1./pvecback[background_module_->index_bg_a_] - 1.);
 
   /* minimum value of R such that the integral giving sigma_R is
      converged.  The parameter halofit_sigma_precision should be
@@ -2878,7 +2878,7 @@ void NonlinearModule::nonlinear_hmcode_dark_energy_correction(struct nonlinear_w
                                           &last_index,
                                           pvecback.data());
 
-    background_module_->background_w_fld(pba->a_today, &w0, &dw_over_da_fld, &integral_fld);
+    background_module_->background_w_fld(1., &w0, &dw_over_da_fld, &integral_fld);
 
     nonlinear_hmcode_growint(1. / (1. + pnl->z_infinity), -1., 0., &g_lcdm);
 

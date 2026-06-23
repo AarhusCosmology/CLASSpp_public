@@ -10,7 +10,7 @@ void LambdaSpecies::RegisterBackgroundIndices(int& index_bg) {
   index_bg_rho_ = index_bg_rho_lambda_;
 }
 
-void LambdaSpecies::ComputeBackground(double /*a_rel*/,
+void LambdaSpecies::ComputeBackground(double /*a*/,
                                       const double* /*pvecback_B*/,
                                       double* pvecback) {
   pvecback[index_bg_rho_lambda_] = Omega0_lambda_ * H0_ * H0_;

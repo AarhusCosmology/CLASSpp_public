@@ -13,8 +13,8 @@ void CDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   index_bg_rho_ = index_bg_rho_cdm_;
 }
 
-void CDMSpecies::ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) {
-  pvecback[index_bg_rho_cdm_] = Omega0_cdm_ * H0_ * H0_ / (a_rel * a_rel * a_rel);
+void CDMSpecies::ComputeBackground(double a, const double* /*pvecback_B*/, double* pvecback) {
+  pvecback[index_bg_rho_cdm_] = Omega0_cdm_ * H0_ * H0_ / (a * a * a);
 }
 
 double CDMSpecies::Rho(const double* pvecback) const {

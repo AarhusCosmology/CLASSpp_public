@@ -23,10 +23,10 @@ void DCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
 
 void DCDMSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
   ctx.pvecback_integration[index_bi_rho_dcdm_] = Omega_ini_dcdm_ * std::pow(pba_.H0, 2) *
-                                                 std::pow(1.0 / ctx.a_rel, 3);
+                                                 std::pow(1.0 / ctx.a_ini, 3);
 }
 
-void DCDMSpecies::ComputeBackground(double /*a_rel*/, const double* pvecback_B, double* pvecback) {
+void DCDMSpecies::ComputeBackground(double /*a*/, const double* pvecback_B, double* pvecback) {
   pvecback[index_bg_rho_dcdm_] = pvecback_B[index_bi_rho_dcdm_];
 }
 

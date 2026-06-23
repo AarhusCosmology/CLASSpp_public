@@ -155,17 +155,17 @@ class BaseSpecies {
 
   /**
    * Set initial conditions for ODE-integrated background variables.
-   * @param ctx Background initial-condition context (a_rel, a_ini, rho_rad,
+   * @param ctx Background initial-condition context (a_ini, rho_rad,
    *            and the integration vector to fill).
    */
   virtual void SetBackgroundInitialConditions(const BackgroundICContext& ctx) {}
 
   /**
-   * Compute species background quantities at relative scale factor a_rel = a/a_today.
+   * Compute species background quantities at scale factor a.
    * pvecback_B is the current ODE integration vector.
    * Write density (and any other owned quantities) into pvecback.
    */
-  virtual void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) = 0;
+  virtual void ComputeBackground(double a, const double* pvecback_B, double* pvecback) = 0;
 
   /**
    * Contribute to dy/dtau for species with ODE-integrated background variables.
@@ -323,7 +323,6 @@ class BaseSpecies {
    *  The layout is this species' PerturbLayout slot (ppw->pv->species_layouts[i]). */
   virtual void ContributeTensorGwSource(const PerturbLayout& /*layout*/,
                                         double /*a*/,
-                                        double /*a_today*/,
                                         const double* /*y*/,
                                         perturb_workspace* /*ppw*/) const {}
 
@@ -550,9 +549,9 @@ class BaseSpecies {
    *  its mass; composites forward. */
   virtual void WarnIfTooHeavyForHalofit(double /*m_ev_threshold*/) const {}
 
-  /** Earliest a/a_today this species needs integration to start from.
+  /** Earliest scale factor this species needs integration to start from.
    *  Default: returns a_proposed unchanged. NCDM species may pull it earlier. */
-  virtual double BackgroundAIni(double a_proposed, double /*a_today*/, double /*tol*/) const {
+  virtual double BackgroundAIni(double a_proposed, double /*tol*/) const {
     return a_proposed;
   }
 

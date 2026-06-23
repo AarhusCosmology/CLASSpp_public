@@ -106,9 +106,9 @@ class CompositeSpecies : public BaseSpecies {
 
   /** Threads a_proposed through all children (e.g. a wrapped DNCDM child
    *  may pull the earliest integration start earlier). */
-  double BackgroundAIni(double a_proposed, double a_today, double tol) const override {
+  double BackgroundAIni(double a_proposed, double tol) const override {
     for (const auto& c : children_)
-      a_proposed = c->BackgroundAIni(a_proposed, a_today, tol);
+      a_proposed = c->BackgroundAIni(a_proposed, tol);
     return a_proposed;
   }
 
@@ -117,7 +117,7 @@ class CompositeSpecies : public BaseSpecies {
   void SetThermodynamicsModule(const ThermodynamicsModule* thm) override;
   void SetPerturbs(const perturbs* ppt) override;
   void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
-  void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
+  void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;

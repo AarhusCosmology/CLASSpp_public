@@ -1009,9 +1009,9 @@ void ThermodynamicsModule::thermodynamics_init() {
                                         pvecback.data());
 
   rs_rec_            = pvecback[background_module_->index_bg_rs_];
-  ds_rec_            = rs_rec_ * pba->a_today / (1. + z_rec_);
+  ds_rec_            = rs_rec_ / (1. + z_rec_);
   da_rec_            = pvecback[background_module_->index_bg_ang_distance_];
-  ra_rec_            = da_rec_ * (1. + z_rec_) / pba->a_today;
+  ra_rec_            = da_rec_ * (1. + z_rec_);
   angular_rescaling_ = ra_rec_ / (background_module_->conformal_age_ - tau_rec_);
 
   /** - find damping scale at recombination (using linear interpolation) */
@@ -1106,9 +1106,9 @@ void ThermodynamicsModule::thermodynamics_init() {
                                         pvecback.data());
 
   rs_star_ = pvecback[background_module_->index_bg_rs_];
-  ds_star_ = rs_star_ * pba->a_today / (1. + z_star_);
+  ds_star_ = rs_star_ / (1. + z_star_);
   da_star_ = pvecback[background_module_->index_bg_ang_distance_];
-  ra_star_ = da_star_ * (1. + z_star_) / pba->a_today;
+  ra_star_ = da_star_ * (1. + z_star_);
 
   if (pth->compute_damping_scale) {
     rd_star_ = (z_table_[index_tau + 1] - z_star_) /
@@ -1141,7 +1141,7 @@ void ThermodynamicsModule::thermodynamics_init() {
                                         pvecback.data());
 
   rs_d_ = pvecback[background_module_->index_bg_rs_];
-  ds_d_ = rs_d_ * pba->a_today / (1. + z_d_);
+  ds_d_ = rs_d_ / (1. + z_d_);
 
   /** - find idm_dr and idr drag times */
   double tau_idm_dr = 0.0, tau_idr = 0.0;
@@ -2907,9 +2907,9 @@ void ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination
     param.odeh2                      = (Omega0_lambda_hyrec + Omega0_fld_hyrec) * pba->h * pba->h;
   }
   double w_fld, dw_over_da_fld, integral_fld;
-  background_module_->background_w_fld(pba->a_today, &w_fld, &dw_over_da_fld, &integral_fld);
+  background_module_->background_w_fld(1., &w_fld, &dw_over_da_fld, &integral_fld);
   param.w0              = w_fld;
-  param.wa              = -dw_over_da_fld * pba->a_today;
+  param.wa              = -dw_over_da_fld;
   param.Y               = YHe_;
   param.Nnueff          = background_module_->Neff_;
   param.nH0             = 11.223846333047 * param.obh2 *
@@ -3778,7 +3778,7 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
     /*   dy[2]=Tmat/(1.+z); */
     /* v 1.5: like in camb, add here a smoothing term as suggested by Adam Moss */
     double dHdz    = -pvecback[background_module_->index_bg_H_prime_] /
-                     pvecback[background_module_->index_bg_H_] / pba->a_today * _c_ / _Mpc_over_m_;
+                     pvecback[background_module_->index_bg_H_] * _c_ / _Mpc_over_m_;
     double epsilon = Hz * (1. + x + preco->fHe) / (preco->CT * pow(Trad, 3) * x);
     dy[2]          = preco->Tnow +
                      epsilon * ((1. + preco->fHe) / (1. + preco->fHe + x)) *

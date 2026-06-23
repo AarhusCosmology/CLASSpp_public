@@ -8,7 +8,7 @@ struct background;
 /**
  * Cold Dark Matter (CDM) species.
  *
- * Background:  rho_cdm = Omega0_cdm * H0^2 / a_rel^3,  p = 0
+ * Background:  rho_cdm = Omega0_cdm * H0^2 / a^3,  p = 0
  * Perturbations: pressureless fluid, no anisotropic stress.
  *   Newtonian gauge: evolves delta_cdm and theta_cdm.
  *   Synchronous gauge: evolves delta_cdm only (theta = 0 by gauge choice).
@@ -34,7 +34,7 @@ class CDMSpecies : public BaseSpecies {
   void RegisterBackgroundIndices(int& index_bg) override;
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
-  void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
+  void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
 

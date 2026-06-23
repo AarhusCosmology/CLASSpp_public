@@ -260,7 +260,7 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   const double* pvecback     = ppw->pvecback.data();
 
   const double a_prime_over_a = ctx.a_prime_over_a;
-  const double a2_rel         = ctx.a2_rel;
+  const double a2             = ctx.a2;
 
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
@@ -271,7 +271,7 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   // r_dr == 0 when the channel carries no DR (e.g. Gamma == 0); write 0 then,
   // matching DarkRadiationSpecies::Delta's rho_dr <= 0 convention (avoids 0/0).
   if (dr_sp_->transfer_delta_index() >= 0) {
-    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
+    const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.)
                             ? y[my.dr.idx_F0] / r_dr +
                                   4. * a_prime_over_a * ctx.theta_over_k2  // N-body gauge corr.
@@ -286,7 +286,7 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
 
   // ── theta_dr (this channel's slot) ───────────────────────────────────────────
   if (dr_sp_->transfer_theta_index() >= 0) {
-    const double r_dr = (a2_rel / pba_->H0) * (a2_rel / pba_->H0) * dr_sp_->Rho(pvecback);
+    const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[my.dr.idx_F0 + 1] / r_dr +
                                           ctx.theta_shift  // N-body gauge correction
                                     : 0.;

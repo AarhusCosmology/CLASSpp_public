@@ -98,10 +98,7 @@ void ScalarFieldSpecies::SetBackgroundInitialConditions(const BackgroundICContex
              pvecback_integration[bi_phi_prime_index()]);
 }
 
-void ScalarFieldSpecies::ComputeBackground(double a_rel,
-                                           const double* pvecback_B,
-                                           double* pvecback) {
-  const double a                    = a_rel * pba_.a_today;
+void ScalarFieldSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
   const double phi                  = pvecback_B[index_bi_phi_scf_];
   const double phi_prime            = pvecback_B[index_bi_phi_prime_scf_];
   pvecback[index_bg_phi_scf_]       = phi;
@@ -230,7 +227,7 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double dV_bg        = pvecback[index_bg_dV_scf_];
   const double rho_scf      = Rho(pvecback);
   const double p_scf        = P(pvecback);
-  const double a2_rel       = ctx.a2_rel;
+  const double a2           = ctx.a2;
   const double k2 = ctx.k *
                     ctx.k;  // PerturbSourceContext has no k2 field (unlike PerturbScalarContext)
 
@@ -239,17 +236,16 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
     double delta_rho_scf;
     const perturbs* ppt = p_mod->GetPerturbs();
     if (ppt->gauge == possible_gauges::synchronous) {
-      delta_rho_scf = 1. / 3. *
-                          (1. / a2_rel * phi_prime_bg * y[layout.idx_phi_prime] +
-                           dV_bg * y[layout.idx_phi]) +
-                      3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
-                          ctx.theta_over_k2;  // N-body gauge correction
+      delta_rho_scf =
+          1. / 3. * (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi]) +
+          3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
+              ctx.theta_over_k2;  // N-body gauge correction
     }
     else {
       delta_rho_scf =
           1. / 3. *
-              (1. / a2_rel * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi] -
-               1. / a2_rel * phi_prime_bg * phi_prime_bg * ppw->pvecmetric[ppw->index_mt_psi]) +
+              (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi] -
+               1. / a2 * phi_prime_bg * phi_prime_bg * ppw->pvecmetric[ppw->index_mt_psi]) +
           3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
               ctx.theta_over_k2;  // N-body gauge correction
     }
@@ -263,7 +259,7 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
 
   // ── theta_scf ─────────────────────────────────────────────────────────────
   if (index_tp_theta_ >= 0) {
-    const double rho_plus_p_theta_scf = 1. / 3. * k2 / a2_rel * phi_prime_bg * y[layout.idx_phi];
+    const double rho_plus_p_theta_scf = 1. / 3. * k2 / a2 * phi_prime_bg * y[layout.idx_phi];
 
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,

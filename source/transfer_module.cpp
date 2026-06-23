@@ -2225,7 +2225,7 @@ void TransferModule::transfer_selection_compute(double* selection,
                                             pvecback);
 
       /* infer redshift */
-      z = pba->a_today / pvecback[background_module_->index_bg_a_] - 1.;
+      z = 1. / pvecback[background_module_->index_bg_a_] - 1.;
 
       /* get corresponding dN/dz(z,bin) */
       transfer_selection_function(bin, z, &(selection[index_tau]));
@@ -3964,7 +3964,7 @@ void TransferModule::transfer_f_evo(
                      pvecback[background_module_->index_bg_H_] /
                      pvecback[background_module_->index_bg_a_];
 
-    z = pba->a_today / pvecback[background_module_->index_bg_a_] - 1.;
+    z = 1. / pvecback[background_module_->index_bg_a_] - 1.;
 
     if (ptr->has_nz_evo_file) {
       class_test((z < nz_evo_z_[0]) || (z > nz_evo_z_[nz_evo_size_ - 1]),

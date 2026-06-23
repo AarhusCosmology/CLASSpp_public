@@ -673,9 +673,6 @@ void InputModule::ReadContext() {
 
   /** (a) background parameters */
 
-  /** - scale factor today (arbitrary) */
-  pba->a_today = pfc->get_or("a_today", pba->a_today);
-
   /** - h (dimensionless) and [\f$ H_0/c\f$] in \f$ Mpc^{-1} = h / 2997.9... = h * 10^5 / c \f$ */
   auto H0 = pfc->get<double>("H0");
   auto h  = pfc->get<double>("h");
@@ -778,7 +775,7 @@ void InputModule::ReadContext() {
   /** - Omega_0_k (effective fractional density of curvature) */
   pba->Omega0_k = pfc->get_or("Omega_k", pba->Omega0_k);
   /** - Set curvature parameter K */
-  pba->K = -pba->Omega0_k * pow(pba->a_today * pba->H0, 2);
+  pba->K = -pba->Omega0_k * pow(pba->H0, 2);
   /** - Set curvature sign */
   if (pba->K > 0.)
     pba->sgnK = 1;

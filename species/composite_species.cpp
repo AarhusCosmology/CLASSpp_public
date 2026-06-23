@@ -36,9 +36,9 @@ void CompositeSpecies::SetBackgroundInitialConditions(const BackgroundICContext&
     child->SetBackgroundInitialConditions(ctx);
 }
 
-void CompositeSpecies::ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) {
+void CompositeSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
   for (auto& child : children_)
-    child->ComputeBackground(a_rel, pvecback_B, pvecback);
+    child->ComputeBackground(a, pvecback_B, pvecback);
 }
 
 void CompositeSpecies::BackgroundDerivs(double tau,

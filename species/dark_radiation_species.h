@@ -46,7 +46,7 @@ class DarkRadiationSpecies : public BaseSpecies {
   }
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
-  void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
+  void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
 
   double Rho(const double* pvecback) const override {

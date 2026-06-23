@@ -91,16 +91,8 @@ struct background {
 
   //@{
 
-  double K = 0.; /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*a_{today}^2*H_0^2\f$; */
+  double K = 0.; /**< \f$ K \f$: Curvature parameter \f$ K=-\Omega0_k*H_0^2\f$; */
   int sgnK = 0;  /**< K/|K|: -1, 0 or 1 */
-
-  //@}
-
-  /** @name - other background parameters */
-
-  //@{
-
-  double a_today = 1.; /**< scale factor today (arbitrary and irrelevant for most purposes) */
 
   //@}
 

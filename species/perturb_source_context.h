@@ -108,8 +108,8 @@ struct PerturbSourceContext {
   int index_k                = 0;
   int index_tau              = 0;
   double k                   = 0.;
-  double a_rel               = 0.;
-  double a2_rel              = 0.;
+  double a                   = 0.;
+  double a2                  = 0.;
   double a_prime_over_a      = 0.;
   // Pre-computed N-body gauge corrections (0 when not has_Nbody_gauge_transfers)
   double theta_over_k2 = 0.;
@@ -159,6 +159,5 @@ struct PerturbIcContext {
 struct PerturbSwitchContext {
   double k               = 0.;
   double a               = 0.;
-  double a_today         = 1.;
   const double* pvecback = nullptr;
 };

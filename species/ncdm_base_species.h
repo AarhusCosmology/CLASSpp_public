@@ -81,11 +81,11 @@ class NCDMBaseSpecies : public BaseSpecies {
     return false;
   }
 
-  double GetIni(double a, double a_today, double tol_ncdm_initial_w) const;
+  double GetIni(double a, double tol_ncdm_initial_w) const;
 
   /** NCDM may need to start integration earlier so it is relativistic at a_ini. */
-  double BackgroundAIni(double a_proposed, double a_today, double tol) const override {
-    return GetIni(a_proposed, a_today, tol);
+  double BackgroundAIni(double a_proposed, double tol) const override {
+    return GetIni(a_proposed, tol);
   }
 
   double GetRescalingFactor(const double* lnf_array) const;
@@ -171,7 +171,6 @@ class NCDMBaseSpecies : public BaseSpecies {
    *  Uses the species's per-pv NCDMBaseSpecies::PerturbLayout slot. */
   void ContributeTensorGwSource(const BaseSpecies::PerturbLayout& layout,
                                 double a,
-                                double a_today,
                                 const double* y,
                                 perturb_workspace* ppw) const override;
 

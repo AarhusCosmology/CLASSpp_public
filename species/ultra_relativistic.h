@@ -8,7 +8,7 @@ struct background;
 /**
  * Ultra-relativistic neutrinos / relics (UR) species.
  *
- * Background:  rho_ur = Omega0_ur * H0^2 / a_rel^4,
+ * Background:  rho_ur = Omega0_ur * H0^2 / a^4,
  *              p_ur   = rho_ur / 3,
  *              dp/dloga = -4/3 * rho_ur.
  * Perturbations: full Boltzmann hierarchy in l (delta, theta, shear, l3..l_max).
@@ -30,7 +30,7 @@ class UltraRelativisticSpecies : public BaseSpecies {
 
   // ── Background ─────────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
-  void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
+  void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double PPrime(double a,

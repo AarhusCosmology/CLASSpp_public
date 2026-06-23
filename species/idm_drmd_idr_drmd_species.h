@@ -82,8 +82,7 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   void RegisterBackgroundIndices(int& index_bg) override;
   void ComputeIdmDrmd(
       double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
-  void InitializeDrmdBackground(
-      double rho_tot, double H, double a, double a_today, const double* pvecback);
+  void InitializeDrmdBackground(double rho_tot, double H, double a, const double* pvecback);
   void FinalizeBackground(double a, double H, const double* pvecback_B, double* pvecback) override;
   void ProcessBackgroundTable(const double* background_table,
                               int n_rows,

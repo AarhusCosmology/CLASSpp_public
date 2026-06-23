@@ -45,8 +45,7 @@ void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   /* rho_fld today */
   const double rho_fld_today = GetOmega0() * pow(pba_.H0, 2);
 
-  /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0).
-     The module previously passed the absolute a = a_rel*a_today (= ctx.a_ini). */
+  /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0). */
   double w_fld, dw_over_da_fld, integral_fld;
   ComputeWFld(ctx.a_ini, &w_fld, &dw_over_da_fld, &integral_fld);
 
@@ -60,11 +59,10 @@ void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   ctx.pvecback_integration[bi_rho_index()] = rho_fld_today * exp(integral_fld);
 }
 
-void FluidSpecies::ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) {
-  // a == a_rel (a_today == 1). Compute w(a) ourselves rather than having the
-  // module pre-fill the slots.
+void FluidSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
+  // Compute w(a) ourselves rather than having the module pre-fill the slots.
   double w_fld, dw_over_da_fld, integral_fld;
-  ComputeWFld(a_rel, &w_fld, &dw_over_da_fld, &integral_fld);
+  ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
   pvecback[index_bg_w_fld_]          = w_fld;
   pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
   pvecback[index_bg_rho_fld_]        = pvecback_B[index_bi_rho_fld_];
@@ -328,7 +326,7 @@ int FluidSpecies::ComputeWFld(double a,
   /** - first, define the function w(a) */
   switch (fluid_eos_) {
     case CLP:
-      *w_fld = w0_fld_ + wa_fld_ * (1. - a / pba_.a_today);
+      *w_fld = w0_fld_ + wa_fld_ * (1. - a);
       break;
     case EDE: {
       // Omega_ede(a) taken from eq. (10) in 1706.00730
@@ -379,7 +377,7 @@ int FluidSpecies::ComputeWFld(double a,
       function, let's use it! */
   switch (fluid_eos_) {
     case CLP:
-      *dw_over_da_fld = -wa_fld_ / pba_.a_today;
+      *dw_over_da_fld = -wa_fld_;
       break;
     case EDE: {
       double d2Omega_ede_over_da2 = 0.;
@@ -404,8 +402,7 @@ int FluidSpecies::ComputeWFld(double a,
         fast, simple, and accurate enough. */
   switch (fluid_eos_) {
     case CLP:
-      *integral_fld = 3. * ((1. + w0_fld_ + wa_fld_) * log(pba_.a_today / a) +
-                            wa_fld_ * (a / pba_.a_today - 1.));
+      *integral_fld = 3. * ((1. + w0_fld_ + wa_fld_) * log(1. / a) + wa_fld_ * (a - 1.));
       break;
     case EDE:
       class_stop(

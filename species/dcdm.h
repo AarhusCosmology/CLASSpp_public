@@ -44,7 +44,7 @@ class DCDMSpecies : public BaseSpecies {
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
   void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
-  void ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) override;
+  void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
 
   int bi_rho_index() const {
     return index_bi_rho_dcdm_;

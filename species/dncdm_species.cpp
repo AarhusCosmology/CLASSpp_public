@@ -49,9 +49,8 @@ void ApplyDncdmInitialClosure(DNCDMSpecies& sp, const SpeciesBuildContext& ctx) 
     return;
   }
 
-  const double a_ini_seed = ctx.pba ? ctx.pba->a_today * 1e-14 : 1e-14;
-  const double a_today    = ctx.pba ? ctx.pba->a_today : 1.;
-  const double a_ini      = sp.GetIni(a_ini_seed, a_today, ctx.ncdm_settings->tol_ncdm);
+  const double a_ini_seed = 1e-14;
+  const double a_ini      = sp.GetIni(a_ini_seed, ctx.ncdm_settings->tol_ncdm);
   const double z_ini      = 1.0 / a_ini - 1.0;
   const double H0         = ctx.pba ? ctx.pba->H0 : ctx.ncdm_settings->h * 1.e5 / _c_;
 
@@ -247,9 +246,9 @@ std::pair<double, double> DNCDMSpecies::DegGuessFromOmegaToday(const SpeciesBuil
   const background& ba = *ctx.pba;
   // a_ini: earliest scale factor at which the NCDM distribution is non-relativistic enough
   // to integrate numerically.  Mirror input_module.cpp:3764-3769.
-  double a_ini = ctx.ppr ? ctx.ppr->a_ini_over_a_today_default * ba.a_today : ba.a_today * 1e-14;
+  double a_ini         = ctx.ppr ? ctx.ppr->a_ini_over_a_today_default : 1e-14;
   const double tol_ini = ctx.ppr ? ctx.ppr->tol_ncdm_initial_w : ctx.ncdm_settings->tol_ncdm;
-  a_ini                = GetIni(a_ini, ba.a_today, tol_ini);
+  a_ini                = GetIni(a_ini, tol_ini);
   const double z_ini   = 1.0 / a_ini - 1.0;
 
   double rho_actual;
@@ -343,8 +342,8 @@ void DNCDMSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   }
 }
 
-void DNCDMSpecies::ComputeBackground(double a_rel, const double* pvecback_B, double* pvecback) {
-  double z       = 1. / a_rel - 1.;
+void DNCDMSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
+  double z       = 1. / a - 1.;
   const int q_sz = q_size();
 
   std::vector<double> lnf_dlnf_array(2 * q_sz);
@@ -566,7 +565,7 @@ BaseSpecies::StressEnergyContribution DNCDMSpecies::StressEnergy(
     const double epsilon  = std::sqrt(q * q + std::pow(M_ * a, 2));
     delta_p_ncdm         += q * q * q * q / epsilon * w0 * y[layout.index_per_q[iq]];
   }
-  const double fac = factor_ * std::pow(pba_->a_today / a, 4);
+  const double fac = factor_ * std::pow(1. / a, 4);
   se.delta_p       = delta_p_ncdm * fac / 3.;
 
   return se;

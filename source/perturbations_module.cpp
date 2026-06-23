@@ -544,7 +544,7 @@ void PerturbationsModule::perturb_init() {
   if (all_species_.count("Fluid")) {
     /* check values of w_fld at initial time and today */
     background_module_->background_w_fld(0., &w_fld_ini, &dw_over_da_fld, &integral_fld);
-    background_module_->background_w_fld(pba->a_today, &w_fld_0, &dw_over_da_fld, &integral_fld);
+    background_module_->background_w_fld(1., &w_fld_0, &dw_over_da_fld, &integral_fld);
 
     class_test(w_fld_ini >= 0.,
                "The fluid is meant to be negligible at early time, and unimportant for defining "
@@ -1609,7 +1609,7 @@ void PerturbationsModule::perturb_get_k_list() {
          stepsize is still fixed by k_step_super, this is just a
          reduction factor. */
 
-      scale2 = pow(pba->a_today * pba->H0, 2) + fabs(pba->K);
+      scale2 = pow(pba->H0, 2) + fabs(pba->K);
 
       step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
 
@@ -1777,7 +1777,7 @@ void PerturbationsModule::perturb_get_k_list() {
          stepsize is still fixed by k_step_super, this is just a
          reduction factor. */
 
-      scale2 = pow(pba->a_today * pba->H0, 2) + fabs(pba->K);
+      scale2 = pow(pba->H0, 2) + fabs(pba->K);
 
       step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
 
@@ -1902,7 +1902,7 @@ void PerturbationsModule::perturb_get_k_list() {
          stepsize is still fixed by k_step_super, this is just a
          reduction factor. */
 
-      scale2 = pow(pba->a_today * pba->H0, 2) + fabs(pba->K);
+      scale2 = pow(pba->H0, 2) + fabs(pba->K);
 
       step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
 
@@ -3214,7 +3214,6 @@ void PerturbationsModule::perturb_vector_init(
       PerturbSwitchContext switch_ctx;
       switch_ctx.k        = k;
       switch_ctx.a        = ppw->pvecback[background_module_->index_bg_a_];
-      switch_ctx.a_today  = pba->a_today;
       switch_ctx.pvecback = ppw->pvecback.data();
       for (size_t i = 0; i < all_species_.size(); ++i) {
         all_species_[i]->CopyPerturbationsAcrossSwitch(*ppw->pv->species_layouts[i],
@@ -4978,12 +4977,12 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
       for (size_t i = 0; i < all_species_.size(); ++i) {
         const BaseSpecies* sp = all_species_[i];
         if (dynamic_cast<const NCDMSpecies*>(sp)) {
-          sp->ContributeTensorGwSource(*ppw->pv->species_layouts[i], a, pba->a_today, y, ppw);
+          sp->ContributeTensorGwSource(*ppw->pv->species_layouts[i], a, y, ppw);
         }
         else if (auto* composite = dynamic_cast<const DNCDM_DR_Species*>(sp)) {
           const auto& comp_lay = static_cast<const DNCDM_DR_Species::PerturbLayout&>(
               *ppw->pv->species_layouts[i]);
-          composite->dncdm().ContributeTensorGwSource(comp_lay.dncdm, a, pba->a_today, y, ppw);
+          composite->dncdm().ContributeTensorGwSource(comp_lay.dncdm, a, y, ppw);
         }
       }
     }
@@ -5042,7 +5041,7 @@ int PerturbationsModule::perturb_sources_member(
                                         &(ppw->last_index_back),
                                         pvecback);
 
-  double z = pba->a_today / pvecback[background_module_->index_bg_a_] - 1.;
+  double z = 1. / pvecback[background_module_->index_bg_a_] - 1.;
 
   thermodynamics_module_->thermodynamics_at_z(z,
                                               thermodynamics_module_->inter_closeby_,
@@ -5050,8 +5049,8 @@ int PerturbationsModule::perturb_sources_member(
                                               pvecback,
                                               pvecthermo);
 
-  double a_rel  = ppw->pvecback[background_module_->index_bg_a_] / pba->a_today;
-  double a2_rel = a_rel * a_rel;
+  double a  = ppw->pvecback[background_module_->index_bg_a_];
+  double a2 = a * a;
 
   double a_prime_over_a = pvecback[background_module_->index_bg_a_] *
                           pvecback[background_module_->index_bg_H_]; /* (a'/a)=aH */
@@ -5199,7 +5198,7 @@ int PerturbationsModule::perturb_sources_member(
       /** gamma in Nbody gauge, see Eq. A.2 in 1811.00904. */
       if (has_source_k2gamma_Nb_) {
         _set_source_(index_tp_k2gamma_Nb_) = -a_prime_over_a * H_T_Nb_prime +
-                                             9. / 2. * a2_rel * ppw->rho_plus_p_shear;
+                                             9. / 2. * a2 * ppw->rho_plus_p_shear;
       }
     }
 
@@ -5303,8 +5302,8 @@ int PerturbationsModule::perturb_sources_member(
     src_ctx.index_k        = index_k;
     src_ctx.index_tau      = index_tau;
     src_ctx.k              = k;
-    src_ctx.a_rel          = a_rel;
-    src_ctx.a2_rel         = a2_rel;
+    src_ctx.a              = a;
+    src_ctx.a2             = a2;
     src_ctx.a_prime_over_a = a_prime_over_a;
     src_ctx.theta_over_k2  = theta_over_k2;
     src_ctx.theta_shift    = theta_shift;
@@ -5606,7 +5605,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
         double rho_delta_ncdm        = 0.0;
         double rho_plus_p_theta_ncdm = 0.0;
         double rho_plus_p_shear_ncdm = 0.0;
-        const double factor          = ncdm_sp->factor() * pow(pba->a_today / a, 4);
+        const double factor          = ncdm_sp->factor() * pow(1. / a, 4);
 
         for (int index_q = 0; index_q < ncdm_lay.q_size; index_q++) {
           const int idx        = ncdm_lay.index_per_q[index_q];
@@ -5772,7 +5771,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
              (8. * _PI_ * _G_ * _m_H_);
 
       // total amount of hydrogen today
-      n_H = (pba->a_today / a) * (pba->a_today / a) * (pba->a_today / a) * Nnow;
+      n_H = Nnow / (a * a * a);
 
       // Helium-to-hydrogen ratio
       fHe = thermodynamics_module_->YHe_ / (_not4_ * (1 - thermodynamics_module_->YHe_));
@@ -5885,10 +5884,9 @@ int PerturbationsModule::perturb_derivs_member(double tau,
       dy[ppw->pv->index_pt_perturbed_recombination_delta_temp] =
           2. / 3. * dy[b_dr_lay.idx_delta] -
           a * Compton_CR * pow(pba->T_cmb / a, 4) * chi / (1. + chi + fHe) *
-              ((1. -
-                pba->T_cmb * pba->a_today / a / pvecthermo[thermodynamics_module_->index_th_Tb_]) *
+              ((1. - pba->T_cmb / a / pvecthermo[thermodynamics_module_->index_th_Tb_]) *
                    (delta_g + delta_chi * (1. + fHe) / (1. + chi + fHe)) +
-               pba->T_cmb * pba->a_today / a / pvecthermo[thermodynamics_module_->index_th_Tb_] *
+               pba->T_cmb / a / pvecthermo[thermodynamics_module_->index_th_Tb_] *
                    (delta_temp - 1. / 4. * delta_g));
     }
 

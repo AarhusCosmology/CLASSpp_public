@@ -229,8 +229,8 @@ void NCDMSpecies::RegisterIntegrationIndices(int& /*index_bi*/) {
   // Stable NCDM has no integration variables
 }
 
-void NCDMSpecies::ComputeBackground(double a_rel, const double* /*pvecback_B*/, double* pvecback) {
-  double z = 1. / a_rel - 1.;
+void NCDMSpecies::ComputeBackground(double a, const double* /*pvecback_B*/, double* pvecback) {
+  double z = 1. / a - 1.;
 
   double number_ncdm, rho_ncdm, p_ncdm, pseudo_p_ncdm;
   ComputeMomenta(z, &number_ncdm, &rho_ncdm, &p_ncdm, nullptr, &pseudo_p_ncdm);
@@ -566,7 +566,7 @@ BaseSpecies::StressEnergyContribution NCDMSpecies::StressEnergy(
   // benign vectorization-reduction drift, validated to <<0.1% on Cl/P(k).
   const double a      = ppw->scalar_ctx.a;
   const double ma2    = M_ * M_ * a * a;
-  const double factor = factor_ * std::pow(pba_->a_today / a, 4);
+  const double factor = factor_ * std::pow(1. / a, 4);
 
   double s_drho = 0., s_theta = 0., s_dp = 0., s_shear = 0.;
   for (int iq = 0; iq < layout.q_size; ++iq) {
@@ -618,12 +618,11 @@ void NCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout
     // Collapse full hierarchy → (delta, theta, shear) for fluid approximation.
     const double a            = ctx.a;
     const double k            = ctx.k;
-    const double a_today      = ctx.a_today;
     const double rho          = Rho(ctx.pvecback);
     const double p            = P(ctx.pvecback);
     const double rho_plus_p   = rho + p;
     const double M_local      = M_;
-    const double factor_local = factor_ * std::pow(a_today / a, 4);
+    const double factor_local = factor_ * std::pow(1. / a, 4);
 
     const int idx_new = new_l.index_per_q[0];
     for (int l = 0; l <= 2; ++l)

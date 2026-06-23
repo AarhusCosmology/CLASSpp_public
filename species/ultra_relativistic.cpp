@@ -19,10 +19,10 @@ void UltraRelativisticSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_, _TRUE_, index_bg, 1);
 }
 
-void UltraRelativisticSpecies::ComputeBackground(double a_rel,
+void UltraRelativisticSpecies::ComputeBackground(double a,
                                                  const double* /*pvecback_B*/,
                                                  double* pvecback) {
-  const double a4         = a_rel * a_rel * a_rel * a_rel;
+  const double a4         = a * a * a * a;
   pvecback[index_bg_rho_] = Omega0_ur_ * H0_ * H0_ / a4;
 }
 
