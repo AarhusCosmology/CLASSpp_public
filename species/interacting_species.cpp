@@ -35,7 +35,7 @@ void IDM_DRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                   double /*tau*/,
                                   const double* y,
                                   double* dy,
-                                  const perturb_parameters_and_workspace& ppaw) {
+                                  const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -142,7 +142,7 @@ void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                double /*tau*/,
                                const double* y,
                                double* dy,
-                               const perturb_parameters_and_workspace& ppaw) {
+                               const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -331,7 +331,7 @@ void IDM_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                     double /*tau*/,
                                     const double* y,
                                     double* dy,
-                                    const perturb_parameters_and_workspace& ppaw) {
+                                    const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -409,7 +409,7 @@ void IDR_DRMDSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                     double /*tau*/,
                                     const double* y,
                                     double* dy,
-                                    const perturb_parameters_and_workspace& ppaw) {
+                                    const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;

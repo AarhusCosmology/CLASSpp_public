@@ -94,7 +94,7 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
@@ -113,7 +113,7 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
-                   PerturbSourceContext& ctx) override;
+                   PerturbSourceContext& ctx) const override;
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,
@@ -132,7 +132,7 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
   void AddCouplingDerivs(double tau,
                          const double* y,
                          double* dy,
-                         const perturb_parameters_and_workspace& ppaw) override;
+                         const perturb_parameters_and_workspace& ppaw) const override;
 
  private:
   IDM_DRSpecies* idm_dr_ = nullptr;

@@ -81,7 +81,7 @@ void DCDM_DR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                     double tau,
                                     const double* y,
                                     double* dy,
-                                    const perturb_parameters_and_workspace& ppaw) {
+                                    const perturb_parameters_and_workspace& ppaw) const {
   const auto& my = static_cast<const PerturbLayout&>(base);
   dcdm_->PerturbDerivs(my.dcdm, tau, y, dy, ppaw);
   dr_sp_->PerturbDerivs(my.dr, tau, y, dy, ppaw);
@@ -124,7 +124,7 @@ BaseSpecies::StressEnergyContribution DCDM_DR_Species::StressEnergy(
 void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                                   const double* y,
                                   const double* /*dy*/,
-                                  PerturbSourceContext& ctx) {
+                                  PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
   const double* pvecback     = ppw->pvecback.data();
@@ -211,7 +211,7 @@ void DCDM_DR_Species::WriteOutputColumns(PerturbColumnWriter& w,
 void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
                                         const double* y,
                                         double* dy,
-                                        const perturb_parameters_and_workspace& ppaw) {
+                                        const perturb_parameters_and_workspace& ppaw) const {
   const perturb_workspace* ppw    = ppaw.ppw;
   const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;

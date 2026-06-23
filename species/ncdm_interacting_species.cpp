@@ -99,7 +99,7 @@ std::vector<Named> NCDMInteractingSpecies::CreateAll(const SpeciesBuildContext& 
   return result;
 }
 
-double NCDMInteractingSpecies::FitIntegralOfl(double z) {
+double NCDMInteractingSpecies::FitIntegralOfl(double z) const {
   const double qs[6]{0.0,
                      265.1039577689589,
                      22154.177207573077,
@@ -127,7 +127,7 @@ void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& lay
                                            double tau,
                                            const double* y,
                                            double* dy,
-                                           const perturb_parameters_and_workspace& ppaw) {
+                                           const perturb_parameters_and_workspace& ppaw) const {
   // 1. Compute standard free-streaming derivatives via layout-based NCDMSpecies
   NCDMSpecies::PerturbDerivs(layout, tau, y, dy, ppaw);
 

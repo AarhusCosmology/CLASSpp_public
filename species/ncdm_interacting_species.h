@@ -16,14 +16,14 @@ class NCDMInteractingSpecies : public NCDMSpecies {
   // Factory method to read N_ncdm_interacting and create instances
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  double FitIntegralOfl(double z);
+  double FitIntegralOfl(double z) const;
 
   // Layout-based PerturbDerivs: runs NCDMSpecies hierarchy + collision terms.
   void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   double GetGeff() const {
     return G_eff_;

@@ -722,7 +722,7 @@ void NCDMBaseSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base
                                           double /*tau*/,
                                           const double* y,
                                           double* dy,
-                                          const perturb_parameters_and_workspace& ppaw) {
+                                          const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   if (layout.q_size <= 0 || layout.index_per_q.empty())
     return;

@@ -129,7 +129,7 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
 void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                                             const double* y,
                                             const double* /*dy*/,
-                                            PerturbSourceContext& ctx) {
+                                            PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
 
   // These sources are scalar-only
@@ -274,7 +274,7 @@ void IDM_DRMD_IDR_DRMD_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& 
                                               double tau,
                                               const double* y,
                                               double* dy,
-                                              const perturb_parameters_and_workspace& ppaw) {
+                                              const perturb_parameters_and_workspace& ppaw) const {
   const auto& my = static_cast<const PerturbLayout&>(base);
   idm_drmd_->PerturbDerivs(my.idm_drmd, tau, y, dy, ppaw);
   idr_drmd_->PerturbDerivs(my.idr_drmd, tau, y, dy, ppaw);
@@ -300,10 +300,11 @@ BaseSpecies::StressEnergyContribution IDM_DRMD_IDR_DRMD_Species::StressEnergy(
   return se;
 }
 
-void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(double /*tau*/,
-                                                  const double* y,
-                                                  double* dy,
-                                                  const perturb_parameters_and_workspace& ppaw) {
+void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
+    double /*tau*/,
+    const double* y,
+    double* dy,
+    const perturb_parameters_and_workspace& ppaw) const {
   const perturb_workspace* ppw    = ppaw.ppw;
   const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;

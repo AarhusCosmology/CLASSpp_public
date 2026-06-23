@@ -66,7 +66,7 @@ void CDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                double /*tau*/,
                                const double* y,
                                double* dy,
-                               const perturb_parameters_and_workspace& ppaw) {
+                               const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout              = static_cast<const PerturbLayout&>(base);
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -125,7 +125,7 @@ void CDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
 void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                              const double* y,
                              const double* /*dy*/,
-                             PerturbSourceContext& ctx) {
+                             PerturbSourceContext& ctx) const {
   const auto& layout         = static_cast<const PerturbLayout&>(base);
   PerturbationsModule* p_mod = ctx.p_mod;
 

@@ -262,7 +262,7 @@ void NCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWr
 void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
                               const double* /*y*/,
                               const double* /*dy*/,
-                              PerturbSourceContext& ctx) {
+                              PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
 
@@ -337,7 +337,7 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                 double tau,
                                 const double* y,
                                 double* dy,
-                                const perturb_parameters_and_workspace& ppaw) {
+                                const perturb_parameters_and_workspace& ppaw) const {
   // This species only exists when NCDM is present, so the legacy pba->has_ncdm guard is gone.
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
 

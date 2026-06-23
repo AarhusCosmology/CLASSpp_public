@@ -50,7 +50,7 @@ class CDMSpecies : public BaseSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,
@@ -69,7 +69,7 @@ class CDMSpecies : public BaseSpecies {
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
-                   PerturbSourceContext& ctx) override;
+                   PerturbSourceContext& ctx) const override;
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;

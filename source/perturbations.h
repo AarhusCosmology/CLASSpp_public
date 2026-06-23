@@ -257,8 +257,8 @@ struct perturb_vector {
   // perturbation variable in THIS pv's mode (no-ops like Lambda excluded), in
   // lex-key order. Consumed by the scalar/vector/tensor RHS dispatch loops.
   struct ActiveSpecies {
-    BaseSpecies* species;
-    BaseSpecies::PerturbLayout* layout;
+    const BaseSpecies* species;
+    const BaseSpecies::PerturbLayout* layout;
     bool clusters_as_matter;  // ClustersAsMatter()    (delta_m/theta_m membership)
     bool is_cold;             // IsColdMatterSpecies() (delta_cb bucket)
   };
@@ -271,8 +271,8 @@ struct perturb_vector {
   // perturb_sources_member dispatches FillSources by pointer. Empty in runs
   // without dTk/mTk/k_output, so that per-sample loop is skipped entirely.
   struct SourceSpecies {
-    BaseSpecies* species;
-    BaseSpecies::PerturbLayout* layout;
+    const BaseSpecies* species;
+    const BaseSpecies::PerturbLayout* layout;
   };
   std::vector<SourceSpecies> source_species;
 

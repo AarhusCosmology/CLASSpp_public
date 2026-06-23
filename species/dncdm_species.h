@@ -103,7 +103,7 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,

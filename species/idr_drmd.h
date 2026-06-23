@@ -73,7 +73,7 @@ class IDR_DRMDSpecies : public BaseSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 

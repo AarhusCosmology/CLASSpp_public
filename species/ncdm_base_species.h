@@ -164,7 +164,7 @@ class NCDMBaseSpecies : public BaseSpecies {
                            double tau,
                            const double* y,
                            double* dy,
-                           const perturb_parameters_and_workspace& ppaw) override;
+                           const perturb_parameters_and_workspace& ppaw) const override;
 
   // ── Tensor GW source contribution ────────────────────────────────────────
   /** Contributes this species' anisotropic-stress integral to ppw->gw_source.

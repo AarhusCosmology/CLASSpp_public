@@ -299,21 +299,21 @@ class BaseSpecies {
                              double tau,
                              const double* y,
                              double* dy,
-                             const perturb_parameters_and_workspace& ppaw) = 0;
+                             const perturb_parameters_and_workspace& ppaw) const = 0;
 
   /** Contribute to dy for the vector perturbation ODE. Default: no-op. */
   virtual void PerturbVectorDerivs(const PerturbLayout& /*layout*/,
                                    double /*tau*/,
                                    const double* /*y*/,
                                    double* /*dy*/,
-                                   const perturb_parameters_and_workspace& /*ppaw*/) {}
+                                   const perturb_parameters_and_workspace& /*ppaw*/) const {}
 
   /** Contribute to dy for the tensor perturbation ODE. Default: no-op. */
   virtual void PerturbTensorDerivs(const PerturbLayout& /*layout*/,
                                    double /*tau*/,
                                    const double* /*y*/,
                                    double* /*dy*/,
-                                   const perturb_parameters_and_workspace& /*ppaw*/) {}
+                                   const perturb_parameters_and_workspace& /*ppaw*/) const {}
 
   /** Write this species' tensor-mode output column titles. Default: no-op. */
   virtual void WriteTensorOutputColumnTitles(std::string& /*tensor_titles*/) const {}
@@ -397,7 +397,7 @@ class BaseSpecies {
   virtual void FillSources(const PerturbLayout& /*layout*/,
                            const double* /*y*/,
                            const double* /*dy*/,
-                           PerturbSourceContext& /*ctx*/) {}
+                           PerturbSourceContext& /*ctx*/) const {}
 
   // ── Stage 3: Initial conditions ───────────────────────────────────────────
 

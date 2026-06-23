@@ -65,7 +65,7 @@ class DCDMSpecies : public BaseSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
                                         const perturb_vector* pv,

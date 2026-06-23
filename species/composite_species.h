@@ -142,5 +142,5 @@ class CompositeSpecies : public BaseSpecies {
   virtual void AddCouplingDerivs(double tau,
                                  const double* y,
                                  double* dy,
-                                 const perturb_parameters_and_workspace& ppaw);
+                                 const perturb_parameters_and_workspace& ppaw) const;
 };

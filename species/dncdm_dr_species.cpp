@@ -75,7 +75,7 @@ void DNCDM_DR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                      double tau,
                                      const double* y,
                                      double* dy,
-                                     const perturb_parameters_and_workspace& ppaw) {
+                                     const perturb_parameters_and_workspace& ppaw) const {
   const auto& my = static_cast<const PerturbLayout&>(base);
   dncdm_->PerturbDerivs(my.dncdm, tau, y, dy, ppaw);
   dr_sp_->PerturbDerivs(my.dr, tau, y, dy, ppaw);
@@ -86,7 +86,7 @@ void DNCDM_DR_Species::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& bas
                                            double tau,
                                            const double* y,
                                            double* dy,
-                                           const perturb_parameters_and_workspace& ppaw) {
+                                           const perturb_parameters_and_workspace& ppaw) const {
   const auto& my = static_cast<const PerturbLayout&>(base);
   // DNCDMSpecies inherits NCDMBaseSpecies::PerturbTensorDerivs.
   // GetDlnf0Dlnq is overridden by DNCDMSpecies to use pvecback.
@@ -130,7 +130,7 @@ BaseSpecies::StressEnergyContribution DNCDM_DR_Species::StressEnergy(
 void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
                                          const double* y,
                                          double* dy,
-                                         const perturb_parameters_and_workspace& ppaw) {
+                                         const perturb_parameters_and_workspace& ppaw) const {
   const perturb_workspace* ppw    = ppaw.ppw;
   const precision* ppr            = ppaw.perturbations_module->GetPrecision();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -254,7 +254,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
 void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                                    const double* y,
                                    const double* /*dy*/,
-                                   PerturbSourceContext& ctx) {
+                                   PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
   const double* pvecback     = ppw->pvecback.data();

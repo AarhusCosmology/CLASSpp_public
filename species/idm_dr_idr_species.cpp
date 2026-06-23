@@ -76,7 +76,7 @@ void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout
 void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                                      const double* y,
                                      const double* /*dy*/,
-                                     PerturbSourceContext& ctx) {
+                                     PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
 
@@ -261,7 +261,7 @@ void IDM_DR_IDR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                        double tau,
                                        const double* y,
                                        double* dy,
-                                       const perturb_parameters_and_workspace& ppaw) {
+                                       const perturb_parameters_and_workspace& ppaw) const {
   const auto& my = static_cast<const PerturbLayout&>(base);
   idm_dr_->PerturbDerivs(my.idm_dr, tau, y, dy, ppaw);
   idr_->PerturbDerivs(my.idr, tau, y, dy, ppaw);
@@ -291,7 +291,7 @@ BaseSpecies::StressEnergyContribution IDM_DR_IDR_Species::StressEnergy(
 void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
                                            const double* y,
                                            double* dy,
-                                           const perturb_parameters_and_workspace& ppaw) {
+                                           const perturb_parameters_and_workspace& ppaw) const {
   const perturb_workspace* ppw    = ppaw.ppw;
   const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;

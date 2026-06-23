@@ -86,13 +86,13 @@ class DNCDM_DR_Species : public CompositeSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
                            double tau,
                            const double* y,
                            double* dy,
-                           const perturb_parameters_and_workspace& ppaw) override;
+                           const perturb_parameters_and_workspace& ppaw) const override;
 
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
@@ -111,7 +111,7 @@ class DNCDM_DR_Species : public CompositeSpecies {
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
-                   PerturbSourceContext& ctx) override;
+                   PerturbSourceContext& ctx) const override;
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
@@ -129,7 +129,7 @@ class DNCDM_DR_Species : public CompositeSpecies {
   void AddCouplingDerivs(const PerturbLayout& my,
                          const double* y,
                          double* dy,
-                         const perturb_parameters_and_workspace& ppaw);
+                         const perturb_parameters_and_workspace& ppaw) const;
 
   DNCDMSpecies* dncdm_         = nullptr;
   DarkRadiationSpecies* dr_sp_ = nullptr;

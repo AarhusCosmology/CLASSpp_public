@@ -54,7 +54,7 @@ class DCDM_DR_Species : public CompositeSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
@@ -73,7 +73,7 @@ class DCDM_DR_Species : public CompositeSpecies {
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
-                   PerturbSourceContext& ctx) override;
+                   PerturbSourceContext& ctx) const override;
 
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
@@ -114,7 +114,7 @@ class DCDM_DR_Species : public CompositeSpecies {
   void AddCouplingDerivs(double tau,
                          const double* y,
                          double* dy,
-                         const perturb_parameters_and_workspace& ppaw) override;
+                         const perturb_parameters_and_workspace& ppaw) const override;
 
  private:
   DCDMSpecies* dcdm_           = nullptr;  // non-owning pointer into children_

@@ -83,7 +83,7 @@ double CompositeSpecies::FreestreamingRho(const double* pvecback) const {
 void CompositeSpecies::AddCouplingDerivs(double /*tau*/,
                                          const double* /*y*/,
                                          double* /*dy*/,
-                                         const perturb_parameters_and_workspace& /*ppaw*/) {}
+                                         const perturb_parameters_and_workspace& /*ppaw*/) const {}
 
 bool CompositeSpecies::ClustersAsMatter() const {
   for (const auto& child : children_)

@@ -97,12 +97,12 @@ class ScalarFieldSpecies : public BaseSpecies {
                      double tau,
                      const double* y,
                      double* dy,
-                     const perturb_parameters_and_workspace& ppaw) override;
+                     const perturb_parameters_and_workspace& ppaw) const override;
 
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
-                   PerturbSourceContext& ctx) override;
+                   PerturbSourceContext& ctx) const override;
 
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
