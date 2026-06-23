@@ -264,6 +264,18 @@ struct perturb_vector {
   };
   std::vector<ActiveSpecies> active_species;
 
+  // Non-owning view into species_layouts: the species that emit a per-species
+  // transfer source (delta_g, delta_cdm, delta_ncdm, ...), in lex-key order.
+  // Source-column membership is k-independent (fixed in
+  // perturb_indices_of_perturbs); this list materialises it per pv so
+  // perturb_sources_member dispatches FillSources by pointer. Empty in runs
+  // without dTk/mTk/k_output, so that per-sample loop is skipped entirely.
+  struct SourceSpecies {
+    BaseSpecies* species;
+    BaseSpecies::PerturbLayout* layout;
+  };
+  std::vector<SourceSpecies> source_species;
+
   // Always-present species, resolved once per pv (non-owning, into
   // species_layouts). Base-typed because perturbations.h cannot see the nested
   // PhotonsSpecies/BaryonsSpecies::PerturbLayout types (photons.h/baryons.h

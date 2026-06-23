@@ -138,6 +138,15 @@ class PerturbationsModule : public BaseModule {
 
   void ResolveSpecies(); /**< resolve `resolved_` once; called from the ctor */
 
+  /**< Per-species flag, parallel to all_species_: does this species emit a
+       per-species transfer source (delta_g, delta_cdm, delta_ncdm, ...)? Set
+       once in perturb_indices_of_perturbs() from the same index_type advancement
+       that drives RegisterTransferSourceIndices; k-independent. Each
+       perturb_vector materialises the flagged species into pv->source_species
+       (pointer + layout) for per-sample FillSources dispatch. All-false when no
+       dTk/mTk/k_output is requested. */
+  std::vector<char> species_emits_source_;
+
   bool has_source_t_;            /**< do we need source for CMB temperature? */
   bool has_source_p_;            /**< do we need source for CMB polarization? */
   bool has_source_delta_m_;      /**< do we need source for delta of total matter? */

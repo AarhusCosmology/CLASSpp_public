@@ -974,8 +974,20 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       const SourceRequestContext src_ctx{ppt->has_density_transfers,
                                          ppt->has_velocity_transfers,
                                          static_cast<int>(ppt->gauge)};
-      for (auto& [name, sp] : all_species_)
-        sp->RegisterTransferSourceIndices(index_type, src_ctx);
+      // Record which species actually emit a transfer-source column: index_type
+      // advances iff the species registered at least one. This flag (k-independent)
+      // drives the per-pv source_species list and hence the per-sample FillSources
+      // dispatch, so source-less species are never dispatched.
+      species_emits_source_.assign(all_species_.size(), 0);
+      {
+        size_t isp = 0;
+        for (auto& sp : all_species_) {
+          const int before = index_type;
+          sp->RegisterTransferSourceIndices(index_type, src_ctx);
+          species_emits_source_[isp] = (index_type > before) ? 1 : 0;
+          ++isp;
+        }
+      }
       class_define_index(index_tp_phi_, has_source_phi_, index_type, 1);
       class_define_index(index_tp_phi_prime_, has_source_phi_prime_, index_type, 1);
       class_define_index(index_tp_phi_plus_psi_, has_source_phi_plus_psi_, index_type, 1);
@@ -2989,6 +3001,18 @@ void PerturbationsModule::perturb_vector_init(
                                          ppv->species_layouts[i].get(),
                                          entry->ClustersAsMatter(),
                                          entry->IsColdMatterSpecies()});
+        ++i;
+      }
+    }
+
+    /* Source-dispatch view: the species that emit a per-species transfer source
+       (k-independent membership precomputed in species_emits_source_), paired
+       with this pv's layouts. Empty without dTk/mTk/k_output. */
+    {
+      size_t i = 0;
+      for (auto& entry : all_species_) {
+        if (species_emits_source_[i])
+          ppv->source_species.push_back({entry.get(), ppv->species_layouts[i].get()});
         ++i;
       }
     }
@@ -5287,13 +5311,10 @@ int PerturbationsModule::perturb_sources_member(
 
     /* delta_tot */
     if (has_source_delta_tot_) {
+      double rho_tot = pvecback[background_module_->index_bg_rho_tot_];
       /** We follow the (debatable) CMBFAST/CAMB convention of not including rho_lambda in rho_tot */
-      double rho_tot;
       if (resolved_.lambda) {
-        rho_tot = pvecback[background_module_->index_bg_rho_tot_] - resolved_.lambda->Rho(pvecback);
-      }
-      else {
-        rho_tot = pvecback[background_module_->index_bg_rho_tot_];
+        rho_tot -= resolved_.lambda->Rho(pvecback);
       }
 
       _set_source_(index_tp_delta_tot_) =
@@ -5303,14 +5324,11 @@ int PerturbationsModule::perturb_sources_member(
                                          theta_over_k2;
     }
 
-    // Species-specific sources (delta_g, theta_g, delta_b, theta_b, delta_cdm, ...)
-    {
-      size_t i = 0;
-      for (auto& sp : all_species_) {
-        sp->FillSources(*ppw->pv->species_layouts[i], y, dy, src_ctx);
-        ++i;
-      }
-    }
+    // Species-specific sources (delta_g, theta_g, delta_b, theta_b, delta_cdm, ...).
+    // Only source-emitting species are dispatched; in a standard run (no
+    // dTk/mTk/k_output) pv->source_species is empty and this loop costs nothing.
+    for (const auto& e : ppw->pv->source_species)
+      e.species->FillSources(*e.layout, y, dy, src_ctx);
 
     /* total velocity  */
     if (has_source_theta_tot_) {
