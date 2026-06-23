@@ -1,7 +1,7 @@
 # Thin convenience shim. The build system is CMakeLists.txt; see README.md.
 BUILD_DIR ?= build/cmake
 
-.PHONY: all class class_profiled classy test test-parser test-bisection test-photons clean
+.PHONY: all class class_profiled classy classy-pip-dev test test-parser test-bisection test-photons clean
 
 # The real parallelism happens inside `cmake --build --parallel`; serialize
 # the shim targets so `make -j class class_profiled` cannot run two CMake
@@ -27,6 +27,18 @@ test: $(BUILD_DIR)/CMakeCache.txt
 classy:
 	rm -rf python/build && mkdir -p python/build
 	pip install .
+	python scripts/montepython_layout.py
+
+# Faster local wrapper rebuild: reuse scikit-build-core's CMake tree and build
+# with 12 parallel jobs. This assumes build dependencies are already installed.
+# Direct CMake can be faster still:
+#   cmake -S . -B build/dev -DCLASS_BUILD_PYTHON=ON
+#   cmake --build build/dev --target classy --parallel
+# but that only builds the extension in build/dev; it does not install the
+# package or recreate the python/build/lib.* layout.
+classy-pip-dev:
+	rm -rf python/build && mkdir -p python/build
+	pip install . --no-build-isolation -Cbuild-dir=build/skbuild -Cbuild.tool-args=-j12
 	python scripts/montepython_layout.py
 
 clean:
