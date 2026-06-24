@@ -1082,6 +1082,12 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
 void PerturbationsModule::perturb_timesampling_for_sources() {
   /** Summary: */
 
+  class_test((ppr->perturbations_sampling_boost_above_age_fraction < 0.) ||
+                 (ppr->perturbations_sampling_boost_above_age_fraction > 1.),
+             "The precision parameter perturbations_sampling_boost_above_age_fraction should be "
+             "between 0 and 1, not %e",
+             ppr->perturbations_sampling_boost_above_age_fraction);
+
   double timescale_source;
   double a_prime_over_a;
 
@@ -1255,6 +1261,11 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
     /* compute inverse rate */
     timescale_source = 1. / timescale_source;
 
+    if (tau >
+        background_module_->conformal_age_ * ppr->perturbations_sampling_boost_above_age_fraction) {
+      timescale_source /= 2.;
+    }
+
     class_test(fabs(ppr->perturb_sampling_stepsize * timescale_source / tau) <
                    ppr->smallest_allowed_variation,
                "integration step =%e < machine precision : leads either to numerical error or "
@@ -1329,6 +1340,11 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
 
     /* compute inverse rate */
     timescale_source = 1. / timescale_source;
+
+    if (tau >
+        background_module_->conformal_age_ * ppr->perturbations_sampling_boost_above_age_fraction) {
+      timescale_source /= 2.;
+    }
 
     class_test(fabs(ppr->perturb_sampling_stepsize * timescale_source / tau) <
                    ppr->smallest_allowed_variation,
@@ -1531,6 +1547,15 @@ void PerturbationsModule::perturb_get_k_list() {
     if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers) ||
         (ppt->has_nl_corrections_based_on_delta_m))
       k_max = std::max(k_max, ppt->k_max_for_pk);
+
+    /*
+     * The normal transfer grid remains capped by k_max_cl. Only the overall
+     * perturbation source grid is extended for the separate full-Limber
+     * integral.
+     */
+    if (ppt->has_cl_cmb_lensing_potential && ppt->want_lcmb_full_limber) {
+      k_max = std::max(k_max, ppr->k_max_limber_over_l_max_scalars * ppt->l_scalar_max);
+    }
 
     /** - --> test that result for k_min, k_max make sense */
 

@@ -401,16 +401,32 @@ class TestClass(unittest.TestCase):
                                 self.cl_faulty_plot(elem + "_" + key, value[2:], reference_name, to_test[key][2:], candidate_name, rtol_cl)
                                 status_pass = False
                     # For cross-spectra, as there can be zero-crossing, we
-                    # instead compare the difference.
+                    # compare an absolute difference against a physical scale.
+                    # Pointwise relative errors are not meaningful near a zero
+                    # crossing. For TE, sqrt(TT*EE) is the natural scale.
                     else:
-                        # First, we multiply each array by the biggest value
-                        norm = max(
-                            np.abs(value).max(), np.abs(to_test[key]).max())
-                        value *= norm
-                        to_test[key] *= norm
                         try:
-                            np.testing.assert_array_almost_equal(
-                                value, to_test[key], decimal=3)
+                            if key == 'te':
+                                norm = np.maximum(
+                                    np.sqrt(np.abs(ref['tt'] * ref['ee'])),
+                                    np.sqrt(np.abs(
+                                        to_test['tt'] * to_test['ee'])))
+                                np.testing.assert_array_less(
+                                    np.abs(value - to_test[key]),
+                                    rtol_cl * norm + COMPARE_CL_ABSOLUTE_ERROR)
+                            else:
+                                norm = max(
+                                    np.abs(value).max(),
+                                    np.abs(to_test[key]).max())
+                                if norm == 0.0:
+                                    np.testing.assert_array_equal(
+                                        value, to_test[key])
+                                else:
+                                    np.testing.assert_allclose(
+                                        value / norm,
+                                        to_test[key] / norm,
+                                        rtol=0.0,
+                                        atol=rtol_cl)
                         except AssertionError:
                             self.cl_faulty_plot(elem + "_" + key, value[2:], reference_name, to_test[key][2:], candidate_name, rtol_cl)
                             status_pass = False

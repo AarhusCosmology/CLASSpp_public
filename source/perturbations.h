@@ -134,6 +134,8 @@ struct perturbs {
   bool has_cl_cmb_polarization = false; /**< do we need \f$ C_l \f$'s for CMB polarization? */
   bool has_cl_cmb_lensing_potential =
       false; /**< do we need \f$ C_l \f$'s for CMB lensing potential? */
+  bool want_lcmb_full_limber =
+      true; /**< use the separate full-Limber CMB lensing scheme above l_switch_limber */
   bool has_cl_lensing_potential =
       false;                        /**< do we need \f$ C_l \f$'s for galaxy lensing potential? */
   bool has_cl_number_count = false; /**< do we need \f$ C_l \f$'s for density number count? */

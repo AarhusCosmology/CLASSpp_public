@@ -1822,6 +1822,14 @@ void InputModule::ReadDerived() {
     ptr->lcmb_pivot   = pfc->get_or("lcmb_pivot", ptr->lcmb_pivot);
   }
 
+  if (auto full_limber = pfc->get<std::string>("want_lcmb_full_limber")) {
+    class_test(full_limber->empty() || (((*full_limber)[0] != 'y') && ((*full_limber)[0] != 'Y') &&
+                                        ((*full_limber)[0] != 'n') && ((*full_limber)[0] != 'N')),
+               "In input file, want_lcmb_full_limber must begin with 'y' or 'n', not '%s'",
+               full_limber->c_str());
+    ppt->want_lcmb_full_limber = ((*full_limber)[0] == 'y') || ((*full_limber)[0] == 'Y');
+  }
+
   if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
     auto P_k_max_h_Mpc = pfc->get<double>("P_k_max_h/Mpc");
     auto P_k_max_1_Mpc = pfc->get<double>("P_k_max_1/Mpc");
@@ -2534,6 +2542,9 @@ void precision::parse(const FileContent& fc) {
   read(fc, "gw_ini", gw_ini);
   read(fc, "perturb_integration_stepsize", perturb_integration_stepsize);
   read(fc, "perturb_sampling_stepsize", perturb_sampling_stepsize);
+  read(fc,
+       "perturbations_sampling_boost_above_age_fraction",
+       perturbations_sampling_boost_above_age_fraction);
   read(fc, "tol_perturb_integration", tol_perturb_integration);
   read(fc, "c_gamma_k_H_square_max", c_gamma_k_H_square_max);
   read(fc, "tol_tau_approx", tol_tau_approx);
@@ -2593,6 +2604,8 @@ void precision::parse(const FileContent& fc) {
   read(fc, "q_logstep_open", q_logstep_open);
   read(fc, "q_logstep_trapzd", q_logstep_trapzd);
   read(fc, "q_numstep_transition", q_numstep_transition);
+  read(fc, "q_logstep_limber", q_logstep_limber);
+  read(fc, "k_max_limber_over_l_max_scalars", k_max_limber_over_l_max_scalars);
   read(fc, "transfer_neglect_delta_k_S_t0", transfer_neglect_delta_k_S_t0);
   read(fc, "transfer_neglect_delta_k_S_t1", transfer_neglect_delta_k_S_t1);
   read(fc, "transfer_neglect_delta_k_S_t2", transfer_neglect_delta_k_S_t2);

@@ -248,7 +248,7 @@ struct precision {
       0.1; /**< number defining k_min for the computation of Cl's and P(k)'s (dimensionless): (k_min tau_0), usually chosen much smaller than one */
 
   double k_max_tau0_over_l_max =
-      2.4; /**< number defining k_max for the computation of Cl's (dimensionless): (k_max tau_0)/l_max, usually chosen around two */
+      1.8; /**< number defining k_max for the computation of Cl's (dimensionless): (k_max tau_0)/l_max, usually chosen around two. Since v3.2.2, the separate full-Limber grid keeps CMB lensing accurate at high l, allowing the standard transfer grid to stop at 1.8 instead of 2.4. */
   double k_step_sub =
       0.05; /**< step in k space, in units of one period of acoustic oscillation at decoupling, for scales inside sound horizon at decoupling */
   double k_step_super =
@@ -342,6 +342,11 @@ struct precision {
    * default step \f$ d \tau \f$ for sampling the source function, in units of the timescale involved in the sources: \f$ (\dot{\kappa}- \ddot{\kappa}/\dot{\kappa})^{-1} \f$
    */
   double perturb_sampling_stepsize = 0.1;
+  /**
+   * Age fraction above which source sampling is twice as fine. This improves
+   * the low-l CMB lensing line-of-sight integral; 1.0 disables the boost.
+   */
+  double perturbations_sampling_boost_above_age_fraction = 0.9;
 
   /**
    * control parameter for the precision of the perturbation integration,
@@ -520,6 +525,11 @@ struct precision {
   // UNHANDLED: q_logstep_spline steps (transition
   // UNHANDLED: must be smooth for spline) */
 
+  double q_logstep_limber =
+      1.025; /**< logarithmic q-step ratio for the separate full-Limber CMB lensing grid */
+  double k_max_limber_over_l_max_scalars =
+      0.001; /**< full-Limber perturbation source cutoff k_max/l_max_scalars in 1/Mpc */
+
   double transfer_neglect_delta_k_S_t0 =
       0.15; /**< for temperature source function T0 of scalar mode, range of k values (in 1/Mpc) taken into account in transfer function: for l < (k-delta_k)*tau0, ie for k > (l/tau0 + delta_k), the transfer function is set to zero */
   double transfer_neglect_delta_k_S_t1 =
@@ -580,7 +590,7 @@ struct precision {
   double sigma_k_per_decade =
       80.; /**< logarithmic stepsize controlling the precision of integrals for sigma(R,k) and similar quantitites */
 
-  double nonlinear_min_k_max = 20.0; /**< when
+  double nonlinear_min_k_max = 5.0; /**< when
   // UNHANDLED: using an algorithm to compute nonlinear
   // UNHANDLED: corrections, like halofit or hmcode,
   // UNHANDLED: k_max must be at least equal to this

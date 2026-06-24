@@ -1175,6 +1175,52 @@ void SpectraModule::spectra_compute_cl(int index_md,
     }
   }
 
+  const bool use_full_limber_pp    = transfer_module_->do_lcmb_full_limber_ && _scalarsEXT_ &&
+                                     has_pp_ && l_[index_l] > ppr->l_switch_limber;
+  constexpr int limber_num_columns = 3;
+  std::vector<double> cl_integrand_limber;
+
+  if (use_full_limber_pp) {
+    cl_integrand_limber.resize(transfer_module_->q_size_limber_ * limber_num_columns);
+    std::vector<double> primordial_pk(ic_ic_size_[index_md]);
+
+    for (int index_q_limber = 0; index_q_limber < transfer_module_->q_size_limber_;
+         index_q_limber++) {
+      const double k_limber = transfer_module_->k_limber_[index_md][index_q_limber];
+      cl_integrand_limber[index_q_limber * limber_num_columns] = k_limber;
+
+      primordial_module_->primordial_spectrum_at_k(index_md,
+                                                   linear,
+                                                   k_limber,
+                                                   primordial_pk.data());
+
+      const double transfer_ic1_limber =
+          transfer_module_
+              ->transfer_limber_[index_md][((index_ic1 * transfer_module_->tt_size_[index_md] +
+                                             transfer_module_->index_tt_lcmb_) *
+                                                transfer_module_->l_size_[index_md] +
+                                            index_l) *
+                                               transfer_module_->q_size_limber_ +
+                                           index_q_limber];
+      const double transfer_ic2_limber =
+          index_ic1 == index_ic2
+              ? transfer_ic1_limber
+              : transfer_module_
+                    ->transfer_limber_[index_md]
+                                      [((index_ic2 * transfer_module_->tt_size_[index_md] +
+                                         transfer_module_->index_tt_lcmb_) *
+                                            transfer_module_->l_size_[index_md] +
+                                        index_l) *
+                                           transfer_module_->q_size_limber_ +
+                                       index_q_limber];
+
+      cl_integrand_limber[index_q_limber * limber_num_columns + 1] = primordial_pk[index_ic1_ic2] *
+                                                                     transfer_ic1_limber *
+                                                                     transfer_ic2_limber * 4. *
+                                                                     _PI_ / k_limber;
+    }
+  }
+
   for (index_ct = 0; index_ct < ct_size_; index_ct++) {
     /* treat null spectra (C_l^BB of scalars, C_l^pp of tensors, etc. */
 
@@ -1192,6 +1238,34 @@ void SpectraModule::spectra_compute_cl(int index_md,
     }
     /* for non-zero spectra, integrate over q */
     else {
+      if (use_full_limber_pp && index_ct == index_ct_pp_) {
+        array_spline(cl_integrand_limber.data(),
+                     limber_num_columns,
+                     transfer_module_->q_size_limber_,
+                     0,
+                     1,
+                     2,
+                     _SPLINE_EST_DERIV_);
+
+        array_integrate_all_trapzd_or_spline(cl_integrand_limber.data(),
+                                             limber_num_columns,
+                                             transfer_module_->q_size_limber_,
+                                             0,
+                                             0,
+                                             1,
+                                             2,
+                                             &clvalue);
+
+        if (pba->sgnK == 1) {
+          clvalue += cl_integrand_limber[1] * transfer_module_->q_limber_[0] /
+                     transfer_module_->k_limber_[index_md][0] * sqrt(pba->K) / 2.;
+        }
+
+        cl_[index_md][(index_l * ic_ic_size_[index_md] + index_ic1_ic2) * ct_size_ + index_ct] =
+            clvalue;
+        continue;
+      }
+
       /* spline the integrand over the whole range of k's */
 
       array_spline(cl_integrand,

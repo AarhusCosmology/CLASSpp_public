@@ -59,6 +59,16 @@ class TransferModule : public BaseModule {
       k_; /**< list of wavenumber values for each requested mode, k[index_md][index_q]. In flat universes k=q. In non-flat universes q and k differ through q2 = k2 + K(1+m), where m=0,1,2 for scalar, vector, tensor. q should be used throughout the transfer module, excepted when interpolating or manipulating the source functions S(k,tau): for a given value of q this should be done in k(q). */
   int index_q_flat_approximation_; /**< index of the first q value using the flat rescaling approximation */
   //@}
+
+  /** @name - full Limber scheme for CMB lensing */
+  //@{
+  bool do_lcmb_full_limber_ = false;
+  int q_size_limber_        = 0;
+  std::vector<double> q_limber_;
+  std::vector<std::vector<double>> k_limber_;
+  std::vector<std::vector<double>> transfer_limber_;
+  //@}
+
   /** @name - transfer functions */
   //@{
   std::vector<std::vector<double>>
@@ -80,6 +90,7 @@ class TransferModule : public BaseModule {
   void transfer_get_l_list();
   void transfer_get_q_list(double q_period, double K, int sgnK);
   int transfer_get_q_list_v1(double q_period, double K, int sgnK);
+  void transfer_get_q_limber_list(double K, int sgnK);
   void transfer_get_k_list(double K);
   void transfer_get_source_correspondence(std::vector<std::vector<int>>& tp_of_tt);
   void transfer_source_tau_size_max(double tau_rec, double tau0, int* tau_size_max);
@@ -92,9 +103,10 @@ class TransferModule : public BaseModule {
                                    double** const* sources,
                                    double** const* sources_spline,
                                    double* window,
-                                   struct transfer_workspace* ptw);
+                                   struct transfer_workspace* ptw,
+                                   bool use_full_limber);
   void transfer_radial_coordinates(struct transfer_workspace* ptw, int index_md, int index_q);
-  void transfer_interpolate_sources(int index_q,
+  void transfer_interpolate_sources(double k,
                                     int index_md,
                                     int index_ic,
                                     int index_type,
@@ -103,7 +115,7 @@ class TransferModule : public BaseModule {
                                     double* interpolated_sources);
   void transfer_sources(double* interpolated_sources,
                         double tau_rec,
-                        int index_q,
+                        double k,
                         int index_md,
                         int index_tt,
                         double* sources,
@@ -139,7 +151,8 @@ class TransferModule : public BaseModule {
                                    int index_l,
                                    double l,
                                    double q_max_bessel,
-                                   radial_function_type radial_type);
+                                   radial_function_type radial_type,
+                                   bool use_full_limber);
   void transfer_use_limber(
       double q_max_bessel, int index_md, int index_tt, double q, double l, short* use_limber);
   void transfer_integrate(struct transfer_workspace* ptw,
