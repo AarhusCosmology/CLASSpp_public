@@ -1,6 +1,25 @@
 cmake_minimum_required(VERSION 3.21)
 project(CLASSpp LANGUAGES C CXX)
 
+# Version: pyproject.toml's [project] version is the single source of truth.
+# scikit-build-core passes it as SKBUILD_PROJECT_VERSION for wheel builds; for a
+# standalone CMake build we read the `version = "x.y.z"` line out of pyproject.
+# Either way we generate version.h so the C++ _VERSION_ macro is derived from
+# that one value instead of being hand-edited.
+if(DEFINED SKBUILD_PROJECT_VERSION)
+  set(CLASS_VERSION "${SKBUILD_PROJECT_VERSION}")
+else()
+  file(STRINGS "${PROJECT_SOURCE_DIR}/pyproject.toml" _class_version_line
+       REGEX "^version *=")
+  string(REGEX REPLACE "^version *= *\"([^\"]+)\".*" "\\1"
+         CLASS_VERSION "${_class_version_line}")
+endif()
+configure_file(
+  "${PROJECT_SOURCE_DIR}/include/version.h.in"
+  "${PROJECT_BINARY_DIR}/generated/version.h"
+  @ONLY
+)
+
 if(SKBUILD)
   set(_class_python_default ON)
 else()
@@ -115,6 +134,7 @@ set_target_properties(classpp PROPERTIES
 )
 target_include_directories(classpp
   PUBLIC
+    ${PROJECT_BINARY_DIR}/generated
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/tools
     ${PROJECT_SOURCE_DIR}/source

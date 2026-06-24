@@ -5,7 +5,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
-#include "svnversion.h"
+#include "version.h"
 
 #ifdef __cplusplus
 #include <algorithm>
@@ -51,7 +51,8 @@ typedef std::shared_ptr<const LensingModule> LensingModulePtr;
 #include "precision.h"
 #endif
 
-#define _VERSION_ "v2.9.0"
+/* _VERSION_ is defined in the generated version.h (from the pyproject.toml
+   version), included above. */
 /* @cond INCLUDE_WITH_DOXYGEN */
 
 #define _MAX_IT_ \

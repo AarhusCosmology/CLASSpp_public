@@ -4,7 +4,9 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "classy-community"
-version = "23.2.0"
+# Single source of truth for the version. CMakeLists.txt derives the C++
+# _VERSION_ macro from this line, so the wheel metadata and the binary can't drift.
+version = "26.0.0"
 authors = [
   { name="Thomas Tram", email="thomas.tram@phys.au.dk"},
 ]
