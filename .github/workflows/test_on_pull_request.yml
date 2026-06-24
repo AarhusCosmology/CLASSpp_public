@@ -35,7 +35,9 @@ jobs:
           sed -i.bak "s/Extension('classy'/Extension('classyref'/g" setup.py
           pip install .
         else
-          pip install . --config-settings=cmake.define.CLASS_PYTHON_MODULE_NAME=classyref
+          pip install . \
+            --config-settings=cmake.define.CLASS_PYTHON_MODULE_NAME=classyref \
+            --config-settings=cmake.define.CLASS_FAST_MATH=OFF
         fi
         deactivate
     - name: Testing 🤖

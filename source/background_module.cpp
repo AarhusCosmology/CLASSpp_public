@@ -722,6 +722,9 @@ void BackgroundModule::background_solve_evolver() {
     loga[index_loga]           = loga_ini + index_loga * (loga_final - loga_ini) / (bt_size_ - 1);
     used_in_output[index_loga] = 1;
   }
+  // -ffast-math robustness fix: preserve exact boundary values.
+  loga.front() = loga_ini;
+  loga.back()  = loga_final;
 
   /** - Remember that we evolve tau at index_bi_a: */
   pvecback_integration[index_bi_a_] = pvecback_integration[index_bi_tau_];

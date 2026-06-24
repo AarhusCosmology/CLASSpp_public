@@ -26,6 +26,9 @@ else()
   set(_class_python_default OFF)
 endif()
 option(CLASS_BUILD_PYTHON "Build the classy Python extension" ${_class_python_default})
+option(CLASS_FAST_MATH "Enable relaxed floating-point optimizations" ON)
+set(CLASS_ARCH_FLAGS "" CACHE STRING
+  "Additional architecture flags, e.g. -march=x86-64-v3 or /arch:AVX2")
 
 # The lvl2 nose tests install a second wrapper built from master under the
 # name `classyref`; the import name must therefore be configurable.
@@ -125,6 +128,17 @@ add_library(classpp STATIC
   ${CLASS_HYREC_FILES}
 )
 target_compile_features(classpp PUBLIC cxx_std_17)
+if(CLASS_FAST_MATH)
+  if(MSVC)
+    target_compile_options(classpp PRIVATE /fp:fast)
+  else()
+    target_compile_options(classpp PRIVATE -ffast-math)
+  endif()
+endif()
+if(CLASS_ARCH_FLAGS)
+  separate_arguments(_class_arch_flags NATIVE_COMMAND "${CLASS_ARCH_FLAGS}")
+  target_compile_options(classpp PRIVATE ${_class_arch_flags})
+endif()
 # Hidden visibility keeps a parallel build (e.g. classyref in the lvl2 nose
 # tests) loadable in the same Python process without symbol collisions.
 set_target_properties(classpp PROPERTIES
