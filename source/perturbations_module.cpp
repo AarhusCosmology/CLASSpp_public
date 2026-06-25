@@ -46,20 +46,6 @@
 #include "thermodynamics_module.h"
 #include "thread_pool.h"
 
-namespace {
-
-/** True iff any NCDM-family species (NCDM, NCDMInteracting, or the DNCDMSpecies
- *  child of a DNCDM_DR_Species composite) is present in all_species_. */
-bool HasNcdm(const SpeciesCollection& all_species) {
-  for (const auto& sp : all_species) {
-    if (dynamic_cast<NCDMBaseSpecies*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get()))
-      return true;
-  }
-  return false;
-}
-
-}  // namespace
-
 PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
                                          BackgroundModulePtr background_module,
                                          ThermodynamicsModulePtr thermodynamics_module)
@@ -88,7 +74,6 @@ void PerturbationsModule::ResolveSpecies() {
   if (auto* p = all_species_.find("Lambda"))
     resolved_.lambda = p->get();
 
-  resolved_.has_ncdm  = HasNcdm(all_species_);
   resolved_.cdm_index = all_species_.index_of("CDM");
 
   if (auto* p = all_species_.find("Fluid"))
@@ -520,7 +505,7 @@ void PerturbationsModule::perturb_init() {
                ppr->ur_fluid_approximation);
   }
 
-  if (HasNcdm(all_species_)) {
+  if (all_species_.has_ncdm()) {
     class_test((ppr->ncdm_fluid_approximation < static_cast<int>(ncdmfa_method::ncdmfa_mb)) ||
                    (ppr->ncdm_fluid_approximation > static_cast<int>(ncdmfa_method::ncdmfa_none)),
                "your ncdm_fluid_approximation is set to %d, out of range defined in "
@@ -605,14 +590,14 @@ void PerturbationsModule::perturb_init() {
         break;
 
       case (tm_massless_approximation):
-        if ((all_species_.count("UR")) || HasNcdm(all_species_))
+        if ((all_species_.count("UR")) || all_species_.has_ncdm())
           evolve_tensor_ur_ = _TRUE_;
         break;
 
       case (tm_exact):
         if (all_species_.count("UR"))
           evolve_tensor_ur_ = _TRUE_;
-        if (HasNcdm(all_species_))
+        if (all_species_.has_ncdm())
           evolve_tensor_ncdm_ = _TRUE_;
         break;
     }
@@ -885,7 +870,7 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
         has_lss_            = true;
         has_source_delta_m_ = true;
 
-        if (HasNcdm(all_species_)) {
+        if (all_species_.has_ncdm()) {
           has_source_delta_cb_ = true;
         }
       }
@@ -913,7 +898,7 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
         }
         if (ppt->has_nc_rsd) {
           has_source_theta_m_ = true;
-          if (HasNcdm(all_species_))
+          if (all_species_.has_ncdm())
             /* we may not need theta_cb at all, rsd always defined for
                the total matter, but at least this is made
                available */
@@ -2089,7 +2074,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
              .idr()
              .idr_nature() == idr_free_streaming))
       ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_idr);
-    if (HasNcdm(all_species_))
+    if (all_species_.has_ncdm())
       ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ncdm);
     if (all_species_.count("DCDM_DR"))
       ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_dr);
@@ -2098,7 +2083,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
     ppw->max_l_max = std::max(ppr->l_max_g_ten, ppr->l_max_pol_g_ten);
     if (all_species_.count("UR"))
       ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ur);
-    if (HasNcdm(all_species_))
+    if (all_species_.has_ncdm())
       ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ncdm);
   }
 
@@ -2174,7 +2159,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
 
   if (_scalars_) {
     class_define_index(ppw->index_ap_ufa, all_species_.count("UR"), index_ap, 1);
-    class_define_index(ppw->index_ap_ncdmfa, HasNcdm(all_species_), index_ap, 1);
+    class_define_index(ppw->index_ap_ncdmfa, all_species_.has_ncdm(), index_ap, 1);
     class_define_index(ppw->index_ap_tca_idm_dr, all_species_.count("IDM_DR_IDR"), index_ap, 1);
     class_define_index(ppw->index_ap_tca_idm_drmd,
                        all_species_.count("IDM_DRMD_IDR_DRMD"),
@@ -2208,7 +2193,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
     if (all_species_.count("UR")) {
       ppw->approx[ppw->index_ap_ufa] = (int) ufa_off;
     }
-    if (HasNcdm(all_species_)) {
+    if (all_species_.has_ncdm()) {
       ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_off;
     }
   }
@@ -2373,7 +2358,7 @@ void PerturbationsModule::perturb_solve(int index_md,
              k_[index_md][k_size_[index_md] - 1] / ppw->pvecback[background_module_->index_bg_a_] /
                  ppw->pvecback[background_module_->index_bg_H_]);
 
-  if (HasNcdm(all_species_)) {
+  if (all_species_.has_ncdm()) {
     for (auto& sp : all_species_)
       sp->CheckUltraRelativisticAtIc(ppw->pvecback.data(), ppr->tol_ncdm_initial_w);
   }
@@ -2395,7 +2380,7 @@ void PerturbationsModule::perturb_solve(int index_md,
                                           ppw->pvecback.data());
 
     /* if there are non-cold relics, check that they are relativistic enough */
-    if (HasNcdm(all_species_)) {
+    if (all_species_.has_ncdm()) {
       for (auto& sp : all_species_) {
         if (!sp->IsUltraRelativisticAtIc(ppw->pvecback.data(), ppr->tol_ncdm_initial_w))
           is_early_enough = _FALSE_;
@@ -2898,7 +2883,7 @@ void PerturbationsModule::perturb_find_approximation_switches(
                       interval_limit[index_switch]);
             }
           }
-          if (HasNcdm(all_species_)) {
+          if (all_species_.has_ncdm()) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_ncdmfa] == (int) ncdmfa_off) &&
                 (interval_approx[index_switch][ppw->index_ap_ncdmfa] == (int) ncdmfa_on)) {
               fprintf(stdout,
@@ -3202,7 +3187,7 @@ void PerturbationsModule::perturb_vector_init(
                    "scalar initial conditions assume ur fluid approximation turned off");
       }
 
-      if (HasNcdm(all_species_)) {
+      if (all_species_.has_ncdm()) {
         class_test(ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on,
                    "scalar initial conditions assume ncdm fluid approximation turned off");
       }
@@ -3431,7 +3416,7 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if (HasNcdm(all_species_)) {
+      if (all_species_.has_ncdm()) {
         if ((pa_old[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) &&
             (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on)) {
           if (ppt->perturbations_verbose > 2)
@@ -3829,7 +3814,7 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.shear_ur = 0.;
       ic_ctx.l3_ur    = 0.;
       ic_ctx.delta_dr = 0.;
-      if ((all_species_.count("UR")) || (HasNcdm(all_species_)) ||
+      if ((all_species_.count("UR")) || (all_species_.has_ncdm()) ||
           (all_species_.count("DCDM_DR")) || (all_species_.count("IDM_DR_IDR"))) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = -k * ktau_three / 36. / (4. * fracnu + 15.) *
@@ -3881,7 +3866,7 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.l3_ur      = 0.;
       ic_ctx.delta_dr   = 0.;
 
-      if ((all_species_.count("UR")) || (HasNcdm(all_species_))) {
+      if ((all_species_.count("UR")) || (all_species_.has_ncdm())) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = ic_ctx.theta_g_ic;
         ic_ctx.shear_ur = -ppr->entropy_ini * fraccdm * ktau_two * tau * om / 6. /
@@ -3909,7 +3894,7 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.l3_ur      = 0.;
       ic_ctx.delta_dr   = 0.;
 
-      if ((all_species_.count("UR")) || (HasNcdm(all_species_))) {
+      if ((all_species_.count("UR")) || (all_species_.has_ncdm())) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = ic_ctx.theta_g_ic;
         ic_ctx.shear_ur = -ppr->entropy_ini * fracb * ktau_two * tau * om / 6. /
@@ -3923,7 +3908,7 @@ void PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.4.) Neutrino density Isocurvature */
 
     if ((ppt->has_nid) && (index_ic == index_ic_nid_)) {
-      class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
+      class_test((all_species_.count("UR") == 0) && !all_species_.has_ncdm(),
                  "not consistent to ask for NID in absence of ur or ncdm species!");
 
       class_test((all_species_.count("IDM_DR_IDR") != 0),
@@ -3947,7 +3932,7 @@ void PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.5.) Neutrino velocity Isocurvature */
 
     if ((ppt->has_niv) && (index_ic == index_ic_niv_)) {
-      class_test((all_species_.count("UR") == 0) && !HasNcdm(all_species_),
+      class_test((all_species_.count("UR") == 0) && !all_species_.has_ncdm(),
                  "not consistent to ask for NIV in absence of ur or ncdm species!");
 
       class_test((all_species_.count("IDM_DR_IDR") != 0),
@@ -4427,7 +4412,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
       }
     }
 
-    if (resolved_.has_ncdm) {
+    if (all_species_.has_ncdm()) {
       if ((tau / tau_k > ppr->ncdm_fluid_trigger_tau_over_tau_k) &&
           (ppr->ncdm_fluid_approximation != static_cast<int>(ncdmfa_method::ncdmfa_none))) {
         ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_on;
@@ -4558,7 +4543,7 @@ int PerturbationsModule::perturb_timescale_member(double tau,
   if ((ppt->has_scalars) && (pppaw->index_md == index_md_scalars_)) {
     *timescale = tau_h;
 
-    if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (resolved_.has_ncdm))
+    if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (all_species_.has_ncdm()))
       *timescale = std::min(tau_k, *timescale);
 
     if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
@@ -4983,7 +4968,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
         if (resolved_.ur)
           rho_relativistic += resolved_.ur->Rho(ppw->pvecback.data());
 
-        if (resolved_.has_ncdm) {
+        if (all_species_.has_ncdm()) {
           for (auto& sp : all_species_)
             rho_relativistic += sp->TensorMasslessRelativisticRho(ppw->pvecback.data());
         }

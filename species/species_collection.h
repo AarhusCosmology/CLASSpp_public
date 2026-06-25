@@ -128,6 +128,12 @@ class SpeciesCollection {
     assert(frozen_);
     return baryons_index_;
   }
+  /** True iff the collection holds any NCDM-family species (an NCDMBaseSpecies,
+   *  or the DNCDM_DR_Species composite). Valid only after freeze(). */
+  bool has_ncdm() const {
+    assert(frozen_);
+    return has_ncdm_;
+  }
 
   // ── Iteration / size ────────────────────────────────────────────────────
   Container::iterator begin() {
@@ -167,5 +173,6 @@ class SpeciesCollection {
   BaseSpecies* baryons_      = nullptr;
   std::size_t photons_index_ = 0;
   std::size_t baryons_index_ = 0;
+  bool has_ncdm_             = false;
   bool frozen_               = false;
 };

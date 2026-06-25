@@ -27,7 +27,6 @@ struct ResolvedSpecies {
   PpfFluid* ppf_fluid                       = nullptr;          // PPF fluid (absorbs ppf_fluid_)
   const BaseSpecies* ur                     = nullptr;          // UFA, RSA-ur, tensor rho
   const BaseSpecies* lambda                 = nullptr;          // excluded from rho_tot (delta_tot)
-  bool has_ncdm                             = false;            // ncdmfa scheme present
   int idr_nature                            = idr_free_streaming;  // absorbs idr_nature_
   std::size_t cdm_index = static_cast<std::size_t>(-1);            // h source (sync gauge)
 };
