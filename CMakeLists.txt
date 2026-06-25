@@ -121,12 +121,34 @@ set(CLASS_HYREC_FILES
   hyrec/hyrectools.c
 )
 
+# Headers are listed only so IDE projects (Xcode/VS) display them; CMake marks
+# .h files HEADER_FILE_ONLY and never compiles them. CONFIGURE_DEPENDS re-globs
+# on build, so adding/removing a header refreshes the project automatically.
+file(GLOB CLASS_HEADER_FILES CONFIGURE_DEPENDS
+  ${PROJECT_SOURCE_DIR}/include/*.h
+  ${PROJECT_SOURCE_DIR}/main/*.h
+  ${PROJECT_SOURCE_DIR}/source/*.h
+  ${PROJECT_SOURCE_DIR}/species/*.h
+  ${PROJECT_SOURCE_DIR}/tools/*.h
+  ${PROJECT_SOURCE_DIR}/hyrec/*.h
+)
+
 # ------------------------------------------------------------------ library --
 add_library(classpp STATIC
   ${CLASS_SOURCE_FILES}
   ${CLASS_SPECIES_FILES}
   ${CLASS_TOOLS_FILES}
   ${CLASS_HYREC_FILES}
+  ${CLASS_HEADER_FILES}
+)
+
+# Mirror the on-disk folder layout into IDE groups instead of one flat list.
+source_group(TREE ${PROJECT_SOURCE_DIR} FILES
+  ${CLASS_SOURCE_FILES}
+  ${CLASS_SPECIES_FILES}
+  ${CLASS_TOOLS_FILES}
+  ${CLASS_HYREC_FILES}
+  ${CLASS_HEADER_FILES}
 )
 target_compile_features(classpp PUBLIC cxx_std_17)
 if(CLASS_FAST_MATH)
