@@ -74,9 +74,9 @@ struct background {
   // on pba.
 
   // Fluid physics params (fluid_equation_of_state, w0_fld, wa_fld, cs2_fld,
-  // Omega_EDE, use_ppf, c_gamma_over_c_fld) live on FluidSpecies — see
-  // FluidSpecies::CreateAll for the parser and species/fluid.h for the
-  // accessors used by cross-module readers.
+  // Omega_EDE) live on FluidSpecies; PPF-only params (use_ppf, c_gamma_over_c_fld)
+  // live on PpfFluid — see FluidSpecies::CreateAll for the parser and
+  // species/fluid.h / species/ppf_fluid.h for the accessors.
 
   // DCDM physics params (Gamma_dcdm, Omega_ini_dcdm) live on DCDMSpecies — see
   // DCDM_DR_Species::CreateAll for the parser and species/dcdm.h for the

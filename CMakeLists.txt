@@ -81,6 +81,7 @@ set(CLASS_SPECIES_FILES
   species/dncdm_dr_species.cpp
   species/dncdm_species.cpp
   species/fluid.cpp
+  species/ppf_fluid.cpp
   species/greybody_ncdm_species.cpp
   species/idm_dr_idr_species.cpp
   species/idm_drmd_idr_drmd_species.cpp

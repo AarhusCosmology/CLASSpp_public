@@ -23,6 +23,10 @@ CASES = {
     "fluid": {
         "Omega_Lambda": 0.0, "w0_fld": -0.9, "wa_fld": 0.0, "N_ur": 3.044,
     },
+    "fluid_nonppf": {
+        "Omega_Lambda": 0.0, "w0_fld": -0.9, "wa_fld": 0.1, "use_ppf": "no",
+        "N_ur": 3.044,
+    },
     "scf": {
         "Omega_Lambda": 0.0, "Omega_fld": 0.0,
         "Omega_scf": -1, "attractor_ic_scf": "yes",

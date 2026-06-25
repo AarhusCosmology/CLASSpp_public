@@ -38,6 +38,7 @@
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "../species/ncdm_species.h"
 #include "../species/photons.h"
+#include "../species/ppf_fluid.h"
 #include "../species/scalar_field.h"
 #include "../species/ultra_relativistic.h"
 #include "background_module.h"
@@ -90,11 +91,9 @@ void PerturbationsModule::ResolveSpecies() {
   resolved_.has_ncdm  = HasNcdm(all_species_);
   resolved_.cdm_index = all_species_.index_of("CDM");
 
-  if (auto* p = all_species_.find("Fluid")) {
-    auto* f = static_cast<FluidSpecies*>(p->get());
-    if (f->use_ppf())
+  if (auto* p = all_species_.find("Fluid"))
+    if (auto* f = dynamic_cast<PpfFluid*>(p->get()))
       resolved_.ppf_fluid = f;
-  }
 }
 
 PerturbationsModule::~PerturbationsModule() {}

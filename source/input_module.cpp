@@ -828,9 +828,10 @@ void InputModule::ReadContext() {
              "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar "
              "field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
-  /* Fluid physics params (use_ppf, fluid_equation_of_state, w0_fld, wa_fld,
-     cs2_fld, Omega_EDE, c_gamma_over_c_fld) are parsed inside
-     FluidSpecies::CreateAll directly from pfc; no per-key writes to pba here.
+  /* Fluid physics params (fluid_equation_of_state, w0_fld, wa_fld, cs2_fld,
+     Omega_EDE) are parsed inside FluidSpecies::CreateAll; PPF-only params
+     (use_ppf, c_gamma_over_c_fld) are parsed there too but live on PpfFluid.
+     No per-key writes to pba here.
 
      Scalar field physics params (scf_parameters, scf_tuning_index,
      scf_shooting_parameter, attractor_ic_scf, phi_ini_scf, phi_prime_ini_scf)

@@ -6,7 +6,7 @@
 #include "base_module.h"
 #include "input_module.h"
 
-class FluidSpecies;
+class PpfFluid;
 class IDM_DR_IDR_Species;
 class IDM_DRMD_IDR_DRMD_Species;
 
@@ -24,7 +24,7 @@ struct ResolvedSpecies {
   const IDM_DR_IDR_Species* idm_dr_idr = nullptr;               // TCA-idm_dr, RSA-idr
   std::size_t idm_dr_idr_index = static_cast<std::size_t>(-1);  // its species_layouts[] index
   const IDM_DRMD_IDR_DRMD_Species* idm_drmd = nullptr;          // TCA-idm_drmd
-  FluidSpecies* ppf_fluid                   = nullptr;          // PPF fluid (absorbs ppf_fluid_)
+  PpfFluid* ppf_fluid                       = nullptr;          // PPF fluid (absorbs ppf_fluid_)
   const BaseSpecies* ur                     = nullptr;          // UFA, RSA-ur, tensor rho
   const BaseSpecies* lambda                 = nullptr;          // excluded from rho_tot (delta_tot)
   bool has_ncdm                             = false;            // ncdmfa scheme present
@@ -37,7 +37,7 @@ class PerturbationsModule : public BaseModule {
   // The single PPF fluid, or nullptr. PPF is a modified-gravity closure defined
   // relative to the whole universe (intrinsically singular), so the module owns
   // it; non-PPF fluids are ordinary species. Resolved once in the ctor.
-  FluidSpecies* ppf_fluid() const {
+  PpfFluid* ppf_fluid() const {
     return resolved_.ppf_fluid;
   }
 
