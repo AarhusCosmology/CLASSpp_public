@@ -1065,19 +1065,25 @@ void NonlinearModule::nonlinear_init() {
        * evalutes P_m_nl, it needs both P_m_l and P_cb_l. */
 
       for (index_pk = 0; index_pk < pk_size_; index_pk++) {
-        /* get P_L(k) at this time */
-        nonlinear_pk_linear(index_pk, index_tau, k_size_extra_, lnpk_l[index_pk].data(), nullptr);
-
-        /* spline P_L(k) at this time along k */
-        array_spline_table_columns(ln_k_.data(),
-                                   k_size_extra_,
-                                   lnpk_l[index_pk].data(),
-                                   1,
-                                   ddlnpk_l[index_pk].data(),
-                                   _SPLINE_NATURAL_);
-
         /* if we are still in a range of time where P_NL(k) should be computable */
         if (nl_corr_not_computable_at_this_k == _FALSE_) {
+          /* get P_L(k) at this time. This is only needed while the non-linear
+             corrections are still computable: once they are not (high z, where
+             k_NL exceeds k_max), we just store R_NL=1 below, so recomputing the
+             linear P(k) -- a primordial-spectrum evaluation over the whole
+             extended k-grid -- for every remaining early-time slice is pure
+             waste. Guarding it here matches class_public and, for a run with CMB
+             lensing (tau grid spanning z~0..1100), cuts the Nonlinear stage ~3x. */
+          nonlinear_pk_linear(index_pk, index_tau, k_size_extra_, lnpk_l[index_pk].data(), nullptr);
+
+          /* spline P_L(k) at this time along k */
+          array_spline_table_columns(ln_k_.data(),
+                                     k_size_extra_,
+                                     lnpk_l[index_pk].data(),
+                                     1,
+                                     ddlnpk_l[index_pk].data(),
+                                     _SPLINE_NATURAL_);
+
           /* get P_NL(k) at this time with Halofit */
           if (pnl->method == nl_halofit) {
             nonlinear_halofit(index_pk,
