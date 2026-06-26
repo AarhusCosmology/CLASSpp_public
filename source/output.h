@@ -1,4 +1,4 @@
-/** @file output.h Documented includes for output module */
+/** @file output.h Output configuration shared with OutputModule. */
 
 #ifndef __OUTPUT__
 #define __OUTPUT__

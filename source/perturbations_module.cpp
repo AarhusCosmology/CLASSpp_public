@@ -1,25 +1,6 @@
-/** @file perturbations.c Documented perturbation module
- *
- * Julien Lesgourgues, 23.09.2010
- *
- * Deals with the perturbation evolution.
- * This module has two purposes:
- *
- * - at the beginning; to initialize the perturbations, i.e. to
- * integrate the perturbation equations, and store temporarily the terms
- * contributing to the source functions as a function of conformal
- * time. Then, to perform a few manipulations of these terms in order to
- * infer the actual source functions \f$ S^{X} (k, \tau) \f$, and to
- * store them as a function of conformal time inside an interpolation
- * table.
- *
- * - at any time in the code; to evaluate the source functions at a
- * given conformal time (by interpolating within the interpolation
- * table).
- *
- * Hence the following functions can be called from other modules:
- *
- * -# perturb_sources_at_tau() at any time during the module's lifetime
+/** @file perturbations_module.cpp
+ * Evolves cosmological perturbations and constructs the source functions used
+ * by later modules during the lifetime of a PerturbationsModule instance.
  */
 
 #include "perturbations_module.h"
@@ -737,15 +718,6 @@ void PerturbationsModule::perturb_init() {
     }
   }
 }
-
-/**
- * Free all memory space allocated by perturb_init().
- *
- * To be called at the end of each run, only when no further calls to
- * perturb_sources_at_tau() are needed.
- *
- * @return the error status
- */
 
 /**
  * Initialize all indices and allocate most arrays in perturbs structure.

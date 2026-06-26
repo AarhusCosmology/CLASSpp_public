@@ -1,4 +1,4 @@
-/** @file background.h Documented includes for background module */
+/** @file background.h Input data and shared types for background evolution. */
 
 #ifndef __BACKGROUND__
 #define __BACKGROUND__
@@ -20,13 +20,10 @@ class DarkRadiation;
 enum equation_of_state { CLP, EDE };
 
 /**
- * All background parameters and evolution that other modules need to know.
+ * Input parameters for the background calculation.
  *
- * Once initialized by the backgound_init(), contains all necessary
- * information on the background evolution (except thermodynamics),
- * and in particular, a table of all background quantities as a
- * function of time and scale factor, used for interpolation in other
- * modules.
+ * Computed background tables belong to BackgroundModule; this structure holds
+ * the shared configuration read by InputModule.
  */
 
 /** Which of {Lambda, Fluid, ScalarField} (if any) is the budget-closure
@@ -154,4 +151,3 @@ struct background {
 //@}
 
 #endif
-/* @endcond */

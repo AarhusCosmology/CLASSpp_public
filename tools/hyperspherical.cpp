@@ -1,4 +1,4 @@
-/** @file hyperspherical.c Documented hyperspherical bessel function module.
+/** @file hyperspherical.cpp Hyperspherical Bessel-function implementation.
  *
  * Thomas Tram, 11.01.2013
  *

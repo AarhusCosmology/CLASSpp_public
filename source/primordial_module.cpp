@@ -1,15 +1,5 @@
-/** @file primordial.c Documented primordial module.
- *
- * Julien Lesgourgues, 24.08.2010
- *
- * This module computes the primordial spectra. It can be used in different modes:
- * simple parametric form, evolving inflaton perturbations, etc. So far only
- * the mode corresponding to a simple analytic form in terms of amplitudes, tilts
- * and runnings has been developed.
- *
- * The following functions can be called from other modules:
- *
- * -# primordial_spectrum_at_k() at any time for computing P(k) at any k
+/** @file primordial_module.cpp
+ * Computes primordial spectra for the lifetime of a PrimordialModule instance.
  */
 
 #include "primordial_module.h"
@@ -461,14 +451,6 @@ void PrimordialModule::primordial_init() {
     }
   }
 }
-
-/**
- * This routine frees all the memory space allocated by primordial_init().
- *
- * To be called at the end of each run.
- *
- * @return the error status
- */
 
 /**
  * This routine defines indices and allocates tables in the primordial structure

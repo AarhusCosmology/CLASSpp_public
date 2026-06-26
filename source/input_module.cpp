@@ -1,6 +1,5 @@
-/** @file input.c Documented input module.
- *
- * Julien Lesgourgues, 27.08.2010
+/** @file input_module.cpp
+ * Parses CLASS input and constructs the shared input data and species set.
  */
 
 #include "input_module.h"

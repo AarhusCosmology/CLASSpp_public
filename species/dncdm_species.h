@@ -175,6 +175,9 @@ class DNCDMSpecies : public NCDMBaseSpecies {
    * numerically stable.
    *
    * @param layout this species' per-pv NCDM layout (provides index_per_q).
+   * @param a Scale factor at the current integration time.
+   * @param k Fourier wavenumber of the perturbation mode.
+   * @param ppw Perturbation workspace holding the current phase-space state.
    */
   std::tuple<double, double, double> RescaledPerturbations(
       const NCDMBaseSpecies::PerturbLayout& layout,

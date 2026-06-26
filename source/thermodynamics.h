@@ -1,4 +1,4 @@
-/** @file thermodynamics.h Documented includes for thermodynamics module */
+/** @file thermodynamics.h Input data and shared types for thermodynamics. */
 
 #ifndef __THERMODYNAMICS__
 #define __THERMODYNAMICS__
@@ -49,12 +49,10 @@ enum reionization_z_or_tau {
 #define _BBN_ -1
 
 /**
- * All thermodynamics parameters and evolution that other modules need to know.
+ * Input parameters for the thermodynamics calculation.
  *
- * Once initialized by thermodynamics_init(), contains all the
- * necessary information on the thermodynamics, and in particular, a
- * table of thermodynamical quantities as a function of the redshift,
- * used for interpolation in other modules.
+ * Computed thermodynamic tables belong to ThermodynamicsModule; this structure
+ * holds the shared configuration read by InputModule.
  */
 
 struct thermo {
@@ -425,7 +423,6 @@ struct reionization {
 /**
  * @name Some limits imposed on cosmological parameter values:
  */
-/* @endcond */
 //@{
 
 #define _YHE_BIG_ 0.5    /**< maximal \f$ Y_{He} \f$ */

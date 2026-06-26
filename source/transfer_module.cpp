@@ -1,24 +1,6 @@
-/** @file transfer.c Documented transfer module.
- *
- * Julien Lesgourgues, 28.07.2013
- *
- * This module has two purposes:
- *
- * - at the beginning, to compute the transfer functions \f$
- *   \Delta_l^{X} (q) \f$, and store them in tables used for
- *   interpolation in other modules.
- *
- * - at any time in the code, to evaluate the transfer functions (for
- *   a given mode, initial condition, type and multipole l) at any
- *   wavenumber q (by interpolating within the interpolation table).
- *
- * Hence the following functions can be called from other modules:
- *
- * -# transfer_functions_at_q() at any time during the module's lifetime
- *
- * Note that in the standard implementation of CLASS, only the pre-computed
- * values of the transfer functions are used, no interpolation is necessary;
- * hence the routine transfer_functions_at_q() is actually never called.
+/** @file transfer_module.cpp
+ * Computes harmonic-space transfer functions for the lifetime of a
+ * TransferModule instance.
  */
 
 #include "transfer_module.h"
@@ -319,15 +301,6 @@ void TransferModule::transfer_init() {
   future_output.clear();
   /** - finally, temporary source tables are cleaned up by RAII */
 }
-
-/**
- * This routine frees all the memory space allocated by transfer_init().
- *
- * To be called at the end of each run, only when no further calls to
- * transfer_functions_at_k() are needed.
- *
- * @return the error status
- */
 
 /**
  * This routine defines all indices and allocates all tables

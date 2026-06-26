@@ -1,4 +1,4 @@
-/** @file lensing.h Documented includes for spectra module */
+/** @file lensing.h Input data and shared types for CMB lensing. */
 
 #ifndef __LENSING__
 #define __LENSING__
@@ -6,12 +6,10 @@
 #include "spectra.h"
 
 /**
- * Structure containing everything about lensed spectra that other modules need to know.
+ * Input parameters for CMB lensing.
  *
- * Once initialized by lensing_init(), contains a table of all lensed
- * \f$ C_l\f$'s for the all modes (scalar/tensor), all types (TT, TE...),
- * and all pairs of initial conditions (adiabatic, isocurvatures...).
- * FOR THE MOMENT, ASSUME ONLY SCALAR & ADIABATIC
+ * Computed lensed spectra belong to LensingModule; this structure holds the
+ * shared configuration read by InputModule.
  */
 
 struct lensing {
@@ -37,7 +35,6 @@ struct lensing {
 };
 
 /*************************************************************************************************************/
-/* @cond INCLUDE_WITH_DOXYGEN */
 /*
  * Boilerplate for C++
  */
@@ -50,4 +47,3 @@ extern "C" {
 #endif
 
 #endif
-/* @endcond */

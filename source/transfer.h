@@ -1,4 +1,4 @@
-/** @file transfer.h Documented includes for transfer module. */
+/** @file transfer.h Input data and shared types for transfer functions. */
 
 #ifndef __TRANSFER__
 #define __TRANSFER__
@@ -54,26 +54,10 @@
   if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))                  \
     bin = index_tt - index_tt_nc_g5_;
 /**
- * Structure containing everything about transfer functions in
- * harmonic space \f$ \Delta_l^{X} (q) \f$ that other modules need to
- * know.
+ * Input parameters for transfer functions.
  *
- * Once initialized by transfer_init(), contains all tables of
- * transfer functions used for interpolation in other modules, for all
- * requested modes (scalar/vector/tensor), initial conditions, types
- * (temperature, polarization, etc), multipoles l, and wavenumbers q.
- *
- * Wavenumbers are called q in this module and k in the perturbation
- * module. In flat universes k=q. In non-flat universes q and k differ
- * through q2 = k2 + K(1+m), where m=0,1,2 for scalar, vector,
- * tensor. q should be used throughout the transfer module, except
- * when interpolating or manipulating the source functions S(k,tau)
- * calculated in the perturbation module: for a given value of q, this
- * should be done at the corresponding k(q).
- *
- * The content of this structure is entirely computed in this module,
- * given the content of the 'precision', 'bessels', 'background',
- * 'thermodynamics' and 'perturbation' structures.
+ * Computed transfer-function tables belong to TransferModule; this structure
+ * holds the shared configuration read by InputModule.
  */
 
 struct transfers {

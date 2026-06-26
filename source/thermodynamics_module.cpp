@@ -1,73 +1,6 @@
-/** @file thermodynamics.c Documented thermodynamics module
- *
- * Julien Lesgourgues, 6.09.2010
- *
- * Deals with the thermodynamical evolution.
- * This module has two purposes:
- *
- * - at the beginning, to initialize the thermodynamics, i.e. to
- *   integrate the thermodynamical equations, and store all
- *   thermodynamical quantities as a function of redshift inside an
- *   interpolation table. The current version of recombination is
- *   based on RECFAST v1.5. The current version of reionization is
- *   based on exactly the same reionization function as in CAMB, in
- *   order to make allow for comparison. It should be easy to
- *   generalize the module to more complicated reionization histories.
- *
- * - to provide a routine which allow other modules to evaluate any
- *   thermodynamical quantities at a given redshift value (by
- *   interpolating within the interpolation table).
- *
- *
- * The logic is the following:
- *
- * - in a first step, the code assumes that there is no reionization,
- *   and computes the ionization fraction, Thomson scattering rate,
- *   baryon temperature, etc., using RECFAST. The result is stored in
- *   a temporary table 'recombination_table' (within a temporary
- *   structure of type 'recombination') for each redshift in a range 0
- *   < z < z_initial.  The sampling in z space is done with a simple
- *   linear step size.
- * - in a second step, the code adds the reionization history,
- *   starting from a redshift z_reio_start. The ionization fraction at
- *   this redshift is read in the previous recombination table in
- *   order to ensure a perfect matching. The code computes the
- *   ionization fraction, Thomson scattering rate, baryon temperature,
- *   etc., using a given parametrization of the reionization
- *   history. The result is stored in a temporary table
- *   'reionization_table' (within a temporary structure of type
- *   'reionization') for each redshift in the range 0 < z <
- *   z_reio_start. The sampling in z space is found automatically,
- *   given the precision parameter 'reionization_sampling'.
- *
- * - in a third step, the code merges the two tables
- *   'recombination_table' and 'reionization_table' inside the table
- *   'thermodynamics_table', and the large temporary tables within
- *   'recombination' and 'reionization' are released. In
- *   'thermodynamics_table', the sampling in z space is the one
- *   defined in the recombination algorithm for z_reio_start < z <
- *   z_initial, and the one defined in the reionization algorithm for
- *   0 < z < z_reio_start.
- *
- * - at this stage, only a few columns in the table
- *   'thermodynamics_table' have been filled. In a fourth step, the
- *   remaining columns are filled, using some numerical
- *   integration/derivation routines from the 'array.c' tools module.
- *
- * - small detail: one of the columns contains the maximum variation
- *   rate of a few relevant thermodynamical quantities. This rate
- *   will be used for defining automatically the sampling step size in
- *   the perturbation module. Hence, the exact value of this rate is
- *   unimportant, but its order of magnitude at a given z defines the
- *   sampling precision of the perturbation module. Hence, it is
- *   harmless to use a smoothing routine in order to make this rate
- *   look nicer, although this will not affect the final result
- *   significantly. The last step in the thermodynamics_init module is
- *   to perform this smoothing.
- *
- * In summary, the following functions can be called from other modules:
- *
- * -# thermodynamics_at_z() at any time during the module's lifetime
+/** @file thermodynamics_module.cpp
+ * Computes recombination and reionization histories and exposes interpolated
+ * thermodynamic quantities for the lifetime of a ThermodynamicsModule instance.
  */
 
 #include "thermodynamics_module.h"
@@ -1246,13 +1179,6 @@ void ThermodynamicsModule::thermodynamics_init() {
     }
   }
 }
-
-/**
- * Free all memory space allocated by thermodynamics_init().
- *
- *
- * @return the error status
- */
 
 /**
  * Assign value to each relevant index in vectors of thermodynamical quantities,

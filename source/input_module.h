@@ -1,4 +1,4 @@
-/** @file input_module.h Documented includes for input module */
+/** @file input_module.h Input parsing and cosmological-species construction. */
 
 #ifndef __INPUT__
 #define __INPUT__

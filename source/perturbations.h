@@ -1,4 +1,4 @@
-/** @file perturbations.h Documented includes for perturbation module */
+/** @file perturbations.h Input data and shared types for perturbations. */
 
 #ifndef __PERTURBATIONS__
 #define __PERTURBATIONS__
@@ -91,13 +91,10 @@ enum selection_type { gaussian, tophat, dirac };
 //@}
 
 /**
- * Structure containing everything about perturbations that other
- * modules need to know, in particular tabled values of the source
- * functions \f$ S(k, \tau) \f$ for all requested modes
- * (scalar/vector/tensor), initial conditions, types (temperature,
- * E-polarization, B-polarization, lensing potential, etc), multipole
- * l and wavenumber k.
+ * Input parameters for the perturbation calculation.
  *
+ * Computed perturbations and source tables belong to PerturbationsModule; this
+ * structure holds the shared configuration read by InputModule.
  */
 
 struct perturbs {

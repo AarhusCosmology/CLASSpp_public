@@ -1,4 +1,4 @@
-/** @file nonlinear.h Documented includes for trg module */
+/** @file nonlinear.h Input data and shared types for nonlinear corrections. */
 
 #include <vector>
 
@@ -40,11 +40,10 @@ enum hmcode_baryonic_feedback_model {
 enum out_sigmas { out_sigma, out_sigma_prime, out_sigma_disp };
 
 /**
- * Structure containing all information on non-linear spectra.
+ * Input parameters for nonlinear corrections.
  *
- * Once initialized by nonlinear_init(), contains a table for all two points correlation functions
- * and for all the ai,bj functions (containing the three points correlation functions), for each
- * time and wave-number.
+ * Computed nonlinear spectra belong to NonlinearModule; this structure holds
+ * the shared configuration read by InputModule.
  */
 
 struct nonlinear {

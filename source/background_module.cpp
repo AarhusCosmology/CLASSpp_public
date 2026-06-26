@@ -1,75 +1,6 @@
-/** @file background.c Documented background module
- *
- * * Julien Lesgourgues, 17.04.2011
- * * routines related to ncdm written by T. Tram in 2011
- *
- * Deals with the cosmological background evolution.
- * This module has two purposes:
- *
- * - at the beginning, to initialize the background, i.e. to integrate
- *    the background equations, and store all background quantities
- *    as a function of conformal time inside an interpolation table.
- *
- * - to provide routines which allow other modules to evaluate any
- *    background quantity for a given value of the conformal time (by
- *    interpolating within the interpolation table), or to find the
- *    correspondence between redshift and conformal time.
- *
- *
- * The overall logic in this module is the following:
- *
- * 1. most background parameters that we will call {A}
- * (e.g. rho_gamma, ..) can be expressed as simple analytical
- * functions of a few variables that we will call {B} (in simplest
- * models, of the scale factor 'a'; in extended cosmologies, of 'a'
- * plus e.g. (phi, phidot) for quintessence, or some temperature for
- * exotic particles, etc...).
- *
- * 2. in turn, quantities {B} can be found as a function of conformal
- * time by integrating the background equations.
- *
- * 3. some other quantities that we will call {C} (like e.g. the
- * sound horizon or proper time) also require an integration with
- * respect to time, that cannot be inferred analytically from
- * parameters {B}.
- *
- * So, we define the following routines:
- *
- * - background_functions() returns all background
- *    quantities {A} as a function of quantities {B}.
- *
- * - the result is stored in the form of a big table in the background
- *    structure. There is one column for conformal time 'tau'; one or
- *    more for quantities {B}; then several columns for quantities {A}
- *    and {C}.
- *
- * Later in the code, if we know the variables {B} and need some
- * quantity {A}, the quickest and most precise way is to call directly
- * background_functions() (for instance, in simple models, if we want
- * H at a given value of the scale factor). If we know 'tau' and want
- * any other quantity, we can call background_at_tau(), which
- * interpolates in the table and returns all values. Finally it can be
- * useful to get 'tau' for a given redshift 'z': this can be done with
- * background_tau_of_z(). So if we are somewhere in the code, knowing
- * z and willing to get background quantities, we should call first
- * background_tau_of_z() and then background_at_tau().
- *
- *
- * In order to save time, background_at_tau() can be called in three
- * modes: short_info, normal_info, long_info (returning only essential
- * quantities, or useful quantities, or rarely useful
- * quantities). Each line in the interpolation table is a vector whose
- * first few elements correspond to the short_info format; a larger
- * fraction contribute to the normal format; and the full vector
- * corresponds to the long format. The guideline is that short_info
- * returns only geometric quantities like a, H, H'; normal format
- * returns quantities strictly needed at each step in the integration
- * of perturbations; long_info returns quantities needed only
- * occasionally.
- *
- * In summary, the following functions can be called from other modules:
- *
- * -# background_at_tau(), background_tau_of_z() at any time during the module's lifetime
+/** @file background_module.cpp
+ * Integrates the cosmological background and provides interpolated background
+ * quantities for the lifetime of a BackgroundModule instance.
  */
 
 #include "background_module.h"
@@ -554,13 +485,6 @@ void BackgroundModule::background_init() {
 
   background_output_budget();
 }
-
-/**
- * Free all memory space allocated by background_init().
- *
- *
- * @return the error status
- */
 
 /**
  * Assign value to each relevant index in vectors of background quantities.

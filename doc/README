@@ -1,13 +1,21 @@
-CLASS automatic documentation folders
-=====================================
-(Deanna Hooper, 25.03.2016)
+CLASS documentation
+===================
 
-* the automatically generated PDF manual can be found in
+The committed PDF manual is at `doc/manual/CLASS_MANUAL.pdf`. The generated
+HTML and LaTeX directories are intentionally ignored.
 
-    doc/manual/CLASS_MANUAL.pdf
+The Doxygen input is configured in `doc/input/doxyconf`. It extracts current
+source documentation and the hand-written chapters listed in `INPUT=`. The
+historical C-architecture chapter `input/chap3.md` is deliberately excluded:
+it describes the former manual `*_init()` / `*_free()` lifecycle and is kept
+only as an archive.
 
-* the files in doc/input/ are auxiliary files for generating it
+Documentation follows the policy in [README.md](../README.md#documentation):
+code and tests define behaviour; Doxygen captures public contracts and
+non-obvious domain context without duplicating implementation details.
 
-* if you wish to update this manual yourself using doxygen, look at instructions in section 6 of CLASS_MANUAL.pdf
+To generate the HTML and LaTeX output locally, install Doxygen and run:
 
-* there is also an html version that you can access from the CLASS webpages. The html version used to be distributed together with CLASS, but we removed it because the html directory was too big. If you do wish to get the html source files on your own computer, you just need to recompile the manual with "cd doc/input/; ./make1.sh" (assuming that you have doxygen installed).
+    cd doc/input && doxygen doxyconf
+
+The CI workflow runs this command with warnings treated as errors.

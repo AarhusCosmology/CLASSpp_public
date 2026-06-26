@@ -1,16 +1,6 @@
-/** @file lensing.c Documented lensing module
- *
- * Simon Prunet and Julien Lesgourgues, 6.12.2010
- *
- * This module computes the lensed temperature and polarization
- * anisotropy power spectra \f$ C_l^{X}, P(k), ... \f$'s given the
- * unlensed temperature, polarization and lensing potential spectra.
- *
- * Follows Challinor and Lewis full-sky method, astro-ph/0502425
- *
- * The following functions can be called from other modules:
- *
- * -# lensing_cl_at_l() at any time for computing Cl_lensed at any l
+/** @file lensing_module.cpp
+ * Computes lensed CMB power spectra from unlensed spectra using the full-sky
+ * method of Challinor and Lewis for the lifetime of a LensingModule instance.
  */
 
 #include "lensing_module.h"
@@ -560,15 +550,6 @@ void LensingModule::lensing_init() {
 
   /** - Exit **/
 }
-
-/**
- * This routine frees all the memory space allocated by lensing_init().
- *
- * To be called at the end of each run, only when no further calls to
- * lensing_cl_at_l() are needed.
- *
- * @return the error status
- */
 
 /**
  * This routine defines indices and allocates tables in the lensing structure

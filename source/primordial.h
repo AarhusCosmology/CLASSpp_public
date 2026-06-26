@@ -1,4 +1,4 @@
-/** @file primordial.h Documented includes for primordial module. */
+/** @file primordial.h Input data and shared types for primordial spectra. */
 
 #ifndef __PRIMORDIAL__
 #define __PRIMORDIAL__
@@ -47,10 +47,10 @@ enum phi_pivot_methods { N_star, ln_aH_ratio, ln_aH_ratio_auto };
 enum inflation_module_behavior { numerical, analytical };
 
 /**
- * Structure containing everything about primordial spectra that other modules need to know.
+ * Input parameters for primordial spectra.
  *
- * Once initialized by primordial_init(), contains a table of all
- * primordial spectra as a function of wavenumber, mode, and pair of initial conditions.
+ * Computed spectra belong to PrimordialModule; this structure holds the shared
+ * configuration read by InputModule.
  */
 
 struct primordial {
@@ -232,4 +232,3 @@ struct primordial_inflation_parameters_and_workspace {
 //@}
 
 #endif
-/* @endcond */

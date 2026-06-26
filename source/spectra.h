@@ -1,4 +1,4 @@
-/** @file spectra.h Documented includes for spectra module */
+/** @file spectra.h Input data and shared types for power spectra. */
 
 #ifndef __SPECTRA__
 #define __SPECTRA__
@@ -6,12 +6,10 @@
 #include "transfer.h"
 
 /**
- * Structure containing everything about anisotropy and Fourier power spectra that other modules need to know.
+ * Input parameters for harmonic and matter power spectra.
  *
- * Once initialized by spectra_init(), contains a table of all
- * \f$ C_l\f$'s and P(k) as a function of multipole/wavenumber,
- * mode (scalar/tensor...), type (for \f$ C_l\f$'s: TT, TE...),
- * and pairs of initial conditions (adiabatic, isocurvatures...).
+ * Computed spectra belong to SpectraModule; this structure holds the shared
+ * configuration read by InputModule.
  */
 
 struct spectra {
@@ -51,7 +49,6 @@ struct spectra {
 };
 
 /*************************************************************************************************************/
-/* @cond INCLUDE_WITH_DOXYGEN */
 /*
  * Boilerplate for C++
  */
@@ -66,4 +63,3 @@ extern "C" {
 #endif
 
 #endif
-/* @endcond */

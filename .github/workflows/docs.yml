@@ -1,0 +1,16 @@
+name: Documentation
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  doxygen:
+    runs-on: [self-hosted, linux, light]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build documentation
+        run: cd doc/input && doxygen doxyconf

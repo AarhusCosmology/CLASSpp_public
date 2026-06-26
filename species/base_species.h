@@ -429,6 +429,7 @@ class BaseSpecies {
    * Single source of truth for the density-contrast gauge shift; mirrors the
    * continuity equation used in BackgroundDerivs. Default: ρ̇/ρ = -3ℋ(Rho+P)/Rho.
    * Species with extra source/sink terms (e.g. decay) override this.
+   * @param pvecback Current background-quantity vector.
    * @param a_prime_over_a  ℋ = a'/a (base does not store H/a indices).
    */
   virtual double RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {

@@ -1,14 +1,6 @@
-/** @file nonlinear.c Documented nonlinear module
- *
- * Julien Lesgourgues, 6.03.2014
- *
- * New module replacing an older one present up to version 2.0 The new
- * module is located in a better place in the main, allowing it to
- * compute non-linear correction to \f$ C_l\f$'s and not just \f$ P(k)\f$. It will
- * also be easier to generalize to new methods.  The old implementation
- * of one-loop calculations and TRG calculations has been dropped from
- * this version, they can still be found in older versions.
- *
+/** @file nonlinear_module.cpp
+ * Computes nonlinear corrections to matter power spectra for the lifetime of
+ * a NonlinearModule instance.
  */
 
 #include "nonlinear_module.h"
@@ -1209,13 +1201,6 @@ void NonlinearModule::nonlinear_init() {
         pnl->method);
   }
 }
-
-/**
- * Free all memory space allocated by nonlinear_init().
- *
- *
- * @return the error status
- */
 
 /**
  * Define indices in the nonlinear array, and when possible, allocate

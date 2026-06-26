@@ -44,6 +44,38 @@ jobs:
         cd main_class
         git push https://AarhusCosmology:"$TOKEN"@github.com/AarhusCosmology/CLASSpp_public master:master
 
+  deploy_documentation:
+    name: Deploy documentation
+    runs-on: [self-hosted, linux, light]
+    needs: conclude
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build HTML documentation
+        run: cd doc/input && doxygen doxyconf
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: doc/manual/html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
   nose_tests_lvl3:
     runs-on: [self-hosted, linux, heavy]
     needs: iftest

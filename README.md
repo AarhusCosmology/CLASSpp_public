@@ -99,13 +99,27 @@ which you don't want to keep default values. If you find it more
 convenient, you can pass these precision parameter values in your *.ini
 file instead of an additional *.pre file.
 
-The automatically-generated documentation is located in
+## Documentation
 
-    doc/manual/html/index.html
-    doc/manual/CLASS_manual.pdf
+The code and its tests are the authoritative description of behavior. Doxygen
+is maintained as a navigable reference for public interfaces and domain
+context; it is not a second specification of implementation details.
 
-On top of that, if you wish to modify the code, you will find lots of
-comments directly in the files.
+Keep an existing Doxygen comment when it is accurate, update it in the same
+change when its contract changes, and remove it when it only repeats the code.
+Add new Doxygen comments only when they capture information the code cannot
+reliably express: public API contracts, units, ownership or lifetime rules,
+invariants, numerical assumptions, or the rationale for a non-obvious
+algorithm. Do not add boilerplate comments for every function.
+
+The generated manual is not committed except for the PDF release artifact.
+To build the HTML and LaTeX output locally, install Doxygen and run:
+
+```sh
+(cd doc/input && doxygen doxyconf)
+```
+
+The output is written below `doc/manual/`.
 
 ### Plotting utility
 

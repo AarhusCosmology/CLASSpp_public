@@ -1,5 +1,5 @@
-/** @file class.c
- * Julien Lesgourgues, 17.04.2011
+/** @file class.cpp
+ * Command-line entry point for CLASS.
  */
 
 #include "class.h"

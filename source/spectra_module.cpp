@@ -1,13 +1,6 @@
-/** @file spectra.c Documented spectra module
- *
- * Julien Lesgourgues, 1.11.2019
- *
- * This module computes the harmonic power spectra \f$ C_l^{X} \f$'s
- * given the transfer functions and the primordial spectra.
- *
- * The following functions can be called from other modules:
- *
- * -# spectra_cl_at_l() at any time for computing individual \f$ C_l \f$'s at any l
+/** @file spectra_module.cpp
+ * Combines transfer functions and primordial spectra into harmonic and matter
+ * power spectra for the lifetime of a SpectraModule instance.
  */
 
 #include "spectra_module.h"
@@ -459,15 +452,6 @@ void SpectraModule::spectra_init() {
     ct_size_ = 0;
   }
 }
-
-/**
- * This routine frees all the memory space allocated by spectra_init().
- *
- * To be called at the end of each run, only when no further calls to
- * spectra_cls_at_l(), spectra_pk_at_z(), spectra_pk_at_k_and_z() are needed.
- *
- * @return the error status
- */
 
 /**
  * This routine defines indices and allocates tables in the spectra structure

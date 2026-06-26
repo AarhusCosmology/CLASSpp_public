@@ -4,6 +4,14 @@ CLASS overview (architecture, input/output, general principles)
 Author: Julien Lesgourgues
 
 
+# Historical C architecture (archived)
+
+> This chapter describes the pre-C++ CLASS architecture and its manual
+> `*_init()` / `*_free()` lifecycle. It is retained for historical context only
+> and is not included in generated documentation. The source, tests, and
+> [documentation policy](../../README.md#documentation) are authoritative for
+> the current codebase.
+
 # Overall architecture of `class` #
 
 ## Files and directories ##
@@ -508,7 +516,7 @@ Any feature or equation which could be true in one cosmology and not in another 
 
 Implementing a new idea completly from scratch would be rather intimidating, even for the main developpers of `CLASS`. Fortunately, we never have to work from scratch. Usually we want to code a new species, a new observable, a new approximation scheme, etc. The trick is to think of another species, observable, approximation scheme, etc., looking as close as possible to the new one.
 
-Then, playing with the `grep` command and the `search` command of your editor, search for all occurences of this nearest-as-possible other feature. This is usually easy thanks to our naming scheme. For each species, observable, approximation scheme, etc., we usually use the same sequence of few letters everywhere (fo instance, `fld` for the fluid usually representing Dark Energy). Grep for `fld` and you'll get all the lines related to the fluid. There is another way: we use everywhere some conditional jumps  related to a given feature. For instance, the lines related to the fluid are always in between `if (pba->has_fld == _TRUE_) { ... }` and the lines related to the cosmic shear observables are always in between `if (ppt->has_lensing_potential == _TRUE_) { ... }`. Locating these flags and conditional jumps shows you all the parts related to a given feature/ingredient.
+Then, playing with the <code>grep</code> command and the <code>search</code> command of your editor, search for all occurences of this nearest-as-possible other feature. This is usually easy thanks to our naming scheme. For each species, observable, approximation scheme, etc., we usually use the same sequence of few letters everywhere (fo instance, <code>fld</code> for the fluid usually representing Dark Energy). Grep for <code>fld</code> and you'll get all the lines related to the fluid. There is another way: we use everywhere some conditional jumps related to a given feature. For instance, the lines related to the fluid are always in between <code>if (pba-&gt;has_fld == _TRUE_) { ... }</code> and the lines related to the cosmic shear observables are always in between <code>if (ppt-&gt;has_lensing_potential == _TRUE_) { ... }</code>. Locating these flags and conditional jumps shows you all the parts related to a given feature/ingredient.
 
 Once you have localised your nearest-as-possible other feature, you can copy/paste these lines and adapt them to the case of your new feature! You are then sure that you didn't miss any step, even the smallest technical steps (definition of indices, etc.)
 

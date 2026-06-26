@@ -1,16 +1,6 @@
-/** @file output.c Documented output module
- *
- * Julien Lesgourgues, 26.08.2010
- *
- * This module writes the output in files.
- *
- * The following functions can be called from other modules or from the main:
- *
- * -# output_init() (must be called after spectra_init())
- * -# output_total_cl_at_l() (can be called even before output_init())
- *
- * No memory needs to be deallocated after that,
- * hence there is no output_free() routine like in other modules.
+/** @file output_module.cpp
+ * Writes the requested CLASS results after the required modules have been
+ * constructed.
  */
 
 #include "output_module.h"
