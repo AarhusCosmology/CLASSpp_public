@@ -82,7 +82,8 @@ class ScalarFieldSpecies : public BaseSpecies {
 
   // ── Perturbations ────────────────────────────────────────────────────────
   struct PerturbLayout : BaseSpecies::PerturbLayout {
-    int idx_phi       = -1;
+    int idx_phi = -1;  // delta_phi
+    // Synchronous: delta_phi'. Newtonian: q = delta_phi' - phi'_bg (psi + 3 phi).
     int idx_phi_prime = -1;
   };
 

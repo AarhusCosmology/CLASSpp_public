@@ -153,14 +153,14 @@ if TEST_LEVEL > 1:
         {'tensor method': 'photons'}],
         'power')
 
-if TEST_LEVEL > 2:
-    CLASS_INPUT['Isocurvature_modes'] = (
-        [{'ic': 'ad,nid,cdi', 'c_ad_cdi': -0.5}],
-        'normal')
-
     CLASS_INPUT['Scalar_field'] = (
         [{'Omega_scf': 0.1, 'attractor_ic_scf': 'yes',
         'scf_parameters': '10, 0, 0, 0'}],
+        'normal')
+
+if TEST_LEVEL > 2:
+    CLASS_INPUT['Isocurvature_modes'] = (
+        [{'ic': 'ad,nid,cdi', 'c_ad_cdi': -0.5}],
         'normal')
 
     CLASS_INPUT['Inflation'] = (
@@ -529,14 +529,8 @@ class DumpIniFiles(TestClass):
             return
         path = os.path.join(self.faulty_figs_path, self.name)
         self.store_ini_file(path)
-        # The scalar field (scf) has no valid Newtonian counterpart: the
-        # Newtonian-gauge Klein-Gordon source is incomplete and is intentionally
-        # rejected (see TestScenario.test_scenario's scf_present guard). Emitting
-        # an N-variant here would produce an .ini that is guaranteed to throw
-        # under Valgrind, so skip it.
-        if 'Omega_scf' not in self.scenario:
-            self.scenario.update({'gauge':'Newtonian'})
-            self.store_ini_file(path + 'N')
+        self.scenario.update({'gauge':'Newtonian'})
+        self.store_ini_file(path + 'N')
 
 
 @pytest.mark.test_scenario
@@ -590,18 +584,13 @@ class TestScenario(TestClass):
                 # testing absence of mPk
                 self.assertRaises(CosmoSevereError, self.cosmo.pk, 0.1, 0)
 
-        # The scalar field (scf) is only implemented in synchronous gauge (the
-        # Newtonian-gauge Klein-Gordon source is incomplete and intentionally
-        # rejected), so it has no Newtonian counterpart to compare against.
-        scf_present = 'Omega_scf' in self.scenario
-
-        if (COMPARE_OUTPUT_REF or COMPARE_OUTPUT_GAUGE) and not scf_present:
+        if COMPARE_OUTPUT_REF or COMPARE_OUTPUT_GAUGE:
             # Now compute same scenario in Newtonian gauge
             self.cosmo_newt.set(dict(self.verbose, **self.scenario))
             self.cosmo_newt.set({'gauge': 'newtonian'})
             self.cosmo_newt.compute()
 
-        if COMPARE_OUTPUT_GAUGE and not scf_present:
+        if COMPARE_OUTPUT_GAUGE:
             # Compare synchronous and Newtonian gauge
             self.assertTrue(
                 self.cosmo_newt.state,
@@ -617,7 +606,9 @@ class TestScenario(TestClass):
             status = self.compare_output(cosmo_ref, "Reference", self.cosmo, 'Synchronous', COMPARE_CL_RELATIVE_ERROR, COMPARE_PK_RELATIVE_ERROR)
             assert status, 'Reference comparison failed in Synchronous gauge!'
 
-            if not scf_present:
+            # Mainline CLASS has the historical incomplete Newtonian scalar
+            # KG equation, so it is not a valid Newtonian reference for scf.
+            if 'Omega_scf' not in self.scenario:
                 cosmo_ref = classyref.Class()
                 cosmo_ref.set(dict(self.verbose, **self.scenario))
                 cosmo_ref.set({'gauge': 'newtonian'})

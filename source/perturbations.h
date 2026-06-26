@@ -253,8 +253,10 @@ struct perturb_vector {
   std::vector<std::unique_ptr<BaseSpecies::PerturbLayout>> species_layouts;
 
   // Non-owning view into species_layouts: the species that registered ≥1
-  // perturbation variable in THIS pv's mode (no-ops like Lambda excluded), in
-  // lex-key order. Consumed by the scalar/vector/tensor RHS dispatch loops.
+  // perturbation variable in THIS pv's mode (no-ops like Lambda excluded).
+  // Scalar-mode construction keeps scalar fields last so their Newtonian
+  // stress-energy evaluation sees the complete shear accumulated from other
+  // species. Consumed by the scalar/vector/tensor RHS dispatch loops.
   struct ActiveSpecies {
     const BaseSpecies* species;
     const BaseSpecies::PerturbLayout* layout;

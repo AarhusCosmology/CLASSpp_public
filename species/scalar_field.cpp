@@ -194,8 +194,8 @@ void ScalarFieldSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   /* Use BackgroundModule's canonical pvecback slots for background quantities */
-  auto bgm                  = ppaw.perturbations_module->GetBackgroundModule();
   const double phi_prime_bg = ppw->pvecback[index_bg_phi_prime_scf_];
+  const double dV_bg        = ppw->pvecback[index_bg_dV_scf_];
   const double ddV_bg       = ppw->pvecback[index_bg_ddV_scf_];
 
   const double k2                = ctx.k2;
@@ -203,10 +203,31 @@ void ScalarFieldSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double a_prime_over_a    = ctx.a_prime_over_a;
   const double metric_continuity = ctx.metric_continuity;
 
-  dy[layout.idx_phi]       = y[layout.idx_phi_prime];
-  dy[layout.idx_phi_prime] = -2. * a_prime_over_a * y[layout.idx_phi_prime] -
-                             metric_continuity * phi_prime_bg -
-                             (k2 + a2 * ddV_bg) * y[layout.idx_phi];
+  if (ctx.gauge == static_cast<int>(possible_gauges::synchronous)) {
+    dy[layout.idx_phi]       = y[layout.idx_phi_prime];
+    dy[layout.idx_phi_prime] = -2. * a_prime_over_a * y[layout.idx_phi_prime] -
+                               metric_continuity * phi_prime_bg -
+                               (k2 + a2 * ddV_bg) * y[layout.idx_phi];
+  }
+  else {
+    /* In Newtonian gauge, evolve q = delta_phi' - phi'_bg (psi + 3 phi)
+       instead of delta_phi'. The background KG equation removes the otherwise
+       required psi' term exactly:
+
+         delta_phi' = q + phi'_bg (psi + 3 phi)
+         q' = -2 H q - (k^2 + a^2 V_,phiphi) delta_phi
+              + a^2 V_,phi (3 phi - psi).
+
+       Thus free-streaming anisotropic stress enters only through the algebraic
+       psi constraint; no shear time derivative is needed. */
+    const double phi = y[ppw->pv->index_pt_phi];
+    const double psi = ppw->pvecmetric[ppw->index_mt_psi];
+    const double q   = y[layout.idx_phi_prime];
+
+    dy[layout.idx_phi]       = q + phi_prime_bg * (psi + 3. * phi);
+    dy[layout.idx_phi_prime] = -2. * a_prime_over_a * q - (k2 + a2 * ddV_bg) * y[layout.idx_phi] +
+                               a2 * dV_bg * (3. * phi - psi);
+  }
 }
 
 void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
@@ -227,27 +248,33 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double dV_bg        = pvecback[index_bg_dV_scf_];
   const double rho_scf      = Rho(pvecback);
   const double p_scf        = P(pvecback);
+  const perturbs* ppt       = p_mod->GetPerturbs();
   const double a2           = ctx.a2;
   const double k2 = ctx.k *
                     ctx.k;  // PerturbSourceContext has no k2 field (unlike PerturbScalarContext)
+  double delta_phi_prime = y[layout.idx_phi_prime];
+  if (ppt->gauge == possible_gauges::newtonian) {
+    const double phi  = y[ppw->pv->index_pt_phi];
+    const double psi  = ppw->pvecmetric[ppw->index_mt_psi];
+    delta_phi_prime  += phi_prime_bg * (psi + 3. * phi);
+  }
 
   // ── delta_scf ─────────────────────────────────────────────────────────────
   if (index_tp_delta_ >= 0) {
     double delta_rho_scf;
-    const perturbs* ppt = p_mod->GetPerturbs();
     if (ppt->gauge == possible_gauges::synchronous) {
-      delta_rho_scf =
-          1. / 3. * (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi]) +
-          3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
-              ctx.theta_over_k2;  // N-body gauge correction
+      delta_rho_scf = 1. / 3. *
+                          (1. / a2 * phi_prime_bg * delta_phi_prime + dV_bg * y[layout.idx_phi]) +
+                      3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
+                          ctx.theta_over_k2;  // N-body gauge correction
     }
     else {
-      delta_rho_scf =
-          1. / 3. *
-              (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi] -
-               1. / a2 * phi_prime_bg * phi_prime_bg * ppw->pvecmetric[ppw->index_mt_psi]) +
-          3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
-              ctx.theta_over_k2;  // N-body gauge correction
+      delta_rho_scf = 1. / 3. *
+                          (1. / a2 * phi_prime_bg * delta_phi_prime + dV_bg * y[layout.idx_phi] -
+                           1. / a2 * phi_prime_bg * phi_prime_bg *
+                               ppw->pvecmetric[ppw->index_mt_psi]) +
+                      3. * ctx.a_prime_over_a * (1. + p_scf / rho_scf) *
+                          ctx.theta_over_k2;  // N-body gauge correction
     }
     p_mod->SetSourceValue(ctx.index_md,
                           ctx.index_ic,
@@ -286,17 +313,20 @@ void ScalarFieldSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout
 void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                                        double* y,
                                                        const PerturbIcContext& ctx) {
-  const auto& l               = static_cast<const PerturbLayout&>(base);
-  const double* pvecback      = ctx.ppw->pvecback.data();
-  const BackgroundModule* bgm = ctx.p_mod->GetBackgroundModule().get();
-  const double phi_prime      = pvecback[index_bg_phi_prime_scf_];
-  const double phi_scf        = pvecback[index_bg_phi_scf_];
+  const auto& l          = static_cast<const PerturbLayout&>(base);
+  const double* pvecback = ctx.ppw->pvecback.data();
+  const double phi_prime = pvecback[index_bg_phi_prime_scf_];
+  const double dV        = pvecback[index_bg_dV_scf_];
   if (l.idx_phi >= 0)
     y[l.idx_phi] += ctx.alpha * phi_prime;
-  if (l.idx_phi_prime >= 0)
-    y[l.idx_phi_prime] += (-2. * ctx.a_prime_over_a * ctx.alpha * phi_prime -
-                           ctx.a * ctx.a * dV_scf(phi_scf) * ctx.alpha +
-                           phi_prime * ctx.alpha_prime);
+  if (l.idx_phi_prime >= 0) {
+    /* Transform the synchronous delta_phi' into the Newtonian q state. Using
+       alpha' = psi - H alpha cancels psi explicitly and avoids requiring the
+       initial total shear here. */
+    const double phi    = y[ctx.ppw->pv->index_pt_phi];
+    y[l.idx_phi_prime] += (-3. * ctx.a_prime_over_a * phi_prime - ctx.a * ctx.a * dV) * ctx.alpha -
+                          3. * phi_prime * phi;
+  }
 }
 
 void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
@@ -337,15 +367,20 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
 
     const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
 
+    double delta_phi_prime = y[layout.idx_phi_prime];
+    if (ppt->gauge == possible_gauges::newtonian) {
+      const double phi  = y[pv->index_pt_phi];
+      delta_phi_prime  += phi_prime_bg * (pvecmetric[ppw->index_mt_psi] + 3. * phi);
+    }
+
     double delta_rho_scf = 0.;
     if (ppt->gauge == possible_gauges::synchronous) {
-      delta_rho_scf =
-          1. / 3. * (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] + dV_bg * y[layout.idx_phi]);
+      delta_rho_scf = 1. / 3. *
+                      (1. / a2 * phi_prime_bg * delta_phi_prime + dV_bg * y[layout.idx_phi]);
     }
     else {
       delta_rho_scf = 1. / 3. *
-                      (1. / a2 * phi_prime_bg * y[layout.idx_phi_prime] +
-                       dV_bg * y[layout.idx_phi] -
+                      (1. / a2 * phi_prime_bg * delta_phi_prime + dV_bg * y[layout.idx_phi] -
                        1. / a2 * phi_prime_bg * phi_prime_bg * pvecmetric[ppw->index_mt_psi]);
     }
 
@@ -384,13 +419,20 @@ BaseSpecies::StressEnergyContribution ScalarFieldSpecies::StressEnergy(
   const double dV        = pvecback[index_bg_dV_scf_];
   const double a2        = ppw->scalar_ctx.a2;
   const double k2        = ppw->scalar_ctx.k2;
+  const bool newtonian   = ppw->scalar_ctx.gauge == static_cast<int>(possible_gauges::newtonian);
+
+  double psi             = 0.;
+  double delta_phi_prime = y[layout.idx_phi_prime];
+  if (newtonian) {
+    const double phi  = y[pv->index_pt_phi];
+    psi               = phi - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
+    delta_phi_prime  += phi_prime * (psi + 3. * phi);
+  }
 
   // delta_rho: body of DeltaRho
-  double delta_rho = (1. / 3.) *
-                     (1. / a2 * phi_prime * y[layout.idx_phi_prime] + dV * y[layout.idx_phi]);
-  if (ppw->scalar_ctx.gauge == static_cast<int>(possible_gauges::newtonian)) {
-    double psi  = y[pv->index_pt_phi] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
-    delta_rho  -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
+  double delta_rho = (1. / 3.) * (1. / a2 * phi_prime * delta_phi_prime + dV * y[layout.idx_phi]);
+  if (newtonian) {
+    delta_rho -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }
   se.delta_rho = delta_rho;
 
@@ -398,11 +440,9 @@ BaseSpecies::StressEnergyContribution ScalarFieldSpecies::StressEnergy(
   se.rho_plus_p_theta = (1. / 3.) * k2 / a2 * phi_prime * y[layout.idx_phi];
 
   // delta_p: body of DeltaP
-  double delta_p = (1. / 3.) *
-                   (1. / a2 * phi_prime * y[layout.idx_phi_prime] - dV * y[layout.idx_phi]);
-  if (ppw->scalar_ctx.gauge == static_cast<int>(possible_gauges::newtonian)) {
-    double psi  = y[pv->index_pt_phi] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
-    delta_p    -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
+  double delta_p = (1. / 3.) * (1. / a2 * phi_prime * delta_phi_prime - dV * y[layout.idx_phi]);
+  if (newtonian) {
+    delta_p -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }
   se.delta_p = delta_p;
 

@@ -2968,6 +2968,12 @@ void PerturbationsModule::perturb_vector_init(
        Composites (IDM_DR_IDR, IDM_DRMD_IDR_DRMD, DCDM_DR, DNCDM_DR) register
        all children at their lex position in all_species_. */
     {
+      /* Keep scalar fields last in active_species. In Newtonian gauge their
+         StressEnergy() reconstructs psi from the accumulated total shear, and
+         a canonical scalar field contributes no shear of its own. Keeping the
+         y/layout registration below in all_species_ order preserves the
+         parallel species_layouts indexing; only the dispatch view is ordered. */
+      std::vector<perturb_vector::ActiveSpecies> scalar_active_species;
       size_t i = 0;
       for (auto& entry : all_species_) {
         const int before = index_pt;
@@ -2977,13 +2983,21 @@ void PerturbationsModule::perturb_vector_init(
                                            index_pt,
                                            ppw,
                                            static_cast<int>(ppt->gauge));
-        if (index_pt > before)
-          ppv->active_species.push_back({entry.get(),
-                                         ppv->species_layouts[i].get(),
-                                         entry->ClustersAsMatter(),
-                                         entry->IsColdMatterSpecies()});
+        if (index_pt > before) {
+          perturb_vector::ActiveSpecies active{entry.get(),
+                                               ppv->species_layouts[i].get(),
+                                               entry->ClustersAsMatter(),
+                                               entry->IsColdMatterSpecies()};
+          if (dynamic_cast<const ScalarFieldSpecies*>(entry.get()))
+            scalar_active_species.push_back(active);
+          else
+            ppv->active_species.push_back(active);
+        }
         ++i;
       }
+      ppv->active_species.insert(ppv->active_species.end(),
+                                 scalar_active_species.begin(),
+                                 scalar_active_species.end());
     }
 
     /* Source-dispatch view: the species that emit a per-species transfer source
@@ -3947,13 +3961,6 @@ void PerturbationsModule::perturb_initial_conditions(
                  "Use synchronous gauge for the DRMD implementation as Netwonian gauge has not "
                  "been tested!");
 
-      class_test((all_species_.count("ScalarField") != 0),
-                 "Scalar field (scf) perturbations are only implemented in the synchronous "
-                 "gauge: the Newtonian-gauge Klein-Gordon source term is incomplete (it is "
-                 "missing the psi' and -2 a^2 V_,phi psi contributions, which would require the "
-                 "shear time-derivative), so Newtonian-gauge results are not gauge-invariant. "
-                 "Please use synchronous gauge.");
-
       /* alpha is like in Ma & Bertschinger: (h'+6 eta')/(2k^2). We obtain it from the first two Einstein equations:
 
          alpha = [eta + 3/2 (a'/a)^2 (delta_rho/rho_c) / k^2 /s_2^2 + 3/2 (a'/a)^3 3 ((rho+p)theta/rho_c) / k^4 / s_2^2] / (a'/a)
@@ -4021,7 +4028,7 @@ void PerturbationsModule::perturb_initial_conditions(
           the former inline per-species shift blocks and the relativistic re-seed
           in former section (e). */
       ic_ctx.alpha       = alpha;
-      ic_ctx.alpha_prime = 0.;  // historical: alpha_prime was hardcoded 0 (scalar-field block)
+      ic_ctx.alpha_prime = 0.;  // no species IC transform currently requires alpha'
       {
         size_t sp_idx = 0;
         for (auto& sp : all_species_) {
@@ -4828,13 +4835,15 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     const bool tally = has_source_delta_m_ || has_source_theta_m_;
 
     /* Single pass: each species returns all six stress-energy quantities in one
-       virtual call. rho_plus_p_shear is accumulated here too (the former
-       separate pre-pass was needed only by ScalarFieldSpecies' Newtonian-gauge
-       DeltaRho/DeltaP, which is a hard class_test error at init — see issue
-       #285; any future Newtonian-scf fix must restore the complete shear before
-       the scalar field reads it, e.g. by ordering it last or reinstating a
-       pre-pass). Accumulation order over active_species is unchanged, so totals
-       are bit-identical. */
+       virtual call. rho_plus_p_shear is accumulated here too. In Newtonian gauge
+       ScalarFieldSpecies::StressEnergy reconstructs psi from the accumulated
+       total shear (psi = phi - 4.5 (a^2/k^2) rho_plus_p_shear), so it must see
+       the complete shear: active_species orders scalar fields last (see
+       perturb_vector_init). A canonical scalar field carries no anisotropic
+       stress, so the shear total is order-independent; the reordering only moves
+       a scalar field's (nonzero) delta_rho/theta/p contributions to the end of
+       these reductions, hence non-bit-identical at ULP level for scf configs but
+       unchanged for everything else. */
     for (const auto& e : pv->active_species) {
       const BaseSpecies::StressEnergyContribution se =
           e.species->StressEnergy(*e.layout, pv, y, pb, ppw);
@@ -5847,9 +5856,11 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     }
 
     /* Species contributions to the scalar perturbation ODE — single pass over
-       the active (non-no-op) species in lex order. Photons/baryons are ordinary
-       entries; the PPF fluid too (its dy[idx_Gamma] = Gamma_prime_fld is valid
-       here because ComputePpf already ran in perturb_einstein() above). Order is
+       the active (non-no-op) species. Non-scalars retain lexicographic order;
+       scalar fields run last so their Newtonian stress-energy evaluation sees
+       the complete accumulated shear. Photons/baryons are ordinary entries; the
+       PPF fluid too (its dy[idx_Gamma] = Gamma_prime_fld is valid here because
+       ComputePpf already ran in perturb_einstein() above). Order is otherwise
        free: each species reads scalar_ctx/y and writes only its own dy. */
     for (const auto& [species, layout, clusters_as_matter, is_cold] : pv->active_species)
       species->PerturbDerivs(*layout, tau, y, dy, *pppaw);
