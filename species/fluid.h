@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "background.h"
 #include "base_species.h"
 #include "species_build_context.h"
@@ -19,6 +21,8 @@ class BackgroundModule;
  */
 class FluidSpecies : public BaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "fluid";
+
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     int idx_delta = -1;
     int idx_theta = -1;

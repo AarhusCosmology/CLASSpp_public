@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "../species/ncdm_base_species.h"
@@ -12,6 +13,8 @@ class BackgroundModule;
 
 class NCDMSpecies : public NCDMBaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "ncdm_standard";
+
   // New input path: parameters are read from PFC under <instance_name>.<field>.
   NCDMSpecies(FileContent* pfc,
               const std::string& instance_name,

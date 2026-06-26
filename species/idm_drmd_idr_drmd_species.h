@@ -1,4 +1,6 @@
 #pragma once
+#include <string_view>
+
 #include "background.h"
 #include "composite_species.h"
 #include "idm_drmd.h"
@@ -7,6 +9,8 @@
 
 class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
  public:
+  static constexpr std::string_view kTypeName = "idm_drmd_idr_drmd";
+
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     IDM_DRMDSpecies::PerturbLayout idm_drmd;
     IDR_DRMDSpecies::PerturbLayout idr_drmd;

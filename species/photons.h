@@ -1,4 +1,6 @@
 #pragma once
+#include <string_view>
+
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
@@ -7,6 +9,8 @@
 /** Photons: rho ~ a^{-4}. Boltzmann hierarchy with l_max_g multipoles. */
 class PhotonsSpecies : public BaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "photons";
+
   explicit PhotonsSpecies(const background& pba)
       : BaseSpecies("Photons", EnergyType::Radiation), pba_(pba) {}
 

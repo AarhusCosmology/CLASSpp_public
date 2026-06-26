@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string_view>
 
 #include "base_species.h"
 #include "species_build_context.h"
@@ -16,6 +17,8 @@ struct background;
  */
 class LambdaSpecies : public BaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "lambda";
+
   explicit LambdaSpecies(const background& pba, double omega0_lambda);
 
   double GetOmega0() const override {

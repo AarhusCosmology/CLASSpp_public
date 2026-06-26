@@ -37,32 +37,36 @@ struct SpeciesFactoryEntry {
   std::vector<Named> (*create_all)(const SpeciesBuildContext&);
 };
 
+// NOTE: each entry name is the species' kTypeName (the .ini `type =` value).
+// This is deliberately distinct from a species' collection registration key
+// (CamelCase, e.g. all_species_.at("Lambda")), which lives in each CreateAll.
 inline constexpr std::array kAllSpeciesFactories = {
-    SpeciesFactoryEntry{"Photons", &PhotonsSpecies::CreateAll},
-    SpeciesFactoryEntry{"Baryons", &BaryonsSpecies::CreateAll},
-    SpeciesFactoryEntry{"CDM", &CDMSpecies::CreateAll},
-    SpeciesFactoryEntry{"UR", &UltraRelativisticSpecies::CreateAll},
-    SpeciesFactoryEntry{"DCDM_DR", &DCDM_DR_Species::CreateAll},
-    SpeciesFactoryEntry{"NCDM", &NCDMSpecies::CreateAll},
-    SpeciesFactoryEntry{"NCDMGreyBody", &GreyBodyNCDMSpecies::CreateAll},
-    SpeciesFactoryEntry{"DNCDM_DR", &DNCDM_DR_Species::CreateAll},
-    SpeciesFactoryEntry{"NCDMInt", &NCDMInteractingSpecies::CreateAll},
-    SpeciesFactoryEntry{"IDM_DR_IDR", &IDM_DR_IDR_Species::CreateAll},
-    SpeciesFactoryEntry{"IDM_DRMD_IDR_DRMD", &IDM_DRMD_IDR_DRMD_Species::CreateAll},
-    SpeciesFactoryEntry{"Lambda", &LambdaSpecies::CreateAll},
-    SpeciesFactoryEntry{"Fluid", &FluidSpecies::CreateAll},
-    SpeciesFactoryEntry{"ScalarField", &ScalarFieldSpecies::CreateAll},
+    SpeciesFactoryEntry{PhotonsSpecies::kTypeName, &PhotonsSpecies::CreateAll},
+    SpeciesFactoryEntry{BaryonsSpecies::kTypeName, &BaryonsSpecies::CreateAll},
+    SpeciesFactoryEntry{CDMSpecies::kTypeName, &CDMSpecies::CreateAll},
+    SpeciesFactoryEntry{UltraRelativisticSpecies::kTypeName, &UltraRelativisticSpecies::CreateAll},
+    SpeciesFactoryEntry{DCDM_DR_Species::kTypeName, &DCDM_DR_Species::CreateAll},
+    SpeciesFactoryEntry{NCDMSpecies::kTypeName, &NCDMSpecies::CreateAll},
+    SpeciesFactoryEntry{GreyBodyNCDMSpecies::kTypeName, &GreyBodyNCDMSpecies::CreateAll},
+    SpeciesFactoryEntry{DNCDMSpecies::kTypeName, &DNCDM_DR_Species::CreateAll},
+    SpeciesFactoryEntry{NCDMInteractingSpecies::kTypeName, &NCDMInteractingSpecies::CreateAll},
+    SpeciesFactoryEntry{IDM_DR_IDR_Species::kTypeName, &IDM_DR_IDR_Species::CreateAll},
+    SpeciesFactoryEntry{IDM_DRMD_IDR_DRMD_Species::kTypeName,
+                        &IDM_DRMD_IDR_DRMD_Species::CreateAll},
+    SpeciesFactoryEntry{LambdaSpecies::kTypeName, &LambdaSpecies::CreateAll},
+    SpeciesFactoryEntry{FluidSpecies::kTypeName, &FluidSpecies::CreateAll},
+    SpeciesFactoryEntry{ScalarFieldSpecies::kTypeName, &ScalarFieldSpecies::CreateAll},
 };
 
 /** Maps the closure-species enum to the matching factory entry name. */
 inline constexpr std::string_view ClosureSpeciesName(ClosureSpecies cs) {
   switch (cs) {
     case ClosureSpecies::Lambda:
-      return "Lambda";
+      return LambdaSpecies::kTypeName;
     case ClosureSpecies::Fluid:
-      return "Fluid";
+      return FluidSpecies::kTypeName;
     case ClosureSpecies::ScalarField:
-      return "ScalarField";
+      return ScalarFieldSpecies::kTypeName;
     case ClosureSpecies::None:
       return "";
   }

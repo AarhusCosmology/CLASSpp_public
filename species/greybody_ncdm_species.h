@@ -1,6 +1,7 @@
 #pragma once
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "../species/ncdm_species.h"
@@ -53,6 +54,8 @@ class GreyBodyParams {
  *  (r, M2, M3). All perturbation/background behavior is inherited from NCDMSpecies. */
 class GreyBodyNCDMSpecies : public NCDMSpecies {
  public:
+  static constexpr std::string_view kTypeName = "ncdm_greybody";
+
   GreyBodyNCDMSpecies(FileContent* pfc,
                       const std::string& instance_name,
                       const NcdmSettings& settings,

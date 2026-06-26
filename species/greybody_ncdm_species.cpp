@@ -295,7 +295,7 @@ std::optional<double> GreyBodyNCDMSpecies::GetParam(const std::string& name) con
 }
 
 std::vector<Named> GreyBodyNCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
-  const auto instances = ctx.pfc->instances_with("type", "ncdm_greybody");
+  const auto instances = ctx.pfc->instances_with("type", std::string(kTypeName));
   std::vector<Named> result;
   result.reserve(instances.size());
   for (const auto& name : instances) {

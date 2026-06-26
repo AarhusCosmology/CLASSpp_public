@@ -2,6 +2,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -20,6 +21,8 @@ class BackgroundModule;
  */
 class DNCDMSpecies : public NCDMBaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "ncdm_decay_dr";
+
   // Reads all DNCDM-specific parameters from the dot-syntax instance
   // identified by instance_name (e.g. "dncdm1").
   DNCDMSpecies(FileContent* pfc,

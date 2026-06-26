@@ -2,6 +2,10 @@
 
 #include <cstdlib>
 #include <stdexcept>
+#include <string_view>
+#include <vector>
+
+#include "species/all_species.h"
 
 SpeciesInput::SpeciesInput(FileContent* pfc, std::string instance_name)
     : pfc_(pfc), instance_name_(std::move(instance_name)) {
@@ -27,6 +31,40 @@ int ParseIntValue(const std::string& value, const std::string& field_name) {
                                 value + "'");
   }
   return static_cast<int>(parsed);
+}
+
+struct DotFieldMap {
+  std::string_view dot;
+  std::string_view legacy;
+};
+
+struct SingleInstanceSpec {
+  std::string_view type;
+  std::vector<DotFieldMap> fields;
+};
+
+// Module-owned: which named species are single-instance, and how each clean
+// dot-field maps to its legacy key. Keyed by the species' canonical kTypeName.
+// ScalarField is intentionally absent (reserved for a multi-instance future).
+const std::vector<SingleInstanceSpec>& SingleInstanceTable() {
+  static const std::vector<SingleInstanceSpec> table = {
+      {PhotonsSpecies::kTypeName, {{"Omega", "Omega_g"}, {"T_cmb", "T_cmb"}}},
+      {BaryonsSpecies::kTypeName, {{"Omega", "Omega_b"}}},
+      {CDMSpecies::kTypeName, {{"Omega", "Omega_cdm"}}},
+      {UltraRelativisticSpecies::kTypeName,
+       {{"N", "N_ur"}, {"Omega", "Omega_ur"}, {"omega", "omega_ur"}}},
+      {LambdaSpecies::kTypeName, {{"Omega", "Omega_Lambda"}}},
+      {FluidSpecies::kTypeName,
+       {{"Omega", "Omega_fld"},
+        {"w0", "w0_fld"},
+        {"wa", "wa_fld"},
+        {"cs2", "cs2_fld"},
+        {"Omega_EDE", "Omega_EDE"},
+        {"c_gamma_over_c", "c_gamma_over_c_fld"},
+        {"use_ppf", "use_ppf"},
+        {"equation_of_state", "fluid_equation_of_state"}}},
+  };
+  return table;
 }
 
 }  // namespace
@@ -85,4 +123,43 @@ bool SynthesiseIdenticalScalarField(FileContent* pfc,
 
   pfc->set(legacy_key, first);
   return true;
+}
+
+void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
+  if (!pfc) {
+    throw std::invalid_argument("TranslateSingleInstanceDotSyntax: null FileContent*");
+  }
+  for (const auto& spec : SingleInstanceTable()) {
+    const std::string type(spec.type);
+    const auto instances = pfc->instances_with("type", type);
+    if (instances.empty()) {
+      continue;
+    }
+    if (instances.size() > 1) {
+      std::string joined;
+      for (size_t i = 0; i < instances.size(); ++i) {
+        joined += (i ? ", " : "") + instances[i];
+      }
+      throw std::invalid_argument("species type '" + type + "' is single-instance but was given " +
+                                  std::to_string(instances.size()) + " times (" + joined + ")");
+    }
+    SpeciesInput input(pfc, instances.front());
+    (void) input.get<std::string>("type");  // consume "<name>.type"
+    for (const auto& fm : spec.fields) {
+      const std::string dot(fm.dot);
+      auto value = input.get<std::string>(dot);  // consumes "<name>.<dot>" if present
+      if (!value) {
+        continue;
+      }
+      const std::string legacy(fm.legacy);
+      auto existing = pfc->get<std::string>(legacy);
+      if (existing && *existing != *value) {
+        throw std::invalid_argument("input sets both legacy key '" + legacy + "' and dot-syntax '" +
+                                    instances.front() + "." + dot + "' with different values");
+      }
+      pfc->set(
+          legacy,
+          *value);  // set() resets the read flag so the downstream consumer still sees this key
+    }
+  }
 }

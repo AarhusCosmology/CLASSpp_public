@@ -63,3 +63,16 @@ bool SynthesiseIdenticalScalarField(FileContent* pfc,
                                     const std::string& dot_field,
                                     const std::string& legacy_key,
                                     const std::string& species_description);
+
+/**
+ * Translate dot-syntax for SINGLE-INSTANCE legacy species into their legacy
+ * keys, in place. For each recognised single-instance type T (photons, baryons,
+ * cdm, ur, lambda, fluid), finds the at-most-one instance N with "N.type == T",
+ * rewrites each known "N.<dot_field>" to its legacy key via FileContent::set,
+ * and marks the dot entries read. The instance name N is discarded, so output
+ * is identical to the legacy-key form. Throws std::invalid_argument if a type
+ * appears more than once, or if a translated legacy key is already present with
+ * a different value. Unknown "N.<field>" entries are left untouched (and unread,
+ * so the usual unrecognised-parameter warning still fires).
+ */
+void TranslateSingleInstanceDotSyntax(FileContent* pfc);

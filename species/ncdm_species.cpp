@@ -202,7 +202,7 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
 std::vector<Named> NCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   TransmuteLegacyStandardNcdmToDot(*ctx.pfc);
 
-  const auto instances = ctx.pfc->instances_with("type", "ncdm_standard");
+  const auto instances = ctx.pfc->instances_with("type", std::string(kTypeName));
 
   std::vector<Named> result;
   result.reserve(instances.size());

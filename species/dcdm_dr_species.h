@@ -1,4 +1,6 @@
 #pragma once
+#include <string_view>
+
 #include "background.h"
 #include "composite_species.h"
 #include "dark_radiation_species.h"
@@ -19,6 +21,8 @@ class BackgroundModule;
  */
 class DCDM_DR_Species : public CompositeSpecies {
  public:
+  static constexpr std::string_view kTypeName = "dcdm_dr";
+
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     DCDMSpecies::PerturbLayout dcdm;
     DarkRadiationSpecies::PerturbLayout dr;

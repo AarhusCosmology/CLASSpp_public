@@ -1,4 +1,6 @@
 #pragma once
+#include <string_view>
+
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
@@ -7,6 +9,8 @@
 /** Baryons: rho ~ a^{-3}. Two perturbation variables: delta_b, theta_b. */
 class BaryonsSpecies : public BaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "baryons";
+
   explicit BaryonsSpecies(const background& pba)
       : BaseSpecies("Baryons", EnergyType::Matter), pba_(pba) {}
 

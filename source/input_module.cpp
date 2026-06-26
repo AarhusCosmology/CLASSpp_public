@@ -205,6 +205,9 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
 InputModule::InputModule(FileContent& fc) : file_content_(fc) {
   file_content_.mark_all_unread();
   try {
+    // Translate dot-syntax for single-instance legacy species (bary.Omega ->
+    // Omega_b) before any consumer reads the file.
+    TranslateSingleInstanceDotSyntax(&file_content_);
     input_read_precisions();
     ReadContext();
     ConstructSpecies();
@@ -256,8 +259,9 @@ void InputModule::ConstructSpecies() {
     if (entry.name == closure_name)
       continue;
     auto produced             = entry.create_all(ctx);
-    const bool is_ncdm_family = (entry.name == "NCDM" || entry.name == "DNCDM_DR" ||
-                                 entry.name == "NCDMInt");
+    const bool is_ncdm_family = (entry.name == NCDMSpecies::kTypeName ||
+                                 entry.name == DNCDMSpecies::kTypeName ||
+                                 entry.name == NCDMInteractingSpecies::kTypeName);
     for (auto& e : produced) {
       omega0_sum += e.species->GetOmega0();
       if (is_ncdm_family) {
@@ -591,7 +595,8 @@ void InputModule::input_read_precisions() {
   /** - resolve runtime data-file paths against class_dir (defaults are relative) */
   ppr->ResolveDataPaths();
 
-  const auto standard_ncdm_instances = file_content_.instances_with("type", "ncdm_standard");
+  const auto standard_ncdm_instances =
+      file_content_.instances_with("type", std::string(NCDMSpecies::kTypeName));
   SynthesiseIdenticalScalarField(&file_content_,
                                  standard_ncdm_instances,
                                  "fluid_approximation",

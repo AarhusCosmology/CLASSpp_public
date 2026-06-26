@@ -82,7 +82,7 @@ NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
 std::vector<Named> NCDMInteractingSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   RejectLegacyInteractingKeys(*ctx.pfc);
 
-  const auto instances = ctx.pfc->instances_with("type", "ncdm_self_interacting");
+  const auto instances = ctx.pfc->instances_with("type", std::string(kTypeName));
 
   std::vector<Named> result;
   result.reserve(instances.size());

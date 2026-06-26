@@ -1,4 +1,6 @@
 #pragma once
+#include <string_view>
+
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
@@ -12,6 +14,8 @@ class BackgroundModule;
  */
 class ScalarFieldSpecies : public BaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "scalar_field";
+
   ScalarFieldSpecies(const background& pba,
                      double omega0_scf,
                      std::vector<double> scf_parameters,

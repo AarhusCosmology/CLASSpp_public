@@ -118,11 +118,118 @@ static void test_get_parse_error_throws() {
   assert(threw);
 }
 
+static void test_dot_baryons_translation() {
+  FileContent fc;
+  fc.set("atom.type", "baryons");
+  fc.set("atom.Omega", "0.05");
+  TranslateSingleInstanceDotSyntax(&fc);
+  auto ob = fc.get<std::string>("Omega_b");
+  assert(ob && *ob == "0.05");
+  assert(fc.was_read("atom.type"));
+  assert(fc.was_read("atom.Omega"));
+}
+
+static void test_dot_name_is_ignored() {
+  // Any instance name maps to the same legacy key.
+  FileContent fc;
+  fc.set("whatever.type", "cdm");
+  fc.set("whatever.Omega", "0.25");
+  TranslateSingleInstanceDotSyntax(&fc);
+  auto oc = fc.get<std::string>("Omega_cdm");
+  assert(oc && *oc == "0.25");
+}
+
+static void test_dot_fluid_full_set() {
+  FileContent fc;
+  fc.set("de.type", "fluid");
+  fc.set("de.Omega", "0.7");
+  fc.set("de.w0", "-0.9");
+  fc.set("de.wa", "0.1");
+  fc.set("de.cs2", "1.0");
+  fc.set("de.use_ppf", "no");
+  fc.set("de.equation_of_state", "CLP");
+  fc.set("de.Omega_EDE", "0.01");
+  fc.set("de.c_gamma_over_c", "0.4");
+  TranslateSingleInstanceDotSyntax(&fc);
+  assert(*fc.get<std::string>("Omega_fld") == "0.7");
+  assert(*fc.get<std::string>("w0_fld") == "-0.9");
+  assert(*fc.get<std::string>("wa_fld") == "0.1");
+  assert(*fc.get<std::string>("cs2_fld") == "1.0");
+  assert(*fc.get<std::string>("use_ppf") == "no");
+  assert(*fc.get<std::string>("fluid_equation_of_state") == "CLP");
+  assert(*fc.get<std::string>("Omega_EDE") == "0.01");
+  assert(*fc.get<std::string>("c_gamma_over_c_fld") == "0.4");
+}
+
+static void test_dot_ur_forms() {
+  FileContent fc;
+  fc.set("nu.type", "ur");
+  fc.set("nu.N", "3.044");
+  TranslateSingleInstanceDotSyntax(&fc);
+  assert(*fc.get<std::string>("N_ur") == "3.044");
+}
+
+static void test_dot_duplicate_instance_throws() {
+  FileContent fc;
+  fc.set("a.type", "baryons");
+  fc.set("a.Omega", "0.05");
+  fc.set("b.type", "baryons");
+  fc.set("b.Omega", "0.04");
+  bool threw = false;
+  try {
+    TranslateSingleInstanceDotSyntax(&fc);
+  }
+  catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+static void test_dot_conflict_with_legacy_throws() {
+  FileContent fc;
+  fc.set("Omega_b", "0.04");
+  fc.set("x.type", "baryons");
+  fc.set("x.Omega", "0.05");
+  bool threw = false;
+  try {
+    TranslateSingleInstanceDotSyntax(&fc);
+  }
+  catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+static void test_dot_identical_legacy_ok() {
+  FileContent fc;
+  fc.set("Omega_b", "0.05");
+  fc.set("x.type", "baryons");
+  fc.set("x.Omega", "0.05");
+  TranslateSingleInstanceDotSyntax(&fc);  // must not throw
+  assert(*fc.get<std::string>("Omega_b") == "0.05");
+}
+
+static void test_dot_unknown_field_left_unread() {
+  FileContent fc;
+  fc.set("x.type", "baryons");
+  fc.set("x.Omeega", "0.05");  // typo: not in the table
+  TranslateSingleInstanceDotSyntax(&fc);
+  assert(!fc.was_read("x.Omeega"));  // stays unread -> warned later
+}
+
 int main() {
   test_instances_with_basic();
   test_species_input_prefixing();
   test_species_input_required_throws();
   test_get_typed();
   test_get_parse_error_throws();
+  test_dot_baryons_translation();
+  test_dot_name_is_ignored();
+  test_dot_fluid_full_set();
+  test_dot_ur_forms();
+  test_dot_duplicate_instance_throws();
+  test_dot_conflict_with_legacy_throws();
+  test_dot_identical_legacy_ok();
+  test_dot_unknown_field_left_unread();
   return 0;
 }

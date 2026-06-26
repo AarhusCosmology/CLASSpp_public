@@ -223,7 +223,7 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
 std::vector<DNCDMSpecies::Named> DNCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   RejectLegacyDecayDrKeys(*ctx.pfc);
 
-  const auto instances = ctx.pfc->instances_with("type", "ncdm_decay_dr");
+  const auto instances = ctx.pfc->instances_with("type", std::string(kTypeName));
 
   std::vector<Named> result;
   result.reserve(instances.size());

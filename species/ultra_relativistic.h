@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "base_species.h"
 #include "species_build_context.h"
 
@@ -17,6 +19,8 @@ struct background;
  */
 class UltraRelativisticSpecies : public BaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "ur";
+
   UltraRelativisticSpecies(const background& pba, double omega0_ur);
 
   double GetOmega0() const override {

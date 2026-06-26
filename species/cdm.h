@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "base_species.h"
 #include "species_build_context.h"
 
@@ -15,6 +17,8 @@ struct background;
  */
 class CDMSpecies : public BaseSpecies {
  public:
+  static constexpr std::string_view kTypeName = "cdm";
+
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     int idx_delta = -1;
     int idx_theta = -1;  // newtonian gauge only
