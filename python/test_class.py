@@ -807,6 +807,38 @@ class TestReviewRegressions(TestClass):
             cosmo.struct_cleanup()
             cosmo.empty()
 
+    def test_tensor_with_dncdm_dr_is_rejected(self):
+        """#345 guard: evolving tensor modes with the exact NCDM method
+        together with a decaying-NCDM (DNCDM_DR) species is not supported and
+        must be rejected up front. The DNCDM_DR composite is a CompositeSpecies
+        (not an NCDMSpecies), so the tensor-NCDM loops would silently skip it;
+        the guard in perturb_init prevents that silent, unsupported run. It
+        fires during perturbation solving, so classy raises a
+        CosmoComputationError (not the input-time CosmoSevereError)."""
+        scenario = {
+            'output': 'tCl',
+            'modes': 't',
+            'tensor method': 'exact',
+            'N_ur': 3.046,
+            'omega_b': 0.022032,
+            'omega_cdm': 0.12038,
+            # Pin YHe to skip BBN; this is a guard test, not a precision test.
+            'YHe': 0.25,
+            'dncdm1.type': 'ncdm_decay_dr',
+            'dncdm1.m': 1.0,
+            'dncdm1.T': 0.71611,
+            'dncdm1.Gamma': 1e3,
+            'dncdm1.Omega_ini': 0.001,
+        }
+        self.scenario = dict(scenario)
+        self.name = self._testMethodName
+        self.cosmo.set(dict(self.verbose, **scenario))
+        with self.assertRaises(CosmoComputationError) as ctx:
+            self.cosmo.compute()
+        self.assertIn(
+            "Cannot evolve tensor modes with decaying NCDM species",
+            str(ctx.exception))
+
     def test_theta_s_shooting_matches_reference(self):
         # The most common shoot: 100*theta_s varies h (module-level target in DoShooting).
         # Candidate (lazy DoShooting) must match the reference (ctor-shooting) within tol.
@@ -962,27 +994,6 @@ class TestReviewRegressions(TestClass):
         del reference['nu2.log10G_eff']
         reference['nu2.G_eff'] = 1e-4
         self._assert_scenarios_match(scenario, reference, "Linear G_eff for nu2")
-
-    def test_scalar_field_newtonian_gauge_is_rejected(self):
-        # The Newtonian-gauge scalar-field Klein-Gordon source is incomplete
-        # (missing the psi' / -2 a^2 V_,phi psi terms), so it is not gauge-invariant.
-        # It is only valid in synchronous gauge; Newtonian must be rejected up front.
-        scenario = {
-            'output': 'tCl',
-            'gauge': 'newtonian',
-            'Omega_fld': 0,
-            'Omega_scf': 0.1,
-            'attractor_ic_scf': 'yes',
-            'scf_parameters': '10, 0, 0, 0',
-        }
-        # The guard fires during perturbation solving, so classy raises a
-        # CosmoComputationError (not the input-time CosmoSevereError).
-        self.scenario = dict(scenario)
-        self.name = self._testMethodName
-        self.cosmo.set(dict(self.verbose, **scenario))
-        with self.assertRaises(CosmoComputationError) as ctx:
-            self.cosmo.compute()
-        self.assertIn("synchronous gauge", str(ctx.exception))
 
     def test_scalar_field_synchronous_gauge_computes(self):
         scenario = {

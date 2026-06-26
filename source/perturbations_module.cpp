@@ -578,8 +578,13 @@ void PerturbationsModule::perturb_init() {
       case (tm_exact):
         if (all_species_.count("UR"))
           evolve_tensor_ur_ = _TRUE_;
-        if (all_species_.has_ncdm())
+        if (all_species_.has_ncdm()) {
+          // The exact tensor-NCDM path only handles plain NCDMSpecies; the
+          // decaying composite (DNCDM_DR_Species, a CompositeSpecies) would be
+          // silently skipped by the tensor loops, so reject it up front.
+          class_test(has_dncdm_dr, "Cannot evolve tensor modes with decaying NCDM species.");
           evolve_tensor_ncdm_ = _TRUE_;
+        }
         break;
     }
   }
@@ -5584,8 +5589,8 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
 
     /* Non-cold Dark Matter */
     if (evolve_tensor_ncdm_ == _TRUE_) {
-      class_test(all_species_.count("DNCDM_DR") != 0,
-                 "Cannot evolve tensor modes with decaying NCDM species.");
+      // Decaying NCDM with tensor modes is rejected in perturb_init (the guard
+      // where evolve_tensor_ncdm_ is set), so only plain NCDMSpecies reach here.
       for (size_t i = 0; i < all_species_.size(); ++i) {
         const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
         if (!ncdm_sp)
