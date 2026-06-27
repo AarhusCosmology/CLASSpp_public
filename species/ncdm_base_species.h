@@ -308,6 +308,7 @@ class NCDMBaseSpecies : public BaseSpecies {
 
   int quadrature_strategy_ = 0;
   int input_q_size_        = 5;
+  int input_q_size_bg_     = 5;
   double qmax_             = 15.;
   std::vector<double> psd_parameters_;
   bool got_file_ = false;

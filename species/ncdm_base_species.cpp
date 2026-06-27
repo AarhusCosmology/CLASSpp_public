@@ -68,6 +68,7 @@ void NCDMBaseSpecies::ReadParametersByInstance(FileContent* pfc,
   ksi_                 = input.get_or("ksi", ksi_);
   quadrature_strategy_ = input.get_or("quadrature_strategy", quadrature_strategy_);
   input_q_size_        = input.get_or("momenta_bins", input_q_size_);
+  input_q_size_bg_     = input.get_or("momenta_bins_bg", input_q_size_);
   qmax_                = input.get_or("max_q", qmax_);
 
   // psd_parameters: variable-length list (single instance, comma-separated values).
@@ -204,8 +205,21 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                          DistributionFunction,
                          &pbadist,
                          gb);
-    q_bg_ = q_;
-    w_bg_ = w_;
+
+    q_bg_.resize(input_q_size_bg_);
+    w_bg_.resize(input_q_size_bg_);
+    std::vector<double> dq_bg_dummy(input_q_size_bg_);
+    get_qsampling_manual(q_bg_.data(),
+                         w_bg_.data(),
+                         dq_bg_dummy.data(),
+                         input_q_size_bg_,
+                         qmax_,
+                         (enum quadrature_method) strategy,
+                         pbadist.q.data(),
+                         pbadist.tablesize,
+                         DistributionFunction,
+                         &pbadist,
+                         gb);
   }
 
   // Compute dlnf0_dlnq_

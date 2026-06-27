@@ -85,6 +85,7 @@ constexpr LegacyFieldMap kLegacyStandardFields[] = {
     {"ncdm_psd_filenames", "psd_filename"},
     {"quadrature_strategy_ncdm_standard", "quadrature_strategy"},
     {"N_momentum_bins_ncdm_standard", "momenta_bins"},
+    {"N_momentum_bins_bg_ncdm_standard", "momenta_bins_bg"},
     {"maximum_q_ncdm_standard", "max_q"},
 };
 

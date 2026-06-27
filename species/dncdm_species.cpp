@@ -80,6 +80,17 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   bgm_ = bgm;
 
   SpeciesInput input(pfc, instance_name);
+  const int strategy = input.get_or("quadrature_strategy", static_cast<int>(qm_auto));
+  if (strategy != qm_auto) {
+    if (auto bg_bins = input.get<int>("momenta_bins_bg")) {
+      if (*bg_bins != q_size()) {
+        throw std::invalid_argument(
+            "species '" + instance_name +
+            "': momenta_bins_bg must match momenta_bins for ncdm_decay_dr; its background "
+            "distribution is evolved on the perturbation momentum grid");
+      }
+    }
+  }
 
   // Read decay rate (exactly one of these must be specified)
   auto Gamma_value         = input.get<double>("Gamma");
