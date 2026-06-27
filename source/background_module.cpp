@@ -15,6 +15,7 @@
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "../species/ncdm_species.h"
 #include "../species/scalar_field.h"
+#include "../species/type3_species.h"
 #include "bisection.h"
 
 /**
@@ -1102,6 +1103,10 @@ int BackgroundModule::background_derivs_member(
     auto& drmd  = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
     rho_M      += drmd.idm_drmd().Rho(pvecback);
   }
+  if (all_species_.count("CDM_SCF_Momentum")) {
+    auto& t3  = static_cast<Type3Species&>(*all_species_.at("CDM_SCF_Momentum"));
+    rho_M    += t3.cdm().Rho(pvecback);
+  }
 
   dy[index_bi_D_]       = y[index_bi_D_prime_];
   dy[index_bi_D_prime_] = -a * H * y[index_bi_D_prime_] + 1.5 * a * a * rho_M * y[index_bi_D_];
@@ -1146,6 +1151,10 @@ void BackgroundModule::background_output_budget() {
     if (all_species_.count("IDM_DR_IDR")) {
       const auto& comp = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
       print_one("Interacting Dark Matter - DR ", comp.idm_dr().GetOmega0(), budget_matter);
+    }
+    if (all_species_.count("CDM_SCF_Momentum")) {
+      const auto& comp = static_cast<const Type3Species&>(*all_species_.at("CDM_SCF_Momentum"));
+      print_one("Cold Dark Matter (Type-3 coupled)", comp.cdm().GetOmega0(), budget_matter);
     }
     if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
       const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(

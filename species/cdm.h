@@ -21,14 +21,18 @@ class CDMSpecies : public BaseSpecies {
 
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     int idx_delta = -1;
-    int idx_theta = -1;  // newtonian gauge only
+    int idx_theta = -1;  // newtonian gauge, or synchronous when coupled
   };
 
   std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
     return std::make_unique<PerturbLayout>();
   }
 
-  explicit CDMSpecies(const background& pba, double omega0_cdm);
+  explicit CDMSpecies(const background& pba, double omega0_cdm, bool coupled = false);
+
+  bool coupled() const {
+    return coupled_;
+  }
 
   double GetOmega0() const override {
     return Omega0_cdm_;
@@ -91,8 +95,9 @@ class CDMSpecies : public BaseSpecies {
  private:
   double Omega0_cdm_;
   double H0_;
+  bool coupled_         = false;
   int index_bg_rho_cdm_ = -1;
 
   int index_tp_delta_ = -1;  // #309 transfer-source slot
-  int index_tp_theta_ = -1;  // registered only when gauge != synchronous
+  int index_tp_theta_ = -1;  // registered only when gauge != synchronous (or when coupled)
 };

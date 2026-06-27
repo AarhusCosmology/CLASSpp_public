@@ -451,7 +451,8 @@ void PerturbationsModule::perturb_init() {
       printf("Computing sources\n");
   }
 
-  class_test((ppt->gauge == possible_gauges::synchronous) && (all_species_.count("CDM") == 0),
+  class_test((ppt->gauge == possible_gauges::synchronous) && (all_species_.count("CDM") == 0) &&
+                 (all_species_.count("CDM_SCF_Momentum") == 0),
              "In the synchronous gauge, it is not self-consistent to assume no CDM: the later is "
              "used to define the initial timelike hypersurface. You can either add a negligible "
              "amount of CDM or switch to newtonian gauge");
@@ -2989,10 +2990,7 @@ void PerturbationsModule::perturb_vector_init(
                                            ppw,
                                            static_cast<int>(ppt->gauge));
         if (index_pt > before) {
-          perturb_vector::ActiveSpecies active{entry.get(),
-                                               ppv->species_layouts[i].get(),
-                                               entry->ClustersAsMatter(),
-                                               entry->IsColdMatterSpecies()};
+          perturb_vector::ActiveSpecies active{entry.get(), ppv->species_layouts[i].get()};
           if (dynamic_cast<const ScalarFieldSpecies*>(entry.get()))
             scalar_active_species.push_back(active);
           else
@@ -3050,10 +3048,7 @@ void PerturbationsModule::perturb_vector_init(
                                                  ppw,
                                                  static_cast<int>(ppt->gauge));
         if (index_pt > before)
-          ppv->active_species.push_back({entry.get(),
-                                         ppv->species_layouts[i].get(),
-                                         entry->ClustersAsMatter(),
-                                         entry->IsColdMatterSpecies()});
+          ppv->active_species.push_back({entry.get(), ppv->species_layouts[i].get()});
         ++i;
       }
     }
@@ -3083,10 +3078,7 @@ void PerturbationsModule::perturb_vector_init(
                                                  ppw,
                                                  static_cast<int>(ppt->gauge));
         if (index_pt > before)
-          ppv->active_species.push_back({entry.get(),
-                                         ppv->species_layouts[i].get(),
-                                         entry->ClustersAsMatter(),
-                                         entry->IsColdMatterSpecies()});
+          ppv->active_species.push_back({entry.get(), ppv->species_layouts[i].get()});
         ++i;
       }
     }
@@ -4829,54 +4821,38 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     ppw->scalar_ctx.gauge      = static_cast<int>(ppt->gauge);
     ppw->scalar_ctx.idr_nature = resolved_.idr_nature;
 
-    ppw->delta_rho        = 0.;
-    ppw->rho_plus_p_theta = 0.;
+    BaseSpecies::StressEnergyContribution total, total_cold,
+        total_warm;  // module-owned accumulators
+
+    /* Single pass: each species (or composite, via DelegateTally over its children)
+       accumulates its stress-energy into `total` and folds its matter contribution
+       into the cold/warm buckets (per-child, using the species' cached classification).
+       A canonical scalar field's Newtonian StressEnergy reconstructs psi from the
+       running shear in ppw->rho_plus_p_shear (active_species orders scalar fields last,
+       see perturb_vector_init), so we keep that field synced from `total` after each
+       species. See docs/superpowers/specs/2026-06-27-composite-child-iteration-and-matter-tally-design.md */
     ppw->rho_plus_p_shear = 0.;
-    ppw->delta_p          = 0.;
-    ppw->rho_plus_p_tot   = 0.;
-    struct Tally {
-      double drho = 0, rho = 0, rppt = 0, rpp = 0;
-    } cold, warm;
-    const bool tally = has_source_delta_m_ || has_source_theta_m_;
-
-    /* Single pass: each species returns all six stress-energy quantities in one
-       virtual call. rho_plus_p_shear is accumulated here too. In Newtonian gauge
-       ScalarFieldSpecies::StressEnergy reconstructs psi from the accumulated
-       total shear (psi = phi - 4.5 (a^2/k^2) rho_plus_p_shear), so it must see
-       the complete shear: active_species orders scalar fields last (see
-       perturb_vector_init). A canonical scalar field carries no anisotropic
-       stress, so the shear total is order-independent; the reordering only moves
-       a scalar field's (nonzero) delta_rho/theta/p contributions to the end of
-       these reductions, hence non-bit-identical at ULP level for scf configs but
-       unchanged for everything else. */
     for (const auto& e : pv->active_species) {
-      const BaseSpecies::StressEnergyContribution se =
-          e.species->StressEnergy(*e.layout, pv, y, pb, ppw);
-      const double rpp = se.rho + se.p;
-
-      ppw->delta_rho        += se.delta_rho;
-      ppw->rho_plus_p_theta += se.rho_plus_p_theta;
-      ppw->rho_plus_p_shear += se.rho_plus_p_shear;
-      ppw->delta_p          += se.delta_p;
-      ppw->rho_plus_p_tot   += rpp;
-
-      if (tally && e.clusters_as_matter) {
-        const double m_rho   = se.rho - 3. * se.p;
-        const double m_drho  = se.delta_rho - 3. * se.delta_p;
-        const double m_rppt  = (rpp > 0.) ? m_rho * se.rho_plus_p_theta / rpp : 0.;
-        Tally& t             = e.is_cold ? cold : warm;
-        t.drho              += m_drho;
-        t.rho               += m_rho;
-        t.rppt              += m_rppt;
-        t.rpp               += m_rho;
-      }
+      e.species->TallyStressEnergy(*e.layout, pv, y, pb, ppw, total, total_cold, total_warm);
+      // Sync per active species (not per child): a composite's whole shear contribution
+      // lands here at once. A scalar-field child inside a composite that needed the
+      // running shear for Newtonian psi reconstruction would see a total missing its
+      // siblings. Harmless today: Type-3 is synchronous-only and canonical scalar fields
+      // carry zero shear; revisit before adding a Newtonian composite-with-scalar-field.
+      ppw->rho_plus_p_shear = total.rho_plus_p_shear;
     }
 
+    ppw->delta_rho        = total.delta_rho;
+    ppw->rho_plus_p_theta = total.rho_plus_p_theta;
+    ppw->delta_p          = total.delta_p;
+    ppw->rho_plus_p_tot   = total.rho + total.p;
+    // ppw->rho_plus_p_shear already holds total.rho_plus_p_shear (last sync above).
+
     if (has_source_delta_m_ && has_source_delta_cb_)
-      ppw->delta_cb = cold.drho / cold.rho;
+      ppw->delta_cb = total_cold.delta_rho / total_cold.rho;
     if ((has_source_delta_m_ || has_source_theta_m_) &&
         (has_source_delta_cb_ || has_source_theta_cb_))
-      ppw->theta_cb = cold.rppt / cold.rpp;
+      ppw->theta_cb = total_cold.rho_plus_p_theta / (total_cold.rho + total_cold.p);
 
     if (auto* f = ppf_fluid()) {
       f->ComputePpf(k, a, a_prime_over_a, ppr, y, ppw);
@@ -4887,9 +4863,11 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     }
 
     if (has_source_delta_m_)
-      ppw->delta_m = (cold.drho + warm.drho) / (cold.rho + warm.rho);
+      ppw->delta_m = (total_cold.delta_rho + total_warm.delta_rho) /
+                     (total_cold.rho + total_warm.rho);
     if (has_source_delta_m_ || has_source_theta_m_)
-      ppw->theta_m = (cold.rppt + warm.rppt) / (cold.rpp + warm.rpp);
+      ppw->theta_m = (total_cold.rho_plus_p_theta + total_warm.rho_plus_p_theta) /
+                     ((total_cold.rho + total_cold.p) + (total_warm.rho + total_warm.p));
   }
 
   /** - for vector modes */
@@ -5867,7 +5845,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
        PPF fluid too (its dy[idx_Gamma] = Gamma_prime_fld is valid here because
        ComputePpf already ran in perturb_einstein() above). Order is otherwise
        free: each species reads scalar_ctx/y and writes only its own dy. */
-    for (const auto& [species, layout, clusters_as_matter, is_cold] : pv->active_species)
+    for (const auto& [species, layout] : pv->active_species)
       species->PerturbDerivs(*layout, tau, y, dy, *pppaw);
 
     /* perturbed recombination — derivatives of delta x_e and delta T_b. Runs
@@ -5927,7 +5905,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     }
 
     /** - --> species Boltzmann hierarchies (vector modes) */
-    for (const auto& [species, layout, clusters_as_matter, is_cold] : pv->active_species)
+    for (const auto& [species, layout] : pv->active_species)
       species->PerturbVectorDerivs(*layout, tau, y, dy, *pppaw);
 
     if (ppt->gauge == possible_gauges::synchronous) {
@@ -5943,7 +5921,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
   /** - tensor modes: */
   if (_tensors_) {
     /** - --> species Boltzmann hierarchies (tensor modes) */
-    for (const auto& [species, layout, clusters_as_matter, is_cold] : pv->active_species)
+    for (const auto& [species, layout] : pv->active_species)
       species->PerturbTensorDerivs(*layout, tau, y, dy, *pppaw);
 
     /** - --> relativistic-neutrino tensor hierarchy (pv-owned: ur and/or

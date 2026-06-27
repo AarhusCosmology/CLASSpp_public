@@ -32,6 +32,10 @@ void SpeciesCollection::freeze() {
      its own layout in ppw->pv->species_layouts[collection_index_]. */
   for (std::size_t i = 0; i < species_.size(); ++i)
     species_[i].species->collection_index_ = i;
+  /* Stamp the cached matter classification once, now that every species (and every
+     composite child) is fully constructed. Composites recurse into their children. */
+  for (std::size_t i = 0; i < species_.size(); ++i)
+    species_[i].species->FinalizeMatterClassification();
   auto* photons_slot = find("Photons");
   auto* baryons_slot = find("Baryons");
   if (!photons_slot) {

@@ -355,6 +355,45 @@ class BaseSpecies {
                                                 const double* pvecback,
                                                 const perturb_workspace* ppw) const = 0;
 
+  // ── Stress-energy + matter tally (hot path) ───────────────────────────────
+  // Non-virtual wrapper, inlined at the loop call site (e.species is BaseSpecies*).
+  // Plain species: one virtual call (StressEnergy) + accumulate. Composites set
+  // delegates_tally_ and forward the WHOLE call per child via DelegateTally, so each
+  // child is evaluated exactly once. The three accumulators are owned by the module
+  // loop; StressEnergyContribution::operator+= is reused as the bucket combiner.
+  // ppw is only passed through to StressEnergy (never dereferenced), so this compiles
+  // with perturb_workspace forward-declared.
+  void TallyStressEnergy(const PerturbLayout& layout,
+                         const perturb_vector* pv,
+                         const double* y,
+                         const double* pvecback,
+                         const perturb_workspace* ppw,
+                         StressEnergyContribution& total,
+                         StressEnergyContribution& total_cold,
+                         StressEnergyContribution& total_warm) const {
+    if (delegates_tally_) {
+      DelegateTally(layout, pv, y, pvecback, ppw, total, total_cold, total_warm);
+      return;
+    }
+    const StressEnergyContribution se  = StressEnergy(layout, pv, y, pvecback, ppw);
+    total                             += se;
+    // Actual ρ/δρ/(ρ+P)θ — no ρ−3P proxy. Radiation never reaches here (it does not
+    // cluster as matter), so there is nothing to "zero out".
+    if (clusters_as_matter_)
+      (is_cold_ ? total_cold : total_warm) += se;
+  }
+
+  // Seam: only composites (delegates_tally_ == true) override this; plain species
+  // never reach the base body.
+  virtual void DelegateTally(const PerturbLayout& /*layout*/,
+                             const perturb_vector* /*pv*/,
+                             const double* /*y*/,
+                             const double* /*pvecback*/,
+                             const perturb_workspace* /*ppw*/,
+                             StressEnergyContribution& /*total*/,
+                             StressEnergyContribution& /*total_cold*/,
+                             StressEnergyContribution& /*total_warm*/) const {}
+
   // ── Stage 1: Output ──────────────────────────────────────────────────────
 
   /**
@@ -556,6 +595,23 @@ class BaseSpecies {
     return a_proposed;
   }
 
+  /** Cached counterparts of ClustersAsMatter()/IsColdMatterSpecies(), valid after
+   *  FinalizeMatterClassification(). The hot-path tally reads these. */
+  bool ClustersAsMatterCached() const {
+    return clusters_as_matter_;
+  }
+  bool IsColdCached() const {
+    return is_cold_;
+  }
+
+  /** Stamp the cached classification from the (virtual) predicates. Called once by
+   *  SpeciesCollection::freeze() after every species and its children are built.
+   *  CompositeSpecies overrides to also recurse into children. */
+  virtual void FinalizeMatterClassification() {
+    clusters_as_matter_ = ClustersAsMatter();
+    is_cold_            = IsColdMatterSpecies();
+  }
+
   /**
    * True iff this species' clustering participates in the total matter tally
    * (delta_m / theta_m and the P_m(k) source). This is the axis-2 (perturbation)
@@ -605,6 +661,13 @@ class BaseSpecies {
 
   std::string name_;
   EnergyType energy_type_;
+
+  // Cached matter-tally classification, stamped once by FinalizeMatterClassification()
+  // (driven by SpeciesCollection::freeze(); composites recurse into children). Read on
+  // the stress-energy hot path, so it must be a plain member, not a per-step virtual.
+  bool clusters_as_matter_ = false;
+  bool is_cold_            = false;
+  bool delegates_tally_    = false;  // true for composites (set in CompositeSpecies ctor)
 
   // Set by SpeciesCollection::freeze(); used by PrintVariables to look up layout.
   std::size_t collection_index_ = SIZE_MAX;

@@ -17,44 +17,22 @@ ScalarFieldSpecies::ScalarFieldSpecies(const background& pba,
                                        int scf_tuning_index,
                                        bool attractor_ic_scf,
                                        double phi_ini_scf,
-                                       double phi_prime_ini_scf)
+                                       double phi_prime_ini_scf,
+                                       ScalarFieldPotential potential,
+                                       double beta)
     : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba), Omega0_scf_(omega0_scf),
       scf_parameters_(std::move(scf_parameters)), scf_tuning_index_(scf_tuning_index),
       attractor_ic_scf_(attractor_ic_scf), phi_ini_scf_(phi_ini_scf),
-      phi_prime_ini_scf_(phi_prime_ini_scf) {}
+      phi_prime_ini_scf_(phi_prime_ini_scf), potential_(std::move(potential)), beta_(beta) {}
 
 double ScalarFieldSpecies::V_scf(double phi) const {
-  double lambda = scf_parameters_[0];
-  double alpha  = scf_parameters_[1];
-  double A      = scf_parameters_[2];
-  double B      = scf_parameters_[3];
-  return exp(-lambda * phi) * (pow(phi - B, alpha) + A);
+  return potential_.V(phi, scf_parameters_);
 }
-
 double ScalarFieldSpecies::dV_scf(double phi) const {
-  double lambda = scf_parameters_[0];
-  double alpha  = scf_parameters_[1];
-  double A      = scf_parameters_[2];
-  double B      = scf_parameters_[3];
-  double Ve     = exp(-lambda * phi);
-  double Vp     = pow(phi - B, alpha) + A;
-  double dVe    = -lambda * Ve;
-  double dVp    = alpha * pow(phi - B, alpha - 1);
-  return dVe * Vp + Ve * dVp;
+  return potential_.dV(phi, scf_parameters_);
 }
-
 double ScalarFieldSpecies::ddV_scf(double phi) const {
-  double lambda = scf_parameters_[0];
-  double alpha  = scf_parameters_[1];
-  double A      = scf_parameters_[2];
-  double B      = scf_parameters_[3];
-  double Ve     = exp(-lambda * phi);
-  double Vp     = pow(phi - B, alpha) + A;
-  double dVe    = -lambda * Ve;
-  double dVp    = alpha * pow(phi - B, alpha - 1);
-  double ddVe   = lambda * lambda * Ve;
-  double ddVp   = alpha * (alpha - 1.) * pow(phi - B, alpha - 2);
-  return ddVe * Vp + 2 * dVe * dVp + Ve * ddVp;
+  return potential_.ddV(phi, scf_parameters_);
 }
 
 void ScalarFieldSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
@@ -106,9 +84,11 @@ void ScalarFieldSpecies::ComputeBackground(double a, const double* pvecback_B, d
   pvecback[index_bg_V_scf_]         = V_scf(phi);
   pvecback[index_bg_dV_scf_]        = dV_scf(phi);
   pvecback[index_bg_ddV_scf_]       = ddV_scf(phi);
-  pvecback[index_bg_rho_]           = (phi_prime * phi_prime / (2. * a * a) + V_scf(phi)) / 3.;
-  pvecback[index_bg_p_]             = (phi_prime * phi_prime / (2. * a * a) - V_scf(phi)) / 3.;
-  pvecback[index_bg_p_prime_scf_]   = 0.;
+  pvecback[index_bg_rho_] =
+      ((1. - 2. * beta_) * phi_prime * phi_prime / (2. * a * a) + V_scf(phi)) / 3.;
+  pvecback[index_bg_p_] = ((1. - 2. * beta_) * phi_prime * phi_prime / (2. * a * a) - V_scf(phi)) /
+                          3.;
+  pvecback[index_bg_p_prime_scf_] = 0.;
 }
 
 void ScalarFieldSpecies::BackgroundDerivs(double /*tau*/,
@@ -121,7 +101,7 @@ void ScalarFieldSpecies::BackgroundDerivs(double /*tau*/,
   const double phi_prime = y[index_bi_phi_prime_scf_];
   /** phi'' + 2*a*H*phi' + a^2*dV = 0 */
   dy[index_bi_phi_scf_]       = phi_prime;
-  dy[index_bi_phi_prime_scf_] = -a * (2. * H * phi_prime + a * dV_scf(phi));
+  dy[index_bi_phi_prime_scf_] = -a * (2. * H * phi_prime + a * dV_scf(phi) / (1. - 2. * beta_));
 }
 
 double ScalarFieldSpecies::PPrime(double a,
@@ -130,7 +110,7 @@ double ScalarFieldSpecies::PPrime(double a,
                                   const double* /*pvecback*/) const {
   const double phi       = pvecback_B[index_bi_phi_scf_];
   const double phi_prime = pvecback_B[index_bi_phi_prime_scf_];
-  return phi_prime * (-phi_prime * H / a - 2. / 3. * dV_scf(phi));
+  return phi_prime * (-(1. - 2. * beta_) * phi_prime * H / a - 2. / 3. * dV_scf(phi));
 }
 
 void ScalarFieldSpecies::FinalizeBackground(double a,
@@ -207,7 +187,7 @@ void ScalarFieldSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
     dy[layout.idx_phi]       = y[layout.idx_phi_prime];
     dy[layout.idx_phi_prime] = -2. * a_prime_over_a * y[layout.idx_phi_prime] -
                                metric_continuity * phi_prime_bg -
-                               (k2 + a2 * ddV_bg) * y[layout.idx_phi];
+                               (k2 / (1. - 2. * beta_) + a2 * ddV_bg) * y[layout.idx_phi];
   }
   else {
     /* In Newtonian gauge, evolve q = delta_phi' - phi'_bg (psi + 3 phi)
@@ -430,7 +410,8 @@ BaseSpecies::StressEnergyContribution ScalarFieldSpecies::StressEnergy(
   }
 
   // delta_rho: body of DeltaRho
-  double delta_rho = (1. / 3.) * (1. / a2 * phi_prime * delta_phi_prime + dV * y[layout.idx_phi]);
+  double delta_rho = (1. / 3.) * ((1. - 2. * beta_) / a2 * phi_prime * delta_phi_prime +
+                                  dV * y[layout.idx_phi]);
   if (newtonian) {
     delta_rho -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }
@@ -440,7 +421,8 @@ BaseSpecies::StressEnergyContribution ScalarFieldSpecies::StressEnergy(
   se.rho_plus_p_theta = (1. / 3.) * k2 / a2 * phi_prime * y[layout.idx_phi];
 
   // delta_p: body of DeltaP
-  double delta_p = (1. / 3.) * (1. / a2 * phi_prime * delta_phi_prime - dV * y[layout.idx_phi]);
+  double delta_p = (1. / 3.) *
+                   ((1. - 2. * beta_) / a2 * phi_prime * delta_phi_prime - dV * y[layout.idx_phi]);
   if (newtonian) {
     delta_p -= (1. / 3.) * (1. / a2) * phi_prime * phi_prime * psi;
   }
@@ -473,18 +455,16 @@ std::vector<ShootingTarget> ScalarFieldSpecies::GetShootingTargets() const {
   return {};
 }
 
-void ScalarFieldSpecies::ComputeShootingGuess(const SpeciesBuildContext& /*ctx*/,
+void ScalarFieldSpecies::ComputeShootingGuess(const SpeciesBuildContext& ctx,
                                               std::vector<double>& guess,
                                               std::vector<double>& dxdy) const {
-  if (scf_tuning_index_ == 0) {
-    guess.push_back(sqrt(3.0 / Omega0_scf_));
-    dxdy.push_back(-0.5 * sqrt(3.0) * pow(Omega0_scf_, -1.5));
-  }
-  else {
-    /* Default: take the passed value as xguess and set dxdy to 1. */
-    guess.push_back(scf_parameters_[scf_tuning_index_]);
-    dxdy.push_back(1.);
-  }
+  // The guess is potential-specific, so it lives in the potential bundle. The
+  // default bundle reproduces the historical lambda/Omega guess; the composite's
+  // 1EXP bundle returns the frozen-field V0 guess (~3 H0^2 Omega).
+  const auto [xguess, dxdF] =
+      potential_.shooting_guess(Omega0_scf_, ctx.pba->H0, scf_parameters_, scf_tuning_index_);
+  guess.push_back(xguess);
+  dxdy.push_back(dxdF);
 }
 
 double ScalarFieldSpecies::ComputeShootingResidual(const ShootingResidualContext& ctx,
@@ -498,6 +478,11 @@ double ScalarFieldSpecies::ComputeShootingResidual(const ShootingResidualContext
 
 std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
+
+  // When the Type-3 (scf_veta) coupling is active, the Type3 composite owns the
+  // scalar field; the standalone factory must not also build one.
+  if (auto veta = ctx.pfc->get<double>("scf_veta"); veta.has_value() && *veta != 0.)
+    return result;  // the Type3 composite owns the scalar field
 
   // Decide our Omega0_scf and whether shooting may apply.
   // Three cases:
@@ -591,13 +576,13 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
     }
   }
 
-  auto composite = std::make_unique<ScalarFieldSpecies>(*ctx.pba,
-                                                        omega0_scf,
-                                                        std::move(scf_parameters),
-                                                        scf_tuning_index,
-                                                        attractor_ic_scf,
-                                                        phi_ini_scf,
-                                                        phi_prime_ini_scf);
+  auto species = std::make_unique<ScalarFieldSpecies>(*ctx.pba,
+                                                      omega0_scf,
+                                                      std::move(scf_parameters),
+                                                      scf_tuning_index,
+                                                      attractor_ic_scf,
+                                                      phi_ini_scf,
+                                                      phi_prime_ini_scf);
 
   // Detect guess-driven construction: Omega_scf user-set to >0 but
   // scf_shooting_parameter absent. The nonzero check matches the historic shooting
@@ -606,21 +591,125 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
     bool shooting_param_present = ctx.pfc->get<double>("scf_shooting_parameter").has_value();
 
     if (!shooting_param_present) {
-      composite->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
-      composite->needs_shooting_  = true;
+      species->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
+      species->needs_shooting_  = true;
 
       std::vector<double> g, d;
-      composite->ComputeShootingGuess(ctx, g, d);
+      species->ComputeShootingGuess(ctx, g, d);
 
       // Seed the guess into this discovery-build species' scf_parameters_[tuning_index]
       // so its ComputeBackground / shooter residual see a valid potential. Do NOT write it
       // into the file content: the fc is user-facing state checked for unread parameters,
       // and DoShooting writes the *resolved* scf_shooting_parameter back into the fc (which
       // the final build then reads). A guess here would never be read.
-      composite->scf_parameters_[composite->scf_tuning_index_] = g[0];
+      species->scf_parameters_[species->scf_tuning_index_] = g[0];
     }
   }
 
-  result.push_back({"ScalarField", std::move(composite)});
+  result.push_back({"ScalarField", std::move(species)});
+  return result;
+}
+
+std::vector<Named> ScalarFieldSpecies::CreateAllForComposite(const SpeciesBuildContext& ctx,
+                                                             double beta) {
+  // Builds the scalar-field child the Type3 composite owns: an injectable pure-1EXP
+  // potential V = V0 * exp(-lambda*phi) with non-attractor FROZEN initial conditions
+  // (phi_ini = 1e-4, phi'_ini = 0), shooting V0 to hit Omega_scf. Frozen ICs keep the
+  // field negligible during radiation domination (so the Omega_r radiation-start check
+  // is not tripped), and the (1-2beta) kinetic term in the background then has no early
+  // effect. Distinct from the standalone CreateAll, which uses the exponential-
+  // quintessence default potential + attractor ICs and must stay byte-identical.
+  std::vector<Named> result;
+
+  // Resolve Omega0_scf (closure override, or user Omega_scf > 0 ⇒ shooting V0).
+  double omega_scf_val   = 0.;
+  auto omega_scf_opt     = ctx.pfc->get<double>("Omega_scf");
+  bool omega_scf_present = omega_scf_opt.has_value();
+  if (omega_scf_present)
+    omega_scf_val = *omega_scf_opt;
+
+  double omega0_scf     = 0.;
+  bool shooting_allowed = false;
+  if (ctx.omega0_closure_override.has_value()) {
+    omega0_scf = *ctx.omega0_closure_override;
+  }
+  else if (omega_scf_present && omega_scf_val > 0.) {
+    omega0_scf       = omega_scf_val;
+    shooting_allowed = true;
+  }
+  else {
+    return result;
+  }
+  if (omega0_scf == 0.)
+    return result;
+
+  // scf_parameters for a Type-3 run = [V0, lambda]: tuning index 0 shoots V0, entry 1
+  // is the 1EXP slope lambda. The V0 entry is a placeholder; the shooting guess
+  // (3 H0^2 Omega) provides the real starting value, and DoShooting writes the resolved
+  // V0 back into scf_shooting_parameter for the final build.
+  std::vector<double> scf_parameters;
+  try {
+    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>("scf_parameters"))
+      scf_parameters = *scf_params_opt;
+  }
+  catch (const std::exception& e) {
+    throw std::invalid_argument(std::string("scf_parameters parse error: ") + e.what());
+  }
+  if (scf_parameters.size() < 2) {
+    throw std::invalid_argument(
+        "Type-3 (scf_veta) coupling requires scf_parameters = 'V0, lambda' (two entries): "
+        "tuning index 0 shoots V0, entry 1 is the 1EXP slope lambda.");
+  }
+  const int scf_tuning_index = 0;                         // shoot V0
+  ctx.pfc->get_or("scf_tuning_index", scf_tuning_index);  // consume (composite forces 0)
+
+  // The composite controls the scalar-field ICs (always non-attractor frozen), so it
+  // ignores attractor_ic_scf's value, but must still consume it to satisfy the
+  // unread-parameter check (the standalone CreateAll, which would read it, is skipped
+  // when scf_veta is active).
+  ctx.pfc->get<std::string>("attractor_ic_scf");
+
+  if (auto scf_shooting_opt = ctx.pfc->get<double>("scf_shooting_parameter"))
+    scf_parameters[scf_tuning_index] = *scf_shooting_opt;  // resolved V0
+
+  // Injectable pure-1EXP potential, params = [V0, lambda].
+  ScalarFieldPotential exp1exp;
+  exp1exp.V = [](double phi, const std::vector<double>& p) { return p[0] * std::exp(-p[1] * phi); };
+  exp1exp.dV = [](double phi, const std::vector<double>& p) {
+    return -p[1] * p[0] * std::exp(-p[1] * phi);
+  };
+  exp1exp.ddV = [](double phi, const std::vector<double>& p) {
+    return p[1] * p[1] * p[0] * std::exp(-p[1] * phi);
+  };
+  exp1exp.shooting_guess =
+      [](double omega, double H0, const std::vector<double>&, int) -> std::pair<double, double> {
+    // Frozen field: rho_phi,today ~ V0 and rho/H0^2 = Omega, so V0 ~ 3 H0^2 Omega.
+    const double v0 = 3.0 * H0 * H0 * omega;
+    return {v0, 3.0 * H0 * H0};
+  };
+
+  auto field = std::make_unique<ScalarFieldSpecies>(*ctx.pba,
+                                                    omega0_scf,
+                                                    std::move(scf_parameters),
+                                                    scf_tuning_index,
+                                                    /*attractor_ic_scf=*/false,
+                                                    /*phi_ini_scf=*/1e-4,
+                                                    /*phi_prime_ini_scf=*/0.,
+                                                    std::move(exp1exp),
+                                                    beta);
+
+  if (shooting_allowed) {
+    bool shooting_param_present = ctx.pfc->get<double>("scf_shooting_parameter").has_value();
+    if (!shooting_param_present) {
+      field->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
+      field->needs_shooting_  = true;
+
+      std::vector<double> g, d;
+      field->ComputeShootingGuess(ctx, g, d);                   // 1EXP guess: V0 ~ 3 H0^2 Omega
+      field->scf_parameters_[field->scf_tuning_index_] = g[0];  // seed V0 guess
+    }
+  }
+
+  result.push_back({"ScalarField", std::move(field)});
   return result;
 }

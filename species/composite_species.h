@@ -26,7 +26,58 @@
 class CompositeSpecies : public BaseSpecies {
  public:
   CompositeSpecies(std::string name, EnergyType energy_type)
-      : BaseSpecies(std::move(name), energy_type) {}
+      : BaseSpecies(std::move(name), energy_type) {
+    delegates_tally_ = true;
+  }
+
+  /** Generic composite layout: one owning sub-layout per child, aligned 1:1 with
+   *  children_ (construction order). Concrete composites that need a typed child
+   *  field cast child_layouts[k] to the concrete child layout. */
+  struct PerturbLayout : BaseSpecies::PerturbLayout {
+    std::vector<std::unique_ptr<BaseSpecies::PerturbLayout>> child_layouts;
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override;
+
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+                                   perturb_vector* pv,
+                                   const precision* ppr,
+                                   int& index_pt,
+                                   const perturb_workspace* ppw,
+                                   int gauge) override;
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+                              double* y,
+                              const PerturbIcContext& ctx) override;
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+                                        const perturb_vector* pv,
+                                        const double* y,
+                                        const double* pvecback,
+                                        const perturb_workspace* ppw) const override;
+  void DelegateTally(const BaseSpecies::PerturbLayout& layout,
+                     const perturb_vector* pv,
+                     const double* y,
+                     const double* pvecback,
+                     const perturb_workspace* ppw,
+                     StressEnergyContribution& total,
+                     StressEnergyContribution& total_cold,
+                     StressEnergyContribution& total_warm) const override;
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+                     double tau,
+                     const double* y,
+                     double* dy,
+                     const perturb_parameters_and_workspace& ppaw) const override;
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) const override;
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
 
   // ── Registration ────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
@@ -119,6 +170,7 @@ class CompositeSpecies : public BaseSpecies {
   void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
   void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
+  void FinalizeBackground(double a, double H, const double* pvecback_B, double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double PPrime(double a,
@@ -130,6 +182,7 @@ class CompositeSpecies : public BaseSpecies {
   // ── Matter tally ────────────────────────────────────────────────────────
   bool ClustersAsMatter() const override;
   bool IsColdMatterSpecies() const override;
+  void FinalizeMatterClassification() override;
 
  protected:
   std::vector<std::unique_ptr<BaseSpecies>> children_;

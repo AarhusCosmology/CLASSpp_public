@@ -4,13 +4,16 @@
 #include "../species/base_species.h"
 #include "background.h"
 #include "perturbations.h"
+#include "scalar_field_potential.h"
 #include "species_build_context.h"
 
 class BackgroundModule;
 
 /**
  * Scalar field: phi and phi' integrated via ODE.
- * Potential V(phi) = exp(-lambda*phi) * ((phi-B)^alpha + A).
+ * The potential is injectable via the ScalarFieldPotential bundle; the default
+ * is V(phi) = exp(-lambda*phi) * ((phi-B)^alpha + A). Composites and callers
+ * may supply their own potential at construction time.
  */
 class ScalarFieldSpecies : public BaseSpecies {
  public:
@@ -22,7 +25,9 @@ class ScalarFieldSpecies : public BaseSpecies {
                      int scf_tuning_index,
                      bool attractor_ic_scf,
                      double phi_ini_scf,
-                     double phi_prime_ini_scf);
+                     double phi_prime_ini_scf,
+                     ScalarFieldPotential potential = DefaultScalarFieldPotential(),
+                     double beta                    = 0.);
 
   double GetOmega0() const override {
     return Omega0_scf_;
@@ -42,6 +47,9 @@ class ScalarFieldSpecies : public BaseSpecies {
   }
   double phi_prime_ini_scf() const {
     return phi_prime_ini_scf_;
+  }
+  double beta() const {
+    return beta_;
   }
 
   // ── Background ──────────────────────────────────────────────────────────
@@ -123,6 +131,11 @@ class ScalarFieldSpecies : public BaseSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
+  // Shared build body for both the standalone factory (beta = 0) and the Type3
+  // composite (beta = scf_veta). Constructs the configured ScalarFieldSpecies with
+  // its shooting state set; CreateAll wraps it with the scf_veta suppression guard.
+  static std::vector<Named> CreateAllForComposite(const SpeciesBuildContext& ctx, double beta);
+
   // ── Shooting hooks ───────────────────────────────────────────────────────
   std::vector<ShootingTarget> GetShootingTargets() const override;
   void ComputeShootingGuess(const SpeciesBuildContext& ctx,
@@ -162,10 +175,21 @@ class ScalarFieldSpecies : public BaseSpecies {
     return index_bi_phi_prime_scf_;
   }
 
+  // Background pvecback slot accessors (used by the Type3 composite to replicate
+  // the scalar-field PrintVariables / coupling against its own nested layout).
+  int index_bg_phi_prime_scf() const {
+    return index_bg_phi_prime_scf_;
+  }
+  int index_bg_dV_scf() const {
+    return index_bg_dV_scf_;
+  }
+
  private:
   double V_scf(double phi) const;
   double dV_scf(double phi) const;
   double ddV_scf(double phi) const;
+
+  ScalarFieldPotential potential_;
 
   ShootingTarget shooting_target_{};  // unknown_param empty => no shooting target
   bool needs_shooting_ = false;       // true iff the direct unknown was absent (we guessed)
@@ -189,4 +213,5 @@ class ScalarFieldSpecies : public BaseSpecies {
   bool attractor_ic_scf_    = true;
   double phi_ini_scf_       = 1.;
   double phi_prime_ini_scf_ = 1.;
+  double beta_              = 0.;
 };

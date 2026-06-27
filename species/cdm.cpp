@@ -5,8 +5,9 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-CDMSpecies::CDMSpecies(const background& pba, double omega0_cdm)
-    : BaseSpecies("CDM", EnergyType::Matter), Omega0_cdm_(omega0_cdm), H0_(pba.H0) {}
+CDMSpecies::CDMSpecies(const background& pba, double omega0_cdm, bool coupled)
+    : BaseSpecies("CDM", EnergyType::Matter), Omega0_cdm_(omega0_cdm), H0_(pba.H0),
+      coupled_(coupled) {}
 
 void CDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_cdm_, _TRUE_, index_bg, 1);
@@ -37,7 +38,7 @@ void CDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceReques
   class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
   class_define_index(index_tp_theta_,
                      ctx.wants_velocity &&
-                         ctx.gauge != static_cast<int>(possible_gauges::synchronous),
+                         (coupled_ || ctx.gauge != static_cast<int>(possible_gauges::synchronous)),
                      index_tp,
                      1);
 }
@@ -53,10 +54,12 @@ void CDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   layout.idx_delta = index_pt;
   ++index_pt;
 
-  /* theta_cdm is a dynamical variable only in Newtonian gauge;
-     in synchronous gauge it is zero by definition. Sentinel -1 signals absent. */
-  layout.idx_theta = -1;
-  if (gauge == static_cast<int>(possible_gauges::newtonian)) {
+  /* theta_cdm is a dynamical variable in Newtonian gauge, or in synchronous
+     gauge when coupled (free-streaming; composite adds the transfer source).
+     Sentinel -1 signals absent. */
+  layout.idx_theta     = -1;
+  const bool newtonian = (gauge == static_cast<int>(possible_gauges::newtonian));
+  if (newtonian || coupled_) {
     layout.idx_theta = index_pt;
     ++index_pt;
   }
@@ -72,11 +75,11 @@ void CDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
   const auto gauge                = ppaw.perturbations_module->GetPerturbs()->gauge;
 
-  if (gauge == possible_gauges::newtonian) {
+  if (gauge == possible_gauges::newtonian || coupled_) {
     dy[layout.idx_delta] = -(y[layout.idx_theta] + ctx.metric_continuity);
     dy[layout.idx_theta] = -ctx.a_prime_over_a * y[layout.idx_theta] + ctx.metric_euler;
   }
-  else { /* synchronous: theta_cdm = 0 by gauge choice */
+  else { /* synchronous, uncoupled: theta_cdm = 0 by gauge choice */
     dy[layout.idx_delta] = -ctx.metric_continuity;
   }
 }
@@ -120,6 +123,9 @@ void CDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
     y[layout.idx_delta] = -ctx.ppr->entropy_ini * 9. / 64. * ctx.fracnu * ctx.fracb / ctx.fracg *
                           ctx.k * ctx.tau * ctx.om * ctx.tau;
   }
+
+  if (layout.idx_theta >= 0)
+    y[layout.idx_theta] = 0.;
 }
 
 void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
@@ -191,7 +197,7 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
 
     delta_cdm           = y[layout.idx_delta];
     const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == possible_gauges::synchronous) {
+    if (ppt->gauge == possible_gauges::synchronous && !coupled_) {
       theta_cdm = 0.;
     }
     else {
@@ -250,6 +256,10 @@ std::vector<Named> CDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   const double omega0 = *ctx.omega_budget->cdm;
   if (omega0 == 0.0)
     return result;
+  // When the Type-3 (scf_veta) coupling is active, the Type3 composite owns the
+  // (coupled) CDM child; the standalone factory must not also build one.
+  if (auto veta = ctx.pfc->get<double>("scf_veta"); veta.has_value() && *veta != 0.)
+    return result;  // the Type3 composite owns the CDM
   result.push_back({"CDM", std::make_unique<CDMSpecies>(*ctx.pba, omega0)});
   return result;
 }

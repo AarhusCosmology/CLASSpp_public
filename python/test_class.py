@@ -1010,6 +1010,152 @@ class TestReviewRegressions(TestClass):
         }
         self._assert_compute_succeeds(scenario)
 
+    def test_type3_synchronous_computes(self):
+        # Type-3 composite (coupled CDM + beta scalar field) end-to-end, in the
+        # paper regime (arXiv:1604.04222): the composite builds an injectable
+        # 1EXP V0*exp(-lambda*phi) scalar field with non-attractor FROZEN ICs and
+        # shoots V0 to hit Omega_scf, plus an uncoupled CDM whose theta stays 0
+        # (no coupling terms yet -> Task 5). Frozen ICs keep the field negligible
+        # during radiation domination, so beta=-0.5 (the (1-2*beta)=2 kinetic
+        # boost) no longer trips the radiation-start Omega_r check.
+        # scf_parameters = 'V0_placeholder, lambda'; tuning index 0 shoots V0.
+        scenario = {
+            'output': 'tCl mPk',
+            'gauge': 'synchronous',
+            'Omega_fld': 0,
+            'Omega_scf': 0.7,
+            'attractor_ic_scf': 'no',
+            'scf_parameters': '1, 1.22',
+            'scf_veta': -0.5,
+        }
+        self._assert_compute_succeeds(scenario)
+
+    def test_type3_newtonian_rejected(self):
+        # The gauge guard in Type3Species::CreateAll rejects Newtonian gauge at
+        # input parsing (before any background/shooting), for any nonzero beta.
+        scenario = {
+            'output': 'tCl',
+            'gauge': 'newtonian',
+            'Omega_fld': 0,
+            'Omega_scf': 0.7,
+            'attractor_ic_scf': 'no',
+            'scf_parameters': '1, 1.22',
+            'scf_veta': -0.5,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        with self.assertRaises(Exception):
+            self.cosmo.compute()
+
+    def test_type3_beta_zero_unset_is_plain_scf(self):
+        # scf_veta absent => no composite => plain CDM + scalar field via the
+        # default exponential-quintessence potential + attractor ICs (unchanged).
+        scenario = {
+            'output': 'tCl',
+            'gauge': 'synchronous',
+            'Omega_fld': 0,
+            'Omega_scf': 0.1,
+            'attractor_ic_scf': 'yes',
+            'scf_parameters': '10, 0, 0, 0',
+        }
+        self._assert_compute_succeeds(scenario)
+
+    def test_type3_drives_theta_cdm(self):
+        # Coupled synchronous CDM carries theta_cdm as a dynamical variable; with
+        # the momentum transfer OFF (beta=0) it stays identically 0. The coupling
+        # (beta=-0.5) must drive it away from zero. Uses the proven frozen-IC
+        # injectable potential ('V0, lambda'); the brief's attractor + 4-param form
+        # does not compute at beta=-0.5 (singular matrix), which is exactly why
+        # test_type3_synchronous_computes also uses frozen ICs.
+        scenario = {
+            'output': 'mPk',
+            'gauge': 'synchronous',
+            'Omega_fld': 0,
+            'Omega_scf': 0.7,
+            'attractor_ic_scf': 'no',
+            'scf_parameters': '1, 1.22',
+            'scf_veta': -0.5,
+            'k_output_values': '0.1',
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        scalar = self.cosmo.get_perturbations()['scalar'][0]
+        assert np.max(np.abs(scalar['theta_cdm'])) > 1e-3
+
+    def test_type3_suppresses_growth(self):
+        # Paper (arXiv:1604.04222, Fig. 1/2): negative beta suppresses growth.
+        # Controlled comparison: two Type-3 composites with the IDENTICAL frozen-IC
+        # injectable potential, differing ONLY in beta. beta=-1e-4 is the
+        # effectively-uncoupled baseline (CreateAll drops the composite at beta==0,
+        # so an exact-zero-beta composite is not constructible). The brief's
+        # plain-scf (no scf_veta) baseline is NOT a controlled comparison: it takes
+        # a different potential/IC path. Larger |beta| => smaller P(k).
+        base = {
+            'output': 'mPk', 'P_k_max_1/Mpc': 1.0, 'z_pk': 0,
+            'gauge': 'synchronous', 'Omega_fld': 0, 'Omega_scf': 0.7,
+            'attractor_ic_scf': 'no', 'scf_parameters': '1, 1.22',
+        }
+        uncoupled = Class()
+        uncoupled.set(dict(self.verbose, scf_veta=-1e-4, **base))
+        uncoupled.compute()
+        coupled = Class()
+        coupled.set(dict(self.verbose, scf_veta=-0.5, **base))
+        coupled.compute()
+        k = 0.1
+        try:
+            ratio = coupled.pk(k, 0) / uncoupled.pk(k, 0)
+            assert ratio < 1.0  # negative beta suppresses growth (paper Fig. 1/2)
+        finally:
+            for c in (uncoupled, coupled):
+                c.struct_cleanup()
+                c.empty()
+
+    def test_type3_pk_ratio_turnup_feature(self):
+        # Paper (arXiv:1604.04222, Fig. 2 right): as |beta| increases from 0 the
+        # suppression of P(k) first deepens (monotonic at fixed k), then the knee
+        # shifts to higher k so that a fixed intermediate-k point recovers — the
+        # "turn-up" feature.  We assert two coarse proxies:
+        #   (i)  moderate coupling (beta=-0.5) suppresses P(k) relative to the
+        #        effectively-uncoupled reference (beta=-1e-4);
+        #   (ii) very large |beta| (beta=-1e4) gives LESS suppression at k=0.2
+        #        than the intermediate coupling (beta=-1e2), confirming the
+        #        turn-up direction.
+        # Reference baseline: scf_veta=-1e-4 keeps the run on the identical
+        # Type-3 composite code path while making the momentum-transfer negligible
+        # (CreateAll drops the composite for beta==0).
+        base = {
+            'output': 'mPk', 'P_k_max_1/Mpc': 1.0, 'z_pk': 0,
+            'gauge': 'synchronous', 'Omega_fld': 0, 'Omega_scf': 0.7,
+            'attractor_ic_scf': 'no', 'scf_parameters': '1, 1.22',
+        }
+        ref = Class()
+        ref.set(dict(self.verbose, scf_veta=-1e-4, **base))
+        ref.compute()
+        k = 0.2
+        pk0 = ref.pk(k, 0)
+        ratios = {}
+        try:
+            for beta in (-0.5, -1e2, -1e4):
+                c = Class()
+                c.set({**self.verbose, **base, 'scf_veta': beta})
+                try:
+                    c.compute()
+                    ratios[beta] = c.pk(k, 0) / pk0
+                finally:
+                    c.struct_cleanup()
+                    c.empty()
+        finally:
+            ref.struct_cleanup()
+            ref.empty()
+        # (i) Suppression at moderate |beta|
+        assert ratios[-0.5] < 1.0, f"Expected suppression, got ratio={ratios[-0.5]:.4f}"
+        # (ii) Turn-up: very large |beta| shows less suppression than intermediate |beta|
+        assert ratios[-1e4] > ratios[-1e2], (
+            f"Expected turn-up: ratio[-1e4]={ratios[-1e4]:.4f} should exceed "
+            f"ratio[-1e2]={ratios[-1e2]:.4f}"
+        )
+
     def test_dot_syntax_interacting_psd_filenames_follow_true_flags(self):
         scenario = {
             **self._dot_syntax_base(),

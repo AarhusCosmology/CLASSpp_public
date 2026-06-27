@@ -1,7 +1,21 @@
 # Thin convenience shim. The build system is CMakeLists.txt; see README.md.
 BUILD_DIR ?= build/cmake
 
-.PHONY: all class class_profiled classy classy-pip-dev test test-parser test-bisection test-quadrature test-photons test-species-types clean
+TEST_TARGETS := \
+	test-parser \
+	test-bisection \
+	test-quadrature \
+	test-photons \
+	test-species-types \
+	test-scf-potential \
+	test-cdm-coupled \
+	test-scf-beta \
+	test-composite-classification \
+	test-type3-gauge-guard \
+	test-composite-layout \
+	test-type3-coupling
+
+.PHONY: all class class_profiled classy classy-pip-dev test clean $(TEST_TARGETS)
 
 # The real parallelism happens inside `cmake --build --parallel`; serialize
 # the shim targets so `make -j class class_profiled` cannot run two CMake
@@ -13,13 +27,13 @@ all: class
 $(BUILD_DIR)/CMakeCache.txt:
 	cmake -S . -B $(BUILD_DIR)
 
-class class_profiled test-parser test-bisection test-quadrature test-photons test-species-types: $(BUILD_DIR)/CMakeCache.txt
+class class_profiled $(TEST_TARGETS): $(BUILD_DIR)/CMakeCache.txt
 	cmake --build $(BUILD_DIR) --target $@ --parallel
 
 # Single cmake invocation so `make -j test` cannot race parallel builds
 # of the same build directory.
 test: $(BUILD_DIR)/CMakeCache.txt
-	cmake --build $(BUILD_DIR) --target test-parser test-bisection test-quadrature test-photons test-species-types --parallel
+	cmake --build $(BUILD_DIR) --target $(TEST_TARGETS) --parallel
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
 
 # Builds + installs classy via pip (scikit-build-core -> CMake), then recreates

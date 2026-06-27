@@ -23,6 +23,7 @@ int main() {
   assert(LambdaSpecies::kTypeName == "lambda");
   assert(FluidSpecies::kTypeName == "fluid");
   assert(ScalarFieldSpecies::kTypeName == "scalar_field");
+  assert(Type3Species::kTypeName == "cdm_scf_momentum");
 
   // The factory registry carries exactly these type strings.
   std::set<std::string> names;
@@ -44,6 +45,7 @@ int main() {
       "lambda",
       "fluid",
       "scalar_field",
+      "cdm_scf_momentum",
   };
   assert(names == expected);
 

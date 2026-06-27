@@ -30,6 +30,7 @@
 #include "photons.h"
 #include "scalar_field.h"
 #include "species_build_context.h"
+#include "type3_species.h"
 #include "ultra_relativistic.h"
 
 struct SpeciesFactoryEntry {
@@ -56,6 +57,7 @@ inline constexpr std::array kAllSpeciesFactories = {
     SpeciesFactoryEntry{LambdaSpecies::kTypeName, &LambdaSpecies::CreateAll},
     SpeciesFactoryEntry{FluidSpecies::kTypeName, &FluidSpecies::CreateAll},
     SpeciesFactoryEntry{ScalarFieldSpecies::kTypeName, &ScalarFieldSpecies::CreateAll},
+    SpeciesFactoryEntry{Type3Species::kTypeName, &Type3Species::CreateAll},
 };
 
 /** Maps the closure-species enum to the matching factory entry name. */

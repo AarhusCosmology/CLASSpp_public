@@ -93,8 +93,10 @@ set(CLASS_SPECIES_FILES
   species/perturb_column_writer.cpp
   species/photons.cpp
   species/scalar_field.cpp
+  species/scalar_field_potential.cpp
   species/species_collection.cpp
   species/species_input.cpp
+  species/type3_species.cpp
   species/ultra_relativistic.cpp
 )
 
@@ -212,8 +214,19 @@ if(NOT SKBUILD)
   add_executable(test-quadrature tools/quadrature_test.cpp)
   add_executable(test-photons species/photons_formula_test.cpp)
   add_executable(test-species-types species/species_type_name_test.cpp)
-  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types)
+  add_executable(test-scf-potential species/scalar_field_potential_test.cpp)
+  add_executable(test-cdm-coupled species/cdm_coupled_test.cpp)
+  add_executable(test-scf-beta species/scalar_field_beta_test.cpp)
+  add_executable(test-composite-classification species/composite_classification_test.cpp)
+  add_executable(test-type3-gauge-guard species/type3_gauge_guard_test.cpp)
+  add_executable(test-composite-layout species/composite_layout_test.cpp)
+  add_executable(test-type3-coupling species/type3_coupling_test.cpp)
+  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling)
     target_link_libraries(${_t} PRIVATE classpp)
+    # These tests assert on values; keep their assert()s live even under
+    # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for
+    # the test executables only; the classpp library stays optimized with NDEBUG.
+    target_compile_options(${_t} PRIVATE -UNDEBUG)
     add_test(NAME ${_t} COMMAND ${_t} WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
   endforeach()
 endif()
