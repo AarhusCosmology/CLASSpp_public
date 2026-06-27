@@ -311,6 +311,14 @@ int NCDMBaseSpecies::TestFunction(void* /*params*/, double q, double* test) {
   double d = 120.0 / (7.0 * pow(_PI_, 4));
   double e = 2.0 / (45.0 * _zeta5_);
   *test    = pow(2.0 * _PI_, 3) / 6.0 * (c * q * q - d * q * q * q - e * q * q * q * q);
+
+  // The original polynomial exactly tests massless and non-relativistic
+  // moments, but a low-order FD Gaussian rule can integrate it exactly while
+  // still undersampling the relativistic/non-relativistic transition in the
+  // perturbation hierarchy. Weight the selector by an intermediate-energy
+  // factor so the automatic grid also samples that transition.
+  if (q > 0.)
+    *test *= std::sqrt(q * q + 0.5) / q;
   return _SUCCESS_;
 }
 

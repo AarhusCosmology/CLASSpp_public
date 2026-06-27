@@ -96,8 +96,11 @@ TEST_LEVEL = int(os.getenv('TEST_LEVEL', '0')) # 0 <= TEST_LEVEL <= 3
 if COMPARE_OUTPUT_REF:
     try:
         import classyref
-    except:
-        COMPARE_OUTPUT_REF = False
+    except ImportError as exc:
+        raise ImportError(
+            "COMPARE_OUTPUT_REF=1 was requested, but classyref could not be imported. "
+            "Install the reference wrapper as classyref before running reference comparisons."
+        ) from exc
 # Define bounds on the relative and absolute errors of C(l) and P(k)
 # between reference, Newtonian and Synchronous gauge
 COMPARE_CL_RELATIVE_ERROR = 3e-3
@@ -596,7 +599,8 @@ class TestScenario(TestClass):
                 self.cosmo_newt.state,
                 "Class failed to go through all __init__ methods in Newtonian gauge")
 
-            self.compare_output(self.cosmo, "Synchronous", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR_GAUGE, COMPARE_PK_RELATIVE_ERROR_GAUGE)
+            status = self.compare_output(self.cosmo, "Synchronous", self.cosmo_newt, 'Newtonian', COMPARE_CL_RELATIVE_ERROR_GAUGE, COMPARE_PK_RELATIVE_ERROR_GAUGE)
+            assert status, 'Gauge comparison failed!'
 
         if COMPARE_OUTPUT_REF:
             # Compute reference models in both gauges and compare

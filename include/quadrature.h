@@ -13,7 +13,14 @@
 
 #include "common.h"
 
-enum quadrature_method { qm_auto, qm_Laguerre, qm_trapz_indefinite, qm_trapz, qm_GB_Laguerre };
+enum quadrature_method {
+  qm_auto,
+  qm_Laguerre,
+  qm_trapz_indefinite,
+  qm_trapz,
+  qm_GB_Laguerre,
+  qm_FermiDirac,
+};
 
 /** Optional grey-body parameters threaded into manual quadrature. When
  *  `active` is false the GB-specific methods are not used. Defined here (not in
@@ -77,6 +84,13 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
 int compute_Hermite(double* x, double* w, int N, int alpha, double* b, double* c);
 int compute_Laguerre(
     double* x, double* w, int N, double alpha, double* b, double* c, int totalweight);
+
+/** Compute the N-point Gaussian rule for the weight 1 / (exp(x) + 1) on
+ *  [0, infinity). The rule is constructed from Laguerre modified moments
+ *  using the modified-Chebyshev algorithm and Golub-Welsch diagonalization.
+ *  It is reliable through order 17; higher orders are intentionally rejected
+ *  rather than silently returning an ill-conditioned rule. */
+int compute_FermiDirac(double* x, double* w, int N);
 int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
             int (*function)(void* params_for_function, double q, double* f0),
             void* params_for_function,

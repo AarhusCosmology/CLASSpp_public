@@ -6,7 +6,130 @@
 #include "quadrature.h"
 
 #include <algorithm>
+#include <limits>
 #define _N_COMB_LAG_ 16
+
+namespace {
+
+constexpr int kFermiDiracMaxOrder   = 17;
+constexpr int kFermiDiracCohenTerms = 40;
+
+double fermi_dirac_weight(double x) {
+  return 1. / (std::exp(x) + 1.);
+}
+
+/**
+ * Compute \int_0^infinity L_n(x)/(exp(x)+1) dx, where L_n is the ordinary
+ * Laguerre polynomial. Expanding the Fermi-Dirac weight gives the alternating
+ * series sum_{k>=1} (-1)^(k-1) (1-1/k)^n/k. Cohen--Rodriguez Villegas--Zagier
+ * acceleration makes the evaluation accurate enough for the subsequent
+ * modified-Chebyshev recurrence.
+ */
+double fermi_dirac_modified_moment(int n) {
+  const long double root = 3.L + std::sqrt(8.L);
+  long double d          = std::pow(root, kFermiDiracCohenTerms);
+  d                      = 0.5L * (d + 1.L / d);
+  long double b          = -1.L;
+  long double c          = -d;
+  long double sum        = 0.L;
+
+  for (int k = 0; k < kFermiDiracCohenTerms; ++k) {
+    c                        = b - c;
+    const long double index  = static_cast<long double>(k + 1);
+    const long double term   = std::pow(1.L - 1.L / index, n) / index;
+    sum                     += c * term;
+    b *= static_cast<long double>((k + kFermiDiracCohenTerms) * (k - kFermiDiracCohenTerms)) /
+         ((static_cast<long double>(k) + 0.5L) * (k + 1));
+  }
+  return static_cast<double>(sum / d);
+}
+
+/** Implicit-QL diagonalization of a real symmetric tridiagonal matrix. The
+ *  eigenvectors are stored by columns in eigenvectors. */
+bool diagonalize_symmetric_tridiagonal(std::vector<double>& diagonal,
+                                       std::vector<double>& subdiagonal,
+                                       std::vector<double>& eigenvectors) {
+  const int n = static_cast<int>(diagonal.size());
+  if (n == 0)
+    return false;
+
+  // The QL iteration expects the subdiagonal shifted one element to the left.
+  for (int i = 1; i < n; ++i)
+    subdiagonal[i - 1] = subdiagonal[i];
+  subdiagonal[n - 1] = 0.;
+
+  constexpr int kMaxIterations = 100;
+  for (int l = 0; l < n; ++l) {
+    int iterations = 0;
+    while (true) {
+      int m = l;
+      for (; m < n - 1; ++m) {
+        const double scale = std::abs(diagonal[m]) + std::abs(diagonal[m + 1]);
+        if (std::abs(subdiagonal[m]) <= std::numeric_limits<double>::epsilon() * scale)
+          break;
+      }
+      if (m == l)
+        break;
+      if (++iterations > kMaxIterations)
+        return false;
+
+      double g = (diagonal[l + 1] - diagonal[l]) / (2. * subdiagonal[l]);
+      double r = std::hypot(g, 1.);
+      g        = diagonal[m] - diagonal[l] + subdiagonal[l] / (g + std::copysign(r, g));
+      double s = 1.;
+      double c = 1.;
+      double p = 0.;
+
+      int i = m - 1;
+      for (; i >= l; --i) {
+        const double f     = s * subdiagonal[i];
+        const double b     = c * subdiagonal[i];
+        r                  = std::hypot(f, g);
+        subdiagonal[i + 1] = r;
+        if (r == 0.) {
+          diagonal[i + 1] -= p;
+          subdiagonal[m]   = 0.;
+          break;
+        }
+        s               = f / r;
+        c               = g / r;
+        g               = diagonal[i + 1] - p;
+        r               = (diagonal[i] - g) * s + 2. * c * b;
+        p               = s * r;
+        diagonal[i + 1] = g + p;
+        g               = c * r - b;
+
+        for (int row = 0; row < n; ++row) {
+          const double z                = eigenvectors[row * n + i + 1];
+          eigenvectors[row * n + i + 1] = s * eigenvectors[row * n + i] + c * z;
+          eigenvectors[row * n + i]     = c * eigenvectors[row * n + i] - s * z;
+        }
+      }
+      if (r == 0. && i >= l)
+        continue;
+      diagonal[l]    -= p;
+      subdiagonal[l]  = g;
+      subdiagonal[m]  = 0.;
+    }
+  }
+
+  // Golub-Welsch rules conventionally expose nodes in increasing order.
+  for (int i = 0; i < n - 1; ++i) {
+    int min_index = i;
+    for (int j = i + 1; j < n; ++j) {
+      if (diagonal[j] < diagonal[min_index])
+        min_index = j;
+    }
+    if (min_index == i)
+      continue;
+    std::swap(diagonal[i], diagonal[min_index]);
+    for (int row = 0; row < n; ++row)
+      std::swap(eigenvectors[row * n + i], eigenvectors[row * n + min_index]);
+  }
+  return true;
+}
+
+}  // namespace
 
 int get_qsampling_manual(double* x,
                          double* w,
@@ -29,6 +152,23 @@ int get_qsampling_manual(double* x,
       std::vector<double> c(N);
       compute_Laguerre(x, dq, N, 0.0, b.data(), c.data(), _TRUE_);
       for (int i = 0; i < N; i++) {
+        (*function)(params_for_function, x[i], &y);
+        w[i] = dq[i] * y;
+      }
+      return _SUCCESS_;
+    }
+    case (qm_FermiDirac): {
+      std::vector<double> fd_weight(N);
+      class_test(compute_FermiDirac(x, fd_weight.data(), N) == _FAILURE_,
+                 "qm_FermiDirac supports 1 through %d momentum bins; the modified-moment "
+                 "recurrence is ill-conditioned above this range",
+                 kFermiDiracMaxOrder);
+      for (int i = 0; i < N; ++i) {
+        const double reference_weight = fermi_dirac_weight(x[i]);
+        class_test(reference_weight == 0.,
+                   "qm_FermiDirac produced an abscissa outside the representable Fermi-Dirac "
+                   "weight range");
+        dq[i] = fd_weight[i] / reference_weight;
         (*function)(params_for_function, x[i], &y);
         w[i] = dq[i] * y;
       }
@@ -104,8 +244,10 @@ int get_qsampling(double* x,
      quadrature and Laguerres quadrature formula. */
 
   int i, NL = 2, NR, level, Nadapt = 0, NLag, NLag_max, Nold = NL;
-  int adapt_converging = _FALSE_, Laguerre_converging = _FALSE_, combined_converging = _FALSE_;
-  double y, y1, y2, I, Igk, err, ILag;
+  int NFD, NFD_max;
+  int adapt_converging = _FALSE_, Laguerre_converging = _FALSE_, FermiDirac_converging = _FALSE_,
+      combined_converging = _FALSE_;
+  double y, y1, y2, I, Igk, err, ILag, IFD;
   std::unique_ptr<qss_node> root      = nullptr;
   std::unique_ptr<qss_node> root_comb = nullptr;
   double I_comb, I_atzero, I_atinf, I_comb2;
@@ -312,6 +454,32 @@ int get_qsampling(double* x,
     }
   }
 
+  /* Search for the minimal Fermi-Dirac Gaussian quadrature rule. The rule is
+     constructed once per trial order from modified Laguerre moments; it is
+     exact for the FD-weighted test polynomial through degree 2*N-1. As for
+     Gauss-Laguerre, fold the actual PSD into the stored weights so this remains
+     a valid importance rule for arbitrary analytic or tabulated PSDs. */
+  NFD_max = std::min(N_max, kFermiDiracMaxOrder);
+  for (NFD = 2; NFD <= NFD_max; ++NFD) {
+    std::vector<double> x_fd(NFD);
+    std::vector<double> w_fd(NFD);
+    if (compute_FermiDirac(x_fd.data(), w_fd.data(), NFD) == _FAILURE_)
+      break;
+
+    IFD = 0.;
+    for (i = 0; i < NFD; ++i) {
+      (*test)(params_for_function, x_fd[i], &y);
+      (*function)(params_for_function, x_fd[i], &y2);
+      w_fd[i] *= y2 / fermi_dirac_weight(x_fd[i]);
+      IFD     += y * w_fd[i];
+    }
+    err = I - IFD;
+    if (fabs(err / Itot) < rtol) {
+      FermiDirac_converging = _TRUE_;
+      break;
+    }
+  }
+
   /* Choose best method if both works: */
   *N = N_max;
   //Laguerre_converging = _FALSE_;
@@ -337,6 +505,17 @@ int get_qsampling(double* x,
       Laguerre_converging = _FALSE_;
     }
   }
+  if (FermiDirac_converging == _TRUE_) {
+    if (NFD <= *N) {
+      *N                  = NFD;
+      Laguerre_converging = _FALSE_;
+      combined_converging = _FALSE_;
+      adapt_converging    = _FALSE_;
+    }
+    else {
+      FermiDirac_converging = _FALSE_;
+    }
+  }
   //printf("N_adapt=%d, N_combined=%d at level=%d, Nlag=%d\n",Nadapt,N_comb,level,NLag);
   if (adapt_converging == _TRUE_) {
     method_chosen = "Adaptive Gauss-Kronrod Quadrature";
@@ -347,6 +526,15 @@ int get_qsampling(double* x,
   else if (Laguerre_converging == _TRUE_) {
     method_chosen = "Gauss-Laguerre Quadrature";
     /* x and w is already populated in this case. */
+  }
+  else if (FermiDirac_converging == _TRUE_) {
+    method_chosen = "Fermi-Dirac Gaussian Quadrature";
+    class_test(compute_FermiDirac(x, w, *N) == _FAILURE_,
+               "Could not reconstruct the selected Fermi-Dirac quadrature rule");
+    for (i = 0; i < *N; ++i) {
+      (*function)(params_for_function, x[i], &y);
+      w[i] *= y / fermi_dirac_weight(x[i]);
+    }
   }
   else if (combined_converging == _TRUE_) {
     method_chosen = "Combined Quadrature";
@@ -381,7 +569,7 @@ int get_qsampling(double* x,
     w[i] = w[i + zeroskip];
   }
 
-  //printf("Chosen sampling: %s, with %d points.\n",method_chosen,*N);
+  //printf("Chosen sampling: %s, with %d points.\n", method_chosen.c_str(), *N);
   //for(i=0; i<*N; i++) printf("(q,w) = (%g,%g)\n",x[i],w[i]);
   /* Deallocate tree handled by unique_ptr automatically. */
 
@@ -650,6 +838,77 @@ int compute_Laguerre(
       w[i] = exp(logcc - log(dp2 * p1));
   }
 
+  return _SUCCESS_;
+}
+
+int compute_FermiDirac(double* x, double* w, int N) {
+  if (N < 1 || N > kFermiDiracMaxOrder)
+    return _FAILURE_;
+
+  /* The reference monic Laguerre recurrence is
+       L_(n+1) = (x - (2n+1)) L_n - n^2 L_(n-1).
+     Modified Chebyshev obtains the recurrence of the FD orthogonal
+     polynomials from nu_n = integral L_n(x)/(exp(x)+1) dx without ever
+     forming ill-conditioned power moments. */
+  std::vector<double> moments(2 * N);
+  double factorial = 1.;
+  for (int n = 0; n < 2 * N; ++n) {
+    if (n > 0)
+      factorial *= n;
+    // fermi_dirac_modified_moment() uses the conventional Laguerre L_n
+    // (leading coefficient (-1)^n/n!), while the recurrence below requires
+    // the monic P_n=(-1)^n n! L_n.
+    moments[n] = (n % 2 == 0 ? factorial : -factorial) * fermi_dirac_modified_moment(n);
+  }
+
+  if (!(moments[0] > 0.) || !std::isfinite(moments[0]))
+    return _FAILURE_;
+
+  std::vector<std::vector<double>> sigma(N, std::vector<double>(2 * N, 0.));
+  std::vector<double> diagonal(N);
+  std::vector<double> off_diagonal_squared(N, 0.);
+  sigma[0]    = moments;
+  diagonal[0] = 1. + moments[1] / moments[0];
+
+  for (int n = 1; n < N; ++n) {
+    for (int l = n; l <= 2 * N - n - 1; ++l) {
+      const double laguerre_diagonal        = 2. * l + 1.;
+      const double laguerre_subdiag_squared = static_cast<double>(l) * l;
+      sigma[n][l] = sigma[n - 1][l + 1] - (diagonal[n - 1] - laguerre_diagonal) * sigma[n - 1][l] -
+                    off_diagonal_squared[n - 1] * (n > 1 ? sigma[n - 2][l] : 0.) +
+                    laguerre_subdiag_squared * sigma[n - 1][l - 1];
+    }
+
+    const double previous = sigma[n - 1][n - 1];
+    const double current  = sigma[n][n];
+    if (previous == 0. || current == 0. || !std::isfinite(previous) || !std::isfinite(current)) {
+      return _FAILURE_;
+    }
+
+    diagonal[n] = (2. * n + 1.) - sigma[n - 1][n] / previous + sigma[n][n + 1] / current;
+    off_diagonal_squared[n] = current / previous;
+    if (!(off_diagonal_squared[n] > 0.) || !std::isfinite(diagonal[n]) ||
+        !std::isfinite(off_diagonal_squared[n])) {
+      return _FAILURE_;
+    }
+  }
+
+  std::vector<double> subdiagonal(N, 0.);
+  for (int n = 1; n < N; ++n)
+    subdiagonal[n] = std::sqrt(off_diagonal_squared[n]);
+
+  std::vector<double> eigenvectors(N * N, 0.);
+  for (int n = 0; n < N; ++n)
+    eigenvectors[n * N + n] = 1.;
+  if (!diagonalize_symmetric_tridiagonal(diagonal, subdiagonal, eigenvectors))
+    return _FAILURE_;
+
+  for (int n = 0; n < N; ++n) {
+    x[n] = diagonal[n];
+    w[n] = moments[0] * eigenvectors[n] * eigenvectors[n];
+    if (!(x[n] > 0.) || !(w[n] > 0.) || !std::isfinite(x[n]) || !std::isfinite(w[n]))
+      return _FAILURE_;
+  }
   return _SUCCESS_;
 }
 
