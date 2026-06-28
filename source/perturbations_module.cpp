@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 
 #include "../species/baryons.h"
 #include "../species/cdm.h"
@@ -1410,14 +1411,52 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
  */
 
 void PerturbationsModule::perturb_get_k_list() {
-  int index_k, index_k_output, index_mode;
+  int index_mode;
   double k, k_min = 0., k_rec, step, tau1;
   std::vector<double> k_max_cmb;
   std::vector<double> k_max_cl;
   double k_max = 0.;
   double scale2;
-  std::vector<double> tmp_k_list;
-  int newk_size, index_newk, add_k_output_value;
+
+  auto append_linear_k_values = [&](int index_md, double k_rec, double k_max_cmb) {
+    while (k < k_max_cmb) {
+      /* the linear step is not constant, it has a step-like shape,
+         centered around the characteristic scale set by the sound
+         horizon at recombination (associated to the comoving wavenumber
+         k_rec) */
+
+      step = (ppr->k_step_super + 0.5 * (tanh((k - k_rec) / k_rec / ppr->k_step_transition) + 1.) *
+                                      (ppr->k_step_sub - ppr->k_step_super)) *
+             k_rec;
+
+      /* there is one other thing to take into account in the step
+         size. There are two other characteristic scales that matter for
+         the sampling: the Hubble scale today, k0=a0H0, and eventually
+         curvature scale sqrt(|K|). We define "scale2" as the sum of the
+         squared Hubble radius and squared curvature radius. We need to
+         increase the sampling for k<sqrt(scale2), in order to get the
+         first mutipoles accurate enough. The formula below reduces it
+         gradually in the k-->0 limit, by up to a factor 10. The actual
+         stepsize is still fixed by k_step_super, this is just a
+         reduction factor. */
+
+      scale2 = pow(pba->H0, 2) + fabs(pba->K);
+
+      step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
+
+      class_test(step / k < ppr->smallest_allowed_variation,
+                 "k step =%e < machine precision : leads either to numerical error or infinite "
+                 "loop",
+                 step * k_rec);
+
+      k += step;
+
+      class_test(k <= k_[index_md].back(),
+                 "consecutive values of k should differ and should be in growing order");
+
+      k_[index_md].push_back(k);
+    }
+  };
 
   /** Summary: */
 
@@ -1537,8 +1576,6 @@ void PerturbationsModule::perturb_get_k_list() {
        k_min, we define exactly the same sampling in the three cases
        K=0, K<0, K>0 */
 
-    /* allocate array with, for the moment, the largest possible size */
-
     /* the following is a boost on k_per_decade_for_pk for the interacting idm-idr cases (relevant for large k and a_idm_dr) */
     const double idmdr_nindex = all_species_.count("IDM_DR_IDR")
                                     ? static_cast<const IDM_DR_IDR_Species&>(
@@ -1546,76 +1583,18 @@ void PerturbationsModule::perturb_get_k_list() {
                                           .idm_dr()
                                           .nindex_idm_dr()
                                     : 0.;
-    if ((all_species_.count("IDM_DR_IDR")) && (idmdr_nindex >= 2)) {
-      k_[index_md_scalars_].resize(
-          (int) ((k_max_cmb[index_md_scalars_] - k_min) / k_rec /
-                 std::min(ppr->k_step_super, ppr->k_step_sub)) +
-          (int) (std::max(ppr->k_per_decade_for_pk * ppr->idmdr_boost_k_per_decade_for_pk *
-                              idmdr_nindex,
-                          ppr->k_per_decade_for_bao) *
-                 log(k_max / k_min) / log(10.)) +
-          3);
-    }
-
-    else {
-      k_[index_md_scalars_].resize(
-          (int) ((k_max_cmb[index_md_scalars_] - k_min) / k_rec /
-                 std::min(ppr->k_step_super, ppr->k_step_sub)) +
-          (int) (std::max(ppr->k_per_decade_for_pk, ppr->k_per_decade_for_bao) *
-                 log(k_max / k_min) / log(10.)) +
-          3);
-    }
+    k_[index_md_scalars_].clear();
 
     /* first value */
 
-    index_k                        = 0;
-    k                              = k_min;
-    k_[index_md_scalars_][index_k] = k;
-    index_k++;
+    k = k_min;
+    k_[index_md_scalars_].push_back(k);
 
     /* values until k_max_cmb[index_md_scalars_] */
 
-    while (k < k_max_cmb[index_md_scalars_]) {
-      /* the linear step is not constant, it has a step-like shape,
-         centered around the characteristic scale set by the sound
-         horizon at recombination (associated to the comoving wavenumber
-         k_rec) */
+    append_linear_k_values(index_md_scalars_, k_rec, k_max_cmb[index_md_scalars_]);
 
-      step = (ppr->k_step_super + 0.5 * (tanh((k - k_rec) / k_rec / ppr->k_step_transition) + 1.) *
-                                      (ppr->k_step_sub - ppr->k_step_super)) *
-             k_rec;
-
-      /* there is one other thing to take into account in the step
-         size. There are two other characteristic scales that matter for
-         the sampling: the Hubble scale today, k0=a0H0, and eventually
-         curvature scale sqrt(|K|). We define "scale2" as the sum of the
-         squared Hubble radius and squared curvature radius. We need to
-         increase the sampling for k<sqrt(scale2), in order to get the
-         first mutipoles accurate enough. The formula below reduces it
-         gradually in the k-->0 limit, by up to a factor 10. The actual
-         stepsize is still fixed by k_step_super, this is just a
-         reduction factor. */
-
-      scale2 = pow(pba->H0, 2) + fabs(pba->K);
-
-      step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
-
-      class_test(step / k < ppr->smallest_allowed_variation,
-                 "k step =%e < machine precision : leads either to numerical error or infinite "
-                 "loop",
-                 step * k_rec);
-
-      k += step;
-
-      class_test(k <= k_[index_md_scalars_][index_k - 1],
-                 "consecutive values of k should differ and should be in growing order");
-
-      k_[index_md_scalars_][index_k] = k;
-
-      index_k++;
-    }
-
-    k_size_cmb_[index_md_scalars_] = index_k;
+    k_size_cmb_[index_md_scalars_] = static_cast<int>(k_[index_md_scalars_].size());
 
     /* values until k_max_cl[index_md_scalars_] */
 
@@ -1627,11 +1606,10 @@ void PerturbationsModule::perturb_get_k_list() {
                                             log(ppr->k_bao_width),
                                         4)))));
 
-      k_[index_md_scalars_][index_k] = k;
-      index_k++;
+      k_[index_md_scalars_].push_back(k);
     }
 
-    k_size_cl_[index_md_scalars_] = index_k;
+    k_size_cl_[index_md_scalars_] = static_cast<int>(k_[index_md_scalars_].size());
 
     /* values until k_max */
 
@@ -1656,13 +1634,10 @@ void PerturbationsModule::perturb_get_k_list() {
                                           4)))));
       }
 
-      k_[index_md_scalars_][index_k] = k;
-      index_k++;
+      k_[index_md_scalars_].push_back(k);
     }
 
-    k_size_[index_md_scalars_] = index_k;
-
-    k_[index_md_scalars_].resize(k_size_[index_md_scalars_]);
+    k_size_[index_md_scalars_] = static_cast<int>(k_[index_md_scalars_].size());
   }
 
   /** - vector modes */
@@ -1729,65 +1704,20 @@ void PerturbationsModule::perturb_get_k_list() {
        k_min, we define exactly the same sampling in the three cases
        K=0, K<0, K>0 */
 
-    /* allocate array with, for the moment, the largest possible size */
-    k_[index_md_vectors_].resize((int) ((k_max_cmb[index_md_vectors_] - k_min) / k_rec /
-                                        std::min(ppr->k_step_super, ppr->k_step_sub)) +
-                                 1);
+    k_[index_md_vectors_].clear();
 
     /* first value */
 
-    index_k                        = 0;
-    k                              = k_min;
-    k_[index_md_vectors_][index_k] = k;
-    index_k++;
+    k = k_min;
+    k_[index_md_vectors_].push_back(k);
 
     /* values until k_max_cmb[index_md_vectors_] */
 
-    while (k < k_max_cmb[index_md_vectors_]) {
-      /* the linear step is not constant, it has a step-like shape,
-         centered around the characteristic scale set by the sound
-         horizon at recombination (associated to the comoving wavenumber
-         k_rec) */
+    append_linear_k_values(index_md_vectors_, k_rec, k_max_cmb[index_md_vectors_]);
 
-      step = (ppr->k_step_super + 0.5 * (tanh((k - k_rec) / k_rec / ppr->k_step_transition) + 1.) *
-                                      (ppr->k_step_sub - ppr->k_step_super)) *
-             k_rec;
-
-      /* there is one other thing to take into account in the step
-         size. There are two other characteristic scales that matter for
-         the sampling: the Hubble scale today, k0=a0H0, and eventually
-         curvature scale sqrt(|K|). We define "scale2" as the sum of the
-         squared Hubble radius and squared curvature radius. We need to
-         increase the sampling for k<sqrt(scale2), in order to get the
-         first mutipoles accurate enough. The formula below reduces it
-         gradually in the k-->0 limit, by up to a factor 10. The actual
-         stepsize is still fixed by k_step_super, this is just a
-         reduction factor. */
-
-      scale2 = pow(pba->H0, 2) + fabs(pba->K);
-
-      step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
-
-      class_test(step / k < ppr->smallest_allowed_variation,
-                 "k step =%e < machine precision : leads either to numerical error or infinite "
-                 "loop",
-                 step * k_rec);
-
-      k += step;
-
-      class_test(k <= k_[index_md_scalars_][index_k - 1],
-                 "consecutive values of k should differ and should be in growing order");
-
-      k_[index_md_vectors_][index_k] = k;
-
-      index_k++;
-    }
-
-    k_size_cmb_[index_md_vectors_] = index_k;
-    k_size_cl_[index_md_vectors_]  = index_k;
-    k_size_[index_md_vectors_]     = index_k;
-
-    k_[index_md_vectors_].resize(k_size_[index_md_vectors_]);
+    k_size_cmb_[index_md_vectors_] = static_cast<int>(k_[index_md_vectors_].size());
+    k_size_cl_[index_md_vectors_]  = static_cast<int>(k_[index_md_vectors_].size());
+    k_size_[index_md_vectors_]     = static_cast<int>(k_[index_md_vectors_].size());
   }
 
   /** - tensor modes */
@@ -1854,65 +1784,20 @@ void PerturbationsModule::perturb_get_k_list() {
        k_min, we define exactly the same sampling in the three cases
        K=0, K<0, K>0 */
 
-    /* allocate array with, for the moment, the largest possible size */
-    k_[index_md_tensors_].resize((int) ((k_max_cmb[index_md_tensors_] - k_min) / k_rec /
-                                        std::min(ppr->k_step_super, ppr->k_step_sub)) +
-                                 1);
+    k_[index_md_tensors_].clear();
 
     /* first value */
 
-    index_k                        = 0;
-    k                              = k_min;
-    k_[index_md_tensors_][index_k] = k;
-    index_k++;
+    k = k_min;
+    k_[index_md_tensors_].push_back(k);
 
     /* values until k_max_cmb[index_md_tensors_] */
 
-    while (k < k_max_cmb[index_md_tensors_]) {
-      /* the linear step is not constant, it has a step-like shape,
-         centered around the characteristic scale set by the sound
-         horizon at recombination (associated to the comoving wavenumber
-         k_rec) */
+    append_linear_k_values(index_md_tensors_, k_rec, k_max_cmb[index_md_tensors_]);
 
-      step = (ppr->k_step_super + 0.5 * (tanh((k - k_rec) / k_rec / ppr->k_step_transition) + 1.) *
-                                      (ppr->k_step_sub - ppr->k_step_super)) *
-             k_rec;
-
-      /* there is one other thing to take into account in the step
-         size. There are two other characteristic scales that matter for
-         the sampling: the Hubble scale today, k0=a0H0, and eventually
-         curvature scale sqrt(|K|). We define "scale2" as the sum of the
-         squared Hubble radius and squared curvature radius. We need to
-         increase the sampling for k<sqrt(scale2), in order to get the
-         first mutipoles accurate enough. The formula below reduces it
-         gradually in the k-->0 limit, by up to a factor 10. The actual
-         stepsize is still fixed by k_step_super, this is just a
-         reduction factor. */
-
-      scale2 = pow(pba->H0, 2) + fabs(pba->K);
-
-      step *= (k * k / scale2 + 1.) / (k * k / scale2 + 1. / ppr->k_step_super_reduction);
-
-      class_test(step / k < ppr->smallest_allowed_variation,
-                 "k step =%e < machine precision : leads either to numerical error or infinite "
-                 "loop",
-                 step * k_rec);
-
-      k += step;
-
-      class_test(k <= k_[index_md_tensors_][index_k - 1],
-                 "consecutive values of k should differ and should be in growing order");
-
-      k_[index_md_tensors_][index_k] = k;
-
-      index_k++;
-    }
-
-    k_size_cmb_[index_md_tensors_] = index_k;
-    k_size_cl_[index_md_tensors_]  = index_k;
-    k_size_[index_md_tensors_]     = index_k;
-
-    k_[index_md_tensors_].resize(k_size_[index_md_tensors_]);
+    k_size_cmb_[index_md_tensors_] = static_cast<int>(k_[index_md_tensors_].size());
+    k_size_cl_[index_md_tensors_]  = static_cast<int>(k_[index_md_tensors_].size());
+    k_size_[index_md_tensors_]     = static_cast<int>(k_[index_md_tensors_].size());
   }
 
   /** - If user asked for k_output_values, add those to all k lists: */
@@ -1920,52 +1805,32 @@ void PerturbationsModule::perturb_get_k_list() {
     /* Allocate storage */
     index_k_output_values_.resize(md_size_ * ppt->k_output_values_num);
 
-    /** - --> Find indices in k_[index_md] corresponding to 'k_output_values'.
-        We are assuming that k_ is sorted and growing, and we have made sure
-        that ppt->k_output_values is also sorted and growing.*/
+    /** - --> Insert k_output_values into each sorted k list and remember their indices. */
     for (index_mode = 0; index_mode < md_size_; index_mode++) {
-      newk_size = k_size_[index_mode] + ppt->k_output_values_num;
-
-      tmp_k_list.resize(newk_size);
-
-      index_k        = 0;
-      index_k_output = 0;
-      for (index_newk = 0; index_newk < newk_size; index_newk++) {
-        /** - --> Decide if we should add k_output_value now. This has to be this complicated, since we
-            can only compare the k-values when both indices are in range.*/
-        if (index_k >= k_size_[index_mode])
-          add_k_output_value = _TRUE_;
-        else if (index_k_output >= ppt->k_output_values_num)
-          add_k_output_value = _FALSE_;
-        else if (ppt->k_output_values[index_k_output] < k_[index_mode][index_k])
-          add_k_output_value = _TRUE_;
-        else
-          add_k_output_value = _FALSE_;
-
-        if (add_k_output_value == _TRUE_) {
-          tmp_k_list[index_newk] = ppt->k_output_values[index_k_output];
-          index_k_output_values_[index_mode * ppt->k_output_values_num + index_k_output] =
-              index_newk;
-          index_k_output++;
-        }
-        else {
-          tmp_k_list[index_newk] = k_[index_mode][index_k];
+      int index_k = 0;
+      for (int index_k_output = 0; index_k_output < ppt->k_output_values_num; index_k_output++) {
+        const double k_output = ppt->k_output_values[index_k_output];
+        while (index_k < static_cast<int>(k_[index_mode].size()) &&
+               k_[index_mode][index_k] <= k_output) {
           index_k++;
         }
+        k_[index_mode].insert(k_[index_mode].begin() + index_k, k_output);
+        index_k_output_values_[index_mode * ppt->k_output_values_num + index_k_output] = index_k;
+        index_k++;
       }
+      k_size_[index_mode] = static_cast<int>(k_[index_mode].size());
 
-      k_[index_mode]      = std::move(tmp_k_list);
-      k_size_[index_mode] = newk_size;
+      const auto cl_end =
+          std::upper_bound(k_[index_mode].begin(), k_[index_mode].end(), k_max_cl[index_mode]);
+      k_size_cl_[index_mode] =
+          std::min(static_cast<int>(std::distance(k_[index_mode].begin(), cl_end)) + 1,
+                   k_size_[index_mode]);
 
-      index_k = newk_size - 1;
-      while (k_[index_mode][index_k] > k_max_cl[index_mode])
-        index_k--;
-      k_size_cl_[index_mode] = std::min(index_k + 2, k_size_[index_mode]);
-
-      index_k = newk_size - 1;
-      while (k_[index_mode][index_k] > k_max_cmb[index_mode])
-        index_k--;
-      k_size_cmb_[index_mode] = std::min(index_k + 2, k_size_[index_mode]);
+      const auto cmb_end =
+          std::upper_bound(k_[index_mode].begin(), k_[index_mode].end(), k_max_cmb[index_mode]);
+      k_size_cmb_[index_mode] =
+          std::min(static_cast<int>(std::distance(k_[index_mode].begin(), cmb_end)) + 1,
+                   k_size_[index_mode]);
 
       /** - --> The two MIN statements are here because in a normal run, the cl and cmb
           arrays contain a single k value larger than their respective k_max.
