@@ -1184,6 +1184,164 @@ class TestReviewRegressions(TestClass):
         self._assert_scenarios_match(scenario, reference, "Explicit legacy default")
 
 
+class TestLazyLifecycle(unittest.TestCase):
+    """Wrapper lifecycle: methods must always reflect the current parameter
+    dict, with construction = validity and set()/compute() as legacy shims.
+    See docs/superpowers/specs/2026-07-03-classy-lazy-wrapper-design.md.
+
+    """
+
+    def _fresh_angular_distance(self, h, z=1.0):
+        cosmo = Class({'h': h})
+        try:
+            return cosmo.angular_distance(z)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_set_without_compute_returns_fresh_results(self):
+        # The historic footgun: set() then a method call WITHOUT compute()
+        # must return results for the new parameters, not stale ones.
+        cosmo = Class({'h': 0.67})
+        try:
+            d_before = cosmo.angular_distance(1.0)
+            cosmo.set({'h': 0.70})
+            d_after = cosmo.angular_distance(1.0)  # no compute() in between
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+        d_expected = self._fresh_angular_distance(0.70)
+        self.assertNotEqual(d_before, d_after)
+        self.assertAlmostEqual(d_after / d_expected, 1.0, places=10)
+
+    def test_unread_parameter_raises_at_first_access(self):
+        # After set() with a bogus parameter, the first access (not just
+        # compute()) must surface the input error instead of silently
+        # serving results for the previous parameters.
+        cosmo = Class()
+        try:
+            cosmo.set({'this_parameter_does_not_exist': 1})
+            with self.assertRaises(CosmoSevereError):
+                cosmo.angular_distance(1.0)
+        finally:
+            cosmo.empty()
+            cosmo.struct_cleanup()
+
+    def test_methods_work_without_compute(self):
+        # Construction = validity: no compute() call is ever needed.
+        cosmo = Class({'output': 'tCl', 'l_max_scalars': 100})
+        try:
+            cl = cosmo.raw_cl(100)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+        self.assertTrue(np.all(np.isfinite(cl['tt'])))
+        self.assertGreater(np.max(np.abs(cl['tt'])), 0.0)
+
+    def test_bad_parameter_raises_at_construction(self):
+        # Constructor-style use validates input at construction (parse-time).
+        with self.assertRaises(CosmoSevereError):
+            Class({'this_parameter_does_not_exist': 1})
+
+    def test_unread_parameter_raises_at_compute_not_set(self):
+        # MontePython compatibility: set() never raises; the error surfaces
+        # at compute(), inside the caller's try block.
+        cosmo = Class()
+        try:
+            cosmo.set({'this_parameter_does_not_exist': 1})  # must not raise
+            with self.assertRaises(CosmoSevereError):
+                cosmo.compute()
+        finally:
+            cosmo.empty()
+            cosmo.struct_cleanup()
+
+    def test_montepython_flow(self):
+        # The canonical MontePython sequence: repeated set(), compute(),
+        # likelihood-style method calls, then a second point.
+        cosmo = Class()
+        try:
+            cosmo.set({'output': 'tCl', 'l_max_scalars': 100})
+            cosmo.set({'h': 0.70})
+            cosmo.compute()
+            cl1 = cosmo.raw_cl(100)
+            self.assertTrue(cosmo.state)
+            self.assertGreater(np.max(np.abs(cl1['tt'])), 0.0)
+
+            cosmo.struct_cleanup()
+            cosmo.set({'h': 0.68})
+            cosmo.compute()
+            cl2 = cosmo.raw_cl(100)
+            # atol=0: raw dimensionless Cl values are ~1e-10, far below
+            # np.allclose's default atol=1e-8, which would compare any two
+            # Cl arrays as "close".
+            self.assertFalse(np.allclose(cl1['tt'][2:], cl2['tt'][2:],
+                                         rtol=1e-5, atol=0.0))
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_error_is_sticky_after_failed_compute(self):
+        # If reset() clears parameters_changed before the unread-parameter
+        # check, a caught error leaves the gate believing it is clean while
+        # _thisptr holds a Cosmology that silently ignored the bogus parameter.
+        # The second access must re-raise rather than serving stale results.
+        cosmo = Class()
+        try:
+            cosmo.set({'this_parameter_does_not_exist': 1})
+            with self.assertRaises(CosmoSevereError):
+                cosmo.compute()
+            # Gate must remain dirty: subsequent access must still raise.
+            with self.assertRaises(CosmoSevereError):
+                cosmo.angular_distance(1.0)
+            # Recovery: clear the bad parameter, set a good one, verify results.
+            cosmo.empty()
+            cosmo.set({'h': 0.70})
+            d = cosmo.angular_distance(1.0)
+            self.assertTrue(np.isfinite(d) and d > 0)
+        finally:
+            cosmo.empty()
+            cosmo.struct_cleanup()
+
+    def test_no_stale_serve_after_failed_rebuild(self):
+        # If reset() clears parameters_changed before the Cosmology constructor
+        # runs, a thrown constructor error leaves the gate believing it is clean
+        # while _thisptr still holds the previous Cosmology. The next access
+        # must re-raise rather than silently returning d1.
+        cosmo = Class({'h': 0.67})
+        try:
+            d1 = cosmo.angular_distance(1.0)
+            # Adding 100*theta_s while h is already in the dict makes the
+            # Cosmology constructor throw (cannot specify both).
+            cosmo.set({'100*theta_s': 1.042})
+            with self.assertRaises(CosmoSevereError):
+                cosmo.compute()
+            # Gate must remain dirty: subsequent access must still raise.
+            with self.assertRaises(CosmoSevereError):
+                cosmo.angular_distance(1.0)
+        finally:
+            cosmo.empty()
+            cosmo.struct_cleanup()
+
+    def test_pars_property_mutation_is_inert(self):
+        # pars exposes a snapshot, not the live dict: mutating the returned
+        # dict must neither change the cosmology nor leak into the internal
+        # parameter dict (set() is the only mutation API — anything else
+        # would bypass the parameters_changed gate). The constructor must
+        # likewise not alias or pollute the caller's dict.
+        caller_dict = {'h': 0.67}
+        cosmo = Class(caller_dict)
+        try:
+            d1 = cosmo.angular_distance(1.0)
+            cosmo.pars['h'] = 0.99
+            self.assertEqual(cosmo.pars['h'], 0.67)
+            self.assertAlmostEqual(cosmo.angular_distance(1.0) / d1, 1.0,
+                                   places=12)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+        self.assertEqual(caller_dict, {'h': 0.67})
+
+
 if __name__ == '__main__':
     toto = TestClass()
     unittest.main()

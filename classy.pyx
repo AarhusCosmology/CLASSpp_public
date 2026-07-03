@@ -348,37 +348,32 @@ cdef class PyCosmology:
     cdef bool parameters_changed
     cdef FileContent _fc
 
-    cdef const precision* pr
-    cdef const background* ba
-    cdef const thermo* th
-    cdef const perturbs* pt
-    cdef const primordial* pm
-    cdef const nonlinear* nl
-    cdef const transfers* tr
-    cdef const spectra* sp
-    cdef const lensing* le
-    cdef const output* op
-
     property pars:
         def __get__(self):
-            return self._pars
+            # Snapshot, not the live dict: a caller mutating the returned
+            # dict would otherwise bypass the parameters_changed gate and
+            # stale-serve. set() is the mutation API.
+            return dict(self._pars)
     property state:
         def __get__(self):
             return True
     property Omega_nu:
         def __get__(self):
-            ibg = deref(self._thisptr).GetBackgroundModule()
+            ibg = deref(self._cosmo()).GetBackgroundModule()
             return deref(ibg).GetOmega0NcdmTot()
     property nonlinear_method:
         def __get__(self):
-            return self.nl.method
+            return self.nl().method
 
     def __init__(self, input_parameters=None):
         if input_parameters is None:
             input_parameters = {}
-        if 'class_dir' not in input_parameters:
-            input_parameters['class_dir'] = os.path.join(os.path.dirname(__file__), 'classy')
-        self._pars = input_parameters
+        # Copy: never alias the caller's dict, so external mutation cannot
+        # bypass the parameters_changed gate (and the class_dir default does
+        # not leak into the caller's dict).
+        self._pars = dict(input_parameters)
+        if 'class_dir' not in self._pars:
+            self._pars['class_dir'] = os.path.join(os.path.dirname(__file__), 'classy')
         self.reset()
 
     cdef reset(self):
@@ -386,7 +381,6 @@ cdef class PyCosmology:
             Py_ssize_t i
             bool problem_flag
         self._update_fc_from_pars()
-        self.parameters_changed = False
         self._thisptr.reset(new Cosmology(self._fc))
         # This part is done to list all the unread parameters, for debugging
         problem_flag = False
@@ -399,19 +393,64 @@ cdef class PyCosmology:
                 "Class did not read input parameter(s): {}\n"
                 .format(', '.join(problematic_parameters))
             )
-
-        input_module = deref(self._thisptr).GetInputModule()
-        self.pr = &deref(input_module).precision_
-        self.ba = &deref(input_module).background_
-        self.th = &deref(input_module).thermodynamics_
-        self.pt = &deref(input_module).perturbations_
-        self.pm = &deref(input_module).primordial_
-        self.nl = &deref(input_module).nonlinear_
-        self.tr = &deref(input_module).transfers_
-        self.sp = &deref(input_module).spectra_
-        self.le = &deref(input_module).lensing_
-        self.op = &deref(input_module).output_
+        # Only clear the dirty flag after all throwing operations have
+        # succeeded. If Cosmology construction or the unread-parameter check
+        # throws, parameters_changed stays True so the next _cosmo() call
+        # re-runs reset() and re-raises instead of serving stale results.
+        self.parameters_changed = False
         return self
+
+    # Single gate to the C++ object: rebuilds the Cosmology if the parameter
+    # dict changed since it was last built. Everything must reach the C++
+    # object through _cosmo() (or the struct accessors below), never through
+    # _thisptr directly, so results always reflect the current parameters.
+    cdef Cosmology* _cosmo(self) except NULL:
+        if self.parameters_changed or self._thisptr.get() == NULL:
+            self.reset()
+        return self._thisptr.get()
+
+    # The input structs live inside the InputModule, and DoShooting replaces
+    # the InputModule instance on first use; fetching through GetInputModule()
+    # on every access is the only way a cached pointer cannot go stale.
+    cdef const precision* pr(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).precision_
+
+    cdef const background* ba(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).background_
+
+    cdef const thermo* th(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).thermodynamics_
+
+    cdef const perturbs* pt(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).perturbations_
+
+    cdef const primordial* pm(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).primordial_
+
+    cdef const nonlinear* nl(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).nonlinear_
+
+    cdef const transfers* tr(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).transfers_
+
+    cdef const spectra* sp(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).spectra_
+
+    cdef const lensing* le(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).lensing_
+
+    cdef const output* op(self) except NULL:
+        input_module = deref(self._cosmo()).GetInputModule()
+        return &deref(input_module).output_
 
     cdef _update_fc_from_pars(self):
         cdef:
@@ -448,58 +487,60 @@ cdef class PyCosmology:
         return self
 
     cpdef compute(self, level=None):
+        # Legacy shim (MontePython): modules are built lazily on first access,
+        # so compute() only pre-triggers the requested level. Its remaining
+        # value is that computation errors surface here, where callers expect
+        # to catch them.
         if level is None:
             level = ['lensing']
-        if self.parameters_changed:
-            self.reset()
         final_level = level[0].lower()
         if final_level == 'background':
-            deref(self._thisptr).GetBackgroundModule()
+            deref(self._cosmo()).GetBackgroundModule()
         elif final_level == 'thermodynamics':
-            deref(self._thisptr).GetThermodynamicsModule()
+            deref(self._cosmo()).GetThermodynamicsModule()
         elif final_level == 'perturb':
-            deref(self._thisptr).GetPerturbationsModule()
+            deref(self._cosmo()).GetPerturbationsModule()
         elif final_level == 'primordial':
-            deref(self._thisptr).GetPrimordialModule()
+            deref(self._cosmo()).GetPrimordialModule()
         elif final_level == 'nonlinear':
-            deref(self._thisptr).GetNonlinearModule()
+            deref(self._cosmo()).GetNonlinearModule()
         elif final_level == 'transfer':
-            deref(self._thisptr).GetTransferModule()
+            deref(self._cosmo()).GetTransferModule()
         elif final_level == 'spectra':
-            deref(self._thisptr).GetSpectraModule()
+            deref(self._cosmo()).GetSpectraModule()
         elif final_level == 'lensing':
-            deref(self._thisptr).GetLensingModule()
+            deref(self._cosmo()).GetLensingModule()
         return self
 
     cpdef get_input_precision(self):
-        return deref(self.pr)
+        return deref(self.pr())
 
     cpdef get_input_background(self):
-        return deref(self.ba)
+        return deref(self.ba())
 
     cpdef get_input_thermodynamics(self):
-        return deref(self.th)
+        return deref(self.th())
 
     cpdef get_input_perturbations(self):
-        return deref(self.pt)
+        return deref(self.pt())
 
     cpdef get_input_transfers(self):
-        return deref(self.tr)
+        return deref(self.tr())
 
     cpdef get_input_primordial(self):
-        return deref(self.pm)
+        return deref(self.pm())
 
     cpdef get_input_spectra(self):
-        return deref(self.sp)
+        return deref(self.sp())
 
     cpdef get_input_nonlinear(self):
-        return deref(self.nl)
+        return deref(self.nl())
 
     cpdef get_input_lensing(self):
-        return deref(self.le)
+        return deref(self.le())
 
     cpdef get_input_output(self):
-        return deref(self.op)
+        return deref(self.op())
 
     cdef general_cl(self, int lmax, bool is_lensed):
         cdef:
@@ -508,21 +549,21 @@ cdef class PyCosmology:
             int lmaxpp
             map[string, vector[double]] cl_data
 
-        if self.pt.has_cls == constvals.sFALSE:
+        if self.pt().has_cls == constvals.sFALSE:
             raise CosmoSevereError("No Cls computed")
 
         if is_lensed:
-            le = deref(self._thisptr).GetLensingModule()
+            le = deref(self._cosmo()).GetLensingModule()
             lmax_computed = deref(le).l_lensed_max_
             if lmax == -1:
                 lmax = lmax_computed
-            if self.le.has_lensed_cls == constvals.sFALSE:
+            if self.le().has_lensed_cls == constvals.sFALSE:
                 raise CosmoSevereError("Lensing Cls not computed, add 'lensing':'yes' to your input.")
             if lmax > lmax_computed:
                 raise CosmoSevereError("Can only compute up to lmax=%d"%lmax_computed)
             cl_data = deref(le).cl_output(lmax)
         else:
-            sp = deref(self._thisptr).GetSpectraModule()
+            sp = deref(self._cosmo()).GetSpectraModule()
             lmax_computed = deref(sp).l_max_tot_
             if lmax == -1:
                 lmax = lmax_computed
@@ -548,7 +589,7 @@ cdef class PyCosmology:
             map[string, int] index_map
             vector[double*] output_pointers
 
-        sp = deref(self._thisptr).GetSpectraModule()
+        sp = deref(self._cosmo()).GetSpectraModule()
         lmax_computed = deref(sp).l_max_tot_
         if lmax == -1:
             lmax = lmax_computed
@@ -581,7 +622,7 @@ cdef class PyCosmology:
             dict out_dict
             map[string, vector[double]] cl_data
 
-        le = deref(self._thisptr).GetLensingModule()
+        le = deref(self._cosmo()).GetLensingModule()
         cl_data = deref(le).cl_output_computed()
         out_dict = {}
         for element in cl_data:
@@ -613,10 +654,10 @@ cdef class PyCosmology:
         dzdr_arr = np.empty(z_array_size, np.double)
         dzdr = dzdr_arr
 
-        long_info = self.ba.long_info
-        inter_normal = self.ba.inter_normal
+        long_info = self.ba().long_info
+        inter_normal = self.ba().inter_normal
 
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         bg_size = deref(background_module).bg_size_
         index_bg_conf_distance = deref(background_module).index_bg_conf_distance_
         index_bg_H = deref(background_module).index_bg_H_
@@ -640,7 +681,7 @@ cdef class PyCosmology:
         luminosity_distance(z)
         """
         cdef int index_bg_lum_distance
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         index_bg_lum_distance = deref(background_module).index_bg_lum_distance_
         return self.get_background_value_at_z(z, index_bg_lum_distance)
 
@@ -648,10 +689,10 @@ cdef class PyCosmology:
         cdef:
             double pk
 
-        if (self.pt.has_pk_matter == constvals.sFALSE):
+        if (self.pt().has_pk_matter == constvals.sFALSE):
             raise CosmoSevereError("Power spectrum not computed. You must add mPk to the list of outputs.")
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         deref(nonlinear_module).nonlinear_pk_at_k_and_z(linear_or_nonlinear, k, z, index_pk, &pk, NULL)
         return pk
 
@@ -669,12 +710,12 @@ cdef class PyCosmology:
             int index_pk_m
             pk_outputs linear_or_nonlinear
 
-        if self.nl.method == nl_none:
+        if self.nl().method == nl_none:
             linear_or_nonlinear = pk_linear
         else:
             linear_or_nonlinear = pk_nonlinear
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_m = deref(nonlinear_module).index_pk_m_
 
         return self.pk_general(k, z, index_pk_m, linear_or_nonlinear)
@@ -695,12 +736,12 @@ cdef class PyCosmology:
             pk_outputs linear_or_nonlinear
             short has_pk_cb
 
-        if self.nl.method == nl_none:
+        if self.nl().method == nl_none:
             linear_or_nonlinear = pk_linear
         else:
             linear_or_nonlinear = pk_nonlinear
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_cb = deref(nonlinear_module).index_pk_cb_
         has_pk_cb = deref(nonlinear_module).has_pk_cb_
 
@@ -721,7 +762,7 @@ cdef class PyCosmology:
 
         """
         cdef int index_pk_m
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_m = deref(nonlinear_module).index_pk_m_
 
         return self.pk_general(k, z, index_pk_m, pk_linear)
@@ -741,7 +782,7 @@ cdef class PyCosmology:
             int index_pk_cb
             short has_pk_cb
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_cb = deref(nonlinear_module).index_pk_cb_
         has_pk_cb = deref(nonlinear_module).has_pk_cb_
 
@@ -757,12 +798,12 @@ cdef class PyCosmology:
             double pk_val
             double[:,:,::1] pk
 
-        if (self.pt.has_pk_matter == constvals.sFALSE):
+        if (self.pt().has_pk_matter == constvals.sFALSE):
             raise CosmoSevereError("Power spectrum not computed. You must add mPk to the list of outputs.")
 
         pk_arr = np.empty((k_size, z_size, mu_size), np.double)
         pk = pk_arr
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         # TODO: Consider prange for outer loop
         for index_k in range(k_size):
             for index_z in range(z_size):
@@ -777,12 +818,12 @@ cdef class PyCosmology:
             int index_pk_m
             pk_outputs linear_or_nonlinear
 
-        if self.nl.method == nl_none:
+        if self.nl().method == nl_none:
             linear_or_nonlinear = pk_linear
         else:
             linear_or_nonlinear = pk_nonlinear
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_m = deref(nonlinear_module).index_pk_m_
         return self.get_pk_general(k, z, k_size, z_size, mu_size, index_pk_m, linear_or_nonlinear)
 
@@ -793,12 +834,12 @@ cdef class PyCosmology:
             short has_pk_cb
             pk_outputs linear_or_nonlinear
 
-        if self.nl.method == nl_none:
+        if self.nl().method == nl_none:
             linear_or_nonlinear = pk_linear
         else:
             linear_or_nonlinear = pk_nonlinear
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_cb = deref(nonlinear_module).index_pk_cb_
         has_pk_cb = deref(nonlinear_module).has_pk_cb_
 
@@ -810,7 +851,7 @@ cdef class PyCosmology:
     cpdef get_pk_lin(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the linear power spectrum on a k and z array """
         cdef int index_pk_m
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_m = deref(nonlinear_module).index_pk_m_
 
         return self.get_pk_general(k, z, k_size, z_size, mu_size, index_pk_m, pk_linear)
@@ -821,7 +862,7 @@ cdef class PyCosmology:
             int index_pk_cb
             short has_pk_cb
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_cb = deref(nonlinear_module).index_pk_cb_
         has_pk_cb = deref(nonlinear_module).has_pk_cb_
 
@@ -847,12 +888,12 @@ cdef class PyCosmology:
             double sigma
             int index_pk_m
 
-        if self.pt.has_pk_matter == constvals.sFALSE:
+        if self.pt().has_pk_matter == constvals.sFALSE:
             raise CosmoSevereError("Power spectrum not computed. In order to get sigma(R, z) you must add mPk to the list of outputs.")
-        if self.pt.k_max_for_pk < self.ba.h:
+        if self.pt().k_max_for_pk < self.ba().h:
             raise CosmoSevereError("In order to get sigma(R,z) you must set 'P_k_max_h/Mpc' to 1 or bigger, in order to have k_max > 1 h/Mpc.")
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_m = deref(nonlinear_module).index_pk_m_
         deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk_m, out_sigma, &sigma)
 
@@ -875,12 +916,12 @@ cdef class PyCosmology:
             double sigma_cb
             int index_pk_cb
 
-        if self.pt.has_pk_matter == constvals.sFALSE:
+        if self.pt().has_pk_matter == constvals.sFALSE:
             raise CosmoSevereError("Power spectrum not computed. In order to get sigma(R,z) you must add mPk to the list of outputs.")
-        if self.pt.k_max_for_pk < self.ba.h:
+        if self.pt().k_max_for_pk < self.ba().h:
             raise CosmoSevereError("In order to get sigma(R,z) you must set 'P_k_max_h/Mpc' to 1 or bigger, in order to have k_max > 1 h/Mpc.")
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         index_pk_cb = deref(nonlinear_module).index_pk_cb_
         has_pk_cb = deref(nonlinear_module).has_pk_cb_
         if (has_pk_cb == constvals.sFALSE):
@@ -907,10 +948,10 @@ cdef class PyCosmology:
             int index_pk_m
             int k_size
 
-        if (self.pt.has_pk_matter == constvals.sFALSE):
+        if (self.pt().has_pk_matter == constvals.sFALSE):
             raise CosmoSevereError("Power spectrum not computed. In order to get pk_tilt(k, z) you must add mPk to the list of outputs.")
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         ln_k = log(k)
         k_size = deref(nonlinear_module).k_size_
         index_pk_m = deref(nonlinear_module).index_pk_m_
@@ -921,93 +962,93 @@ cdef class PyCosmology:
 
 
     cpdef age(self):
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         return deref(background_module).age_
 
     cpdef h(self):
-        return self.ba.h
+        return self.ba().h
 
     cpdef n_s(self):
-        primordial_module = deref(self._thisptr).GetPrimordialModule()
+        primordial_module = deref(self._cosmo()).GetPrimordialModule()
         return deref(primordial_module).n_s_
 
     cpdef A_s(self):
-        primordial_module = deref(self._thisptr).GetPrimordialModule()
+        primordial_module = deref(self._cosmo()).GetPrimordialModule()
         return deref(primordial_module).A_s_
 
     cpdef tau_reio(self):
-        thm = deref(self._thisptr).GetThermodynamicsModule()
+        thm = deref(self._cosmo()).GetThermodynamicsModule()
         return deref(thm).tau_reionization_
 
     cpdef Omega_m(self):
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         return deref(background_module).Omega0_m_
 
     cpdef Omega_r(self):
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         return deref(background_module).Omega0_r_
 
     cpdef theta_s_100(self):
-        thm = deref(self._thisptr).GetThermodynamicsModule()
+        thm = deref(self._cosmo()).GetThermodynamicsModule()
         return 100.*deref(thm).rs_rec_/deref(thm).ra_rec_
 
     cpdef theta_star_100(self):
-        thm = deref(self._thisptr).GetThermodynamicsModule()
+        thm = deref(self._cosmo()).GetThermodynamicsModule()
         return 100.*deref(thm).rs_star_/deref(thm).ra_star_
 
     cpdef theta_d_100(self):
-        if (self.th.compute_damping_scale == constvals.sFALSE):
+        if (self.th().compute_damping_scale == constvals.sFALSE):
             raise CosmoSevereError(r"Photon damping scale has not been computed - you must add 'compute damping scale':'yes'.")
-        thm = deref(self._thisptr).GetThermodynamicsModule()
+        thm = deref(self._cosmo()).GetThermodynamicsModule()
         return 100.*deref(thm).rd_rec_/deref(thm).ra_rec_
 
     cpdef Omega_Lambda(self):
-        bam = deref(self._thisptr).GetBackgroundModule()
+        bam = deref(self._cosmo()).GetBackgroundModule()
         return deref(bam).GetOmega0Species(b"Lambda")
 
     cpdef Omega_g(self):
-        return self.ba.Omega0_g
+        return self.ba().Omega0_g
 
     cpdef Omega_b(self):
-        return self.ba.Omega0_b
+        return self.ba().Omega0_b
 
     cpdef omega_b(self):
-        return self.ba.Omega0_b*self.ba.h*self.ba.h
+        return self.ba().Omega0_b*self.ba().h*self.ba().h
 
     cpdef Neff(self):
-        bam = deref(self._thisptr).GetBackgroundModule()
+        bam = deref(self._cosmo()).GetBackgroundModule()
         return deref(bam).Neff_
 
     cpdef f_idr_drmd(self):
-        bam = deref(self._thisptr).GetBackgroundModule()
+        bam = deref(self._cosmo()).GetBackgroundModule()
         return deref(bam).f_idr_drmd()
 
     cpdef z_dec_drmd(self):
-        bam = deref(self._thisptr).GetBackgroundModule()
+        bam = deref(self._cosmo()).GetBackgroundModule()
         return deref(bam).z_dec_drmd()
 
     cpdef k_eq(self):
-        bam = deref(self._thisptr).GetBackgroundModule()
+        bam = deref(self._cosmo()).GetBackgroundModule()
         return deref(bam).a_eq_*deref(bam).H_eq_
 
     cpdef sigma8(self):
         cdef int index_pk_m
-        nlm = deref(self._thisptr).GetNonlinearModule()
+        nlm = deref(self._cosmo()).GetNonlinearModule()
         index_pk_m = deref(nlm).index_pk_m_
         return deref(nlm).sigma8_[index_pk_m]
 
     cpdef sigma8_cb(self):
         cdef int index_pk_cb
-        nlm = deref(self._thisptr).GetNonlinearModule()
+        nlm = deref(self._cosmo()).GetNonlinearModule()
         index_pk_cb = deref(nlm).index_pk_cb_
         return deref(nlm).sigma8_[index_pk_cb]
 
     cpdef rs_drag(self):
-        thm = deref(self._thisptr).GetThermodynamicsModule()
+        thm = deref(self._cosmo()).GetThermodynamicsModule()
         return deref(thm).rs_d_
 
     cpdef z_reio(self):
-        thm = deref(self._thisptr).GetThermodynamicsModule()
+        thm = deref(self._cosmo()).GetThermodynamicsModule()
         return deref(thm).z_reionization_
 
     cdef get_background_value_at_z(self, double z, int index_bg):
@@ -1020,10 +1061,10 @@ cdef class PyCosmology:
             short long_info
             vector[double] pvecback
 
-        long_info = self.ba.long_info
-        inter_normal = self.ba.inter_normal
+        long_info = self.ba().long_info
+        inter_normal = self.ba().inter_normal
 
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         bg_size = deref(background_module).bg_size_
 
         pvecback.resize(bg_size)
@@ -1045,11 +1086,11 @@ cdef class PyCosmology:
             short inter_mode
             double output_value
 
-        long_info = self.ba.long_info
-        inter_normal = self.ba.inter_normal
+        long_info = self.ba().long_info
+        inter_normal = self.ba().inter_normal
 
-        background_module = deref(self._thisptr).GetBackgroundModule()
-        thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
+        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
         bg_size = deref(background_module).bg_size_
         th_size = deref(thermodynamics_module).th_size_
 
@@ -1078,7 +1119,7 @@ cdef class PyCosmology:
                 Desired redshift
         """
         cdef int index_bg_ang_distance
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         index_bg_ang_distance = deref(background_module).index_bg_ang_distance_
         return self.get_background_value_at_z(z, index_bg_ang_distance)
 
@@ -1095,7 +1136,7 @@ cdef class PyCosmology:
                 Desired redshift
         """
         cdef int index_bg_D
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         index_bg_D = deref(background_module).index_bg_D_
         return self.get_background_value_at_z(z, index_bg_D)
 
@@ -1112,7 +1153,7 @@ cdef class PyCosmology:
                 Desired redshift
         """
         cdef int index_bg_f
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         index_bg_f = deref(background_module).index_bg_f_
         return self.get_background_value_at_z(z, index_bg_f)
 
@@ -1136,10 +1177,10 @@ cdef class PyCosmology:
             short short_info
             vector[double] pvecback
 
-        short_info = self.ba.short_info
-        inter_normal = self.ba.inter_normal
+        short_info = self.ba().short_info
+        inter_normal = self.ba().inter_normal
 
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         bg_size_short = deref(background_module).bg_size_short_
         index_bg_a = deref(background_module).index_bg_a_
 
@@ -1161,7 +1202,7 @@ cdef class PyCosmology:
                 Desired redshift
         """
         cdef int index_bg_H
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         index_bg_H = deref(background_module).index_bg_H_
         return self.get_background_value_at_z(z, index_bg_H)
 
@@ -1178,7 +1219,7 @@ cdef class PyCosmology:
                 Desired redshift
         """
         cdef int index_bg_Omega_m
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         index_bg_Omega_m = deref(background_module).index_bg_Omega_m_
         return self.get_background_value_at_z(z, index_bg_Omega_m)
 
@@ -1195,7 +1236,7 @@ cdef class PyCosmology:
                 Desired redshift
         """
         cdef int index_th_xe
-        thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
         index_th_xe = deref(thermodynamics_module).index_th_xe_
         return self.get_thermodynamics_value_at_z(z, index_th_xe)
 
@@ -1211,7 +1252,7 @@ cdef class PyCosmology:
                 Desired redshift
         """
         cdef int index_th_Tb
-        thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
         index_th_Tb = deref(thermodynamics_module).index_th_Tb_
         return self.get_thermodynamics_value_at_z(z, index_th_Tb)
 
@@ -1219,7 +1260,7 @@ cdef class PyCosmology:
         """
         Return the CMB temperature
         """
-        return self.ba.T_cmb
+        return self.ba().T_cmb
 
     # redundent with a previous Omega_m() funciton,
     # but we leave it not to break compatibility
@@ -1249,7 +1290,7 @@ cdef class PyCosmology:
             string titles
             vector[double] data
 
-        background_module = deref(self._thisptr).GetBackgroundModule()
+        background_module = deref(self._cosmo()).GetBackgroundModule()
         deref(background_module).background_output_titles(titles)
 
         tmp = <bytes> titles
@@ -1285,7 +1326,7 @@ cdef class PyCosmology:
             string titles
             vector[double] data
 
-        thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
 
         deref(thermodynamics_module).thermodynamics_output_titles(titles)
 
@@ -1324,7 +1365,7 @@ cdef class PyCosmology:
             dict primordial
             int i
 
-        primordial_module = deref(self._thisptr).GetPrimordialModule()
+        primordial_module = deref(self._cosmo()).GetPrimordialModule()
 
         deref(primordial_module).primordial_output_titles(titles)
 
@@ -1370,7 +1411,7 @@ cdef class PyCosmology:
 
         perturbations = {}
 
-        if self.pt.k_output_values_num<1:
+        if self.pt().k_output_values_num<1:
             return perturbations
 
         cdef:
@@ -1386,16 +1427,16 @@ cdef class PyCosmology:
             list names
             list tmparray
 
-        perturbation_module = deref(self._thisptr).GetPerturbationsModule()
-        k_size = self.pt.k_output_values_num
+        perturbation_module = deref(self._cosmo()).GetPerturbationsModule()
+        k_size = self.pt().k_output_values_num
         for mode in ['scalar','vector','tensor']:
-            if mode=='scalar' and self.pt.has_scalars:
+            if mode=='scalar' and self.pt().has_scalars:
                 thetitles = <bytes> deref(perturbation_module).scalar_titles_
                 thesizes = <int*> deref(perturbation_module).size_scalar_perturbation_data_
-            elif mode=='vector' and self.pt.has_vectors:
+            elif mode=='vector' and self.pt().has_vectors:
                 thetitles = <bytes> deref(perturbation_module).vector_titles_
                 thesizes = <int*> deref(perturbation_module).size_vector_perturbation_data_
-            elif mode=='tensor' and self.pt.has_tensors:
+            elif mode=='tensor' and self.pt().has_tensors:
                 thetitles = <bytes> deref(perturbation_module).tensor_titles_
                 thesizes = <int*> deref(perturbation_module).size_tensor_perturbation_data_
             else:
@@ -1456,7 +1497,7 @@ cdef class PyCosmology:
             int index_ic
             int i
 
-        if (not self.pt.has_density_transfers) and (not self.pt.has_velocity_transfers):
+        if (not self.pt().has_density_transfers) and (not self.pt().has_velocity_transfers):
             return {}
 
         if output_format == 'camb':
@@ -1464,7 +1505,7 @@ cdef class PyCosmology:
         else:
             outf = file_format.class_format
 
-        perturbations_module = deref(self._thisptr).GetPerturbationsModule()
+        perturbations_module = deref(self._cosmo()).GetPerturbationsModule()
         index_md = deref(perturbations_module).index_md_scalars_
 
         deref(perturbations_module).perturb_output_titles(outf, titles)
@@ -1513,7 +1554,7 @@ cdef class PyCosmology:
             double n_s
             double r
 
-        primordial_module = deref(self._thisptr).GetPrimordialModule()
+        primordial_module = deref(self._cosmo()).GetPrimordialModule()
         r = deref(primordial_module).r_
         n_s = deref(primordial_module).n_s_
         alpha_s = deref(primordial_module).alpha_s_
@@ -1566,121 +1607,121 @@ cdef class PyCosmology:
         derived = {}
         for name in names:
             if name == 'h':
-                value = self.ba.h
+                value = self.ba().h
             elif name == 'H0':
-                value = self.ba.h*100
+                value = self.ba().h*100
             elif name == 'Omega0_lambda' or name == 'Omega_Lambda':
-                bam_l = deref(self._thisptr).GetBackgroundModule()
+                bam_l = deref(self._cosmo()).GetBackgroundModule()
                 value = deref(bam_l).GetOmega0Species(b"Lambda")
             elif name == 'Omega0_fld':
-                bam_f = deref(self._thisptr).GetBackgroundModule()
+                bam_f = deref(self._cosmo()).GetBackgroundModule()
                 value = deref(bam_f).GetOmega0Species(b"Fluid")
             elif name == 'age':
                 value = self.age()
             elif name == 'conformal_age':
-                background_module = deref(self._thisptr).GetBackgroundModule()
+                background_module = deref(self._cosmo()).GetBackgroundModule()
                 value = deref(background_module).conformal_age_
             #TODO: Need to wrap NCDM class to get the masses
             #elif name == 'm_ncdm_in_eV':
-            #    value = self.ba.m_ncdm_in_eV[0]
+            #    value = self.ba().m_ncdm_in_eV[0]
             elif name == 'm_ncdm_tot':
                 # TODO: Is this really what we want??
-                ibg = deref(self._thisptr).GetBackgroundModule()
-                value = deref(ibg).GetOmega0NcdmTot()*self.ba.h*self.ba.h*93.14
+                ibg = deref(self._cosmo()).GetBackgroundModule()
+                value = deref(ibg).GetOmega0NcdmTot()*self.ba().h*self.ba().h*93.14
             elif name == 'Neff':
                 value = self.Neff()
             elif name == 'Omega_m':
                 value = self.Omega_m()
             elif name == 'omega_m':
-                value = self.Omega_m()/self.ba.h/self.ba.h
+                value = self.Omega_m()/self.ba().h/self.ba().h
             elif name == 'Omega_g':
-                value = self.ba.Omega0_g
+                value = self.ba().Omega0_g
             elif name == 'xi_idr':
-                bam_xi_idr = deref(self._thisptr).GetBackgroundModule()
-                value = deref(bam_xi_idr).GetSpeciesParam(b"IDM_DR_IDR", b"T_idr")/self.ba.T_cmb
+                bam_xi_idr = deref(self._cosmo()).GetBackgroundModule()
+                value = deref(bam_xi_idr).GetSpeciesParam(b"IDM_DR_IDR", b"T_idr")/self.ba().T_cmb
             elif name == 'N_dg':
-                bam_idr = deref(self._thisptr).GetBackgroundModule()
-                value = deref(bam_idr).GetOmega0Species(b"IDR")/self.ba.Omega0_g*8./7.*pow(11./4.,4./3.)
+                bam_idr = deref(self._cosmo()).GetBackgroundModule()
+                value = deref(bam_idr).GetOmega0Species(b"IDR")/self.ba().Omega0_g*8./7.*pow(11./4.,4./3.)
             elif name == 'Gamma_0_nadm':
-                bam_idr2 = deref(self._thisptr).GetBackgroundModule()
-                value = deref(bam_idr2).GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")*(4./3.)*(self.ba.h*self.ba.h*deref(bam_idr2).GetOmega0Species(b"IDR"))
+                bam_idr2 = deref(self._cosmo()).GetBackgroundModule()
+                value = deref(bam_idr2).GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")*(4./3.)*(self.ba().h*self.ba().h*deref(bam_idr2).GetOmega0Species(b"IDR"))
             elif name == 'a_dark':
-                bam_a_dark = deref(self._thisptr).GetBackgroundModule()
+                bam_a_dark = deref(self._cosmo()).GetBackgroundModule()
                 value = deref(bam_a_dark).GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")
             elif name == 'tau_reio':
                 value = self.tau_reio()
             elif name == 'z_reio':
                 value = self.z_reio()
             elif name == 'z_rec':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).z_rec_
             elif name == 'tau_rec':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).tau_rec_
             elif name == 'rs_rec':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).rs_rec_
             elif name == 'rs_rec_h':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).rs_rec_*self.ba.h
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
+                value = deref(thermodynamics_module).rs_rec_*self.ba().h
             elif name == 'ds_rec':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).ds_rec_
             elif name == 'ds_rec_h':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ds_rec_*self.ba.h
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
+                value = deref(thermodynamics_module).ds_rec_*self.ba().h
             elif name == 'ra_rec':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).ra_rec_
             elif name == 'ra_rec_h':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ra_rec_*self.ba.h
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
+                value = deref(thermodynamics_module).ra_rec_*self.ba().h
             elif name == 'da_rec':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).da_rec_
             elif name == 'da_rec_h':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).da_rec_*self.ba.h
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
+                value = deref(thermodynamics_module).da_rec_*self.ba().h
             elif name == 'z_star':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).z_star_
             elif name == 'tau_star':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).tau_star_
             elif name == 'rs_star':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).rs_star_
             elif name == 'ds_star':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).ds_star_
             elif name == 'ra_star':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).ra_star_
             elif name == 'da_star':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).da_star_
             elif name == 'rd_star':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).rd_star_
             elif name == 'z_d':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).z_d_
             elif name == 'tau_d':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).tau_d_
             elif name == 'ds_d':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).ds_d_
             elif name == 'ds_d_h':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ds_d_*self.ba.h
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
+                value = deref(thermodynamics_module).ds_d_*self.ba().h
             elif name == 'rs_d':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).rs_d_
             elif name == 'rs_d_h':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 rs_d = deref(thermodynamics_module).rs_d_
-                value = rs_d*self.ba.h
+                value = rs_d*self.ba().h
             elif name == '100*theta_s':
                 value = self.theta_s_100()
             elif name == '100*theta_star':
@@ -1688,52 +1729,52 @@ cdef class PyCosmology:
             elif name == '100*theta_d':
                 value = self.theta_d_100()
             elif name == 'YHe':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).YHe_
             elif name == 'n_e':
-                thermodynamics_module = deref(self._thisptr).GetThermodynamicsModule()
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).n_e_
             elif name == 'A_s':
                 value = self.A_s()
             elif name == 'ln10^{10}A_s':
                 value = log(1.e10*self.A_s())
             elif name == 'n_s':
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).n_s_
             elif name == 'alpha_s':
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).alpha_s_
             elif name == 'beta_s':
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).beta_s_
             elif name == 'r':
                 # This is at the pivot scale
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).r_
             elif name == 'r_0002':
                 # at k_pivot = 0.002/Mpc
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 r = deref(primordial_module).r_
                 n_s = deref(primordial_module).n_s_
                 n_t = deref(primordial_module).n_t_
                 alpha_s = deref(primordial_module).alpha_s_
-                value = r*(0.002/self.pm.k_pivot)**(n_t - n_s - 1 + 0.5*alpha_s*log(0.002/self.pm.k_pivot))
+                value = r*(0.002/self.pm().k_pivot)**(n_t - n_s - 1 + 0.5*alpha_s*log(0.002/self.pm().k_pivot))
             elif name == 'n_t':
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).n_t_
             elif name == 'alpha_t':
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).alpha_t_
             elif name == 'V_0':
-                value = self.pm.V0
+                value = self.pm().V0
             elif name == 'V_1':
-                value = self.pm.V1
+                value = self.pm().V1
             elif name == 'V_2':
-                value = self.pm.V2
+                value = self.pm().V2
             elif name == 'V_3':
-                value = self.pm.V3
+                value = self.pm().V3
             elif name == 'V_4':
-                value = self.pm.V4
+                value = self.pm().V4
             elif name == 'epsilon_V':
                 epsilons = self.get_slowroll_parameters()
                 eps1, eps2, eps23 = epsilons
@@ -1749,10 +1790,10 @@ cdef class PyCosmology:
             elif name == 'exp_m_2_tau_As':
                 value = exp(-2*self.tau_reio())*self.A_s()
             elif name == 'phi_min':
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).phi_min_
             elif name == 'phi_max':
-                primordial_module = deref(self._thisptr).GetPrimordialModule()
+                primordial_module = deref(self._cosmo()).GetPrimordialModule()
                 value = deref(primordial_module).phi_max_
             elif name == 'sigma8':
                 value = self.sigma8()
@@ -1767,7 +1808,7 @@ cdef class PyCosmology:
             elif name.endswith('.M_2') or name.endswith('.M_3') or name.endswith('.M_4') \
                  or name.endswith('.alpha') or name.endswith('.q0') or name.endswith('.x'):
                 instance, _, field = name.rpartition('.')
-                background_module = deref(self._thisptr).GetBackgroundModule()
+                background_module = deref(self._cosmo()).GetBackgroundModule()
                 value = deref(background_module).GetSpeciesParam(
                     instance.encode('utf-8'), field.encode('utf-8'))
             else:
@@ -1797,7 +1838,7 @@ cdef class PyCosmology:
 
         k_nl_arr = np.empty(z_size, np.double)
         k_nl = k_nl_arr
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         for index_z in range(z_size):
             deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
             k_nl[index_z] = k_nl_val
@@ -1828,7 +1869,7 @@ cdef class PyCosmology:
 
         k_nl_cb_arr = np.empty(z_size, np.double)
         k_nl_cb = k_nl_cb_arr
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         for index_z in range(z_size):
             deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
             k_nl_cb[index_z] = k_nl_cb_val
@@ -1849,8 +1890,8 @@ cdef class PyCosmology:
         data = ctx.get('data')  # recover data from the context
 
         # Set the module to the current values
-        self._pars = data.cosmo_arguments
-        self.reset()
+        self._pars = dict(data.cosmo_arguments)
+        self.parameters_changed = True
         self.compute()
 
         # Compute the derived paramter value and store them
@@ -1883,7 +1924,7 @@ cdef class PyCosmology:
         pk_cb_arr = np.empty(k_size*z_size, np.double)
         pk_cb = pk_cb_arr
 
-        nonlinear_module = deref(self._thisptr).GetNonlinearModule()
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         deref(nonlinear_module).nonlinear_pks_at_kvec_and_zvec(pk_linear, &k[0], k_size, &z[0], z_size, &pk[0],  &pk_cb[0])
 
         return pk_arr, pk_cb_arr
@@ -1896,8 +1937,8 @@ cdef class PyCosmology:
 
     cpdef Omega0_k(self):
         """ Curvature contribution """
-        return self.ba.Omega0_k
+        return self.ba().Omega0_k
 
     cpdef Omega0_cdm(self):
-        bam = deref(self._thisptr).GetBackgroundModule()
+        bam = deref(self._cosmo()).GetBackgroundModule()
         return deref(bam).GetOmega0Species(b"CDM")
