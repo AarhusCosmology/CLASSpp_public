@@ -12,5 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check documentation dependencies
+        run: |
+          doxygen --version
+          dot -V
+
+      - name: Clean generated documentation
+        run: |
+          rm -rf doc/manual/html
+          rm -rf doc/manual/latex
+
       - name: Build documentation
         run: cd doc/input && doxygen doxyconf

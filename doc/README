@@ -14,8 +14,10 @@ Documentation follows the policy in [README.md](../README.md#documentation):
 code and tests define behaviour; Doxygen captures public contracts and
 non-obvious domain context without duplicating implementation details.
 
-To generate the HTML and LaTeX output locally, install Doxygen and run:
+To generate the HTML and LaTeX output locally, install Doxygen and Graphviz,
+then run:
 
+    rm -rf doc/manual/html doc/manual/latex
     cd doc/input && doxygen doxyconf
 
 The CI workflow runs this command with warnings treated as errors.

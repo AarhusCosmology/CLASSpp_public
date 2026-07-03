@@ -113,9 +113,11 @@ invariants, numerical assumptions, or the rationale for a non-obvious
 algorithm. Do not add boilerplate comments for every function.
 
 The generated manual is not committed except for the PDF release artifact.
-To build the HTML and LaTeX output locally, install Doxygen and run:
+To build the HTML and LaTeX output locally, install Doxygen and Graphviz, then
+run:
 
 ```sh
+rm -rf doc/manual/html doc/manual/latex
 (cd doc/input && doxygen doxyconf)
 ```
 
