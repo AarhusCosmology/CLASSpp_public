@@ -575,7 +575,7 @@ void TransferModule::transfer_perturbation_source_spline(
 void TransferModule::transfer_get_l_list() {
   int index_l;
   int l_max = 0;
-  int increment, current_l;
+  int increment;
   /** Summary: */
   /*
     fprintf(stderr,"rescaling %e logstep %e linstep %e\n",
@@ -604,19 +604,18 @@ void TransferModule::transfer_get_l_list() {
 
   /** - start from l = 2 and increase with logarithmic step */
 
-  index_l   = 0;
-  current_l = 2;
+  l_.clear();
+  l_.push_back(2);
   increment =
-      std::max((int) (current_l *
+      std::max((int) (l_.back() *
                       (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
                1);
 
-  while (((current_l + increment) < l_max) &&
+  while (((l_.back() + increment) < l_max) &&
          (increment < ppr->l_linstep * thermodynamics_module_->angular_rescaling_)) {
-    index_l++;
-    current_l += increment;
+    l_.push_back(l_.back() + increment);
     increment =
-        std::max((int) (current_l *
+        std::max((int) (l_.back() *
                         (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
                  1);
   }
@@ -626,52 +625,17 @@ void TransferModule::transfer_get_l_list() {
 
   increment = ppr->l_linstep * thermodynamics_module_->angular_rescaling_;
 
-  while ((current_l + increment) <= l_max) {
-    index_l++;
-    current_l += increment;
+  while ((l_.back() + increment) <= l_max) {
+    l_.push_back(l_.back() + increment);
   }
 
   /** - last value set to exactly l_max */
 
-  if (current_l != l_max) {
-    index_l++;
+  if (l_.back() != l_max) {
+    l_.push_back(l_max);
   }
 
-  l_size_max_ = index_l + 1;
-
-  /** - so far we just counted the number of values. Now repeat the
-      whole thing but fill array with values. */
-
-  l_.resize(l_size_max_);
-
-  index_l = 0;
-  l_[0]   = 2;
-  increment =
-      std::max((int) (l_[0] *
-                      (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
-               1);
-
-  while (((l_[index_l] + increment) < l_max) &&
-         (increment < ppr->l_linstep * thermodynamics_module_->angular_rescaling_)) {
-    index_l++;
-    l_[index_l] = l_[index_l - 1] + increment;
-    increment =
-        std::max((int) (l_[index_l] *
-                        (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
-                 1);
-  }
-
-  increment = ppr->l_linstep * thermodynamics_module_->angular_rescaling_;
-
-  while ((l_[index_l] + increment) <= l_max) {
-    index_l++;
-    l_[index_l] = l_[index_l - 1] + increment;
-  }
-
-  if (l_[index_l] != l_max) {
-    index_l++;
-    l_[index_l] = l_max;
-  }
+  l_size_max_ = static_cast<int>(l_.size());
 
   /* for each mode and type, find relevant size of l array,
      l_size_tt[index_md][index_tt] (since for some modes and types
@@ -753,9 +717,7 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
   int index_q;
   double q, q_min = 0., q_max = 0., q_step;
   int nu, nu_min, nu_proposed;
-  int q_size_max;
   double q_approximation;
-  double q_threshold;
   double last_step = 0.;
   int last_index   = 0;
   double q_logstep_spline;
@@ -815,62 +777,20 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
                      pow(thermodynamics_module_->angular_rescaling_, ppr->q_logstep_open);
   q_logstep_trapzd = ppr->q_logstep_trapzd;
 
-  /* slightly conservative estimate of number of values */
-
-  if (sgnK == 1) {
-    q_approximation = std::min(ppr->hyper_flat_approximation_nu, (q_max / sqrt(K))) * sqrt(K);
-
-    /* max contribution from integer nu values */
-    q_threshold = ppr->q_linstep / q_logstep_trapzd;
-
-    q_step     = 1. + 0.5 * q_period * q_logstep_trapzd;
-    q_size_max = (int) (log(std::min(q_approximation, q_threshold) / q_min) / log(q_step) + 1);
-
-    q_step      = std::max(q_period * ppr->q_linstep, 1 * sqrt(K));
-    q_size_max += (int) (1.1 * (q_approximation - std::min(q_min, 10 * q_threshold)) / q_step +
-                         18 * q_threshold / q_step + 1);
-
-    /* max contribution from non-integer nu values */
-    q_threshold = ppr->q_linstep / q_logstep_spline;
-
-    q_step      = 1. + 0.5 * q_period * q_logstep_spline;
-    q_size_max += (int) (log(std::min(q_max, q_threshold) / q_approximation) / log(q_step) + 1);
-
-    q_step      = q_period * ppr->q_linstep;
-    q_size_max += (int) (1.1 * (q_max - std::min(q_max, 10 * q_threshold)) / q_step +
-                         18 * q_threshold / q_step + 1);
-
-    /* cap at 2^25 (~3*10^7) to prevent runaway allocations */
-    q_size_max = std::min(q_size_max, 1 << 25);
-  }
-  else {
-    /* max contribution from non-integer nu values */
-    q_threshold = ppr->q_linstep / q_logstep_spline;
-
-    q_step     = 1. + 0.5 * q_period * q_logstep_spline;
-    q_size_max = (int) (log(std::min(q_max, q_threshold) / q_min) / log(q_step) + 1);
-
-    q_step      = q_period * ppr->q_linstep;
-    q_size_max += (int) (1.1 * (q_max - std::min(q_max, 10 * q_threshold)) / q_step +
-                         18 * q_threshold / q_step + 1);
-  }
-
-  /* create array with this conservative size estimate. The exact size
-     will be readjusted below, after filling the array. */
-
-  q_.resize(q_size_max);
-
   /* assign the first value before starting the loop */
 
-  index_q     = 0;
-  q_[index_q] = q_min;
-  nu          = 3;
-  index_q++;
+  q_.clear();
+  q_.push_back(q_min);
+  nu = 3;
 
   /* loop over the values */
 
-  while (q_[index_q - 1] < q_max) {
-    class_test(index_q >= q_size_max, "buggy q-list definition (q_size=%d)", q_size_max);
+  while (q_.back() < q_max) {
+    index_q = static_cast<int>(q_.size());
+
+    /* cap at 2^25 (~3*10^7) values so that pathological precision
+       parameters fail cleanly instead of sampling forever */
+    class_test(index_q >= (1 << 25), "buggy q-list definition (q_size=%d)", index_q);
 
     /* step size formula in flat/open case. Step goes gradually from
        logarithmic to linear:
@@ -927,22 +847,17 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
       }
     }
 
-    q_[index_q] = q;
-    index_q++;
+    q_.push_back(q);
   }
 
-  /* infer total number of values (also checking if we overshot the last point) */
+  /* drop the last point if we overshot q_max, then infer total number of values */
 
-  if (q_[index_q - 1] > q_max)
-    q_size_ = index_q - 1;
-  else
-    q_size_ = index_q;
+  if (q_.back() > q_max)
+    q_.pop_back();
+
+  q_size_ = static_cast<int>(q_.size());
 
   class_test(q_size_ < 2, "buggy q-list definition");
-
-  /* now, readjust array size */
-
-  q_.resize(q_size_);
 
   /* in curved universe, check at which index the flat rescaling
      approximation will start being used */

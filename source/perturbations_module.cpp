@@ -1059,7 +1059,7 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
   std::vector<double> pvecback(background_module_->bg_size_short_);
   std::vector<double> pvecthermo(thermodynamics_module_->th_size_);
 
-  /** - first, just count the number of sampling points in order to allocate the array containing all values */
+  /** - build the list of sampling points, appending each value to tau_sampling_ */
 
   /** - (a) if CMB requested, first sampling point = when the universe
       stops being opaque; otherwise, start sampling gravitational
@@ -1176,10 +1176,12 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
       timescale_source = 1/aH; repeat till today.
   */
 
-  int counter           = 1;
   int last_index_back   = first_index_back;
   int last_index_thermo = first_index_thermo;
   double tau            = tau_ini;
+
+  tau_sampling_.clear();
+  tau_sampling_.push_back(tau_ini);
 
   while (tau < background_module_->conformal_age_) {
     background_module_->background_at_tau(tau,
@@ -1236,92 +1238,14 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
                ppr->perturb_sampling_stepsize * timescale_source);
 
     tau = tau + ppr->perturb_sampling_stepsize * timescale_source;
-    counter++;
-  }
-
-  /** - --> infer total number of time steps, tau_size_ */
-  tau_size_ = counter;
-
-  /** - --> allocate array of time steps, tau_sampling_[index_tau] */
-  tau_sampling_.resize(tau_size_);
-
-  /** - --> repeat the same steps, now filling the array with each tau value: */
-
-  /** - --> (b.1.) first sampling point = when the universe stops being opaque */
-
-  counter                = 0;
-  tau_sampling_[counter] = tau_ini;
-
-  /** - --> (b.2.) next sampling point = previous + ppr->perturb_sampling_stepsize * timescale_source, where
-      timescale_source1 = \f$ |g/\dot{g}| = |\dot{\kappa}-\ddot{\kappa}/\dot{\kappa}|^{-1} \f$;
-      timescale_source2 = \f$ |2\ddot{a}/a-(\dot{a}/a)^2|^{-1/2} \f$ (to sample correctly the late ISW effect; and
-      timescale_source=1/(1/timescale_source1+1/timescale_source2); repeat till today.
-      If CMB not requested:
-      timescale_source = 1/aH; repeat till today.  */
-
-  last_index_back   = first_index_back;
-  last_index_thermo = first_index_thermo;
-  tau               = tau_ini;
-
-  while (tau < background_module_->conformal_age_) {
-    background_module_->background_at_tau(tau,
-                                          pba->short_info,
-                                          pba->inter_closeby,
-                                          &last_index_back,
-                                          pvecback.data());
-
-    thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                                    1., /* redshift z=1/a-1 */
-                                                thermodynamics_module_->inter_closeby_,
-                                                &last_index_thermo,
-                                                pvecback.data(),
-                                                pvecthermo.data());
-
-    if (has_cmb_) {
-      /* variation rate of thermodynamics variables */
-      double rate_thermo = pvecthermo[thermodynamics_module_->index_th_rate_];
-
-      /* variation rate of metric due to late ISW effect (important at late times) */
-      a_prime_over_a             = pvecback[background_module_->index_bg_H_] *
-                                   pvecback[background_module_->index_bg_a_];
-      double a_primeprime_over_a = pvecback[background_module_->index_bg_H_prime_] *
-                                       pvecback[background_module_->index_bg_a_] +
-                                   2. * a_prime_over_a * a_prime_over_a;
-      double rate_isw_squared    = fabs(2. * a_primeprime_over_a - a_prime_over_a * a_prime_over_a);
-
-      /* compute rate */
-      timescale_source = sqrt(rate_thermo * rate_thermo + rate_isw_squared);
-    }
-    else {
-      a_prime_over_a   = pvecback[background_module_->index_bg_H_] *
-                         pvecback[background_module_->index_bg_a_];
-      timescale_source = a_prime_over_a;
-    }
-
-    /* check it is non-zero */
-    class_test(timescale_source == 0., "null evolution rate, integration is diverging");
-
-    /* compute inverse rate */
-    timescale_source = 1. / timescale_source;
-
-    if (tau >
-        background_module_->conformal_age_ * ppr->perturbations_sampling_boost_above_age_fraction) {
-      timescale_source /= 2.;
-    }
-
-    class_test(fabs(ppr->perturb_sampling_stepsize * timescale_source / tau) <
-                   ppr->smallest_allowed_variation,
-               "integration step =%e < machine precision : leads either to numerical error or "
-               "infinite loop",
-               ppr->perturb_sampling_stepsize * timescale_source);
-
-    tau = tau + ppr->perturb_sampling_stepsize * timescale_source;
-    counter++;
-    tau_sampling_[counter] = tau;
+    tau_sampling_.push_back(tau);
   }
 
   /** - last sampling point = exactly today */
-  tau_sampling_[counter] = background_module_->conformal_age_;
+  tau_sampling_.back() = background_module_->conformal_age_;
+
+  /** - --> infer total number of time steps, tau_size_ */
+  tau_size_ = static_cast<int>(tau_sampling_.size());
 
   /** - check the maximum redshift z_max_pk at which the Fourier
       transfer functions \f$ T_i(k,z)\f$ should be computable by
