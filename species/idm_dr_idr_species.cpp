@@ -47,9 +47,8 @@ void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout
   if (ctx.index_ic != mod->index_ic_ad_)
     return;
 
-  const auto& my_lay     = static_cast<const PerturbLayout&>(base);
-  const auto& idm_dr_lay = my_lay.idm_dr;
-  const auto& idr_lay    = my_lay.idr;
+  const auto& idm_dr_lay = idm_dr_layout(base);
+  const auto& idr_lay    = idr_layout(base);
 
   if (has_idm_dr()) {
     if (idm_dr_lay.idx_delta >= 0)
@@ -89,9 +88,8 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   };
 
   // ── IDM_DR ────────────────────────────────────────────────────────────────
-  const auto& my_lay     = static_cast<const PerturbLayout&>(base);
-  const auto& idm_dr_lay = my_lay.idm_dr;
-  const auto& idr_lay    = my_lay.idr;
+  const auto& idm_dr_lay = idm_dr_layout(base);
+  const auto& idr_lay    = idr_layout(base);
   if (index_tp_delta_idm_dr_ >= 0) {
     set_source(index_tp_delta_idm_dr_,
                y[idm_dr_lay.idx_delta] +
@@ -163,9 +161,8 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const perturbs* ppt      = mod.GetPerturbs();
 
-    const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-    const auto& idm_dr_lay = my_lay.idm_dr;
-    const auto& idr_lay    = my_lay.idr;
+    const auto& idm_dr_lay = idm_dr_layout(*pv->species_layouts[collection_index_]);
+    const auto& idr_lay    = idr_layout(*pv->species_layouts[collection_index_]);
 
     if (has_idm_dr()) {
       delta_idm_dr = y[idm_dr_lay.idx_delta];
@@ -244,49 +241,9 @@ IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba,
   children_.push_back(std::move(idr));
 }
 
-// ── Perturbation layout-based overrides ───────────────────────────────────────
-
-void IDM_DR_IDR_Species::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
-                                                     perturb_vector* pv,
-                                                     const precision* ppr,
-                                                     int& index_pt,
-                                                     const perturb_workspace* ppw,
-                                                     int gauge) {
-  auto& my = static_cast<PerturbLayout&>(base);
-  idm_dr_->RegisterPerturbationIndices(my.idm_dr, pv, ppr, index_pt, ppw, gauge);
-  idr_->RegisterPerturbationIndices(my.idr, pv, ppr, index_pt, ppw, gauge);
-}
-
-void IDM_DR_IDR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
-                                       double tau,
-                                       const double* y,
-                                       double* dy,
-                                       const perturb_parameters_and_workspace& ppaw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  idm_dr_->PerturbDerivs(my.idm_dr, tau, y, dy, ppaw);
-  idr_->PerturbDerivs(my.idr, tau, y, dy, ppaw);
-  AddCouplingDerivs(tau, y, dy, ppaw);
-}
-
-void IDM_DR_IDR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
-                                                       double* y,
-                                                       const PerturbIcContext& ctx) {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  idm_dr_->PerturbSynchronousToNewtonian(my.idm_dr, y, ctx);
-  idr_->PerturbSynchronousToNewtonian(my.idr, y, ctx);
-}
-
-BaseSpecies::StressEnergyContribution IDM_DR_IDR_Species::StressEnergy(
-    const BaseSpecies::PerturbLayout& base,
-    const perturb_vector* pv,
-    const double* y,
-    const double* pvecback,
-    const perturb_workspace* ppw) const {
-  const auto& my               = static_cast<const PerturbLayout&>(base);
-  StressEnergyContribution se  = idm_dr_->StressEnergy(my.idm_dr, pv, y, pvecback, ppw);
-  se                          += idr_->StressEnergy(my.idr, pv, y, pvecback, ppw);
-  return se;
-}
+// ── Perturbation coupling terms ───────────────────────────────────────────────
+// Registration, PerturbDerivs, sync->Newtonian, StressEnergy and the
+// approximation-switch copy all use the generic CompositeSpecies child loops.
 
 void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
                                            const double* y,
@@ -310,9 +267,8 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
   if (rho_idm_dr <= 0. || rho_idr <= 0. || dmu_idm_dr <= 0.)
     return;
 
-  const auto& my_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-  const auto& idm_dr_lay    = my_lay.idm_dr;
-  const auto& idr_lay       = my_lay.idr;
+  const auto& idm_dr_lay    = idm_dr_layout(*pv->species_layouts[collection_index_]);
+  const auto& idr_lay       = idr_layout(*pv->species_layouts[collection_index_]);
   const double Sinv         = 4. / 3. * rho_idr / rho_idm_dr;
   const double theta_idm_dr = y[idm_dr_lay.idx_theta];
 
@@ -611,11 +567,11 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
 void IDM_DR_IDR_Species::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
                                            const perturb_workspace* ppw,
                                            int* used_in_sources) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
+  const auto& idr_lay = idr_layout(base);
   /* IDM_DR_IDR has no tensor-mode slots; idx_l3 < 0 also when TCA is on.
      index_ap_rsa_idr and index_ap_tca_idm_dr are only defined in scalar mode,
      so we must not access them in tensor/vector mode. */
-  if (my.idr.idx_l3 < 0)
+  if (idr_lay.idx_l3 < 0)
     return;
   /* IDR l>=3 multipoles not needed in sources when rsa_idr is off, idr is
      free-streaming, and tca_idm_dr is off. */
@@ -626,17 +582,6 @@ void IDM_DR_IDR_Species::MarkUsedInSources(const BaseSpecies::PerturbLayout& bas
   if (ppw->approx[ppw->index_ap_tca_idm_dr] != (int) tca_idm_dr_off)
     return;
 
-  for (int idx = my.idr.idx_l3; idx <= my.idr.idx_delta + my.idr.l_max; ++idx)
+  for (int idx = idr_lay.idx_l3; idx <= idr_lay.idx_delta + idr_lay.l_max; ++idx)
     used_in_sources[idx] = _FALSE_;
-}
-
-void IDM_DR_IDR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
-                                                       const BaseSpecies::PerturbLayout& new_base,
-                                                       const double* old_y,
-                                                       double* new_y,
-                                                       const PerturbSwitchContext& ctx) const {
-  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
-  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  idm_dr_->CopyPerturbationsAcrossSwitch(old_l.idm_dr, new_l.idm_dr, old_y, new_y, ctx);
-  idr_->CopyPerturbationsAcrossSwitch(old_l.idr, new_l.idr, old_y, new_y, ctx);
 }

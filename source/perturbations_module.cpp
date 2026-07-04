@@ -3168,12 +3168,10 @@ void PerturbationsModule::perturb_vector_init(
           auto& idm_dr_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
           if (idm_dr_idr.idr().idr_nature() == idr_free_streaming) {
             const size_t idr_swi    = all_species_.index_of("IDM_DR_IDR");
-            const auto& old_idr_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                          *ppw->pv->species_layouts[idr_swi])
-                                          .idr;
-            const auto& new_idr_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                          *ppv->species_layouts[idr_swi])
-                                          .idr;
+            const auto& old_idr_lay = IDM_DR_IDR_Species::idr_layout(
+                *ppw->pv->species_layouts[idr_swi]);
+            const auto& new_idr_lay = IDM_DR_IDR_Species::idr_layout(
+                *ppv->species_layouts[idr_swi]);
             ppv->y[new_idr_lay.idx_shear] =
                 idm_dr_idr.idr().TcaShearIdr(old_idr_lay, ppw->pv->y.data(), ppw);
             ppv->y[new_idr_lay.idx_l3] =
@@ -3236,15 +3234,15 @@ void PerturbationsModule::perturb_vector_init(
                                                   &csp2,
                                                   &Gint);
 
-          const size_t drm_swi     = all_species_.index_of("IDM_DRMD_IDR_DRMD");
-          const auto& drm_old_full = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+          const size_t drm_swi    = all_species_.index_of("IDM_DRMD_IDR_DRMD");
+          const auto& drm_old_lay = IDM_DRMD_IDR_DRMD_Species::idr_drmd_layout(
               *ppw->pv->species_layouts[drm_swi]);
-          const auto& drm_new_full = static_cast<const IDM_DRMD_IDR_DRMD_Species::PerturbLayout&>(
+          const auto& drm_new_lay = IDM_DRMD_IDR_DRMD_Species::idr_drmd_layout(
               *ppv->species_layouts[drm_swi]);
-          const auto& drm_old_lay     = drm_old_full.idr_drmd;
-          const auto& drm_new_lay     = drm_new_full.idr_drmd;
-          const auto& idm_drm_old_lay = drm_old_full.idm_drmd;
-          const auto& idm_drm_new_lay = drm_new_full.idm_drmd;
+          const auto& idm_drm_old_lay = IDM_DRMD_IDR_DRMD_Species::idm_drmd_layout(
+              *ppw->pv->species_layouts[drm_swi]);
+          const auto& idm_drm_new_lay = IDM_DRMD_IDR_DRMD_Species::idm_drmd_layout(
+              *ppv->species_layouts[drm_swi]);
 
           double theta_idr = ppw->pv->y[drm_old_lay.idx_theta];
           double delta_idr = ppw->pv->y[drm_old_lay.idx_delta];
@@ -4498,9 +4496,8 @@ void PerturbationsModule::perturb_einstein(
       }
 
       if (resolved_.idm_dr_idr && (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
-        const auto& idr_th_lay = static_cast<const IDM_DR_IDR_Species::PerturbLayout&>(
-                                     *ppw->pv->species_layouts[resolved_.idm_dr_idr_index])
-                                     .idr;
+        const auto& idr_th_lay = IDM_DR_IDR_Species::idr_layout(
+            *ppw->pv->species_layouts[resolved_.idm_dr_idr_index]);
         shear_idr = 0.5 * 8. / 15. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
                     resolved_.idm_dr_idr->idr().alpha_idm_dr()[0] *
                     (y[idr_th_lay.idx_theta] + k2 * ppw->pvecmetric[ppw->index_mt_alpha]);
@@ -4742,9 +4739,11 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
           sp->ContributeTensorGwSource(*ppw->pv->species_layouts[i], a, y, ppw);
         }
         else if (auto* composite = dynamic_cast<const DNCDM_DR_Species*>(sp)) {
-          const auto& comp_lay = static_cast<const DNCDM_DR_Species::PerturbLayout&>(
-              *ppw->pv->species_layouts[i]);
-          composite->dncdm().ContributeTensorGwSource(comp_lay.dncdm, a, y, ppw);
+          composite->dncdm().ContributeTensorGwSource(DNCDM_DR_Species::dncdm_layout(
+                                                          *ppw->pv->species_layouts[i]),
+                                                      a,
+                                                      y,
+                                                      ppw);
         }
       }
     }

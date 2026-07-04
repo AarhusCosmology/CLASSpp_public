@@ -286,16 +286,16 @@ struct perturb_vector {
   /* Photons bare fields removed — use pv->species_layouts[g_i] (PhotonsSpecies::PerturbLayout). */
   /* Baryons bare fields removed — use pv->species_layouts[b_i] (BaryonsSpecies::PerturbLayout). */
   /* CDM bare fields removed — use pv->species_layouts[cdm_i] (CDMSpecies::PerturbLayout). */
-  /* IDM_DR bare fields removed — use pv->species_layouts[idm_dr_idr_i]
-     (IDM_DR_IDR_Species::PerturbLayout::idm_dr). */
-  /* IDM_DRMD bare fields removed — use pv->species_layouts[idm_drmd_idr_drmd_i]
-     (IDM_DRMD_IDR_DRMD_Species::PerturbLayout::idm_drmd). */
-  /* DCDM bare fields removed — use pv->species_layouts[dcdm_dr_i] (DCDM_DR_Species::PerturbLayout::dcdm). */
+  /* IDM_DR bare fields removed — use
+     IDM_DR_IDR_Species::idm_dr_layout(*pv->species_layouts[idm_dr_idr_i]). */
+  /* IDM_DRMD bare fields removed — use
+     IDM_DRMD_IDR_DRMD_Species::idm_drmd_layout(*pv->species_layouts[idm_drmd_idr_drmd_i]). */
+  /* DCDM bare fields removed — use DCDM_DR_Species::dcdm_layout(*pv->species_layouts[dcdm_dr_i]). */
   /* UR bare fields removed — use pv->species_layouts[ur_i] (UltraRelativisticSpecies::PerturbLayout). */
-  /* IDR bare fields removed — use pv->species_layouts[idm_dr_idr_i]
-     (IDM_DR_IDR_Species::PerturbLayout::idr). */
-  /* IDR_DRMD bare fields removed — use pv->species_layouts[idm_drmd_idr_drmd_i]
-     (IDM_DRMD_IDR_DRMD_Species::PerturbLayout::idr_drmd). */
+  /* IDR bare fields removed — use
+     IDM_DR_IDR_Species::idr_layout(*pv->species_layouts[idm_dr_idr_i]). */
+  /* IDR_DRMD bare fields removed — use
+     IDM_DRMD_IDR_DRMD_Species::idr_drmd_layout(*pv->species_layouts[idm_drmd_idr_drmd_i]). */
 
   /* perturbed recombination */
   int index_pt_perturbed_recombination_delta_temp; /**< Gas temperature perturbation */

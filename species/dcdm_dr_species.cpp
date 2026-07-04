@@ -65,60 +65,21 @@ void DCDM_DR_Species::BackgroundDerivs(double tau,
 }
 
 // ── Perturbation layout-based overrides ───────────────────────────────────────
-
-void DCDM_DR_Species::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
-                                                  perturb_vector* pv,
-                                                  const precision* ppr,
-                                                  int& index_pt,
-                                                  const perturb_workspace* ppw,
-                                                  int gauge) {
-  auto& my = static_cast<PerturbLayout&>(base);
-  dcdm_->RegisterPerturbationIndices(my.dcdm, pv, ppr, index_pt, ppw, gauge);
-  dr_sp_->RegisterPerturbationIndices(my.dr, pv, ppr, index_pt, ppw, gauge);
-}
-
-void DCDM_DR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
-                                    double tau,
-                                    const double* y,
-                                    double* dy,
-                                    const perturb_parameters_and_workspace& ppaw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  dcdm_->PerturbDerivs(my.dcdm, tau, y, dy, ppaw);
-  dr_sp_->PerturbDerivs(my.dr, tau, y, dy, ppaw);
-  AddCouplingDerivs(tau, y, dy, ppaw);
-}
-
-void DCDM_DR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
-                                             double* y,
-                                             const PerturbIcContext& ctx) {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  dcdm_->ApplyInitialConditions(my.dcdm, y, ctx);
-  dr_sp_->ApplyInitialConditions(my.dr, y, ctx);
-}
+// Registration, PerturbDerivs, ICs, StressEnergy and the approximation-switch
+// copy all use the generic CompositeSpecies child loops.
 
 void DCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                                     double* y,
                                                     const PerturbIcContext& ctx) {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  dcdm_->PerturbSynchronousToNewtonian(my.dcdm, y, ctx);  // matter+decay via RhoDotOverRho
+  dcdm_->PerturbSynchronousToNewtonian(dcdm_layout(base),
+                                       y,
+                                       ctx);  // matter+decay via RhoDotOverRho
   const double* pvecback  = ctx.ppw->pvecback.data();
   const double rho_dr     = dr_sp_->Rho(pvecback);
   const double decay_corr = (rho_dr > 0.)
                                 ? ctx.a * dcdm_->Gamma_dcdm() * dcdm_->Rho(pvecback) / rho_dr
                                 : 0.;
-  dr_sp_->PerturbNewtonianReseed(my.dr, y, ctx, decay_corr);
-}
-
-BaseSpecies::StressEnergyContribution DCDM_DR_Species::StressEnergy(
-    const BaseSpecies::PerturbLayout& base,
-    const perturb_vector* pv,
-    const double* y,
-    const double* pvecback,
-    const perturb_workspace* ppw) const {
-  const auto& my               = static_cast<const PerturbLayout&>(base);
-  StressEnergyContribution se  = dcdm_->StressEnergy(my.dcdm, pv, y, pvecback, ppw);
-  se                          += dr_sp_->StressEnergy(my.dr, pv, y, pvecback, ppw);
-  return se;
+  dr_sp_->PerturbNewtonianReseed(dr_layout(base), y, ctx, decay_corr);
 }
 
 void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
@@ -135,7 +96,8 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const auto& my_lay = static_cast<const PerturbLayout&>(base);
+  const auto& dcdm_lay = dcdm_layout(base);
+  const auto& dr_lay   = dr_layout(base);
 
   // ── delta_dcdm ─────────────────────────────────────────────────────────────
   if (dcdm_->transfer_delta_index() >= 0) {
@@ -144,7 +106,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                           dcdm_->transfer_delta_index(),
                           ctx.index_tau,
                           ctx.index_k,
-                          y[my_lay.dcdm.idx_delta] +
+                          y[dcdm_lay.idx_delta] +
                               (3. * a_prime_over_a + ctx.a * dcdm_->Gamma_dcdm()) *
                                   ctx.theta_over_k2);  // N-body gauge correction
   }
@@ -156,7 +118,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
                           dcdm_->transfer_theta_index(),
                           ctx.index_tau,
                           ctx.index_k,
-                          y[my_lay.dcdm.idx_theta] + ctx.theta_shift);  // N-body gauge correction
+                          y[dcdm_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
   }
 
   // ── delta_dr (this channel's slot) ───────────────────────────────────────────
@@ -165,7 +127,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   if (dr_sp_->transfer_delta_index() >= 0) {
     const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.)
-                            ? y[my_lay.dr.idx_F0] / r_dr +
+                            ? y[dr_lay.idx_F0] / r_dr +
                                   4. * a_prime_over_a * ctx.theta_over_k2  // N-body gauge corr.
                             : 0.;
     p_mod->SetSourceValue(ctx.index_md,
@@ -179,7 +141,7 @@ void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   // ── theta_dr (this channel's slot) ───────────────────────────────────────────
   if (dr_sp_->transfer_theta_index() >= 0) {
     const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
-    const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[my_lay.dr.idx_F0 + 1] / r_dr +
+    const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[dr_lay.idx_F0 + 1] / r_dr +
                                           ctx.theta_shift  // N-body gauge correction
                                     : 0.;
     p_mod->SetSourceValue(ctx.index_md,
@@ -216,36 +178,25 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
   const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  const auto& my_cd_lay = static_cast<const PerturbLayout&>(
-      *pv->species_layouts[collection_index_]);
-  if (my_cd_lay.dcdm.idx_delta < 0 || my_cd_lay.dr.idx_F0 < 0)
+  const auto& dcdm_lay = dcdm_layout(*pv->species_layouts[collection_index_]);
+  const auto& dr_lay   = dr_layout(*pv->species_layouts[collection_index_]);
+  if (dcdm_lay.idx_delta < 0 || dr_lay.idx_F0 < 0)
     return;
 
   const double* pvecback = ppw->pvecback.data();
   const double a         = ctx.a;
   const double k         = ctx.k;
 
-  const int base         = my_cd_lay.dr.idx_F0;
+  const int base         = dr_lay.idx_F0;
   const double rprime_dr = dcdm_->Gamma_dcdm() * dcdm_->Rho(pvecback) * std::pow(a, 5) /
                            (pba_->H0 * pba_->H0);
 
-  const double delta_dcdm = y[my_cd_lay.dcdm.idx_delta];
-  const double theta_dcdm = y[my_cd_lay.dcdm.idx_theta];
+  const double delta_dcdm = y[dcdm_lay.idx_delta];
+  const double theta_dcdm = y[dcdm_lay.idx_theta];
 
   // Add DCDM source to this channel's DR l=0 and l=1
   dy[base + 0] += rprime_dr * (delta_dcdm + ctx.metric_euler / (k * k));
   dy[base + 1] += rprime_dr / k * theta_dcdm;
-}
-
-void DCDM_DR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
-                                                    const BaseSpecies::PerturbLayout& new_base,
-                                                    const double* old_y,
-                                                    double* new_y,
-                                                    const PerturbSwitchContext& ctx) const {
-  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
-  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  dcdm_->CopyPerturbationsAcrossSwitch(old_l.dcdm, new_l.dcdm, old_y, new_y, ctx);
-  dr_sp_->CopyPerturbationsAcrossSwitch(old_l.dr, new_l.dr, old_y, new_y, ctx);
 }
 
 // ── Shooter hooks ─────────────────────────────────────────────────────────────

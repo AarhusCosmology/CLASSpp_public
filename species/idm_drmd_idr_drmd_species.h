@@ -11,20 +11,21 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
  public:
   static constexpr std::string_view kTypeName = "idm_drmd_idr_drmd";
 
-  struct PerturbLayout : BaseSpecies::PerturbLayout {
-    IDM_DRMDSpecies::PerturbLayout idm_drmd;
-    IDR_DRMDSpecies::PerturbLayout idr_drmd;
-  };
-
-  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
-    return std::make_unique<PerturbLayout>();
+  // Uses the generic CompositeSpecies::PerturbLayout (one owning sub-layout per
+  // child in children_ order): the base-class child loops — including the
+  // TallyStressEnergy/DelegateTally hot path — index child_layouts, so every
+  // composite layout must carry it (#358). Typed views below.
+  enum ChildIndex { kIdmDrmd = 0, kIdrDrmd = 1 };  // children_ order, set in the ctor
+  static const IDM_DRMDSpecies::PerturbLayout& idm_drmd_layout(
+      const BaseSpecies::PerturbLayout& my) {
+    return static_cast<const IDM_DRMDSpecies::PerturbLayout&>(
+        *static_cast<const CompositeSpecies::PerturbLayout&>(my).child_layouts[kIdmDrmd]);
   }
-
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
-                                     const double* old_y,
-                                     double* new_y,
-                                     const PerturbSwitchContext& ctx) const override;
+  static const IDR_DRMDSpecies::PerturbLayout& idr_drmd_layout(
+      const BaseSpecies::PerturbLayout& my) {
+    return static_cast<const IDR_DRMDSpecies::PerturbLayout&>(
+        *static_cast<const CompositeSpecies::PerturbLayout&>(my).child_layouts[kIdrDrmd]);
+  }
 
   IDM_DRMD_IDR_DRMD_Species(const background& pba,
                             double omega0_idm_drmd,
@@ -99,32 +100,12 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
-                                   perturb_vector* pv,
-                                   const precision* ppr,
-                                   int& index_pt,
-                                   const perturb_workspace* ppw,
-                                   int gauge) override;
-
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
-                     double tau,
-                     const double* y,
-                     double* dy,
-                     const perturb_parameters_and_workspace& ppaw) const override;
-
+  // Registration, derivs (children + AddCouplingDerivs), stress-energy,
+  // sync->Newtonian and approximation-switch copies all use the generic
+  // CompositeSpecies child loops. Only composite-specific logic is overridden.
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;
-
-  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
-                                     double* y,
-                                     const PerturbIcContext& ctx) override;
-
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
-                                        const perturb_vector* pv,
-                                        const double* y,
-                                        const double* pvecback,
-                                        const perturb_workspace* ppw) const override;
 
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,

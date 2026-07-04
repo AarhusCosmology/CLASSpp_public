@@ -62,24 +62,13 @@ void DNCDM_DR_Species::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& b
                                                    int& index_pt,
                                                    const perturb_workspace* ppw,
                                                    int gauge) {
-  auto& my = static_cast<PerturbLayout&>(base);
+  auto& my = static_cast<CompositeSpecies::PerturbLayout&>(base);
   /* DR child first, DNCDM child second — contiguous per composite.
      NOTE: differs from the legacy split layout (all-DR-of-all-composites
-     first, all-DNCDM-of-all-composites second). See design spec section
-     B.3 for the y-vector reorder rationale. */
-  dr_sp_->RegisterPerturbationIndices(my.dr, pv, ppr, index_pt, ppw, gauge);
-  dncdm_->RegisterPerturbationIndices(my.dncdm, pv, ppr, index_pt, ppw, gauge);
-}
-
-void DNCDM_DR_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
-                                     double tau,
-                                     const double* y,
-                                     double* dy,
-                                     const perturb_parameters_and_workspace& ppaw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  dncdm_->PerturbDerivs(my.dncdm, tau, y, dy, ppaw);
-  dr_sp_->PerturbDerivs(my.dr, tau, y, dy, ppaw);
-  AddCouplingDerivs(my, y, dy, ppaw);
+     first, all-DNCDM-of-all-composites second) and from children_ order.
+     See design spec section B.3 for the y-vector reorder rationale. */
+  dr_sp_->RegisterPerturbationIndices(*my.child_layouts[kDr], pv, ppr, index_pt, ppw, gauge);
+  dncdm_->RegisterPerturbationIndices(*my.child_layouts[kDncdm], pv, ppr, index_pt, ppw, gauge);
 }
 
 void DNCDM_DR_Species::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
@@ -87,53 +76,38 @@ void DNCDM_DR_Species::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& bas
                                            const double* y,
                                            double* dy,
                                            const perturb_parameters_and_workspace& ppaw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
   // DNCDMSpecies inherits NCDMBaseSpecies::PerturbTensorDerivs.
   // GetDlnf0Dlnq is overridden by DNCDMSpecies to use pvecback.
-  dncdm_->PerturbTensorDerivs(my.dncdm, tau, y, dy, ppaw);
-}
-
-void DNCDM_DR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
-                                              double* y,
-                                              const PerturbIcContext& ctx) {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  dncdm_->ApplyInitialConditions(my.dncdm, y, ctx);
-  dr_sp_->ApplyInitialConditions(my.dr, y, ctx);
+  dncdm_->PerturbTensorDerivs(dncdm_layout(base), tau, y, dy, ppaw);
 }
 
 void DNCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                                      double* y,
                                                      const PerturbIcContext& ctx) {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  dncdm_->PerturbSynchronousToNewtonian(my.dncdm, y, ctx);  // NCDMBaseSpecies per-q transform
+  dncdm_->PerturbSynchronousToNewtonian(dncdm_layout(base),
+                                        y,
+                                        ctx);  // NCDMBaseSpecies per-q transform
   const double* pvecback  = ctx.ppw->pvecback.data();
   const double rho_dr     = dr_sp_->Rho(pvecback);
   const double decay_corr = (rho_dr > 0.) ? ctx.a * dncdm_->Gamma() * dncdm_->Rho(pvecback) / rho_dr
                                           : 0.;
-  dr_sp_->PerturbNewtonianReseed(my.dr, y, ctx, decay_corr);
-}
-
-BaseSpecies::StressEnergyContribution DNCDM_DR_Species::StressEnergy(
-    const BaseSpecies::PerturbLayout& base,
-    const perturb_vector* pv,
-    const double* y,
-    const double* pvecback,
-    const perturb_workspace* ppw) const {
-  const auto& my               = static_cast<const PerturbLayout&>(base);
-  StressEnergyContribution se  = dncdm_->StressEnergy(my.dncdm, pv, y, pvecback, ppw);
-  se                          += dr_sp_->StressEnergy(my.dr, pv, y, pvecback, ppw);
-  return se;
+  dr_sp_->PerturbNewtonianReseed(dr_layout(base), y, ctx, decay_corr);
 }
 
 // ── Coupling derivs ───────────────────────────────────────────────────────────
+// Registration order aside, PerturbDerivs, ICs, StressEnergy and the
+// approximation-switch copy all use the generic CompositeSpecies child loops.
 
-void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
+void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
                                          const double* y,
                                          double* dy,
                                          const perturb_parameters_and_workspace& ppaw) const {
   const perturb_workspace* ppw    = ppaw.ppw;
   const precision* ppr            = ppaw.perturbations_module->GetPrecision();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
+
+  const auto& dncdm_lay = dncdm_layout(*ppw->pv->species_layouts[collection_index_]);
+  const auto& dr_lay    = dr_layout(*ppw->pv->species_layouts[collection_index_]);
 
   const double* pvecback = ppw->pvecback.data();
   const double a         = ctx.a;
@@ -147,7 +121,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
   const double rprime_dr = std::pow(a, 5) / (pba_->H0 * pba_->H0) * M_ncdm * Gamma *
                            pvecback[dncdm_->bg_number_index()];
 
-  const int lmax = my.dr.l_max;
+  const int lmax = dr_lay.l_max;
 
   auto ComputeFl = [&](int index_q, std::vector<double>& output) {
     double q       = dncdm_->GetQ()[index_q];
@@ -210,7 +184,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
           break;
         }
 
-        int psi_ind     = my.dncdm.index_per_q[index_q] + l;
+        int psi_ind     = dncdm_lay.index_per_q[index_q] + l;
         integral_num   += w0 * q * q * y[psi_ind] * FL[l * q_size + index_q];
         integral_denom += w0 * q * q;
       }
@@ -222,7 +196,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
           double dq       = dncdm_->dq()[index_q];
           double lnf      = pvecback[dncdm_->bg_lnf_index() + index_q];
           double q        = dncdm_->GetQ()[index_q];
-          int psi_ind     = my.dncdm.index_per_q[index_q] + l;
+          int psi_ind     = dncdm_lay.index_per_q[index_q] + l;
           integral_num   += dq * q * q * exp(lnN + lnf) * y[psi_ind] * FL[l * q_size + index_q];
           integral_denom += dq * q * q * exp(lnN + lnf);
         }
@@ -231,15 +205,15 @@ void DNCDM_DR_Species::AddCouplingDerivs(const PerturbLayout& my,
     }
     else {
       if (l == 0)
-        return rprime_dr * y[my.dncdm.index_per_q[0]];
+        return rprime_dr * y[dncdm_lay.index_per_q[0]];
       else if (l == 1)
-        return rprime_dr * y[my.dncdm.index_per_q[0] + 1] / k;
+        return rprime_dr * y[dncdm_lay.index_per_q[0] + 1] / k;
       else
         return 0.;
     }
   };
 
-  const int base = my.dr.idx_F0;
+  const int base = dr_lay.idx_F0;
   for (int l = 0; l <= lmax; ++l) {
     double collision_term = 0.;
     if ((l <= ppr->l_max_dr_col) && (l < 800)) {
@@ -265,7 +239,7 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   if (ctx.index_md != p_mod->index_md_scalars_)
     return;
 
-  const auto& my = static_cast<const PerturbLayout&>(base);
+  const auto& dr_lay = dr_layout(base);
 
   // ── delta_dr (this channel's slot) ───────────────────────────────────────────
   // r_dr == 0 when the channel carries no DR (e.g. Gamma == 0); write 0 then,
@@ -273,7 +247,7 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   if (dr_sp_->transfer_delta_index() >= 0) {
     const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
     const double src  = (r_dr > 0.)
-                            ? y[my.dr.idx_F0] / r_dr +
+                            ? y[dr_lay.idx_F0] / r_dr +
                                   4. * a_prime_over_a * ctx.theta_over_k2  // N-body gauge corr.
                             : 0.;
     p_mod->SetSourceValue(ctx.index_md,
@@ -287,7 +261,7 @@ void DNCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   // ── theta_dr (this channel's slot) ───────────────────────────────────────────
   if (dr_sp_->transfer_theta_index() >= 0) {
     const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
-    const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[my.dr.idx_F0 + 1] / r_dr +
+    const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[dr_lay.idx_F0 + 1] / r_dr +
                                           ctx.theta_shift  // N-body gauge correction
                                     : 0.;
     p_mod->SetSourceValue(ctx.index_md,
@@ -314,17 +288,6 @@ void DNCDM_DR_Species::WriteOutputColumns(PerturbColumnWriter& w,
     w.Add("t_" + dr_sp_->name(),
           dr_sp_->transfer_theta_index(),
           dr_sp_->transfer_theta_index() >= 0);
-}
-
-void DNCDM_DR_Species::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
-                                                     const BaseSpecies::PerturbLayout& new_base,
-                                                     const double* old_y,
-                                                     double* new_y,
-                                                     const PerturbSwitchContext& ctx) const {
-  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
-  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  dncdm_->CopyPerturbationsAcrossSwitch(old_l.dncdm, new_l.dncdm, old_y, new_y, ctx);
-  dr_sp_->CopyPerturbationsAcrossSwitch(old_l.dr, new_l.dr, old_y, new_y, ctx);
 }
 
 // ── Closure ───────────────────────────────────────────────────────────────────

@@ -87,9 +87,8 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
   if (ctx.index_ic != mod->index_ic_ad_)
     return;
 
-  const auto& my_lay      = static_cast<const PerturbLayout&>(base);
-  const auto& idm_drm_lay = my_lay.idm_drmd;
-  const auto& idr_drm_lay = my_lay.idr_drmd;
+  const auto& idm_drm_lay = idm_drmd_layout(base);
+  const auto& idr_drm_lay = idr_drmd_layout(base);
 
   if (has_idr_drmd()) {
     if (idr_drm_lay.idx_delta >= 0)
@@ -142,9 +141,8 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
   };
 
   // ── IDM_DRMD ──────────────────────────────────────────────────────────────
-  const auto& my_src_lay      = static_cast<const PerturbLayout&>(base);
-  const auto& idm_drm_src_lay = my_src_lay.idm_drmd;
-  const auto& idr_drm_src_lay = my_src_lay.idr_drmd;
+  const auto& idm_drm_src_lay = idm_drmd_layout(base);
+  const auto& idr_drm_src_lay = idr_drmd_layout(base);
   if (index_tp_delta_idm_drmd_ >= 0) {
     set_source(index_tp_delta_idm_drmd_,
                y[idm_drm_src_lay.idx_delta] +
@@ -205,10 +203,8 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const perturbs* ppt      = mod.GetPerturbs();
 
-    const auto& my_pr_lay = static_cast<const PerturbLayout&>(
-        *pv->species_layouts[collection_index_]);
-    const auto& idm_drm_pr_lay = my_pr_lay.idm_drmd;
-    const auto& idr_drm_pr_lay = my_pr_lay.idr_drmd;
+    const auto& idm_drm_pr_lay = idm_drmd_layout(*pv->species_layouts[collection_index_]);
+    const auto& idr_drm_pr_lay = idr_drmd_layout(*pv->species_layouts[collection_index_]);
 
     if (has_idm_drmd()) {
       delta_idm_drmd = y[idm_drm_pr_lay.idx_delta];
@@ -258,48 +254,9 @@ IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba,
   children_.push_back(std::move(idr));
 }
 
-// ── Perturbation layout-based overrides ───────────────────────────────────────
-
-void IDM_DRMD_IDR_DRMD_Species::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
-                                                            perturb_vector* pv,
-                                                            const precision* ppr,
-                                                            int& index_pt,
-                                                            const perturb_workspace* ppw,
-                                                            int gauge) {
-  auto& my = static_cast<PerturbLayout&>(base);
-  idm_drmd_->RegisterPerturbationIndices(my.idm_drmd, pv, ppr, index_pt, ppw, gauge);
-  idr_drmd_->RegisterPerturbationIndices(my.idr_drmd, pv, ppr, index_pt, ppw, gauge);
-}
-
-void IDM_DRMD_IDR_DRMD_Species::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
-                                              double tau,
-                                              const double* y,
-                                              double* dy,
-                                              const perturb_parameters_and_workspace& ppaw) const {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  idm_drmd_->PerturbDerivs(my.idm_drmd, tau, y, dy, ppaw);
-  idr_drmd_->PerturbDerivs(my.idr_drmd, tau, y, dy, ppaw);
-  AddCouplingDerivs(tau, y, dy, ppaw);
-}
-
-void IDM_DRMD_IDR_DRMD_Species::PerturbSynchronousToNewtonian(
-    const BaseSpecies::PerturbLayout& base, double* y, const PerturbIcContext& ctx) {
-  const auto& my = static_cast<const PerturbLayout&>(base);
-  idm_drmd_->PerturbSynchronousToNewtonian(my.idm_drmd, y, ctx);
-  idr_drmd_->PerturbSynchronousToNewtonian(my.idr_drmd, y, ctx);
-}
-
-BaseSpecies::StressEnergyContribution IDM_DRMD_IDR_DRMD_Species::StressEnergy(
-    const BaseSpecies::PerturbLayout& base,
-    const perturb_vector* pv,
-    const double* y,
-    const double* pvecback,
-    const perturb_workspace* ppw) const {
-  const auto& my               = static_cast<const PerturbLayout&>(base);
-  StressEnergyContribution se  = idm_drmd_->StressEnergy(my.idm_drmd, pv, y, pvecback, ppw);
-  se                          += idr_drmd_->StressEnergy(my.idr_drmd, pv, y, pvecback, ppw);
-  return se;
-}
+// ── Perturbation coupling terms ───────────────────────────────────────────────
+// Registration, PerturbDerivs, sync->Newtonian, StressEnergy and the
+// approximation-switch copy all use the generic CompositeSpecies child loops.
 
 void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
     double /*tau*/,
@@ -322,10 +279,8 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
   double Rint, csp2, Gint;
   ComputeIdmDrmd(ctx.a, rho_idm_drmd / rho_idr_drmd, &Rint, &csp2, &Gint);
 
-  const auto& my_acc_lay = static_cast<const PerturbLayout&>(
-      *pv->species_layouts[collection_index_]);
-  const auto& idm_drm_acc_lay = my_acc_lay.idm_drmd;
-  const auto& idr_drm_acc_lay = my_acc_lay.idr_drmd;
+  const auto& idm_drm_acc_lay = idm_drmd_layout(*pv->species_layouts[collection_index_]);
+  const auto& idr_drm_acc_lay = idr_drmd_layout(*pv->species_layouts[collection_index_]);
 
   const double theta_idm = y[idm_drm_acc_lay.idx_theta];
   const double theta_idr = y[idr_drm_acc_lay.idx_theta];
@@ -343,18 +298,6 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
     dy[idm_drm_acc_lay.idx_theta] += Gint * (theta_idr - theta_idm);
     dy[idr_drm_acc_lay.idx_theta] -= Gint * Rint * (theta_idr - theta_idm);
   }
-}
-
-void IDM_DRMD_IDR_DRMD_Species::CopyPerturbationsAcrossSwitch(
-    const BaseSpecies::PerturbLayout& old_base,
-    const BaseSpecies::PerturbLayout& new_base,
-    const double* old_y,
-    double* new_y,
-    const PerturbSwitchContext& ctx) const {
-  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
-  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  idm_drmd_->CopyPerturbationsAcrossSwitch(old_l.idm_drmd, new_l.idm_drmd, old_y, new_y, ctx);
-  idr_drmd_->CopyPerturbationsAcrossSwitch(old_l.idr_drmd, new_l.idr_drmd, old_y, new_y, ctx);
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
