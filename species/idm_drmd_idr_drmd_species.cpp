@@ -21,7 +21,7 @@ void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundData(const double* pvecback,
 
 void IDM_DRMD_IDR_DRMD_Species::RegisterBackgroundIndices(int& index_bg) {
   CompositeSpecies::RegisterBackgroundIndices(index_bg);  // children: idm_drmd, idr_drmd
-  class_define_index(index_bg_G_over_aH_drmd_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_G_over_aH_drmd_, true, index_bg, 1);
 }
 
 void IDM_DRMD_IDR_DRMD_Species::ComputeIdmDrmd(

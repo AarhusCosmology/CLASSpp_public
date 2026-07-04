@@ -127,10 +127,12 @@ cdef extern from "hyperspherical.h":
     cdef cppclass HyperInterpStruct:
         HyperInterpStruct(int K, double beta, int nl, int* lvec, double xmin,
                           double xmax, double sampling, int l_WKB, double phiminabs) except +
-    int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS, int nxi,
-                                                    int lnum, double* xinterp,
-                                                    double* Phi, double* dPhi,
-                                                    double* d2Phi) except +
+    void hyperspherical_Hermite_interpolation_all "hyperspherical_Hermite_interpolation<6, true, true, true>"(
+        const HyperInterpStruct* pHIS, int nxi, int lnum, const double* xinterp,
+        double* Phi, double* dPhi, double* d2Phi) except +
+    void hyperspherical_Hermite_interpolation_Phi "hyperspherical_Hermite_interpolation<6, true, false, false>"(
+        const HyperInterpStruct* pHIS, int nxi, int lnum, const double* xinterp,
+        double* Phi, double* dPhi, double* d2Phi) except +
     int hyperspherical_bessel_direct_vector(int K, double beta, int* lvec, int nl,
                                             double* xvec, int nx, double* Phi) except +
     int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) except +
@@ -285,12 +287,12 @@ def hyperspherical_bessel_interpolate(K, beta, l, x, sampling=None, derivatives=
             dPhi = np.empty((nl, nx), dtype=np.double)
             d2Phi = np.empty((nl, nx), dtype=np.double)
             for i in range(nl):
-                hyperspherical_Hermite_interpolation_vector(his, nx, i, &xv[0],
-                                                            &Phi[i, 0], &dPhi[i, 0], &d2Phi[i, 0])
+                hyperspherical_Hermite_interpolation_all(his, nx, i, &xv[0],
+                                                         &Phi[i, 0], &dPhi[i, 0], &d2Phi[i, 0])
         else:
             for i in range(nl):
-                hyperspherical_Hermite_interpolation_vector(his, nx, i, &xv[0],
-                                                            &Phi[i, 0], NULL, NULL)
+                hyperspherical_Hermite_interpolation_Phi(his, nx, i, &xv[0],
+                                                         &Phi[i, 0], NULL, NULL)
     finally:
         del his
 

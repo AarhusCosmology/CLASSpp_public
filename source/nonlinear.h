@@ -111,7 +111,7 @@ struct nonlinear_workspace {
 
   double dark_energy_correction; /** this is the ratio [g_wcdm(z_infinity)/g_lcdm(z_infinity)]^1.5
                                   * (power comes from Dolag et al. (2004) correction)
-                                  * it is 1, if has_fld == _FALSE_ */
+                                  * it is 1, if !has_fld */
 
   //@}
 };

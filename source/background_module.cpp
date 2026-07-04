@@ -178,10 +178,10 @@ void BackgroundModule::background_at_tau(
       interpolation mode) */
 
   if (intermode == pba->inter_normal) {
-    array_interpolate_spline(const_cast<double*>(tau_table_.data()),
+    array_interpolate_spline(tau_table_.data(),
                              bt_size_,
-                             const_cast<double*>(background_table_.data()),
-                             const_cast<double*>(d2background_dtau2_table_.data()),
+                             background_table_.data(),
+                             d2background_dtau2_table_.data(),
                              bg_size_,
                              tau,
                              last_index,
@@ -189,10 +189,10 @@ void BackgroundModule::background_at_tau(
                              pvecback_size);
   }
   if (intermode == pba->inter_closeby) {
-    array_interpolate_spline_growing_closeby(const_cast<double*>(tau_table_.data()),
+    array_interpolate_spline_growing_closeby(tau_table_.data(),
                                              bt_size_,
-                                             const_cast<double*>(background_table_.data()),
-                                             const_cast<double*>(d2background_dtau2_table_.data()),
+                                             background_table_.data(),
+                                             d2background_dtau2_table_.data(),
                                              bg_size_,
                                              tau,
                                              last_index,
@@ -228,10 +228,10 @@ void BackgroundModule::background_tau_of_z(double z, double* tau) const {
   class_test(z > z_table_[0], "out of range: a=%e > a_max=%e\n", z, z_table_[0]);
 
   /** - interpolate from pre-computed table with array_interpolate() */
-  array_interpolate_spline(const_cast<double*>(z_table_.data()),
+  array_interpolate_spline(z_table_.data(),
                            bt_size_,
-                           const_cast<double*>(tau_table_.data()),
-                           const_cast<double*>(d2tau_dz2_table_.data()),
+                           tau_table_.data(),
+                           d2tau_dz2_table_.data(),
                            1,
                            z,
                            &last_index,
@@ -508,11 +508,11 @@ void BackgroundModule::background_indices() {
   index_bg = 0;
 
   /* index for scale factor */
-  class_define_index(index_bg_a_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_a_, true, index_bg, 1);
 
   /* - indices for H and its conformal-time-derivative */
-  class_define_index(index_bg_H_, _TRUE_, index_bg, 1);
-  class_define_index(index_bg_H_prime_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_H_, true, index_bg, 1);
+  class_define_index(index_bg_H_prime_, true, index_bg, 1);
 
   /* - end of indices in the short vector of background values */
   bg_size_short_ = index_bg;
@@ -523,16 +523,16 @@ void BackgroundModule::background_indices() {
 
   // ── Module aggregate indices ──────────────────────────────────────────────
   /* - index for total density */
-  class_define_index(index_bg_rho_tot_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rho_tot_, true, index_bg, 1);
 
   /* - index for total pressure */
-  class_define_index(index_bg_p_tot_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_p_tot_, true, index_bg, 1);
 
   /* - index for derivative of total pressure */
-  class_define_index(index_bg_p_tot_prime_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_p_tot_prime_, true, index_bg, 1);
 
   /* - index for Omega_r (relativistic density fraction) */
-  class_define_index(index_bg_Omega_r_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_Omega_r_, true, index_bg, 1);
 
   /* - put here additional ingredients that you want to appear in the
      normal vector */
@@ -545,31 +545,31 @@ void BackgroundModule::background_indices() {
   /* - indices in the long version : */
 
   /* -> critical density */
-  class_define_index(index_bg_rho_crit_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rho_crit_, true, index_bg, 1);
 
   /* - index for Omega_m (non-relativistic density fraction) */
-  class_define_index(index_bg_Omega_m_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_Omega_m_, true, index_bg, 1);
 
   /* -> conformal distance */
-  class_define_index(index_bg_conf_distance_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_conf_distance_, true, index_bg, 1);
 
   /* -> angular diameter distance */
-  class_define_index(index_bg_ang_distance_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_ang_distance_, true, index_bg, 1);
 
   /* -> luminosity distance */
-  class_define_index(index_bg_lum_distance_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_lum_distance_, true, index_bg, 1);
 
   /* -> proper time (for age of the Universe) */
-  class_define_index(index_bg_time_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_time_, true, index_bg, 1);
 
   /* -> conformal sound horizon */
-  class_define_index(index_bg_rs_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rs_, true, index_bg, 1);
 
   /* -> density growth factor in dust universe */
-  class_define_index(index_bg_D_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_D_, true, index_bg, 1);
 
   /* -> velocity growth factor in dust universe */
-  class_define_index(index_bg_f_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_f_, true, index_bg, 1);
 
   /* -> put here additional quantities describing background */
   /*    */
@@ -584,7 +584,7 @@ void BackgroundModule::background_indices() {
   index_bi = 0;
 
   /* -> scale factor */
-  class_define_index(index_bi_a_, _TRUE_, index_bi, 1);
+  class_define_index(index_bi_a_, true, index_bi, 1);
 
   /* -> integration indices for all species (each species owns its own offsets) */
   for (auto& [name, sp] : all_species_) {
@@ -595,17 +595,17 @@ void BackgroundModule::background_indices() {
   bi_B_size_ = index_bi;
 
   /* -> proper time (for age of the Universe) */
-  class_define_index(index_bi_time_, _TRUE_, index_bi, 1);
+  class_define_index(index_bi_time_, true, index_bi, 1);
 
   /* -> sound horizon */
-  class_define_index(index_bi_rs_, _TRUE_, index_bi, 1);
+  class_define_index(index_bi_rs_, true, index_bi, 1);
 
   /* -> Second order equation for growth factor */
-  class_define_index(index_bi_D_, _TRUE_, index_bi, 1);
-  class_define_index(index_bi_D_prime_, _TRUE_, index_bi, 1);
+  class_define_index(index_bi_D_, true, index_bi, 1);
+  class_define_index(index_bi_D_prime_, true, index_bi, 1);
 
   /* -> index for conformal time in vector of variables to integrate */
-  class_define_index(index_bi_tau_, _TRUE_, index_bi, 1);
+  class_define_index(index_bi_tau_, true, index_bi, 1);
 
   /* -> end of indices in the vector of variables to integrate */
   bi_size_ = index_bi;
@@ -973,14 +973,14 @@ void BackgroundModule::background_find_equality() {
 
 void BackgroundModule::background_output_titles(std::string& titles) const {
   // ── Module header (always present) ──────────────────────────────────────
-  class_store_columntitle(titles, "z", _TRUE_);
-  class_store_columntitle(titles, "proper time [Gyr]", _TRUE_);
-  class_store_columntitle(titles, "conf. time [Mpc]", _TRUE_);
-  class_store_columntitle(titles, "H [1/Mpc]", _TRUE_);
-  class_store_columntitle(titles, "comov. dist.", _TRUE_);
-  class_store_columntitle(titles, "ang.diam.dist.", _TRUE_);
-  class_store_columntitle(titles, "lum. dist.", _TRUE_);
-  class_store_columntitle(titles, "comov.snd.hrz.", _TRUE_);
+  class_store_columntitle(titles, "z", true);
+  class_store_columntitle(titles, "proper time [Gyr]", true);
+  class_store_columntitle(titles, "conf. time [Mpc]", true);
+  class_store_columntitle(titles, "H [1/Mpc]", true);
+  class_store_columntitle(titles, "comov. dist.", true);
+  class_store_columntitle(titles, "ang.diam.dist.", true);
+  class_store_columntitle(titles, "lum. dist.", true);
+  class_store_columntitle(titles, "comov.snd.hrz.", true);
 
   // ── Species output — per-species dispatch ───────────────────────────────
   BackgroundColumnWriter writer(titles);
@@ -988,32 +988,29 @@ void BackgroundModule::background_output_titles(std::string& titles) const {
     sp->WriteBackgroundColumnTitles(writer);
 
   // ── Module aggregate columns ────────────────────────────────────────────
-  class_store_columntitle(titles, "(.)rho_crit", _TRUE_);
-  class_store_columntitle(titles, "(.)rho_tot", _TRUE_);
-  class_store_columntitle(titles, "(.)p_tot", _TRUE_);
-  class_store_columntitle(titles, "(.)p_tot_prime", _TRUE_);
-  class_store_columntitle(titles, "gr.fac. D", _TRUE_);
-  class_store_columntitle(titles, "gr.fac. f", _TRUE_);
+  class_store_columntitle(titles, "(.)rho_crit", true);
+  class_store_columntitle(titles, "(.)rho_tot", true);
+  class_store_columntitle(titles, "(.)p_tot", true);
+  class_store_columntitle(titles, "(.)p_tot_prime", true);
+  class_store_columntitle(titles, "gr.fac. D", true);
+  class_store_columntitle(titles, "gr.fac. f", true);
 }
 
 void BackgroundModule::background_output_data(int number_of_titles, double* data) const {
   for (int index_tau = 0; index_tau < bt_size_; index_tau++) {
-    double* dataptr  = data + index_tau * number_of_titles;
-    double* pvecback = const_cast<double*>(background_table_.data()) + index_tau * bg_size_;
-    int storeidx     = 0;
+    double* dataptr        = data + index_tau * number_of_titles;
+    const double* pvecback = background_table_.data() + index_tau * bg_size_;
+    int storeidx           = 0;
 
     // ── Module header ──────────────────────────────────────────────────────
-    class_store_double(dataptr, 1. / pvecback[index_bg_a_] - 1., _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_time_] / _Gyr_over_Mpc_, _TRUE_, storeidx);
-    class_store_double(dataptr,
-                       conformal_age_ - pvecback[index_bg_conf_distance_],
-                       _TRUE_,
-                       storeidx);
-    class_store_double(dataptr, pvecback[index_bg_H_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_conf_distance_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_ang_distance_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_lum_distance_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rs_], _TRUE_, storeidx);
+    class_store_double(dataptr, 1. / pvecback[index_bg_a_] - 1., true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_time_] / _Gyr_over_Mpc_, true, storeidx);
+    class_store_double(dataptr, conformal_age_ - pvecback[index_bg_conf_distance_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_H_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_conf_distance_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_ang_distance_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_lum_distance_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rs_], true, storeidx);
 
     // ── Species data — per-species dispatch ───────────────────────────────
     BackgroundColumnWriter writer(dataptr, storeidx);
@@ -1021,12 +1018,12 @@ void BackgroundModule::background_output_data(int number_of_titles, double* data
       sp->WriteBackgroundData(pvecback, writer);
 
     // ── Module aggregate columns ──────────────────────────────────────────
-    class_store_double(dataptr, pvecback[index_bg_rho_crit_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_tot_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_tot_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_tot_prime_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_D_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_f_], _TRUE_, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_crit_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_rho_tot_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_p_tot_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_p_tot_prime_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_D_], true, storeidx);
+    class_store_double(dataptr, pvecback[index_bg_f_], true, storeidx);
   }
 }
 

@@ -182,8 +182,8 @@ struct perturbs {
   double eisw_lisw_split_z =
       120; /**< at which redshift do we define the cut between eisw and lisw ?*/
 
-  int store_perturbations = _FALSE_; /**< Do we want to store perturbations? */
-  int k_output_values_num = 0;       /**< Number of perturbation outputs (default=0) */
+  int store_perturbations = false; /**< Do we want to store perturbations? */
+  int k_output_values_num = 0;     /**< Number of perturbation outputs (default=0) */
   double k_output_values
       [_MAX_NUMBER_OF_K_FILES_]; /**< List of k values where perturbation output is requested. */
 

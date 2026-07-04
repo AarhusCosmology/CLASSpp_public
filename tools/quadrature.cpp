@@ -150,7 +150,7 @@ int get_qsampling_manual(double* x,
       /* Allocate storage for Laguerre coefficients: */
       std::vector<double> b(N);
       std::vector<double> c(N);
-      compute_Laguerre(x, dq, N, 0.0, b.data(), c.data(), _TRUE_);
+      compute_Laguerre(x, dq, N, 0.0, b.data(), c.data(), true);
       for (int i = 0; i < N; i++) {
         (*function)(params_for_function, x[i], &y);
         w[i] = dq[i] * y;
@@ -186,7 +186,7 @@ int get_qsampling_manual(double* x,
                  "selected for a species that did not provide them");
       std::vector<double> b(N);
       std::vector<double> c(N);
-      compute_Laguerre(x, dq, N, gb.alpha + 1., b.data(), c.data(), _TRUE_);
+      compute_Laguerre(x, dq, N, gb.alpha + 1., b.data(), c.data(), true);
       double scaling = 1. / gb.x_times_alpha;
       for (int i = 0; i < N; i++) {
         dq[i] *= pow(x[i], -(gb.alpha + 1.)) * scaling;  // bare weight (uses original node)
@@ -245,8 +245,8 @@ int get_qsampling(double* x,
 
   int i, NL = 2, NR, level, Nadapt = 0, NLag, NLag_max, Nold = NL;
   int NFD, NFD_max;
-  int adapt_converging = _FALSE_, Laguerre_converging = _FALSE_, FermiDirac_converging = _FALSE_,
-      combined_converging = _FALSE_;
+  int adapt_converging = false, Laguerre_converging = false, FermiDirac_converging = false,
+      combined_converging = false;
   double y, y1, y2, I, Igk, err, ILag, IFD;
   std::unique_ptr<qss_node> root      = nullptr;
   std::unique_ptr<qss_node> root_comb = nullptr;
@@ -286,7 +286,7 @@ int get_qsampling(double* x,
   }
 
   /* First do the adaptive quadrature - this will also give the value of the integral: */
-  gk_adapt(root, (*test), (*function), params_for_function, rtol * 1e-4, 1, 0.0, 1.0, _TRUE_);
+  gk_adapt(root, (*test), (*function), params_for_function, rtol * 1e-4, 1, 0.0, 1.0, true);
   /* Do a leaf count: */
   leaf_count(root.get());
   /* I can get the integral now: */
@@ -312,7 +312,7 @@ int get_qsampling(double* x,
     /* The adaptive routine could not recieve required precision
        using less than the required maximal number of points.*/
     if (Nadapt <= N_max)
-      adapt_converging = _TRUE_;
+      adapt_converging = true;
   }
 
   /* Combined adaptive quadrature and Laguerre rescaled quadrature: */
@@ -339,7 +339,7 @@ int get_qsampling(double* x,
     //printf("f(100) = %e ?= %e\n",y2,a_comb*exp(-b_comb*100));
 
     /* Evaluate tail using 6 point Laguerre: */
-    compute_Laguerre(q_lag, w_lag, _N_COMB_LAG_, 0.0, b.data(), c.data(), _TRUE_);
+    compute_Laguerre(q_lag, w_lag, _N_COMB_LAG_, 0.0, b.data(), c.data(), true);
     for (i = 0, I_atinf = 0.0; i < _N_COMB_LAG_; i++) {
       w_lag[i] *= exp(-q_lag[i]);
       q_lag[i]  = qmax + q_lag[i] / b_comb;
@@ -357,7 +357,7 @@ int get_qsampling(double* x,
              1,
              qmin,
              qmax,
-             _FALSE_);
+             false);
     /* Do a leaf count: */
     leaf_count(root_comb.get());
     /* Starting from the top, move down in levels until tolerance is met: */
@@ -377,7 +377,7 @@ int get_qsampling(double* x,
       leaf_count(root_comb.get());
       N_comb = 15 * root_comb->leaf_childs + _N_COMB_LAG_ + N_comb_leg;
       if (N_comb <= N_max)
-        combined_converging = _TRUE_;
+        combined_converging = true;
     }
 
     /* Do the second combined quadrature: Same as above, but with trapezoidal rule
@@ -401,7 +401,7 @@ int get_qsampling(double* x,
     }
     I_comb2 += (I_atzero + I_atinf);
     err      = I - I_comb2;
-    //    if(fabs(err/Itot)<rtol) combined2_converging= _TRUE_;
+    //    if(fabs(err/Itot)<rtol) combined2_converging= true;
     //printf("I_comb2 = %e, rerr = %e\n",I_comb2,fabs(err/I));
   }
 
@@ -409,7 +409,7 @@ int get_qsampling(double* x,
   NLag_max = std::min(N_max, 80);
   for (NLag = NL; NLag <= NLag_max; NLag = std::min(NLag_max, NLag + 10)) {
     /* Evaluate integral: */
-    compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), _TRUE_);
+    compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), true);
     ILag = 0.0;
     for (i = 0; i < NLag; i++) {
       (*test)(params_for_function, x[i], &y);
@@ -420,7 +420,7 @@ int get_qsampling(double* x,
     err = I - ILag;
     //fprintf(stderr,"\n Computing Laguerre, N=%d, I=%g and err=%g.\n",NLag,ILag,err);
     if (fabs(err / I) < rtol) {
-      Laguerre_converging = _TRUE_;
+      Laguerre_converging = true;
       break;
     }
     Nold = NLag;
@@ -428,14 +428,14 @@ int get_qsampling(double* x,
       break;
   }
 
-  if (Laguerre_converging == _TRUE_) {
+  if (Laguerre_converging) {
     /* We must refine NLag: */
     NL = Nold;
     NR = NLag;
     while ((NR - NL) > 1) {
       NLag = (NL + NR) / 2;
       /* Evaluate integral: */
-      compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), _TRUE_);
+      compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), true);
       ILag = 0.0;
       for (i = 0; i < NLag; i++) {
         (*test)(params_for_function, x[i], &y);
@@ -475,59 +475,59 @@ int get_qsampling(double* x,
     }
     err = I - IFD;
     if (fabs(err / Itot) < rtol) {
-      FermiDirac_converging = _TRUE_;
+      FermiDirac_converging = true;
       break;
     }
   }
 
   /* Choose best method if both works: */
   *N = N_max;
-  //Laguerre_converging = _FALSE_;
-  if (adapt_converging == _TRUE_) {
+  //Laguerre_converging = false;
+  if (adapt_converging) {
     *N = Nadapt;
   }
-  if (combined_converging == _TRUE_) {
+  if (combined_converging) {
     if (N_comb <= *N) {
       *N               = N_comb;
-      adapt_converging = _FALSE_;
+      adapt_converging = false;
     }
     else {
-      combined_converging = _FALSE_;
+      combined_converging = false;
     }
   }
-  if (Laguerre_converging == _TRUE_) {
+  if (Laguerre_converging) {
     if (NLag <= *N) {
       *N                  = NLag;
-      combined_converging = _FALSE_;
-      adapt_converging    = _FALSE_;
+      combined_converging = false;
+      adapt_converging    = false;
     }
     else {
-      Laguerre_converging = _FALSE_;
+      Laguerre_converging = false;
     }
   }
-  if (FermiDirac_converging == _TRUE_) {
+  if (FermiDirac_converging) {
     if (NFD <= *N) {
       *N                  = NFD;
-      Laguerre_converging = _FALSE_;
-      combined_converging = _FALSE_;
-      adapt_converging    = _FALSE_;
+      Laguerre_converging = false;
+      combined_converging = false;
+      adapt_converging    = false;
     }
     else {
-      FermiDirac_converging = _FALSE_;
+      FermiDirac_converging = false;
     }
   }
   //printf("N_adapt=%d, N_combined=%d at level=%d, Nlag=%d\n",Nadapt,N_comb,level,NLag);
-  if (adapt_converging == _TRUE_) {
+  if (adapt_converging) {
     method_chosen = "Adaptive Gauss-Kronrod Quadrature";
     /* Gather weights and xvalues from tree: */
     i = Nadapt - 1;
-    get_leaf_x_and_w(root.get(), &i, x, w, _TRUE_);
+    get_leaf_x_and_w(root.get(), &i, x, w, true);
   }
-  else if (Laguerre_converging == _TRUE_) {
+  else if (Laguerre_converging) {
     method_chosen = "Gauss-Laguerre Quadrature";
     /* x and w is already populated in this case. */
   }
-  else if (FermiDirac_converging == _TRUE_) {
+  else if (FermiDirac_converging) {
     method_chosen = "Fermi-Dirac Gaussian Quadrature";
     class_test(compute_FermiDirac(x, w, *N) == _FAILURE_,
                "Could not reconstruct the selected Fermi-Dirac quadrature rule");
@@ -536,14 +536,14 @@ int get_qsampling(double* x,
       w[i] *= y / fermi_dirac_weight(x[i]);
     }
   }
-  else if (combined_converging == _TRUE_) {
+  else if (combined_converging) {
     method_chosen = "Combined Quadrature";
     for (i = 0; i < N_comb_leg; i++) {
       x[i] = q_leg[i];
       w[i] = w_leg[i];
     }
     i = N_comb_leg;
-    get_leaf_x_and_w(root_comb.get(), &i, x, w, _FALSE_);
+    get_leaf_x_and_w(root_comb.get(), &i, x, w, false);
     //printf("from %d to %d\n",N_comb_leg,i);
 
     for (i = 0; i < _N_COMB_LAG_; i++) {
@@ -622,7 +622,7 @@ int get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindef
     for (k = 0; k < 15; k++) {
       x[*ind] = node->x[k];
       w[*ind] = node->w[k];
-      if (isindefinite == _TRUE_) {
+      if (isindefinite) {
         (*ind)--;
       }
       else {
@@ -700,7 +700,7 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
              int isindefinite) {
   /* Do adaptive Gauss-Kronrod quadrature, while building the
      recurrence tree. If treemode!=0, store x-values and weights aswell.
-     At first call, a and b should be 0 and 1 if isdefinite==_TRUE_. */
+     At first call, a and b should be 0 and 1 if isdefinite. */
   double mid;
   /* Allocate current node: */
   node = std::make_unique<qss_node>();
@@ -757,7 +757,7 @@ int compute_Hermite(double* x, double* w, int N, int alpha, double* b, double* c
   alpha_Lag = (alpha - 1.0) / 2.0;
 
   /* Compute the positive roots and weights (up to some simple manipulation): */
-  compute_Laguerre(x + NLag, w + NLag, NLag, alpha_Lag, b, c, _FALSE_);
+  compute_Laguerre(x + NLag, w + NLag, NLag, alpha_Lag, b, c, false);
 
   /* Do manipulations:*/
   for (i = NLag; i < 2 * NLag; i++) {
@@ -832,7 +832,7 @@ int compute_Laguerre(
     /* Okay, write root and weight: */
     x[i] = x0;
 
-    if (totalweight == _TRUE_)
+    if (totalweight)
       w[i] = exp(x0 + logcc - log(dp2 * p1));
     else
       w[i] = exp(logcc - log(dp2 * p1));
@@ -970,7 +970,7 @@ int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
     t = 0.5 * (a * (1 - z_k[i]) + b * (1 + z_k[i]));
     /* Modify weight such that it reflects the linear transformation above: */
     wk = 0.5 * (b - a) * w_k[i];
-    if (isindefinite == _TRUE_) {
+    if (isindefinite) {
       /* Transform t into x in interval between 0 and inf: */
       x = 1.0 / t - 1.0;
       /* Modify weight accordingly: */
@@ -994,7 +994,7 @@ int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
       j = (i - 1) / 2;
       /* Transform weight according to linear transformation: */
       wg = 0.5 * (b - a) * w_g[j];
-      if (isindefinite == _TRUE_) {
+      if (isindefinite) {
         /* Transform weight according to non-linear transformation x = 1/t -1: */
         wg = wg / (t * t);
       }
@@ -1046,89 +1046,5 @@ int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol) {
     w8[i - 1] = 2.0 / ((1.0 - z * z) * pp * pp);
     w8[n - i] = w8[i - 1];
   }
-  return _SUCCESS_;
-}
-
-int quadrature_in_rectangle(double xl,
-                            double xr,
-                            double yl,
-                            double yr,
-                            int* n,
-                            std::vector<double>& x,
-                            std::vector<double>& y,
-                            std::vector<double>& w) {
-  double xl_tile, xr_tile, yl_tile, yr_tile;
-  int N;
-
-  N       = 24;
-  xl_tile = xl;
-  xr_tile = xr;
-  yl_tile = yl;
-  yr_tile = yr;
-
-  *n = N;
-
-  x.resize(N);
-  y.resize(N);
-  w.resize(N);
-  cubature_order_eleven(xl_tile, xr_tile, yl_tile, yr_tile, x.data(), y.data(), w.data());
-
-  return _SUCCESS_;
-}
-
-int cubature_order_eleven(
-    double xl, double xr, double yl, double yr, double* x, double* y, double* w) {
-  double wi[6] = {0.48020763350723814563e-01,
-                  0.66071329164550595674e-01,
-                  0.97386777358668164196e-01,
-                  0.21173634999894860050e+00,
-                  0.22562606172886338740e+00,
-                  0.35115871839824543766e+00};
-  double xi[6] = {0.98263922354085547295e+00,
-                  0.82577583590296393730e+00,
-                  0.18858613871864195460e+00,
-                  0.81252054830481310049e+00,
-                  0.52532025036454776234e+00,
-                  0.41658071912022368274e-01};
-  double yi[6] = {0.69807610454956756478e+00,
-                  0.93948638281673690721e+00,
-                  0.95353952820153201585e+00,
-                  0.31562343291525419599e+00,
-                  0.71200191307533630655e+00,
-                  0.42484724884866925062e+00};
-
-  int idx, i;
-  double a1, a2, b1, b2;
-
-  a1 = 2. / (xr - xl);
-  a2 = 2. / (yr - yl);
-  b1 = 1. - 2 * xr / (xr - xl);
-  b2 = 1. - 2 * yr / (yr - yl);
-
-  for (i = 0, idx = 0; i < 6; i++, idx++) {
-    // Upper right corner:
-    x[idx] = (xi[i] - b1) / a1;
-    y[idx] = (yi[i] - b2) / a2;
-    w[idx] = wi[i] / a1 / a2;
-  }
-  for (i = 0, idx = 6; i < 6; i++, idx++) {
-    // Upper left corner:
-    x[idx] = (-yi[i] - b1) / a1;
-    y[idx] = (xi[i] - b2) / a2;
-    w[idx] = wi[i] / a1 / a2;
-  }
-  for (i = 0, idx = 12; i < 6; i++, idx++) {
-    // Lower left corner:
-    x[idx] = (-xi[i] - b1) / a1;
-    y[idx] = (-yi[i] - b2) / a2;
-    w[idx] = wi[i] / a1 / a2;
-  }
-  for (i = 0, idx = 18; i < 6; i++, idx++) {
-    // Lower right corner:
-    x[idx] = (yi[i] - b1) / a1;
-    y[idx] = (-xi[i] - b2) / a2;
-    w[idx] = wi[i] / a1 / a2;
-  }
-
   return _SUCCESS_;
 }

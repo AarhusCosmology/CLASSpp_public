@@ -520,6 +520,8 @@ void TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(
           }
         }
         else {
+          // The table mixes writable local copies (nonlinear case above) with
+          // module-owned tables used read-only; the cast is confined here.
           sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp] =
               const_cast<double*>(
                   perturbations_module_
@@ -554,7 +556,7 @@ void TransferModule::transfer_perturbation_source_spline(
                                       .data();
 
         array_spline_table_columns2(
-            const_cast<double*>(perturbations_module_->k_[index_md].data()),
+            perturbations_module_->k_[index_md].data(),
             perturbations_module_->k_size_[index_md],
             sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp],
             perturbations_module_->tau_size_,
@@ -1477,14 +1479,14 @@ void TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt,
 
             /* for K>0 (closed), transfer functions only defined for l<nu */
             if ((ptw->sgnK == 1) && (l_[index_l] >= (int) (q / sqrt(ptw->K) + 0.2))) {
-              neglect = _TRUE_;
+              neglect = true;
             }
             /* This would maybe go into transfer_can_be_neglected later: */
             if ((ptw->sgnK != 0) && (index_l >= ptw->HIS.l_size) && !use_full_limber &&
                 (index_q < index_q_flat_approximation_)) {
-              neglect = _TRUE_;
+              neglect = true;
             }
-            if (neglect == _TRUE_) {
+            if (neglect) {
               if (use_full_limber) {
                 transfer_limber_[index_md]
                                 [((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] +
@@ -1713,16 +1715,16 @@ void TransferModule::transfer_sources(double* interpolated_sources,
       background and/or window function, and eventually to resample it,
       or redefine its time limits? */
 
-  redefine_source = _FALSE_;
+  redefine_source = false;
 
   if (_scalarsEXT_) {
     /* cmb lensing potential */
     if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_))
-      redefine_source = _TRUE_;
+      redefine_source = true;
 
     /* number count Cl's */
     if (_nonintegrated_ncl_ || _integrated_ncl_)
-      redefine_source = _TRUE_;
+      redefine_source = true;
   }
 
   /* conformal time today */
@@ -1730,7 +1732,7 @@ void TransferModule::transfer_sources(double* interpolated_sources,
 
   /** - case where we need to redefine by a window function (or any
       function of the background and of k) */
-  if (redefine_source == _TRUE_) {
+  if (redefine_source) {
     transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size);
 
     if (_scalarsEXT_) {
@@ -2143,7 +2145,7 @@ void TransferModule::transfer_source_resample(int bin,
 
   /* interpolate the sources linearly at the new time values */
   for (int index_tau = 0; index_tau < tau_size; index_tau++) {
-    array_interpolate_two(const_cast<double*>(perturbations_module_->tau_sampling_.data()),
+    array_interpolate_two(perturbations_module_->tau_sampling_.data(),
                           1,
                           0,
                           interpolated_sources,
@@ -2339,11 +2341,11 @@ void TransferModule::transfer_compute_for_each_l(struct transfer_workspace* ptw,
     if (ptr->transfer_verbose > 3)
       printf("Compute transfer for l=%d type=%d\n", (int) l, index_tt);
 
-    short use_limber = _TRUE_;
+    short use_limber = true;
     if (!use_full_limber)
       transfer_use_limber(q_max_bessel, index_md, index_tt, q, l, &use_limber);
 
-    if (use_limber == _TRUE_) {
+    if (use_limber) {
       transfer_limber(ptw, index_md, index_q, l, q, radial_type, &transfer_function);
     }
     else {
@@ -2378,10 +2380,10 @@ void TransferModule::transfer_use_limber(
   /* criteria for choosing between integration and Limber
      must be implemented here */
 
-  *use_limber = _FALSE_;
+  *use_limber = false;
 
   if (q > q_max_bessel) {
-    *use_limber = _TRUE_;
+    *use_limber = true;
   }
   else {
     if (_scalarsEXT_) {
@@ -2389,74 +2391,74 @@ void TransferModule::transfer_use_limber(
 
       if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_) &&
           (l > ppr->l_switch_limber)) {
-        *use_limber = _TRUE_;
+        *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_density_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_rsd_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_d0_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_d1_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens) &&
           (l >= ppr->l_switch_limber_for_nc_los_over_z *
                     ppt->selection_mean[index_tt - index_tt_nc_lens_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_nc_g1_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_nc_g2_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_nc_g3_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr) &&
           (l >= ppr->l_switch_limber_for_nc_los_over_z *
                     ppt->selection_mean[index_tt - index_tt_nc_g4_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr) &&
           (l >= ppr->l_switch_limber_for_nc_local_over_z *
                     ppt->selection_mean[index_tt - index_tt_nc_g5_])) {
         if (ppt->selection != dirac)
-          *use_limber = _TRUE_;
+          *use_limber = true;
       }
       if (_index_tt_in_range_(index_tt_lensing_,
                               ppt->selection_num,
                               ppt->has_cl_lensing_potential) &&
           (l >= ppr->l_switch_limber_for_nc_los_over_z *
                     ppt->selection_mean[index_tt - index_tt_lensing_])) {
-        *use_limber = _TRUE_;
+        *use_limber = true;
       }
     }
   }
@@ -2567,7 +2569,7 @@ void TransferModule::transfer_integrate(struct transfer_workspace* ptw,
     }
   }
 
-  if (ptw->neglect_late_source == _TRUE_) {
+  if (ptw->neglect_late_source) {
     while (tau0_minus_tau[index_tau_max] < ptw->tau0_minus_tau_cut) {
       index_tau_max--;
       if (index_tau_max < 0) {
@@ -2873,56 +2875,56 @@ void TransferModule::transfer_limber2(int tau_size,
 
 void TransferModule::transfer_can_be_neglected(
     int index_md, int index_ic, int index_tt, double ra_rec, double k, double l, short* neglect) {
-  *neglect = _FALSE_;
+  *neglect = false;
 
   if (_scalarsEXT_) {
     if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t0_) &&
         (l < (k - ppr->transfer_neglect_delta_k_S_t0) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t1_) &&
              (l < (k - ppr->transfer_neglect_delta_k_S_t1) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_) &&
              (l < (k - ppr->transfer_neglect_delta_k_S_t2) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_) &&
              (l < (k - ppr->transfer_neglect_delta_k_S_e) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
   }
 
   else if (_vectorsEXT_) {
     if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t1_) &&
         (l < (k - ppr->transfer_neglect_delta_k_V_t1) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_) &&
              (l < (k - ppr->transfer_neglect_delta_k_V_t2) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_) &&
              (l < (k - ppr->transfer_neglect_delta_k_V_e) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_b_) &&
              (l < (k - ppr->transfer_neglect_delta_k_V_b) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
   }
 
   else if (_tensorsEXT_) {
     if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_) &&
         (l < (k - ppr->transfer_neglect_delta_k_T_t2) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_) &&
              (l < (k - ppr->transfer_neglect_delta_k_T_e) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
 
     else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_b_) &&
              (l < (k - ppr->transfer_neglect_delta_k_T_b) * ra_rec))
-      *neglect = _TRUE_;
+      *neglect = true;
   }
 }
 
@@ -2930,7 +2932,7 @@ void TransferModule::transfer_late_source_can_be_neglected(int index_md,
                                                            int index_tt,
                                                            double l,
                                                            short* neglect) {
-  *neglect = _FALSE_;
+  *neglect = false;
 
   if (l > ppr->transfer_neglect_late_source * thermodynamics_module_->angular_rescaling_) {
     /* sources at late times can be neglected for CMB, excepted when
@@ -2939,27 +2941,27 @@ void TransferModule::transfer_late_source_can_be_neglected(int index_md,
     if (_scalarsEXT_) {
       if (ppt->has_cl_cmb_temperature) {
         if ((index_tt == index_tt_t1_) || (index_tt == index_tt_t2_))
-          *neglect = _TRUE_;
+          *neglect = true;
       }
       if (ppt->has_cl_cmb_polarization) {
         if (index_tt == index_tt_e_)
-          *neglect = _TRUE_;
+          *neglect = true;
       }
     }
     else if (_vectorsEXT_) {
       if (ppt->has_cl_cmb_temperature) {
         if ((index_tt == index_tt_t1_) || (index_tt == index_tt_t2_))
-          *neglect = _TRUE_;
+          *neglect = true;
       }
       if (ppt->has_cl_cmb_polarization) {
         if ((index_tt == index_tt_e_) || (index_tt == index_tt_b_))
-          *neglect = _TRUE_;
+          *neglect = true;
       }
     }
     else if (_tensorsEXT_) {
       if (ppt->has_cl_cmb_polarization) {
         if ((index_tt == index_tt_e_) || (index_tt == index_tt_b_))
-          *neglect = _TRUE_;
+          *neglect = true;
       }
     }
   }
@@ -2990,11 +2992,10 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
   double l = (double) l_[index_l];
   double rescale_argument;
   double rescale_amplitude;
-  int (*interpolate_Phi)(HyperInterpStruct*, int, int, double*, double*);
-  int (*interpolate_dPhi)(HyperInterpStruct*, int, int, double*, double*);
-  int (*interpolate_Phid2Phi)(HyperInterpStruct*, int, int, double*, double*, double*);
-  int (*interpolate_PhidPhi)(HyperInterpStruct*, int, int, double*, double*, double*);
-  int (*interpolate_PhidPhid2Phi)(HyperInterpStruct*, int, int, double*, double*, double*, double*);
+  using HermiteInterpolation =
+      void (*)(const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+  HermiteInterpolation interpolate_Phi, interpolate_dPhi, interpolate_PhidPhi, interpolate_Phid2Phi,
+      interpolate_PhidPhid2Phi;
   enum Hermite_Interpolation_Order HIorder;
 
   K  = ptw->K;
@@ -3038,28 +3039,19 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
     HIorder           = HERMITE4;
   }
 
-  switch (HIorder) {
-    case HERMITE3:
-      interpolate_Phi          = hyperspherical_Hermite3_interpolation_vector_Phi;
-      interpolate_dPhi         = hyperspherical_Hermite3_interpolation_vector_dPhi;
-      interpolate_PhidPhi      = hyperspherical_Hermite3_interpolation_vector_PhidPhi;
-      interpolate_Phid2Phi     = hyperspherical_Hermite3_interpolation_vector_Phid2Phi;
-      interpolate_PhidPhid2Phi = hyperspherical_Hermite3_interpolation_vector_PhidPhid2Phi;
-      break;
-    case HERMITE4:
-      interpolate_Phi          = hyperspherical_Hermite4_interpolation_vector_Phi;
-      interpolate_dPhi         = hyperspherical_Hermite4_interpolation_vector_dPhi;
-      interpolate_PhidPhi      = hyperspherical_Hermite4_interpolation_vector_PhidPhi;
-      interpolate_Phid2Phi     = hyperspherical_Hermite4_interpolation_vector_Phid2Phi;
-      interpolate_PhidPhid2Phi = hyperspherical_Hermite4_interpolation_vector_PhidPhid2Phi;
-      break;
-    case HERMITE6:
-      interpolate_Phi          = hyperspherical_Hermite6_interpolation_vector_Phi;
-      interpolate_dPhi         = hyperspherical_Hermite6_interpolation_vector_dPhi;
-      interpolate_PhidPhi      = hyperspherical_Hermite6_interpolation_vector_PhidPhi;
-      interpolate_Phid2Phi     = hyperspherical_Hermite6_interpolation_vector_Phid2Phi;
-      interpolate_PhidPhid2Phi = hyperspherical_Hermite6_interpolation_vector_PhidPhid2Phi;
-      break;
+  if (HIorder == HERMITE4) {
+    interpolate_Phi          = hyperspherical_Hermite_interpolation<4, true, false, false>;
+    interpolate_dPhi         = hyperspherical_Hermite_interpolation<4, false, true, false>;
+    interpolate_PhidPhi      = hyperspherical_Hermite_interpolation<4, true, true, false>;
+    interpolate_Phid2Phi     = hyperspherical_Hermite_interpolation<4, true, false, true>;
+    interpolate_PhidPhid2Phi = hyperspherical_Hermite_interpolation<4, true, true, true>;
+  }
+  else {
+    interpolate_Phi          = hyperspherical_Hermite_interpolation<6, true, false, false>;
+    interpolate_dPhi         = hyperspherical_Hermite_interpolation<6, false, true, false>;
+    interpolate_PhidPhi      = hyperspherical_Hermite_interpolation<6, true, true, false>;
+    interpolate_Phid2Phi     = hyperspherical_Hermite_interpolation<6, true, false, true>;
+    interpolate_PhidPhid2Phi = hyperspherical_Hermite_interpolation<6, true, true, true>;
   }
 
   //Reverse chi
@@ -3117,21 +3109,18 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
 
   switch (radial_type) {
     case SCALAR_TEMPERATURE_0:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
+      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       for (j = 0; j < x_size; j++)
         radial_function[x_size - 1 - j] = Phi[j] * rescale_function[j];
       break;
     case SCALAR_TEMPERATURE_1:
-      interpolate_dPhi(pHIS, x_size, index_l, chireverse, dPhi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, nullptr, dPhi, nullptr);
+      interpolate_dPhi(pHIS, x_size, index_l, chireverse, nullptr, dPhi, nullptr);
       for (j = 0; j < x_size; j++)
         radial_function[x_size - 1 - j] = sqrt_absK_over_k * dPhi[j] * rescale_argument *
                                           rescale_function[j];
       break;
     case SCALAR_TEMPERATURE_2:
-      interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, d2Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
+      interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
       s2     = sqrt(1.0 - 3.0 * K / k2);
       factor = 1.0 / (2.0 * s2);
       for (j = 0; j < x_size; j++)
@@ -3140,8 +3129,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
             rescale_function[j];
       break;
     case SCALAR_POLARISATION_E:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
+      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s2     = sqrt(1.0 - 3.0 * K / k2);
       factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / s2;
       for (j = 0; j < x_size; j++)
@@ -3149,8 +3137,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                           cscKgen[x_size - 1 - j] * Phi[j] * rescale_function[j];
       break;
     case VECTOR_TEMPERATURE_1:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
+      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s0     = sqrt(1.0 + K / k2);
       factor = sqrt(0.5 * l * (l + 1)) / s0;
       for (j = 0; j < x_size; j++)
@@ -3158,8 +3145,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                           rescale_function[j];
       break;
     case VECTOR_TEMPERATURE_2:
-      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
+      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       factor = sqrt(1.5 * l * (l + 1)) / s0 / ssqrt3;
@@ -3170,8 +3156,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                           rescale_function[j];
       break;
     case VECTOR_POLARISATION_E:
-      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi);
-      //    hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
+      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       factor = 0.5 * sqrt((l - 1.0) * (l + 2.0)) / s0 / ssqrt3;
@@ -3182,8 +3167,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                           rescale_function[j];
       break;
     case VECTOR_POLARISATION_B:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
+      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
@@ -3193,8 +3177,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                           rescale_function[j];
       break;
     case TENSOR_TEMPERATURE_2:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
+      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
       factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / si / ssqrt2;
@@ -3204,7 +3187,6 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
       break;
     case TENSOR_POLARISATION_E:
       interpolate_PhidPhid2Phi(pHIS, x_size, index_l, chireverse, Phi, dPhi, d2Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
       factor = 0.25 / si / ssqrt2;
@@ -3218,8 +3200,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
             rescale_function[j];
       break;
     case TENSOR_POLARISATION_B:
-      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
+      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       ssqrt2i = sqrt(1.0 + 3.0 * K / k2);
       ssqrt2  = sqrt(1.0 - 1.0 * K / k2);
       si      = sqrt(1.0 + 2.0 * K / k2);
@@ -3231,8 +3212,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
                                           rescale_function[j];
       break;
     case NC_RSD:
-      interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, d2Phi);
-      //hyperspherical_Hermite_interpolation_vector(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
+      interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
       //s2 = sqrt(1.0-3.0*K/k2);
       factor = 1.0;
       for (j = 0; j < x_size; j++)
@@ -3414,7 +3394,7 @@ void TransferModule::transfer_workspace_init(struct transfer_workspace* ptw,
   ptw->K                   = K;
   ptw->sgnK                = sgnK;
   ptw->tau0_minus_tau_cut  = tau0_minus_tau_cut;
-  ptw->neglect_late_source = _FALSE_;
+  ptw->neglect_late_source = false;
 
   ptw->interpolated_sources.resize(perturb_tau_size);
   ptw->sources.resize(tau_size_max);
@@ -3526,7 +3506,7 @@ void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int ind
 }
 
 void TransferModule::transfer_get_lmax(
-    int (*get_xmin_generic)(
+    void (*get_xmin_generic)(
         int sgnK, int l, double nu, double xtol, double phiminabs, double* x_nonzero, int* fevals),
     int sgnK,
     double nu,
@@ -3540,16 +3520,16 @@ void TransferModule::transfer_get_lmax(
   double x_nonzero;
   int fevals = 0, index_l_mid;
   int multiplier;
-  int right_boundary_checked = _FALSE_;
+  int right_boundary_checked = false;
   int hil = 0, hir = 0, bini = 0;
-  class_call(get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals));
+  get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals);
   if (x_nonzero >= xmax) {
     //printf("None relevant\n");
     //x at left boundary is already larger than xmax.
     *index_l_right = std::max(lsize - 1, 1);
     return;
   }
-  class_call(get_xmin_generic(sgnK, lvec[lsize - 1], nu, xtol, phiminabs, &x_nonzero, &fevals));
+  get_xmin_generic(sgnK, lvec[lsize - 1], nu, xtol, phiminabs, &x_nonzero, &fevals);
 
   if (x_nonzero < xmax) {
     //All Bessels are relevant
@@ -3560,8 +3540,7 @@ void TransferModule::transfer_get_lmax(
   /* Hunt for left boundary: */
   for (multiplier = 1;; multiplier *= 5) {
     hil++;
-    class_call(
-        get_xmin_generic(sgnK, lvec[*index_l_left], nu, xtol, phiminabs, &x_nonzero, &fevals));
+    get_xmin_generic(sgnK, lvec[*index_l_left], nu, xtol, phiminabs, &x_nonzero, &fevals);
     //printf("Hunt left, iter = %d, x_nonzero=%g\n",hil,x_nonzero);
     if (x_nonzero <= xmax) {
       //Boundary found
@@ -3570,7 +3549,7 @@ void TransferModule::transfer_get_lmax(
     else {
       //We can use current index_l_left as index_l_right:
       *index_l_right         = *index_l_left;
-      right_boundary_checked = _TRUE_;
+      right_boundary_checked = true;
     }
     //Update index_l_left:
     *index_l_left = (*index_l_left) - multiplier;
@@ -3580,12 +3559,11 @@ void TransferModule::transfer_get_lmax(
     }
   }
   /* If not found, hunt for right boundary: */
-  if (right_boundary_checked == _FALSE_) {
+  if (!right_boundary_checked) {
     for (multiplier = 1;; multiplier *= 5) {
       hir++;
       //printf("right iteration %d,index_l_right:%d\n",hir,*index_l_right);
-      class_call(
-          get_xmin_generic(sgnK, lvec[*index_l_right], nu, xtol, phiminabs, &x_nonzero, &fevals));
+      get_xmin_generic(sgnK, lvec[*index_l_right], nu, xtol, phiminabs, &x_nonzero, &fevals);
       if (x_nonzero >= xmax) {
         //Boundary found
         break;
@@ -3611,7 +3589,7 @@ void TransferModule::transfer_get_lmax(
     bini++;
     index_l_mid = (int) (0.5 * ((*index_l_right) + (*index_l_left)));
     //printf("left:%d, mid=%d, right=%d\n",*index_l_left,index_l_mid,*index_l_right);
-    class_call(get_xmin_generic(sgnK, lvec[index_l_mid], nu, xtol, phiminabs, &x_nonzero, &fevals));
+    get_xmin_generic(sgnK, lvec[index_l_mid], nu, xtol, phiminabs, &x_nonzero, &fevals);
     if (x_nonzero < xmax)
       *index_l_left = index_l_mid;
     else

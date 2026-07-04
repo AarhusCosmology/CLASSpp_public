@@ -7,19 +7,8 @@
 
 #include "common.h"
 
-/**
- * Boilerplate for C++
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
+void cosine_integral(double x, double* Ci);
 
-int cosine_integral(double x, double* Ci);
-
-int sine_integral(double x, double* Si);
-
-#ifdef __cplusplus
-}
-#endif
+void sine_integral(double x, double* Si);
 
 #endif

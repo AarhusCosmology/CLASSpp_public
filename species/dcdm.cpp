@@ -13,12 +13,12 @@ DCDMSpecies::DCDMSpecies(const background& pba,
       Gamma_dcdm_(Gamma_dcdm), Omega_ini_dcdm_(Omega_ini_dcdm) {}
 
 void DCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
-  class_define_index(index_bg_rho_dcdm_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rho_dcdm_, true, index_bg, 1);
   index_bg_rho_ = index_bg_rho_dcdm_;
 }
 
 void DCDMSpecies::RegisterIntegrationIndices(int& index_bi) {
-  class_define_index(index_bi_rho_dcdm_, _TRUE_, index_bi, 1);
+  class_define_index(index_bi_rho_dcdm_, true, index_bi, 1);
 }
 
 void DCDMSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {

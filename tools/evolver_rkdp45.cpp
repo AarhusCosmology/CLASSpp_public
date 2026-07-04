@@ -120,7 +120,7 @@ int evolver_rkdp45(
 
   const int tdir = (x_end > x_ini) ? 1 : -1;
   double hnew    = absh * tdir;
-  int nofailed   = _TRUE_;
+  int nofailed   = true;
 
   int idx = 0;
   if ((t - x_end) * tdir < 0.0)
@@ -171,8 +171,8 @@ int evolver_rkdp45(
        * error-proportional factor and marks nofailed; consecutive failures
        * halve. (This corrects a transcription bug in the PhD2024-EBH branch
        * where nofailed was never set, making the halving path dead code.) */
-      if (nofailed == _TRUE_) {
-        nofailed = _FALSE_;
+      if (nofailed) {
+        nofailed = false;
         hnew = tdir * std::max(hmin, fabs(h) * std::max(0.1, 0.8 * pow(rtol / errmax, pow_grow)));
       }
       else {
@@ -188,7 +188,7 @@ int evolver_rkdp45(
                          ki.data() + 6 * neq,
                          parameters_and_workspace_for_derivs);
 
-    nofailed = _TRUE_;
+    nofailed = true;
     hnew     = tdir * std::max(hmin, fabs(h) * std::max(0.1, 0.8 * pow(rtol / errmax, pow_grow)));
     const double tnew = t + h;
 
@@ -208,7 +208,7 @@ int evolver_rkdp45(
                          ixx[i - 2][2] * 4 * ss3;
         }
         for (int k = 0; k < neq; k++) {
-          if (used_in_output[k] == _TRUE_) {
+          if (used_in_output[k]) {
             yinterp[k]  = y[k];
             dyinterp[k] = 0.0;
             for (int i = 0; i < 7; i++) {

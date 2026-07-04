@@ -21,7 +21,7 @@ void PpfFluid::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                            const perturb_workspace* /*ppw*/,
                                            int /*gauge*/) {
   auto& layout = static_cast<PerturbLayout&>(base);
-  class_define_index(layout.idx_Gamma, _TRUE_, index_pt, 1);
+  class_define_index(layout.idx_Gamma, true, index_pt, 1);
 }
 
 void PpfFluid::PerturbDerivs(const BaseSpecies::PerturbLayout& base,

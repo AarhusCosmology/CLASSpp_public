@@ -249,10 +249,10 @@ void SpectraModule::spectra_cl_at_l(
     index_md = 0;
     if ((int) l <= l_[l_size_[index_md] - 1]) {
       /* interpolate at l */
-      array_interpolate_spline(const_cast<double*>(l_.data()),
+      array_interpolate_spline(l_.data(),
                                l_size_[index_md],
-                               const_cast<double*>(cl_[index_md].data()),
-                               const_cast<double*>(ddcl_[index_md].data()),
+                               cl_[index_md].data(),
+                               ddcl_[index_md].data(),
                                ct_size_,
                                l,
                                &last_index,
@@ -281,12 +281,11 @@ void SpectraModule::spectra_cl_at_l(
     for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
       for (index_ic2 = index_ic1; index_ic2 < ic_size_[index_md]; index_ic2++) {
         index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
-        if (((int) l <= l_[l_size_[index_md] - 1]) &&
-            (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_)) {
-          array_interpolate_spline(const_cast<double*>(l_.data()),
+        if (((int) l <= l_[l_size_[index_md] - 1]) && (is_non_zero_[index_md][index_ic1_ic2])) {
+          array_interpolate_spline(l_.data(),
                                    l_size_[index_md],
-                                   const_cast<double*>(cl_[index_md].data()),
-                                   const_cast<double*>(ddcl_[index_md].data()),
+                                   cl_[index_md].data(),
+                                   ddcl_[index_md].data(),
                                    ic_ic_size_[index_md] * ct_size_,
                                    l,
                                    &last_index,
@@ -326,10 +325,10 @@ void SpectraModule::spectra_cl_at_l(
 
       if (ic_size_[index_md] == 1) {
         if ((int) l <= l_[l_size_[index_md] - 1]) {
-          array_interpolate_spline(const_cast<double*>(l_.data()),
+          array_interpolate_spline(l_.data(),
                                    l_size_[index_md],
-                                   const_cast<double*>(cl_[index_md].data()),
-                                   const_cast<double*>(ddcl_[index_md].data()),
+                                   cl_[index_md].data(),
+                                   ddcl_[index_md].data(),
                                    ct_size_,
                                    l,
                                    &last_index,
@@ -353,10 +352,10 @@ void SpectraModule::spectra_cl_at_l(
       if (ic_size_[index_md] > 1) {
         if ((int) l <= l_[l_size_[index_md] - 1]) {
           /* interpolate all ic and ct */
-          array_interpolate_spline(const_cast<double*>(l_.data()),
+          array_interpolate_spline(l_.data(),
                                    l_size_[index_md],
-                                   const_cast<double*>(cl_[index_md].data()),
-                                   const_cast<double*>(ddcl_[index_md].data()),
+                                   cl_[index_md].data(),
+                                   ddcl_[index_md].data(),
                                    ic_ic_size_[index_md] * ct_size_,
                                    l,
                                    &last_index,
@@ -369,7 +368,7 @@ void SpectraModule::spectra_cl_at_l(
               index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
               for (index_ct = 0; index_ct < ct_size_; index_ct++) {
                 if (((int) l > l_max_ct_[index_md][index_ct]) ||
-                    (is_non_zero_[index_md][index_ic1_ic2] == _FALSE_))
+                    (!is_non_zero_[index_md][index_ic1_ic2]))
                   cl_md_ic[index_md][index_ic1_ic2 * ct_size_ + index_ct] = 0.;
               }
             }
@@ -794,7 +793,7 @@ void SpectraModule::spectra_cls() {
         index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
 
         /* non-diagonal coefficients should be computed only if non-zero correlation */
-        if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+        if (is_non_zero_[index_md][index_ic1_ic2]) {
           int l_size = transfer_module_->l_size_[index_md];
 
           for (int index_l = 0; index_l < l_size; index_l++) {
@@ -1437,7 +1436,7 @@ void SpectraModule::spectra_pk_nl_at_k_and_z(
  * @param zvec_size      Input: size of array of redshifts
  * @param pk_tot_out     Output: P(k_i,z_j) for total matter (if available) in Mpc**3
  * @param pk_cb_tot_out  Output: P_cb(k_i,z_j) for cdm+baryons (if available) in Mpc**3
- * @param nonlinear      Input: _TRUE_ or _FALSE_ (to output nonlinear or linear P(k,z))
+ * @param nonlinear      Input: true or false (to output nonlinear or linear P(k,z))
  * @return the error status
  */
 
@@ -1457,7 +1456,7 @@ void SpectraModule::spectra_fast_pk_at_kvec_and_zvec(
           " -> [WARNING:] You are calling the function spectra_fast_pks_at_kvec_and_zvec() which "
           "is deprecated since v2.8. Try using nonlinear_pk_at_kvec_and_zvec() instead.\n");
 
-  if (nonlinear == _TRUE_)
+  if (nonlinear)
     pk_output = pk_nonlinear;
   else
     pk_output = pk_linear;

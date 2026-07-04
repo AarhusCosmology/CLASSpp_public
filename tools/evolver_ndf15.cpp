@@ -44,9 +44,9 @@
 	to add some new physics without thinking too much about how the code work. So we
 	pay a few more function evaluations, and calculate the full jacobian every time.
 
-	Then, if jac->use_sparse==_TRUE_, numjac will try to construct a sparse matrix from
+	Then, if jac->use_sparse, numjac will try to construct a sparse matrix from
 	the dense matrix. If there are too many nonzero elements in the dense matrix, numjac
-	will stop constructing the sparse matrix and set jac->use_sparse=_FALSE_. The sparse
+	will stop constructing the sparse matrix and set jac->use_sparse=false. The sparse
 	matrix is stored in the compressed column format. (See sparse.h).
 
 	In the sparse case, we also do partial pivoting, but with diagonal preference. The
@@ -181,7 +181,7 @@ int evolver_ndf15(
   if (verbose > 1) {
     numidx = 0;
     for (ii = 1; ii <= neq; ii++) {
-      if (interpidx[ii] == _TRUE_)
+      if (interpidx[ii])
         numidx++;
     }
     printf("%d/%d ", numidx, neq);
@@ -215,7 +215,7 @@ int evolver_ndf15(
          parameters_and_workspace_for_derivs);
   stepstat[3] += 1;
   stepstat[2] += nfenj;
-  Jcurrent     = _TRUE_; /* True */
+  Jcurrent     = true; /* True */
 
   hmin = 16.0 * eps * fabs(t);
   /*Calculate initial step */
@@ -270,12 +270,12 @@ int evolver_ndf15(
   nconhk  = 0; /*steps taken with current h and k*/
   new_linearisation(&jac, hinvGak, neq);
   stepstat[4] += 1;
-  havrate      = _FALSE_; /*false*/
+  havrate      = false; /*false*/
 
   /* Doing main loop: */
-  done    = _FALSE_;
-  at_hmin = _FALSE_;
-  while (done == _FALSE_) {
+  done    = false;
+  at_hmin = false;
+  while (!done) {
     //class_test(stepstat[2] > 1e7,
     //     "Too many steps in evolver! Current stepsize:%g, in interval: [%g:%g]\n",
     //     absh,t0,tfinal);
@@ -284,20 +284,20 @@ int evolver_ndf15(
     absh   = std::min(hmax, maxtmp);
     if (fabs(absh - hmin) < 100 * eps) {
       /* If the stepsize has not changed */
-      if (at_hmin == _TRUE_) {
+      if (at_hmin) {
         absh = abshlast; /*required by stepsize recovery */
       }
-      at_hmin = _TRUE_;
+      at_hmin = true;
     }
     else {
-      at_hmin = _FALSE_;
+      at_hmin = false;
     }
     h = tdir * absh;
     /* Stretch the step if within 10% of tfinal-t. */
     if (1.1 * absh >= fabs(tfinal - t)) {
       h    = tfinal - t;
       absh = fabs(h);
-      done = _TRUE_;
+      done = true;
     }
     if (((fabs(absh - abshlast) / absh) > 1e-6) || (k != klast)) {
       adjust_stepsize(dif, (absh / abshlast), neq, k);
@@ -305,16 +305,16 @@ int evolver_ndf15(
       nconhk  = 0;
       new_linearisation(&jac, hinvGak, neq);
       stepstat[4] += 1;
-      havrate      = _FALSE_;
+      havrate      = false;
     }
     /*		Loop for advancing one step */
-    nofailed = _TRUE_;
+    nofailed = true;
     for (;;) {
-      gotynew = _FALSE_; /* is ynew evaluated yet?*/
-      while (gotynew == _FALSE_) {
+      gotynew = false; /* is ynew evaluated yet?*/
+      while (!gotynew) {
         /* Predict a solution at t+h. */
         tnew = t + h;
-        if (done == _TRUE_) {
+        if (done) {
           tnew = tfinal; /*Hit end point exactly. */
         }
         h = tnew - t; /* Purify h. */
@@ -349,7 +349,7 @@ int evolver_ndf15(
           minnrm    = std::max(minnrm, maxtmp);
         }
         /* Iterate with simplified Newton method. */
-        tooslow = _FALSE_;
+        tooslow = false;
         for (iter = 1; iter <= maxit; iter++) {
           /* derivs touches only f0; psi and difkp1 are unchanged across the call,
              so the old tempvec1 = psi + difkp1 prepass is unnecessary. Folded into
@@ -380,14 +380,14 @@ int evolver_ndf15(
             ynew[j]    = pred[j] + difkp1[j];
           }
           if (newnrm <= minnrm) {
-            gotynew = _TRUE_;
+            gotynew = true;
             break; /* Break Newton loop */
           }
           else if (iter == 1) {
-            if (havrate == _TRUE_) {
+            if (havrate) {
               errit = newnrm * rate / (1.0 - rate);
               if (errit <= 0.05 * rtol) {
-                gotynew = _TRUE_;
+                gotynew = true;
                 break; /* Break Newton Loop*/
               }
             }
@@ -396,32 +396,32 @@ int evolver_ndf15(
             }
           }
           else if (newnrm > 0.9 * oldnrm) {
-            tooslow = _TRUE_;
+            tooslow = true;
             break; /*Break Newton lop */
           }
           else {
             rate    = std::max(0.9 * rate, newnrm / oldnrm);
-            havrate = _TRUE_;
+            havrate = true;
             errit   = newnrm * rate / (1.0 - rate);
             if (errit <= 0.5 * rtol) {
-              gotynew = _TRUE_;
+              gotynew = true;
               break; /* exit newton */
             }
             else if (iter == maxit) {
-              tooslow = _TRUE_;
+              tooslow = true;
               break; /*exit newton */
             }
             else if (0.5 * rtol < errit * pow(rate, (maxit - iter))) {
-              tooslow = _TRUE_;
+              tooslow = true;
               break; /*exit Newton */
             }
           }
           oldnrm = newnrm;
         }
-        if (tooslow == _TRUE_) {
+        if (tooslow) {
           stepstat[1] += 1;
           /*	! Speed up the iteration by forming new linearization or reducing h. */
-          if (Jcurrent == _FALSE_) {
+          if (!Jcurrent) {
             (*derivs)(t, y + 1, f0 + 1, parameters_and_workspace_for_derivs);
             nfenj = 0;
             numjac((*derivs),
@@ -436,7 +436,7 @@ int evolver_ndf15(
                    parameters_and_workspace_for_derivs);
             stepstat[3] += 1;
             stepstat[2] += (nfenj + 1);
-            Jcurrent     = _TRUE_;
+            Jcurrent     = true;
           }
           else if (absh <= hmin) {
             class_test(absh <= hmin,
@@ -450,7 +450,7 @@ int evolver_ndf15(
             abshlast = absh;
             absh     = std::max(0.3 * absh, hmin);
             h        = tdir * absh;
-            done     = _FALSE_;
+            done     = false;
             adjust_stepsize(dif, (absh / abshlast), neq, k);
             hinvGak = h * invGa[k - 1];
             nconhk  = 0;
@@ -458,7 +458,7 @@ int evolver_ndf15(
           /* A new linearisation is needed in both cases */
           new_linearisation(&jac, hinvGak, neq);
           stepstat[4] += 1;
-          havrate      = _FALSE_;
+          havrate      = false;
         }
       }
       /*end of while loop for getting ynew
@@ -480,8 +480,8 @@ int evolver_ndf15(
                      tfinal);
         }
         abshlast = absh;
-        if (nofailed == _TRUE_) {
-          nofailed = _FALSE_;
+        if (nofailed) {
+          nofailed = false;
           hopt     = absh * std::max(0.1, 0.833 * pow((rtol / err), (1.0 / (k + 1))));
           if (k > 1) {
             errkm1 = 0.0;
@@ -502,14 +502,14 @@ int evolver_ndf15(
         }
         h = tdir * absh;
         if (absh < abshlast) {
-          done = _FALSE_;
+          done = false;
         }
         adjust_stepsize(dif, (absh / abshlast), neq, k);
         hinvGak = h * invGa[k - 1];
         nconhk  = 0;
         new_linearisation(&jac, hinvGak, neq);
         stepstat[4] += 1;
-        havrate      = _FALSE_;
+        havrate      = false;
       }
       else {
         break; /* Succesfull step */
@@ -569,7 +569,7 @@ int evolver_ndf15(
       next++;
     }
     /** End of output **/
-    if (done == _TRUE_) {
+    if (done) {
       break;
     }
     klast    = k;
@@ -630,7 +630,7 @@ int evolver_ndf15(
     /* Advance the integration one step. */
     t = tnew;
     eqvec(ynew, y, neq);
-    Jcurrent = _FALSE_;
+    Jcurrent = false;
 
     // MODIFICATION BY LUC
     if (print_variables != nullptr) {
@@ -705,13 +705,13 @@ int calc_C(struct jacobian* jac) {
       if (Ai[i] != j) {
         /*Don't consider diagonal entries..*/
         /* Add (i,j) to sparsity pattern of C, if it does not exist: */
-        duplicate = _FALSE_;
+        duplicate = false;
         col       = j;
         row       = Ai[i];
         for (k = 0; k < Cp[col + 1]; k++) {
           /* Check for duplicates in column col:*/
           if (jac->Numerical->xi[col][k] == row) {
-            duplicate = _TRUE_;
+            duplicate = true;
             break;
           }
         }
@@ -720,13 +720,13 @@ int calc_C(struct jacobian* jac) {
           Cp[col + 1]++;
         }
         /* Add (j,i) to sparsity pattern if it does not exist: */
-        duplicate = _FALSE_;
+        duplicate = false;
         col       = Ai[i];
         row       = j;
         for (k = 0; k < Cp[col + 1]; k++) {
           /* Check for dublicates in the Ai[i]'th column: */
           if (jac->Numerical->xi[col][k] == row) {
-            duplicate = _TRUE_;
+            duplicate = true;
             break;
           }
         }
@@ -768,7 +768,7 @@ int interp_from_difold(double tinterp,
   s = (tinterp - tnew) / h;
   if (k == 1) {
     for (i = 1; i <= neq; i++) {
-      if (index[i] == _TRUE_) {
+      if (index[i]) {
         yinterp[i] = ynew[i] + dif[i][1] * s;
         if (output > 1)
           ypinterp[i] = dif[i][1] / h;
@@ -780,7 +780,7 @@ int interp_from_difold(double tinterp,
   else {
     /*This gets tricky */
     for (i = 1; i <= neq; i++) {
-      if (index[i] == _TRUE_) {
+      if (index[i]) {
         /*First the value of the function:	*/
         sumj   = 0.0;
         factor = 1;
@@ -876,7 +876,7 @@ int interp_from_dif(double tinterp,
   }
 
   for (int index_x = 1; index_x <= neq; index_x++) {
-    if (mask[index_x] == _TRUE_) {
+    if (mask[index_x]) {
       sumtmp  = 0;
       sumtmp2 = 0;
       for (int j = 0; j < k; j++) {
@@ -955,7 +955,7 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
       }
     }
     /* Matrix constructed... */
-    if (jac->new_jacobian == _TRUE_) {
+    if (jac->new_jacobian) {
       /*I have a new pattern, and I have not done a LU decomposition
 	since the last jacobian calculation, so	I need to do a full
 	sparse LU-decomposition: */
@@ -972,7 +972,7 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
 	 example is no longer valid now that q is a std::vector<int>. */
       funcreturn = sp_ludcmp(jac->Numerical.get(), jac->spJ.get(), 1e-3);
       class_test(funcreturn == _FAILURE_, "Failure in sp_ludcmp. Possibly singular matrix!");
-      jac->new_jacobian = _FALSE_;
+      jac->new_jacobian = false;
     }
     else {
       /* I have a repeated pattern, so I can just refactor:*/
@@ -1085,7 +1085,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
      variable increments tolx or summed absolute function values tolf.*/
   int i, *indx, ntrial = 20;
   double errx, errf, d, *F0, *Fdel, **Fjac, *p, *lu_work;
-  int has_converged = _FALSE_;
+  int has_converged = false;
   double toljac     = 1e-1;
   double* delx;
 
@@ -1124,7 +1124,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
     for (i = 1; i <= x_size; i++)
       errf += fabs(F0[i - 1]);  //Check function convergence.
     if (errf <= tolF) {
-      has_converged = _TRUE_;
+      has_converged = true;
       break;
     }
 
@@ -1192,14 +1192,14 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
       x_inout[i - 1] += p[i];
     }
     if (errx <= tolx) {
-      has_converged = _TRUE_;
+      has_converged = true;
       break;
     }
   }
 
   /* Memory freed by RAII (vectors go out of scope) */
 
-  if (has_converged == _TRUE_) {
+  if (has_converged) {
     //fprintf(stderr, "Newton converged after %d iterations\n", k);
     return _SUCCESS_;
   }
@@ -1249,7 +1249,7 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
   }
 
   /* Set new_jacobian flag: */
-  jac->new_jacobian = _TRUE_;
+  jac->new_jacobian = true;
 
   for (j = 1; j <= neq; j++) {
     nj_ws->yscale[j] = std::max(fabs(y[j]), thresh);
@@ -1482,7 +1482,7 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
   if ((jac->use_sparse) && (jac->repeated_pattern < jac->trust_sparse)) {
     nz             = 0; /*Number of non-zeros */
     Ap[0]          = 0;
-    pattern_broken = _FALSE_;
+    pattern_broken = false;
     for (j = 1; j <= neq; j++) {
       for (i = 1; i <= neq; i++) {
         if ((i == j) || (fabs(dFdy[i][j]) != 0.0)) {
@@ -1496,27 +1496,27 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
           /* Two conditions must be met if the pattern is intact: Ap[j-1]<=nz<Ap[j],
 	     so that we are in the right column, and (i-1) must exist in column. Ai[nz]*/
           /* We should first test if nz is in the column, otherwise pattern is dead:*/
-          if ((pattern_broken == _FALSE_) && (jac->has_pattern == _TRUE_)) {
+          if ((!pattern_broken) && (jac->has_pattern)) {
             if ((nz < Ap[j - 1]) || (nz >= Ap[j])) {
               /* If we are no longer in the right column, pattern is broken for sure. */
-              pattern_broken = _TRUE_;
+              pattern_broken = true;
             }
           }
-          if ((pattern_broken == _FALSE_) && (jac->has_pattern == _TRUE_)) {
+          if ((!pattern_broken) && (jac->has_pattern)) {
             /* Up to this point, the new jacobian has managed to fit in the old
 	       sparsity pattern..*/
             if (Ai[nz] != (i - 1)) {
               /* The current non-zero rownumber does not fit the current entry in the
 		 sparse matrix. Pattern MIGHT be broken. Scan ahead in the sparse matrix
 		 to search for the row entry: (Remember: the indices are sorted..)*/
-              pattern_broken = _TRUE_;
+              pattern_broken = true;
               for (nz2 = nz; (nz2 < Ap[j]) && (Ai[nz2] <= (i - 1)); nz2++) {
                 /* Go through the rest of the column with the added constraint that
 		   the row index in the sparse matrix should be smaller than the current
 		   row index i-1:*/
                 if (Ai[nz2] == (i - 1)) {
                   /* sparsity pattern recovered.. */
-                  pattern_broken = _FALSE_;
+                  pattern_broken = false;
                   nz             = nz2;
                   break;
                 }
@@ -1534,12 +1534,12 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
         }
       }
       /* Break this loop too if I have hit max non-zero points: */
-      if (jac->use_sparse == _FALSE_)
+      if (!jac->use_sparse)
         break;
       Ap[j] = nz;
     }
-    if (jac->use_sparse == _TRUE_) {
-      if ((jac->has_pattern == _TRUE_) && (pattern_broken == _FALSE_)) {
+    if (jac->use_sparse) {
+      if ((jac->has_pattern) && (!pattern_broken)) {
         /*New jacobian fitted into the current sparsity pattern:*/
         jac->repeated_pattern++;
         /* printf("\n Found repeated pattern. nz=%d/%d and

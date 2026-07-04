@@ -31,10 +31,10 @@ int readDoubleList(FileContent* pfc, const char* name, std::vector<double>& valu
   try {
     if (auto l = pfc->get<std::vector<double>>(name)) {
       values = *l;
-      *found = _TRUE_;
+      *found = true;
     }
     else
-      *found = _FALSE_;
+      *found = false;
   }
   catch (const std::exception& e) {
     class_stop("%s", e.what());
@@ -963,13 +963,11 @@ void InputModule::ReadDerived() {
     int found;
     pth->binned_reio_num = pfc->get_or("binned_reio_num", pth->binned_reio_num);
     readDoubleList(pfc, "binned_reio_z", pth->binned_reio_z, &found);
-    class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->binned_reio_z.size()) != pth->binned_reio_num,
+    class_test(!found || static_cast<int>(pth->binned_reio_z.size()) != pth->binned_reio_num,
                "Number of entries in binned_reio_z does not match expected number, %d.",
                pth->binned_reio_num);
     readDoubleList(pfc, "binned_reio_xe", pth->binned_reio_xe, &found);
-    class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->binned_reio_xe.size()) != pth->binned_reio_num,
+    class_test(!found || static_cast<int>(pth->binned_reio_xe.size()) != pth->binned_reio_num,
                "Number of entries in binned_reio_xe does not match expected number, %d.",
                pth->binned_reio_num);
     pth->binned_reio_step_sharpness = pfc->get_or("binned_reio_step_sharpness",
@@ -981,11 +979,11 @@ void InputModule::ReadDerived() {
     int found;
     pth->many_tanh_num = pfc->get_or("many_tanh_num", pth->many_tanh_num);
     readDoubleList(pfc, "many_tanh_z", pth->many_tanh_z, &found);
-    class_test(found == _FALSE_ || static_cast<int>(pth->many_tanh_z.size()) != pth->many_tanh_num,
+    class_test(!found || static_cast<int>(pth->many_tanh_z.size()) != pth->many_tanh_num,
                "Number of entries in many_tanh_z does not match expected number, %d.",
                pth->many_tanh_num);
     readDoubleList(pfc, "many_tanh_xe", pth->many_tanh_xe, &found);
-    class_test(found == _FALSE_ || static_cast<int>(pth->many_tanh_xe.size()) != pth->many_tanh_num,
+    class_test(!found || static_cast<int>(pth->many_tanh_xe.size()) != pth->many_tanh_num,
                "Number of entries in many_tanh_xe does not match expected number, %d.",
                pth->many_tanh_num);
     pth->many_tanh_width = pfc->get_or("many_tanh_width", pth->many_tanh_width);
@@ -996,13 +994,11 @@ void InputModule::ReadDerived() {
     int found;
     pth->reio_inter_num = pfc->get_or("reio_inter_num", pth->reio_inter_num);
     readDoubleList(pfc, "reio_inter_z", pth->reio_inter_z, &found);
-    class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->reio_inter_z.size()) != pth->reio_inter_num,
+    class_test(!found || static_cast<int>(pth->reio_inter_z.size()) != pth->reio_inter_num,
                "Number of entries in reio_inter_z does not match expected number, %d.",
                pth->reio_inter_num);
     readDoubleList(pfc, "reio_inter_xe", pth->reio_inter_xe, &found);
-    class_test(found == _FALSE_ ||
-                   static_cast<int>(pth->reio_inter_xe.size()) != pth->reio_inter_num,
+    class_test(!found || static_cast<int>(pth->reio_inter_xe.size()) != pth->reio_inter_num,
                "Number of entries in reio_inter_xe does not match expected number, %d.",
                pth->reio_inter_num);
   }
@@ -1190,8 +1186,8 @@ void InputModule::ReadDerived() {
 
     /* modes */
     if (auto modes = pfc->get<std::string>("modes")) {
-      /* if no modes are specified, the default is has_scalars=_TRUE_;
-         but if they are specified we should reset has_scalars to _FALSE_ before reading */
+      /* if no modes are specified, the default is has_scalars=true;
+         but if they are specified we should reset has_scalars to false before reading */
       ppt->has_scalars = false;
 
       if ((modes->find("s") != std::string::npos) || (modes->find("S") != std::string::npos))
@@ -1211,8 +1207,8 @@ void InputModule::ReadDerived() {
 
     if (ppt->has_scalars) {
       if (auto ic = pfc->get<std::string>("ic")) {
-        /* if no initial conditions are specified, the default is has_ad=_TRUE_;
-           but if they are specified we should reset has_ad to _FALSE_ before reading */
+        /* if no initial conditions are specified, the default is has_ad=true;
+           but if they are specified we should reset has_ad to false before reading */
         ppt->has_ad = false;
 
         if ((ic->find("ad") != std::string::npos) || (ic->find("AD") != std::string::npos))
@@ -1851,7 +1847,7 @@ void InputModule::ReadDerived() {
     int found;
     readDoubleList(pfc, "z_pk", zPkValues, &found);
 
-    if (found == _TRUE_) {
+    if (found) {
       n_list = static_cast<int>(zPkValues.size());
       class_test(n_list > _Z_PK_NUM_MAX_,
                  "you want to write some output for %d different values of z, hence you should "
@@ -1894,7 +1890,7 @@ void InputModule::ReadDerived() {
     std::vector<double> selectionValues;
     readDoubleList(pfc, "selection_mean", selectionValues, &found);
 
-    if ((found == _TRUE_) && !selectionValues.empty()) {
+    if ((found) && !selectionValues.empty()) {
       n_list = static_cast<int>(selectionValues.size());
 
       class_test(n_list > _SELECTION_NUM_MAX_,
@@ -1925,7 +1921,7 @@ void InputModule::ReadDerived() {
       selectionValues.clear();
       readDoubleList(pfc, "selection_width", selectionValues, &found);
 
-      if ((found == _TRUE_) && !selectionValues.empty()) {
+      if ((found) && !selectionValues.empty()) {
         n_list = static_cast<int>(selectionValues.size());
 
         if (n_list == 1) {
@@ -1952,7 +1948,7 @@ void InputModule::ReadDerived() {
       selectionValues.clear();
       readDoubleList(pfc, "selection_bias", selectionValues, &found);
 
-      if ((found == _TRUE_) && !selectionValues.empty()) {
+      if ((found) && !selectionValues.empty()) {
         n_list = static_cast<int>(selectionValues.size());
 
         if (n_list == 1) {
@@ -1979,7 +1975,7 @@ void InputModule::ReadDerived() {
       selectionValues.clear();
       readDoubleList(pfc, "selection_magnification_bias", selectionValues, &found);
 
-      if ((found == _TRUE_) && !selectionValues.empty()) {
+      if ((found) && !selectionValues.empty()) {
         n_list = static_cast<int>(selectionValues.size());
 
         if (n_list == 1) {
@@ -2091,7 +2087,7 @@ void InputModule::ReadDerived() {
   if (auto headers = pfc->get<std::string>("headers");
       headers &&
       ((headers->find("y") == std::string::npos) && (headers->find("Y") == std::string::npos))) {
-    pop->write_header = _FALSE_;
+    pop->write_header = false;
   }
 
   if (auto format = pfc->get<std::string>("format")) {
@@ -2190,7 +2186,7 @@ void InputModule::ReadDerived() {
      no-op when no scalars are requested. This is a deterministic function of
      the input, so we resolve it here rather than mutating pnl->method from
      inside the module (see issue #20). With no scalars, has_pk_matter is
-     already _FALSE_ (enforced above), so clearing method makes the nonlinear
+     already false (enforced above), so clearing method makes the nonlinear
      module skip via its generic "nothing requested" gate. */
   if (!ppt->has_scalars) {
     pnl->method = nl_none;
@@ -2315,7 +2311,7 @@ void InputModule::ReadDerived() {
   if (auto write_background = pfc->get<std::string>("write background");
       write_background && ((write_background->find("y") != std::string::npos) ||
                            (write_background->find("Y") != std::string::npos))) {
-    pop->write_background = _TRUE_;
+    pop->write_background = true;
   }
 
   /** - (i.2.) shall we write thermodynamics quantities in a file? */
@@ -2323,7 +2319,7 @@ void InputModule::ReadDerived() {
   if (auto write_thermodynamics = pfc->get<std::string>("write thermodynamics");
       write_thermodynamics && ((write_thermodynamics->find("y") != std::string::npos) ||
                                (write_thermodynamics->find("Y") != std::string::npos))) {
-    pop->write_thermodynamics = _TRUE_;
+    pop->write_thermodynamics = true;
   }
 
   /** - (i.3.) shall we write perturbation quantities in files? */
@@ -2332,7 +2328,7 @@ void InputModule::ReadDerived() {
   int k_output_found;
   readDoubleList(pfc, "k_output_values", kOutputValues, &k_output_found);
 
-  if (k_output_found == _TRUE_) {
+  if (k_output_found) {
     n_list = static_cast<int>(kOutputValues.size());
     class_test(n_list > _MAX_NUMBER_OF_K_FILES_,
                "you want to write some output for %d different values of k, hence you should "
@@ -2348,8 +2344,8 @@ void InputModule::ReadDerived() {
     /* Sort k_output_values ascending */
     std::sort(ppt->k_output_values, ppt->k_output_values + ppt->k_output_values_num);
 
-    ppt->store_perturbations = _TRUE_;
-    pop->write_perturbations = _TRUE_;
+    ppt->store_perturbations = true;
+    pop->write_perturbations = true;
   }
 
   /** - (i.4.) shall we write primordial spectra in a file? */
@@ -2357,7 +2353,7 @@ void InputModule::ReadDerived() {
   if (auto write_primordial = pfc->get<std::string>("write primordial");
       write_primordial && ((write_primordial->find("y") != std::string::npos) ||
                            (write_primordial->find("Y") != std::string::npos))) {
-    pop->write_primordial = _TRUE_;
+    pop->write_primordial = true;
   }
 
   /* flags for calling the interpolation routine */

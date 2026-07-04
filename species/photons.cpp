@@ -649,11 +649,11 @@ void PhotonsSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
     return;
 
   for (int idx = g_lay.idx_l3; idx <= g_lay.idx_delta + g_lay.l_max; ++idx)
-    used_in_sources[idx] = _FALSE_;
+    used_in_sources[idx] = false;
 
-  used_in_sources[g_lay.idx_pol1] = _FALSE_;
+  used_in_sources[g_lay.idx_pol1] = false;
   for (int idx = g_lay.idx_pol3; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx)
-    used_in_sources[idx] = _FALSE_;
+    used_in_sources[idx] = false;
 }
 
 // ── MarkTensorUsedInSources ────────────────────────────────────────────────────
@@ -669,15 +669,15 @@ void PhotonsSpecies::MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& b
   if (ppw->approx[ppw->index_ap_tca] != (int) tca_off)
     return;
 
-  used_in_sources[g_lay.idx_theta] = _FALSE_;
-  used_in_sources[g_lay.idx_l3]    = _FALSE_;
+  used_in_sources[g_lay.idx_theta] = false;
+  used_in_sources[g_lay.idx_l3]    = false;
   for (int idx = g_lay.idx_delta + 5; idx <= g_lay.idx_delta + g_lay.l_max; ++idx)
-    used_in_sources[idx] = _FALSE_;
+    used_in_sources[idx] = false;
 
-  used_in_sources[g_lay.idx_pol1] = _FALSE_;
-  used_in_sources[g_lay.idx_pol3] = _FALSE_;
+  used_in_sources[g_lay.idx_pol1] = false;
+  used_in_sources[g_lay.idx_pol3] = false;
   for (int idx = g_lay.idx_pol0 + 5; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx)
-    used_in_sources[idx] = _FALSE_;
+    used_in_sources[idx] = false;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

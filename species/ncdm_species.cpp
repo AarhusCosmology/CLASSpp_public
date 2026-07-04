@@ -145,7 +145,7 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
     }
 
     // psd_filename special case: legacy lists one filename per instance whose
-    // use_ncdm_psd_files flag is _TRUE_, in order. Skip the broadcast/distribute
+    // use_ncdm_psd_files flag is true, in order. Skip the broadcast/distribute
     // path and assign filenames only to instances that opted in. Counts must
     // match exactly: under- or over-supplying filenames is an error.
     if (std::string(fm.dot) == "psd_filename") {
@@ -521,11 +521,11 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
 void NCDMSpecies::WriteTensorOutputColumnTitles(std::string& tensor_titles) const {
   const std::string& nm = name();
   std::string title     = "delta_" + nm;
-  class_store_columntitle(tensor_titles, title.c_str(), _TRUE_);
+  class_store_columntitle(tensor_titles, title.c_str(), true);
   title = "theta_" + nm;
-  class_store_columntitle(tensor_titles, title.c_str(), _TRUE_);
+  class_store_columntitle(tensor_titles, title.c_str(), true);
   title = "shear_" + nm;
-  class_store_columntitle(tensor_titles, title.c_str(), _TRUE_);
+  class_store_columntitle(tensor_titles, title.c_str(), true);
 }
 
 // Fused stress-energy: eliminates four virtual dispatches with one override.

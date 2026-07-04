@@ -25,14 +25,14 @@ FluidSpecies::FluidSpecies(const background& pba,
       Omega_EDE_(Omega_EDE) {}
 
 void FluidSpecies::RegisterBackgroundIndices(int& index_bg) {
-  class_define_index(index_bg_rho_fld_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rho_fld_, true, index_bg, 1);
   index_bg_rho_ = index_bg_rho_fld_;
-  class_define_index(index_bg_w_fld_, _TRUE_, index_bg, 1);
-  class_define_index(index_bg_dw_over_da_fld_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_w_fld_, true, index_bg, 1);
+  class_define_index(index_bg_dw_over_da_fld_, true, index_bg, 1);
 }
 
 void FluidSpecies::RegisterIntegrationIndices(int& index_bi) {
-  class_define_index(index_bi_rho_fld_, _TRUE_, index_bi, 1);
+  class_define_index(index_bi_rho_fld_, true, index_bi, 1);
 }
 
 void FluidSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
@@ -112,8 +112,8 @@ void FluidSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                const perturb_workspace* /*ppw*/,
                                                int /*gauge*/) {
   auto& layout = static_cast<PerturbLayout&>(base);
-  class_define_index(layout.idx_delta, _TRUE_, index_pt, 1);
-  class_define_index(layout.idx_theta, _TRUE_, index_pt, 1);
+  class_define_index(layout.idx_delta, true, index_pt, 1);
+  class_define_index(layout.idx_theta, true, index_pt, 1);
 }
 
 void FluidSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
@@ -475,8 +475,8 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   if (auto ppf_opt = ctx.pfc->get<std::string>("use_ppf")) {
     const std::string& ppf_str = *ppf_opt;
     use_ppf = (ppf_str.find("y") != std::string::npos || ppf_str.find("Y") != std::string::npos)
-                  ? _TRUE_
-                  : _FALSE_;
+                  ? true
+                  : false;
   }
   if (use_ppf)
     c_gamma_over_c_fld = ctx.pfc->get_or("c_gamma_over_c_fld", c_gamma_over_c_fld);

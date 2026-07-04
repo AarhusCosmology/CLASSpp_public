@@ -1,12 +1,12 @@
 #include "lambda.h"
 
-#include "background.h" /* for class_define_index, _TRUE_ */
+#include "background.h" /* for class_define_index, true */
 
 LambdaSpecies::LambdaSpecies(const background& pba, double omega0_lambda)
     : BaseSpecies("Lambda", EnergyType::DarkEnergy), Omega0_lambda_(omega0_lambda), H0_(pba.H0) {}
 
 void LambdaSpecies::RegisterBackgroundIndices(int& index_bg) {
-  class_define_index(index_bg_rho_lambda_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rho_lambda_, true, index_bg, 1);
   index_bg_rho_ = index_bg_rho_lambda_;
 }
 

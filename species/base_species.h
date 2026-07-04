@@ -17,7 +17,7 @@ struct perturb_workspace;
 struct perturb_parameters_and_workspace;
 
 #include "background_ic_context.h"
-#include "common.h"  // class_store_columntitle, class_store_double, _TRUE_, _FALSE_
+#include "common.h"  // class_store_columntitle, class_store_double, true, false
 #include "perturb_source_context.h"
 
 class BackgroundModule;      // forward declaration
@@ -41,10 +41,10 @@ class BackgroundColumnWriter {
 
   void Add(const char* title, double value, bool condition = true) {
     if (titles_) {
-      class_store_columntitle(*titles_, title, condition ? _TRUE_ : _FALSE_);
+      class_store_columntitle(*titles_, title, condition ? true : false);
     }
     else if (dataptr_) {
-      class_store_double(dataptr_, value, condition ? _TRUE_ : _FALSE_, (*storeidx_));
+      class_store_double(dataptr_, value, condition ? true : false, (*storeidx_));
     }
   }
   void Add(const std::string& title, double value, bool condition = true) {

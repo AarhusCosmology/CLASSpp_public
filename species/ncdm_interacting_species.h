@@ -35,7 +35,7 @@ class NCDMInteractingSpecies : public NCDMSpecies {
 
  private:
   double G_eff_              = 0.0;
-  bool use_alpha_correction_ = _FALSE_;
+  bool use_alpha_correction_ = false;
 };
 
 #endif  // NCDM_INTERACTING_SPECIES_H

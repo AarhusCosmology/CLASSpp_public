@@ -104,13 +104,13 @@ typedef std::shared_ptr<const LensingModule> LensingModulePtr;
 /* macros for writing formatted output */
 #define class_fprintf_double(file, output, condition)                    \
   {                                                                      \
-    if (condition == _TRUE_)                                             \
+    if (condition)                                                       \
       fprintf(file, "%*.*e ", _COLUMNWIDTH_, _OUTPUTPRECISION_, output); \
   }
 
 #define class_fprintf_double_or_default(file, output, condition, defaultvalue) \
   {                                                                            \
-    if (condition == _TRUE_)                                                   \
+    if (condition)                                                             \
       fprintf(file, "%*.*e ", _COLUMNWIDTH_, _OUTPUTPRECISION_, output);       \
     else                                                                       \
       fprintf(file, "%*.*e ", _COLUMNWIDTH_, _OUTPUTPRECISION_, defaultvalue); \
@@ -118,7 +118,7 @@ typedef std::shared_ptr<const LensingModule> LensingModulePtr;
 
 #define class_fprintf_int(file, output, condition)                \
   {                                                               \
-    if (condition == _TRUE_)                                      \
+    if (condition)                                                \
       fprintf(file,                                               \
               "%*d%*s ",                                          \
               std::max(0, _COLUMNWIDTH_ - _OUTPUTPRECISION_ - 5), \
@@ -129,7 +129,7 @@ typedef std::shared_ptr<const LensingModule> LensingModulePtr;
 
 #define class_fprintf_columntitle(file, title, condition, colnum)            \
   {                                                                          \
-    if (condition == _TRUE_)                                                 \
+    if (condition)                                                           \
       fprintf(file,                                                          \
               "%*s%2d:%-*s ",                                                \
               std::max(0,                                                    \
@@ -143,7 +143,7 @@ typedef std::shared_ptr<const LensingModule> LensingModulePtr;
 
 #define class_store_columntitle(titlestring, title, condition) \
   {                                                            \
-    if (condition == _TRUE_) {                                 \
+    if (condition) {                                           \
       titlestring += title;                                    \
       titlestring += _DELIMITER_;                              \
     }                                                          \
@@ -151,13 +151,13 @@ typedef std::shared_ptr<const LensingModule> LensingModulePtr;
 
 #define class_store_double(storage, value, condition, dataindex) \
   {                                                              \
-    if (condition == _TRUE_)                                     \
+    if (condition)                                               \
       storage[dataindex++] = value;                              \
   }
 
 #define class_store_double_or_default(storage, value, condition, dataindex, defaultvalue) \
   {                                                                                       \
-    if (condition == _TRUE_)                                                              \
+    if (condition)                                                                        \
       storage[dataindex++] = value;                                                       \
     else                                                                                  \
       storage[dataindex++] = defaultvalue;                                                \

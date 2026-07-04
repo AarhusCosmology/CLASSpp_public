@@ -136,9 +136,9 @@ std::optional<std::vector<std::string>> FileContent::get<std::vector<std::string
 extern "C" {
 #endif
 
-int parser_read_file(const char* filename, FileContent* pfc);
+void parser_read_file(const char* filename, FileContent* pfc);
 
-int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3);
+void parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3);
 
 #ifdef __cplusplus
 }

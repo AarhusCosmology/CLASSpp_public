@@ -4,8 +4,6 @@
 
 #include <cstdio>  // fopen / nullptr-compare in class_open
 
-#define _TRUE_ 1
-#define _FALSE_ 0
 #define _SUCCESS_ 0
 #define _FAILURE_ 1
 
@@ -13,13 +11,6 @@
     const char* func, int line, const char* prefix, const char* fmt, ...);
 
 /* All error macros throw std::runtime_error from the error origin. */
-
-#define class_call(function)                                         \
-  {                                                                  \
-    if ((function) == _FAILURE_) {                                   \
-      ThrowFormatted(__func__, __LINE__, "error in " #function, ""); \
-    }                                                                \
-  }
 
 #define class_test(condition, args, ...)                     \
   {                                                          \

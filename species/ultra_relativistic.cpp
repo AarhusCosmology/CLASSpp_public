@@ -16,7 +16,7 @@ UltraRelativisticSpecies::UltraRelativisticSpecies(const background& pba, double
 // ── Background ────────────────────────────────────────────────────────────────
 
 void UltraRelativisticSpecies::RegisterBackgroundIndices(int& index_bg) {
-  class_define_index(index_bg_rho_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rho_, true, index_bg, 1);
 }
 
 void UltraRelativisticSpecies::ComputeBackground(double a,
@@ -401,7 +401,7 @@ void UltraRelativisticSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayou
     return;
 
   for (int idx = ur_lay.idx_l3; idx <= ur_lay.idx_delta + ur_lay.l_max; ++idx)
-    used_in_sources[idx] = _FALSE_;
+    used_in_sources[idx] = false;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

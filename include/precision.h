@@ -6,7 +6,7 @@
 #include <string>
 
 #include "constants.h"  // physics constants used in precision defaults
-#include "errors.h"     // _TRUE_, _FALSE_
+#include "errors.h"     // status codes
 
 class FileContent;  // forward decl for precision::parse
 
@@ -189,7 +189,7 @@ struct precision {
    * Recfast 1.5 parameters
    */
   int recfast_Hswitch =
-      _TRUE_; /**< from recfast 1.5, specifies how accurate the Hydrogen recombination should be handled */
+      1; /**< from recfast 1.5, specifies how accurate the Hydrogen recombination should be handled */
   double recfast_fudge_H =
       1.14; /**< from recfast 1.4, fudge factor for Peeble's equation coeffient of Hydrogen */
   double recfast_delta_fudge_H =
@@ -663,7 +663,7 @@ struct precision {
    * */
 
   int accurate_lensing =
-      _FALSE_; /**< switch between Gauss-Legendre quadrature integration and simple quadrature on a subdomain of angles */
+      0; /**< switch between Gauss-Legendre quadrature integration and simple quadrature on a subdomain of angles */
   int num_mu_minus_lmax =
       70;                /**< difference between num_mu and l_max, increase for more precision */
   int delta_l_max = 500; /**< difference between l_max in unlensed and lensed spectra */

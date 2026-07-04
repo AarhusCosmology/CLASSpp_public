@@ -10,7 +10,7 @@ CDMSpecies::CDMSpecies(const background& pba, double omega0_cdm, bool coupled)
       coupled_(coupled) {}
 
 void CDMSpecies::RegisterBackgroundIndices(int& index_bg) {
-  class_define_index(index_bg_rho_cdm_, _TRUE_, index_bg, 1);
+  class_define_index(index_bg_rho_cdm_, true, index_bg, 1);
   index_bg_rho_ = index_bg_rho_cdm_;
 }
 

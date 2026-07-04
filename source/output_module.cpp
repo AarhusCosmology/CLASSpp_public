@@ -75,8 +75,8 @@ void OutputModule::output_init() {
   /** - check that we really want to output at least one file */
 
   if ((!ppt->has_cls) && (!ppt->has_pk_matter) && (!ppt->has_density_transfers) &&
-      (!ppt->has_velocity_transfers) && (pop->write_background == _FALSE_) &&
-      (pop->write_thermodynamics == _FALSE_) && (pop->write_primordial == _FALSE_)) {
+      (!ppt->has_velocity_transfers) && (!pop->write_background) && (!pop->write_thermodynamics) &&
+      (!pop->write_primordial)) {
     if (pop->output_verbose > 0)
       printf("No output files requested. Output module skipped.\n");
     return;
@@ -110,25 +110,25 @@ void OutputModule::output_init() {
 
   /** - deal with background quantities */
 
-  if (pop->write_background == _TRUE_) {
+  if (pop->write_background) {
     output_background();
   }
 
   /** - deal with thermodynamics quantities */
 
-  if (pop->write_thermodynamics == _TRUE_) {
+  if (pop->write_thermodynamics) {
     output_thermodynamics();
   }
 
   /** - deal with perturbation quantities */
 
-  if (pop->write_perturbations == _TRUE_) {
+  if (pop->write_perturbations) {
     output_perturbations();
   }
 
   /** - deal with primordial spectra */
 
-  if (pop->write_primordial == _TRUE_) {
+  if (pop->write_primordial) {
     output_primordial();
   }
 }
@@ -322,7 +322,7 @@ void OutputModule::output_cl() {
           int index_ic1_ic2 =
               index_symmetric_matrix(index_ic1, index_ic2, spectra_module_->ic_size_[index_md]);
 
-          if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+          if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2]) {
             output_open_cl_file(&(out_md_ic[index_md][index_ic1_ic2]),
                                 file_name,
                                 first_line.c_str(),
@@ -365,7 +365,7 @@ void OutputModule::output_cl() {
           (l <= spectra_module_->l_max_[index_md])) {
         for (int index_ic1_ic2 = 0; index_ic1_ic2 < spectra_module_->ic_ic_size_[index_md];
              index_ic1_ic2++) {
-          if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+          if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2]) {
             output_one_line_of_cl(out_md_ic[index_md][index_ic1_ic2],
                                   l,
                                   &(cl_md_ic[index_md][index_ic1_ic2 * spectra_module_->ct_size_]),
@@ -382,7 +382,7 @@ void OutputModule::output_cl() {
     if (perturbations_module_->ic_size_[index_md] > 1) {
       for (int index_ic1_ic2 = 0; index_ic1_ic2 < spectra_module_->ic_ic_size_[index_md];
            index_ic1_ic2++) {
-        if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+        if (spectra_module_->is_non_zero_[index_md][index_ic1_ic2]) {
           fclose(out_md_ic[index_md][index_ic1_ic2]);
         }
       }
@@ -412,12 +412,12 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
   /** - define local variables */
 
   std::string file_name;
-  short do_ic = _FALSE_;
+  short do_ic = false;
 
   /** - preliminary: check whether we need to output the decomposition into contributions from each initial condition */
 
   if ((pk_output == pk_linear) && (nonlinear_module_->ic_size_ > 1))
-    do_ic = _TRUE_;
+    do_ic = true;
 
   /** - allocate arrays to store the P(k) */
 
@@ -426,7 +426,7 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
   std::vector<double> ln_pk_ic;
   std::vector<FILE*> out_pk_ic;
 
-  if (do_ic == _TRUE_) {
+  if (do_ic) {
     ln_pk_ic.resize(nonlinear_module_->k_size_ * nonlinear_module_->ic_ic_size_);
 
     /** - allocate pointer to output files */
@@ -473,7 +473,7 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
       FILE* out_pk;
       output_open_pk_file(&out_pk, file_name, "", pop->z_pk[index_z]);
 
-      if (do_ic == _TRUE_) {
+      if (do_ic) {
         std::string first_line;
         for (int index_ic1 = 0; index_ic1 < nonlinear_module_->ic_size_; index_ic1++) {
           for (int index_ic2 = index_ic1; index_ic2 < nonlinear_module_->ic_size_; index_ic2++) {
@@ -580,7 +580,7 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
             int index_ic1_ic2 =
                 index_symmetric_matrix(index_ic1, index_ic2, nonlinear_module_->ic_size_);
 
-            if (nonlinear_module_->is_non_zero_[index_ic1_ic2] == _TRUE_) {
+            if (nonlinear_module_->is_non_zero_[index_ic1_ic2]) {
               output_open_pk_file(&(out_pk_ic[index_ic1_ic2]),
                                   file_name,
                                   first_line.c_str(),
@@ -606,10 +606,10 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
                               exp(nonlinear_module_->ln_k_[index_k]) / pba->h,
                               exp(ln_pk[index_k]) * pow(pba->h, 3));
 
-        if (do_ic == _TRUE_) {
+        if (do_ic) {
           for (int index_ic1_ic2 = 0; index_ic1_ic2 < nonlinear_module_->ic_ic_size_;
                index_ic1_ic2++) {
-            if (nonlinear_module_->is_non_zero_[index_ic1_ic2] == _TRUE_) {
+            if (nonlinear_module_->is_non_zero_[index_ic1_ic2]) {
               output_one_line_of_pk(out_pk_ic[index_ic1_ic2],
                                     exp(nonlinear_module_->ln_k_[index_k]) / pba->h,
                                     exp(ln_pk_ic[index_k * nonlinear_module_->ic_ic_size_ +
@@ -624,10 +624,10 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
 
       fclose(out_pk);
 
-      if (do_ic == _TRUE_) {
+      if (do_ic) {
         for (int index_ic1_ic2 = 0; index_ic1_ic2 < nonlinear_module_->ic_ic_size_;
              index_ic1_ic2++) {
-          if (nonlinear_module_->is_non_zero_[index_ic1_ic2] == _TRUE_) {
+          if (nonlinear_module_->is_non_zero_[index_ic1_ic2]) {
             fclose(out_pk_ic[index_ic1_ic2]);
           }
         }
@@ -715,7 +715,7 @@ void OutputModule::output_tk() {
       FILE* tkfile;
       class_open(tkfile, file_name.c_str(), "w");
 
-      if (pop->write_header == _TRUE_) {
+      if (pop->write_header) {
         if (pop->output_format == file_format::class_format) {
           fprintf(tkfile,
                   "# Transfer functions T_i(k) %sat redshift z=%g\n",
@@ -798,7 +798,7 @@ void OutputModule::output_background() {
   FILE* backfile;
   class_open(backfile, file_name.c_str(), "w");
 
-  if (pop->write_header == _TRUE_) {
+  if (pop->write_header) {
     fprintf(backfile, "# Table of selected background quantities\n");
     fprintf(backfile,
             "# All densities are multiplied by (8piG/3) (below, shortcut notation (.) for this "
@@ -834,7 +834,7 @@ void OutputModule::output_thermodynamics() {
   FILE* thermofile;
   class_open(thermofile, file_name.c_str(), "w");
 
-  if (pop->write_header == _TRUE_) {
+  if (pop->write_header) {
     fprintf(thermofile, "# Table of selected thermodynamics quantities\n");
     fprintf(thermofile, "# The following notation is used in column titles:\n");
     fprintf(thermofile, "#         x_e = electron ionization fraction\n");
@@ -887,8 +887,8 @@ void OutputModule::output_perturbations() {
       fprintf(out, "#scalar perturbations for mode k = %.*e Mpc^(-1)\n", _OUTPUTPRECISION_, k);
       output_print_data(out,
                         perturbations_module_->scalar_titles_,
-                        const_cast<double*>(
-                            perturbations_module_->scalar_perturbations_data_[index_ikout].data()),
+
+                        perturbations_module_->scalar_perturbations_data_[index_ikout].data(),
                         perturbations_module_->size_scalar_perturbation_data_[index_ikout]);
 
       fclose(out);
@@ -904,8 +904,8 @@ void OutputModule::output_perturbations() {
       fprintf(out, "#vector perturbations for mode k = %.*e Mpc^(-1)\n", _OUTPUTPRECISION_, k);
       output_print_data(out,
                         perturbations_module_->vector_titles_,
-                        const_cast<double*>(
-                            perturbations_module_->vector_perturbations_data_[index_ikout].data()),
+
+                        perturbations_module_->vector_perturbations_data_[index_ikout].data(),
                         perturbations_module_->size_vector_perturbation_data_[index_ikout]);
 
       fclose(out);
@@ -921,8 +921,8 @@ void OutputModule::output_perturbations() {
       fprintf(out, "#tensor perturbations for mode k = %.*e Mpc^(-1)\n", _OUTPUTPRECISION_, k);
       output_print_data(out,
                         perturbations_module_->tensor_titles_,
-                        const_cast<double*>(
-                            perturbations_module_->tensor_perturbations_data_[index_ikout].data()),
+
+                        perturbations_module_->tensor_perturbations_data_[index_ikout].data(),
                         perturbations_module_->size_tensor_perturbation_data_[index_ikout]);
 
       fclose(out);
@@ -944,7 +944,7 @@ void OutputModule::output_primordial() {
 
   FILE* out;
   class_open(out, file_name.c_str(), "w");
-  if (pop->write_header == _TRUE_) {
+  if (pop->write_header) {
     fprintf(out, "# Dimensionless primordial spectrum, equal to [k^3/2pi^2] P(k) \n");
   }
 
@@ -955,7 +955,7 @@ void OutputModule::output_primordial() {
 
 void OutputModule::output_print_data(FILE* out,
                                      const std::string& titles,
-                                     double* dataptr,
+                                     const double* dataptr,
                                      int size_dataptr) {
   int colnum = 1;
 
@@ -967,7 +967,7 @@ void OutputModule::output_print_data(FILE* out,
   std::string titles_copy = titles;
   char* pch               = strtok(&titles_copy[0], _DELIMITER_);
   while (pch != nullptr) {
-    class_fprintf_columntitle(out, pch, _TRUE_, colnum);
+    class_fprintf_columntitle(out, pch, true, colnum);
     pch = strtok(nullptr, _DELIMITER_);
   }
   fprintf(out, "\n");
@@ -978,7 +978,7 @@ void OutputModule::output_print_data(FILE* out,
     for (int index_tau = 0; index_tau < size_dataptr / number_of_titles; index_tau++) {
       fprintf(out, " ");
       for (int index_title = 0; index_title < number_of_titles; index_title++) {
-        class_fprintf_double(out, dataptr[index_tau * number_of_titles + index_title], _TRUE_);
+        class_fprintf_double(out, dataptr[index_tau * number_of_titles + index_title], true);
       }
       fprintf(out, "\n");
     }
@@ -1010,7 +1010,7 @@ void OutputModule::output_open_cl_file(FILE** clfile,
 
   class_open(*clfile, filename.c_str(), "w");
 
-  if (pop->write_header == _TRUE_) {
+  if (pop->write_header) {
     /** - First we deal with the entries that are dependent of format type */
 
     if (pop->output_format == file_format::class_format) {
@@ -1084,20 +1084,20 @@ void OutputModule::output_open_cl_file(FILE** clfile,
              index_d2 <= std::min(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
              index_d2++) {
           snprintf(tmp, tmp_size, "dens[%d]-dens[%d]", index_d1 + 1, index_d2 + 1);
-          class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
+          class_fprintf_columntitle(*clfile, tmp, true, colnum);
         }
       }
     }
     if (spectra_module_->has_td_) {
       for (index_d1 = 0; index_d1 < spectra_module_->d_size_; index_d1++) {
         snprintf(tmp, tmp_size, "T-dens[%d]", index_d1 + 1);
-        class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
+        class_fprintf_columntitle(*clfile, tmp, true, colnum);
       }
     }
     if (spectra_module_->has_pd_) {
       for (index_d1 = 0; index_d1 < spectra_module_->d_size_; index_d1++) {
         snprintf(tmp, tmp_size, "phi-dens[%d]", index_d1 + 1);
-        class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
+        class_fprintf_columntitle(*clfile, tmp, true, colnum);
       }
     }
     if (spectra_module_->has_ll_) {
@@ -1106,14 +1106,14 @@ void OutputModule::output_open_cl_file(FILE** clfile,
              index_d2 <= std::min(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
              index_d2++) {
           snprintf(tmp, tmp_size, "lens[%d]-lens[%d]", index_d1 + 1, index_d2 + 1);
-          class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
+          class_fprintf_columntitle(*clfile, tmp, true, colnum);
         }
       }
     }
     if (spectra_module_->has_tl_) {
       for (index_d1 = 0; index_d1 < spectra_module_->d_size_; index_d1++) {
         snprintf(tmp, tmp_size, "T-lens[%d]", index_d1 + 1);
-        class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
+        class_fprintf_columntitle(*clfile, tmp, true, colnum);
       }
     }
     if (spectra_module_->has_dl_) {
@@ -1122,7 +1122,7 @@ void OutputModule::output_open_cl_file(FILE** clfile,
              index_d2 <= std::min(index_d1 + psp->non_diag, spectra_module_->d_size_ - 1);
              index_d2++) {
           snprintf(tmp, tmp_size, "dens[%d]-lens[%d]", index_d1 + 1, index_d2 + 1);
-          class_fprintf_columntitle(*clfile, tmp, _TRUE_, colnum);
+          class_fprintf_columntitle(*clfile, tmp, true, colnum);
         }
       }
     }
@@ -1152,7 +1152,7 @@ void OutputModule::output_one_line_of_cl(FILE* clfile,
   fprintf(clfile, " ");
 
   if (0 == 1) {
-    class_fprintf_int(clfile, (int) l, _TRUE_);
+    class_fprintf_int(clfile, (int) l, true);
   }
   else {
     fprintf(clfile, "%4d ", (int) l);
@@ -1160,7 +1160,7 @@ void OutputModule::output_one_line_of_cl(FILE* clfile,
 
   if (pop->output_format == file_format::class_format) {
     for (index_ct = 0; index_ct < ct_size; index_ct++) {
-      class_fprintf_double(clfile, factor * cl[index_ct], _TRUE_);
+      class_fprintf_double(clfile, factor * cl[index_ct], true);
     }
     fprintf(clfile, "\n");
   }
@@ -1206,7 +1206,7 @@ void OutputModule::output_one_line_of_cl(FILE* clfile,
       index_ct_rest++;
     /* Now print the remaining (if any) entries:*/
     for (index_ct = index_ct_rest; index_ct < ct_size; index_ct++) {
-      class_fprintf_double(clfile, factor * cl[index_ct], _TRUE_);
+      class_fprintf_double(clfile, factor * cl[index_ct], true);
     }
 
     fprintf(clfile, "\n");
@@ -1231,7 +1231,7 @@ void OutputModule::output_open_pk_file(FILE** pkfile,
   int colnum = 1;
   class_open(*pkfile, filename.c_str(), "w");
 
-  if (pop->write_header == _TRUE_) {
+  if (pop->write_header) {
     fprintf(*pkfile, "# Matter power spectrum P(k) %sat redshift z=%g\n", first_line, z);
     fprintf(*pkfile,
             "# for k=%g to %g h/Mpc,\n",
@@ -1240,8 +1240,8 @@ void OutputModule::output_open_pk_file(FILE** pkfile,
     fprintf(*pkfile, "# number of wavenumbers equal to %d\n", nonlinear_module_->k_size_);
 
     fprintf(*pkfile, "#");
-    class_fprintf_columntitle(*pkfile, "k (h/Mpc)", _TRUE_, colnum);
-    class_fprintf_columntitle(*pkfile, "P (Mpc/h)^3", _TRUE_, colnum);
+    class_fprintf_columntitle(*pkfile, "k (h/Mpc)", true, colnum);
+    class_fprintf_columntitle(*pkfile, "P (Mpc/h)^3", true, colnum);
 
     fprintf(*pkfile, "\n");
   }
@@ -1258,7 +1258,7 @@ void OutputModule::output_open_pk_file(FILE** pkfile,
 
 void OutputModule::output_one_line_of_pk(FILE* pkfile, double one_k, double one_pk) {
   fprintf(pkfile, " ");
-  class_fprintf_double(pkfile, one_k, _TRUE_);
-  class_fprintf_double(pkfile, one_pk, _TRUE_);
+  class_fprintf_double(pkfile, one_k, true);
+  class_fprintf_double(pkfile, one_pk, true);
   fprintf(pkfile, "\n");
 }

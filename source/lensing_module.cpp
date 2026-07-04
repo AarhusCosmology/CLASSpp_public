@@ -110,10 +110,10 @@ void LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
              l_lensed_max_);
 
   int last_index;
-  array_interpolate_spline(const_cast<double*>(l_.data()),
+  array_interpolate_spline(l_.data(),
                            l_size_,
-                           const_cast<double*>(cl_lens_.data()),
-                           const_cast<double*>(ddcl_lens_.data()),
+                           cl_lens_.data(),
+                           ddcl_lens_.data(),
                            lt_size_,
                            l,
                            &last_index,
@@ -153,7 +153,7 @@ void LensingModule::lensing_init() {
   else {
     if (ple->lensing_verbose > 0) {
       printf("Computing lensed spectra ");
-      if (ppr->accurate_lensing == _TRUE_)
+      if (ppr->accurate_lensing)
         printf("(accurate mode)\n");
       else
         printf("(fast mode)\n");
@@ -170,7 +170,7 @@ void LensingModule::lensing_init() {
       The rest will be chosen as roots of a Gauss-Legendre quadrature **/
 
   int num_mu;
-  if (ppr->accurate_lensing == _TRUE_) {
+  if (ppr->accurate_lensing) {
     num_mu  = (l_unlensed_max_ + ppr->num_mu_minus_lmax); /* Must be even ?? CHECK */
     num_mu += num_mu % 2;                                 /* Force it to be even */
   }
@@ -186,7 +186,7 @@ void LensingModule::lensing_init() {
 
   std::vector<double> w8(num_mu - 1);
 
-  if (ppr->accurate_lensing == _TRUE_) {
+  if (ppr->accurate_lensing) {
     quadrature_gauss_legendre(mu.data(), w8.data(), num_mu - 1, ppr->tol_gauss_legendre);
   }
   else { /* Crude integration on [0,pi/16]: Riemann sum on theta */
@@ -460,7 +460,7 @@ void LensingModule::lensing_init() {
                        X_p000 * X_p000 * d1m1[index_mu][l] * Cgl2[index_mu] * 8. / (ll * (ll + 1)) +
                        (X_p000 * X_p000 * d00[index_mu][l] + X_220 * X_220 * d2m2[index_mu][l]) *
                            Cgl2[index_mu] * Cgl2[index_mu]);
-        if (ppr->accurate_lensing == _FALSE_) {
+        if (!ppr->accurate_lensing) {
           /* Remove unlensed correlation function */
           lens -= d00[index_mu][l];
         }
@@ -477,7 +477,7 @@ void LensingModule::lensing_init() {
                        0.5 * Cgl2[index_mu] * Cgl2[index_mu] *
                            ((2. * X_p022 * X_p000 + X_220 * X_220) * d20[index_mu][l] +
                             X_220 * X_242 * d4m2[index_mu][l]));
-        if (ppr->accurate_lensing == _FALSE_) {
+        if (!ppr->accurate_lensing) {
           lens -= d20[index_mu][l];
         }
         resX           *= lens;
@@ -500,7 +500,7 @@ void LensingModule::lensing_init() {
                         0.5 * Cgl2[index_mu] * Cgl2[index_mu] *
                             (2. * X_p022 * X_p022 * d2m2[index_mu][l] +
                              X_220 * X_220 * d00[index_mu][l] + X_242 * X_242 * d4m4[index_mu][l]));
-        if (ppr->accurate_lensing == _FALSE_) {
+        if (!ppr->accurate_lensing) {
           lensp -= d22[index_mu][l];
           lensm -= d2m2[index_mu][l];
         }
@@ -515,14 +515,14 @@ void LensingModule::lensing_init() {
   /** - compute lensed \f$ C_l\f$'s by integration */
   if (has_tt_) {
     lensing_lensed_cl_tt(ksi.data(), d00.data(), w8.data(), num_mu - 1);
-    if (ppr->accurate_lensing == _FALSE_) {
+    if (!ppr->accurate_lensing) {
       lensing_addback_cl_tt(cl_tt.data());
     }
   }
 
   if (has_te_) {
     lensing_lensed_cl_te(ksiX.data(), d20.data(), w8.data(), num_mu - 1);
-    if (ppr->accurate_lensing == _FALSE_) {
+    if (!ppr->accurate_lensing) {
       lensing_addback_cl_te(cl_te.data());
     }
   }
@@ -534,7 +534,7 @@ void LensingModule::lensing_init() {
                             d2m2.data(),
                             w8.data(),
                             num_mu - 1);
-    if (ppr->accurate_lensing == _FALSE_) {
+    if (!ppr->accurate_lensing) {
       lensing_addback_cl_ee_bb(cl_ee.data(), cl_bb.data());
     }
   }

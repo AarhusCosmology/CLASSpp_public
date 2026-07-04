@@ -5,6 +5,7 @@
 #ifndef __HYPERSPHERICAL__
 #define __HYPERSPHERICAL__
 
+#include <algorithm>
 #include <vector>
 
 #include "common.h"
@@ -52,15 +53,6 @@ struct WKB_parameters {
   double phiminabs;
 };
 
-/**
- * Boilerplate for C++
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
-int hyperspherical_bessel_direct_vector(
-    int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi);
-
 int hyperspherical_forwards_recurrence(int K,
                                        int lmax,
                                        double beta,
@@ -100,10 +92,10 @@ int hyperspherical_backwards_recurrence_chunk(int K,
                                               double* sqrtK,
                                               double* one_over_sqrtK,
                                               double* PhiL);
-int hyperspherical_get_xmin(HyperInterpStruct* pHIS, double xtol, double phiminabs, double* xmin);
 
 int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi);
-int hyperspherical_WKB_vec(int l, double beta, double* sinK_vec, int size_sinK_vec, double* Phi);
+int hyperspherical_bessel_direct_vector(
+    int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi);
 int ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign);
 int get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign);
 int CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF);
@@ -113,11 +105,10 @@ double coef2(double z);
 double coef3(double z);
 double coef4(double z);
 double cheb(double x, int n, const double A[]);
-double get_value_at_small_phi(int K, int l, double beta, double Phi);
 
 double PhiWKB_minus_phiminabs(double x, void* param);
 
-int hyperspherical_get_xmin_from_Airy(
+void hyperspherical_get_xmin_from_Airy(
     int K, int l, double beta, double xtol, double phiminabs, double* xmin, int* fevals);
 
 int fzero_ridder(double (*func)(double, void*),
@@ -130,79 +121,56 @@ int fzero_ridder(double (*func)(double, void*),
                  double* xzero,
                  int* fevals);
 
-int HypersphericalExplicit(int K, int l, double beta, double x, double* Phi);
-
-int hyperspherical_get_xmin_from_approx(
+void hyperspherical_get_xmin_from_approx(
     int K, int l, double nu, double ignore1, double phiminabs, double* xmin, int* ignore2);
 
-int hyperspherical_Hermite_interpolation_vector(HyperInterpStruct* pHIS,
-                                                int nxi,
-                                                int lnum,
-                                                double* xinterp,
-                                                double* Phi,
-                                                double* dPhi,
-                                                double* d2Phi);
+/** Hermite interpolation (order 4 or 6) of the hyperspherical Bessel function
+    Phi and/or its first two derivatives, evaluated at the nxi points xinterp
+    for the multipole pHIS->l[lnum]. Only the outputs selected by the template
+    flags are computed and stored (pass nullptr for the others).
 
-int hyperspherical_Hermite3_interpolation_vector_Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi);
-int hyperspherical_Hermite3_interpolation_vector_dPhi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi);
-int hyperspherical_Hermite3_interpolation_vector_d2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* d2Phi);
-int hyperspherical_Hermite3_interpolation_vector_PhidPhi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* dPhi);
-int hyperspherical_Hermite3_interpolation_vector_Phid2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* d2Phi);
-int hyperspherical_Hermite3_interpolation_vector_dPhid2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi, double* d2Phi);
-int hyperspherical_Hermite3_interpolation_vector_PhidPhid2Phi(HyperInterpStruct* pHIS,
-                                                              int nxi,
-                                                              int lnum,
-                                                              double* xinterp,
-                                                              double* Phi,
-                                                              double* dPhi,
-                                                              double* d2Phi);
-int hyperspherical_Hermite4_interpolation_vector_Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi);
-int hyperspherical_Hermite4_interpolation_vector_dPhi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi);
-int hyperspherical_Hermite4_interpolation_vector_d2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* d2Phi);
-int hyperspherical_Hermite4_interpolation_vector_PhidPhi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* dPhi);
-int hyperspherical_Hermite4_interpolation_vector_Phid2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* d2Phi);
-int hyperspherical_Hermite4_interpolation_vector_dPhid2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi, double* d2Phi);
-int hyperspherical_Hermite4_interpolation_vector_PhidPhid2Phi(HyperInterpStruct* pHIS,
-                                                              int nxi,
-                                                              int lnum,
-                                                              double* xinterp,
-                                                              double* Phi,
-                                                              double* dPhi,
-                                                              double* d2Phi);
-int hyperspherical_Hermite6_interpolation_vector_Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi);
-int hyperspherical_Hermite6_interpolation_vector_dPhi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi);
-int hyperspherical_Hermite6_interpolation_vector_d2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* d2Phi);
-int hyperspherical_Hermite6_interpolation_vector_PhidPhi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* dPhi);
-int hyperspherical_Hermite6_interpolation_vector_Phid2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* Phi, double* d2Phi);
-int hyperspherical_Hermite6_interpolation_vector_dPhid2Phi(
-    HyperInterpStruct* pHIS, int nxi, int lnum, double* xinterp, double* dPhi, double* d2Phi);
-int hyperspherical_Hermite6_interpolation_vector_PhidPhid2Phi(HyperInterpStruct* pHIS,
-                                                              int nxi,
-                                                              int lnum,
-                                                              double* xinterp,
-                                                              double* Phi,
-                                                              double* dPhi,
-                                                              double* d2Phi);
+    When xinterp is sorted (increasing), computations are reused across
+    points; for randomly ordered input the routine is not much slower. For the
+    closed case the interpolation structure only covers
+    [safety; pi/2-safety]; the calling routine should respect this.
 
-#ifdef __cplusplus
-}
-#endif
+    Each requested output at derivative level m (Phi: m=0, dPhi: m=1,
+    d2Phi: m=2) is Hermite-interpolated from levels m..m+Order/2-1 at the two
+    surrounding grid points. The tabulated Phi and dPhi are lifted to higher
+    derivatives through the radial equation
+      Phi'' = -2 cotK Phi' + (l(l+1)/sinK^2 - beta^2 + K) Phi
+    differentiated as often as needed. */
+template <int Order, bool DoPhi, bool DoDPhi, bool DoD2Phi>
+void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
+                                          int nxi,
+                                          int lnum,
+                                          const double* xinterp,
+                                          double* Phi,
+                                          double* dPhi,
+                                          double* d2Phi);
+
+// The definition lives in hyperspherical.cpp (same translation unit as
+// ClosedModY, which must inline into the closed-case loop); these are the
+// combinations the transfer module dispatches to.
+extern template void hyperspherical_Hermite_interpolation<4, true, false, false>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<4, false, true, false>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<4, true, true, false>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<4, true, false, true>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<4, true, true, true>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<6, true, false, false>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<6, false, true, false>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<6, true, true, false>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<6, true, false, true>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
+extern template void hyperspherical_Hermite_interpolation<6, true, true, true>(
+    const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
 
 #endif

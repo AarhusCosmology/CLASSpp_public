@@ -90,12 +90,12 @@ void NonlinearModule::nonlinear_pk_at_z(
   int index_ic1_ic1;
   int index_ic2_ic2;
   int last_index;
-  short do_ic = _FALSE_;
+  short do_ic = false;
 
   /** - check whether we need the decomposition into contributions from each initial condition */
 
   if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
-    do_ic = _TRUE_;
+    do_ic = true;
 
   /** - case z=0 requiring no interpolation in z */
   if (z == 0) {
@@ -103,7 +103,7 @@ void NonlinearModule::nonlinear_pk_at_z(
       if (pk_output == pk_linear) {
         out_pk[index_k] = ln_pk_l_[index_pk][(ln_tau_size_ - 1) * k_size_ + index_k];
 
-        if (do_ic == _TRUE_) {
+        if (do_ic) {
           for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
             out_pk_ic[index_k * ic_ic_size_ + index_ic1_ic2] =
                 ln_pk_ic_l_[index_pk]
@@ -147,7 +147,7 @@ void NonlinearModule::nonlinear_pk_at_z(
       for (int index_k = 0; index_k < k_size_; index_k++) {
         if (pk_output == pk_linear) {
           out_pk[index_k] = ln_pk_l_[index_pk][index_k];
-          if (do_ic == _TRUE_) {
+          if (do_ic) {
             for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
               out_pk_ic[index_k * ic_ic_size_ + index_ic1_ic2] =
                   ln_pk_ic_l_[index_pk][index_k * ic_ic_size_ + index_ic1_ic2];
@@ -173,7 +173,7 @@ void NonlinearModule::nonlinear_pk_at_z(
       for (int index_k = 0; index_k < k_size_; index_k++) {
         if (pk_output == pk_linear) {
           out_pk[index_k] = ln_pk_l_[index_pk][(ln_tau_size_ - 1) * k_size_ + index_k];
-          if (do_ic == _TRUE_) {
+          if (do_ic) {
             for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
               out_pk_ic[index_k * ic_ic_size_ + index_ic1_ic2] =
                   ln_pk_ic_l_[index_pk][((ln_tau_size_ - 1) * k_size_ + index_k) * ic_ic_size_ +
@@ -191,10 +191,10 @@ void NonlinearModule::nonlinear_pk_at_z(
     else {
       if (pk_output == pk_linear) {
         /** --> interpolate P_l(k) at tau from pre-computed array */
-        array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
+        array_interpolate_spline(ln_tau_.data(),
                                  ln_tau_size_,
-                                 const_cast<double*>(ln_pk_l_[index_pk].data()),
-                                 const_cast<double*>(ddln_pk_l_[index_pk].data()),
+                                 ln_pk_l_[index_pk].data(),
+                                 ddln_pk_l_[index_pk].data(),
                                  k_size_,
                                  ln_tau,
                                  &last_index,
@@ -202,11 +202,11 @@ void NonlinearModule::nonlinear_pk_at_z(
                                  k_size_);
 
         /** --> interpolate P_ic_l(k) at tau from pre-computed array */
-        if (do_ic == _TRUE_) {
-          array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
+        if (do_ic) {
+          array_interpolate_spline(ln_tau_.data(),
                                    ln_tau_size_,
-                                   const_cast<double*>(ln_pk_ic_l_[index_pk].data()),
-                                   const_cast<double*>(ddln_pk_ic_l_[index_pk].data()),
+                                   ln_pk_ic_l_[index_pk].data(),
+                                   ddln_pk_ic_l_[index_pk].data(),
                                    k_size_ * ic_ic_size_,
                                    ln_tau,
                                    &last_index,
@@ -216,10 +216,10 @@ void NonlinearModule::nonlinear_pk_at_z(
       }
       else {
         /** --> interpolate P_nl(k) at tau from pre-computed array */
-        array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
+        array_interpolate_spline(ln_tau_.data(),
                                  ln_tau_size_,
-                                 const_cast<double*>(ln_pk_nl_[index_pk].data()),
-                                 const_cast<double*>(ddln_pk_nl_[index_pk].data()),
+                                 ln_pk_nl_[index_pk].data(),
+                                 ddln_pk_nl_[index_pk].data(),
                                  k_size_,
                                  ln_tau,
                                  &last_index,
@@ -237,7 +237,7 @@ void NonlinearModule::nonlinear_pk_at_z(
       /** --> convert total spectrum */
       out_pk[index_k] = exp(out_pk[index_k]);
 
-      if (do_ic == _TRUE_) {
+      if (do_ic) {
         /** --> convert contribution of each ic (diagonal elements) */
         for (index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
           index_ic1_ic1 = index_symmetric_matrix(index_ic1, index_ic1, ic_size_);
@@ -350,12 +350,12 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 ) const {
   std::vector<double> out_pk_at_z;
   std::vector<double> out_pk_ic_at_z;
-  short do_ic = _FALSE_;
+  short do_ic = false;
 
   /** - preliminary: check whether we need the decomposition into contributions from each initial condition */
 
   if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
-    do_ic = _TRUE_;
+    do_ic = true;
 
   /** - first step: check that k is in valid range [0:kmax]
       (the test for z will be done when calling nonlinear_pk_linear_at_z()) */
@@ -372,7 +372,7 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
   if (k == 0.) {
     *out_pk = 0.;
 
-    if (do_ic == _TRUE_) {
+    if (do_ic) {
       for (int index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
         out_pk_ic[index_ic_ic] = 0.;
       }
@@ -386,7 +386,7 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 
     out_pk_at_z.resize(k_size_);
 
-    if (do_ic == _TRUE_) {
+    if (do_ic) {
       out_pk_ic_at_z.resize(k_size_ * ic_ic_size_);
     }
 
@@ -395,7 +395,7 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
                       z,
                       index_pk,
                       out_pk_at_z.data(),
-                      do_ic == _TRUE_ ? out_pk_ic_at_z.data() : nullptr);
+                      do_ic ? out_pk_ic_at_z.data() : nullptr);
 
     /** - deal with standard case kmin <= k <= kmax
         (just need to interpolate at the right k) */
@@ -406,14 +406,14 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 
       ddout_pk_at_z.resize(k_size_);
 
-      array_spline_table_lines(const_cast<double*>(ln_k_.data()),
+      array_spline_table_lines(ln_k_.data(),
                                k_size_,
                                out_pk_at_z.data(),
                                1,
                                ddout_pk_at_z.data(),
                                _SPLINE_NATURAL_);
 
-      array_interpolate_spline(const_cast<double*>(ln_k_.data()),
+      array_interpolate_spline(ln_k_.data(),
                                k_size_,
                                out_pk_at_z.data(),
                                ddout_pk_at_z.data(),
@@ -423,18 +423,18 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
                                out_pk,
                                1);
 
-      if (do_ic == _TRUE_) {
+      if (do_ic) {
         std::vector<double> ddout_pk_ic_at_z;
         ddout_pk_ic_at_z.resize(k_size_ * ic_ic_size_);
 
-        array_spline_table_lines(const_cast<double*>(ln_k_.data()),
+        array_spline_table_lines(ln_k_.data(),
                                  k_size_,
                                  out_pk_ic_at_z.data(),
                                  ic_ic_size_,
                                  ddout_pk_ic_at_z.data(),
                                  _SPLINE_NATURAL_);
 
-        array_interpolate_spline(const_cast<double*>(ln_k_.data()),
+        array_interpolate_spline(ln_k_.data(),
                                  k_size_,
                                  out_pk_ic_at_z.data(),
                                  ddout_pk_ic_at_z.data(),
@@ -463,7 +463,7 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
       /* get P(kmin) */
       *out_pk = out_pk_at_z[0];
 
-      if (do_ic == _TRUE_) {
+      if (do_ic) {
         for (int index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
           out_pk_ic[index_ic_ic] = out_pk_ic_at_z[index_ic_ic];
         }
@@ -495,7 +495,7 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 
       *out_pk *= (k * pk_primordial_k[0] / kmin / pk_primordial_kmin[0]);
 
-      if (do_ic == _TRUE_) {
+      if (do_ic) {
         for (int index_ic_ic = 0; index_ic_ic < ic_ic_size_; index_ic_ic++) {
           out_pk_ic[index_ic_ic] *= (k * pk_primordial_k[index_ic_ic] / kmin /
                                      pk_primordial_kmin[index_ic_ic]);
@@ -622,7 +622,7 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
   /** - Spline it for interpolation along k */
 
   if (has_pk_m_) {
-    array_spline_table_columns2(const_cast<double*>(ln_k_.data()),
+    array_spline_table_columns2(ln_k_.data(),
                                 k_size_,
                                 ln_pk_table.data(),
                                 zvec_size,
@@ -630,7 +630,7 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
                                 _SPLINE_NATURAL_);
   }
   if (has_pk_cb_) {
-    array_spline_table_columns2(const_cast<double*>(ln_k_.data()),
+    array_spline_table_columns2(ln_k_.data(),
                                 k_size_,
                                 ln_pk_cb_table.data(),
                                 zvec_size,
@@ -770,7 +770,7 @@ void NonlinearModule::nonlinear_sigmas_at_z(
 
   /** - spline it along k */
 
-  array_spline_table_columns(const_cast<double*>(ln_k_.data()),
+  array_spline_table_columns(ln_k_.data(),
                              k_size_,
                              out_pk.data(),
                              1,
@@ -811,10 +811,10 @@ void NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_c
       *k_nl = k_nl_[index_pk_m_][0];
     }
     else {
-      array_interpolate_two(const_cast<double*>(tau_.data()),
+      array_interpolate_two(tau_.data(),
                             1,
                             0,
-                            const_cast<double*>(k_nl_[index_pk_m_].data()),
+                            k_nl_[index_pk_m_].data(),
                             1,
                             tau_size_,
                             tau,
@@ -830,10 +830,10 @@ void NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_c
       *k_nl_cb = k_nl_[index_pk_cb_][0];
     }
     else {
-      array_interpolate_two(const_cast<double*>(tau_.data()),
+      array_interpolate_two(tau_.data(),
                             1,
                             0,
-                            const_cast<double*>(k_nl_[index_pk_cb_].data()),
+                            k_nl_[index_pk_cb_].data(),
                             1,
                             tau_size_,
                             tau,
@@ -865,7 +865,7 @@ void NonlinearModule::nonlinear_init() {
   std::vector<std::vector<double>> lnpk_l;
   std::vector<std::vector<double>> ddlnpk_l;
 
-  short nl_corr_not_computable_at_this_k = _FALSE_;
+  short nl_corr_not_computable_at_this_k = false;
 
   std::vector<double> pvecback;
   int last_index;
@@ -879,7 +879,7 @@ void NonlinearModule::nonlinear_init() {
   has_pk_matter_ = ppt->has_pk_matter;
   /** --> This module only makes sense for dealing with scalar perturbations.
       When no scalars are requested the input module sets pnl->method to
-      nl_none (and has_pk_matter is _FALSE_), so the generic gate below skips
+      nl_none (and has_pk_matter is false), so the generic gate below skips
       the module without mutating the input here (see issue #20). */
 
   /** --> Nothing to be done if we don't want the matter power spectrum */
@@ -1041,9 +1041,9 @@ void NonlinearModule::nonlinear_init() {
             time/redshift, compute P_NL(k,z) using either Halofit or
             HMcode */
 
-    /* this flag will become _TRUE_ at the minimum redshift such that
+    /* this flag will become true at the minimum redshift such that
        the non-lienar corrections cannot be consistently computed */
-    nl_corr_not_computable_at_this_k = _FALSE_;
+    nl_corr_not_computable_at_this_k = false;
 
     /* this index will refer to the value of time corresponding to
        that redhsift */
@@ -1058,7 +1058,7 @@ void NonlinearModule::nonlinear_init() {
 
       for (index_pk = 0; index_pk < pk_size_; index_pk++) {
         /* if we are still in a range of time where P_NL(k) should be computable */
-        if (nl_corr_not_computable_at_this_k == _FALSE_) {
+        if (!nl_corr_not_computable_at_this_k) {
           /* get P_L(k) at this time. This is only needed while the non-linear
              corrections are still computable: once they are not (high z, where
              k_NL exceeds k_max), we just store R_NL=1 below, so recomputing the
@@ -1109,7 +1109,7 @@ void NonlinearModule::nonlinear_init() {
           }
 
           /* infer and store R_NL=(P_NL/P_L)^1/2 */
-          if (nl_corr_not_computable_at_this_k == _FALSE_) {
+          if (!nl_corr_not_computable_at_this_k) {
             for (int index_k = 0; index_k < k_size_; index_k++) {
               nl_corr_density_[index_pk][index_tau * k_size_ + index_k] = sqrt(
                   pk_nl[index_pk][index_k] / exp(lnpk_l[index_pk][index_k]));
@@ -1627,7 +1627,7 @@ void NonlinearModule::nonlinear_pk_linear(
         index_ic1_ic1 = index_symmetric_matrix(index_ic1, index_ic1, ic_size_);
         index_ic2_ic2 = index_symmetric_matrix(index_ic2, index_ic2, ic_size_);
 
-        if (is_non_zero_[index_ic1_ic2] == _TRUE_) {
+        if (is_non_zero_[index_ic1_ic2]) {
           double source_ic2;
 
           nonlinear_get_source(index_k,
@@ -1708,10 +1708,10 @@ void NonlinearModule::nonlinear_sigmas(double R,
 
   /** - allocate temporary array for an integral over y(x) */
 
-  class_define_index(index_x, _TRUE_, i, 1);    // index for x
-  class_define_index(index_y, _TRUE_, i, 1);    // index for integrand
-  class_define_index(index_ddy, _TRUE_, i, 1);  // index for its second derivative (spline method)
-  index_num = i;                                // number of columns in the array
+  class_define_index(index_x, true, i, 1);    // index for x
+  class_define_index(index_y, true, i, 1);    // index for integrand
+  class_define_index(index_ddy, true, i, 1);  // index for its second derivative (spline method)
+  index_num = i;                              // number of columns in the array
 
   integrand_size = (int) (log(k_[k_size - 1] / k_[0]) / log(10.) * k_per_decade) + 1;
   array_for_sigma.resize(integrand_size * index_num);
@@ -1725,7 +1725,7 @@ void NonlinearModule::nonlinear_sigmas(double R,
       pk = exp(lnpk_l[0]);
     }
     else {
-      array_interpolate_spline(const_cast<double*>(ln_k_.data()),
+      array_interpolate_spline(ln_k_.data(),
                                k_size,
                                lnpk_l,
                                ddlnpk_l,
@@ -1852,7 +1852,7 @@ void NonlinearModule::nonlinear_sigma_at_z(
 
   /** - spline it along k */
 
-  array_spline_table_columns(const_cast<double*>(ln_k_.data()),
+  array_spline_table_columns(ln_k_.data(),
                              k_size_,
                              out_pk.data(),
                              1,
@@ -1871,7 +1871,7 @@ void NonlinearModule::nonlinear_sigma_at_z(
  * At high redshift it is possible that the non-linear corrections are
  * so small that they can be computed only by going to very large
  * wavenumbers. Thius, for some combination of (z, k_max), the
- * calculation is not possible. In this case a _FALSE_ will be
+ * calculation is not possible. In this case a false will be
  * returned in the flag halofit_found_k_max.
  *
  * @param tau         Input: conformal time at which we want to do the calculation
@@ -1879,7 +1879,7 @@ void NonlinearModule::nonlinear_sigma_at_z(
  * @param lnpk_l      Input: array of log(P(k)_linear)
  * @param ddlnpk_l    Input: array of second derivative of log(P(k)_linear) wrt k, for spline interpolation
  * @param k_nl        Output: non-linear wavenumber
- * @param nl_corr_not_computable_at_this_k Ouput: flag concerning the status of the calculation (_TRUE_ if not possible)
+ * @param nl_corr_not_computable_at_this_k Ouput: flag concerning the status of the calculation (true if not possible)
  * @return the error status
  */
 
@@ -1993,10 +1993,10 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
   */
 
   index_ia = 0;
-  class_define_index(index_ia_k, _TRUE_, index_ia, 1);
-  class_define_index(index_ia_pk, _TRUE_, index_ia, 1);
-  class_define_index(index_ia_sum, _TRUE_, index_ia, 1);
-  class_define_index(index_ia_ddsum, _TRUE_, index_ia, 1);
+  class_define_index(index_ia_k, true, index_ia, 1);
+  class_define_index(index_ia_pk, true, index_ia, 1);
+  class_define_index(index_ia_sum, true, index_ia, 1);
+  class_define_index(index_ia_ddsum, true, index_ia, 1);
   ia_size = index_ia;
 
   integrand_size = (int) (log(k_[k_size_ - 1] / k_[0]) / log(10.) * ppr->halofit_k_per_decade) + 1;
@@ -2078,11 +2078,11 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
      this redshift without treating it as an error. */
 
   if (sigma < 1.) {
-    *nl_corr_not_computable_at_this_k = _TRUE_;
+    *nl_corr_not_computable_at_this_k = true;
     return;
   }
   else {
-    *nl_corr_not_computable_at_this_k = _FALSE_;
+    *nl_corr_not_computable_at_this_k = false;
   }
 
   xlogr1 = log(R) / log(10.);
@@ -2558,7 +2558,7 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
       fprintf(stdout,
               " -> [WARNING:] the minimum mass in the mass-table is too large to find the "
               "nonlinear scale at this redshift.\n   Decrease mmin_for_p1h_integral\n");
-    *nl_corr_not_computable_at_this_k = _TRUE_;
+    *nl_corr_not_computable_at_this_k = true;
     return;
   }
 
@@ -2614,11 +2614,11 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   *k_nl = 1. / r_nl;
 
   if (*k_nl > k_[k_size_ - 1]) {
-    *nl_corr_not_computable_at_this_k = _TRUE_;
+    *nl_corr_not_computable_at_this_k = true;
     return;
   }
   else {
-    *nl_corr_not_computable_at_this_k = _FALSE_;
+    *nl_corr_not_computable_at_this_k = false;
   }
 
   /* call sigma_prime function at r_nl to find the effective spectral index n_eff */
@@ -3425,8 +3425,8 @@ void NonlinearModule::prepare_pk_eq() {
   z.resize(pk_eq_tau_size_);
 
   index_eq = 0;
-  class_define_index(index_pk_eq_w_, _TRUE_, index_eq, 1);
-  class_define_index(index_pk_eq_Omega_m_, _TRUE_, index_eq, 1);
+  class_define_index(index_pk_eq_w_, true, index_eq, 1);
+  class_define_index(index_pk_eq_Omega_m_, true, index_eq, 1);
   pk_eq_size_ = index_eq;
   pk_eq_w_and_Omega_.resize(pk_eq_tau_size_ * pk_eq_size_);
   pk_eq_ddw_and_ddOmega_.resize(pk_eq_tau_size_ * pk_eq_size_);

@@ -192,9 +192,9 @@ void ThermodynamicsModule::thermodynamics_at_z(
     /* some very specific cases require linear interpolation because of a break in the derivative of the functions */
     if (((pth->reio_parametrization == reio_half_tanh) && (z < 2 * z_reionization_)) ||
         ((pth->reio_parametrization == reio_inter) && (z < 50.))) {
-      array_interpolate_linear(const_cast<double*>(z_table_.data()),
+      array_interpolate_linear(z_table_.data(),
                                tt_size_,
-                               const_cast<double*>(thermodynamics_table_.data()),
+                               thermodynamics_table_.data(),
                                th_size_,
                                z,
                                last_index,
@@ -205,10 +205,10 @@ void ThermodynamicsModule::thermodynamics_at_z(
     /* in the "normal" case, use spline interpolation */
     else {
       if (inter_mode == inter_normal_) {
-        array_interpolate_spline(const_cast<double*>(z_table_.data()),
+        array_interpolate_spline(z_table_.data(),
                                  tt_size_,
-                                 const_cast<double*>(thermodynamics_table_.data()),
-                                 const_cast<double*>(d2thermodynamics_dz2_table_.data()),
+                                 thermodynamics_table_.data(),
+                                 d2thermodynamics_dz2_table_.data(),
                                  th_size_,
                                  z,
                                  last_index,
@@ -217,11 +217,11 @@ void ThermodynamicsModule::thermodynamics_at_z(
       }
 
       if (inter_mode == inter_closeby_) {
-        array_interpolate_spline_growing_closeby(const_cast<double*>(z_table_.data()),
+        array_interpolate_spline_growing_closeby(z_table_.data(),
                                                  tt_size_,
-                                                 const_cast<double*>(thermodynamics_table_.data()),
-                                                 const_cast<double*>(
-                                                     d2thermodynamics_dz2_table_.data()),
+                                                 thermodynamics_table_.data(),
+
+                                                 d2thermodynamics_dz2_table_.data(),
                                                  th_size_,
                                                  z,
                                                  last_index,
@@ -3150,10 +3150,10 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
   preco->H_frac = ppr->recfast_H_frac;
 
   /* H fudging */
-  class_test((ppr->recfast_Hswitch != _TRUE_) && (ppr->recfast_Hswitch != _FALSE_),
+  class_test((ppr->recfast_Hswitch != 0) && (ppr->recfast_Hswitch != 1),
              "RECFAST error: unknown H fudging scheme");
   preco->fu = ppr->recfast_fudge_H;
-  if (ppr->recfast_Hswitch == _TRUE_)
+  if (ppr->recfast_Hswitch)
     preco->fu += ppr->recfast_delta_fudge_H;
 
   /* He fudging */
@@ -3539,7 +3539,7 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
 
   /* following is from recfast 1.5 */
 
-  if (ppr->recfast_Hswitch == _TRUE_)
+  if (ppr->recfast_Hswitch)
     K *= 1. +
          ppr->recfast_AGauss1 *
              exp(-pow((log(1. + z) - ppr->recfast_zGauss1) / ppr->recfast_wGauss1, 2)) +
@@ -3867,63 +3867,63 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
  */
 
 void ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) const {
-  class_store_columntitle(titles, "z", _TRUE_);
-  class_store_columntitle(titles, "conf. time [Mpc]", _TRUE_);
-  class_store_columntitle(titles, "x_e", _TRUE_);
-  class_store_columntitle(titles, "kappa' [Mpc^-1]", _TRUE_);
-  class_store_columntitle(titles, "exp(-kappa)", _TRUE_);
-  class_store_columntitle(titles, "g [Mpc^-1]", _TRUE_);
-  class_store_columntitle(titles, "Tb [K]", _TRUE_);
-  class_store_columntitle(titles, "w_b", _TRUE_);
-  class_store_columntitle(titles, "c_b^2", _TRUE_);
-  class_store_columntitle(titles, "tau_d", _TRUE_);
+  class_store_columntitle(titles, "z", true);
+  class_store_columntitle(titles, "conf. time [Mpc]", true);
+  class_store_columntitle(titles, "x_e", true);
+  class_store_columntitle(titles, "kappa' [Mpc^-1]", true);
+  class_store_columntitle(titles, "exp(-kappa)", true);
+  class_store_columntitle(titles, "g [Mpc^-1]", true);
+  class_store_columntitle(titles, "Tb [K]", true);
+  class_store_columntitle(titles, "w_b", true);
+  class_store_columntitle(titles, "c_b^2", true);
+  class_store_columntitle(titles, "tau_d", true);
   class_store_columntitle(titles, "r_d", pth->compute_damping_scale);
 
   if (all_species_.count("IDM_DR_IDR") > 0) {
-    class_store_columntitle(titles, "dmu_idm_dr", _TRUE_);
-    class_store_columntitle(titles, "tau_idm_dr", _TRUE_);
-    class_store_columntitle(titles, "tau_idr", _TRUE_);
-    class_store_columntitle(titles, "g_idm_dr [Mpc^-1]", _TRUE_);
-    class_store_columntitle(titles, "c_idm_dr^2", _TRUE_);
-    class_store_columntitle(titles, "T_idm_dr", _TRUE_);
-    class_store_columntitle(titles, "dmu_idr", _TRUE_);
+    class_store_columntitle(titles, "dmu_idm_dr", true);
+    class_store_columntitle(titles, "tau_idm_dr", true);
+    class_store_columntitle(titles, "tau_idr", true);
+    class_store_columntitle(titles, "g_idm_dr [Mpc^-1]", true);
+    class_store_columntitle(titles, "c_idm_dr^2", true);
+    class_store_columntitle(titles, "T_idm_dr", true);
+    class_store_columntitle(titles, "dmu_idr", true);
   }
 }
 
 void ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, double* data) const {
   int storeidx;
-  double *dataptr, *pvecthermo;
+  double* dataptr;
   double z, tau;
 
   /* Store quantities: */
   for (int index_z = 0; index_z < tt_size_; index_z++) {
-    dataptr    = data + index_z * number_of_titles;
-    pvecthermo = const_cast<double*>(thermodynamics_table_.data()) + index_z * th_size_;
-    z          = z_table_[index_z];
-    storeidx   = 0;
+    dataptr                  = data + index_z * number_of_titles;
+    const double* pvecthermo = thermodynamics_table_.data() + index_z * th_size_;
+    z                        = z_table_[index_z];
+    storeidx                 = 0;
 
     background_module_->background_tau_of_z(z, &tau);
 
-    class_store_double(dataptr, z, _TRUE_, storeidx);
-    class_store_double(dataptr, tau, _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_xe_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_dkappa_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_exp_m_kappa_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_g_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_Tb_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_wb_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_cb2_], _TRUE_, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_tau_d_], _TRUE_, storeidx);
+    class_store_double(dataptr, z, true, storeidx);
+    class_store_double(dataptr, tau, true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_xe_], true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_dkappa_], true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_exp_m_kappa_], true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_g_], true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_Tb_], true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_wb_], true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_cb2_], true, storeidx);
+    class_store_double(dataptr, pvecthermo[index_th_tau_d_], true, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_r_d_], pth->compute_damping_scale, storeidx);
 
     if (all_species_.count("IDM_DR_IDR") > 0) {
-      class_store_double(dataptr, pvecthermo[index_th_dmu_idm_dr_], _TRUE_, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_tau_idm_dr_], _TRUE_, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_tau_idr_], _TRUE_, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_g_idm_dr_], _TRUE_, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_cidm_dr2_], _TRUE_, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_Tidm_dr_], _TRUE_, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_dmu_idr_], _TRUE_, storeidx);
+      class_store_double(dataptr, pvecthermo[index_th_dmu_idm_dr_], true, storeidx);
+      class_store_double(dataptr, pvecthermo[index_th_tau_idm_dr_], true, storeidx);
+      class_store_double(dataptr, pvecthermo[index_th_tau_idr_], true, storeidx);
+      class_store_double(dataptr, pvecthermo[index_th_g_idm_dr_], true, storeidx);
+      class_store_double(dataptr, pvecthermo[index_th_cidm_dr2_], true, storeidx);
+      class_store_double(dataptr, pvecthermo[index_th_Tidm_dr_], true, storeidx);
+      class_store_double(dataptr, pvecthermo[index_th_dmu_idr_], true, storeidx);
     }
   }
 }

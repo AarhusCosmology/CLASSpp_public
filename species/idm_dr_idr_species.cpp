@@ -583,5 +583,5 @@ void IDM_DR_IDR_Species::MarkUsedInSources(const BaseSpecies::PerturbLayout& bas
     return;
 
   for (int idx = idr_lay.idx_l3; idx <= idr_lay.idx_delta + idr_lay.l_max; ++idx)
-    used_in_sources[idx] = _FALSE_;
+    used_in_sources[idx] = false;
 }

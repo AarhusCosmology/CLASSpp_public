@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "common.h"  // for file_format, _TRUE_, _FALSE_, class_store_* macros
+#include "common.h"  // for file_format, true, false, class_store_* macros
 
 // Forward declarations
 struct perturb_workspace;

@@ -68,7 +68,7 @@ class PrimordialModule : public BaseModule {
                                               double* dy,
                                               enum target_quantity target,
                                               double stop,
-                                              short check_epsilon,
+                                              bool check_epsilon,
                                               enum integration_direction direction,
                                               enum time_definition time);
   void primordial_inflation_check_potential(double phi, double* V, double* dV, double* ddV);

@@ -38,7 +38,7 @@ int evolver_rk(
 
   x1 = x_ini;
 
-  call_output = _FALSE_;
+  call_output = false;
 
   while ((x1 < x_end) && (next_index_x < x_size)) {
     (*evaluate_timescale)(x1, parameters_and_workspace_for_derivs, &timescale);
@@ -55,12 +55,12 @@ int evolver_rk(
     }
     else {
       x2          = x_sampling[next_index_x];
-      call_output = _TRUE_;
+      call_output = true;
     }
 
     if (x2 > x_end) {
       x2          = x_end;
-      call_output = _FALSE_;
+      call_output = false;
     }
 
     if (print_variables != nullptr) {
@@ -80,12 +80,12 @@ int evolver_rk(
                        x1 * minimum_variation,
                        &gi);
 
-    if (call_output == _TRUE_) {
+    if (call_output) {
       (*derivs)(x2, y, dy.data(), parameters_and_workspace_for_derivs);
 
       (*output)(x2, y, dy.data(), next_index_x, parameters_and_workspace_for_derivs);
 
-      call_output = _FALSE_;
+      call_output = false;
 
       next_index_x++;
     }

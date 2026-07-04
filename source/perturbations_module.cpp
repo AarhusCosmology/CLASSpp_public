@@ -135,12 +135,11 @@ void PerturbationsModule::perturb_sources_at_tau(
         but actually never used by default version of CLASS */
 
   if ((logtau < ln_tau_[0]) || (ln_tau_size_ <= 1)) {
-    array_interpolate_two_bis(const_cast<double*>(tau_sampling_.data()),
+    array_interpolate_two_bis(tau_sampling_.data(),
                               1,
                               0,
-                              const_cast<double*>(
-                                  sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
-                                      .data()),
+
+                              sources_[index_md][index_ic * tp_size_[index_md] + index_tp].data(),
                               k_size_[index_md],
                               tau_size_,
                               tau,
@@ -153,12 +152,12 @@ void PerturbationsModule::perturb_sources_at_tau(
         functions T(k,z) or power spectra P(k,z) */
 
   else {
-    array_interpolate_spline(const_cast<double*>(ln_tau_.data()),
+    array_interpolate_spline(ln_tau_.data(),
                              ln_tau_size_,
                              late_sources_[index_md][index_ic * tp_size_[index_md] + index_tp],
-                             const_cast<double*>(
-                                 ddlate_sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
-                                     .data()),
+
+                             ddlate_sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
+                                 .data(),
                              k_size_[index_md],
                              logtau,
                              &last_index,
@@ -248,7 +247,7 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
       k2           = k * k;
       k_over_h     = k / pba->h;
 
-      class_store_double(dataptr, k_over_h, _TRUE_, storeidx);
+      class_store_double(dataptr, k_over_h, true, storeidx);
 
       /* indices for species associated with a velocity transfer function in Fourier space */
 
@@ -294,11 +293,7 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
                                    output_format,
                                    BaseSpecies::TransferColumnSection::density);
         }
-        class_store_double_or_default(dataptr,
-                                      -tk[index_tp_delta_tot_] / k2,
-                                      _TRUE_,
-                                      storeidx,
-                                      0.0);
+        class_store_double_or_default(dataptr, -tk[index_tp_delta_tot_] / k2, true, storeidx, 0.0);
       }
     }
   }
@@ -318,7 +313,7 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
 void PerturbationsModule::perturb_output_titles(file_format output_format,
                                                 std::string& titles) const {
   if (output_format == file_format::class_format) {
-    class_store_columntitle(titles, "k (h/Mpc)", _TRUE_);
+    class_store_columntitle(titles, "k (h/Mpc)", true);
     if (ppt->has_density_transfers) {
       PerturbColumnWriter w(titles);
       for (auto& [name, sp] : all_species_)
@@ -326,7 +321,7 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
                                *this,
                                output_format,
                                BaseSpecies::TransferColumnSection::density);
-      class_store_columntitle(titles, "d_tot", _TRUE_);
+      class_store_columntitle(titles, "d_tot", true);
       class_store_columntitle(titles, "phi", has_source_phi_);
       class_store_columntitle(titles, "psi", has_source_psi_);
       class_store_columntitle(titles, "phi_prime", has_source_phi_prime_);
@@ -344,12 +339,12 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
                                *this,
                                output_format,
                                BaseSpecies::TransferColumnSection::velocity);
-      class_store_columntitle(titles, "t_tot", _TRUE_);
+      class_store_columntitle(titles, "t_tot", true);
     }
   }
 
   else if (output_format == file_format::camb_format) {
-    class_store_columntitle(titles, "k (h/Mpc)", _TRUE_);
+    class_store_columntitle(titles, "k (h/Mpc)", true);
     {
       PerturbColumnWriter w(titles);
       for (auto& [name, sp] : all_species_)
@@ -358,7 +353,7 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
                                output_format,
                                BaseSpecies::TransferColumnSection::density);
     }
-    class_store_columntitle(titles, "-T_tot/k2", _TRUE_);
+    class_store_columntitle(titles, "-T_tot/k2", true);
   }
 }
 
@@ -565,8 +560,8 @@ void PerturbationsModule::perturb_init() {
   }
 
   if (ppt->has_tensors) {
-    evolve_tensor_ur_   = _FALSE_;
-    evolve_tensor_ncdm_ = _FALSE_;
+    evolve_tensor_ur_   = false;
+    evolve_tensor_ncdm_ = false;
 
     switch (ppt->tensor_method) {
       case (tm_photons_only):
@@ -574,18 +569,18 @@ void PerturbationsModule::perturb_init() {
 
       case (tm_massless_approximation):
         if ((all_species_.count("UR")) || all_species_.has_ncdm())
-          evolve_tensor_ur_ = _TRUE_;
+          evolve_tensor_ur_ = true;
         break;
 
       case (tm_exact):
         if (all_species_.count("UR"))
-          evolve_tensor_ur_ = _TRUE_;
+          evolve_tensor_ur_ = true;
         if (all_species_.has_ncdm()) {
           // The exact tensor-NCDM path only handles plain NCDMSpecies; the
           // decaying composite (DNCDM_DR_Species, a CompositeSpecies) would be
           // silently skipped by the tensor loops, so reject it up front.
           class_test(has_dncdm_dr, "Cannot evolve tensor modes with decaying NCDM species.");
-          evolve_tensor_ncdm_ = _TRUE_;
+          evolve_tensor_ncdm_ = true;
         }
         break;
     }
@@ -1020,7 +1015,7 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       /** - --> only one initial condition for tensors*/
 
       index_ic = 0;
-      class_define_index(index_ic_ten_, _TRUE_, index_ic, 1);
+      class_define_index(index_ic_ten_, true, index_ic, 1);
       ic_size_[index_md] = index_ic;
     }
 
@@ -1872,8 +1867,8 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
     /* newtonian gauge */
 
     if (ppt->gauge == possible_gauges::newtonian) {
-      class_define_index(ppw->index_mt_psi, _TRUE_, index_mt, 1);       /* psi */
-      class_define_index(ppw->index_mt_phi_prime, _TRUE_, index_mt, 1); /* phi' */
+      class_define_index(ppw->index_mt_psi, true, index_mt, 1);       /* psi */
+      class_define_index(ppw->index_mt_phi_prime, true, index_mt, 1); /* phi' */
     }
 
     /* synchronous gauge (note that eta is counted in the vector of
@@ -1881,14 +1876,14 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
        quantities obeying to constraint equations) */
 
     if (ppt->gauge == possible_gauges::synchronous) {
-      class_define_index(ppw->index_mt_h_prime, _TRUE_, index_mt, 1);       /* h' */
-      class_define_index(ppw->index_mt_h_prime_prime, _TRUE_, index_mt, 1); /* h'' */
-      class_define_index(ppw->index_mt_eta_prime, _TRUE_, index_mt, 1);     /* eta' */
+      class_define_index(ppw->index_mt_h_prime, true, index_mt, 1);       /* h' */
+      class_define_index(ppw->index_mt_h_prime_prime, true, index_mt, 1); /* h'' */
+      class_define_index(ppw->index_mt_eta_prime, true, index_mt, 1);     /* eta' */
       class_define_index(ppw->index_mt_alpha,
-                         _TRUE_,
+                         true,
                          index_mt,
                          1); /* alpha = (h' + 6 tau') / (2 k**2) */
-      class_define_index(ppw->index_mt_alpha_prime, _TRUE_, index_mt, 1); /* alpha' */
+      class_define_index(ppw->index_mt_alpha_prime, true, index_mt, 1); /* alpha' */
     }
   }
 
@@ -1896,16 +1891,16 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
     /* newtonian gauge */
 
     if (ppt->gauge == possible_gauges::newtonian) {
-      class_define_index(ppw->index_mt_V_prime, _TRUE_, index_mt, 1);
+      class_define_index(ppw->index_mt_V_prime, true, index_mt, 1);
     }
 
     if (ppt->gauge == possible_gauges::synchronous) {
-      class_define_index(ppw->index_mt_hv_prime_prime, _TRUE_, index_mt, 1);
+      class_define_index(ppw->index_mt_hv_prime_prime, true, index_mt, 1);
     }
   }
 
   if (_tensors_) {
-    class_define_index(ppw->index_mt_gw_prime_prime, _TRUE_, index_mt, 1);
+    class_define_index(ppw->index_mt_gw_prime_prime, true, index_mt, 1);
   }
 
   ppw->mt_size = index_mt;
@@ -1921,8 +1916,8 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
   /** - count number of approximations, initialize their indices, and allocate their flags */
   index_ap = 0;
 
-  class_define_index(ppw->index_ap_tca, _TRUE_, index_ap, 1);
-  class_define_index(ppw->index_ap_rsa, _TRUE_, index_ap, 1);
+  class_define_index(ppw->index_ap_tca, true, index_ap, 1);
+  class_define_index(ppw->index_ap_rsa, true, index_ap, 1);
 
   if (_scalars_) {
     class_define_index(ppw->index_ap_ufa, all_species_.count("UR"), index_ap, 1);
@@ -2138,7 +2133,7 @@ void PerturbationsModule::perturb_solve(int index_md,
   tau_mid = 0.5 * (tau_lower + tau_upper);
 
   while ((tau_upper - tau_lower) / tau_lower > ppr->tol_tau_approx) {
-    is_early_enough = _TRUE_;
+    is_early_enough = true;
 
     background_module_->background_at_tau(tau_mid,
                                           pba->normal_info,
@@ -2150,12 +2145,12 @@ void PerturbationsModule::perturb_solve(int index_md,
     if (all_species_.has_ncdm()) {
       for (auto& sp : all_species_) {
         if (!sp->IsUltraRelativisticAtIc(ppw->pvecback.data(), ppr->tol_ncdm_initial_w))
-          is_early_enough = _FALSE_;
+          is_early_enough = false;
       }
     }
 
     /* also check that the two conditions on (aH/kappa') and (aH/k) are fulfilled */
-    if (is_early_enough == _TRUE_) {
+    if (is_early_enough) {
       thermodynamics_module_
           ->thermodynamics_at_z(1. / ppw->pvecback[background_module_->index_bg_a_] -
                                     1., /* redshift z=1/a-1 */
@@ -2172,10 +2167,10 @@ void PerturbationsModule::perturb_solve(int index_md,
                ppw->pvecback[background_module_->index_bg_H_] >
            ppr->start_large_k_at_tau_h_over_tau_k))
 
-        is_early_enough = _FALSE_;
+        is_early_enough = false;
     }
 
-    if (is_early_enough == _TRUE_)
+    if (is_early_enough)
       tau_lower = tau_mid;
     else
       tau_upper = tau_mid;
@@ -2344,15 +2339,15 @@ void PerturbationsModule::perturb_prepare_k_output() {
   if (ppt->k_output_values_num > 0) {
     /** Write titles for all perturbations that we would like to print/store. */
     if (ppt->has_scalars) {
-      class_store_columntitle(scalar_titles_, "tau [Mpc]", _TRUE_);
-      class_store_columntitle(scalar_titles_, "a", _TRUE_);
+      class_store_columntitle(scalar_titles_, "tau [Mpc]", true);
+      class_store_columntitle(scalar_titles_, "a", true);
       {
         PerturbColumnWriter w(scalar_titles_);
         for (auto& [name, sp] : all_species_)
           sp->PrintVariables(w, 0., nullptr, *this, nullptr);
       }
-      class_store_columntitle(scalar_titles_, "psi", _TRUE_);
-      class_store_columntitle(scalar_titles_, "phi", _TRUE_);
+      class_store_columntitle(scalar_titles_, "psi", true);
+      class_store_columntitle(scalar_titles_, "phi", true);
       /* Perturbed recombination */
       class_store_columntitle(scalar_titles_, "delta_Tb", ppt->has_perturbed_recombination);
       class_store_columntitle(scalar_titles_, "delta_chi", ppt->has_perturbed_recombination);
@@ -2361,22 +2356,22 @@ void PerturbationsModule::perturb_prepare_k_output() {
     }
 
     if (ppt->has_tensors) {
-      class_store_columntitle(tensor_titles_, "tau [Mpc]", _TRUE_);
-      class_store_columntitle(tensor_titles_, "a", _TRUE_);
-      class_store_columntitle(tensor_titles_, "delta_g", _TRUE_);
-      class_store_columntitle(tensor_titles_, "shear_g", _TRUE_);
-      class_store_columntitle(tensor_titles_, "l4_g", _TRUE_);
-      class_store_columntitle(tensor_titles_, "pol0_g", _TRUE_);
-      class_store_columntitle(tensor_titles_, "pol2_g", _TRUE_);
-      class_store_columntitle(tensor_titles_, "pol4_g", _TRUE_);
-      class_store_columntitle(tensor_titles_, "H (gw)", _TRUE_);
-      class_store_columntitle(tensor_titles_, "Hdot (gwdot)", _TRUE_);
+      class_store_columntitle(tensor_titles_, "tau [Mpc]", true);
+      class_store_columntitle(tensor_titles_, "a", true);
+      class_store_columntitle(tensor_titles_, "delta_g", true);
+      class_store_columntitle(tensor_titles_, "shear_g", true);
+      class_store_columntitle(tensor_titles_, "l4_g", true);
+      class_store_columntitle(tensor_titles_, "pol0_g", true);
+      class_store_columntitle(tensor_titles_, "pol2_g", true);
+      class_store_columntitle(tensor_titles_, "pol4_g", true);
+      class_store_columntitle(tensor_titles_, "H (gw)", true);
+      class_store_columntitle(tensor_titles_, "Hdot (gwdot)", true);
 
       class_store_columntitle(tensor_titles_, "delta_ur", evolve_tensor_ur_);
       class_store_columntitle(tensor_titles_, "shear_ur", evolve_tensor_ur_);
       class_store_columntitle(tensor_titles_, "l4_ur", evolve_tensor_ur_);
 
-      if (evolve_tensor_ncdm_ == _TRUE_) {
+      if (evolve_tensor_ncdm_) {
         for (auto& sp : all_species_)
           sp->WriteTensorOutputColumnTitles(tensor_titles_);
       }
@@ -2808,8 +2803,8 @@ void PerturbationsModule::perturb_vector_init(
        baryon-photon system, not a standalone species). Indices defined
        once TCA is off. */
     if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
-      class_define_index(ppv->index_pt_perturbed_recombination_delta_temp, _TRUE_, index_pt, 1);
-      class_define_index(ppv->index_pt_perturbed_recombination_delta_chi, _TRUE_, index_pt, 1);
+      class_define_index(ppv->index_pt_perturbed_recombination_delta_temp, true, index_pt, 1);
+      class_define_index(ppv->index_pt_perturbed_recombination_delta_chi, true, index_pt, 1);
     }
 
     /* metric (only quantities to be integrated, not those obeying constraint equations) */
@@ -2844,10 +2839,10 @@ void PerturbationsModule::perturb_vector_init(
 
     /** - (a) metric perturbations V or \f$ h_v \f$ depending on gauge */
     if (ppt->gauge == possible_gauges::synchronous) {
-      class_define_index(ppv->index_pt_hv_prime, _TRUE_, index_pt, 1);
+      class_define_index(ppv->index_pt_hv_prime, true, index_pt, 1);
     }
     if (ppt->gauge == possible_gauges::newtonian) {
-      class_define_index(ppv->index_pt_V, _TRUE_, index_pt, 1);
+      class_define_index(ppv->index_pt_V, true, index_pt, 1);
     }
   }
 
@@ -2875,7 +2870,7 @@ void PerturbationsModule::perturb_vector_init(
     /* Tensor relativistic-neutrino hierarchy (massless ur or massless-approximated
        ncdm). Owned by pv, not a species: register its slots directly. Same slot
        order/count as the former UR registration, so y-vector layout is unchanged. */
-    if (evolve_tensor_ur_ == _TRUE_) {
+    if (evolve_tensor_ur_) {
       auto& ur_lay     = ppv->tensor_ur_layout;
       ur_lay.l_max     = ppr->l_max_ur;
       ur_lay.idx_delta = index_pt++;
@@ -2891,10 +2886,10 @@ void PerturbationsModule::perturb_vector_init(
         in the vector of ordinary perturbations, no in that of metric perturbations */
 
     class_define_index(ppv->index_pt_gw,
-                       _TRUE_,
+                       true,
                        index_pt,
                        1); /* tensor metric perturbation h (gravitational waves) */
-    class_define_index(ppv->index_pt_gwdot, _TRUE_, index_pt, 1); /* its time-derivative */
+    class_define_index(ppv->index_pt_gwdot, true, index_pt, 1); /* its time-derivative */
   }
 
   ppv->pt_size = index_pt;
@@ -2910,10 +2905,10 @@ void PerturbationsModule::perturb_vector_init(
 
   /* take all of them by default */
   for (index_pt = 0; index_pt < ppv->pt_size; index_pt++)
-    ppv->used_in_sources[index_pt] = _TRUE_;
+    ppv->used_in_sources[index_pt] = true;
 
   /* Per-species MarkUsedInSources: each species marks its approximation-irrelevant
-     slots as _FALSE_ (omitting perturbations in this list does not change results,
+     slots as false (omitting perturbations in this list does not change results,
      it only saves evaluation time). Scalar mode only — tensor/vector masking is
      handled by the _tensors_ / _vectors_ blocks below. */
   if (_scalars_) {
@@ -2931,7 +2926,7 @@ void PerturbationsModule::perturb_vector_init(
                                                ppv->used_in_sources.data());
     }
     /* gw is a metric slot, not a species — module-owned. */
-    ppv->used_in_sources[ppv->index_pt_gw] = _FALSE_;
+    ppv->used_in_sources[ppv->index_pt_gw] = false;
   }
 
   /** - case of setting initial conditions for a new wavenumber */
@@ -3350,7 +3345,7 @@ void PerturbationsModule::perturb_vector_init(
 
       ppv->y[ppv->index_pt_gwdot] = ppw->pv->y[ppw->pv->index_pt_gwdot];
 
-      if (evolve_tensor_ur_ == _TRUE_) {
+      if (evolve_tensor_ur_) {
         /* relativistic-neutrino tensor hierarchy (pv-owned) */
         const auto& old_ur_lay       = ppw->pv->tensor_ur_layout;
         const auto& new_ur_lay       = ppv->tensor_ur_layout;
@@ -4706,7 +4701,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     }
 
     /** - --> ur contribution to gravitational wave source: */
-    if (evolve_tensor_ur_ == _TRUE_) {
+    if (evolve_tensor_ur_) {
       double rho_relativistic = 0.;
 
       if (ppt->tensor_method == tm_exact) {
@@ -4732,7 +4727,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     }
 
     /** - --> ncdm contribution to gravitational wave source: */
-    if (evolve_tensor_ncdm_ == _TRUE_) {
+    if (evolve_tensor_ncdm_) {
       for (size_t i = 0; i < all_species_.size(); ++i) {
         const BaseSpecies* sp = all_species_[i];
         if (dynamic_cast<const NCDMSpecies*>(sp)) {
@@ -5266,15 +5261,15 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
                    size_scalar_perturbation_data_[ppw->index_ikout];
     size_scalar_perturbation_data_[ppw->index_ikout] += number_of_scalar_titles_;
 
-    class_store_double(dataptr, tau, _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[background_module_->index_bg_a_], _TRUE_, storeidx);
+    class_store_double(dataptr, tau, true, storeidx);
+    class_store_double(dataptr, pvecback[background_module_->index_bg_a_], true, storeidx);
     {
       PerturbColumnWriter w(dataptr, storeidx);
       for (auto& [name, sp] : all_species_)
         sp->PrintVariables(w, tau, y, *this, ppw);
     }
-    class_store_double(dataptr, psi, _TRUE_, storeidx);
-    class_store_double(dataptr, phi, _TRUE_, storeidx);
+    class_store_double(dataptr, psi, true, storeidx);
+    class_store_double(dataptr, phi, true, storeidx);
     /* perturbed recombination */
     class_store_double(dataptr, delta_temp, ppt->has_perturbed_recombination, storeidx);
     class_store_double(dataptr, delta_chi, ppt->has_perturbed_recombination, storeidx);
@@ -5316,7 +5311,7 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
       pol4_g  = 0.;
     }
 
-    if (evolve_tensor_ur_ == _TRUE_) {
+    if (evolve_tensor_ur_) {
       const auto& ur_pv_lay = ppw->pv->tensor_ur_layout;
       delta_ur              = y[ur_pv_lay.idx_delta];
       shear_ur              = y[ur_pv_lay.idx_shear];
@@ -5338,23 +5333,23 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
     size_tensor_perturbation_data_[ppw->index_ikout] += number_of_tensor_titles_;
 
     //fprintf(ppw->perturb_output_file," ");
-    class_store_double(dataptr, tau, _TRUE_, storeidx);
-    class_store_double(dataptr, pvecback[background_module_->index_bg_a_], _TRUE_, storeidx);
-    class_store_double(dataptr, delta_g, _TRUE_, storeidx);
-    class_store_double(dataptr, shear_g, _TRUE_, storeidx);
-    class_store_double(dataptr, l4_g, _TRUE_, storeidx);
-    class_store_double(dataptr, pol0_g, _TRUE_, storeidx);
-    class_store_double(dataptr, pol2_g, _TRUE_, storeidx);
-    class_store_double(dataptr, pol4_g, _TRUE_, storeidx);
-    class_store_double(dataptr, y[ppw->pv->index_pt_gw], _TRUE_, storeidx);
-    class_store_double(dataptr, y[ppw->pv->index_pt_gwdot], _TRUE_, storeidx);
+    class_store_double(dataptr, tau, true, storeidx);
+    class_store_double(dataptr, pvecback[background_module_->index_bg_a_], true, storeidx);
+    class_store_double(dataptr, delta_g, true, storeidx);
+    class_store_double(dataptr, shear_g, true, storeidx);
+    class_store_double(dataptr, l4_g, true, storeidx);
+    class_store_double(dataptr, pol0_g, true, storeidx);
+    class_store_double(dataptr, pol2_g, true, storeidx);
+    class_store_double(dataptr, pol4_g, true, storeidx);
+    class_store_double(dataptr, y[ppw->pv->index_pt_gw], true, storeidx);
+    class_store_double(dataptr, y[ppw->pv->index_pt_gwdot], true, storeidx);
 
     class_store_double(dataptr, delta_ur, evolve_tensor_ur_, storeidx);
     class_store_double(dataptr, shear_ur, evolve_tensor_ur_, storeidx);
     class_store_double(dataptr, l4_ur, evolve_tensor_ur_, storeidx);
 
     /* Non-cold Dark Matter */
-    if (evolve_tensor_ncdm_ == _TRUE_) {
+    if (evolve_tensor_ncdm_) {
       // Decaying NCDM with tensor modes is rejected in perturb_init (the guard
       // where evolve_tensor_ncdm_ is set), so only plain NCDMSpecies reach here.
       for (size_t i = 0; i < all_species_.size(); ++i) {
@@ -5389,9 +5384,9 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
         const double theta_ncdm = rho_plus_p_theta_ncdm / rho_plus_p;
         const double shear_ncdm = rho_plus_p_shear_ncdm / rho_plus_p;
 
-        class_store_double(dataptr, delta_ncdm, _TRUE_, storeidx);
-        class_store_double(dataptr, theta_ncdm, _TRUE_, storeidx);
-        class_store_double(dataptr, shear_ncdm, _TRUE_, storeidx);
+        class_store_double(dataptr, delta_ncdm, true, storeidx);
+        class_store_double(dataptr, theta_ncdm, true, storeidx);
+        class_store_double(dataptr, shear_ncdm, true, storeidx);
       }
     }
 
@@ -5714,7 +5709,7 @@ int PerturbationsModule::perturb_derivs_member(double tau,
 
     /** - --> relativistic-neutrino tensor hierarchy (pv-owned: ur and/or
         massless-approximated ncdm), sourced by the gravitational waves. */
-    if (evolve_tensor_ur_ == _TRUE_) {
+    if (evolve_tensor_ur_) {
       const auto& ur_lay  = pv->tensor_ur_layout;
       const int idx_delta = ur_lay.idx_delta;
       const int idx_theta = ur_lay.idx_theta;

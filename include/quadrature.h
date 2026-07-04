@@ -104,16 +104,4 @@ int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol);
 
 int quadrature_gauss_legendre_2D(int n, double* x, double* y, double* w);
 
-int quadrature_in_rectangle(double xl,
-                            double xr,
-                            double yl,
-                            double yr,
-                            int* n,
-                            std::vector<double>& x,
-                            std::vector<double>& y,
-                            std::vector<double>& w);
-
-int cubature_order_eleven(
-    double xl, double xr, double yl, double yr, double* x, double* y, double* w);
-
 #endif

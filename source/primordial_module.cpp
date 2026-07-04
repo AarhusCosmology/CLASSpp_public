@@ -113,7 +113,7 @@ void PrimordialModule::primordial_spectrum_at_k(
       for (index_ic2 = index_ic1; index_ic2 < ic_size_[index_md]; index_ic2++) {
         index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
 
-        if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+        if (is_non_zero_[index_md][index_ic1_ic2]) {
           primordial_analytic_spectrum(index_md, index_ic1_ic2, exp(lnk), &(output[index_ic1_ic2]));
         }
         else {
@@ -132,7 +132,7 @@ void PrimordialModule::primordial_spectrum_at_k(
       for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
         for (index_ic2 = index_ic1 + 1; index_ic2 < ic_size_[index_md]; index_ic2++) {
           index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
-          if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+          if (is_non_zero_[index_md][index_ic1_ic2]) {
             output[index_ic1_ic2] /= sqrt(
                 output[index_symmetric_matrix(index_ic1, index_ic1, ic_size_[index_md])] *
                 output[index_symmetric_matrix(index_ic2, index_ic2, ic_size_[index_md])]);
@@ -145,10 +145,10 @@ void PrimordialModule::primordial_spectrum_at_k(
   /** - otherwise, interpolate in the pre-computed table */
 
   else {
-    array_interpolate_spline(const_cast<double*>(lnk_.data()),
+    array_interpolate_spline(lnk_.data(),
                              lnk_size_,
-                             const_cast<double*>(lnpk_[index_md].data()),
-                             const_cast<double*>(ddlnpk_[index_md].data()),
+                             lnpk_[index_md].data(),
+                             ddlnpk_[index_md].data(),
                              ic_ic_size_[index_md],
                              lnk,
                              &last_index,
@@ -165,7 +165,7 @@ void PrimordialModule::primordial_spectrum_at_k(
       for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
         for (index_ic2 = index_ic1 + 1; index_ic2 < ic_size_[index_md]; index_ic2++) {
           index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
-          if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+          if (is_non_zero_[index_md][index_ic1_ic2]) {
             output[index_ic1_ic2] *= sqrt(
                 output[index_symmetric_matrix(index_ic1, index_ic1, ic_size_[index_md])] *
                 output[index_symmetric_matrix(index_ic2, index_ic2, ic_size_[index_md])]);
@@ -260,7 +260,7 @@ void PrimordialModule::primordial_init() {
           for (int index_ic2 = index_ic1; index_ic2 < ic_size_[index_md]; index_ic2++) {
             index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
 
-            if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+            if (is_non_zero_[index_md][index_ic1_ic2]) {
               primordial_analytic_spectrum(index_md, index_ic1_ic2, k, &pk);
 
               if (index_ic1 == index_ic2) {
@@ -588,7 +588,7 @@ void PrimordialModule::primordial_analytic_spectrum_init() {
 
       index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic1, ic_size_[index_md]);
 
-      is_non_zero_[index_md][index_ic1_ic2] = _TRUE_;
+      is_non_zero_[index_md][index_ic1_ic2] = true;
       amplitude_[index_md][index_ic1_ic2]   = one_amplitude;
       tilt_[index_md][index_ic1_ic2]        = one_tilt;
       running_[index_md][index_ic1_ic2]     = one_running;
@@ -708,13 +708,13 @@ void PrimordialModule::primordial_analytic_spectrum_init() {
         index_ic2_ic2 = index_symmetric_matrix(index_ic2, index_ic2, ic_size_[index_md]);
 
         if (one_correlation == 0.) {
-          is_non_zero_[index_md][index_ic1_ic2] = _FALSE_;
+          is_non_zero_[index_md][index_ic1_ic2] = false;
           amplitude_[index_md][index_ic1_ic2]   = 0.;
           tilt_[index_md][index_ic1_ic2]        = 0.;
           running_[index_md][index_ic1_ic2]     = 0.;
         }
         else {
-          is_non_zero_[index_md][index_ic1_ic2] = _TRUE_;
+          is_non_zero_[index_md][index_ic1_ic2] = true;
           amplitude_[index_md][index_ic1_ic2]   = sqrt(amplitude_[index_md][index_ic1_ic1] *
                                                        amplitude_[index_md][index_ic2_ic2]) *
                                                   one_correlation;
@@ -745,7 +745,7 @@ void PrimordialModule::primordial_analytic_spectrum(int index_md,
                                                     int index_ic1_ic2,
                                                     double k,
                                                     double* pk) const {
-  if (is_non_zero_[index_md][index_ic1_ic2] == _TRUE_) {
+  if (is_non_zero_[index_md][index_ic1_ic2]) {
     *pk = amplitude_[index_md][index_ic1_ic2] *
           exp((tilt_[index_md][index_ic1_ic2] - 1.) * log(k / ppm->k_pivot) +
               0.5 * running_[index_md][index_ic1_ic2] * pow(log(k / ppm->k_pivot), 2.));
@@ -1008,7 +1008,7 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
                                          dy.data(),
                                          _aH_,
                                          aH_end,
-                                         _TRUE_,
+                                         true,
                                          forward,
                                          conformal);
 
@@ -1067,7 +1067,7 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
                                                dy.data(),
                                                _aH_,
                                                aH_ini * ppr->primordial_inflation_aH_ini_target,
-                                               _TRUE_,
+                                               true,
                                                backward,
                                                conformal);
 
@@ -1097,7 +1097,7 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
                                                dy.data(),
                                                _phi_,
                                                phi_pivot_,
-                                               _TRUE_,
+                                               true,
                                                forward,
                                                conformal);
 
@@ -1126,7 +1126,7 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
                                              dy.data(),
                                              _aH_,
                                              aH_ini,
-                                             _TRUE_,
+                                             true,
                                              backward,
                                              conformal);
 
@@ -1169,7 +1169,7 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
                                          dy.data(),
                                          _aH_,
                                          k_min,
-                                         _FALSE_,
+                                         false,
                                          forward,
                                          conformal);
 
@@ -1179,7 +1179,7 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
                                          dy.data(),
                                          _aH_,
                                          k_max,
-                                         _FALSE_,
+                                         false,
                                          forward,
                                          conformal);
 
@@ -1215,13 +1215,7 @@ void PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
     double k = exp(lnk_[index_k]);
 
     /* evolve background until k=aH is reached */
-    primordial_inflation_evolve_background(y.data(),
-                                           dy.data(),
-                                           _aH_,
-                                           k,
-                                           _FALSE_,
-                                           forward,
-                                           conformal);
+    primordial_inflation_evolve_background(y.data(), dy.data(), _aH_, k, false, forward, conformal);
 
     /** - read value of phi at time when k=aH */
     double phi_k = y[index_in_phi_];
@@ -1240,9 +1234,9 @@ void PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
   }
 
   is_non_zero_[perturbations_module_->index_md_scalars_][perturbations_module_->index_ic_ad_] =
-      _TRUE_;
+      true;
   is_non_zero_[perturbations_module_->index_md_tensors_][perturbations_module_->index_ic_ten_] =
-      _TRUE_;
+      true;
 }
 
 /**
@@ -1270,9 +1264,9 @@ void PrimordialModule::primordial_inflation_spectra(double* y_ini) {
   future_output.clear();
 
   is_non_zero_[perturbations_module_->index_md_scalars_][perturbations_module_->index_ic_ad_] =
-      _TRUE_;
+      true;
   is_non_zero_[perturbations_module_->index_md_tensors_][perturbations_module_->index_ic_ten_] =
-      _TRUE_;
+      true;
 }
 
 /**
@@ -1307,7 +1301,7 @@ void PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int in
                                          dy.data(),
                                          _aH_,
                                          k / ppr->primordial_inflation_ratio_min,
-                                         _FALSE_,
+                                         false,
                                          forward,
                                          conformal);
 
@@ -1533,7 +1527,7 @@ void PrimordialModule::primordial_inflation_find_attractor(
 
     /* evolve the background equations until phi_0 is reached */
 
-    primordial_inflation_evolve_background(y, dy, _phi_, phi_0, _TRUE_, forward, conformal);
+    primordial_inflation_evolve_background(y, dy, _phi_, phi_0, true, forward, conformal);
 
     /* compute phi' in phi_0, this is the new point in the series
        which convergence we want to check */
@@ -1589,7 +1583,7 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
                                                               double* dy,
                                                               enum target_quantity target,
                                                               double stop,
-                                                              short check_epsilon,
+                                                              bool check_epsilon,
                                                               enum integration_direction direction,
                                                               enum time_definition time) {
   struct primordial_inflation_parameters_and_workspace pipaw{this};
@@ -1625,7 +1619,7 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
 
   /* at starting point, compute eventually epsilon */
 
-  if (check_epsilon == _TRUE_) {
+  if (check_epsilon) {
     primordial_inflation_get_epsilon(y[index_in_phi_], &epsilon);
   }
 
@@ -1718,7 +1712,7 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
 
     /* eventually, check that epsilon is not becoming greater than one */
 
-    if (check_epsilon == _TRUE_) {
+    if (check_epsilon) {
       epsilon_old = epsilon;
 
       try {
@@ -2033,7 +2027,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
     y[index_in_phi_]  = phi_small_epsilon;
     y[index_in_dphi_] = y[index_in_a_] * dphidt_small_epsilon;
 
-    primordial_inflation_evolve_background(y, dy, _end_inflation_, 0., _FALSE_, forward, conformal);
+    primordial_inflation_evolve_background(y, dy, _end_inflation_, 0., false, forward, conformal);
 
     // we have used here conformal time, so aH = dy[a]/y[a]
     aH_ratio_after_small_epsilon = dy[index_in_a_] / y[index_in_a_] / H_small_epsilon;
@@ -2098,7 +2092,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                    exp(target +
                                                        ppr->primordial_inflation_extra_efolds) *
                                                    aH_ratio_after_small_epsilon,
-                                               _TRUE_,
+                                               true,
                                                backward,
                                                conformal);
         break;
@@ -2112,7 +2106,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                    exp(target +
                                                        ppr->primordial_inflation_extra_efolds) *
                                                    a_ratio_after_small_epsilon,
-                                               _TRUE_,
+                                               true,
                                                backward,
                                                conformal);
         break;
@@ -2137,7 +2131,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
     y[index_in_phi_]  = phi_try;
     y[index_in_dphi_] = dphidt_try;
 
-    primordial_inflation_evolve_background(y, dy, _end_inflation_, 0., _FALSE_, forward, proper);
+    primordial_inflation_evolve_background(y, dy, _end_inflation_, 0., false, forward, proper);
 
     switch (ppm->phi_pivot_method) {
       case ln_aH_ratio_auto:
@@ -2182,7 +2176,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                dy,
                                                _aH_,
                                                H_try * ratio_try / exp(target),
-                                               _FALSE_,
+                                               false,
                                                forward,
                                                proper);
         break;
@@ -2193,7 +2187,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                dy,
                                                _a_,
                                                ratio_try / exp(target),
-                                               _FALSE_,
+                                               false,
                                                forward,
                                                proper);
         break;
@@ -2210,7 +2204,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
 
       aH_pivot = dy[0];
       a_pivot  = y[0];
-      primordial_inflation_evolve_background(y, dy, _end_inflation_, 0., _FALSE_, forward, proper);
+      primordial_inflation_evolve_background(y, dy, _end_inflation_, 0., false, forward, proper);
       printf(" (from phi_pivot till the end, ln(aH_2/aH_1) = %e, ln(a_2/a_1) = %e)\n",
              log(dy[0] / aH_pivot),
              log(y[0] / a_pivot));
@@ -2250,7 +2244,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                    exp(target +
                                                        ppr->primordial_inflation_extra_efolds) *
                                                    aH_ratio_after_small_epsilon,
-                                               _TRUE_,
+                                               true,
                                                backward,
                                                conformal);
         break;
@@ -2264,7 +2258,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                    exp(target +
                                                        ppr->primordial_inflation_extra_efolds) *
                                                    a_ratio_after_small_epsilon,
-                                               _TRUE_,
+                                               true,
                                                backward,
                                                conformal);
         break;
@@ -2289,7 +2283,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
     y[index_in_phi_]  = phi_try;
     y[index_in_dphi_] = dphidt_try;
 
-    primordial_inflation_evolve_background(y, dy, _phi_, ppm->phi_end, _FALSE_, forward, proper);
+    primordial_inflation_evolve_background(y, dy, _phi_, ppm->phi_end, false, forward, proper);
 
     switch (ppm->phi_pivot_method) {
       case ln_aH_ratio_auto:
@@ -2334,7 +2328,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                dy,
                                                _aH_,
                                                H_try * ratio_try / exp(target),
-                                               _FALSE_,
+                                               false,
                                                forward,
                                                proper);
         break;
@@ -2345,7 +2339,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
                                                dy,
                                                _a_,
                                                ratio_try / exp(target),
-                                               _FALSE_,
+                                               false,
                                                forward,
                                                proper);
         break;
@@ -2362,7 +2356,7 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
 
       aH_pivot = dy[0];
       a_pivot  = y[0];
-      primordial_inflation_evolve_background(y, dy, _phi_, ppm->phi_end, _FALSE_, forward, proper);
+      primordial_inflation_evolve_background(y, dy, _phi_, ppm->phi_end, false, forward, proper);
       printf(" (from phi_pivot till the end, ln(aH_2/aH_1) = %e, ln(a_2/a_1) = %e)\n",
              log(dy[0] / aH_pivot),
              log(y[0] / a_pivot));
@@ -2701,15 +2695,15 @@ void PrimordialModule::primordial_external_spectrum_init() {
   };
   /** - Tell CLASS that there are scalar (and tensor) modes */
   is_non_zero_[perturbations_module_->index_md_scalars_][perturbations_module_->index_ic_ad_] =
-      _TRUE_;
+      true;
   if (ppt->has_tensors)
     is_non_zero_[perturbations_module_->index_md_tensors_][perturbations_module_->index_ic_ten_] =
-        _TRUE_;
+        true;
 }
 
 void PrimordialModule::primordial_output_titles(std::string& titles) const {
-  class_store_columntitle(titles, "k [1/Mpc]", _TRUE_);
-  class_store_columntitle(titles, "P_scalar(k)", _TRUE_);
+  class_store_columntitle(titles, "k [1/Mpc]", true);
+  class_store_columntitle(titles, "P_scalar(k)", true);
   class_store_columntitle(titles, "P_tensor(k)", ppt->has_tensors);
 }
 
@@ -2721,10 +2715,10 @@ void PrimordialModule::primordial_output_data(int number_of_titles, double* data
     dataptr  = data + index_k * number_of_titles;
     storeidx = 0;
 
-    class_store_double(dataptr, exp(lnk_[index_k]), _TRUE_, storeidx);
+    class_store_double(dataptr, exp(lnk_[index_k]), true, storeidx);
     class_store_double(dataptr,
                        exp(lnpk_[perturbations_module_->index_md_scalars_][index_k]),
-                       _TRUE_,
+                       true,
                        storeidx);
     class_store_double(dataptr,
                        exp(lnpk_[perturbations_module_->index_md_tensors_][index_k]),

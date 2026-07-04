@@ -302,21 +302,21 @@ int column_grouping(sp_mat* G, int* col_g, int* filled) {
       filled[i] = 0;
     }
     //Try to assign remaining columns to current group:
-    done = _TRUE_;
+    done = true;
     for (testcol = 0; testcol < neq; testcol++) {
       if (col_g[testcol] != -1) {
         continue;
       }
-      done = _FALSE_;
+      done = false;
       //Is current testcol in conflict with the groups filling vector?
-      fitted = _TRUE_;
+      fitted = true;
       for (i = Ap[testcol]; i < Ap[testcol + 1]; i++) {
         if (filled[Ai[i]] != 0) {
-          fitted = _FALSE_;
+          fitted = false;
           break;
         }
       }
-      if (fitted == _TRUE_) {
+      if (fitted) {
         //Test succesfull
         col_g[testcol] = groupnum;
         for (i = Ap[testcol]; i < Ap[testcol + 1]; i++) {
@@ -324,7 +324,7 @@ int column_grouping(sp_mat* G, int* col_g, int* filled) {
         }
       }
     }
-    if (done == _TRUE_) {
+    if (done) {
       //No columns remaining.
       //No column belongs to current groupnum.
       break;

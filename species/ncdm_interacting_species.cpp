@@ -65,11 +65,11 @@ NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
 
   if (use_alpha_correction_string == "True" || use_alpha_correction_string == "true" ||
       use_alpha_correction_string == "yes") {
-    use_alpha_correction_ = _TRUE_;
+    use_alpha_correction_ = true;
   }
   else if (use_alpha_correction_string == "False" || use_alpha_correction_string == "false" ||
            use_alpha_correction_string == "no") {
-    use_alpha_correction_ = _FALSE_;
+    use_alpha_correction_ = false;
   }
   else {
     throw std::invalid_argument(

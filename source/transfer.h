@@ -11,7 +11,7 @@
 
 /* macro: test if index_tt is in the range between index and index+num, while the flag is true */
 #define _index_tt_in_range_(index, num, flag) \
-  (flag == _TRUE_) && (index_tt >= index) && (index_tt < index + num)
+  (flag) && (index_tt >= index) && (index_tt < index + num)
 /* macro: test if index_tt corresponds to an integrated nCl/sCl contribution */
 #define _integrated_ncl_                                                                         \
   (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) || \
@@ -203,6 +203,6 @@ typedef enum {
   NC_RSD
 } radial_function_type;
 
-enum Hermite_Interpolation_Order { HERMITE3, HERMITE4, HERMITE6 };
+enum Hermite_Interpolation_Order { HERMITE4, HERMITE6 };
 
 #endif

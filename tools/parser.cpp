@@ -268,22 +268,20 @@ std::string FileContent::get_or(const std::string& name, const char* fallback) c
  * Legacy C-style wrapper functions
  *****************************************************************************/
 
-int parser_read_file(const char* filename, FileContent* pfc) {
+void parser_read_file(const char* filename, FileContent* pfc) {
   try {
     *pfc = FileContent::from_file(filename);
   }
   catch (const std::exception& e) {
     class_stop("%s", e.what());
   }
-  return _SUCCESS_;
 }
 
-int parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3) {
+void parser_cat(const FileContent* pfc1, const FileContent* pfc2, FileContent* pfc3) {
   try {
     *pfc3 = *pfc1 + *pfc2;
   }
   catch (const std::exception& e) {
     class_stop("%s", e.what());
   }
-  return _SUCCESS_;
 }
