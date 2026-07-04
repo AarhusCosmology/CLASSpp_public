@@ -46,43 +46,42 @@ typedef struct adaptive_integration_tree_node {
   std::unique_ptr<struct adaptive_integration_tree_node> left, right; /* Pointer to left child. */
 } qss_node;
 
-int get_qsampling(double* x,
-                  double* w,
-                  int* N,
-                  int N_max,
-                  double rtol,
-                  double* qvec,
-                  int qsiz,
-                  int (*test)(void* params_for_function, double q, double* psi),
-                  int (*function)(void* params_for_function, double q, double* f0),
-                  void* params_for_function);
-int get_qsampling_manual(double* x,
-                         double* w,
-                         double* dq,
-                         int N,
-                         double qmax,
-                         enum quadrature_method method,
-                         double* qvec,
-                         int qsiz,
-                         int (*function)(void* params_for_function, double q, double* f0),
-                         void* params_for_function,
-                         const GBQuadParams& gb);
-int sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx);
-int get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite);
-int reduce_tree(qss_node* node, int level);
-int leaf_count(qss_node* node);
+void get_qsampling(double* x,
+                   double* w,
+                   int* N,
+                   int N_max,
+                   double rtol,
+                   double* qvec,
+                   int qsiz,
+                   void (*test)(void* params_for_function, double q, double* psi),
+                   void (*function)(void* params_for_function, double q, double* f0),
+                   void* params_for_function);
+bool get_qsampling_manual(double* x,
+                          double* w,
+                          double* dq,
+                          int N,
+                          double qmax,
+                          enum quadrature_method method,
+                          double* qvec,
+                          int qsiz,
+                          void (*function)(void* params_for_function, double q, double* f0),
+                          void* params_for_function,
+                          const GBQuadParams& gb);
+void sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx);
+void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite);
+void reduce_tree(qss_node* node, int level);
+void leaf_count(qss_node* node);
 double get_integral(qss_node* node, int level);
-int gk_adapt(std::unique_ptr<qss_node>& node,
-             int (*test)(void* params_for_function, double q, double* psi),
-             int (*function)(void* params_for_function, double q, double* f0),
-             void* params_for_function,
-             double tol,
-             int treemode,
-             double a,
-             double b,
-             int isindefinite);
-int compute_Hermite(double* x, double* w, int N, int alpha, double* b, double* c);
-int compute_Laguerre(
+void gk_adapt(std::unique_ptr<qss_node>& node,
+              void (*test)(void* params_for_function, double q, double* psi),
+              void (*function)(void* params_for_function, double q, double* f0),
+              void* params_for_function,
+              double tol,
+              int treemode,
+              double a,
+              double b,
+              int isindefinite);
+void compute_Laguerre(
     double* x, double* w, int N, double alpha, double* b, double* c, int totalweight);
 
 /** Compute the N-point Gaussian rule for the weight 1 / (exp(x) + 1) on
@@ -90,18 +89,15 @@ int compute_Laguerre(
  *  using the modified-Chebyshev algorithm and Golub-Welsch diagonalization.
  *  It is reliable through order 17; higher orders are intentionally rejected
  *  rather than silently returning an ill-conditioned rule. */
-int compute_FermiDirac(double* x, double* w, int N);
-int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
-            int (*function)(void* params_for_function, double q, double* f0),
-            void* params_for_function,
-            qss_node* node,
-            double a,
-            double b,
-            int isindefinite);
-double testfun(double x);
+bool compute_FermiDirac(double* x, double* w, int N);
+void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
+             void (*function)(void* params_for_function, double q, double* f0),
+             void* params_for_function,
+             qss_node* node,
+             double a,
+             double b,
+             int isindefinite);
 
-int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol);
-
-int quadrature_gauss_legendre_2D(int n, double* x, double* y, double* w);
+void quadrature_gauss_legendre(double* mu, double* w8, int n, double tol);
 
 #endif

@@ -77,24 +77,21 @@ double BackgroundModule::GetSpeciesParam(const std::string& key, const std::stri
 }
 
 // Wrapper functions to pass non-static member functions
-int BackgroundModule::background_derivs_loga(double loga,
-                                             double* y,
-                                             double* dy,
-                                             void* parameters_and_workspace) {
+void BackgroundModule::background_derivs_loga(double loga,
+                                              double* y,
+                                              double* dy,
+                                              void* parameters_and_workspace) {
   auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
-  return pbpaw->background_module->background_derivs_loga_member(loga,
-                                                                 y,
-                                                                 dy,
-                                                                 parameters_and_workspace);
+  pbpaw->background_module->background_derivs_loga_member(loga, y, dy, parameters_and_workspace);
 }
-int BackgroundModule::background_add_line_to_bg_table(
+void BackgroundModule::background_add_line_to_bg_table(
     double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace) {
   auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
-  return pbpaw->background_module->background_add_line_to_bg_table_member(loga,
-                                                                          y,
-                                                                          dy,
-                                                                          index_loga,
-                                                                          parameters_and_workspace);
+  pbpaw->background_module->background_add_line_to_bg_table_member(loga,
+                                                                   y,
+                                                                   dy,
+                                                                   index_loga,
+                                                                   parameters_and_workspace);
 }
 
 /**
@@ -108,13 +105,12 @@ int BackgroundModule::background_add_line_to_bg_table(
  * exceeds the requested output spacing, so it effectively integrates from one
  * output point to the next under the control of tol_background_integration.
  */
-int BackgroundModule::background_timescale(double loga,
-                                           void* parameters_and_workspace,
-                                           double* timescale) {
+void BackgroundModule::background_timescale(double loga,
+                                            void* parameters_and_workspace,
+                                            double* timescale) {
   (void) loga;
   (void) parameters_and_workspace;
   *timescale = 1.;
-  return _SUCCESS_;
 }
 
 /**
@@ -173,8 +169,8 @@ void BackgroundModule::background_at_tau(
     }
   }
 
-  /** - interpolate from pre-computed table with array_interpolate()
-      or array_interpolate_growing_closeby() (depending on
+  /** - interpolate from pre-computed table with array_interpolate_spline()
+      or array_interpolate_spline_growing_closeby() (depending on
       interpolation mode) */
 
   if (intermode == pba->inter_normal) {
@@ -216,7 +212,7 @@ void BackgroundModule::background_tau_of_z(double z, double* tau) const {
 
   /** - define local variables */
 
-  /* necessary for calling array_interpolate(), but never used */
+  /* necessary for calling array_interpolate_spline(), but never used */
   int last_index;
 
   /** - check that \f$ z \f$ is in the pre-computed range */
@@ -227,7 +223,7 @@ void BackgroundModule::background_tau_of_z(double z, double* tau) const {
 
   class_test(z > z_table_[0], "out of range: a=%e > a_max=%e\n", z, z_table_[0]);
 
-  /** - interpolate from pre-computed table with array_interpolate() */
+  /** - interpolate from pre-computed table with array_interpolate_spline() */
   array_interpolate_spline(z_table_.data(),
                            bt_size_,
                            tau_table_.data(),
@@ -367,20 +363,20 @@ void BackgroundModule::background_functions(
  * @return the error status
  */
 
-int BackgroundModule::background_w_fld(double a,
-                                       double* w_fld,
-                                       double* dw_over_da_fld,
-                                       double* integral_fld) const {
+void BackgroundModule::background_w_fld(double a,
+                                        double* w_fld,
+                                        double* dw_over_da_fld,
+                                        double* integral_fld) const {
   if (all_species_.count("Fluid")) {
-    return static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
+    static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
         .ComputeWFld(a, w_fld, dw_over_da_fld, integral_fld);
+    return;
   }
   /* No Fluid species: fall back to CLP defaults (w0=-1, wa=0) so callers
      (HyRec, etc.) get a sensible w(a) without needing to gate on has_fld. */
   *w_fld          = -1.;
   *dw_over_da_fld = 0.;
   *integral_fld   = 0.;
-  return _SUCCESS_;
 }
 
 void BackgroundModule::background_idm_drmd(
@@ -1047,7 +1043,7 @@ void BackgroundModule::background_output_data(int number_of_titles, double* data
  * @param parameters_and_workspace Input: pointer to fixed parameters (e.g. indices)
  * @param error_message            Output: error message
  */
-int BackgroundModule::background_derivs_member(
+void BackgroundModule::background_derivs_member(
     double tau,
     double* y, /* vector with argument y[index_bi] (must be already allocated with size bi_size_) */
     double* dy, /* vector with argument dy[index_bi]
@@ -1112,8 +1108,6 @@ int BackgroundModule::background_derivs_member(
   for (const auto& [name, sp] : all_species_) {
     sp->BackgroundDerivs(tau, y, dy, pvecback);  // default is no-op
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -1250,7 +1244,7 @@ void BackgroundModule::background_output_budget() {
  * @param parameters_and_workspace Input: pointer to fixed parameters (e.g. indices)
  * @param error_message            Output: error message
  */
-int BackgroundModule::background_derivs_loga_member(
+void BackgroundModule::background_derivs_loga_member(
     double loga,
     double* y, /* vector with argument y[index_bi] (must be already allocated with size bi_size_) */
     double* dy, /* vector with argument dy[index_bi]
@@ -1280,10 +1274,9 @@ int BackgroundModule::background_derivs_loga_member(
   for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++) {
     dy[index_bi] *= 1. / (a * H);
   }
-  return _SUCCESS_;
 }
 
-int BackgroundModule::background_add_line_to_bg_table_member(
+void BackgroundModule::background_add_line_to_bg_table_member(
     double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace) {
   double a       = exp(loga);
   double tau     = y[index_bi_a_];
@@ -1304,14 +1297,12 @@ int BackgroundModule::background_add_line_to_bg_table_member(
 
   //Swap a and tau again
   y[index_bi_a_] = tau;
-
-  return _SUCCESS_;
 }
 
-int BackgroundModule::background_print_variables(double loga,
-                                                 double* y,
-                                                 double* dy,
-                                                 void* parameters_and_workspace) {
+void BackgroundModule::background_print_variables(double loga,
+                                                  double* y,
+                                                  double* dy,
+                                                  void* parameters_and_workspace) {
   background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
       parameters_and_workspace);
   double* pvecback     = pbpaw->pvecback;
@@ -1329,7 +1320,6 @@ int BackgroundModule::background_print_variables(double loga,
   //FILE* fid = fopen("tmp.dat", "a");
   //fprintf(fid, "%.3e %.3e %.3e %.3e %.3e %.3e\n", exp(loga), tau, pvecback[bm.index_bg_rho_ncdm1_], pvecback[bm.index_bg_rho_dr_species_], y[bm.index_bi_rho_dr_species_], pvecback[bm.index_bg_lnf_ncdm_decay_dr1_ + 2]);
   //fclose(fid);
-  return _SUCCESS_;
 }
 
 int BackgroundModule::GetNcdmCount() const {

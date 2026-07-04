@@ -25,8 +25,8 @@ int main(int argc, char** argv) {
   }
   catch (const std::exception& e) {
     printf("\n\nError in Class:\n%s\n", e.what());
-    return _FAILURE_;
+    return 1;
   }
 
-  return _SUCCESS_;
+  return 0;
 }

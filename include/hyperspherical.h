@@ -53,26 +53,7 @@ struct WKB_parameters {
   double phiminabs;
 };
 
-int hyperspherical_forwards_recurrence(int K,
-                                       int lmax,
-                                       double beta,
-                                       double x,
-                                       double sinK,
-                                       double cotK,
-                                       double* sqrtK,
-                                       double* one_over_sqrtK,
-                                       double* PhiL);
-int hyperspherical_forwards_recurrence_chunk(int K,
-                                             int lmax,
-                                             double beta,
-                                             double* x,
-                                             double* sinK,
-                                             double* cotK,
-                                             int chunk,
-                                             double* sqrtK,
-                                             double* one_over_sqrtK,
-                                             double* PhiL);
-int hyperspherical_backwards_recurrence(int K,
+void hyperspherical_forwards_recurrence(int K,
                                         int lmax,
                                         double beta,
                                         double x,
@@ -81,8 +62,7 @@ int hyperspherical_backwards_recurrence(int K,
                                         double* sqrtK,
                                         double* one_over_sqrtK,
                                         double* PhiL);
-
-int hyperspherical_backwards_recurrence_chunk(int K,
+void hyperspherical_forwards_recurrence_chunk(int K,
                                               int lmax,
                                               double beta,
                                               double* x,
@@ -92,13 +72,33 @@ int hyperspherical_backwards_recurrence_chunk(int K,
                                               double* sqrtK,
                                               double* one_over_sqrtK,
                                               double* PhiL);
+void hyperspherical_backwards_recurrence(int K,
+                                         int lmax,
+                                         double beta,
+                                         double x,
+                                         double sinK,
+                                         double cotK,
+                                         double* sqrtK,
+                                         double* one_over_sqrtK,
+                                         double* PhiL);
 
-int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi);
-int hyperspherical_bessel_direct_vector(
+void hyperspherical_backwards_recurrence_chunk(int K,
+                                               int lmax,
+                                               double beta,
+                                               double* x,
+                                               double* sinK,
+                                               double* cotK,
+                                               int chunk,
+                                               double* sqrtK,
+                                               double* one_over_sqrtK,
+                                               double* PhiL);
+
+bool hyperspherical_WKB(int K, int l, double beta, double y, double* Phi);
+void hyperspherical_bessel_direct_vector(
     int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi);
-int ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign);
-int get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign);
-int CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF);
+void ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign);
+bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign);
+bool CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF);
 double airy_cheb_approx(double z);
 double coef1(double z);
 double coef2(double z);
@@ -111,15 +111,15 @@ double PhiWKB_minus_phiminabs(double x, void* param);
 void hyperspherical_get_xmin_from_Airy(
     int K, int l, double beta, double xtol, double phiminabs, double* xmin, int* fevals);
 
-int fzero_ridder(double (*func)(double, void*),
-                 double x1,
-                 double x2,
-                 double xtol,
-                 void* param,
-                 double* Fx1,
-                 double* Fx2,
-                 double* xzero,
-                 int* fevals);
+bool fzero_ridder(double (*func)(double, void*),
+                  double x1,
+                  double x2,
+                  double xtol,
+                  void* param,
+                  double* Fx1,
+                  double* Fx2,
+                  double* xzero,
+                  int* fevals);
 
 void hyperspherical_get_xmin_from_approx(
     int K, int l, double nu, double ignore1, double phiminabs, double* xmin, int* ignore2);

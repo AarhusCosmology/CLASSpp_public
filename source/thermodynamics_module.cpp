@@ -26,15 +26,15 @@ ThermodynamicsModule::ThermodynamicsModule(InputModulePtr input_module,
 ThermodynamicsModule::~ThermodynamicsModule() {}
 
 // Wrapper functions to pass non-static member functions
-int ThermodynamicsModule::thermodynamics_derivs_with_recfast(double z,
-                                                             double* y,
-                                                             double* dy,
-                                                             void* fixed_parameters) {
+void ThermodynamicsModule::thermodynamics_derivs_with_recfast(double z,
+                                                              double* y,
+                                                              double* dy,
+                                                              void* fixed_parameters) {
   auto tppaw = static_cast<thermodynamics_parameters_and_workspace*>(fixed_parameters);
-  return tppaw->thermodynamics_module->thermodynamics_derivs_with_recfast_member(z,
-                                                                                 y,
-                                                                                 dy,
-                                                                                 fixed_parameters);
+  tppaw->thermodynamics_module->thermodynamics_derivs_with_recfast_member(z,
+                                                                          y,
+                                                                          dy,
+                                                                          fixed_parameters);
 }
 
 /**
@@ -3492,7 +3492,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
  * @param error_message            Output: error message
  */
 
-int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
+void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
     double z, double* y, double* dy, void* parameters_and_workspace) {
   /* define local variables */
 
@@ -3728,8 +3728,6 @@ int ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
             2. / (3. * _k_B_) * energy_rate * chi_heat / n / (1. + preco->fHe + x) /
                 (Hz * (1. + z)); /* energy injection */
   }
-
-  return _SUCCESS_;
 }
 
 /**

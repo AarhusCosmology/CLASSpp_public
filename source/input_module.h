@@ -67,7 +67,7 @@ class InputModule {
     // with the authoritative target (so the species never re-derives it from the file content).
     std::vector<std::string> target_species_keys;
   };
-  static int ShootingResidual(double* x, int x_size, void* pworkspace, double* output);
+  static void ShootingResidual(double* x, int x_size, void* pworkspace, double* output);
 
   void ConstructSpecies();
 

@@ -124,14 +124,14 @@ class ThermodynamicsModule : public BaseModule {
   void thermodynamics_recombination(recombination* preco, double* pvecback);
   void thermodynamics_recombination_with_hyrec(recombination* prec, double* pvecback);
   void thermodynamics_recombination_with_recfast(recombination* prec, double* pvecback);
-  int thermodynamics_derivs_with_recfast_member(double z,
-                                                double* y,
-                                                double* dy,
-                                                void* fixed_parameters);
-  static int thermodynamics_derivs_with_recfast(double z,
-                                                double* y,
-                                                double* dy,
-                                                void* fixed_parameters);
+  void thermodynamics_derivs_with_recfast_member(double z,
+                                                 double* y,
+                                                 double* dy,
+                                                 void* fixed_parameters);
+  static void thermodynamics_derivs_with_recfast(double z,
+                                                 double* y,
+                                                 double* dy,
+                                                 void* fixed_parameters);
   void thermodynamics_merge_reco_and_reio(recombination* preco, reionization* preio);
   void thermodynamics_tanh(
       double x, double center, double before, double after, double width, double* result);

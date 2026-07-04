@@ -131,21 +131,21 @@ bool diagonalize_symmetric_tridiagonal(std::vector<double>& diagonal,
 
 }  // namespace
 
-int get_qsampling_manual(double* x,
-                         double* w,
-                         double* dq,
-                         int N,
-                         double qmax,
-                         enum quadrature_method method,
-                         double* qvec,
-                         int qsiz,
-                         int (*function)(void* params_for_function, double q, double* f0),
-                         void* params_for_function,
-                         const GBQuadParams& gb) {
+bool get_qsampling_manual(double* x,
+                          double* w,
+                          double* dq,
+                          int N,
+                          double qmax,
+                          enum quadrature_method method,
+                          double* qvec,
+                          int qsiz,
+                          void (*function)(void* params_for_function, double q, double* f0),
+                          void* params_for_function,
+                          const GBQuadParams& gb) {
   double y, h, t;
   switch (method) {
     case (qm_auto):
-      return _FAILURE_;
+      return false;
     case (qm_Laguerre): {
       /* Allocate storage for Laguerre coefficients: */
       std::vector<double> b(N);
@@ -155,11 +155,11 @@ int get_qsampling_manual(double* x,
         (*function)(params_for_function, x[i], &y);
         w[i] = dq[i] * y;
       }
-      return _SUCCESS_;
+      return true;
     }
     case (qm_FermiDirac): {
       std::vector<double> fd_weight(N);
-      class_test(compute_FermiDirac(x, fd_weight.data(), N) == _FAILURE_,
+      class_test(!compute_FermiDirac(x, fd_weight.data(), N),
                  "qm_FermiDirac supports 1 through %d momentum bins; the modified-moment "
                  "recurrence is ill-conditioned above this range",
                  kFermiDiracMaxOrder);
@@ -172,7 +172,7 @@ int get_qsampling_manual(double* x,
         (*function)(params_for_function, x[i], &y);
         w[i] = dq[i] * y;
       }
-      return _SUCCESS_;
+      return true;
     }
     case (qm_GB_Laguerre): {
       // Generalized Gauss-Laguerre on the GL weight q^(alpha+1) e^(-alpha x q),
@@ -194,7 +194,7 @@ int get_qsampling_manual(double* x,
         (*function)(params_for_function, x[i], &y);      // y = f0(x[i])
         w[i] = dq[i] * y;
       }
-      return _SUCCESS_;
+      return true;
     }
     case (qm_trapz):
       for (int i = 0; i < N; ++i) {
@@ -209,7 +209,7 @@ int get_qsampling_manual(double* x,
           w[i]  *= 0.5;
         }
       }
-      return _SUCCESS_;
+      return true;
     case (qm_trapz_indefinite):
       /** We do the variable transformation q = 1/t-1. The trapezoidal rule is closed, but since the distribution function
 	goes to zero in both limits, we can use an effectively N+2 rule simply by not using the exterior points. */
@@ -221,20 +221,20 @@ int get_qsampling_manual(double* x,
         dq[i] = h / t / t;
         w[i]  = dq[i] * y;
       }
-      return _SUCCESS_;
+      return true;
   }
-  return _SUCCESS_;
+  return true;
 }
-int get_qsampling(double* x,
-                  double* w,
-                  int* N,
-                  int N_max,
-                  double rtol,
-                  double* qvec,
-                  int qsiz,
-                  int (*test)(void* params_for_function, double q, double* psi),
-                  int (*function)(void* params_for_function, double q, double* f0),
-                  void* params_for_function) {
+void get_qsampling(double* x,
+                   double* w,
+                   int* N,
+                   int N_max,
+                   double rtol,
+                   double* qvec,
+                   int qsiz,
+                   void (*test)(void* params_for_function, double q, double* psi),
+                   void (*function)(void* params_for_function, double q, double* f0),
+                   void* params_for_function) {
   /* This routine returns the fewest possible number of abscissas and weights under
      the requirement that a test function folded with the neutrino distribution function
      can be integrated to an accuracy of rtol. If the distribution function is Fermi-Dirac
@@ -463,7 +463,7 @@ int get_qsampling(double* x,
   for (NFD = 2; NFD <= NFD_max; ++NFD) {
     std::vector<double> x_fd(NFD);
     std::vector<double> w_fd(NFD);
-    if (compute_FermiDirac(x_fd.data(), w_fd.data(), NFD) == _FAILURE_)
+    if (!compute_FermiDirac(x_fd.data(), w_fd.data(), NFD))
       break;
 
     IFD = 0.;
@@ -529,7 +529,7 @@ int get_qsampling(double* x,
   }
   else if (FermiDirac_converging) {
     method_chosen = "Fermi-Dirac Gaussian Quadrature";
-    class_test(compute_FermiDirac(x, w, *N) == _FAILURE_,
+    class_test(!compute_FermiDirac(x, w, *N),
                "Could not reconstruct the selected Fermi-Dirac quadrature rule");
     for (i = 0; i < *N; ++i) {
       (*function)(params_for_function, x[i], &y);
@@ -572,16 +572,14 @@ int get_qsampling(double* x,
   //printf("Chosen sampling: %s, with %d points.\n", method_chosen.c_str(), *N);
   //for(i=0; i<*N; i++) printf("(q,w) = (%g,%g)\n",x[i],w[i]);
   /* Deallocate tree handled by unique_ptr automatically. */
-
-  return _SUCCESS_;
 }
 
-int sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx) {
+void sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx) {
   int i, top = endidx, bot = startidx;
   double pivot;
   /* End recursion if only one element left in array: */
   if ((endidx - startidx) < 1) {
-    return _SUCCESS_;
+    return;
   }
   else {
     /*Copy x and w to workarray: */
@@ -609,11 +607,10 @@ int sort_x_and_w(double* x, double* w, double* workx, double* workw, int startid
     /* Recursive call: */
     sort_x_and_w(x, w, workx, workw, startidx, bot - 1);
     sort_x_and_w(x, w, workx, workw, top + 1, endidx);
-    return _SUCCESS_;
   }
 }
 
-int get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite) {
+void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite) {
   /* x and w should be exactly 15*root_node->leafchilds, and a leaf count should have
      been performed. Or perhaps I just use the fact that a leaf won't have children.
      Nah, let me use the leaf-count then. */
@@ -635,10 +632,9 @@ int get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindef
     get_leaf_x_and_w(node->left.get(), ind, x, w, isindefinite);
     get_leaf_x_and_w(node->right.get(), ind, x, w, isindefinite);
   }
-  return _SUCCESS_;
 }
 
-int reduce_tree(qss_node* node, int level) {
+void reduce_tree(qss_node* node, int level) {
   /* Reduce the tree to a given level. Make all nodes with
      node->leaf_childs==level into leafs.
      If we call reduce_tree(root,1), nothing happens.*/
@@ -652,10 +648,9 @@ int reduce_tree(qss_node* node, int level) {
     reduce_tree(node->right.get(), level);
   }
   /* If called on a node which has leaf_childs<level, it does nothing. */
-  return _SUCCESS_;
 }
 
-int leaf_count(qss_node* node) {
+void leaf_count(qss_node* node) {
   /* Count the amount of leafs under a given node and write the number in the node. */
   /* We call recursively, until a node is a leaf - then we add the numbers on our
      way back:*/
@@ -664,12 +659,10 @@ int leaf_count(qss_node* node) {
     leaf_count(node->left.get());
     leaf_count(node->right.get());
     node->leaf_childs = node->left->leaf_childs + node->right->leaf_childs;
-    return _SUCCESS_;
   }
   else {
     /* This is a leaf, by definition leaf_childs = 1: */
     node->leaf_childs = 1;
-    return _SUCCESS_;
   }
 }
 
@@ -689,15 +682,15 @@ double get_integral(qss_node* node, int level) {
   }
 }
 
-int gk_adapt(std::unique_ptr<qss_node>& node,
-             int (*test)(void* params_for_function, double q, double* psi),
-             int (*function)(void* params_for_function, double q, double* f0),
-             void* params_for_function,
-             double tol,
-             int treemode,
-             double a,
-             double b,
-             int isindefinite) {
+void gk_adapt(std::unique_ptr<qss_node>& node,
+              void (*test)(void* params_for_function, double q, double* psi),
+              void (*function)(void* params_for_function, double q, double* f0),
+              void* params_for_function,
+              double tol,
+              int treemode,
+              double a,
+              double b,
+              int isindefinite) {
   /* Do adaptive Gauss-Kronrod quadrature, while building the
      recurrence tree. If treemode!=0, store x-values and weights aswell.
      At first call, a and b should be 0 and 1 if isdefinite. */
@@ -712,7 +705,7 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
   gk_quad((*test), (*function), params_for_function, node.get(), a, b, isindefinite);
   if ((fabs(node->err / node->I) < tol) || (tol >= 1.0)) {
     /* Stop recursion and return. tol>=1.0 in case of I=0 infinite recursion */
-    return _SUCCESS_;
+    return;
   }
   else {
     /* Call gk_adapt recursively on children:*/
@@ -743,40 +736,10 @@ int gk_adapt(std::unique_ptr<qss_node>& node,
        (*node)->I = (*node)->left->I + (*node)->right->I;
        (*node)->err = sqrt(pow(node->left->err,2)+pow(node->right->err,2));
     */
-    return _SUCCESS_;
   }
 }
 
-int compute_Hermite(double* x, double* w, int N, int alpha, double* b, double* c) {
-  int NLag, i;
-  double alpha_Lag;
-
-  NLag = N / 2;
-  /* In case N is uneven, zero the N'th weight:*/
-  w[N - 1]  = 0.0;
-  alpha_Lag = (alpha - 1.0) / 2.0;
-
-  /* Compute the positive roots and weights (up to some simple manipulation): */
-  compute_Laguerre(x + NLag, w + NLag, NLag, alpha_Lag, b, c, false);
-
-  /* Do manipulations:*/
-  for (i = NLag; i < 2 * NLag; i++) {
-    x[i]  = sqrt(x[i]);
-    w[i] *= 0.5;
-  }
-
-  /* Set the negative roots and weights:*/
-  for (i = 0; i < NLag; i++) {
-    x[i] = -x[2 * NLag - i - 1];
-    w[i] = w[2 * NLag - i - 1];
-    if (alpha % 2 != 0) {
-      w[i] = -w[i];
-    }
-  }
-  return _SUCCESS_;
-}
-
-int compute_Laguerre(
+void compute_Laguerre(
     double* x, double* w, int N, double alpha, double* b, double* c, int totalweight) {
   int i, j, iter, maxiter = 10;
   double x0 = 0., r1, r2, ratio, d, logprod, logcc;
@@ -837,13 +800,11 @@ int compute_Laguerre(
     else
       w[i] = exp(logcc - log(dp2 * p1));
   }
-
-  return _SUCCESS_;
 }
 
-int compute_FermiDirac(double* x, double* w, int N) {
+bool compute_FermiDirac(double* x, double* w, int N) {
   if (N < 1 || N > kFermiDiracMaxOrder)
-    return _FAILURE_;
+    return false;
 
   /* The reference monic Laguerre recurrence is
        L_(n+1) = (x - (2n+1)) L_n - n^2 L_(n-1).
@@ -862,7 +823,7 @@ int compute_FermiDirac(double* x, double* w, int N) {
   }
 
   if (!(moments[0] > 0.) || !std::isfinite(moments[0]))
-    return _FAILURE_;
+    return false;
 
   std::vector<std::vector<double>> sigma(N, std::vector<double>(2 * N, 0.));
   std::vector<double> diagonal(N);
@@ -882,14 +843,14 @@ int compute_FermiDirac(double* x, double* w, int N) {
     const double previous = sigma[n - 1][n - 1];
     const double current  = sigma[n][n];
     if (previous == 0. || current == 0. || !std::isfinite(previous) || !std::isfinite(current)) {
-      return _FAILURE_;
+      return false;
     }
 
     diagonal[n] = (2. * n + 1.) - sigma[n - 1][n] / previous + sigma[n][n + 1] / current;
     off_diagonal_squared[n] = current / previous;
     if (!(off_diagonal_squared[n] > 0.) || !std::isfinite(diagonal[n]) ||
         !std::isfinite(off_diagonal_squared[n])) {
-      return _FAILURE_;
+      return false;
     }
   }
 
@@ -901,24 +862,24 @@ int compute_FermiDirac(double* x, double* w, int N) {
   for (int n = 0; n < N; ++n)
     eigenvectors[n * N + n] = 1.;
   if (!diagonalize_symmetric_tridiagonal(diagonal, subdiagonal, eigenvectors))
-    return _FAILURE_;
+    return false;
 
   for (int n = 0; n < N; ++n) {
     x[n] = diagonal[n];
     w[n] = moments[0] * eigenvectors[n] * eigenvectors[n];
     if (!(x[n] > 0.) || !(w[n] > 0.) || !std::isfinite(x[n]) || !std::isfinite(w[n]))
-      return _FAILURE_;
+      return false;
   }
-  return _SUCCESS_;
+  return true;
 }
 
-int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
-            int (*function)(void* params_for_function, double q, double* f0),
-            void* params_for_function,
-            qss_node* node,
-            double a,
-            double b,
-            int isindefinite) {
+void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
+             void (*function)(void* params_for_function, double q, double* f0),
+             void* params_for_function,
+             qss_node* node,
+             double a,
+             double b,
+             int isindefinite) {
   const double z_k[15] = {-0.991455371120813,
                           -0.949107912342759,
                           -0.864864423359769,
@@ -1004,7 +965,6 @@ int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
   }
   node->err = pow(200 * fabs(Ik - Ig), 1.5);
   node->I   = Ik;
-  return _SUCCESS_;
 }
 
 /**
@@ -1018,7 +978,7 @@ int gk_quad(int (*test)(void* params_for_function, double q, double* psi),
  * From Numerical recipes
  **/
 
-int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol) {
+void quadrature_gauss_legendre(double* mu, double* w8, int n, double tol) {
   int m, j, i, counter;
   double z1, z, pp, p3, p2, p1;
 
@@ -1046,5 +1006,4 @@ int quadrature_gauss_legendre(double* mu, double* w8, int n, double tol) {
     w8[i - 1] = 2.0 / ((1.0 - z * z) * pp * pp);
     w8[n - i] = w8[i - 1];
   }
-  return _SUCCESS_;
 }

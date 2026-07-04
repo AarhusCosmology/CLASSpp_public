@@ -6,7 +6,7 @@
  * Initialize the integrator
  *
  */
-int initialize_generic_integrator(int n_dim, struct generic_integrator_workspace* pgi) {
+void initialize_generic_integrator(int n_dim, struct generic_integrator_workspace* pgi) {
   /** - Allocate workspace dynamically */
 
   pgi->n = n_dim;
@@ -22,8 +22,6 @@ int initialize_generic_integrator(int n_dim, struct generic_integrator_workspace
   pgi->ak5.resize(n_dim);
   pgi->ak6.resize(n_dim);
   pgi->ytemp.resize(n_dim);
-
-  return _SUCCESS_;
 }
 
 /**
@@ -31,12 +29,10 @@ int initialize_generic_integrator(int n_dim, struct generic_integrator_workspace
  *
  * Called by background_solve(); thermodynamics_solve_with_recfast(); perturb_solve().
  */
-int cleanup_generic_integrator(struct generic_integrator_workspace* pgi) {
-  return _SUCCESS_;
-}
+void cleanup_generic_integrator(struct generic_integrator_workspace* pgi) {}
 
-int generic_integrator(
-    int (*derivs)(double x, double y[], double yprime[], void* parameters_and_workspace),
+void generic_integrator(
+    void (*derivs)(double x, double y[], double yprime[], void* parameters_and_workspace),
     double x1,
     double x2,
     double ystart[],
@@ -64,7 +60,7 @@ int generic_integrator(
     if ((x - x2) * (x2 - x1) >= 0.0) {
       for (i = 0; i < pgi->n; i++)
         ystart[i] = pgi->y[i];
-      return _SUCCESS_;
+      return;
     }
     class_test(fabs(hnext / x1) <= hmin,
                "Step size too small: step:%g, minimum:%g, in interval: [%g:%g]",
@@ -82,14 +78,14 @@ int generic_integrator(
       x2);
 }
 
-int rkqs(double* x,
-         double htry,
-         double eps,
-         double* hdid,
-         double* hnext,
-         int (*derivs)(double, double[], double[], void*),
-         void* parameters_and_workspace_for_derivs,
-         struct generic_integrator_workspace* pgi) {
+void rkqs(double* x,
+          double htry,
+          double eps,
+          double* hdid,
+          double* hnext,
+          void (*derivs)(double, double[], double[], void*),
+          void* parameters_and_workspace_for_derivs,
+          struct generic_integrator_workspace* pgi) {
   int i;
   double errmax, h, htemp, xnew;
 
@@ -114,15 +110,13 @@ int rkqs(double* x,
   *x += (*hdid = h);
   for (i = 0; i < pgi->n; i++)
     pgi->y[i] = pgi->ytemp[i];
-
-  return _SUCCESS_;
 }
 
-int rkck(double x,
-         double h,
-         int (*derivs)(double, double[], double[], void*),
-         void* parameters_and_workspace_for_derivs,
-         struct generic_integrator_workspace* pgi) {
+void rkck(double x,
+          double h,
+          void (*derivs)(double, double[], double[], void*),
+          void* parameters_and_workspace_for_derivs,
+          struct generic_integrator_workspace* pgi) {
   int i;
 
   for (i = 0; i < pgi->n; i++)
@@ -177,6 +171,4 @@ int rkck(double x,
     pgi->yerr[i] = h *
                    (_RKCK_dc1_ * pgi->dydx[i] + _RKCK_dc3_ * pgi->ak3[i] +
                     _RKCK_dc4_ * pgi->ak4[i] + _RKCK_dc5_ * pgi->ak5[i] + _RKCK_dc6_ * pgi->ak6[i]);
-
-  return _SUCCESS_;
 }

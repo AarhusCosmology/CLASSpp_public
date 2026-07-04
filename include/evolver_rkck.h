@@ -5,15 +5,8 @@
 
 /**************************************************************/
 
-/**
- * Boilerplate for C++
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-int evolver_rk(
-    int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
+void evolver_rk(
+    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
     double x_ini,
     double x_end,
     double* y,
@@ -22,16 +15,12 @@ int evolver_rk(
     void* parameters_and_workspace_for_derivs,
     double tolerance,
     double minimum_variation,
-    int (*evaluate_timescale)(double x, void* parameters_and_workspace, double* timescale),
+    void (*evaluate_timescale)(double x, void* parameters_and_workspace, double* timescale),
     double timestep_over_timescale,
     double* x_sampling,
     int x_size,
-    int (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    int (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace));
-
-#ifdef __cplusplus
-}
-#endif
+    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
+    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace));
 
 /**************************************************************/
 

@@ -282,7 +282,7 @@ double NCDMBaseSpecies::EvaluatePsdAnalytic(double q) const {
 // DistributionFunction — static callback
 // ─────────────────────────────────────────────────────────────────────────────
 
-int NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
+void NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
   auto* p                   = static_cast<DistributionParams*>(params);
   const NCDMBaseSpecies* sp = p->sp;
 
@@ -313,14 +313,13 @@ int NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
   else {
     *f0 = sp->EvaluatePsdAnalytic(q);
   }
-  return _SUCCESS_;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TestFunction — static callback
 // ─────────────────────────────────────────────────────────────────────────────
 
-int NCDMBaseSpecies::TestFunction(void* /*params*/, double q, double* test) {
+void NCDMBaseSpecies::TestFunction(void* /*params*/, double q, double* test) {
   double c = 2.0 / (3.0 * _zeta3_);
   double d = 120.0 / (7.0 * pow(_PI_, 4));
   double e = 2.0 / (45.0 * _zeta5_);
@@ -333,20 +332,19 @@ int NCDMBaseSpecies::TestFunction(void* /*params*/, double q, double* test) {
   // factor so the automatic grid also samples that transition.
   if (q > 0.)
     *test *= std::sqrt(q * q + 0.5) / q;
-  return _SUCCESS_;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ComputeMomentaMass — background momenta integration at given M
 // ─────────────────────────────────────────────────────────────────────────────
 
-int NCDMBaseSpecies::ComputeMomentaMass(double M,
-                                        double z,
-                                        double* n,
-                                        double* rho,
-                                        double* p,
-                                        double* drho_dM,
-                                        double* pseudo_p) const {
+void NCDMBaseSpecies::ComputeMomentaMass(double M,
+                                         double z,
+                                         double* n,
+                                         double* rho,
+                                         double* p,
+                                         double* drho_dM,
+                                         double* pseudo_p) const {
   double factor2     = factor_ * pow(1 + z, 4);
   const double* qvec = q_bg_.data();
   const double* wvec = w_bg_.data();
@@ -388,30 +386,28 @@ int NCDMBaseSpecies::ComputeMomentaMass(double M,
     *drho_dM *= factor2;
   if (pseudo_p != nullptr)
     *pseudo_p *= factor2;
-
-  return _SUCCESS_;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ComputeMomenta — uses stored M_
 // ─────────────────────────────────────────────────────────────────────────────
 
-int NCDMBaseSpecies::ComputeMomenta(
+void NCDMBaseSpecies::ComputeMomenta(
     double z, double* n, double* rho, double* p, double* drho_dM, double* pseudo_p) const {
-  return ComputeMomentaMass(M_, z, n, rho, p, drho_dM, pseudo_p);
+  ComputeMomentaMass(M_, z, n, rho, p, drho_dM, pseudo_p);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ComputeMomentaDeg — same as ComputeMomentaMass but with variable degeneracy
 // ─────────────────────────────────────────────────────────────────────────────
 
-int NCDMBaseSpecies::ComputeMomentaDeg(double deg,
-                                       double z,
-                                       double* n,
-                                       double* rho,
-                                       double* p,
-                                       double* drho_ddeg,
-                                       double* pseudo_p) const {
+void NCDMBaseSpecies::ComputeMomentaDeg(double deg,
+                                        double z,
+                                        double* n,
+                                        double* rho,
+                                        double* p,
+                                        double* drho_ddeg,
+                                        double* pseudo_p) const {
   double factor2     = deg * 4 * _PI_ * pow(T_cmb_ * T_ * _k_B_, 4) * 8 * _PI_ * _G_ / 3. /
                        pow(_h_P_ / 2. / _PI_, 3) / pow(_c_, 7) * _Mpc_over_m_ * _Mpc_over_m_ *
                        pow(1 + z, 4);
@@ -464,8 +460,6 @@ int NCDMBaseSpecies::ComputeMomentaDeg(double deg,
       *drho_ddeg = rho_tmp * factor2 / deg;
     }
   }
-
-  return _SUCCESS_;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

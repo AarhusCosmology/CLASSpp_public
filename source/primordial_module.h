@@ -76,14 +76,14 @@ class PrimordialModule : public BaseModule {
       double phi, double* H, double* dH, double* ddH, double* dddH);
   void primordial_inflation_get_epsilon(double phi, double* epsilon);
   void primordial_inflation_find_phi_pivot(double* y, double* dy);
-  int primordial_inflation_derivs_member(double tau,
-                                         double* y,
-                                         double* dy,
-                                         void* parameters_and_workspace) const;
-  static int primordial_inflation_derivs(double tau,
-                                         double* y,
-                                         double* dy,
-                                         void* parameters_and_workspace);
+  void primordial_inflation_derivs_member(double tau,
+                                          double* y,
+                                          double* dy,
+                                          void* parameters_and_workspace) const;
+  static void primordial_inflation_derivs(double tau,
+                                          double* y,
+                                          double* dy,
+                                          void* parameters_and_workspace);
   void primordial_external_spectrum_init();
 
   PerturbationsModulePtr perturbations_module_;

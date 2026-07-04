@@ -2364,14 +2364,14 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
   }
 }
 
-int PrimordialModule::primordial_inflation_derivs(double tau,
-                                                  double* y,
-                                                  double* dy,
-                                                  void* parameters_and_workspace) {
+void PrimordialModule::primordial_inflation_derivs(double tau,
+                                                   double* y,
+                                                   double* dy,
+                                                   void* parameters_and_workspace) {
   primordial_inflation_parameters_and_workspace* ppipaw =
       static_cast<primordial_inflation_parameters_and_workspace*>(parameters_and_workspace);
   const PrimordialModule& primordial_module = *(ppipaw->primordial_module);
-  return primordial_module.primordial_inflation_derivs_member(tau, y, dy, parameters_and_workspace);
+  primordial_module.primordial_inflation_derivs_member(tau, y, dy, parameters_and_workspace);
 }
 
 /**
@@ -2390,10 +2390,10 @@ int PrimordialModule::primordial_inflation_derivs(double tau,
  * @return the error status
  */
 
-int PrimordialModule::primordial_inflation_derivs_member(double tau,
-                                                         double* y,
-                                                         double* dy,
-                                                         void* parameters_and_workspace) const {
+void PrimordialModule::primordial_inflation_derivs_member(double tau,
+                                                          double* y,
+                                                          double* dy,
+                                                          void* parameters_and_workspace) const {
   struct primordial_inflation_parameters_and_workspace* ppipaw;
 
   ppipaw = (struct primordial_inflation_parameters_and_workspace*) parameters_and_workspace;
@@ -2538,7 +2538,7 @@ int PrimordialModule::primordial_inflation_derivs_member(double tau,
 
   if (ppipaw->N <=
       in_bg_size_)  // mind the <= instead of ==, necessary because for backward integration 1 equation is removed
-    return _SUCCESS_;
+    return;
 
   // PERTURBATIONS
 
@@ -2563,8 +2563,6 @@ int PrimordialModule::primordial_inflation_derivs_member(double tau,
   dy[index_in_dah_re_] = -(ppipaw->k * ppipaw->k - ppipaw->app_over_a) * y[index_in_ah_re_];
   // 11: d ah_im / dtau
   dy[index_in_dah_im_] = -(ppipaw->k * ppipaw->k - ppipaw->app_over_a) * y[index_in_ah_im_];
-
-  return _SUCCESS_;
 }
 
 /**

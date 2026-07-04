@@ -94,15 +94,6 @@ void array_integrate_spline_table_line_to_line(const double* x_array,
                                                int index_ddy,
                                                int index_inty);
 
-void array_interpolate(const double* array,
-                       int n_columns,
-                       int n_lines,
-                       int index_x, /** from 0 to (n_columns-1) */
-                       double x,
-                       int* last_index,
-                       double* result,
-                       int result_size); /** from 1 to n_columns */
-
 void array_interpolate_spline(const double* x_array,
                               int n_lines,
                               const double* array,
@@ -123,15 +114,6 @@ void array_interpolate_linear(const double* x_array,
                               int* last_index,
                               double* result,
                               int result_size); /** from 1 to n_columns */
-
-void array_interpolate_growing_closeby(const double* array,
-                                       int n_columns,
-                                       int n_lines,
-                                       int index_x, /** from 0 to (n_columns-1) */
-                                       double x,
-                                       int* last_index,
-                                       double* result,
-                                       int result_size);
 
 void array_interpolate_one_growing_closeby(const double* array,
                                            int n_columns,
@@ -156,11 +138,10 @@ void array_interpolate_two(const double* array_x,
                            int n_columns_x,
                            int index_x, /** from 0 to (n_columns_x-1) */
                            const double* array_y,
-                           int n_columns_y,
                            int n_lines, /** must be the same for array_x and array_y */
                            double x,
                            double* result,
-                           int result_size); /** from 1 to n_columns_y */
+                           int result_size);
 
 void array_interpolate_two_bis(const double* array_x,
                                int n_columns_x,
@@ -175,8 +156,7 @@ void array_interpolate_two_bis(const double* array_x,
 void array_interpolate_two_arrays_one_column(
     const double* array_x, /* assumed to be a vector (i.e. one column array) */
     const double* array_y,
-    int n_columns_y,
-    int index_y, /* between 0 and (n_columns_y-1) */
+    int index_y,
     int n_lines, /** must be the same for array_x and array_y */
     double x,
     double* result);

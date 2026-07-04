@@ -66,42 +66,37 @@ void PerturbationsModule::ResolveSpecies() {
 PerturbationsModule::~PerturbationsModule() {}
 
 // Wrapper functions to pass non-static member functions
-int PerturbationsModule::perturb_timescale(double tau,
-                                           void* parameters_and_workspace,
-                                           double* timescale) {
+void PerturbationsModule::perturb_timescale(double tau,
+                                            void* parameters_and_workspace,
+                                            double* timescale) {
   auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  return pppaw->perturbations_module->perturb_timescale_member(tau,
-                                                               parameters_and_workspace,
-                                                               timescale);
+  pppaw->perturbations_module->perturb_timescale_member(tau, parameters_and_workspace, timescale);
 }
-int PerturbationsModule::perturb_sources(double tau,
-                                         double* pvecperturbations,
-                                         double* pvecderivs,
-                                         int index_tau,
+void PerturbationsModule::perturb_sources(double tau,
+                                          double* pvecperturbations,
+                                          double* pvecderivs,
+                                          int index_tau,
+                                          void* parameters_and_workspace) {
+  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  pppaw->perturbations_module->perturb_sources_member(tau,
+                                                      pvecperturbations,
+                                                      pvecderivs,
+                                                      index_tau,
+                                                      parameters_and_workspace);
+}
+void PerturbationsModule::perturb_print_variables(double tau,
+                                                  double* y,
+                                                  double* dy,
+                                                  void* parameters_and_workspace) {
+  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  pppaw->perturbations_module->perturb_print_variables_member(tau, y, dy, parameters_and_workspace);
+}
+void PerturbationsModule::perturb_derivs(double tau,
+                                         double* y,
+                                         double* dy,
                                          void* parameters_and_workspace) {
   auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  return pppaw->perturbations_module->perturb_sources_member(tau,
-                                                             pvecperturbations,
-                                                             pvecderivs,
-                                                             index_tau,
-                                                             parameters_and_workspace);
-}
-int PerturbationsModule::perturb_print_variables(double tau,
-                                                 double* y,
-                                                 double* dy,
-                                                 void* parameters_and_workspace) {
-  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  return pppaw->perturbations_module->perturb_print_variables_member(tau,
-                                                                     y,
-                                                                     dy,
-                                                                     parameters_and_workspace);
-}
-int PerturbationsModule::perturb_derivs(double tau,
-                                        double* y,
-                                        double* dy,
-                                        void* parameters_and_workspace) {
-  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  return pppaw->perturbations_module->perturb_derivs_member(tau, y, dy, parameters_and_workspace);
+  pppaw->perturbations_module->perturb_derivs_member(tau, y, dy, parameters_and_workspace);
 }
 
 /**
@@ -2051,7 +2046,7 @@ void PerturbationsModule::perturb_solve(int index_md,
   int is_early_enough;
 
   /* Related to the perturbation output */
-  int (*perhaps_print_variables)(double, double*, double*, void*);
+  void (*perhaps_print_variables)(double, double*, double*, void*);
   int index_ikout;
 
   /** - initialize indices relevant for back/thermo tables search */
@@ -4246,9 +4241,9 @@ void PerturbationsModule::perturb_approximations(int index_md,
  * @param error_message            Output: error message
  */
 
-int PerturbationsModule::perturb_timescale_member(double tau,
-                                                  void* parameters_and_workspace,
-                                                  double* timescale) {
+void PerturbationsModule::perturb_timescale_member(double tau,
+                                                   void* parameters_and_workspace,
+                                                   double* timescale) {
   /** Summary: */
 
   /** - define local variables */
@@ -4367,8 +4362,6 @@ int PerturbationsModule::perturb_timescale_member(double tau,
       }
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -4771,7 +4764,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
  * @return the error status
  */
 
-int PerturbationsModule::perturb_sources_member(
+void PerturbationsModule::perturb_sources_member(
     double tau, double* y, double* dy, int index_tau, void* parameters_and_workspace) {
   /** Summary: */
 
@@ -5148,8 +5141,6 @@ int PerturbationsModule::perturb_sources_member(
       _set_source_(index_tp_p_) = sqrt(6.) * pvecthermo[thermodynamics_module_->index_th_g_] * P;
     }
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -5170,10 +5161,10 @@ int PerturbationsModule::perturb_sources_member(
  *
  */
 
-int PerturbationsModule::perturb_print_variables_member(double tau,
-                                                        double* y,
-                                                        double* dy,
-                                                        void* parameters_and_workspace) {
+void PerturbationsModule::perturb_print_variables_member(double tau,
+                                                         double* y,
+                                                         double* dy,
+                                                         void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename structure fields (just to avoid heavy notations) */
@@ -5392,8 +5383,6 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
 
     //    fprintf(ppw->perturb_output_file,"\n");
   }
-
-  return _SUCCESS_;
 }
 
 /**
@@ -5418,10 +5407,10 @@ int PerturbationsModule::perturb_print_variables_member(double tau,
  * @param error_message            Output: error message
  */
 
-int PerturbationsModule::perturb_derivs_member(double tau,
-                                               double* y,
-                                               double* dy,
-                                               void* parameters_and_workspace) {
+void PerturbationsModule::perturb_derivs_member(double tau,
+                                                double* y,
+                                                double* dy,
+                                                void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
@@ -5745,8 +5734,6 @@ int PerturbationsModule::perturb_derivs_member(double tau,
     /** - --> its time-derivative */
     dy[pv->index_pt_gwdot] = pvecmetric[ppw->index_mt_gw_prime_prime];
   }
-
-  return _SUCCESS_;
 }
 
 /**

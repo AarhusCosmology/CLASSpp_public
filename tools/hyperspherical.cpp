@@ -287,33 +287,32 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
   }
 }
 
-int hyperspherical_forwards_recurrence(int K,
-                                       int lmax,
-                                       double beta,
-                                       double x,
-                                       double sinK,
-                                       double cotK,
-                                       double* sqrtK,
-                                       double* one_over_sqrtK,
-                                       double* PhiL) {
+void hyperspherical_forwards_recurrence(int K,
+                                        int lmax,
+                                        double beta,
+                                        double x,
+                                        double sinK,
+                                        double cotK,
+                                        double* sqrtK,
+                                        double* one_over_sqrtK,
+                                        double* PhiL) {
   int l;
   hyperspherical_phi01_exact(K, beta, x, sinK, cotK, PhiL, PhiL + 1);
   for (l = 2; l <= lmax; l++) {
     PhiL[l] = ((2 * l - 1) * cotK * PhiL[l - 1] - PhiL[l - 2] * sqrtK[l - 1]) * one_over_sqrtK[l];
   }
-  return _SUCCESS_;
 }
 
-int hyperspherical_forwards_recurrence_chunk(int K,
-                                             int lmax,
-                                             double beta,
-                                             double* x,
-                                             double* sinK,
-                                             double* cotK,
-                                             int chunk,
-                                             double* sqrtK,
-                                             double* one_over_sqrtK,
-                                             double* PhiL) {
+void hyperspherical_forwards_recurrence_chunk(int K,
+                                              int lmax,
+                                              double beta,
+                                              double* x,
+                                              double* sinK,
+                                              double* cotK,
+                                              int chunk,
+                                              double* sqrtK,
+                                              double* one_over_sqrtK,
+                                              double* PhiL) {
   int l;
   int index_x;
   for (index_x = 0; index_x < chunk; index_x++) {
@@ -331,30 +330,29 @@ int hyperspherical_forwards_recurrence_chunk(int K,
                                    PhiL[(l - 2) * chunk + index_x] * sqrtK[l - 1]) *
                                   one_over_sqrtK[l];
   }
-  return _SUCCESS_;
 }
 
-int hyperspherical_backwards_recurrence(int K,
-                                        int lmax,
-                                        double beta,
-                                        double x,
-                                        double sinK,
-                                        double cotK,
-                                        double* sqrtK,
-                                        double* one_over_sqrtK,
-                                        double* PhiL) {
+void hyperspherical_backwards_recurrence(int K,
+                                         int lmax,
+                                         double beta,
+                                         double x,
+                                         double sinK,
+                                         double cotK,
+                                         double* sqrtK,
+                                         double* one_over_sqrtK,
+                                         double* PhiL) {
   double phi0_exact, phi1_exact, phi_top, phipr1 = 0.0, phi, phi_plus_1_times_sqrtK, phi_minus_1,
                                           phi1_down = 0.0, phi0_down, scaling;
   int l, k, isign;
-  int funcreturn = _FAILURE_;
+  bool cf1_found = false;
   hyperspherical_phi01_exact(K, beta, x, sinK, cotK, &phi0_exact, &phi1_exact);
 
   //printf("in backwards. x = %g\n",x);
   if (K == 1) {
     if (beta > 1.5 * lmax) {
-      funcreturn = get_CF1(K, lmax, beta, cotK, &phipr1, &isign);
+      cf1_found = get_CF1(K, lmax, beta, cotK, &phipr1, &isign);
     }
-    if (funcreturn == _FAILURE_) {
+    if (!cf1_found) {
       CF1_from_Gegenbauer(lmax, (int) (beta + 0.2), sinK, cotK, &phipr1);
     }
     phi_top = 1.0;
@@ -443,31 +441,30 @@ int hyperspherical_backwards_recurrence(int K,
   }
   for (k = 0; k <= lmax; k++)
     PhiL[k] *= scaling;
-  return _SUCCESS_;
 }
 
-int hyperspherical_backwards_recurrence_chunk(int K,
-                                              int lmax,
-                                              double beta,
-                                              double* x,
-                                              double* sinK,
-                                              double* cotK,
-                                              int chunk,
-                                              double* sqrtK,
-                                              double* one_over_sqrtK,
-                                              double* PhiL) {
+void hyperspherical_backwards_recurrence_chunk(int K,
+                                               int lmax,
+                                               double beta,
+                                               double* x,
+                                               double* sinK,
+                                               double* cotK,
+                                               int chunk,
+                                               double* sqrtK,
+                                               double* one_over_sqrtK,
+                                               double* PhiL) {
   double phi0_exact, phi1_exact, phi_top, phipr1 = 0.0;
   int l, k, isign;
-  int funcreturn = _FAILURE_;
+  bool cf1_found = false;
   int index_x;
   double scalevec[_HYPER_CHUNK_] = {0}, phi1_down[_HYPER_CHUNK_] = {0};
 
   for (index_x = 0; index_x < chunk; index_x++) {
     if (K == 1) {
       if (beta > 1.5 * lmax) {
-        funcreturn = get_CF1(K, lmax, beta, cotK[index_x], &phipr1, &isign);
+        cf1_found = get_CF1(K, lmax, beta, cotK[index_x], &phipr1, &isign);
       }
-      if (funcreturn == _FAILURE_) {
+      if (!cf1_found) {
         CF1_from_Gegenbauer(lmax, (int) (beta + 0.2), sinK[index_x], cotK[index_x], &phipr1);
       }
       phi_top = 1.0;
@@ -546,11 +543,9 @@ int hyperspherical_backwards_recurrence_chunk(int K,
       PhiL[k * chunk + index_x] *= scalevec[index_x];
     }
   }
-
-  return _SUCCESS_;
 }
 
-int get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
+bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
   int maxiter   = 1000000;
   double tiny   = 1e-100;
   double reltol = DBL_EPSILON;
@@ -586,18 +581,18 @@ int get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
     if (fabs(Delj - 1.0) < reltol) {
       *CF = fj;
       //printf("iter:%d, %g, %g\n",j,sqrttmp,fj);
-      return _SUCCESS_;
+      return true;
     }
   }
-  return _FAILURE_;
+  return false;
 }
 
-int CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF) {
+bool CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF) {
   int n, alpha, k;
   double x, G, dG, Gkm1, Gkm2;
   n = beta - l - 1;
   if (n < 0)
-    return _FAILURE_;
+    return false;
   alpha = l + 1;
   x     = sinK * cotK;  //cos(x)
   switch (n) {
@@ -640,10 +635,10 @@ int CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF) {
   //%Phi = G;
   //%dPhi = l*coty.*G-siny.*dG;
   *CF = l * cotK - sinK * dG / G;
-  return _SUCCESS_;
+  return true;
 }
 
-int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) {
+bool hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) {
   double e, w, w2, alpha, alpha2, CscK, ytp, t;
   double S      = 0.0, Q, C, argu, Ai;
   int airy_sign = 1, phisign = 1, dphisign = 1, intbeta;
@@ -665,7 +660,7 @@ int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) {
     ytp  = asin(1.0 / alpha);
   }
   else {
-    return _FAILURE_;
+    return false;
   }
   w      = alpha / CscK;
   w2     = w * w;
@@ -699,7 +694,7 @@ int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) {
   C    = 0.5 * sqrt(alpha) / beta;
   Ai   = airy_cheb_approx(airy_sign * pow(argu, 2.0 / 3.0));
   *Phi = phisign * 2.0 * sqrt(_PI_) * C * pow(argu, 1.0 / 6.0) * pow(fabs(Q), -0.25) * Ai * CscK;
-  return _SUCCESS_;
+  return true;
 }
 
 double airy_cheb_approx(double z) {
@@ -847,7 +842,7 @@ double cheb(double x, int n, const double A[]) {
   return F;
 }
 
-int ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign) {
+void ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign) {
   *phisign  = 1;
   *dphisign = 1;
 
@@ -870,7 +865,6 @@ int ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign) {
     else  //beta-l-1 even
       *dphisign = -*dphisign;
   }
-  return _SUCCESS_;
 }
 
 void hyperspherical_get_xmin_from_Airy(
@@ -942,15 +936,21 @@ void hyperspherical_get_xmin_from_Airy(
     Fright = Fnew;
   }
 
-  fzero_ridder(PhiWKB_minus_phiminabs,
-               xleft,
-               xright,
-               xtol,
-               &wkbstruct,
-               &Fleft,
-               &Fright,
-               xmin,
-               fevals);
+  class_test(!fzero_ridder(PhiWKB_minus_phiminabs,
+                           xleft,
+                           xright,
+                           xtol,
+                           &wkbstruct,
+                           &Fleft,
+                           &Fright,
+                           xmin,
+                           fevals),
+             "failed to find WKB xmin for K=%d, l=%d, beta=%g between x=%g and x=%g",
+             K,
+             l,
+             beta,
+             xleft,
+             xright);
 }
 
 double PhiWKB_minus_phiminabs(double x, void* param) {
@@ -960,15 +960,15 @@ double PhiWKB_minus_phiminabs(double x, void* param) {
   return (fabs(phiwkb) - wkbparam->phiminabs);
 }
 
-int fzero_ridder(double (*func)(double, void*),
-                 double x1,
-                 double x2,
-                 double xtol,
-                 void* param,
-                 double* Fx1,
-                 double* Fx2,
-                 double* xzero,
-                 int* fevals) {
+bool fzero_ridder(double (*func)(double, void*),
+                  double x1,
+                  double x2,
+                  double xtol,
+                  void* param,
+                  double* Fx1,
+                  double* Fx2,
+                  double* xzero,
+                  int* fevals) {
   /**Using Ridders' method, return the root of a function func known to
       lie between x1 and x2. The root, returned as zriddr, will be found to
       an approximate accuracy xtol.
@@ -996,12 +996,12 @@ int fzero_ridder(double (*func)(double, void*),
       if (s == 0.0) {
         *xzero = ans;
         //printf("Success 1\n");
-        return _SUCCESS_;
+        return true;
       }
       xnew = xm + (xm - xl) * ((fl >= fh ? 1.0 : -1.0) * fm / s);
       if (fabs(xnew - ans) <= xtol) {
         *xzero = ans;
-        return _SUCCESS_;
+        return true;
       }
       ans     = xnew;
       fnew    = (*func)(ans, param);
@@ -1009,7 +1009,7 @@ int fzero_ridder(double (*func)(double, void*),
       if (fnew == 0.0) {
         *xzero = ans;
         //printf("Success 2, ans=%g\n",ans);
-        return _SUCCESS_;
+        return true;
       }
       if (std::copysign(fm, fnew) != fm) {
         xl = xm;
@@ -1026,25 +1026,31 @@ int fzero_ridder(double (*func)(double, void*),
         fl = fnew;
       }
       else
-        return _FAILURE_;
+        return false;
       if (fabs(xh - xl) <= xtol) {
         *xzero = ans;
         //        printf("Success 3\n");
-        return _SUCCESS_;
+        return true;
       }
     }
     fprintf(stderr, "zriddr exceed maximum iterations");
-    return _FAILURE_;
+    return false;
   }
   else {
-    if (fl == 0.0)
-      return x1;
-    if (fh == 0.0)
-      return x2;
+    /* An endpoint is already a root. (This used to `return x1;` / `return
+       x2;`, silently truncating the coordinate to an int status and leaving
+       *xzero unset.) */
+    if (fl == 0.0) {
+      *xzero = x1;
+      return true;
+    }
+    if (fh == 0.0) {
+      *xzero = x2;
+      return true;
+    }
     fprintf(stderr, "root must be bracketed in zriddr.");
-    return _FAILURE_;
+    return false;
   }
-  return _FAILURE_;
 }
 
 void hyperspherical_get_xmin_from_approx(
@@ -1074,7 +1080,7 @@ void hyperspherical_get_xmin_from_approx(
   *xmin = x;
 }
 
-int hyperspherical_bessel_direct_vector(
+void hyperspherical_bessel_direct_vector(
     int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi) {
   /** Evaluate Phi_l^beta(x) by direct forwards/backwards recurrence at each
       requested x, for every requested l. Keeps the numerical considerations
@@ -1191,7 +1197,6 @@ int hyperspherical_bessel_direct_vector(
       Phi[il * nx + ix] = sign * PhiL[l];
     }
   }
-  return _SUCCESS_;
 }
 
 template <int Order, bool DoPhi, bool DoDPhi, bool DoD2Phi>

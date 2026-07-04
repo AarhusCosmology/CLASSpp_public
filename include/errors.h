@@ -1,11 +1,8 @@
-/** @file errors.h Error-reporting (C++ exceptions) + status codes. */
+/** @file errors.h Error-reporting (C++ exceptions). */
 #ifndef CLASS_ERRORS_H
 #define CLASS_ERRORS_H
 
 #include <cstdio>  // fopen / nullptr-compare in class_open
-
-#define _SUCCESS_ 0
-#define _FAILURE_ 1
 
 [[noreturn]] void ThrowFormatted(
     const char* func, int line, const char* prefix, const char* fmt, ...);

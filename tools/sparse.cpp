@@ -75,7 +75,7 @@ void dfsr(int j, sp_mat* G, int* top, int* xik, int* pinv) {
   xik[--(*top)] = j; /*Put column value on stack. */
 }
 
-int sp_splsolve(sp_mat* G, sp_mat* B, int k, int* xik, int top, double* x, int* pinv) {
+void sp_splsolve(sp_mat* G, sp_mat* B, int k, int* xik, int top, double* x, int* pinv) {
   int j, J, p, q, px, n, *Gp, *Gi, *Bp, *Bi;
   double *Gx, *Bx;
   Gp = G->Ap.data();
@@ -102,10 +102,9 @@ int sp_splsolve(sp_mat* G, sp_mat* B, int k, int* xik, int top, double* x, int* 
       x[Gi[p]] -= Gx[p] * x[j];
     }
   }
-  return _SUCCESS_;
 }
 
-int sp_ludcmp(sp_num* N, sp_mat* A, double pivtol) {
+bool sp_ludcmp(sp_num* N, sp_mat* A, double pivtol) {
   double pivot, *Lx, *Ux, *x, a, t;
   int *Lp, *Li, *Up, *Ui, *pinv, *pvec, *q;
   int n, ipiv, k, top, p, i, col, lnz, unz;
@@ -157,7 +156,7 @@ int sp_ludcmp(sp_num* N, sp_mat* A, double pivtol) {
       }
     }
     if ((ipiv == -1) || (a <= 0))
-      return _FAILURE_;
+      return false;
     if ((pinv[col] < 0) && (fabs(x[col]) >= a * pivtol))
       ipiv = col;
     /* Divide by pivot: */
@@ -185,10 +184,10 @@ int sp_ludcmp(sp_num* N, sp_mat* A, double pivtol) {
   Up[n] = unz;
   for (p = 0; p < lnz; p++)
     Li[p] = pinv[Li[p]];
-  return _SUCCESS_;
+  return true;
 }
 
-int sp_lusolve(sp_num* N, double* b, double* x) {
+void sp_lusolve(sp_num* N, double* b, double* x) {
   int p, j, n, *Ap, *Ai;
   double *Ax, *w;
   n = N->n;
@@ -223,10 +222,9 @@ int sp_lusolve(sp_num* N, double* b, double* x) {
     for (j = 0; j < n; j++)
       x[N->q[j]] = w[j];
   }
-  return _SUCCESS_;
 }
 
-int sp_refactor(sp_num* N, sp_mat* A) {
+void sp_refactor(sp_num* N, sp_mat* A) {
   double pivot, *Lx, *Ux, *x;
   int *Lp, *Li, *Up, *Ui, *pinv, *pvec, *q;
   int n, ipiv, k, top, p, i, col, lnz, unz;
@@ -283,7 +281,6 @@ int sp_refactor(sp_num* N, sp_mat* A) {
   Up[n] = unz;
   for (p = 0; p < lnz; p++)
     Li[p] = pinv[Li[p]];
-  return _SUCCESS_;
 }
 
 int column_grouping(sp_mat* G, int* col_g, int* filled) {
@@ -333,7 +330,7 @@ int column_grouping(sp_mat* G, int* col_g, int* filled) {
   return (groupnum - 1);
 }
 
-int sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
+void sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
   int *last, *len, *nv, *next, *head, *elen, *degree, *w, *hhead;
   int d, dk, dext, lemax = 0, e, elenk, eln, i, j, k, k1, k2, k3, jlast, ln;
   int dense, mindeg = 0, nvi, nvj, nvk, mark, wnvi, ok, nel = 0;
@@ -626,7 +623,6 @@ int sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
     if (Cp[i] == -1)
       k = sp_tdfs(i, k, head, next, P, w);
   }
-  return _SUCCESS_;
 }
 
 int sp_wclear(int mark, int lemax, int* w, int n) {

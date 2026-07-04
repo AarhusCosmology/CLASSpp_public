@@ -811,15 +811,7 @@ void NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_c
       *k_nl = k_nl_[index_pk_m_][0];
     }
     else {
-      array_interpolate_two(tau_.data(),
-                            1,
-                            0,
-                            k_nl_[index_pk_m_].data(),
-                            1,
-                            tau_size_,
-                            tau,
-                            k_nl,
-                            1);
+      array_interpolate_two(tau_.data(), 1, 0, k_nl_[index_pk_m_].data(), tau_size_, tau, k_nl, 1);
     }
   }
 
@@ -834,7 +826,6 @@ void NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_c
                             1,
                             0,
                             k_nl_[index_pk_cb_].data(),
-                            1,
                             tau_size_,
                             tau,
                             k_nl_cb,
@@ -2074,7 +2065,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
   sigma = sqrt(sum1);
 
   /* Don't abort when sigma < 1: at high z this is expected. Return
-     _SUCCESS_ with the flag set so the caller skips P_NL(k,z) for
+     normally with the flag set so the caller skips P_NL(k,z) for
      this redshift without treating it as an error. */
 
   if (sigma < 1.) {
@@ -2565,7 +2556,6 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   /* make a first guess for the nonlinear scale */
   array_interpolate_two_arrays_one_column(nu_arr.data(),
                                           r_real.data(),
-                                          1,
                                           0,
                                           ppr->nsteps_for_p1h_integral,
                                           nu_nl,
@@ -2649,7 +2639,6 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
     //
     array_interpolate_two_arrays_one_column(pnw->growtable.data(),
                                             pnw->ztable.data(),
-                                            1,
                                             0,
                                             ng,
                                             g_form,
@@ -3196,15 +3185,7 @@ void NonlinearModule::nonlinear_hmcode_sigma8_at_z(double z,
     *sigma_8 = pnw->sigma_8[index_pk_m_][0];
   }
   else {
-    array_interpolate_two(tau_.data(),
-                          1,
-                          0,
-                          pnw->sigma_8[index_pk_m_],
-                          1,
-                          tau_size_,
-                          tau,
-                          sigma_8,
-                          1);
+    array_interpolate_two(tau_.data(), 1, 0, pnw->sigma_8[index_pk_m_], tau_size_, tau, sigma_8, 1);
   }
 
   if (has_pk_cb_) {
@@ -3216,7 +3197,6 @@ void NonlinearModule::nonlinear_hmcode_sigma8_at_z(double z,
                             1,
                             0,
                             pnw->sigma_8[index_pk_cb_],
-                            1,
                             tau_size_,
                             tau,
                             sigma_8_cb,
@@ -3254,7 +3234,6 @@ void NonlinearModule::nonlinear_hmcode_sigmadisp_at_z(double z,
                           1,
                           0,
                           pnw->sigma_disp[index_pk_m_],
-                          1,
                           tau_size_,
                           tau,
                           sigma_disp,
@@ -3270,7 +3249,6 @@ void NonlinearModule::nonlinear_hmcode_sigmadisp_at_z(double z,
                             1,
                             0,
                             pnw->sigma_disp[index_pk_cb_],
-                            1,
                             tau_size_,
                             tau,
                             sigma_disp_cb,
@@ -3308,7 +3286,6 @@ void NonlinearModule::nonlinear_hmcode_sigmadisp100_at_z(double z,
                           1,
                           0,
                           pnw->sigma_disp_100[index_pk_m_],
-                          1,
                           tau_size_,
                           tau,
                           sigma_disp_100,
@@ -3324,7 +3301,6 @@ void NonlinearModule::nonlinear_hmcode_sigmadisp100_at_z(double z,
                             1,
                             0,
                             pnw->sigma_disp_100[index_pk_cb_],
-                            1,
                             tau_size_,
                             tau,
                             sigma_disp_100_cb,
@@ -3362,7 +3338,6 @@ void NonlinearModule::nonlinear_hmcode_sigmaprime_at_z(double z,
                           1,
                           0,
                           pnw->sigma_prime[index_pk_m_],
-                          1,
                           tau_size_,
                           tau,
                           sigma_prime,
@@ -3378,7 +3353,6 @@ void NonlinearModule::nonlinear_hmcode_sigmaprime_at_z(double z,
                             1,
                             0,
                             pnw->sigma_prime[index_pk_cb_],
-                            1,
                             tau_size_,
                             tau,
                             sigma_prime_cb,

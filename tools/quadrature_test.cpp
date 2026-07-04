@@ -27,14 +27,12 @@ constexpr std::array<double, 16> kFermiDiracPowerMoments = {
     1.307654444554356358920468e12,
 };
 
-int fermi_dirac_distribution(void* /*params*/, double q, double* f0) {
+void fermi_dirac_distribution(void* /*params*/, double q, double* f0) {
   *f0 = 1. / (std::exp(q) + 1.);
-  return _SUCCESS_;
 }
 
-int quartic_test_function(void* /*params*/, double q, double* value) {
+void quartic_test_function(void* /*params*/, double q, double* value) {
   *value = q * q * q * q;
-  return _SUCCESS_;
 }
 
 void check_power_moments(const std::vector<double>& x, const std::vector<double>& w) {
@@ -50,7 +48,7 @@ void check_power_moments(const std::vector<double>& x, const std::vector<double>
 void test_fundamental_rule() {
   constexpr int N = 8;
   std::vector<double> x(N), w(N);
-  assert(compute_FermiDirac(x.data(), w.data(), N) == _SUCCESS_);
+  assert(compute_FermiDirac(x.data(), w.data(), N));
   for (int i = 0; i < N; ++i) {
     assert(x[i] > 0.);
     assert(w[i] > 0.);
@@ -60,13 +58,13 @@ void test_fundamental_rule() {
   check_power_moments(x, w);
 
   std::vector<double> x_max(17), w_max(17);
-  assert(compute_FermiDirac(x_max.data(), w_max.data(), 17) == _SUCCESS_);
+  assert(compute_FermiDirac(x_max.data(), w_max.data(), 17));
   double normalization = 0.;
   for (double weight : w_max)
     normalization += weight;
   assert(std::abs(normalization - kFermiDiracPowerMoments[0]) < 2.e-10);
 
-  assert(compute_FermiDirac(x.data(), w.data(), 18) == _FAILURE_);
+  assert(!compute_FermiDirac(x.data(), w.data(), 18));
 }
 
 void test_manual_selection() {
@@ -83,7 +81,7 @@ void test_manual_selection() {
                               0,
                               fermi_dirac_distribution,
                               nullptr,
-                              gb) == _SUCCESS_);
+                              gb));
   check_power_moments(x, w);
 }
 
@@ -91,16 +89,16 @@ void test_auto_selection() {
   std::array<double, _QUADRATURE_MAX_> x{};
   std::array<double, _QUADRATURE_MAX_> w{};
   int N = 0;
-  assert(get_qsampling(x.data(),
-                       w.data(),
-                       &N,
-                       _QUADRATURE_MAX_,
-                       1.e-10,
-                       nullptr,
-                       0,
-                       quartic_test_function,
-                       fermi_dirac_distribution,
-                       nullptr) == _SUCCESS_);
+  get_qsampling(x.data(),
+                w.data(),
+                &N,
+                _QUADRATURE_MAX_,
+                1.e-10,
+                nullptr,
+                0,
+                quartic_test_function,
+                fermi_dirac_distribution,
+                nullptr);
 
   // A three-point FD rule integrates the quartic exactly. The Laguerre and
   // adaptive candidates require more points at this tolerance, so this also

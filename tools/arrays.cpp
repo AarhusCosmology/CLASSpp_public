@@ -719,40 +719,36 @@ void array_integrate_all_trapzd_or_spline(const double* array,
   }
 }
 
+namespace {
+
+/* The shared search/eval helpers below must inline into the public
+   interpolators: their class_test throw paths make them look too big to the
+   inliner, and an out-of-line call per interpolation point costs ~1% of
+   Transfer. */
+#if defined(_MSC_VER)
+#define CLASS_ALWAYS_INLINE __forceinline
+#else
+#define CLASS_ALWAYS_INLINE inline __attribute__((always_inline))
+#endif
+
 /**
-  * interpolate to get y_i(x), when x and y_i are all columns of the same array
-  *
-  * Called by background_at_eta(); background_eta_of_z(); background_solve(); thermodynamics_at_z().
-  */
-void array_interpolate(const double* array,
-                       int n_columns,
-                       int n_lines,
-                       int index_x, /** from 0 to (n_columns-1) */
-                       double x,
-                       int* last_index,
-                       double* result,
-                       int result_size) /** from 1 to n_columns */
-{
-  int inf, sup, mid, i;
-  double weight;
+ * Locate by bisection the line index inf such that x lies between positions
+ * inf and inf+1 of a monotonic (growing or decreasing) sequence stored at the
+ * given stride. epsilon relaxes the out-of-range tests.
+ */
+CLASS_ALWAYS_INLINE int array_search_bracket(
+    const double* x_array, int stride, int n_lines, double x, double epsilon = 0.) {
+  int inf = 0;
+  int sup = n_lines - 1;
 
-  inf = 0;
-  sup = n_lines - 1;
+  if (x_array[inf * stride] < x_array[sup * stride]) {
+    class_test(x < x_array[inf * stride] - epsilon, "x=%e < x_min=%e", x, x_array[inf * stride]);
 
-  if (*(array + inf * n_columns + index_x) < *(array + sup * n_columns + index_x)) {
-    class_test(x < *(array + inf * n_columns + index_x),
-               "x=%e < x_min=%e",
-               x,
-               *(array + inf * n_columns + index_x));
-
-    class_test(x > *(array + sup * n_columns + index_x),
-               "x=%e > x_max=%e",
-               x,
-               *(array + sup * n_columns + index_x));
+    class_test(x > x_array[sup * stride] + epsilon, "x=%e > x_max=%e", x, x_array[sup * stride]);
 
     while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x < *(array + mid * n_columns + index_x)) {
+      int mid = (int) (0.5 * (inf + sup));
+      if (x < x_array[mid * stride]) {
         sup = mid;
       }
       else {
@@ -760,21 +756,14 @@ void array_interpolate(const double* array,
       }
     }
   }
-
   else {
-    class_test(x < *(array + sup * n_columns + index_x),
-               "x=%e < x_min=%e",
-               x,
-               *(array + sup * n_columns + index_x));
+    class_test(x < x_array[sup * stride] - epsilon, "x=%e < x_min=%e", x, x_array[sup * stride]);
 
-    class_test(x > *(array + inf * n_columns + index_x),
-               "x=%e > x_max=%e",
-               x,
-               *(array + inf * n_columns + index_x));
+    class_test(x > x_array[inf * stride] + epsilon, "x=%e > x_max=%e", x, x_array[inf * stride]);
 
     while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x > *(array + mid * n_columns + index_x)) {
+      int mid = (int) (0.5 * (inf + sup));
+      if (x > x_array[mid * stride]) {
         sup = mid;
       }
       else {
@@ -783,17 +772,60 @@ void array_interpolate(const double* array,
     }
   }
 
-  *last_index = inf;
-
-  weight = (x - *(array + inf * n_columns + index_x)) /
-           (*(array + sup * n_columns + index_x) - *(array + inf * n_columns + index_x));
-
-  for (i = 0; i < result_size; i++)
-    *(result + i) = *(array + inf * n_columns + i) * (1. - weight) +
-                    weight * *(array + sup * n_columns + i);
-
-  *(result + index_x) = x;
+  return inf;
 }
+
+/**
+ * Locate the line index inf such that x lies between positions inf and inf+1
+ * of a growing sequence stored at the given stride, hunting up or down from
+ * last_index (assumed close to the result).
+ */
+CLASS_ALWAYS_INLINE int array_hunt_growing_closeby(
+    const double* x_array, int stride, int n_lines, double x, int last_index) {
+  int inf = last_index;
+  class_test(inf < 0 || inf > n_lines - 1,
+             "*last_index=%d out of range [0:%d]\n",
+             inf,
+             n_lines - 1);
+
+  while (x < x_array[inf * stride]) {
+    inf--;
+    class_test(inf < 0, "x=%e < x_min=%e", x, x_array[0]);
+  }
+  int sup = inf + 1;
+  while (x > x_array[sup * stride]) {
+    sup++;
+    class_test(sup > n_lines - 1, "x=%e > x_max=%e", x, x_array[(n_lines - 1) * stride]);
+  }
+
+  return sup - 1;
+}
+
+/**
+ * Cubic-spline evaluation of columns 0..result_size-1 of array at x, given
+ * the bracketing line index inf from one of the search helpers.
+ */
+CLASS_ALWAYS_INLINE void array_spline_eval(const double* x_array,
+                                           int inf,
+                                           const double* array,
+                                           const double* array_splined,
+                                           int n_columns,
+                                           double x,
+                                           double* result,
+                                           int result_size) {
+  const int sup  = inf + 1;
+  const double h = x_array[sup] - x_array[inf];
+  const double b = (x - x_array[inf]) / h;
+  const double a = 1 - b;
+
+  for (int i = 0; i < result_size; i++)
+    result[i] = a * array[inf * n_columns + i] + b * array[sup * n_columns + i] +
+                ((a * a * a - a) * array_splined[inf * n_columns + i] +
+                 (b * b * b - b) * array_splined[sup * n_columns + i]) *
+                    h * h / 6.;
+}
+
+}  // namespace
 
 /**
   * interpolate to get y_i(x), when x and y_i are in different arrays
@@ -810,55 +842,10 @@ void array_interpolate_spline(const double* x_array,
                               double* result,
                               int result_size) /** from 1 to n_columns */
 {
-  int inf, sup, mid, i;
-  double h, a, b;
+  const int inf = array_search_bracket(x_array, 1, n_lines, x);
+  *last_index   = inf;
 
-  inf = 0;
-  sup = n_lines - 1;
-
-  if (x_array[inf] < x_array[sup]) {
-    class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
-
-    class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x < x_array[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  else {
-    class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
-
-    class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x > x_array[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  *last_index = inf;
-
-  h = x_array[sup] - x_array[inf];
-  b = (x - x_array[inf]) / h;
-  a = 1 - b;
-
-  for (i = 0; i < result_size; i++)
-    *(result + i) = a * *(array + inf * n_columns + i) + b * *(array + sup * n_columns + i) +
-                    ((a * a * a - a) * *(array_splined + inf * n_columns + i) +
-                     (b * b * b - b) * *(array_splined + sup * n_columns + i)) *
-                        h * h / 6.;
+  array_spline_eval(x_array, inf, array, array_splined, n_columns, x, result, result_size);
 }
 
 /**
@@ -867,44 +854,7 @@ void array_interpolate_spline(const double* x_array,
   * Called by nonlinear_HMcode()
   */
 void array_search_bisect(int n_lines, const double* array, double c, int* last_index) {
-  int inf, sup, mid;
-
-  inf = 0;
-  sup = n_lines - 1;
-
-  if (array[inf] < array[sup]) {
-    class_test(c < array[inf], "c=%e < y_min=%e", c, array[inf]);
-
-    class_test(c > array[sup], "c=%e > y_max=%e", c, array[sup]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (c < array[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  else {
-    class_test(c < array[sup], "x=%e < x_min=%e", c, array[sup]);
-
-    class_test(c > array[inf], "x=%e > x_max=%e", c, array[inf]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (c > array[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  *last_index = inf;
+  *last_index = array_search_bracket(array, 1, n_lines, c);
 }
 
 /**
@@ -921,97 +871,15 @@ void array_interpolate_linear(const double* x_array,
                               double* result,
                               int result_size) /** from 1 to n_columns */
 {
-  int inf, sup, mid, i;
-  double h, a, b;
+  const int inf = array_search_bracket(x_array, 1, n_lines, x);
+  const int sup = inf + 1;
+  *last_index   = inf;
 
-  inf = 0;
-  sup = n_lines - 1;
+  const double b = (x - x_array[inf]) / (x_array[sup] - x_array[inf]);
+  const double a = 1 - b;
 
-  if (x_array[inf] < x_array[sup]) {
-    class_test(x < x_array[inf], "x=%e < x_min=%e", x, x_array[inf]);
-
-    class_test(x > x_array[sup], "x=%e > x_max=%e", x, x_array[sup]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x < x_array[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  else {
-    class_test(x < x_array[sup], "x=%e < x_min=%e", x, x_array[sup]);
-
-    class_test(x > x_array[inf], "x=%e > x_max=%e", x, x_array[inf]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x > x_array[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  *last_index = inf;
-
-  h = x_array[sup] - x_array[inf];
-  b = (x - x_array[inf]) / h;
-  a = 1 - b;
-
-  for (i = 0; i < result_size; i++)
-    *(result + i) = a * *(array + inf * n_columns + i) + b * *(array + sup * n_columns + i);
-}
-
-/**
-  * interpolate to get y_i(x), when x and y_i are all columns of the same array, x is arranged in growing order, and the point x is presumably close to the previous point x from the last call of this function.
-  *
-  * Called by background_at_eta(); background_eta_of_z(); background_solve(); thermodynamics_at_z().
-  */
-void array_interpolate_growing_closeby(const double* array,
-                                       int n_columns,
-                                       int n_lines,
-                                       int index_x, /** from 0 to (n_columns-1) */
-                                       double x,
-                                       int* last_index,
-                                       double* result,
-                                       int result_size) /** from 1 to n_columns */
-{
-  int inf, sup, i;
-  double weight;
-
-  inf = *last_index;
-
-  while (x < *(array + inf * n_columns + index_x)) {
-    inf--;
-    class_test(inf < 0, "x=%e < x_min=%e", x, array[index_x]);
-  }
-  sup = inf + 1;
-  while (x > *(array + sup * n_columns + index_x)) {
-    sup++;
-    class_test(sup > (n_lines - 1),
-               "x=%e > x_max=%e",
-               x,
-               array[(n_lines - 1) * n_columns + index_x]);
-  }
-  inf = sup - 1;
-
-  *last_index = inf;
-
-  weight = (x - *(array + inf * n_columns + index_x)) /
-           (*(array + sup * n_columns + index_x) - *(array + inf * n_columns + index_x));
-
-  for (i = 0; i < result_size; i++)
-    *(result + i) = *(array + inf * n_columns + i) * (1. - weight) +
-                    weight * *(array + sup * n_columns + i);
-
-  *(result + index_x) = x;
+  for (int i = 0; i < result_size; i++)
+    result[i] = a * array[inf * n_columns + i] + b * array[sup * n_columns + i];
 }
 
 /**
@@ -1027,32 +895,16 @@ void array_interpolate_one_growing_closeby(const double* array,
                                            int* last_index,
                                            int index_y,
                                            double* result) {
-  int inf, sup;
-  double weight;
+  const int inf = array_hunt_growing_closeby(array + index_x, n_columns, n_lines, x, *last_index);
+  const int sup = inf + 1;
+  *last_index   = inf;
 
-  inf = *last_index;
+  const double x_inf  = array[inf * n_columns + index_x];
+  const double x_sup  = array[sup * n_columns + index_x];
+  const double weight = (x - x_inf) / (x_sup - x_inf);
 
-  while (x < *(array + inf * n_columns + index_x)) {
-    inf--;
-    class_test(inf < 0, "x=%e < x_min=%e", x, array[index_x]);
-  }
-  sup = inf + 1;
-  while (x > *(array + sup * n_columns + index_x)) {
-    sup++;
-    class_test(sup > (n_lines - 1),
-               "x=%e > x_max=%e",
-               x,
-               array[(n_lines - 1) * n_columns + index_x]);
-  }
-  inf = sup - 1;
-
-  *last_index = inf;
-
-  weight = (x - *(array + inf * n_columns + index_x)) /
-           (*(array + sup * n_columns + index_x) - *(array + inf * n_columns + index_x));
-
-  *result = *(array + inf * n_columns + index_y) * (1. - weight) +
-            *(array + sup * n_columns + index_y) * weight;
+  *result = array[inf * n_columns + index_y] * (1. - weight) +
+            array[sup * n_columns + index_y] * weight;
 }
 
 /**
@@ -1070,45 +922,10 @@ void array_interpolate_spline_growing_closeby(const double* x_array,
                                               double* result,
                                               int result_size) /** from 1 to n_columns */
 {
-  int inf, sup, i;
-  double h, a, b;
+  const int inf = array_hunt_growing_closeby(x_array, 1, n_lines, x, *last_index);
+  *last_index   = inf;
 
-  /*
-  if (*last_index < 0) {
-    class_stop( "problem with last_index =%d < 0", *last_index);
-  }
-  if (*last_index > (n_lines-1)) {
-    class_stop( "problem with last_index =%d > %d", *last_index,n_lines-1);
-  }
-  */
-
-  inf = *last_index;
-  class_test(inf < 0 || inf > (n_lines - 1),
-             "*lastindex=%d out of range [0:%d]\n",
-             inf,
-             n_lines - 1);
-  while (x < x_array[inf]) {
-    inf--;
-    class_test(inf < 0, "x=%e < x_min=%e", x, x_array[0]);
-  }
-  sup = inf + 1;
-  while (x > x_array[sup]) {
-    sup++;
-    class_test(sup > (n_lines - 1), "x=%e > x_max=%e", x, x_array[n_lines - 1]);
-  }
-  inf = sup - 1;
-
-  *last_index = inf;
-
-  h = x_array[sup] - x_array[inf];
-  b = (x - x_array[inf]) / h;
-  a = 1 - b;
-
-  for (i = 0; i < result_size; i++)
-    *(result + i) = a * *(array + inf * n_columns + i) + b * *(array + sup * n_columns + i) +
-                    ((a * a * a - a) * *(array_splined + inf * n_columns + i) +
-                     (b * b * b - b) * *(array_splined + sup * n_columns + i)) *
-                        h * h / 6.;
+  array_spline_eval(x_array, inf, array, array_splined, n_columns, x, result, result_size);
 }
 
 /**
@@ -1120,72 +937,24 @@ void array_interpolate_two(const double* array_x,
                            int n_columns_x,
                            int index_x, /** from 0 to (n_columns_x-1) */
                            const double* array_y,
-                           int n_columns_y,
                            int n_lines, /** must be the same for array_x and array_y */
                            double x,
                            double* result,
-                           int result_size) /** from 1 to n_columns_y */
-{
-  int inf, sup, mid, i;
-  double weight;
+                           int result_size) {
+  const int inf = array_search_bracket(array_x + index_x, n_columns_x, n_lines, x);
+  const int sup = inf + 1;
 
-  inf = 0;
-  sup = n_lines - 1;
+  const double x_inf  = array_x[inf * n_columns_x + index_x];
+  const double x_sup  = array_x[sup * n_columns_x + index_x];
+  const double weight = (x - x_inf) / (x_sup - x_inf);
 
-  if (array_x[inf * n_columns_x + index_x] < array_x[sup * n_columns_x + index_x]) {
-    class_test(x < array_x[inf * n_columns_x + index_x],
-               "x=%e < x_min=%e",
-               x,
-               array_x[inf * n_columns_x + index_x]);
-
-    class_test(x > array_x[sup * n_columns_x + index_x],
-               "x=%e > x_max=%e",
-               x,
-               array_x[sup * n_columns_x + index_x]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x < array_x[mid * n_columns_x + index_x]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  else {
-    class_test(x < *(array_x + sup * n_columns_x + index_x),
-               "x=%e < x_min=%e",
-               x,
-               *(array_x + sup * n_columns_x + index_x));
-
-    class_test(x > *(array_x + inf * n_columns_x + index_x),
-               "x=%e > x_max=%e",
-               x,
-               *(array_x + inf * n_columns_x + index_x));
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x > *(array_x + mid * n_columns_x + index_x)) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  weight = (x - *(array_x + inf * n_columns_x + index_x)) /
-           (*(array_x + sup * n_columns_x + index_x) - *(array_x + inf * n_columns_x + index_x));
-
-  for (i = 0; i < result_size; i++)
-    *(result + i) = *(array_y + i * n_lines + inf) * (1. - weight) +
-                    weight * *(array_y + i * n_lines + sup);
+  for (int i = 0; i < result_size; i++)
+    result[i] = array_y[i * n_lines + inf] * (1. - weight) + weight * array_y[i * n_lines + sup];
 }
 
 /**
- * Same as array_interpolate_two, but with order of indices exchanged in array_y
+ * Same as array_interpolate_two, but with order of indices exchanged in array_y:
+ * y_i(line) is array_y[line*n_columns_y + i] instead of array_y[i*n_lines + line]
  */
 void array_interpolate_two_bis(const double* array_x,
                                int n_columns_x,
@@ -1197,62 +966,16 @@ void array_interpolate_two_bis(const double* array_x,
                                double* result,
                                int result_size) /** from 1 to n_columns_y */
 {
-  int inf, sup, mid, i;
-  double weight;
+  const int inf = array_search_bracket(array_x + index_x, n_columns_x, n_lines, x);
+  const int sup = inf + 1;
 
-  inf = 0;
-  sup = n_lines - 1;
+  const double x_inf  = array_x[inf * n_columns_x + index_x];
+  const double x_sup  = array_x[sup * n_columns_x + index_x];
+  const double weight = (x - x_inf) / (x_sup - x_inf);
 
-  if (array_x[inf * n_columns_x + index_x] < array_x[sup * n_columns_x + index_x]) {
-    class_test(x < array_x[inf * n_columns_x + index_x],
-               "x=%e < x_min=%e",
-               x,
-               array_x[inf * n_columns_x + index_x]);
-
-    class_test(x > array_x[sup * n_columns_x + index_x],
-               "x=%e > x_max=%e",
-               x,
-               array_x[sup * n_columns_x + index_x]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x < array_x[mid * n_columns_x + index_x]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  else {
-    class_test(x < *(array_x + sup * n_columns_x + index_x),
-               "x=%e < x_min=%e",
-               x,
-               *(array_x + sup * n_columns_x + index_x));
-
-    class_test(x > *(array_x + inf * n_columns_x + index_x),
-               "x=%e > x_max=%e",
-               x,
-               *(array_x + inf * n_columns_x + index_x));
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x > *(array_x + mid * n_columns_x + index_x)) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  weight = (x - *(array_x + inf * n_columns_x + index_x)) /
-           (*(array_x + sup * n_columns_x + index_x) - *(array_x + inf * n_columns_x + index_x));
-
-  for (i = 0; i < result_size; i++)
-    *(result + i) = *(array_y + inf * n_columns_y + i) * (1. - weight) +
-                    weight * *(array_y + sup * n_columns_y + i);
+  for (int i = 0; i < result_size; i++)
+    result[i] = array_y[inf * n_columns_y + i] * (1. - weight) +
+                weight * array_y[sup * n_columns_y + i];
 }
 
 /**
@@ -1263,51 +986,17 @@ void array_interpolate_two_bis(const double* array_x,
 void array_interpolate_two_arrays_one_column(
     const double* array_x, /* assumed to be a vector (i.e. one column array) */
     const double* array_y,
-    int n_columns_y,
-    int index_y, /* between 0 and (n_columns_y-1) */
+    int index_y,
     int n_lines, /** must be the same for array_x and array_y */
     double x,
     double* result) {
-  int inf, sup, mid;
-  double weight;
-  double epsilon = 1e-9;
+  /* array_x is only assumed to cover x up to a rounding error */
+  const double epsilon = 1e-9;
 
-  inf = 0;
-  sup = n_lines - 1;
+  const int inf = array_search_bracket(array_x, 1, n_lines, x, epsilon);
+  const int sup = inf + 1;
 
-  if (array_x[inf] < array_x[sup]) {
-    class_test(x < array_x[inf] - epsilon, "x=%e < x_min=%e", x, array_x[inf]);
-
-    class_test(x > array_x[sup] + epsilon, "x=%e > x_max=%e", x, array_x[sup]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x < array_x[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  else {
-    class_test(x < array_x[sup] - epsilon, "x=%e < x_min=%e", x, array_x[sup]);
-
-    class_test(x > array_x[inf] + epsilon, "x=%e > x_max=%e", x, array_x[inf]);
-
-    while (sup - inf > 1) {
-      mid = (int) (0.5 * (inf + sup));
-      if (x > array_x[mid]) {
-        sup = mid;
-      }
-      else {
-        inf = mid;
-      }
-    }
-  }
-
-  weight = (x - array_x[inf]) / (array_x[sup] - array_x[inf]);
+  const double weight = (x - array_x[inf]) / (array_x[sup] - array_x[inf]);
 
   *result = array_y[index_y * n_lines + inf] * (1. - weight) +
             weight * array_y[index_y * n_lines + sup];

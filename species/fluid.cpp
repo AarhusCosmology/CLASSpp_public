@@ -291,10 +291,10 @@ BaseSpecies::StressEnergyContribution FluidSpecies::StressEnergy(
   return se;
 }
 
-int FluidSpecies::ComputeWFld(double a,
-                              double* w_fld,
-                              double* dw_over_da_fld,
-                              double* integral_fld) const {
+void FluidSpecies::ComputeWFld(double a,
+                               double* w_fld,
+                               double* dw_over_da_fld,
+                               double* integral_fld) const {
   double Omega_ede          = 0.;
   double dOmega_ede_over_da = 0.;
   double a_eq               = 0.0;
@@ -391,8 +391,6 @@ int FluidSpecies::ComputeWFld(double a,
       defining new parameters pba->w..._fld. Just remember that so
       far, HyRec explicitely assumes that w(a)= w0 + wa (1-a/a0); but
       Recfast does not assume anything */
-
-  return _SUCCESS_;
 }
 
 // ── Newtonian-gauge transform ─────────────────────────────────────────────────

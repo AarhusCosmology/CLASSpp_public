@@ -261,28 +261,28 @@ class PerturbationsModule : public BaseModule {
   void perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);
   void perturb_einstein(int index_md, double k, double tau, double* y, perturb_workspace* ppw);
   void perturb_total_stress_energy(int index_md, double k, double* y, perturb_workspace* ppw);
-  int perturb_timescale_member(double tau, void* parameters_and_workspace, double* timescale);
-  static int perturb_timescale(double tau, void* parameters_and_workspace, double* timescale);
-  int perturb_sources_member(double tau,
-                             double* pvecperturbations,
-                             double* pvecderivs,
-                             int index_tau,
-                             void* parameters_and_workspace);
-  static int perturb_sources(double tau,
-                             double* pvecperturbations,
-                             double* pvecderivs,
-                             int index_tau,
-                             void* parameters_and_workspace);
-  int perturb_print_variables_member(double tau,
-                                     double* y,
-                                     double* dy,
-                                     void* parameters_and_workspace);
-  static int perturb_print_variables(double tau,
-                                     double* y,
-                                     double* dy,
-                                     void* parameters_and_workspace);
-  int perturb_derivs_member(double tau, double* y, double* dy, void* parameters_and_workspace);
-  static int perturb_derivs(double tau, double* y, double* dy, void* parameters_and_workspace);
+  void perturb_timescale_member(double tau, void* parameters_and_workspace, double* timescale);
+  static void perturb_timescale(double tau, void* parameters_and_workspace, double* timescale);
+  void perturb_sources_member(double tau,
+                              double* pvecperturbations,
+                              double* pvecderivs,
+                              int index_tau,
+                              void* parameters_and_workspace);
+  static void perturb_sources(double tau,
+                              double* pvecperturbations,
+                              double* pvecderivs,
+                              int index_tau,
+                              void* parameters_and_workspace);
+  void perturb_print_variables_member(double tau,
+                                      double* y,
+                                      double* dy,
+                                      void* parameters_and_workspace);
+  static void perturb_print_variables(double tau,
+                                      double* y,
+                                      double* dy,
+                                      void* parameters_and_workspace);
+  void perturb_derivs_member(double tau, double* y, double* dy, void* parameters_and_workspace);
+  static void perturb_derivs(double tau, double* y, double* dy, void* parameters_and_workspace);
   void perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace);
   void perturb_rsa_delta_and_theta(
       double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);

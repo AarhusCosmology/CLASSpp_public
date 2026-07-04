@@ -89,7 +89,7 @@ class FluidSpecies : public BaseSpecies {
    * moved here from BackgroundModule::background_w_fld because this is pure
    * fluid physics.
    */
-  int ComputeWFld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
+  void ComputeWFld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
 

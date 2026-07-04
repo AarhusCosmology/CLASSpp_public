@@ -18,7 +18,10 @@ class BackgroundModule : public BaseModule {
   void background_at_tau(
       double tau, short return_format, short inter_mode, int* last_index, double* pvecback) const;
   void background_tau_of_z(double z, double* tau) const;
-  int background_w_fld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
+  void background_w_fld(double a,
+                        double* w_fld,
+                        double* dw_over_da_fld,
+                        double* integral_fld) const;
   void background_idm_drmd(
       double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
 
@@ -112,25 +115,25 @@ class BackgroundModule : public BaseModule {
   void background_solve_evolver();
   void background_initial_conditions(double* pvecback, double* pvecback_integration);
   void background_find_equality();
-  int background_derivs_member(double z, double* y, double* dy, void* parameters_and_workspace);
-  int background_derivs_loga_member(double loga,
-                                    double* y,
-                                    double* dy,
-                                    void* parameters_and_workspace);
-  static int background_derivs_loga(double loga,
-                                    double* y,
-                                    double* dy,
-                                    void* parameters_and_workspace);
-  static int background_timescale(double loga, void* parameters_and_workspace, double* timescale);
-  int background_add_line_to_bg_table_member(
+  void background_derivs_member(double z, double* y, double* dy, void* parameters_and_workspace);
+  void background_derivs_loga_member(double loga,
+                                     double* y,
+                                     double* dy,
+                                     void* parameters_and_workspace);
+  static void background_derivs_loga(double loga,
+                                     double* y,
+                                     double* dy,
+                                     void* parameters_and_workspace);
+  static void background_timescale(double loga, void* parameters_and_workspace, double* timescale);
+  void background_add_line_to_bg_table_member(
       double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);
-  static int background_add_line_to_bg_table(
+  static void background_add_line_to_bg_table(
       double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);
   void background_output_budget();
-  static int background_print_variables(double loga,
-                                        double* y,
-                                        double* dy,
-                                        void* parameters_and_workspace);
+  static void background_print_variables(double loga,
+                                         double* y,
+                                         double* dy,
+                                         void* parameters_and_workspace);
 
   /** @name - all indices for the vector of background quantities to be integrated (=bi)
    *

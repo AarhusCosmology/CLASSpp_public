@@ -27,7 +27,7 @@
 
 namespace {
 
-int readDoubleList(FileContent* pfc, const char* name, std::vector<double>& values, int* found) {
+void readDoubleList(FileContent* pfc, const char* name, std::vector<double>& values, int* found) {
   try {
     if (auto l = pfc->get<std::vector<double>>(name)) {
       values = *l;
@@ -39,7 +39,6 @@ int readDoubleList(FileContent* pfc, const char* name, std::vector<double>& valu
   catch (const std::exception& e) {
     class_stop("%s", e.what());
   }
-  return _SUCCESS_;
 }
 
 // Number of the given optionals that hold a value.
@@ -2657,14 +2656,9 @@ void precision::parse(const FileContent& fc) {
   read(fc, "tol_gauss_legendre", tol_gauss_legendre);
 }
 
-int class_version(char* version) {
-  snprintf(version, 12, "%s", _VERSION_);
-  return _SUCCESS_;
-}
-
 // ── Hook-based shooting (the species-owned replacement for the enum dispatch) ──
 
-int InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, double* output) {
+void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, double* output) {
   auto* w = static_cast<ShootingWorkspace*>(pworkspace);
 
   // Write each trial unknown into the file content.
@@ -2705,7 +2699,6 @@ int InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, doubl
       output[i]      = sp->ComputeShootingResidual(ctx, t);
     }
   }
-  return _SUCCESS_;
 }
 
 InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {

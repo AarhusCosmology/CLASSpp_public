@@ -27,19 +27,12 @@ struct generic_integrator_workspace {
 
 /**************************************************************/
 
-/**
- * Boilerplate for C++
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
+void initialize_generic_integrator(int n_dim, struct generic_integrator_workspace* pgi);
 
-int initialize_generic_integrator(int n_dim, struct generic_integrator_workspace* pgi);
+void cleanup_generic_integrator(struct generic_integrator_workspace* pgi);
 
-int cleanup_generic_integrator(struct generic_integrator_workspace* pgi);
-
-int generic_integrator(
-    int (*derivs)(double x, double y[], double yprime[], void* parameters_and_workspace),
+void generic_integrator(
+    void (*derivs)(double x, double y[], double yprime[], void* parameters_and_workspace),
     double x1,
     double x2,
     double ystart[],
@@ -48,24 +41,20 @@ int generic_integrator(
     double hmin,
     struct generic_integrator_workspace* pgi);
 
-int rkqs(double* x,
-         double htry,
-         double eps,
-         double* hdid,
-         double* hnext,
-         int (*derivs)(double, double[], double[], void*),
-         void* parameters_and_workspace_for_derivs,
-         struct generic_integrator_workspace* pgi);
+void rkqs(double* x,
+          double htry,
+          double eps,
+          double* hdid,
+          double* hnext,
+          void (*derivs)(double, double[], double[], void*),
+          void* parameters_and_workspace_for_derivs,
+          struct generic_integrator_workspace* pgi);
 
-int rkck(double x,
-         double h,
-         int (*derivs)(double, double[], double[], void*),
-         void* parameters_and_workspace_for_derivs,
-         struct generic_integrator_workspace* pgi);
-
-#ifdef __cplusplus
-}
-#endif
+void rkck(double x,
+          double h,
+          void (*derivs)(double, double[], double[], void*),
+          void* parameters_and_workspace_for_derivs,
+          struct generic_integrator_workspace* pgi);
 
 /**************************************************************/
 

@@ -62,7 +62,7 @@ Stats summarize(std::vector<double> v) {
 int main(int argc, char** argv) {
   if (argc < 2) {
     printf("Usage: %s <file.ini> [num_loops]\n", argv[0]);
-    return _FAILURE_;
+    return 1;
   }
   int num_loops = (argc >= 3) ? std::atoi(argv[2]) : 5;
   if (num_loops < 1)
@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
     }
     catch (const std::exception& e) {
       printf("\n\nError in loop %d:\n%s\n", loop + 1, e.what());
-      return _FAILURE_;
+      return 1;
     }
   }
 
@@ -178,5 +178,5 @@ int main(int argc, char** argv) {
          tot.stddev,
          100.0);
 
-  return _SUCCESS_;
+  return 0;
 }

@@ -92,7 +92,7 @@ class NCDMBaseSpecies : public BaseSpecies {
   virtual std::tuple<double, double> GetRescaledParameters(double a, const double* lnf_array) const;
 
   // Called from NCDMSpecies/DNCDMSpecies background methods
-  int ComputeMomenta(
+  void ComputeMomenta(
       double z, double* n, double* rho, double* p, double* drho_dM, double* pseudo_p) const;
 
   int q_size() const {
@@ -242,13 +242,13 @@ class NCDMBaseSpecies : public BaseSpecies {
   void SetDegAndFactor(double deg);
 
   // Momenta variant with variable degeneracy (used by SetDeg_from_Omega_ini):
-  int ComputeMomentaDeg(double deg,
-                        double z,
-                        double* n,
-                        double* rho,
-                        double* p,
-                        double* drho_ddeg,
-                        double* pseudo_p) const;
+  void ComputeMomentaDeg(double deg,
+                         double z,
+                         double* n,
+                         double* rho,
+                         double* p,
+                         double* drho_ddeg,
+                         double* pseudo_p) const;
 
   // Infer M from Omega:
   double MFromOmega(double H0, double Omega0, double tol_M_ncdm) const;
@@ -295,16 +295,16 @@ class NCDMBaseSpecies : public BaseSpecies {
                                 const NcdmSettings& settings);
   void InitDistribution(FileContent* pfc, int species_index);
 
-  int ComputeMomentaMass(double M,
-                         double z,
-                         double* n,
-                         double* rho,
-                         double* p,
-                         double* drho_dM,
-                         double* pseudo_p) const;
+  void ComputeMomentaMass(double M,
+                          double z,
+                          double* n,
+                          double* rho,
+                          double* p,
+                          double* drho_dM,
+                          double* pseudo_p) const;
 
-  static int DistributionFunction(void* params, double q, double* f0);
-  static int TestFunction(void* params, double q, double* test);
+  static void DistributionFunction(void* params, double q, double* f0);
+  static void TestFunction(void* params, double q, double* test);
 
   int quadrature_strategy_ = 0;
   int input_q_size_        = 5;

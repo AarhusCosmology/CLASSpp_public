@@ -66,7 +66,6 @@ void TransferModule::transfer_functions_at_q(
                             ((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] +
                              index_l) *
                                 q_size_,
-                        1,
                         q_size_,
                         q,
                         transfer_function,
@@ -2149,7 +2148,6 @@ void TransferModule::transfer_source_resample(int bin,
                           1,
                           0,
                           interpolated_sources,
-                          1,
                           perturbations_module_->tau_size_,
                           tau0 - tau0_minus_tau[index_tau],
                           source_at_tau.data(),

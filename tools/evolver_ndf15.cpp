@@ -63,8 +63,8 @@
 
 #include "sparse.h"
 
-int evolver_ndf15(
-    int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
+void evolver_ndf15(
+    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
     double x_ini,
     double x_final,
     double* y_inout,
@@ -73,14 +73,14 @@ int evolver_ndf15(
     void* parameters_and_workspace_for_derivs,
     double rtol,
     double minimum_variation,
-    int (*timescale_and_approximation)(double x,
-                                       void* parameters_and_workspace,
-                                       double* timescales),
+    void (*timescale_and_approximation)(double x,
+                                        void* parameters_and_workspace,
+                                        double* timescales),
     double timestep_over_timescale,
     double* t_vec,
     int tres,
-    int (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    int (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
+    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
+    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
   /* Constants: */
   double G[5]     = {1.0, 3.0 / 2.0, 11.0 / 6.0, 25.0 / 12.0, 137.0 / 60.0};
   double alpha[5] = {-37.0 / 200, -1.0 / 9.0, -8.23e-2, -4.15e-2, 0};
@@ -668,7 +668,6 @@ int evolver_ndf15(
 
   uninitialize_jacobian(&jac);
   uninitialize_numjac_workspace(&nj_ws);
-  return _SUCCESS_;
 
 } /*End of program*/
 
@@ -684,7 +683,7 @@ void eqvec(double* datavec, double* emptyvec, int n) {
   }
 }
 
-int calc_C(struct jacobian* jac) {
+void calc_C(struct jacobian* jac) {
   int nz, j, k, n, col, row;
   int duplicate;
   int *Ci, *Cp, *Ai, *Ap;
@@ -746,116 +745,21 @@ int calc_C(struct jacobian* jac) {
     }
     Cp[j + 1] += Cp[j]; /* We can update Cp here. */
   }
-  return _SUCCESS_;
 }
 
 /* Subroutine that interpolates from information stored in dif */
-int interp_from_difold(double tinterp,
-                       double tnew,
-                       double* ynew,
-                       double h,
-                       double** dif,
-                       int k,
-                       double* yinterp,
-                       double* ypinterp,
-                       double* yppinterp,
-                       int* index,
-                       int neq,
-                       int output) {
-  /* Output=1: only y_vector. Output=2: y and y prime. Output=3: y, yp and ypp*/
-  int i, j, m, l, factor;
-  double sumj, suml, sump, prodm, s;
-  s = (tinterp - tnew) / h;
-  if (k == 1) {
-    for (i = 1; i <= neq; i++) {
-      if (index[i]) {
-        yinterp[i] = ynew[i] + dif[i][1] * s;
-        if (output > 1)
-          ypinterp[i] = dif[i][1] / h;
-        if (output > 2)
-          yppinterp[i] = 0; /* No good estimate can be made of the second derivative */
-      }
-    }
-  }
-  else {
-    /*This gets tricky */
-    for (i = 1; i <= neq; i++) {
-      if (index[i]) {
-        /*First the value of the function:	*/
-        sumj   = 0.0;
-        factor = 1;
-        for (j = 1; j <= k; j++) {
-          prodm   = 1.0;
-          factor *= j;
-          for (m = 0; m < j; m++)
-            prodm *= (m + s);
-          sumj += dif[i][j] / factor * prodm;
-        }
-        yinterp[i] = ynew[i] + sumj;
-        /* Now the first derivative: */
-        if (output > 1) {
-          factor = 1;
-          sumj   = 0.0;
-          for (j = 1; j <= k; j++) {
-            suml    = 0.0;
-            factor *= j;
-            for (l = 0; l < j; l++) {
-              prodm = 1.0;
-              for (m = 0; m < j; m++) {
-                if (m != l)
-                  prodm *= (m + s);
-              }
-              suml += prodm;
-            }
-            sumj += dif[i][j] / factor * suml;
-          }
-          ypinterp[i] = sumj / h;
-        }
-        /* The second derivative: */
-        if (output > 2) {
-          factor = 1;
-          sumj   = 0.0;
-          for (j = 1; j <= k; j++) {
-            suml    = 0.0;
-            factor *= j;
-            for (l = 0; l < j; l++) {
-              sump = 0.0;
-              for (int p = 0; p < j; p++) {
-                if (p != l) {
-                  prodm = 1.0;
-                  for (m = 0; m < j; m++) {
-                    if ((m != l) && (m != p)) {
-                      prodm *= (m + s);
-                    }
-                  }
-                  sump += prodm;
-                }
-              }
-              suml += sump;
-            }
-            sumj += dif[i][j] / factor * suml;
-          }
-          yppinterp[i] = sumj / (h * h);
-        }
-      }
-    }
-  }
-  return _SUCCESS_;
-}
-
-/* Subroutine that interpolates from information stored in dif */
-int interp_from_dif(double tinterp,
-                    double tnew,
-                    double* ynew,
-                    double h,
-                    double** dif,
-                    int k,
-                    double* yinterp,
-                    double* ypinterp,
-                    double* yppinterp,
-                    int* mask,
-                    int neq,
-                    int output) {
+void interp_from_dif(double tinterp,
+                     double tnew,
+                     double* ynew,
+                     double h,
+                     double** dif,
+                     int k,
+                     double* yinterp,
+                     double* ypinterp,
+                     double* yppinterp,
+                     int* mask,
+                     int neq,
+                     int output) {
   /* Output=1: only y_vector. Output=2: y and y prime. Output=3: y, yp and ypp*/
   double fact, prod, sumfrac;
   double vecy[5]  = {0., 0., 0., 0., 0.};
@@ -887,10 +791,9 @@ int interp_from_dif(double tinterp,
       ypinterp[index_x] = sumtmp2;
     }
   }
-  return _SUCCESS_;
 }
 
-int adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
+void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
   double mydifU[5][5] = {{-1, -2, -3, -4, -5},
                          {0, 1, 3, 6, 10},
                          {0, 0, -1, -4, -10},
@@ -932,12 +835,11 @@ int adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
         dif[ii + 1][jj + 1] += tempvec[kk] * mydifRU[kk][jj];
     }
   }
-  return _SUCCESS_;
 }
 
-int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
+void new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
   double luparity, *Ax;
-  int i, j, *Ap, *Ai, funcreturn;
+  int i, j, *Ap, *Ai;
   if (jac->use_sparse == 1) {
     Ap = jac->spJ->Ap.data();
     Ai = jac->spJ->Ai.data();
@@ -970,8 +872,8 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
              jac->Numerical->wamd.data());
       /* AMD ordering is used here. The old q = NULL natural-ordering
 	 example is no longer valid now that q is a std::vector<int>. */
-      funcreturn = sp_ludcmp(jac->Numerical.get(), jac->spJ.get(), 1e-3);
-      class_test(funcreturn == _FAILURE_, "Failure in sp_ludcmp. Possibly singular matrix!");
+      class_test(!sp_ludcmp(jac->Numerical.get(), jac->spJ.get(), 1e-3),
+                 "Failure in sp_ludcmp. Possibly singular matrix!");
       jac->new_jacobian = false;
     }
     else {
@@ -989,14 +891,13 @@ int new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
       }
     }
     /*Dense LU decomposition: */
-    funcreturn = ludcmp(jac->LU.data(), neq, jac->luidx.data(), &luparity, jac->LUw.data());
-    class_test(funcreturn == _FAILURE_, "Failure in ludcmp. Possibly singular matrix!");
+    class_test(!ludcmp(jac->LU.data(), neq, jac->luidx.data(), &luparity, jac->LUw.data()),
+               "Failure in ludcmp. Possibly singular matrix!");
   }
-  return _SUCCESS_;
 }
 
 /** Helper functions */
-int lubksb(double** a, int n, int* indx, double b[]) {
+void lubksb(double** a, int n, int* indx, double b[]) {
   int i, ii = 0, ip;
   double sum;
   for (i = 1; i <= n; i++) {
@@ -1016,10 +917,9 @@ int lubksb(double** a, int n, int* indx, double b[]) {
       sum -= a[i][j] * b[j];
     b[i] = sum / a[i][i];
   }
-  return _SUCCESS_;
 }
 
-int ludcmp(double** a, int n, int* indx, double* d, double* vv) {
+bool ludcmp(double** a, int n, int* indx, double* d, double* vv) {
   int i, imax = 0, j, k;
   double big, dum, sum, temp;
   *d = 1.0;
@@ -1029,7 +929,7 @@ int ludcmp(double** a, int n, int* indx, double* d, double* vv) {
       if ((temp = fabs(a[i][j])) > big)
         big = temp;
     if (big == 0.0)
-      return _FAILURE_;
+      return false;
     vv[i] = 1.0 / big;
   }
   for (j = 1; j <= n; j++) {
@@ -1068,17 +968,17 @@ int ludcmp(double** a, int n, int* indx, double* d, double* vv) {
         a[i][j] *= dum;
     }
   }
-  return _SUCCESS_;
+  return true;
 }
 
-int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
-                 double* x_inout,
-                 double* dxdF,
-                 int x_size,
-                 double tolx,
-                 double tolF,
-                 void* param,
-                 int* fevals) {
+void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
+                  double* x_inout,
+                  double* dxdF,
+                  int x_size,
+                  double tolx,
+                  double tolF,
+                  void* param,
+                  int* fevals) {
   /**Given an initial guess x[1..n] for a root in n dimensions,
      take ntrial Newton-Raphson steps to improve the root.
      Stop if the root converges in either summed absolute
@@ -1144,17 +1044,18 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
     }
     for (i = 1; i <= x_size; i++) {
       //printf("x = [%f, %f], delx = [%e, %e]\n",x_inout[0],x_inout[1],delx[0],delx[1]);
-      int return_function = _FAILURE_;
+      bool func_succeeded = false;
       for (int func_iter = 0; func_iter < 10; ++func_iter) {
         x_inout[i - 1] = x_inout_backup[i - 1] + delx[i - 1];
         try {
-          return_function = func(x_inout, x_size, param, Fdel);
+          func(x_inout, x_size, param, Fdel);
+          func_succeeded = true;
           (*fevals)++;
         }
         catch (...) {
-          return_function = _FAILURE_;
+          func_succeeded = false;
         }
-        if (return_function == _SUCCESS_) {
+        if (func_succeeded) {
           double max_y_diff = 0.;
           for (int j = 0; j < x_size; ++j) {
             double yscal = std::max(1e-50, 0.5 * (fabs(Fdel[j]) + fabs(F0[j])));
@@ -1172,7 +1073,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
           delx[i - 1] *= -0.5;
         }
       }
-      if (return_function == _FAILURE_) {
+      if (!func_succeeded) {
         throw(std::runtime_error("Jacobian computation in Newtons method failed during shooting"));
       }
       //printf("F = [%f, %f]\n",Fdel[0],Fdel[1]);
@@ -1199,11 +1100,7 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
 
   /* Memory freed by RAII (vectors go out of scope) */
 
-  if (has_converged) {
-    //fprintf(stderr, "Newton converged after %d iterations\n", k);
-    return _SUCCESS_;
-  }
-  else {
+  if (!has_converged) {
     class_stop(
         "Newton's method failed to converge. Try improving initial guess on the parameters, "
         "decrease the tolerance requirements to Newtons method or increase the precision of "
@@ -1216,16 +1113,16 @@ int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
 /* "numjac", "initialize_jacobian", "uninitialize_jacobian",					*/
 /* "initialize_numjac_workspace", "uninitialize_numjac_workspace".		*/
 /**********************************************************************/
-int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-           double t,
-           double* y,
-           double* fval,
-           struct jacobian* jac,
-           struct numjac_workspace* nj_ws,
-           double thresh,
-           int neq,
-           int* nfe,
-           void* parameters_and_workspace_for_derivs) {
+void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
+            double t,
+            double* y,
+            double* fval,
+            struct jacobian* jac,
+            struct numjac_workspace* nj_ws,
+            double thresh,
+            int neq,
+            int* nfe,
+            void* parameters_and_workspace_for_derivs) {
   /*	Routine that computes the jacobian numerically. It is based on the numjac
 	implementation in MATLAB, but a feature for recognising sparsity in the
 	jacobian and taking advantage of that has been added.
@@ -1552,10 +1449,9 @@ int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_w
       jac->has_pattern = 1;
     }
   }
-  return _SUCCESS_;
 } /* End of numjac */
 
-int initialize_jacobian(struct jacobian* jac, int neq) {
+void initialize_jacobian(struct jacobian* jac, int neq) {
   int i;
 
   if (neq > 15) {
@@ -1613,10 +1509,9 @@ int initialize_jacobian(struct jacobian* jac, int neq) {
   /* Initialize jacvec to sqrt(eps):*/
   for (i = 1; i <= neq; i++)
     jac->jacvec[i] = 1.490116119384765597872e-8;
-  return _SUCCESS_;
 }
 
-int uninitialize_jacobian(struct jacobian* jac) {
+void uninitialize_jacobian(struct jacobian* jac) {
   /* Dense method memory freed by RAII (backing vectors) */
 
   if (jac->sparse_stuff_initialized) {
@@ -1624,10 +1519,9 @@ int uninitialize_jacobian(struct jacobian* jac) {
     jac->spJ.reset();
     jac->Numerical.reset();
   }
-  return _SUCCESS_;
 }
 
-int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq) {
+void initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq) {
   int neqp = neq + 1;
   /* Allocate vectors and matrices using RAII backing storage: */
 
@@ -1653,10 +1547,8 @@ int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq) {
   nj_ws->Rowmax.resize(neqp);
 
   /* Done allocating stuff */
-  return _SUCCESS_;
 }
 
-int uninitialize_numjac_workspace(struct numjac_workspace* nj_ws) {
+void uninitialize_numjac_workspace(struct numjac_workspace* nj_ws) {
   /* All memory freed by RAII (backing vectors destroyed with struct) */
-  return _SUCCESS_;
 }

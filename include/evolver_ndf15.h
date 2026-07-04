@@ -61,57 +61,50 @@ struct numjac_workspace {
   std::vector<double> ydel_Fdel_data_vec;
 };
 
-/**
- * Boilerplate for C++
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-int initialize_jacobian(struct jacobian* jac, int neq);
-int uninitialize_jacobian(struct jacobian* jac);
-int initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq);
-int uninitialize_numjac_workspace(struct numjac_workspace* nj_ws);
-int calc_C(struct jacobian* jac);
-int interp_from_dif(double tinterp,
-                    double tnew,
-                    double* ynew,
-                    double h,
-                    double** dif,
-                    int k,
-                    double* yinterp,
-                    double* ypinterp,
-                    double* yppinterp,
-                    int* index,
-                    int neq,
-                    int output);
-int new_linearisation(struct jacobian* jac, double hinvGak, int neq);
-int adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k);
+void initialize_jacobian(struct jacobian* jac, int neq);
+void uninitialize_jacobian(struct jacobian* jac);
+void initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq);
+void uninitialize_numjac_workspace(struct numjac_workspace* nj_ws);
+void calc_C(struct jacobian* jac);
+void interp_from_dif(double tinterp,
+                     double tnew,
+                     double* ynew,
+                     double h,
+                     double** dif,
+                     int k,
+                     double* yinterp,
+                     double* ypinterp,
+                     double* yppinterp,
+                     int* index,
+                     int neq,
+                     int output);
+void new_linearisation(struct jacobian* jac, double hinvGak, int neq);
+void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k);
 void eqvec(double* datavec, double* emptyvec, int n);
-int lubksb(double** a, int n, int* indx, double b[]);
-int ludcmp(double** a, int n, int* indx, double* d, double* vv);
-int fzero_Newton(int (*func)(double* x, int x_size, void* param, double* F),
-                 double* x_inout,
-                 double* dxdF,
-                 int x_size,
-                 double tolx,
-                 double tolF,
-                 void* param,
-                 int* fevals);
+void lubksb(double** a, int n, int* indx, double b[]);
+bool ludcmp(double** a, int n, int* indx, double* d, double* vv);
+void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
+                  double* x_inout,
+                  double* dxdF,
+                  int x_size,
+                  double tolx,
+                  double tolF,
+                  void* param,
+                  int* fevals);
 
-int numjac(int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-           double t,
-           double* y,
-           double* fval,
-           struct jacobian* jac,
-           struct numjac_workspace* nj_ws,
-           double thresh,
-           int neq,
-           int* nfe,
-           void* parameters_and_workspace_for_derivs);
+void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
+            double t,
+            double* y,
+            double* fval,
+            struct jacobian* jac,
+            struct numjac_workspace* nj_ws,
+            double thresh,
+            int neq,
+            int* nfe,
+            void* parameters_and_workspace_for_derivs);
 
-int evolver_ndf15(
-    int (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
+void evolver_ndf15(
+    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
     double x_ini,
     double x_final,
     double* y_inout,
@@ -120,18 +113,14 @@ int evolver_ndf15(
     void* parameters_and_workspace_for_derivs,
     double rtol,
     double minimum_variation,
-    int (*timescale_and_approximation)(double x,
-                                       void* parameters_and_workspace,
-                                       double* timescales),
+    void (*timescale_and_approximation)(double x,
+                                        void* parameters_and_workspace,
+                                        double* timescales),
     double timestep_over_timescale,
     double* t_vec,
     int t_res,
-    int (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    int (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace));
-
-#ifdef __cplusplus
-}
-#endif
+    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
+    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace));
 
 /**************************************************************/
 

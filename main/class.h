@@ -29,8 +29,7 @@
 
 class ClassConstants {
  public:
-  static constexpr int sFALSE   = false;
-  static constexpr int sFAILURE = _FAILURE_;
+  static constexpr int sFALSE = false;
 };
 
 #endif

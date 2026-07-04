@@ -133,9 +133,9 @@ cdef extern from "hyperspherical.h":
     void hyperspherical_Hermite_interpolation_Phi "hyperspherical_Hermite_interpolation<6, true, false, false>"(
         const HyperInterpStruct* pHIS, int nxi, int lnum, const double* xinterp,
         double* Phi, double* dPhi, double* d2Phi) except +
-    int hyperspherical_bessel_direct_vector(int K, double beta, int* lvec, int nl,
-                                            double* xvec, int nx, double* Phi) except +
-    int hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) except +
+    void hyperspherical_bessel_direct_vector(int K, double beta, int* lvec, int nl,
+                                             double* xvec, int nx, double* Phi) except +
+    bint hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) except +
 
 
 def _normalize_bessel_inputs(K, beta, l, x, method):
@@ -327,7 +327,7 @@ def hyperspherical_bessel_wkb(K, beta, l, x):
     cdef double val
     for il in range(nl):
         for ix in range(nx):
-            if hyperspherical_WKB(Kc, lvec[il], betac, xvec[ix], &val) != 0:
+            if not hyperspherical_WKB(Kc, lvec[il], betac, xvec[ix], &val):
                 raise CosmoSevereError("hyperspherical_WKB failed")
             Phi[il, ix] = val
     if scalar_l:
