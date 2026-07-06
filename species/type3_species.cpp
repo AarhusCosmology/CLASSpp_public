@@ -138,8 +138,13 @@ double Type3CouplingDeltaThetaCdm(double beta,
   const double D        = 3. * rho_cdm * a2 - 2. * beta * Zbar * Zbar;
   const double term1    = -k2 * 2. * beta * (one_m_2b * Zbar * Zbar * phi_prime + dV * phi) /
                           (one_m_2b * D);
-  const double term2    = 4. * beta * dV * phi_prime_bg *
-                          (k2 * phi / phi_prime_bg - 2. * beta * theta_cdm) / (one_m_2b * D);
+  /* phi_prime_bg is factored into the parenthesis analytically (k2*phi/phi_prime_bg *
+     phi_prime_bg = k2*phi) so the coupling stays finite when the background field starts
+     at rest (phi_prime_bg = 0, e.g. thawing/non-attractor ICs). Dividing by phi_prime_bg
+     here gave 0/0 = NaN, which poisoned the whole theta_cdm Jacobian row and tripped the
+     "singular matrix" abort in the evolver. */
+  const double term2 = 4. * beta * dV * (k2 * phi - 2. * beta * theta_cdm * phi_prime_bg) /
+                       (one_m_2b * D);
   const double term3 = -(6. * beta * a_prime_over_a * Zbar * Zbar + 4. * beta * dV * phi_prime_bg) *
                        theta_cdm / D;
   return term1 + term2 + term3;
