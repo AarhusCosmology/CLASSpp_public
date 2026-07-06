@@ -174,9 +174,11 @@ struct precision {
   int thermo_Nz1_idm_dr          = 10000;
   int thermo_Nz2_idm_dr          = 100;
   /**
-   * Tolerance of the relative value of integral during thermodynamical integration
+   * Tolerance for thermodynamical integration. RECFAST now uses the shared evolver
+   * interface with dense output, so this is a true ODE tolerance rather than a
+   * legacy per-redshift-bin RK correction tolerance.
    */
-  double tol_thermo_integration = 1.0e-2;
+  double tol_thermo_integration = 1.0e-7;
   /*
    * Recfast 1.4 switch parameters
    */
@@ -213,8 +215,6 @@ struct precision {
       50.0; /**< Smoothing factor for recombination approximation switching, found to be OK on 3.09.10 */
   double recfast_x_He0_trigger =
       0.995; /**< Switch for Helium full calculation during reco, raised from 0.99 to 0.995 for smoother Helium */
-  double recfast_x_He0_trigger2 =
-      0.995; /**< Switch for Helium full calculation during reco, for changing Helium flag, raised from 0.985 to same as previous one for smoother Helium */
   double recfast_x_He0_trigger_delta =
       0.05; /**< Smoothing factor for recombination approximation switching, found to be OK on 3.09.10 */
   double recfast_x_H0_trigger =

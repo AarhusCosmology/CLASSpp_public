@@ -124,6 +124,17 @@ class ThermodynamicsModule : public BaseModule {
   void thermodynamics_recombination(recombination* preco, double* pvecback);
   void thermodynamics_recombination_with_hyrec(recombination* prec, double* pvecback);
   void thermodynamics_recombination_with_recfast(recombination* prec, double* pvecback);
+  double thermodynamics_recfast_hydrogen_saha_xH(const recombination* preco, double z) const;
+  double thermodynamics_recfast_helium_first_saha_xe(const recombination* preco, double z) const;
+  double thermodynamics_recfast_helium_second_saha_xe(const recombination* preco, double z) const;
+  void thermodynamics_recfast_store_row(
+      recombination* preco, int sample_index, double z, double xe, double Tb, double dTbdz) const;
+  double thermodynamics_recfast_xe_after_helium_ode(const recombination* preco,
+                                                    double z,
+                                                    const double* y) const;
+  double thermodynamics_recfast_xe_after_full_ode(const recombination* preco,
+                                                  double z,
+                                                  const double* y) const;
   void thermodynamics_derivs_with_recfast_member(double z,
                                                  double* y,
                                                  double* dy,
@@ -132,6 +143,17 @@ class ThermodynamicsModule : public BaseModule {
                                                  double* y,
                                                  double* dy,
                                                  void* fixed_parameters);
+  static void thermodynamics_recfast_derivs(double minus_z,
+                                            double* y,
+                                            double* dy,
+                                            void* fixed_parameters);
+  static void thermodynamics_recfast_output(
+      double minus_z, double y[], double dy[], int index_x, void* parameters_and_workspace);
+  static void thermodynamics_recfast_output_none(
+      double minus_z, double y[], double dy[], int index_x, void* parameters_and_workspace);
+  static void thermodynamics_recfast_timescale(double minus_z,
+                                               void* parameters_and_workspace,
+                                               double* timescale);
   void thermodynamics_merge_reco_and_reio(recombination* preco, reionization* preio);
   void thermodynamics_tanh(
       double x, double center, double before, double after, double width, double* result);
@@ -150,6 +172,8 @@ class ThermodynamicsModule : public BaseModule {
   //@}
 };
 
+enum class RecfastPhase { analytic, helium, full };
+
 /**
  * temporary  parameters and workspace passed to the thermodynamics_derivs function
  */
@@ -162,6 +186,8 @@ struct thermodynamics_parameters_and_workspace {
 
   /* workspace */
   double* pvecback;
+  int recfast_output_index_offset = 0;
+  RecfastPhase recfast_phase      = RecfastPhase::full;
 };
 
 #endif  //THERMODYNAMICS_MODULE_H

@@ -2488,7 +2488,6 @@ void precision::parse(const FileContent& fc) {
   read(fc, "recfast_z_He_3", recfast_z_He_3);
   read(fc, "recfast_delta_z_He_3", recfast_delta_z_He_3);
   read(fc, "recfast_x_He0_trigger", recfast_x_He0_trigger);
-  read(fc, "recfast_x_He0_trigger2", recfast_x_He0_trigger2);
   read(fc, "recfast_x_He0_trigger_delta", recfast_x_He0_trigger_delta);
   read(fc, "recfast_x_H0_trigger", recfast_x_H0_trigger);
   read(fc, "recfast_x_H0_trigger2", recfast_x_H0_trigger2);
