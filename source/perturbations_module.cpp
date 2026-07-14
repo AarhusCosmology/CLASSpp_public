@@ -2296,6 +2296,38 @@ void PerturbationsModule::perturb_solve(int index_md,
                     perhaps_print_variables);
   }
 
+  /** - complete the N-body-gauge gamma source. The stored k2gamma_Nb still
+      lacks the -H_T_Nb'' term (the conformal-time derivative of H_T_Nb'),
+      which cannot be formed analytically in the RHS because it needs the
+      total shear derivative. Compute it here, output-only, as the analytic
+      derivative of a cubic spline through the H_T_Nb'(tau) time series for
+      this k over the integrated region [0, tau_actual_size), and subtract it
+      from the partial k2gamma_Nb. */
+  if (has_source_k2gamma_Nb_ && index_md == index_md_scalars_ && tau_actual_size >= 2) {
+    const int n      = tau_actual_size;
+    const int stride = k_size_[index_md];
+    const double* HTp =
+        sources_[index_md][index_ic * tp_size_[index_md] + index_tp_H_T_Nb_prime_].data();
+    double* k2g = sources_[index_md][index_ic * tp_size_[index_md] + index_tp_k2gamma_Nb_].data();
+
+    /* scratch table with columns (y=0, ddy=1, dy=2) */
+    std::vector<double> work(static_cast<size_t>(n) * 3);
+    for (int i = 0; i < n; i++)
+      work[i * 3 + 0] = HTp[i * stride + index_k];
+
+    array_spline_table_line_to_line(tau_sampling_.data(),
+                                    n,
+                                    work.data(),
+                                    3,
+                                    0,
+                                    1,
+                                    _SPLINE_EST_DERIV_);
+    array_derive_spline_table_line_to_line(tau_sampling_.data(), n, work.data(), 3, 0, 1, 2);
+
+    for (int i = 0; i < n; i++)
+      k2g[i * stride + index_k] -= work[i * 3 + 2]; /* subtract H_T_Nb'' */
+  }
+
   /** - if perturbations were printed in a file, close the file */
 
   //if (perhaps_print_variables != nullptr)
@@ -4938,24 +4970,46 @@ void PerturbationsModule::perturb_sources_member(
     if (has_source_H_T_Nb_prime_) {
       double rho_plus_p_tot = (pvecback[background_module_->index_bg_rho_tot_] +
                                pvecback[background_module_->index_bg_p_tot_]);
-      H_T_Nb_prime = 3 * a_prime_over_a / rho_plus_p_tot *
-                     (-ppw->delta_p +
-                      pvecback[background_module_->index_bg_p_tot_prime_] * ppw->rho_plus_p_theta /
-                          rho_plus_p_tot / k / k +
-                      ppw->rho_plus_p_shear);
+      /* Well-conditioned form of H_T_Nb' = 3 zeta'. The naive momentum-constraint
+         combination (-delta_p + p' theta/k^2 + shear) suffers a catastrophic
+         cancellation deep in the super-horizon regime in Newtonian gauge: -delta_p
+         and p' theta/k^2 are each O(1) and cancel to O(1e-4), so the finite
+         integrator precision of the two terms surfaces as ~5% noise in H_T_Nb'
+         (and hence in gamma). Rewrite it exactly (general, no super-horizon
+         assumption) with the adiabatic sound speed c_a^2 = p'/rho' as
+             H_T_Nb' = 3H/(rho+p) [ -delta_p_nad - c_a^2 delta_rho_com + shear ],
+         where delta_p_nad = delta_p - c_a^2 delta_rho is the non-adiabatic pressure
+         and delta_rho_com is the comoving density perturbation. delta_rho_com is
+         taken from the Poisson equation (see perturb_einstein) as
+         -(2/3) k^2 phi / a^2 instead of the algebraically equal
+         delta_rho + 3H(rho+p) theta/k^2: both are the same quantity, but the phi
+         form is manifestly O(k^2) and free of the cancellation, so it stays smooth
+         on all scales. In synchronous gauge the terms do not cancel and this
+         reproduces the previous result. The Poisson constraint carries the
+         curvature factor s2_squared = 1 - 3K/k^2 (see perturb_einstein), so
+         delta_rho_com = -(2/3)(k^2 s2_squared) phi / a^2; for flat models
+         s2_squared = 1. */
+      double s2_squared    = 1. - 3. * pba->K / (k * k);
+      double ca2           = pvecback[background_module_->index_bg_p_tot_prime_] /
+                             (-3. * a_prime_over_a * rho_plus_p_tot);
+      double phi_bardeen   = (ppt->gauge == possible_gauges::newtonian)
+                                 ? y[ppw->pv->index_pt_phi]
+                                 : y[ppw->pv->index_pt_eta] -
+                                       a_prime_over_a * pvecmetric[ppw->index_mt_alpha];
+      double delta_rho_com = -2. / 3. * k * k * s2_squared * phi_bardeen / a2;
+      double delta_p_nad   = ppw->delta_p - ca2 * ppw->delta_rho;
+      H_T_Nb_prime         = 3. * a_prime_over_a / rho_plus_p_tot *
+                             (-delta_p_nad - ca2 * delta_rho_com + ppw->rho_plus_p_shear);
       _set_source_(index_tp_H_T_Nb_prime_) = H_T_Nb_prime;
-      /** gamma in Nbody gauge, see Eq. A.2 in 1811.00904. */
+      /** gamma in Nbody gauge, see Eq. A.2 in 1811.00904. This stores only the
+          partial value; the remaining -H_T_Nb'' term (conformal-time derivative
+          of H_T_Nb') is added as a post-processing spline derivative in
+          perturb_solve, because it cannot be formed analytically here (it needs
+          the total shear derivative). */
       if (has_source_k2gamma_Nb_) {
         _set_source_(index_tp_k2gamma_Nb_) = -a_prime_over_a * H_T_Nb_prime +
                                              9. / 2. * a2 * ppw->rho_plus_p_shear;
       }
-    }
-
-    if (has_source_k2gamma_Nb_) {
-      class_stop(
-          "We need to compute the derivative of H_T_Nb_prime numerically. Written by T. "
-          "Tram but not yet propagated here. See devel branch prior to merging with hmcode "
-          "branch");
     }
 
     /* Bardeen potential -PHI_H = phi in Newtonian gauge */
