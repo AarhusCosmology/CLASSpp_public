@@ -29,3 +29,9 @@ struct ScalarFieldPotential {
 /** The historical built-in: V = exp(-lambda*phi) * ((phi-B)^alpha + A),
  *  params = [lambda, alpha, A, B]. */
 ScalarFieldPotential DefaultScalarFieldPotential();
+
+/** Axion bundle: V = m^2 f^2 (1 - cos(phi/f))^n, params = [m, f, n, Theta_ini]
+ *  (m in 1/Mpc; f, phi in reduced-Planck units; n >= 1; Theta_ini in (0, pi)).
+ *  ddV is written with sin^2 = u(2-u) so it stays regular at the minimum u -> 0.
+ *  The shooting guess assumes a frozen field today: V(Theta_ini*f) = 3 H0^2 Omega. */
+ScalarFieldPotential AxionScalarFieldPotential();

@@ -17,7 +17,7 @@ class DarkRadiation;
 
 /** list of possible parametrisations of the DE equation of state */
 
-enum equation_of_state { CLP, EDE };
+enum equation_of_state { CLP, EDE, PhenoAxion };
 
 /**
  * Input parameters for the background calculation.

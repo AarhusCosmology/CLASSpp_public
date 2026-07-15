@@ -510,7 +510,7 @@ void PerturbationsModule::perturb_init() {
                w_fld_ini);
 
     if (!ppf_fluid()) {  // a non-PPF fluid is present (single-fluid: count && !ppf)
-      class_test((w_fld_ini + 1.0) * (w_fld_0 + 1.0) <= 0.0,
+      class_test(static_cast<const FluidSpecies&>(*all_species_.at("Fluid")).ReachesPhantomDivide(),
                  "w crosses -1 between the infinite past and today, and this would lead to "
                  "divergent perturbation equations for the fluid perturbations. Try to switch to "
                  "PPF scheme: use_ppf = yes");

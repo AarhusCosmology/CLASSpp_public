@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include "../species/fluid.h"
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "background_module.h"
@@ -2897,10 +2898,16 @@ void ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination
     param.okh2                       = pba->Omega0_k * pba->h * pba->h;
     param.odeh2                      = (Omega0_lambda_hyrec + Omega0_fld_hyrec) * pba->h * pba->h;
   }
-  double w_fld, dw_over_da_fld, integral_fld;
-  background_module_->background_w_fld(1., &w_fld, &dw_over_da_fld, &integral_fld);
-  param.w0              = w_fld;
-  param.wa              = -dw_over_da_fld;
+  param.w0 = -1.;
+  param.wa = 0.;
+  if (all_species_.count("Fluid")) {
+    const auto& fld = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
+    class_test(!fld.HyrecCplApproximation(&param.w0, &param.wa),
+               "this fluid's dark-energy density history cannot be represented by the CPL "
+               "(w0, wa) pair that HyRec uses internally (hyrec/history.c) — HyRec would "
+               "misreconstruct H(z) at recombination. Use 'recombination = RECFAST', which "
+               "reads the true background table.");
+  }
   param.Y               = YHe_;
   param.Nnueff          = background_module_->Neff_;
   param.nH0             = 11.223846333047 * param.obh2 *

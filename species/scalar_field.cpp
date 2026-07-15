@@ -517,6 +517,14 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   if (omega0_scf == 0.)
     return result;
 
+  // ── scf_potential dispatch ────────────────────────────────────────────────
+  if (auto pot_opt = ctx.pfc->get<std::string>("scf_potential")) {
+    if (*pot_opt == "axion")
+      return CreateAxion(ctx, omega0_scf);
+    throw std::invalid_argument("unknown scf_potential '" + *pot_opt +
+                                "': supported values are 'axion' (absent = historical default)");
+  }
+
   // ── scf_parameters (variable-length list) ────────────────────────────────
   std::vector<double> scf_parameters;
   try {
@@ -606,6 +614,67 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
     }
   }
 
+  result.push_back({"ScalarField", std::move(species)});
+  return result;
+}
+
+std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ctx,
+                                                   double omega0_scf) {
+  std::vector<Named> result;
+
+  const auto f_opt     = ctx.pfc->get<double>("f_axion");
+  const auto theta_opt = ctx.pfc->get<double>("Theta_initial_scf");
+  const double n       = ctx.pfc->get_or("n_axion", 1.);
+  if (!f_opt || *f_opt <= 0.)
+    throw std::invalid_argument(
+        "scf_potential = axion requires f_axion > 0 (decay constant, reduced-Planck units)");
+  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= M_PI)
+    throw std::invalid_argument(
+        "scf_potential = axion requires Theta_initial_scf in (0, pi): phi_ini = Theta*f");
+  if (n < 1.)
+    throw std::invalid_argument("n_axion must be >= 1 (V = m^2 f^2 (1-cos(phi/f))^n)");
+  const double f     = *f_opt;
+  const double theta = *theta_opt;
+
+  // A (1-cos)^n potential has no exponential attractor: frozen ICs are forced.
+  if (auto attr = ctx.pfc->get<std::string>("attractor_ic_scf")) {
+    if (attr->find("y") != std::string::npos || attr->find("Y") != std::string::npos)
+      throw std::invalid_argument(
+          "attractor_ic_scf = yes is incompatible with scf_potential = axion "
+          "(frozen ICs phi = Theta_initial_scf * f_axion, phi' = 0 are set automatically)");
+  }
+  if (ctx.pfc->get<std::vector<double>>("scf_parameters").has_value())
+    throw std::invalid_argument(
+        "scf_parameters is not used with scf_potential = axion; "
+        "give m_axion, f_axion, n_axion, Theta_initial_scf instead");
+  ctx.pfc->get<int>("scf_tuning_index");  // consume; the axion branch forces 0
+
+  std::vector<double> params = {ctx.pfc->get_or("m_axion", 0.), f, n, theta};
+
+  // Resolved shooting value (written back by DoShooting) wins over any seed.
+  bool shooting_param_present = false;
+  if (auto sp = ctx.pfc->get<double>("scf_shooting_parameter")) {
+    params[0]              = *sp;
+    shooting_param_present = true;
+  }
+
+  auto species = std::make_unique<ScalarFieldSpecies>(*ctx.pba,
+                                                      omega0_scf,
+                                                      std::move(params),
+                                                      /*scf_tuning_index=*/0,
+                                                      /*attractor_ic_scf=*/false,
+                                                      /*phi_ini_scf=*/theta * f,
+                                                      /*phi_prime_ini_scf=*/0.,
+                                                      AxionScalarFieldPotential());
+  if (!shooting_param_present) {
+    species->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega0_scf};
+    species->needs_shooting_  = true;
+    if (species->scf_parameters_[0] <= 0.) {
+      std::vector<double> g, d;
+      species->ComputeShootingGuess(ctx, g, d);
+      species->scf_parameters_[0] = g[0];
+    }
+  }
   result.push_back({"ScalarField", std::move(species)});
   return result;
 }

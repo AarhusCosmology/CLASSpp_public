@@ -89,7 +89,32 @@ class FluidSpecies : public BaseSpecies {
    * moved here from BackgroundModule::background_w_fld because this is pure
    * fluid physics.
    */
-  void ComputeWFld(double a, double* w_fld, double* dw_over_da_fld, double* integral_fld) const;
+  virtual void ComputeWFld(double a,
+                           double* w_fld,
+                           double* dw_over_da_fld,
+                           double* integral_fld) const;
+
+  /** Effective sound speed in the fluid rest frame, cs2(k^2, a). The base fluid
+   *  uses the constant input cs2_fld; AxionEDEFluid overrides with the
+   *  k- and a-dependent GDM formula. Takes k^2 to avoid a sqrt in PerturbDerivs. */
+  virtual double Cs2(double /*k2*/, double /*a*/) const {
+    return cs2_fld_;
+  }
+
+  /** True iff w(a) reaches or crosses -1 between the infinite past and today, which
+   *  would make the true-fluid delta/theta equations divide by 1+w. The base fluid
+   *  answers with the historical endpoint test (w at a=0 and a=1, product of (1+w)
+   *  factors <= 0 — this includes exact contact at -1, which for CLP-style w(a) does
+   *  reach the divide). AxionEDEFluid overrides: its sigmoid satisfies w > -1 strictly
+   *  for every a > 0, so the a=0 asymptote at exactly -1 is not a crossing. */
+  virtual bool ReachesPhantomDivide() const;
+
+  /** HyRec reconstructs its internal dark-energy density from a CPL (w0, wa) pair
+   *  (hyrec/history.c:83). Fill (w0, wa) with this fluid's best CPL representation and
+   *  return true, or return false when no CPL pair can represent the density history
+   *  (the caller must then refuse to run HyRec). Base fluid: tangent at a = 1,
+   *  w0 = w(1), wa = -dw/da(1) — exactly the historical behavior. */
+  virtual bool HyrecCplApproximation(double* w0, double* wa) const;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
 
@@ -124,6 +149,9 @@ class FluidSpecies : public BaseSpecies {
                                      const PerturbSwitchContext& ctx) const override;
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
+
+  // Factory branch for fluid_equation_of_state = pheno_axion (AxiCLASS EDE fluid).
+  static std::vector<Named> CreatePhenoAxion(const SpeciesBuildContext& ctx);
 
   StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
                                         const perturb_vector* pv,

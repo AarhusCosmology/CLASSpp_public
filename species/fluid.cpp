@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "axion_ede_fluid.h"
 #include "background.h"
 #include "background_module.h"
 #include "idm_dr_idr_species.h"
@@ -12,6 +13,7 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 #include "ppf_fluid.h"
+#include "species_collection.h"
 
 FluidSpecies::FluidSpecies(const background& pba,
                            double omega0_fld,
@@ -135,7 +137,7 @@ void FluidSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double dw_over_da_fld = ppw->pvecback[index_bg_dw_over_da_fld_];
   const double w_prime_fld    = dw_over_da_fld * a_prime_over_a * a;
   const double ca2            = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
-  const double cs2            = cs2_fld_;
+  const double cs2            = Cs2(k2, a);
 
   dy[layout.idx_delta] = -(1. + w_fld) * (y[layout.idx_theta] + metric_continuity) -
                          3. * (cs2 - w_fld) * a_prime_over_a * y[layout.idx_delta] -
@@ -196,12 +198,13 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
   double w_fld, dw_over_da, integral;
   auto* bgm = ctx.p_mod->GetBackgroundModule().get();
   bgm->background_w_fld(ctx.a, &w_fld, &dw_over_da, &integral);
+  const double cs2 = Cs2(ctx.k * ctx.k, ctx.a);
 
-  y[layout.idx_delta] = -ctx.ktau_two / 4. * (1. + w_fld) * (4. - 3. * cs2_fld_) /
-                        (4. - 6. * w_fld + 3. * cs2_fld_) * ctx.ppr->curvature_ini * ctx.s2_squared;
+  y[layout.idx_delta] = -ctx.ktau_two / 4. * (1. + w_fld) * (4. - 3. * cs2) /
+                        (4. - 6. * w_fld + 3. * cs2) * ctx.ppr->curvature_ini * ctx.s2_squared;
 
-  y[layout.idx_theta] = -ctx.k * ctx.ktau_three / 4. * cs2_fld_ /
-                        (4. - 6. * w_fld + 3. * cs2_fld_) * ctx.ppr->curvature_ini * ctx.s2_squared;
+  y[layout.idx_theta] = -ctx.k * ctx.ktau_three / 4. * cs2 / (4. - 6. * w_fld + 3. * cs2) *
+                        ctx.ppr->curvature_ini * ctx.s2_squared;
 }
 
 void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
@@ -271,6 +274,7 @@ BaseSpecies::StressEnergyContribution FluidSpecies::StressEnergy(
     const double k2             = ppw->scalar_ctx.k2;
     const double a              = ppw->scalar_ctx.a;
     const double a_prime_over_a = pvecback[bgm_->index_bg_H_] * a;
+    const double cs2            = Cs2(k2, a);
 
     double w_fld, dw_over_da_fld, integral_fld;
     ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
@@ -281,8 +285,8 @@ BaseSpecies::StressEnergyContribution FluidSpecies::StressEnergy(
     const double rho_plus_p_theta_fld = (1. + w_fld) * rho * y[layout.idx_theta];
     const double ca2_fld              = w_fld - w_prime_fld / 3. / (1. + w_fld) / a_prime_over_a;
 
-    se.delta_p = cs2_fld_ * delta_rho_fld +
-                 (cs2_fld_ - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
+    se.delta_p = cs2 * delta_rho_fld +
+                 (cs2 - ca2_fld) * (3. * a_prime_over_a * rho_plus_p_theta_fld / k2);
   }
 
   // rho_plus_p_shear: always 0 for fluid
@@ -344,6 +348,11 @@ void FluidSpecies::ComputeWFld(double a,
       *w_fld = -dOmega_ede_over_da * a / Omega_ede / 3. / (1. - Omega_ede) + a_eq / 3. / (a + a_eq);
       break;
     }
+    case PhenoAxion:
+      class_stop(
+          "internal error: base FluidSpecies::ComputeWFld reached with PhenoAxion eos "
+          "(AxionEDEFluid must override)");
+      break;
   }
 
   /** - then, give the corresponding analytic derivative dw/da (used
@@ -364,6 +373,11 @@ void FluidSpecies::ComputeWFld(double a,
                         a_eq / 3. / (a + a_eq) / (a + a_eq);
       break;
     }
+    case PhenoAxion:
+      class_stop(
+          "internal error: base FluidSpecies::ComputeWFld reached with PhenoAxion eos "
+          "(AxionEDEFluid must override)");
+      break;
   }
 
   /** - finally, give the analytic solution of the following integral:
@@ -385,12 +399,32 @@ void FluidSpecies::ComputeWFld(double a,
           "EDE implementation not finished: to finish it, read the comments in background.c "
           "just before this line\n");
       break;
+    case PhenoAxion:
+      class_stop(
+          "internal error: base FluidSpecies::ComputeWFld reached with PhenoAxion eos "
+          "(AxionEDEFluid must override)");
+      break;
   }
 
   /** note: of course you can generalise these formulas to anything,
       defining new parameters pba->w..._fld. Just remember that so
       far, HyRec explicitely assumes that w(a)= w0 + wa (1-a/a0); but
       Recfast does not assume anything */
+}
+
+bool FluidSpecies::ReachesPhantomDivide() const {
+  double w_ini, w_0, dw_over_da, integral;
+  ComputeWFld(0., &w_ini, &dw_over_da, &integral);
+  ComputeWFld(1., &w_0, &dw_over_da, &integral);
+  return (w_ini + 1.) * (w_0 + 1.) <= 0.;
+}
+
+bool FluidSpecies::HyrecCplApproximation(double* w0, double* wa) const {
+  double w_fld, dw_over_da_fld, integral_fld;
+  ComputeWFld(1., &w_fld, &dw_over_da_fld, &integral_fld);
+  *w0 = w_fld;
+  *wa = -dw_over_da_fld;
+  return true;
 }
 
 // ── Newtonian-gauge transform ─────────────────────────────────────────────────
@@ -424,22 +458,15 @@ void FluidSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayou
 std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
 
-  // Resolve Omega0_fld first: either the closure-budget override or pfc.
-  double omega0_fld = 0.;
-  if (ctx.omega0_closure_override.has_value()) {
-    omega0_fld = *ctx.omega0_closure_override;
-  }
-  else {
-    omega0_fld = ctx.pfc->get_or("Omega_fld", omega0_fld);
-  }
-  if (omega0_fld == 0.)
-    return result;
-
   // ── fluid_equation_of_state (string-keyed enum) ────────────────────────────
   equation_of_state fluid_eos = CLP;
   if (auto eos_opt = ctx.pfc->get<std::string>("fluid_equation_of_state")) {
     const std::string& eos_str = *eos_opt;
-    if (eos_str.find("CLP") != std::string::npos || eos_str.find("clp") != std::string::npos) {
+    if (eos_str.find("pheno_axion") != std::string::npos ||
+        eos_str.find("PhenoAxion") != std::string::npos) {
+      return CreatePhenoAxion(ctx);
+    }
+    else if (eos_str.find("CLP") != std::string::npos || eos_str.find("clp") != std::string::npos) {
       fluid_eos = CLP;
     }
     else if (eos_str.find("EDE") != std::string::npos || eos_str.find("ede") != std::string::npos) {
@@ -450,6 +477,17 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
                                   "' for the field 'fluid_equation_of_state'");
     }
   }
+
+  // Resolve Omega0_fld: either the closure-budget override or pfc.
+  double omega0_fld = 0.;
+  if (ctx.omega0_closure_override.has_value()) {
+    omega0_fld = *ctx.omega0_closure_override;
+  }
+  else {
+    omega0_fld = ctx.pfc->get_or("Omega_fld", omega0_fld);
+  }
+  if (omega0_fld == 0.)
+    return result;
 
   // ── numeric params ────────────────────────────────────────────────────────
   double w0_fld    = -1.;
@@ -500,5 +538,130 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
                                         Omega_EDE);
   }
   result.push_back({"Fluid", std::move(sp)});
+  return result;
+}
+
+std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx) {
+  std::vector<Named> result;
+
+  if (ctx.omega0_closure_override.has_value())
+    throw std::invalid_argument(
+        "the pheno_axion fluid cannot be the budget-closure species (its density is set "
+        "by a_c and the EDE fraction); let Lambda close the budget");
+
+  // ── n XOR w_fld_f ──────────────────────────────────────────────────────────
+  const auto n_opt  = ctx.pfc->get<double>("n_pheno_axion");
+  const auto wf_opt = ctx.pfc->get<double>("w_fld_f");
+  if (n_opt && wf_opt)
+    throw std::invalid_argument("give only one of 'n_pheno_axion' and 'w_fld_f'");
+  if (!n_opt && !wf_opt)
+    throw std::invalid_argument("pheno_axion needs 'n_pheno_axion' (or 'w_fld_f')");
+  double n, w_f;
+  if (n_opt) {
+    n = *n_opt;
+    if (n < 1.)
+      throw std::invalid_argument("n_pheno_axion must be >= 1");
+    w_f = AxionEDEFluid::WFinal(n);
+  }
+  else {
+    w_f = *wf_opt;
+    // w_f < 0 would give a derived n = (1+w_f)/(1-w_f) < 1, violating the model
+    // requirement n >= 1 (and making the k->0 sound speed w_f negative).
+    if (w_f < 0. || w_f >= 1.)
+      throw std::invalid_argument(
+          "w_fld_f must lie in [0, 1) so that the derived n = (1+w_f)/(1-w_f) is >= 1");
+    n = (1. + w_f) / (1. - w_f);
+  }
+  const double w_i = ctx.pfc->get_or("w_fld_i", -1.);
+  const double nu  = ctx.pfc->get_or("nu_fld", 1.);
+  if (nu <= 0.)
+    throw std::invalid_argument("nu_fld must be > 0");
+  // w_i < -1 would make w(a) cross -1 on its way to w_f, which the true-fluid
+  // equations cannot handle (AxionEDEFluid::ReachesPhantomDivide answers false
+  // on the premise w(a) > -1 for all a > 0; w_i = -1 exactly is the designed
+  // asymptote and stays safe because w(a) > w_i at every a > 0).
+  if (w_i < -1.)
+    throw std::invalid_argument("w_fld_i must be >= -1 (w may not cross the phantom divide)");
+  if (w_f <= w_i)
+    throw std::invalid_argument("pheno_axion needs w_fld_f > w_fld_i");
+
+  // ── a_c XOR log10_axion_ac ─────────────────────────────────────────────────
+  const auto ac_opt     = ctx.pfc->get<double>("a_c");
+  const auto log_ac_opt = ctx.pfc->get<double>("log10_axion_ac");
+  if (ac_opt && log_ac_opt)
+    throw std::invalid_argument("give only one of 'a_c' and 'log10_axion_ac'");
+  if (!ac_opt && !log_ac_opt)
+    throw std::invalid_argument("pheno_axion needs 'a_c' or 'log10_axion_ac'");
+  const double a_c = ac_opt ? *ac_opt : std::pow(10., *log_ac_opt);
+  if (a_c <= 0. || a_c >= 1.)
+    throw std::invalid_argument("a_c must lie in (0, 1)");
+
+  // ── Theta_initial_fld (required; enters only the omega_axion calibration) ──
+  const auto theta_opt = ctx.pfc->get<double>("Theta_initial_fld");
+  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= M_PI)
+    throw std::invalid_argument("pheno_axion requires Theta_initial_fld in (0, pi)");
+
+  // ── density: exactly one of Omega_fld / Omega_fld_ac / fraction_fld_ac ────
+  const auto om0_opt  = ctx.pfc->get<double>("Omega_fld");
+  const auto omac_opt = ctx.pfc->get<double>("Omega_fld_ac");
+  const auto frac_opt = ctx.pfc->get<double>("fraction_fld_ac");
+  const int n_density = int(om0_opt.has_value()) + int(omac_opt.has_value()) +
+                        int(frac_opt.has_value());
+  if (n_density != 1)
+    throw std::invalid_argument(
+        "pheno_axion needs exactly one of 'Omega_fld', 'Omega_fld_ac', 'fraction_fld_ac'");
+
+  double omega0_fld = 0.;
+  if (om0_opt) {
+    omega0_fld = *om0_opt;
+  }
+  else if (omac_opt) {
+    omega0_fld = AxionEDEFluid::OmegaZeroFromOmegaAc(*omac_opt, a_c, nu, w_i, w_f);
+  }
+  else {
+    // fraction f = rho_fld(a_c)/rho_tot(a_c): Omega_fld_ac = Omega_tot_others(a_c) f/(1-f),
+    // with the other species scaled to a_c by EnergyType (AxiCLASS input.c:4157-4174;
+    // Lambda is excluded there too — negligible at EDE-era a_c).
+    const double f_ac = *frac_opt;
+    if (f_ac <= 0. || f_ac >= 1.)
+      throw std::invalid_argument("fraction_fld_ac must lie in (0, 1)");
+    if (ctx.all_species == nullptr)
+      throw std::invalid_argument(
+          "fraction_fld_ac needs the species collection (internal: all_species missing)");
+    double omega_tot_ac = 0.;
+    for (const auto& sp : *ctx.all_species) {
+      switch (sp->energy_type()) {
+        case BaseSpecies::EnergyType::Radiation:
+          omega_tot_ac += sp->GetOmega0() * std::pow(a_c, -4.);
+          break;
+        case BaseSpecies::EnergyType::Matter:
+          omega_tot_ac += sp->GetOmega0() * std::pow(a_c, -3.);
+          break;
+        default:
+          break;
+      }
+    }
+    const double omega_ac = omega_tot_ac * f_ac / (1. - f_ac);
+    omega0_fld            = AxionEDEFluid::OmegaZeroFromOmegaAc(omega_ac, a_c, nu, w_i, w_f);
+  }
+  if (omega0_fld <= 0.)
+    throw std::invalid_argument(
+        "pheno_axion needs a positive fluid density: Omega_fld / Omega_fld_ac must be > 0");
+
+  // ── PPF is meaningless here; cs2 is derived, not an input ──────────────────
+  if (auto ppf_opt = ctx.pfc->get<std::string>("use_ppf")) {
+    if (ppf_opt->find("y") != std::string::npos || ppf_opt->find("Y") != std::string::npos)
+      throw std::invalid_argument(
+          "use_ppf = yes is incompatible with pheno_axion (w > -1 always; the GDM "
+          "sound speed requires the true fluid equations)");
+  }
+  if (ctx.pfc->get<double>("cs2_fld").has_value())
+    throw std::invalid_argument(
+        "cs2_fld is not an input for pheno_axion (the sound speed is the GDM formula "
+        "derived from n, a_c and Theta_initial_fld)");
+
+  result.push_back(
+      {"Fluid",
+       std::make_unique<AxionEDEFluid>(*ctx.pba, omega0_fld, a_c, n, nu, w_i, w_f, *theta_opt)});
   return result;
 }

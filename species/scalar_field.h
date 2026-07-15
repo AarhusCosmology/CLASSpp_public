@@ -131,6 +131,11 @@ class ScalarFieldSpecies : public BaseSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
+  // Axion factory branch: scf_potential = axion. params = [m, f, n, Theta_ini],
+  // frozen ICs (phi = Theta*f, phi' = 0), always shoots m (tuning index 0)
+  // against Omega_scf / the closure value; m_axion is an optional Newton seed.
+  static std::vector<Named> CreateAxion(const SpeciesBuildContext& ctx, double omega0_scf);
+
   // Shared build body for both the standalone factory (beta = 0) and the Type3
   // composite (beta = scf_veta). Constructs the configured ScalarFieldSpecies with
   // its shooting state set; CreateAll wraps it with the scf_veta suppression guard.
