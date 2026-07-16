@@ -212,6 +212,15 @@ bool CompositeSpecies::IsColdMatterSpecies() const {
   return false;
 }
 
+bool CompositeSpecies::HasWarmMatter() const {
+  // Per-child scan: the composite's own OR-ed predicates can't answer this
+  // (a cold parent + warm daughter would read ClustersAsMatter && IsCold).
+  for (const auto& child : children_)
+    if (child->HasWarmMatter())
+      return true;
+  return false;
+}
+
 void CompositeSpecies::FinalizeMatterClassification() {
   BaseSpecies::
       FinalizeMatterClassification();  // stamp this composite's own (unused but valid) bits

@@ -15,6 +15,7 @@
 #include "dark_radiation_species.h"
 #include "dcdm.h"
 #include "dcdm_dr_species.h"
+#include "dcdm_wdm_species.h"
 #include "dncdm_dr_species.h"
 #include "fluid.h"
 #include "greybody_ncdm_species.h"
@@ -50,6 +51,7 @@ inline constexpr std::array kAllSpeciesFactories = {
     SpeciesFactoryEntry{NCDMSpecies::kTypeName, &NCDMSpecies::CreateAll},
     SpeciesFactoryEntry{GreyBodyNCDMSpecies::kTypeName, &GreyBodyNCDMSpecies::CreateAll},
     SpeciesFactoryEntry{DNCDMSpecies::kTypeName, &DNCDM_DR_Species::CreateAll},
+    SpeciesFactoryEntry{DCDM_WDM_Species::kTypeName, &DCDM_WDM_Species::CreateAll},
     SpeciesFactoryEntry{NCDMInteractingSpecies::kTypeName, &NCDMInteractingSpecies::CreateAll},
     SpeciesFactoryEntry{IDM_DR_IDR_Species::kTypeName, &IDM_DR_IDR_Species::CreateAll},
     SpeciesFactoryEntry{IDM_DRMD_IDR_DRMD_Species::kTypeName,

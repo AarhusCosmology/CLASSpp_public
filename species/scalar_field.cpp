@@ -628,7 +628,7 @@ std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ct
   if (!f_opt || *f_opt <= 0.)
     throw std::invalid_argument(
         "scf_potential = axion requires f_axion > 0 (decay constant, reduced-Planck units)");
-  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= M_PI)
+  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= _PI_)
     throw std::invalid_argument(
         "scf_potential = axion requires Theta_initial_scf in (0, pi): phi_ini = Theta*f");
   if (n < 1.)

@@ -78,6 +78,7 @@ set(CLASS_SPECIES_FILES
   species/dark_radiation_species.cpp
   species/dcdm.cpp
   species/dcdm_dr_species.cpp
+  species/dcdm_wdm_species.cpp
   species/dncdm_dr_species.cpp
   species/dncdm_species.cpp
   species/fluid.cpp
@@ -99,6 +100,7 @@ set(CLASS_SPECIES_FILES
   species/species_input.cpp
   species/type3_species.cpp
   species/ultra_relativistic.cpp
+  species/wdm_decay_product.cpp
 )
 
 set(CLASS_TOOLS_FILES
@@ -224,7 +226,8 @@ if(NOT SKBUILD)
   add_executable(test-type3-coupling species/type3_coupling_test.cpp)
   add_executable(test-axion-scf-factory species/axion_scf_factory_test.cpp)
   add_executable(test-axion-ede-fluid species/axion_ede_fluid_test.cpp)
-  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid)
+  add_executable(test-dcdm-wdm species/dcdm_wdm_test.cpp)
+  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for

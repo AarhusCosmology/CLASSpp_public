@@ -1219,7 +1219,10 @@ void NonlinearModule::nonlinear_indices() {
      first) */
 
   has_pk_m_ = true;
-  if (background_module_->GetNcdmCount() > 0) {
+  /* Must agree with the has_source_delta_cb_ gate in the perturbations module
+     (both keyed on warm matter being present), since P_cb is built from the
+     index_tp_delta_cb_ source. */
+  if (all_species_.has_warm_matter()) {
     has_pk_cb_ = true;
   }
   else {

@@ -163,7 +163,7 @@ void AxionEDEFluid::DeriveAxionScales() {
   m_fld_           = std::pow(1. - cos_initial, (1. - n) / 2.) *
                      std::sqrt((1. - f) * (6. * p + 2.) * theta_i_ / (n * sin_initial)) / xc;
   alpha_fld_       = std::sqrt(6. * omega_ac_) / m_fld_ / std::pow(1. - cos_initial, n / 2.);
-  const double Gac = std::sqrt(M_PI) * std::tgamma((n + 1.) / (2. * n)) /
+  const double Gac = std::sqrt(_PI_) * std::tgamma((n + 1.) / (2. * n)) /
                      std::tgamma(1. + 1. / (2. * n)) * std::pow(2., -(n * n + 1.) / (2. * n)) *
                      std::pow(3., 0.5 * (1. / n - 1.)) * std::pow(a_c_, 3. - 6. / (1. + n)) *
                      std::pow(std::pow(a_c_, 6. * n / (1. + n)) + 1., 0.5 * (1. / n - 1.));

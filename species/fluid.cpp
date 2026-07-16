@@ -598,7 +598,7 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
 
   // ── Theta_initial_fld (required; enters only the omega_axion calibration) ──
   const auto theta_opt = ctx.pfc->get<double>("Theta_initial_fld");
-  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= M_PI)
+  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= _PI_)
     throw std::invalid_argument("pheno_axion requires Theta_initial_fld in (0, pi)");
 
   // ── density: exactly one of Omega_fld / Omega_fld_ac / fraction_fld_ac ────

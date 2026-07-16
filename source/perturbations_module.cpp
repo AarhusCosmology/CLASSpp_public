@@ -839,7 +839,10 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
         has_lss_            = true;
         has_source_delta_m_ = true;
 
-        if (all_species_.has_ncdm()) {
+        /* P_cb differs from P_m exactly when a warm-matter species is present
+           (clusters in delta_m but not delta_cb): plain NCDM, but also warm
+           composite children such as the dcdm_wdm daughter. */
+        if (all_species_.has_warm_matter()) {
           has_source_delta_cb_ = true;
         }
       }
@@ -867,7 +870,7 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
         }
         if (ppt->has_nc_rsd) {
           has_source_theta_m_ = true;
-          if (all_species_.has_ncdm())
+          if (all_species_.has_warm_matter())
             /* we may not need theta_cb at all, rsd always defined for
                the total matter, but at least this is made
                available */

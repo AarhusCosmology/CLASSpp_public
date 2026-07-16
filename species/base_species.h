@@ -639,6 +639,19 @@ class BaseSpecies {
     return energy_type_ == EnergyType::Matter;
   }
 
+  /**
+   * True iff this species contributes WARM matter: it clusters in the total
+   * matter tally (delta_m / P_m) but stays out of the cold tally (delta_cb /
+   * P_cb). This is exactly the condition under which P_cb differs from P_m,
+   * so it gates the _cb sources and spectra (has_source_delta_cb_,
+   * has_pk_cb_). Default: derived from the two predicates above. Override:
+   * composites scan children (their own two predicates OR over children, so
+   * e.g. a cold parent + warm daughter composite would wrongly read as cold).
+   */
+  virtual bool HasWarmMatter() const {
+    return ClustersAsMatter() && !IsColdMatterSpecies();
+  }
+
  protected:
   BaseSpecies(std::string name, EnergyType energy_type)
       : name_(std::move(name)), energy_type_(energy_type) {}

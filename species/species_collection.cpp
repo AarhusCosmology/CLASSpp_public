@@ -54,6 +54,8 @@ void SpeciesCollection::freeze() {
     if (dynamic_cast<NCDMBaseSpecies*>(species_[i].get()) ||
         dynamic_cast<DNCDM_DR_Species*>(species_[i].get()))
       has_ncdm_ = true;
+    if (species_[i]->HasWarmMatter())
+      has_warm_matter_ = true;
   }
   frozen_ = true;
 }

@@ -134,6 +134,14 @@ class SpeciesCollection {
     assert(frozen_);
     return has_ncdm_;
   }
+  /** True iff any species (or composite child) contributes warm matter —
+   *  clusters in delta_m/P_m but not in delta_cb/P_cb. Gates the _cb sources
+   *  and spectra: P_cb differs from P_m exactly when this is true. Valid only
+   *  after freeze(). */
+  bool has_warm_matter() const {
+    assert(frozen_);
+    return has_warm_matter_;
+  }
 
   // ── Iteration / size ────────────────────────────────────────────────────
   Container::iterator begin() {
@@ -174,5 +182,6 @@ class SpeciesCollection {
   std::size_t photons_index_ = 0;
   std::size_t baryons_index_ = 0;
   bool has_ncdm_             = false;
+  bool has_warm_matter_      = false;
   bool frozen_               = false;
 };

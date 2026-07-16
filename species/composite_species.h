@@ -182,6 +182,7 @@ class CompositeSpecies : public BaseSpecies {
   // ── Matter tally ────────────────────────────────────────────────────────
   bool ClustersAsMatter() const override;
   bool IsColdMatterSpecies() const override;
+  bool HasWarmMatter() const override;
   void FinalizeMatterClassification() override;
 
  protected:
