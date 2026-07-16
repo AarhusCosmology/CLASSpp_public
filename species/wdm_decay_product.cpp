@@ -501,28 +501,6 @@ BaseSpecies::StressEnergyContribution WdmDecayProductSpecies::StressEnergy(
   return se;
 }
 
-void WdmDecayProductSpecies::CopyPerturbationsAcrossSwitch(
-    const BaseSpecies::PerturbLayout& old_base,
-    const BaseSpecies::PerturbLayout& new_base,
-    const double* old_y,
-    double* new_y,
-    const PerturbSwitchContext& /*ctx*/) const {
-  // The daughter has no approximation of its own: the layout shape never
-  // changes, so this is always a slot-by-slot copy. (NOTE: NCDMBaseSpecies has
-  // no default copy — without this override the hierarchy would be zeroed at
-  // every TCA/RSA switch.)
-  const auto& old_l = static_cast<const NCDMBaseSpecies::PerturbLayout&>(old_base);
-  const auto& new_l = static_cast<const NCDMBaseSpecies::PerturbLayout&>(new_base);
-  if (old_l.q_size <= 0 || new_l.q_size <= 0)
-    return;
-  for (int iq = 0; iq < new_l.q_size; ++iq) {
-    const int o = old_l.index_per_q[iq];
-    const int n = new_l.index_per_q[iq];
-    for (int l = 0; l <= new_l.l_max; ++l)
-      new_y[n + l] = old_y[o + l];
-  }
-}
-
 void WdmDecayProductSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                                          const double* y,
                                          const double* /*dy*/,

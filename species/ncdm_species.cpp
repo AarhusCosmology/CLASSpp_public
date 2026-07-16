@@ -605,13 +605,8 @@ void NCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout
   const bool fa_is_on  = (new_l.q_size == 1 && new_l.l_max == 2);
 
   if (fa_was_on == fa_is_on) {
-    // Slot-by-slot copy (no-switch or unchanged approximation).
-    for (int iq = 0; iq < new_l.q_size; ++iq) {
-      const int new_base_idx = new_l.index_per_q[iq];
-      const int old_base_idx = old_l.index_per_q[iq];
-      for (int l = 0; l <= new_l.l_max; ++l)
-        new_y[new_base_idx + l] = old_y[old_base_idx + l];
-    }
+    // Shape unchanged (no-switch or unchanged approximation): base slot copy.
+    NCDMBaseSpecies::CopyPerturbationsAcrossSwitch(old_base, new_base, old_y, new_y, ctx);
     return;
   }
 

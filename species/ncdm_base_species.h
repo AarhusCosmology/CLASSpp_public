@@ -184,6 +184,20 @@ class NCDMBaseSpecies : public BaseSpecies {
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 
+  // ── CopyPerturbationsAcrossSwitch ─────────────────────────────────────────
+  /** Layout-shape-preserving slot-by-slot copy across a vector reallocation.
+   *  Default for NCDM-family species with no approximation switches of their
+   *  own: the vector is still reallocated (zero-initialized) whenever any OTHER
+   *  species' approximation flips (TCA/RSA/...), so every species must migrate
+   *  its slots or lose its hierarchy mid-integration (#372). Subclasses whose
+   *  layout shape can change across a switch must override (NCDMSpecies'
+   *  fluid-approximation collapse). */
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
+                                     const BaseSpecies::PerturbLayout& new_layout,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
+
  protected:
   int index_tp_delta_ = -1;  // #309 transfer-source slot (this ncdm flavor)
   int index_tp_theta_ = -1;

@@ -727,6 +727,32 @@ void NCDMBaseSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CopyPerturbationsAcrossSwitch
+// Default slot-by-slot migration for NCDM-family species whose layout shape
+// never changes (DNCDMSpecies, WdmDecayProductSpecies). The reallocated vector
+// arrives zero-initialized, so skipping this restarts the hierarchy from zero
+// mid-integration (#372). NCDMSpecies overrides for its fluid-approximation
+// collapse and delegates back here when the shape is unchanged.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void NCDMBaseSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                                    const BaseSpecies::PerturbLayout& new_base,
+                                                    const double* old_y,
+                                                    double* new_y,
+                                                    const PerturbSwitchContext& /*ctx*/) const {
+  const auto& old_l = static_cast<const PerturbLayout&>(old_base);
+  const auto& new_l = static_cast<const PerturbLayout&>(new_base);
+  if (old_l.q_size < 0 || new_l.q_size < 0)
+    return;
+  for (int iq = 0; iq < new_l.q_size; ++iq) {
+    const int old_idx = old_l.index_per_q[iq];
+    const int new_idx = new_l.index_per_q[iq];
+    for (int l = 0; l <= new_l.l_max; ++l)
+      new_y[new_idx + l] = old_y[old_idx + l];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PerturbTensorDerivs (layout-based)
 // Ports the per-species tensor Boltzmann hierarchy from perturb_derivs_member.
 // GetDlnf0Dlnq is supplied by the concrete subclass:

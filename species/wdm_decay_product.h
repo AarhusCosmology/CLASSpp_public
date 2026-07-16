@@ -149,11 +149,6 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
                                         const double* y,
                                         const double* pvecback,
                                         const perturb_workspace* ppw) const override;
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
-                                     const double* old_y,
-                                     double* new_y,
-                                     const PerturbSwitchContext& ctx) const override;
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
