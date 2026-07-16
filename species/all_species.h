@@ -9,6 +9,7 @@
 #include <array>
 #include <string_view>
 
+#include "axion_ncdm_species.h"
 #include "baryons.h"
 #include "base_species.h"
 #include "cdm.h"
@@ -50,6 +51,7 @@ inline constexpr std::array kAllSpeciesFactories = {
     SpeciesFactoryEntry{DCDM_DR_Species::kTypeName, &DCDM_DR_Species::CreateAll},
     SpeciesFactoryEntry{NCDMSpecies::kTypeName, &NCDMSpecies::CreateAll},
     SpeciesFactoryEntry{GreyBodyNCDMSpecies::kTypeName, &GreyBodyNCDMSpecies::CreateAll},
+    SpeciesFactoryEntry{AxionNCDMSpecies::kTypeName, &AxionNCDMSpecies::CreateAll},
     SpeciesFactoryEntry{DNCDMSpecies::kTypeName, &DNCDM_DR_Species::CreateAll},
     SpeciesFactoryEntry{DCDM_WDM_Species::kTypeName, &DCDM_WDM_Species::CreateAll},
     SpeciesFactoryEntry{NCDMInteractingSpecies::kTypeName, &NCDMInteractingSpecies::CreateAll},

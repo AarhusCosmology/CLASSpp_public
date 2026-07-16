@@ -16,6 +16,7 @@ int main() {
   assert(DCDM_DR_Species::kTypeName == "dcdm_dr");
   assert(NCDMSpecies::kTypeName == "ncdm_standard");
   assert(GreyBodyNCDMSpecies::kTypeName == "ncdm_greybody");
+  assert(AxionNCDMSpecies::kTypeName == "ncdm_axion");
   assert(DNCDMSpecies::kTypeName == "ncdm_decay_dr");
   assert(DCDM_WDM_Species::kTypeName == "dcdm_wdm");
   assert(WdmDecayProductSpecies::kTypeName == "dcdm_wdm");  // daughter shares the sector type
@@ -40,6 +41,7 @@ int main() {
       "dcdm_dr",
       "ncdm_standard",
       "ncdm_greybody",
+      "ncdm_axion",
       "ncdm_decay_dr",
       "dcdm_wdm",
       "ncdm_self_interacting",

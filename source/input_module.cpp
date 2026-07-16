@@ -249,22 +249,13 @@ void InputModule::ConstructSpecies() {
   const std::string_view closure_name = ClosureSpeciesName(pba->closure_species);
 
   // Pass 1: build every non-closure species, summing Omega0 contributions.
-  // Also tally NCDM-family counters as we go: we know which factories are
-  // NCDM-family by their entry name, so no downcast is needed.
   double omega0_sum = 0.0;
-  int n_ncdm        = 0;
   for (const auto& entry : kAllSpeciesFactories) {
     if (entry.name == closure_name)
       continue;
-    auto produced             = entry.create_all(ctx);
-    const bool is_ncdm_family = (entry.name == NCDMSpecies::kTypeName ||
-                                 entry.name == DNCDMSpecies::kTypeName ||
-                                 entry.name == NCDMInteractingSpecies::kTypeName);
+    auto produced = entry.create_all(ctx);
     for (auto& e : produced) {
       omega0_sum += e.species->GetOmega0();
-      if (is_ncdm_family) {
-        n_ncdm += 1;
-      }
       all_species_.insert(e.key, std::move(e.species));
     }
   }
@@ -301,9 +292,9 @@ void InputModule::ConstructSpecies() {
   all_species_.freeze();
 
   // Precision-parameter consistency check that fires when any NCDM-family
-  // species is present (NCDMSpecies + DNCDMSpecies + NCDMInteractingSpecies).
+  // species is present (any NCDMBaseSpecies, or the DNCDM_DR composite).
   const precision* ppr = &precision_;
-  if (n_ncdm > 0) {
+  if (all_species_.has_ncdm()) {
     if (ppr->ncdm_fluid_trigger_tau_over_tau_k == ppr->radiation_streaming_trigger_tau_over_tau_k) {
       throw std::invalid_argument(
           "please choose different values for precision parameters "

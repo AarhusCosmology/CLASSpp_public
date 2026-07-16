@@ -85,6 +85,7 @@ set(CLASS_SPECIES_FILES
   species/axion_ede_fluid.cpp
   species/ppf_fluid.cpp
   species/greybody_ncdm_species.cpp
+  species/axion_ncdm_species.cpp
   species/idm_dr_idr_species.cpp
   species/idm_drmd_idr_drmd_species.cpp
   species/interacting_species.cpp
@@ -227,7 +228,8 @@ if(NOT SKBUILD)
   add_executable(test-axion-scf-factory species/axion_scf_factory_test.cpp)
   add_executable(test-axion-ede-fluid species/axion_ede_fluid_test.cpp)
   add_executable(test-dcdm-wdm species/dcdm_wdm_test.cpp)
-  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm)
+  add_executable(test-axion-ncdm species/axion_ncdm_test.cpp)
+  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for

@@ -16,7 +16,8 @@ TEST_TARGETS := \
 	test-type3-coupling \
 	test-axion-scf-factory \
 	test-axion-ede-fluid \
-	test-dcdm-wdm
+	test-dcdm-wdm \
+	test-axion-ncdm
 
 .PHONY: all class class_profiled classy classy-pip-dev test clean $(TEST_TARGETS)
 
