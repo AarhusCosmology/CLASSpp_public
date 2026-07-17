@@ -5,6 +5,10 @@ System. This site is meant to be a practical map of the codebase: start from
 the conceptual pages below, then use the generated API reference when you need
 the exact class, function, or source-level contract.
 
+> **Looking for tutorials and examples?** This page is the C++ API
+> reference. Executed example notebooks and the getting-started guide live
+> on the [CLASSpp documentation site](../index.html).
+
 The code and tests remain the authoritative description of behavior. The
 Doxygen manual should explain public contracts, ownership and lifetime rules,
 units, numerical assumptions, and the reasons behind non-obvious algorithms.

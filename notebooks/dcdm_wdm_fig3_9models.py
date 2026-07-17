@@ -90,7 +90,7 @@ def freestream(bg_z, bg_H, chi_star, z_d, vk):
     """(k_fs [1/Mpc], l_fs) of the paper's dashed lines: lambda = 2 x Eq. (1)."""
     zz = np.linspace(0.0, z_d, 4001)
     Hz = np.interp(zz, bg_z, bg_H)  # 1/Mpc
-    lam = 2.0 * vk / (1.0 + z_d) * np.trapz((1.0 + zz) / Hz, zz)  # Mpc
+    lam = 2.0 * vk / (1.0 + z_d) * np.trapezoid((1.0 + zz) / Hz, zz)  # Mpc
     return 2.0 * np.pi / lam, np.pi * chi_star / lam
 
 

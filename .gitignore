@@ -59,3 +59,12 @@ test-greybody-moments
 
 # Local agent/tooling state
 .claude/
+
+# Documentation site (doc/site): build output, build-time notebook copies,
+# and notebook-execution byproducts (savefig PDFs, caches). Only the section
+# index.md files are tracked in these two directories.
+doc/site/_build/
+doc/site/tutorials/*
+!doc/site/tutorials/index.md
+doc/site/models/*
+!doc/site/models/index.md

@@ -24,3 +24,28 @@ jobs:
 
       - name: Build documentation
         run: cd doc/input && doxygen doxyconf
+
+  site:
+    runs-on: [self-hosted, linux, light]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create virtual Python environment
+        run: |
+          rm -rf venv-docs
+          DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv-docs --system-site-packages
+          source venv-docs/bin/activate
+          pip install -r doc/site/requirements.txt
+          deactivate
+
+      - name: Build site (no notebook execution)
+        run: |
+          source venv-docs/bin/activate
+          rm -rf doc/site/_build
+          python -m sphinx -W --keep-going -b html doc/site doc/site/_build/html
+          deactivate
+
+      - name: Remove virtual Python environment
+        if: success() || failure()
+        run: rm -rf venv-docs

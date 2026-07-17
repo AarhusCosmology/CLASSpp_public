@@ -61,8 +61,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build HTML documentation
+      - name: Build Doxygen HTML
         run: cd doc/input && doxygen doxyconf
+
+      - name: Create virtual Python environment
+        run: |
+          rm -rf venv-docs
+          DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv-docs --system-site-packages
+          source venv-docs/bin/activate
+          pip install .
+          pip install -r doc/site/requirements.txt
+          deactivate
+
+      - name: Build site with executed notebooks
+        run: |
+          source venv-docs/bin/activate
+          rm -rf doc/site/_build
+          CLASSPP_DOCS_EXECUTE=force python -m sphinx -b html doc/site doc/site/_build/html
+          deactivate
+
+      - name: Add C++ API reference
+        run: cp -r doc/manual/html doc/site/_build/html/api
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -70,11 +89,15 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: doc/manual/html
+          path: doc/site/_build/html
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Remove virtual Python environment
+        if: success() || failure()
+        run: rm -rf venv-docs
 
   nose_tests_lvl3:
     runs-on: [self-hosted, linux, heavy]
