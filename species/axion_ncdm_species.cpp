@@ -3,6 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 
+#include "species/ncdm_family.h"
 #include "species/species_input.h"
 
 AxionNCDMSpecies::AxionNCDMSpecies(FileContent* pfc,
@@ -66,14 +67,5 @@ double AxionNCDMSpecies::EvaluatePsdAnalytic(double q) const {
 }
 
 std::vector<Named> AxionNCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
-  const auto instances = ctx.pfc->instances_with("type", std::string(kTypeName));
-  std::vector<Named> result;
-  result.reserve(instances.size());
-  for (const auto& name : instances) {
-    (void) ctx.pfc->get<std::string>(name + ".type");
-    auto sp =
-        std::make_unique<AxionNCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
-    result.push_back({name, std::move(sp)});
-  }
-  return result;
+  return CreateAllNcdmInstances<AxionNCDMSpecies>(ctx);
 }

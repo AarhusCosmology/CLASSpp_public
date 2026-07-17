@@ -7,6 +7,7 @@
 
 #include "background_module.h"
 #include "bisection.h"
+#include "species/ncdm_family.h"
 #include "species/species_input.h"
 
 namespace {
@@ -295,14 +296,5 @@ std::optional<double> GreyBodyNCDMSpecies::GetParam(const std::string& name) con
 }
 
 std::vector<Named> GreyBodyNCDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
-  const auto instances = ctx.pfc->instances_with("type", std::string(kTypeName));
-  std::vector<Named> result;
-  result.reserve(instances.size());
-  for (const auto& name : instances) {
-    (void) ctx.pfc->get<std::string>(name + ".type");
-    auto sp =
-        std::make_unique<GreyBodyNCDMSpecies>(ctx.pfc, name, *ctx.ncdm_settings, ctx.pba, ctx.bgm);
-    result.push_back({name, std::move(sp)});
-  }
-  return result;
+  return CreateAllNcdmInstances<GreyBodyNCDMSpecies>(ctx);
 }

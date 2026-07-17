@@ -23,6 +23,7 @@
 
 #include "../species/all_species.h"
 #include "../species/dcdm_dr_species.h"
+#include "../species/ncdm_family.h"
 #include "../species/species_input.h"
 
 namespace {
@@ -584,13 +585,7 @@ void InputModule::input_read_precisions() {
   /** - resolve runtime data-file paths against class_dir (defaults are relative) */
   ppr->ResolveDataPaths();
 
-  const auto standard_ncdm_instances =
-      file_content_.instances_with("type", std::string(NCDMSpecies::kTypeName));
-  SynthesiseIdenticalScalarField(&file_content_,
-                                 standard_ncdm_instances,
-                                 "fluid_approximation",
-                                 "ncdm_fluid_approximation",
-                                 "dot-syntax standard NCDM species");
+  SynthesiseNcdmFluidApproximation(&file_content_);
 
   /** - parse all precision parameters from config file */
   ppr->parse(file_content_);

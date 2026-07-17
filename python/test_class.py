@@ -939,7 +939,7 @@ class TestReviewRegressions(TestClass):
             'nu2.m': 0.08,
             'nu2.fluid_approximation': 3,
         }
-        self._assert_compute_fails(scenario, "must be identical for all dot-syntax standard NCDM species")
+        self._assert_compute_fails(scenario, "must be identical for all dot-syntax NCDM-family species")
 
     def test_dot_syntax_standard_psd_filenames_follow_true_flags(self):
         scenario = {

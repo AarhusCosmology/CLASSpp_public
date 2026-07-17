@@ -91,6 +91,7 @@ set(CLASS_SPECIES_FILES
   species/interacting_species.cpp
   species/lambda.cpp
   species/ncdm_base_species.cpp
+  species/ncdm_family.cpp
   species/ncdm_interacting_species.cpp
   species/ncdm_species.cpp
   species/perturb_column_writer.cpp
@@ -230,7 +231,8 @@ if(NOT SKBUILD)
   add_executable(test-dcdm-wdm species/dcdm_wdm_test.cpp)
   add_executable(test-axion-ncdm species/axion_ncdm_test.cpp)
   add_executable(test-dncdm-switch-copy species/dncdm_switch_copy_test.cpp)
-  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy)
+  add_executable(test-ncdm-family species/ncdm_family_test.cpp)
+  foreach(_t IN ITEMS test-parser test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-ncdm-family)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for
