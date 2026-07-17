@@ -25,9 +25,6 @@ class BackgroundModule : public BaseModule {
   void background_idm_drmd(
       double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
 
-  // Number of NCDM-family species present in all_species_ (incl. DNCDM children).
-  int GetNcdmCount() const;
-
   /** Sum of GetOmega0() across all NCDM-family species (NCDM, NCDMInteracting,
    *  and the DNCDMSpecies child of every DNCDM_DR_Species composite). */
   double GetOmega0NcdmTot() const;

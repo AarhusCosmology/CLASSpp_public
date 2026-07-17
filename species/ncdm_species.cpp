@@ -80,7 +80,6 @@ constexpr LegacyFieldMap kLegacyStandardFields[] = {
     {"Omega_ncdm", "Omega"},
     {"omega_ncdm", "omega"},
     {"ksi_ncdm", "ksi"},
-    {"ncdm_psd_parameters", "psd_parameters"},
     {"use_ncdm_psd_files", "use_psd_file"},
     {"ncdm_psd_filenames", "psd_filename"},
     {"quadrature_strategy_ncdm_standard", "quadrature_strategy"},

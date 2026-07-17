@@ -34,8 +34,7 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
                           "quadrature_strategy",
                           "momenta_bins_bg",
                           "use_psd_file",
-                          "psd_filename",
-                          "psd_parameters"}) {
+                          "psd_filename"}) {
     if (input.get<std::string>(key).has_value()) {
       throw std::invalid_argument("species '" + instance_name + "': parameter '" +
                                   std::string(key) + "' is not supported by dcdm_wdm");

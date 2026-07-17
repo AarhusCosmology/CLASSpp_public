@@ -1136,7 +1136,7 @@ void BackgroundModule::background_output_budget() {
     printf(" ---------------------------- Budget equation ----------------------- \n");
 
     printf(" ---> Nonrelativistic Species \n");
-    print_one("Bayrons", pba->Omega0_b, budget_matter);
+    print_one("Baryons", pba->Omega0_b, budget_matter);
     if (all_species_.count("CDM"))
       print_one("Cold Dark Matter", all_species_.at("CDM")->GetOmega0(), budget_matter);
     if (all_species_.count("IDM_DR_IDR")) {
@@ -1320,10 +1320,6 @@ void BackgroundModule::background_print_variables(double loga,
   //FILE* fid = fopen("tmp.dat", "a");
   //fprintf(fid, "%.3e %.3e %.3e %.3e %.3e %.3e\n", exp(loga), tau, pvecback[bm.index_bg_rho_ncdm1_], pvecback[bm.index_bg_rho_dr_species_], y[bm.index_bi_rho_dr_species_], pvecback[bm.index_bg_lnf_ncdm_decay_dr1_ + 2]);
   //fclose(fid);
-}
-
-int BackgroundModule::GetNcdmCount() const {
-  return static_cast<int>(GetNcdmSpecies(all_species_).size());
 }
 
 double BackgroundModule::GetOmega0NcdmTot() const {

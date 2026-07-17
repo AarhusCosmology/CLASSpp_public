@@ -71,11 +71,6 @@ void NCDMBaseSpecies::ReadParametersByInstance(FileContent* pfc,
   input_q_size_bg_     = input.get_or("momenta_bins_bg", input_q_size_);
   qmax_                = input.get_or("max_q", qmax_);
 
-  // psd_parameters: variable-length list (single instance, comma-separated values).
-  if (auto psd_params = input.get<std::vector<double>>("psd_parameters")) {
-    psd_parameters_ = std::move(*psd_params);
-  }
-
   // PSD file: a single-instance flag and an optional filename.
   int use_psd_file = input.get_or("use_psd_file", 0);
   got_file_        = (use_psd_file != 0);
