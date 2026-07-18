@@ -633,10 +633,6 @@ void NCDMBaseSpecies::WarnIfTooHeavyForHalofit(double m_ev_threshold) const {
             m_ncdm_in_electronvolt);
 }
 
-void NCDMBaseSpecies::PrintOmegaInfo() const {
-  printf("-> %-26s Omega = %-15g , omega = %-15g\n", "Neutrino Species", Omega0_, omega0_);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // RegisterTensorPerturbationIndices (layout-based)
 // Reads ppr->l_max_ncdm and q_size() directly; no caller pre-setup required.

@@ -691,3 +691,22 @@ class BaseSpecies {
 
   friend class SpeciesCollection;
 };
+
+// ── Background budget printout (background_verbose > 1) ───────────────────────
+// Coarse presentation buckets for background_output_budget(). Distinct from
+// EnergyType because NCDM-family species are EnergyType::Other yet warrant their
+// own section, and composites (also EnergyType::Other) split across buckets by
+// child.
+enum class BudgetBucket { Radiation, NonRelativistic, Ncdm, Other };
+
+// One printed budget line: a (sub-)species' today density fraction and its bucket.
+struct BudgetLine {
+  std::string label;
+  double omega;
+  BudgetBucket bucket;
+};
+
+// Classify a species into a budget bucket. NCDM-family -> Ncdm (the same family
+// test GetNcdmSpecies uses); otherwise mapped from energy_type(). Defined in
+// base_species.cpp.
+BudgetBucket BudgetBucketOf(const BaseSpecies& s);

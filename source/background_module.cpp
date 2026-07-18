@@ -6,8 +6,11 @@
 #include "background_module.h"
 
 #include <algorithm>
+#include <map>
+#include <vector>
 
 #include "../species/background_ic_context.h"
+#include "../species/composite_species.h"
 #include "../species/dcdm_dr_species.h"
 #include "../species/dncdm_dr_species.h"
 #include "../species/fluid.h"
@@ -1121,107 +1124,101 @@ void BackgroundModule::background_derivs_member(
  */
 
 void BackgroundModule::background_output_budget() {
-  if (pba->background_verbose > 1) {
-    double budget_matter    = 0;
-    double budget_radiation = 0;
-    double budget_other     = 0;
-    double budget_neutrino  = 0;
+  if (pba->background_verbose <= 1)
+    return;
 
-    // Helper: print one species line and accumulate into a budget bucket.
-    auto print_one = [&](const char* label, double omega, double& budget) {
-      printf("-> %-30s Omega = %-15g , omega = %-15g\n", label, omega, omega * pba->h * pba->h);
-      budget += omega;
-    };
+  // Today densities live in the last background-table row; Rho()/rho_crit is a
+  // species' Omega today and closes the budget to 1 by construction.
+  const double* bg_today = background_table_.data() + (bt_size_ - 1) * bg_size_;
+  const double rho_crit  = bg_today[index_bg_rho_crit_];
 
-    printf(" ---------------------------- Budget equation ----------------------- \n");
+  // Display-only: terse internal species names -> readable labels. Any name not
+  // in the map prints verbatim via name(). This map never drives logic.
+  static const std::map<std::string, const char*> kPretty = {
+      {"Baryons", "Baryons"},
+      {"Photons", "Photons"},
+      {"CDM", "Cold Dark Matter"},
+      {"UR", "Ultra-relativistic relics"},
+      {"Lambda", "Cosmological Constant"},
+      {"Fluid", "Dark Energy Fluid"},
+      {"ScalarField", "Scalar Field"},
+      {"DCDM", "Decaying Cold Dark Matter"},
+      {"DR", "Dark Radiation"},
+      {"IDR", "Interacting Dark Radiation"},
+      {"IDM_DR", "Interacting Dark Matter (DR)"},
+      {"IDR_DRMD", "Dark Radiation (DRMD)"},
+      {"IDM_DRMD", "Interacting Dark Matter (DRMD)"},
+  };
+  auto pretty = [&](const std::string& name) -> const char* {
+    auto it = kPretty.find(name);
+    return it != kPretty.end() ? it->second : name.c_str();
+  };
 
-    printf(" ---> Nonrelativistic Species \n");
-    print_one("Baryons", pba->Omega0_b, budget_matter);
-    if (all_species_.count("CDM"))
-      print_one("Cold Dark Matter", all_species_.at("CDM")->GetOmega0(), budget_matter);
-    if (all_species_.count("IDM_DR_IDR")) {
-      const auto& comp = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
-      print_one("Interacting Dark Matter - DR ", comp.idm_dr().GetOmega0(), budget_matter);
-    }
-    if (all_species_.count("CDM_SCF_Momentum")) {
-      const auto& comp = static_cast<const Type3Species&>(*all_species_.at("CDM_SCF_Momentum"));
-      print_one("Cold Dark Matter (Type-3 coupled)", comp.cdm().GetOmega0(), budget_matter);
-    }
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(
-          *all_species_.at("IDM_DRMD_IDR_DRMD"));
-      print_one("Interacting DM (DRMD)", comp.idm_drmd().GetOmega0(), budget_matter);
-    }
-    if (all_species_.count("DCDM_DR")) {
-      // Use integration-derived Omega0_dcdm_ for accuracy (set in background_solve_evolver).
-      print_one("Decaying Cold Dark Matter", Omega0_dcdm_, budget_matter);
-    }
-
-    printf(" ---> Relativistic Species \n");
-    print_one("Photons", pba->Omega0_g, budget_radiation);
-    if (all_species_.count("UR"))
-      print_one("Ultra-relativistic relics", all_species_.at("UR")->GetOmega0(), budget_radiation);
-    if (GetNDecayDr() > 0) {
-      // Omega0_dr_ aggregates the decay radiation of DCDM_DR and every DNCDM_DR
-      // composite (integration-derived, set in background_solve_evolver), so this
-      // single line covers all decay-DR channels.
-      print_one("Dark Radiation (from decay)", Omega0_dr_, budget_radiation);
-    }
-    if (all_species_.count("IDM_DR_IDR")) {
-      const auto& comp = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
-      print_one("Interacting Dark Radiation", comp.idr().GetOmega0(), budget_radiation);
-    }
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
-      const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(
-          *all_species_.at("IDM_DRMD_IDR_DRMD"));
-      print_one("Dark Radiation (DRMD)", comp.idr_drmd().GetOmega0(), budget_radiation);
-    }
-
-    if (!GetNcdmSpecies(all_species_).empty()) {
-      printf(" ---> Massive Neutrino Species \n");
-      for (auto* sp : GetNcdmSpecies(all_species_)) {
-        sp->PrintOmegaInfo();
-        budget_neutrino += sp->GetOmega0();
-      }
-    }
-
-    if (all_species_.count("Lambda") || all_species_.count("Fluid") ||
-        all_species_.count("ScalarField") || pba->sgnK != 0) {
-      printf(" ---> Other Content \n");
-    }
-    if (all_species_.count("Lambda"))
-      print_one("Cosmological Constant", all_species_.at("Lambda")->GetOmega0(), budget_other);
-    if (all_species_.count("Fluid"))
-      print_one("Dark Energy Fluid", all_species_.at("Fluid")->GetOmega0(), budget_other);
-    if (all_species_.count("ScalarField"))
-      print_one("Scalar Field", all_species_.at("ScalarField")->GetOmega0(), budget_other);
-    if (pba->sgnK != 0)
-      print_one("Spatial Curvature", pba->Omega0_k, budget_other);
-
-    printf(" ---> Total budgets \n");
-    printf(" Radiation                        Omega = %-15g , omega = %-15g \n",
-           budget_radiation,
-           budget_radiation * pba->h * pba->h);
-    printf(" Non-relativistic                 Omega = %-15g , omega = %-15g \n",
-           budget_matter,
-           budget_matter * pba->h * pba->h);
-    if (!GetNcdmSpecies(all_species_).empty()) {
-      printf(" Neutrinos                        Omega = %-15g , omega = %-15g \n",
-             budget_neutrino,
-             budget_neutrino * pba->h * pba->h);
-    }
-    if (all_species_.count("Lambda") || all_species_.count("Fluid") ||
-        all_species_.count("ScalarField") || pba->sgnK != 0) {
-      printf(" Other Content                    Omega = %-15g , omega = %-15g \n",
-             budget_other,
-             budget_other * pba->h * pba->h);
-    }
-    printf(" TOTAL                            Omega = %-15g , omega = %-15g \n",
-           budget_radiation + budget_matter + budget_neutrino + budget_other,
-           (budget_radiation + budget_matter + budget_neutrino + budget_other) * pba->h * pba->h);
-
-    printf(" -------------------------------------------------------------------- \n");
+  // Gather one line per (sub-)species. Composites own their sector breakdown;
+  // plain species contribute a single line. Curvature is not a species.
+  std::vector<BudgetLine> lines;
+  for (const auto& [key, sp] : all_species_) {
+    if (const auto* comp = dynamic_cast<const CompositeSpecies*>(sp.get()))
+      comp->AppendBudgetLines(bg_today, rho_crit, lines);
+    else
+      // Label with the collection key, not name(): the key is unique, whereas
+      // name() is the type name and may be shared across instances post-#246.
+      lines.push_back({key, sp->Rho(bg_today) / rho_crit, BudgetBucketOf(*sp)});
   }
+  if (pba->sgnK != 0)
+    lines.push_back({"Spatial Curvature", pba->Omega0_k, BudgetBucket::Other});
+
+  struct Section {
+    BudgetBucket bucket;
+    const char* header;
+    const char* total_label;
+  };
+  static const Section kSections[] = {
+      {BudgetBucket::Radiation, " ---> Relativistic Species ", "Radiation"},
+      {BudgetBucket::NonRelativistic, " ---> Nonrelativistic Species ", "Non-relativistic"},
+      {BudgetBucket::Ncdm, " ---> Non-Cold Dark Matter (NCDM) ", "Non-Cold Dark Matter"},
+      {BudgetBucket::Other, " ---> Other Content ", "Other Content"},
+  };
+
+  printf(" ---------------------------- Budget equation ----------------------- \n");
+
+  double totals[4] = {0., 0., 0., 0.};
+  for (const auto& section : kSections) {
+    bool any = false;
+    for (const auto& l : lines)
+      if (l.bucket == section.bucket) {
+        any = true;
+        break;
+      }
+    if (!any)
+      continue;
+    printf("%s\n", section.header);
+    for (const auto& l : lines) {
+      if (l.bucket != section.bucket)
+        continue;
+      printf("-> %-30s Omega = %-15g , omega = %-15g\n",
+             pretty(l.label),
+             l.omega,
+             l.omega * pba->h * pba->h);
+      totals[static_cast<int>(section.bucket)] += l.omega;
+    }
+  }
+
+  printf(" ---> Total budgets \n");
+  double grand = 0.;
+  for (const auto& section : kSections) {
+    const double t  = totals[static_cast<int>(section.bucket)];
+    grand          += t;
+    if (t != 0.)
+      printf(" %-32s Omega = %-15g , omega = %-15g \n",
+             section.total_label,
+             t,
+             t * pba->h * pba->h);
+  }
+  printf(" TOTAL                            Omega = %-15g , omega = %-15g \n",
+         grand,
+         grand * pba->h * pba->h);
+  printf(" -------------------------------------------------------------------- \n");
 }
 
 /**

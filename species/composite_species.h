@@ -92,6 +92,16 @@ class CompositeSpecies : public BaseSpecies {
     return sum;
   }
 
+  /** Append one budget line per child (label = child name(), omega = today
+   *  Rho/rho_crit, bucket = BudgetBucketOf(child)) for background_output_budget().
+   *  The composite owns its sector breakdown; children_ is never exposed. */
+  void AppendBudgetLines(const double* pvecback_today,
+                         double rho_crit,
+                         std::vector<BudgetLine>& out) const {
+    for (const auto& c : children_)
+      out.push_back({c->name(), c->Rho(pvecback_today) / rho_crit, BudgetBucketOf(*c)});
+  }
+
   /** Sums GetRadiationOmega0() over all children (dark-radiation children
    *  contribute their Omega0; matter children contribute 0). */
   double GetRadiationOmega0() const override {

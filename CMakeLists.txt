@@ -233,7 +233,8 @@ if(NOT SKBUILD)
   add_executable(test-axion-ncdm species/axion_ncdm_test.cpp)
   add_executable(test-dncdm-switch-copy species/dncdm_switch_copy_test.cpp)
   add_executable(test-ncdm-family species/ncdm_family_test.cpp)
-  foreach(_t IN ITEMS test-parser test-errors test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-ncdm-family)
+  add_executable(test-species-budget species/species_budget_test.cpp)
+  foreach(_t IN ITEMS test-parser test-errors test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-ncdm-family test-species-budget)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for
