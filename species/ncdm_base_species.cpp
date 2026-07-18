@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 #include "species_input.h"
@@ -79,17 +80,16 @@ void NCDMBaseSpecies::ReadParametersByInstance(FileContent* pfc,
       psd_file_ = std::move(*filename);
     }
     else {
-      throw std::invalid_argument("species '" + instance_name +
-                                  "': use_psd_file=1 but psd_filename is missing");
+      class_stop_severe("species '%s': use_psd_file=1 but psd_filename is missing",
+                        instance_name.c_str());
     }
   }
 
   // Resolve omega/Omega conflict (matches existing semantics).
   if (omega0_ != 0.0) {
-    if (Omega0_ != 0.0) {
-      throw std::invalid_argument("species '" + instance_name +
-                                  "': both Omega and omega specified — choose one");
-    }
+    class_test_severe(Omega0_ != 0.0,
+                      "species '%s': both Omega and omega specified — choose one",
+                      instance_name.c_str());
     Omega0_ = omega0_ / settings.h / settings.h;
   }
   else {
@@ -488,7 +488,7 @@ double NCDMBaseSpecies::MFromOmega(double H0, double Omega0, double tol_M_ncdm) 
       return M;
     }
   }
-  ThrowRuntimeError("Newton iteration could not converge on a mass for some reason.");
+  class_stop("Newton iteration could not converge on a mass for some reason.");
   return 0.;
 }
 

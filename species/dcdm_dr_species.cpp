@@ -1,9 +1,9 @@
 #include "dcdm_dr_species.h"
 
 #include <cmath>
-#include <stdexcept>
 
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations_module.h"
 
 DCDM_DR_Species::DCDM_DR_Species(const background* pba,
@@ -300,9 +300,9 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
     Omega_ini_dcdm = *omega_ini_opt;
   if (has_omega_ini)
     omega_ini_dcdm_val = *omega_ini_small_opt;
-  if (has_Omega_ini && has_omega_ini)
-    throw std::invalid_argument(
-        "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, choose one");
+  class_test_severe(has_Omega_ini && has_omega_ini,
+                    "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, "
+                    "choose one");
   if (has_omega_ini)
     Omega_ini_dcdm = omega_ini_dcdm_val / (ctx.pba->h * ctx.pba->h);
 

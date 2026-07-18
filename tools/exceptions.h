@@ -13,8 +13,4 @@
 
 std::pair<std::string, std::string> get_my_py_error_message();
 
-void ThrowRuntimeErrorIf(bool condition, std::string string_for_printf, ...);
-
-void ThrowRuntimeError(std::string string_for_printf, ...);
-
 #endif /* exceptions_h */

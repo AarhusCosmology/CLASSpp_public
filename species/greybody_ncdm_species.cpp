@@ -7,6 +7,7 @@
 
 #include "background_module.h"
 #include "bisection.h"
+#include "errors.h"
 #include "species/ncdm_family.h"
 #include "species/species_input.h"
 
@@ -85,10 +86,7 @@ constexpr double kRMatZero = 1.43748132827993497652;
 // unique solution; r <= 1 is unphysical (and would make the initial guess and
 // bracket search ill-defined), so we reject it up front.
 double solve_alpha(double r) {
-  if (r <= 1.) {
-    throw std::runtime_error("grey-body: moment ratio r = " + std::to_string(r) +
-                             " must exceed 1 (requires M2*M4 >= M3^2)");
-  }
+  class_test(r <= 1., "grey-body: moment ratio r = %g must exceed 1 (requires M2*M4 >= M3^2)", r);
   auto f = [&](double a) { return r_M(a) - r; };
   // Initial guess from inverting the rational approximation
   // r_M(alpha) ~ (alpha + 2*kRMatZero) / (alpha + 2) (exact at alpha=0, -> 1 as
@@ -105,9 +103,7 @@ double solve_alpha(double r) {
     right = std::fabs(right) * 10.;
   }
   // f(left) >= 0, f(right) <= 0; bisect_value treats pred(mid)==true as the hi side.
-  if (f(left) * f(right) > 0.) {
-    throw std::runtime_error("grey-body: failed to bracket alpha for r=" + std::to_string(r));
-  }
+  class_test(f(left) * f(right) > 0., "grey-body: failed to bracket alpha for r=%g", r);
   return bisect_value(left, right, 1e-13, [&](double mid) { return f(mid) < 0.; });
 }
 }  // namespace
@@ -118,9 +114,8 @@ GreyBodyParams GreyBodyParams::FromDirect(double alpha, double x, double q0) {
   // The PSD q^(alpha-1)/(exp(alpha*x*q)+1) and its GB-Laguerre quadrature
   // (which divides by alpha*x) require strictly positive parameters; reject
   // non-physical direct input rather than silently producing inf/nan.
-  if (alpha <= 0. || x <= 0. || q0 <= 0.) {
-    throw std::invalid_argument("grey-body: direct parameters alpha, x, q0 must all be > 0");
-  }
+  class_test(alpha <= 0. || x <= 0. || q0 <= 0.,
+             "grey-body: direct parameters alpha, x, q0 must all be > 0");
   GreyBodyParams p;
   p.alpha_         = alpha;
   p.x_             = x;
@@ -133,9 +128,7 @@ GreyBodyParams GreyBodyParams::FromDirect(double alpha, double x, double q0) {
 GreyBodyParams GreyBodyParams::FromMoments(double r, double M2, double M3) {
   // x divides by M3 and the normalization takes log(M2); both moments of a
   // positive PSD are strictly positive, so reject non-positive input up front.
-  if (M2 <= 0. || M3 <= 0.) {
-    throw std::invalid_argument("grey-body: moments M2 and M3 must both be > 0");
-  }
+  class_test(M2 <= 0. || M3 <= 0., "grey-body: moments M2 and M3 must both be > 0");
   double alpha = solve_alpha(r);
   double A     = std::pow(2., alpha + 1.);
   double x     = ((2. * A - 1.) * M2 * riemann_zeta(alpha + 3.) * std::tgamma(alpha + 3.)) /
@@ -181,46 +174,41 @@ GreyBodyNCDMSpecies::GreyBodyNCDMSpecies(FileContent* pfc,
   SpeciesInput input(pfc, instance_name);
 
   auto mode_opt = input.get<std::string>("parameterization");
-  if (!mode_opt) {
-    throw std::invalid_argument("grey-body species '" + instance_name +
-                                "': required field 'parameterization' is missing "
-                                "(set it to 'direct' or 'moments')");
-  }
+  class_test_severe(!mode_opt,
+                    "grey-body species '%s': required field 'parameterization' is missing (set "
+                    "it to 'direct' or 'moments')",
+                    instance_name.c_str());
   const std::string& mode = *mode_opt;
-  if (mode != "direct" && mode != "moments") {
-    throw std::invalid_argument("grey-body species '" + instance_name +
-                                "': parameterization must be 'direct' or 'moments'");
-  }
+  class_test_severe(mode != "direct" && mode != "moments",
+                    "grey-body species '%s': parameterization must be 'direct' or 'moments'",
+                    instance_name.c_str());
 
   if (mode == "direct") {
     auto alpha = input.get<double>("alpha");
     auto q0    = input.get<double>("q0");
     auto x     = input.get<double>("x");
-    if (!(alpha && q0 && x)) {
-      throw std::invalid_argument("grey-body species '" + instance_name +
-                                  "': direct mode requires alpha, q0, x");
-    }
+    class_test_severe(!(alpha && q0 && x),
+                      "grey-body species '%s': direct mode requires alpha, q0, x",
+                      instance_name.c_str());
     gb_ = greybody::GreyBodyParams::FromDirect(*alpha, *x, *q0);
   }
   else {
     auto r  = input.get<double>("r");
     auto M2 = input.get<double>("M2");
     auto M3 = input.get<double>("M3");
-    if (!(r && M2 && M3)) {
-      throw std::invalid_argument("grey-body species '" + instance_name +
-                                  "': moments mode requires r, M2, M3");
-    }
+    class_test_severe(!(r && M2 && M3),
+                      "grey-body species '%s': moments mode requires r, M2, M3",
+                      instance_name.c_str());
     gb_ = greybody::GreyBodyParams::FromMoments(*r, *M2, *M3);
 
     // Optional mass-via-M2 convenience: m = m_M2 / M2.
     if (auto m_M2 = input.get<double>("m_M2")) {
       m_in_eV_ = *m_M2 / *M2;
     }
-    if (m_in_eV_ != 0.0 && m_in_eV_ < 0.01) {
-      throw std::invalid_argument(
-          "grey-body species '" + instance_name +
-          "': inferred mass < 0.01 eV; moment inversion is unreliable in the low-mass limit");
-    }
+    class_test(m_in_eV_ != 0.0 && m_in_eV_ < 0.01,
+               "grey-body species '%s': inferred mass < 0.01 eV; moment inversion is unreliable "
+               "in the low-mass limit",
+               instance_name.c_str());
   }
   gb_ready_ = true;
 

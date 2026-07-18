@@ -7,6 +7,7 @@
 
 #include <algorithm>
 
+#include "errors.h"
 #include "nonlinear_module.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
@@ -97,14 +98,14 @@ std::map<std::string, int> SpectraModule::cl_output_index_map() const {
 }
 
 void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_pointers) const {
-  ThrowRuntimeErrorIf((lmax > l_max_tot_) || (lmax < 0),
-                      "Error: lmax = %d is outside the allowed range [0, %d]\n",
-                      lmax,
-                      l_max_tot_);
-  ThrowRuntimeErrorIf(output_pointers.size() != ct_size_,
-                      "Error: Size of input vector (%d) does not match ct_size = %d\n",
-                      output_pointers.size(),
-                      ct_size_);
+  class_test_severe((lmax > l_max_tot_) || (lmax < 0),
+                    "Error: lmax = %d is outside the allowed range [0, %d]\n",
+                    lmax,
+                    l_max_tot_);
+  class_test_severe(output_pointers.size() != ct_size_,
+                    "Error: Size of input vector (%zu) does not match ct_size = %d\n",
+                    output_pointers.size(),
+                    ct_size_);
 
   cl_output_index_map();
 
@@ -153,11 +154,11 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
 }
 
 std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) const {
-  ThrowRuntimeErrorIf(!ppt->has_cls, "Error: Cls have not been computed! lmax = %d\n", lmax);
-  ThrowRuntimeErrorIf((lmax > l_max_tot_) || (lmax < 0),
-                      "Error: lmax = %d is outside the allowed range [0, %d]\n",
-                      lmax,
-                      l_max_tot_);
+  class_test_severe(!ppt->has_cls, "Error: Cls have not been computed! lmax = %d\n", lmax);
+  class_test_severe((lmax > l_max_tot_) || (lmax < 0),
+                    "Error: lmax = %d is outside the allowed range [0, %d]\n",
+                    lmax,
+                    l_max_tot_);
   std::map<std::string, int> index_map = cl_output_index_map();
 
   std::vector<double*> cl_md(md_size_);

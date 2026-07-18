@@ -196,9 +196,28 @@ if (cond) {
 
 # 8. Error Handling
 
-* Errors are stored in `error_message_`.
-* This member may be declared `mutable`.
-* Do not introduce alternative error handling mechanisms without strong justification.
+Errors are C++ exceptions thrown at the error origin via the macros in
+`include/errors.h`. The exception type encodes severity; the Python wrapper
+maps it to sampler behaviour (`classy.pyx: raise_my_py_error`):
+
+* `class_test_severe` / `class_stop_severe` → `std::invalid_argument` →
+  `CosmoSevereError`: the sampler **aborts**. Use ONLY for checks that depend
+  exclusively on the *structure* of the input: key presence, mutual
+  exclusivity, unparseable strings, unknown enum names, list-length/count
+  consistency, API-argument validation.
+* `class_test` / `class_stop` → `std::runtime_error` →
+  `CosmoComputationError`: the sampler **rejects the point** and the chain
+  survives. Use for everything that depends on a parsed numeric value (range
+  checks included) and for every numerical failure, wherever it occurs — the
+  input phase and shooting trial builds included.
+* The governing rule: a severe check must never depend on possibly-varying
+  parameters. Aborting a long chain on one unlucky proposal destroys work;
+  rejecting is always the safe direction.
+* Programmer-error invariants throw `std::logic_error` (surfaces as
+  `CosmoSevereError` via the classy fallback).
+* Do not introduce alternative error mechanisms.
+
+Design rationale: `docs/superpowers/specs/2026-07-17-error-severity-conventions-design.md`.
 
 ---
 
@@ -210,7 +229,6 @@ All modules (except `InputModule`) inherit from `BaseModule`.
 
 * Access to input structs (`pba`, `pth`, etc.)
 * Ownership of the `InputModule`
-* Error handling via `error_message_`
 
 Rules:
 

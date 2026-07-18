@@ -115,10 +115,30 @@ int main() {
   };
   expect_throw([](FileContent& fc) { fc.set("attractor_ic_scf", "yes"); });
   expect_throw([](FileContent& fc) { fc.set("scf_parameters", "1.0, 2.0"); });
-  expect_throw([](FileContent& fc) { fc.set("f_axion", "-0.5"); });
-  expect_throw([](FileContent& fc) { fc.set("n_axion", "0.5"); });
-  expect_throw([](FileContent& fc) { fc.set("Theta_initial_scf", "3.5"); });
-  expect_throw([](FileContent& fc) { fc.set("Theta_initial_scf", "0"); });
+
+  // Checks on a parsed numeric value's range are computation rejections
+  // (runtime_error) so a sampler can reject the point and keep the chain alive.
+  auto expect_throw_computation = [&pba](void (*mut)(FileContent&)) {
+    FileContent fc;
+    fc.set("Omega_scf", "0.05");
+    fc.set("scf_potential", "axion");
+    fc.set("f_axion", "0.5");
+    fc.set("Theta_initial_scf", "2.0");
+    mut(fc);
+    auto ctx   = MakeCtx(fc, pba);
+    bool threw = false;
+    try {
+      ScalarFieldSpecies::CreateAll(ctx);
+    }
+    catch (const std::runtime_error&) {
+      threw = true;
+    }
+    assert(threw);
+  };
+  expect_throw_computation([](FileContent& fc) { fc.set("f_axion", "-0.5"); });
+  expect_throw_computation([](FileContent& fc) { fc.set("n_axion", "0.5"); });
+  expect_throw_computation([](FileContent& fc) { fc.set("Theta_initial_scf", "3.5"); });
+  expect_throw_computation([](FileContent& fc) { fc.set("Theta_initial_scf", "0"); });
 
   // Missing f_axion / Theta_initial_scf.
   for (const char* missing : {"f_axion", "Theta_initial_scf"}) {

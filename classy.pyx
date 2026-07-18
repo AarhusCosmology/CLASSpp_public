@@ -98,7 +98,9 @@ cdef int raise_my_py_error() except *:
     elif "runtime_error" in cpp_exception_type:
         raise CosmoComputationError(cpp_exception.second)
     else:
-        raise NotImplementedError(cpp_exception.second)
+        # logic_error (programmer-error invariants) and anything unrecognized:
+        # abort loudly rather than surfacing a misleading NotImplementedError.
+        raise CosmoSevereError(cpp_exception.second)
 
 cdef extern from "cosmology.h":
     ctypedef shared_ptr[const InputModule] InputModulePtr

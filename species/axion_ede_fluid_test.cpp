@@ -157,6 +157,19 @@ int main() {
     }
     assert(threw);
   };
+  // Structural checks abort (invalid_argument); checks on a parsed numeric value's
+  // range are computation rejections (runtime_error) so a sampler can reject the
+  // point and keep the chain alive.
+  auto expect_create_throw_computation = [&](FileContent fc) {
+    bool threw = false;
+    try {
+      run_create(fc);
+    }
+    catch (const std::runtime_error&) {
+      threw = true;
+    }
+    assert(threw);
+  };
   {  // both n and w_fld_f
     FileContent fc = make_base_fc();
     fc.set("Omega_fld_ac", "0.05");
@@ -203,7 +216,7 @@ int main() {
     FileContent fc = make_base_fc();
     fc.set("Omega_fld_ac", "0.05");
     fc.set("Theta_initial_fld", "3.15");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // closure-budget override is rejected for pheno_axion
     FileContent fc = make_base_fc();
@@ -225,13 +238,13 @@ int main() {
     FileContent fc = make_base_fc();
     fc.set("Omega_fld_ac", "0.05");
     fc.set("nu_fld", "0");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // n_pheno_axion must be >= 1
     FileContent fc = make_base_fc();
     fc.set("Omega_fld_ac", "0.05");
     fc.set("n_pheno_axion", "0.5");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // w_fld_f must lie in [0, 1)
     FileContent fc;
@@ -240,7 +253,7 @@ int main() {
     fc.set("log10_axion_ac", "-3.5");
     fc.set("Theta_initial_fld", "2.8");
     fc.set("Omega_fld_ac", "0.05");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // negative w_fld_f would give derived n = (1+w_f)/(1-w_f) < 1
     FileContent fc;
@@ -249,20 +262,20 @@ int main() {
     fc.set("log10_axion_ac", "-3.5");
     fc.set("Theta_initial_fld", "2.8");
     fc.set("Omega_fld_ac", "0.05");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // w_fld_f (= 0.5 from n = 3) must exceed w_fld_i
     FileContent fc = make_base_fc();
     fc.set("Omega_fld_ac", "0.05");
     fc.set("w_fld_i", "0.9");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // w_fld_i < -1 would cross the phantom divide, contradicting
      // AxionEDEFluid::ReachesPhantomDivide() == false
     FileContent fc = make_base_fc();
     fc.set("Omega_fld_ac", "0.05");
     fc.set("w_fld_i", "-1.5");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // a_c must lie in (0, 1)
     FileContent fc;
@@ -271,17 +284,17 @@ int main() {
     fc.set("a_c", "1.5");
     fc.set("Theta_initial_fld", "2.8");
     fc.set("Omega_fld_ac", "0.05");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // Omega_fld_ac must be positive
     FileContent fc = make_base_fc();
     fc.set("Omega_fld_ac", "-0.05");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
   {  // Omega_fld must be positive
     FileContent fc = make_base_fc();
     fc.set("Omega_fld", "-1e-6");
-    expect_create_throw(std::move(fc));
+    expect_create_throw_computation(std::move(fc));
   }
 
   // ════ Phantom-divide + HyRec-CPL species hooks ════

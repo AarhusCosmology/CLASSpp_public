@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
-#include <stdexcept>
 
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations_module.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,10 +144,9 @@ std::vector<Named> DCDM_WDM_Species::CreateAll(const SpeciesBuildContext& ctx) {
   if (auto gauge = ctx.pfc->get<std::string>("gauge")) {
     std::string g = *gauge;
     std::transform(g.begin(), g.end(), g.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (g.rfind("new", 0) == 0) {
-      throw std::invalid_argument(
-          "dcdm_wdm supports the synchronous gauge only (arXiv:2606.14849 implementation)");
-    }
+    class_test_severe(g.rfind("new", 0) == 0,
+                      "dcdm_wdm supports the synchronous gauge only (arXiv:2606.14849 "
+                      "implementation)");
   }
 
   result.reserve(instances.size());

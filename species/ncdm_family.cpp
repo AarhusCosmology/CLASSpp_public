@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string_view>
 
+#include "errors.h"
 #include "species/axion_ncdm_species.h"
 #include "species/dncdm_species.h"
 #include "species/greybody_ncdm_species.h"
@@ -38,7 +39,7 @@ bool ConsumesFluidApproximation(std::string_view type) {
 
 void SynthesiseNcdmFluidApproximation(FileContent* pfc) {
   if (!pfc) {
-    throw std::invalid_argument("SynthesiseNcdmFluidApproximation: null FileContent*");
+    throw std::logic_error("SynthesiseNcdmFluidApproximation: null FileContent*");
   }
 
   // Reject the dot key on species that ignore the NCDM fluid approximation;
@@ -56,11 +57,12 @@ void SynthesiseNcdmFluidApproximation(FileContent* pfc) {
   for (const auto& key : fa_keys) {
     const std::string instance = key.substr(0, key.size() - kSuffix.size());
     const auto type            = pfc->get<std::string>(instance + ".type");
-    if (type && !ConsumesFluidApproximation(*type)) {
-      throw std::invalid_argument("species '" + instance + "' (type '" + *type +
-                                  "') does not use the NCDM fluid approximation; remove '" + key +
-                                  "'");
-    }
+    class_test_severe(type && !ConsumesFluidApproximation(*type),
+                      "species '%s' (type '%s') does not use the NCDM fluid approximation; remove "
+                      "'%s'",
+                      instance.c_str(),
+                      type->c_str(),
+                      key.c_str());
   }
 
   std::vector<std::string> instances;

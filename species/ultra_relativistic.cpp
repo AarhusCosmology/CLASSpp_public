@@ -2,10 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <stdexcept>
 
 #include "background.h"
 #include "background_module.h"
+#include "errors.h"
 #include "parser.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -429,11 +429,11 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
     n_eff = *n_eff_opt;
 
   // N_eff is a deprecated synonym for N_ur — only one may be present.
-  if (flag_nur && flag_neff)
-    throw std::invalid_argument(
-        "In input file, you can only enter one of N_eff (deprecated syntax) or N_ur "
-        "(up-to-date syntax), since they both describe the same, i.e. the contribution "
-        "of ultra-relativistic species to the effective neutrino number");
+  class_test_severe(
+      flag_nur && flag_neff,
+      "In input file, you can only enter one of N_eff (deprecated syntax) or N_ur (up-to-date "
+      "syntax), since they both describe the same, i.e. the contribution of ultra-relativistic "
+      "species to the effective neutrino number");
   // Normalise: treat N_eff as N_ur going forward.
   if (flag_neff) {
     n_ur      = n_eff;
@@ -455,10 +455,9 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
 
   // At most one of the three forms may be specified.
   const int n_specified = (flag_nur ? 1 : 0) + (flag_Omega ? 1 : 0) + (flag_omega ? 1 : 0);
-  if (n_specified >= 2)
-    throw std::invalid_argument(
-        "In input file, you can only enter one of N_ur (or deprecated N_eff), Omega_ur, or "
-        "omega_ur, choose one");
+  class_test_severe(n_specified >= 2,
+                    "In input file, you can only enter one of N_ur (or deprecated N_eff), "
+                    "Omega_ur, or omega_ur, choose one");
 
   // (c) Compute Omega0_ur from whichever form was provided.
   double omega0_ur      = 0.;

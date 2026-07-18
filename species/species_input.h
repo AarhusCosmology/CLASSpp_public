@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "errors.h"
 #include "parser.h"
 
 /**
@@ -41,8 +42,9 @@ class SpeciesInput {
   T require(const std::string& field) const {
     if (auto v = get<T>(field))
       return *v;
-    throw std::invalid_argument("species '" + instance_name_ + "': missing required field '" +
-                                field + "'");
+    class_stop_severe("species '%s': missing required field '%s'",
+                      instance_name_.c_str(),
+                      field.c_str());
   }
 
  private:

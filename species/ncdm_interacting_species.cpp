@@ -2,10 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "errors.h"
 #include "perturbations_module.h"
 #include "species/ncdm_family.h"
 #include "species/species_input.h"
@@ -27,11 +27,10 @@ constexpr double kExactHierarchyL2Correction = 64.0;
 
 void RejectLegacyInteractingKeys(FileContent& pfc) {
   for (const char* key : kLegacyInteractingKeys) {
-    if (pfc.get<std::string>(key).has_value()) {
-      throw std::invalid_argument(
-          std::string("'") + key + "' is no longer supported. Use dot-syntax: " +
-          "'<instance>.<dot-name> = ...' with '<instance>.type = ncdm_self_interacting'.");
-    }
+    class_test_severe(pfc.get<std::string>(key).has_value(),
+                      "'%s' is no longer supported. Use dot-syntax: '<instance>.<dot-name> = "
+                      "...' with '<instance>.type = ncdm_self_interacting'.",
+                      key);
   }
 }
 
@@ -50,10 +49,9 @@ NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
   auto G_eff_value      = input.get<double>("G_eff");
   auto log10G_eff_value = input.get<double>("log10G_eff");
 
-  if (G_eff_value && log10G_eff_value) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': specify exactly one of G_eff or log10G_eff");
-  }
+  class_test_severe(G_eff_value && log10G_eff_value,
+                    "species '%s': specify exactly one of G_eff or log10G_eff",
+                    instance_name.c_str());
   if (G_eff_value) {
     G_eff_ = *G_eff_value;
   }
@@ -73,9 +71,10 @@ NCDMInteractingSpecies::NCDMInteractingSpecies(FileContent* pfc,
     use_alpha_correction_ = false;
   }
   else {
-    throw std::invalid_argument(
-        "species '" + instance_name +
-        "': Please specify use_alpha_correction as either True/true/yes or False/false/no");
+    class_stop_severe(
+        "species '%s': Please specify use_alpha_correction as either True/true/yes or "
+        "False/false/no",
+        instance_name.c_str());
   }
 }
 

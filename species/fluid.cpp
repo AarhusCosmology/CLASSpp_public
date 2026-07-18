@@ -7,6 +7,7 @@
 #include "axion_ede_fluid.h"
 #include "background.h"
 #include "background_module.h"
+#include "errors.h"
 #include "idm_dr_idr_species.h"
 #include "idm_drmd_idr_drmd_species.h"
 #include "parser.h"
@@ -473,8 +474,8 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
       fluid_eos = EDE;
     }
     else {
-      throw std::invalid_argument("incomprehensible input '" + eos_str +
-                                  "' for the field 'fluid_equation_of_state'");
+      class_stop_severe("incomprehensible input '%s' for the field 'fluid_equation_of_state'",
+                        eos_str.c_str());
     }
   }
 
@@ -544,62 +545,52 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
 std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
 
-  if (ctx.omega0_closure_override.has_value())
-    throw std::invalid_argument(
-        "the pheno_axion fluid cannot be the budget-closure species (its density is set "
-        "by a_c and the EDE fraction); let Lambda close the budget");
+  class_test_severe(ctx.omega0_closure_override.has_value(),
+                    "the pheno_axion fluid cannot be the budget-closure species (its density is "
+                    "set by a_c and the EDE fraction); let Lambda close the budget");
 
   // ── n XOR w_fld_f ──────────────────────────────────────────────────────────
   const auto n_opt  = ctx.pfc->get<double>("n_pheno_axion");
   const auto wf_opt = ctx.pfc->get<double>("w_fld_f");
-  if (n_opt && wf_opt)
-    throw std::invalid_argument("give only one of 'n_pheno_axion' and 'w_fld_f'");
-  if (!n_opt && !wf_opt)
-    throw std::invalid_argument("pheno_axion needs 'n_pheno_axion' (or 'w_fld_f')");
+  class_test_severe(n_opt && wf_opt, "give only one of 'n_pheno_axion' and 'w_fld_f'");
+  class_test_severe(!n_opt && !wf_opt, "pheno_axion needs 'n_pheno_axion' (or 'w_fld_f')");
   double n, w_f;
   if (n_opt) {
     n = *n_opt;
-    if (n < 1.)
-      throw std::invalid_argument("n_pheno_axion must be >= 1");
+    class_test(n < 1., "n_pheno_axion must be >= 1");
     w_f = AxionEDEFluid::WFinal(n);
   }
   else {
     w_f = *wf_opt;
     // w_f < 0 would give a derived n = (1+w_f)/(1-w_f) < 1, violating the model
     // requirement n >= 1 (and making the k->0 sound speed w_f negative).
-    if (w_f < 0. || w_f >= 1.)
-      throw std::invalid_argument(
-          "w_fld_f must lie in [0, 1) so that the derived n = (1+w_f)/(1-w_f) is >= 1");
+    class_test(w_f < 0. || w_f >= 1.,
+               "w_fld_f must lie in [0, 1) so that the derived n = (1+w_f)/(1-w_f) is >= 1");
     n = (1. + w_f) / (1. - w_f);
   }
   const double w_i = ctx.pfc->get_or("w_fld_i", -1.);
   const double nu  = ctx.pfc->get_or("nu_fld", 1.);
-  if (nu <= 0.)
-    throw std::invalid_argument("nu_fld must be > 0");
+  class_test(nu <= 0., "nu_fld must be > 0");
   // w_i < -1 would make w(a) cross -1 on its way to w_f, which the true-fluid
   // equations cannot handle (AxionEDEFluid::ReachesPhantomDivide answers false
   // on the premise w(a) > -1 for all a > 0; w_i = -1 exactly is the designed
   // asymptote and stays safe because w(a) > w_i at every a > 0).
-  if (w_i < -1.)
-    throw std::invalid_argument("w_fld_i must be >= -1 (w may not cross the phantom divide)");
-  if (w_f <= w_i)
-    throw std::invalid_argument("pheno_axion needs w_fld_f > w_fld_i");
+  class_test(w_i < -1., "w_fld_i must be >= -1 (w may not cross the phantom divide)");
+  class_test(w_f <= w_i, "pheno_axion needs w_fld_f > w_fld_i");
 
   // ── a_c XOR log10_axion_ac ─────────────────────────────────────────────────
   const auto ac_opt     = ctx.pfc->get<double>("a_c");
   const auto log_ac_opt = ctx.pfc->get<double>("log10_axion_ac");
-  if (ac_opt && log_ac_opt)
-    throw std::invalid_argument("give only one of 'a_c' and 'log10_axion_ac'");
-  if (!ac_opt && !log_ac_opt)
-    throw std::invalid_argument("pheno_axion needs 'a_c' or 'log10_axion_ac'");
+  class_test_severe(ac_opt && log_ac_opt, "give only one of 'a_c' and 'log10_axion_ac'");
+  class_test_severe(!ac_opt && !log_ac_opt, "pheno_axion needs 'a_c' or 'log10_axion_ac'");
   const double a_c = ac_opt ? *ac_opt : std::pow(10., *log_ac_opt);
-  if (a_c <= 0. || a_c >= 1.)
-    throw std::invalid_argument("a_c must lie in (0, 1)");
+  class_test(a_c <= 0. || a_c >= 1., "a_c must lie in (0, 1)");
 
   // ── Theta_initial_fld (required; enters only the omega_axion calibration) ──
   const auto theta_opt = ctx.pfc->get<double>("Theta_initial_fld");
-  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= _PI_)
-    throw std::invalid_argument("pheno_axion requires Theta_initial_fld in (0, pi)");
+  class_test_severe(!theta_opt, "pheno_axion requires 'Theta_initial_fld'");
+  class_test(*theta_opt <= 0. || *theta_opt >= _PI_,
+             "pheno_axion requires Theta_initial_fld in (0, pi)");
 
   // ── density: exactly one of Omega_fld / Omega_fld_ac / fraction_fld_ac ────
   const auto om0_opt  = ctx.pfc->get<double>("Omega_fld");
@@ -607,9 +598,9 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
   const auto frac_opt = ctx.pfc->get<double>("fraction_fld_ac");
   const int n_density = int(om0_opt.has_value()) + int(omac_opt.has_value()) +
                         int(frac_opt.has_value());
-  if (n_density != 1)
-    throw std::invalid_argument(
-        "pheno_axion needs exactly one of 'Omega_fld', 'Omega_fld_ac', 'fraction_fld_ac'");
+  class_test_severe(n_density != 1,
+                    "pheno_axion needs exactly one of 'Omega_fld', 'Omega_fld_ac', "
+                    "'fraction_fld_ac'");
 
   double omega0_fld = 0.;
   if (om0_opt) {
@@ -623,10 +614,11 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
     // with the other species scaled to a_c by EnergyType (AxiCLASS input.c:4157-4174;
     // Lambda is excluded there too — negligible at EDE-era a_c).
     const double f_ac = *frac_opt;
-    if (f_ac <= 0. || f_ac >= 1.)
-      throw std::invalid_argument("fraction_fld_ac must lie in (0, 1)");
+    class_test(f_ac <= 0. || f_ac >= 1., "fraction_fld_ac must lie in (0, 1)");
+    // Programmer-error invariant: the caller wiring, not user input, controls whether
+    // all_species is populated. This can only fire if ConstructSpecies fails to pass it.
     if (ctx.all_species == nullptr)
-      throw std::invalid_argument(
+      throw std::logic_error(
           "fraction_fld_ac needs the species collection (internal: all_species missing)");
     double omega_tot_ac = 0.;
     for (const auto& sp : *ctx.all_species) {
@@ -644,21 +636,19 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
     const double omega_ac = omega_tot_ac * f_ac / (1. - f_ac);
     omega0_fld            = AxionEDEFluid::OmegaZeroFromOmegaAc(omega_ac, a_c, nu, w_i, w_f);
   }
-  if (omega0_fld <= 0.)
-    throw std::invalid_argument(
-        "pheno_axion needs a positive fluid density: Omega_fld / Omega_fld_ac must be > 0");
+  class_test(omega0_fld <= 0.,
+             "pheno_axion needs a positive fluid density: Omega_fld / Omega_fld_ac must be > 0");
 
   // ── PPF is meaningless here; cs2 is derived, not an input ──────────────────
   if (auto ppf_opt = ctx.pfc->get<std::string>("use_ppf")) {
-    if (ppf_opt->find("y") != std::string::npos || ppf_opt->find("Y") != std::string::npos)
-      throw std::invalid_argument(
-          "use_ppf = yes is incompatible with pheno_axion (w > -1 always; the GDM "
-          "sound speed requires the true fluid equations)");
+    class_test_severe(ppf_opt->find("y") != std::string::npos ||
+                          ppf_opt->find("Y") != std::string::npos,
+                      "use_ppf = yes is incompatible with pheno_axion (w > -1 always; the GDM "
+                      "sound speed requires the true fluid equations)");
   }
-  if (ctx.pfc->get<double>("cs2_fld").has_value())
-    throw std::invalid_argument(
-        "cs2_fld is not an input for pheno_axion (the sound speed is the GDM formula "
-        "derived from n, a_c and Theta_initial_fld)");
+  class_test_severe(ctx.pfc->get<double>("cs2_fld").has_value(),
+                    "cs2_fld is not an input for pheno_axion (the sound speed is the GDM "
+                    "formula derived from n, a_c and Theta_initial_fld)");
 
   result.push_back(
       {"Fluid",

@@ -2,11 +2,11 @@
 
 #include <cstdio>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 #include "thermodynamics.h"
@@ -351,10 +351,9 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
   if (omega0_idm_dr != 0. || omega0_idr != 0.) {
     // Re-homed from the monolith idm/idr parse block: an IDM_DR component
     // without any IDR density is unphysical (the interaction needs a partner).
-    if (omega0_idm_dr > 0. && omega0_idr == 0.)
-      throw std::invalid_argument(
-          "You have requested interacting DM with DR, this requires a non-zero density of "
-          "interacting DR. Please set either N_idr or xi_idr");
+    class_test(omega0_idm_dr > 0. && omega0_idr == 0.,
+               "You have requested interacting DM with DR, this requires a non-zero density of "
+               "interacting DR. Please set either N_idr or xi_idr");
 
     const double T_idr_local = (ctx.coupled_inputs && ctx.coupled_inputs->T_idr)
                                    ? *ctx.coupled_inputs->T_idr
@@ -391,9 +390,9 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
       a_dark = *a_dark_opt;
     if (f_g)
       gamma0 = *gamma0_opt;
-    if (((int) f_a + (int) f_ad + (int) f_g) >= 2)
-      throw std::invalid_argument(
-          "In input file, you can only enter one of a_idm_dr, a_dark or Gamma_0_nadm, choose one");
+    class_test_severe(((int) f_a + (int) f_ad + (int) f_g) >= 2,
+                      "In input file, you can only enter one of a_idm_dr, a_dark or Gamma_0_nadm, "
+                      "choose one");
 
     if (f_a) {
       a_idm_dr = a_param;
@@ -442,9 +441,9 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
         nd_dark = *nd_dark_opt;
       if (h_nd_idm)
         nd_idm = *nd_idm_opt;
-      if (h_nd_dark && h_nd_idm)
-        throw std::invalid_argument(
-            "In input file, you can only enter one of nindex_dark, nindex_idm_dr, choose one");
+      class_test_severe(h_nd_dark && h_nd_idm,
+                        "In input file, you can only enter one of nindex_dark, nindex_idm_dr, "
+                        "choose one");
       if (h_nd_dark)
         nindex_idm_dr = nd_dark;
       if (h_nd_idm)
@@ -477,9 +476,8 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
         m1 = *m1_opt;
       if (found_m_dm)
         m2 = *m2_opt;
-      if (found_m_idm && found_m_dm)
-        throw std::invalid_argument(
-            "In input file, you can only enter one of m_idm, m_dm, choose one");
+      class_test_severe(found_m_idm && found_m_dm,
+                        "In input file, you can only enter one of m_idm, m_dm, choose one");
       if (found_m_idm)
         m_idm = m1;
       if (found_m_dm)
@@ -497,9 +495,8 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
         b1 = *b1_opt;
       if (found_b_idr)
         b2 = *b2_opt;
-      if (found_b_dark && found_b_idr)
-        throw std::invalid_argument(
-            "In input file, you can only enter one of b_dark, b_idr, choose one");
+      class_test_severe(found_b_dark && found_b_idr,
+                        "In input file, you can only enter one of b_dark, b_idr, choose one");
       if (found_b_dark)
         b_idr = b1;
       if (found_b_idr)

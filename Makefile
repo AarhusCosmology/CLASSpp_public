@@ -3,6 +3,7 @@ BUILD_DIR ?= build/cmake
 
 TEST_TARGETS := \
 	test-parser \
+	test-errors \
 	test-bisection \
 	test-quadrature \
 	test-photons \

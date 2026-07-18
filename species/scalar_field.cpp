@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "background_module.h"
+#include "errors.h"
 #include "parser.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -521,8 +522,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   if (auto pot_opt = ctx.pfc->get<std::string>("scf_potential")) {
     if (*pot_opt == "axion")
       return CreateAxion(ctx, omega0_scf);
-    throw std::invalid_argument("unknown scf_potential '" + *pot_opt +
-                                "': supported values are 'axion' (absent = historical default)");
+    class_stop_severe(
+        "unknown scf_potential '%s': supported values are 'axion' (absent = historical default)",
+        pot_opt->c_str());
   }
 
   // ── scf_parameters (variable-length list) ────────────────────────────────
@@ -532,18 +534,17 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
       scf_parameters = *scf_params_opt;
   }
   catch (const std::exception& e) {
-    throw std::invalid_argument(std::string("scf_parameters parse error: ") + e.what());
+    class_stop_severe("scf_parameters parse error: %s", e.what());
   }
 
   // ── scf_tuning_index + bounds check ──────────────────────────────────────
   int scf_tuning_index = 0;
   scf_tuning_index     = ctx.pfc->get_or("scf_tuning_index", scf_tuning_index);
-  if (scf_tuning_index >= static_cast<int>(scf_parameters.size())) {
-    throw std::invalid_argument(
-        "Tuning index scf_tuning_index = " + std::to_string(scf_tuning_index) +
-        " is larger than the number of entries " + std::to_string(scf_parameters.size()) +
-        " in scf_parameters. Check your .ini file.");
-  }
+  class_test_severe(scf_tuning_index >= static_cast<int>(scf_parameters.size()),
+                    "Tuning index scf_tuning_index = %d is larger than the number of entries "
+                    "%zu in scf_parameters. Check your .ini file.",
+                    scf_tuning_index,
+                    scf_parameters.size());
 
   // scf_shooting_parameter (when present) OVERWRITES the slot at tuning_index.
   // This is the resolved value DoShooting writes back into the fc for the final build.
@@ -573,12 +574,10 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
     }
     else {
       attractor_ic_scf = false;
-      if (scf_parameters.size() < 2) {
-        throw std::invalid_argument(
-            "Since you are not using attractor initial conditions, you must specify phi and "
-            "its derivative phi' as the last two entries in scf_parameters. See "
-            "explanatory.ini for more details.");
-      }
+      class_test_severe(scf_parameters.size() < 2,
+                        "Since you are not using attractor initial conditions, you must specify "
+                        "phi and its derivative phi' as the last two entries in scf_parameters. "
+                        "See explanatory.ini for more details.");
       phi_ini_scf       = scf_parameters[scf_parameters.size() - 2];
       phi_prime_ini_scf = scf_parameters[scf_parameters.size() - 1];
     }
@@ -625,28 +624,28 @@ std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ct
   const auto f_opt     = ctx.pfc->get<double>("f_axion");
   const auto theta_opt = ctx.pfc->get<double>("Theta_initial_scf");
   const double n       = ctx.pfc->get_or("n_axion", 1.);
-  if (!f_opt || *f_opt <= 0.)
-    throw std::invalid_argument(
-        "scf_potential = axion requires f_axion > 0 (decay constant, reduced-Planck units)");
-  if (!theta_opt || *theta_opt <= 0. || *theta_opt >= _PI_)
-    throw std::invalid_argument(
-        "scf_potential = axion requires Theta_initial_scf in (0, pi): phi_ini = Theta*f");
-  if (n < 1.)
-    throw std::invalid_argument("n_axion must be >= 1 (V = m^2 f^2 (1-cos(phi/f))^n)");
+  class_test_severe(!f_opt,
+                    "scf_potential = axion requires 'f_axion' (decay constant, reduced-Planck "
+                    "units)");
+  class_test(*f_opt <= 0.,
+             "scf_potential = axion requires f_axion > 0 (decay constant, reduced-Planck units)");
+  class_test_severe(!theta_opt, "scf_potential = axion requires 'Theta_initial_scf'");
+  class_test(*theta_opt <= 0. || *theta_opt >= _PI_,
+             "scf_potential = axion requires Theta_initial_scf in (0, pi): phi_ini = Theta*f");
+  class_test(n < 1., "n_axion must be >= 1 (V = m^2 f^2 (1-cos(phi/f))^n)");
   const double f     = *f_opt;
   const double theta = *theta_opt;
 
   // A (1-cos)^n potential has no exponential attractor: frozen ICs are forced.
   if (auto attr = ctx.pfc->get<std::string>("attractor_ic_scf")) {
-    if (attr->find("y") != std::string::npos || attr->find("Y") != std::string::npos)
-      throw std::invalid_argument(
-          "attractor_ic_scf = yes is incompatible with scf_potential = axion "
-          "(frozen ICs phi = Theta_initial_scf * f_axion, phi' = 0 are set automatically)");
+    class_test_severe(attr->find("y") != std::string::npos || attr->find("Y") != std::string::npos,
+                      "attractor_ic_scf = yes is incompatible with scf_potential = axion "
+                      "(frozen ICs phi = Theta_initial_scf * f_axion, phi' = 0 are set "
+                      "automatically)");
   }
-  if (ctx.pfc->get<std::vector<double>>("scf_parameters").has_value())
-    throw std::invalid_argument(
-        "scf_parameters is not used with scf_potential = axion; "
-        "give m_axion, f_axion, n_axion, Theta_initial_scf instead");
+  class_test_severe(ctx.pfc->get<std::vector<double>>("scf_parameters").has_value(),
+                    "scf_parameters is not used with scf_potential = axion; "
+                    "give m_axion, f_axion, n_axion, Theta_initial_scf instead");
   ctx.pfc->get<int>("scf_tuning_index");  // consume; the axion branch forces 0
 
   std::vector<double> params = {ctx.pfc->get_or("m_axion", 0.), f, n, theta};
@@ -722,13 +721,11 @@ std::vector<Named> ScalarFieldSpecies::CreateAllForComposite(const SpeciesBuildC
       scf_parameters = *scf_params_opt;
   }
   catch (const std::exception& e) {
-    throw std::invalid_argument(std::string("scf_parameters parse error: ") + e.what());
+    class_stop_severe("scf_parameters parse error: %s", e.what());
   }
-  if (scf_parameters.size() < 2) {
-    throw std::invalid_argument(
-        "Type-3 (scf_veta) coupling requires scf_parameters = 'V0, lambda' (two entries): "
-        "tuning index 0 shoots V0, entry 1 is the 1EXP slope lambda.");
-  }
+  class_test_severe(scf_parameters.size() < 2,
+                    "Type-3 (scf_veta) coupling requires scf_parameters = 'V0, lambda' (two "
+                    "entries): tuning index 0 shoots V0, entry 1 is the 1EXP slope lambda.");
   const int scf_tuning_index = 0;                         // shoot V0
   ctx.pfc->get_or("scf_tuning_index", scf_tuning_index);  // consume (composite forces 0)
 

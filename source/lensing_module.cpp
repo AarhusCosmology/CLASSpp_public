@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <numeric>
 
+#include "errors.h"
 #include "spectra_module.h"
 #include "thread_pool.h"
 
@@ -32,10 +33,10 @@ LensingModule::LensingModule(InputModulePtr input_module, SpectraModulePtr spect
 LensingModule::~LensingModule() {}
 
 std::map<std::string, std::vector<double>> LensingModule::cl_output(int lmax) const {
-  ThrowRuntimeErrorIf((lmax > l_lensed_max_) || (lmax < 0),
-                      "Error: lmax = %d is outside the allowed range [0, %d]\n",
-                      lmax,
-                      l_lensed_max_);
+  class_test_severe((lmax > l_lensed_max_) || (lmax < 0),
+                    "Error: lmax = %d is outside the allowed range [0, %d]\n",
+                    lmax,
+                    l_lensed_max_);
   std::vector<int> l_values(lmax + 1 - 2);
   std::iota(l_values.begin(), l_values.end(), 2);
   return cl_output_at_l_values(l_values);
@@ -55,7 +56,7 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_computed() c
 
 std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
     const std::vector<int>& l_values) const {
-  ThrowRuntimeErrorIf(!ple->has_lensed_cls, "No lensed Cls was computed, adjust your inputs.\n");
+  class_test_severe(!ple->has_lensed_cls, "No lensed Cls was computed, adjust your inputs.\n");
 
   std::map<std::string, int> index_map;
 

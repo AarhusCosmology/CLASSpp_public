@@ -48,6 +48,21 @@ static bool Throws(FileContent& fc) {
   }
 }
 
+// Value checks (numeric ranges on epsilon/vkick/momenta_bins/kernel_width): the
+// species code raises these via the plain (runtime_error) severity macros — the
+// sampler should reject the point, not abort the chain.
+static bool ThrowsComputation(FileContent& fc) {
+  background pba{};
+  pba.H0 = 2.2e-4;
+  try {
+    WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
+    return false;
+  }
+  catch (const std::runtime_error&) {
+    return true;
+  }
+}
+
 int main() {
   background pba{};
   pba.H0 = 2.2e-4;
@@ -90,7 +105,7 @@ int main() {
     fc.set("ddm.Gamma", "100");
     fc.set("ddm.epsilon", "1.0");  // too close to 1
     fc.set("ddm.Omega_ini", "0.05");
-    assert(Throws(fc));
+    assert(ThrowsComputation(fc));
   }
   {
     FileContent fc = BaseFc();
@@ -113,7 +128,7 @@ int main() {
     FileContent fc = BaseFc();
     fc.set("ddm.momenta_bins", "9");
     fc.set("ddm.kernel_width", "3");  // denominator n - 3w would be 0 -> reject
-    assert(Throws(fc));
+    assert(ThrowsComputation(fc));
   }
 
   // ── Injection kernel: exact energy sum rule ────────────────────────────────

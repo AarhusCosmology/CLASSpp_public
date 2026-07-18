@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations_module.h"
 #include "species/ncdm_family.h"
 #include "species/species_input.h"
@@ -112,10 +113,9 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
   if (has2)
     N2 = *n2_opt;
 
-  if (has1 && has2) {
-    throw std::invalid_argument(
-        "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose one");
-  }
+  class_test_severe(has1 && has2,
+                    "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose "
+                    "one");
   int N = has1 ? N1 : (has2 ? N2 : 0);
   if (N <= 0) {
     return;  // nothing to transmute
@@ -124,11 +124,10 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
   // 2. Synthesised prefix collision check.
   for (int i = 1; i <= N; ++i) {
     const std::string prefix = "ncdm__" + std::to_string(i);
-    if (any_dot_key_with_prefix(pfc, prefix)) {
-      throw std::invalid_argument(
-          "legacy NCDM transmutation collides with existing dot-instance '" + prefix +
-          "': rename your dot instance or remove the legacy N_ncdm keys");
-    }
+    class_test_severe(any_dot_key_with_prefix(pfc, prefix),
+                      "legacy NCDM transmutation collides with existing dot-instance '%s': rename "
+                      "your dot instance or remove the legacy N_ncdm keys",
+                      prefix.c_str());
   }
 
   // 3. For each legacy CSV field, broadcast or distribute per instance.
@@ -159,11 +158,11 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
           ++enabled;
         }
       }
-      if (static_cast<int>(values.size()) != enabled) {
-        throw std::invalid_argument("ncdm_psd_filenames has " + std::to_string(values.size()) +
-                                    " entries but " + std::to_string(enabled) +
-                                    " instances have use_ncdm_psd_files=1");
-      }
+      class_test_severe(static_cast<int>(values.size()) != enabled,
+                        "ncdm_psd_filenames has %zu entries but %d instances have "
+                        "use_ncdm_psd_files=1",
+                        values.size(),
+                        enabled);
       size_t fn_idx = 0;
       for (int i = 0; i < N; ++i) {
         if (use_flags[i] != 0) {
@@ -186,9 +185,11 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
       }
     }
     else {
-      throw std::invalid_argument(std::string(fm.legacy) + " has " + std::to_string(values.size()) +
-                                  " entries but N_ncdm_standard = " + std::to_string(N) +
-                                  "; expected 1 (broadcast) or " + std::to_string(N));
+      class_stop_severe("%s has %zu entries but N_ncdm_standard = %d; expected 1 (broadcast) or %d",
+                        fm.legacy,
+                        values.size(),
+                        N,
+                        N);
     }
   }
 

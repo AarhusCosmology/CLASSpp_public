@@ -29,17 +29,12 @@
 namespace {
 
 void readDoubleList(FileContent* pfc, const char* name, std::vector<double>& values, int* found) {
-  try {
-    if (auto l = pfc->get<std::vector<double>>(name)) {
-      values = *l;
-      *found = true;
-    }
-    else
-      *found = false;
+  if (auto l = pfc->get<std::vector<double>>(name)) {
+    values = *l;
+    *found = true;
   }
-  catch (const std::exception& e) {
-    class_stop("%s", e.what());
-  }
+  else
+    *found = false;
 }
 
 // Number of the given optionals that hold a value.
@@ -53,7 +48,7 @@ template <class T>
 std::optional<T> read_one_of(const FileContent& fc, const char* n1, const char* n2) {
   auto a = fc.get<T>(n1);
   auto b = fc.get<T>(n2);
-  class_test(a && b, "In input file, you can only enter one of %s, %s, choose one", n1, n2);
+  class_test_severe(a && b, "In input file, you can only enter one of %s, %s, choose one", n1, n2);
   return a ? a : b;
 }
 
@@ -110,13 +105,15 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
         extension     = (arglen >= 4) ? std::string(argv[i] + arglen - 4) : std::string(argv[i]);
       }
       if (extension == ".ini") {
-        class_test(!input_file.empty(),
-                   "You have passed more than one input file with extension '.ini', choose one.");
+        class_test_severe(!input_file.empty(),
+                          "You have passed more than one input file with extension '.ini', choose "
+                          "one.");
         input_file = argv[i];
       }
       else if (extension == ".pre") {
-        class_test(!precision_file.empty(),
-                   "You have passed more than one precision with extension '.pre', choose one.");
+        class_test_severe(!precision_file.empty(),
+                          "You have passed more than one precision with extension '.pre', choose "
+                          "one.");
         precision_file = argv[i];
       }
       else {
@@ -203,19 +200,14 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
 
 InputModule::InputModule(FileContent& fc) : file_content_(fc) {
   file_content_.mark_all_unread();
-  try {
-    // Translate dot-syntax for single-instance legacy species (bary.Omega ->
-    // Omega_b) before any consumer reads the file.
-    TranslateSingleInstanceDotSyntax(&file_content_);
-    input_read_precisions();
-    ReadContext();
-    ConstructSpecies();
-    ReadDerived();
-    WriteParameterFiles();
-  }
-  catch (const std::runtime_error& e) {
-    throw std::invalid_argument(e.what());
-  }
+  // Translate dot-syntax for single-instance legacy species (bary.Omega ->
+  // Omega_b) before any consumer reads the file.
+  TranslateSingleInstanceDotSyntax(&file_content_);
+  input_read_precisions();
+  ReadContext();
+  ConstructSpecies();
+  ReadDerived();
+  WriteParameterFiles();
 }
 
 void InputModule::ConstructSpecies() {
@@ -331,8 +323,8 @@ void InputModule::ReadCoupledCluster() {
   auto N_idr  = pfc->get<double>("N_idr");
   auto N_dg   = pfc->get<double>("N_dg");
   auto xi_idr = pfc->get<double>("xi_idr");
-  class_test(n_present(N_idr, N_dg, xi_idr) > 1,
-             "In input file, you can only enter one of N_idr, N_dg or xi_idr, choose one");
+  class_test_severe(n_present(N_idr, N_dg, xi_idr) > 1,
+                    "In input file, you can only enter one of N_idr, N_dg or xi_idr, choose one");
 
   double T_idr_local = 0.;
   if (N_idr) {
@@ -388,8 +380,8 @@ void InputModule::ReadCoupledCluster() {
 
   auto Omega_cdm = pfc->get<double>("Omega_cdm");
   auto omega_cdm = pfc->get<double>("omega_cdm");
-  class_test((Omega_cdm && omega_cdm),
-             "In input file, you can only enter one of Omega_cdm or omega_cdm, choose one");
+  class_test_severe((Omega_cdm && omega_cdm),
+                    "In input file, you can only enter one of Omega_cdm or omega_cdm, choose one");
   if (Omega_cdm) {
     omega0_cdm   = *Omega_cdm;
     cdm_user_set = true;
@@ -414,9 +406,10 @@ void InputModule::ReadCoupledCluster() {
   auto Omega_idm_dr = pfc->get<double>("Omega_idm_dr");
   auto omega_idm_dr = pfc->get<double>("omega_idm_dr");
   auto f_idm_dr     = pfc->get<double>("f_idm_dr");
-  class_test(n_present(Omega_idm_dr, omega_idm_dr, f_idm_dr) > 1,
-             "In input file, you can only enter one of Omega_idm_dr, omega_idm_dr or f_idm_dr, "
-             "choose one");
+  class_test_severe(n_present(Omega_idm_dr, omega_idm_dr, f_idm_dr) > 1,
+                    "In input file, you can only enter one of Omega_idm_dr, omega_idm_dr or "
+                    "f_idm_dr, "
+                    "choose one");
 
   if (Omega_idm_dr)
     omega_budget_.idm_dr = *Omega_idm_dr;
@@ -449,8 +442,9 @@ void InputModule::ReadCoupledCluster() {
   // they are parsed in DCDM_DR_Species::CreateAll, not here.
   auto Omega_dcdmdr = pfc->get<double>("Omega_dcdmdr");
   auto omega_dcdmdr = pfc->get<double>("omega_dcdmdr");
-  class_test((Omega_dcdmdr && omega_dcdmdr),
-             "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose one");
+  class_test_severe((Omega_dcdmdr && omega_dcdmdr),
+                    "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose "
+                    "one");
   if (Omega_dcdmdr)
     omega_budget_.dcdmdr = *Omega_dcdmdr;
   if (omega_dcdmdr)
@@ -471,9 +465,10 @@ void InputModule::ReadCoupledCluster() {
 
   const int any_drmd = z_stop || G_over_aH_drmd || f_idm_drmd || delta_Neff_drmd;
   const int all_drmd = z_stop && G_over_aH_drmd && f_idm_drmd && delta_Neff_drmd;
-  class_test(any_drmd && !all_drmd,
-             "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters are "
-             "'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
+  class_test_severe(any_drmd && !all_drmd,
+                    "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters "
+                    "are "
+                    "'z_stop', 'G_over_aH_drmd_ini', 'f_idm_drmd' and 'delta_Neff_drmd'.");
 
   // Store DRMD intermediates into coupled_inputs_ for factory reuse.
   coupled_inputs_.z_stop             = z_stop_drmd;
@@ -662,7 +657,7 @@ void InputModule::ReadContext() {
   /** - h (dimensionless) and [\f$ H_0/c\f$] in \f$ Mpc^{-1} = h / 2997.9... = h * 10^5 / c \f$ */
   auto H0 = pfc->get<double>("H0");
   auto h  = pfc->get<double>("h");
-  class_test(H0 && h, "In input file, you cannot enter both h and H0, choose one");
+  class_test_severe(H0 && h, "In input file, you cannot enter both h and H0, choose one");
   if (H0) {
     pba->H0 = *H0 * 1.e3 / _c_;
     pba->h  = *H0 / 100.;
@@ -677,15 +672,16 @@ void InputModule::ReadContext() {
    *  combining it with a direct h/H0 — except inside a shooting build, where DoShooting
    *  has itself set the trial h. h keeps its default; DoShooting seeds and solves it. */
   auto theta_s = pfc->get<double>("100*theta_s");
-  class_test(theta_s && (H0 || h) && !pfc->is_shooting,
-             "In input file, you cannot enter both 100*theta_s and h (or H0), choose one");
+  class_test_severe(theta_s && (H0 || h) && !pfc->is_shooting,
+                    "In input file, you cannot enter both 100*theta_s and h (or H0), choose one");
 
   /** - Omega_0_g (photons) and T_cmb */
   auto T_cmb   = pfc->get<double>("T_cmb");
   auto Omega_g = pfc->get<double>("Omega_g");
   auto omega_g = pfc->get<double>("omega_g");
-  class_test(n_present(T_cmb, Omega_g, omega_g) > 1,
-             "In input file, you can only enter one of T_cmb, Omega_g or omega_g, choose one");
+  class_test_severe(n_present(T_cmb, Omega_g, omega_g) > 1,
+                    "In input file, you can only enter one of T_cmb, Omega_g or omega_g, choose "
+                    "one");
 
   if (n_present(T_cmb, Omega_g, omega_g) == 0) {
     pba->Omega0_g = Omega0gFromTcmb(pba->T_cmb, pba->h);
@@ -713,8 +709,8 @@ void InputModule::ReadContext() {
   /** - Omega_0_b (baryons) */
   auto Omega_b = pfc->get<double>("Omega_b");
   auto omega_b = pfc->get<double>("omega_b");
-  class_test((Omega_b && omega_b),
-             "In input file, you can only enter one of Omega_b or omega_b, choose one");
+  class_test_severe((Omega_b && omega_b),
+                    "In input file, you can only enter one of Omega_b or omega_b, choose one");
   if (Omega_b)
     pba->Omega0_b = *Omega_b;
   if (omega_b)
@@ -735,8 +731,9 @@ void InputModule::ReadContext() {
     ppt->G_eff_ur = *G_eff_ur;
   if (log10_G_eff_ur) {
     ppt->G_eff_ur = *log10_G_eff_ur;
-    class_test(G_eff_ur.has_value(),
-               "In input file, you cannot enter both log10_G_eff_ur and G_eff_ur, choose one");
+    class_test_severe(G_eff_ur.has_value(),
+                      "In input file, you cannot enter both log10_G_eff_ur and G_eff_ur, choose "
+                      "one");
     ppt->G_eff_ur = pow(10.0, ppt->G_eff_ur);
   }
 
@@ -778,10 +775,11 @@ void InputModule::ReadContext() {
   auto Omega_fld    = pfc->get<double>("Omega_fld");
   auto Omega_scf    = pfc->get<double>("Omega_scf");
 
-  class_test(Omega_Lambda && Omega_fld && (!Omega_scf || (*Omega_scf >= 0.)),
-             "In input file, either Omega_Lambda or Omega_fld must be left unspecified, except if "
-             "Omega_scf is set and <0.0, in which case the contribution from the scalar field will "
-             "be the free parameter.");
+  class_test_severe(
+      Omega_Lambda && Omega_fld && (!Omega_scf || (*Omega_scf >= 0.)),
+      "In input file, either Omega_Lambda or Omega_fld must be left unspecified, except if "
+      "Omega_scf is set and <0.0, in which case the contribution from the scalar field will "
+      "be the free parameter.");
 
   /** - --> (!Omega_scf || (*Omega_scf >= 0.)) explained:
    *  it means that either we have not read Omega_scf so we are ignoring it
@@ -813,9 +811,10 @@ void InputModule::ReadContext() {
 
   /** - Test that the user have not specified Omega_scf = -1 but left either
       Omega_lambda or Omega_fld unspecified:*/
-  class_test((!Omega_Lambda || !Omega_fld) && (Omega_scf && (*Omega_scf < 0.)),
-             "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar "
-             "field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
+  class_test_severe(
+      (!Omega_Lambda || !Omega_fld) && (Omega_scf && (*Omega_scf < 0.)),
+      "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar "
+      "field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
   /* Fluid physics params (fluid_equation_of_state, w0_fld, wa_fld, cs2_fld,
      Omega_EDE) are parsed inside FluidSpecies::CreateAll; PPF-only params
@@ -915,18 +914,19 @@ void InputModule::ReadDerived() {
       recognized                = true;
     }
 
-    class_test(!recognized,
-               "could not identify reionization_parametrization value, check that it is one of "
-               "'reio_none', 'reio_camb', 'reio_bins_tanh', 'reio_half_tanh', 'reio_many_tanh', "
-               "'reio_inter'...");
+    class_test_severe(
+        !recognized,
+        "could not identify reionization_parametrization value, check that it is one of "
+        "'reio_none', 'reio_camb', 'reio_bins_tanh', 'reio_half_tanh', 'reio_many_tanh', "
+        "'reio_inter'...");
   }
 
   /** - reionization parameters if reio_parametrization=reio_camb */
   if ((pth->reio_parametrization == reio_camb) || (pth->reio_parametrization == reio_half_tanh)) {
     auto z_reio   = pfc->get<double>("z_reio");
     auto tau_reio = pfc->get<double>("tau_reio");
-    class_test((z_reio && tau_reio),
-               "In input file, you can only enter one of z_reio or tau_reio, choose one");
+    class_test_severe((z_reio && tau_reio),
+                      "In input file, you can only enter one of z_reio or tau_reio, choose one");
     if (z_reio) {
       pth->z_reio        = *z_reio;
       pth->reio_z_or_tau = reio_z;
@@ -948,13 +948,14 @@ void InputModule::ReadDerived() {
     int found;
     pth->binned_reio_num = pfc->get_or("binned_reio_num", pth->binned_reio_num);
     readDoubleList(pfc, "binned_reio_z", pth->binned_reio_z, &found);
-    class_test(!found || static_cast<int>(pth->binned_reio_z.size()) != pth->binned_reio_num,
-               "Number of entries in binned_reio_z does not match expected number, %d.",
-               pth->binned_reio_num);
+    class_test_severe(!found || static_cast<int>(pth->binned_reio_z.size()) != pth->binned_reio_num,
+                      "Number of entries in binned_reio_z does not match expected number, %d.",
+                      pth->binned_reio_num);
     readDoubleList(pfc, "binned_reio_xe", pth->binned_reio_xe, &found);
-    class_test(!found || static_cast<int>(pth->binned_reio_xe.size()) != pth->binned_reio_num,
-               "Number of entries in binned_reio_xe does not match expected number, %d.",
-               pth->binned_reio_num);
+    class_test_severe(!found ||
+                          static_cast<int>(pth->binned_reio_xe.size()) != pth->binned_reio_num,
+                      "Number of entries in binned_reio_xe does not match expected number, %d.",
+                      pth->binned_reio_num);
     pth->binned_reio_step_sharpness = pfc->get_or("binned_reio_step_sharpness",
                                                   pth->binned_reio_step_sharpness);
   }
@@ -964,13 +965,13 @@ void InputModule::ReadDerived() {
     int found;
     pth->many_tanh_num = pfc->get_or("many_tanh_num", pth->many_tanh_num);
     readDoubleList(pfc, "many_tanh_z", pth->many_tanh_z, &found);
-    class_test(!found || static_cast<int>(pth->many_tanh_z.size()) != pth->many_tanh_num,
-               "Number of entries in many_tanh_z does not match expected number, %d.",
-               pth->many_tanh_num);
+    class_test_severe(!found || static_cast<int>(pth->many_tanh_z.size()) != pth->many_tanh_num,
+                      "Number of entries in many_tanh_z does not match expected number, %d.",
+                      pth->many_tanh_num);
     readDoubleList(pfc, "many_tanh_xe", pth->many_tanh_xe, &found);
-    class_test(!found || static_cast<int>(pth->many_tanh_xe.size()) != pth->many_tanh_num,
-               "Number of entries in many_tanh_xe does not match expected number, %d.",
-               pth->many_tanh_num);
+    class_test_severe(!found || static_cast<int>(pth->many_tanh_xe.size()) != pth->many_tanh_num,
+                      "Number of entries in many_tanh_xe does not match expected number, %d.",
+                      pth->many_tanh_num);
     pth->many_tanh_width = pfc->get_or("many_tanh_width", pth->many_tanh_width);
   }
 
@@ -979,13 +980,13 @@ void InputModule::ReadDerived() {
     int found;
     pth->reio_inter_num = pfc->get_or("reio_inter_num", pth->reio_inter_num);
     readDoubleList(pfc, "reio_inter_z", pth->reio_inter_z, &found);
-    class_test(!found || static_cast<int>(pth->reio_inter_z.size()) != pth->reio_inter_num,
-               "Number of entries in reio_inter_z does not match expected number, %d.",
-               pth->reio_inter_num);
+    class_test_severe(!found || static_cast<int>(pth->reio_inter_z.size()) != pth->reio_inter_num,
+                      "Number of entries in reio_inter_z does not match expected number, %d.",
+                      pth->reio_inter_num);
     readDoubleList(pfc, "reio_inter_xe", pth->reio_inter_xe, &found);
-    class_test(!found || static_cast<int>(pth->reio_inter_xe.size()) != pth->reio_inter_num,
-               "Number of entries in reio_inter_xe does not match expected number, %d.",
-               pth->reio_inter_num);
+    class_test_severe(!found || static_cast<int>(pth->reio_inter_xe.size()) != pth->reio_inter_num,
+                      "Number of entries in reio_inter_xe does not match expected number, %d.",
+                      pth->reio_inter_num);
   }
 
   /** - energy injection parameters from CDM annihilation/decay */
@@ -1012,8 +1013,8 @@ void InputModule::ReadDerived() {
           pth->has_on_the_spot = false;
         }
         else {
-          class_stop("incomprehensible input '%s' for the field 'on the spot'",
-                     on_the_spot->c_str());
+          class_stop_severe("incomprehensible input '%s' for the field 'on the spot'",
+                            on_the_spot->c_str());
         }
       }
     }
@@ -1032,8 +1033,8 @@ void InputModule::ReadDerived() {
         pth->compute_damping_scale = false;
       }
       else {
-        class_stop("incomprehensible input '%s' for the field 'compute damping scale'",
-                   compute_damping_scale->c_str());
+        class_stop_severe("incomprehensible input '%s' for the field 'compute damping scale'",
+                          compute_damping_scale->c_str());
       }
     }
   }
@@ -1128,10 +1129,11 @@ void InputModule::ReadDerived() {
       if ((tc.find("pol") != std::string::npos) || (tc.find("Pol") != std::string::npos))
         ppt->switch_pol = 1;
 
-      class_test((ppt->switch_sw == 0) && (ppt->switch_eisw == 0) && (ppt->switch_lisw == 0) &&
-                     (ppt->switch_dop == 0) && (ppt->switch_pol == 0),
-                 "In the field 'output', you selected CMB temperature, but in the field "
-                 "'temperature contributions', you removed all contributions");
+      class_test_severe((ppt->switch_sw == 0) && (ppt->switch_eisw == 0) &&
+                            (ppt->switch_lisw == 0) && (ppt->switch_dop == 0) &&
+                            (ppt->switch_pol == 0),
+                        "In the field 'output', you selected CMB temperature, but in the field "
+                        "'temperature contributions', you removed all contributions");
 
       ppt->eisw_lisw_split_z = pfc->get_or("early/late isw redshift", ppt->eisw_lisw_split_z);
     }
@@ -1149,10 +1151,10 @@ void InputModule::ReadDerived() {
       if (ncc.find("gr") != std::string::npos)
         ppt->has_nc_gr = true;
 
-      class_test((!ppt->has_nc_density) && (!ppt->has_nc_rsd) && (!ppt->has_nc_lens) &&
-                     (!ppt->has_nc_gr),
-                 "In the field 'output', you selected number count Cl's, but in the field 'number "
-                 "count contributions', you removed all contributions");
+      class_test_severe(
+          (!ppt->has_nc_density) && (!ppt->has_nc_rsd) && (!ppt->has_nc_lens) && (!ppt->has_nc_gr),
+          "In the field 'output', you selected number count Cl's, but in the field 'number "
+          "count contributions', you removed all contributions");
     }
 
     else {
@@ -1184,10 +1186,11 @@ void InputModule::ReadDerived() {
       if ((modes->find("t") != std::string::npos) || (modes->find("T") != std::string::npos))
         ppt->has_tensors = true;
 
-      class_test(!ppt->has_scalars && !ppt->has_vectors && !ppt->has_tensors,
-                 "You wrote: modes='%s'. Could not identify any of the modes ('s', 'v', 't') in "
-                 "such input",
-                 modes->c_str());
+      class_test_severe(!ppt->has_scalars && !ppt->has_vectors && !ppt->has_tensors,
+                        "You wrote: modes='%s'. Could not identify any of the modes ('s', 'v', "
+                        "'t') in "
+                        "such input",
+                        modes->c_str());
     }
 
     if (ppt->has_scalars) {
@@ -1211,33 +1214,37 @@ void InputModule::ReadDerived() {
         if ((ic->find("niv") != std::string::npos) || (ic->find("NIV") != std::string::npos))
           ppt->has_niv = true;
 
-        class_test(!ppt->has_ad && !ppt->has_bi && !ppt->has_cdi && !ppt->has_nid && !ppt->has_niv,
-                   "You wrote: ic='%s'. Could not identify any of the initial conditions ('ad', "
-                   "'bi', 'cdi', 'nid', 'niv') in such input",
-                   ic->c_str());
+        class_test_severe(
+            !ppt->has_ad && !ppt->has_bi && !ppt->has_cdi && !ppt->has_nid && !ppt->has_niv,
+            "You wrote: ic='%s'. Could not identify any of the initial conditions ('ad', "
+            "'bi', 'cdi', 'nid', 'niv') in such input",
+            ic->c_str());
       }
     }
 
     else {
-      class_test(ppt->has_cl_cmb_lensing_potential,
-                 "Inconsistency: you want C_l's for cmb lensing potential, but no scalar modes\n");
+      class_test_severe(ppt->has_cl_cmb_lensing_potential,
+                        "Inconsistency: you want C_l's for cmb lensing potential, but no scalar "
+                        "modes\n");
 
-      class_test(ppt->has_pk_matter,
-                 "Inconsistency: you want P(k) of matter, but no scalar modes\n");
+      class_test_severe(ppt->has_pk_matter,
+                        "Inconsistency: you want P(k) of matter, but no scalar modes\n");
     }
 
     if (ppt->has_vectors) {
-      class_test((!ppt->has_cl_cmb_temperature) && (!ppt->has_cl_cmb_polarization),
-                 "inconsistent input: you asked for vectors, so you should have at least one "
-                 "non-zero "
-                 "tensor source type (temperature or polarization). Please adjust your input.");
+      class_test_severe(
+          (!ppt->has_cl_cmb_temperature) && (!ppt->has_cl_cmb_polarization),
+          "inconsistent input: you asked for vectors, so you should have at least one "
+          "non-zero "
+          "tensor source type (temperature or polarization). Please adjust your input.");
     }
 
     if (ppt->has_tensors) {
-      class_test((!ppt->has_cl_cmb_temperature) && (!ppt->has_cl_cmb_polarization),
-                 "inconsistent input: you asked for tensors, so you should have at least one "
-                 "non-zero "
-                 "tensor source type (temperature or polarization). Please adjust your input.");
+      class_test_severe(
+          (!ppt->has_cl_cmb_temperature) && (!ppt->has_cl_cmb_polarization),
+          "inconsistent input: you asked for tensors, so you should have at least one "
+          "non-zero "
+          "tensor source type (temperature or polarization). Please adjust your input.");
     }
   }
 
@@ -1269,9 +1276,10 @@ void InputModule::ReadDerived() {
       ppm->primordial_spec_type = external_Pk;
       recognized                = true;
     }
-    class_test(!recognized,
-               "could not identify primordial spectrum type, check that it is one of "
-               "'analytic_pk', 'two_scales', 'inflation_V', 'inflation_H', 'external_Pk'...");
+    class_test_severe(!recognized,
+                      "could not identify primordial spectrum type, check that it is one of "
+                      "'analytic_pk', 'two_scales', 'inflation_V', 'inflation_H', "
+                      "'external_Pk'...");
   }
 
   ppm->k_pivot = pfc->get_or("k_pivot", ppm->k_pivot);
@@ -1393,9 +1401,10 @@ void InputModule::ReadDerived() {
       auto ln_A_s = pfc->get<double>("ln10^{10}A_s");
       auto sigma8 = pfc->get<double>("sigma8");
       auto S8     = pfc->get<double>("S8");
-      class_test(n_present(A_s, ln_A_s, sigma8, S8) > 1,
-                 "In input file, you can only enter one of A_s, ln10^{10}A_s, sigma8 and S8, "
-                 "choose one");
+      class_test_severe(n_present(A_s, ln_A_s, sigma8, S8) > 1,
+                        "In input file, you can only enter one of A_s, ln10^{10}A_s, sigma8 and "
+                        "S8, "
+                        "choose one");
       if (A_s)
         ppm->A_s = *A_s;
       else if (ln_A_s)
@@ -1684,7 +1693,7 @@ void InputModule::ReadDerived() {
         ppm->potential = higgs_inflation;
       }
       else {
-        class_stop(
+        class_stop_severe(
             "did not recognize input parameter 'potential': should be one of 'polynomial' "
             "or 'higgs_inflation'");
       }
@@ -1700,9 +1709,10 @@ void InputModule::ReadDerived() {
     auto ln_aH_ratio_str = pfc->get<std::string>("ln_aH_ratio");
     auto N_star_str      = pfc->get<std::string>("N_star");
 
-    class_test(ln_aH_ratio_str && N_star_str,
-               "In input file, you can only enter one of ln_aH_ratio or N_star, the two are not "
-               "compatible");
+    class_test_severe(ln_aH_ratio_str && N_star_str,
+                      "In input file, you can only enter one of ln_aH_ratio or N_star, the two are "
+                      "not "
+                      "compatible");
 
     if (ln_aH_ratio_str) {
       if ((ln_aH_ratio_str->find("auto") != std::string::npos) ||
@@ -1728,14 +1738,15 @@ void InputModule::ReadDerived() {
         ppm->behavior = analytical;
       }
       else {
-        class_stop("Your entry for 'inflation behavior' could not be understood");
+        class_stop_severe("Your entry for 'inflation behavior' could not be understood");
       }
     }
   }
 
   else if (ppm->primordial_spec_type == external_Pk) {
     auto command = pfc->get<std::string>("command");
-    class_test(!command || command->empty(), "You omitted to write a command for the external Pk");
+    class_test_severe(!command || command->empty(),
+                      "You omitted to write a command for the external Pk");
 
     ppm->command  = *command;
     ppm->custom1  = pfc->get_or("custom1", ppm->custom1);
@@ -1753,16 +1764,17 @@ void InputModule::ReadDerived() {
   /* Tests moved from primordial module: */
   if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_H) ||
       (ppm->primordial_spec_type == inflation_V_end)) {
-    class_test(!ppt->has_scalars,
-               "inflationary module cannot work if you do not ask for scalar modes");
+    class_test_severe(!ppt->has_scalars,
+                      "inflationary module cannot work if you do not ask for scalar modes");
 
-    class_test(ppt->has_vectors, "inflationary module cannot work if you ask for vector modes");
+    class_test_severe(ppt->has_vectors,
+                      "inflationary module cannot work if you ask for vector modes");
 
-    class_test(!ppt->has_tensors,
-               "inflationary module cannot work if you do not ask for tensor modes");
+    class_test_severe(!ppt->has_tensors,
+                      "inflationary module cannot work if you do not ask for tensor modes");
 
-    class_test(ppt->has_bi || ppt->has_cdi || ppt->has_nid || ppt->has_niv,
-               "inflationary module cannot work if you ask for isocurvature modes");
+    class_test_severe(ppt->has_bi || ppt->has_cdi || ppt->has_nid || ppt->has_niv,
+                      "inflationary module cannot work if you ask for isocurvature modes");
   }
 
   /** (e) parameters for final spectra */
@@ -1794,7 +1806,7 @@ void InputModule::ReadDerived() {
       ple->has_lensed_cls = true;
     }
     else {
-      class_stop(
+      class_stop_severe(
           "you asked for lensed CMB Cls, but this requires a minimal number of options: "
           "'modes' should include 's', 'output' should include 'tCl' and/or 'pCL', and "
           "also, importantly, 'lCl', the CMB lensing potential spectrum. You forgot one of "
@@ -1809,18 +1821,20 @@ void InputModule::ReadDerived() {
   }
 
   if (auto full_limber = pfc->get<std::string>("want_lcmb_full_limber")) {
-    class_test(full_limber->empty() || (((*full_limber)[0] != 'y') && ((*full_limber)[0] != 'Y') &&
-                                        ((*full_limber)[0] != 'n') && ((*full_limber)[0] != 'N')),
-               "In input file, want_lcmb_full_limber must begin with 'y' or 'n', not '%s'",
-               full_limber->c_str());
+    class_test_severe(full_limber->empty() ||
+                          (((*full_limber)[0] != 'y') && ((*full_limber)[0] != 'Y') &&
+                           ((*full_limber)[0] != 'n') && ((*full_limber)[0] != 'N')),
+                      "In input file, want_lcmb_full_limber must begin with 'y' or 'n', not '%s'",
+                      full_limber->c_str());
     ppt->want_lcmb_full_limber = ((*full_limber)[0] == 'y') || ((*full_limber)[0] == 'Y');
   }
 
   if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
     auto P_k_max_h_Mpc = pfc->get<double>("P_k_max_h/Mpc");
     auto P_k_max_1_Mpc = pfc->get<double>("P_k_max_1/Mpc");
-    class_test(P_k_max_h_Mpc && P_k_max_1_Mpc,
-               "In input file, you cannot enter both P_k_max_h/Mpc and P_k_max_1/Mpc, choose one");
+    class_test_severe(P_k_max_h_Mpc && P_k_max_1_Mpc,
+                      "In input file, you cannot enter both P_k_max_h/Mpc and P_k_max_1/Mpc, "
+                      "choose one");
     if (P_k_max_h_Mpc) {
       ppt->k_max_for_pk = *P_k_max_h_Mpc * pba->h;
     }
@@ -1834,10 +1848,11 @@ void InputModule::ReadDerived() {
 
     if (found) {
       n_list = static_cast<int>(zPkValues.size());
-      class_test(n_list > _Z_PK_NUM_MAX_,
-                 "you want to write some output for %d different values of z, hence you should "
-                 "increase _Z_PK_NUM_MAX_ in include/output.h to at least this number",
-                 n_list);
+      class_test_severe(n_list > _Z_PK_NUM_MAX_,
+                        "you want to write some output for %d different values of z, hence you "
+                        "should "
+                        "increase _Z_PK_NUM_MAX_ in include/output.h to at least this number",
+                        n_list);
       pop->z_pk_num = n_list;
       for (i = 0; i < n_list; i++) {
         pop->z_pk[i] = zPkValues[i];
@@ -1868,7 +1883,7 @@ void InputModule::ReadDerived() {
         ppt->selection = dirac;
       }
       else {
-        class_stop("In selection function input: type '%s' is unclear", selection->c_str());
+        class_stop_severe("In selection function input: type '%s' is unclear", selection->c_str());
       }
     }
 
@@ -1878,10 +1893,11 @@ void InputModule::ReadDerived() {
     if ((found) && !selectionValues.empty()) {
       n_list = static_cast<int>(selectionValues.size());
 
-      class_test(n_list > _SELECTION_NUM_MAX_,
-                 "you want to compute density Cl's for %d different bins, hence you should "
-                 "increase _SELECTION_NUM_MAX_ in include/perturbations.h to at least this number",
-                 n_list);
+      class_test_severe(n_list > _SELECTION_NUM_MAX_,
+                        "you want to compute density Cl's for %d different bins, hence you should "
+                        "increase _SELECTION_NUM_MAX_ in include/perturbations.h to at least this "
+                        "number",
+                        n_list);
 
       ppt->selection_num = n_list;
       for (i = 0; i < n_list; i++) {
@@ -1920,7 +1936,7 @@ void InputModule::ReadDerived() {
           }
         }
         else {
-          class_stop(
+          class_stop_severe(
               "In input for selection function, you asked for %d bin centers and %d bin "
               "widths; number of bins unclear; you should pass either one bin width (common "
               "to all bins) or %d bin widths",
@@ -1947,7 +1963,7 @@ void InputModule::ReadDerived() {
           }
         }
         else {
-          class_stop(
+          class_stop_severe(
               "In input for selection function, you asked for %d bin centers and %d bin "
               "biases; number of bins unclear; you should pass either one bin bias (common "
               "to all bins) or %d bin biases",
@@ -1974,7 +1990,7 @@ void InputModule::ReadDerived() {
           }
         }
         else {
-          class_stop(
+          class_stop_severe(
               "In input for selection function, you asked for %d bin centers and %d bin "
               "biases; number of bins unclear; you should pass either one bin bias (common "
               "to all bins) or %d bin biases",
@@ -1988,9 +2004,10 @@ void InputModule::ReadDerived() {
     if (ppt->selection_num > 1) {
       psp->non_diag = pfc->get_or("non_diagonal", psp->non_diag);
       if ((psp->non_diag < 0) || (psp->non_diag >= ppt->selection_num))
-        class_stop("Input for non_diagonal is %d, while it is expected to be between 0 and %d\n",
-                   psp->non_diag,
-                   ppt->selection_num - 1);
+        class_stop_severe(
+            "Input for non_diagonal is %d, while it is expected to be between 0 and %d\n",
+            psp->non_diag,
+            ppt->selection_num - 1);
     }
 
     if (auto dNdz_selection = pfc->get<std::string>("dNdz_selection")) {
@@ -2013,17 +2030,19 @@ void InputModule::ReadDerived() {
       }
     }
 
-    class_test(pfc->get<double>("bias").has_value(),
-               "the input parameter 'bias' is obsolete, because you can now pass an independent "
-               "light-to-mass bias for each bin/selection function. The new input name is "
-               "'selection_bias'. It can be set to a single number (common bias for all bins) or "
-               "as many numbers as the number of bins");
+    class_test_severe(
+        pfc->get<double>("bias").has_value(),
+        "the input parameter 'bias' is obsolete, because you can now pass an independent "
+        "light-to-mass bias for each bin/selection function. The new input name is "
+        "'selection_bias'. It can be set to a single number (common bias for all bins) or "
+        "as many numbers as the number of bins");
 
-    class_test(pfc->get<double>("s_bias").has_value(),
-               "the input parameter 's_bias' is obsolete, because you can now pass an independent "
-               "magnitude bias for each bin/selection function. The new input name is "
-               "'selection_magnitude_bias'. It can be set to a single number (common magnitude "
-               "bias for all bins) or as many numbers as the number of bins");
+    class_test_severe(
+        pfc->get<double>("s_bias").has_value(),
+        "the input parameter 's_bias' is obsolete, because you can now pass an independent "
+        "magnitude bias for each bin/selection function. The new input name is "
+        "'selection_magnitude_bias'. It can be set to a single number (common magnitude "
+        "bias for all bins) or as many numbers as the number of bins");
   }
   /* end of selection function section */
 
@@ -2084,7 +2103,7 @@ void InputModule::ReadDerived() {
           (format->find("CAMB") != std::string::npos))
         pop->output_format = file_format::camb_format;
       else
-        class_stop(
+        class_stop_severe(
             "You wrote: format='%s'. Could not identify any of the possible formats "
             "('class', 'CLASS', 'camb', 'CAMB')",
             format->c_str());
@@ -2094,9 +2113,10 @@ void InputModule::ReadDerived() {
   /** (f) parameter related to the non-linear spectra computation */
 
   if (auto non_linear = pfc->get<std::string>("non linear")) {
-    class_test(!ppt->has_perturbations,
-               "You requested non linear computation but no linear computation. You must set "
-               "output to tCl or similar.");
+    class_test_severe(!ppt->has_perturbations,
+                      "You requested non linear computation but no linear computation. You must "
+                      "set "
+                      "output to tCl or similar.");
 
     if ((non_linear->find("halofit") != std::string::npos) ||
         (non_linear->find("Halofit") != std::string::npos) ||
@@ -2141,9 +2161,10 @@ void InputModule::ReadDerived() {
       auto eta_0 = pfc->get<double>("eta_0");
       auto c_min = pfc->get<double>("c_min");
 
-      class_test((feedback_model && (eta_0 || c_min)),
-                 "In input file, you cannot enter both a baryonic feedback model and a choice of "
-                 "baryonic feedback parameters, choose one of both methods");
+      class_test_severe((feedback_model && (eta_0 || c_min)),
+                        "In input file, you cannot enter both a baryonic feedback model and a "
+                        "choice of "
+                        "baryonic feedback parameters, choose one of both methods");
 
       if (eta_0 && c_min) {
         pnl->feedback = nl_user_defined;
@@ -2280,12 +2301,13 @@ void InputModule::ReadDerived() {
   // obsolete precision parameter: read for compatibility with old precision files
   ppr->q_logstep_spline = pfc->get_or("q_logstep_trans", ppr->q_logstep_spline);
 
-  class_test(pfc->get<std::string>("l_switch_limber_for_cl_density_over_z").has_value(),
-             "You passed in input a precision parameter called "
-             "l_switch_limber_for_cl_density_over_z. This syntax is deprecated since v2.5.0. "
-             "Please use instead the two precision parameters l_switch_limber_for_nc_local_over_z, "
-             "l_switch_limber_for_nc_los_over_z, defined in include/common.h, and allowing for "
-             "better performance.");
+  class_test_severe(
+      pfc->get<std::string>("l_switch_limber_for_cl_density_over_z").has_value(),
+      "You passed in input a precision parameter called "
+      "l_switch_limber_for_cl_density_over_z. This syntax is deprecated since v2.5.0. "
+      "Please use instead the two precision parameters l_switch_limber_for_nc_local_over_z, "
+      "l_switch_limber_for_nc_los_over_z, defined in include/common.h, and allowing for "
+      "better performance.");
 
   /** (i) Write values in file */
   if (ple->has_lensed_cls)
@@ -2315,11 +2337,12 @@ void InputModule::ReadDerived() {
 
   if (k_output_found) {
     n_list = static_cast<int>(kOutputValues.size());
-    class_test(n_list > _MAX_NUMBER_OF_K_FILES_,
-               "you want to write some output for %d different values of k, hence you should "
-               "increase _MAX_NUMBER_OF_K_FILES_ in include/perturbations.h to at least this "
-               "number",
-               n_list);
+    class_test_severe(
+        n_list > _MAX_NUMBER_OF_K_FILES_,
+        "you want to write some output for %d different values of k, hence you should "
+        "increase _MAX_NUMBER_OF_K_FILES_ in include/perturbations.h to at least this "
+        "number",
+        n_list);
     ppt->k_output_values_num = n_list;
 
     for (i = 0; i < n_list; i++) {
@@ -2735,9 +2758,9 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
     // A species must report one guess + one Jacobian seed per target (same order), or the
     // flattened unknown vector below desyncs. Guard against a mis-implemented hook.
     if (g.size() != tgts.size() || d.size() != tgts.size()) {
-      throw std::runtime_error("species '" + key + "' reported " + std::to_string(tgts.size()) +
-                               " shooting target(s) but " + std::to_string(g.size()) +
-                               " guess(es) / " + std::to_string(d.size()) + " Jacobian seed(s)");
+      throw std::logic_error("species '" + key + "' reported " + std::to_string(tgts.size()) +
+                             " shooting target(s) but " + std::to_string(g.size()) +
+                             " guess(es) / " + std::to_string(d.size()) + " Jacobian seed(s)");
     }
     for (size_t j = 0; j < tgts.size(); ++j) {
       w.targets.push_back(tgts[j]);

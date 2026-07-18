@@ -1,10 +1,10 @@
 #include "wdm_decay_product.h"
 
 #include <cmath>
-#include <stdexcept>
 
 #include "background_module.h"
 #include "dcdm.h"
+#include "errors.h"
 #include "perturbations_module.h"
 #include "species/species_input.h"
 
@@ -35,10 +35,10 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
                           "momenta_bins_bg",
                           "use_psd_file",
                           "psd_filename"}) {
-    if (input.get<std::string>(key).has_value()) {
-      throw std::invalid_argument("species '" + instance_name + "': parameter '" +
-                                  std::string(key) + "' is not supported by dcdm_wdm");
-    }
+    class_test_severe(input.get<std::string>(key).has_value(),
+                      "species '%s': parameter '%s' is not supported by dcdm_wdm",
+                      instance_name.c_str(),
+                      key);
   }
 
   // Internal thermodynamic convention: T_wdm = T_cmb, deg = 1, no chemical potential.
@@ -54,11 +54,10 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   auto log10lifetime_value = input.get<double>("log10lifetime");
   int n_provided = (int) Gamma_value.has_value() + (int) log10Gamma_value.has_value() +
                    (int) lifetime_value.has_value() + (int) log10lifetime_value.has_value();
-  if (n_provided != 1) {
-    throw std::invalid_argument(
-        "species '" + instance_name +
-        "': specify exactly one of Gamma, log10Gamma, lifetime, log10lifetime");
-  }
+  class_test_severe(n_provided != 1,
+                    "species '%s': specify exactly one of Gamma, log10Gamma, lifetime, "
+                    "log10lifetime",
+                    instance_name.c_str());
   double Gamma_raw = 0.;
   if (Gamma_value) {
     Gamma_raw = *Gamma_value;
@@ -78,26 +77,23 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   // Kinematics: exactly one of epsilon (mass retention) or vkick (v/c).
   auto eps_opt   = input.get<double>("epsilon");
   auto vkick_opt = input.get<double>("vkick");
-  if (eps_opt.has_value() == vkick_opt.has_value()) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': specify exactly one of epsilon, vkick");
-  }
+  class_test_severe(eps_opt.has_value() == vkick_opt.has_value(),
+                    "species '%s': specify exactly one of epsilon, vkick",
+                    instance_name.c_str());
   if (eps_opt) {
     eps_ = *eps_opt;
-    if (eps_ < 0. || eps_ > 1. - 1e-9) {
-      throw std::invalid_argument("species '" + instance_name +
-                                  "': epsilon must be in [0, 1 - 1e-9]; for smaller kicks "
-                                  "input vkick directly");
-    }
+    class_test(eps_ < 0. || eps_ > 1. - 1e-9,
+               "species '%s': epsilon must be in [0, 1 - 1e-9]; for smaller kicks input vkick "
+               "directly",
+               instance_name.c_str());
     vkick_ = std::sqrt((1. - eps_) * (1. + eps_));
   }
   else {
     vkick_ = *vkick_opt;
-    if (vkick_ < 1e-8 || vkick_ > 1.) {
-      throw std::invalid_argument("species '" + instance_name +
-                                  "': vkick must be in [1e-8, 1] (in units of c); for "
-                                  "vkick -> 0 the model is plain CDM");
-    }
+    class_test(vkick_ < 1e-8 || vkick_ > 1.,
+               "species '%s': vkick must be in [1e-8, 1] (in units of c); for vkick -> 0 the "
+               "model is plain CDM",
+               instance_name.c_str());
     eps_ = std::sqrt((1. - vkick_) * (1. + vkick_));
   }
   // p/m_d = v/sqrt(1-v^2) = v/eps  =>  M = m_d/T0 = kQKick * eps / v.
@@ -110,21 +106,19 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   q_min_ratio_  = input.get_or("q_min_ratio", 1e-4);
   kernel_width_ = input.get_or("kernel_width", 1.0);
   l_max_input_  = input.get_or("l_max", -1);
-  if (n_bins_ < 8 || n_bins_ > 4096) {
-    throw std::invalid_argument("species '" + instance_name + "': momenta_bins out of range");
-  }
-  if (!(q_min_ratio_ > 0. && q_min_ratio_ < 0.5)) {
-    throw std::invalid_argument("species '" + instance_name + "': q_min_ratio must be in (0, 0.5)");
-  }
-  if (!(kernel_width_ >= 0.2 && kernel_width_ <= 5.)) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': kernel_width must be in [0.2, 5] bins");
-  }
-  if (n_bins_ <= 3. * kernel_width_ + 4.) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': momenta_bins must exceed 3*kernel_width + 4 "
-                                "(the grid must resolve the injection kernel)");
-  }
+  class_test(n_bins_ < 8 || n_bins_ > 4096,
+             "species '%s': momenta_bins out of range",
+             instance_name.c_str());
+  class_test(!(q_min_ratio_ > 0. && q_min_ratio_ < 0.5),
+             "species '%s': q_min_ratio must be in (0, 0.5)",
+             instance_name.c_str());
+  class_test(!(kernel_width_ >= 0.2 && kernel_width_ <= 5.),
+             "species '%s': kernel_width must be in [0.2, 5] bins",
+             instance_name.c_str());
+  class_test(n_bins_ <= 3. * kernel_width_ + 4.,
+             "species '%s': momenta_bins must exceed 3*kernel_width + 4 (the grid must resolve "
+             "the injection kernel)",
+             instance_name.c_str());
 
   const double q_lo = kQKick * q_min_ratio_;
   du_               = std::log(kQKick / q_lo) / (n_bins_ - 3. * kernel_width_);
@@ -150,25 +144,21 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   auto omega_ini_opt  = input.get<double>("omega_ini");
   auto Omega_comb_opt = input.get<double>("Omega_dcdmwdm");
   auto omega_comb_opt = input.get<double>("omega_dcdmwdm");
-  if (Omega_ini_opt && omega_ini_opt) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': specify only one of Omega_ini, omega_ini");
-  }
-  if (Omega_comb_opt && omega_comb_opt) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': specify only one of Omega_dcdmwdm, omega_dcdmwdm");
-  }
+  class_test_severe(Omega_ini_opt && omega_ini_opt,
+                    "species '%s': specify only one of Omega_ini, omega_ini",
+                    instance_name.c_str());
+  class_test_severe(Omega_comb_opt && omega_comb_opt,
+                    "species '%s': specify only one of Omega_dcdmwdm, omega_dcdmwdm",
+                    instance_name.c_str());
   const bool has_initial  = Omega_ini_opt.has_value() || omega_ini_opt.has_value();
   const bool has_combined = Omega_comb_opt.has_value() || omega_comb_opt.has_value();
   const bool in_shooting  = (pfc != nullptr) && pfc->is_shooting;
-  if (has_initial && has_combined && !in_shooting) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': Omega_ini conflicts with Omega_dcdmwdm — choose one");
-  }
-  if (!has_initial && !has_combined) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': specify Omega_ini/omega_ini or Omega_dcdmwdm/omega_dcdmwdm");
-  }
+  class_test_severe(has_initial && has_combined && !in_shooting,
+                    "species '%s': Omega_ini conflicts with Omega_dcdmwdm — choose one",
+                    instance_name.c_str());
+  class_test_severe(!has_initial && !has_combined,
+                    "species '%s': specify Omega_ini/omega_ini or Omega_dcdmwdm/omega_dcdmwdm",
+                    instance_name.c_str());
   if (Omega_ini_opt)
     Omega_ini_pending_ = *Omega_ini_opt;
   else if (omega_ini_opt)

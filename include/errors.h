@@ -7,7 +7,12 @@
 [[noreturn]] void ThrowFormatted(
     const char* func, int line, const char* prefix, const char* fmt, ...);
 
-/* All error macros throw std::runtime_error from the error origin. */
+[[noreturn]] void ThrowFormattedSevere(
+    const char* func, int line, const char* prefix, const char* fmt, ...);
+
+/* class_test / class_stop throw std::runtime_error from the error origin
+   (computation errors). The severe variants further down throw
+   std::invalid_argument; see their comment block for which to use when. */
 
 #define class_test(condition, args, ...)                     \
   {                                                          \
@@ -23,6 +28,31 @@
 #define class_stop(args, ...)                                           \
   {                                                                     \
     ThrowFormatted(__func__, __LINE__, "error; ", args, ##__VA_ARGS__); \
+  }
+
+/* Severe variants: throw std::invalid_argument (classy: CosmoSevereError, the
+   sampler ABORTS). Use ONLY for checks that depend exclusively on the
+   STRUCTURE of the input: key presence, mutual exclusivity, unparseable
+   strings, unknown enum names, list-length/count consistency, API-argument
+   validation. A severe check must never depend on possibly-varying (numeric)
+   parameters: range checks on parsed values and all numerical failures use
+   class_test/class_stop (std::runtime_error -> CosmoComputationError, the
+   sampler rejects the point and the chain survives). */
+
+#define class_test_severe(condition, args, ...)                    \
+  {                                                                \
+    if (condition) {                                               \
+      ThrowFormattedSevere(__func__,                               \
+                           __LINE__,                               \
+                           "condition (" #condition ") is true; ", \
+                           args,                                   \
+                           ##__VA_ARGS__);                         \
+    }                                                              \
+  }
+
+#define class_stop_severe(args, ...)                                          \
+  {                                                                           \
+    ThrowFormattedSevere(__func__, __LINE__, "error; ", args, ##__VA_ARGS__); \
   }
 
 #define class_open(pointer, filename, mode)                        \

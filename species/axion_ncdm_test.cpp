@@ -46,6 +46,21 @@ static bool Throws(FileContent& fc) {
   }
 }
 
+// Value checks (T <= 0, gstar_dec below today's g*S, ksi != 0): these reject a
+// numeric parameter, so the species code raises them via the plain (runtime_error)
+// severity macros — the sampler should reject the point, not abort the chain.
+static bool ThrowsComputation(FileContent& fc) {
+  background pba{};
+  pba.H0 = 2.2e-4;
+  try {
+    AxionNCDMSpecies sp(&fc, "ax", TestSettings(), &pba, nullptr);
+    return false;
+  }
+  catch (const std::runtime_error&) {
+    return true;
+  }
+}
+
 int main() {
   background pba{};
   pba.H0 = 2.2e-4;
@@ -94,12 +109,12 @@ int main() {
     FileContent fc;
     fc.set("ax.type", "ncdm_axion");
     fc.set("ax.gstar_dec", "3.0");  // below today's g*S = 43/11
-    assert(Throws(fc));
+    assert(ThrowsComputation(fc));
   }
   {
     FileContent fc = BaseFc();
     fc.set("ax.ksi", "0.1");  // chemical potential unsupported
-    assert(Throws(fc));
+    assert(ThrowsComputation(fc));
   }
   {
     FileContent fc = BaseFc();
@@ -112,7 +127,7 @@ int main() {
     fc.set("ax.type", "ncdm_axion");
     fc.set("ax.m", "1.0");
     fc.set("ax.T", "0.0");  // non-positive temperature
-    assert(Throws(fc));
+    assert(ThrowsComputation(fc));
   }
 
   // ── CreateAll factory: one instance per dot-syntax block of this type ──

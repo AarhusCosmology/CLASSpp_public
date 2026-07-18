@@ -1,9 +1,9 @@
 #include "type3_species.h"
 
-#include <stdexcept>
 #include <string>
 
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
 
@@ -247,19 +247,19 @@ std::vector<Named> Type3Species::CreateAll(const SpeciesBuildContext& ctx) {
     return result;
   const double beta = *veta_opt;
 
-  if (beta >= 0.5)
-    throw std::invalid_argument(
-        "scf_veta (beta) must be < 1/2: beta >= 1/2 has a ghost / strong-coupling pathology.");
+  class_test(beta >= 0.5,
+             "scf_veta (beta) must be < 1/2: beta >= 1/2 has a ghost / strong-coupling "
+             "pathology.");
 
   // Synchronous gauge only. Mirror the parser's Newtonian resolution
   // (input_module.cpp): it resolves Newtonian on any of "newtonian"/"Newtonian"/"new",
   // so a bare "new"/"newt" must be rejected here too — a find("newton") check lets it
   // slip past and the coupling would silently run in Newtonian gauge.
   if (auto gauge = ctx.pfc->get<std::string>("gauge")) {
-    if (gauge->find("newtonian") != std::string::npos ||
-        gauge->find("Newtonian") != std::string::npos || gauge->find("new") != std::string::npos)
-      throw std::invalid_argument(
-          "Type-3 (scf_veta) coupling is implemented in synchronous gauge only.");
+    class_test_severe(gauge->find("newtonian") != std::string::npos ||
+                          gauge->find("Newtonian") != std::string::npos ||
+                          gauge->find("new") != std::string::npos,
+                      "Type-3 (scf_veta) coupling is implemented in synchronous gauge only.");
   }
 
   // CDM Omega from the resolved coupled-species budget (same source CDMSpecies uses).
@@ -272,9 +272,9 @@ std::vector<Named> Type3Species::CreateAll(const SpeciesBuildContext& ctx) {
   // returns at most one "ScalarField" entry (with shooting state set); it must be
   // present here.
   std::vector<Named> scf_built = ScalarFieldSpecies::CreateAllForComposite(ctx, beta);
-  if (scf_built.empty())
-    throw std::invalid_argument(
-        "scf_veta is set but no scalar field was configured (set Omega_scf and scf_parameters).");
+  class_test_severe(scf_built.empty(),
+                    "scf_veta is set but no scalar field was configured (set Omega_scf and "
+                    "scf_parameters).");
   auto scf_ptr = std::unique_ptr<ScalarFieldSpecies>(
       static_cast<ScalarFieldSpecies*>(scf_built.front().species.release()));
 

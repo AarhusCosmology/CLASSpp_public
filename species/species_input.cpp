@@ -5,16 +5,15 @@
 #include <string_view>
 #include <vector>
 
+#include "errors.h"
 #include "species/all_species.h"
 
 SpeciesInput::SpeciesInput(FileContent* pfc, std::string instance_name)
     : pfc_(pfc), instance_name_(std::move(instance_name)) {
   if (!pfc_) {
-    throw std::invalid_argument("SpeciesInput: null FileContent*");
+    throw std::logic_error("SpeciesInput: null FileContent*");
   }
-  if (instance_name_.empty()) {
-    throw std::invalid_argument("SpeciesInput: empty instance name");
-  }
+  class_test_severe(instance_name_.empty(), "SpeciesInput: empty instance name");
 }
 
 std::string SpeciesInput::qualify(const std::string& field) const {
@@ -26,10 +25,10 @@ namespace {
 int ParseIntValue(const std::string& value, const std::string& field_name) {
   char* end   = nullptr;
   long parsed = std::strtol(value.c_str(), &end, 10);
-  if ((end == value.c_str()) || (*end != '\0')) {
-    throw std::invalid_argument("dot-syntax field '" + field_name + "' must be an integer, got '" +
-                                value + "'");
-  }
+  class_test_severe((end == value.c_str()) || (*end != '\0'),
+                    "dot-syntax field '%s' must be an integer, got '%s'",
+                    field_name.c_str(),
+                    value.c_str());
   return static_cast<int>(parsed);
 }
 
@@ -101,25 +100,26 @@ bool SynthesiseIdenticalScalarField(FileContent* pfc,
   }
 
   for (const auto& value : values) {
-    if (value.empty()) {
-      throw std::invalid_argument("dot-syntax field '" + dot_field +
-                                  "' must be specified for all " + species_description +
-                                  " if provided for any of them");
-    }
+    class_test_severe(value.empty(),
+                      "dot-syntax field '%s' must be specified for all %s if provided for any of "
+                      "them",
+                      dot_field.c_str(),
+                      species_description.c_str());
   }
 
   const std::string& first = values.front();
   for (const auto& value : values) {
-    if (value != first) {
-      throw std::invalid_argument(dot_field + " must be identical for all " + species_description);
-    }
+    class_test_severe(value != first,
+                      "%s must be identical for all %s",
+                      dot_field.c_str(),
+                      species_description.c_str());
   }
 
   auto existing_value = pfc->get<std::string>(legacy_key);
-  if (existing_value.has_value() && *existing_value != first) {
-    throw std::invalid_argument("input sets both '" + legacy_key + "' and dot-syntax field '" +
-                                dot_field + "' with different values");
-  }
+  class_test_severe(existing_value.has_value() && *existing_value != first,
+                    "input sets both '%s' and dot-syntax field '%s' with different values",
+                    legacy_key.c_str(),
+                    dot_field.c_str());
 
   pfc->set(legacy_key, first);
   return true;
@@ -127,7 +127,7 @@ bool SynthesiseIdenticalScalarField(FileContent* pfc,
 
 void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
   if (!pfc) {
-    throw std::invalid_argument("TranslateSingleInstanceDotSyntax: null FileContent*");
+    throw std::logic_error("TranslateSingleInstanceDotSyntax: null FileContent*");
   }
   for (const auto& spec : SingleInstanceTable()) {
     const std::string type(spec.type);
@@ -140,8 +140,10 @@ void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
       for (size_t i = 0; i < instances.size(); ++i) {
         joined += (i ? ", " : "") + instances[i];
       }
-      throw std::invalid_argument("species type '" + type + "' is single-instance but was given " +
-                                  std::to_string(instances.size()) + " times (" + joined + ")");
+      class_stop_severe("species type '%s' is single-instance but was given %zu times (%s)",
+                        type.c_str(),
+                        instances.size(),
+                        joined.c_str());
     }
     SpeciesInput input(pfc, instances.front());
     (void) input.get<std::string>("type");  // consume "<name>.type"
@@ -153,10 +155,12 @@ void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
       }
       const std::string legacy(fm.legacy);
       auto existing = pfc->get<std::string>(legacy);
-      if (existing && *existing != *value) {
-        throw std::invalid_argument("input sets both legacy key '" + legacy + "' and dot-syntax '" +
-                                    instances.front() + "." + dot + "' with different values");
-      }
+      class_test_severe(existing && *existing != *value,
+                        "input sets both legacy key '%s' and dot-syntax '%s.%s' with different "
+                        "values",
+                        legacy.c_str(),
+                        instances.front().c_str(),
+                        dot.c_str());
       pfc->set(
           legacy,
           *value);  // set() resets the read flag so the downstream consumer still sees this key

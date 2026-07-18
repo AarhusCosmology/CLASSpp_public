@@ -1,12 +1,12 @@
 #include "dncdm_species.h"
 
 #include <cmath>
-#include <stdexcept>
 #include <utility>
 #include <vector>
 
 #include "arrays.h"
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations_module.h"
 #include "species/species_input.h"
 
@@ -34,11 +34,10 @@ constexpr const char* kLegacyDecayDrKeys[] = {
 
 void RejectLegacyDecayDrKeys(FileContent& pfc) {
   for (const char* key : kLegacyDecayDrKeys) {
-    if (pfc.get<std::string>(key).has_value()) {
-      throw std::invalid_argument(
-          std::string("'") + key + "' is no longer supported. Use dot-syntax: " +
-          "'<instance>.<dot-name> = ...' with '<instance>.type = ncdm_decay_dr'.");
-    }
+    class_test_severe(pfc.get<std::string>(key).has_value(),
+                      "'%s' is no longer supported. Use dot-syntax: '<instance>.<dot-name> = "
+                      "...' with '<instance>.type = ncdm_decay_dr'.",
+                      key);
   }
 }
 
@@ -83,12 +82,11 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   const int strategy = input.get_or("quadrature_strategy", static_cast<int>(qm_auto));
   if (strategy != qm_auto) {
     if (auto bg_bins = input.get<int>("momenta_bins_bg")) {
-      if (*bg_bins != q_size()) {
-        throw std::invalid_argument(
-            "species '" + instance_name +
-            "': momenta_bins_bg must match momenta_bins for ncdm_decay_dr; its background "
-            "distribution is evolved on the perturbation momentum grid");
-      }
+      class_test_severe(*bg_bins != q_size(),
+                        "species '%s': momenta_bins_bg must match momenta_bins for "
+                        "ncdm_decay_dr; its background distribution is evolved on the "
+                        "perturbation momentum grid",
+                        instance_name.c_str());
     }
   }
 
@@ -100,11 +98,10 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
 
   int n_provided = (int) Gamma_value.has_value() + (int) log10Gamma_value.has_value() +
                    (int) lifetime_value.has_value() + (int) log10lifetime_value.has_value();
-  if (n_provided != 1) {
-    throw std::invalid_argument(
-        "species '" + instance_name +
-        "': specify exactly one of Gamma, log10Gamma, lifetime, log10lifetime");
-  }
+  class_test_severe(n_provided != 1,
+                    "species '%s': specify exactly one of Gamma, log10Gamma, lifetime, "
+                    "log10lifetime",
+                    instance_name.c_str());
 
   double Gamma_raw = 0.;
   if (Gamma_value) {
@@ -127,15 +124,13 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   // Semantics: at most one of {deg, Omega_ini, omega_ini, Neff_ini, Omega_dncdmdr}
   // (resolved later by ConstructSpecies / DoShooting). Bare today-matter Omega/omega is
   // rejected: it leaves the decay radiation out of the flatness budget.
-  if (input.get<double>("Omega").has_value() || input.get<double>("omega").has_value()) {
-    throw std::invalid_argument(
-        "species '" + instance_name +
-        "': a decaying species (ncdm_decay_dr) cannot be normalized by today-matter "
-        "'Omega'/'omega' "
-        "(the decay radiation would be left out of the flatness budget). Use "
-        "'Omega_ini'/'omega_ini'/'Neff_ini' to pin the initial abundance, or "
-        "'Omega_dncdmdr'/'omega_dncdmdr' to pin the combined matter+radiation density today.");
-  }
+  class_test_severe(
+      input.get<double>("Omega").has_value() || input.get<double>("omega").has_value(),
+      "species '%s': a decaying species (ncdm_decay_dr) cannot be normalized by today-matter "
+      "'Omega'/'omega' (the decay radiation would be left out of the flatness budget). Use "
+      "'Omega_ini'/'omega_ini'/'Neff_ini' to pin the initial abundance, or "
+      "'Omega_dncdmdr'/'omega_dncdmdr' to pin the combined matter+radiation density today.",
+      instance_name.c_str());
 
   auto deg_opt           = input.get<double>("deg");
   auto Omega_ini_opt     = input.get<double>("Omega_ini");
@@ -156,10 +151,9 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   bool has_Neff_ini          = Neff_ini_opt.has_value();
   bool has_Omega_dncdmdr     = Omega_dncdmdr_opt.has_value();
   bool has_omega_dncdmdr     = omega_dncdmdr_opt.has_value();
-  if (has_Omega_dncdmdr && has_omega_dncdmdr) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': specify exactly one of Omega_dncdmdr, omega_dncdmdr");
-  }
+  class_test_severe(has_Omega_dncdmdr && has_omega_dncdmdr,
+                    "species '%s': specify exactly one of Omega_dncdmdr, omega_dncdmdr",
+                    instance_name.c_str());
   if (has_omega_dncdmdr) {
     Omega_dncdmdr_local = omega_dncdmdr_local / settings.h / settings.h;
     has_Omega_dncdmdr   = true;
@@ -169,21 +163,20 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   // shooting build, where DoShooting legitimately writes <flavor>.Omega_dncdmdr as the
   // initial-mode fixed-point unknown (or .deg for combined mode) alongside the user's key.
   const bool in_shooting = (pfc != nullptr) && pfc->is_shooting;
-  if (has_Omega_dncdmdr && (has_Omega_ini || has_omega_ini || has_Neff_ini) && !in_shooting) {
-    throw std::invalid_argument("species '" + instance_name +
-                                "': Omega_dncdmdr conflicts with Omega_ini/omega_ini/Neff_ini");
-  }
+  class_test_severe(has_Omega_dncdmdr && (has_Omega_ini || has_omega_ini || has_Neff_ini) &&
+                        !in_shooting,
+                    "species '%s': Omega_dncdmdr conflicts with Omega_ini/omega_ini/Neff_ini",
+                    instance_name.c_str());
 
   // Count mutually-exclusive target specs (skip inside a shooting build: the shooter adds
   // Omega_dncdmdr alongside the user's initial-abundance key).
   if (!in_shooting) {
     int n_deg_options = (int) has_deg + (int) has_Omega_ini + (int) has_omega_ini +
                         (int) has_Neff_ini + (int) has_Omega_dncdmdr;
-    if (n_deg_options > 1) {
-      throw std::invalid_argument(
-          "species '" + instance_name +
-          "': specify at most one of deg, Omega_ini, omega_ini, Neff_ini, Omega_dncdmdr");
-    }
+    class_test_severe(n_deg_options > 1,
+                      "species '%s': specify at most one of deg, Omega_ini, omega_ini, Neff_ini, "
+                      "Omega_dncdmdr",
+                      instance_name.c_str());
   }
 
   // Stash Omega_dncdmdr_pending_ whenever Omega_dncdmdr is present: combined mode (user input),
