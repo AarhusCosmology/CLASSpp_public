@@ -17,9 +17,11 @@ class DCDMSpecies;
  * mass m_d = ε·m_χ/2 and kick velocity v = √(1−ε²)·c. All daughters are born
  * with the same physical momentum, so the comoving distribution f(q,τ) builds
  * up at the moving cutoff q_cut(τ) = a·kQKick. f and g ≡ ∂f/∂ln q are
- * integrated per momentum bin in the background ODE (injection via a
- * normalized Gaussian kernel in ln q — the energy-injection sum rule
- * Σᵢ dqᵢ qᵢ² εᵢ Jᵢ · factor/a⁴ = aΓρ_dcdm holds exactly by construction).
+ * integrated per momentum bin in the background ODE. Injection is a
+ * conservative cell-integrated Gaussian (erf) energy deposit in ln q: the
+ * energy-injection sum rule Σᵢ dqᵢ qᵢ² εᵢ Jᵢ · factor/a⁴ = aΓρ_dcdm holds
+ * exactly for every cutoff position, and the source is smooth in time (both
+ * evolvers integrate it).
  *
  * Internal conventions: T_wdm = T_cmb, deg = 1, dimensionless kick momentum
  * kQKick = p/T₀ = 10 (only v_kick is physical; the parent mass drops out).
@@ -33,6 +35,31 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
  public:
   static constexpr std::string_view kTypeName = "dcdm_wdm";
   static constexpr double kQKick              = 10.0;  // p/T0, internal convention
+
+  /** Static-sparsity seed for the injection source. ndf15's numjac derives the
+   *  Jacobian sparsity pattern from exact zeros and locks it permanently once it
+   *  repeats (tools/evolver_ndf15.cpp: pattern from fabs(dFdy)!=0, locked after
+   *  trust_sparse repeats, never re-derived). A moving compact source would lock
+   *  a too-narrow pattern early and corrupt the grouped Jacobian when the
+   *  footprint sweeps on. Flooring every weight (renormalized, Σw stays exactly
+   *  1) keeps every injection row structurally coupled to rho_dcdm at all times
+   *  at a physically invisible level (~1e-12 of the instantaneous deposit).
+   *  This trick only works because J is LINEAR in rho_dcdm (the floor is a
+   *  fixed fraction of the same A that scales with rho_dcdm) — a nonlinear
+   *  coupling would decouple the seeded pattern from the finite-difference
+   *  Jacobian numjac actually probes, defeating the pattern-lock. */
+  static constexpr double kSparsityFloor = 1e-12;
+
+  // ── Fiducial-cosmology placement helpers ───────────────────────────────────
+  // Placement-only fixed LCDM background — NOT physics. Maps a decay time t (Mpc)
+  // to the scale factor a at which those decays inject, so the momentum grid is a
+  // function of Gamma alone (invariant across the run's cosmology). See spec
+  // docs/superpowers/specs/2026-07-18-dcdm-wdm-adaptive-momentum-grid-design.md.
+  static constexpr double kFidOmegaM = 0.31;
+  static constexpr double kFidOmegaR = 9.2e-5;            // photons+nu, T_cmb=2.7255, Neff=3.044
+  static constexpr double kFidH      = 0.674;             // h
+  static double FiducialCosmicTime(double a);             // t(a) [Mpc], radiation+matter
+  static double FiducialScaleFactorAtTime(double t_mpc);  // inverse (monotone)
 
   WdmDecayProductSpecies(FileContent* pfc,
                          const std::string& instance_name,
@@ -55,6 +82,15 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
   const std::vector<double>& u() const {
     return u_;
   }
+  const std::vector<double>& u_edge() const {
+    return u_edge_;
+  }
+  /** Injection kernel width at u_cut: the analytic local quantile-bin width
+   *  Δu_loc = [(F_hi−F_lo)/N] · H_fid(a) e^{+Γ t_fid(a)} / Γ  (a = e^{u_cut}/kQKick),
+   *  clamped to [kSigmaMin, kSigmaMax]. Smooth in u_cut; evaluated in log form so
+   *  no overflow/inf is ever materialized (-ffast-math discipline). Floor = the
+   *  background-table resolvability bound; cap = the placement-bias budget. */
+  double SigmaAt(double u_cut) const;
 
   /** Wired by DCDM_WDM_Species; used by RhoDotOverRho / FillSources. */
   void SetParent(const DCDMSpecies* dcdm) {
@@ -70,14 +106,16 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
 
   /**
    * Injection source Jᵢ = dfᵢ/dτ (and optionally dJᵢ/dln q) for the current
-   * (a, ρ_dcdm). Normalized Gaussian kernel in u = ln q at u_cut = ln(a·kQKick):
-   *   Jᵢ = A·Gᵢ/D,  Gᵢ = exp(−(uᵢ−u_cut)²/2σ²),  σ = kernel_width·Δu,
-   *   D  = Σⱼ dqⱼ qⱼ² εⱼ(a) Gⱼ,  A = aΓρ_dcdm·a⁴/factor_.
-   * A smooth Gaussian gate ramps the injection on over the first few kernel
-   * widths of the grid (pre-grid decays, ~1e-6 of the total for defaults, are
-   * suppressed/dropped): with the gate at 1 the energy sum rule is exact.
-   * The kernel argument is clamped (G = 0 beyond ~11σ): under -ffast-math,
-   * exp of extreme arguments and denormal intermediates are not IEEE-safe.
+   * (a, ρ_dcdm). Conservative cell-integrated Gaussian (erf) energy deposit in
+   * u = ln q at u_cut = ln(a·kQKick): the kick's energy A = aΓρ_dcdm·a⁴/factor_
+   * is split by GaussWeights over the cells (σ = SigmaAt(u_cut)), off-grid tails
+   * clamped into the edge bins, so Σ Wᵢ = 1 identically and the exact sum rule
+   * Σ dqᵢ qᵢ² εᵢ Jᵢ = A holds for every u_cut. dJ/dln q is the full derivative of
+   * J(u) = A·φ_σ(u−u_cut)/(q³ε): the cell-averaged raw-kernel derivative (normal-pdf
+   * differences at the cell edges, smooth, no edge special cases) MINUS the
+   * measure's own log-derivative (3 + q²/ε²)·J, which supplies the g-channel's
+   * ρ-weighted moment (Σ dq q² ε dJdlnq ≈ −3A non-relativistically, by integration
+   * by parts) that drives the daughter's fluid-limit metric-driven growth.
    * dJdlnq may be nullptr. Background-thread only (uses mutable scratch).
    */
   void FillInjection(double a, double rho_dcdm, double* J, double* dJdlnq) const;
@@ -208,6 +246,16 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
    *  rho_gamma and never enters any physics). */
   static constexpr double kFSeed = 1e-10;
 
+  /** Build the injection-adapted quantile grid (equal injected decays per bin);
+   *  fills q_/q_bg_/u_/dq_/u_edge_. Depends on Gamma + the fiducial H only. */
+  void BuildInjectionAdaptedGrid();
+  /** Cell-integrated Gaussian (erf) energy-deposit weights for a kick at u_cut:
+   *  w[i] = Φ((u_edge[i+1]−u_cut)/σ) − Φ((u_edge[i]−u_cut)/σ), plus the below-/
+   *  above-grid tail mass clamped into the corresponding edge bin, so Σ w = 1
+   *  identically (energy conserved for every u_cut, no D-renormalization) and
+   *  the source is C-infinity in time. */
+  void GaussWeights(double u_cut, double sigma, double* w) const;
+
   const background* pba_;
   const DCDMSpecies* parent_ = nullptr;
 
@@ -215,14 +263,20 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
   double vkick_ = 0.;  // kick velocity in units of c
   double eps_   = 0.;  // total mass retention (m_d = eps*m_parent/2)
 
-  int n_bins_          = 96;
-  double q_min_ratio_  = 1e-4;
-  double kernel_width_ = 1.0;  // sigma in units of the log-grid spacing du_
-  int l_max_input_     = -1;   // -1 → ppr->l_max_ncdm
+  int n_bins_        = 96;
+  double q_edge_tol_ = 1e-3;  // decayed-fraction trimmed off each end (grid F-span);
+                              // the trimmed tail is clamped into the edge bin, not dropped
+  int l_max_input_ = -1;      // -1 → ppr->l_max_ncdm
+  std::optional<double> q_min_ratio_floor_;  // optional hard floor on q_lo/q_kick
 
-  double du_ = 0.;          // uniform spacing in u = ln q
-  std::vector<double> u_;   // ln q_i
-  std::vector<double> dq_;  // q_i * du_ (midpoint rule in ln q)
+  static constexpr double kSigmaMin = 0.03;  // ≈ 4 background-table samples (7e-3 in ln a)
+  static constexpr double kSigmaMax = 0.25;  // bounds the wide-bin placement bias
+  double F_lo_ = 0.;  // realized decayed-fraction span of the grid (0,0 = fallback grid)
+  double F_hi_ = 0.;
+
+  std::vector<double> u_;       // ln q_i (bin centres = q(F_mid[i]))
+  std::vector<double> dq_;      // cell widths q_edge[i+1] - q_edge[i]
+  std::vector<double> u_edge_;  // N+1 cell edges in u (F-quantile edges)
 
   std::optional<double> Omega_ini_pending_;
   std::optional<double> Omega_combined_pending_;
@@ -236,5 +290,5 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
   int index_bi_f_        = -1;
   int index_bi_dfdlnq_   = -1;
 
-  mutable std::vector<double> scratch_G_;  // kernel weights (background thread only)
+  mutable std::vector<double> scratch_w_;  // erf energy-deposit weights (background thread only)
 };

@@ -1,12 +1,58 @@
 #include "wdm_decay_product.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "background_module.h"
 #include "dcdm.h"
 #include "errors.h"
 #include "perturbations_module.h"
+#include "precision.h"
 #include "species/species_input.h"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fiducial cosmic time t(a) and its inverse (placement-only; NOT physics).
+// H(a) = H0 a^-2 sqrt(Or + Om a)  =>  exact radiation+matter cosmic time
+//   t(a) = (2 / (3 H0 Om^2)) [ sqrt(Or + Om a)(Om a - 2 Or) + 2 Or^{3/2} ].
+// (Lambda is negligible at the epochs the daughter grid cares about.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+double WdmDecayProductSpecies::FiducialCosmicTime(double a) {
+  const double H0 = kFidH * 1.0e5 / _c_;  // Mpc^-1
+  const double Om = kFidOmegaM, Or = kFidOmegaR;
+  const double s = std::sqrt(Or + Om * a);
+  return (2.0 / (3.0 * H0 * Om * Om)) * (s * (Om * a - 2.0 * Or) + 2.0 * Or * std::sqrt(Or));
+}
+
+double WdmDecayProductSpecies::FiducialScaleFactorAtTime(double t_mpc) {
+  const double H0 = kFidH * 1.0e5 / _c_;
+  const double Om = kFidOmegaM, Or = kFidOmegaR;
+  double a_lo = 1e-12, a_hi = 1.0;
+  while (FiducialCosmicTime(a_hi) < t_mpc && a_hi < 1e3)
+    a_hi *= 2.0;
+  // Matter-limit seed; refine with bracketed Newton (dt/da = a / (H0 sqrt(Or+Om a)))
+  // and bisection fallback — monotone, so this always converges.
+  double a = std::pow(1.5 * t_mpc * H0 * std::sqrt(Om), 2.0 / 3.0);
+  if (!(a > a_lo && a < a_hi))
+    a = 0.5 * (a_lo + a_hi);
+  for (int it = 0; it < 80; ++it) {
+    const double f = FiducialCosmicTime(a) - t_mpc;
+    if (f > 0.)
+      a_hi = a;
+    else
+      a_lo = a;
+    const double dtda = a / (H0 * std::sqrt(Or + Om * a));
+    double a_next     = a - f / dtda;
+    if (!(a_next > a_lo && a_next < a_hi))
+      a_next = 0.5 * (a_lo + a_hi);
+    if (std::fabs(a_next - a) <= 1e-14 * a) {
+      a = a_next;
+      break;
+    }
+    a = a_next;
+  }
+  return a;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constructor
@@ -99,42 +145,27 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   // p/m_d = v/sqrt(1-v^2) = v/eps  =>  M = m_d/T0 = kQKick * eps / v.
   M_ = kQKick * eps_ / vkick_;
 
-  // Momentum grid: uniform in u = ln q on [ln q_lo, ln q_kick + 3 sigma], so the
-  // kernel keeps a 3 sigma margin above q_cut(a=1) = kQKick for any bin count:
-  //   du (n_bins - 3 kernel_width) = ln(kQKick / q_lo).
-  n_bins_       = input.get_or("momenta_bins", 96);
-  q_min_ratio_  = input.get_or("q_min_ratio", 1e-4);
-  kernel_width_ = input.get_or("kernel_width", 1.0);
-  l_max_input_  = input.get_or("l_max", -1);
+  // ── Injection-adapted momentum grid (equal injected decays per bin) ─────────
+  // Decay is Poisson in cosmic time, so cumulative decayed fraction F = 1-e^{-Gamma t}
+  // is the natural coordinate: uniform-in-F bins carry equal injected decays (= equal
+  // injected energy). q = a'(F) * kQKick via the fiducial t(a) map => grid = f(Gamma).
+  n_bins_      = input.get_or("momenta_bins", 96);
+  q_edge_tol_  = input.get_or("q_edge_tol", 1e-3);
+  l_max_input_ = input.get_or("l_max", -1);
+  if (auto qmr = input.get<double>("q_min_ratio"))
+    q_min_ratio_floor_ = *qmr;
   class_test(n_bins_ < 8 || n_bins_ > 4096,
              "species '%s': momenta_bins out of range",
              instance_name.c_str());
-  class_test(!(q_min_ratio_ > 0. && q_min_ratio_ < 0.5),
-             "species '%s': q_min_ratio must be in (0, 0.5)",
+  class_test(!(q_edge_tol_ > 1e-12 && q_edge_tol_ < 1e-2),
+             "species '%s': q_edge_tol must be in (1e-12, 1e-2)",
              instance_name.c_str());
-  class_test(!(kernel_width_ >= 0.2 && kernel_width_ <= 5.),
-             "species '%s': kernel_width must be in [0.2, 5] bins",
-             instance_name.c_str());
-  class_test(n_bins_ <= 3. * kernel_width_ + 4.,
-             "species '%s': momenta_bins must exceed 3*kernel_width + 4 (the grid must resolve "
-             "the injection kernel)",
-             instance_name.c_str());
+  if (q_min_ratio_floor_)
+    class_test(!(*q_min_ratio_floor_ > 0. && *q_min_ratio_floor_ < 0.5),
+               "species '%s': q_min_ratio must be in (0, 0.5)",
+               instance_name.c_str());
 
-  const double q_lo = kQKick * q_min_ratio_;
-  du_               = std::log(kQKick / q_lo) / (n_bins_ - 3. * kernel_width_);
-  q_.resize(n_bins_);
-  u_.resize(n_bins_);
-  dq_.resize(n_bins_);
-  for (int i = 0; i < n_bins_; ++i) {
-    u_[i]  = std::log(q_lo) + (i + 0.5) * du_;
-    q_[i]  = std::exp(u_[i]);
-    dq_[i] = q_[i] * du_;
-  }
-  q_bg_ = q_;
-  w_.assign(n_bins_, 0.);
-  w_bg_.assign(n_bins_, 0.);        // refreshed from f each ComputeBackground
-  dlnf0_dlnq_.assign(n_bins_, 0.);  // unused (tensor slots disabled)
-  scratch_G_.assign(n_bins_, 0.);
+  BuildInjectionAdaptedGrid();
 
   // Normalization: Omega_ini/omega_ini (parent initial abundance, dcdm convention)
   // XOR Omega_dcdmwdm/omega_dcdmwdm (combined sector today). During a shooting
@@ -170,6 +201,117 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BuildInjectionAdaptedGrid / SigmaAt / GaussWeights
+// ─────────────────────────────────────────────────────────────────────────────
+
+void WdmDecayProductSpecies::BuildInjectionAdaptedGrid() {
+  const int N = n_bins_;
+  // Today's decayed fraction in the fiducial background caps the upper edge.
+  const double g_at_1 = Gamma_ * FiducialCosmicTime(1.0);
+  const double F_at_1 = -std::expm1(-g_at_1);
+  double F_lo         = q_edge_tol_;
+  double F_hi         = std::min(1.0 - q_edge_tol_, F_at_1);
+  if (q_min_ratio_floor_) {  // hard floor on q_lo == floor on a' raises F_lo
+    const double g_floor = Gamma_ * FiducialCosmicTime(*q_min_ratio_floor_);
+    F_lo                 = std::max(F_lo, -std::expm1(-g_floor));
+  }
+
+  F_lo_ = F_lo;
+  F_hi_ = F_hi;
+
+  q_.resize(N);
+  u_.resize(N);
+  dq_.resize(N);
+  u_edge_.resize(N + 1);
+
+  if (!(F_hi > F_lo + q_edge_tol_)) {
+    // Negligible-decay fallback: too little decays by today to define a span.
+    // Daughter is essentially empty; a minimal valid uniform-ln q grid keeps the
+    // hierarchy/kernel well-formed. Observationally irrelevant.
+    F_lo_             = 0.;
+    F_hi_             = 0.;  // signals SigmaAt to use the uniform fallback spacing
+    const double q_lo = kQKick / 30.0;
+    const double du   = std::log(kQKick / q_lo) / N;
+    for (int j = 0; j <= N; ++j)
+      u_edge_[j] = std::log(q_lo) + j * du;
+    for (int i = 0; i < N; ++i)
+      u_[i] = 0.5 * (u_edge_[i] + u_edge_[i + 1]);  // uniform-grid cell centre
+  }
+  else {
+    const double dF = (F_hi - F_lo) / N;
+    auto u_at_F     = [&](double F) {
+      const double g = -std::log1p(-F);  // -ln(1 - F) = Gamma * t
+      return std::log(FiducialScaleFactorAtTime(g / Gamma_) * kQKick);
+    };
+    for (int j = 0; j <= N; ++j)
+      u_edge_[j] = u_at_F(F_lo + j * dF);
+    // Grid point at the F-quantile midpoint: q_[i] = q(F_mid[i]) (spec §4.2), NOT the
+    // u-midpoint of the edges — F is nonlinear in u, so the two differ at O((dF)^2).
+    for (int i = 0; i < N; ++i)
+      u_[i] = u_at_F(F_lo + (i + 0.5) * dF);
+  }
+
+  for (int i = 0; i < N; ++i) {
+    q_[i]  = std::exp(u_[i]);
+    dq_[i] = std::exp(u_edge_[i + 1]) - std::exp(u_edge_[i]);
+  }
+
+  q_bg_ = q_;
+  w_.assign(N, 0.);
+  w_bg_.assign(N, 0.);
+  dlnf0_dlnq_.assign(N, 0.);
+  scratch_w_.assign(N, 0.);
+}
+
+double WdmDecayProductSpecies::SigmaAt(double u_cut) const {
+  // Fallback (negligible-decay) grid: uniform spacing, constant width.
+  if (!(F_hi_ > F_lo_)) {
+    const double du = u_edge_[1] - u_edge_[0];
+    return std::min(kSigmaMax, std::max(kSigmaMin, du));
+  }
+  // Analytic local quantile-bin width (spec §4.3 v3):
+  //   dF/du = Γ e^{−Γ t_fid(a)} / H_fid(a),  a = e^{u_cut}/kQKick
+  //   Δu_loc = [(F_hi−F_lo)/N] · H_fid(a) e^{+Γ t_fid(a)} / Γ
+  // Γ t_fid can exceed 700 (fast decays, late times): compare in log form and
+  // return the cap BEFORE exponentiating — never materialize inf (-ffast-math).
+  const double a     = std::exp(u_cut) / kQKick;
+  const double H0    = kFidH * 1.0e5 / _c_;
+  const double H     = H0 * std::sqrt(kFidOmegaM / (a * a * a) + kFidOmegaR / (a * a * a * a));
+  const double gt    = Gamma_ * FiducialCosmicTime(a);
+  const double ln_du = std::log((F_hi_ - F_lo_) / n_bins_ * H / Gamma_) + gt;
+  if (ln_du >= std::log(kSigmaMax))
+    return kSigmaMax;
+  return std::max(kSigmaMin, std::exp(ln_du));
+}
+
+void WdmDecayProductSpecies::GaussWeights(double u_cut, double sigma, double* w) const {
+  const int N        = n_bins_;
+  const double inv_s = 1.0 / (sigma * std::sqrt(2.0));
+  // Normal CDF at a cell edge; erf saturates by |x| ~ 6, clamp at 8 so no
+  // huge-argument libm call happens under -ffast-math.
+  auto cdf = [&](double u_e) {
+    const double x = (u_e - u_cut) * inv_s;
+    if (x >= 8.)
+      return 1.0;
+    if (x <= -8.)
+      return 0.0;
+    return 0.5 * (1.0 + std::erf(x));
+  };
+  double c_lo = cdf(u_edge_[0]);
+  w[0]        = c_lo;  // below-grid tail clamped into the bottom bin
+  for (int i = 0; i < N; ++i) {
+    const double c_hi = cdf(u_edge_[i + 1]);
+    if (i > 0)
+      w[i] = 0.;
+    w[i] += c_hi - c_lo;
+    c_lo  = c_hi;
+  }
+  w[N - 1] += 1.0 - c_lo;  // above-grid tail clamped into the top bin
+  // Σ w = 1 identically for every u_cut (telescoping) — the exact energy
+  // sum-rule needs no renormalization.
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FillInjection
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -178,9 +320,7 @@ void WdmDecayProductSpecies::FillInjection(double a,
                                            double* J,
                                            double* dJdlnq) const {
   const int N        = n_bins_;
-  const double q_cut = a * kQKick;
-  const double u_cut = std::log(q_cut);
-  const double sigma = kernel_width_ * du_;
+  const double u_cut = std::log(a * kQKick);
 
   auto zero_all = [&]() {
     for (int i = 0; i < N; ++i) {
@@ -189,55 +329,63 @@ void WdmDecayProductSpecies::FillInjection(double a,
         dJdlnq[i] = 0.;
     }
   };
-
   if (rho_dcdm <= 0. || Gamma_ == 0.) {
     zero_all();
     return;
   }
 
-  // Smooth onset gate: injection ramps on as a Gaussian over the first few
-  // kernel widths of the grid instead of switching on discontinuously when
-  // q_cut crosses the grid edge (a hard switch-on makes the stiff evolver
-  // grind to a halt at rtol ~ 1e-6). Decays suppressed or dropped by the gate
-  // are the pre-grid ones, negligible by construction (~1e-6 for defaults).
-  // The clamp value 60 keeps every residual on/off step at exp(-60) ~ 9e-27 —
-  // orders of magnitude below the evolver's error-control threshold — while
-  // staying far away from exp-underflow/denormal territory, which is not
-  // IEEE-safe under -ffast-math (auto-vectorized exp, flush-to-zero).
-  double gate       = 1.;
-  const double x_on = (u_cut - (u_[0] + 3. * sigma)) / sigma;
-  if (x_on < 0.) {
-    const double x2_on = 0.5 * x_on * x_on;
-    if (x2_on >= 60.) {
-      zero_all();
-      return;
-    }
-    gate = std::exp(-x2_on);
+  // Conservative cell-integrated Gaussian (erf) energy deposit (spec §4.3 v3):
+  // smooth in time (both evolvers; tabulated injection columns stay
+  // representable), Σ w = 1 identically (exact sum rule, edges clamped).
+  const double a2    = a * a;
+  const double A     = a * Gamma_ * rho_dcdm * a2 * a2 / factor_;
+  const double sigma = SigmaAt(u_cut);
+  GaussWeights(u_cut, sigma, scratch_w_.data());
+
+  // Static-sparsity floor (see kSparsityFloor doc): w -> (w + f)/(1 + N f)
+  // keeps Sum w = 1 exactly while making every row structurally nonzero.
+  const double fnorm = 1.0 / (1.0 + N * kSparsityFloor);
+  for (int i = 0; i < N; ++i)
+    scratch_w_[i] = (scratch_w_[i] + kSparsityFloor) * fnorm;
+
+  for (int i = 0; i < N; ++i) {
+    const double w       = scratch_w_[i];
+    const double epsilon = std::sqrt(q_[i] * q_[i] + a2 * M_ * M_);
+    J[i]                 = A * w / (dq_[i] * q_[i] * q_[i] * epsilon);
   }
 
-  double D = 0.;
-  for (int i = 0; i < N; ++i) {
-    const double x  = (u_[i] - u_cut) / sigma;
-    const double x2 = 0.5 * x * x;
-    // Clamp: exp of very large negative arguments must never be evaluated —
-    // under -ffast-math the auto-vectorized exp returns garbage outside its
-    // valid range, and denormal results get flushed to zero mid-expression.
-    // exp(-60) ~ 9e-27 is far below any relevant weight.
-    const double G        = (x2 >= 60.) ? 0. : std::exp(-x2);
-    scratch_G_[i]         = G;
-    const double epsilon  = std::sqrt(q_[i] * q_[i] + a * a * M_ * M_);
-    D                    += dq_[i] * q_[i] * q_[i] * epsilon * G;
-  }
-  if (D <= 0.) {
-    zero_all();
+  if (dJdlnq == nullptr)
     return;
-  }
-  const double a2 = a * a;
-  const double A  = gate * a * Gamma_ * rho_dcdm * a2 * a2 / factor_;
+  // g-source: d/dlnq of the deposited profile J(u) = A·φ_σ(u−u_cut)/(q³ε). The
+  // 1/(q³ε) measure factor makes this a TWO-term derivative, not just the
+  // edge-pdf difference:
+  //   ∂J/∂ln q = [A·φ′_σ/(q³ε)]  −  (3 + q²/ε²)·J
+  // First term: cell-averaged d/dlnq of the raw kernel, via the normal pdf
+  // differenced at the cell edges (no edge special cases; telescopes to ~0
+  // under the Σ dq q² ε (·) moment for interior cutoffs). Second term: the
+  // measure's own log-derivative (d ln(q³ε)/d ln q = 3 + q²/ε²) pulled back
+  // through the quotient rule; this is what supplies the correct ρ-weighted
+  // moment Σ dq q² ε dJdlnq ≈ −Σ dq q² ε (3 + q²/ε²) J ≈ −3A (non-relativistic,
+  // via integration by parts) — the g-channel's fluid-limit continuity source.
+  // Omitting it leaves the g-channel's metric-driven growth dead (measured: a
+  // flat −7.6% low-k P_m deficit; see the spec's §4.3 dJ/dlnq block).
+  const double inv_s = 1.0 / sigma;
+  const double norm  = inv_s / std::sqrt(2.0 * M_PI);
+  auto pdf           = [&](double u_e) {
+    const double x  = (u_e - u_cut) * inv_s;
+    const double x2 = 0.5 * x * x;
+    return (x2 >= 60.) ? 0.0 : norm * std::exp(-x2);  // master-style exp clamp
+  };
+  double p_lo = pdf(u_edge_[0]);
   for (int i = 0; i < N; ++i) {
-    J[i] = A * scratch_G_[i] / D;
-    if (dJdlnq != nullptr)
-      dJdlnq[i] = J[i] * (u_cut - u_[i]) / (sigma * sigma);
+    const double p_hi         = pdf(u_edge_[i + 1]);
+    const double diff         = p_hi - p_lo;
+    p_lo                      = p_hi;
+    const double epsilon      = std::sqrt(q_[i] * q_[i] + a2 * M_ * M_);
+    const double q2_over_eps2 = q_[i] * q_[i] / (epsilon * epsilon);
+    // + kSparsityFloor: static-sparsity seed (sign irrelevant, structure only)
+    dJdlnq[i] = A * (diff + kSparsityFloor) / (dq_[i] * q_[i] * q_[i] * epsilon) -
+                (3. + q2_over_eps2) * J[i];
   }
 }
 

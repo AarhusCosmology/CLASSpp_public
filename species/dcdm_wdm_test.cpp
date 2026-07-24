@@ -48,7 +48,7 @@ static bool Throws(FileContent& fc) {
   }
 }
 
-// Value checks (numeric ranges on epsilon/vkick/momenta_bins/kernel_width): the
+// Value checks (numeric ranges on epsilon/vkick/momenta_bins): the
 // species code raises these via the plain (runtime_error) severity macros — the
 // sampler should reject the point, not abort the chain.
 static bool ThrowsComputation(FileContent& fc) {
@@ -67,6 +67,32 @@ int main() {
   background pba{};
   pba.H0 = 2.2e-4;
 
+  // ── Fiducial cosmic-time helpers (Task 1) ──────────────────────────────────
+  {
+    const double H0 = 0.674 * 1.0e5 / _c_, Om = 0.31, Or = 9.2e-5;
+    // Matter-era limit t(a) -> (2/3) a^{3/2} / (H0 sqrt(Om)) for a >> a_eq (=Or/Om ~ 3e-4).
+    for (double a : {0.1, 0.5, 1.0}) {
+      const double t_matter = (2.0 / 3.0) * std::pow(a, 1.5) / (H0 * std::sqrt(Om));
+      const double t        = WdmDecayProductSpecies::FiducialCosmicTime(a);
+      assert(std::fabs(t - t_matter) < 5e-3 * t_matter);
+    }
+    // Radiation-era limit t(a) -> a^2 / (2 H0 sqrt(Or)) for a << a_eq.
+    {
+      const double a     = 1e-6;
+      const double t_rad = a * a / (2.0 * H0 * std::sqrt(Or));
+      assert(std::fabs(WdmDecayProductSpecies::FiducialCosmicTime(a) - t_rad) < 1e-2 * t_rad);
+    }
+    // Monotone + inverse round-trip.
+    double prev = -1.;
+    for (double a : {1e-4, 1e-3, 1e-2, 0.1, 0.5, 1.0}) {
+      const double t = WdmDecayProductSpecies::FiducialCosmicTime(a);
+      assert(t > prev);
+      prev                = t;
+      const double a_back = WdmDecayProductSpecies::FiducialScaleFactorAtTime(t);
+      assert(std::fabs(a_back - a) < 1e-9 * a);
+    }
+  }
+
   // ── Construction + grid ─────────────────────────────────────────────────────
   {
     FileContent fc = BaseFc();
@@ -75,11 +101,38 @@ int main() {
     // M = kQKick * eps / v with eps = sqrt(1 - v^2)
     const double v = 0.1, eps = std::sqrt(1. - v * v);
     assert(std::fabs(sp.M() - 10.0 * eps / v) < 1e-12 * sp.M());
-    // Grid top edge: u.back() + du/2 = ln(kQKick) + 3*sigma (3-sigma margin at a=1)
-    const double du = sp.u()[1] - sp.u()[0];
-    assert(std::fabs((sp.u().back() + 0.5 * du) - (std::log(10.0) + 3.0 * du)) < 1e-10);
-    // Grid bottom edge at q_min_ratio: u.front() - du/2 = ln(kQKick * 1e-4)
-    assert(std::fabs((sp.u().front() - 0.5 * du) - std::log(10.0 * 1e-4)) < 1e-10);
+    // Injection-adapted grid: equal-injected-decay quantiles. Reconstruct the
+    // decayed fraction F at each bin centre; it must be the uniform F-grid.
+    {
+      const int Nq       = sp.q_size();
+      const double g1    = sp.Gamma() * WdmDecayProductSpecies::FiducialCosmicTime(1.0);
+      const double F_at1 = -std::expm1(-g1);
+      const double F_lo  = 1e-3;  // default q_edge_tol
+      const double F_hi  = std::min(1. - 1e-3, F_at1);
+      const double dF    = (F_hi - F_lo) / Nq;
+      double prev        = 0.;
+      for (int i = 0; i < Nq; ++i) {
+        const double a = sp.q()[i] / 10.0;  // a' = q / kQKick
+        const double F = -std::expm1(-sp.Gamma() * WdmDecayProductSpecies::FiducialCosmicTime(a));
+        assert(std::fabs(F - (F_lo + (i + 0.5) * dF)) < 1e-6);
+        assert(sp.q()[i] > prev);  // strictly increasing
+        prev = sp.q()[i];
+      }
+      assert(sp.q().back() < 10.0 * (1. + 1e-9));  // within (0, kQKick]
+    }
+    // Grid depends on Gamma alone (fiducial H): different h / pba.H0, same Gamma
+    // -> bit-identical grid.
+    {
+      FileContent fc2 = BaseFc();
+      NcdmSettings s2 = TestSettings();
+      s2.h            = 0.80;
+      background pba2{};
+      pba2.H0 = 3.0e-4;
+      WdmDecayProductSpecies sp2(&fc2, "ddm", s2, &pba2, nullptr);
+      assert(sp2.q_size() == sp.q_size());
+      for (int i = 0; i < sp.q_size(); ++i)
+        assert(sp.q()[i] == sp2.q()[i]);
+    }
   }
   {
     FileContent fc;
@@ -124,20 +177,17 @@ int main() {
     fc.set("ddm.Omega_dcdmwdm", "0.1");  // conflicts with Omega_ini outside shooting
     assert(Throws(fc));
   }
-  {
-    FileContent fc = BaseFc();
-    fc.set("ddm.momenta_bins", "9");
-    fc.set("ddm.kernel_width", "3");  // denominator n - 3w would be 0 -> reject
-    assert(ThrowsComputation(fc));
-  }
-
   // ── Injection kernel: exact energy sum rule ────────────────────────────────
   {
     FileContent fc = BaseFc();
     WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
     const int N = sp.q_size();
     std::vector<double> J(N), dJ(N);
-    for (double a : {2e-4, 1e-3, 0.05, 0.3, 1.0}) {
+    const int Nsr = sp.q_size();
+    for (double a : {sp.q()[Nsr / 5] / 10.0,
+                     sp.q()[2 * Nsr / 5] / 10.0,
+                     sp.q()[3 * Nsr / 5] / 10.0,
+                     sp.q()[4 * Nsr / 5] / 10.0}) {
       const double rho_dcdm = 0.7;  // arbitrary
       sp.FillInjection(a, rho_dcdm, J.data(), dJ.data());
       double sum = 0.;
@@ -150,28 +200,153 @@ int main() {
       const double rhs = a * sp.Gamma() * rho_dcdm;
       assert(std::fabs(lhs - rhs) < 1e-12 * rhs);
     }
-    // Well below the grid (a = 2e-5, ~20 sigma below the onset gate): no
-    // injection at all (pre-grid decays are dropped — negligible by
-    // construction). Nearer the grid edge (a = 5e-5) the smooth onset gate is
-    // already nonzero but strongly suppressed.
-    sp.FillInjection(2e-5, 0.7, J.data(), dJ.data());
-    for (int i = 0; i < N; ++i)
-      assert(J[i] == 0.);
-    sp.FillInjection(5e-5, 0.7, J.data(), dJ.data());
+    // Below the grid's bottom edge the erf deposit CLAMPS the whole kick into the
+    // bottom bin (it does not drop): the below-grid tail of GaussWeights is folded
+    // into w[0] (Sigma w = 1 identically), so the realized fraction of the exact
+    // a*Gamma*rho sum rule stays exactly 1 at the edge centre and everywhere below
+    // it -- no injected energy is lost. This is what fixes the over-time energy
+    // golden at high z (dropping removed the earliest q_edge_tol of decays, a large
+    // fraction of the cumulative rho_wdm early on). Grid-derived, so it holds for
+    // any Gamma.
     {
-      double sum = 0.;
-      for (int i = 0; i < N; ++i) {
-        const double q        = sp.q()[i];
-        const double epsilon  = std::sqrt(q * q + 5e-5 * 5e-5 * sp.M() * sp.M());
-        sum                  += sp.dq()[i] * q * q * epsilon * J[i];
-      }
-      const double full = 5e-5 * sp.Gamma() * 0.7 * std::pow(5e-5, 4) / sp.factor();
-      assert(sum < 1e-20 * full);  // gate-suppressed by ~24 orders of magnitude
+      auto gate_ratio = [&](double u_cut) {
+        const double a_c = std::exp(u_cut) / 10.0;
+        sp.FillInjection(a_c, 0.7, J.data(), dJ.data());
+        double s = 0.;
+        for (int i = 0; i < N; ++i) {
+          const double q   = sp.q()[i];
+          const double ep  = std::sqrt(q * q + a_c * a_c * sp.M() * sp.M());
+          s               += sp.dq()[i] * q * q * ep * J[i];
+        }
+        return s * sp.factor() / std::pow(a_c, 4) / (a_c * sp.Gamma() * 0.7);
+      };
+      const double u0    = sp.u()[0];
+      const double sp01  = sp.u()[1] - sp.u()[0];
+      const double r_at  = gate_ratio(u0);               // at the bottom centre
+      const double r_mid = gate_ratio(u0 - 0.5 * sp01);  // half a bin below
+      const double r_far = gate_ratio(u0 - 2.0 * sp01);  // well below the edge
+      assert(std::fabs(r_at - 1.0) < 1e-9);              // full deposit at the edge centre
+      assert(std::fabs(r_mid - 1.0) < 1e-9);             // clamped: energy retained below edge
+      assert(std::fabs(r_far - 1.0) < 1e-9);             // still fully retained far below (no drop)
+      // dJ/dlnq pointwise sign structure below the grid is no longer asserted
+      // here: with the -(3+q^2/eps^2)J measure term, the sign is not
+      // constrained by "off-grid falling tail" reasoning alone. See the
+      // moment-identity block below for the load-bearing dJ/dlnq property.
     }
-    // In-grid, far bins are outside the clamped kernel: top bin gets nothing
-    // while the cutoff is near the bottom of the grid.
-    sp.FillInjection(2e-4, 0.7, J.data(), dJ.data());
-    assert(J[N - 1] == 0.);
+  }
+
+  // ── Erf deposit: interior energy centroid sits at u_cut to within the kernel
+  // width. The cell-integrated Gaussian is symmetric in u, so the deposited
+  // energy centroid tracks the kick location; sub-cell effects bound the error
+  // by a fraction of sigma. (The old CIC's 1e-9 exactness was a stencil
+  // property, not a physical requirement — the over-time golden is the
+  // physical requirement.)
+  {
+    FileContent fc = BaseFc();
+    WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
+    const int N = sp.q_size();
+    std::vector<double> J(N);
+    for (int idx : {N / 4, N / 2, 3 * N / 4}) {
+      const double u_cut = 0.5 * (sp.u()[idx] + sp.u()[idx + 1]);  // between centres
+      const double a     = std::exp(u_cut) / 10.0;                 // u_cut = ln(a*kQKick)
+      const double sigma = sp.SigmaAt(u_cut);
+      sp.FillInjection(a, 0.7, J.data(), nullptr);
+      double A = 0., Au = 0.;
+      bool negative = false;
+      for (int i = 0; i < N; ++i) {
+        const double q   = sp.q()[i];
+        const double ep  = std::sqrt(q * q + a * a * sp.M() * sp.M());
+        const double e   = sp.dq()[i] * q * q * ep * J[i];  // injected energy in bin i
+        A               += e;
+        Au              += e * sp.u()[i];
+        if (J[i] < 0.)
+          negative = true;
+      }
+      assert(!negative);  // weights in [0,1]
+      assert(A > 0.);
+      assert(std::fabs(Au / A - u_cut) < 0.5 * sigma);         // centroid within the kernel
+      assert(sigma >= 0.03 - 1e-12 && sigma <= 0.25 + 1e-12);  // clamp respected
+    }
+  }
+
+  // ── High-side clamp: fast decay trims q_hi < kQKick; a kick past the top edge is
+  //    CLAMPED into the top bin (retained, not dropped) so no energy is lost. ────
+  {
+    FileContent fc = BaseFc();
+    fc.set("ddm.Gamma", "100000");  // very fast: F(a=1) -> 1, top trimmed
+    WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
+    const int N = sp.q_size();
+    assert(sp.q().back() < 10.0 * (1. - 1e-6));  // q_hi trimmed below kQKick
+    std::vector<double> J(N);
+    // The realized fraction of the exact a*Gamma*rho sum rule, i.e. Sum(w).
+    auto sum_w = [&](double a_c) {
+      sp.FillInjection(a_c, 0.7, J.data(), nullptr);
+      double s = 0.;
+      for (int i = 0; i < N; ++i) {
+        const double q   = sp.q()[i];
+        const double ep  = std::sqrt(q * q + a_c * a_c * sp.M() * sp.M());
+        s               += sp.dq()[i] * q * q * ep * J[i];
+      }
+      return s * sp.factor() / std::pow(a_c, 4) / (a_c * sp.Gamma() * 0.7);
+    };
+    const double a_in = sp.q().back() / 10.0 * 0.98;  // cutoff just below top edge
+    assert(std::fabs(sum_w(a_in) - 1.0) < 1e-9);      // in-grid: full deposit
+    // Cutoff at kQKick >> q_hi is past the top edge: clamped into the top bin,
+    // energy retained (Sum(w) still 1), NOT shut off.
+    assert(std::fabs(sum_w(1.0) - 1.0) < 1e-9);
+    assert(J[N - 1] > 0.);  // the retained energy lands in the top bin
+    // dJ/dlnq pointwise sign structure above the grid is no longer asserted
+    // here: with the -(3+q^2/eps^2)J measure term, the sign is not
+    // constrained by "off-grid rising tail" reasoning alone. See the
+    // moment-identity block below for the load-bearing dJ/dlnq property.
+  }
+  // ── dJ/dlnq moment identity (integration by parts): with the completed
+  //    -(3+q^2/eps^2)J measure term, dJ/dlnq is no longer pointwise-signed
+  //    (rises below cutoff / falls above — that was a premise of the old,
+  //    incomplete derivative). The physical invariant instead is the
+  //    rho-weighted moment: the edge-difference part of dJ/dlnq telescopes to
+  //    ~0 for interior cutoffs, so
+  //      Sum dq q^2 eps dJdlnq  ==  - Sum dq q^2 eps (3 + q^2/eps^2) J
+  //    up to the sparsity seed (~1e-12 rel.) and edge-pdf leakage. This is the
+  //    g-channel's load-bearing property: it drives the daughter's fluid-limit
+  //    (low-k) metric growth; its absence measured as a flat -7.6% P_m deficit
+  //    (see .superpowers/sdd/task-3-lowk-diagnosis.md). Checked at three
+  //    interior cutoffs (between centres at N/4, N/2, 3N/4) plus a=0.5. ─────
+  {
+    FileContent fc = BaseFc();
+    WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
+    const int N = sp.q_size();
+    std::vector<double> J(N), dJ(N);
+
+    // J itself still peaks near the cutoff (unaffected by the dJ/dlnq fix).
+    {
+      const double a     = 0.5;
+      const double u_cut = std::log(a * 10.0);
+      sp.FillInjection(a, 0.7, J.data(), dJ.data());
+      int i_peak = 0;
+      for (int i = 1; i < N; ++i)
+        if (J[i] > J[i_peak])
+          i_peak = i;
+      assert(i_peak > 0);  // interior cutoff (a=0.5) -> peak is never the bottom bin
+      assert(std::fabs(sp.u()[i_peak] - u_cut) <= (sp.u()[i_peak] - sp.u()[i_peak - 1]) * 1.5);
+    }
+
+    auto moment_check = [&](double a) {
+      sp.FillInjection(a, 0.7, J.data(), dJ.data());
+      double lhs = 0., rhs = 0.;
+      for (int i = 0; i < N; ++i) {
+        const double q   = sp.q()[i];
+        const double ep  = std::sqrt(q * q + a * a * sp.M() * sp.M());
+        lhs             += sp.dq()[i] * q * q * ep * dJ[i];
+        rhs             -= sp.dq()[i] * q * q * ep * (3. + q * q / (ep * ep)) * J[i];
+      }
+      assert(std::fabs(lhs - rhs) < 1e-6 * std::fabs(rhs));
+    };
+    moment_check(0.5);
+    for (int idx : {N / 4, N / 2, 3 * N / 4}) {
+      const double u_cut = 0.5 * (sp.u()[idx] + sp.u()[idx + 1]);  // between centres
+      moment_check(std::exp(u_cut) / 10.0);
+    }
   }
 
   // ── Background plumbing: indices, ICs, ComputeMomenta via w_bg_ ────────────
@@ -279,9 +454,9 @@ int main() {
     const double Gamma = 100. * 1.e3 / _c_;  // same double conversion as the species
     const int n_rows   = bgm->bt_size_;
     auto row           = [&](int r, int c) { return data[(size_t) r * n_titles + c]; };
-    // Compare at late epochs where rho_wdm is physical: before the momentum
-    // grid opens (a < q_min_ratio) the code deliberately drops the negligible
-    // pre-grid injection, so a relative comparison there is 0-vs-negligible.
+    // Compare at epochs where rho_wdm is physical (nonzero). The deposit clamps
+    // below-grid injection into the bottom bin (Σ W = 1 always), so energy is
+    // conserved from the earliest decays.
     auto row_at_z = [&](double z_target) {
       int best = n_rows - 1;
       for (int r = 0; r < n_rows; ++r) {
@@ -315,18 +490,9 @@ int main() {
 
   // ── Perturbed run smoke test: Cls finite, spectra suppressed vs LCDM-ish ───
   //
-  // DEVIATION from the brief: momenta_bins=32 (as specified) reproducibly
-  // throws "rho_crit <= 0" during the background solve — even in a plain
-  // background-only run with no perturbations at all. Bisection (32 alone
-  // fails; every bin count from 8-31 and 33-96 tested clean) plus a
-  // -ffast-math-off rebuild (all bin counts clean, including 32) show this is
-  // a pre-existing floating-point-sensitivity/-ffast-math trap in the
-  // Task 2/3 background/evolver coupling (DCDM_WDM composite + ndf15),
-  // unrelated to the Task 4 perturbation code added here — a background-only
-  // Cosmology build with no "output" set already reproduces it. Using
-  // momenta_bins=48 instead (still far below the default 96, so the test
-  // stays fast) avoids the trap while preserving the brief's intent. See
-  // task-4-report.md for the full bisection evidence.
+  // Perturbed run smoke test: the full pipeline runs and Cls are finite.
+  // (Uses momenta_bins=48 to stay fast; the historical momenta_bins=32
+  // -ffast-math background failure no longer reproduces on master.)
   {
     FileContent fc = BaseFc();
     fc.set("h", "0.67");
