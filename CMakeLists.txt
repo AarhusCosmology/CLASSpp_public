@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.21)
 project(CLASSpp LANGUAGES C CXX)
 
+# Emit build/<dir>/compile_commands.json so clangd (and any other libclang
+# tooling) sees the real include paths and flags instead of guessing. .clangd
+# points at BUILD_DIR from the Makefile. Honoured by the Makefile and Ninja
+# generators only -- Xcode/Visual Studio ignore it, so those users need a
+# throwaway Makefile-generator build dir to get a database.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Version: pyproject.toml's [project] version is the single source of truth.
 # scikit-build-core passes it as SKBUILD_PROJECT_VERSION for wheel builds; for a
 # standalone CMake build we read the `version = "x.y.z"` line out of pyproject.

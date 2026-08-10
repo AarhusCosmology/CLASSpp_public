@@ -5,7 +5,7 @@
 #include "input_module.h"
 
 #include <algorithm>
-#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 
@@ -27,6 +27,15 @@
 #include "../species/species_input.h"
 
 namespace {
+
+// True if the file can be opened for reading. Deliberately not
+// std::filesystem::exists: that is the only part of libstdc++ with an ABI break
+// (GCC 8 lays path out differently and needs -lstdc++fs), which buys nothing for
+// four existence probes on relative paths and turns a compiler mismatch into a
+// segfault inside ~path. Matches the fopen(name, "r") test used before v3.
+bool file_exists(const std::string& name) {
+  return std::ifstream(name).good();
+}
 
 void readDoubleList(FileContent* pfc, const char* name, std::vector<double>& values, int* found) {
   if (auto l = pfc->get<std::vector<double>>(name)) {
@@ -140,14 +149,13 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
     if (!root_set) {
       inifilename = input_file.substr(0, input_file.size() - 4);
       for (filenum = 0; filenum < 100; filenum++) {
-        std::error_code ec;
         {
           std::ostringstream oss;
           oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
               << "_cl.dat";
           tmp_file = oss.str();
         }
-        if (std::filesystem::exists(tmp_file, ec))
+        if (file_exists(tmp_file))
           continue;
         {
           std::ostringstream oss;
@@ -155,7 +163,7 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
               << "_pk.dat";
           tmp_file = oss.str();
         }
-        if (std::filesystem::exists(tmp_file, ec))
+        if (file_exists(tmp_file))
           continue;
         {
           std::ostringstream oss;
@@ -163,7 +171,7 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
               << "_tk.dat";
           tmp_file = oss.str();
         }
-        if (std::filesystem::exists(tmp_file, ec))
+        if (file_exists(tmp_file))
           continue;
         {
           std::ostringstream oss;
@@ -171,7 +179,7 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
               << "_parameters.ini";
           tmp_file = oss.str();
         }
-        if (std::filesystem::exists(tmp_file, ec))
+        if (file_exists(tmp_file))
           continue;
         break;
       }

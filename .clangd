@@ -1,10 +1,5 @@
 CompileFlags:
-  Add:
-    - -Iinclude
-    - -Itools
-    - -Isource
-    - -Ispecies
-    - -I.
-    - -Ihyrec
-    - -std=c++17
-    - -DHYREC
+  # Use the database CMake writes into the Makefile's default BUILD_DIR, so
+  # include paths, -std and -D come from the real build rather than being
+  # duplicated here. Run `make class` (or any cmake configure) once to create it.
+  CompilationDatabase: build/cmake

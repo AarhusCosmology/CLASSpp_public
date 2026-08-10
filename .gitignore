@@ -1,6 +1,8 @@
 output/
 *~
 build/
+# Generated per-machine (absolute paths); .clangd points at build/cmake instead.
+compile_commands.json
 class
 class_profiled
 test-parser
