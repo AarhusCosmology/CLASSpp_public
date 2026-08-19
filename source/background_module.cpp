@@ -6,6 +6,7 @@
 #include "background_module.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <map>
 #include <vector>
 
@@ -20,6 +21,7 @@
 #include "../species/scalar_field.h"
 #include "../species/type3_species.h"
 #include "bisection.h"
+#include "evolver_etd.h"
 
 /**
  * Return all NCDMBaseSpecies pointers from all_species_ in deterministic order.
@@ -153,10 +155,21 @@ void BackgroundModule::background_at_tau(
              tau,
              tau_table_[0]);
 
-  class_test(tau > tau_table_[bt_size_ - 1],
-             "out of range: tau=%e > tau_max=%e\n",
-             tau,
-             tau_table_[bt_size_ - 1]);
+  /* The adaptive perturbation evolver may request tau a fraction of a ULP
+     beyond the last tabulated point (= conformal age = exact integration
+     endpoint x_end). On a step clamped to land on x_end, the DP45 ci=1 stage
+     recomputes t + (x_end - t); when t is far from x_end the subtraction is not
+     exactly representable, so the sum rounds one ULP above x_end and the RHS is
+     evaluated just past the table. Snap such rounding-level overshoots onto the
+     endpoint. The measured overshoot is 1 ULP (reldiff ~1.2e-16); a threshold of
+     a few ULP absorbs it while a genuine out-of-range tau (beyond rounding) still
+     fails below. */
+  const double tau_max = tau_table_[bt_size_ - 1];
+  if (tau > tau_max && tau - tau_max <= 4. * DBL_EPSILON * tau_max) {
+    tau = tau_max;
+  }
+
+  class_test(tau > tau_max, "out of range: tau=%e > tau_max=%e\n", tau, tau_max);
 
   /** - deduce length of returned vector from format mode */
 
@@ -261,6 +274,10 @@ void BackgroundModule::background_functions(
         pvecback /* vector with argument pvecback[index_bg] (must be already allocated with a size compatible with return_format) */
 ) {
   /** Summary: */
+
+  /* Species self-checks consult this to tell a stored row from a trial state; see
+     StoringBackgroundTable(). */
+  storing_background_table_ = (return_format == pba->long_info);
 
   /** - initialize local variables */
   double a       = pvecback_B[index_bi_a_];
@@ -661,11 +678,14 @@ void BackgroundModule::background_solve_evolver() {
   d2background_dtau2_table_.resize(bt_size_ * bg_size_);
 
   auto generic_evolver = &evolver_ndf15;
-  if (ppr->evolver == evolver_type::rk) {
+  if (ppr->evolver_background == evolver_type::rk) {
     generic_evolver = &evolver_rk;
   }
-  else if (ppr->evolver == evolver_type::rkdp45) {
+  else if (ppr->evolver_background == evolver_type::rkdp45) {
     generic_evolver = &evolver_rkdp45;
+  }
+  else if (ppr->evolver_background == evolver_type::etd) {
+    generic_evolver = &evolver_etd;
   }
 
   /* Size of vector to integrate is (bi_size_-1) rather than
@@ -685,7 +705,8 @@ void BackgroundModule::background_solve_evolver() {
                   loga.data(),
                   bt_size_,
                   background_add_line_to_bg_table,
-                  nullptr);
+                  nullptr,
+                  background_derivs_diagonal_loga);
 
   /** - deduce age of the Universe */
   /* -> age in Gyears */
@@ -1271,6 +1292,61 @@ void BackgroundModule::background_derivs_loga_member(
   for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++) {
     dy[index_bi] *= 1. / (a * H);
   }
+}
+
+void BackgroundModule::background_derivs_diagonal_loga(double loga,
+                                                       double* y,
+                                                       double* diag,
+                                                       void* parameters_and_workspace) {
+  auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
+  pbpaw->background_module->background_derivs_diagonal_loga_member(loga,
+                                                                   y,
+                                                                   diag,
+                                                                   parameters_and_workspace);
+}
+
+void BackgroundModule::background_derivs_diagonal_loga_member(double loga,
+                                                              double* y,
+                                                              double* diag,
+                                                              void* parameters_and_workspace) {
+  background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
+      parameters_and_workspace);
+  double* pvecback = pbpaw->pvecback;
+
+  // Same a/tau slot swap as background_derivs_loga_member: index_bi_a_ holds tau
+  // during integration, and the species read a from pvecback, which
+  // background_functions fills.
+  double a       = exp(loga);
+  double tau     = y[index_bi_a_];
+  y[index_bi_a_] = a;
+
+  // pvecback must be populated before the species are asked: they read a and H from
+  // it. background_derivs_member does this via background_functions on every call;
+  // do the same here rather than relying on a previous derivs call having left the
+  // right state behind, which would make the evolver's call ORDER load-bearing.
+  background_functions(y, pba->normal_info, pvecback);
+
+  // bi_size_ - 1, not bi_size_: tau sits in the last slot and is stored but not
+  // integrated, so background_solve_evolver hands the evolver bi_size_ - 1 equations
+  // and diag is only that long. The scaling loop below already had this right.
+  for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++)
+    diag[index_bi] = 0.;
+
+  // Only species with a stiff self-coupling contribute; the default is a no-op, so
+  // the standard sector correctly reports zero and the exponential step reduces to
+  // its explicit counterpart there.
+  for (const auto& [name, sp] : all_species_)
+    sp->BackgroundDerivsDiagonal(tau, y, diag, pvecback);
+
+  y[index_bi_a_]    = tau;
+  diag[index_bi_a_] = 0.;  // dtau/dloga = 1 is state-independent
+
+  // d/dtau -> d/dloga, matching the dy conversion exactly. The diagonal is a RATE,
+  // so it takes the same 1/(a H) factor the derivatives do -- and only that: the
+  // a-dependence of H does not enter d(dy_i)/d(y_i) at fixed loga.
+  double H = pvecback[index_bg_H_];
+  for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++)
+    diag[index_bi] *= 1. / (a * H);
 }
 
 void BackgroundModule::background_add_line_to_bg_table_member(

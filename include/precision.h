@@ -16,9 +16,20 @@ class FileContent;  // forward decl for precision::parse
  * list of evolver types for integrating perturbations over time
  */
 enum class evolver_type {
-  rk,    /* Runge-Kutta integrator */
-  ndf15, /* stiff integrator */
-  rkdp45 /* Dormand-Prince 4(5) explicit adaptive integrator */
+  rk,     /* Runge-Kutta integrator */
+  ndf15,  /* stiff integrator */
+  rkdp45, /* Dormand-Prince 4(5) explicit adaptive integrator */
+  etd     /* exponential Rosenbrock (ETDRK4, Cox-Matthews); integrates a species-reported
+             Jacobian DIAGONAL exactly, so a diagonal stiffness stops limiting
+             the step at explicit cost. Available on the background and the
+             perturbations; species that report no diagonal get the explicit
+             scheme, since at diag = 0 the phi functions reduce ETDRK4 to
+             classical RK4. Thermodynamics passes no diagonal.
+
+             Worth it where a diagonal stiffness dominates, which on the dncdm_inv
+             perturbations it does across the measured range (Gamma = 1e5 .. 1e9,
+             1.2x to 4.9x faster than rkdp45). Elsewhere the diagonal is zero and
+             this is RK4 with a per-step overhead, so it is opt-in per module. */
 };
 
 /**
@@ -318,6 +329,8 @@ struct precision {
       17; /**< number of momenta in Boltzmann hierarchy for decay radiation, at least 4 */
   int l_max_dr_col =
       17; /**< number of collision terms in Boltzmann hierarchy for decay radiation, at least 2 */
+  int l_max_dncdm_col =
+      17; /**< max multipole receiving the DNCDM inverse-decay collision term; must be <= l_max_ncdm */
   int l_max_ur =
       17; /**< number of momenta in Boltzmann hierarchy for relativistic neutrino/relics (scalar), at least 4 */
   int l_max_idr =
@@ -422,9 +435,25 @@ struct precision {
   double neglect_CMB_sources_below_visibility = 1.0e-3;
 
   /**
-   * The type of evolver to use: options are ndf15 or rk
+   * The type of evolver to use: options are ndf15, rk, rkdp45 or etd.
+   *
+   * PER-MODULE, because the three callers do not want the same integrator. The
+   * decaying-NCDM inverse-decay sector is the case that forced this: its
+   * BACKGROUND Jacobian is genuinely dense (every parent momentum bin couples to
+   * every daughter bin through the collision integral, so numjac abandons
+   * sparsity and ndf15 costs ~84x more than rkdp45 for answers agreeing to 4e-9
+   * of the energy budget), while its PERTURBATION Jacobian stays sparse and
+   * stiffness-limited, where an implicit method is the natural choice. With one
+   * global setting that model cannot express its own best configuration.
+   *
+   * Input is an XOR: either the blanket `evolver` key, or any subset of
+   * `evolver_background` / `evolver_thermodynamics` / `evolver_perturbations`
+   * (unset members keep the default). Mixing the two is rejected rather than
+   * silently resolved by a precedence rule -- see precision::parse.
    */
-  evolver_type evolver = evolver_type::ndf15;
+  evolver_type evolver_background     = evolver_type::ndf15;
+  evolver_type evolver_thermodynamics = evolver_type::ndf15;
+  evolver_type evolver_perturbations  = evolver_type::ndf15;
 
   /*
    * Primordial parameters

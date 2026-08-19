@@ -37,6 +37,26 @@ class SpeciesInput {
     return fallback;
   }
 
+  /** Yes/no flag on the repo's convention: the value must begin with 'y'/'Y' or
+   *  'n'/'N', absent falls back to @p fallback, and anything else is REJECTED --
+   *  same rule input_module.cpp applies to its own yes/no keys. Rejecting rather
+   *  than reading an unrecognised value as "no" is the point: these flags select
+   *  physics, and a typo that silently turns one off is not something a run reports.
+   *  Structural (decidable from the text, not from a value a sampler varies), hence
+   *  severe. */
+  bool get_flag(const std::string& field, bool fallback) const {
+    auto v = get<std::string>(field);
+    if (!v)
+      return fallback;
+    const char c = v->empty() ? '\0' : (*v)[0];
+    class_test_severe(c != 'y' && c != 'Y' && c != 'n' && c != 'N',
+                      "species '%s': field '%s' must begin with 'y' or 'n', not '%s'",
+                      instance_name_.c_str(),
+                      field.c_str(),
+                      v->c_str());
+    return c == 'y' || c == 'Y';
+  }
+
   /** Required accessor: throws std::invalid_argument if the field is absent. */
   template <class T>
   T require(const std::string& field) const {

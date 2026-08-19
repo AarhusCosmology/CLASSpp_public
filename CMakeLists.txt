@@ -87,7 +87,10 @@ set(CLASS_SPECIES_FILES
   species/dcdm_dr_species.cpp
   species/dcdm_wdm_species.cpp
   species/dncdm_dr_species.cpp
+  species/dncdm_inv_species.cpp
+  species/dncdm_proxy_species.cpp
   species/dncdm_species.cpp
+  species/dr_psd_species.cpp
   species/fluid.cpp
   species/axion_ede_fluid.cpp
   species/ppf_fluid.cpp
@@ -115,14 +118,18 @@ set(CLASS_SPECIES_FILES
 set(CLASS_TOOLS_FILES
   tools/arrays.cpp
   tools/common.cpp
+  tools/decay_transition_kernel.cpp
   tools/dei_rkck.cpp
+  tools/evolver_etd.cpp
   tools/evolver_ndf15.cpp
   tools/evolver_rkck.cpp
   tools/evolver_rkdp45.cpp
+  tools/nonfinite.cpp
   tools/exceptions.cpp
   tools/hyperspherical.cpp
   tools/parser.cpp
   tools/quadrature.cpp
+  tools/reduced_collision_operator.cpp
   tools/sparse.cpp
   tools/trigonometric_integrals.cpp
 )
@@ -170,6 +177,17 @@ if(CLASS_FAST_MATH)
     target_compile_options(classpp PRIVATE /fp:fast)
   else()
     target_compile_options(classpp PRIVATE -ffast-math)
+  endif()
+endif()
+# tools/nonfinite.cpp holds the ONLY non-finite test in the build. Under
+# -ffast-math (-ffinite-math-only) every such test folds to false -- measured, and
+# true even for the memcpy bit-pattern form -- so this one file is compiled without
+# it. Removing this line silently disables NaN/Inf detection everywhere.
+if(CLASS_FAST_MATH)
+  if(MSVC)
+    set_source_files_properties(tools/nonfinite.cpp PROPERTIES COMPILE_OPTIONS "/fp:precise")
+  else()
+    set_source_files_properties(tools/nonfinite.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
   endif()
 endif()
 if(CLASS_ARCH_FLAGS)
@@ -222,9 +240,14 @@ if(NOT SKBUILD)
 
   enable_testing()
   add_executable(test-parser tools/parser_test.cpp)
+  add_executable(test-precision-evolver tools/precision_evolver_test.cpp)
   add_executable(test-errors tools/errors_test.cpp)
   add_executable(test-bisection tools/bisection_test.cpp)
   add_executable(test-quadrature tools/quadrature_test.cpp)
+  add_executable(test-decay-kernel tools/decay_kernel_test.cpp)
+  add_executable(test-reduced-operator tools/reduced_operator_test.cpp)
+  add_executable(test-evolver-etd tools/evolver_etd_test.cpp)
+  add_executable(test-evolver-nonfinite tools/evolver_nonfinite_test.cpp)
   add_executable(test-photons species/photons_formula_test.cpp)
   add_executable(test-species-types species/species_type_name_test.cpp)
   add_executable(test-scf-potential species/scalar_field_potential_test.cpp)
@@ -239,9 +262,12 @@ if(NOT SKBUILD)
   add_executable(test-dcdm-wdm species/dcdm_wdm_test.cpp)
   add_executable(test-axion-ncdm species/axion_ncdm_test.cpp)
   add_executable(test-dncdm-switch-copy species/dncdm_switch_copy_test.cpp)
+  add_executable(test-dncdm-inv species/dncdm_inv_test.cpp)
+  add_executable(test-dncdm-proxy species/dncdm_proxy_test.cpp)
+  add_executable(test-dr-psd species/dr_psd_test.cpp)
   add_executable(test-ncdm-family species/ncdm_family_test.cpp)
   add_executable(test-species-budget species/species_budget_test.cpp)
-  foreach(_t IN ITEMS test-parser test-errors test-bisection test-quadrature test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-ncdm-family test-species-budget)
+  foreach(_t IN ITEMS test-parser test-precision-evolver test-errors test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-etd test-evolver-nonfinite test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-ncdm-family test-species-budget)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for

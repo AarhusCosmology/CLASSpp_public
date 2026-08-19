@@ -17,7 +17,10 @@ void evolver_rk(
     double* x_sampling,
     int x_size,
     void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
+    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
+    /* Part of the shared evolver signature; unused here. See evolver_rkck.h. */
+    void (* /*derivs_diagonal*/)(
+        double x, double* y, double* diag, void* parameters_and_workspace)) {
   int next_index_x;
   double x1, x2 = 0., timestep, timescale;
   struct generic_integrator_workspace gi;

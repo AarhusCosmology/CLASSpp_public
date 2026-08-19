@@ -459,7 +459,20 @@ void ThermodynamicsModule::thermodynamics_init() {
 
   /** - --> minus the baryon drag interaction rate, -dkappa_d/dtau = -[1/R * kappa'], with R = 3 rho_b / 4 rho_gamma, stored temporarily in column ddkappa */
 
-  last_index_back = background_module_->bg_size_ - 1;
+  // bt_size_ (ROWS = time steps), not bg_size_ (COLUMNS = entries per row). This is a
+  // starting guess for the closeby hunt below, which walks a ROW index of the background
+  // table, so it must lie in [0, bt_size_-1]; tau_table here is DECREASING (tau_ini_ is
+  // its last element), so the sweep starts at the latest time and the top row is the
+  // right guess.
+  //
+  // It read bg_size_-1 for years and only ever mattered once bg_size_ grew past bt_size_:
+  // background columns scale with the momentum grids, so a decaying-NCDM sector with
+  // dr_N_q=1600 pushed bg_size_ to 6481 against bt_size_=4605 and the run died in
+  // array_hunt_growing_closeby with "*last_index=6480 out of range [0:4604]". Below that
+  // threshold the wrong value is merely a poor guess that the hunt walks away from, which
+  // is why no result ever changed -- and why this must NOT be "fixed" by clamping inside
+  // the hunt, which would hide the next caller that confuses the two sizes.
+  last_index_back = background_module_->bt_size_ - 1;
 
   for (index_tau = 0; index_tau < tt_size_; index_tau++) {
     background_module_->background_at_tau(tau_table[index_tau],
@@ -3445,13 +3458,21 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
      for the recombination integration only, leaving the user's evolver choice intact for
      the background and perturbation modules. */
   auto generic_evolver = &evolver_ndf15;
-  if (ppr->evolver == evolver_type::rkdp45) {
+  if (ppr->evolver_thermodynamics == evolver_type::rkdp45) {
     generic_evolver = &evolver_rkdp45;
   }
-  else if (ppr->evolver == evolver_type::rk) {
+  else if (ppr->evolver_thermodynamics == evolver_type::rk) {
     generic_evolver = &evolver_rkdp45;
     printf(
         "\nWarning: evolver=rk cannot integrate the stiff RECFAST system; using rkdp45 for "
+        "recombination instead.\n");
+  }
+  else if (ppr->evolver_thermodynamics == evolver_type::etd) {
+    // RECFAST's stiffness is not diagonal in the sense ETD exploits, and no species
+    // reports a diagonal here, so ETD would be explicit Heun on a stiff system.
+    generic_evolver = &evolver_rkdp45;
+    printf(
+        "\nWarning: evolver=etd applies to the background only; using rkdp45 for "
         "recombination instead.\n");
   }
 
@@ -3584,6 +3605,8 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
                   helium_sampling,
                   helium_sampling_count,
                   helium_output,
+                  nullptr,
+                  // No species reports a diagonal on the thermodynamics path.
                   nullptr);
 
   y[0] = ppr->recfast_x_H0_trigger;
@@ -3613,6 +3636,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
                     minus_z_sampling.data() + first_full_sample,
                     Nz - first_full_sample,
                     thermodynamics_recfast_output,
+                    nullptr,
                     nullptr);
   }
 }

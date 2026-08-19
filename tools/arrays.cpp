@@ -783,10 +783,24 @@ CLASS_ALWAYS_INLINE int array_search_bracket(
 CLASS_ALWAYS_INLINE int array_hunt_growing_closeby(
     const double* x_array, int stride, int n_lines, double x, int last_index) {
   int inf = last_index;
+  // Kept as a hard error rather than a silent clamp: an out-of-range hint means the
+  // caller is confusing two different sizes, and that is worth failing loudly. It is
+  // exactly how a decaying-NCDM run at dr_N_q=1600 exposed thermodynamics_module.cpp
+  // seeding this with bg_size_ (COLUMNS) instead of bt_size_ (ROWS).
   class_test(inf < 0 || inf > n_lines - 1,
              "*last_index=%d out of range [0:%d]\n",
              inf,
              n_lines - 1);
+
+  // The function returns a BRACKET [inf, inf+1], so the search must start at
+  // inf <= n_lines-2 even though n_lines-1 is a legitimate index to be told about.
+  // Without this, a hint of exactly n_lines-1 sets sup = n_lines and the `while`
+  // below dereferences x_array[n_lines] -- one past the end -- BEFORE its class_test
+  // can fire. Reading garbage there then reports a spurious "x > x_max" for an x that
+  // merely equals x_max, which is the common case when the caller sweeps a table
+  // downward from its own last row.
+  if (inf > n_lines - 2)
+    inf = n_lines - 2;
 
   while (x < x_array[inf * stride]) {
     inf--;

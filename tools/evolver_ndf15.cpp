@@ -57,6 +57,7 @@
 #include "evolver_ndf15.h"
 
 #include "common.h"
+#include "nonfinite.h"
 //#include "perturbations.h"
 #include <algorithm>
 #include <vector>
@@ -80,7 +81,10 @@ void evolver_ndf15(
     double* t_vec,
     int tres,
     void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
+    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
+    /* Part of the shared evolver signature; unused here. See evolver_ndf15.h. */
+    void (* /*derivs_diagonal*/)(
+        double x, double* y, double* diag, void* parameters_and_workspace)) {
   /* Constants: */
   double G[5]     = {1.0, 3.0 / 2.0, 11.0 / 6.0, 25.0 / 12.0, 137.0 / 60.0};
   double alpha[5] = {-37.0 / 200, -1.0 / 9.0, -8.23e-2, -4.15e-2, 0};
@@ -293,6 +297,35 @@ void evolver_ndf15(
       at_hmin = false;
     }
     h = tdir * absh;
+    /* NO-PROGRESS GUARD. If h has shrunk below the floating-point resolution of t then
+       t + h == t exactly and the integration cannot advance, however many steps it
+       takes. This is NOT caught by the "Step size too small" test further down: that
+       one sits inside the `err > rtol` branch, and in this failure mode the steps are
+       ACCEPTED (h is tiny, so the local error is ~1e-12 against an rtol of 1e-5). The
+       run therefore spins forever at one t, silently, looking like a slow run rather
+       than a hung one.
+
+       Measured on the decaying-NCDM sector at Gamma=1e8 (dr_N_q=20, inverse decays):
+       an exponentially growing mode in the parent's l=5, bin 0 perturbation reaches
+       ~1e25 at tau=6422.97 (a~0.15); the controller chases it down through
+       h = 2.9e-4 -> 5.3e-14 -> 7.08e-16 against eps*t = 1.4e-12, and then 93% of all
+       4.87M attempted steps land on that single t. Same class of defect as the rkdp45
+       Inf-rejection grind fixed in da5d874a, and fixed the same way: turn a hang into
+       an error that names where and what.
+
+       Neither existing floor catches it, and NOT because of -ffast-math: ndf15's own
+       `absh <= hmin` test uses hmin = minimum_variation = DBL_EPSILON = 2.2e-16, an
+       ABSOLUTE bound, while h = 7.08e-16 at t = 6.4e3 -- above the floor yet 2000x
+       too small to move t. It also sits inside the `err > rtol` branch, and these
+       steps are accepted. StepMakesNoProgress is the relative test, and lives in the
+       -fno-fast-math TU because `t + h == t` is algebraically `h == 0` and the
+       optimiser is entitled to substitute one for the other. */
+    class_test(StepMakesNoProgress(t, h),
+               "ndf15: step size %e underflows the resolution of x=%e (t+h==t), so the "
+               "integration cannot advance. The step controller is being driven to zero "
+               "by something upstream.",
+               h,
+               t);
     /* Stretch the step if within 10% of tfinal-t. */
     if (1.1 * absh >= fabs(tfinal - t)) {
       h    = tfinal - t;

@@ -2548,6 +2548,7 @@ void precision::parse(const FileContent& fc) {
   read(fc, "l_max_pol_g", l_max_pol_g);
   read(fc, "l_max_dr", l_max_dr);
   read(fc, "l_max_dr_col", l_max_dr_col);
+  read(fc, "l_max_dncdm_col", l_max_dncdm_col);
   read(fc, "l_max_ur", l_max_ur);
   read(fc, "l_max_idr", l_max_idr);
   read(fc, "l_max_ncdm", l_max_ncdm);
@@ -2579,7 +2580,41 @@ void precision::parse(const FileContent& fc) {
   read(fc, "ncdm_fluid_approximation", ncdm_fluid_approximation);
   read(fc, "ncdm_fluid_trigger_tau_over_tau_k", ncdm_fluid_trigger_tau_over_tau_k);
   read(fc, "neglect_CMB_sources_below_visibility", neglect_CMB_sources_below_visibility);
-  read_enum(fc, "evolver", evolver);
+  // Evolver: blanket `evolver` XOR the per-module family. Structural (decidable
+  // from which keys are present, not from any numeric value a sampler varies), so
+  // severe rather than rejectable. Rejecting the mix instead of imposing a
+  // precedence rule is deliberate: with a precedence rule, `evolver = 2` plus a
+  // stale `evolver_perturbations` in an inherited .pre file would silently run a
+  // different integrator than the visible key says.
+  {
+    const bool has_blanket           = fc.get<int>("evolver").has_value();
+    const char* per_module_names[]   = {"evolver_background",
+                                        "evolver_thermodynamics",
+                                        "evolver_perturbations"};
+    evolver_type* per_module_slots[] = {&evolver_background,
+                                        &evolver_thermodynamics,
+                                        &evolver_perturbations};
+    bool has_per_module              = false;
+    for (const char* n : per_module_names)
+      has_per_module = has_per_module || fc.get<int>(n).has_value();
+
+    class_test_severe(has_blanket && has_per_module,
+                      "specify either 'evolver' (applies to every module) or the per-module "
+                      "keys 'evolver_background' / 'evolver_thermodynamics' / "
+                      "'evolver_perturbations' (each defaulting independently), not both");
+
+    if (has_blanket) {
+      evolver_type all = evolver_background;  // any slot carries the shared default
+      read_enum(fc, "evolver", all);
+      evolver_background     = all;
+      evolver_thermodynamics = all;
+      evolver_perturbations  = all;
+    }
+    else {
+      for (int i = 0; i < 3; ++i)
+        read_enum(fc, per_module_names[i], *per_module_slots[i]);
+    }
+  }
 
   /* Primordial */
   read(fc, "k_per_decade_primordial", k_per_decade_primordial);

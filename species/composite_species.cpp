@@ -51,6 +51,14 @@ void CompositeSpecies::BackgroundDerivs(double tau,
     child->BackgroundDerivs(tau, y, dy, pvecback);
 }
 
+void CompositeSpecies::BackgroundDerivsDiagonal(double tau,
+                                                const double* y,
+                                                double* diag,
+                                                const double* pvecback) {
+  for (auto& child : children_)
+    child->BackgroundDerivsDiagonal(tau, y, diag, pvecback);
+}
+
 void CompositeSpecies::FinalizeBackground(double a,
                                           double H,
                                           const double* pvecback_B,
@@ -159,6 +167,19 @@ void CompositeSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   for (size_t i = 0; i < children_.size(); ++i)
     children_[i]->PerturbDerivs(*my.child_layouts[i], tau, y, dy, ppaw);
   AddCouplingDerivs(tau, y, dy, ppaw);  // two-phase contract: children first, then coupling
+}
+
+void CompositeSpecies::PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& base,
+                                             double tau,
+                                             const double* y,
+                                             double* diag,
+                                             const perturb_parameters_and_workspace& ppaw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
+  for (size_t i = 0; i < children_.size(); ++i)
+    children_[i]->PerturbDerivsDiagonal(*my.child_layouts[i], tau, y, diag, ppaw);
+  /* No coupling phase here, unlike PerturbDerivs: a composite whose coupling has a
+     diagonal overrides this outright (dncdm_inv does), and the base class has no
+     AddCouplingDerivs counterpart to call. */
 }
 
 void CompositeSpecies::FillSources(const BaseSpecies::PerturbLayout& base,

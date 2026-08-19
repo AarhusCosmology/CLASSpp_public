@@ -4,17 +4,72 @@
 #include <vector>
 
 #include "background_module.h"
+#include "errors.h"
 #include "perturbations_module.h"
+#include "species/dncdm_inv_species.h"
+#include "species/dncdm_proxy_species.h"
 #include "species/shooting_target.h"
 #include "species/species_build_context.h"
+#include "species/species_input.h"
 
 std::vector<Named> DNCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
   auto dncdm_vec = DNCDMSpecies::CreateAll(ctx);
   std::vector<Named> result;
   result.reserve(dncdm_vec.size());
   for (auto& e : dncdm_vec) {
-    result.push_back(
-        {e.key, std::make_unique<DNCDM_DR_Species>(std::move(e.species), ctx.pba, ctx.bgm)});
+    // Per-instance dispatch on the DECAY-RADIATION REPRESENTATION, which is what
+    // actually selects the implementation:
+    //
+    //   integrated (default) -> DNCDM_DR_Species: the daughters are one
+    //                           momentum-INTEGRATED ultra-relativistic hierarchy.
+    //   psd                  -> DNCDMInvSpecies: the daughters carry a resolved
+    //                           per-q PSD, driven by the transition kernel.
+    //
+    // Inverse decays REQUIRE psd -- the inverse rate is f_l(q2) f_phi(q3) at the
+    // transition's own momenta, which an integrated hierarchy simply does not
+    // carry -- so inverse_decays=yes implies it. The reverse is not true, and that
+    // asymmetry is the point of having a separate key: `inverse_decays = no` with
+    // `dr_representation = psd` builds the composite with the kernel's inverse term
+    // switched OFF, which is
+    //   (a) the paper's decay-only ("dec") rung, and
+    //   (b) the closest thing to an independent check this sector can have --
+    //       the same pure-decay physics through two unrelated discretisations
+    //       (resolved-PSD kernel vs integrated fluid), so agreement tests the
+    //       composite's initial conditions, hierarchy, stress-energy assembly and
+    //       metric coupling against code that does none of it the same way.
+    SpeciesInput in(ctx.pfc, e.key);
+    const bool inv        = in.get_flag("inverse_decays", false);
+    const auto rep_opt    = in.get<std::string>("dr_representation");
+    const std::string rep = rep_opt.value_or(inv ? "psd" : "integrated");
+    // Structural: decidable from which keys are set, not from any numeric value a
+    // sampler could vary -> severe.
+    class_test_severe(rep != "psd" && rep != "integrated" && rep != "proxy",
+                      "species '%s': dr_representation (='%s') must be 'psd', 'integrated' or "
+                      "'proxy'",
+                      e.key.c_str(),
+                      rep.c_str());
+    class_test_severe(inv && rep == "integrated",
+                      "species '%s': inverse_decays = yes requires dr_representation = psd "
+                      "(the inverse rate is f_l(q2)*f_phi(q3) at the transition momenta, which "
+                      "a momentum-integrated daughter hierarchy does not carry). Drop "
+                      "'dr_representation' to get it implicitly.",
+                      e.key.c_str());
+    if (rep == "proxy") {
+      // proxy -> DNCDMProxySpecies: the daughters keep a COARSE background PSD
+      // driven by the same transition kernel, but their perturbations collapse to
+      // one integrated hierarchy each and the linearised collision operator is
+      // replaced by a relaxation-time closure. Three or four orders of magnitude
+      // cheaper than `psd`, which is what makes high-Gamma parameter estimation
+      // possible at all; see dncdm_proxy_species.h for what is and is not kept.
+      result.push_back(DNCDMProxySpecies::Create(std::move(e.species), ctx));
+    }
+    else if (rep == "psd") {
+      result.push_back(DNCDMInvSpecies::Create(std::move(e.species), ctx));
+    }
+    else {
+      result.push_back(
+          {e.key, std::make_unique<DNCDM_DR_Species>(std::move(e.species), ctx.pba, ctx.bgm)});
+    }
   }
   return result;
 }

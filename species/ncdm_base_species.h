@@ -41,6 +41,11 @@ struct NcdmSettings {
  */
 class NCDMBaseSpecies : public BaseSpecies {
  public:
+  /** Every NCDM species is, by definition, a momentum-resolved hierarchy. */
+  bool HasNcdm() const override {
+    return true;
+  }
+
   // ── PerturbLayout ─────────────────────────────────────────────────────────
   /**
    * Per-pv layout for all NCDM-family species.
@@ -68,6 +73,32 @@ class NCDMBaseSpecies : public BaseSpecies {
   }
   double GetDeg() const {
     return deg_;
+  }
+  /** T_ncdm / T_cmb (#385: the kernel boundary pins the daughters' T to this). */
+  double GetT() const {
+    return T_;
+  }
+  /** mu / T_ncdm (#385: nonzero on the parent has no single bare-occupation
+   *  reading at the kernel boundary — guarded at DNCDMInvSpecies::Create). */
+  double GetKsi() const {
+    return ksi_;
+  }
+  /** True iff use_psd_file=1 (#385: a file-based parent PSD has no single bare-
+   *  occupation reading at the kernel boundary — guarded at DNCDMInvSpecies::Create). */
+  bool UsesPsdFile() const {
+    return got_file_;
+  }
+  /** One-standard-massless-neutrino reference density (#385 test anchor):
+   *  GetNeff()/PrintNeffInfo() normalize against this. Stefan-Boltzmann-type
+   *  closed form for g=2, T_nu = (4/11)^(1/3) T_cmb, a pure function of T_cmb_
+   *  alone — assigned ONCE in the NCDMBaseSpecies constructor (both overloads,
+   *  see RhoNuRelFromTcmb in the .cpp), before ReadParametersByInstance /
+   *  BuildQuadratureAndMass run, so it is valid even for DeferInit subclasses
+   *  that build their own grid and never call InitQuadrature (DrPsdSpecies,
+   *  WdmDecayProductSpecies) — those used to read this back as the 0. default,
+   *  which made GetNeff() divide by zero. */
+  double rho_nu_rel() const {
+    return rho_nu_rel_;
   }
   /**
    * NCDM (and DNCDM) are "warm" matter — they participate in delta_m but

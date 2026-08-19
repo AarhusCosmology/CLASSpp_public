@@ -3,9 +3,14 @@ BUILD_DIR ?= build/cmake
 
 TEST_TARGETS := \
 	test-parser \
+	test-precision-evolver \
 	test-errors \
 	test-bisection \
 	test-quadrature \
+	test-decay-kernel \
+	test-reduced-operator \
+	test-evolver-etd \
+	test-evolver-nonfinite \
 	test-photons \
 	test-species-types \
 	test-scf-potential \
@@ -20,6 +25,9 @@ TEST_TARGETS := \
 	test-dcdm-wdm \
 	test-axion-ncdm \
 	test-dncdm-switch-copy \
+	test-dncdm-inv \
+	test-dncdm-proxy \
+	test-dr-psd \
 	test-ncdm-family \
 	test-species-budget
 

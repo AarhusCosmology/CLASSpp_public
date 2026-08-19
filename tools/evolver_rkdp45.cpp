@@ -5,6 +5,8 @@
 #include <cmath>
 #include <vector>
 
+#include "nonfinite.h"
+
 /**
  * Dormand-Prince 4(5) explicit adaptive Runge-Kutta integrator with 4th-order
  * dense output. Ported from branch PhD2024-EBH. Conforms to the canonical CLASS
@@ -29,7 +31,10 @@ void evolver_rkdp45(
     double* x_sampling,
     int x_size,
     void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
+    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
+    /* Part of the shared evolver signature; unused here. See evolver_rkdp45.h. */
+    void (* /*derivs_diagonal*/)(
+        double x, double* y, double* diag, void* parameters_and_workspace)) {
   (void) minimum_variation;
   (void) evaluate_timescale;
   (void) timestep_over_timescale;
@@ -159,11 +164,54 @@ void evolver_rkdp45(
       }
     }
 
+    /* The non-finite flag is accumulated INSIDE the error reduction, not tested on
+       errmax afterwards, because the reduction cannot carry a NaN out:
+       `errtemp > errmax` is FALSE for NaN, so a NaN component leaves errmax at 0 and
+       the step is ACCEPTED -- h then grows and the run completes, silently, with a
+       poisoned state. Inf behaves differently (inf > x is true), which is why the
+       observed decaying-NCDM failure hung on rejection instead of returning garbage.
+       Both modes have to be caught, so the test is per component. */
     double errmax = 0.0;
+    int nonfinite = 0;
     for (int k = 0; k < neq; k++) {
-      double errtemp = fabs(err[k] / std::max(threshold, fabs(ynew[k])));
+      double errtemp  = fabs(err[k] / std::max(threshold, fabs(ynew[k])));
+      nonfinite      |= (int) (IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
       if (errtemp > errmax)
         errmax = errtemp;
+    }
+
+    /* A non-finite state must ABORT, not be handed back to the step controller. The
+       O(neq) search for the offending index runs only on the failure path.
+
+       On the Inf path the run does not stop, it GRINDS: errmax > rtol is taken, the
+       step is rejected, h shrinks, and the only exit is class_test(fabs(h) < hmin)
+       with hmin = 100*DBL_MIN*|x|. h converges ONTO that value without going below
+       it, so the guard never fires. Measured on the decaying-NCDM sector at Gamma=1e8
+       (dr_N_q=30, k=0.5): NaN at x=523.76, then h pinned at 1.1654e-303 with 99.4% of
+       steps rejected, repeating identically -- two multi-hour runs burned on what
+       should have been an immediate error.
+
+       IsNonFinite is a bit test rather than std::isnan because classpp is built with
+       -ffast-math, under which std::isnan may be folded to false (see nonfinite.h). */
+    if (nonfinite != 0) {
+      int kbad = 0;
+      for (int k = 0; k < neq; k++) {
+        if (IsNonFinite(ynew[k]) || IsNonFinite(err[k])) {
+          kbad = k;
+          break;
+        }
+      }
+      class_stop(
+          "rkdp45: non-finite state at x=%e (h=%e, errmax=%e): y[%d]=%e, err[%d]=%e. The "
+          "integration cannot recover -- rejecting and shrinking h only converges onto the "
+          "step-size floor. Something upstream produced NaN/Inf.",
+          t,
+          h,
+          errmax,
+          kbad,
+          ynew[kbad],
+          kbad,
+          err[kbad]);
     }
 
     if (errmax > rtol) {

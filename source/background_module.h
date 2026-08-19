@@ -105,8 +105,29 @@ class BackgroundModule : public BaseModule {
   double f_idr_drmd() const;
   double z_dec_drmd() const;
 
+  /** True while background_functions is filling a STORED row of background_table_
+   *  (return_format == long_info), false during the trial evaluations the evolver
+   *  makes for derivatives, initial conditions and rejected steps.
+   *
+   *  A species self-check must consult this before reporting anything. Trial states
+   *  are allowed to be unphysical -- the evolver's whole job is to propose a step,
+   *  measure it and throw it away -- so a check that fires on them reports failures
+   *  that never reached the solution. That is not hypothetical: the first version of
+   *  DNCDMSpecies's floor guard did exactly that, and its false positives said the
+   *  lasing regime was broken when the accepted solution never came within 75
+   *  decades of the floor.
+   *
+   *  Safe as plain state because the background is solved on ONE thread; the
+   *  perturbation modules read the finished table through background_at_tau and
+   *  never re-enter background_functions. */
+  bool StoringBackgroundTable() const {
+    return storing_background_table_;
+  }
+
  private:
   void background_functions(double* pvecback_B, short return_format, double* pvecback);
+  bool storing_background_table_ = false;
+
   void background_init();
   void background_indices();
   void background_solve_evolver();
@@ -121,6 +142,16 @@ class BackgroundModule : public BaseModule {
                                      double* y,
                                      double* dy,
                                      void* parameters_and_workspace);
+  /** d(dy_i)/d(y_i) of the loga RHS, for the exponential evolver. Same shape and
+   *  units as background_derivs_loga, including the 1/(a H) conversion. */
+  void background_derivs_diagonal_loga_member(double loga,
+                                              double* y,
+                                              double* diag,
+                                              void* parameters_and_workspace);
+  static void background_derivs_diagonal_loga(double loga,
+                                              double* y,
+                                              double* diag,
+                                              void* parameters_and_workspace);
   static void background_timescale(double loga, void* parameters_and_workspace, double* timescale);
   void background_add_line_to_bg_table_member(
       double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);

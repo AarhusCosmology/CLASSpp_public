@@ -453,7 +453,7 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
                                  const double* y,
                                  const PerturbationsModule& mod,
                                  const perturb_workspace* ppw) const {
-  double delta_ncdm = 0., theta_ncdm = 0., shear_ncdm = 0., cs2_ncdm = 0.;
+  double delta_ncdm = 0., theta_ncdm = 0., shear_ncdm = 0., cs2_ncdm = 0., a4Pi_ncdm = 0.;
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
@@ -468,11 +468,20 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
     const double rho_plus_p  = rho_ncdm_bg + p_ncdm_bg;
     const double w_ncdm      = (rho_ncdm_bg > 0.) ? p_ncdm_bg / rho_ncdm_bg : 0.;
 
-    const auto& layout          = *pv->species_layouts[collection_index_];
-    const auto se               = StressEnergy(layout, pv, y, pvecback, ppw);
-    delta_ncdm                  = (rho_ncdm_bg > 0.) ? se.delta_rho / rho_ncdm_bg : 0.;
-    theta_ncdm                  = (rho_plus_p > 0.) ? se.rho_plus_p_theta / rho_plus_p : 0.;
-    shear_ncdm                  = (rho_plus_p > 0.) ? se.rho_plus_p_shear / rho_plus_p : 0.;
+    const auto& layout = *pv->species_layouts[collection_index_];
+    const auto se      = StressEnergy(layout, pv, y, pvecback, ppw);
+    delta_ncdm         = (rho_ncdm_bg > 0.) ? se.delta_rho / rho_ncdm_bg : 0.;
+    theta_ncdm         = (rho_plus_p > 0.) ? se.rho_plus_p_theta / rho_plus_p : 0.;
+    shear_ncdm         = (rho_plus_p > 0.) ? se.rho_plus_p_shear / rho_plus_p : 0.;
+    // a⁴Π ≡ a⁴(ρ̄+p̄)σ — the anisotropic stress that sources k²(φ−ψ) = 12πGa²Π.
+    // Deliberately built from the SAME `se.rho_plus_p_shear` that DNCDMInvSpecies
+    // uses for its own a4Pi_* columns, rather than reconstructed from the
+    // normalized `shear_ncdm` above: the two columns are then definitionally
+    // identical, which is what makes a decaying sector and a self-interacting one
+    // comparable in magnitude and not merely in shape. a⁴ removes the free
+    // radiation redshift, so a free-streaming species oscillates at constant
+    // amplitude and collisional isotropisation shows up as a decaying envelope.
+    a4Pi_ncdm                   = a * a * a * a * se.rho_plus_p_shear;
     const double delta_p_ncdm   = se.delta_p;
     const double delta_rho_ncdm = rho_ncdm_bg * delta_ncdm;
     constexpr double eps        = 1e-300;
@@ -503,6 +512,7 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
   w.Add("theta_" + nm, theta_ncdm, true);
   w.Add("shear_" + nm, shear_ncdm, true);
   w.Add("cs2_" + nm, cs2_ncdm, true);
+  w.Add("a4Pi_" + nm, a4Pi_ncdm, true);
 }
 
 // ── Tensor output column titles ────────────────────────────────────────────

@@ -15,12 +15,28 @@
 // Constructors + BuildQuadratureAndMass
 // ─────────────────────────────────────────────────────────────────────────────
 
+// rho_nu_rel_ is a pure function of T_cmb_ (the Stefan-Boltzmann-type closed form
+// for one standard massless neutrino, g=2, T_nu = (4/11)^(1/3) T_cmb) — it needs
+// nothing from the quadrature/PSD, so both constructors set it here rather than in
+// InitQuadrature. Load-bearing for DeferInit subclasses (DrPsdSpecies,
+// WdmDecayProductSpecies) that build their own grid and never call
+// BuildQuadratureAndMass/InitQuadrature: leaving it to InitQuadrature left
+// rho_nu_rel_ at its 0. default for them, so GetNeff()/PrintNeffInfo() divided by
+// zero (materializing infinity(), which -ffast-math forbids) the moment either was
+// reached — PrintNeffInfo is NOT gated behind NeffContribution's override and IS
+// reached for DrPsdSpecies via CompositeSpecies::PrintNeffInfo's child loop.
+static double RhoNuRelFromTcmb(double T_cmb) {
+  return 56.0 / 45.0 * pow(_PI_, 6) * pow(4.0 / 11.0, 4.0 / 3.0) * _G_ / pow(_h_P_, 3) /
+         pow(_c_, 7) * pow(_Mpc_over_m_, 2) * pow(T_cmb * _k_B_, 4);
+}
+
 NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
                                  EnergyType energy_type,
                                  FileContent* pfc,
                                  const std::string& instance_name,
                                  const NcdmSettings& settings)
-    : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h) {
+    : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h),
+      rho_nu_rel_(RhoNuRelFromTcmb(settings.T_cmb)) {
   ReadParametersByInstance(pfc, instance_name, settings);
   BuildQuadratureAndMass(settings);
 }
@@ -31,7 +47,8 @@ NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
                                  const std::string& instance_name,
                                  const NcdmSettings& settings,
                                  DeferInit)
-    : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h) {
+    : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h),
+      rho_nu_rel_(RhoNuRelFromTcmb(settings.T_cmb)) {
   ReadParametersByInstance(pfc, instance_name, settings);
   // Caller (subclass) is responsible for BuildQuadratureAndMass after setting up its PSD.
 }
@@ -253,9 +270,8 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
   factor_ = deg_ * 4 * _PI_ * pow(T_cmb_ * T_ * _k_B_, 4) * 8 * _PI_ * _G_ / 3. /
             pow(_h_P_ / 2. / _PI_, 3) / pow(_c_, 7) * _Mpc_over_m_ * _Mpc_over_m_;
 
-  // Compute rho_nu_rel_ (relativistic reference density)
-  rho_nu_rel_ = 56.0 / 45.0 * pow(_PI_, 6) * pow(4.0 / 11.0, 4.0 / 3.0) * _G_ / pow(_h_P_, 3) /
-                pow(_c_, 7) * pow(_Mpc_over_m_, 2) * pow(T_cmb_ * _k_B_, 4);
+  // rho_nu_rel_ is set once at construction (see RhoNuRelFromTcmb above) — it is a
+  // pure function of T_cmb_, which never changes, so it needs no recomputation here.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

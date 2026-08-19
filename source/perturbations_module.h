@@ -283,6 +283,14 @@ class PerturbationsModule : public BaseModule {
                                       void* parameters_and_workspace);
   void perturb_derivs_member(double tau, double* y, double* dy, void* parameters_and_workspace);
   static void perturb_derivs(double tau, double* y, double* dy, void* parameters_and_workspace);
+  void perturb_derivs_diagonal_member(double tau,
+                                      double* y,
+                                      double* diag,
+                                      void* parameters_and_workspace);
+  static void perturb_derivs_diagonal(double tau,
+                                      double* y,
+                                      double* diag,
+                                      void* parameters_and_workspace);
   void perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace);
   void perturb_rsa_delta_and_theta(
       double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);

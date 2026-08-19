@@ -66,6 +66,11 @@ class CompositeSpecies : public BaseSpecies {
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) const override;
+  void PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& layout,
+                             double tau,
+                             const double* y,
+                             double* diag,
+                             const perturb_parameters_and_workspace& ppaw) const override;
   void FillSources(const BaseSpecies::PerturbLayout& layout,
                    const double* y,
                    const double* dy,
@@ -180,6 +185,10 @@ class CompositeSpecies : public BaseSpecies {
   void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
   void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
+  void BackgroundDerivsDiagonal(double tau,
+                                const double* y,
+                                double* diag,
+                                const double* pvecback) override;
   void FinalizeBackground(double a, double H, const double* pvecback_B, double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;

@@ -25,6 +25,7 @@
 #include "../species/ultra_relativistic.h"
 #include "background_module.h"
 #include "bisection.h"
+#include "evolver_etd.h"
 #include "thermodynamics_module.h"
 #include "thread_pool.h"
 
@@ -97,6 +98,16 @@ void PerturbationsModule::perturb_derivs(double tau,
                                          void* parameters_and_workspace) {
   auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   pppaw->perturbations_module->perturb_derivs_member(tau, y, dy, parameters_and_workspace);
+}
+void PerturbationsModule::perturb_derivs_diagonal(double tau,
+                                                  double* y,
+                                                  double* diag,
+                                                  void* parameters_and_workspace) {
+  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  pppaw->perturbations_module->perturb_derivs_diagonal_member(tau,
+                                                              y,
+                                                              diag,
+                                                              parameters_and_workspace);
 }
 
 /**
@@ -1824,6 +1835,15 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
   int index_ap;
   int l;
 
+  /** - per-species per-k working memory. This workspace is a stack local of the
+      per-k task, so one allocation here is one private copy per k-mode for the
+      whole integration — which is what lets a species keep hot-path scratch
+      without being a data race. Parallel to all_species_, like the layouts. */
+  ppw->species_scratch.clear();
+  ppw->species_scratch.reserve(all_species_.size());
+  for (const auto& entry : all_species_)
+    ppw->species_scratch.push_back(entry->CreatePerturbScratch());
+
   /** - Compute maximum l_max for any multipole */;
   if (_scalars_) {
     ppw->max_l_max = std::max(ppr->l_max_g, ppr->l_max_pol_g);
@@ -2275,11 +2295,14 @@ void PerturbationsModule::perturb_solve(int index_md,
     /** - --> (d) integrate the perturbations over the current interval. */
 
     auto generic_evolver = &evolver_ndf15;
-    if (ppr->evolver == evolver_type::rk) {
+    if (ppr->evolver_perturbations == evolver_type::rk) {
       generic_evolver = &evolver_rk;
     }
-    else if (ppr->evolver == evolver_type::rkdp45) {
+    else if (ppr->evolver_perturbations == evolver_type::rkdp45) {
       generic_evolver = &evolver_rkdp45;
+    }
+    else if (ppr->evolver_perturbations == evolver_type::etd) {
+      generic_evolver = &evolver_etd;
     }
 
     generic_evolver(perturb_derivs,
@@ -2296,7 +2319,8 @@ void PerturbationsModule::perturb_solve(int index_md,
                     tau_sampling_.data(),
                     tau_actual_size,
                     perturb_sources,
-                    perhaps_print_variables);
+                    perhaps_print_variables,
+                    perturb_derivs_diagonal);
   }
 
   /** - complete the N-body-gauge gamma source. The stored k2gamma_Nb still
@@ -5463,6 +5487,38 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
  * @param parameters_and_workspace Input/Output: in input, fixed parameters (e.g. indices); in output, background and thermo quantities evaluated at tau.
  * @param error_message            Output: error message
  */
+
+/**
+ * Jacobian diagonal d(dy_i)/d(y_i) of the scalar perturbation RHS, for
+ * evolver_etd. Species that report nothing leave their slots at zero, where the
+ * phi functions reduce ETDRK4 to its explicit counterpart -- so the standard
+ * sector is integrated exactly as it was.
+ */
+void PerturbationsModule::perturb_derivs_diagonal_member(double tau,
+                                                         double* y,
+                                                         double* diag,
+                                                         void* parameters_and_workspace) {
+  auto pppaw             = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  perturb_workspace* ppw = pppaw->ppw;
+  double* pvecback       = ppw->pvecback.data();
+
+  std::fill(diag, diag + ppw->pv->pt_size, 0.);
+
+  /* Same interpolation the RHS does, with the same flags and the same closeby
+     hint: the two calls are at the same tau, so the hint stays warm. The
+     diagonal deliberately re-derives its own background rather than reading
+     whatever the last RHS left behind -- a diagonal paired with a DIFFERENT
+     state than the RHS it linearises is the failure mode that stays stable
+     while degrading the step for reasons nothing reports. */
+  background_module_->background_at_tau(tau,
+                                        pba->normal_info,
+                                        pba->inter_closeby,
+                                        &(ppw->last_index_back),
+                                        pvecback);
+
+  for (const auto& [species, layout] : ppw->pv->active_species)
+    species->PerturbDerivsDiagonal(*layout, tau, y, diag, *pppaw);
+}
 
 void PerturbationsModule::perturb_derivs_member(double tau,
                                                 double* y,

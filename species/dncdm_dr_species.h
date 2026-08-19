@@ -17,6 +17,11 @@ class BackgroundModule;
  */
 class DNCDM_DR_Species : public CompositeSpecies {
  public:
+  /** The parent is a momentum-resolved NCDM hierarchy. */
+  bool HasNcdm() const override {
+    return true;
+  }
+
   // ── PerturbLayout ──────────────────────────────────────────────────────────
   // Uses the generic CompositeSpecies::PerturbLayout (one owning sub-layout per
   // child in children_ order): the base-class child loops — including the

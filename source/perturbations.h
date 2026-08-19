@@ -378,6 +378,14 @@ struct perturb_workspace {
                                  integrated perturbations and their
                                  time-derivatives */
 
+  /** Per-species per-k working memory, parallel to all_species_ (same indexing as
+   *  pv->species_layouts, so a species reaches its own with collection_index_).
+   *  Entries are null for species that need none. Filled once in
+   *  perturb_workspace_init; unlike the layouts it is NOT rebuilt at approximation
+   *  switches. See BaseSpecies::PerturbScratch for why hot-path scratch belongs
+   *  here rather than on the species. */
+  std::vector<std::unique_ptr<BaseSpecies::PerturbScratch>> species_scratch;
+
   double delta_rho;        /**< total density perturbation (gives delta Too) */
   double rho_plus_p_theta; /**< total (rho+p)*theta perturbation (gives delta Toi) */
   double rho_plus_p_shear; /**< total (rho+p)*shear (gives delta Tij) */

@@ -3,9 +3,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include "dncdm_dr_species.h"
-#include "ncdm_base_species.h"
-
 void SpeciesCollection::insert(std::string key, Ptr species) {
   if (frozen_) {
     throw std::logic_error("SpeciesCollection::insert: called after freeze()");
@@ -51,8 +48,7 @@ void SpeciesCollection::freeze() {
       photons_index_ = i;
     if (species_[i].key == "Baryons")
       baryons_index_ = i;
-    if (dynamic_cast<NCDMBaseSpecies*>(species_[i].get()) ||
-        dynamic_cast<DNCDM_DR_Species*>(species_[i].get()))
+    if (species_[i]->HasNcdm())
       has_ncdm_ = true;
     if (species_[i]->HasWarmMatter())
       has_warm_matter_ = true;

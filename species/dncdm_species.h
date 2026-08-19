@@ -71,6 +71,20 @@ class DNCDMSpecies : public NCDMBaseSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
+  // ── Collision-owned mode (DNCDMInvSpecies composite, design §3 table) ─────
+  // When true, the parent drops its ln f + separate-dlnfdlnq integration
+  // variables for a single f-per-bin variable and its background RHS becomes a
+  // no-op; the composite writes the kernel-supplied RHS into the f-slots. Every
+  // background column and the entire perturbation surface are unchanged (both
+  // modes publish index_bg_lnf_decay_dr1_ / index_bg_dlnfdlnq_decay_). Decay-only
+  // runs never set this, so their code path is byte-for-byte unchanged.
+  void SetCollisionOwned(bool v) {
+    collision_owned_ = v;
+  }
+  int bi_f_parent_index() const {
+    return index_bi_f_parent_;
+  }
+
   // ── Background ──────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
@@ -120,6 +134,21 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                                         const double* y,
                                         const double* pvecback,
                                         const perturb_workspace* ppw) const override;
+
+  /** Transfer sources for the parent's own delta/theta. The slots have always been
+   *  allocated (NCDMBaseSpecies::RegisterTransferSourceIndices) but were never filled
+   *  and never named, so the decaying parent was the one member of its own sector
+   *  absent from mTk/vTk output while both daughters were present — which made the
+   *  sector's total delta unassemblable from a single run. Mirrors DrPsdSpecies. */
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) const override;
+  void WriteOutputColumns(
+      PerturbColumnWriter& writer,
+      const PerturbationsModule& mod,
+      file_format fmt,
+      TransferColumnSection section = TransferColumnSection::all) const override;
 
   bool IsFreestreaming() const override {
     return true;
@@ -208,12 +237,90 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   double Gamma_ = 0.;
   std::vector<double> dq_;
 
+  // Collision-owned mode (set by the DNCDMInvSpecies factory before any index
+  // registration). kFParentFloor keeps ln f defined as gains repopulate f from 0.
+  // In this mode the perturbation state variable is F = δf, not the normalized Ψ
+  // (#386) — see PerturbDerivs / RescaledPerturbations.
+  bool collision_owned_ = false;
+  /** Soft floor added to the collision-owned parent's occupation before its ln f
+   *  column is published (see ComputeBackground). It must sit comfortably ABOVE the
+   *  integrator's own noise level, which after the kFScale rescale is
+   *  `threshold/kFScale = (abstol/rtol)/kFScale` ~ 1e-159 at the default
+   *  tol_background_integration -- i.e. the column should plateau while the state is
+   *  still well resolved, never track it down into the noise. 1e-100 keeps ~59
+   *  decades of margin, and a species at 1e-100 of its initial occupation is
+   *  irrelevant to every observable, so there is nothing to gain by going lower and
+   *  a real failure mode to be bought by it. */
+  static constexpr double kFParentFloor = 1e-100;
+  // Set from STORED table rows only (BackgroundModule::StoringBackgroundTable) --
+  // never from the evolver's trial states, which are allowed to be unphysical.
+  // See FloorReport.
+  mutable bool floor_touched_   = false;
+  mutable bool floor_left_      = false;
+  mutable bool negative_f_rows_ = false;
+
+ public:
+  /** Units of the collision-owned parent's background f-slot: the integrator carries
+   *  kFScale*f, not f.
+   *
+   *  Both solvers control error with max(threshold, |y|) against a HARD-CODED
+   *  abstol = 1e-15 that tol_background_integration cannot move (rkdp45:
+   *  threshold = abstol/rtol, so the effective absolute bound is abstol again;
+   *  ndf15: threshold = abstol outright). This species' f starts near 0.5 and decays
+   *  hundreds of decades below that, so unrescaled it is integrated as noise the
+   *  moment it drops under ~1e-9 -- f chatters against zero, the published ln f
+   *  column acquires square wells, and the perturbation module's cubic spline of that
+   *  column turns P(k) into NaN.
+   *
+   *  Rescaling is EXACT, a change of units rather than an approximation, and it moves
+   *  the noise floor below anything this species can reach while carrying energy. It
+   *  works here because the decay is MONOTONE: ln f falls smoothly, reaches
+   *  kFParentFloor and stays there, and a flat plateau is something a spline can
+   *  represent. A configuration in which inverse decays genuinely REPOPULATE the
+   *  parent from ~0 would come back off that plateau and needs the FLOOR addressed
+   *  too, not just the scale.
+   *
+   *  Public because the composite converts at the kernel boundary; see
+   *  DNCDMInvSpecies::ApplyKernelBackgroundDerivs. */
+  static constexpr double kFScale = 1e150;
+
+  /** Whether the collision-owned parent's occupation went under kFParentFloor during
+   *  the background solve, and whether it later came back out.
+   *
+   *  `touched` alone is benign: the species has decayed into irrelevance and its
+   *  published ln f column simply plateaus, which splines fine.
+   *
+   *  `left` is the one that matters -- inverse decays repopulated the parent from
+   *  below the floor, so the plateau was hiding real physics AND the column now has a
+   *  rise whose height is set by the floor rather than by the solution. The soft floor
+   *  keeps such a recovery smooth, but it still says kFParentFloor is too high for the
+   *  configuration being run.
+   *
+   *  `negative` is stronger than either: the integrator produced a NEGATIVE occupation
+   *  on a stored row. Unphysical whatever the floor is, and clamped to zero only so
+   *  the logarithm stays total.
+   *
+   *  ALL THREE are evaluated on STORED rows only. An earlier version tested every
+   *  ComputeBackground call, including the trial states the evolver proposes and
+   *  rejects, and its false positives condemned configurations whose accepted solution
+   *  stayed dozens of decades clear of the floor. */
+  struct FloorReport {
+    bool touched  = false;
+    bool left     = false;
+    bool negative = false;
+  };
+  FloorReport BackgroundFloorReport() const {
+    return {floor_touched_, floor_left_, negative_f_rows_};
+  }
+
+ private:
   // Background indices
   int index_bg_number_   = -1;
   int index_bg_pseudo_p_ = -1;
 
   int index_bi_lnf_decay_dr1_           = -1;
   int index_bi_dlnfdlnq_separate_decay_ = -1;
+  int index_bi_f_parent_                = -1;  // collision-owned: single f-per-bin variable
 
   int index_bg_lnf_decay_dr1_  = -1;
   int index_bg_dlnfdlnq_decay_ = -1;

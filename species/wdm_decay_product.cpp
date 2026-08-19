@@ -370,7 +370,7 @@ void WdmDecayProductSpecies::FillInjection(double a,
   // Omitting it leaves the g-channel's metric-driven growth dead (measured: a
   // flat −7.6% low-k P_m deficit; see the spec's §4.3 dJ/dlnq block).
   const double inv_s = 1.0 / sigma;
-  const double norm  = inv_s / std::sqrt(2.0 * M_PI);
+  const double norm  = inv_s / std::sqrt(2.0 * _PI_);
   auto pdf           = [&](double u_e) {
     const double x  = (u_e - u_cut) * inv_s;
     const double x2 = 0.5 * x * x;

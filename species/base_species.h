@@ -100,6 +100,29 @@ class BaseSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
+  /**
+   * Per-workspace working memory: whatever a species needs to scribble on during a
+   * perturbation RHS but must not share.
+   *
+   * perturb_init evolves k-modes concurrently, so hot-path scratch kept as a
+   * `mutable` member is a data race — invisible in the physics, and surfacing far
+   * from its cause. perturb_workspace is a stack local inside the per-k task, so
+   * scratch hung here is private by construction: exactly one per k-mode
+   * integration, for the whole integration.
+   *
+   * Scope differs from PerturbLayout, which lives on the perturb_vector and is
+   * rebuilt at every approximation switch. Scratch survives tca/rsa switches, so a
+   * species may cache setup work that does not depend on the vector's shape.
+   *
+   * Default: nullptr, for the species that need nothing.
+   */
+  struct PerturbScratch {
+    virtual ~PerturbScratch() = default;
+  };
+  virtual std::unique_ptr<PerturbScratch> CreatePerturbScratch() const {
+    return nullptr;
+  }
+
   virtual ~BaseSpecies()                     = default;
   BaseSpecies(const BaseSpecies&)            = delete;
   BaseSpecies& operator=(const BaseSpecies&) = delete;
@@ -174,6 +197,28 @@ class BaseSpecies {
    */
   virtual void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) {}
 
+  /**
+   * Contribute d(dy_i)/d(y_i) — the DIAGONAL of this species' background Jacobian —
+   * for the slots it owns, in the same units and layout as BackgroundDerivs.
+   *
+   * For the exponential evolver, which integrates the diagonal exactly and carries
+   * the remainder explicitly. ACCUMULATE (+=): the caller zeroes the buffer once, and
+   * a composite's rungs each add their own slots.
+   *
+   * Default: nothing. That is the correct answer for a species without a stiff
+   * self-coupling, not a fallback — at diag = 0 the exponential step degenerates
+   * smoothly to its explicit counterpart.
+   *
+   * A diagonal that is not the true one costs efficiency and conditioning, never
+   * correctness (the evolver forms N = f - Ly, so the fixed point is exact for any L).
+   * A wrong SIGN is the dangerous case; pin any implementation against finite
+   * differences of BackgroundDerivs.
+   */
+  virtual void BackgroundDerivsDiagonal(double tau,
+                                        const double* y,
+                                        double* diag,
+                                        const double* pvecback) {}
+
   /** Energy density at current background state. */
   virtual double Rho(const double* pvecback) const = 0;
 
@@ -226,6 +271,12 @@ class BaseSpecies {
    */
   bool IsPresent() const {
     return index_bg_rho_ >= 0;
+  }
+
+  /** Where this species' energy density sits in pvecback. Rho() is the way to read
+   *  it; the index itself is for callers that must address the slot directly. */
+  int bg_rho_index() const {
+    return index_bg_rho_;
   }
 
   /**
@@ -300,6 +351,17 @@ class BaseSpecies {
                              const double* y,
                              double* dy,
                              const perturb_parameters_and_workspace& ppaw) const = 0;
+
+  /**
+   * The same for the scalar perturbation ODE; see BackgroundDerivsDiagonal for the
+   * accumulate contract, the zero default and the wrong-sign warning, which apply
+   * verbatim here.
+   */
+  virtual void PerturbDerivsDiagonal(const PerturbLayout& /*layout*/,
+                                     double /*tau*/,
+                                     const double* /*y*/,
+                                     double* /*diag*/,
+                                     const perturb_parameters_and_workspace& /*ppaw*/) const {}
 
   /** Contribute to dy for the vector perturbation ODE. Default: no-op. */
   virtual void PerturbVectorDerivs(const PerturbLayout& /*layout*/,
@@ -650,6 +712,27 @@ class BaseSpecies {
    */
   virtual bool HasWarmMatter() const {
     return ClustersAsMatter() && !IsColdMatterSpecies();
+  }
+
+  /**
+   * Does this species present a momentum-resolved NCDM hierarchy to the module?
+   * Gates the ncdm-shaped machinery (the fluid-approximation index, the ncdm initial
+   * conditions, several radiation-streaming branches) through
+   * SpeciesCollection::has_ncdm.
+   *
+   * A virtual rather than a dynamic_cast in the collection: the answer belongs to the
+   * class that knows it, and a chain of downcasts silently omits whatever was added
+   * last. That is not a missed optimisation — answering false skips
+   * CheckUltraRelativisticAtIc, so the tau_ini bisection stops requiring a massive
+   * parent to be relativistic at its initial conditions, and two representations of
+   * one model start at different initial times for no physical reason.
+   *
+   * COMPOSITES ANSWER FOR THEMSELVES and deliberately do NOT scan children. A generic
+   * "any child is NCDM" rule would also flip dcdm_wdm, whose daughter is an
+   * NCDMBaseSpecies, changing a merged model's gating for reasons unrelated to it.
+   */
+  virtual bool HasNcdm() const {
+    return false;
   }
 
  protected:
