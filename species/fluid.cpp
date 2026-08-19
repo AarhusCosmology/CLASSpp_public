@@ -223,6 +223,7 @@ void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 }
 
 void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
+                                  const BaseSpecies::PerturbLayout* base,
                                   double /*tau*/,
                                   const double* y,
                                   const PerturbationsModule& mod,
@@ -230,8 +231,7 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_rho_fld = 0., rho_plus_p_theta_fld = 0., delta_p_fld = 0.;
 
   if (!w.IsTitleMode()) {
-    const auto& layout = static_cast<const PerturbLayout&>(
-        *ppw->pv->species_layouts[collection_index_]);
+    const auto& layout   = static_cast<const PerturbLayout&>(*base);
     const auto se        = StressEnergy(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
     delta_rho_fld        = se.delta_rho;
     rho_plus_p_theta_fld = se.rho_plus_p_theta;

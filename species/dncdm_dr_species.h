@@ -106,17 +106,6 @@ class DNCDM_DR_Species : public CompositeSpecies {
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
-                   const double* y,
-                   const double* dy,
-                   PerturbSourceContext& ctx) const override;
-
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
-
  protected:
   void AddCouplingDerivs(double tau,
                          const double* y,

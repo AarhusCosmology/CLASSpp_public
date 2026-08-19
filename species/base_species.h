@@ -477,8 +477,14 @@ class BaseSpecies {
    * and perturb_print_variables_member (data mode).
    * Guard computation behind: if (!writer.IsTitleMode()) { ... compute ... }
    * Use writer.Add(title, computed_value, active).
+   *
+   * layout is NULL in title mode (there is no perturb_vector yet) and is the
+   * species' own sub-layout otherwise — passed in rather than resolved from
+   * collection_index_ so that CompositeSpecies can chain this to children, which
+   * are not registered in the collection and have no valid collection_index_.
    */
   virtual void PrintVariables(PerturbColumnWriter& /*writer*/,
+                              const PerturbLayout* /*base*/,
                               double /*tau*/,
                               const double* /*y*/,
                               const PerturbationsModule& /*mod*/,
@@ -526,14 +532,20 @@ class BaseSpecies {
 
   // ── Synchronous → Newtonian gauge transformation ──────────────────────────
   /**
-   * Log conformal-time derivative of the background density, ρ̇/ρ (ρ̇ ≡ dρ̄/dτ).
-   * Single source of truth for the density-contrast gauge shift; mirrors the
-   * continuity equation used in BackgroundDerivs. Default: ρ̇/ρ = -3ℋ(Rho+P)/Rho.
-   * Species with extra source/sink terms (e.g. decay) override this.
+   * Log conformal-time derivative of the background density, ρ'/ρ (ρ' ≡ dρ̄/dτ).
+   * Single source of truth for the density-contrast gauge shift. Default:
+   * ρ'/ρ = -3ℋ(Rho+P)/Rho.
+   *
+   * A species reports ONLY its own equation of motion — exactly the terms in its
+   * own BackgroundDerivs. A species with an intrinsic sink overrides (DCDM decays
+   * whatever receives the energy: -3ℋ - aΓ). A species that is SOURCED from
+   * outside does not: DarkRadiationSpecies and WdmDecayProductSpecies are fed by
+   * their parent composite's BackgroundDerivs, so they report pure dilution and
+   * it is the composite's job to correct for the coupling.
    * @param pvecback Current background-quantity vector.
    * @param a_prime_over_a  ℋ = a'/a (base does not store H/a indices).
    */
-  virtual double RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {
+  virtual double RhoPrimeOverRho(const double* pvecback, double a_prime_over_a) const {
     return -3. * a_prime_over_a * (Rho(pvecback) + P(pvecback)) / Rho(pvecback);
   }
 
@@ -750,7 +762,7 @@ class BaseSpecies {
                                     const double* pvecback,
                                     const PerturbIcContext& ctx) const {
     if (idx_delta >= 0)
-      y[idx_delta] += RhoDotOverRho(pvecback, ctx.a_prime_over_a) * ctx.alpha;
+      y[idx_delta] += RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.alpha;
     if (idx_theta >= 0)
       y[idx_theta] += ctx.k * ctx.k * ctx.alpha;
   }
@@ -765,7 +777,8 @@ class BaseSpecies {
   bool is_cold_            = false;
   bool delegates_tally_    = false;  // true for composites (set in CompositeSpecies ctor)
 
-  // Set by SpeciesCollection::freeze(); used by PrintVariables to look up layout.
+  // Set by SpeciesCollection::freeze(); indexes ppw->pv->species_layouts and
+  // ppw->species_scratch for species reached through the collection.
   std::size_t collection_index_ = SIZE_MAX;
 
   // Set by RegisterBackgroundIndices(); -1 means "not registered / species absent"

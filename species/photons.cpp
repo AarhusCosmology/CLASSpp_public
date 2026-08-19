@@ -575,6 +575,7 @@ void PhotonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 }
 
 void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
+                                    const BaseSpecies::PerturbLayout* base,
                                     double /*tau*/,
                                     const double* y,
                                     const PerturbationsModule& mod,
@@ -583,9 +584,7 @@ void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
   double pol0_g = 0., pol1_g = 0., pol2_g = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    // Use collection_index_ (set by SpeciesCollection::freeze) to access our layout.
-    const auto& g_lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+    const auto& g_lay = static_cast<const PerturbLayout&>(*base);
     // scalar_ctx.k is always current here: the evolver sets it in perturb_derivs_member
     // before the print callback fires, so it equals pppaw->k at this call site.
     const double k           = ppw->scalar_ctx.k;

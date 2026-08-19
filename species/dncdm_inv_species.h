@@ -273,19 +273,13 @@ class DNCDMInvSpecies : public CompositeSpecies {
     return reduced() && !reduced_table_.empty();
   }
 
-  // ── Perturbation output (children write their own transfer columns) ─────────
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
-
   /** k_output_values time series: the sector's total anisotropic stress
    *  a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i (paper/thesis eq. 6.19), plus its
    *  per-child decomposition. Composite-owned like Type3Species::PrintVariables:
    *  the children carry no valid collection_index_, so their layouts are reached
    *  through THIS composite's nested layout. */
   void PrintVariables(PerturbColumnWriter& writer,
+                      const BaseSpecies::PerturbLayout* base,
                       double tau,
                       const double* y,
                       const PerturbationsModule& mod,

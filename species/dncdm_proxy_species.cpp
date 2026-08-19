@@ -1015,24 +1015,20 @@ void DNCDMProxySpecies::AddCouplingDerivs(double /*tau*/,
 // Perturbation output (children write their own transfer columns)
 // ─────────────────────────────────────────────────────────────────────────────
 
-void DNCDMProxySpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                           const PerturbationsModule& mod,
-                                           file_format fmt,
-                                           BaseSpecies::TransferColumnSection section) const {
-  parent_->WriteOutputColumns(w, mod, fmt, section);
-  fermion_->WriteOutputColumns(w, mod, fmt, section);
-  boson_->WriteOutputColumns(w, mod, fmt, section);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // k_output time series
 // ─────────────────────────────────────────────────────────────────────────────
 
 void DNCDMProxySpecies::PrintVariables(PerturbColumnWriter& w,
-                                       double /*tau*/,
+                                       const BaseSpecies::PerturbLayout* base,
+                                       double tau,
                                        const double* y,
                                        const PerturbationsModule& mod,
                                        const perturb_workspace* ppw) const {
+  // Chain first (children currently publish nothing) so a child that later gains
+  // PrintVariables is picked up without editing this; then the sector aggregates
+  // below, which no child can form on its own.
+  CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
   // a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i, the sector's total anisotropic
   // stress and the quantity the ℓ ≥ 2 closure approximates. Each child already
   // forms (ρ+p)σ in its own StressEnergy — the parent from its per-q moments,
@@ -1045,8 +1041,7 @@ void DNCDMProxySpecies::PrintVariables(PerturbColumnWriter& w,
     const double* pvecback   = ppw->pvecback.data();
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const double a4          = a * a * a * a;
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(
-        *pv->species_layouts[collection_index_]);
+    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
     pi_H = a4 *
            parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw).rho_plus_p_shear;
     pi_l =

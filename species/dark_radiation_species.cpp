@@ -189,3 +189,59 @@ void DarkRadiationSpecies::CopyPerturbationsAcrossSwitch(
   for (int l = 0; l <= n.l_max; ++l)
     new_y[n.idx_F0 + l] = old_y[o.idx_F0 + l];
 }
+
+// ── Output ────────────────────────────────────────────────────────────────────
+
+void DarkRadiationSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
+                                       const double* y,
+                                       const double* /*dy*/,
+                                       PerturbSourceContext& ctx) const {
+  PerturbationsModule* p_mod = ctx.p_mod;
+  if (ctx.index_md != p_mod->index_md_scalars_)
+    return;
+
+  const auto& layout     = static_cast<const PerturbLayout&>(base);
+  const double* pvecback = ctx.ppw->pvecback.data();
+
+  // r_dr == 0 when the channel carries no DR (e.g. Gamma == 0); write 0 then,
+  // matching Delta's rho_dr <= 0 convention (avoids 0/0).
+  const double r_dr = (ctx.a2 / pba_->H0) * (ctx.a2 / pba_->H0) * Rho(pvecback);
+
+  if (index_tp_delta_ >= 0) {
+    const double src = (r_dr > 0.) ? y[layout.idx_F0] / r_dr -
+                                         RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) *
+                                             ctx.theta_over_k2  // N-body gauge correction
+                                   : 0.;
+    p_mod->SetSourceValue(ctx.index_md,
+                          ctx.index_ic,
+                          index_tp_delta_,
+                          ctx.index_tau,
+                          ctx.index_k,
+                          src);
+  }
+
+  if (index_tp_theta_ >= 0) {
+    const double src = (r_dr > 0.) ? 3. / 4. * ctx.k * y[layout.idx_F0 + 1] / r_dr +
+                                         ctx.theta_shift  // N-body gauge correction
+                                   : 0.;
+    p_mod->SetSourceValue(ctx.index_md,
+                          ctx.index_ic,
+                          index_tp_theta_,
+                          ctx.index_tau,
+                          ctx.index_k,
+                          src);
+  }
+}
+
+void DarkRadiationSpecies::WriteOutputColumns(PerturbColumnWriter& w,
+                                              const PerturbationsModule& mod,
+                                              file_format fmt,
+                                              BaseSpecies::TransferColumnSection section) const {
+  if (fmt != file_format::class_format)
+    return;
+  const perturbs* ppt = mod.GetPerturbs();
+  if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    w.Add("d_" + name(), index_tp_delta_, index_tp_delta_ >= 0);
+  if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    w.Add("t_" + name(), index_tp_theta_, index_tp_theta_ >= 0);
+}

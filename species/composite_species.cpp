@@ -191,6 +191,26 @@ void CompositeSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
     children_[i]->FillSources(*my.child_layouts[i], y, dy, ctx);
 }
 
+void CompositeSpecies::WriteOutputColumns(PerturbColumnWriter& writer,
+                                          const PerturbationsModule& mod,
+                                          file_format fmt,
+                                          BaseSpecies::TransferColumnSection section) const {
+  for (const auto& child : children_)
+    child->WriteOutputColumns(writer, mod, fmt, section);
+}
+
+void CompositeSpecies::PrintVariables(PerturbColumnWriter& writer,
+                                      const BaseSpecies::PerturbLayout* base,
+                                      double tau,
+                                      const double* y,
+                                      const PerturbationsModule& mod,
+                                      const perturb_workspace* ppw) const {
+  const auto* my = static_cast<const PerturbLayout*>(base);
+  for (size_t i = 0; i < children_.size(); ++i)
+    children_[i]
+        ->PrintVariables(writer, my ? my->child_layouts[i].get() : nullptr, tau, y, mod, ppw);
+}
+
 void CompositeSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                                      double* y,
                                                      const PerturbIcContext& ctx) {

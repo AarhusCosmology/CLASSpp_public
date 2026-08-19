@@ -162,6 +162,7 @@ class ScalarFieldSpecies : public BaseSpecies {
       TransferColumnSection section = TransferColumnSection::all) const override;
 
   void PrintVariables(PerturbColumnWriter& writer,
+                      const BaseSpecies::PerturbLayout* base,
                       double tau,
                       const double* y,
                       const PerturbationsModule& mod,

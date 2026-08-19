@@ -52,7 +52,7 @@ class DCDMSpecies : public BaseSpecies {
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
-  double RhoDotOverRho(const double* pvecback, double a_prime_over_a) const override;
+  double RhoPrimeOverRho(const double* pvecback, double a_prime_over_a) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
@@ -95,12 +95,17 @@ class DCDMSpecies : public BaseSpecies {
     return index_tp_theta_;
   }
 
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) const override;
   void WriteOutputColumns(
       PerturbColumnWriter& writer,
       const PerturbationsModule& mod,
       file_format fmt,
       TransferColumnSection section = TransferColumnSection::all) const override;
   void PrintVariables(PerturbColumnWriter& writer,
+                      const BaseSpecies::PerturbLayout* base,
                       double tau,
                       const double* y,
                       const PerturbationsModule& mod,

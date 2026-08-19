@@ -136,29 +136,6 @@ class DNCDMProxySpecies : public CompositeSpecies {
                              double* diag,
                              const perturb_parameters_and_workspace& ppaw) const override;
 
-  /** Transfer columns for the children. CompositeSpecies chains
-   *  RegisterTransferSourceIndices and FillSources but NOT this, so without the
-   *  override the parent's slots are allocated and filled and then never named --
-   *  the sector vanished from mTk/vTk entirely, while the same model under
-   *  dr_representation = psd reports it. Same body as
-   *  DNCDMInvSpecies::WriteOutputColumns, deliberately: the two representations
-   *  must be readable by one script.
-   *
-   *  KNOWN GAP. Only the PARENT appears. This representation's daughters are
-   *  DarkRadiationSpecies, which -- unlike DrPsdSpecies -- implements neither
-   *  FillSources nor WriteOutputColumns and expects its owning composite to do
-   *  both (DNCDM_DR_Species does, for its single daughter). So the two daughter
-   *  slots here are still allocated and left unwritten. Closing it needs a
-   *  convention decided rather than copied: DNCDM_DR_Species hardcodes
-   *  rho-dot/rho = -4H in the N-body gauge correction while DrPsdSpecies calls
-   *  RhoDotOverRho, and for a daughter that is being SOURCED those are not the
-   *  same number. */
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
-
   /** k_output_values time series: the sector's total anisotropic stress
    *  a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i, plus its per-child decomposition.
    *
@@ -169,6 +146,7 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *  collection_index_, so their layouts are reached through THIS composite's
    *  nested layout. */
   void PrintVariables(PerturbColumnWriter& writer,
+                      const BaseSpecies::PerturbLayout* base,
                       double tau,
                       const double* y,
                       const PerturbationsModule& mod,

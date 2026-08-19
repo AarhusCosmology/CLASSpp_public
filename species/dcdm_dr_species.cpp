@@ -73,101 +73,13 @@ void DCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
                                                     const PerturbIcContext& ctx) {
   dcdm_->PerturbSynchronousToNewtonian(dcdm_layout(base),
                                        y,
-                                       ctx);  // matter+decay via RhoDotOverRho
+                                       ctx);  // matter+decay via RhoPrimeOverRho
   const double* pvecback  = ctx.ppw->pvecback.data();
   const double rho_dr     = dr_sp_->Rho(pvecback);
   const double decay_corr = (rho_dr > 0.)
                                 ? ctx.a * dcdm_->Gamma_dcdm() * dcdm_->Rho(pvecback) / rho_dr
                                 : 0.;
   dr_sp_->PerturbNewtonianReseed(dr_layout(base), y, ctx, decay_corr);
-}
-
-void DCDM_DR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
-                                  const double* y,
-                                  const double* /*dy*/,
-                                  PerturbSourceContext& ctx) const {
-  PerturbationsModule* p_mod = ctx.p_mod;
-  perturb_workspace* ppw     = ctx.ppw;
-  const double* pvecback     = ppw->pvecback.data();
-
-  const double a_prime_over_a = ctx.a_prime_over_a;
-  const double a2             = ctx.a2;
-
-  if (ctx.index_md != p_mod->index_md_scalars_)
-    return;
-
-  const auto& dcdm_lay = dcdm_layout(base);
-  const auto& dr_lay   = dr_layout(base);
-
-  // ── delta_dcdm ─────────────────────────────────────────────────────────────
-  if (dcdm_->transfer_delta_index() >= 0) {
-    p_mod->SetSourceValue(ctx.index_md,
-                          ctx.index_ic,
-                          dcdm_->transfer_delta_index(),
-                          ctx.index_tau,
-                          ctx.index_k,
-                          y[dcdm_lay.idx_delta] +
-                              (3. * a_prime_over_a + ctx.a * dcdm_->Gamma_dcdm()) *
-                                  ctx.theta_over_k2);  // N-body gauge correction
-  }
-
-  // ── theta_dcdm ─────────────────────────────────────────────────────────────
-  if (dcdm_->transfer_theta_index() >= 0) {
-    p_mod->SetSourceValue(ctx.index_md,
-                          ctx.index_ic,
-                          dcdm_->transfer_theta_index(),
-                          ctx.index_tau,
-                          ctx.index_k,
-                          y[dcdm_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
-  }
-
-  // ── delta_dr (this channel's slot) ───────────────────────────────────────────
-  // r_dr == 0 when the channel carries no DR (e.g. Gamma_dcdm == 0); write 0 then,
-  // matching DarkRadiationSpecies::Delta's rho_dr <= 0 convention (avoids 0/0).
-  if (dr_sp_->transfer_delta_index() >= 0) {
-    const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
-    const double src  = (r_dr > 0.)
-                            ? y[dr_lay.idx_F0] / r_dr +
-                                  4. * a_prime_over_a * ctx.theta_over_k2  // N-body gauge corr.
-                            : 0.;
-    p_mod->SetSourceValue(ctx.index_md,
-                          ctx.index_ic,
-                          dr_sp_->transfer_delta_index(),
-                          ctx.index_tau,
-                          ctx.index_k,
-                          src);
-  }
-
-  // ── theta_dr (this channel's slot) ───────────────────────────────────────────
-  if (dr_sp_->transfer_theta_index() >= 0) {
-    const double r_dr = (a2 / pba_->H0) * (a2 / pba_->H0) * dr_sp_->Rho(pvecback);
-    const double src  = (r_dr > 0.) ? 3. / 4. * ctx.k * y[dr_lay.idx_F0 + 1] / r_dr +
-                                          ctx.theta_shift  // N-body gauge correction
-                                    : 0.;
-    p_mod->SetSourceValue(ctx.index_md,
-                          ctx.index_ic,
-                          dr_sp_->transfer_theta_index(),
-                          ctx.index_tau,
-                          ctx.index_k,
-                          src);
-  }
-}
-
-void DCDM_DR_Species::WriteOutputColumns(PerturbColumnWriter& w,
-                                         const PerturbationsModule& mod,
-                                         file_format fmt,
-                                         BaseSpecies::TransferColumnSection section) const {
-  if (fmt != file_format::class_format)
-    return;
-  const perturbs* ppt = mod.GetPerturbs();
-  if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-    w.Add("d_" + dr_sp_->name(),
-          dr_sp_->transfer_delta_index(),
-          dr_sp_->transfer_delta_index() >= 0);
-  if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-    w.Add("t_" + dr_sp_->name(),
-          dr_sp_->transfer_theta_index(),
-          dr_sp_->transfer_theta_index() >= 0);
 }
 
 void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,

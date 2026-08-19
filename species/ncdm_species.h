@@ -97,6 +97,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
                           file_format,
                           TransferColumnSection) const override;
   void PrintVariables(PerturbColumnWriter&,
+                      const BaseSpecies::PerturbLayout*,
                       double,
                       const double*,
                       const PerturbationsModule&,

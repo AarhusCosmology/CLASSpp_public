@@ -341,6 +341,7 @@ void UltraRelativisticSpecies::WriteOutputColumns(
 }
 
 void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
+                                              const BaseSpecies::PerturbLayout* base,
                                               double /*tau*/,
                                               const double* y,
                                               const PerturbationsModule& mod,
@@ -348,13 +349,12 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_ur = 0., theta_ur = 0., shear_ur = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
     const double k           = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback.data();
     const double* pvecmetric = ppw->pvecmetric.data();
 
     if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-      const auto& lay = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
+      const auto& lay = static_cast<const PerturbLayout&>(*base);
       delta_ur        = y[lay.idx_delta];
       theta_ur        = y[lay.idx_theta];
       shear_ur        = y[lay.idx_shear];

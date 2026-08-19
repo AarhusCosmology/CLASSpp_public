@@ -175,6 +175,16 @@ class SpeciesCollection {
     return species_[i].species.get();
   }
 
+  /** Indexed access whose constness does NOT propagate to the pointee, exactly like
+   *  Entry::get() above (and like `const std::unique_ptr<T>&` iteration). Lets a const
+   *  member function drive a mutating per-species hook -- registration, IC application --
+   *  by index, so the species/species_layouts pairing stays in one expression instead of
+   *  a counter walked alongside a range-for. */
+  BaseSpecies* get(std::size_t i) const {
+    assert(i < species_.size());
+    return species_[i].species.get();
+  }
+
  private:
   Container species_;
   BaseSpecies* photons_      = nullptr;

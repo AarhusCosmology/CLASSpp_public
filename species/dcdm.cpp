@@ -49,7 +49,7 @@ double DCDMSpecies::P(const double* /*pvecback*/) const {
   return 0.;
 }
 
-double DCDMSpecies::RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {
+double DCDMSpecies::RhoPrimeOverRho(const double* pvecback, double a_prime_over_a) const {
   // ρ̇/ρ = -a(3H + Γ) = -3ℋ - aΓ  (same physics as BackgroundDerivs).
   const double a = pvecback[bgm_->index_bg_a_];
   return -3. * a_prime_over_a - a * Gamma_dcdm_;
@@ -114,7 +114,7 @@ void DCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
 void DCDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                                 double* y,
                                                 const PerturbIcContext& ctx) {
-  // delta += (ρ̇/ρ)·α with ρ̇/ρ = -3ℋ - aΓ (decay-aware RhoDotOverRho), theta += k²·α.
+  // delta += (ρ̇/ρ)·α with ρ̇/ρ = -3ℋ - aΓ (decay-aware RhoPrimeOverRho), theta += k²·α.
   const auto& l = static_cast<const PerturbLayout&>(base);
   ApplyFluidLikeNewtonianShift(y, l.idx_delta, l.idx_theta, ctx.ppw->pvecback.data(), ctx);
 }
@@ -137,11 +137,40 @@ void DCDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceReque
   class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
 }
 
+void DCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
+                              const double* y,
+                              const double* /*dy*/,
+                              PerturbSourceContext& ctx) const {
+  PerturbationsModule* p_mod = ctx.p_mod;
+  if (ctx.index_md != p_mod->index_md_scalars_)
+    return;
+
+  const auto& layout     = static_cast<const PerturbLayout&>(base);
+  const double* pvecback = ctx.ppw->pvecback.data();
+
+  if (index_tp_delta_ >= 0) {
+    p_mod->SetSourceValue(ctx.index_md,
+                          ctx.index_ic,
+                          index_tp_delta_,
+                          ctx.index_tau,
+                          ctx.index_k,
+                          y[layout.idx_delta] - RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) *
+                                                    ctx.theta_over_k2);  // N-body gauge correction
+  }
+  if (index_tp_theta_ >= 0) {
+    p_mod->SetSourceValue(ctx.index_md,
+                          ctx.index_ic,
+                          index_tp_theta_,
+                          ctx.index_tau,
+                          ctx.index_k,
+                          y[layout.idx_theta] + ctx.theta_shift);  // N-body gauge correction
+  }
+}
+
 void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      const PerturbationsModule& mod,
                                      file_format fmt,
                                      BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
@@ -152,6 +181,7 @@ void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 }
 
 void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
+                                 const BaseSpecies::PerturbLayout* base,
                                  double /*tau*/,
                                  const double* y,
                                  const PerturbationsModule& mod,
@@ -159,9 +189,8 @@ void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_dcdm = 0., theta_dcdm = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-    const double k     = ppw->scalar_ctx.k;
+    const auto& layout       = static_cast<const PerturbLayout&>(*base);
+    const double k           = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback.data();
     const double* pvecmetric = ppw->pvecmetric.data();
 

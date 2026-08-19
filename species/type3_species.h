@@ -72,17 +72,6 @@ class Type3Species : public CompositeSpecies {
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
-  void PrintVariables(PerturbColumnWriter& writer,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
-
   std::vector<ShootingTarget> GetShootingTargets() const override {
     return scf_->GetShootingTargets();
   }

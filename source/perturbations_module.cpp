@@ -2397,8 +2397,9 @@ void PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(scalar_titles_, "a", true);
       {
         PerturbColumnWriter w(scalar_titles_);
+        // Title mode: no perturb_vector exists yet, so there is no layout to pass.
         for (auto& [name, sp] : all_species_)
-          sp->PrintVariables(w, 0., nullptr, *this, nullptr);
+          sp->PrintVariables(w, nullptr, 0., nullptr, *this, nullptr);
       }
       class_store_columntitle(scalar_titles_, "psi", true);
       class_store_columntitle(scalar_titles_, "phi", true);
@@ -2818,23 +2819,21 @@ void PerturbationsModule::perturb_vector_init(
          y/layout registration below in all_species_ order preserves the
          parallel species_layouts indexing; only the dispatch view is ordered. */
       std::vector<perturb_vector::ActiveSpecies> scalar_active_species;
-      size_t i = 0;
-      for (auto& entry : all_species_) {
+      for (size_t i = 0; i < all_species_.size(); ++i) {
         const int before = index_pt;
-        entry->RegisterPerturbationIndices(*ppv->species_layouts[i],
-                                           ppv.get(),
-                                           ppr,
-                                           index_pt,
-                                           ppw,
-                                           static_cast<int>(ppt->gauge));
+        all_species_.get(i)->RegisterPerturbationIndices(*ppv->species_layouts[i],
+                                                         ppv.get(),
+                                                         ppr,
+                                                         index_pt,
+                                                         ppw,
+                                                         static_cast<int>(ppt->gauge));
         if (index_pt > before) {
-          perturb_vector::ActiveSpecies active{entry.get(), ppv->species_layouts[i].get()};
-          if (dynamic_cast<const ScalarFieldSpecies*>(entry.get()))
+          perturb_vector::ActiveSpecies active{all_species_[i], ppv->species_layouts[i].get()};
+          if (dynamic_cast<const ScalarFieldSpecies*>(all_species_[i]))
             scalar_active_species.push_back(active);
           else
             ppv->active_species.push_back(active);
         }
-        ++i;
       }
       ppv->active_species.insert(ppv->active_species.end(),
                                  scalar_active_species.begin(),
@@ -2845,11 +2844,9 @@ void PerturbationsModule::perturb_vector_init(
        (k-independent membership precomputed in species_emits_source_), paired
        with this pv's layouts. Empty without dTk/mTk/k_output. */
     {
-      size_t i = 0;
-      for (auto& entry : all_species_) {
+      for (size_t i = 0; i < all_species_.size(); ++i) {
         if (species_emits_source_[i])
-          ppv->source_species.push_back({entry.get(), ppv->species_layouts[i].get()});
-        ++i;
+          ppv->source_species.push_back({all_species_[i], ppv->species_layouts[i].get()});
       }
     }
 
@@ -2876,18 +2873,16 @@ void PerturbationsModule::perturb_vector_init(
   if (_vectors_) {
     /* Per-species vector-mode registration. */
     {
-      size_t i = 0;
-      for (auto& entry : all_species_) {
+      for (size_t i = 0; i < all_species_.size(); ++i) {
         const int before = index_pt;
-        entry->RegisterVectorPerturbationIndices(*ppv->species_layouts[i],
-                                                 ppv.get(),
-                                                 ppr,
-                                                 index_pt,
-                                                 ppw,
-                                                 static_cast<int>(ppt->gauge));
+        all_species_.get(i)->RegisterVectorPerturbationIndices(*ppv->species_layouts[i],
+                                                               ppv.get(),
+                                                               ppr,
+                                                               index_pt,
+                                                               ppw,
+                                                               static_cast<int>(ppt->gauge));
         if (index_pt > before)
-          ppv->active_species.push_back({entry.get(), ppv->species_layouts[i].get()});
-        ++i;
+          ppv->active_species.push_back({all_species_[i], ppv->species_layouts[i].get()});
       }
     }
 
@@ -2906,18 +2901,16 @@ void PerturbationsModule::perturb_vector_init(
        early-returns when ppt_->tensor_method != tm_exact, so no module-side
        type check is needed. */
     {
-      size_t i = 0;
-      for (auto& entry : all_species_) {
+      for (size_t i = 0; i < all_species_.size(); ++i) {
         const int before = index_pt;
-        entry->RegisterTensorPerturbationIndices(*ppv->species_layouts[i],
-                                                 ppv.get(),
-                                                 ppr,
-                                                 index_pt,
-                                                 ppw,
-                                                 static_cast<int>(ppt->gauge));
+        all_species_.get(i)->RegisterTensorPerturbationIndices(*ppv->species_layouts[i],
+                                                               ppv.get(),
+                                                               ppr,
+                                                               index_pt,
+                                                               ppw,
+                                                               static_cast<int>(ppt->gauge));
         if (index_pt > before)
-          ppv->active_species.push_back({entry.get(), ppv->species_layouts[i].get()});
-        ++i;
+          ppv->active_species.push_back({all_species_[i], ppv->species_layouts[i].get()});
       }
     }
 
@@ -3594,10 +3587,10 @@ void PerturbationsModule::perturb_initial_conditions(
     auto dispatch_species_ic = [&]() {
       eta = ic_ctx.eta;
       {
-        size_t i = 0;
-        for (auto& sp : all_species_) {
-          sp->ApplyInitialConditions(*ppw->pv->species_layouts[i], ppw->pv->y.data(), ic_ctx);
-          ++i;
+        for (size_t i = 0; i < all_species_.size(); ++i) {
+          all_species_.get(i)->ApplyInitialConditions(*ppw->pv->species_layouts[i],
+                                                      ppw->pv->y.data(),
+                                                      ic_ctx);
         }
       }
     };
@@ -3832,18 +3825,15 @@ void PerturbationsModule::perturb_initial_conditions(
 
       double delta_rho_ic = 0., rho_plus_p_theta_ic = 0.;
       {
-        size_t i = 0;
-        for (const auto& sp : all_species_) {
-          if (sp->energy_type() == BaseSpecies::EnergyType::DarkEnergy) {
-            ++i;
+        for (size_t i = 0; i < all_species_.size(); ++i) {
+          const BaseSpecies* sp = all_species_[i];
+          if (sp->energy_type() == BaseSpecies::EnergyType::DarkEnergy)
             continue;
-          }
           const auto& layout = *ppw->pv->species_layouts[i];
           const auto se =
               sp->StressEnergy(layout, ppw->pv.get(), ppw->pv->y.data(), ppw->pvecback.data(), ppw);
           delta_rho_ic        += se.delta_rho;
           rho_plus_p_theta_ic += se.rho_plus_p_theta;
-          ++i;
         }
       }
       double delta_tot    = delta_rho_ic / (rho_r + rho_m);
@@ -5337,8 +5327,13 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
     class_store_double(dataptr, pvecback[background_module_->index_bg_a_], true, storeidx);
     {
       PerturbColumnWriter w(dataptr, storeidx);
-      for (auto& [name, sp] : all_species_)
-        sp->PrintVariables(w, tau, y, *this, ppw);
+      // Indexed, not a counter alongside a range-for: species_layouts is parallel to
+      // all_species_, and SpeciesCollection::operator[] exists for exactly this
+      // pairing. Iterating all of them (not active_species/source_species, which are
+      // filtered) is required — title mode has no pv and emits every species, so the
+      // two loops must produce the same columns in the same order.
+      for (size_t i = 0; i < all_species_.size(); ++i)
+        all_species_[i]->PrintVariables(w, ppw->pv->species_layouts[i].get(), tau, y, *this, ppw);
     }
     class_store_double(dataptr, psi, true, storeidx);
     class_store_double(dataptr, phi, true, storeidx);

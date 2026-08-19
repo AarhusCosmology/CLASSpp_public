@@ -173,6 +173,9 @@ void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(
     const PerturbationsModule& mod,
     file_format fmt,
     BaseSpecies::TransferColumnSection section) const {
+  // This composite owns its transfer slots directly, but chain anyway so a
+  // child that later registers its own is named without editing this.
+  CompositeSpecies::WriteOutputColumns(w, mod, fmt, section);
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
@@ -187,15 +190,18 @@ void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(
 }
 
 void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
-                                               double /*tau*/,
+                                               const BaseSpecies::PerturbLayout* base,
+                                               double tau,
                                                const double* y,
                                                const PerturbationsModule& mod,
                                                const perturb_workspace* ppw) const {
+  // Chain first (children currently publish nothing) so a child that later gains
+  // PrintVariables is picked up without editing this.
+  CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
   double delta_idm_drmd = 0., theta_idm_drmd = 0.;
   double delta_idr_drmd = 0., theta_idr_drmd = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback.data();
     const double* pvecmetric = ppw->pvecmetric.data();
     const double k           = ppw->scalar_ctx.k;
@@ -203,8 +209,8 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const perturbs* ppt      = mod.GetPerturbs();
 
-    const auto& idm_drm_pr_lay = idm_drmd_layout(*pv->species_layouts[collection_index_]);
-    const auto& idr_drm_pr_lay = idr_drmd_layout(*pv->species_layouts[collection_index_]);
+    const auto& idm_drm_pr_lay = idm_drmd_layout(*base);
+    const auto& idr_drm_pr_lay = idr_drmd_layout(*base);
 
     if (has_idm_drmd()) {
       delta_idm_drmd = y[idm_drm_pr_lay.idx_delta];

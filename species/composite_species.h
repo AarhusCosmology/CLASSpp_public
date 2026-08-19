@@ -75,6 +75,27 @@ class CompositeSpecies : public BaseSpecies {
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
+  /** Names every child's transfer columns, in children_ order. Chained like every
+   *  other per-species hook so that a composite which allocates a child's source
+   *  slot (RegisterTransferSourceIndices) and fills it (FillSources) also names
+   *  it — without this the columns are computed every step and thrown away, and
+   *  d_tot is not reconstructible from the d_i (issue #391). Composites that own
+   *  slots at composite level override and chain to this first. */
+  void WriteOutputColumns(
+      PerturbColumnWriter& writer,
+      const PerturbationsModule& mod,
+      file_format fmt,
+      TransferColumnSection section = TransferColumnSection::all) const override;
+  /** Chains each child's k_output_values columns, in children_ order. Composites
+   *  that publish sector-level aggregates their children cannot form (the DNCDM
+   *  a4Pi decomposition) override and add those on top. */
+  void PrintVariables(PerturbColumnWriter& writer,
+                      const BaseSpecies::PerturbLayout* base,
+                      double tau,
+                      const double* y,
+                      const PerturbationsModule& mod,
+                      const perturb_workspace* ppw) const override;
+
   void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
                                      double* y,
                                      const PerturbIcContext& ctx) override;

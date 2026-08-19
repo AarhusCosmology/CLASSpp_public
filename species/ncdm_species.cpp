@@ -449,6 +449,7 @@ void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 }
 
 void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
+                                 const BaseSpecies::PerturbLayout* base,
                                  double /*tau*/,
                                  const double* y,
                                  const PerturbationsModule& mod,
@@ -468,7 +469,7 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
     const double rho_plus_p  = rho_ncdm_bg + p_ncdm_bg;
     const double w_ncdm      = (rho_ncdm_bg > 0.) ? p_ncdm_bg / rho_ncdm_bg : 0.;
 
-    const auto& layout = *pv->species_layouts[collection_index_];
+    const auto& layout = *base;
     const auto se      = StressEnergy(layout, pv, y, pvecback, ppw);
     delta_ncdm         = (rho_ncdm_bg > 0.) ? se.delta_rho / rho_ncdm_bg : 0.;
     theta_ncdm         = (rho_plus_p > 0.) ? se.rho_plus_p_theta / rho_plus_p : 0.;

@@ -487,13 +487,16 @@ double WdmDecayProductSpecies::PPrime(double a,
          factor_ / (3. * a2 * a2) * dp_inj;
 }
 
-double WdmDecayProductSpecies::RhoDotOverRho(const double* pvecback, double a_prime_over_a) const {
+double WdmDecayProductSpecies::RhoPrimeOverRho(const double* pvecback,
+                                               double a_prime_over_a) const {
+  // Own dilution only. The decay injection is DCDM_WDM_Species::BackgroundDerivs',
+  // not this species', so it is not reported here (see BaseSpecies::RhoPrimeOverRho).
+  // The rho == 0 guard is load-bearing: a sourced daughter starts empty and the
+  // base implementation would form 0/0 there.
   const double rho = Rho(pvecback);
   if (rho <= 0.)
     return 0.;
-  const double a   = pvecback[bgm_->index_bg_a_];
-  const double inj = (parent_ != nullptr) ? a * Gamma_ * parent_->Rho(pvecback) : 0.;
-  return (-3. * a_prime_over_a * (rho + P(pvecback)) + inj) / rho;
+  return -3. * a_prime_over_a * (rho + P(pvecback)) / rho;
 }
 
 // ── Background output columns ────────────────────────────────────────────────
@@ -670,9 +673,8 @@ void WdmDecayProductSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   if (index_tp_delta_ >= 0) {
     // delta with N-body gauge correction: delta_Nb = delta - (rhodot/rho) theta_tot/k^2
     const double delta = (rho > 0.) ? fac * s_drho / rho : 0.;
-    const double src = (rho > 0.)
-                           ? delta - RhoDotOverRho(pvecback, ctx.a_prime_over_a) * ctx.theta_over_k2
-                           : 0.;
+    const double src =
+        (rho > 0.) ? delta - RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.theta_over_k2 : 0.;
     ctx.p_mod->SetSourceValue(ctx.index_md,
                               ctx.index_ic,
                               index_tp_delta_,

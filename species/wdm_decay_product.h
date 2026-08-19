@@ -8,7 +8,6 @@
 #include "background.h"
 
 class BackgroundModule;
-class DCDMSpecies;
 
 /**
  * Warm decay products of cold dark matter (arXiv:2606.14849).
@@ -92,11 +91,6 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
    *  background-table resolvability bound; cap = the placement-bias budget. */
   double SigmaAt(double u_cut) const;
 
-  /** Wired by DCDM_WDM_Species; used by RhoDotOverRho / FillSources. */
-  void SetParent(const DCDMSpecies* dcdm) {
-    parent_ = dcdm;
-  }
-
   const std::optional<double>& Omega_ini_pending() const {
     return Omega_ini_pending_;
   }
@@ -136,7 +130,7 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
                 double H,
                 const double* pvecback_B,
                 const double* pvecback) const override;
-  double RhoDotOverRho(const double* pvecback, double a_prime_over_a) const override;
+  double RhoPrimeOverRho(const double* pvecback, double a_prime_over_a) const override;
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
@@ -257,7 +251,6 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
   void GaussWeights(double u_cut, double sigma, double* w) const;
 
   const background* pba_;
-  const DCDMSpecies* parent_ = nullptr;
 
   double Gamma_ = 0.;  // decay rate, CLASS units (Mpc^-1 after both conversions)
   double vkick_ = 0.;  // kick velocity in units of c

@@ -78,18 +78,6 @@ class DCDM_WDM_Species : public CompositeSpecies {
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   // Registration, derivs (children + AddCouplingDerivs), ICs, stress-energy and
-  // switch copies use the generic CompositeSpecies child loops. FillSources is
-  // overridden to also write the parent's transfer sources (DCDMSpecies itself
-  // has none — mirrors DCDM_DR).
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
-                   const double* y,
-                   const double* dy,
-                   PerturbSourceContext& ctx) const override;
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
 
   DCDMSpecies& dcdm() {
     return *dcdm_;

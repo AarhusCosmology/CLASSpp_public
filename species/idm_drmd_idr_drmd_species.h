@@ -118,6 +118,7 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
       TransferColumnSection section = TransferColumnSection::all) const override;
 
   void PrintVariables(PerturbColumnWriter& writer,
+                      const BaseSpecies::PerturbLayout* base,
                       double tau,
                       const double* y,
                       const PerturbationsModule& mod,

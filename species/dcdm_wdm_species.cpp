@@ -22,7 +22,6 @@ DCDM_WDM_Species::DCDM_WDM_Species(std::unique_ptr<WdmDecayProductSpecies> wdm_a
       std::make_unique<DCDMSpecies>(*pba, omega0_combined, wdm_arg->Gamma(), Omega_ini_dcdm);
   dcdm_ = dcdm.get();
   wdm_  = wdm_arg.get();
-  wdm_->SetParent(dcdm_);
   // Child order matters: DCDM first so its rho is in pvecback before the
   // daughter's injection columns are written (ComputeBackground below).
   children_.push_back(std::move(dcdm));
@@ -236,48 +235,4 @@ void DCDM_WDM_Species::AddCouplingDerivs(double /*tau*/,
   const int inj0          = wdm_->bg_inj_index();
   for (int iq = 0; iq < wdm_lay.q_size; ++iq)
     dy[wdm_lay.index_per_q[iq]] += pvecback[inj0 + iq] * delta_dcdm;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sources / output (parent slots; the daughter writes its own via the generic
-// child loop)
-// ─────────────────────────────────────────────────────────────────────────────
-
-void DCDM_WDM_Species::FillSources(const BaseSpecies::PerturbLayout& base,
-                                   const double* y,
-                                   const double* dy,
-                                   PerturbSourceContext& ctx) const {
-  CompositeSpecies::FillSources(base, y, dy, ctx);  // daughter's d_wdm/t_wdm
-
-  PerturbationsModule* p_mod = ctx.p_mod;
-  if (ctx.index_md != p_mod->index_md_scalars_)
-    return;
-  const auto& dcdm_lay = dcdm_layout(base);
-
-  if (dcdm_->transfer_delta_index() >= 0) {
-    p_mod->SetSourceValue(ctx.index_md,
-                          ctx.index_ic,
-                          dcdm_->transfer_delta_index(),
-                          ctx.index_tau,
-                          ctx.index_k,
-                          y[dcdm_lay.idx_delta] +
-                              (3. * ctx.a_prime_over_a + ctx.a * dcdm_->Gamma_dcdm()) *
-                                  ctx.theta_over_k2);  // N-body gauge correction
-  }
-  if (dcdm_->transfer_theta_index() >= 0) {
-    p_mod->SetSourceValue(ctx.index_md,
-                          ctx.index_ic,
-                          dcdm_->transfer_theta_index(),
-                          ctx.index_tau,
-                          ctx.index_k,
-                          y[dcdm_lay.idx_theta] + ctx.theta_shift);
-  }
-}
-
-void DCDM_WDM_Species::WriteOutputColumns(PerturbColumnWriter& w,
-                                          const PerturbationsModule& mod,
-                                          file_format fmt,
-                                          BaseSpecies::TransferColumnSection section) const {
-  dcdm_->WriteOutputColumns(w, mod, fmt, section);
-  wdm_->WriteOutputColumns(w, mod, fmt, section);
 }

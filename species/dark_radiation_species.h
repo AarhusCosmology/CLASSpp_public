@@ -113,12 +113,21 @@ class DarkRadiationSpecies : public BaseSpecies {
   }
 
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
-  int transfer_delta_index() const {
-    return index_tp_delta_;
-  }
-  int transfer_theta_index() const {
-    return index_tp_theta_;
-  }
+
+  /** Own transfer columns, named `d_<name>` / `t_<name>`. Owning composites do
+   *  NOT reimplement these: CompositeSpecies chains both hooks, so a channel is
+   *  named wherever it is allocated. The proxy DNCDM daughters are constructed as
+   *  `dr_<instance>_l` / `_phi`, which makes these column names identical to the
+   *  ones DrPsdSpecies emits under `dr_representation = psd`. */
+  void FillSources(const BaseSpecies::PerturbLayout& layout,
+                   const double* y,
+                   const double* dy,
+                   PerturbSourceContext& ctx) const override;
+  void WriteOutputColumns(
+      PerturbColumnWriter& writer,
+      const PerturbationsModule& mod,
+      file_format fmt,
+      TransferColumnSection section = TransferColumnSection::all) const override;
 
  private:
   const background* pba_;

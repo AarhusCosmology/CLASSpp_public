@@ -750,11 +750,11 @@ BaseSpecies::StressEnergyContribution DNCDMSpecies::StressEnergy(
 // Transfer sources (#309 slots, allocated by NCDMBaseSpecies but until now unfilled).
 //
 // Deliberately spelled like DrPsdSpecies::FillSources rather than NCDMSpecies::
-// FillSources: the two are algebraically identical under the base RhoDotOverRho
+// FillSources: the two are algebraically identical under the base RhoPrimeOverRho
 // (-3ℋ(ρ+p)/ρ vs 3ℋ(1+w), the same number), but the parent and its two daughters are
 // summed against each other downstream to form the sector's total δ, and a sector sum
 // is only meaningful if its three terms carry the SAME gauge convention. Should the
-// decay sink ever be folded into RhoDotOverRho, this spelling picks it up and the
+// decay sink ever be folded into RhoPrimeOverRho, this spelling picks it up and the
 // NCDM one silently would not.
 //
 // StressEnergy already resolves the representation split: it returns δρ from
@@ -780,7 +780,7 @@ void DNCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
     // it: both sums vanish together and the quotient is only well posed while ρ > 0.
     const double src = (se.rho > 0.)
                            ? se.delta_rho / se.rho -
-                                 RhoDotOverRho(pvecback, ctx.a_prime_over_a) * ctx.theta_over_k2
+                                 RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.theta_over_k2
                            : 0.;
     ctx.p_mod->SetSourceValue(ctx.index_md,
                               ctx.index_ic,

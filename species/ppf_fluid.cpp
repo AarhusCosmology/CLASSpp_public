@@ -66,6 +66,7 @@ void PpfFluid::FillSources(const BaseSpecies::PerturbLayout& /*base*/,
 }
 
 void PpfFluid::PrintVariables(PerturbColumnWriter& w,
+                              const BaseSpecies::PerturbLayout* base,
                               double /*tau*/,
                               const double* /*y*/,
                               const PerturbationsModule& /*mod*/,

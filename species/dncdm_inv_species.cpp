@@ -488,7 +488,7 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
   // exactly that). n_H falls monotonically through 1/e once and only once.
   int best_row = -1;
   for (int row = 0; row < n_rows; ++row) {
-    if (comoving_n(background_table + (size_t) row * row_stride) < n0 / M_E) {
+    if (comoving_n(background_table + (size_t) row * row_stride) < n0 / _E_) {
       best_row = row;
       break;
     }
@@ -1292,27 +1292,16 @@ double DNCDMInvSpecies::ComputeShootingResidual(const ShootingResidualContext& c
   return combined - target.target_value;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Perturbation output (children write their own transfer columns)
-// ─────────────────────────────────────────────────────────────────────────────
-
-void DNCDMInvSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                         const PerturbationsModule& mod,
-                                         file_format fmt,
-                                         BaseSpecies::TransferColumnSection section) const {
-  // Parent first, then the two daughters: the sector's total δ is the ρ-weighted sum
-  // of exactly these three, and it could not be assembled from a single run while the
-  // parent was the only member without transfer columns.
-  parent_->WriteOutputColumns(w, mod, fmt, section);
-  fermion_->WriteOutputColumns(w, mod, fmt, section);
-  boson_->WriteOutputColumns(w, mod, fmt, section);
-}
-
 void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
-                                     double /*tau*/,
+                                     const BaseSpecies::PerturbLayout* base,
+                                     double tau,
                                      const double* y,
                                      const PerturbationsModule& mod,
                                      const perturb_workspace* ppw) const {
+  // Chain first (children currently publish nothing) so a child that later gains
+  // PrintVariables is picked up without editing this; then the sector aggregates
+  // below, which no child can form on its own.
+  CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
   // a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i — the total anisotropic stress of the
   // decaying sector, eq. (6.19) of the thesis / the Ma&Bertschinger source of
   // k²(φ−ψ) = 12πGa²Π. Each child already forms (ρ+p)σ in its own StressEnergy
@@ -1343,8 +1332,7 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
     const double* pvecback   = ppw->pvecback.data();
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const double a4          = a * a * a * a;
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(
-        *pv->species_layouts[collection_index_]);
+    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
     const auto se_H   = parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw);
     const auto se_l   = fermion_->StressEnergy(*my.child_layouts[kFermion], pv, y, pvecback, ppw);
     const auto se_phi = boson_->StressEnergy(*my.child_layouts[kBoson], pv, y, pvecback, ppw);
@@ -1430,9 +1418,8 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
     const double* pvecback   = ppw->pvecback.data();
     const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const double a4          = a * a * a * a;
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(
-        *pv->species_layouts[collection_index_]);
-    auto* scratch = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
+    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
+    auto* scratch            = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
     if (scratch != nullptr && scratch->kernel_pt != nullptr) {
       const auto& p_lay = parent_layout(my);
       int l_max_col     = mod.GetPrecision()->l_max_dncdm_col;
@@ -1520,8 +1507,7 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback.data();
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(
-        *pv->species_layouts[collection_index_]);
+    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
     const auto se = parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw);
     rho_H         = se.rho;
     drho_H        = se.delta_rho;

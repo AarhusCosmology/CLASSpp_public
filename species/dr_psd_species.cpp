@@ -705,9 +705,8 @@ void DrPsdSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
 
   if (index_tp_delta_ >= 0) {
     const double delta = (rho > 0.) ? fac * s_drho / rho : 0.;
-    const double src = (rho > 0.)
-                           ? delta - RhoDotOverRho(pvecback, ctx.a_prime_over_a) * ctx.theta_over_k2
-                           : 0.;
+    const double src =
+        (rho > 0.) ? delta - RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.theta_over_k2 : 0.;
     ctx.p_mod->SetSourceValue(ctx.index_md,
                               ctx.index_ic,
                               index_tp_delta_,

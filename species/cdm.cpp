@@ -182,6 +182,7 @@ void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 }
 
 void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
+                                const BaseSpecies::PerturbLayout* base,
                                 double /*tau*/,
                                 const double* y,
                                 const PerturbationsModule& mod,
@@ -189,9 +190,8 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
   double delta_cdm = 0., theta_cdm = 0.;
 
   if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const auto& layout = static_cast<const PerturbLayout&>(*pv->species_layouts[collection_index_]);
-    const double k     = ppw->scalar_ctx.k;
+    const auto& layout       = static_cast<const PerturbLayout&>(*base);
+    const double k           = ppw->scalar_ctx.k;
     const double* pvecback   = ppw->pvecback.data();
     const double* pvecmetric = ppw->pvecmetric.data();
 
