@@ -747,6 +747,28 @@ class BaseSpecies {
     return false;
   }
 
+  /**
+   * Whether this species' PERTURBATION sector is known to integrate efficiently
+   * with an explicit evolver (rkdp45).
+   *
+   * Default false, deliberately: stiffness is parameter dependent, and an
+   * explicit method degrades without bound on a stiff sector rather than merely
+   * getting slower. A species opts in only after its perturbation equations have
+   * been benchmarked against ndf15 over the parameter range it supports.
+   *
+   * Consumed by InputModule::SelectPerturbationEvolver(), which upgrades the
+   * default perturbations evolver from ndf15 to rkdp45 only when EVERY species
+   * present opts in (and nothing else in the run adds stiffness). An explicit
+   * `evolver` / `evolver_perturbations` in the input always wins.
+   *
+   * NOTE for subclass authors: this is inherited like any virtual. If you derive
+   * from a species that opts in and your sector adds stiffness -- an interaction
+   * rate, a decay channel, a collision term -- override it back to false.
+   */
+  virtual bool SupportsExplicitPerturbationEvolver() const {
+    return false;
+  }
+
  protected:
   BaseSpecies(std::string name, EnergyType energy_type)
       : name_(std::move(name)), energy_type_(energy_type) {}

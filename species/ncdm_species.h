@@ -13,6 +13,11 @@ class BackgroundModule;
 
 class NCDMSpecies : public NCDMBaseSpecies {
  public:
+  /** Benchmarked against ndf15 across the standard parameter range; see
+   *  BaseSpecies::SupportsExplicitPerturbationEvolver(). */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    return true;
+  }
   static constexpr std::string_view kTypeName = "ncdm_standard";
 
   // New input path: parameters are read from PFC under <instance_name>.<field>.

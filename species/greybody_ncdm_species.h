@@ -54,6 +54,12 @@ class GreyBodyParams {
  *  (r, M2, M3). All perturbation/background behavior is inherited from NCDMSpecies. */
 class GreyBodyNCDMSpecies : public NCDMSpecies {
  public:
+  /** Deliberately NOT inheriting the parent's opt-in: this sector adds stiffness
+   *  and has not been benchmarked against ndf15 with an explicit evolver.
+   *  See BaseSpecies::SupportsExplicitPerturbationEvolver(). */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    return false;
+  }
   static constexpr std::string_view kTypeName = "ncdm_greybody";
 
   GreyBodyNCDMSpecies(FileContent* pfc,

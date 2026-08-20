@@ -17,6 +17,11 @@ struct background;
  */
 class CDMSpecies : public BaseSpecies {
  public:
+  /** Benchmarked against ndf15 across the standard parameter range; see
+   *  BaseSpecies::SupportsExplicitPerturbationEvolver(). */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    return true;
+  }
   static constexpr std::string_view kTypeName = "cdm";
 
   struct PerturbLayout : BaseSpecies::PerturbLayout {

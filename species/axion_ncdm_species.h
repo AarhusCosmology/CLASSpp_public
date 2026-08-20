@@ -16,6 +16,12 @@
  *  All background/perturbation behavior is inherited from NCDMSpecies. */
 class AxionNCDMSpecies : public NCDMSpecies {
  public:
+  /** Deliberately NOT inheriting the parent's opt-in: this sector adds stiffness
+   *  and has not been benchmarked against ndf15 with an explicit evolver.
+   *  See BaseSpecies::SupportsExplicitPerturbationEvolver(). */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    return false;
+  }
   static constexpr std::string_view kTypeName = "ncdm_axion";
 
   AxionNCDMSpecies(FileContent* pfc,

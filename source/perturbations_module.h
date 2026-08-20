@@ -63,10 +63,15 @@ class PerturbationsModule : public BaseModule {
   const precision* GetPrecision() const noexcept {
     return ppr;
   }
-  BackgroundModulePtr GetBackgroundModule() const {
+  /* Return by const reference: these are called from the perturbation RHS, and
+     returning the shared_ptr by value made every call a pair of atomic refcount
+     RMWs on one control block shared by all worker threads. That cache line
+     ping-ponged across cores (catastrophically across the P/E cluster boundary)
+     and cost up to 5.5x on the Perturbations stage at 11 threads. */
+  const BackgroundModulePtr& GetBackgroundModule() const {
     return background_module_;
   }
-  ThermodynamicsModulePtr GetThermodynamicsModule() const {
+  const ThermodynamicsModulePtr& GetThermodynamicsModule() const {
     return thermodynamics_module_;
   }
 

@@ -215,7 +215,50 @@ InputModule::InputModule(FileContent& fc) : file_content_(fc) {
   ReadContext();
   ConstructSpecies();
   ReadDerived();
+  SelectPerturbationEvolver();
   WriteParameterFiles();
+}
+
+/**
+ * Choose the perturbations evolver when the input did not.
+ *
+ * ndf15 stays the default because stiffness is parameter dependent: an explicit
+ * method does not merely get slower on a stiff sector, it degrades without bound
+ * (measured: 500x on perturbed recombination). But the standard LCDM(+massive nu)
+ * content is not stiff once tight coupling is approximated, and there rkdp45 is
+ * 1.1x-2.1x faster -- which is the bulk of real runs, so it is worth taking.
+ *
+ * The upgrade is therefore opt-in from BOTH directions and applies only when:
+ *   - the input set neither `evolver` nor `evolver_perturbations`, and
+ *   - every species present opts in via SupportsExplicitPerturbationEvolver(), and
+ *   - no non-species option adds stiffness to the perturbation system.
+ *
+ * The last clause is why perturbed recombination is tested here rather than being
+ * left to the species: it is a flag on an otherwise ordinary LCDM content, so no
+ * species could report it. Any future option of that kind belongs in this list.
+ */
+void InputModule::SelectPerturbationEvolver() {
+  /* An explicit choice in the input always wins. Both spellings are checked;
+     precision::parse has already rejected setting them together. */
+  if (file_content_.get<int>("evolver").has_value() ||
+      file_content_.get<int>("evolver_perturbations").has_value())
+    return;
+
+  /* Non-species stiffness sources. Perturbed recombination integrates x_e and
+     T_b from a very small initial conformal time; explanatory.ini has always
+     told users to keep ndf15 for it. */
+  if (perturbations_.has_perturbed_recombination)
+    return;
+
+  for (const auto& [key, species] : all_species_) {
+    (void) key;
+    if (!species->SupportsExplicitPerturbationEvolver())
+      return;
+  }
+
+  precision_.evolver_perturbations = evolver_type::rkdp45;
+  if (perturbations_.perturbations_verbose > 0)
+    printf(" -> every species supports it, using the explicit rkdp45 perturbations evolver\n");
 }
 
 void InputModule::ConstructSpecies() {

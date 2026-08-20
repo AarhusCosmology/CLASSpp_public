@@ -81,9 +81,10 @@ class InputModule {
    *  Called from ReadContext. */
   void ReadCoupledCluster();
 
-  void ReadContext();          // phase i: inputs needed to build species
-  void ReadDerived();          // phase iii: everything else + species-dependent reads
-  void WriteParameterFiles();  // read/unread parameter dump (runs after ReadDerived)
+  void ReadContext();                // phase i: inputs needed to build species
+  void ReadDerived();                // phase iii: everything else + species-dependent reads
+  void SelectPerturbationEvolver();  // phase iv: opt into the explicit evolver
+  void WriteParameterFiles();        // read/unread parameter dump (runs after ReadDerived)
   void input_read_precisions();
 };
 

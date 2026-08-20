@@ -9,6 +9,11 @@
 /** Photons: rho ~ a^{-4}. Boltzmann hierarchy with l_max_g multipoles. */
 class PhotonsSpecies : public BaseSpecies {
  public:
+  /** Benchmarked against ndf15 across the standard parameter range; see
+   *  BaseSpecies::SupportsExplicitPerturbationEvolver(). */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    return true;
+  }
   static constexpr std::string_view kTypeName = "photons";
 
   explicit PhotonsSpecies(const background& pba)

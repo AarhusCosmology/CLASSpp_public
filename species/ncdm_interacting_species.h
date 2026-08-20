@@ -8,6 +8,12 @@
 
 class NCDMInteractingSpecies : public NCDMSpecies {
  public:
+  /** Deliberately NOT inheriting the parent's opt-in: this sector adds stiffness
+   *  and has not been benchmarked against ndf15 with an explicit evolver.
+   *  See BaseSpecies::SupportsExplicitPerturbationEvolver(). */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    return false;
+  }
   static constexpr std::string_view kTypeName = "ncdm_self_interacting";
 
   // New input path: parameters read from PFC under <instance_name>.<field>

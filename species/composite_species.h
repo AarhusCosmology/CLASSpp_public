@@ -128,6 +128,16 @@ class CompositeSpecies : public BaseSpecies {
       out.push_back({c->name(), c->Rho(pvecback_today) / rho_crit, BudgetBucketOf(*c)});
   }
 
+  /** A composite is explicit-evolver safe only if every child is. Unlike
+   *  HasNcdm() this DOES scan children: the question is about the stiffness of
+   *  the merged system, to which each child contributes its own equations. */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    for (const auto& c : children_)
+      if (!c->SupportsExplicitPerturbationEvolver())
+        return false;
+    return true;
+  }
+
   /** Sums GetRadiationOmega0() over all children (dark-radiation children
    *  contribute their Omega0; matter children contribute 0). */
   double GetRadiationOmega0() const override {
