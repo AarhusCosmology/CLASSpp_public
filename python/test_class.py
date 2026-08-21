@@ -903,6 +903,49 @@ class TestReviewRegressions(TestClass):
         self.cosmo.compute()
         self.assertTrue(self.cosmo.state)
 
+    def test_tensor_spectrum_does_not_depend_on_l_max_ncdm(self):
+        """With tensor_method = massless_approximation the massive neutrinos are
+        evolved through the pv-owned relativistic hierarchy, which runs to
+        l_max_ur; the ncdm hierarchy depth is not used at all, so the tensor
+        spectrum must be independent of l_max_ncdm.
+
+        It was not. perturb_workspace_init sized the free-streaming array s_l
+        from the species present -- l_max_ncdm + 1 entries when N_ur = 0 -- while
+        the hierarchy indexed it to l_max_ur, so the spectrum was built partly
+        from whatever lay past the end of the buffer. l_max_ncdm therefore chose
+        how much heap garbage got read: NaN about half the time, different
+        numbers otherwise."""
+        scenario = {
+            'N_ur': 0.0,
+            'N_ncdm': 1,
+            'm_ncdm': 0.06,
+            'deg_ncdm': 3.0,
+            'output': 'tCl',
+            'modes': 't',
+            'gauge': 'newtonian',
+        }
+        self.scenario = dict(scenario)
+
+        shallow, deep = Class(), Class()
+        try:
+            shallow.set(dict(self.verbose, **scenario, **{'l_max_ncdm': 10}))
+            shallow.compute()
+            deep.set(dict(self.verbose, **scenario, **{'l_max_ncdm': 16}))
+            deep.compute()
+
+            cl_shallow = shallow.raw_cl(100)['tt']
+            cl_deep = deep.raw_cl(100)['tt']
+            self.assertTrue(np.all(np.isfinite(cl_shallow)), "tensor TT is not finite")
+            self.assertTrue(np.all(np.isfinite(cl_deep)), "tensor TT is not finite")
+            np.testing.assert_allclose(
+                cl_shallow, cl_deep, rtol=1e-10,
+                err_msg="tensor TT depends on l_max_ncdm, which it does not use")
+        finally:
+            deep.struct_cleanup()
+            deep.empty()
+            shallow.struct_cleanup()
+            shallow.empty()
+
     def test_drmd_without_idr_drmd_computes(self):
         scenario = {
             'z_stop': 1.0e4,

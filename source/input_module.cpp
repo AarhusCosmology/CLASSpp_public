@@ -937,6 +937,24 @@ void InputModule::ReadDerived() {
     }
   }
 
+  /** - how injected energy is split between deposition channels */
+  if (auto chi_type = pfc->get<std::string>("chi_type")) {
+    bool recognized = false;
+    if (*chi_type == "Galli_2013") {
+      pth->chi_type = deposition_Galli_2013;
+      recognized    = true;
+    }
+    if (*chi_type == "legacy") {
+      pth->chi_type = deposition_legacy;
+      recognized    = true;
+    }
+
+    class_test_severe(!recognized,
+                      "could not identify chi_type value, check that it is one of 'Galli_2013' "
+                      "(the tabulated fractions of Galli et al. 2013, the default) or 'legacy' "
+                      "(the analytic fits CLASS used before, for reproducing older results)");
+  }
+
   /** - reionization parametrization */
   if (auto reio_parametrization = pfc->get<std::string>("reio_parametrization")) {
     bool recognized = false;

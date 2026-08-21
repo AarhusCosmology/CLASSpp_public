@@ -1865,6 +1865,15 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
       ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ur);
     if (all_species_.has_ncdm())
       ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ncdm);
+    /* The tensor relativistic-neutrino hierarchy is owned by pv rather than by a
+       species, and always runs to l_max_ur -- including when it is fed by
+       massless-approximated ncdm instead of by a UR species (see the
+       tensor_ur_layout setup, which sets l_max = ppr->l_max_ur unconditionally).
+       Sizing s_l from the species present alone therefore left it l_max_ncdm + 1
+       entries long whenever N_ur = 0 with a massive neutrino, while the
+       hierarchy indexed it to l_max_ur. */
+    if (evolve_tensor_ur_)
+      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ur);
   }
 
   /** - Allocate \f$ s_l\f$[ ] array for freestreaming of multipoles (see arXiv:1305.3261) and initialize

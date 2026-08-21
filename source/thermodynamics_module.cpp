@@ -2778,20 +2778,10 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
       double energy_rate;
       thermodynamics_energy_injection(preco, z, &energy_rate);
 
-      // old approximation from Chen and Kamionkowski:
-      // chi_heat = (1.+2.*preio->reionization_table[i*preio->re_size+preio->index_re_xe])/3.;
-
-      // coefficient as revised by Slatyer et al. 2013
-      // (in fact it is a fit by Vivian Poulin of columns 1 and 2 in Table V
-      // of Slatyer et al. 2013):
       xe = preio->reionization_table[i * preio->re_size + preio->index_re_xe];
-      double chi_heat;
-      if (xe < 1.)
-        chi_heat = std::min(0.996857 * (1. - pow(1. - pow(xe, 0.300134), 1.51035)), 1.0);
-      else
-        chi_heat = 1.;
+      const EnergyDeposition dep = energy_deposition_fractions(pth->chi_type, xe);
 
-      dTdz += -2. / (3. * _k_B_) * energy_rate * chi_heat / (preco->Nnow * pow(1. + z, 3)) /
+      dTdz += -2. / (3. * _k_B_) * energy_rate * dep.heat / (preco->Nnow * pow(1. + z, 3)) /
               (1. + preco->fHe +
                preio->reionization_table[i * preio->re_size + preio->index_re_xe]) /
               (pvecback[background_module_->index_bg_H_] * _c_ / _Mpc_over_m_ *
@@ -3702,6 +3692,12 @@ void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
   double energy_rate;
   thermodynamics_energy_injection(preco, z, &energy_rate);
 
+  /* Fractions of that rate reaching each deposition channel. Skipped entirely
+     when nothing is being injected -- the default -- so the usual path does not
+     pay for a spline evaluation per derivative call. */
+  const EnergyDeposition dep = (energy_rate > 0.) ? energy_deposition_fractions(pth->chi_type, x)
+                                                  : EnergyDeposition{0., 0., 0., 0., 0.};
+
   /* Hz is H in inverse seconds (while pvecback returns [H0/c] in inverse Mpcs) */
   double Hz = pvecback[background_module_->index_bg_H_] * _c_ / _Mpc_over_m_;
 
@@ -3814,20 +3810,9 @@ void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
       C = 1.;
     }
 
-    /* For DM annihilation: fraction of injected energy going into
-       ionization and Lya excitation */
-
-    /* - old approximation from Chen and Kamionkowski: */
-
-    //chi_ion_H = (1.-x)/3.;
-
-    /* coefficient as revised by Slatyer et al. 2013 (in fact it is a fit by Vivian Poulin of columns 1 and 2 in Table V of Slatyer et al. 2013): */
-
-    double chi_ion_H = 0.;
-    if (x < 1.)
-      chi_ion_H = 0.369202 * pow(1. - pow(x, 0.463929), 1.70237);
-    else
-      chi_ion_H = 0.;
+    /* For DM annihilation: fractions of the injected energy going into hydrogen
+       ionization and into Lyman-alpha excitation. The escape probability C splits
+       the excitation channel the way RECFAST's three-level atom sees it. */
 
     /* evolution of hydrogen ionisation fraction: */
 
@@ -3836,7 +3821,7 @@ void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
 
     dy[0] = (x * x_H * n * Rdown - Rup * (1. - x_H) * exp(-preco->CL / Tmat)) * C /
                 (Hz * (1. + z)) /* Peeble's equation with fudged factors */
-            - energy_rate * chi_ion_H / n * (1. / _L_H_ion_ + (1. - C) / _L_H_alpha_) /
+            - energy_rate / n * (dep.ion_H / _L_H_ion_ + dep.lya * (1. - C) / _L_H_alpha_) /
                   (_h_P_ * _c_ * Hz *
                    (1. + z)); /* energy injection (neglect fraction going to helium) */
   }
@@ -3887,18 +3872,9 @@ void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
   else {
     /* equations modified to take into account energy injection from dark matter */
 
-    //chi_heat = (1.+2.*preio->reionization_table[i*preio->re_size+preio->index_re_xe])/3.; // old approximation from Chen and Kamionkowski
-
-    // coefficient as revised by Slatyer et al. 2013 (in fact it is a fit by Vivian Poulin of columns 1 and 2 in Table V of Slatyer et al. 2013)
-    double chi_heat = 0.;
-    if (x < 1.)
-      chi_heat = std::min(0.996857 * (1. - pow(1. - pow(x, 0.300134), 1.51035)), 1.0);
-    else
-      chi_heat = 1.;
-
     dy[2] = preco->CT * pow(Trad, 4) * x / (1. + x + preco->fHe) * (Tmat - Trad) / (Hz * (1. + z)) +
             2. * Tmat / (1. + z) -
-            2. / (3. * _k_B_) * energy_rate * chi_heat / n / (1. + preco->fHe + x) /
+            2. / (3. * _k_B_) * energy_rate * dep.heat / n / (1. + preco->fHe + x) /
                 (Hz * (1. + z)); /* energy injection */
   }
 }

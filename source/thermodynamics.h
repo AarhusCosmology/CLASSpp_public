@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "background.h"
+#include "energy_deposition.h"
 //#include "arrays.h"
 //#include "helium.h"
 //#include "hydrogen.h"
@@ -122,6 +123,9 @@ struct thermo {
   std::vector<double> reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
 
   /** parameters for energy injection */
+
+  enum energy_deposition_function chi_type =
+      deposition_Galli_2013; /**< how injected energy is split between deposition channels */
 
   double annihilation =
       0.; /**< parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */

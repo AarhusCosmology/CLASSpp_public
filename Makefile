@@ -5,6 +5,7 @@ TEST_TARGETS := \
 	test-parser \
 	test-precision-evolver \
 	test-errors \
+	test-deposition \
 	test-bisection \
 	test-quadrature \
 	test-decay-kernel \
