@@ -2578,6 +2578,12 @@ void precision::parse(const FileContent& fc) {
   read(fc, "start_large_k_at_tau_h_over_tau_k", start_large_k_at_tau_h_over_tau_k);
   read(fc, "tight_coupling_trigger_tau_c_over_tau_h", tight_coupling_trigger_tau_c_over_tau_h);
   read(fc, "tight_coupling_trigger_tau_c_over_tau_k", tight_coupling_trigger_tau_c_over_tau_k);
+  read(fc,
+       "tight_coupling_trigger_tau_c_over_tau_h_ten",
+       tight_coupling_trigger_tau_c_over_tau_h_ten);
+  read(fc,
+       "tight_coupling_trigger_tau_c_over_tau_k_ten",
+       tight_coupling_trigger_tau_c_over_tau_k_ten);
   read(fc, "start_sources_at_tau_c_over_tau_h", start_sources_at_tau_c_over_tau_h);
   read(fc, "tight_coupling_approximation", tight_coupling_approximation);
   read(fc,

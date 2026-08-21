@@ -79,6 +79,23 @@ class FileContent {
     return read_params_.count(name) > 0;
   }
 
+  /** Legacy-NCDM transmutation state.
+   *
+   *  TransmuteLegacyStandardNcdmToDot writes ncdm__N.* keys, and its own
+   *  collision guard rejects exactly those keys, so it must run at most once per
+   *  FileContent -- while every shooting target (100*theta_s, Omega_dcdmdr, ...)
+   *  reparses the same FileContent. This flag is deliberately NOT a parameter:
+   *  the parameter map accepts arbitrary user-supplied names, so a sentinel key
+   *  there could be set from an input file and would silently suppress the
+   *  transmutation and its collision guard. It also survives mark_all_unread(),
+   *  which only clears read state. */
+  bool legacy_ncdm_transmuted() const {
+    return legacy_ncdm_transmuted_;
+  }
+  void set_legacy_ncdm_transmuted() {
+    legacy_ncdm_transmuted_ = true;
+  }
+
   /** Return every instance name N such that the entry "N.<field>" has the
    *  given value. The dot is a literal separator; N must match the instance
    *  regex [A-Za-z_][A-Za-z0-9_]*. Results are returned in insertion order.
@@ -93,6 +110,7 @@ class FileContent {
   std::vector<std::string> keys_; /**< insertion-order key list */
   std::map<std::string, std::string> params_;
   mutable std::set<std::string> read_params_;
+  bool legacy_ncdm_transmuted_ = false;
 
  public:
   /** Invoke @p fn for every parameter in insertion order.

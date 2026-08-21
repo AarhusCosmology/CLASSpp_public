@@ -87,7 +87,7 @@ struct precision {
    * Default stepsize in conformal time for the background integration,
    * in units for the conformal Hubble time. dtau = back_integration_stepsize/aH
    */
-  double back_integration_stepsize = 7.e-3;
+  double back_integration_stepsize = 0.07;
   /**
    * Tolerance of the background integration, giving the allowed relative integration error.
    * Passed to the evolver in background_solve_evolver(). The default is 1e-6 (not the
@@ -95,7 +95,7 @@ struct precision {
    * output points capped the step size and the step count acted as the effective precision
    * knob; the evolver instead relies on this tolerance directly, so it must be tight.
    */
-  double tol_background_integration = 1.e-6;
+  double tol_background_integration = 1e-7;
   /**
    * Tolerance of the deviation of \f$ \Omega_r \f$ from 1 for which to start integration:
    * The starting point of integration will be chosen,
@@ -114,7 +114,7 @@ struct precision {
    * non-cold dark matter phase-space distributions in the synchronous gauge.
    * The convenience input key "tol_ncdm" sets both this and tol_ncdm_newtonian.
    */
-  double tol_ncdm_synchronous = 3.4e-3;
+  double tol_ncdm_synchronous = 0.03;
   /**
    * Tolerance on the relative precision of the integration over
    * non-cold dark matter phase-space distributions in the newtonian gauge.
@@ -157,7 +157,7 @@ struct precision {
   /**
    * The initial z for the recfast calculation of the recombination history, e.g. 10^4
    */
-  double recfast_z_initial = 1.0e4;
+  double recfast_z_initial = 20000.;
   /**
    * Number of recfast integration steps, e.g. if this is 1.10^4 and the previous one is 10^4, the step will be Delta z = 0.5
    */
@@ -238,15 +238,15 @@ struct precision {
   double recfast_H_frac =
       1.0e-3; /**< from recfast 1.4, specifies the time at which the temperature evolution is calculated by the more precise equation */
 
-  double reionization_z_start_max = 50.0;   /**< Maximum starting value in z for reionization */
-  double reionization_sampling    = 5.0e-2; /**< Sampling density in z during reionization */
+  double reionization_z_start_max = 50.0; /**< Maximum starting value in z for reionization */
+  double reionization_sampling    = 0.01; /**< Sampling density in z during reionization */
   double reionization_optical_depth_tol =
       1.0e-4; /**< Relative tolerance on finding the user-given optical depth of reionization given a certain redshift of reionization */
   double reionization_start_factor =
       8.0; /**< Searching optical depth corresponding to the redshift is started from an initial offset beyond z_reionization_start, multiplied by reionization_width */
 
   int thermo_rate_smoothing_radius =
-      50; /**< Smoothing in redshift of the variation rate of \f$ \exp(-\kappa) \f$, g, and \f$ \frac{dg}{d\tau} \f$ that is used as a timescale afterwards */
+      10; /**< Smoothing in redshift of the variation rate of \f$ \exp(-\kappa) \f$, g, and \f$ \frac{dg}{d\tau} \f$ that is used as a timescale afterwards */
 
   std::string hyrec_Alpha_inf_file =
       "/hyrec/Alpha_inf.dat"; /**< File containing the alpha parameter of hyrec */
@@ -261,11 +261,11 @@ struct precision {
   double k_max_tau0_over_l_max =
       1.8; /**< number defining k_max for the computation of Cl's (dimensionless): (k_max tau_0)/l_max, usually chosen around two. Since v3.2.2, the separate full-Limber grid keeps CMB lensing accurate at high l, allowing the standard transfer grid to stop at 1.8 instead of 2.4. */
   double k_step_sub =
-      0.05; /**< step in k space, in units of one period of acoustic oscillation at decoupling, for scales inside sound horizon at decoupling */
+      0.08; /**< step in k space, in units of one period of acoustic oscillation at decoupling, for scales inside sound horizon at decoupling */
   double k_step_super =
       0.002; /**< step in k space, in units of one period of acoustic oscillation at decoupling, for scales above sound horizon at decoupling */
   double k_step_transition =
-      0.2; /**< dimensionless number regulating the transition from 'sub' steps to 'super' steps. Decrease for more precision. */
+      0.4; /**< dimensionless number regulating the transition from 'sub' steps to 'super' steps. Decrease for more precision. */
   double k_step_super_reduction =
       0.1; /**< the step k_step_super is reduced by this amount in the k-->0 limit (below scale of Hubble and/or curvature radius) */
 
@@ -285,7 +285,7 @@ struct precision {
       4.0; /**< in ln(k) space, width of the BAO region where sampling is finer: this number gives roughly the number of BAO oscillations well resolved on both sides of the central value (recommended: 4, i.e. finest sampling from before first up to 3+4=7th peak) */
 
   double start_small_k_at_tau_c_over_tau_h =
-      0.0015; /**< largest wavelengths start being sampled when universe is sufficiently opaque. This is quantified in terms of the ratio of thermo to hubble time scales, \f$ \tau_c/\tau_H \f$. Start when start_largek_at_tau_c_over_tau_h equals this ratio. Decrease this value to start integrating the wavenumbers earlier in time. */
+      0.006; /**< largest wavelengths start being sampled when universe is sufficiently opaque. This is quantified in terms of the ratio of thermo to hubble time scales, \f$ \tau_c/\tau_H \f$. Start when start_largek_at_tau_c_over_tau_h equals this ratio. Decrease this value to start integrating the wavenumbers earlier in time. */
 
   double start_large_k_at_tau_h_over_tau_k =
       0.07; /**< largest wavelengths start being sampled when mode is sufficiently outside Hubble scale. This is quantified in terms of the ratio of hubble time scale to wavenumber time scale, \f$ \tau_h/\tau_k \f$ which is roughly equal to (k*tau). Start when this ratio equals start_large_k_at_tau_k_over_tau_h. Decrease this value to start integrating the wavenumbers earlier in time. */
@@ -306,7 +306,23 @@ struct precision {
    * tight_coupling_trigger_tau_c_over_tau_k.
    * Decrease this value to switch off earlier in time.
    */
-  double tight_coupling_trigger_tau_c_over_tau_k = 0.01;
+  double tight_coupling_trigger_tau_c_over_tau_k = 0.04;
+
+  /** Tensor-mode counterparts of the two tight-coupling triggers above.
+   *
+   *  The two modes want different values. The scalar TCA has a proper hierarchy
+   *  of closures (tight_coupling_approximation, first_order_MB ... second-order),
+   *  so it tolerates a late switch-off. The tensor TCA has none: while it is on,
+   *  perturbations_module.cpp sets shear_g = pol2_g = 0 identically, and the
+   *  photon polarization quadrupole IS the tensor B-mode source. Extending TCA
+   *  therefore suppresses BB directly -- measured at 14% over l = 100-300 when
+   *  the shared trigger moved 0.01 -> 0.04, with every tight_coupling_approximation
+   *  scheme giving exactly the same answer because none of them reaches tensors.
+   *
+   *  Defaults reproduce the pre-2026-08-21 shared values, so tensors are
+   *  unaffected by loosening the scalar trigger. */
+  double tight_coupling_trigger_tau_c_over_tau_h_ten = 0.015;
+  double tight_coupling_trigger_tau_c_over_tau_k_ten = 0.01;
 
   double start_sources_at_tau_c_over_tau_h =
       0.008; /**< sources start being sampled when universe is sufficiently opaque. This is quantified in terms of the ratio of thermo to hubble time scales, \f$ \tau_c/\tau_H \f$. Start when start_sources_at_tau_c_over_tau_h equals this ratio. Decrease this value to start sampling the sources earlier in time. */
@@ -336,7 +352,7 @@ struct precision {
   int l_max_idr =
       17; /**< number of momenta in Boltzmann hierarchy for interacting dark radiation */
   int l_max_ncdm =
-      17; /**< number of momenta in Boltzmann hierarchy for relativistic neutrino/relics (scalar), at least 4 */
+      10; /**< number of momenta in Boltzmann hierarchy for relativistic neutrino/relics (scalar), at least 4 */
   int l_max_g_ten =
       5; /**< number of momenta in Boltzmann hierarchy for photon temperature (tensor), at least 4 */
   int l_max_pol_g_ten =
@@ -359,13 +375,13 @@ struct precision {
    * Age fraction above which source sampling is twice as fine. This improves
    * the low-l CMB lensing line-of-sight integral; 1.0 disables the boost.
    */
-  double perturbations_sampling_boost_above_age_fraction = 0.9;
+  double perturbations_sampling_boost_above_age_fraction = 1.;
 
   /**
    * control parameter for the precision of the perturbation integration,
    * IMPORTANT FOR SETTING THE STEPSIZE OF NDF15
    */
-  double tol_perturb_integration = 1.0e-5;
+  double tol_perturb_integration = 0.0001;
 
   /**
    * cutoff relevant for controlling stiffness in the PPF scheme. It is
@@ -380,7 +396,7 @@ struct precision {
    * times at which sources start being sampled, and at which
    * approximations must be switched on/off (units of Mpc)
    */
-  double tol_tau_approx = 1.0e-10;
+  double tol_tau_approx = 1e-6;
 
   /**
    * method for switching off photon perturbations
@@ -393,7 +409,7 @@ struct precision {
    * shear and higher momenta to zero):
    * first condition: \f$ k \tau \f$ > radiation_streaming_trigger_tau_h_over_tau_k
    */
-  double radiation_streaming_trigger_tau_over_tau_k = 45.0;
+  double radiation_streaming_trigger_tau_over_tau_k = 26.;
 
   /**
    * when to switch off photon perturbations, ie when to switch
@@ -417,7 +433,7 @@ struct precision {
    * when to switch off ur (massless neutrinos / ultra-relativistic
    * relics) fluid approximation
    */
-  double ur_fluid_trigger_tau_over_tau_k = 30.0;
+  double ur_fluid_trigger_tau_over_tau_k = 20.;
 
   int ncdm_fluid_approximation = static_cast<int>(
       ncdmfa_method::ncdmfa_CLASS); /**< method for non-cold dark matter fluid approximation */
@@ -426,13 +442,13 @@ struct precision {
    * when to switch off ncdm (massive neutrinos / non-cold
    * relics) fluid approximation
    */
-  double ncdm_fluid_trigger_tau_over_tau_k = 31.0;
+  double ncdm_fluid_trigger_tau_over_tau_k = 15.;
 
   /**
    * whether CMB source functions can be approximated as zero when
    * visibility function g(tau) is tiny
    */
-  double neglect_CMB_sources_below_visibility = 1.0e-3;
+  double neglect_CMB_sources_below_visibility = 0.008;
 
   /**
    * The type of evolver to use: options are ndf15, rk, rkdp45 or etd.
@@ -516,7 +532,7 @@ struct precision {
   double hyper_nu_sampling_step =
       1000.0; /**< open/closed cases: value of nu at which sampling changes  */
   double hyper_phi_min_abs =
-      1.0e-10; /**< small value of Bessel function used in calculation of first point x (\f$ \Phi_l^{\nu}(x) \f$ equals hyper_phi_min_abs) */
+      1e-8; /**< small value of Bessel function used in calculation of first point x (\f$ \Phi_l^{\nu}(x) \f$ equals hyper_phi_min_abs) */
   double hyper_x_tol = 1.0e-4; /**< tolerance parameter used to determine first value of x */
   double hyper_flat_approximation_nu =
       4000.0; /**< value of nu below which the flat approximation is used to compute Bessel function */
@@ -526,7 +542,7 @@ struct precision {
   // UNHANDLED: (comoving angular diameter distance to
   // UNHANDLED: recombination), very important for CMB */
 
-  double q_logstep_spline = 170.0; /**< initial logarithmic sampling step in q
+  double q_logstep_spline = 400.; /**< initial logarithmic sampling step in q
   // UNHANDLED: space, in units of \f$ 2\pi/r_a(\tau_{rec})\f$
   // UNHANDLED: (comoving angular diameter distance to
   // UNHANDLED: recombination), very important for CMB and LSS */
@@ -555,18 +571,18 @@ struct precision {
   // UNHANDLED: must be smooth for spline) */
 
   double q_logstep_limber =
-      1.025; /**< logarithmic q-step ratio for the separate full-Limber CMB lensing grid */
+      1.1; /**< logarithmic q-step ratio for the separate full-Limber CMB lensing grid */
   double k_max_limber_over_l_max_scalars =
-      0.001; /**< full-Limber perturbation source cutoff k_max/l_max_scalars in 1/Mpc */
+      0.0005; /**< full-Limber perturbation source cutoff k_max/l_max_scalars in 1/Mpc */
 
   double transfer_neglect_delta_k_S_t0 =
       0.15; /**< for temperature source function T0 of scalar mode, range of k values (in 1/Mpc) taken into account in transfer function: for l < (k-delta_k)*tau0, ie for k > (l/tau0 + delta_k), the transfer function is set to zero */
   double transfer_neglect_delta_k_S_t1 =
       0.04; /**< same for temperature source function T1 of scalar mode */
   double transfer_neglect_delta_k_S_t2 =
-      0.15; /**< same for temperature source function T2 of scalar mode */
+      0.12; /**< same for temperature source function T2 of scalar mode */
   double transfer_neglect_delta_k_S_e =
-      0.11; /**< same for polarization source function E of scalar mode */
+      1.; /**< same for polarization source function E of scalar mode */
   double transfer_neglect_delta_k_V_t1 =
       1.0; /**< same for temperature source function T1 of vector mode */
   double transfer_neglect_delta_k_V_t2 =
@@ -586,7 +602,7 @@ struct precision {
       400.0; /**< value of l below which the CMB source functions can be neglected at late time, excepted when there is a Late ISW contribution */
 
   double l_switch_limber =
-      10.; /**< when to use the Limber approximation for project gravitational potential cl's */
+      40.; /**< when to use the Limber approximation for project gravitational potential cl's */
   // For density Cl, we recommend not to use the Limber approximation
   // at all, and hence to put here a very large number (e.g. 10000); but
   // if you have wide and smooth selection functions you may wish to

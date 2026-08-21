@@ -209,6 +209,59 @@ int main() {
     assert(result[0].species->GetOmega0() > 0.);
   }
 
+  // ── Legacy N_ncdm transmutation must be idempotent ──
+  //
+  // Regression for the 100*theta_s + N_ncdm abort: TransmuteLegacyStandardNcdmToDot
+  // writes ncdm__N.* keys and its own collision guard rejects exactly those keys,
+  // so a second parse of the same FileContent used to die on the first parse's
+  // work. Every shooting target (100*theta_s, Omega_dcdmdr, Omega_ini_dcdm)
+  // performs that second parse.
+  {
+    FileContent fc;
+    fc.set("N_ncdm", "1");
+    fc.set("m_ncdm", "0.06");
+    fc.set("T_ncdm", "0.71611");
+
+    NcdmSettings settings = TestSettings();
+    SpeciesBuildContext ctx{};
+    ctx.pfc           = &fc;
+    ctx.pba           = &pba;
+    ctx.ncdm_settings = &settings;
+
+    auto first = NCDMSpecies::CreateAll(ctx);
+    assert(first.size() == 1);
+    assert(fc.legacy_ncdm_transmuted());
+
+    // The shooting loop does exactly this before re-reading.
+    fc.mark_all_unread();
+    auto second = NCDMSpecies::CreateAll(ctx);
+    assert(second.size() == 1);
+    assert(second[0].species->GetOmega0() > 0.);
+  }
+
+  // ── ...but a genuine clash is still rejected on the first pass ──
+  {
+    FileContent fc;
+    fc.set("N_ncdm", "1");
+    fc.set("m_ncdm", "0.06");
+    fc.set("ncdm__1.m", "0.12");  // hand-written, collides with the synthesised name
+
+    NcdmSettings settings = TestSettings();
+    SpeciesBuildContext ctx{};
+    ctx.pfc           = &fc;
+    ctx.pba           = &pba;
+    ctx.ncdm_settings = &settings;
+
+    bool threw = false;
+    try {
+      NCDMSpecies::CreateAll(ctx);
+    }
+    catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
   printf("ncdm_family_test: all assertions passed\n");
   return 0;
 }

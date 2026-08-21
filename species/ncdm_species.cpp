@@ -121,7 +121,20 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
     return;  // nothing to transmute
   }
 
-  // 2. Synthesised prefix collision check.
+  // 1b. Idempotence. Every shooting target (100*theta_s, Omega_dcdmdr,
+  // Omega_ini_dcdm, ...) reparses the *same* FileContent, so this function runs
+  // more than once on it. The keys it writes in step 3 are exactly the ones the
+  // collision check in step 2 rejects, so without this guard the second pass
+  // aborts on the work the first pass did -- which made 100*theta_s unusable
+  // with any massive neutrino. The flag lives on the FileContent itself rather
+  // than in the parameter map, which a user could write to.
+  if (pfc.legacy_ncdm_transmuted()) {
+    return;
+  }
+
+  // 2. Synthesised prefix collision check. Reached only on the first pass, so a
+  // genuine clash between hand-written ncdm__N.* keys and legacy N_ncdm keys is
+  // still caught.
   for (int i = 1; i <= N; ++i) {
     const std::string prefix = "ncdm__" + std::to_string(i);
     class_test_severe(any_dot_key_with_prefix(pfc, prefix),
@@ -129,6 +142,7 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
                       "your dot instance or remove the legacy N_ncdm keys",
                       prefix.c_str());
   }
+  pfc.set_legacy_ncdm_transmuted();
 
   // 3. For each legacy CSV field, broadcast or distribute per instance.
   for (const auto& fm : kLegacyStandardFields) {

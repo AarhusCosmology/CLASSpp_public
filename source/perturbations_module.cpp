@@ -4251,8 +4251,8 @@ void PerturbationsModule::perturb_approximations(int index_md,
       tau_c = 1. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
 
       /** - ----> (b.2.b) check whether tight-coupling approximation should be on */
-      if ((tau_c / tau_h < ppr->tight_coupling_trigger_tau_c_over_tau_h) &&
-          (tau_c / tau_k < ppr->tight_coupling_trigger_tau_c_over_tau_k)) {
+      if ((tau_c / tau_h < ppr->tight_coupling_trigger_tau_c_over_tau_h_ten) &&
+          (tau_c / tau_k < ppr->tight_coupling_trigger_tau_c_over_tau_k_ten)) {
         ppw->approx[ppw->index_ap_tca] = (int) tca_on;
       }
       else {
