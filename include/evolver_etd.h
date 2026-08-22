@@ -42,8 +42,7 @@
  *
  * Derivation, the stability/cost measurements behind the order-4 and dense-output
  * choices, and the rejected alternatives (ndf15, phi-lifted DP54, published EPIRK
- * 5(4) pairs) are in docs/superpowers/specs/2026-08-06-etdrk4-perturbations-design.md
- * and docs/superpowers/plans/2026-08-06-etdrk4-perturbations.md.
+ * 5(4) pairs) are in docs/superpowers/specs/2026-08-06-etdrk4-perturbations-design.md.
  *
  * `derivs_diagonal` may be null, in which case the diagonal is taken as zero
  * throughout. minimum_variation, evaluate_timescale and timestep_over_timescale are

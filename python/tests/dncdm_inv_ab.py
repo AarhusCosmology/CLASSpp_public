@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""dncdm_inv_ab.py -- DNCDM inverse-decay A/B validation driver (plan Task 3.4).
+"""dncdm_inv_ab.py -- DNCDM inverse-decay A/B validation driver.
 
 NOT a `make test` / CTest target -- deliberately excluded from CMakeLists.txt and
-Makefile TEST_TARGETS (per docs/superpowers/plans/2026-07-24-dncdm-inverse-qs-plan.md
-Task 3.4). This is a documented driver script you run by hand (or as a separate CI
-step). It implements the "Background validation ladder" from that plan:
+Makefile TEST_TARGETS, because its default mode builds a scratch reference binary
+from `origin/master` (see --decay-only below). It is a driver script you run by
+hand, or as a separate CI step, rather than a unit test. It implements the
+background rungs of the validation ladder in section 7 of
+docs/superpowers/specs/2026-07-24-dncdm-inverse-decay-qs-design.md:
 
   --decay-only
       `inverse_decays=no` (or unset) takes the byte-for-byte UNCHANGED

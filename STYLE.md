@@ -286,7 +286,56 @@ These tools are part of the definition of correctness.
 
 ---
 
-# 14. Guiding Principle
+# 14. Design Documentation
+
+Non-trivial work gets a **design spec**, committed under
+`docs/superpowers/specs/` and named `YYYY-MM-DD-<topic>-design.md`. A spec states
+the problem, the approach taken, the alternatives rejected and why, and how the
+result is verified. Write it to be read a year later by someone who did not do
+the work.
+
+Step-by-step **implementation plans are not committed.** Write one if it helps
+you execute, and keep it out of the repo. The commit history and the spec are the
+durable record; a task list is scaffolding that goes stale the moment execution
+diverges from it, and it is never updated to say so.
+
+* Cite the spec from the code whose rationale it carries, by path, at the
+  relevant declaration — see the file comments in `include/evolver_etd.h` and
+  `species/dncdm_proxy_species.h`. Prose does the same where it needs to: the
+  error-handling rules in section 8 close by naming the spec behind them.
+* Record measured numbers in the spec, or in a companion
+  `YYYY-MM-DD-<topic>-results.md`. Results nobody wrote down get re-measured.
+
+## 14.1 A spec need not match the code
+
+It must be honest about itself. Keeping a design document in sync with an evolving
+implementation is a bargain you lose, and specs that pretend otherwise are the ones
+nobody trusts. The requirement is narrower: **a spec must never misrepresent what
+shipped.** A reader cannot tell a carried-out recommendation from a pending one, or
+a dropped section from an implemented one, unless you say which it is.
+
+Two conventions discharge that, both cheap, both already used here:
+
+* **A status header.** One dated block at the top saying what shipped, what did
+  not, and what superseded it. Correct an earlier spec *by reference* rather than
+  editing it: `2026-08-12-dncdm-reduced-operator-galerkin-results.md` names the
+  exact sections of its design note it overrides and the ones that still stand.
+  A spec written as recommendations needs this most — an imperative table reads
+  as pending work forever until a header says it was executed.
+* **Evidence tags.** Mark what you did not verify yourself. The disposition tables
+  in `2026-08-17-dncdm-minimal-knob-set.md` tag every row: **[M]** measured here,
+  **[C]** stated by the code, **[P]** earlier campaign, not re-measured, **[?]** no
+  evidence — do not act on this without checking. The **[?]** on `dr_rate_cap` is
+  why that knob is still in the code while fifteen of the knobs tabulated
+  alongside it are gone.
+
+What ages well is rationale, rejected alternatives, and dated measurements: those
+are facts about a moment and stay true. What ages badly is interface detail — knob
+and symbol names, paths — which the code documents better anyway. Cite it lightly.
+
+---
+
+# 15. Guiding Principle
 
 When making design decisions:
 
