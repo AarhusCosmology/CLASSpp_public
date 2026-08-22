@@ -737,6 +737,17 @@ struct precision {
 
   double halofit_min_k_max = 5.0; /**< DEPRECATED: should use instead nonlinear_min_k_max */
 
+  double halofit_kR_max = 5.0; /**< halofit's sigma integrals use a Gaussian
+  // UNHANDLED: window exp(-(kR)^2), and are integrated until
+  // UNHANDLED: kR reaches this value, extrapolating the linear
+  // UNHANDLED: P(k) above the computed k_max if needed.
+  // UNHANDLED: sigma itself converges by kR ~
+  // UNHANDLED: sqrt(-log(halofit_sigma_precision)) ~ 1.7, but the
+  // UNHANDLED: third integral carries a weight 4(kR)^2(1-(kR)^2)
+  // UNHANDLED: whose (kR)^4 term needs kR ~ 4 (measured; CAMB
+  // UNHANDLED: uses 4 for its top-hat). Truncating there biases
+  // UNHANDLED: the curvature C and through it P_nl. */
+
   double halofit_k_per_decade = 80.0; /**< halofit needs to evalute integrals
   // UNHANDLED: (linear power spectrum times some
   // UNHANDLED: kernels). They are sampled using

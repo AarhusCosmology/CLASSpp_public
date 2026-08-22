@@ -15,6 +15,17 @@ int main() {
   int idx = bisect_index(0, 9, [](int i) { return i >= 5; });
   assert(idx == 5);
 
+  // Regression (#395): tol below one ulp of the bracket must terminate rather
+  // than spin. tol_tau_approx is an absolute time in Mpc, so tol=1e-12 against
+  // tau ~ 1e4 (one ulp ~ 1.8e-12) is reachable from the input file, and the
+  // approximation-switch bisection used to hang forever on it.
+  double tau = bisect_value(1.0e4, 2.0e4, 1e-12, [](double t) { return t > 1.5e4; });
+  assert(std::fabs(tau - 1.5e4) < 1e-8);
+
+  // Degenerate tolerances must terminate too, at the best available bracket.
+  double zero_tol = bisect_value(1.0e4, 2.0e4, 0.0, [](double t) { return t > 1.5e4; });
+  assert(std::fabs(zero_tol - 1.5e4) < 1e-8);
+
   std::printf("bisection tests passed\n");
   return 0;
 }

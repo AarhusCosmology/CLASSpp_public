@@ -5,6 +5,7 @@ TEST_TARGETS := \
 	test-parser \
 	test-precision-evolver \
 	test-errors \
+	test-tca-ic-guard \
 	test-deposition \
 	test-hyrec \
 	test-bisection \

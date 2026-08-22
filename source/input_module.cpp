@@ -2495,6 +2495,52 @@ void InputModule::ReadDerived() {
              "over first four momenta of non-cold dark matter perturbed phase-space "
              "distribution",
              ppr->l_max_ncdm);
+
+  /* sqrt(-log(halofit_sigma_precision)) sets both the smallest R halofit trusts
+     and, since #399, how far the sigma integrands are extrapolated, so a value
+     outside (0,1) would silently produce a NaN rather than a bad answer. */
+  class_test_severe((ppr->halofit_sigma_precision <= 0.) || (ppr->halofit_sigma_precision >= 1.),
+                    "halofit_sigma_precision=%g must lie strictly between 0 and 1; it is the "
+                    "residual exp(-(kR)^2) at which the sigma(R) integral is called converged.",
+                    ppr->halofit_sigma_precision);
+
+  /* Initial conditions are set inside the tight-coupling approximation (see
+     perturb_vector_init), but integration starts once tau_c/tau_H reaches
+     start_small_k_at_tau_c_over_tau_h, while tight coupling only holds while
+     tau_c/tau_H is below tight_coupling_trigger_tau_c_over_tau_h. Ordered the
+     wrong way round, the smallest wavenumbers start being integrated after
+     tight coupling has already switched off, and perturb_vector_init aborts.
+
+     These are SEVERE because both operands are precision parameters, fixed for
+     a whole run: the pair is invalid as a configuration, not at a point. Left
+     as an ordinary class_test the failure is cosmology-dependent, so a sampler
+     reads it as a zero likelihood and silently carves a hole out of the
+     posterior instead of reporting a broken setup (#395). */
+  if (ppt->has_scalars) {
+    class_test_severe(ppr->start_small_k_at_tau_c_over_tau_h >=
+                          ppr->tight_coupling_trigger_tau_c_over_tau_h,
+                      "inconsistent precision parameters: "
+                      "start_small_k_at_tau_c_over_tau_h=%g must be smaller than "
+                      "tight_coupling_trigger_tau_c_over_tau_h=%g, otherwise the smallest "
+                      "wavenumbers start being integrated after the tight-coupling "
+                      "approximation has switched off and their initial conditions are "
+                      "invalid. Decrease the former or increase the latter.",
+                      ppr->start_small_k_at_tau_c_over_tau_h,
+                      ppr->tight_coupling_trigger_tau_c_over_tau_h);
+  }
+
+  if (ppt->has_tensors) {
+    class_test_severe(ppr->start_small_k_at_tau_c_over_tau_h >=
+                          ppr->tight_coupling_trigger_tau_c_over_tau_h_ten,
+                      "inconsistent precision parameters: "
+                      "start_small_k_at_tau_c_over_tau_h=%g must be smaller than "
+                      "tight_coupling_trigger_tau_c_over_tau_h_ten=%g, otherwise the smallest "
+                      "wavenumbers start being integrated after the tensor tight-coupling "
+                      "approximation has switched off and their initial conditions are "
+                      "invalid. Decrease the former or increase the latter.",
+                      ppr->start_small_k_at_tau_c_over_tau_h,
+                      ppr->tight_coupling_trigger_tau_c_over_tau_h_ten);
+  }
 }
 
 /** Overloaded helpers for type-dispatched precision parameter reading. */
@@ -2812,6 +2858,7 @@ void precision::parse(const FileContent& fc) {
   read(fc, "nonlinear_min_k_max", nonlinear_min_k_max);
   read(fc, "halofit_min_k_nonlinear", halofit_min_k_nonlinear);
   read(fc, "halofit_min_k_max", halofit_min_k_max);
+  read(fc, "halofit_kR_max", halofit_kR_max);
   read(fc, "halofit_k_per_decade", halofit_k_per_decade);
   read(fc, "halofit_sigma_precision", halofit_sigma_precision);
   read(fc, "halofit_tol_sigma", halofit_tol_sigma);

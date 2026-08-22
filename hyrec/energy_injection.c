@@ -133,8 +133,8 @@ double eps_over_mdot_pbh(double Mpbh, double z, double xe, double Teff) {
   X = TS_over_me_pbh(Mpbh, z, xe, Teff);
   
   /* Fit to the (e-e + e-p) free-free Gaunt factor */
-  if (X < 1) G = 4./M_PI * sqrt(2./M_PI/X) *(1.+ 5.5*pow(X, 1.25));
-  else       G = 27./2./M_PI *(log(2.*X*0.56146 + 0.08) + 4./3.);
+  if (X < 1) G = 4./_PI_ * sqrt(2./_PI_/X) *(1.+ 5.5*pow(X, 1.25));
+  else       G = 27./2./_PI_ *(log(2.*X*0.56146 + 0.08) + 4./3.);
 
   return X/1836./137. * G;   /* alpha[fine-struct] * TS/mp * G */
 }

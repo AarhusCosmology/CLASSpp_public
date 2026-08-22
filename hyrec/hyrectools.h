@@ -7,6 +7,13 @@ Also, function to make linear arrays and interpolation routines.
 #define __HYRECTOOLS__
 
 #define SIZE_ErrorM   2048
+
+/* pi. M_PI is a POSIX extension, not standard C or C++, so it is not portable
+   (MSVC only defines it under _USE_MATH_DEFINES). CLASS spells this _PI_ in
+   include/constants.h, but that header includes <cmath> and so cannot be
+   included from these C sources; the value is repeated here rather than adding
+   a C-compatibility guard to a C++ header. */
+#define _PI_ 3.1415926535897932384626433832795e0
 double square(double x); 
 double cube(double x);
 double *create_1D_array(unsigned n1, int *error, char error_message[SIZE_ErrorM]);

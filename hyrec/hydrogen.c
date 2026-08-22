@@ -386,7 +386,7 @@ void interpolate_rates(double Alpha[2], double DAlpha[2], double Beta[2], double
                                 +atomic->logAlpha_tab[l][NTM-1][iTR+2]*coeff2[3]);
 
     /* Beta obtained by detailed balance from Alpha(Tr, Tr) */
-    /* prefactor = pow(2.0 * M_PI * mue *TR / hPc / hPc, 1.5)) * exp(-0.25*EI/TR) */
+    /* prefactor = pow(2.0 * _PI_ * mue *TR / hPc / hPc, 1.5)) * exp(-0.25*EI/TR) */
     Beta[l] = Alpha_eq[l] * SAHA_FACT(fsR, meR) * TR*sqrt(TR) *exp(-0.25*EI/TR)/(2.*l+1.);
   }
 
@@ -719,11 +719,11 @@ void populateTS_2photon(double Trr[2][2], double *Trv[2], double *Tvr[2], double
     }
     /*********************/
 
-    Dtau[b] = Gammab * x1s * cube(hPc/atomic->Eb_tab[b]/fsR/fsR/meR) * nH /8. /M_PI /H;
+    Dtau[b] = Gammab * x1s * cube(hPc/atomic->Eb_tab[b]/fsR/fsR/meR) * nH /8. /_PI_ /H;
     /* Rescaled for alpha, me*/
 
     one_minus_Pib = Dtau[b] > 1e-6 ? 1.- (1.-exp(-Dtau[b]))/Dtau[b] : Dtau[b]/2. - square(Dtau[b])/6.;
-    Tvv[0][b] = Dtau[b] > 0.? Gammab/one_minus_Pib : 2./(x1s * cube(hPc/atomic->Eb_tab[b]/fsR/fsR/meR) * nH /8. /M_PI /H);  /* Added May 2012: proper limit Dtau->0 */
+    Tvv[0][b] = Dtau[b] > 0.? Gammab/one_minus_Pib : 2./(x1s * cube(hPc/atomic->Eb_tab[b]/fsR/fsR/meR) * nH /8. /_PI_ /H);  /* Added May 2012: proper limit Dtau->0 */
     sv[b]  = Tvv[0][b] * x1s * Dfplus[b] * (1.-one_minus_Pib);
 
   }

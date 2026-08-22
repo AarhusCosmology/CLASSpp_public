@@ -35,9 +35,18 @@
    STRUCTURE of the input: key presence, mutual exclusivity, unparseable
    strings, unknown enum names, list-length/count consistency, API-argument
    validation. A severe check must never depend on possibly-varying (numeric)
-   parameters: range checks on parsed values and all numerical failures use
-   class_test/class_stop (std::runtime_error -> CosmoComputationError, the
-   sampler rejects the point and the chain survives). */
+   parameters: range checks on cosmological values and all numerical failures
+   use class_test/class_stop (std::runtime_error -> CosmoComputationError, the
+   sampler rejects the point and the chain survives).
+
+   "Possibly-varying" is the operative test, not "numeric". Precision and
+   run-configuration parameters are fixed for a whole run -- a sampler never
+   varies them -- so a numeric check depending only on those is a statement
+   about the CONFIGURATION and belongs in the severe channel. Putting such a
+   check in class_test is actively harmful: whether it fires is then
+   cosmology-dependent, so the sampler reads a broken setup as zero likelihood
+   and silently carves a hole out of the posterior instead of reporting it
+   (#395). The rule is about who can change the operand, not its type. */
 
 #define class_test_severe(condition, args, ...)                    \
   {                                                                \

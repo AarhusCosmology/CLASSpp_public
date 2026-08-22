@@ -1304,11 +1304,10 @@ void NonlinearModule::nonlinear_indices() {
 }
 
 /**
- * Copy list of k from perturbation module, and extended it if
- * necessary to larger k for extrapolation (currently this
- * extrapolation is required only by HMcode)
- *
- * @return the error status
+ * Copy list of k from perturbation module, and extend it if necessary to
+ * larger k for extrapolation. HMcode extrapolates out to hmcode_max_k_extra;
+ * halofit extrapolates far enough for the tail of its sigma-derivative
+ * integrals (halofit_kR_max, see below).
 */
 
 void NonlinearModule::nonlinear_get_k_list() {
@@ -1319,17 +1318,40 @@ void NonlinearModule::nonlinear_get_k_list() {
   k_size_ = perturbations_module_->k_size_[index_md_scalars_];
   k_max   = perturbations_module_->k_[index_md_scalars_][k_size_ - 1];
 
-  /** - if k extrapolation necessary, compute number of required extra values */
+  /** - if k extrapolation necessary, compute the k it has to reach */
+  double k_extra_max = 0.;
+
   if (pnl->method == nl_HMcode) {
+    k_extra_max = ppr->hmcode_max_k_extra;
+  }
+  else if (pnl->method == nl_halofit) {
+    /* halofit's sigma integrals use a Gaussian window exp(-(kR)^2). sigma
+       itself converges once kR ~ sqrt(-log(halofit_sigma_precision)) ~ 1.7,
+       which is what sets R below in nonlinear_halofit -- but the third integral
+       carries a weight 4(kR)^2(1-(kR)^2) whose (kR)^4 term pushes its support
+       out to kR ~ 4. Stopping the integrand at the computed k_max therefore
+       leaves sigma and n_eff converged while biasing the curvature C (rncur),
+       and through it P_nl by several percent. It only bites when R_nl is small,
+       i.e. when growth is suppressed: measured on an exponential-tracker scalar
+       field, R_nl = 0.45 Mpc gives kR_max = 2.7 and C is 6.7% high, whereas
+       LambdaCDM has R_nl = 4.0 Mpc, kR_max = 22 and is unaffected (#399).
+
+       Extending by extrapolation (as CAMB does for the same integrals) costs
+       integrand points only, not perturbation modes, so this does not raise
+       k_max_for_pk. */
+    k_extra_max = k_max * ppr->halofit_kR_max / sqrt(-log(ppr->halofit_sigma_precision));
+  }
+
+  if (k_extra_max > k_max) {
     index_k = 0;
-    while (k < ppr->hmcode_max_k_extra && index_k < _MAX_NUM_EXTRAPOLATION_) {
+    while (k < k_extra_max && index_k < _MAX_NUM_EXTRAPOLATION_) {
       index_k++;
       k = k_max * pow(10, (double) index_k / ppr->k_per_decade_for_pk);
     }
     class_test(index_k == _MAX_NUM_EXTRAPOLATION_,
                "could not reach extrapolated value k = %.10e starting from k = %.10e with "
                "k_per_decade of %.10e in _MAX_NUM_INTERPOLATION_=%i steps",
-               ppr->hmcode_max_k_extra,
+               k_extra_max,
                k_max,
                ppr->k_per_decade_for_pk,
                _MAX_NUM_EXTRAPOLATION_);
@@ -1982,7 +2004,10 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
           We create a temporary integrand_array which columns will be:
           - k in 1/Mpc
           - just linear P(k) in Mpc**3
-          - 1/(2(pi**2)) P(k) k**2 exp(-(kR)**2) or 1/(2(pi**2)) P(k) k**2 2 (kR) exp(-(kR)**2) or 1/(2(pi**2)) P(k) k**2 4 (kR)(1-kR) exp(-(kR)**2)
+          - 1/(2(pi**2)) P(k) k**2 exp(-(kR)**2), or that times 2 (kR)**2, or that
+            times 4 (kR)**2 (1-(kR)**2), for integral one/two/three respectively.
+            The (kR)**4 in the third one is why it needs a larger kR than sigma:
+            see nonlinear_get_k_list.
           - second derivative of previous line with spline
   */
 
@@ -1993,7 +2018,11 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
   class_define_index(index_ia_ddsum, true, index_ia, 1);
   ia_size = index_ia;
 
-  integrand_size = (int) (log(k_[k_size_ - 1] / k_[0]) / log(10.) * ppr->halofit_k_per_decade) + 1;
+  /* the integrand runs over the extended grid (see nonlinear_get_k_list): above
+     k_[k_size_ - 1] the linear P(k) is the analytic extrapolation, which is what
+     the tail of the sigma-derivative integrals needs. */
+  integrand_size =
+      (int) (log(k_[k_size_extra_ - 1] / k_[0]) / log(10.) * ppr->halofit_k_per_decade) + 1;
 
   integrand_array.resize(integrand_size * ia_size);
 
@@ -2009,7 +2038,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
     }
     else {
       array_interpolate_spline(ln_k_.data(),
-                               k_size_,
+                               k_size_extra_,
                                lnpk_l,
                                ddlnpk_l,
                                1,
@@ -2051,8 +2080,12 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
      other redshifts, so there is normally no need to change i
   */
 
-  R = sqrt(-log(ppr->halofit_sigma_precision)) /
-      integrand_array[(integrand_size - 1) * ia_size + index_ia_k];
+  /* deliberately k_[k_size_ - 1], the largest k that was actually computed,
+     rather than the top of the extended integrand: this R decides at which
+     redshifts halofit declares itself computable, and that claim should not
+     rest on extrapolated power. Keeping it here also avoids defining R from a
+     k_max that was itself derived from R. */
+  R = sqrt(-log(ppr->halofit_sigma_precision)) / k_[k_size_ - 1];
 
   nonlinear_halofit_integrate(integrand_array.data(),
                               integrand_size,
