@@ -70,6 +70,24 @@ static void test_full_family_matches_blanket() {
   assert(p.evolver_perturbations == evolver_type::rkdp45);
 }
 
+// The tsit5 value has to survive the parser and reach the right slot. The driver
+// tests exercise the integrator directly and would not notice if `evolver = 4`
+// were dropped on the floor between the input file and the module dispatch.
+static void test_tsit5_is_parsed() {
+  FileContent fc;
+  fc.set("evolver", "4");
+  const precision p = parsed(fc);
+  assert(p.evolver_background == evolver_type::tsit5);
+  assert(p.evolver_thermodynamics == evolver_type::tsit5);
+  assert(p.evolver_perturbations == evolver_type::tsit5);
+
+  FileContent fc2;
+  fc2.set("evolver_perturbations", "4");
+  const precision p2 = parsed(fc2);
+  assert(p2.evolver_perturbations == evolver_type::tsit5);
+  assert(p2.evolver_background == evolver_type::ndf15);
+}
+
 // Mixing the two spellings is REJECTED rather than resolved by precedence. With
 // a precedence rule, a visible `evolver = 2` plus a stale per-module key in an
 // inherited .pre file would silently run a different integrator than the file
@@ -102,6 +120,7 @@ int main() {
   test_blanket_sets_all();
   test_per_module_is_independent();
   test_full_family_matches_blanket();
+  test_tsit5_is_parsed();
   test_mixing_is_rejected();
   std::printf("precision evolver test passed\n");
   return 0;

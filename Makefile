@@ -10,6 +10,8 @@ TEST_TARGETS := \
 	test-quadrature \
 	test-decay-kernel \
 	test-reduced-operator \
+	test-evolver-erk \
+	test-evolver-erk-config \
 	test-evolver-etd \
 	test-evolver-nonfinite \
 	test-photons \

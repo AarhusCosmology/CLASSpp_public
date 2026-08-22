@@ -5,8 +5,9 @@
 #include <float.h>  // DBL_EPSILON
 #include <string>
 
-#include "constants.h"  // physics constants used in precision defaults
-#include "errors.h"     // status codes
+#include "constants.h"    // physics constants used in precision defaults
+#include "errors.h"       // status codes
+#include "evolver_erk.h"  // ErkControllerConfig, for erk_controller_config()
 
 class FileContent;  // forward decl for precision::parse
 
@@ -30,6 +31,11 @@ enum class evolver_type {
              perturbations it does across the measured range (Gamma = 1e5 .. 1e9,
              1.2x to 4.9x faster than rkdp45). Elsewhere the diagonal is zero and
              this is RK4 with a per-step overhead, so it is opt-in per module. */
+  ,
+  tsit5 /* Tsitouras 5(4) explicit adaptive integrator. Same shape as rkdp45
+           (7 stages, FSAL, 4th-order dense output) and driven by the same core
+           in evolver_erk.cpp, so choosing between them changes the Butcher
+           tableau and nothing else. */
 };
 
 /**
@@ -470,6 +476,85 @@ struct precision {
   evolver_type evolver_background     = evolver_type::ndf15;
   evolver_type evolver_thermodynamics = evolver_type::ndf15;
   evolver_type evolver_perturbations  = evolver_type::ndf15;
+
+  /**
+   * Step-size controller, error norm and interpolant for the explicit embedded
+   * pairs (rkdp45, tsit5). They do nothing for the other integrators.
+   *
+   *  rk_controller  0 = legacy    the historical control: an I controller with no
+   *                               cap on how fast h may grow, which also grows h
+   *                               on the step right after a rejection. Throws away
+   *                               ~13% of its steps on LCDM + Mnu.
+   *                 1 = capped    the same with a growth cap and no growth right
+   *                               after a rejection. Measured worth almost nothing
+   *                               on its own (13.7% -> 12.3% rejected).
+   *                 2 = pi        Hairer/Gustafsson PI control. Rejections fall to
+   *                               ~4.4% and, because the step sequence is smoother,
+   *                               it delivers more accuracy per step than the extra
+   *                               steps cost: ~9% cheaper at matched accuracy on
+   *                               both C_l and P(k). Not the default because at a
+   *                               FIXED tolerance it is 3.6% dearer for accuracy
+   *                               nobody is short of -- realising its value means
+   *                               loosening tol_perturb_integration with it, and
+   *                               that knob is shared with ndf15, where the same
+   *                               number means something ~45x different.
+   *  rk_error_norm  0 = max norm of the scaled error (MATLAB ode45; historical)
+   *                 1 = RMS norm (Hairer's DOPRI5)
+   *  rk_interpolant 0 = the pair's own continuous extension, which is 4th order
+   *                     over a 5th-order step
+   *                 1 = quintic Hermite through the last three step ends, using
+   *                     the values and the FSAL derivatives already in hand. One
+   *                     order better for no extra derivative evaluations and no
+   *                     change to the step sequence. THE DEFAULT, because a 4th-
+   *                     order interpolant under a 5th-order step means the sources
+   *                     CLASS stores are systematically one order worse than the
+   *                     solution the error controller is protecting, and a user
+   *                     has no way to see or fix that. Measured on LCDM + Mnu it
+   *                     is 1.3-2.0x more accurate on lensed C_l at identical RHS
+   *                     count and a wall-time difference inside the noise, and
+   *                     P(k) is untouched (at z_pk = 0 it reads a single stored
+   *                     tau, which is a step end either way).
+   *  rk_output_stepping
+   *                 0 = serve output points from the interpolant
+   *                 1 = truncate h so every output point is a step end, which
+   *                     never interpolates. A DIAGNOSTIC, not a setting: it is the
+   *                     only way to separate interpolation error from accumulated
+   *                     error, and it costs 1.31x at matched accuracy.
+   *
+   * rk_safety and rk_fac_min/rk_fac_max bound the step-size change factor and are
+   * read by every controller including `legacy`. Note that rk_safety and
+   * rk_pi_beta together fix the error ratio the controller settles at, so raising
+   * safety is equivalent to loosening the tolerance rather than being free.
+   *
+   * These are pushed into a process-wide slot because the shared evolver signature
+   * has no room for them. Each module configures it from its OWN ppr immediately
+   * before it integrates, so lazily-built Cosmology objects cannot read each
+   * other's settings; what remains is that two cosmologies whose modules RUN
+   * concurrently in one process must agree on them.
+   */
+  int rk_controller      = 0;
+  int rk_error_norm      = 0;
+  int rk_output_stepping = 0;
+  int rk_interpolant     = 1;
+  double rk_safety       = 0.8;
+  double rk_fac_min      = 0.1;
+  double rk_fac_max      = 5.0;
+  double rk_pi_beta      = 0.04;
+
+  /** The controller settings as the evolver wants them. Built here so the three
+      callers do not each repeat the mapping. */
+  ErkControllerConfig erk_controller_config() const {
+    ErkControllerConfig c;
+    c.kind            = static_cast<ErkControllerKind>(rk_controller);
+    c.norm            = static_cast<ErkErrorNorm>(rk_error_norm);
+    c.output_stepping = static_cast<ErkOutputStepping>(rk_output_stepping);
+    c.interpolant     = static_cast<ErkInterpolant>(rk_interpolant);
+    c.safety          = rk_safety;
+    c.fac_min         = rk_fac_min;
+    c.fac_max         = rk_fac_max;
+    c.pi_beta         = rk_pi_beta;
+    return c;
+  }
 
   /*
    * Primordial parameters

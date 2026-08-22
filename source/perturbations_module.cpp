@@ -25,7 +25,9 @@
 #include "../species/ultra_relativistic.h"
 #include "background_module.h"
 #include "bisection.h"
+#include "evolver_erk.h"
 #include "evolver_etd.h"
+#include "evolver_tsit5.h"
 #include "thermodynamics_module.h"
 #include "thread_pool.h"
 
@@ -650,6 +652,11 @@ void PerturbationsModule::perturb_init() {
   /** - create an array of workspaces in multi-thread case */
 
   /** - loop over modes (scalar, tensors, etc). For each mode: */
+  /* Configure the shared explicit-RK controller from THIS module's ppr, and do it
+     before the task system fans out: Cosmology is lazy, so setting it at parse
+     time would let a second object parsed in between decide what this run uses. */
+  evolver_erk_configure(ppr->erk_controller_config());
+
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<void>> future_output;
 
@@ -2312,6 +2319,9 @@ void PerturbationsModule::perturb_solve(int index_md,
     }
     else if (ppr->evolver_perturbations == evolver_type::etd) {
       generic_evolver = &evolver_etd;
+    }
+    else if (ppr->evolver_perturbations == evolver_type::tsit5) {
+      generic_evolver = &evolver_tsit5;
     }
 
     generic_evolver(perturb_derivs,

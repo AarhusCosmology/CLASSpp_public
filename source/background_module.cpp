@@ -21,7 +21,9 @@
 #include "../species/scalar_field.h"
 #include "../species/type3_species.h"
 #include "bisection.h"
+#include "evolver_erk.h"
 #include "evolver_etd.h"
+#include "evolver_tsit5.h"
 
 /**
  * Return all NCDMBaseSpecies pointers from all_species_ in deterministic order.
@@ -677,12 +679,20 @@ void BackgroundModule::background_solve_evolver() {
   background_table_.resize(bt_size_ * bg_size_);
   d2background_dtau2_table_.resize(bt_size_ * bg_size_);
 
+  /* Configure the shared explicit-RK controller from THIS module's ppr, here
+     rather than at parse time: Cosmology is lazy, so a second object parsed in
+     between would otherwise be the one whose settings this run reads. */
+  evolver_erk_configure(ppr->erk_controller_config());
+
   auto generic_evolver = &evolver_ndf15;
   if (ppr->evolver_background == evolver_type::rk) {
     generic_evolver = &evolver_rk;
   }
   else if (ppr->evolver_background == evolver_type::rkdp45) {
     generic_evolver = &evolver_rkdp45;
+  }
+  else if (ppr->evolver_background == evolver_type::tsit5) {
+    generic_evolver = &evolver_tsit5;
   }
   else if (ppr->evolver_background == evolver_type::etd) {
     generic_evolver = &evolver_etd;

@@ -12,8 +12,10 @@
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "background_module.h"
+#include "evolver_erk.h"
 #include "evolver_ndf15.h"
 #include "evolver_rkdp45.h"
+#include "evolver_tsit5.h"
 
 #ifdef HYREC
 #include "hyrec.h"
@@ -3447,9 +3449,17 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
      history and trips the z_rec sanity check). When rk is requested, fall back to rkdp45
      for the recombination integration only, leaving the user's evolver choice intact for
      the background and perturbation modules. */
+  /* Configure the shared explicit-RK controller from THIS module's ppr, here
+     rather than at parse time: Cosmology is lazy, so a second object parsed in
+     between would otherwise be the one whose settings this run reads. */
+  evolver_erk_configure(ppr->erk_controller_config());
+
   auto generic_evolver = &evolver_ndf15;
   if (ppr->evolver_thermodynamics == evolver_type::rkdp45) {
     generic_evolver = &evolver_rkdp45;
+  }
+  else if (ppr->evolver_thermodynamics == evolver_type::tsit5) {
+    generic_evolver = &evolver_tsit5;
   }
   else if (ppr->evolver_thermodynamics == evolver_type::rk) {
     generic_evolver = &evolver_rkdp45;

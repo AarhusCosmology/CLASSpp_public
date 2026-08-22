@@ -2683,6 +2683,55 @@ void precision::parse(const FileContent& fc) {
     }
   }
 
+  // Explicit-RK controller, error norm and interpolant. NOT pushed into the
+  // evolver here: Cosmology modules are lazy, so parsing a second object would
+  // overwrite what the first one is about to run with. Each module configures the
+  // evolver from its own ppr immediately before it integrates.
+  read(fc, "rk_controller", rk_controller);
+  read(fc, "rk_error_norm", rk_error_norm);
+  read(fc, "rk_output_stepping", rk_output_stepping);
+  read(fc, "rk_interpolant", rk_interpolant);
+  read(fc, "rk_safety", rk_safety);
+  read(fc, "rk_fac_min", rk_fac_min);
+  read(fc, "rk_fac_max", rk_fac_max);
+  read(fc, "rk_pi_beta", rk_pi_beta);
+  {
+    class_test_severe(rk_controller < 0 || rk_controller > 2,
+                      "rk_controller must be 0 (legacy), 1 (capped) or 2 (PI), got %d",
+                      rk_controller);
+    class_test_severe(rk_error_norm < 0 || rk_error_norm > 1,
+                      "rk_error_norm must be 0 (max) or 1 (RMS), got %d",
+                      rk_error_norm);
+    class_test_severe(rk_output_stepping < 0 || rk_output_stepping > 1,
+                      "rk_output_stepping must be 0 (interpolate) or 1 (step onto every "
+                      "output point), got %d",
+                      rk_output_stepping);
+    class_test_severe(rk_interpolant < 0 || rk_interpolant > 1,
+                      "rk_interpolant must be 0 (the pair's continuous extension) or 1 "
+                      "(quintic Hermite over three step ends), got %d",
+                      rk_interpolant);
+    // Domain checks, because these reach a step-size loop whose only other exit is
+    // a step-size floor. safety = 0 makes the very first trial step zero;
+    // fac_min >= 1 lets a REJECTED step grow, so the loop cannot make progress;
+    // fac_max <= 1 forbids growth entirely. The PI exponent has to leave
+    // alpha = 1/order - 0.75*beta positive, which for a 5th-order pair caps beta
+    // below 4/15; 0.2 keeps a margin.
+    class_test_severe(!(rk_safety > 0. && rk_safety <= 1.),
+                      "rk_safety must be in (0, 1], got %e",
+                      rk_safety);
+    class_test_severe(!(rk_fac_min > 0. && rk_fac_min < 1.),
+                      "rk_fac_min must be in (0, 1) -- it is the most a step may SHRINK "
+                      "-- got %e",
+                      rk_fac_min);
+    class_test_severe(!(rk_fac_max > 1.),
+                      "rk_fac_max must be > 1 -- it is the most a step may GROW -- got %e",
+                      rk_fac_max);
+    class_test_severe(!(rk_pi_beta >= 0. && rk_pi_beta <= 0.2),
+                      "rk_pi_beta must be in [0, 0.2]; beyond that the PI exponent "
+                      "1/order - 0.75*beta stops being positive. Got %e",
+                      rk_pi_beta);
+  }
+
   /* Primordial */
   read(fc, "k_per_decade_primordial", k_per_decade_primordial);
   read(fc, "primordial_inflation_ratio_min", primordial_inflation_ratio_min);

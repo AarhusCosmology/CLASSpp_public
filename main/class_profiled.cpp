@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "cosmology.h"
+#include "evolver_erk.h"
 #include "input_module.h"
 
 namespace {
@@ -89,6 +90,8 @@ int main(int argc, char** argv) {
   const size_t n_stages                 = labels.size();
   std::vector<std::vector<double>> samples(n_stages);
   std::vector<double> totals;
+  ErkStats erk_last;
+  ErkHistograms erk_hist;
 
   printf("Profiling '%s' over %d loop(s)...\n", argv[1], num_loops);
 
@@ -110,7 +113,21 @@ int main(int argc, char** argv) {
       cosmology.GetThermodynamicsModule();
       stage_ms[2] = ms_since(t);
       t           = Clock::now();
+      // Explicit-RK step statistics for this loop only. Cheap (a handful of
+      // relaxed atomics per step) but not free, so it is enabled around the
+      // perturbations stage rather than globally.
+      // The counters are a handful of relaxed atomics per step -- small, but a
+      // PER-STEP cost, so leaving them on while comparing integrators that take
+      // different numbers of steps tilts the wall-time measurement towards
+      // whichever takes fewer. CLASS_ERK_NOSTATS turns them off for timing runs.
+      const bool want_stats = (getenv("CLASS_ERK_NOSTATS") == nullptr);
+      evolver_erk_stats_reset();
+      evolver_erk_stats_enable(want_stats);
+      evolver_erk_histograms_enable(want_stats && getenv("CLASS_ERK_HIST") != nullptr);
       cosmology.GetPerturbationsModule();
+      evolver_erk_stats_enable(false);
+      erk_last    = evolver_erk_stats_get();
+      erk_hist    = evolver_erk_histograms_get();
       stage_ms[3] = ms_since(t);
       t           = Clock::now();
       cosmology.GetPrimordialModule();
@@ -151,6 +168,46 @@ int main(int argc, char** argv) {
          "--------",
          "--------",
          "------");
+  if (erk_last.steps_accepted + erk_last.steps_rejected > 0) {
+    const long long attempted = erk_last.steps_accepted + erk_last.steps_rejected;
+    printf(
+        "Explicit-RK perturbation steps (last loop): %lld accepted, %lld rejected"
+        " (%.2f%% of %lld attempts), %lld RHS evaluations\n",
+        erk_last.steps_accepted,
+        erk_last.steps_rejected,
+        100.0 * erk_last.steps_rejected / attempted,
+        attempted,
+        erk_last.derivs_calls);
+    if (getenv("CLASS_ERK_HIST") != nullptr) {
+      printf("  log10(err/rtol)   accepted   rejected      (1.0 = the acceptance boundary)\n");
+      for (int i = 0; i < ErkHistograms::kErrBins; i++) {
+        if (erk_hist.err_accepted[i] + erk_hist.err_rejected[i] == 0)
+          continue;
+        printf("   %6.2f          %9lld  %9lld\n",
+               ErkHistograms::kErrLo + ErkHistograms::kErrStep * i,
+               erk_hist.err_accepted[i],
+               erk_hist.err_rejected[i]);
+      }
+      printf("  log10(tau/Mpc)    accepted   rejected   reject%%\n");
+      for (int i = 0; i < ErkHistograms::kXBins; i++) {
+        const long long a = erk_hist.x_accepted[i], r = erk_hist.x_rejected[i];
+        if (a + r == 0)
+          continue;
+        printf("   %6.2f          %9lld  %9lld   %6.2f%%\n",
+               ErkHistograms::kXLo + ErkHistograms::kXStep * i,
+               a,
+               r,
+               100.0 * r / (a + r));
+      }
+    }
+    printf(
+        "Source output points: %lld from dense output, %lld exact (%.2f dense points"
+        " per accepted step)\n\n",
+        erk_last.dense_points,
+        erk_last.exact_points,
+        erk_last.steps_accepted > 0 ? (double) erk_last.dense_points / erk_last.steps_accepted
+                                    : 0.0);
+  }
   Stats tot = summarize(totals);
   for (size_t i = 0; i < n_stages; ++i) {
     Stats s    = summarize(samples[i]);
