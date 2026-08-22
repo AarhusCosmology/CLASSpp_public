@@ -1029,6 +1029,33 @@ class TestReviewRegressions(TestClass):
             candidate.struct_cleanup()
             candidate.empty()
 
+    def test_z_max_pk_above_the_thermodynamics_table_computes(self):
+        """thermodynamics_at_z extrapolates analytically above the tabulated
+        range, and that branch used to be the one path through the function that
+        never wrote its *last_index out-parameter (#380). The no-CMB source
+        sampler seeds its interpolation cursor through exactly that call, so the
+        cursor stayed indeterminate and the first inter_closeby handed garbage to
+        array_hunt_growing_closeby.
+
+        recfast_z_initial = z_max_pk + 1 puts the seed lookup at the table edge,
+        which is what walks it onto the unguarded path -- it is what
+        notebooks/many_times.ipynb does."""
+        self.cosmo.set(dict(self.verbose, **{
+            'output': 'mTk',
+            'z_max_pk': 46000,
+            'recfast_Nz0': 92000,
+            'recfast_z_initial': 46001.,
+            'k_per_decade_for_pk': 400,
+            'k_per_decade_for_bao': 400,
+            'k_min_tau0': 40.,
+            'perturb_sampling_stepsize': 0.05,
+            'P_k_max_1/Mpc': 1.0,
+            'compute damping scale': 'yes',
+            'gauge': 'newtonian',
+        }))
+        self.cosmo.compute()
+        self.assertIn('mTk', self.cosmo.pars['output'])
+
     def test_retired_hyrec_file_parameters_are_rejected(self):
         """HYREC-2 takes one directory, so the three per-file paths are gone. A
         user who set them should hear about it rather than be ignored."""

@@ -38,8 +38,7 @@ CURATED = {
         ("cltt_terms", "cltt_terms.ipynb", []),
         ("one_k", "one_k.ipynb", []),
         ("one_time", "one_time.ipynb", []),
-        # many_times: dropped until the array_hunt_growing_closeby failure at
-        # z_max_pk=46000 is fixed (#380)
+        ("many_times", "many_times.ipynb", []),
         ("varying_neff", "varying_neff.ipynb", []),
         ("neutrinohierarchy", "neutrinohierarchy.ipynb", []),
         ("varying_pann", "varying_pann.ipynb", []),

@@ -130,6 +130,15 @@ void ThermodynamicsModule::thermodynamics_at_z(
      using simple analytic approximations */
 
   if (z >= z_table_[tt_size_ - 1]) {
+    /* Seed the caller's interpolation cursor even though nothing is
+       interpolated here. inter_normal is output-only for last_index, so callers
+       legitimately use this call to initialise a cursor they then sweep with
+       inter_closeby; leaving it unwritten hands the next hunt whatever was on
+       the stack (#380). The last row is the one this branch extrapolates from,
+       and the sweep proceeds downward in z from there --
+       array_hunt_growing_closeby documents n_lines-1 as a valid hint. */
+    *last_index = tt_size_ - 1;
+
     /* ionization fraction assumed to remain constant at large z */
     double x0                = thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_xe_];
     pvecthermo[index_th_xe_] = x0;
