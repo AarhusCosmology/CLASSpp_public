@@ -330,6 +330,45 @@ void PhotonsSpecies::PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
   }
 }
 
+/* Leading order in eps = 1/kappa' of the tensor hierarchy below.
+ *
+ * F_0 and G_0 are O(eps); theta is O(eps^2); shear and G_2 are O(eps^3); F_4 and
+ * G_4 are O(eps^5). Keeping only the O(1) terms of the two monopole equations,
+ *
+ *   kappa' (F_0 + sqrt6 P_2) = sqrt6 hdot        (temperature, sourced by the GW)
+ *   kappa' (G_0 - sqrt6 P_2) = 0                 (polarisation, unsourced)
+ *
+ * and P_2 = -(1/10 F_0 - 3/5 G_0)/sqrt6 once the higher-order multipoles drop
+ * out. The second equation gives G_0 = sqrt6 P_2, which closes P_2 = -F_0/4;
+ * substituting into the first gives (3/4) F_0 = sqrt6 hdot.
+ *
+ * Same result as class_public v3.3.0 (credits C. Pitrou), reached independently
+ * here; CLASS++ carried the pre-v3.3.0 expressions until #398.
+ *
+ * First order. F_0 and G_0 track hdot/kappa', so they vary on the timescale over
+ * which tau_c itself varies -- and through recombination tau_c climbs by orders
+ * of magnitude, so kappa'^-1 F_0' is NOT negligible. Restoring the two dropped
+ * derivative terms (the -4/3 theta term stays out: it is O(eps^3), as are the
+ * shear and G_2 that the multipole combination omits),
+ *
+ *   kappa' (F_0 + sqrt6 P_2) = sqrt6 hdot - F_0'
+ *   kappa' (G_0 - sqrt6 P_2) = -G_0'
+ *
+ * with F_0' = (4 sqrt6/3) D and G_0' = -(sqrt6/3) D evaluated on the leading
+ * solution, D = d/dtau (hdot/kappa'). Solving the same 3x3 system gives the
+ * coefficients below. G_0 = -F_0/4 holds only at leading order: the drift enters
+ * F_0 and G_0 with -22/9 against +13/9, and that asymmetry is the correction.
+ * Not in class_public. */
+PhotonsSpecies::TensorTcaClosure PhotonsSpecies::TensorTightCoupling(double gwdot,
+                                                                     double dkappa,
+                                                                     double drift) {
+  const double u = gwdot / dkappa; /* hdot/kappa' */
+  const double v = drift / dkappa; /* D/kappa' */
+  return {_SQRT6_ * (4. / 3. * u - 22. / 9. * v),
+          _SQRT6_ * (-1. / 3. * u + 13. / 9. * v),
+          -1. / 3. * u + 10. / 9. * v};
+}
+
 void PhotonsSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
                                          double /*tau*/,
                                          const double* y,
@@ -355,10 +394,12 @@ void PhotonsSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
   const double shear_g = y[layout.idx_shear];
 
   /* P^{(2)}: polarization combination */
-  const double P2 = -1.0 / _SQRT6_ *
-                    (1. / 10. * delta_g + 2. / 7. * shear_g + 3. / 70. * y[layout.idx_delta + 4] -
-                     3. / 5. * y[layout.idx_pol0] + 6. / 7. * y[layout.idx_pol2] -
-                     3. / 70. * y[layout.idx_pol0 + 4]);
+  const double P2 = TensorP2(delta_g,
+                             shear_g,
+                             y[layout.idx_delta + 4],
+                             y[layout.idx_pol0],
+                             y[layout.idx_pol2],
+                             y[layout.idx_pol0 + 4]);
 
   dy[layout.idx_delta] = -4. / 3. * theta_g - dkappa * (delta_g + _SQRT6_ * P2) +
                          _SQRT6_ * y[ppw->pv->index_pt_gwdot]; /* gravitational wave source */

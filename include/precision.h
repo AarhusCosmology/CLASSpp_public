@@ -316,17 +316,17 @@ struct precision {
 
   /** Tensor-mode counterparts of the two tight-coupling triggers above.
    *
-   *  The two modes want different values. The scalar TCA has a proper hierarchy
-   *  of closures (tight_coupling_approximation, first_order_MB ... second-order),
-   *  so it tolerates a late switch-off. The tensor TCA has none: while it is on,
-   *  perturbations_module.cpp sets shear_g = pol2_g = 0 identically, and the
-   *  photon polarization quadrupole IS the tensor B-mode source. Extending TCA
-   *  therefore suppresses BB directly -- measured at 14% over l = 100-300 when
-   *  the shared trigger moved 0.01 -> 0.04, with every tight_coupling_approximation
-   *  scheme giving exactly the same answer because none of them reaches tensors.
+   *  Kept separate because the two modes reach their closures differently: the
+   *  scalar TCA selects one of tight_coupling_approximation's schemes, while the
+   *  tensor closure is PhotonsSpecies::TensorTightCoupling(), which no input
+   *  parameter selects.
    *
-   *  Defaults reproduce the pre-2026-08-21 shared values, so tensors are
-   *  unaffected by loosening the scalar trigger. */
+   *  The k-trigger stays at 0.01. Correcting the closure and carrying it to
+   *  first order in tau_c (#398) made 0.04 eight times cheaper in accuracy than
+   *  it was -- 14.0% -> 1.74% on BB over l = 100-300 against a converged
+   *  reference -- but 0.01 still delivers 0.18% there, and loosening buys no
+   *  measurable time: 0.5% on a tensor-only run at l_max_tensors = 1500, inside
+   *  the noise. Tensors are cheap; there is nothing to trade the accuracy for. */
   double tight_coupling_trigger_tau_c_over_tau_h_ten = 0.015;
   double tight_coupling_trigger_tau_c_over_tau_k_ten = 0.01;
 

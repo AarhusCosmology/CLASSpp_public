@@ -3,6 +3,7 @@
 
 #include "../species/base_species.h"
 #include "background.h"
+#include "constants.h"
 #include "perturbations.h"
 #include "species_build_context.h"
 
@@ -111,6 +112,40 @@ class PhotonsSpecies : public BaseSpecies {
                            const double* y,
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) const override;
+
+  // ── Tensor tight coupling ──────────────────────────────────────────────────
+
+  /** The polarisation combination \f$ P^{(2)} \f$ that couples the temperature
+   *  and polarisation tensor hierarchies. Shared so that PerturbTensorDerivs,
+   *  the source, and the tight-coupling closure cannot drift apart. */
+  static double TensorP2(double F0, double shear, double F4, double G0, double G2, double G4) {
+    return -1. / _SQRT6_ *
+           (1. / 10. * F0 + 2. / 7. * shear + 3. / 70. * F4 - 3. / 5. * G0 + 6. / 7. * G2 -
+            3. / 70. * G4);
+  }
+
+  /** Leading-order tensor tight-coupling state, in the multipoles the hierarchy
+   *  evolves. Everything above l = 0 is higher order in 1/kappa' and stays zero. */
+  struct TensorTcaClosure {
+    double F0; /**< photon temperature monopole (delta_g) */
+    double G0; /**< photon polarisation monopole (pol0_g) */
+    double P2; /**< the combination above, evaluated on this state */
+  };
+
+  /** \f$ D = d/d\tau (\dot h / \kappa') \f$, the drift the first-order closure
+   *  needs, from the quantities a call site already has. */
+  static double TensorTcaDrift(double gwdot, double dkappa, double gw_second, double ddkappa) {
+    return gw_second / dkappa - gwdot * ddkappa / (dkappa * dkappa);
+  }
+
+  /** Solve the tensor hierarchy's stiff balance for (F_0, G_0, P^{(2)}).
+   *
+   *  \param gwdot   \f$ \dot h \f$, the gravitational-wave velocity.
+   *  \param dkappa  \f$ \kappa' \f$, the Thomson scattering rate.
+   *  \param drift   \f$ D \f$ from TensorTcaDrift(). Zero -- the default -- gives
+   *                 the leading-order closure, for call sites with no time
+   *                 derivative available. */
+  static TensorTcaClosure TensorTightCoupling(double gwdot, double dkappa, double drift = 0.);
 
   // ── Source filling and initial conditions ──────────────────────────────────
 

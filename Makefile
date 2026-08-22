@@ -16,6 +16,7 @@ TEST_TARGETS := \
 	test-evolver-etd \
 	test-evolver-nonfinite \
 	test-photons \
+	test-tensor-tca \
 	test-species-types \
 	test-scf-potential \
 	test-cdm-coupled \

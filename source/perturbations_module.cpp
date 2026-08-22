@@ -3435,11 +3435,22 @@ void PerturbationsModule::perturb_vector_init(
         const size_t new_g_i = all_species_.index_of("Photons");
         auto& new_g_lay      = static_cast<PhotonsSpecies::PerturbLayout&>(
             *ppv->species_layouts[new_g_i]);
-        ppv->y[new_g_lay.idx_delta] = -4. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
-                                      ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
-
-        ppv->y[new_g_lay.idx_pol0] = 1. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
-                                     ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        /* Hand the exact hierarchy the state tight coupling was standing in for.
+           Multipoles above l = 0 are higher order in 1/kappa' and stay at zero. */
+        /* gw'' from the last Einstein evaluation, which is at (or within one
+           rejected step of) this switch time. It only enters the first-order
+           correction, so an error in it is second order. */
+        const double dkappa = ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        const double drift =
+            PhotonsSpecies::TensorTcaDrift(ppw->pv->y[ppw->pv->index_pt_gwdot],
+                                           dkappa,
+                                           ppw->pvecmetric[ppw->index_mt_gw_prime_prime],
+                                           ppw->pvecthermo[thermodynamics_module_
+                                                               ->index_th_ddkappa_]);
+        const PhotonsSpecies::TensorTcaClosure tca =
+            PhotonsSpecies::TensorTightCoupling(ppw->pv->y[ppw->pv->index_pt_gwdot], dkappa, drift);
+        ppv->y[new_g_lay.idx_delta] = tca.F0;
+        ppv->y[new_g_lay.idx_pol0]  = tca.G0;
       }
 
       /* -- case of switching on radiation streaming
@@ -5200,14 +5211,24 @@ void PerturbationsModule::perturb_sources_member(
       if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
         const auto& g_tsrc_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
             *ppw->pv->photon_layout);
-        P = -(1. / 10. * y[g_tsrc_lay.idx_delta] + 2. / 7. * y[g_tsrc_lay.idx_shear] +
-              3. / 70. * y[g_tsrc_lay.idx_delta + 4] - 3. / 5. * y[g_tsrc_lay.idx_pol0] +
-              6. / 7. * y[g_tsrc_lay.idx_pol2] - 3. / 70. * y[g_tsrc_lay.idx_pol0 + 4]) /
-            sqrt(6.);
+        P = PhotonsSpecies::TensorP2(y[g_tsrc_lay.idx_delta],
+                                     y[g_tsrc_lay.idx_shear],
+                                     y[g_tsrc_lay.idx_delta + 4],
+                                     y[g_tsrc_lay.idx_pol0],
+                                     y[g_tsrc_lay.idx_pol2],
+                                     y[g_tsrc_lay.idx_pol0 + 4]);
       }
       else {
-        P = 2. / 5. * _SQRT6_ * y[ppw->pv->index_pt_gwdot] /
-            ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];  //TBC
+        const double dkappa = ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        P                   = PhotonsSpecies::TensorTightCoupling(
+                                  y[ppw->pv->index_pt_gwdot],
+                                  dkappa,
+                                  PhotonsSpecies::TensorTcaDrift(y[ppw->pv->index_pt_gwdot],
+                                                                 dkappa,
+                                                                 dy[ppw->pv->index_pt_gwdot], /* = gw'' */
+                                                                 ppw->pvecthermo[thermodynamics_module_
+                                                                                     ->index_th_ddkappa_]))
+                                  .P2;
       }
     }
     else {
@@ -5378,12 +5399,18 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
         pol4_g  = y[g_pv_lay.idx_pol0 + 4];
       }
       else {
-        delta_g = -4. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
-                  pvecthermo[thermodynamics_module_->index_th_dkappa_];  //TBC
+        const double dkappa = pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        const PhotonsSpecies::TensorTcaClosure tca = PhotonsSpecies::TensorTightCoupling(
+            ppw->pv->y[ppw->pv->index_pt_gwdot],
+            dkappa,
+            PhotonsSpecies::TensorTcaDrift(ppw->pv->y[ppw->pv->index_pt_gwdot],
+                                           dkappa,
+                                           dy[ppw->pv->index_pt_gwdot],
+                                           pvecthermo[thermodynamics_module_->index_th_ddkappa_]));
+        delta_g = tca.F0;
         shear_g = 0.;
         l4_g    = 0.;
-        pol0_g  = 1. / 3. * ppw->pv->y[ppw->pv->index_pt_gwdot] /
-                  pvecthermo[thermodynamics_module_->index_th_dkappa_];  //TBC
+        pol0_g  = tca.G0;
         pol2_g  = 0.;
         pol4_g  = 0.;
       }
