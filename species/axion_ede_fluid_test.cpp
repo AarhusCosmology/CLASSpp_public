@@ -297,12 +297,12 @@ int main() {
     expect_create_throw_computation(std::move(fc));
   }
 
-  // ════ Phantom-divide + HyRec-CPL species hooks ════
+  // ════ Phantom-divide species hook ════
+  // The companion HyRec-CPL hook is gone: HYREC-2 reads CLASS's background, so no
+  // fluid has to offer a (w0, wa) stand-in for its density history any more.
   {
-    // AxionEDEFluid: never reaches the divide; refuses a CPL pair for HyRec.
+    // AxionEDEFluid: never reaches the divide.
     assert(!fld.ReachesPhantomDivide());
-    double w0h = -2., wah = -2.;
-    assert(!fld.HyrecCplApproximation(&w0h, &wah));
 
     // Base fluid, CLP w0 = -1, wa = 0 (exact divide contact): reaches it.
     FluidSpecies lambda_like(pba, 0.7, CLP, -1., 0., 1., 0.);
@@ -311,10 +311,6 @@ int main() {
     // Base fluid, CLP w0 = -0.9, wa = 0: never reaches -1.
     FluidSpecies quint(pba, 0.7, CLP, -0.9, 0., 1., 0.);
     assert(!quint.ReachesPhantomDivide());
-    // Its HyRec CPL tangent reproduces (w0, wa) exactly.
-    assert(quint.HyrecCplApproximation(&w0h, &wah));
-    assert(std::fabs(w0h + 0.9) < 1e-15);
-    assert(std::fabs(wah - 0.) < 1e-15);
 
     // Base fluid, CLP crossing (w(0) = w0+wa = -1.4, w(1) = -0.9): reaches it.
     FluidSpecies crosser(pba, 0.7, CLP, -0.9, -0.5, 1., 0.);

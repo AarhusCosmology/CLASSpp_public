@@ -46,13 +46,6 @@ class AxionEDEFluid : public FluidSpecies {
     // the exact -1 at the a = 0 asymptote lies outside the integration domain.
     return false;
   }
-  bool HyrecCplApproximation(double* /*w0*/, double* /*wa*/) const override {
-    // No CPL pair represents a frozen->dilution sigmoid: HyRec would extrapolate
-    // rho_DE ~ a^(-3(1+w_f)) from today's density to all redshifts and destroy the
-    // recombination-era expansion rate. Callers must use RECFAST (reads the true
-    // background) or implement true-H(z) feeding for HyRec.
-    return false;
-  }
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
                               double* y,
                               const PerturbIcContext& ctx) override;

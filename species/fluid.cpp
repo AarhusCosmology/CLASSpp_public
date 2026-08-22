@@ -408,9 +408,8 @@ void FluidSpecies::ComputeWFld(double a,
   }
 
   /** note: of course you can generalise these formulas to anything,
-      defining new parameters pba->w..._fld. Just remember that so
-      far, HyRec explicitely assumes that w(a)= w0 + wa (1-a/a0); but
-      Recfast does not assume anything */
+      defining new parameters pba->w..._fld. Neither recombination code
+      constrains the form: both read the true background. */
 }
 
 bool FluidSpecies::ReachesPhantomDivide() const {
@@ -418,14 +417,6 @@ bool FluidSpecies::ReachesPhantomDivide() const {
   ComputeWFld(0., &w_ini, &dw_over_da, &integral);
   ComputeWFld(1., &w_0, &dw_over_da, &integral);
   return (w_ini + 1.) * (w_0 + 1.) <= 0.;
-}
-
-bool FluidSpecies::HyrecCplApproximation(double* w0, double* wa) const {
-  double w_fld, dw_over_da_fld, integral_fld;
-  ComputeWFld(1., &w_fld, &dw_over_da_fld, &integral_fld);
-  *w0 = w_fld;
-  *wa = -dw_over_da_fld;
-  return true;
 }
 
 // ── Newtonian-gauge transform ─────────────────────────────────────────────────

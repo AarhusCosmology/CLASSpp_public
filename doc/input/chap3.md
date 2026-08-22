@@ -59,7 +59,7 @@ it can be interfaced with other codes, etc.
 
 - `bbn/` contains interpolation tables produced by BBN codes, in order to predict e.g. \f$ Y_\mathrm{He}(\omega_b, \Delta N_\mathrm{eff})\f$.
 
-- `hyrec/` contains the recombination code HyRec of Yacine Ali-Haimoud and Chris Hirata, that can be used as an alternative to the built-in Recfast (using the input parameter `recombination = <...>`).
+- `hyrec/` contains HYREC-2, the recombination code of Yacine Ali-Haimoud, Chris Hirata and Nanoom Lee, vendored unmodified from upstream and usable as an alternative to the built-in RECFAST (input parameter `recombination = <...>`). See `hyrec/PROVENANCE.md`.
 
 
 ## The ten-module backbone ##

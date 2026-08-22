@@ -5,6 +5,7 @@
 
 #include "base_module.h"
 #include "input_module.h"
+#include "recombination_model.h"
 
 class ThermodynamicsModule : public BaseModule {
  public:
@@ -122,8 +123,7 @@ class ThermodynamicsModule : public BaseModule {
                                           double* pvecback);
   void thermodynamics_get_xe_before_reionization(recombination* preco, double z, double* xe);
   void thermodynamics_recombination(recombination* preco, double* pvecback);
-  void thermodynamics_recombination_with_hyrec(recombination* prec, double* pvecback);
-  void thermodynamics_recombination_with_recfast(recombination* prec, double* pvecback);
+  void thermodynamics_recombination_integrate(recombination* prec, double* pvecback);
   double thermodynamics_recfast_hydrogen_saha_xH(const recombination* preco, double z) const;
   double thermodynamics_recfast_helium_first_saha_xe(const recombination* preco, double z) const;
   double thermodynamics_recfast_helium_second_saha_xe(const recombination* preco, double z) const;
@@ -135,14 +135,14 @@ class ThermodynamicsModule : public BaseModule {
   double thermodynamics_recfast_xe_after_full_ode(const recombination* preco,
                                                   double z,
                                                   const double* y) const;
-  void thermodynamics_derivs_with_recfast_member(double z,
-                                                 double* y,
-                                                 double* dy,
-                                                 void* fixed_parameters);
-  static void thermodynamics_derivs_with_recfast(double z,
-                                                 double* y,
-                                                 double* dy,
-                                                 void* fixed_parameters);
+  void thermodynamics_recombination_derivs_member(double z,
+                                                  double* y,
+                                                  double* dy,
+                                                  void* fixed_parameters);
+  static void thermodynamics_recombination_derivs(double z,
+                                                  double* y,
+                                                  double* dy,
+                                                  void* fixed_parameters);
   static void thermodynamics_recfast_derivs(double minus_z,
                                             double* y,
                                             double* dy,
@@ -172,7 +172,7 @@ class ThermodynamicsModule : public BaseModule {
   //@}
 };
 
-enum class RecfastPhase { analytic, helium, full };
+enum class RecombinationPhase { analytic, helium, full };
 
 /**
  * temporary  parameters and workspace passed to the thermodynamics_derivs function
@@ -184,10 +184,13 @@ struct thermodynamics_parameters_and_workspace {
   /* structures containing fixed input parameters (indices, ...) */
   recombination* preco;
 
+  /* which atomic physics supplies dx_H/dz and dx_He/dz */
+  const RecombinationModel* recombination_model = nullptr;
+
   /* workspace */
   double* pvecback;
-  int recfast_output_index_offset = 0;
-  RecfastPhase recfast_phase      = RecfastPhase::full;
+  int recfast_output_index_offset        = 0;
+  RecombinationPhase recombination_phase = RecombinationPhase::full;
 };
 
 #endif  //THERMODYNAMICS_MODULE_H

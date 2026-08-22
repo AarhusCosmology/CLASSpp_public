@@ -2516,10 +2516,8 @@ void read_enum(const FileContent& fc, const char* name, E& v) {
 
 void precision::ResolveDataPaths() {
   // Prepend the runtime class_dir to each field's relative-path default.
-  sBBN_file                    = class_dir + sBBN_file;
-  hyrec_Alpha_inf_file         = class_dir + hyrec_Alpha_inf_file;
-  hyrec_R_inf_file             = class_dir + hyrec_R_inf_file;
-  hyrec_two_photon_tables_file = class_dir + hyrec_two_photon_tables_file;
+  sBBN_file  = class_dir + sBBN_file;
+  hyrec_path = class_dir + hyrec_path;
 }
 
 void precision::parse(const FileContent& fc) {
@@ -2576,9 +2574,24 @@ void precision::parse(const FileContent& fc) {
   read(fc, "reionization_optical_depth_tol", reionization_optical_depth_tol);
   read(fc, "reionization_start_factor", reionization_start_factor);
   read(fc, "thermo_rate_smoothing_radius", thermo_rate_smoothing_radius);
-  read(fc, "Alpha_inf hyrec file", hyrec_Alpha_inf_file);
-  read(fc, "R_inf hyrec file", hyrec_R_inf_file);
-  read(fc, "two_photon_tables hyrec file", hyrec_two_photon_tables_file);
+  read(fc, "hyrec_path", hyrec_path);
+  /* HYREC-2 builds its file names with a bare strcat onto this string, so a
+     directory given without the trailing separator would become
+     "<dir>Alpha_inf.dat". Append it rather than making the user remember. */
+  if (!hyrec_path.empty() && hyrec_path.back() != '/') {
+    hyrec_path += '/';
+  }
+
+  /* HYREC-2 takes a directory and appends its own file names, so the three
+     per-file paths CLASS used for the November 2011 code are gone. Say so rather
+     than ignoring them: a user who set them is expecting them to matter. */
+  for (const char* retired :
+       {"Alpha_inf hyrec file", "R_inf hyrec file", "two_photon_tables hyrec file"}) {
+    class_test_severe(fc.get<std::string>(retired).has_value(),
+                      "'%s' no longer exists: HYREC-2 reads its tables from one directory. "
+                      "Use 'hyrec_path' instead.",
+                      retired);
+  }
 
   /* Perturbations */
   read(fc, "k_min_tau0", k_min_tau0);

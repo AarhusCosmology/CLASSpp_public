@@ -109,13 +109,6 @@ class FluidSpecies : public BaseSpecies {
    *  for every a > 0, so the a=0 asymptote at exactly -1 is not a crossing. */
   virtual bool ReachesPhantomDivide() const;
 
-  /** HyRec reconstructs its internal dark-energy density from a CPL (w0, wa) pair
-   *  (hyrec/history.c:83). Fill (w0, wa) with this fluid's best CPL representation and
-   *  return true, or return false when no CPL pair can represent the density history
-   *  (the caller must then refuse to run HyRec). Base fluid: tangent at a = 1,
-   *  w0 = w(1), wa = -dw/da(1) — exactly the historical behavior. */
-  virtual bool HyrecCplApproximation(double* w0, double* wa) const;
-
   // ── Perturbations ──────────────────────────────────────────────────────────
 
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;

@@ -6,6 +6,7 @@ TEST_TARGETS := \
 	test-precision-evolver \
 	test-errors \
 	test-deposition \
+	test-hyrec \
 	test-bisection \
 	test-quadrature \
 	test-decay-kernel \

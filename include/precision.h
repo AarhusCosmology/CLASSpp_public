@@ -254,12 +254,12 @@ struct precision {
   int thermo_rate_smoothing_radius =
       10; /**< Smoothing in redshift of the variation rate of \f$ \exp(-\kappa) \f$, g, and \f$ \frac{dg}{d\tau} \f$ that is used as a timescale afterwards */
 
-  std::string hyrec_Alpha_inf_file =
-      "/hyrec/Alpha_inf.dat"; /**< File containing the alpha parameter of hyrec */
-  std::string hyrec_R_inf_file =
-      "/hyrec/R_inf.dat"; /**< File containing the R_inf parameter of hyrec */
-  std::string hyrec_two_photon_tables_file =
-      "/hyrec/two_photon_tables.dat"; /**< File containing the two-photon interaction parameter of hyrec */
+  std::string hyrec_path =
+      "/hyrec/"; /**< Directory holding HYREC-2's data tables. HYREC-2 appends its own
+                      file names (Alpha_inf.dat, R_inf.dat, fit_swift.dat,
+                      two_photon_tables.dat), so it takes a directory rather than the
+                      three individual paths CLASS used before. A missing trailing
+                      separator is appended at parse time. */
 
   double k_min_tau0 =
       0.1; /**< number defining k_min for the computation of Cl's and P(k)'s (dimensionless): (k_min tau_0), usually chosen much smaller than one */

@@ -16,10 +16,8 @@
 #include "evolver_ndf15.h"
 #include "evolver_rkdp45.h"
 #include "evolver_tsit5.h"
-
-#ifdef HYREC
-#include "hyrec.h"
-#endif
+#include "hyrec_model.h"
+#include "recfast_model.h"
 
 ThermodynamicsModule::ThermodynamicsModule(InputModulePtr input_module,
                                            BackgroundModulePtr background_module)
@@ -30,15 +28,15 @@ ThermodynamicsModule::ThermodynamicsModule(InputModulePtr input_module,
 ThermodynamicsModule::~ThermodynamicsModule() {}
 
 // Wrapper functions to pass non-static member functions
-void ThermodynamicsModule::thermodynamics_derivs_with_recfast(double z,
-                                                              double* y,
-                                                              double* dy,
-                                                              void* fixed_parameters) {
+void ThermodynamicsModule::thermodynamics_recombination_derivs(double z,
+                                                               double* y,
+                                                               double* dy,
+                                                               void* fixed_parameters) {
   auto tppaw = static_cast<thermodynamics_parameters_and_workspace*>(fixed_parameters);
-  tppaw->thermodynamics_module->thermodynamics_derivs_with_recfast_member(z,
-                                                                          y,
-                                                                          dy,
-                                                                          fixed_parameters);
+  tppaw->thermodynamics_module->thermodynamics_recombination_derivs_member(z,
+                                                                           y,
+                                                                           dy,
+                                                                           fixed_parameters);
 }
 
 void ThermodynamicsModule::thermodynamics_recfast_timescale(double /*minus_z*/,
@@ -56,21 +54,21 @@ void ThermodynamicsModule::thermodynamics_recfast_derivs(double minus_z,
   auto* module   = ws->thermodynamics_module;
   const double z = -minus_z;
 
-  if (ws->recfast_phase == RecfastPhase::helium) {
+  if (ws->recombination_phase == RecombinationPhase::helium) {
     // State is {x_He, Tmat}; hydrogen follows its Saha branch.
     double y_full[3] = {module->thermodynamics_recfast_hydrogen_saha_xH(ws->preco, z), y[0], y[1]};
     double dy_full_dz[3];
-    module->thermodynamics_derivs_with_recfast_member(z,
-                                                      y_full,
-                                                      dy_full_dz,
-                                                      parameters_and_workspace);
+    module->thermodynamics_recombination_derivs_member(z,
+                                                       y_full,
+                                                       dy_full_dz,
+                                                       parameters_and_workspace);
     dy[0] = -dy_full_dz[1];
     dy[1] = -dy_full_dz[2];
   }
   else {
     // State is {x_H, x_He, Tmat}.
     double dy_dz[_RECFAST_INTEG_SIZE_];
-    module->thermodynamics_derivs_with_recfast_member(z, y, dy_dz, parameters_and_workspace);
+    module->thermodynamics_recombination_derivs_member(z, y, dy_dz, parameters_and_workspace);
     for (int index_y = 0; index_y < _RECFAST_INTEG_SIZE_; index_y++)
       dy[index_y] = -dy_dz[index_y];
   }
@@ -85,7 +83,7 @@ void ThermodynamicsModule::thermodynamics_recfast_output(
   const double z         = -minus_z;
   const int sample_index = ws->recfast_output_index_offset + index_x;
 
-  if (ws->recfast_phase == RecfastPhase::helium) {
+  if (ws->recombination_phase == RecombinationPhase::helium) {
     const double y_full[3] = {module->thermodynamics_recfast_hydrogen_saha_xH(preco, z),
                               y[0],
                               y[1]};
@@ -2834,309 +2832,10 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
  */
 
 void ThermodynamicsModule::thermodynamics_recombination(recombination* preco, double* pvecback) {
-  if (pth->recombination == hyrec) {
-    thermodynamics_recombination_with_hyrec(preco, pvecback);
-  }
-
-  if (pth->recombination == recfast) {
-    thermodynamics_recombination_with_recfast(preco, pvecback);
-  }
-}
-
-/**
- * Integrate thermodynamics with HyRec.
- *
- * Integrate thermodynamics with HyRec, allocate and fill the part
- * of the thermodynamics interpolation table (the rest is filled in
- * thermodynamics_init()). Called once by
- * thermodynamics_recombination(), from thermodynamics_init().
- *
- *************************************************************************************************
- *                 HYREC: Hydrogen and Helium Recombination Code
- *         Written by Yacine Ali-Haimoud and Chris Hirata (Caltech)
- *************************************************************************************************
- *
- *
- * @param preco    Output: pointer to recombination structure
- * @param pvecback Input: pointer to an allocated (but empty) vector of background variables
- */
-
-void ThermodynamicsModule::thermodynamics_recombination_with_hyrec(recombination* preco,
-                                                                   double* pvecback) {
-  /** Summary: */
-#ifdef HYREC
-
-  REC_COSMOPARAMS param;
-  HRATEEFF rate_table;
-  TWO_PHOTON_PARAMS twog_params;
-  double *xe_output, *Tm_output;
-  FILE* fA;
-  FILE* fR;
-  double L2s1s_current;
-  std::vector<char> buffer;
-  int buf_size;
-  double tau;
-  int last_index_back;
-
-  /** - Fill hyrec parameter structure */
-
-  param.T0   = pba->T_cmb;
-  param.obh2 = pba->Omega0_b * pba->h * pba->h;
-  {
-    const double Omega0_idm_dr_hyrec = all_species_.count("IDM_DR_IDR")
-                                           ? static_cast<const IDM_DR_IDR_Species&>(
-                                                 *all_species_.at("IDM_DR_IDR"))
-                                                 .idm_dr()
-                                                 .GetOmega0()
-                                           : 0.;
-    const double Omega0_cdm_hyrec = all_species_.count("CDM") ? all_species_.at("CDM")->GetOmega0()
-                                                              : 0.;
-    const double Omega0_lambda_hyrec = all_species_.count("Lambda")
-                                           ? all_species_.at("Lambda")->GetOmega0()
-                                           : 0.;
-    const double Omega0_fld_hyrec    = all_species_.count("Fluid")
-                                           ? all_species_.at("Fluid")->GetOmega0()
-                                           : 0.;
-    param.omh2                       = (pba->Omega0_b + Omega0_cdm_hyrec + Omega0_idm_dr_hyrec +
-                                        background_module_->GetOmega0NcdmTot()) *
-                                       pba->h * pba->h;
-    param.okh2                       = pba->Omega0_k * pba->h * pba->h;
-    param.odeh2                      = (Omega0_lambda_hyrec + Omega0_fld_hyrec) * pba->h * pba->h;
-  }
-  param.w0 = -1.;
-  param.wa = 0.;
-  if (all_species_.count("Fluid")) {
-    const auto& fld = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
-    class_test(!fld.HyrecCplApproximation(&param.w0, &param.wa),
-               "this fluid's dark-energy density history cannot be represented by the CPL "
-               "(w0, wa) pair that HyRec uses internally (hyrec/history.c) — HyRec would "
-               "misreconstruct H(z) at recombination. Use 'recombination = RECFAST', which "
-               "reads the true background table.");
-  }
-  param.Y               = YHe_;
-  param.Nnueff          = background_module_->Neff_;
-  param.nH0             = 11.223846333047 * param.obh2 *
-                          (1. - param.Y); /* number density of hydrogen today in m-3 */
-  param.fHe             = param.Y / (1 - param.Y) / 3.97153; /* abundance of helium by number */
-  param.zstart          = ppr->recfast_z_initial;            /* Redshift range */
-  param.zend            = 0.;
-  param.dlna            = 8.49e-5;
-  param.nz              = floor(2 + log((1. + param.zstart) / (1. + param.zend)) / param.dlna);
-  param.annihilation    = pth->annihilation;
-  param.has_on_the_spot = pth->has_on_the_spot;
-  param.decay           = pth->decay;
-  param.annihilation_variation = pth->annihilation_variation;
-  param.annihilation_z         = pth->annihilation_z;
-  param.annihilation_zmax      = pth->annihilation_zmax;
-  param.annihilation_zmin      = pth->annihilation_zmin;
-  param.annihilation_f_halo    = pth->annihilation_f_halo;
-  param.annihilation_z_halo    = pth->annihilation_z_halo;
-
-  /** - Build effective rate tables */
-
-  /* allocate contiguous memory zone */
-
-  buf_size = (2 * NTR + NTM + 2 * NTR * NTM + 2 * param.nz) * sizeof(double) +
-             2 * NTM * sizeof(double*);
-
-  buffer.resize(buf_size);
-
-  /** - distribute addresses for each table */
-
-  rate_table.logTR_tab          = (double*) buffer.data();
-  rate_table.TM_TR_tab          = (double*) (rate_table.logTR_tab + NTR);
-  rate_table.logAlpha_tab[0]    = (double**) (rate_table.TM_TR_tab + NTM);
-  rate_table.logAlpha_tab[1]    = (double**) (rate_table.logAlpha_tab[0] + NTM);
-  rate_table.logAlpha_tab[0][0] = (double*) (rate_table.logAlpha_tab[1] + NTM);
-  for (int j = 1; j < NTM; j++) {
-    rate_table.logAlpha_tab[0][j] = (double*) (rate_table.logAlpha_tab[0][j - 1] + NTR);
-  }
-  rate_table.logAlpha_tab[1][0] = (double*) (rate_table.logAlpha_tab[0][NTM - 1] + NTR);
-  for (int j = 1; j < NTM; j++) {
-    rate_table.logAlpha_tab[1][j] = (double*) (rate_table.logAlpha_tab[1][j - 1] + NTR);
-  }
-  rate_table.logR2p2s_tab = (double*) (rate_table.logAlpha_tab[1][NTM - 1] + NTR);
-
-  xe_output = (double*) (rate_table.logR2p2s_tab + NTR);
-  Tm_output = (double*) (xe_output + param.nz);
-
-  /* store sampled values of temperatures */
-
-  for (int i = 0; i < NTR; i++)
-    rate_table.logTR_tab[i] = log(TR_MIN) + i * (log(TR_MAX) - log(TR_MIN)) / (NTR - 1.);
-  for (int i = 0; i < NTM; i++)
-    rate_table.TM_TR_tab[i] = TM_TR_MIN + i * (TM_TR_MAX - TM_TR_MIN) / (NTM - 1.);
-
-  rate_table.DlogTR = rate_table.logTR_tab[1] - rate_table.logTR_tab[0];
-  rate_table.DTM_TR = rate_table.TM_TR_tab[1] - rate_table.TM_TR_tab[0];
-
-  /* read in file */
-
-  class_open(fA, ppr->hyrec_Alpha_inf_file.c_str(), "r");
-  class_open(fR, ppr->hyrec_R_inf_file.c_str(), "r");
-
-  for (int i = 0; i < NTR; i++) {
-    for (int j = 0; j < NTM; j++) {
-      for (int l = 0; l <= 1; l++) {
-        if (fscanf(fA, "%le", &(rate_table.logAlpha_tab[l][j][i])) != 1)
-          class_stop("Error reading hyrec data file %s", ppr->hyrec_Alpha_inf_file.c_str());
-        rate_table.logAlpha_tab[l][j][i] = log(rate_table.logAlpha_tab[l][j][i]);
-      }
-    }
-
-    if (fscanf(fR, "%le", &(rate_table.logR2p2s_tab[i])) != 1)
-      class_stop("Error reading hyrec data file %s", ppr->hyrec_R_inf_file.c_str());
-    rate_table.logR2p2s_tab[i] = log(rate_table.logR2p2s_tab[i]);
-  }
-  fclose(fA);
-  fclose(fR);
-
-  /* Read two-photon rate tables */
-
-  class_open(fA, ppr->hyrec_two_photon_tables_file.c_str(), "r");
-
-  for (int b = 0; b < NVIRT; b++) {
-    if ((fscanf(fA, "%le", &(twog_params.Eb_tab[b])) != 1) ||
-        (fscanf(fA, "%le", &(twog_params.A1s_tab[b])) != 1) ||
-        (fscanf(fA, "%le", &(twog_params.A2s_tab[b])) != 1) ||
-        (fscanf(fA, "%le", &(twog_params.A3s3d_tab[b])) != 1) ||
-        (fscanf(fA, "%le", &(twog_params.A4s4d_tab[b])) != 1))
-      class_stop("Error reading hyrec data file %s", ppr->hyrec_two_photon_tables_file.c_str());
-  }
-
-  fclose(fA);
-
-  /** - Normalize 2s--1s differential decay rate to L2s1s (can be set by user in hydrogen.h) */
-  L2s1s_current = 0.;
-  for (int b = 0; b < NSUBLYA; b++)
-    L2s1s_current += twog_params.A2s_tab[b];
-  for (int b = 0; b < NSUBLYA; b++)
-    twog_params.A2s_tab[b] *= L2s1s / L2s1s_current;
-
-  /*  In CLASS, we have neutralized the switches for the various
-      effects considered in Hirata (2008), keeping the full
-      calculation as a default; but you could restore their
-      functionality by copying a few lines from hyrec/hyrec.c to
-      here */
-
-  /** - Compute the recombination history by calling a function in hyrec (no CLASS-like error management here) */
-
-  if (pth->thermodynamics_verbose > 0)
-    printf(" -> calling HyRec version %s,\n", HYREC_VERSION);
-
-  rec_build_history(&param, &rate_table, &twog_params, xe_output, Tm_output);
-
-  if (pth->thermodynamics_verbose > 0)
-    printf("    by Y. Ali-Haïmoud & C. Hirata\n");
-
-  /** - fill a few parameters in preco and pth */
-
-  int Nz = ppr->recfast_Nz0;
-
-  preco->rt_size = Nz;
-  preco->H0      = pba->H0 * _c_ / _Mpc_over_m_;
-  /* preco->H0 in inverse seconds (while pba->H0 is [H0/c] in inverse Mpcs) */
-  preco->YHe  = YHe_;
-  preco->Nnow = 3. * preco->H0 * preco->H0 * pba->Omega0_b * (1. - preco->YHe) /
-                (8. * _PI_ * _G_ * _m_H_);
-  /* energy injection parameters */
-  preco->annihilation           = pth->annihilation;
-  preco->has_on_the_spot        = pth->has_on_the_spot;
-  preco->annihilation_variation = pth->annihilation_variation;
-  preco->annihilation_z         = pth->annihilation_z;
-  preco->annihilation_zmax      = pth->annihilation_zmax;
-  preco->annihilation_zmin      = pth->annihilation_zmin;
-  preco->decay                  = pth->decay;
-  preco->annihilation_f_halo    = pth->annihilation_f_halo;
-  preco->annihilation_z_halo    = pth->annihilation_z_halo;
-  n_e_                          = preco->Nnow;
-
-  /** - allocate memory for thermodynamics interpolation tables (size known in advance) and fill it */
-
-  preco->recombination_table.resize(preco->re_size * preco->rt_size);
-
-  for (int i = 0; i < Nz; i++) {
-    /** - --> get redshift, corresponding results from hyrec, and background quantities */
-
-    double z = param.zstart * (1. - (double) (i + 1) / (double) Nz);
-
-    /* get (xe,Tm) by interpolating in pre-computed tables */
-
-    double xe;
-    array_interpolate_cubic_equal(-log(1. + param.zstart),
-                                  param.dlna,
-                                  xe_output,
-                                  param.nz,
-                                  -log(1. + z),
-                                  &xe);
-
-    double Tm;
-    array_interpolate_cubic_equal(-log(1. + param.zstart),
-                                  param.dlna,
-                                  Tm_output,
-                                  param.nz,
-                                  -log(1. + z),
-                                  &Tm);
-
-    background_module_->background_tau_of_z(z, &tau);
-
-    background_module_->background_at_tau(tau,
-                                          pba->short_info,
-                                          pba->inter_normal,
-                                          &last_index_back,
-                                          pvecback);
-
-    /*   thermodynamics_energy_injection(ppr,pba,preco,z,&energy_rate,buf);
-    */
-
-    /* Hz is H in inverse seconds (while pvecback returns [H0/c] in inverse Mpcs) */
-    double Hz = pvecback[background_module_->index_bg_H_] * _c_ / _Mpc_over_m_;
-
-    /** - --> store the results in the table */
-
-    /* results are obtained in order of decreasing z, and stored in order of growing z */
-
-    /* redshift */
-    preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_z] = z;
-
-    /* ionization fraction */
-    preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_xe] = xe;
-
-    /* Tb */
-    preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_Tb] = Tm;
-
-    /* wb = (k_B/mu) Tb */
-    preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_wb] =
-        _k_B_ / (_c_ * _c_ * _m_H_) * (1. + (1. / _not4_ - 1.) * YHe_ + xe * (1. - YHe_)) * Tm;
-
-    /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz)
-       with (1+z)dlnTb/dz= - [dlnTb/dlna] */
-    preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_cb2] =
-        preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_wb] *
-        (1. - rec_dTmdlna(xe,
-                          Tm,
-                          pba->T_cmb * (1. + z),
-                          Hz,
-                          param.fHe,
-                          param.nH0 * pow((1 + z), 3) * 1e-6,
-                          energy_injection_rate(&param, z)) /
-                  Tm / 3.);
-
-    /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
-    preco->recombination_table[(Nz - i - 1) * preco->re_size + preco->index_re_dkappadtau] =
-        (1. + z) * (1. + z) * preco->Nnow * xe * _sigma_ * _Mpc_over_m_;
-  }
-
-  /* Cleanup */
-
-#else
-
-  class_stop(
-      "you compiled without including the HyRec code, and now wish to use it. Either set "
-      "the input parameter 'recombination' to something else than 'HyRec', or recompile "
-      "after setting in the Makefile the appropriate path HYREC=... ");
-
-#endif
+  /* Both recombination codes go through the same integration: they differ only
+     in the atomic physics supplying dx_H/dz and dx_He/dz, which is selected
+     inside. */
+  thermodynamics_recombination_integrate(preco, pvecback);
 }
 
 double ThermodynamicsModule::thermodynamics_recfast_hydrogen_saha_xH(const recombination* preco,
@@ -3254,8 +2953,8 @@ double ThermodynamicsModule::thermodynamics_recfast_xe_after_full_ode(const reco
  * @return the error status
  */
 
-void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombination* preco,
-                                                                     double* pvecback) {
+void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination* preco,
+                                                                  double* pvecback) {
   /** Summary: */
 
   /** - define local variables */
@@ -3263,7 +2962,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
   /* vector of variables to be integrated: x_H, x_He, Tmat */
   double y[3], dy[3];
 
-  /* contains all fixed parameters which should be passed to thermodynamics_derivs_with_recfast */
+  /* contains all fixed parameters which should be passed to thermodynamics_recombination_derivs */
   thermodynamics_parameters_and_workspace tpaw{this};
 
   /** - allocate memory for thermodynamics interpolation tables (size known in advance) */
@@ -3347,6 +3046,38 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
   /** - define the fields of the 'thermodynamics parameter and workspace' structure */
   tpaw.preco    = preco;
   tpaw.pvecback = pvecback;
+
+  /* The atomic physics behind dx_H/dz and dx_He/dz. Everything else about the
+     integration -- the Saha phases, the baryon temperature, the evolver, the
+     sampling -- is shared, so the two recombination codes differ in exactly this
+     one place. In particular both are handed CLASS's own H(z) at every step. */
+  std::unique_ptr<RecombinationModel> recombination_model;
+  if (pth->recombination == hyrec) {
+    /* SWIFT's correction function is calibrated against a fiducial cosmology and
+       takes the NON-free-streaming matter density: total matter less the massive
+       neutrinos, which stream out of the perturbations it was fitted to. Adding
+       them here is exactly the double-count that made the old HyRec path wrong
+       (#396), reached through a different term. */
+    recombination_model = std::make_unique<HyrecModel>(ppr->hyrec_path,
+                                                       pba->T_cmb,
+                                                       pba->Omega0_b * pba->h * pba->h,
+                                                       (background_module_->Omega0_m_ -
+                                                        background_module_->GetOmega0NcdmTot()) *
+                                                           pba->h * pba->h,
+                                                       pba->Omega0_k * pba->h * pba->h,
+                                                       background_module_->Neff_,
+                                                       YHe_,
+                                                       preco->fHe,
+                                                       preco->Nnow,
+                                                       ppr->recfast_z_initial);
+  }
+  else {
+    recombination_model = std::make_unique<RecfastModel>(ppr, preco);
+  }
+  tpaw.recombination_model = recombination_model.get();
+
+  if (pth->thermodynamics_verbose > 0)
+    printf(" -> recombination computed with %s\n", recombination_model->Name());
 
   /** - impose initial conditions at early times */
 
@@ -3478,7 +3209,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
 
   /** - Fill all analytic RECFAST regimes directly on the requested sampling. */
 
-  tpaw.recfast_phase = RecfastPhase::analytic;
+  tpaw.recombination_phase = RecombinationPhase::analytic;
 
   int i = 0;
   for (; (i < Nz) && (sample_z(i) > z_helium_ode_start); i++) {
@@ -3553,7 +3284,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
     y[1] = x_He0;
     y[2] = preco->Tnow * (1. + z);
 
-    thermodynamics_derivs_with_recfast(z, y, dy, &tpaw);
+    thermodynamics_recombination_derivs(z, y, dy, &tpaw);
     thermodynamics_recfast_store_row(preco, i, z, x0, y[2], dy[2]);
   }
 
@@ -3588,7 +3319,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
   auto helium_output              = (helium_sample_count > 0) ? &thermodynamics_recfast_output
                                                               : &thermodynamics_recfast_output_none;
 
-  tpaw.recfast_phase               = RecfastPhase::helium;
+  tpaw.recombination_phase         = RecombinationPhase::helium;
   tpaw.recfast_output_index_offset = first_helium_sample;
 
   generic_evolver(thermodynamics_recfast_derivs,
@@ -3619,7 +3350,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
                                                    z_hydrogen_ode_start);
 
   if (first_full_sample < Nz) {
-    tpaw.recfast_phase               = RecfastPhase::full;
+    tpaw.recombination_phase         = RecombinationPhase::full;
     tpaw.recfast_output_index_offset = first_full_sample;
 
     generic_evolver(thermodynamics_recfast_derivs,
@@ -3663,7 +3394,7 @@ void ThermodynamicsModule::thermodynamics_recombination_with_recfast(recombinati
  * @param parameters_and_workspace Input: pointer to fixed parameters (e.g. indices) and workspace (already allocated)
  */
 
-void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
+void ThermodynamicsModule::thermodynamics_recombination_derivs_member(
     double z, double* y, double* dy, void* parameters_and_workspace) {
   /* define local variables */
 
@@ -3676,9 +3407,9 @@ void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
      state here (mirrors the perturbations module): hydrogen stays frozen on its Saha
      branch until the full phase, and the RECFAST 1.4 helium corrections run once
      helium is recombining (helium and full phases). */
-  const RecfastPhase phase      = ptpaw->recfast_phase;
-  const bool hydrogen_frozen    = (phase != RecfastPhase::full);
-  const bool helium_corrections = (phase != RecfastPhase::analytic);
+  const RecombinationPhase phase = ptpaw->recombination_phase;
+  const bool hydrogen_frozen     = (phase != RecombinationPhase::full);
+  const bool helium_corrections  = (phase != RecombinationPhase::analytic);
 
   double x_H  = y[0];
   double x_He = y[1];
@@ -3711,162 +3442,15 @@ void ThermodynamicsModule::thermodynamics_derivs_with_recfast_member(
   /* Hz is H in inverse seconds (while pvecback returns [H0/c] in inverse Mpcs) */
   double Hz = pvecback[background_module_->index_bg_H_] * _c_ / _Mpc_over_m_;
 
-  double Rdown = 1.e-19 * _a_PPB_ * pow((Tmat / 1.e4), _b_PPB_) /
-                 (1. + _c_PPB_ * pow((Tmat / 1.e4), _d_PPB_));
-  double Rup   = Rdown * pow((preco->CR * Tmat), 1.5) * exp(-preco->CDB / Tmat);
+  const RecombinationState state =
+      {z, x_H, x_He, x, n, Hz, Tmat, Trad, hydrogen_frozen, helium_corrections};
 
-  double sq_0     = sqrt(Tmat / _T_0_);
-  double sq_1     = sqrt(Tmat / _T_1_);
-  double Rdown_He = _a_VF_ /
-                    (sq_0 * pow((1. + sq_0), (1. - _b_VF_)) * pow((1. + sq_1), (1. + _b_VF_)));
-  double Rup_He   = 4. * Rdown_He * pow((preco->CR * Tmat), 1.5) * exp(-preco->CDB_He / Tmat);
-  double K        = preco->CK / Hz;
-
-  /* following is from recfast 1.5 */
-
-  if (ppr->recfast_Hswitch)
-    K *= 1. +
-         ppr->recfast_AGauss1 *
-             exp(-pow((log(1. + z) - ppr->recfast_zGauss1) / ppr->recfast_wGauss1, 2)) +
-         ppr->recfast_AGauss2 *
-             exp(-pow((log(1. + z) - ppr->recfast_zGauss2) / ppr->recfast_wGauss2, 2));
-
-  /* end of new recfast 1.5 piece */
-
-  /* following is from recfast 1.4 */
-
-  double Rdown_trip = _a_trip_ / (sq_0 * pow((1. + sq_0), (1. - _b_trip_)) *
-                                  pow((1. + sq_1), (1. + _b_trip_)));
-  double Rup_trip   = Rdown_trip * exp(-_h_P_ * _c_ * _L_He2St_ion_ / (_k_B_ * Tmat)) *
-                      pow(preco->CR * Tmat, 1.5) * 4. / 3.;
-
-  int Heflag = 0;
-  if (helium_corrections && (x_He >= 5.e-9))
-    Heflag = ppr->recfast_Heswitch;
-
-  double CfHe_t = 0.;
-
-  double K_He = 0.;
-  if (Heflag == 0)
-    K_He = preco->CK_He / Hz;
-  else {
-    double tauHe_s = _A2P_s_ * preco->CK_He * 3. * n_He * (1. - x_He) / Hz;
-    double pHe_s   = (1. - exp(-tauHe_s)) / tauHe_s;
-    K_He           = 1. / (_A2P_s_ * pHe_s * 3. * n_He * (1. - x_He));
-
-    double Doppler = 0.;
-    double pb      = 0.;
-    double qb      = 0.;
-    double AHcon   = 0.;
-
-    /*    if (((Heflag == 2) || (Heflag >= 5)) && (x_H < 0.99999)) { */
-    if (((Heflag == 2) || (Heflag >= 5)) &&
-        (x_H < 0.9999999)) { /* threshold changed by Antony Lewis in 2008 to get smoother Helium */
-
-      Doppler          = 2. * _k_B_ * Tmat / (_m_H_ * _not4_ * _c_ * _c_);
-      Doppler          = _c_ * _L_He_2p_ * sqrt(Doppler);
-      double gamma_2Ps = 3. * _A2P_s_ * preco->fHe * (1. - x_He) * _c_ * _c_ /
-                         (sqrt(_PI_) * _sigma_He_2Ps_ * 8. * _PI_ * Doppler * (1. - x_H)) /
-                         pow(_c_ * _L_He_2p_, 2);
-      pb               = 0.36;
-      qb               = ppr->recfast_fudge_He;
-      AHcon            = _A2P_s_ / (1. + pb * pow(gamma_2Ps, qb));
-      K_He             = 1. / ((_A2P_s_ * pHe_s + AHcon) * 3. * n_He * (1. - x_He));
-    }
-
-    if (Heflag >= 3) {
-      double tauHe_t = _A2P_t_ * n_He * (1. - x_He) * 3. / (8. * _PI_ * Hz * pow(_L_He_2Pt_, 3));
-      double pHe_t   = (1. - exp(-tauHe_t)) / tauHe_t;
-      double CL_PSt  = _h_P_ * _c_ * (_L_He_2Pt_ - _L_He_2St_) / _k_B_;
-      if ((Heflag == 3) || (Heflag == 5) || (x_H >= 0.99999)) {
-        CfHe_t = _A2P_t_ * pHe_t * exp(-CL_PSt / Tmat);
-        CfHe_t = CfHe_t / (Rup_trip + CfHe_t);
-      }
-      else {
-        Doppler          = 2. * _k_B_ * Tmat / (_m_H_ * _not4_ * _c_ * _c_);
-        Doppler          = _c_ * _L_He_2Pt_ * sqrt(Doppler);
-        double gamma_2Pt = 3. * _A2P_t_ * preco->fHe * (1. - x_He) * _c_ * _c_ /
-                           (sqrt(_PI_) * _sigma_He_2Pt_ * 8. * _PI_ * Doppler * (1. - x_H)) /
-                           pow(_c_ * _L_He_2Pt_, 2);
-        pb               = 0.66;
-        qb               = 0.9;
-        AHcon            = _A2P_t_ / (1. + pb * pow(gamma_2Pt, qb)) / 3.;
-        CfHe_t           = (_A2P_t_ * pHe_t + AHcon) * exp(-CL_PSt / Tmat);
-        CfHe_t           = CfHe_t / (Rup_trip + CfHe_t);
-      }
-    }
-  }
-
-  /* end of new recfast 1.4 piece */
+  const IonisationDerivatives dx = ptpaw->recombination_model->Derivatives(state, dep, energy_rate);
+  dy[0]                          = dx.dx_H_dz;
+  dy[1]                          = dx.dx_He_dz;
 
   double timeTh = (1. / (preco->CT * pow(Trad, 4))) * (1. + x + preco->fHe) / x;
   double timeH  = 2. / (3. * preco->H0 * pow(1. + z, 1.5));
-
-  /************/
-  /* hydrogen */
-  /************/
-
-  if (hydrogen_frozen)
-    dy[0] = 0.;
-  else {
-    /* Peebles' coefficient (approximated as one when the Hydrogen
-       ionization fraction is very close to one) */
-    double C = 0.;
-    if (x_H < ppr->recfast_x_H0_trigger2) {
-      C = (1. + K * _Lambda_ * n * (1. - x_H)) /
-          (1. / preco->fu + K * _Lambda_ * n * (1. - x_H) / preco->fu + K * Rup * n * (1. - x_H));
-    }
-    else {
-      C = 1.;
-    }
-
-    /* For DM annihilation: fractions of the injected energy going into hydrogen
-       ionization and into Lyman-alpha excitation. The escape probability C splits
-       the excitation channel the way RECFAST's three-level atom sees it. */
-
-    /* evolution of hydrogen ionisation fraction: */
-
-    // JL: test for debugginf reio_inter
-    //fprintf(stdout,"%e  %e  %e  %e\n",z,Tmat,K*_Lambda_*n,K*Rup*n);
-
-    dy[0] = (x * x_H * n * Rdown - Rup * (1. - x_H) * exp(-preco->CL / Tmat)) * C /
-                (Hz * (1. + z)) /* Peeble's equation with fudged factors */
-            - energy_rate / n * (dep.ion_H / _L_H_ion_ + dep.lya * (1. - C) / _L_H_alpha_) /
-                  (_h_P_ * _c_ * Hz *
-                   (1. + z)); /* energy injection (neglect fraction going to helium) */
-  }
-
-  /************/
-  /* helium   */
-  /************/
-
-  if (x_He < 1.e-15)
-    dy[1] = 0.;
-  else {
-    double He_Boltz = exp(std::min(680., preco->Bfact / Tmat));
-
-    /* equations modified to take into account energy injection from dark matter */
-    //C_He=(1. + K_He*_Lambda_He_*n_He*(1.-x_He)*He_Boltz)/(1. + K_He*(_Lambda_He_+Rup_He)*n_He*(1.-x_He)*He_Boltz);
-
-    dy[1] =
-        ((x * x_He * n * Rdown_He - Rup_He * (1. - x_He) * exp(-preco->CL_He / Tmat)) *
-         (1. + K_He * _Lambda_He_ * n_He * (1. - x_He) * He_Boltz)) /
-        (Hz * (1 + z) *
-         (1. +
-          K_He * (_Lambda_He_ + Rup_He) * n_He * (1. - x_He) *
-              He_Boltz)); /* in case of energy injection due to DM, we neglect the contribution to helium ionization */
-
-    /* following is from recfast 1.4 */
-    /* this correction is not self-consistent when there is energy injection  from dark matter, and leads to nan's  at small redshift (unimportant when reionization takes over before that redshift) */
-
-    if (Heflag >= 3)
-      dy[1] = dy[1] +
-              (x * x_He * n * Rdown_trip -
-               (1. - x_He) * 3. * Rup_trip * exp(-_h_P_ * _c_ * _L_He_2St_ / (_k_B_ * Tmat))) *
-                  CfHe_t / (Hz * (1. + z));
-
-    /* end of new recfast 1.4 piece */
-  }
 
   if (timeTh < preco->H_frac * timeH) {
     /*   dy[2]=Tmat/(1.+z); */

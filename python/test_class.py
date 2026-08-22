@@ -960,6 +960,88 @@ class TestReviewRegressions(TestClass):
         self.cosmo.compute()
         self.assertTrue(self.cosmo.state)
 
+    # ---- recombination = hyrec -------------------------------------------
+    # Until HYREC-2 landed, nothing in the test suite set `recombination` at all
+    # (issue #396), which is how a HyRec that was 1% off its own RECFAST went
+    # unnoticed. These pin the combinations that were broken or rejected before.
+
+    def test_hyrec_with_massive_neutrino_computes(self):
+        """HyRec used to rebuild H(z) itself and count the massive neutrino as
+        both matter and radiation, a 0.29% error at z = 1100 (issues #396, #369).
+        HYREC-2 is handed CLASS's background instead."""
+        scenario = {
+            'recombination': 'HyRec',
+            'N_ur': 2.0308,
+            'N_ncdm': 1,
+            'm_ncdm': 0.06,
+            'output': 'tCl,pCl',
+            'l_max_scalars': 500,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        self.assertTrue(self.cosmo.state)
+
+    def test_hyrec_with_scalar_field_computes(self):
+        """Scalar-field dark energy is not a Fluid, so HyRec's CPL reconstruction
+        silently ignored it. HYREC-2 reads the true background, so it cannot."""
+        scenario = {
+            'recombination': 'HyRec',
+            'Omega_fld': 0,
+            'Omega_scf': 0.1,
+            'attractor_ic_scf': 'yes',
+            'scf_parameters': '10.0, 0.0, 0.0, 0.0, 100.0, 0.0',
+            'output': 'tCl',
+            'l_max_scalars': 500,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        self.assertTrue(self.cosmo.state)
+
+    def test_hyrec_and_recfast_agree_to_a_few_tenths_of_a_percent(self):
+        """The point of the upgrade. Before it, HyRec sat ~1% from CLASS's own
+        RECFAST in TT and cost dchi2 ~ +25 against Planck; the two codes should
+        differ by a few tenths of a percent at most."""
+        scenario = {
+            'recombination': 'HyRec',
+            'output': 'tCl',
+            'l_max_scalars': 1000,
+        }
+        reference = dict(scenario, **{'recombination': 'RECFAST'})
+
+        candidate, ref = Class(), Class()
+        try:
+            candidate.set(dict(self.verbose, **scenario))
+            candidate.compute()
+            ref.set(dict(self.verbose, **reference))
+            ref.compute()
+
+            cl_hyrec = candidate.raw_cl(1000)['tt'][2:]
+            cl_recfast = ref.raw_cl(1000)['tt'][2:]
+            rel = np.abs(cl_hyrec/cl_recfast - 1.0)
+            self.assertLess(
+                np.max(rel), 0.005,
+                "HyRec and RECFAST TT differ by more than 0.5%%: max %.3e" % np.max(rel))
+        finally:
+            ref.struct_cleanup()
+            ref.empty()
+            candidate.struct_cleanup()
+            candidate.empty()
+
+    def test_retired_hyrec_file_parameters_are_rejected(self):
+        """HYREC-2 takes one directory, so the three per-file paths are gone. A
+        user who set them should hear about it rather than be ignored."""
+        self.cosmo.set(dict(self.verbose, **{
+            'recombination': 'HyRec',
+            'Alpha_inf hyrec file': '/nowhere/Alpha_inf.dat',
+            'output': 'tCl',
+            'l_max_scalars': 100,
+        }))
+        with self.assertRaises(CosmoSevereError) as ctx:
+            self.cosmo.compute()
+        self.assertIn('hyrec_path', str(ctx.exception))
+
     def test_dot_syntax_standard_partial_field_uses_legacy_defaults(self):
         scenario = {
             **self._dot_syntax_base(),

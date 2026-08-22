@@ -72,6 +72,8 @@ set(CLASS_SOURCE_FILES
   source/nonlinear_module.cpp
   source/output_module.cpp
   source/perturbations_module.cpp
+  source/hyrec_model.cpp
+  source/recfast_model.cpp
   source/primordial_module.cpp
   source/spectra_module.cpp
   source/thermodynamics_module.cpp
@@ -139,6 +141,7 @@ set(CLASS_TOOLS_FILES
 
 # hyrec/hyrec.c is the standalone HyRec driver (has its own main) and stays out.
 set(CLASS_HYREC_FILES
+  hyrec/energy_injection.c
   hyrec/helium.c
   hyrec/history.c
   hyrec/hydrogen.c
@@ -246,6 +249,7 @@ if(NOT SKBUILD)
   add_executable(test-precision-evolver tools/precision_evolver_test.cpp)
   add_executable(test-errors tools/errors_test.cpp)
   add_executable(test-deposition source/energy_deposition_test.cpp)
+  add_executable(test-hyrec source/hyrec_model_test.cpp)
   add_executable(test-bisection tools/bisection_test.cpp)
   add_executable(test-quadrature tools/quadrature_test.cpp)
   add_executable(test-decay-kernel tools/decay_kernel_test.cpp)
@@ -273,7 +277,7 @@ if(NOT SKBUILD)
   add_executable(test-dr-psd species/dr_psd_test.cpp)
   add_executable(test-ncdm-family species/ncdm_family_test.cpp)
   add_executable(test-species-budget species/species_budget_test.cpp)
-  foreach(_t IN ITEMS test-parser test-precision-evolver test-errors test-deposition test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-ncdm-family test-species-budget)
+  foreach(_t IN ITEMS test-parser test-precision-evolver test-errors test-deposition test-hyrec test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-ncdm-family test-species-budget)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for

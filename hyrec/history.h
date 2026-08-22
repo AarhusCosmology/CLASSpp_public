@@ -1,104 +1,70 @@
 /*************************************************************************************************/
-/*                 HYREC: Hydrogen and Helium Recombination Code                                 */
-/*         Written by Yacine Ali-Haimoud and Chris Hirata (Caltech)                              */
+/*                 HYREC-2: Hydrogen and Helium Recombination Code                               */
+/*         Written by Yacine Ali-Haimoud and Chris Hirata (2010-17)                              */
+/*            with contributions from Nanoom Lee (2020)                                          */
 /*                                                                                               */
 /*         history.h: functions for recombination history                                        */
 /*                                                                                               */
 /*************************************************************************************************/
 
-#define PROMPT 1      /* Set to zero to suppress initial prompts */
+#ifndef __HISTORY__
+#define __HISTORY__
 
-/**** Switch to choose the physical model used for hydrogen ****/ 
+#include "hyrectools.h"
+#include "hydrogen.h"
 
-/* definitions*/
-#define PEEBLES   0    /* Peebles effective three-level atom */
-#define RECFAST   1    /* Effective three-level atom for hydrogen with fudge factor F = 1.14 */
-#define EMLA2s2p  2    /* Correct EMLA model, with standard decay rates from 2s and 2p only */
-#define FULL      3    /* All radiative transfer effects included. Additional switches in header file hydrogen.h */
+#define HYREC_VERSION "2020"
 
-/** here is the switch **/
-#define MODEL RECFAST     /* default setting: FULL */
+#define MODEL SWIFT	                /* SWIFT is the default model. Four more models can be used (PEEBLES, RECFAST, EMLA2s2p, FULL). */
+                                    /* Each model is defined in hydrogen.h */
 
-/***** Switches for derivative d(xe)/dt *****/
+/* !!!!!  Do NOT change any numbers below unless you know what's going on with each parameter exactly !!!!! */
 
-#define FUNC_HEI     1
-#define FUNC_H2G     2
-#define FUNC_HMLA    3
-#define FUNC_PEEBLES 4
+#define SIZE_ErrorM      2048
 
-/**** Cosmological parameters. 
-      Include information on starting and ending redshit and timestep  ****/
+#define DXHEII_MAX       1e-5       /* If xHeII - xHeII(Saha) < DXEHII_MAX, use post-Saha expansion for Helium.*/
+#define DXHEII_DIFF_MAX  5e-2       /* If |1-dxHeIIdlna_prev/dxHeIIdlna| > DXHEII_DIFF_MAX, do loop with 10 times smaller time step */
 
-typedef struct {
-   double T0;                   /* CMB temperature today in K*/
-   double obh2, omh2, okh2;     /* cosmological parameters */
-   double odeh2, w0, wa;        /* dark energy parameters */
-   double Y;                    /* primordial helium abundance */
-   double Nnueff;               /* effective number of neutrinos */
+#define DXHII_MAX        3e-4       /* If xHII - xHII(Saha) < DXHII_MAX, use post-Saha expansion for Hydrogen. Switch to ODE integration after that.
+                                    IMPORTANT: do not set to a lower value unless using a smaller time-step */
+#define DXHII_DIFF_MAX   5e-2       /* If |1-dxHIIdlna_prev/dxHIIdlna| > DXHII_DIFF_MAX, do loop with 10 times smaller time step */
 
-   /* Secondary parameters, to avoid recalculating every time */
-   double nH0;                  /* density of hydrogen today in m^{-3} */  
-   double fHe;                  /* Helium fraction by number */
+#define XHEII_MIN        1e-6       /* Stop considering Helium recombination once xHeII < XHEII_MIN */
+//#define XHEII_MIN      1e-10      /* Used when calculating correction function in SWIFT mode */
 
-   double zstart, zend, dlna;   /* initial and final redshift and step size in log a */
-   int nz;                      /* total number of redshift steps */
+#define DLNT_MAX         5e-4       /* Use the steady-state approximation for Tm as long as 1-Tm/Tr < DLNT_MAX, then switch to ODE integration */
+#define DTM_DIFF_MAX     5e-2       /* If |1-dTmdlna_prev/dTmdlna| > DTM_DIFF_MAX, evole Tm with implicit method */
 
-   /** parameters for energy injection */
-
-   double annihilation; /** parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
-  
-   short has_on_the_spot; /** do we want to use the on-the-spot approximation? */
-
-   double decay; /** parameter descibing CDM decay (f/tau, see e.g. 1109.6322)*/
-
-   double annihilation_variation; /** if this parameter is non-zero,
-				     the function F(z)=(f <sigma*v> /
-				     m_cdm)(z) will be a parabola in
-				     log-log scale between zmin and
-				     zmax, with a curvature given by
-				     annihlation_variation (must ne
-				     negative), and with a maximum in
-				     zmax; it will be constant outside
-				     this range */
-
-   double annihilation_z; /** if annihilation_variation is non-zero,
-			     this is the value of z at which the
-			     parameter annihilation is defined, i.e.
-			     F(annihilation_z)=annihilation */
-  
-   double annihilation_zmax; /** if annihilation_variation is non-zero,
-				redhsift above which annihilation rate
-				is maximal */
-
-   double annihilation_zmin; /** if annihilation_variation is non-zero,
-				redhsift below which annihilation rate
-				is constant */
-
-   double annihilation_f_halo; /* takes the contribution of DM annihilation in halos into account*/
-   double annihilation_z_halo; /*characteristic redshift for DM annihilation in halos*/
-
-} REC_COSMOPARAMS;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 void rec_get_cosmoparam(FILE *fin, FILE *fout, REC_COSMOPARAMS *param);
-double rec_HubbleConstant(REC_COSMOPARAMS *param, double z);
-double rec_Tmss(double xe, double Tr, double H, double fHe, double nH, double energy_rate);
-double rec_dTmdlna(double xe, double Tm, double Tr, double H, double fHe , double nH, double energy_rate);
-void rec_get_xe_next1(REC_COSMOPARAMS *param, double z1, double xe_in, double *xe_out,
-                      HRATEEFF *rate_table, int func_select, unsigned iz, TWO_PHOTON_PARAMS *twog_params,
-		      double **logfminus_hist, double *logfminus_Ly_hist[], 
-                      double *z_prev, double *dxedlna_prev, double *z_prev2, double *dxedlna_prev2);
-void rec_get_xe_next2(REC_COSMOPARAMS *param, double z1, double xe_in, double Tm_in, double *xe_out, double *Tm_out,
-                      HRATEEFF *rate_table, int func_select, unsigned iz, TWO_PHOTON_PARAMS *twog_params,
-		      double **logfminus_hist, double *logfminus_Ly_hist[], 
-                      double *z_prev, double *dxedlna_prev, double *dTmdlna_prev, 
-                      double *z_prev2, double *dxedlna_prev2, double *dTmdlna_prev2);
-void rec_build_history(REC_COSMOPARAMS *param, HRATEEFF *rate_table, TWO_PHOTON_PARAMS *twog_params,
-                       double *xe_output, double *Tm_output);
 
-double energy_injection_rate(REC_COSMOPARAMS *param, double z);
-#ifdef __cplusplus
-}
+double rec_HubbleRate(REC_COSMOPARAMS *param, double z);
+
+double rec_Tmss(double z, double xe, REC_COSMOPARAMS *cosmo, double dEdtdV, double H);
+
+double rec_dTmdlna(double z, double xe, double Tm, REC_COSMOPARAMS *cosmo, double dEdtdV, double H);
+
+double Tm_implicit(double z, double xe, double Tm, REC_COSMOPARAMS *cosmo, double dEdtdV, double H, double DLNA);
+
+void rec_get_xe_next1_He(HYREC_DATA *data, double z_in, double *xHeII, double dxHeIIdlna_prev[2],
+                         double *hubble_array, int flag);
+
+void rec_xH1_stiff(HYREC_DATA *data, int model, double z, double xHeII, double *xH1, unsigned iz_rad, double H);
+
+void get_rec_next2_HHe(HYREC_DATA *data, int model, double z_in, long iz, double *xH1, double *xHeII,
+                       double dxHIIdlna_prev[2], double dxHeIIdlna_prev[2], double H);
+
+void rec_get_xe_next1_H(HYREC_DATA *data, int model, double z_in, long iz, double xe_in, double Tm_in,
+                        double *xe_out, double *Tm_out, double dxedlna_prev[2], double H, int flag);
+
+void rec_get_xe_next2_HTm(HYREC_DATA *data, int model, double z_in, long iz, double dxedlna_prev[2],
+                          double dTmdlna_prev[2], double H, double z_out, double H_next);
+
+char* rec_build_history(HYREC_DATA *data, int model, double *hubble_array);
+
+void hyrec_allocate(HYREC_DATA *data, double zmax, double zmin);
+void hyrec_free(HYREC_DATA *data);
+void hyrec_compute(HYREC_DATA *data, int model);
+double hyrec_xe(double z, HYREC_DATA *data);
+double hyrec_Tm(double z, HYREC_DATA *data);
+
 #endif

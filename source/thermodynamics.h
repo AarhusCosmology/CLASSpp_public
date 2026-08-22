@@ -207,7 +207,7 @@ struct recombination {
   //@}
 
   /** @name - recfast parameters needing to be passed to
-      thermodynamics_derivs_with_recfast() routine */
+      thermodynamics_recombination_derivs() routine */
 
   //@{
 
