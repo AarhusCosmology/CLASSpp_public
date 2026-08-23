@@ -1,6 +1,7 @@
 # HYREC-2
 
-The files in this directory are HYREC-2, vendored **unmodified** from upstream.
+The files in this directory are HYREC-2, vendored from upstream with a single
+portability patch (see [Local modifications](#local-modifications)).
 
 | | |
 |---|---|
@@ -19,13 +20,28 @@ Not vendored: `hyrec.c` (the standalone driver's `main`), `input.dat`, `output_x
 `two_photon_tables_hires.dat`, `readme.pdf`, and upstream's `Makefile`. CLASS builds these
 sources as part of `libclasspp` and drives them through its own wrapper.
 
-## Keeping it unmodified
+## Local modifications
 
-Nothing in this directory is edited. Everything CLASS-specific lives in
+One patch, in `history.c`, for MSVC (the Windows wheel build):
+
+- `#include <unistd.h>` moved inside the `#ifdef CAMB` block, and the unused
+  `#include <libgen.h>` deleted. Both headers are POSIX and do not exist in the MSVC C
+  runtime, so the Windows wheel build failed with `error C1083: Cannot open include file:
+  'unistd.h'`. The only declarations HYREC-2 takes from them are `getcwd()` and `chdir()`,
+  used solely by `hyrec_init()` — which lives in the `CAMB` block that CLASS never
+  compiles. Nothing from `libgen.h` is referenced at all.
+
+Re-apply this when upgrading; it is otherwise not CLASS-specific and would be worth
+sending upstream.
+
+## Keeping the rest unmodified
+
+Nothing else in this directory is edited. Everything CLASS-specific lives in
 `source/hyrec_model.{h,cpp}`, behind the `RecombinationModel` interface in
 `source/recombination_model.h`; that pair owns the `extern "C"` seam, the `HYREC_DATA`
 lifetime, and the translation between CLASS's and HYREC-2's conventions. Upgrading is
-therefore a matter of dropping in the new upstream files and updating the commit hash above.
+therefore a matter of dropping in the new upstream files, re-applying the patch above, and
+updating the commit hash.
 
 Two consequences worth knowing when reading the code:
 
@@ -41,9 +57,9 @@ Two consequences worth knowing when reading the code:
 ## Upstream equivalence
 
 This tree is byte-identical to `class_public` v3.3.4's `external/HyRec2020/` except for
-whitespace and one `malloc` added inside a CAMB-only wrapper that neither code calls. All
-four data tables match exactly. That makes `class_public` usable as a parity reference for
-this integration.
+whitespace, one `malloc` added inside a CAMB-only wrapper that neither code calls, and the
+`unistd.h` move above. All four data tables match exactly. That makes `class_public` usable
+as a parity reference for this integration.
 
 ## History
 

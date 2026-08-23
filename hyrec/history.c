@@ -35,8 +35,6 @@
 #include <math.h>
 #include <stdbool.h>
 #include <string.h>
-#include <unistd.h>
-#include <libgen.h>
 
 #include "history.h"
 #include "helium.h"
@@ -46,6 +44,10 @@ Hubble expansion rate in sec^-1.
 *************************************************************************************/
 
 #ifdef CAMB
+
+/* getcwd()/chdir() are POSIX and absent from the MSVC C runtime; they are only
+   used by hyrec_init() below, which is part of the CAMB-only entry points. */
+#include <unistd.h>
 
 /* Use the Hubble rate from CAMB */
 
