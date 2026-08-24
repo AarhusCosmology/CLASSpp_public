@@ -660,10 +660,17 @@ void BackgroundModule::background_solve_evolver() {
   double loga_final = 0.;
   bt_size_          = (loga_final - loga_ini) / ppr->back_integration_stepsize;
   std::vector<double> loga(bt_size_);
-  std::vector<int> used_in_output(bt_size_);
+  /* used_in_output is indexed by EQUATION, not by output row: the evolvers read
+     used_in_output[k] for k < neq when deciding which components of the dense
+     output to reconstruct. Size it by the equation count handed to the evolver
+     below (bi_size_ - 1), not by bt_size_ -- a species with a large integrated
+     background grid (e.g. a decaying-NCDM daughter momentum grid) makes neq
+     exceed bt_size_ and every component past bt_size_ then reads heap garbage,
+     silently dropping it from the interpolated table. Every background variable
+     is needed by the output, so all entries are 1. */
+  std::vector<int> used_in_output(bi_size_ - 1, 1);
   for (int index_loga = 0; index_loga < bt_size_; index_loga++) {
-    loga[index_loga]           = loga_ini + index_loga * (loga_final - loga_ini) / (bt_size_ - 1);
-    used_in_output[index_loga] = 1;
+    loga[index_loga] = loga_ini + index_loga * (loga_final - loga_ini) / (bt_size_ - 1);
   }
   // -ffast-math robustness fix: preserve exact boundary values.
   loga.front() = loga_ini;
