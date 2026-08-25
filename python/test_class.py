@@ -1029,6 +1029,37 @@ class TestReviewRegressions(TestClass):
             candidate.struct_cleanup()
             candidate.empty()
 
+    def test_halofit_tail_accepts_non_analytic_primordial_table(self):
+        """Halofit's extended sigma tail must not query non-analytic primordial
+        tables above their computed k range."""
+        external_pk = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            'external_Pk',
+            'Pk_example.dat')
+        scenario = {
+            'P_k_ini type': 'external_Pk',
+            'command': 'cat {}'.format(external_pk),
+            'output': 'mPk',
+            'P_k_max_1/Mpc': 2,
+            'non linear': 'halofit',
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        self.assertTrue(self.cosmo.state)
+
+    def test_inflation_v_default_step_size_computes(self):
+        """The default inflation_V integration must not reject a valid final step."""
+        scenario = {
+            'P_k_ini type': 'inflation_V',
+            'output': 'tCl',
+            'modes': 's, t',
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        self.assertTrue(self.cosmo.state)
+
     def test_z_max_pk_above_the_thermodynamics_table_computes(self):
         """thermodynamics_at_z extrapolates analytically above the tabulated
         range, and that branch used to be the one path through the function that

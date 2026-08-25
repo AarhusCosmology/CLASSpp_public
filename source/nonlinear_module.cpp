@@ -1582,6 +1582,29 @@ void NonlinearModule::nonlinear_pk_linear(
 
   pk_ic.resize(ic_ic_size_);
 
+  const bool extrapolate_primordial_tail = (ppm->primordial_spec_type != analytic_Pk) &&
+                                           (k_size > k_size_);
+  std::vector<double> primordial_pk_previous;
+  std::vector<double> primordial_pk_max;
+
+  if (extrapolate_primordial_tail) {
+    class_test(k_size_ < 2,
+               "cannot extrapolate the primordial spectrum tail with only %d computed k values",
+               k_size_);
+
+    primordial_pk_previous.resize(ic_ic_size_);
+    primordial_pk_max.resize(ic_ic_size_);
+
+    primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
+                                                 logarithmic,
+                                                 ln_k_[k_size_ - 2],
+                                                 primordial_pk_previous.data());
+    primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
+                                                 logarithmic,
+                                                 ln_k_[k_size_ - 1],
+                                                 primordial_pk_max.data());
+  }
+
   if ((has_pk_m_) && (index_pk == index_pk_m_)) {
     index_tp = perturbations_module_->index_tp_delta_m_;
   }
@@ -1596,10 +1619,34 @@ void NonlinearModule::nonlinear_pk_linear(
 
   for (int index_k = 0; index_k < k_size; index_k++) {
     /** --> get primordial spectrum */
-    primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
-                                                 logarithmic,
-                                                 ln_k_[index_k],
-                                                 primordial_pk.data());
+    if (extrapolate_primordial_tail && (index_k >= k_size_)) {
+      /* The nonlinear tail is an extrapolation of the perturbation sources.
+         Non-analytic primordial spectra (inflation/external tables) are only
+         tabulated up to the computed perturbation k_max, so extend their
+         diagonal log spectra with the local slope and keep correlation angles
+         fixed at the edge. */
+      const double tail_fraction = (ln_k_[index_k] - ln_k_[k_size_ - 1]) /
+                                   (ln_k_[k_size_ - 1] - ln_k_[k_size_ - 2]);
+
+      for (int index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
+        index_ic1_ic1                = index_symmetric_matrix(index_ic1, index_ic1, ic_size_);
+        primordial_pk[index_ic1_ic1] = primordial_pk_max[index_ic1_ic1] +
+                                       tail_fraction * (primordial_pk_max[index_ic1_ic1] -
+                                                        primordial_pk_previous[index_ic1_ic1]);
+      }
+      for (int index_ic1 = 0; index_ic1 < ic_size_; index_ic1++) {
+        for (int index_ic2 = index_ic1 + 1; index_ic2 < ic_size_; index_ic2++) {
+          index_ic1_ic2                = index_symmetric_matrix(index_ic1, index_ic2, ic_size_);
+          primordial_pk[index_ic1_ic2] = primordial_pk_max[index_ic1_ic2];
+        }
+      }
+    }
+    else {
+      primordial_module_->primordial_spectrum_at_k(index_md_scalars_,
+                                                   logarithmic,
+                                                   ln_k_[index_k],
+                                                   primordial_pk.data());
+    }
 
     /** --> initialize a local variable for P_m(k) and P_cb(k) to zero */
     pk = 0.;

@@ -1393,10 +1393,8 @@ void PrimordialModule::primordial_inflation_one_k(
 
     tau_end = tau_start + dtau;
 
-    class_test(dtau / tau_start < ppr->smallest_allowed_variation,
-               "integration step: relative change in time =%e < machine precision : leads either "
-               "to numerical error or infinite loop",
-               dtau / tau_start);
+    class_test(tau_end == tau_start,
+               "integration step no longer advances time: numerical precision prevents progress");
 
     /* evolve the system */
     generic_integrator(primordial_inflation_derivs,
