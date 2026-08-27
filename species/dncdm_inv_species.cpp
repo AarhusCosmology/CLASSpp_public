@@ -607,11 +607,7 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
                               fermion_bg_view,
                               boson_bg_view);
   std::vector<double> fH(Np), diagH(Np), diagl(Nf), diagp(Nb);
-  double n_H_ini = 0.;
-  for (int i = 0; i < Np; ++i)
-    n_H_ini += parent_->dq()[i] * parent_->GetQ()[i] * parent_->GetQ()[i] * kappa *
-               std::exp(background_table[pf + i]);
-  int row_lo = -1, row_hi = -1;
+  int row_lo = -1;
   for (int row = 0; row < n_rows; ++row) {
     const double* bg = background_table + (size_t) row * row_stride;
     const double a   = bg[bgm_->index_bg_a_];
@@ -627,28 +623,48 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
       rate = std::fmax(rate, std::fabs(d));
     for (double d : diagp)
       rate = std::fmax(rate, std::fabs(d));
-    // TWO conditions, and the second is the one that matters.
+    // ONE condition, on the EARLY side only. The window runs from the first active row
+    // to the end of the table.
     //
-    // rate/aH alone does NOT bound the window on the late side: the parent's diagonal
-    // tends to a*Gamma while aH falls, so the ratio grows monotonically and is still
-    // rising at a = 1 -- long after the parent is extinct (rho_H/rho_tot ~ 1e-60) and
-    // the operator acts on nothing. Using it alone tabulated 2468 of 4605 rows over
-    // a = 3e-8 .. 1 and cost 266 MB. It is the same trap BuildReducedBasis documents for
-    // picking the freeze row, arrived at from the other direction.
+    // There WAS a late cut, on the parent's remaining comoving number (n_H > 1e-6 n_ini),
+    // on the reasoning that "the parent has to exist for its collision to move anything".
+    // That reasoning is wrong, and it is the bug this comment replaces. The operator does
+    // not only move the parent: with inverse decays it couples the two daughter sectors to
+    // each other, and that coupling is what keeps the reduced moment system dissipative.
+    // Truncate it -- Apply() contributes exactly ZERO outside the tabulated range -- and
+    // the moments are left with an undamped growing mode that runs to z = 0.
     //
-    // What actually bounds the window is that the parent has to EXIST for its collision
-    // to move anything, so the late cut is on the parent's remaining comoving number.
-    // The early cut is the rate, which really is small there (rate/aH ~ a^3 while the
-    // parent is relativistic).
-    double n_H = 0.;
-    for (int i = 0; i < Np; ++i)
-      n_H += parent_->dq()[i] * parent_->GetQ()[i] * parent_->GetQ()[i] * fH[i];
-    if (rate > kTableActiveRate * aH && n_H > kTableMinAbundance * n_H_ini) {
-      if (row_lo < 0)
-        row_lo = row;
-      row_hi = row;
+    // Measured, Gamma = 1e6, m = 0.3, six moments, max|phi| (0.4734 is correct): the
+    // sector tracks the matrix-free path to 1e-4 until a = 2.6e-2, then diverges, reaching
+    // 2.1e27 by z = 0. The divergence begins ~3x PAST the old window's late edge, in the
+    // region the table had truncated away. Removing the late cut alone restores
+    // max|phi| = 0.4734 and C_2^TT = 1.4777e-10 at every background stepsize tested.
+    //
+    // Why it stayed hidden: where the last qualifying row lands depends on the background
+    // table's row spacing, so the damage is a function of `back_integration_stepsize` --
+    // a global precision knob this species does not own. At the 7e-3 default this code was
+    // developed against, the cut fell late enough to be harmless; when #397 moved that
+    // default to 0.07 every reduced run diverged, while the exact scheme (no table, no
+    // window) and the matrix-free reduced path (no window) stayed correct.
+    //
+    // The cost of not truncating is bounded and small: the tail from the decay epoch to
+    // a = 1 is ~2 decades, which at the default spacing is 65 further rows -- 21.6 MB and
+    // 0.14 s against 14.6 MB and 0.10 s truncated (Gamma = 1e6, 28x28 blocks). The blocks
+    // out there are near zero and cost only storage, which is the same trade the rows
+    // inside the window already make.
+    if (rate > kTableActiveRate * aH) {
+      row_lo = row;
+      break;
     }
   }
+  // The late edge is the end of the table, unconditionally -- not "the last row that also
+  // passed the test above". Deriving it from the rate would silently reinstate a late cut
+  // the moment the ratio dipped back under the threshold anywhere, which is the exact
+  // failure this function was rewritten to remove; the argument that it never dips (the
+  // parent's diagonal tends to a*Gamma while aH falls, so rate/aH rises monotonically and
+  // is still rising at a = 1) is a property of the physics, not something the code should
+  // be relying on to stay dissipative.
+  const int row_hi = n_rows - 1;
   if (row_lo < 0) {
     // Not gated: falling back to the matrix-free path is a silent 10x, and a user who
     // asked for the table needs to know they did not get it.
@@ -667,18 +683,45 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
   // scratch. Chunks are contiguous, so each task writes a slice the merge below just
   // concatenates; every row costs the same S assemblies, so there is no imbalance to
   // spread by interleaving.
-  const int n_win     = row_hi - row_lo + 1;
-  const int n_threads = std::max(1,
-                                 pba_ != nullptr ? static_cast<int>(pba_->number_of_threads) : 1);
-  const int n_chunks  = std::min(n_win, 4 * n_threads);
+  // The tabulation is interpolated in ln a, so its accuracy is set by the SPACING of the
+  // points it holds -- and those were the background integrator's own rows, i.e.
+  // `back_integration_stepsize`, a knob this table does not own and cannot see. At the
+  // 7e-3 this code was developed against that spacing was fine; at the 0.07 of #397 it is
+  // not, and the residue shows up where the operator varies fastest (Gamma = 1e9,
+  // m = 0.06: max|phi| 101 against 0.4734 correct, the last cell still wrong once the
+  // truncation above is fixed). So the table sub-divides each background interval until
+  // its own spacing meets kTableMaxDlna, interpolating the kernel's INPUTS -- the parent's
+  // ln f, the daughters' f, a and H -- rather than the assembled operator. n_sub is global
+  // and taken from the widest interval, so a background table uniform in ln a stays uniform
+  // here and ReducedOperatorTable::LowerRow keeps its O(1) lookup.
+  const int n_win = row_hi - row_lo + 1;
+  double dlna_row = 0.;
+  for (int row = row_lo; row < row_hi; ++row) {
+    const double a0 = background_table[(size_t) row * row_stride + bgm_->index_bg_a_];
+    const double a1 = background_table[(size_t) (row + 1) * row_stride + bgm_->index_bg_a_];
+    dlna_row        = std::fmax(dlna_row, std::log(a1 / a0));
+  }
+  const int n_sub =
+      std::max(1, static_cast<int>(std::ceil(dlna_row / kTableMaxDlna - kTableDlnaSlack)));
+  const long long n_pts = (long long) (n_win - 1) * n_sub + 1;
+  const int n_threads   = std::max(1,
+                                   pba_ != nullptr ? static_cast<int>(pba_->number_of_threads) : 1);
+  const int n_chunks    = static_cast<int>(std::min<long long>(n_pts, 4LL * n_threads));
+  const size_t block    = (size_t) (l_max + 1) * S * S;
   std::vector<std::vector<double>> chunk_M(n_chunks);
   std::vector<std::vector<double>> chunk_a(n_chunks);
 
   const auto t0 = std::chrono::steady_clock::now();
   auto do_chunk = [&](int c) {
-    const int lo = row_lo + (int) ((long long) c * n_win / n_chunks);
-    const int hi = (c + 1 == n_chunks) ? row_hi + 1
-                                       : row_lo + (int) ((long long) (c + 1) * n_win / n_chunks);
+    const long long lo = (long long) c * n_pts / n_chunks;
+    const long long hi = (long long) (c + 1) * n_pts / n_chunks;
+    // Both final sizes are known exactly here, and chunk_M is the big one: at the heaviest
+    // cell the table is 277 MB, so letting it grow by reallocation would recopy the
+    // assembled blocks log2(n) times and transiently hold ~1.5x a chunk on top of what the
+    // finished chunks already occupy -- while every chunk is live, since they are merged
+    // only after the last one returns.
+    chunk_a[c].reserve((size_t) (hi - lo));
+    chunk_M[c].reserve((size_t) (hi - lo) * block);
     DecayTransitionKernel k2(parent_view,
                              fermion_view,
                              boson_view,
@@ -694,14 +737,44 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
                                 fermion_->statistics(),
                                 boson_->statistics(),
                                 ReducedCollisionOperator::Config{reduced_moments_});
-    std::vector<double> f(Np), M;
-    for (int row = lo; row < hi; ++row) {
+    std::vector<double> f(Np), f_l(Nf), f_phi(Nb), M;
+    for (long long p = lo; p < hi; ++p) {
+      const int row    = row_lo + static_cast<int>(p / n_sub);
+      const int sub    = static_cast<int>(p % n_sub);
+      const double t   = static_cast<double>(sub) / n_sub;
       const double* bg = background_table + (size_t) row * row_stride;
-      const double a   = bg[bgm_->index_bg_a_];
-      const double aH  = a * bg[bgm_->index_bg_H_];
-      for (int i = 0; i < Np; ++i)
-        f[i] = kappa * std::exp(bg[pf + i]);
-      k2.PrepareTransitions(a, m, Gamma, f.data(), &bg[fbase], &bg[bbase], aH);
+      // sub == 0 reads the row itself, so the last row -- which has no successor -- is only
+      // ever reached there and bg1 is never formed past the end of the table.
+      const double* bg1 = (sub == 0) ? bg : background_table + (size_t) (row + 1) * row_stride;
+      double a, aH;
+      const double* f_l_src;
+      const double* f_phi_src;
+      if (sub == 0) {
+        a  = bg[bgm_->index_bg_a_];
+        aH = a * bg[bgm_->index_bg_H_];
+        for (int i = 0; i < Np; ++i)
+          f[i] = kappa * std::exp(bg[pf + i]);
+        f_l_src   = &bg[fbase];
+        f_phi_src = &bg[bbase];
+      }
+      else {
+        const double lna0 = std::log(bg[bgm_->index_bg_a_]);
+        const double lnH0 = std::log(bg[bgm_->index_bg_H_]);
+        a                 = std::exp(lna0 + t * (std::log(bg1[bgm_->index_bg_a_]) - lna0));
+        aH                = a * std::exp(lnH0 + t * (std::log(bg1[bgm_->index_bg_H_]) - lnH0));
+        // The parent is stored as ln f, so linear here is GEOMETRIC in f, which is what an
+        // occupation that falls many decades across the window needs. The daughters are
+        // stored as f and are built up from zero, where geometric would be wrong.
+        for (int i = 0; i < Np; ++i)
+          f[i] = kappa * std::exp(bg[pf + i] + t * (bg1[pf + i] - bg[pf + i]));
+        for (int j = 0; j < Nf; ++j)
+          f_l[j] = bg[fbase + j] + t * (bg1[fbase + j] - bg[fbase + j]);
+        for (int j = 0; j < Nb; ++j)
+          f_phi[j] = bg[bbase + j] + t * (bg1[bbase + j] - bg[bbase + j]);
+        f_l_src   = f_l.data();
+        f_phi_src = f_phi.data();
+      }
+      k2.PrepareTransitions(a, m, Gamma, f.data(), f_l_src, f_phi_src, aH);
 
       // The BASIS is the frozen one -- SetBackground here would rebuild it per row and
       // silently make every row's moments mean something different. Only the operator
@@ -729,7 +802,6 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
   }
 
   reduced_table_.Reset(S, l_max);
-  const size_t block = (size_t) (l_max + 1) * S * S;
   for (int c = 0; c < n_chunks; ++c)
     for (size_t r = 0; r < chunk_a[c].size(); ++r)
       reduced_table_.AddRow(chunk_a[c][r],
@@ -741,12 +813,16 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
     return;
   const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
   fprintf(stderr,
-          "[dncdm-reduced] %s: tabulated M~_l on %d of %d background rows "
-          "(a = %.4e .. %.4e), %d x %d per multipole, %.1f MB, precompute "
-          "%.2f s on %d threads. The k-loop no longer sweeps the %d-point daughter grid.\n",
+          "[dncdm-reduced] %s: tabulated M~_l at %d points across %d of %d background rows "
+          "(dln a %.2e, %dx sub-divided; a = %.4e .. %.4e), %d x %d per multipole, %.1f MB, "
+          "precompute %.2f s on %d threads. The k-loop no longer sweeps the %d-point "
+          "daughter grid.\n",
           name().c_str(),
           reduced_table_.n_rows(),
+          n_win,
           n_rows,
+          dlna_row / n_sub,
+          n_sub,
           background_table[(size_t) row_lo * row_stride + bgm_->index_bg_a_],
           background_table[(size_t) row_hi * row_stride + bgm_->index_bg_a_],
           S,

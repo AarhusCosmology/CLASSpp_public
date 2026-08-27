@@ -92,8 +92,31 @@ struct precision {
   /**
    * Default stepsize in conformal time for the background integration,
    * in units for the conformal Hubble time. dtau = back_integration_stepsize/aH
+   *
+   * This is NOT the integrator's step: background_solve_evolver drives the ODE to
+   * tol_background_integration and has dense output, so this knob only sets how densely
+   * the solution is SAMPLED into the stored table (background_module.cpp computes
+   * bt_size_ = |ln a_ini| / back_integration_stepsize) and therefore how accurately every
+   * later consumer can interpolate it. Its cost is dense-output reconstruction plus the
+   * spline over bt_size_ rows, not integration work, which is why loosening it buys much
+   * less than the row count suggests.
+   *
+   * #397 moved it 7e-3 -> 0.07 as part of the precision campaign; it is back at 7e-3 here,
+   * because the 10x coarser table was not paying for itself. Measured, one thread, lensed
+   * LCDM + mPk with one massive neutrino, five interleaved pairs: 1.089 s at 7e-3 against
+   * 1.086 s at 0.07, i.e. 0.3% and inside the run-to-run spread. The bound is structural
+   * rather than lucky -- background and thermodynamics together are 0.03 s of that 1.09 s
+   * (0.02 s at 0.07), so no setting of this knob can be worth more than ~1% of a CMB run.
+   * It goes the right way on accuracy at that price: 1.3e-4 on TT, 1.0e-3 on EE, 2.4e-4 on
+   * P(k), with 7e-3 the finer of the two.
+   *
+   * What the coarser table did cost is paid by every consumer that interpolates the
+   * background in ln a and inherits this spacing without being in a position to notice it.
+   * DNCDM's reduced collision table was one: at 0.07 every Galerkin run in the hpc_prod
+   * campaign diverged. That species now owns its own spacing (kTableMaxDlna), but it was
+   * not the only such consumer, merely the one that failed loudly.
    */
-  double back_integration_stepsize = 0.07;
+  double back_integration_stepsize = 7.e-3;
   /**
    * Tolerance of the background integration, giving the allowed relative integration error.
    * Passed to the evolver in background_solve_evolver(). The default is 1e-6 (not the

@@ -348,34 +348,61 @@ class DNCDMInvSpecies : public CompositeSpecies {
    *  (Gamma, m)-dependent tuning this whole scheme exists to avoid. */
   void BuildReducedBasis(const double* background_table, int n_rows, int row_stride);
 
-  /** Assembles M~_l on every background row of the collision window and stores it.
-   *  Called from ProcessBackgroundTable after BuildReducedBasis, which it needs: the
-   *  table is the reduction of the operator ONTO the frozen basis, so the basis has to
-   *  exist first.
+  /** Assembles M~_l on every background row from the first active one to the end of the
+   *  table, and stores it. Called from ProcessBackgroundTable after BuildReducedBasis,
+   *  which it needs: the table is the reduction of the operator ONTO the frozen basis, so
+   *  the basis has to exist first.
    *
-   *  The window is the CONTIGUOUS row range over which the collision diagonal rises
-   *  above `kTableActiveRate * aH` and the parent still exists (kTableMinAbundance).
-   *  Contiguous and not merely "the active rows",
+   *  The window is the CONTIGUOUS row range from where the collision diagonal first rises
+   *  above `kTableActiveRate * aH` to the last row. Contiguous and not merely "the active
+   *  rows",
    *  because the lookup interpolates between neighbours and a hole in the middle of the
    *  range would be interpolated ACROSS rather than skipped. Rows inside the window that
    *  are individually quiet are tabulated anyway; their blocks are near zero and cost
    *  only storage. */
   void BuildReducedTable(const double* background_table, int n_rows, int row_stride);
 
-  /** Activity threshold, in units of the expansion rate, that bounds the window. The
-   *  collision falls ten or more orders outside its ~1.5 decades (design note M1), so
-   *  anything in this region is a truncation far below every other error in the scheme
-   *  -- but it IS a truncation, and Apply drops to exactly zero outside, so it must be
-   *  loose enough that the discontinuity is unobservable. */
+  /** Activity threshold, in units of the expansion rate, that bounds the window on the
+   *  EARLY side. The collision falls ten or more orders below this before the decay
+   *  begins, so the truncation there is far below every other error in the scheme -- but
+   *  it IS a truncation, and Apply drops to exactly zero outside, so it must be loose
+   *  enough that the discontinuity is unobservable. The same is NOT true on the late
+   *  side, which is why there is no late cut: see below. */
   static constexpr double kTableActiveRate = 1e-4;
 
-  /** Late cut: the parent's comoving number as a fraction of its initial value. Below
-   *  this the collision has essentially nothing left to act on and every row past it is
-   *  pure storage. This, not the rate, is what makes the window ~1.5 decades wide
-   *  instead of the whole history -- the rate alone does NOT bound it on the late side,
-   *  because the parent's diagonal tends to a*Gamma while aH falls, so rate/aH is still
-   *  rising at a = 1. */
-  static constexpr double kTableMinAbundance = 1e-6;
+  /** Largest ln-a step the tabulated operator may be interpolated across. The table owns
+   *  this; it is NOT `back_integration_stepsize`, which is what the row spacing used to be
+   *  and which this species neither owns nor can see.
+   *
+   *  7e-3 is where the answer is converged, not merely where it stops moving: at
+   *  Gamma = 1e6, m = 0.3 the C_2^TT it gives agrees with a 32x finer grid to 7e-5
+   *  relative. The cell that needs it is the fastest-varying one, Gamma = 1e9 / m = 0.06,
+   *  which reads max|phi| = 101 against 0.4734 correct when the table simply inherits the
+   *  0.07 default and 0.4734 once it sub-divides to this. */
+  static constexpr double kTableMaxDlna = 7e-3;
+
+  /** Relative overshoot of kTableMaxDlna that does NOT buy a sub-division.
+   *
+   *  Without it the common case sub-divides by two for nothing. A background table is
+   *  laid out on bt_size_ = |ln a_ini| / back_integration_stepsize rows with bt_size_
+   *  truncated to an int, so its realised spacing lands a hair ABOVE whatever stepsize
+   *  was asked for -- 7.0021e-3 for the 7e-3 default. An exact `>` then reads that 0.03%
+   *  as "too coarse" and doubles both the memory and the precompute (432.7 MB / 4.6 s
+   *  against 216.4 MB / 2.3 s at Gamma = 1e6, m = 0.3) to buy an accuracy kTableMaxDlna
+   *  is documented above as already having 32x of margin on.
+   *
+   *  1% is far below any spacing that matters here and comfortably above that layout
+   *  artefact, which is at most ~1/bt_size_ + 1/(bt_size_ - 1). Applied inside the ceil,
+   *  so it means "ignore a sub-1% overshoot" at every level, not just the first. */
+  static constexpr double kTableDlnaSlack = 0.01;
+
+  /** There is deliberately NO late cut. An earlier version stopped tabulating once the
+   *  parent's comoving number fell below 1e-6 of its initial value; outside the tabulated
+   *  range Apply() contributes exactly zero, and that truncation left the reduced moment
+   *  system with an undamped growing mode. See BuildReducedTable for the measurement.
+   *
+   *  The window therefore runs from the first row where the collision is active
+   *  (kTableActiveRate) to the end of the background table. */
 
   DNCDMSpecies* parent_  = nullptr;
   DrPsdSpecies* fermion_ = nullptr;
