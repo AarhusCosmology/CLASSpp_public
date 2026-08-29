@@ -135,6 +135,57 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = inv;
   cfg.quantum_statistics = qs;
+  // Well-balanced band factor (see Config::balanced_gather). Only meaningful with
+  // inverse decays: it exists to stop the linear gather's convexity bias reading as a
+  // spurious f_l f_phi repopulation, and on the decay-only rung there is no such term,
+  // so the gather never enters Lambda and the flag is a no-op. Defaulting it to `inv`
+  // would silently change the reference method's published numbers, so it defaults off
+  // and is opted into.
+  cfg.balanced_gather = in.get_flag("balanced_gather", false);
+  class_test_severe(cfg.balanced_gather && !inv,
+                    "species '%s': balanced_gather requires inverse_decays = yes (it corrects the "
+                    "f_l f_phi band factor, which the decay-only rung does not have)",
+                    name.c_str());
+  // The lumped daughter loss buys positivity from the LINEAR gather's overestimate at
+  // an injection front. The balanced gather removes that overestimate at the root -- a
+  // geometric mean vanishes with any factor, so an empty bin is billed exactly nothing
+  // -- which makes the exact split Metzler again and lets the lumping's O(dq) energy
+  // misplacement go. That misplacement is the dominant term in the daughter-grid
+  // requirement at high Gamma, so the two flags are one scheme and this is where they
+  // are coupled. Overridable: `lumped_loss` set explicitly wins, which is what makes
+  // the 2x2 measurable from an ini.
+  cfg.lumped_loss = in.get_flag("lumped_loss", !cfg.balanced_gather);
+  class_test_severe(!cfg.lumped_loss && !cfg.balanced_gather,
+                    "species '%s': lumped_loss = no requires balanced_gather = yes. Without it the "
+                    "exact two-bin split has a negative off-diagonal, so an empty daughter bin is "
+                    "billed for its neighbour's particles and the right-hand side drives it "
+                    "negative -- no integrator can repair that",
+                    name.c_str());
+  // The balanced gather's CHAIN RULE in the perturbation operator (see
+  // Config::balanced_pert). Without it the operator is a consistent linearisation of the
+  // LINEAR-gather band factor while the background integrates the balanced one -- a
+  // 1.1e-1 drift from a finite-difference Jacobian, against 8.8e-12 on the linear path.
+  // Off by default because it changes measured perturbation output; requires the
+  // background flag, since there is no chain factor without it.
+  cfg.balanced_pert = in.get_flag("balanced_pert", false);
+  class_test_severe(cfg.balanced_pert && !cfg.balanced_gather,
+                    "species '%s': balanced_pert = yes requires balanced_gather = yes (it is the "
+                    "chain rule OF that gather; with a linear band factor there is nothing to "
+                    "differentiate)",
+                    name.c_str());
+  cfg.chain_cap = in.get_or("chain_cap", cfg.chain_cap);
+  class_test_severe(!(cfg.chain_cap > 1.),
+                    "species '%s': chain_cap must exceed 1 (got %g) -- 1 is the linear "
+                    "gather's own sensitivity",
+                    name.c_str(),
+                    cfg.chain_cap);
+  // Emission-quadrature order; see Config::emission_gauss. The default reproduces the
+  // historical midpoint rule exactly.
+  cfg.emission_gauss = in.get_or("emission_gauss", cfg.emission_gauss);
+  class_test_severe(cfg.emission_gauss < 1 || cfg.emission_gauss > 4,
+                    "species '%s': emission_gauss must be 1..4 (got %d)",
+                    name.c_str(),
+                    cfg.emission_gauss);
   // No stiffness cap: this is the reference method, and capping it is an
   // approximation of unquantified accuracy. DNCDMProxySpecies, whose whole point is
   // cheapness, does cap -- see its dr_rate_cap.

@@ -71,7 +71,11 @@ double MaxAbs(const std::vector<double>& a,
 //                                2 eps1 - 2 q2* - 2 q3* == 0 since q2*+q3* = eps1)
 // These hold for ARBITRARY f -- a failure is a gather/scatter transpose or a
 // 1/(q^2 dq) conversion bug, never a tolerance to loosen.
-void test_conservation() {
+// `balanced` is a free parameter here on purpose: the discrete number and energy
+// identities are properties of the DEPOSIT weights and hold for ANY value of the band
+// factor, so a gather change must leave them at round-off. That is the check that
+// Config::balanced_gather really did only move a coefficient.
+void test_conservation(bool balanced = false) {
   Grid P      = MakeGrid(1e-3, 1e2, 64);
   Grid F      = MakeGrid(1e-4, 2e2, 64);  // wider than the parent bands: no off-grid clamp
   Grid B      = MakeGrid(1e-4, 2e2, 64);
@@ -91,6 +95,7 @@ void test_conservation() {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   std::vector<double> dfH(N), dfl(N), dfphi(N);
@@ -118,8 +123,9 @@ void test_conservation() {
   const double ene    = std::fabs(2. * M.E_H + 2. * M.E_l + M.E_phi - K.split_energy_residual()) /
                         escale;
   std::printf(
-      "conservation (random f): |N_H+N_l|=%.2e |2N_H+N_phi|=%.2e "
+      "conservation (random f)%s: |N_H+N_l|=%.2e |2N_H+N_phi|=%.2e "
       "|2E_H+2E_l+E_phi - booked|=%.2e (booked %.2e of scale)\n",
+      balanced ? " (balanced_gather)" : "",
       num_f,
       num_b,
       ene,
@@ -137,7 +143,7 @@ void test_conservation() {
 // to the conservation manifold (N/E still exact). Normalize by the decay-only
 // rate (same f/grids, resolution-independent) and test the convergence ratio.
 double parent_only_resid = 0.;
-double EquilibResidual(int Nd) {
+double EquilibResidual(int Nd, bool balanced = false) {
   Grid P         = MakeGrid(1e-3, 1e2, 64);  // parent grid FIXED across the refinement
   Grid F         = MakeGrid(1e-4, 2e2, Nd);
   Grid B         = MakeGrid(1e-4, 2e2, Nd);
@@ -159,6 +165,7 @@ double EquilibResidual(int Nd) {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
   DecayTransitionKernel Kfull(View(P),
                               View(F),
                               View(B),
@@ -239,6 +246,31 @@ void test_equilibrium() {
       p64,
       p128);
   assert(r128 < r64 / 2.5);
+
+  // Config::balanced_gather: the band factor is built from the log-odds, which are
+  // EXACTLY linear in q for this state, so the parent leg -- which is Lambda alone --
+  // must come back at round-off and STAY there under refinement. That flatness is the
+  // claim: a scheme that merely converged faster would still fall with Nd.
+  const double b64   = EquilibResidual(64, true);
+  const double bp64  = parent_only_resid;
+  const double b128  = EquilibResidual(128, true);
+  const double bp128 = parent_only_resid;
+  std::printf(
+      "   balanced_gather: r64=%.3e r128=%.3e; parent leg alone %.3e / %.3e "
+      "(linear gather: %.3e / %.3e)\n",
+      b64,
+      b128,
+      bp64,
+      bp128,
+      p64,
+      p128);
+  // The parent leg is Lambda with nothing else on it; the daughter legs additionally
+  // carry the lumped loss deviation, which survives at Lambda == 0 and is NOT what
+  // this flag addresses, so the well-balanced claim is asserted where it is made.
+  // These are residuals already normalised by the decay-only rate, so 1e-15 is a
+  // round-off claim, and asserting it at BOTH resolutions is the flatness claim.
+  assert(bp64 < 1e-15);
+  assert(bp128 < 1e-15);
 }
 
 // Mode reduction: inverse+qs off => Lambda = -f_H(q1) => the parent decay term
@@ -440,7 +472,7 @@ void test_rhs_continuity() {
 // node layout, and the l=1 momentum identity in particular leans on
 // q1 = q2* cos_a* + q3* cos_b* holding at every node -- which the stratified
 // breakpoints generate by a different route than the Gauss-Legendre ones.
-void test_perturbation_operator() {
+void test_perturbation_operator(bool balanced = false) {
   Grid P      = MakeGrid(1e-3, 1e2, 64);
   Grid F      = MakeGrid(1e-4, 2e2, 64);  // wider than the parent bands: no off-grid clamp
   Grid B      = MakeGrid(1e-4, 2e2, 64);
@@ -469,6 +501,12 @@ void test_perturbation_operator() {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  // The chain rule changes what the operator gathers, never how it scatters, so every
+  // identity below must hold unchanged under it. That is the point of running this
+  // whole test a second time rather than adding a separate one.
+  cfg.balanced_gather = balanced;
+  cfg.balanced_pert   = balanced;
+  cfg.lumped_loss     = !balanced;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
   K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
 
@@ -745,7 +783,7 @@ void test_perturbation_operator() {
 // on the daughter profile a future change might alter. What the scheme needs to be
 // CORRECT is the diagonal matching the operator, which is asserted; whether it is
 // FAST is a question about trajectories, which the timings answer.
-void test_collision_diagonal() {
+void test_collision_diagonal(bool balanced = false) {
   Grid P       = MakeGrid(1e-3, 1e2, 24);
   Grid F       = MakeGrid(1e-4, 2e2, 48);
   Grid B       = MakeGrid(1e-4, 2e2, 48);
@@ -763,6 +801,7 @@ void test_collision_diagonal() {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   auto rhs = [&](const std::vector<double>& yy, std::vector<double>& out) {
@@ -818,7 +857,8 @@ void test_collision_diagonal() {
       at    = i;
     }
   }
-  std::printf("collision diagonal: max rel dev from finite differences = %.2e at index %d\n",
+  std::printf("collision diagonal%s: max rel dev from finite differences = %.2e at index %d\n",
+              balanced ? " (balanced_gather)" : "",
               worst,
               at);
   assert(worst < 1e-6);  // central differences on a smooth RHS; not a machine-eps claim
@@ -837,6 +877,18 @@ void test_collision_diagonal() {
     y[Np + Nd + j]  = 0.5 * std::exp(-lb * lb);
   }
   rhs(y, d0);
+  // Grab the analytic diagonal for THIS state before the sweep below re-prepares the
+  // transitions. This is the interesting state for balanced_gather: the chain factor
+  // is G(1-+G)/(f(1-+f)), so it is O(1) on the smooth random state above and
+  // ENORMOUS here, where the Gaussian daughter profile leaves bins many decades
+  // below their neighbours. If the linearisation is wrong anywhere it is here.
+  K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
+  for (int i = 0; i < Np; ++i)
+    analytic[i] = dH[i];
+  for (int j = 0; j < Nd; ++j)
+    analytic[Np + j] = dl[j];
+  for (int j = 0; j < Nd; ++j)
+    analytic[Np + Nd + j] = dphi[j];
   std::fill(offsum.begin(), offsum.end(), 0.);
   for (int c = 0; c < N; ++c) {
     const double h         = std::fmax(1e-7 * std::fabs(y[c]), 1e-13);
@@ -858,13 +910,84 @@ void test_collision_diagonal() {
     Dmax   = std::fmax(Dmax, std::fabs(numeric[i]));
     Offmax = std::fmax(Offmax, offsum[i]);
   }
+  double worst2 = 0.;
+  int at2       = -1;
+  for (int i = 0; i < N; ++i) {
+    const double e = std::fabs(analytic[i] - numeric[i]) / Scale(numeric[i], Dmax);
+    if (e > worst2) {
+      worst2 = e;
+      at2    = i;
+    }
+  }
   std::printf(
       "   extinct parent, physical daughter profile: max|J_ii| = %.3e, "
-      "max row off-diagonal = %.3e (ratio %.2e -- reported, not asserted)\n",
+      "max row off-diagonal = %.3e (ratio %.2e -- reported, not asserted); "
+      "diagonal dev = %.2e at %d\n",
       Dmax,
       Offmax,
-      Offmax / Dmax);
+      Offmax / Dmax,
+      worst2,
+      at2);
   assert(Dmax > 0.);  // the report must not be vacuous
+  // worst2 is REPORTED, not asserted, and the linear path is the reason: with the
+  // parent at 1e-60 the central difference's step floors at 1e-13, which is a huge
+  // RELATIVE perturbation, so the numeric column there is the difference quotient of
+  // a different state. It reads ~3e-1 on the shipped scheme too. What it is good for
+  // is comparing the two gathers against each other on the same unsound estimator.
+
+  // DYNAMIC RANGE, on a state the finite difference can still resolve. The chain
+  // factor G(1-+G)/(f(1-+f)) is 1 by construction on a flat stencil, so a smooth
+  // random state barely exercises it; here the daughters are log-uniform over eight
+  // decades, which makes the factor range over many orders while every bin stays far
+  // enough above the 1e-13 step floor for the quotient to mean something.
+  std::mt19937 rng2(90210u);
+  std::uniform_real_distribution<double> LU(-8., -0.05);
+  for (int i = 0; i < Np; ++i)
+    y[i] = U(rng2);
+  for (int j = 0; j < 2 * Nd; ++j)
+    y[Np + j] = std::pow(10., LU(rng2));
+  rhs(y, d0);
+  K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
+  for (int i = 0; i < Np; ++i)
+    analytic[i] = dH[i];
+  for (int j = 0; j < Nd; ++j)
+    analytic[Np + j] = dl[j];
+  for (int j = 0; j < Nd; ++j)
+    analytic[Np + Nd + j] = dphi[j];
+  // A RELATIVE step, and a coarse one. The block above can floor at 1e-13 because its
+  // state is O(1); here a bin may sit at 1e-8, where an absolute floor is a 1e-5
+  // relative kick. And the step has to be coarse: df_c is dominated by transitions out
+  // of far larger bins, so dp[c] - dm[c] is a cancellation and the estimator's
+  // round-off branch takes over below h/y ~ 1e-4. Measured on the linear path,
+  // h/y = 1e-4/1e-5/1e-6/1e-7 gives 5.3e-6/8.3e-5/4.2e-4/1.8e-3 -- growing as h
+  // SHRINKS, i.e. the5.3e-6 is the estimator, not the diagonal.
+  for (int c = 0; c < N; ++c) {
+    const double h         = 1e-4 * std::fabs(y[c]);
+    std::vector<double> yp = y, ym = y;
+    yp[c] += h;
+    ym[c] -= h;
+    rhs(yp, dp);
+    rhs(ym, dm);
+    numeric[c] = (dp[c] - dm[c]) / (2 * h);
+  }
+  double dscale3 = 0., worst3 = 0.;
+  int at3 = -1;
+  for (int i = 0; i < N; ++i)
+    dscale3 = std::fmax(dscale3, std::fabs(numeric[i]));
+  for (int i = 0; i < N; ++i) {
+    const double e = std::fabs(analytic[i] - numeric[i]) / Scale(numeric[i], dscale3);
+    if (e > worst3) {
+      worst3 = e;
+      at3    = i;
+    }
+  }
+  std::printf("   log-uniform daughters over 8 decades: max rel dev = %.2e at index %d\n",
+              worst3,
+              at3);
+  // 1e-4 leaves ~20x over the estimator's own floor and still catches a dropped chain
+  // factor, which is an O(1) relative error, not a small one.
+  assert(worst3 < 1e-4);
+  assert(dscale3 > 0.);
 }
 
 // Per-l diagonal of the PERTURBATION operator, against the background's
@@ -886,7 +1009,7 @@ void test_collision_diagonal() {
 // The strict-ascending-l contract (the rolling Legendre recurrence) means column
 // j at level l costs one PrepareTransitions plus a replay of ll = 0..l. Same
 // shape as DumpCollisionSpectrum, which is where this construction comes from.
-void test_perturbation_diagonal() {
+void test_perturbation_diagonal(bool balanced = false) {
   Grid P       = MakeGrid(1e-3, 1e2, 16);
   Grid F       = MakeGrid(1e-4, 2e2, 24);  // wider than the parent bands: no off-grid clamp
   Grid B       = MakeGrid(1e-4, 2e2, 24);
@@ -907,6 +1030,9 @@ void test_perturbation_diagonal() {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
+  cfg.balanced_pert      = balanced;
+  cfg.lumped_loss        = !balanced;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   // Analytic diagonal, taken ONCE from the background decomposition. The same
@@ -1095,7 +1221,21 @@ void test_band_bound() {
 // positivity with number: the lumped loss removes exactly the same TOTAL number
 // (sum_e w_e f_{k+e} is the gathered value by definition), only from the bins that
 // actually hold the particles.
-void test_daughter_positivity() {
+// `lumped`/`balanced` span the 2x2 because positivity is exactly what distinguishes
+// the four schemes, and three of them CLAIM it. (linear, unlumped) is the known-broken
+// corner and is run as a control: it must actually go negative, or the front states
+// below are not exercising the defect and the other three pass for nothing.
+void test_daughter_positivity(bool balanced = false, bool lumped = true) {
+  double worst_neg = 0.;
+  // Only the corner without a positivity argument is allowed to violate. For the other
+  // three, `assert` fires on the spot; here we also record the worst excursion so the
+  // control can be shown to be a real one.
+  const bool must_hold = lumped || balanced;
+  auto check           = [&](double df) {
+    if (df < worst_neg)
+      worst_neg = df;
+    assert(!must_hold || df >= 0.);
+  };
   Grid P       = MakeGrid(1e-3, 1e2, 24);
   Grid F       = MakeGrid(1e-4, 2e2, 48);
   Grid B       = MakeGrid(1e-4, 2e2, 48);
@@ -1105,6 +1245,8 @@ void test_daughter_positivity() {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
+  cfg.lumped_loss        = lumped;
   // Both quadratures: positivity is a property of the LUMPED loss, which is what
   // makes the operator Metzler, and lumping is independent of where the nodes sit.
   // It is checked under stratified as well because that is now the shipped path --
@@ -1130,7 +1272,7 @@ void test_daughter_positivity() {
     for (int k = 0; k < Nd; ++k) {
       if (fphi[k] != 0.)
         continue;
-      assert(dfphi[k] >= 0.);  // an empty bin may only fill
+      check(dfphi[k]);  // an empty bin may only fill
     }
     auto M = K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
     assert(std::fabs(M.N_H + M.N_l) < 1e-12 * Scale(M.N_H, M.N_l));
@@ -1155,7 +1297,7 @@ void test_daughter_positivity() {
     for (int k = 0; k < Nd; ++k) {
       if (fl[k] != 0.)
         continue;
-      assert(dfl[k] >= 0.);
+      check(dfl[k]);
     }
     auto M = K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
     assert(std::fabs(M.N_H + M.N_l) < 1e-12 * Scale(M.N_H, M.N_l));
@@ -1181,7 +1323,11 @@ void test_daughter_positivity() {
   auto M              = K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
   const double ident  = 2. * M.E_H + 2. * M.E_l + M.E_phi;
   const double booked = K.split_energy_residual();
-  assert(booked != 0.);  // else this assertion is vacuous (a constant f lumps exactly)
+  // With the exact split nothing is misplaced, so the residual is identically zero and
+  // the energy identity closes on its own -- assert THAT rather than skipping, since
+  // "no residual" is the substantive claim for that scheme. With lumping on, a nonzero
+  // booking is required or the identity below is vacuous (a constant f lumps exactly).
+  assert(lumped ? booked != 0. : booked == 0.);
   assert(std::fabs(ident - booked) < 1e-12 * Scale3(2. * M.E_H, 2. * M.E_l, M.E_phi));
   std::printf("positivity: energy identity %.6e == booked split residual %.6e\n", ident, booked);
 
@@ -1226,6 +1372,15 @@ void test_daughter_positivity() {
       assert(rel < 0.75 * prev);  // shrinking with resolution
     prev = rel;
   }
+
+  std::printf("positivity [%s gather, %s loss]: worst empty-bin RHS = %.3e (%s)\n",
+              balanced ? "balanced" : "linear",
+              lumped ? "lumped" : "exact",
+              worst_neg,
+              must_hold ? "asserted >= 0" : "CONTROL: expected < 0");
+  // The control must actually break, or the front states are not reaching the defect
+  // and the three positive results above are vacuous.
+  assert(must_hold || worst_neg < 0.);
 }
 
 // The deposit stencil's three invariants, for EVERY order. These are the
@@ -1355,7 +1510,7 @@ void test_band_partition() {
 // the gathered f has kinks inside a state cell that one node per cell does not
 // resolve exactly. That costs O(dq^2) accuracy and NOTHING in conservation, which is
 // per transition; this test pins that distinction.
-void test_separate_bg_grids() {
+void test_separate_bg_grids(bool balanced = false) {
   const int NP = 16, NST = 64, NBG = 64 * 3;  // refine = 3
   Grid P         = MakeGrid(1e-3, 1e2, NP);
   Grid FS        = MakeGrid(1e-4, 2e2, NST);
@@ -1375,6 +1530,15 @@ void test_separate_bg_grids() {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  // The production geometry for the chain rule, and the one place its two halves are
+  // read off DIFFERENT grids: G(1-+G) comes from the band factor's BACKGROUND-grid
+  // gather (the accurate estimate of f at q*), while 1/(f(1-+f)) is on the STATE grid,
+  // because that is where F lives and so where Psi = F/f can be formed at all. The
+  // diagonal check below is what pins that pairing -- at refine = 1 the two grids
+  // coincide and it cannot see a mix-up.
+  cfg.balanced_gather = balanced;
+  cfg.balanced_pert   = balanced;
+  cfg.lumped_loss     = !balanced;
   DecayTransitionKernel K(View(P),
                           View(FS),
                           View(BS),
@@ -1422,6 +1586,25 @@ void test_separate_bg_grids() {
     K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
     K.CollisionDiagonal(dgH.data(), dgl.data(), dgp.data());
 
+    // ⚠ SCALE-RELATIVE, NOT POINTWISE. This used to divide by |dgl[k]| floored at
+    // 1e-300, i.e. not floored at all, and the daughter grid has bins that are empty to
+    // within double precision: the worst offender here sits at |dgl| = 2.6e-15 against a
+    // max of 1.14, and the bin the LINEAR gather reports at 4.3e-38. Dividing round-off
+    // by round-off is not a test -- it passed on clang and failed on gcc at 1.9e-10 for
+    // no reason either compiler was wrong about, and the balanced gather makes it worse
+    // by construction, since its chain factor is DESIGNED to be maximally sensitive
+    // exactly where a bin empties.
+    //
+    // Flooring at 1e-12 of the operator's own scale keeps every discrepancy that could
+    // matter to ETD -- which subtracts this diagonal from the operator, so what counts is
+    // the deviation against the operator's magnitude, not against a bin that holds
+    // nothing. The real disagreements this test exists to catch (a lumping quantity read
+    // off the wrong grid) are O(1) relative and clear the floor by twelve orders.
+    double dgmax = 0.;
+    for (int k = 0; k < NST; ++k)
+      dgmax = std::fmax(dgmax, std::fabs(dgl[k]));
+    assert(dgmax > 0.);  // else every ratio below is 0/0 and the test is vacuous
+
     // Column k of the operator at l = 0: F = e_k, read back dF_l[k].
     double worst = 0.;
     int worst_k  = -1;
@@ -1437,7 +1620,7 @@ void test_separate_bg_grids() {
                                   dH2.data(),
                                   dl2.data(),
                                   dp2.data());
-      const double sc  = std::fmax(std::fabs(dgl[k]), 1e-300);
+      const double sc  = std::fmax(std::fabs(dgl[k]), 1e-12 * dgmax);
       const double rel = std::fabs(dl2[k] - dgl[k]) / sc;
       if (rel > worst) {
         worst   = rel;
@@ -1481,7 +1664,7 @@ void test_separate_bg_grids() {
 // loop-invariant reciprocal out of the l loop, which is a legitimate optimisation
 // with no physical content. 1e-12 of the array's own scale is far tighter than any
 // real defect could hide under and still leaves that room.
-void test_all_l_matches_per_l() {
+void test_all_l_matches_per_l(bool balanced = false) {
   Grid P       = MakeGrid(1e-3, 1e2, 48);
   Grid F       = MakeGrid(1e-4, 2e2, 64);
   Grid B       = MakeGrid(1e-4, 2e2, 64);
@@ -1512,6 +1695,9 @@ void test_all_l_matches_per_l() {
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
+  cfg.balanced_pert      = balanced;
+  cfg.lumped_loss        = !balanced;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   // Reference: the per-l form, one multipole at a time into contiguous slices, then
@@ -1573,10 +1759,19 @@ void test_all_l_matches_per_l() {
   // The booked split residuals are part of the contract too: they feed the energy
   // identity in test_perturbation_operator, so a sweep that got them wrong would
   // look conservative here and be wrong there.
+  //
+  // Scaled against the operator's own l = 0 ENERGY, not against the residual itself:
+  // with the exact split (lumped_loss off, which is what balanced_gather brings) the
+  // misplacement is identically zero, so both implementations book round-off and a
+  // residual-relative comparison would be dividing 1e-17 by 1e-17. The identity the
+  // residual serves is 2eH + 2el + ephi == booked, so the energy is its natural scale.
+  double e_scale = 0.;
+  for (int j = 0; j < ND; ++j)
+    e_scale += std::fabs(F.dq[j] * F.q[j] * F.q[j] * F.q[j] * refl[(size_t) j * stride]);
   const double we = std::fabs(K.split_energy_residual_pert() - ref_resid_e) /
-                    Scale(K.split_energy_residual_pert(), ref_resid_e);
+                    Scale3(K.split_energy_residual_pert(), ref_resid_e, e_scale);
   const double wm = std::fabs(K.split_momentum_residual_pert() - ref_resid_m) /
-                    Scale(K.split_momentum_residual_pert(), ref_resid_m);
+                    Scale3(K.split_momentum_residual_pert(), ref_resid_m, e_scale);
   std::printf(
       "all-l vs per-l: dF_H=%.2e dF_l=%.2e dF_phi=%.2e "
       "resid_e=%.2e resid_m=%.2e\n",
@@ -1597,20 +1792,318 @@ void test_all_l_matches_per_l() {
   assert(mag > 0.);
 }
 
+// THE OPERATOR IS A JACOBIAN, AND OF WHICH BAND FACTOR.
+//
+// ApplyPerturbationOperator at l = 0 (every Legendre factor is 1) is a DIRECTIONAL
+// DERIVATIVE of ComputeBackgroundDerivs: the same network, linearised. So it can be
+// pinned against a central difference of the background RHS along the perturbation --
+// two entirely independent code paths, one of them not differentiated by hand at all.
+//
+// This is the test the balanced gather did not have. test_perturbation_diagonal pins the
+// operator against CollisionDiagonal, but both were written from the same derivation, so
+// a wrong gather in BOTH agrees with itself. Against finite differences it does not:
+// with balanced_gather on and the chain rule off, the operator gathers F linearly and is
+// the exact Jacobian of a DIFFERENT discrete model than the one the background
+// integrates -- measured 1.1e-1 here, against 8.8e-12 on the linear path.
+//
+// The perturbation is seeded as F = f * Psi with Psi a smooth O(1) function, which is
+// what the hierarchy delivers and what makes f + h F stay positive for the difference.
+// The step is scanned rather than fixed: the quotient is a cancellation, so it has a
+// truncation branch and a round-off branch and the minimum over the scan is the signal.
+void test_perturbation_jacobian(bool balanced, bool chain) {
+  const int N = 48;
+  Grid P      = MakeGrid(1e-3, 1e2, N);
+  Grid F      = MakeGrid(1e-4, 2e2, N);
+  Grid B      = MakeGrid(1e-4, 2e2, N);
+
+  std::mt19937 rng(98765u);
+  std::uniform_real_distribution<double> U(0.01, 0.9);
+  std::vector<double> fH(N), fl(N), fphi(N), FH(N), Fl(N), Fphi(N);
+  for (int i = 0; i < N; ++i) {
+    fH[i]   = U(rng);
+    fl[i]   = U(rng);
+    fphi[i] = U(rng);
+  }
+  for (int i = 0; i < N; ++i) {
+    FH[i]   = fH[i] * 0.37 * std::sin(1.3 * std::log(P.q[i]));
+    Fl[i]   = fl[i] * 0.29 * std::cos(0.9 * std::log(F.q[i]));
+    Fphi[i] = fphi[i] * 0.41 * std::sin(0.7 * std::log(B.q[i]) + 0.3);
+  }
+
+  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  DecayTransitionKernel::Config cfg;
+  cfg.inverse_decays     = true;
+  cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
+  cfg.balanced_pert      = chain;
+  cfg.lumped_loss        = !balanced;
+  DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
+
+  std::vector<double> oH(N), ol(N), ophi(N);
+  K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
+  K.ApplyPerturbationOperator(0,
+                              FH.data(),
+                              Fl.data(),
+                              Fphi.data(),
+                              oH.data(),
+                              ol.data(),
+                              ophi.data());
+
+  auto rel = [](const std::vector<double>& x, const std::vector<double>& y) {
+    double num = 0., den = 0.;
+    for (size_t i = 0; i < x.size(); ++i) {
+      num = std::fmax(num, std::fabs(x[i] - y[i]));
+      den = std::fmax(den, std::fabs(y[i]));
+    }
+    return den > 0. ? num / den : num;
+  };
+
+  std::vector<double> pH(N), pl(N), pphi(N);
+  std::vector<double> aH(N), al(N), aphi(N), bH(N), bl(N), bphi(N), gH(N), gl(N), gphi(N);
+  double best = 1e300, best_h = 0.;
+  for (double h : {1e-3, 3e-4, 1e-4, 3e-5, 1e-5, 3e-6, 1e-6}) {
+    for (int i = 0; i < N; ++i) {
+      pH[i]   = fH[i] + h * FH[i];
+      pl[i]   = fl[i] + h * Fl[i];
+      pphi[i] = fphi[i] + h * Fphi[i];
+    }
+    K.ComputeBackgroundDerivs(a,
+                              m,
+                              Gamma,
+                              pH.data(),
+                              pl.data(),
+                              pphi.data(),
+                              aH.data(),
+                              al.data(),
+                              aphi.data());
+    for (int i = 0; i < N; ++i) {
+      pH[i]   = fH[i] - h * FH[i];
+      pl[i]   = fl[i] - h * Fl[i];
+      pphi[i] = fphi[i] - h * Fphi[i];
+    }
+    K.ComputeBackgroundDerivs(a,
+                              m,
+                              Gamma,
+                              pH.data(),
+                              pl.data(),
+                              pphi.data(),
+                              bH.data(),
+                              bl.data(),
+                              bphi.data());
+    for (int i = 0; i < N; ++i) {
+      gH[i]   = (aH[i] - bH[i]) / (2 * h);
+      gl[i]   = (al[i] - bl[i]) / (2 * h);
+      gphi[i] = (aphi[i] - bphi[i]) / (2 * h);
+    }
+    best = std::fmin(best, std::fmax(rel(oH, gH), std::fmax(rel(ol, gl), rel(ophi, gphi))));
+    if (best == std::fmax(rel(oH, gH), std::fmax(rel(ol, gl), rel(ophi, gphi))))
+      best_h = h;
+  }
+  std::printf("pert Jacobian vs finite differences (%s gather%s): %.2e at h=%.0e\n",
+              balanced ? "balanced" : "linear",
+              chain ? " + chain rule" : "",
+              best,
+              best_h);
+  // Guard against a vacuous pass: the operator must not be identically zero.
+  double mag = 0.;
+  for (int i = 0; i < N; ++i)
+    mag = std::fmax(mag, std::fabs(ol[i]));
+  assert(mag > 0.);
+
+  if (balanced && !chain) {
+    // CONTROL. Without the chain rule the operator differentiates the linear gather
+    // while the background integrates the balanced one. If this ever stops failing, the
+    // two assertions below have stopped measuring anything.
+    assert(best > 1e-3);
+  }
+  else {
+    assert(best < 1e-9);
+  }
+}
+
+// The chain factor diverges as a bin empties -- dG/df_e = w_e (f_other/f_e)^{w_other} in
+// the dilute limit -- which is a real property of a geometric mean and the reason this
+// was left unshipped. ChainFactor caps it. This pins that the cap holds on the state that
+// provokes it (an injection front: f falling off a cliff mid-grid) and, just as
+// importantly, that the operator stays FINITE and CONSERVATIVE there.
+void test_chain_factor_cap() {
+  const int N = 40;
+  Grid P      = MakeGrid(1e-3, 1e2, N);
+  Grid F      = MakeGrid(1e-4, 2e2, N);
+  Grid B      = MakeGrid(1e-4, 2e2, N);
+
+  // Injection front: the daughters are filled up to a cut and empty above it, spanning
+  // ~80 decades across two bins -- the geometry that makes G/f_e ~ 1e40.
+  std::vector<double> fH(N), fl(N), fphi(N), FH(N), Fl(N), Fphi(N);
+  for (int i = 0; i < N; ++i) {
+    fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
+    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
+    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
+  }
+  // Psi ~ O(1) everywhere, so F inherits the same cliff: the physical statement that an
+  // empty bin has an empty perturbation.
+  for (int i = 0; i < N; ++i) {
+    FH[i]   = 0.3 * fH[i];
+    Fl[i]   = -0.2 * fl[i];
+    Fphi[i] = 0.5 * fphi[i];
+  }
+
+  const double a = 0.5, m = 2.0, Gamma = 0.3, A = a * a * m * m;
+  DecayTransitionKernel::Config cfg;
+  cfg.inverse_decays     = true;
+  cfg.quantum_statistics = true;
+  cfg.balanced_gather    = true;
+  cfg.balanced_pert      = true;
+  cfg.lumped_loss        = false;
+  DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
+  K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
+
+  std::vector<double> dH(N), dl(N), dphi(N);
+  K.ApplyPerturbationOperator(0,
+                              FH.data(),
+                              Fl.data(),
+                              Fphi.data(),
+                              dH.data(),
+                              dl.data(),
+                              dphi.data());
+
+  double worst = 0.;
+  for (int i = 0; i < N; ++i) {
+    assert(std::isfinite(dH[i]) && std::isfinite(dl[i]) && std::isfinite(dphi[i]));
+    worst = std::fmax(worst, std::fabs(dl[i]));
+  }
+  // The l = 0 number identities do not care what the gather did -- all three legs are
+  // built from the same node source terms -- so they must still be exact ON THIS STATE.
+  // That is what says the cap did not quietly break conservation to buy finiteness.
+  double numH = 0, numl = 0, numphi = 0;
+  for (int i = 0; i < N; ++i) {
+    const double q = P.q[i], w = P.dq[i] * q * q;
+    (void) A;
+    numH += w * dH[i];
+  }
+  for (int j = 0; j < N; ++j)
+    numl += F.dq[j] * F.q[j] * F.q[j] * dl[j];
+  for (int k = 0; k < N; ++k)
+    numphi += B.dq[k] * B.q[k] * B.q[k] * dphi[k];
+  const double nf = std::fabs(numH + numl) / Scale(numH, numl);
+  const double nb = std::fabs(2. * numH + numphi) / Scale(2. * numH, numphi);
+  std::printf(
+      "chain cap on a front state: max|dF_l| = %.2e, |numH+numl| = %.2e, "
+      "|2numH+numphi| = %.2e\n",
+      worst,
+      nf,
+      nb);
+  assert(nf < 1e-11);
+  assert(nb < 1e-11);
+  assert(worst > 0.);  // else the finiteness assertions above are vacuous
+}
+
+// REGRESSION: the cap must reach the BACKGROUND diagonal, not just the operator.
+//
+// The cap used to be gated on chain_pert_ (= balanced_gather && balanced_pert) while
+// ChainFactor is CONSUMED under chain_diag_, which is a superset: a background kernel
+// has separate_bg_grids_ == false at the dr_bg_refine = 1 production setting, so it
+// carries the chain rule on balanced_gather ALONE. Plain `balanced_gather` therefore ran
+// CollisionDiagonal with inv_cap = 0 and reached diag = 6.8e84 on an emptying bin, which
+// etd cannot integrate -- hpc_ratchet's cmb_G05.0_m0.3_x_bal_q2x died in 3 s, and a
+// dr_N_q scan at that cell was clean at 83..103 EXCEPT exactly 93, a knife-edge on where
+// the deposit lands. test_chain_factor_cap above never caught it because it sets
+// balanced_pert = true, i.e. the one configuration in which the cap was already applied.
+//
+// The invariant asserted here is exact rather than a magnitude bound: balanced_pert
+// changes the PERTURBATION gather and nothing the background diagonal reads, so the two
+// kernels must return the SAME diagonal. Before the fix they differed by ~1e36.
+void test_chain_cap_reaches_background_diagonal() {
+  const int N = 40;
+  Grid P      = MakeGrid(1e-3, 1e2, N);
+  Grid F      = MakeGrid(1e-4, 2e2, N);
+  Grid B      = MakeGrid(1e-4, 2e2, N);
+
+  // Same injection front as test_chain_factor_cap: daughters filled to a cut and empty
+  // above it, which is the geometry that drives X = G(1-+G)/(f_e(1-+f_e)) to ~1e40.
+  std::vector<double> fH(N), fl(N), fphi(N);
+  for (int i = 0; i < N; ++i) {
+    fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
+    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
+    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
+  }
+  const double a = 0.5, m = 2.0, Gamma = 0.3;
+
+  auto diagonal_with = [&](bool balanced_pert,
+                           std::vector<double>& dH,
+                           std::vector<double>& dl,
+                           std::vector<double>& dphi) {
+    DecayTransitionKernel::Config cfg;
+    cfg.inverse_decays     = true;
+    cfg.quantum_statistics = true;
+    cfg.balanced_gather    = true;
+    cfg.balanced_pert      = balanced_pert;
+    cfg.lumped_loss        = false;
+    DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
+    K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
+    K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
+    return K.chain_factor_max();
+  };
+
+  std::vector<double> dH0(N), dl0(N), dphi0(N), dH1(N), dl1(N), dphi1(N);
+  const double raw = diagonal_with(false, dH0, dl0, dphi0);  // `bal`: the shipped config
+  diagonal_with(true, dH1, dl1, dphi1);                      // `chn`: always capped
+
+  // The raw worst X really does reach the runaway regime on this state, else every
+  // assertion below is vacuous and the test would keep passing through a reintroduction.
+  assert(raw > 1e20);
+
+  double worst = 0.;
+  for (int i = 0; i < N; ++i) {
+    assert(std::isfinite(dH0[i]) && std::isfinite(dl0[i]) && std::isfinite(dphi0[i]));
+    worst =
+        std::fmax(worst,
+                  std::fmax(std::fabs(dH0[i] - dH1[i]),
+                            std::fmax(std::fabs(dl0[i] - dl1[i]), std::fabs(dphi0[i] - dphi1[i]))));
+  }
+  double scale = 0.;
+  for (int i = 0; i < N; ++i)
+    scale = std::fmax(scale,
+                      std::fmax(std::fabs(dH1[i]),
+                                std::fmax(std::fabs(dl1[i]), std::fabs(dphi1[i]))));
+  std::printf(
+      "   background diagonal, balanced_pert off vs on: worst abs dev = %.2e "
+      "(scale %.2e, raw chain factor %.2e)\n",
+      worst,
+      scale,
+      raw);
+  assert(scale > 0.);  // a trivially-zero diagonal would agree for the wrong reason
+  assert(worst <= 1e-12 * scale);
+}
+
 }  // namespace
 
 int main() {
   test_deposit_moments();
   test_band_partition();
   test_separate_bg_grids();
+  test_separate_bg_grids(true);
   test_conservation();
+  test_conservation(true);
   test_equilibrium();
   test_rhs_continuity();
   test_perturbation_operator();
+  test_perturbation_operator(true);  // balanced gather + chain rule: same identities
   test_all_l_matches_per_l();
-  test_daughter_positivity();
+  test_all_l_matches_per_l(true);
+  test_perturbation_jacobian(false, false);  // linear gather: already a Jacobian
+  test_perturbation_jacobian(true, false);   // control: balanced band factor, linear gather
+  test_perturbation_jacobian(true, true);    // the claim
+  test_chain_factor_cap();
+  test_chain_cap_reaches_background_diagonal();
+  test_daughter_positivity();              // shipped: linear gather, lumped loss
+  test_daughter_positivity(false, false);  // control: the defect lumping exists for
+  test_daughter_positivity(true, true);    // balanced gather, lumping still on
+  test_daughter_positivity(true, false);   // balanced gather, EXACT split -- the claim
   test_collision_diagonal();
+  test_collision_diagonal(true);
   test_perturbation_diagonal();
+  test_perturbation_diagonal(true);
   test_mode_reduction();
   test_band_bound();
   std::printf("decay kernel test passed\n");

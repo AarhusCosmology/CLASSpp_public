@@ -5,6 +5,26 @@
 #include "errors.h"
 #include "quadrature.h"
 
+namespace {
+/* Gauss-Legendre nodes and weights for 1..4 points on [-1,1]; index [k-1] is the k-point
+   rule, and k = 1 is the midpoint rule. */
+constexpr double kGaussX[4][4] = {{0.0, 0.0, 0.0, 0.0},
+                                  {-0.57735026918962576451, 0.57735026918962576451, 0.0, 0.0},
+                                  {-0.77459666924148337704, 0.0, 0.77459666924148337704, 0.0},
+                                  {-0.86113631159405257522,
+                                   -0.33998104358485626480,
+                                   0.33998104358485626480,
+                                   0.86113631159405257522}};
+constexpr double kGaussW[4][4] =
+    {{2.0, 0.0, 0.0, 0.0},
+     {1.0, 1.0, 0.0, 0.0},
+     {0.55555555555555555556, 0.88888888888888888889, 0.55555555555555555556, 0.0},
+     {0.34785484513745385737,
+      0.65214515486254614263,
+      0.65214515486254614263,
+      0.34785484513745385737}};
+}  // namespace
+
 DecayTransitionKernel::DecayTransitionKernel(GridView parent,
                                              GridView fermion,
                                              GridView boson,
@@ -18,11 +38,41 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
       boson_bg_(boson_bg.n > 0 ? boson_bg : boson), fermion_stat_(fermion_stat),
       boson_stat_(boson_stat), cfg_(cfg) {
   separate_bg_grids_ = (fermion_bg_.q != fermion_.q) || (boson_bg_.q != boson_.q);
+  chain_pert_        = cfg_.balanced_gather && cfg_.balanced_pert;
+  // The diagonal carries the chain factor whenever the operator it has to agree with
+  // does: on a background kernel that is the background RHS (always, under the balanced
+  // gather), on a perturbation kernel it is ApplyPerturbationOperator, which gathers
+  // linearly unless balanced_pert ports the chain rule into it.
+  chain_diag_ = cfg_.balanced_gather && (!separate_bg_grids_ || chain_pert_);
+  class_test_severe(!(cfg_.chain_cap > 1.),
+                    "chain_cap must exceed 1 (got %g): 1 IS the linear gather's "
+                    "sensitivity, so capping at or below it would throw the chain rule "
+                    "away while claiming to apply it",
+                    cfg_.chain_cap);
+  // The cap goes wherever ChainFactor is CALLED, which is chain_diag_ -- a superset of
+  // chain_pert_, since a background kernel (separate_bg_grids_ == false, i.e. the
+  // dr_bg_refine = 1 production setting) carries the chain rule on balanced_gather alone.
+  //
+  // This used to read `chain_pert_`, on the argument that CollisionDiagonal is the
+  // derivative of the BACKGROUND right-hand side -- an object with a true value that
+  // ChainFactor must not bend. That argument does not survive contact with an emptying
+  // bin. X_e = G(1-+G)/(f_e(1-+f_e)) diverges there (see the header), so `bal` ran the
+  // background diagonal UNCAPPED and reached diag = 6.8e84, which etd cannot integrate:
+  // hpc_ratchet's cmb_G05.0_m0.3_x_bal_q2x died in 3 s, and a dr_N_q scan at that cell
+  // shows 83..103 clean except exactly 93 -- a knife-edge on where the deposit lands.
+  //
+  // Capping bends nothing physical: X_e f_e = G(1-+G)/(1-+f_e) is bounded and a
+  // perturbation of an empty bin is itself empty. Measured, capped vs uncapped
+  // background at dr_N_q = 47/71/101: rho_ur and H identical, and the extinct
+  // (~1e-32) parent density moves <= 6e-6 relative.
+  inv_chain_cap_ = chain_diag_ ? 1. / cfg_.chain_cap : 0.;
 
   // Worst-case nodes per parent: the union partition cuts the band at every fermion
   // cell edge AND every image of a boson cell edge inside it, so at most
   // (n_f + n_b + 1) sub-intervals, each carrying one midpoint node.
-  node_stride_ = fermion_.n + boson_.n + 1;
+  /* Worst case is one sub-interval per cell edge of either daughter grid, each carrying
+     emission_gauss nodes. */
+  node_stride_ = cfg.emission_gauss * (fermion_.n + boson_.n + 1);
   breakpoints_.assign(fermion_.n + boson_.n + 2, 0.);
 
   // All hot-path scratch sized once here so PrepareTransitions never allocates.
@@ -64,6 +114,22 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
     inv_meas_b_[k] = 1.0 / (boson_.q[k] * boson_.q[k] * boson_.dq[k]);
   theta_l_.assign(total, 1.);
   theta_phi_.assign(total, 1.);
+  // Balanced gather scratch, allocated ONLY when the flag is on: two of these are
+  // node-sized (parent_.n * node_stride_) and there is no reason to carry them on the
+  // path that never reads them. Every read is under cfg_.balanced_gather, or under
+  // chain_diag_, which implies it.
+  if (cfg_.balanced_gather) {
+    eta_l_.assign(fermion_bg_.n, 0.);
+    eta_phi_.assign(boson_bg_.n, 0.);
+    chain_l_.assign(fermion_.n, 1.);
+    chain_phi_.assign(boson_.n, 1.);
+    dg_l_.assign(total, 1.);
+    dg_phi_.assign(total, 1.);
+  }
+  if (chain_pert_) {
+    wg_fermion_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
+    wg_boson_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
+  }
   d_l_edge_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
   d_phi_edge_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
   dev_l_edge_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
@@ -215,6 +281,16 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     return;
   }
 
+  // Log-odds of the daughter occupations, once per RHS on the BACKGROUND grids --
+  // O(n_q) against the O(n_parent n_q) nodes that read them back, so the two
+  // transcendentals per bin are amortised away. See Config::balanced_gather.
+  if (cfg_.balanced_gather) {
+    for (int j = 0; j < fermion_bg_.n; ++j)
+      eta_l_[j] = EtaOf(f_l[j], fermion_stat_);
+    for (int j = 0; j < boson_bg_.n; ++j)
+      eta_phi_[j] = EtaOf(f_phi[j], boson_stat_);
+  }
+
   // Rolling deposit brackets. Within a parent bin the node momenta are monotone --
   // q2* ascends along the stratified partition, q3* = eps1 - q2* descends -- and
   // across bins the band edges move smoothly, so carrying these over the whole sweep
@@ -281,22 +357,32 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     if (qhi > breakpoints_[nbp - 1])
       breakpoints_[nbp++] = qhi;
 
-    class_test_severe(nbp - 1 > node_stride_,
-                      "stratified quadrature: parent bin %d needs %d nodes but the "
-                      "stride is %d",
+    class_test_severe(cfg_.emission_gauss * (nbp - 1) > node_stride_,
+                      "stratified quadrature: parent bin %d needs %d nodes (%d "
+                      "sub-intervals x %d Gauss points) but the stride is %d",
                       i,
+                      cfg_.emission_gauss * (nbp - 1),
                       nbp - 1,
+                      cfg_.emission_gauss,
                       node_stride_);
-    // One midpoint node per sub-interval. The integrand is smooth across a cell, and
-    // the midpoint rule there already matches an 8-node-per-cell reference to <5e-5.
-    for (int c = 0; c + 1 < nbp; ++c) {
-      const double ca = breakpoints_[c];
-      const double hw = 0.5 * (breakpoints_[c + 1] - ca);
-      if (!(hw > 0.))
-        continue;
-      q2_star_[off + cnt] = ca + hw;
-      wn_[off + cnt]      = 2.0 * hw;
-      ++cnt;
+    // Gauss-Legendre on each sub-interval; emission_gauss = 1 is the midpoint rule this
+    // has always used, and reproduces it exactly. The integrand is smooth ACROSS a cell
+    // -- that is what the stratification buys -- but the midpoint rule still resolves
+    // only its mean, which is enough for the moments and not for the daughter PSD's
+    // shape (measured 1.7e-2 against a 4-point reference). See Config::emission_gauss.
+    {
+      const int ng = cfg_.emission_gauss;
+      for (int c = 0; c + 1 < nbp; ++c) {
+        const double ca = breakpoints_[c];
+        const double hw = 0.5 * (breakpoints_[c + 1] - ca);
+        if (!(hw > 0.))
+          continue;
+        for (int gp = 0; gp < ng; ++gp) {
+          q2_star_[off + cnt] = ca + hw * (1.0 + kGaussX[ng - 1][gp]);
+          wn_[off + cnt]      = hw * kGaussW[ng - 1][gp];
+          ++cnt;
+        }
+      }
     }
 
     node_cnt_[i] = cnt;
@@ -328,12 +414,35 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       // must remain transposes for the conservation identities, but WHERE the
       // background occupation is read is a free choice, and reading it coarsely
       // fakes the daughters' injection front (see the ctor doc).
+      // Under balanced_gather the interpolated variable is the log-odds eta rather than
+      // f: eta is exactly linear in q at equilibrium and q2* + q3* = eps1 exactly, so
+      // the gathered pair keeps the relation that makes Lambda vanish. Degenerate
+      // occupations are handled by EtaOf's clamp, not by falling back to a linear
+      // gather -- an unfilled bin holds f = 0 exactly and stays there above the
+      // injection front, so a fallback rule would fire on precisely the nodes this
+      // transform exists to fix. Two lambdas rather than one with an internal branch,
+      // so the linear body stays exactly what it was.
+      //
+      // ⚠ The linear path is NOT bit-identical to the commit before this one: a
+      // background table's rho/number/pressure move by 1.5e-12 -- round-off the ODE
+      // amplifies, not a change in the discretisation. Merely putting a branch in this
+      // loop is enough to make the compiler schedule the surrounding reductions
+      // differently; keeping the linear lambda byte-for-byte and allocating the new
+      // scratch only when the flag is on were both tried and left the md5 exactly where
+      // it is. Verify this flag's OFF path on the physics, not on a checksum.
       const auto gather = [](const DepositStencil& s, const double* f) {
         double acc = 0.;
         for (int e = 0; e < DepositStencil::kWidth; ++e)
           acc += s.w[e] * f[s.j0 + e];
         return acc;
       };
+      const auto gather_balanced =
+          [](const DepositStencil& s, const std::vector<double>& eta, Statistics stat) {
+            double acc = 0.;
+            for (int e = 0; e < DepositStencil::kWidth; ++e)
+              acc += s.w[e] * eta[s.j0 + e];
+            return FOfEta(acc, stat);
+          };
       double fl_g   = 0.;
       double fphi_g = 0.;
       if (separate_bg_grids_) {
@@ -341,15 +450,24 @@ void DecayTransitionKernel::PrepareTransitions(double a,
         DepositStencil sbb;
         BuildDeposit(fermion_bg_, q2, sfb, &hint_fbg);
         BuildDeposit(boson_bg_, q3, sbb, &hint_bbg);
-        fl_g   = gather(sfb, f_l);
-        fphi_g = gather(sbb, f_phi);
+        fl_g   = cfg_.balanced_gather ? gather_balanced(sfb, eta_l_, fermion_stat_)
+                                      : gather(sfb, f_l);
+        fphi_g = cfg_.balanced_gather ? gather_balanced(sbb, eta_phi_, boson_stat_)
+                                      : gather(sbb, f_phi);
       }
       else {
-        fl_g   = gather(sf, f_l);
-        fphi_g = gather(sb, f_phi);
+        fl_g = cfg_.balanced_gather ? gather_balanced(sf, eta_l_, fermion_stat_) : gather(sf, f_l);
+        fphi_g = cfg_.balanced_gather ? gather_balanced(sb, eta_phi_, boson_stat_)
+                                      : gather(sb, f_phi);
       }
       fl_gather_[n]   = fl_g;
       fphi_gather_[n] = fphi_g;
+      if (cfg_.balanced_gather) {
+        // Per-NODE half of dG/df_e = w_e G(1-+G)/(f_e(1-+f_e)); the per-BIN reciprocal
+        // is filled below, once the state-grid occupations are resolved.
+        dg_l_[n]   = fl_g * (1. - fl_g);
+        dg_phi_[n] = fphi_g * (1. + fphi_g);
+      }
 
       // Lambda = f_l f_phi (inv) - f_H (dec) + f_H (f_l - f_phi) (qs); drop the
       // inv term when inverse decays are off, the qs term when qs is off.
@@ -440,6 +558,20 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     }
     f_l_st   = fl_state_.data();
     f_phi_st = fphi_state_.data();
+  }
+  // Per-bin half of the balanced gather's chain rule (see chain_l_). Uses the SAME
+  // clamp as EtaOf, so an unfilled bin gives a bounded 1/kFMin rather than a division
+  // by zero. Indexed on the STATE grid because that is what CollisionDiagonal
+  // differentiates with respect to.
+  if (cfg_.balanced_gather) {
+    for (int k = 0; k < fermion_.n; ++k) {
+      const double x = ClampF(f_l_st[k], fermion_stat_);
+      chain_l_[k]    = 1. / (x * (1. - x));
+    }
+    for (int k = 0; k < boson_.n; ++k) {
+      const double x = ClampF(f_phi_st[k], boson_stat_);
+      chain_phi_[k]  = 1. / (x * (1. + x));
+    }
   }
   // ── deposit sweep ────────────────────────────────────────────────────────
   // ~95% of PrepareTransitions.
@@ -535,6 +667,38 @@ void DecayTransitionKernel::PrepareTransitions(double a,
 
   for (int i = 0; i < parent_.n; ++i)
     sweep(i, df_bg_l_.data(), df_bg_phi_.data(), split_energy_residual_, clamped_energy_residual_);
+
+  wg_dirty_ = true;
+}
+
+void DecayTransitionKernel::EnsureGatherWeights() const {
+  if (!chain_pert_ || !wg_dirty_)
+    return;
+  wg_dirty_ = false;
+  // Perturbation gather weights, wg[e] = dG/df_e = w[e] * ChainFactor (see
+  // Config::balanced_pert). Built HERE rather than in PrepareTransitions because the
+  // background kernel shares this Config and never calls the operator: it would
+  // otherwise pay four divisions per node on the background's hot path for an array
+  // nothing reads. One flag makes it exactly as lazy as it should be, and the whole
+  // l = 0..l_max sweep still pays it once.
+  constexpr int W = DepositStencil::kWidth;
+  double worst    = chain_factor_max_;
+  for (int i = 0; i < parent_.n; ++i) {
+    for (int n = node_off_[i]; n < node_off_[i] + node_cnt_[i]; ++n) {
+      const int jf = j_fermion_[n];
+      const int kb = k_boson_[n];
+      for (int e = 0; e < W; ++e) {
+        const double xf        = dg_l_[n] * chain_l_[jf + e];
+        const double xb        = dg_phi_[n] * chain_phi_[kb + e];
+        worst                  = std::fmax(worst, std::fmax(xf, xb));
+        wg_fermion_[W * n + e] = w_fermion_[W * n + e] *
+                                 ChainFactor(dg_l_[n], chain_l_[jf + e], inv_chain_cap_);
+        wg_boson_[W * n + e]   = w_boson_[W * n + e] *
+                                 ChainFactor(dg_phi_[n], chain_phi_[kb + e], inv_chain_cap_);
+      }
+    }
+  }
+  chain_factor_max_ = worst;
 }
 
 void DecayTransitionKernel::PositivityDecomposition(PositivityTerms& fermion_out,
@@ -612,6 +776,7 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
                     "consumes l=0..l_max in one pass and cannot resume mid-hierarchy",
                     next_l_);
   next_l_ = l_max + 1;
+  EnsureGatherWeights();
 
   for (int i = 0; i < parent_.n; ++i)
     for (int l = 0; l <= l_max; ++l)
@@ -642,6 +807,12 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
   double Pa_l[kMaxSweepL + 1], Pb_l[kMaxSweepL + 1], Pg_l[kMaxSweepL + 1];
   double Fl_node_l[kMaxSweepL + 1], Fphi_node_l[kMaxSweepL + 1];
   double dthg_l_l[kMaxSweepL + 1], dthg_p_l[kMaxSweepL + 1];
+  // The band factor's gather and its offset from the linear one (Config::balanced_pert).
+  // Both are filled for every node whether or not the chain rule is on -- Fl_g_l is then
+  // a copy of Fl_node_l and dFl_l is exactly 0.0 -- so the hot loops below stay
+  // branch-free and the off path stays bit-identical (x + 0.0 == x).
+  double Fl_g_l[kMaxSweepL + 1], Fphi_g_l[kMaxSweepL + 1];
+  double dFl_l[kMaxSweepL + 1], dFphi_l[kMaxSweepL + 1];
 
   for (int i = 0; i < parent_.n; ++i) {
     const double q1            = parent_.q[i];
@@ -742,11 +913,47 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
           dthg_p_l[l] += c * src[l];
       }
 
+      // Band-factor gather: the same stencil weighted by dG/df_e (see the per-l form for
+      // why it is a SECOND gather rather than a replacement -- the lumping deviation is
+      // measured against the linear one whatever Lambda used).
+      if (chain_pert_) {
+        const double* const wgf = &wg_fermion_[W * n];
+        const double* const wgb = &wg_boson_[W * n];
+        for (int l = 0; l <= l_max; ++l) {
+          Fl_g_l[l]   = 0.;
+          Fphi_g_l[l] = 0.;
+        }
+        for (int e = 0; e < nf; ++e) {
+          const double c                     = wgf[e];
+          const double* const __restrict src = F_l + (size_t) (jf + e) * stride;
+          for (int l = 0; l <= l_max; ++l)
+            Fl_g_l[l] += c * src[l];
+        }
+        for (int e = 0; e < nb; ++e) {
+          const double c                     = wgb[e];
+          const double* const __restrict src = F_phi + (size_t) (kb + e) * stride;
+          for (int l = 0; l <= l_max; ++l)
+            Fphi_g_l[l] += c * src[l];
+        }
+        for (int l = 0; l <= l_max; ++l) {
+          dFl_l[l]   = Fl_g_l[l] - Fl_node_l[l];
+          dFphi_l[l] = Fphi_g_l[l] - Fphi_node_l[l];
+        }
+      }
+      else {
+        for (int l = 0; l <= l_max; ++l) {
+          Fl_g_l[l]   = Fl_node_l[l];
+          Fphi_g_l[l] = Fphi_node_l[l];
+          dFl_l[l]    = 0.;
+          dFphi_l[l]  = 0.;
+        }
+      }
+
       // Parent leg.
       for (int l = 0; l <= l_max; ++l) {
         const double sH    = c_H * FH_bin[l];
-        const double sl    = c_l * Fl_node_l[l];
-        const double sphi  = c_phi * Fphi_node_l[l];
+        const double sl    = c_l * Fl_g_l[l];
+        const double sphi  = c_phi * Fphi_g_l[l];
         dFH_bin[l]        += B * (sH + sl * Pa_l[l] + sphi * Pb_l[l]) * inv_meas_p;
       }
 
@@ -766,9 +973,10 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
           // loss (see LumpTheta); th_l = 1 gives the fully lumped expression. theta
           // is a function of the state, so perturbing it perturbs Lambda_k too, which
           // is the dthg term.
-          const double Fl_e    = th_l * src[l] + one_m_thl * Fl_node_l[l] + dv * dthg_l_l[l];
+          const double Fl_e    = th_l * src[l] + one_m_thl * Fl_node_l[l] + dv * dthg_l_l[l] +
+                                 dFl_l[l];
           const double dN_l_k  = B * (cH_e * FH_bin[l] * Pa_l[l] + c_l * Fl_e +
-                                      cphi_e * Fphi_node_l[l] * Pg_l[l]);
+                                      cphi_e * Fphi_g_l[l] * Pg_l[l]);
           dst[l]              += pref * dN_l_k;
         }
       }
@@ -782,8 +990,9 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
         const double* const __restrict src = F_phi + (size_t) k * stride;
         double* const __restrict dst       = dF_phi + (size_t) k * stride;
         for (int l = 0; l <= l_max; ++l) {
-          const double Fphi_e    = th_p * src[l] + one_m_thp * Fphi_node_l[l] + dv * dthg_p_l[l];
-          const double dN_phi_k  = B * (cH_e * FH_bin[l] * Pb_l[l] + cl_e * Fl_node_l[l] * Pg_l[l] +
+          const double Fphi_e    = th_p * src[l] + one_m_thp * Fphi_node_l[l] + dv * dthg_p_l[l] +
+                                   dFphi_l[l];
+          const double dN_phi_k  = B * (cH_e * FH_bin[l] * Pb_l[l] + cl_e * Fl_g_l[l] * Pg_l[l] +
                                         c_phi * Fphi_e);
           dst[l]                += pref * dN_phi_k;
         }
@@ -795,8 +1004,8 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
       // the summation order (fermion edges, then boson edges, ascending i then n).
       for (int l = 0; l <= 1 && l <= l_max; ++l) {
         const double sH     = c_H * FH_bin[l];
-        const double sl     = c_l * Fl_node_l[l];
-        const double sphi   = c_phi * Fphi_node_l[l];
+        const double sl     = c_l * Fl_g_l[l];
+        const double sphi   = c_phi * Fphi_g_l[l];
         const double dN_l   = B * (sH * Pa_l[l] + sl + sphi * Pg_l[l]);
         const double dN_phi = B * (sH * Pb_l[l] + sl * Pg_l[l] + sphi);
         double& R           = (l == 0) ? resid_e : resid_m;
@@ -806,9 +1015,9 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
           const double cH_e    = c_H + (cfg_.quantum_statistics ? dl : 0.);
           const double cphi_e  = c_phi + (cfg_.inverse_decays ? dl : 0.);
           const double Fl_e    = th_l * F_l[(size_t) k * stride + l] + one_m_thl * Fl_node_l[l] +
-                                 devl[e] * dthg_l_l[l];
+                                 devl[e] * dthg_l_l[l] + dFl_l[l];
           const double dN_l_k  = B * (cH_e * FH_bin[l] * Pa_l[l] + c_l * Fl_e +
-                                      cphi_e * Fphi_node_l[l] * Pg_l[l]);
+                                      cphi_e * Fphi_g_l[l] * Pg_l[l]);
           R                   += -2.0 * wf[e] * fermion_.q[k] * (dN_l_k - dN_l);
         }
         for (int e = 0; e < nb; ++e) {
@@ -817,8 +1026,8 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
           const double cH_e   = c_H - (cfg_.quantum_statistics ? dphi : 0.);
           const double cl_e   = c_l + (cfg_.inverse_decays ? dphi : 0.);
           const double Fphi_e = th_p * F_phi[(size_t) k * stride + l] + one_m_thp * Fphi_node_l[l] +
-                                devp[e] * dthg_p_l[l];
-          const double dN_phi_k  = B * (cH_e * FH_bin[l] * Pb_l[l] + cl_e * Fl_node_l[l] * Pg_l[l] +
+                                devp[e] * dthg_p_l[l] + dFphi_l[l];
+          const double dN_phi_k  = B * (cH_e * FH_bin[l] * Pb_l[l] + cl_e * Fl_g_l[l] * Pg_l[l] +
                                         c_phi * Fphi_e);
           R                     += -2.0 * wb[e] * boson_.q[k] * (dN_phi_k - dN_phi);
         }
@@ -839,6 +1048,11 @@ void DecayTransitionKernel::CollisionDiagonal(double* diag_H,
   for (int k = 0; k < boson_.n; ++k)
     diag_phi[k] = 0.;
 
+  // The BACKGROUND kernel forms its chain factor only here -- it never calls the
+  // perturbation operator, so EnsureGatherWeights never runs on it -- and this is the
+  // one place the background's own worst X can be seen. A profile puts this whole
+  // callback at 0.03% of a run, so two fmax per edge is free.
+  double chain_worst = chain_factor_max_;
   for (int i = 0; i < parent_.n; ++i) {
     const double q1    = parent_.q[i];
     const double dq1   = parent_.dq[i];
@@ -863,17 +1077,30 @@ void DecayTransitionKernel::CollisionDiagonal(double* diag_H,
       const double g_phi = (cfg_.inverse_decays ? fl_g : 0.) -
                            (cfg_.quantum_statistics ? fH_i : 0.);
 
-      // d(Lambda_k)/d(f_k) = g (theta + (1-theta) dG/df_k), where G is the gathered
-      // occupation. Fully lumped (theta = 1) this is just g -- which is why the
-      // shipped diagonal is a bare g and is exact. Under the limiter the (1-theta)
-      // fraction still rides on the gather, so its derivative has to be carried:
-      // dG/df_k is the deposit weight for the linear gather and the log-odds chain
-      // factor for the balanced one. Getting this term wrong is not cosmetic --
-      // this diagonal is what the ETD evolver integrates analytically.
-      // ...and theta is itself a function of the state under the limiter, so the
-      // (f_k - G) d(theta)/df_k term rides along too. Dropping it is a 4.1e-2 error
-      // in the diagonal (measured), which is not acceptable in the operator ETD
-      // integrates analytically.
+      // d(Lambda_k)/d(f_k). PrepareTransitions deposits
+      //
+      //     Lambda_k = Lambda + g * theta * (f_st[k] - G_lin),
+      //
+      // where Lambda = Lambda0 + g G carries the gather that built the band factor and
+      // G_lin is the LINEAR state-grid gather the lumping deviation is measured
+      // against. Differentiating that literally:
+      //
+      //     d(Lambda_k)/df_k = g [ dG/df_k + theta (1 - w_k) + (f_k - G_lin) dtheta/df_k ]
+      //
+      // Three terms, and each one has been got wrong at some point:
+      //   * dG/df_k is the derivative of the gather Lambda was built from -- the deposit
+      //     weight w_k on the linear path, the log-odds CHAIN FACTOR under
+      //     balanced_gather. The tempting rewrite `theta + (1-theta) dG/df_k` is the
+      //     same algebra ONLY while the two gathers coincide; under balanced_gather it
+      //     multiplies the chain factor by (1-theta) and so DROPS IT ENTIRELY at
+      //     theta = 1, which is exactly where the limiter puts a front.
+      //   * (1 - w_k) rather than (1 - dG/df_k): the deviation is taken against the
+      //     linear state-grid gather whatever Lambda used, because that is the identity
+      //     sum_e w_e d_e = 0 the whole lumped loss rests on.
+      //   * theta is itself a function of the state, so the (f_k - G_lin) dtheta/df_k
+      //     term rides along too. Dropping it is a 4.1e-2 error (measured).
+      // None of this is cosmetic: this diagonal is what the ETD evolver integrates
+      // analytically.
       const double th_l      = theta_l_[n];
       const double th_p      = theta_phi_[n];
       constexpr int W        = DepositStencil::kWidth;
@@ -883,29 +1110,38 @@ void DecayTransitionKernel::CollisionDiagonal(double* diag_H,
       for (int e = 0; e < nf; ++e) {
         const int k       = jf + e;
         const double meas = fermion_.q[k] * fermion_.q[k] * fermion_.dq[k];
-        const double dGdf = wf[e];
         // Read the deviation and d(theta)/df that PrepareTransitions ALREADY stored.
         // Recomputing them here would have to reproduce its STATE-grid gather, and
         // the tempting `fl_gather_[n]` is the BACKGROUND-grid one -- a distinction
         // that vanishes at dr_bg_refine = 1 and silently corrupts everything above it
         // (the same trap the lumped-loss comment above records).
-        const double dth   = dth_l_edge_[W * n + e];
-        const double dLam  = th_l + (1. - th_l) * dGdf + dev_l_edge_[W * n + e] * dth;
+        const double dth = dth_l_edge_[W * n + e];
+        if (chain_diag_)
+          chain_worst = std::fmax(chain_worst, dg_l_[n] * chain_l_[k]);
+        const double dLam  = chain_diag_
+                                 ? wf[e] * ChainFactor(dg_l_[n], chain_l_[k], inv_chain_cap_) +
+                                       th_l * (1. - wf[e]) + dev_l_edge_[W * n + e] * dth
+                                 : th_l + (1. - th_l) * wf[e] + dev_l_edge_[W * n + e] * dth;
         diag_l[k]         += -1.0 * C * wf[e] * g_l * dLam / meas;
       }
       const int kb           = k_boson_[n];
       const double* const wb = &w_boson_[W * n];
       constexpr int nb       = DepositStencil::kWidth;
       for (int e = 0; e < nb; ++e) {
-        const int k        = kb + e;
-        const double meas  = boson_.q[k] * boson_.q[k] * boson_.dq[k];
-        const double dGdf  = wb[e];
-        const double dth   = dth_phi_edge_[W * n + e];
-        const double dLam  = th_p + (1. - th_p) * dGdf + dev_phi_edge_[W * n + e] * dth;
+        const int k       = kb + e;
+        const double meas = boson_.q[k] * boson_.q[k] * boson_.dq[k];
+        const double dth  = dth_phi_edge_[W * n + e];
+        if (chain_diag_)
+          chain_worst = std::fmax(chain_worst, dg_phi_[n] * chain_phi_[k]);
+        const double dLam  = chain_diag_
+                                 ? wb[e] * ChainFactor(dg_phi_[n], chain_phi_[k], inv_chain_cap_) +
+                                       th_p * (1. - wb[e]) + dev_phi_edge_[W * n + e] * dth
+                                 : th_p + (1. - th_p) * wb[e] + dev_phi_edge_[W * n + e] * dth;
         diag_phi[k]       += -2.0 * C * wb[e] * g_phi * dLam / meas;
       }
     }
   }
+  chain_factor_max_ = chain_worst;
 }
 
 void DecayTransitionKernel::ComputeBackgroundDerivs(double a,
@@ -998,6 +1234,7 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
                     next_l_,
                     l);
   next_l_ = l + 1;
+  EnsureGatherWeights();
   // Only l = 0 (energy) and l = 1 (momentum) carry a conservation identity, so only
   // those two book a residual. Resolved once here, not per node.
   double* const resid = (l == 0)   ? &split_energy_residual_pert_
@@ -1038,6 +1275,29 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
       for (int e = 0; e < nb; ++e)
         Fphi_node += wb[e] * F_phi[kb + e];
 
+      // The BAND FACTOR's gather (Config::balanced_pert): the same stencil weighted by
+      // dG/df_e instead of w_e. Two gathers rather than one because they answer two
+      // different questions and only coincide on the linear path: Fl_g is how the
+      // gathered occupation Lambda was built from responds to F, while the lumping
+      // deviation below is measured against the LINEAR state-grid gather whatever
+      // Lambda used -- the same sum_e w_e d_e = 0 identity the background's lumped loss
+      // rests on. dFl/dFphi are exactly 0.0 when the chain rule is off, so every
+      // expression downstream is untouched bit for bit on that path.
+      double Fl_g   = Fl_node;
+      double Fphi_g = Fphi_node;
+      if (chain_pert_) {
+        const double* const wgf = &wg_fermion_[W * n];
+        const double* const wgb = &wg_boson_[W * n];
+        Fl_g                    = 0.;
+        Fphi_g                  = 0.;
+        for (int e = 0; e < nf; ++e)
+          Fl_g += wgf[e] * F_l[jf + e];
+        for (int e = 0; e < nb; ++e)
+          Fphi_g += wgb[e] * F_phi[kb + e];
+      }
+      const double dFl   = Fl_g - Fl_node;
+      const double dFphi = Fphi_g - Fphi_node;
+
       // Linearized band-factor coefficients c_i = dLambda/df_i at this node.
       double c_H   = -1.0;
       double c_l   = cfg_.inverse_decays ? fphi_g : 0.0;
@@ -1049,8 +1309,8 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
       }
       // Per-species source amplitudes s_i = c_i F_i (F-space perturbation of Lambda).
       const double sH   = c_H * FH_i;
-      const double sl   = c_l * Fl_node;
-      const double sphi = c_phi * Fphi_node;
+      const double sl   = c_l * Fl_g;
+      const double sphi = c_phi * Fphi_g;
 
       // Angular factors advanced by ONE recurrence step from the cached pair instead of
       // rebuilt from P_0: same relation, same operand order as LegendreP, so the value is
@@ -1118,8 +1378,9 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
         double dthg_l = 0.;
         for (int t = 0; t < nf; ++t)
           dthg_l += dth_l_edge_[W * n + t] * F_l[jf + t];
-        const double Fl_e = th_l * F_l[k] + (1. - th_l) * Fl_node + dev_l_edge_[W * n + e] * dthg_l;
-        const double dN_l_k  = B * (cH_e * FH_i * Pa + c_l * Fl_e + cphi_e * Fphi_node * Pg);
+        const double Fl_e    = th_l * F_l[k] + (1. - th_l) * Fl_node +
+                               dev_l_edge_[W * n + e] * dthg_l + dFl;
+        const double dN_l_k  = B * (cH_e * FH_i * Pa + c_l * Fl_e + cphi_e * Fphi_g * Pg);
         dF_l[k]             += -wf[e] * dN_l_k / (fermion_.q[k] * fermion_.q[k] * fermion_.dq[k]);
         if (resid)
           *resid += -2.0 * wf[e] * fermion_.q[k] * (dN_l_k - dN_l);
@@ -1135,8 +1396,8 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
         for (int t = 0; t < nb; ++t)
           dthg_p += dth_phi_edge_[W * n + t] * F_phi[kb + t];
         const double Fphi_e   = th_p * F_phi[k] + (1. - th_p) * Fphi_node +
-                                dev_phi_edge_[W * n + e] * dthg_p;
-        const double dN_phi_k = B * (cH_e * FH_i * Pb + cl_e * Fl_node * Pg + c_phi * Fphi_e);
+                                dev_phi_edge_[W * n + e] * dthg_p + dFphi;
+        const double dN_phi_k = B * (cH_e * FH_i * Pb + cl_e * Fl_g * Pg + c_phi * Fphi_e);
         dF_phi[k] += -2.0 * wb[e] * dN_phi_k / (boson_.q[k] * boson_.q[k] * boson_.dq[k]);
         if (resid)
           *resid += -2.0 * wb[e] * boson_.q[k] * (dN_phi_k - dN_phi);

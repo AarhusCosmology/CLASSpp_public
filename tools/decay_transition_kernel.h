@@ -26,6 +26,102 @@ enum class Statistics : std::uint8_t { Fermion, Boson };
 inline constexpr double kFMin = 1e-100;
 inline constexpr double kFMax = 1.0 - 1e-15;  // 1-f must stay representable
 
+/** Log-odds of an occupation: eta = ln((1-f)/f) for a fermion, ln((1+f)/f) for a
+ *  boson. At equilibrium both equal (q - mu)/T, i.e. EXACTLY LINEAR IN q, which is
+ *  what makes the two-bin gather reproduce them without error. See
+ *  Config::balanced_gather.
+ *
+ *  kEtaMax keeps exp() away from overflow, which matters because this translation
+ *  unit is built with -ffinite-math-only, where a materialised infinity is undefined
+ *  rather than merely large. */
+inline constexpr double kEtaMax = 500.0;  // exp(500) = 1.4e217, decades from overflow
+
+inline double ClampF(double f, Statistics s) {
+  const double lo = f > kFMin ? f : kFMin;
+  return (s == Statistics::Fermion && lo > kFMax) ? kFMax : lo;
+}
+
+inline double EtaOf(double f, Statistics s) {
+  const double x = ClampF(f, s);
+  return (s == Statistics::Fermion) ? std::log((1. - x) / x) : std::log((1. + x) / x);
+}
+
+/** Inverse of EtaOf. Deliberately NOT re-clamped to [kFMin, kFMax] on the way out.
+ *
+ *  Taken alone the fermion branch does collapse: 1/(exp(eta)+1) rounds to exactly 1.0
+ *  below eta ~ -36.7, which would send dg = G(1-G) to exactly 0 and defeat kFMax. It
+ *  cannot be reached, because the only argument this ever receives is the gathered
+ *  acc = sum_e w_e eta_e, and that is a CONVEX combination of already-clamped etas:
+ *  BuildDeposit sets w = {lambda, 1-lambda} with lambda in [0,1], and every eta_e comes
+ *  from EtaOf, whose ClampF holds f <= kFMax = 1-1e-15, i.e. eta_e >= ln(1e-15) ~ -34.54.
+ *  A convex combination cannot fall below its smallest member, so acc >= -34.54 and G
+ *  stays at or below 1-1e-15, with ~2.2 in eta (a factor ~9 in 1-f) of margin.
+ *
+ *  Both halves of that are load-bearing, so a stencil with negative weights, weights not
+ *  summing to 1, or an eta built without EtaOf would break it silently. Re-clamping here
+ *  would hide exactly that, which is why it is documented rather than defended. */
+inline double FOfEta(double eta, Statistics s) {
+  if (eta > kEtaMax)
+    return 0.;
+  if (s == Statistics::Fermion)
+    return 1. / (std::exp(eta < -kEtaMax ? -kEtaMax : eta) + 1.);
+  // Boson: eta > 0 always (f finite), and eta -> 0 is f -> infinity.
+  return 1. / (std::exp(eta < 1e-12 ? 1e-12 : eta) - 1.);
+}
+
+/** The log-odds gather's chain factor, relative to the linear gather's.
+ *
+ *  With G = FOfEta(sum_e w_e eta_e) the exact derivative of the gathered occupation
+ *  with respect to one stencil occupation is
+ *
+ *      dG/df_e = w_e * X_e,      X_e = G(1 -+ G) / (f_e (1 -+ f_e)),
+ *
+ *  so X is exactly the factor by which the balanced gather is more sensitive to a
+ *  single bin than the linear gather (which has X == 1). This returns X from its two
+ *  precomputed halves: `dg` = G(1-+G) per NODE, `chain` = 1/(f(1-+f)) per BIN.
+ *
+ *  WHY IT NEEDS A CAP. In the dilute limit G is the weighted GEOMETRIC mean of the
+ *  stencil, so for a two-bin split X_e = (f_other/f_e)^{w_other}: it diverges as a bin
+ *  empties. That is a real property of a geometric mean, not a discretisation artefact
+ *  -- the mean's logarithm is exactly as sensitive to a bin at 1e-80 as to one at 1,
+ *  so its DERIVATIVE with respect to the occupation blows up. It is harmless on the
+ *  exact quantity, because X_e f_e = G(1-+G)/(1-+f_e) is bounded and a perturbation of
+ *  an empty bin is itself empty; it is NOT harmless in floating point, where an
+ *  independently-accumulated F_e carrying round-off from a far larger scale meets a
+ *  coefficient of 1e40.
+ *
+ *  The cap is a SOFT MINIMUM, X/(1+(X/cap)^4)^(1/4), not a min() and not the obvious
+ *  harmonic X/(1+X/cap). Smooth in the state and monotone, like the harmonic form, but
+ *  its error below the ceiling is (X/cap)^4/4 rather than X/cap -- and that difference
+ *  is the whole usability of a TIGHT cap. The harmonic form biases every coefficient in
+ *  the problem by X/cap, so at cap = 1e4 it moved the operator 2.2e-4 off its own
+ *  finite-difference Jacobian on a state where X was only ~10 and no capping was wanted
+ *  at all. The quartic leaves that state at 2.5e-13.
+ *
+ *  It has to be a function of the BACKGROUND alone -- never of F -- or the perturbation
+ *  operator stops being linear in F, which is the one property the whole hierarchy is
+ *  built on (ReducedCollisionOperator assembles it one column at a time).
+ *
+ *  The cap sits in the gap between the two regimes. On a resolved thermal tail one cell
+ *  spans d(ln f) = -q dlnq / T, so X stays below ~1e2 even at q/T ~ 50 and 14
+ *  bins/decade; across the daughters' INJECTION FRONT, where f falls ~87 decades, X is
+ *  1e20 and up. Anything in between is inert on the physics and finite on the front --
+ *  which is why Config::chain_cap is a knob and not a constant: the gap is wide, and
+ *  where the cap bites G is exponentially small, so a much tighter cap may cost nothing
+ *  in accuracy while costing a great deal less in stiffness. That is a measurement, and
+ *  DecayTransitionKernel::chain_factor_max() is what it is measured against.
+ *
+ *  `inv_cap` is 1/cap, passed rather than divided per call. */
+inline constexpr double kChainCapDefault = 1e4;
+
+inline double ChainFactor(double dg, double chain, double inv_cap) {
+  const double x  = dg * chain;  // >= 0: G(1-+G) >= 0 for admissible G, chain > 0
+  const double y  = x * inv_cap;
+  const double y2 = y * y;
+  // inv_cap = 0 returns x/sqrt(sqrt(1)) = x, bit for bit the uncapped product.
+  return x / std::sqrt(std::sqrt(1. + y2 * y2));
+}
+
 /**
  * Conservative discrete transition network for nu_H <-> nu_l + phi (massless
  * daughters). Discretizes the joint band integral ONCE per RHS evaluation and
@@ -63,6 +159,169 @@ class DecayTransitionKernel {
      *  untouched, where a per-bin cap would rescale the legs of one transition
      *  differently and break them. */
     double max_rate = 0.;
+
+    /** Gather the daughter occupations that form Lambda by interpolating the LOG-ODDS
+     *  eta instead of f itself, so the discrete band factor vanishes EXACTLY at
+     *  equilibrium at any resolution -- the well-balanced property.
+     *
+     *  WHY. Lambda = f_l f_phi - f_H + f_H(f_l - f_phi) is zero in the continuum when
+     *  the daughters are FD/BE with mu_H = mu_l + mu_phi, because q2* + q3* = eps1
+     *  EXACTLY at every node. On the grid f_l(q2*) and f_phi(q3*) are reached by a
+     *  two-bin LINEAR-IN-q interpolation, and e^{-q} is convex, so both come out HIGH
+     *  and Lambda keeps a one-signed residual of O(dq^2).
+     *
+     *  That residual is a RATCHET, not merely an accuracy loss. Lambda > 0 is a
+     *  spurious inverse decay: it re-creates a parent at eps1 out of daughters at
+     *  q2* + q3*, energy-conserving at that instant, but the parent's comoving energy
+     *  then GROWS as a*m before it decays again. Each spurious cycle pumps energy into
+     *  the sector and the cycle count is proportional to Gamma, so the sector's comoving
+     *  radiation is wrong by O(Gamma dq^2) always with the same sign -- which is why the
+     *  daughter-grid requirement was observed to grow with Gamma even though the PHYSICS
+     *  saturates above Gamma ~ H(a_nr).
+     *
+     *  THE FIX. eta is exactly linear in q at equilibrium and the two-bin split has
+     *  sum_e w_e = 1 and sum_e w_e q_e = q*, so it reproduces a linear function exactly.
+     *  Gathering eta and inverting returns f_l(q2*) and f_phi(q3*) with their
+     *  equilibrium relation intact, and eta_l + eta_phi = (eps1 - mu_H)/T gives
+     *  Lambda == 0 to round-off.
+     *
+     *  The SCATTER weights are untouched, so every discrete number/energy identity is
+     *  exactly as before: this changes only the VALUE of a coefficient, never how a
+     *  transition is split between bins. That separation is the same one the
+     *  fermion_bg/boson_bg override already relies on -- where the background occupation
+     *  is read is a free choice, the deposit is not.
+     *
+     *  Occupations are clamped to [kFMin, kFMax] rather than special-cased; see EtaOf
+     *  for why a "fall back when degenerate" rule would defeat the transform on
+     *  precisely the nodes it exists to fix.
+     *
+     *  This flag governs the BACKGROUND band factor only. The perturbation gather stays
+     *  linear in F, so ApplyPerturbationOperator is the Jacobian of the linear gather
+     *  and not of this one; the chain rule there is a separate, unshipped piece of work
+     *  (it diverges as a bin empties, dG/df_e = w_e G/f_e). CollisionDiagonal, which the
+     *  ETD evolver integrates analytically, DOES carry the chain factor and is exact --
+     *  see the derivation there. */
+    bool balanced_gather = false;
+
+    /** Apply the balanced gather's CHAIN RULE in the perturbation operator, so
+     *  ApplyPerturbationOperator is the Jacobian of the band factor the background
+     *  actually integrates rather than of the linear-gather one.
+     *
+     *  WHY IT IS A SEPARATE FLAG. balanced_gather changes the BACKGROUND band factor;
+     *  with this off the perturbation gather stays linear in F, which leaves the
+     *  operator a consistent linearisation of a DIFFERENT discrete model. Measured on a
+     *  random state, the operator drifts 1.1e-1 from a central-difference Jacobian of
+     *  ComputeBackgroundDerivs under balanced_gather, against 8.8e-12 on the linear
+     *  path -- so this is the size of the inconsistency, not an accuracy nicety.
+     *
+     *  WHAT IT CHANGES. The gathered daughter perturbation at a node becomes
+     *
+     *      dG = G(1-+G) sum_e w_e F_e / (f_e (1 -+ f_e))  =  G(1-+G) sum_e w_e Psi_e,
+     *
+     *  i.e. LINEAR INTERPOLATION OF Psi = F/f, scaled by the gathered background. That
+     *  is the same argument that motivated balanced_gather itself: F = f Psi inherits
+     *  f's injection front, so interpolating F linearly reads high across a cell for
+     *  exactly the reason interpolating f linearly did, while Psi is smooth there.
+     *
+     *  The SCATTER weights are again untouched, so every conservation identity is
+     *  unaffected: the l=0 number identities hold because all three legs are built from
+     *  the same node source terms whatever formed them, and the q-weighted identities
+     *  depend only on sum_e w_e q_e = q*.
+     *
+     *  The chain factor is capped (see ChainFactor); the cap is a background-only
+     *  function, so the operator stays exactly linear in F.
+     *
+     *  Requires balanced_gather. Off by default: it changes measured perturbation
+     *  output, so it is opted into rather than riding along. */
+    bool balanced_pert = false;
+
+    /** Ceiling on the chain factor X = dG/df_e / w_e; see ChainFactor for the shape of
+     *  the cap. Read wherever ChainFactor is called, which is chain_diag_ -- so it binds
+     *  the BACKGROUND diagonal too, on any kernel with balanced_gather and a single grid
+     *  (dr_bg_refine = 1, the production setting), not only under balanced_pert.
+     *
+     *  It used to be read only under balanced_pert, on the argument that
+     *  CollisionDiagonal is the true derivative of the background right-hand side and
+     *  must not be bent. That argument does not survive an emptying bin: X diverges there
+     *  while X_e f_e = G(1-+G)/(1-+f_e) stays bounded, so the cap bends nothing physical,
+     *  and uncapped the diagonal reached 6.8e84 -- which etd cannot integrate.
+     *
+     *  IT IS NOT A SAFETY VALVE, IT IS THE MODEL. Measured on the fiducial at Gamma=1e8,
+     *  53 daughter bins: X reaches 2.6e7 within the first minute of the run, so an
+     *  effectively uncapped chain rule (1e12) makes a single-k perturbation solve
+     *  >12x slower than the linear gather -- 50 s becomes over 12 minutes -- and never
+     *  finished. The amplification is REAL: across the injection front the stencil ratio
+     *  is 1e15 in one cell and a geometric mean is genuinely that sensitive to its
+     *  smallest member. It is also physically empty, because G is suppressed by the same
+     *  factor, so the node it belongs to contributes nothing to Lambda.
+     *
+     *  The cap CONVERGES, measured on the daughter transfer functions against the
+     *  cap = 1e5 run (successive increments in d_dr_phi):
+     *
+     *      cap    30 -> 100     3.1e-3
+     *      cap   100 -> 1e3     1.4e-3
+     *      cap   1e3 -> 1e4     1.1e-4
+     *      cap   1e4 -> 1e5     2.1e-4   (at the ladder's noise floor)
+     *
+     *  and the observables (d_cdm, d_tot, phi) are already within 5e-7 of the limit at
+     *  cap = 100. The default 1e4 sits where the daughters are converged to ~1e-5 and the
+     *  run costs ~1.2x the linear gather; 1e5 costs ~4x and buys nothing measurable. */
+    double chain_cap = kChainCapDefault;
+
+    /** Lump the daughter loss onto the deposit bin's own occupation (blended by the
+     *  harmonic limiter, see LumpTheta) rather than using the exact two-bin split.
+     *
+     *  WHY IT EXISTS. With the exact split the loss charged to bin k is proportional to
+     *  its NEIGHBOUR's occupation as well as its own -- a negative off-diagonal -- so at
+     *  an injection front an empty bin is billed for particles it does not hold and the
+     *  RHS drives it negative. That is a property of the right-hand side, so no
+     *  integrator can repair it: rejection, clamping f at 0 and evolving sqrt(f) were
+     *  each tried and each stalled the solver instead. Lumping removes the off-diagonal
+     *  and costs O(dq) in where the energy is filed, booked in split_energy_residual().
+     *
+     *  WHY IT CAN BE TURNED OFF UNDER balanced_gather, which is the whole point of this
+     *  flag. The off-diagonal is the loss term g*G evaluated at f_k = 0. For the LINEAR
+     *  gather G|_{f_k=0} = sum_{e'!=e} w_e' f_e' is still positive -- that is the bill.
+     *  The log-odds gather is a weighted geometric mean of the stencil, so
+     *  G|_{f_k=0} = 0 identically and the bill is not merely smaller, it is GONE:
+     *
+     *      fermion, at f_l[k] = 0:  df_k = + w_e C f_H (1 + G_phi) / meas  >= 0
+     *      boson,   at f_phi[k]=0:  df_k = + 2 w_e C f_H (1 - G_l)  / meas >= 0
+     *
+     *  for any admissible state (f_H >= 0, G_l <= 1, G_phi >= -1), which is exactly the
+     *  condition the lumped scheme also needs. So the exact split is Metzler again, and
+     *  the O(dq) energy misplacement -- which is the DOMINANT term in the daughter-grid
+     *  requirement at high Gamma -- can be dropped. decay_kernel_test asserts the two
+     *  inequalities directly on a front state.
+     *
+     *  The two flags are therefore one scheme, and the input layer couples them:
+     *  balanced_gather = yes turns this off unless it is set explicitly. Kept separate
+     *  in Config because they are independent mechanisms and the 2x2 is what the
+     *  measurement needs. */
+    bool lumped_loss = true;
+    /** Gauss-Legendre points per emission sub-interval, 1..4. 1 is the midpoint rule
+     *  this quadrature has always used.
+     *
+     *  The stratified layout is a multigroup transfer matrix: the emission band is cut at
+     *  the daughters' CELL EDGES and integrated piece by piece, which is what gives every
+     *  cell in the band a deposit and keeps the daughter PSD free of the comb a
+     *  band-global Gauss rule leaves behind. That structure is right; the ONE-POINT rule
+     *  on each piece is not converged.
+     *
+     *  Measured against a 4-point reference at Gamma=1e9: the midpoint rule reproduces
+     *  every MOMENT essentially exactly -- rho_l to 1e-42, H to 1e-28 -- and the daughter
+     *  PSD shape to only 1.7e-2. Two points bring the PSD to 1.2e-3 and three to 1.9e-4.
+     *  The moments are exact because the deposit conserves them per transition whatever
+     *  the quadrature; it is the SHAPE that the rule has to resolve, and the perturbation
+     *  hierarchy reads shape (dlnf/dlnq), not just moments.
+     *
+     *  It also smooths the right-hand side, which is why it was tried: the sub-intervals
+     *  appear, vanish and resize as the band sweeps, and an unconverged rule turns each of
+     *  those into a step in the RHS. Two points cut the kink amplitude 3600x (9.2e-4 ->
+     *  2.6e-7) and it SATURATES there -- the remaining floor is not quadrature error.
+     *  That is worth about 1.5x in step count against 2x the nodes, so as a speed measure
+     *  it is a small net loss; it is here for the accuracy. */
+    int emission_gauss = 1;
   };
 
   struct Moments {
@@ -267,7 +526,13 @@ class DecayTransitionKernel {
    *  change of variable can prevent it. That is the distinction between "the solver
    *  overshot" and "the discretisation is not positivity-preserving".
    *
-   *  Requires a prior PrepareTransitions for the state being diagnosed. */
+   *  Requires a prior PrepareTransitions for the state being diagnosed.
+   *
+   *  ⚠ Describes the LINEAR-gather decomposition. Under Config::balanced_gather the
+   *  band factor is no longer affine in the daughter's own occupation (the gathered
+   *  value carries it too, through the log-odds chain factor), so gain + diag*f is a
+   *  tangent line rather than an identity and this function has not been extended to
+   *  report it. It currently has no consumer; extend it before giving it one. */
   struct PositivityTerms {
     std::vector<double> gain, diag;
     void Resize(int n) {
@@ -311,6 +576,27 @@ class DecayTransitionKernel {
   // The operator itself never divides by f; the composite uses this to guard the
   // parent's Psi_H <-> F_H round trip.
   static constexpr double kFFloor = 1e-100;
+
+  /** The largest UNCAPPED chain factor X = G(1-+G)/(f(1-+f)) this kernel has formed
+   *  since construction, or 0 if it never formed one (chain_diag_ false, or no call that
+   *  forms it yet). A lifetime maximum, not a per-call one: the question it answers is
+   *  whether ChainFactor's cap ever bound over a whole run, which no single right-hand
+   *  side can settle.
+   *
+   *  Updated from BOTH places that form X: EnsureGatherWeights under balanced_pert, and
+   *  CollisionDiagonal whenever chain_diag_ -- which a background kernel satisfies on
+   *  balanced_gather alone, and is the only place its own worst X can be seen.
+   *
+   *  X is 1 for the linear gather and stays O(1e2) on a resolved thermal tail; it is the
+   *  daughters' injection front that sends it to 1e20 and beyond. Reading this back well
+   *  below chain_cap() is what says the cap is a guard rather than a model. */
+  double chain_factor_max() const {
+    return chain_factor_max_;
+  }
+  /** The ceiling chain_factor_max() has to be read against (Config::chain_cap). */
+  double chain_cap() const {
+    return cfg_.chain_cap;
+  }
 
   // Energy mis-deposited by off-grid clamping since the last PrepareTransitions.
   // Zero iff every node's q2*/q3* land inside the daughter grids (no clamping).
@@ -391,6 +677,33 @@ class DecayTransitionKernel {
   // IS the gather split and the extra binary searches are skipped entirely, which is
   // what keeps the single-grid path bit-identical.
   bool separate_bg_grids_ = false;
+  /** Whether CollisionDiagonal carries the balanced gather's chain factor.
+   *
+   *  CollisionDiagonal serves two different consumers, and they want two different
+   *  objects. On the BACKGROUND kernel (state grids == bg grids, no override) it is
+   *  d(df_i)/d(f_i) of the background RHS, and the log-odds gather is a function of
+   *  that very state, so its chain factor belongs in the derivative. On a PERTURBATION
+   *  kernel (bg views supplied) the daughter occupations are a fixed table rather than
+   *  the state -- the state is F -- and the F gather is linear whatever the background
+   *  band factor was built from, so the diagonal there must stay the linear expression
+   *  or it will not match the operator ETD subtracts it from.
+   *
+   *  The two cases are exactly distinguished by whether bg views were supplied, which
+   *  is a construction-time property, not a runtime one: DNCDMInvSpecies builds the
+   *  background kernel on the bg grids with no override and every per-k perturbation
+   *  kernel with one. decay_kernel_test pins both halves -- CollisionDiagonal against a
+   *  finite-difference Jacobian on the background kernel, and against the perturbation
+   *  operator's implied diagonal on a refine > 1 kernel.
+   *
+   *  Config::balanced_pert collapses the two cases: with the chain rule ported into the
+   *  operator, the perturbation kernel's diagonal wants the chain factor too, and the
+   *  distinction disappears. */
+  bool chain_diag_ = false;
+  /** Whether the perturbation gather carries the chain rule (Config::balanced_pert and
+   *  balanced_gather both on). Cached rather than re-tested per node: it selects the
+   *  gather weights, and it is the ONE thing that decides whether the operator is the
+   *  Jacobian of the balanced band factor or of the linear one. */
+  bool chain_pert_ = false;
   Statistics fermion_stat_, boson_stat_;
   Config cfg_;
 
@@ -399,6 +712,32 @@ class DecayTransitionKernel {
   mutable std::vector<double> wn_;                       // node weight 0.5(qhi-qlo)*gl_w
   mutable std::vector<double> lambda_s_;                 // Lambda_s (band factor)
   mutable std::vector<double> fl_gather_, fphi_gather_;  // gathered f_l(q2*), f_phi(q3*)
+  // Config::balanced_gather only. eta_* is the log-odds of the daughter background
+  // occupations, one per BACKGROUND grid point, refilled once per PrepareTransitions:
+  // O(n_q) against the O(n_parent n_q) nodes that read it back, so the two
+  // transcendentals per bin amortise away.
+  mutable std::vector<double> eta_l_, eta_phi_;
+  // The gather's chain factor, split into the two halves it naturally factorises into.
+  // With G = FOfEta(sum_e w_e eta_e),
+  //     dG/df_e = w_e * G(1 -+ G) / (f_e (1 -+ f_e))
+  // (upper sign fermion, lower boson). dg_* is the per-NODE numerator G(1-+G) and
+  // chain_* the per-BIN reciprocal on the STATE grid; keeping them apart is what makes
+  // the diagonal free in its loop, since chain_* is one small array that stays in L1.
+  // Both are left at 1 when balanced_gather is off, so the diagonal's expression is
+  // shape-identical either way.
+  mutable std::vector<double> chain_l_, chain_phi_;  // 1/(f(1-+f)) on the STATE grid
+  mutable std::vector<double> dg_l_, dg_phi_;        // G(1-+G) per node
+  // Config::balanced_pert only: the perturbation gather's EFFECTIVE weights,
+  // wg[e] = w[e] * ChainFactor(dg[n], chain[j0+e]) -- i.e. dG/df_e with the cap. Kept
+  // as a premultiplied array rather than formed in the operator because the operator
+  // runs the whole l = 0..l_max sweep between two PrepareTransitions calls, so a
+  // division per (node, edge) would be paid l_max + 1 times over.
+  mutable std::vector<double> wg_fermion_, wg_boson_;
+  // wg_* are rebuilt lazily, on the first operator call after each PrepareTransitions.
+  mutable bool wg_dirty_           = true;
+  double inv_chain_cap_            = 1. / kChainCapDefault;
+  mutable double chain_factor_max_ = 0.;
+  void EnsureGatherWeights() const;
   // Per-node lumping fraction, one value per node and daughter (see LumpTheta).
   mutable std::vector<double> theta_l_, theta_phi_;
 
@@ -427,7 +766,7 @@ class DecayTransitionKernel {
   double LumpTheta(double g, const double* w, int n, int j0, const double* f, double f_gath) const {
     // Nodes with g <= 0 are exempt: there the "loss" is a gain, its off-diagonal is
     // POSITIVE, and Metzler is satisfied by the exact split already.
-    if (!(g > 0.))
+    if (!cfg_.lumped_loss || !(g > 0.))
       return 0.;
     // theta = 1 - H/A, the harmonic mean of the stencil over its arithmetic mean.
     // H <= A always (AM-HM), with equality iff the stencil is flat, so theta is in
@@ -465,7 +804,7 @@ class DecayTransitionKernel {
    *  Returns 0 when the limiter is not the active scheme, where theta is constant. */
   double LumpDTheta(
       double g, const double* w, int n, int j0, const double* f, double f_gath, int e) const {
-    if (!(g > 0.) || !(f_gath > 0.))
+    if (!cfg_.lumped_loss || !(g > 0.) || !(f_gath > 0.))
       return 0.;
     double S = 0.;
     for (int t = 0; t < n; ++t) {
