@@ -256,6 +256,79 @@ class DNCDMInvSpecies : public CompositeSpecies {
   void set_reduced_table_l_max(int l) {
     reduced_table_l_max_ = l;
   }
+  /** `dr_table_max_dlna`: largest ln-a step the tabulated operator may be interpolated
+   *  across. The table owns this; it is NOT `back_integration_stepsize`, which is what
+   *  the row spacing used to be and which this species neither owns nor can see.
+   *
+   *  ⚠ THE DEFAULT IS VALIDATED ONLY TO Gamma = 1e9. It is a fixed spacing while the
+   *  requirement grows with Gamma, so above that it must be set explicitly. Left at the
+   *  default it does not fail, it degrades: measured C_2^TT against the Gamma-independent
+   *  1.481e-10, m = 0.3, six-moment Galerkin --
+   *
+   *      Gamma   1e9    1e9.5   1e10   1e10.5   1e11    1e11.5    1e12
+   *      err    -0.1%   -0.7%   -2.4%   -7.9%  -30.1%   +506%   +4e10%
+   *
+   *  and the run reports nothing, because the identities the kernel asserts are number
+   *  identities that a mis-interpolated operator still satisfies.
+   *
+   *  WHY THIS IS AN INPUT AND NOT A LAW IN THE CODE. Deriving it from Gamma internally
+   *  would be one line, and it is deliberately not done: this model has several knobs
+   *  whose requirement grows with Gamma (`dr_N_q` and the daughter grid above all), a
+   *  cell costs hundreds of core-hours, and a caller who has not been made to think about
+   *  one of them has not been made to think about the others either. An explicit key also
+   *  gives the convergence test a handle -- halve it and the pair brackets the answer --
+   *  which a hidden law does not have. Set it from the campaign's own sizing rule, the
+   *  way `dr_N_q` already is.
+   *
+   *  THE MEASURED REQUIREMENT. The operator is interpolated linearly, so its error is
+   *  O(h^2) in the realised spacing h = dlna_row / n_sub:
+   *
+   *      err(Gamma, m, n_sub) = A(m) (Gamma/1e11)^1.10 / n_sub^2,
+   *      A(0.30 eV) = 0.295,  A(0.06 eV) = 0.868
+   *
+   *  fitted to the n_sub = 1 ladder above and validated against an independent sweep in
+   *  n_sub at fixed Gamma, which it reproduces to ~30% wherever the error is small enough
+   *  for the h^2 law to hold at all (0.083% predicted / 0.1% observed at Gamma = 3.16e10,
+   *  n_sub = 10; 0.295% / 0.3% at 1e11, n_sub = 10; 0.074% / 0.1% at 1e11, n_sub = 20).
+   *  Since the sub-division drives the realised spacing to this key, the error is
+   *  err = A(m) (Gamma/1e11)^1.10 (h/h_ref)^2 and a target error eps wants
+   *
+   *      dr_table_max_dlna = h_ref * sqrt(eps / (A(m) (Gamma/1e11)^1.10)),  h_ref = 7.0e-3
+   *
+   *  ⚠ h_ref is the spacing the fit was CALIBRATED at -- the realised spacing when n_sub
+   *  came out 1 on a 7e-3 background grid -- and NOT `back_integration_stepsize`. They are
+   *  the same number today, and that is a coincidence of this campaign rather than a
+   *  coupling: the requirement is a property of how fast the operator varies in ln a, so
+   *  halving `back_integration_stepsize` should leave this key alone and halve n_sub
+   *  instead. That decoupling is the reason the key exists; do not put the background's
+   *  own stepsize back into the sizing rule.
+   *
+   *  Equivalently n_sub ~ Gamma^0.55, NOT the Gamma^0.60 an earlier estimate quoted --
+   *  that one read its index off a point already in the runaway, where O(h^2) does not
+   *  apply.
+   *  A(m) is two masses and one interpolation, so treat it as calibrated on [0.06, 0.3] eV
+   *  and nowhere else.
+   *
+   *  7e-3 is where the answer is converged at LOW Gamma, not merely where it stops
+   *  moving: at Gamma = 1e6, m = 0.3 the C_2^TT it gives agrees with a 32x finer grid to
+   *  7e-5 relative. The cell that needs even that is the fastest-varying one,
+   *  Gamma = 1e9 / m = 0.06, which reads max|phi| = 101 against 0.4734 correct when the
+   *  table simply inherits the 0.07 default and 0.4734 once it sub-divides to this. */
+  static constexpr double kTableMaxDlnaDefault = 7e-3;
+
+  /** Largest Gamma at which kTableMaxDlnaDefault has been measured to hold the table
+   *  error below the six-moment closure floor. Used only to decide whether to WARN that
+   *  the key was left unset; nothing scales with it. */
+  static constexpr double kTableDefaultValidatedTo = 1e9;
+
+  /** `dr_table_max_dlna`: see kTableMaxDlnaDefault for the measured sizing rule and for
+   *  why this is an input rather than a law evaluated from Gamma. */
+  void set_table_max_dlna(double dlna) {
+    table_max_dlna_ = dlna;
+  }
+  double table_max_dlna() const {
+    return table_max_dlna_;
+  }
   /** True once the tabulated operator exists and may be used on the hot path.
    *
    *  The table is built whenever the reduction is on. The matrix-free path survives
@@ -370,25 +443,14 @@ class DNCDMInvSpecies : public CompositeSpecies {
    *  side, which is why there is no late cut: see below. */
   static constexpr double kTableActiveRate = 1e-4;
 
-  /** Largest ln-a step the tabulated operator may be interpolated across. The table owns
-   *  this; it is NOT `back_integration_stepsize`, which is what the row spacing used to be
-   *  and which this species neither owns nor can see.
-   *
-   *  7e-3 is where the answer is converged, not merely where it stops moving: at
-   *  Gamma = 1e6, m = 0.3 the C_2^TT it gives agrees with a 32x finer grid to 7e-5
-   *  relative. The cell that needs it is the fastest-varying one, Gamma = 1e9 / m = 0.06,
-   *  which reads max|phi| = 101 against 0.4734 correct when the table simply inherits the
-   *  0.07 default and 0.4734 once it sub-divides to this. */
-  static constexpr double kTableMaxDlna = 7e-3;
-
-  /** Relative overshoot of kTableMaxDlna that does NOT buy a sub-division.
+  /** Relative overshoot of `dr_table_max_dlna` that does NOT buy a sub-division.
    *
    *  Without it the common case sub-divides by two for nothing. A background table is
    *  laid out on bt_size_ = |ln a_ini| / back_integration_stepsize rows with bt_size_
    *  truncated to an int, so its realised spacing lands a hair ABOVE whatever stepsize
    *  was asked for -- 7.0021e-3 for the 7e-3 default. An exact `>` then reads that 0.03%
    *  as "too coarse" and doubles both the memory and the precompute (432.7 MB / 4.6 s
-   *  against 216.4 MB / 2.3 s at Gamma = 1e6, m = 0.3) to buy an accuracy kTableMaxDlna
+   *  against 216.4 MB / 2.3 s at Gamma = 1e6, m = 0.3) to buy an accuracy the default
    *  is documented above as already having 32x of margin on.
    *
    *  1% is far below any spacing that matters here and comfortably above that layout
@@ -430,6 +492,9 @@ class DNCDMInvSpecies : public CompositeSpecies {
    *  matrix-free path if the table is short, so a mismatch costs speed, never
    *  correctness. */
   int reduced_table_l_max_ = -1;
+  /** `dr_table_max_dlna`, resolved at Create time. Read once, in ProcessBackgroundTable,
+   *  to size the sub-division; nothing on the hot path consults it. */
+  double table_max_dlna_ = kTableMaxDlnaDefault;
   /** M~_l over the window. Written once in ProcessBackgroundTable and read-only on the
    *  threaded k-loop thereafter, so it is shared rather than per-workspace. */
   ReducedOperatorTable reduced_table_;

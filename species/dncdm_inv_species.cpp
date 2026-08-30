@@ -20,6 +20,40 @@
 #include "species/species_input.h"
 #include "thread_pool.h"  // Tools::TaskSystem — the precompute is row-parallel
 
+namespace {
+
+/** The reduced scheme is on and `dr_table_max_dlna` was left at a default that has only
+ *  ever been validated to Gamma = 1e9. Say so, once per instance.
+ *
+ *  This warns; it does not size anything. Deriving the spacing from Gamma here would be
+ *  one line and is deliberately not done — see kTableMaxDlnaDefault. What the caller
+ *  cannot be allowed to do is walk into it unaware, because the failure is silent: the
+ *  identities the kernel asserts are number identities, and a mis-interpolated operator
+ *  satisfies them all the way into a 4e10% runaway. */
+void WarnTableSpacingUnset(const std::string& name, double gamma_kms_mpc) {
+  if (!(gamma_kms_mpc > DNCDMInvSpecies::kTableDefaultValidatedTo))
+    return;
+  // Keyed on the instance and Gamma, so a re-Compute from the python wrapper with a new
+  // cosmology warns again. Species construction is single-threaded, so no lock is needed.
+  static std::set<std::pair<std::string, double>> warned;
+  if (!warned.emplace(name, gamma_kms_mpc).second)
+    return;
+  fprintf(stderr,
+          "WARNING: species '%s': dr_reduced_moments is set and dr_table_max_dlna is not, so "
+          "the reduced collision table is interpolated at the default %g. That default is "
+          "validated only to Gamma = %g and this run is at Gamma = %g; the table's accuracy "
+          "requirement grows with Gamma and a fixed spacing does not follow it. Measured "
+          "C_2^TT error at this default, m = 0.3 eV: -2.4%% at Gamma = 1e10, -30%% at 1e11, "
+          "a full runaway by 1e12 -- and nothing else in the run reports it. Set "
+          "dr_table_max_dlna explicitly; the sizing rule is in dncdm_inv_species.h.\n",
+          name.c_str(),
+          DNCDMInvSpecies::kTableMaxDlnaDefault,
+          DNCDMInvSpecies::kTableDefaultValidatedTo,
+          gamma_kms_mpc);
+}
+
+}  // namespace
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Factory
 // ─────────────────────────────────────────────────────────────────────────────
@@ -247,6 +281,11 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
             DrPsdSpecies::kQMaxMargin * q_star_max);
   }
 
+  // DNCDMSpecies stores Gamma internally as Gamma/c in 1/Mpc (dncdm_species.cpp:121).
+  // Everything that talks ABOUT it -- the input key, the campaign, the sizing rule in
+  // kTableMaxDlnaDefault -- speaks km/s/Mpc, so convert back once, here.
+  const double gamma_kms_mpc = parent->Gamma() * (_c_ / 1.e3);
+
   auto composite = std::make_unique<DNCDMInvSpecies>(std::move(parent),
                                                      std::move(fermion),
                                                      std::move(boson),
@@ -274,6 +313,19 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                     ">= 2, and see the design note for why 6 is the measured working point",
                     name.c_str());
   composite->set_reduced_moments(red);
+  // Reduced collision table ln-a spacing. See kTableMaxDlnaDefault for the measured
+  // sizing rule and for why the Gamma dependence is the caller's to apply.
+  const auto dlna_set = in.get<double>("dr_table_max_dlna");
+  const double dlna   = dlna_set.value_or(DNCDMInvSpecies::kTableMaxDlnaDefault);
+  class_test_severe(!(dlna > 0.),
+                    "species '%s': dr_table_max_dlna (=%g) must be positive -- it is a ln-a "
+                    "spacing, and the table sub-divides each background row until its own "
+                    "spacing meets it",
+                    name.c_str(),
+                    dlna);
+  composite->set_table_max_dlna(dlna);
+  if (red > 0 && !dlna_set)
+    WarnTableSpacingUnset(name, gamma_kms_mpc);
   composite->background_verbose_ = ctx.pfc->get_or("background_verbose", 0);
   // Resolved here and not in ProcessBackgroundTable, which runs before any perturbation
   // layout exists.  Mirrors what AddCouplingDerivs computes per call:
@@ -741,7 +793,7 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
   // not, and the residue shows up where the operator varies fastest (Gamma = 1e9,
   // m = 0.06: max|phi| 101 against 0.4734 correct, the last cell still wrong once the
   // truncation above is fixed). So the table sub-divides each background interval until
-  // its own spacing meets kTableMaxDlna, interpolating the kernel's INPUTS -- the parent's
+  // its own spacing meets `dr_table_max_dlna`, interpolating the kernel's INPUTS -- the parent's
   // ln f, the daughters' f, a and H -- rather than the assembled operator. n_sub is global
   // and taken from the widest interval, so a background table uniform in ln a stays uniform
   // here and ReducedOperatorTable::LowerRow keeps its O(1) lookup.
@@ -753,7 +805,7 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
     dlna_row        = std::fmax(dlna_row, std::log(a1 / a0));
   }
   const int n_sub =
-      std::max(1, static_cast<int>(std::ceil(dlna_row / kTableMaxDlna - kTableDlnaSlack)));
+      std::max(1, static_cast<int>(std::ceil(dlna_row / table_max_dlna_ - kTableDlnaSlack)));
   const long long n_pts = (long long) (n_win - 1) * n_sub + 1;
   const int n_threads   = std::max(1,
                                    pba_ != nullptr ? static_cast<int>(pba_->number_of_threads) : 1);

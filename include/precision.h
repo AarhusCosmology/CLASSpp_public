@@ -113,7 +113,8 @@ struct precision {
    * What the coarser table did cost is paid by every consumer that interpolates the
    * background in ln a and inherits this spacing without being in a position to notice it.
    * DNCDM's reduced collision table was one: at 0.07 every Galerkin run in the hpc_prod
-   * campaign diverged. That species now owns its own spacing (kTableMaxDlna), but it was
+   * campaign diverged. That species now owns its own spacing (`dncdm<i>.dr_table_max_dlna`,
+   * PR #413), but it was
    * not the only such consumer, merely the one that failed loudly.
    */
   double back_integration_stepsize = 7.e-3;
