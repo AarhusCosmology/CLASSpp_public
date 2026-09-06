@@ -1060,6 +1060,128 @@ class TestReviewRegressions(TestClass):
         self.cosmo.compute()
         self.assertTrue(self.cosmo.state)
 
+    def test_axion_monodromy_reproduces_its_analytic_delta_ns(self):
+        """'potential = monodromy' is the axion-monodromy potential of
+        arXiv:0907.2916, V = mu^3 (x + b f cos(x/f)) with x = V_4 - phi.
+
+        Two things are pinned here. First the plumbing: before this shape
+        existed the 'potential' key was read and thrown away for
+        'P_k_ini type = inflation_V' ("only polynomial coded so far"), so
+        anything but polynomial was silently ignored and V_1 was reinterpreted
+        as the linear Taylor coefficient. Second the physics: the modulation
+        must show up in P_s(k) with the fractional amplitude the paper derives
+        in its eq. (2.9),
+
+            delta n_s = 12 b / sqrt(1+(3 f phi_*)^2)
+                        * sqrt(pi/8 * coth(pi/(2 f phi_*)) * f phi_*) ,
+
+        with f and phi_* in REDUCED Planck units, i.e. sqrt(8 pi) times the
+        V_1 and V_4 this module is given. See
+        docs/superpowers/specs/2026-09-06-axion-monodromy-inflation-design.md.
+        """
+        import math
+
+        sq8pi = math.sqrt(8. * math.pi)
+        phi_star, f_red, b = 11., 0.02, 0.08
+        x_star = phi_star/sq8pi
+        # normalise to A_s ~ 2.1e-9 through the first-order slow-roll relation
+        V_0 = 2.1e-9*3./(128.*math.pi*x_star**3)
+
+        common = {
+            'P_k_ini type': 'inflation_V',
+            'potential': 'monodromy',
+            'V_0': V_0, 'V_1': f_red/sq8pi, 'V_3': 1., 'V_4': x_star,
+            'output': 'tCl',
+            'modes': 's, t',
+            'k_per_decade_primordial': 200,
+            'primordial_inflation_tol_integration': 1e-5,
+        }
+
+        spectra = {}
+        for label, b_value in (('smooth', 0.), ('modulated', b)):
+            cosmo = Class()
+            cosmo.set(dict(self.verbose, **common, **{'V_2': b_value}))
+            cosmo.compute(level=['primordial'])
+            primordial = cosmo.get_primordial()
+            spectra[label] = (primordial['k [1/Mpc]'].copy(),
+                              primordial['P_scalar(k)'].copy())
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+        k, P_modulated = spectra['modulated']
+        _, P_smooth = spectra['smooth']
+        ratio = P_modulated/P_smooth - 1.
+
+        # Project onto the paper's template cos(phi_k/f), phi_k =
+        # sqrt(phi_*^2 - 2 ln(k/k_*)), with the phase free (the cos and sin
+        # columns) and a quadratic in ln k to absorb any residual trend. phi_*
+        # is scanned rather than fixed: k <-> phi_k is a slow-roll relation and
+        # a 1% error in it is many radians of phase when f is small.
+        ln_k = np.log(k/0.05)
+        window = np.abs(ln_k) < 2.
+        ln_k, ratio = ln_k[window], ratio[window]
+        best_amplitude = 0.
+        for phi_star_fit in np.linspace(10.5, 11.5, 501):
+            theta = np.sqrt(phi_star_fit**2 - 2.*ln_k)/f_red
+            design = np.column_stack([np.cos(theta), np.sin(theta),
+                                      np.ones_like(ln_k), ln_k, ln_k**2])
+            coefficients, *_ = np.linalg.lstsq(design, ratio, rcond=None)
+            best_amplitude = max(best_amplitude,
+                                 math.hypot(coefficients[0], coefficients[1]))
+
+        y = f_red*phi_star
+        delta_ns = (12.*b/math.sqrt(1. + (3.*y)**2)
+                    * math.sqrt(math.pi/8./math.tanh(math.pi/(2.*y))*y))
+        self.assertAlmostEqual(best_amplitude/delta_ns, 1., delta=0.06)
+
+        # A wrong template frequency must NOT score: without this the test would
+        # pass on any spectrum with enough structure in it.
+        theta = np.sqrt(phi_star**2 - 2.*ln_k)/(f_red/3.)
+        design = np.column_stack([np.cos(theta), np.sin(theta),
+                                  np.ones_like(ln_k), ln_k, ln_k**2])
+        coefficients, *_ = np.linalg.lstsq(design, ratio, rcond=None)
+        self.assertLess(math.hypot(coefficients[0], coefficients[1]),
+                        0.2*delta_ns)
+
+    def test_monodromy_parameter_domain_is_rejected(self):
+        """The monodromy potential divides by the decay constant V_1, so V_1 = 0
+        reaches primordial_inflation_check_potential as a NaN -- and its V<=0 and
+        dV>=0 tests are ordered comparisons, which do not catch one. The other
+        three bound the branch the field is supposed to roll down. Raised in
+        review of PR #415."""
+        import math
+
+        sq8pi = math.sqrt(8. * math.pi)
+        good = {'P_k_ini type': 'inflation_V', 'potential': 'monodromy',
+                'V_0': 1.4830727019323157e-12, 'V_1': 0.02/sq8pi, 'V_2': 0.08,
+                'V_3': 1., 'V_4': 11./sq8pi,
+                'output': 'tCl', 'modes': 's, t'}
+        for key, bad_value in (('V_1', 0.),      # decay constant -> division by zero
+                               ('V_1', -1e-3),   # same model as (b, f) -> (-b, -f)
+                               ('V_3', 0.),      # monodromy power
+                               ('V_0', 0.),      # monodromy scale
+                               ('V_4', 0.)):     # no branch left to roll down
+            scenario = dict(self.verbose, **good)
+            scenario[key] = bad_value
+            cosmo = Class()
+            cosmo.set(scenario)
+            with self.assertRaises(CosmoComputationError,
+                                   msg=f'{key} = {bad_value} was accepted'):
+                cosmo.compute(level=['primordial'])
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_unknown_inflation_potential_is_rejected(self):
+        """The 'potential' key used to be parsed and discarded, so a typo in it
+        ran the polynomial shape with whatever V_i happened to be set."""
+        self.cosmo.set(dict(self.verbose, **{
+            'P_k_ini type': 'inflation_V',
+            'potential': 'no_such_potential',
+            'output': 'tCl',
+            'modes': 's, t',
+        }))
+        self.assertRaises(CosmoSevereError, self.cosmo.compute)
+
     def test_z_max_pk_above_the_thermodynamics_table_computes(self):
         """thermodynamics_at_z extrapolates analytically above the tabulated
         range, and that branch used to be the one path through the function that

@@ -827,6 +827,57 @@ void PrimordialModule::primordial_inflation_potential(double phi,
 
       break;
 
+      /* Axion monodromy with a sinusoidal modulation, arXiv:0907.2916 eq. (2.2),
+         generalised from the linear monodromy of that paper to an arbitrary power.
+         Conventions, parameter choices and the numbers this shape was validated
+         against are in
+         docs/superpowers/specs/2026-09-06-axion-monodromy-inflation-design.md.
+
+         The paper's inflaton x runs down towards x=0, whereas this module requires
+         phi to grow with dV/dphi<0, so the two are related by a reflection
+
+           x = V4 - phi ,
+
+         and since phi_pivot=0 for P_k_ini type = inflation_V, V4 is directly the
+         field value x_* at which the pivot scale leaves the horizon. Note that the
+         paper works in reduced Planck units while this module uses phi and V in
+         units of the (non-reduced) Planck mass, so V4 and V1 are the paper's
+         phi_* and f divided by sqrt(8 pi).
+
+           V0 = mu^(4-p) , the monodromy scale, in units of Mp^(4-p)
+           V1 = f        , the axion decay constant, in units of Mp
+           V2 = b        , modulation amplitude, = Lambda^4/(mu^(4-p) f); b<1 for p=1
+           V3 = p        , the monodromy power (p=1 is the paper's linear case)
+           V4 = x_*      , the field value at the pivot scale, in units of Mp     */
+    case monodromy: {
+      const double f = ppm->V1;
+      const double b = ppm->V2;
+      const double p = ppm->V3;
+      const double x = ppm->V4 - phi;
+
+      /* pow(x, p) is not defined for x<0 and non-integer p, and x=0 is the end
+         of the monodromy branch: refuse both rather than return a NaN that the
+         positivity check in primordial_inflation_check_potential cannot see. */
+      class_test(x <= 0.,
+                 "the monodromy potential is only defined for phi < V_4 = %g, but it was "
+                 "evaluated at phi=%g (x = V_4 - phi = %g). Raise V_4, i.e. start the "
+                 "observable window further from the end of the monodromy branch",
+                 ppm->V4,
+                 phi,
+                 x);
+
+      const double x_pm1 = pow(x, p - 1.);
+
+      /* dV/dphi = -dV/dx, d2V/dphi2 = +d2V/dx2. The x^(p-2) term is dropped
+         rather than multiplied by zero for p=1: 0*pow(0,-1) would be a NaN. */
+      *V   = ppm->V0 * (x * x_pm1 + b * f * cos(x / f));
+      *dV  = -ppm->V0 * (p * x_pm1 - b * sin(x / f));
+      *ddV = ppm->V0 * (-b / f * cos(x / f));
+      if (p != 1.)
+        *ddV += ppm->V0 * p * (p - 1.) * x_pm1 / x;
+      break;
+    }
+
       /* code here other shapes */
 
     default:
@@ -1341,7 +1392,7 @@ void PrimordialModule::primordial_inflation_one_k(
   /** Summary: */
 
   /** - define local variables */
-  double tau_start, tau_end, dtau;
+  double tau_start, tau_end, dtau, dtau_done;
   double z, ksi2, ah2;
   double aH;
   double curvature_old;
@@ -1383,15 +1434,39 @@ void PrimordialModule::primordial_inflation_one_k(
   /** - compute derivative of initial vector and infer first value of adaptive time-step */
   primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
+  /* The outer step has to resolve the fastest scale in the system. Two of them
+     are obvious: the mode's own frequency k, and the effective frequency
+     sqrt|k^2 - z''/z| that the mode actually oscillates at. The third, aH, is
+     the one that used to be missing. It never binds while the mode is
+     sub-horizon (there aH <= k/ratio_min), but after horizon exit sqrt|k^2 -
+     z''/z| passes through zero -- once for a smooth potential, repeatedly for a
+     modulated one -- and the step jumps to 2*pi/k while a is growing
+     exponentially. The adaptive integrator then has to swallow many e-folds in
+     one call, and gives up. Capping the step at the expansion time is the same
+     criterion primordial_inflation_evolve_background() already applies. See
+     docs/superpowers/specs/2026-09-06-axion-monodromy-inflation-design.md sec. 5. */
+  aH   = dy[index_in_a_] / y[index_in_a_];
   dtau = ppr->primordial_inflation_pt_stepsize * 2. * _PI_ /
-         std::max(sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k);
+         std::max({sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k, aH});
 
   /** - loop over time */
   do {
-    /*  new time interval [tau_start, tau_end] over which equations will be integrated */
-    tau_start = tau_end;
+    /*  new time interval [tau_start, tau_end] over which equations will be
+        integrated. The right-hand side does not depend explicitly on tau, so
+        we are free to re-anchor the interval at every step, and we do:
+        generic_integrator() compares its internal step to the ABSOLUTE start
+        time x1, so letting tau accumulate makes that guard tighten without
+        bound. After a thousand steps tau reaches ~1e7 and a perfectly healthy
+        substep of 1e-9 is rejected as "step size too small". Anchoring at
+        [dtau, 2*dtau] makes the guard mean what it says: stop when a substep
+        falls to ~1e-16 of the step we asked for. */
+    tau_start = dtau;
 
     tau_end = tau_start + dtau;
+
+    /* the step actually taken, needed below to turn a change in curvature into
+       a rate: dtau itself is overwritten with the NEXT step before it is used */
+    dtau_done = dtau;
 
     class_test(tau_end == tau_start,
                "integration step no longer advances time: numerical precision prevents progress");
@@ -1409,12 +1484,12 @@ void PrimordialModule::primordial_inflation_one_k(
     /* compute derivatives at tau_end, useful to infer new time step and spectra */
     primordial_inflation_derivs(tau_end, y, dy, &pipaw);
 
-    /* new time step */
-    dtau = ppr->primordial_inflation_pt_stepsize * 2. * _PI_ /
-           std::max(sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k);
-
     /* new aH */
     aH = dy[index_in_a_] / y[index_in_a_];
+
+    /* new time step (see the comment on the first one) */
+    dtau = ppr->primordial_inflation_pt_stepsize * 2. * _PI_ /
+           std::max({sqrt(fabs(dy[index_in_dksi_re_] / y[index_in_ksi_re_])), k, aH});
 
     /* store previous value of curvature (at tau_start) */
     curvature_old = curvature_new;
@@ -1425,7 +1500,7 @@ void PrimordialModule::primordial_inflation_one_k(
     curvature_new = k * k * k / 2. / _PI_ / _PI_ * ksi2 / z / z;
 
     /* variation of curvature with time (dimensionless) */
-    dlnPdN = (curvature_new - curvature_old) / dtau * y[index_in_a_] / dy[index_in_a_] /
+    dlnPdN = (curvature_new - curvature_old) / dtau_done * y[index_in_a_] / dy[index_in_a_] /
              curvature_new;
 
     /* stop when (k >> aH) AND curvature is stable */

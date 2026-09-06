@@ -24,7 +24,7 @@ enum linear_or_logarithmic { linear, logarithmic };
 
 /** enum defining the type of inflation potential function V(phi) */
 
-enum potential_shape { polynomial, natural, higgs_inflation };
+enum potential_shape { polynomial, natural, higgs_inflation, monodromy };
 
 /** enum defining which quantity plays the role of a target for evolving inflationary equations */
 

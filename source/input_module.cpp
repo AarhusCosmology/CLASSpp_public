@@ -61,6 +61,56 @@ std::optional<T> read_one_of(const FileContent& fc, const char* n1, const char* 
   return a ? a : b;
 }
 
+// Shape of V(phi) for the inflation_V / inflation_V_end spectra. Shared by the
+// 'potential' and 'full_potential' keys so that the two never drift apart.
+potential_shape read_potential_shape(const std::string& name, const char* key) {
+  if (name == "polynomial")
+    return polynomial;
+  if (name == "natural")
+    return natural;
+  if (name == "higgs_inflation")
+    return higgs_inflation;
+  if (name == "monodromy")
+    return monodromy;
+  class_stop_severe(
+      "did not recognize input parameter '%s' = '%s': should be one of 'polynomial', 'natural', "
+      "'higgs_inflation' or 'monodromy'",
+      key,
+      name.c_str());
+}
+
+// Parameter-domain checks for potential = monodromy. They belong here rather
+// than in primordial_inflation_potential() because they do not depend on phi,
+// and primordial_inflation_check_potential() cannot be relied on to catch them
+// downstream: a zero decay constant reaches it as a NaN through cos(x/f), and
+// its V<=0 and dV>=0 tests are ordered comparisons, which IEEE says are false
+// against a NaN and -ffast-math says nothing about at all. Every value here is
+// one a sampler can vary, hence class_test and not its severe variant.
+void check_monodromy_parameters(const primordial* ppm) {
+  class_test(ppm->V1 <= 0.,
+             "potential = monodromy needs a positive axion decay constant f, but was given "
+             "f = %g. V(phi) divides by it (cos(x/f)), so f = 0 is a NaN and f < 0 is the "
+             "same model as (b, f) -> (-b, -f)",
+             ppm->V1);
+
+  class_test(ppm->V3 <= 0.,
+             "potential = monodromy needs a positive monodromy power p, but was given p = %g "
+             "(p = 1 is the linear case of arXiv:0907.2916). A non-positive power is not a "
+             "monotonic branch to roll down",
+             ppm->V3);
+
+  class_test(ppm->V0 <= 0.,
+             "potential = monodromy needs a positive monodromy scale mu^(4-p), but was given "
+             "V_0 = %g",
+             ppm->V0);
+
+  class_test(ppm->V4 <= 0.,
+             "potential = monodromy measures the field from the end of the monodromy branch, "
+             "x = V_4 - phi, and the observable window sits at x > 0. V_4 = %g leaves no "
+             "branch to roll down",
+             ppm->V4);
+}
+
 }  // namespace
 /**
  * Use this routine to extract initial parameters from files 'xxx.ini'
@@ -1654,11 +1704,20 @@ void InputModule::ReadDerived() {
     double HSR0, HSR1, HSR2, HSR3, HSR4;
 
     if (ppm->primordial_spec_type == inflation_V) {
-      pfc->get<std::string>("potential");
+      if (auto potential_name = pfc->get<std::string>("potential")) {
+        ppm->potential = read_potential_shape(*potential_name, "potential");
+      }
 
-      /* only polynomial coded so far: no need to interpret the value **/
+      /* The 'PSR_i' and 'R_i' reparametrisations below are the slow-roll
+         parameters of the Taylor expansion, so they only make sense for the
+         polynomial shape. Every other shape reads its V_i directly; see
+         primordial_inflation_potential() for what each V_i means there. */
+      class_test_severe((ppm->potential != polynomial) &&
+                            (pfc->get<double>("PSR_0") || pfc->get<double>("R_0")),
+                        "the 'PSR_i' and 'R_i' parametrisations describe the Taylor coefficients "
+                        "of 'potential = polynomial'; for the other shapes pass 'V_0' ... 'V_4'");
 
-      if (pfc->get<double>("PSR_0")) {
+      if ((ppm->potential == polynomial) && pfc->get<double>("PSR_0")) {
         PSR0 = 0.;
         PSR1 = 0.;
         PSR2 = 0.;
@@ -1688,7 +1747,7 @@ void InputModule::ReadDerived() {
       }
 
       else {
-        if (pfc->get<double>("R_0")) {
+        if ((ppm->potential == polynomial) && pfc->get<double>("R_0")) {
           R0 = 0.;
           R1 = 0.;
           R2 = 0.;
@@ -1718,6 +1777,10 @@ void InputModule::ReadDerived() {
           ppm->V3 = pfc->get_or("V_3", ppm->V3);
           ppm->V4 = pfc->get_or("V_4", ppm->V4);
         }
+      }
+
+      if (ppm->potential == monodromy) {
+        check_monodromy_parameters(ppm);
       }
     }
 
@@ -1755,17 +1818,7 @@ void InputModule::ReadDerived() {
 
   else if (ppm->primordial_spec_type == inflation_V_end) {
     if (auto full_potential = pfc->get<std::string>("full_potential")) {
-      if (*full_potential == "polynomial") {
-        ppm->potential = polynomial;
-      }
-      else if (*full_potential == "higgs_inflation") {
-        ppm->potential = higgs_inflation;
-      }
-      else {
-        class_stop_severe(
-            "did not recognize input parameter 'potential': should be one of 'polynomial' "
-            "or 'higgs_inflation'");
-      }
+      ppm->potential = read_potential_shape(*full_potential, "full_potential");
     }
 
     ppm->phi_end = pfc->get_or("phi_end", ppm->phi_end);
@@ -1774,6 +1827,10 @@ void InputModule::ReadDerived() {
     ppm->V2      = pfc->get_or("Vparam2", ppm->V2);
     ppm->V3      = pfc->get_or("Vparam3", ppm->V3);
     ppm->V4      = pfc->get_or("Vparam4", ppm->V4);
+
+    if (ppm->potential == monodromy) {
+      check_monodromy_parameters(ppm);
+    }
 
     auto ln_aH_ratio_str = pfc->get<std::string>("ln_aH_ratio");
     auto N_star_str      = pfc->get<std::string>("N_star");
