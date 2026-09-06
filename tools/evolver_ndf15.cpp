@@ -225,10 +225,17 @@ void evolver_ndf15(
   /*Calculate initial step */
   rh = 0.0;
 
+  /* wt is the error weight and keeps the absolute floor -- it is used throughout the
+     integration. The INITIAL-STEP estimate below does not: a component at or below
+     `threshold` has no relative scale yet, so max(|y|,threshold) is a constant
+     unrelated to the magnitude it is about to acquire, and it would drive h0 to zero.
+     See the corresponding comment in evolver_etd.cpp for the case that motivated
+     this (a decay-sourced radiation density starting at exactly 0). */
   for (jj = 1; jj <= neq; jj++) {
     wt[jj] = std::max(fabs(y[jj]), threshold);
-    /*printf("wt: %4.8f \n",wt[jj]);*/
-    rh = std::max(rh, 1.25 / sqrt(rtol) * fabs(f0[jj] / wt[jj]));
+    if (fabs(y[jj]) <= threshold)
+      continue;
+    rh = std::max(rh, 1.25 / sqrt(rtol) * fabs(f0[jj]) / fabs(y[jj]));
   }
 
   absh = std::min(hmax, htspan);
@@ -253,7 +260,9 @@ void evolver_ndf15(
   rh = 0.0;
   for (ii = 1; ii <= neq; ii++) {
     ddfddt[ii] += (tempvec1[ii] - f0[ii]) / tdel;
-    rh          = std::max(rh, 1.25 * sqrt(0.5 * fabs(ddfddt[ii] / wt[ii]) / rtol));
+    if (fabs(y[ii]) <= threshold)
+      continue; /* same exclusion as above: no relative scale yet */
+    rh = std::max(rh, 1.25 * sqrt(0.5 * fabs(ddfddt[ii] / wt[ii]) / rtol));
   }
   absh = std::min(hmax, htspan);
   if (absh * rh > 1.0)

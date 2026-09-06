@@ -124,9 +124,30 @@ void evolver_etd(
   if (absh == 0.0)
     absh = hmax;
 
+  /* INITIAL STEP. The usual relative criterion, with one exclusion that is not
+     cosmetic: a component sitting at or below the absolute floor `threshold` carries
+     NO relative-error information at t0. For it, max(|y|,threshold) collapses to
+     `threshold` -- a fixed constant with no relation to the magnitude the component
+     is about to acquire -- and the ratio it contributes is arbitrary.
+
+     This is not hypothetical. The background system integrates a decay-sourced
+     radiation density that starts at exactly zero with dy/dx ~ 6e11 (its RD attractor
+     is ~1.5e11, reached within a fraction of an e-fold). Including it gives
+     rh ~ 6e19, hence h0 ~ 1e-20, hence t + h == t at x = -32.2 and the no-progress
+     guard below fires on the FIRST iteration -- so every dncdm run with
+     evolver_background = 3 aborted before taking a single step, and the same
+     arithmetic disabled ndf15. Nothing was wrong with the stiffness; the initial-step
+     heuristic was being asked a question it cannot answer.
+
+     Skipping such a component is safe: after one step it is nonzero, the ordinary
+     error test governs from then on, and if the step really was too large the
+     controller rejects and shrinks it by the normal path. */
   double rh = 0.0;
-  for (int k = 0; k < neq; k++)
-    rh = std::max(rh, std::fabs(f0[k]) / std::max(std::fabs(y[k]), threshold));
+  for (int k = 0; k < neq; k++) {
+    if (std::fabs(y[k]) <= threshold)
+      continue;
+    rh = std::max(rh, std::fabs(f0[k]) / std::fabs(y[k]));
+  }
   rh /= 0.8 * pow(rtol, pow_grow);
   if (absh * rh > 1.0)
     absh = 1.0 / rh;

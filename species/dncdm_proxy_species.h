@@ -154,22 +154,77 @@ class DNCDMProxySpecies : public CompositeSpecies {
 
   /** `dr_rta_form`: which transport rate the ℓ ≥ 2 damping uses.
    *
-   *  kPowers (default) is the fitted two-power form Γ_T/Γ = C₃ ε_ne^n₃ γ⁻³ + C₅ γ⁻⁵
-   *  with a non-relativistic shut-off. It is a CALIBRATION of this code's own runs,
-   *  accurate to a few per cent across the measured window, and it is what the
-   *  shipped defaults are tuned for.
+   *  kPowers (default) is the fitted two-power form Γ_T/Γ = C₃ ε_ne^n₃ γ⁻³ + C₅ γ⁻⁵,
+   *  with NO shut-off factor. It is a CALIBRATION of this code's own runs over the
+   *  window they converge on, γ ∈ [2,15], and it is what the shipped defaults are
+   *  tuned for.
+   *
+   *  ⚠ It is a calibration, so it carries no statement outside that window. In
+   *  particular it does NOT vanish as γ → 1: it saturates at C₅ (times the parent's
+   *  energy fraction), where the physical rate must shut off because inverse decay is
+   *  kinematically closed. The shut-off that the derivation actually has is 𝓕(X),
+   *  after the momentum average -- kCOPW carries it explicitly and for free. For
+   *  m_νH = 0.3 eV recombination sits at γ ≈ 2.1, i.e. at the EDGE of the calibrated
+   *  window, so this is a real boundary and not a remote corner.
    *
    *  kCOPW is the analytic prescription of Chen, Oldengott, Pierobon & Wong
    *  (arXiv:2203.09075) — eq. (13) with 𝓕 from eq. (14). A SINGLE γ⁻⁵ term carrying
    *  the paper's own (1/12) amplitude: no γ⁻³ piece (that paper argues against one)
    *  and no fitted normalisation, so `dr_rta_C3` defaults to 0 and `dr_rta_C5` to 1
-   *  under this form, and `dr_rta_n3` / `dr_rta_vshut` are ignored outright.
+   *  under this form, and `dr_rta_n3` is ignored outright.
    *
    *  It is the one form derived from first principles rather than fitted, which is
    *  why it is worth being able to run, but it is derived AT detailed balance and
    *  does not reproduce the measured γ-dependence inside the converged window; see
    *  TransportRate. */
-  enum class RtaForm { kPowers, kCOPW };
+  /** kStructured is the same two components written in the variable the derivation
+   *  produces, X = a m_νH/T₀, rather than in powers of the parent's mean Lorentz
+   *  factor: (1/12)[C₃ε^n₃ X³Φ₂(X) + C₅ X⁵Φ₄(X)]. It recovers γ⁻³ and γ⁻⁵ as X → 0
+   *  instead of assuming them, needs no shut-off factor because both Φ's die as
+   *  e⁻ˣ, and fits the measured rate better than either (rel-rms 0.301 against
+   *  0.473). See PhiLO/PhiNLO and TransportRate. */
+  enum class RtaForm { kPowers, kCOPW, kStructured };
+
+  /** Which ℓ-dependence the γ⁻⁵ term carries (`dr_rta_alpha`).
+   *
+   *  kQuartic is arXiv:2203.09075 eq. (16), α_ℓ = (3ℓ⁴+2ℓ³−11ℓ²+6ℓ)/32 — the
+   *  default, and the published prescription.
+   *
+   *  kIntegrated is the same collision integral with the ℓ-expansion NOT taken.
+   *  α_ℓ is exact as the coefficient of the μ² term at fixed q₁ (checked to six
+   *  digits for ℓ = 0…10), but the expansion behind it converges only for
+   *  q₁/(a m_H) ≳ ℓ², and the momentum integral runs over the whole thermal
+   *  distribution. Doing the integral first gives an ℓ-dependence that grows
+   *  roughly as ℓ³ rather than ℓ⁴ and depends on X = a m_H/T₀: at X = 0.01 it is
+   *  3596 at ℓ = 17 against the published 8041, and at X = 0.1 it is 1207. Both
+   *  are normalised to α_2 = 1, so C₅ is unaffected. See dncdm_proxy_alpha_eff.h.
+   *
+   *  ⚠ Unlike `dr_rta_C3` / `dr_rta_n3`, this applies to BOTH RtaForms: AlphaFor
+   *  multiplies the γ⁻⁵ term on the common return path, whichever branch built it.
+   *  kCOPW out of the box is still exactly the paper (the default IS the paper's
+   *  quartic), and kCOPW with kIntegrated is deliberate rather than accidental --
+   *  arguably the more self-consistent pairing, since kCOPW's ℓ = 2 normalisation
+   *  X⁵𝓕(X) and α^eff's ℓ-ratio then come from the same momentum integral. */
+  enum class AlphaForm { kQuartic, kIntegrated };
+
+  /** Which ℓ-dependence the γ⁻³ term carries (`dr_rta_beta`).
+   *
+   *  kLegendre (default) is β_ℓ = ℓ(ℓ+1)/6, the O(x) Legendre coefficient normalised
+   *  at ℓ = 2. It has never had a derivation: it is NOT in arXiv:2203.09075 (that
+   *  paper contains no β_ℓ at all — its eq. (16) is α_ℓ only), and taking the leading
+   *  Legendre coefficient is a guess, because the γ⁻³ term exists only where the
+   *  cancellation FAILS and nothing in the balanced expansion computes the failure.
+   *
+   *  kLegs is the computed alternative: the O(μ) coefficient of the collision integral
+   *  is ℓ(ℓ+1)/2 − 2 for the ν_H leg and IDENTICALLY the same for the ν_l/φ leg —
+   *  which is why they cancel — so the leakage should inherit that. Unlike α_ℓ this
+   *  one is q₁-INDEPENDENT (checked over q₁ = 0.3…30), so the momentum integral leaves
+   *  it alone and there is no X-dependent β^eff to compute.
+   *
+   *  Measured against the exact solve in the s₃ > 0.5 corner: ℓ(ℓ+1)/2 − 2 is right at
+   *  ℓ = 3 (ratio 1.00) and increasingly too steep above, turning over near ℓ = 8 —
+   *  the same pattern α_ℓ shows, and here the momentum integral cannot explain it. */
+  enum class BetaForm { kLegendre, kLegs };
 
   RtaForm rta_form() const {
     return rta_form_;
@@ -203,6 +258,14 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *  both branches to the paper's error bars against an independent Γ(0,x). */
   static double CurlyF(double x);
 
+  /** The two shape functions of kStructured, in closed form via Γ(0,X):
+   *  Φ₂(X) = (1+X)e⁻ˣ − X²Γ(0,X)  and  Φ₄(X) = ½e⁻ˣ(X−1) + (1−X²/2)Γ(0,X).
+   *  Φ₄ is 𝓕 evaluated exactly rather than through the paper's two-branch
+   *  approximation, which CurlyF keeps because kCOPW's job is to be the paper as
+   *  published. Φ₂(0) = 1; Φ₄ ~ ln(1/X). Public for the unit test. */
+  static double PhiLO(double X);
+  static double PhiNLO(double X);
+
   /** α_ℓ of arXiv:2203.09075 eq. (16), the ℓ-dependence of the γ⁻⁵ term.
    *  α_0 = α_1 = 0 (the ℓ ≤ 1 collision integrals vanish identically by
    *  energy/momentum conservation), α_2 = 1, and it grows as ℓ⁴ — small angular
@@ -210,6 +273,25 @@ class DNCDMProxySpecies : public CompositeSpecies {
   static constexpr double AlphaL(int l) {
     const double x = static_cast<double>(l);
     return (3. * x * x * x * x + 2. * x * x * x - 11. * x * x + 6. * x) / 32.;
+  }
+
+  /** α_ℓ with the momentum integral done before the ℓ-expansion, tabulated against
+   *  X = a m_H/T₀ and linearly interpolated in log X. Normalised to α_2 = 1, and
+   *  clamped to the table's ends (below X = 10⁻⁶ it is flat to a per cent; above
+   *  the top the rate carries X⁵𝓕(X), which has already died). Falls back to
+   *  AlphaL outside the tabulated ℓ range. */
+  static double AlphaLEff(int l, double X);
+
+  /** β_ℓ, honouring `dr_rta_beta`. Both are normalised to 1 at ℓ = 2, so C₃ does not
+   *  move with the choice. */
+  double BetaFor(int l) const {
+    const double L = l * (l + 1.) / 2.;
+    return beta_form_ == BetaForm::kLegs ? L - 2. : L / 3.;
+  }
+
+  /** The ℓ-dependence actually in force, honouring `dr_rta_alpha`. */
+  double AlphaFor(int l, double X) const {
+    return alpha_form_ == AlphaForm::kIntegrated ? AlphaLEff(l, X) : AlphaL(l);
   }
 
   /** Stored -> bare occupation for the parent leg (#385): the kernel's band factor
@@ -308,13 +390,15 @@ class DNCDMProxySpecies : public CompositeSpecies {
 
   double f_ini_l_ = 1.0, f_ini_phi_ = 0.0;
 
-  /** Fitted transport-rate coefficients (`dr_rta_C3` / `dr_rta_C5` / `dr_rta_n3` /
-   *  `dr_rta_vshut`). These are a CALIBRATION, not a derivation -- see TransportRate
-   *  -- so they stay inputs: re-fit them if the measurement improves. n3_ and vshut_
-   *  are exponents of the fitted form only; kCOPW ignores them. */
-  double C3_ = 0.2802, C5_ = 2.5228, n3_ = 0.8714, vshut_ = 1.7995;
+  /** Fitted transport-rate coefficients (`dr_rta_C3` / `dr_rta_C5` / `dr_rta_n3`).
+   *  These are a CALIBRATION, not a derivation -- see Create -- so they stay inputs:
+   *  re-fit them if the measurement improves. n3_ is an exponent of the fitted form
+   *  only; kCOPW ignores all three and carries its own amplitude. */
+  double C3_ = 0.2336, C5_ = 1.3283, n3_ = 0.5;
 
-  RtaForm rta_form_ = RtaForm::kPowers;
+  RtaForm rta_form_     = RtaForm::kPowers;
+  AlphaForm alpha_form_ = AlphaForm::kQuartic;
+  BetaForm beta_form_   = BetaForm::kLegendre;
 
   // Composite-owned background integration state: the two daughter PSDs.
   int index_bi_f_l_   = -1;

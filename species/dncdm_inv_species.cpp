@@ -327,6 +327,11 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   if (red > 0 && !dlna_set)
     WarnTableSpacingUnset(name, gamma_kms_mpc);
   composite->background_verbose_ = ctx.pfc->get_or("background_verbose", 0);
+
+  // Diagnostic only: the per-multipole sector moments alpha_l is measured from.
+  // A plain flag, not severe -- an unrecognised value simply means "off", and being
+  // off changes no physics, only which columns the perturbation output carries.
+  composite->emit_l_moments_ = in.get_flag("dr_emit_l_moments", false);
   // Resolved here and not in ProcessBackgroundTable, which runs before any perturbation
   // layout exists.  Mirrors what AddCouplingDerivs computes per call:
   // min(l_max_dncdm_col, the hierarchies' own l_max).
@@ -1669,6 +1674,110 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
       gamma_H = (den > 0.) ? num / (den * a * M) : 0.;
     }
   }
+  // ── Per-multipole sector moments: what alpha_l can actually be measured from ──
+  //
+  // alpha_l is NOT measurable from any one species. Under the exact kernel the
+  // nu_H, nu_l and phi collision terms at l >= 2 are individually enormous compared
+  // with their sum -- a factor 5e5 at gamma = 1000 -- and each of them carries the
+  // l-dependence (l+2)(l-1)/2, which is the O(mu) coefficient of the Legendre
+  // expansion, NOT alpha_l. alpha_l is precisely what survives the cancellation
+  // between them, exactly as Barenboim et al. describe it: at leading order the
+  // l = 2 collision term is an admixture of the LOSSLESS l = 0 and l = 1 ones, so
+  // the leading exchange destroys nothing and the loss is the residual two powers
+  // of 1/gamma down. Measuring one leg would return the wrong quartic.
+  //
+  // So the emitted quantity is the SECTOR TOTAL at each l, on exactly the a4Pi
+  // normalisation established above: for each species the raw l-moment is taken with
+  // that species' own StressEnergy quadrature weight (dq q^4/eps, which is dq q^3 for
+  // the massless daughters), and rescaled by the y-INDEPENDENT norm N_i that carries
+  // its raw l = 2 moment onto pi_i. N_i cancels in any single-l ratio but sets the
+  // RELATIVE weight between species, which is the whole content of the cancellation,
+  // and taking it from l = 2 means these columns reduce to a4Pi/a4PiDot_coll at
+  // l = 2 by construction rather than by a second copy of the normalisation.
+  //
+  //     alpha_l^measured = [MlDot(l)/Ml(l)] / [MlDot(2)/Ml(2)],
+  //
+  // fitted over gamma bins the same amplitude-weighted way Gamma_T is, because Ml
+  // oscillates through zero. `Mlcancel` is the health flag: |sum| / sum|.|, so 1 is
+  // no cancellation and 1e-3 means three digits have been lost before the answer
+  // starts. Off by default (dr_emit_l_moments) -- it is 3*(l_max-1) extra columns
+  // and only a dedicated measurement wants them.
+  if (emit_l_moments_) {
+    double m_num[kLMomentMax + 1] = {0.}, m_den[kLMomentMax + 1] = {0.};
+    double m_can[kLMomentMax + 1] = {0.};
+    if (!w.IsTitleMode()) {
+      const perturb_vector* pv = ppw->pv.get();
+      const double* pvecback   = ppw->pvecback.data();
+      const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+      const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
+      auto* scratch = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
+      if (scratch != nullptr && !scratch->dy_coll.empty()) {
+        const double* dyc = scratch->dy_coll.data();
+        const double aM2  = a * a * parent_->GetMass() * parent_->GetMass();
+        // (layout, q, dq, n, mass^2 a^2, norm) for each of the three legs. The norms
+        // are filled from l = 2 below, so they must be computed before the l loop.
+        struct Leg {
+          const NCDMBaseSpecies::PerturbLayout* lay;
+          const std::vector<double>* q;
+          const std::vector<double>* dq;
+          const double* state;  // NOT the same vector for all three -- see below
+          double a2m2;
+          double pi;    // that species' a4Pi contribution
+          double norm;  // pi / raw l=2 moment
+        };
+        // ⚠ THE THREE LEGS READ DIFFERENT STATE VECTORS, and it is not optional.
+        // DNCDMSpecies::RescaledPerturbations reads ppw->pv->y directly and IGNORES the
+        // y it is handed, so pi_H is built from pv->y; the daughters' StressEnergy
+        // contracts the y it is given, so pi_l and pi_phi are built from `y`. Each norm
+        // N_i must be calibrated on whichever vector its own pi_i came from. Using one
+        // vector for all three is wrong by 0.7% on the parent or 0.7-1.4% on the
+        // daughters depending on which you pick -- silently, and only in the COLLISION
+        // term, because the moments themselves agree to 5e-13 either way.
+        Leg legs[3] =
+            {{&parent_layout(my), &parent_->q(), &parent_->dq(), pv->y.data(), aM2, pi_H, 0.},
+             {&fermion_layout(my), &fermion_->q(), &fermion_->dq(), y, 0., pi_l, 0.},
+             {&boson_layout(my), &boson_->q(), &boson_->dq(), y, 0., pi_phi, 0.}};
+        auto raw = [&](const Leg& L, const double* vec, int l) {
+          if (l > L.lay->l_max || L.lay->q_size <= 0)
+            return 0.;
+          double sum = 0.;
+          for (int i = 0; i < L.lay->q_size && i < static_cast<int>(L.q->size()); ++i) {
+            const double q    = (*L.q)[i];
+            const double eps  = std::sqrt(q * q + L.a2m2);
+            sum              += (*L.dq)[i] * q * q * q * q / eps * vec[L.lay->index_per_q[i] + l];
+          }
+          return sum;
+        };
+        for (Leg& L : legs) {
+          const double r2 = raw(L, L.state, 2);
+          L.norm          = (r2 != 0.) ? L.pi / r2 : 0.;
+        }
+        int l_top = mod.GetPrecision()->l_max_dncdm_col;
+        for (const Leg& L : legs)
+          l_top = std::min(l_top, L.lay->l_max);
+        l_top = std::min(l_top, kLMomentMax);
+        for (int l = 2; l <= l_top; ++l) {
+          double sn = 0., sd = 0., an = 0.;
+          for (const Leg& L : legs) {
+            const double n  = L.norm * raw(L, dyc, l);
+            sn             += n;
+            an             += std::fabs(n);
+            sd             += L.norm * raw(L, L.state, l);
+          }
+          m_num[l] = sn;
+          m_den[l] = sd;
+          m_can[l] = (an > 0.) ? std::fabs(sn) / an : 0.;
+        }
+      }
+    }
+    for (int l = 2; l <= kLMomentMax; ++l) {
+      const std::string sl = "_l" + std::to_string(l) + "_" + name();
+      w.Add("Ml" + sl, m_den[l], true);
+      w.Add("MlDot" + sl, m_num[l], true);
+      w.Add("Mlcancel" + sl, m_can[l], true);
+    }
+  }
+
   w.Add("a4PiDot_coll_" + name(), pidot_H + pidot_l + pidot_phi, true);
   w.Add("a4PiDot_coll_" + name() + "_H", pidot_H, true);
   w.Add("a4PiDot_coll_" + name() + "_l", pidot_l, true);

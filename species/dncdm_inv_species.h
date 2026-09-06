@@ -474,6 +474,18 @@ class DNCDMInvSpecies : public CompositeSpecies {
    *  during the background solve, and reports what it built at > 1. Warnings do not
    *  consult this. */
   int background_verbose_ = 0;
+  /** `dr_emit_l_moments`: emit the per-multipole SECTOR moments and their collision
+   *  terms -- the only thing alpha_l can be measured from, since the three species'
+   *  own l >= 2 terms are individually orders of magnitude larger than their sum and
+   *  carry a different l-dependence. Off by default: it is 3*(kLMomentMax - 1) extra
+   *  perturbation-output columns, and only a dedicated measurement wants them. */
+  bool emit_l_moments_ = false;
+
+  /** Top multipole of that diagnostic. Fixed so the column set does not depend on the
+   *  run's l_max: multipoles above the hierarchy's own top are emitted as ZERO rather
+   *  than silently absent, which is what lets two runs at different l_max_ncdm be read
+   *  by one script. */
+  static constexpr int kLMomentMax = 20;
   /** Kept alive for the whole run: it owns the FROZEN basis (including the entropy
    *  weight, which the daughters do not carry), and the perturbation RHS calls its
    *  Reconstruct / Project on the hot path. Only const methods are used there, so it is

@@ -7,6 +7,7 @@
 
 #include "background_module.h"
 #include "perturbations_module.h"
+#include "species/dncdm_proxy_alpha_eff.h"
 #include "species/species_input.h"
 
 namespace {
@@ -21,6 +22,58 @@ constexpr double kCurlyFSeam = 1.9497103;
 
 /** Coefficient of 𝓕's tail. */
 constexpr double kCurlyFTail = 0.409;
+
+/** Γ(0,x) = E₁(x) = ∫ₓ^∞ e⁻ᵗ/t dt, the incomplete gamma the whole family is built on.
+ *  Both Φ's below reduce to it in closed form, so one accurate evaluation serves both
+ *  and no series/tail seam is needed. Series below 1 (alternating, converges fast);
+ *  Abramowitz & Stegun 5.1.56 above, |ε| < 2e-8 -- four orders better than the 7-10%
+ *  two-branch approximation CurlyF carries, which exists only because the paper wanted
+ *  to avoid this function. */
+double ExpInt1(double x) {
+  if (x <= 0.) {
+    return 0.;  // divergent; callers multiply it by X^2 or X^5, which vanish faster
+  }
+  if (x > 700.) {
+    return 0.;  // e^-700 is already zero in double
+  }
+  if (x < 1.) {
+    double sum = 0., term = 1.;
+    for (int k = 1; k <= 30; ++k) {
+      term *= -x / k;
+      sum  += -term / k;  // (-1)^(k+1) x^k / (k k!)
+    }
+    return -kEulerGamma - std::log(x) + sum;
+  }
+  // Modified Lentz. E_1(x) = e^-x / (x + 1 - 1^2/(x + 3 - 2^2/(x + 5 - ...))).
+  //
+  // The obvious alternative, the Abramowitz & Stegun 5.1.56 rational approximation,
+  // is NOT good enough here, and its stated bound is easy to misread: |eps| < 2e-8 is
+  // ABSOLUTE, on the O(1) quantity x e^x E_1(x), which is only ~5e-5 RELATIVE on E_1
+  // itself. Both Phi's are differences of two terms several times larger than their
+  // result, so that 5e-5 lands as 1e-4 to 3e-3 on Phi -- which the unit test against
+  // an independent quadrature catches.
+  constexpr double kTiny = 1e-300;
+  double b = x + 1., c = 1. / kTiny, d = 1. / b, h = d;
+  for (int i = 1; i <= 200; ++i) {
+    const double an  = -1.0 * i * i;
+    b               += 2.;
+    d                = an * d + b;
+    if (std::fabs(d) < kTiny) {
+      d = kTiny;
+    }
+    c = b + an / c;
+    if (std::fabs(c) < kTiny) {
+      c = kTiny;
+    }
+    d                 = 1. / d;
+    const double del  = d * c;
+    h                *= del;
+    if (std::fabs(del - 1.) < 1e-15) {
+      break;
+    }
+  }
+  return h * std::exp(-x);
+}
 
 /** Floor on a daughter occupation, mirroring DrPsdSpecies::kFFloor: the PSDs are
  *  sourced from zero and the kernel's (1±f) coefficients must see a positive
@@ -57,6 +110,60 @@ double DNCDMProxySpecies::CurlyF(double x) {
   // typo (538% there, and it would make the paper's own two branches disagree by 5.7x
   // where they meet).
   return kCurlyFTail * std::exp(-x) / (x * std::sqrt(x));
+}
+
+double DNCDMProxySpecies::AlphaLEff(int l, double X) {
+  // Scoped to this function: the generated table's names are wanted here and nowhere
+  // else in the TU.
+  using namespace dncdm_alpha_eff;
+  if (l < kAlphaEffLMin || l > kAlphaEffLMax) {
+    return AlphaL(l);  // outside the table: nothing better to offer than the quartic
+  }
+  const int j = l - kAlphaEffLMin;
+  if (!(X > 0.)) {
+    return kAlphaEff[0][j];
+  }
+  const double t = (std::log10(X) - kAlphaEffLog10XMin) * kAlphaEffPerDecade;
+  if (t <= 0.) {
+    return kAlphaEff[0][j];
+  }
+  if (t >= kAlphaEffNX - 1) {
+    return kAlphaEff[kAlphaEffNX - 1][j];
+  }
+  const int i    = static_cast<int>(t);
+  const double u = t - i;
+  return (1. - u) * kAlphaEff[i][j] + u * kAlphaEff[i + 1][j];
+}
+
+/** The two shape functions of the structured form. Both are the SAME momentum
+ *  integral one order apart --
+ *
+ *      Phi_n(X) = ∫₀^∞ du u³ e^(-√(u²+X²)) / (u²+X²)^(n/2),
+ *
+ *  which is what Barenboim et al.'s ∫dq₁ q₁³ e^(-ε₁/T₀) (am/ε₁)^n reduces to with
+ *  u = q₁/T₀ and X = a m_νH/T₀. Substituting ε = √(u²+X²) turns each into a closed
+ *  form, so neither needs quadrature:
+ *
+ *      Φ₂(X) = (1+X)e^(-X) − X² Γ(0,X)                    [LO,  Hannestad-Raffelt]
+ *      Φ₄(X) = ½e^(-X)(X−1) + (1 − X²/2) Γ(0,X)           [NLO, = 𝓕 of eq. (14)]
+ *
+ *  Verified against direct quadrature to 8 digits, and Φ₄ against eq. (14) to 8.
+ *  Φ₂(0) = 1 and Φ₄ ~ ln(1/X), so X³Φ₂ → X³ ∝ γ⁻³ and X⁵Φ₄ → γ⁻⁵ ln(1/X) as X → 0:
+ *  the two published asymptotes, recovered rather than assumed. Both carry
+ *  e^(-√(u²+X²)) ≤ e^(-X), so BOTH shut off once the parent is non-relativistic --
+ *  which is the entire reason this form exists. */
+double DNCDMProxySpecies::PhiLO(double X) {
+  if (!(X > 0.)) {
+    return 1.;
+  }
+  return (1. + X) * std::exp(-X) - X * X * ExpInt1(X);
+}
+
+double DNCDMProxySpecies::PhiNLO(double X) {
+  if (!(X > 0.)) {
+    return 0.;  // divergent; the X^5 it multiplies kills it
+  }
+  return 0.5 * std::exp(-X) * (X - 1.) + (1. - 0.5 * X * X) * ExpInt1(X);
 }
 
 double DNCDMProxySpecies::TransportRate(int l, const double* pvecback) const {
@@ -106,7 +213,40 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
   const double eps_ne = pvecback[index_bg_eps_ne_];
 
   double rate3 = 0., rate5 = 0.;
-  if (rta_form_ == RtaForm::kCOPW) {
+  if (rta_form_ == RtaForm::kStructured) {
+    // Both terms are the SAME momentum integral, one order apart (see PhiLO/PhiNLO):
+    //
+    //   Gamma_T/(Gamma_0 rho_H/rho_sec) = (1/12)[ C3 eps^n3 X^3 Phi_2(X)
+    //                                           + C5        X^5 Phi_4(X) ]
+    //
+    // This is the two-power form written in the variable the derivation actually
+    // produces. It matters for three reasons the fitted gamma-powers cannot address.
+    //
+    //  * gamma^-5 is the X -> 0 ASYMPTOTE of X^5 Phi_4, not its shape. Over the
+    //    window the rate is measured on, X in [0.19, 1.76], the local log-slope of
+    //    X^5 Phi_4 runs 4.21 -> 2.07 and the effective power is 3.44 -- so a fitted
+    //    power in that window was being compared against an asymptote it never
+    //    reaches. The same is true of gamma^-3 and X^3 Phi_2.
+    //
+    //  * gamma is not X. gamma*X = <eps>/T0 is 2.8-3.9 across the window (3 exactly
+    //    for a relativistic MB parent) and rises to ~8 by gamma = 1.2, so the two
+    //    variables drift against each other -- about 9% on a fitted exponent inside
+    //    the window, and unboundedly outside it.
+    //
+    //  * Only X knows about the non-relativistic limit. gamma saturates at 1 while X
+    //    grows without bound, so ANY form written in gamma alone keeps isotropising
+    //    forever; both Phi's die as e^-X. That is what the retired (1-1/gamma^2)^q
+    //    was trying to patch.
+    //
+    // Fitted to the same 539 bins: rel-rms 0.301 against 0.473 for the gamma-power
+    // form and 0.395 for gamma-powers WITH the retired shut-off. n3 comes out
+    // 0.480 (bootstrap 0.440-0.500) -- a fourth independent determination of 1/2,
+    // and the first with no gamma-nuisance factor anywhere in it.
+    const double X2 = X * X;
+    rate3 = C3_ * std::pow(eps_ne > 1e-12 ? eps_ne : 1e-12, n3_) * (1. / 12.) * X2 * X * PhiLO(X);
+    rate5 = C5_ * (1. / 12.) * X2 * X2 * X * PhiNLO(X);
+  }
+  else if (rta_form_ == RtaForm::kCOPW) {
     // Chen, Oldengott, Pierobon & Wong, arXiv:2203.09075 eq. (13), in full:
     //
     //   Gamma_T,l = alpha_l a Gamma^0 (1/12) (rho_H/rho_sec) X^5 F(X)
@@ -116,7 +256,7 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
     // ab initio result" but a heuristic random-walk argument that its appendix shows
     // to be incomplete. So this branch carries no gamma^-3 piece: adding one would
     // make it a third form rather than the paper's, which defeats the point of being
-    // able to select it. dr_rta_C3, dr_rta_n3 and dr_rta_vshut are all ignored here.
+    // able to select it. dr_rta_C3 and dr_rta_n3 are both ignored here.
     //
     // The (1/12) IS the paper's amplitude -- eq. (13) has no free normalisation -- so
     // dr_rta_C5 defaults to 1 under this form rather than to the fitted 2.5228 (see
@@ -151,25 +291,39 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
     rate3 = C3_ * std::pow(eps_ne > 1e-12 ? eps_ne : 1e-12, n3_) * g3i;
     rate5 = C5_ * g3i / g2;
 
-    // Non-relativistic shut-off. A pure power law in gamma has none, and that is not
-    // a detail: the measured Gamma_T/H TURNS OVER below gamma ~ 2.5, and for
-    // m = 0.3 eV recombination happens at gamma ~ 2.1 -- inside the turnover. Left
-    // out, the rate runs away exactly where the CMB is being formed (measured 2x too
-    // high at recombination and 17x too high by a = 4e-3 at Gamma = 1e10).
+    // There is NO velocity shut-off. The fitted (1-1/gamma^2)^q that used to sit
+    // here was removed after three measurements said it was not earning its place:
     //
-    // The shut-off variable is the parent's squared velocity, v^2 = 1 - 1/gamma^2. It
-    // needs no new scale and it is the right physics: inverse decay is kinematically
-    // open only because the parent is boosted, so the rate must vanish with the
-    // boost. kCOPW needs no such term -- F(X) shuts the rate off on its own. The
-    // exponent is fitted, not derived.
-    const double v2  = 1. - 1. / g2;
-    const double S   = std::pow(v2 > 1e-12 ? v2 : 1e-12, vshut_);
-    rate3           *= S;
-    rate5           *= S;
+    //  * It is not derived. The only velocity structure in the kernel it was meant
+    //    to approximate is the OPPOSITE sign. The square bracket of the leading-order
+    //    loss integral in Barenboim et al. (arXiv:2011.01502, sec. 5 -- the one they
+    //    expand in a m/eps_1 to reach gamma^-4) collapses exactly, without expanding:
+    //        [.] = -a^4 m^4/(q1 eps1^3) = -gamma^-4 (1 - 1/gamma^2)^(-1/2),
+    //    a 1/v flux factor -- an ENHANCEMENT at low boost, exponent -1/2, not the
+    //    +1.7995 suppression that was fitted. What actually shuts the rate off after
+    //    the momentum integral is F(X), not a power of v; see CurlyF and kCOPW.
+    //
+    //  * Per cell it was barely identifiable (median chi2_rel flat to 36% over
+    //    q in [-1,3], 30% of cells railing against a grid edge), because over a
+    //    0.9-decade window in gamma a smooth monotone factor is absorbed by the two
+    //    free amplitudes.
+    //
+    //  * Globally it does change the fit -- but it wants a much STEEPER shut-off
+    //    than 1.7995 with no interior minimum (rel-rms 0.473, 0.395, 0.350, 0.297
+    //    at q = 0, 1.7995, 3, 5), which says the SHAPE is wrong rather than the
+    //    exponent. F(X) falls 33x across gamma in [2,15] where (1-1/gamma^2)^1.7995
+    //    falls 1.62x.
+    //
+    // Measured cost of removing it, with C3 and C5 refit on the same 539 bins:
+    // the C_l^TT residual against the exact solve over 200 <= l <= 2000 at
+    // Gamma_0 = 1e10 goes 0.092% -> 0.099% (and the SHIPPED model, which had both
+    // the shut-off and n3 = 0.8714, was 0.139%). The earlier warning that dropping
+    // it "costs a factor 2 at recombination and 17 by a = 4e-3" was measured on the
+    // UNREFIT rate: the factor is degenerate with C3 and C5 over the range that
+    // matters, and once they are refit the term earns nothing.
   }
 
-  const double beta3 = l * (l + 1.) / 6.;
-  return a * parent_->Gamma() * frac_H * (beta3 * rate3 + AlphaL(l) * rate5);
+  return a * parent_->Gamma() * frac_H * (BetaFor(l) * rate3 + AlphaFor(l, X) * rate5);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -432,13 +586,16 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // being measured with them, so a silently-ignored typo would be indistinguishable
   // from a physics result.
   const std::string rta_form = in.get<std::string>("dr_rta_form").value_or("powers");
-  class_test_severe(rta_form != "powers" && rta_form != "copw",
-                    "species '%s': dr_rta_form (='%s') must be 'powers' (fitted, default) "
-                    "or 'copw' (analytic, arXiv:2203.09075)",
+  class_test_severe(rta_form != "powers" && rta_form != "copw" && rta_form != "structured",
+                    "species '%s': dr_rta_form (='%s') must be 'powers' (fitted gamma "
+                    "powers, default), 'copw' (analytic, arXiv:2203.09075) or "
+                    "'structured' (both components in X, see RtaForm)",
                     name.c_str(),
                     rta_form.c_str());
-  const bool copw      = (rta_form == "copw");
-  composite->rta_form_ = copw ? RtaForm::kCOPW : RtaForm::kPowers;
+  const bool copw       = (rta_form == "copw");
+  const bool structured = (rta_form == "structured");
+  composite->rta_form_  = copw ? RtaForm::kCOPW
+                               : (structured ? RtaForm::kStructured : RtaForm::kPowers);
 
   // Under `copw` these default to the PAPER, not to the fit: eq. (13) is a single
   // gamma^-5 term carrying its own (1/12) amplitude and no free normalisation, and
@@ -448,27 +605,63 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // remain settable, so nothing is lost by defaulting them honestly.
   //
   // Defaults from a global least-squares fit of
-  //   Gamma_T^phys/Gamma = (rho_H/rho_sec) (1-1/gamma^2)^q [C3 eps^n3 gamma^-3 + C5 gamma^-5]
-  // to measured Gamma_T/H curves from the moments rung (72 points, 6 cells,
-  // Gamma = 1e5..1e10 at m = 0.3, restricted to their own convergence gate
-  // gamma <= 20, with
-  // eps_ne, rho_H/rho_sec and gamma all read off this code's background). The fit
-  // reproduces the measured rate with a 16/84% spread of 0.74-1.46 -- about +-40%.
+  //   Gamma_T^phys/Gamma = (rho_H/rho_sec) [C3 eps_ne^n3 gamma^-3 + C5 gamma^-5]
+  // to 539 measured Gamma_T bins (67 cells, m = 0.30 AND 0.06 eV, Gamma = 1e5..1e11,
+  // restricted to the campaign's own convergence gate gamma in [2,15]), with eps_ne,
+  // rho_H/rho_sec and gamma all read off this code's own background. ONE (C3, C5) for
+  // every cell -- not one per cell, which is what lets the shape of the model be
+  // tested rather than absorbed.
   //
-  // THIS IS A CALIBRATION, NOT A DERIVATION. The gamma^-3 and gamma^-5 powers and
-  // the eps dependence come from the physics (Hannestad-Raffelt; Barenboim et al.
-  // arXiv:2011.01502 sec.5); C3, C5, n3 and q are fitted numbers, and a single power
-  // fits that data as well as the two-term form does, over a window only 0.7 decades
-  // wide in gamma. Re-fit them if the measurement
+  // THIS IS A CALIBRATION, NOT A DERIVATION. The gamma^-3 and gamma^-5 powers and the
+  // eps dependence come from the physics (Hannestad-Raffelt; Barenboim et al.
+  // arXiv:2011.01502 sec.5); C3, C5 and n3 are fitted. Re-fit them if the measurement
   // improves; do not read them as physical constants.
   //
-  // Dropping the shut-off costs a factor ~2 at recombination and ~17 by a = 4e-3 at
-  // Gamma = 1e10; dropping the eps dependence (n3 = 0) widens the spread to
-  // 0.48-1.72. Both terms earn their place.
-  composite->C3_    = in.get_or("dr_rta_C3", copw ? 0.0 : 0.2802);
-  composite->C5_    = in.get_or("dr_rta_C5", copw ? 1.0 : 2.5228);
-  composite->n3_    = in.get_or("dr_rta_n3", 0.8714);
-  composite->vshut_ = in.get_or("dr_rta_vshut", 1.7995);
+  // n3 = 1/2 replaces the published 0.8714, which no estimator reproduces. It is worth
+  // knowing WHY the published value was high: n3 is correlated with the velocity
+  // shut-off that used to multiply this bracket (see TransportRate). With that
+  // shut-off in place the same global fit wants n3 = 0.275; without it, 0.5. Across
+  // estimators and gamma windows n3 lands in 0.28-0.51 -- that spread, not any formal
+  // error bar, is the uncertainty -- but every one of them is far below 0.8714. The
+  // measured C_l^TT residual against the exact solve over 200 <= l <= 2000 at
+  // Gamma_0 = 1e10 is 0.099% here against 0.139% for (0.2802, 0.8714, 2.5228, q=1.8).
+  //
+  // eps_ne is the BACKGROUND's departure from detailed balance, which is the column
+  // this code emits and the variable the model is written in. The published exponent
+  // was measured against a stand-in (the parent's own l=2 collision term), which
+  // floors at ~2.4e-4 where eps_ne keeps falling to 6e-5; empirically
+  // eps_H ~ eps_ne^0.745.
+  //
+  // Under `structured` the amplitudes are the same global fit redone in X: C3 =
+  // 0.0848, C5 = 0.5283, n3 = 0.5 (best-fit n3 = 0.480, and pinning it to 1/2 costs
+  // nothing -- rel-rms 0.3012 against 0.3011). C5 = 0.53 +- 0.02 is worth reading as
+  // a result rather than a fudge: it says COPW's SHAPE is right and their amplitude
+  // is 1.9x too large, and pinning C5 = 1 wrecks the fit (0.472) and drives C3
+  // negative. Their MB assumption against these runs' quantum_statistics = yes is
+  // one candidate; the separable ansatz and the common-contrast assumption are two
+  // more. None is tested.
+  composite->C3_ = in.get_or("dr_rta_C3", copw ? 0.0 : (structured ? 0.0848 : 0.2336));
+  composite->C5_ = in.get_or("dr_rta_C5", copw ? 1.0 : (structured ? 0.5283 : 1.3283));
+  composite->n3_ = in.get_or("dr_rta_n3", 0.5);
+
+  // Both name a closed set of forms -> severe, for the same reason dr_rta_form is:
+  // a silently-ignored typo would be indistinguishable from a physics result.
+  const std::string alpha_form = in.get<std::string>("dr_rta_alpha").value_or("quartic");
+  class_test_severe(alpha_form != "quartic" && alpha_form != "integrated",
+                    "species '%s': dr_rta_alpha (='%s') must be 'quartic' (published "
+                    "arXiv:2203.09075 eq. 16, default) or 'integrated'",
+                    name.c_str(),
+                    alpha_form.c_str());
+  composite->alpha_form_ = (alpha_form == "integrated") ? AlphaForm::kIntegrated
+                                                        : AlphaForm::kQuartic;
+
+  const std::string beta_form = in.get<std::string>("dr_rta_beta").value_or("legendre");
+  class_test_severe(beta_form != "legendre" && beta_form != "legs",
+                    "species '%s': dr_rta_beta (='%s') must be 'legendre' (l(l+1)/6, "
+                    "default) or 'legs' (l(l+1)/2 - 2, the computed O(mu) coefficient)",
+                    name.c_str(),
+                    beta_form.c_str());
+  composite->beta_form_ = (beta_form == "legs") ? BetaForm::kLegs : BetaForm::kLegendre;
   return Named{name, std::move(composite)};
 }
 

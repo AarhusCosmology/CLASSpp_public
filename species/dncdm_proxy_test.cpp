@@ -307,6 +307,45 @@ int main() {
     for (int l : {0, 1})
       CheckClose(proxy->TransportRate(l, a, pvecback.data()), 0., 0., "copw rate is 0 for l <= 1");
 
+    // dr_rta_alpha applies to BOTH forms -- AlphaFor multiplies the gamma^-5 term on
+    // the common return path, whichever branch built it. That is deliberate (see
+    // AlphaForm), so it is asserted rather than left to be rediscovered: copw out of
+    // the box is the paper because the DEFAULT is the paper's quartic, and copw with
+    // `integrated` is the same eq. (13) carrying the corrected l-dependence.
+    {
+      FileContent fc_ai;
+      SetProxyBase(fc_ai);
+      fc_ai.set("dncdm1.dr_rta_form", "copw");
+      fc_ai.set("dncdm1.dr_rta_alpha", "integrated");
+      auto copw_int = BuildProxy(fc_ai, pba, settings);
+      // A SECOND instance registers its OWN background indices, so it needs its own
+      // row: handing it the vector filled for `proxy` reads slots that mean something
+      // else and every guard in TransportRate returns 0 -- silently, and the test
+      // would then be asserting against a zero it had produced itself.
+      int idx_ai = 0;
+      copw_int->RegisterBackgroundIndices(idx_ai);
+      std::vector<double> pv_ai(idx_ai + 8, 0.);
+      pv_ai[copw_int->parent().bg_rho_index()]    = rho_H;
+      pv_ai[copw_int->parent().bg_number_index()] = number;
+      pv_ai[copw_int->bg_rho_sec_index()]         = rho_sec;
+      pv_ai[copw_int->bg_eps_ne_index()]          = 0.5;
+      for (int l : {2, 5, 9}) {
+        const double base = a * G0 * (rho_H / rho_sec) * (1. / 12.) * X * X * X * X * X *
+                            DNCDMProxySpecies::CurlyF(X);
+        char msg[112];
+        std::snprintf(msg, sizeof(msg), "copw + integrated is eq. (13) x alpha_eff (l=%d)", l);
+        CheckClose(copw_int->TransportRate(l, a, pvecback.data()),
+                   DNCDMProxySpecies::AlphaLEff(l, X) * base,
+                   1e-12,
+                   msg);
+      }
+      // ... and at l = 2 the two forms coincide, because alpha_2 = 1 either way.
+      CheckClose(copw_int->TransportRate(2, a, pvecback.data()),
+                 proxy->TransportRate(2, a, pvecback.data()),
+                 1e-12,
+                 "copw l=2 is unaffected by dr_rta_alpha");
+    }
+
     // The fitted form must NOT agree: if these coincide, the selector is not wired
     // through and every comparison made with it would be vacuous.
     FileContent fcp;
@@ -322,6 +361,175 @@ int main() {
     Check(std::fabs(powers->TransportRate(4, a, pv_p.data()) -
                     proxy->TransportRate(4, a, pvecback.data())) > 1e-30,
           "the two forms give different rates on the same row");
+  }
+
+  // ── alpha_l^eff: the tabulated, momentum-integrated l-dependence ───────────
+  //
+  // The table is generated, so what is checked here are the properties that make it
+  // usable at all -- not its values, which have no independent oracle.
+  {
+    // Normalised to l = 2 at every X, by construction. If this drifts, C5 has been
+    // silently rescaled and every calibrated amplitude is wrong.
+    for (double X : {1e-6, 1e-3, 0.01, 0.3, 1.0, 10.}) {
+      char msg[128];
+      std::snprintf(msg, sizeof(msg), "AlphaLEff(2, %g) == 1", X);
+      CheckClose(DNCDMProxySpecies::AlphaLEff(2, X), 1.0, 1e-12, msg);
+    }
+    // Monotonically increasing in l wherever the term matters (X <~ 1), and strictly
+    // BELOW the published quartic everywhere -- that is the whole content of the form.
+    for (double X : {1e-6, 1e-3, 0.01, 0.1}) {
+      double prev = 1.0;
+      for (int l = 3; l <= 17; ++l) {
+        const double v = DNCDMProxySpecies::AlphaLEff(l, X);
+        char msg[128];
+        std::snprintf(msg, sizeof(msg), "AlphaLEff increasing in l at X = %g, l = %d", X, l);
+        Check(v > prev, msg);
+        std::snprintf(msg, sizeof(msg), "AlphaLEff < AlphaL at X = %g, l = %d", X, l);
+        Check(v < DNCDMProxySpecies::AlphaL(l), msg);
+        prev = v;
+      }
+    }
+    // Falling in X at fixed l: less boost, less able to wipe fine angular structure.
+    Check(DNCDMProxySpecies::AlphaLEff(17, 1e-3) > DNCDMProxySpecies::AlphaLEff(17, 0.1),
+          "AlphaLEff(17, .) decreasing in X");
+    // Clamped, not extrapolated, outside the table.
+    CheckClose(DNCDMProxySpecies::AlphaLEff(17, 1e-12),
+               DNCDMProxySpecies::AlphaLEff(17, 1e-6),
+               1e-12,
+               "AlphaLEff clamps below");
+    CheckClose(DNCDMProxySpecies::AlphaLEff(17, 1e6),
+               DNCDMProxySpecies::AlphaLEff(17, 31.6),
+               1e-2,
+               "AlphaLEff clamps above");
+    // Outside the tabulated l range it must fall back to the quartic, not to garbage.
+    CheckClose(DNCDMProxySpecies::AlphaLEff(25, 0.01),
+               DNCDMProxySpecies::AlphaL(25),
+               1e-12,
+               "AlphaLEff falls back to AlphaL above l_max");
+    // The published values it is meant to replace, at the campaign's own X.
+    CheckClose(DNCDMProxySpecies::AlphaL(17), 8041.0, 1e-9, "AlphaL(17) = 8041");
+    Check(DNCDMProxySpecies::AlphaLEff(17, 0.01) < 0.5 * DNCDMProxySpecies::AlphaL(17),
+          "AlphaLEff(17) is less than half the quartic at X = 0.01");
+  }
+
+  // ── the structured form's two shape functions ─────────────────────────────
+  {
+    // Phi_4 IS curly-F, evaluated exactly instead of through the paper's two-branch
+    // approximation. CurlyFExact above is an independent implementation (it is what
+    // the CurlyF tolerance checks are made against), so this pins the closed form
+    // against something not derived from it.
+    for (double X : {1e-4, 1e-2, 0.1, 0.3, 1.0, 2.0, 5.0, 12.0}) {
+      char msg[128];
+      std::snprintf(msg, sizeof(msg), "PhiNLO(%g) is curly-F exactly", X);
+      CheckClose(DNCDMProxySpecies::PhiNLO(X), CurlyFExact(X), 1e-6, msg);
+    }
+    // Phi_2(0) = 1 is what makes X^3 Phi_2 -> X^3 propto gamma^-3: the
+    // Hannestad-Raffelt asymptote is RECOVERED, not assumed. If this drifts the LO
+    // term no longer has the limit it is named for.
+    CheckClose(DNCDMProxySpecies::PhiLO(0.), 1.0, 1e-12, "PhiLO(0) = 1");
+    CheckClose(DNCDMProxySpecies::PhiLO(1e-8), 1.0, 1e-7, "PhiLO -> 1 as X -> 0");
+    // Closed form against values from an independent quadrature of the defining
+    // integral (scipy, 8 digits): (1+X)e^-X - X^2 Gamma(0,X).
+    const double xs[] = {0.1, 0.3, 1.0, 2.0, 5.0, 10.0};
+    // mpmath, 30 digits, of the DEFINING integral -- not of the closed form, so this
+    // is an independent check rather than a restatement. Quoted to 10 digits because
+    // at 4 the reference itself was what failed the tolerance.
+    const double want[] = {9.7709192026e-01,
+                           8.8155278824e-01,
+                           5.1637494795e-01,
+                           2.1040380688e-01,
+                           1.1720292213e-02,
+                           8.3702334419e-05};
+    for (int i = 0; i < 6; ++i) {
+      char msg[128];
+      std::snprintf(msg, sizeof(msg), "PhiLO(%g) against quadrature", xs[i]);
+      CheckClose(DNCDMProxySpecies::PhiLO(xs[i]), want[i], 1e-9, msg);
+    }
+    // BOTH die once the parent is non-relativistic -- the whole point of the form.
+    // A gamma-power model saturates here instead and isotropises forever.
+    double pl = DNCDMProxySpecies::PhiLO(1.), pn = DNCDMProxySpecies::PhiNLO(1.);
+    for (double X : {2., 4., 8., 16.}) {
+      const double l2 = DNCDMProxySpecies::PhiLO(X), n2 = DNCDMProxySpecies::PhiNLO(X);
+      char msg[128];
+      std::snprintf(msg, sizeof(msg), "PhiLO decreasing at X = %g", X);
+      Check(l2 < pl && l2 > 0., msg);
+      std::snprintf(msg, sizeof(msg), "PhiNLO decreasing at X = %g", X);
+      Check(n2 < pn && n2 > 0., msg);
+      pl = l2;
+      pn = n2;
+    }
+    Check(DNCDMProxySpecies::PhiLO(30.) < 1e-12 * DNCDMProxySpecies::PhiLO(1.),
+          "PhiLO has collapsed by X = 30");
+    // And the form is reachable.
+    NcdmSettings settings = TestSettings();
+    background pba        = MakeBackground();
+    FileContent fcs;
+    SetProxyBase(fcs);
+    fcs.set("dncdm1.dr_rta_form", "structured");
+    auto st = BuildProxy(fcs, pba, settings);
+    Check(st->rta_form() == DNCDMProxySpecies::RtaForm::kStructured,
+          "dr_rta_form = structured selects the structured form");
+
+    // The ASSEMBLY, on a hand-filled row -- the Phi's being right does not make
+    // (1/12) X^3 Phi_2 and (1/12) X^5 Phi_4 right, and this is the piece a refit
+    // would silently invalidate.
+    int idx_s = 0;
+    st->RegisterBackgroundIndices(idx_s);
+    std::vector<double> pv_s(idx_s + 8, 0.);
+    const double aS = 1e-3, rhoS = 3.0, secS = 10.0, numS = 2.0, epsS = 0.25;
+    pv_s[st->parent().bg_rho_index()]    = rhoS;
+    pv_s[st->parent().bg_number_index()] = numS;
+    pv_s[st->bg_rho_sec_index()]         = secS;
+    pv_s[st->bg_eps_ne_index()]          = epsS;
+    const double XS                      = aS * st->parent().GetMass();
+    const double G0S                     = st->parent().Gamma();
+    for (int l : {2, 4, 7}) {
+      const double b3   = l * (l + 1.) / 6.;
+      const double r3   = 0.0848 * std::pow(epsS, 0.5) * (1. / 12.) * XS * XS * XS *
+                          DNCDMProxySpecies::PhiLO(XS);
+      const double r5   = 0.5283 * (1. / 12.) * XS * XS * XS * XS * XS *
+                          DNCDMProxySpecies::PhiNLO(XS);
+      const double want = aS * G0S * (rhoS / secS) * (b3 * r3 + DNCDMProxySpecies::AlphaL(l) * r5);
+      char msg[112];
+      std::snprintf(msg, sizeof(msg), "structured TransportRate(l=%d) assembly", l);
+      CheckClose(st->TransportRate(l, aS, pv_s.data()), want, 1e-12, msg);
+    }
+  }
+
+  // ── beta_l: both forms normalised at l = 2, and distinct above ────────────
+  {
+    NcdmSettings settings = TestSettings();
+    background pba        = MakeBackground();
+    FileContent fcb;
+    SetProxyBase(fcb);
+    fcb.set("dncdm1.dr_rta_beta", "legs");
+    auto legs = BuildProxy(fcb, pba, settings);
+    FileContent fcl;
+    SetProxyBase(fcl);
+    auto leg = BuildProxy(fcl, pba, settings);
+
+    int i1 = 0, i2 = 0;
+    legs->RegisterBackgroundIndices(i1);
+    leg->RegisterBackgroundIndices(i2);
+    std::vector<double> p1(i1 + 8, 0.), p2(i2 + 8, 0.);
+    const double aB = 2e-3, rB = 3.0, sB = 10.0, nB = 2.0;
+    for (auto* pr : {&p1, &p2}) {
+      auto& sp                             = (pr == &p1) ? *legs : *leg;
+      (*pr)[sp.parent().bg_rho_index()]    = rB;
+      (*pr)[sp.parent().bg_number_index()] = nB;
+      (*pr)[sp.bg_rho_sec_index()]         = sB;
+      (*pr)[sp.bg_eps_ne_index()]          = 0.9;  // far from balance: LO term lives
+    }
+    // Both are 1 at l = 2 by construction, so C3 does not move with the choice --
+    // if that drifts, every calibrated amplitude silently changes meaning.
+    CheckClose(legs->TransportRate(2, aB, p1.data()),
+               leg->TransportRate(2, aB, p2.data()),
+               1e-12,
+               "beta forms agree at l = 2");
+    // ... and differ above it, in the direction the O(mu) coefficient says:
+    // l(l+1)/2 - 2 = 8 at l = 4 against l(l+1)/6 = 10/3.
+    Check(legs->TransportRate(4, aB, p1.data()) > leg->TransportRate(4, aB, p2.data()),
+          "dr_rta_beta = legs is steeper than legendre at l = 4");
   }
 
   if (failures > 0) {
