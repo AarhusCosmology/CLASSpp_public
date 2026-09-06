@@ -5,6 +5,7 @@
 #include "input_module.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -970,13 +971,42 @@ void InputModule::ReadDerived() {
 
   /** - primordial helium fraction */
   if (auto YHe = pfc->get<std::string>("YHe")) {
-    if ((YHe->find("BBN") != std::string::npos) || (YHe->find("bbn") != std::string::npos)) {
+    /* Case-folded once rather than testing each spelling: enumerating variants
+       matches "BBN" and "bbn" but silently falls through on "Bbn", and a value
+       that falls through here is parsed as a NUMBER, so the mistake surfaces as a
+       parse error about a helium fraction rather than as an unrecognised mode. */
+    std::string mode = *YHe;
+    std::transform(mode.begin(), mode.end(), mode.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+
+    /* "network" is tested FIRST because its natural spellings -- "BBN network",
+       "bbn_network" -- also contain "bbn", and the table branch would otherwise
+       swallow them. */
+    if (mode.find("network") != std::string::npos) {
+      pth->YHe = _BBN_NETWORK_;
+    }
+    else if (mode.find("bbn") != std::string::npos) {
       pth->YHe = _BBN_;
     }
     else {
       pth->YHe = pfc->get_or("YHe", pth->YHe);
     }
   }
+
+  /* The free neutron lifetime. Only the solved network uses it: the
+     interpolation table was computed once, externally, at a fixed 880.2 s and
+     cannot respond to it. Saying so is better than silently ignoring the key. */
+  pth->tau_n = pfc->get_or("tau_n", pth->tau_n);
+  /* class_test, not class_test_severe: tau_n is a physical parameter a sampler
+     may legitimately vary under a prior, and section 8 of the error conventions
+     reserves the severe channel for checks on things a sampler never touches.
+     Gating an abort on a varying value is what carved a hole in the posterior in
+     #395. The mutual-exclusivity check below IS structural, so it stays severe. */
+  class_test(pth->tau_n <= 0., "tau_n = %g must be positive", pth->tau_n);
+  class_test_severe(pth->YHe == _BBN_ && pfc->get<double>("tau_n").has_value(),
+                    "tau_n only affects 'YHe = network'; the sBBN interpolation table was "
+                    "computed externally at a fixed neutron lifetime and cannot use it.");
 
   /** - recombination parameters */
   if (auto recombination = pfc->get<std::string>("recombination")) {
@@ -2619,8 +2649,9 @@ void read_enum(const FileContent& fc, const char* name, E& v) {
 
 void precision::ResolveDataPaths() {
   // Prepend the runtime class_dir to each field's relative-path default.
-  sBBN_file  = class_dir + sBBN_file;
-  hyrec_path = class_dir + hyrec_path;
+  sBBN_file      = class_dir + sBBN_file;
+  bbn_rates_file = class_dir + bbn_rates_file;
+  hyrec_path     = class_dir + hyrec_path;
 }
 
 void precision::parse(const FileContent& fc) {
@@ -2641,6 +2672,11 @@ void precision::parse(const FileContent& fc) {
   read(fc, "tol_tau_eq", tol_tau_eq);
   read(fc, "Omega0_cdm_min_synchronous", Omega0_cdm_min_synchronous);
   read(fc, "sBBN file", sBBN_file);
+  read(fc, "bbn_rates_file", bbn_rates_file);
+  read(fc, "tol_bbn_integration", tol_bbn_integration);
+  read(fc, "bbn_T9_initial", bbn_T9_initial);
+  read(fc, "bbn_T9_final", bbn_T9_final);
+  read(fc, "bbn_history_file", bbn_history_file);
 
   /* Thermodynamics */
   read(fc, "recfast_z_initial", recfast_z_initial);

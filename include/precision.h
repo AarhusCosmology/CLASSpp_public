@@ -180,6 +180,35 @@ struct precision {
    */
   std::string sBBN_file = "/bbn/sBBN_2017.dat";
 
+  /**
+   * Forward nuclear reaction rates for the solved BBN network, used when
+   * `YHe = network` instead of the interpolation table above. JINA REACLIB
+   * seven-parameter form; see tools/bbn_rates.h. Reverse rates are derived by
+   * detailed balance and are deliberately not expressible in this file.
+   */
+  std::string bbn_rates_file = "/bbn/rates_reaclib.dat";
+
+  /** Relative tolerance for the BBN network integration. */
+  double tol_bbn_integration = 1.e-8;
+
+  /**
+   * Temperature in 10^9 K at which the BBN network starts.
+   *
+   * Must be well above weak freeze-out (T9 ~ 10) so that the initial n/p ratio
+   * really is the equilibrium one; the abundances are insensitive to it above
+   * that (measured: Y_p moves by 1e-6 between T9 = 100 and T9 = 1000).
+   */
+  double bbn_T9_initial = 100.;
+
+  /** Temperature in 10^9 K at which the BBN network stops. */
+  double bbn_T9_final = 0.01;
+
+  /**
+   * If non-empty, the solved BBN run writes its abundance history here, one row
+   * per sampled temperature. Diagnostic only; empty means no file.
+   */
+  std::string bbn_history_file = "";
+
   /*
    *  Thermodynamical quantities
    * */

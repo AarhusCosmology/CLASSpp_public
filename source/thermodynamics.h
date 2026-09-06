@@ -49,6 +49,11 @@ enum reionization_z_or_tau {
 
 #define _BBN_ -1
 
+/* YHe sentinel selecting the SOLVED nuclear reaction network (tools/bbn_solver.h)
+   rather than the interpolation table. Distinct from _BBN_ so that the default
+   stays the table and no existing run changes. */
+#define _BBN_NETWORK_ -2
+
 /**
  * Input parameters for the thermodynamics calculation.
  *
@@ -64,6 +69,9 @@ struct thermo {
   //@{
 
   double YHe = _BBN_; /**< \f$ Y_{He} \f$: primordial helium fraction */
+
+  /** Free neutron lifetime in seconds, PDG 2022. Used only by `YHe = network`. */
+  double tau_n = 878.4;
 
   enum recombination_algorithm recombination = recfast; /**< recombination code */
 

@@ -23,6 +23,21 @@ class ThermodynamicsModule : public BaseModule {
   double
       tau_ini_; /**< initial conformal time at which thermodynamical variables have been be integrated */
   double YHe_;
+
+  /** Primordial abundances from the solved BBN network (`YHe = network`).
+   *
+   *  Ratios by number to hydrogen, as the observational literature quotes them.
+   *  He3 includes tritium and Li7 includes Be7, both of which decay to them long
+   *  after BBN. Left at zero when YHe comes from the interpolation table or is
+   *  fixed by hand, since neither can produce them -- `bbn_network_ran_` says
+   *  which. These are public because generate_wrapper.py lifts public members
+   *  into cclassy.pxd, which is how classy exposes them as derived parameters. */
+  double DoverH_        = 0.;
+  double He3overH_      = 0.;
+  double Li7overH_      = 0.;
+  double Li6overH_      = 0.;
+  double bbn_eta10_     = 0.;
+  bool bbn_network_ran_ = false;
   /**
    *@name - some flags needed for thermodynamics functions
    */
@@ -111,7 +126,9 @@ class ThermodynamicsModule : public BaseModule {
  private:
   void thermodynamics_init();
   void thermodynamics_indices(recombination* preco, reionization* preio);
+  double thermodynamics_delta_neff_at_bbn();
   void thermodynamics_helium_from_bbn();
+  void thermodynamics_helium_from_bbn_network();
   void thermodynamics_onthespot_energy_injection(recombination* preco,
                                                  double z,
                                                  double* energy_rate);

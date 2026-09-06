@@ -12,6 +12,7 @@
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "background_module.h"
+#include "bbn_solver.h"
 #include "evolver_erk.h"
 #include "evolver_ndf15.h"
 #include "evolver_rkdp45.h"
@@ -353,6 +354,20 @@ void ThermodynamicsModule::thermodynamics_init() {
     thermodynamics_helium_from_bbn();
     if (pth->thermodynamics_verbose > 0)
       printf(" with Y_He=%.4f\n", YHe_);
+  }
+  else if (YHe_ == _BBN_NETWORK_) {
+    thermodynamics_helium_from_bbn_network();
+    if (pth->thermodynamics_verbose > 0) {
+      printf(" with Y_He=%.4f from the solved BBN network\n", YHe_);
+      printf(" -> eta_10 = %.4f, D/H = %.4e, He3/H = %.4e, Li7/H = %.4e\n",
+             bbn_eta10_,
+             DoverH_,
+             He3overH_,
+             Li7overH_);
+      printf(
+          " -> Li7/H exceeds the observed ~1.6e-10 by about a factor three; that is the\n"
+          "    cosmological lithium problem, not a failure of this calculation.\n");
+    }
   }
   else {
     if (pth->thermodynamics_verbose > 0)
@@ -1484,29 +1499,20 @@ void ThermodynamicsModule::thermodynamics_indices(recombination* preco, reioniza
  *
  * @return the error status
  */
-void ThermodynamicsModule::thermodynamics_helium_from_bbn() {
-  std::string line;
-  const char* left;
-
-  int num_omegab = 0;
-  int num_deltaN = 0;
-
-  std::vector<double> omegab;
-  std::vector<double> deltaN;
-  std::vector<double> YHe;
-  std::vector<double> ddYHe;
-  std::vector<double> YHe_at_deltaN;
-  std::vector<double> ddYHe_at_deltaN;
-
-  int array_line = 0;
-  double DeltaNeff;
-  double omega_b;
+/**
+ * Extra effective number of neutrino species at the time of BBN.
+ *
+ * Shared by both routes to Y_He -- the interpolation table and the solved
+ * network -- so that the two are driven by an identical number and any
+ * disagreement between them is physics rather than bookkeeping.
+ *
+ * The convention is the sBBN data file's: Delta N_eff = 0 means N_eff = 3.046.
+ *
+ * @return Delta N_eff
+ */
+double ThermodynamicsModule::thermodynamics_delta_neff_at_bbn() {
   int last_index;
-  std::vector<double> pvecback;
-
-  /**Summary: */
-  /** - Infer effective number of neutrinos at the time of BBN */
-  pvecback.resize(background_module_->bg_size_);
+  std::vector<double> pvecback(background_module_->bg_size_);
 
   /** - 8.6173e-11 converts from Kelvin to MeV. We randomly choose 0.1 MeV to be the temperature of BBN */
   double z_bbn = 0.1 / (8.6173e-11 * pba->T_cmb) - 1.0;
@@ -1532,10 +1538,69 @@ void ThermodynamicsModule::thermodynamics_helium_from_bbn() {
     Neff_bbn   -= drmd.idr_drmd().Rho(pvecback.data()) / (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g);
   }
 
-  //  printf("Neff early = %g, Neff at bbn: %g\n", background_module_->Neff_, Neff_bbn);
-
   /** - compute Delta N_eff as defined in bbn file, i.e. \f$ \Delta N_{eff}=0\f$ means \f$ N_{eff}=3.046\f$ */
-  DeltaNeff = Neff_bbn - 3.046;
+  return Neff_bbn - 3.046;
+}
+
+/**
+ * Primordial abundances from the solved nuclear reaction network.
+ *
+ * The alternative to thermodynamics_helium_from_bbn()'s interpolation table,
+ * selected by `YHe = network`. Unlike the table it also yields D/H, He3/H and
+ * Li7/H, and it responds to the neutron lifetime.
+ *
+ * Design: docs/superpowers/specs/2026-09-06-bbn-nuclear-network-design.md
+ */
+void ThermodynamicsModule::thermodynamics_helium_from_bbn_network() {
+  BbnInput input;
+  input.omega_b      = pba->Omega0_b * pba->h * pba->h;
+  input.delta_neff   = thermodynamics_delta_neff_at_bbn();
+  input.tau_n        = pth->tau_n;
+  input.T_cmb        = pba->T_cmb;
+  input.rates_file   = ppr->bbn_rates_file;
+  input.tolerance    = ppr->tol_bbn_integration;
+  input.T9_initial   = ppr->bbn_T9_initial;
+  input.T9_final     = ppr->bbn_T9_final;
+  input.history_file = ppr->bbn_history_file;
+
+  const BbnResult result = SolveBbn(input);
+
+  /* Which helium convention CLASS's YHe means was left open by the design and
+     settled by measurement: over the sBBN table's whole grid the mass fraction
+     rho_He4/rho_b agrees to at worst 2.2e-4, while the nucleon-number fraction
+     4*Y_He4 is off by 1.4e-3 to 1.6e-3. The mass fraction is also what the rest
+     of the code assumes -- recfast forms fHe = YHe/(_not4_ (1-YHe)) with
+     _not4_ = m_He/m_H, a mass ratio. See spec section 6.1. */
+  YHe_             = result.Yp_mass;
+  DoverH_          = result.DoverH;
+  He3overH_        = result.He3overH;
+  Li7overH_        = result.Li7overH;
+  Li6overH_        = result.Li6overH;
+  bbn_eta10_       = result.eta10;
+  bbn_network_ran_ = true;
+}
+
+void ThermodynamicsModule::thermodynamics_helium_from_bbn() {
+  std::string line;
+  const char* left;
+
+  int num_omegab = 0;
+  int num_deltaN = 0;
+
+  std::vector<double> omegab;
+  std::vector<double> deltaN;
+  std::vector<double> YHe;
+  std::vector<double> ddYHe;
+  std::vector<double> YHe_at_deltaN;
+  std::vector<double> ddYHe_at_deltaN;
+
+  int array_line = 0;
+  double omega_b;
+  int last_index;
+
+  /**Summary: */
+  /** - Infer effective number of neutrinos at the time of BBN */
+  const double DeltaNeff = thermodynamics_delta_neff_at_bbn();
 
   /* the following file is assumed to contain (apart from comments and blank lines):
      - the two numbers (num_omegab, num_deltaN) = number of values of BBN free parameters

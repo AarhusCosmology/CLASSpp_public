@@ -2,6 +2,10 @@
 BUILD_DIR ?= build/cmake
 
 TEST_TARGETS := \
+	test-bbn-plasma \
+	test-bbn-rates \
+	test-bbn-weak \
+	test-bbn-solver \
 	test-parser \
 	test-precision-evolver \
 	test-errors \

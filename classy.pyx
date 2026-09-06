@@ -1735,6 +1735,27 @@ cdef class PyCosmology:
             elif name == 'YHe':
                 thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).YHe_
+            elif name in ('D_H', 'He3_H', 'Li7_H', 'Li6_H', 'eta10'):
+                # Primordial abundances from the solved BBN network. The
+                # interpolation table yields Y_He alone, so asking for these
+                # without 'YHe = network' is a request the run cannot answer;
+                # say so rather than returning a zero that looks like a result.
+                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
+                if not deref(thermodynamics_module).bbn_network_ran_:
+                    raise CosmoSevereError(
+                        "%s is only computed by the solved BBN network. Set "
+                        "'YHe' to 'network' to obtain it; the sBBN interpolation "
+                        "table provides Y_He only." % name)
+                if name == 'D_H':
+                    value = deref(thermodynamics_module).DoverH_
+                elif name == 'He3_H':
+                    value = deref(thermodynamics_module).He3overH_
+                elif name == 'Li7_H':
+                    value = deref(thermodynamics_module).Li7overH_
+                elif name == 'Li6_H':
+                    value = deref(thermodynamics_module).Li6overH_
+                else:
+                    value = deref(thermodynamics_module).bbn_eta10_
             elif name == 'n_e':
                 thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
                 value = deref(thermodynamics_module).n_e_
