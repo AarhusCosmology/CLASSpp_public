@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "evolver_options.h"
 #include "sparse.h"
 #define TINY 1e-50
 /**************************************************************/
@@ -103,29 +104,18 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
             int* nfe,
             void* parameters_and_workspace_for_derivs);
 
-void evolver_ndf15(
-    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-    double x_ini,
-    double x_final,
-    double* y_inout,
-    int* used_in_output,
-    int neq,
-    void* parameters_and_workspace_for_derivs,
-    double rtol,
-    double minimum_variation,
-    void (*timescale_and_approximation)(double x,
-                                        void* parameters_and_workspace,
-                                        double* timescales),
-    double timestep_over_timescale,
-    double* t_vec,
-    int t_res,
-    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
-    /* Jacobian DIAGONAL callback, part of the shared CLASS evolver signature and
-       unused here -- as minimum_variation and timestep_over_timescale already are.
-       Only evolver_etd consumes it. May be null. An implicit method could in
-       principle seed its Jacobian from an analytic diagonal; ndf15 does not. */
-    void (*derivs_diagonal)(double x, double* y, double* diag, void* parameters_and_workspace));
+/** Variable-order (1-5) BDF evolver with an adaptive step, for stiff systems.
+ *
+ *  Honours EvolverOptions::max_order and ::stats in addition to the fields every
+ *  evolver honours. Setting anything else is an error rather than an ignore --
+ *  see evolver_options.h. */
+void evolver_ndf15(EvolverDerivs derivs,
+                   double x_ini,
+                   double x_final,
+                   double* y_inout,
+                   int neq,
+                   void* parameters_and_workspace_for_derivs,
+                   const EvolverOptions& options);
 
 /**************************************************************/
 

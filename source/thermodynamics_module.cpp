@@ -3254,20 +3254,25 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
      history and trips the z_rec sanity check). When rk is requested, fall back to rkdp45
      for the recombination integration only, leaving the user's evolver choice intact for
      the background and perturbation modules. */
-  /* Configure the shared explicit-RK controller from THIS module's ppr, here
-     rather than at parse time: Cosmology is lazy, so a second object parsed in
-     between would otherwise be the one whose settings this run reads. */
-  evolver_erk_configure(ppr->erk_controller_config());
+  /* Options carry ONLY what the chosen evolver honours; anything else is now an
+     error rather than a silent ignore. Recombination never supplies a Jacobian
+     diagonal or a timescale, so the only evolver-specific field in play here is
+     the explicit-RK controller. */
+  EvolverOptions options;
+  options.rtol = ppr->tol_thermo_integration;
 
   auto generic_evolver = &evolver_ndf15;
   if (ppr->evolver_thermodynamics == evolver_type::rkdp45) {
     generic_evolver = &evolver_rkdp45;
+    options.erk     = ppr->erk_controller_config();
   }
   else if (ppr->evolver_thermodynamics == evolver_type::tsit5) {
     generic_evolver = &evolver_tsit5;
+    options.erk     = ppr->erk_controller_config();
   }
   else if (ppr->evolver_thermodynamics == evolver_type::rk) {
     generic_evolver = &evolver_rkdp45;
+    options.erk     = ppr->erk_controller_config();
     printf(
         "\nWarning: evolver=rk cannot integrate the stiff RECFAST system; using rkdp45 for "
         "recombination instead.\n");
@@ -3276,6 +3281,7 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
     // RECFAST's stiffness is not diagonal in the sense ETD exploits, and no species
     // reports a diagonal here, so ETD would be explicit Heun on a stiff system.
     generic_evolver = &evolver_rkdp45;
+    options.erk     = ppr->erk_controller_config();
     printf(
         "\nWarning: evolver=etd applies to the background only; using rkdp45 for "
         "recombination instead.\n");
@@ -3396,23 +3402,18 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   tpaw.recombination_phase         = RecombinationPhase::helium;
   tpaw.recfast_output_index_offset = first_helium_sample;
 
+  options.used_in_output  = used_in_output_helium.data();
+  options.x_sampling      = helium_sampling;
+  options.x_sampling_size = helium_sampling_count;
+  options.output          = helium_output;
+
   generic_evolver(thermodynamics_recfast_derivs,
                   -z_helium_ode_start,
                   -z_hydrogen_ode_start,
                   y_helium,
-                  used_in_output_helium.data(),
                   2,
                   &tpaw,
-                  ppr->tol_thermo_integration,
-                  ppr->smallest_allowed_variation,
-                  thermodynamics_recfast_timescale,
-                  z_helium_ode_start - z_hydrogen_ode_start,
-                  helium_sampling,
-                  helium_sampling_count,
-                  helium_output,
-                  nullptr,
-                  // No species reports a diagonal on the thermodynamics path.
-                  nullptr);
+                  options);
 
   y[0] = ppr->recfast_x_H0_trigger;
   y[1] = y_helium[0];
@@ -3427,22 +3428,18 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
     tpaw.recombination_phase         = RecombinationPhase::full;
     tpaw.recfast_output_index_offset = first_full_sample;
 
+    options.used_in_output  = used_in_output_full.data();
+    options.x_sampling      = minus_z_sampling.data() + first_full_sample;
+    options.x_sampling_size = Nz - first_full_sample;
+    options.output          = thermodynamics_recfast_output;
+
     generic_evolver(thermodynamics_recfast_derivs,
                     -z_hydrogen_ode_start,
                     minus_z_sampling[Nz - 1],
                     y,
-                    used_in_output_full.data(),
                     _RECFAST_INTEG_SIZE_,
                     &tpaw,
-                    ppr->tol_thermo_integration,
-                    ppr->smallest_allowed_variation,
-                    thermodynamics_recfast_timescale,
-                    z_hydrogen_ode_start,
-                    minus_z_sampling.data() + first_full_sample,
-                    Nz - first_full_sample,
-                    thermodynamics_recfast_output,
-                    nullptr,
-                    nullptr);
+                    options);
   }
 }
 

@@ -26,13 +26,9 @@
 	Newton iterations fail to converge fast enough. This feature makes the
 	solver competitive even for non-stiff problems.
 
-	Statistics is saved in the stepstat[6] vector. The entries are:
-	stepstat[0] = Successful steps.
-	stepstat[1] = Failed steps.
-	stepstat[2] = Total number of function evaluations.
-	stepstat[3] = Number of Jacobians computed.
-	stepstat[4] = Number of LU decompositions.
-	stepstat[5] = Number of linear solves.
+Statistics accumulate into a named EvolverStats and are handed back
+	through EvolverOptions::stats, which is how the explicit evolvers
+	report as well.
 	If ppt->perturbations_verbose > 2, this statistic is printed at the end of
 	each call to evolver.
 
@@ -56,6 +52,8 @@
 */
 #include "evolver_ndf15.h"
 
+#include <limits>
+
 #include "common.h"
 #include "nonfinite.h"
 //#include "perturbations.h"
@@ -64,33 +62,38 @@
 
 #include "sparse.h"
 
-void evolver_ndf15(
-    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-    double x_ini,
-    double x_final,
-    double* y_inout,
-    int* used_in_output,
-    int neq,
-    void* parameters_and_workspace_for_derivs,
-    double rtol,
-    double minimum_variation,
-    void (*timescale_and_approximation)(double x,
-                                        void* parameters_and_workspace,
-                                        double* timescales),
-    double timestep_over_timescale,
-    double* t_vec,
-    int tres,
-    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
-    /* Part of the shared evolver signature; unused here. See evolver_ndf15.h. */
-    void (* /*derivs_diagonal*/)(
-        double x, double* y, double* diag, void* parameters_and_workspace)) {
+void evolver_ndf15(EvolverDerivs derivs,
+                   double x_ini,
+                   double x_final,
+                   double* y_inout,
+                   int neq,
+                   void* parameters_and_workspace_for_derivs,
+                   const EvolverOptions& options) {
+  EvolverOptionsCheck(options,
+                      "evolver_ndf15",
+                      x_ini,
+                      {EvolverFeature::MaxOrder, EvolverFeature::Stats, EvolverFeature::AbsTol});
+
+  const double rtol                  = options.rtol;
+  const double* t_vec                = options.x_sampling;
+  const int tres                     = options.x_sampling_size;
+  const int* used_in_output          = options.used_in_output;
+  const EvolverOutput output         = options.output;
+  const EvolverPrint print_variables = options.print_variables;
+
   /* Constants: */
   double G[5]     = {1.0, 3.0 / 2.0, 11.0 / 6.0, 25.0 / 12.0, 137.0 / 60.0};
   double alpha[5] = {-37.0 / 200, -1.0 / 9.0, -8.23e-2, -4.15e-2, 0};
   double invGa[5], erconst[5];
-  double abstol = 1e-15, eps = 1e-16, threshold = abstol;
-  int maxit = 4, maxk = 5;
+  /* abstol was hardwired here; it is the error-weight floor, so it decides which
+     variables are resolved relatively at all, and the default preserves the old
+     value exactly. */
+  const double abstol = options.abstol;
+  double eps = 1e-16, threshold = abstol;
+  int maxit = 4;
+  /* 0 means "the evolver's own default", which keeps "the caller asked for 5"
+     distinguishable from "the caller said nothing". */
+  const int maxk = options.max_order > 0 ? options.max_order : 5;
 
   /* Logicals: */
   int Jcurrent, havrate, done, at_hmin, nofailed, gotynew, tooslow, *interpidx;
@@ -110,7 +113,10 @@ void evolver_ndf15(
   int k, klast, nconhk, iter, next, kopt, tdir;
 
   /* Misc: */
-  int stepstat[6], nfenj, j, ii, jj, numidx, neqp = neq + 1;
+  int nfenj, j, ii, jj, numidx, neqp = neq + 1;
+  /* Named, rather than a six-slot int array whose meaning lived in a comment
+     nearly two hundred lines above every use of it. */
+  EvolverStats counters;
   int verbose = 0;
 
   /** Allocate memory . */
@@ -192,11 +198,9 @@ void evolver_ndf15(
   }
 
   htspan = fabs(tfinal - t0);
-  for (ii = 0; ii < 6; ii++)
-    stepstat[ii] = 0;
 
   (*derivs)(t0, y + 1, f0 + 1, parameters_and_workspace_for_derivs);
-  stepstat[2] += 1;
+  counters.derivs_evaluations += 1;
   if ((tfinal - t0) < 0.0) {
     tdir = -1;
   }
@@ -217,9 +221,9 @@ void evolver_ndf15(
          neq,
          &nfenj,
          parameters_and_workspace_for_derivs);
-  stepstat[3] += 1;
-  stepstat[2] += nfenj;
-  Jcurrent     = true; /* True */
+  counters.jacobians          += 1;
+  counters.derivs_evaluations += nfenj;
+  Jcurrent                     = true; /* True */
 
   hmin = 16.0 * eps * fabs(t);
   /*Calculate initial step */
@@ -247,7 +251,7 @@ void evolver_ndf15(
   tdel = (t + tdir * std::min(sqrt(eps) * std::max(fabs(t), fabs(t + h)), absh)) - t;
 
   (*derivs)(t + tdel, y + 1, tempvec1 + 1, parameters_and_workspace_for_derivs);
-  stepstat[2] += 1;
+  counters.derivs_evaluations += 1;
 
   /*I assume that a full jacobi matrix is always calculated in the beginning...*/
   for (ii = 1; ii <= neq; ii++) {
@@ -282,17 +286,20 @@ void evolver_ndf15(
   hinvGak = h * invGa[k - 1];
   nconhk  = 0; /*steps taken with current h and k*/
   new_linearisation(&jac, hinvGak, neq);
-  stepstat[4] += 1;
-  havrate      = false; /*false*/
+  counters.lu_decompositions += 1;
+  havrate                     = false; /*false*/
 
   /* Doing main loop: */
   done    = false;
   at_hmin = false;
   while (!done) {
-    //class_test(stepstat[2] > 1e7,
+    //class_test(counters.derivs_evaluations > 1e7,
     //     "Too many steps in evolver! Current stepsize:%g, in interval: [%g:%g]\n",
     //     absh,t0,tfinal);
-    hmin   = minimum_variation;
+    /* Was threaded in as `minimum_variation`, which every caller filled with
+       ppr->smallest_allowed_variation -- a parameter never read from the input
+       file, so always DBL_EPSILON. Taken directly rather than passed. */
+    hmin   = std::numeric_limits<double>::epsilon();
     maxtmp = std::max(hmin, absh);
     absh   = std::min(hmax, maxtmp);
     if (fabs(absh - hmin) < 100 * eps) {
@@ -346,8 +353,8 @@ void evolver_ndf15(
       hinvGak = h * invGa[k - 1];
       nconhk  = 0;
       new_linearisation(&jac, hinvGak, neq);
-      stepstat[4] += 1;
-      havrate      = false;
+      counters.lu_decompositions += 1;
+      havrate                     = false;
     }
     /*		Loop for advancing one step */
     nofailed = true;
@@ -397,7 +404,7 @@ void evolver_ndf15(
              so the old tempvec1 = psi + difkp1 prepass is unnecessary. Folded into
              rhs below, keeping the (psi + difkp1) grouping => bit-identical. */
           (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
-          stepstat[2] += 1;
+          counters.derivs_evaluations += 1;
           for (j = 1; j <= neq; j++) {
             rhs[j] = hinvGak * f0[j] - (psi[j] + difkp1[j]);
           }
@@ -411,8 +418,8 @@ void evolver_ndf15(
             lubksb(jac.LU.data(), neq, jac.luidx.data(), del);
           }
 
-          stepstat[5] += 1;
-          newnrm       = 0.0;
+          counters.linear_solves += 1;
+          newnrm                  = 0.0;
           /* Fused: the newnrm reduction (over del) and the difkp1/ynew update are
              independent per element, so one pass suffices. Bit-identical. */
           for (j = 1; j <= neq; j++) {
@@ -461,7 +468,7 @@ void evolver_ndf15(
           oldnrm = newnrm;
         }
         if (tooslow) {
-          stepstat[1] += 1;
+          counters.steps_rejected += 1;
           /*	! Speed up the iteration by forming new linearization or reducing h. */
           if (!Jcurrent) {
             (*derivs)(t, y + 1, f0 + 1, parameters_and_workspace_for_derivs);
@@ -476,9 +483,9 @@ void evolver_ndf15(
                    neq,
                    &nfenj,
                    parameters_and_workspace_for_derivs);
-            stepstat[3] += 1;
-            stepstat[2] += (nfenj + 1);
-            Jcurrent     = true;
+            counters.jacobians          += 1;
+            counters.derivs_evaluations += (nfenj + 1);
+            Jcurrent                     = true;
           }
           else if (absh <= hmin) {
             class_test(absh <= hmin,
@@ -499,8 +506,8 @@ void evolver_ndf15(
           }
           /* A new linearisation is needed in both cases */
           new_linearisation(&jac, hinvGak, neq);
-          stepstat[4] += 1;
-          havrate      = false;
+          counters.lu_decompositions += 1;
+          havrate                     = false;
         }
       }
       /*end of while loop for getting ynew
@@ -512,7 +519,7 @@ void evolver_ndf15(
       err = err * erconst[k - 1];
       if (err > rtol) {
         /*Step failed */
-        stepstat[1] += 1;
+        counters.steps_rejected += 1;
         if (absh <= hmin) {
           class_test(absh <= hmin,
                      "Step size too small: step:%g, minimum:%g, in interval: [%g:%g]\n",
@@ -550,15 +557,15 @@ void evolver_ndf15(
         hinvGak = h * invGa[k - 1];
         nconhk  = 0;
         new_linearisation(&jac, hinvGak, neq);
-        stepstat[4] += 1;
-        havrate      = false;
+        counters.lu_decompositions += 1;
+        havrate                     = false;
       }
       else {
         break; /* Succesfull step */
       }
     }
     /* End of conditionless FOR loop */
-    stepstat[0] += 1;
+    counters.steps_accepted += 1;
 
     /* Update dif: one row-local pass. Previously two passes, the second of which
        (j outer, ii inner) strode through memory by one full row per element since
@@ -695,13 +702,21 @@ void evolver_ndf15(
 
   if (verbose > 0) {
     printf("\n End of evolver. Next=%d, t=%e and tnew=%e.", next, t, tnew);
-    printf("\n Statistics: [%d %d %d %d %d %d] \n",
-           stepstat[0],
-           stepstat[1],
-           stepstat[2],
-           stepstat[3],
-           stepstat[4],
-           stepstat[5]);
+    printf(
+        "\n Statistics: %lld accepted, %lld rejected, %lld derivs, %lld jacobians, "
+        "%lld LU, %lld solves\n",
+        counters.steps_accepted,
+        counters.steps_rejected,
+        counters.derivs_evaluations,
+        counters.jacobians,
+        counters.lu_decompositions,
+        counters.linear_solves);
+  }
+
+  /* These six counters have been collected and discarded since this evolver was
+     written; EvolverOptions::stats is how they get out. */
+  if (options.stats != nullptr) {
+    *options.stats = counters;
   }
 
   /** Deallocate memory */

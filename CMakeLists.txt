@@ -130,6 +130,7 @@ set(CLASS_TOOLS_FILES
   tools/evolver_erk.cpp
   tools/evolver_etd.cpp
   tools/evolver_ndf15.cpp
+  tools/evolver_options.cpp
   tools/evolver_rkck.cpp
   tools/evolver_rkdp45.cpp
   tools/evolver_tsit5.cpp
@@ -265,6 +266,8 @@ if(NOT SKBUILD)
   add_executable(test-reduced-operator tools/reduced_operator_test.cpp)
   add_executable(test-evolver-erk tools/evolver_erk_test.cpp)
   add_executable(test-evolver-erk-config tools/evolver_erk_config_test.cpp)
+  add_executable(test-evolver-options tools/evolver_options_test.cpp)
+  add_executable(test-evolver-selection tools/evolver_selection_test.cpp)
   add_executable(test-evolver-etd tools/evolver_etd_test.cpp)
   add_executable(test-evolver-nonfinite tools/evolver_nonfinite_test.cpp)
   add_executable(test-photons species/photons_formula_test.cpp)
@@ -287,7 +290,7 @@ if(NOT SKBUILD)
   add_executable(test-dr-psd species/dr_psd_test.cpp)
   add_executable(test-ncdm-family species/ncdm_family_test.cpp)
   add_executable(test-species-budget species/species_budget_test.cpp)
-  foreach(_t IN ITEMS test-bbn-plasma test-bbn-rates test-bbn-weak test-bbn-solver test-parser test-precision-evolver test-errors test-tca-ic-guard test-deposition test-hyrec test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-tensor-tca test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-ncdm-family test-species-budget)
+  foreach(_t IN ITEMS test-evolver-options test-evolver-selection test-bbn-plasma test-bbn-rates test-bbn-weak test-bbn-solver test-parser test-precision-evolver test-errors test-tca-ic-guard test-deposition test-hyrec test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-tensor-tca test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-ncdm-family test-species-budget)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for

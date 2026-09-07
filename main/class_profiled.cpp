@@ -26,6 +26,7 @@
 #include "cosmology.h"
 #include "evolver_erk.h"
 #include "input_module.h"
+#include "perturbations_module.h"
 
 namespace {
 
@@ -90,7 +91,7 @@ int main(int argc, char** argv) {
   const size_t n_stages                 = labels.size();
   std::vector<std::vector<double>> samples(n_stages);
   std::vector<double> totals;
-  ErkStats erk_last;
+  EvolverStats erk_last;
   ErkHistograms erk_hist;
 
   printf("Profiling '%s' over %d loop(s)...\n", argv[1], num_loops);
@@ -113,23 +114,18 @@ int main(int argc, char** argv) {
       cosmology.GetThermodynamicsModule();
       stage_ms[2] = ms_since(t);
       t           = Clock::now();
-      // Explicit-RK step statistics for this loop only. Cheap (a handful of
-      // relaxed atomics per step) but not free, so it is enabled around the
-      // perturbations stage rather than globally.
-      // The counters are a handful of relaxed atomics per step -- small, but a
-      // PER-STEP cost, so leaving them on while comparing integrators that take
-      // different numbers of steps tilts the wall-time measurement towards
-      // whichever takes fewer. CLASS_ERK_NOSTATS turns them off for timing runs.
-      const bool want_stats = (getenv("CLASS_ERK_NOSTATS") == nullptr);
-      evolver_erk_stats_reset();
-      evolver_erk_stats_enable(want_stats);
-      evolver_erk_histograms_enable(want_stats && getenv("CLASS_ERK_HIST") != nullptr);
-      cosmology.GetPerturbationsModule();
-      evolver_erk_stats_enable(false);
-      erk_last    = evolver_erk_stats_get();
-      erk_hist    = evolver_erk_histograms_get();
-      stage_ms[3] = ms_since(t);
-      t           = Clock::now();
+      // Step statistics come back from the module itself, summed over every
+      // wavenumber and thread. They used to be process-wide atomics incremented
+      // once per STEP, which cost enough that CLASS_ERK_NOSTATS existed to switch
+      // them off before timing -- leaving them on tilted a comparison towards
+      // whichever integrator took fewer steps. They are now per-call counters
+      // accumulated once per interval, so there is nothing left to switch off.
+      // Histograms still cost a log10 per step; set `evolver_histograms = yes`.
+      auto& perturbations_module = cosmology.GetPerturbationsModule();
+      erk_last                   = perturbations_module->evolver_stats_;
+      erk_hist                   = perturbations_module->erk_histograms_;
+      stage_ms[3]                = ms_since(t);
+      t                          = Clock::now();
       cosmology.GetPrimordialModule();
       stage_ms[4] = ms_since(t);
       t           = Clock::now();
@@ -171,14 +167,21 @@ int main(int argc, char** argv) {
   if (erk_last.steps_accepted + erk_last.steps_rejected > 0) {
     const long long attempted = erk_last.steps_accepted + erk_last.steps_rejected;
     printf(
-        "Explicit-RK perturbation steps (last loop): %lld accepted, %lld rejected"
+        "Perturbation evolver steps (last loop): %lld accepted, %lld rejected"
         " (%.2f%% of %lld attempts), %lld RHS evaluations\n",
         erk_last.steps_accepted,
         erk_last.steps_rejected,
         100.0 * erk_last.steps_rejected / attempted,
         attempted,
-        erk_last.derivs_calls);
-    if (getenv("CLASS_ERK_HIST") != nullptr) {
+        erk_last.derivs_evaluations);
+    /* Printed when there is something to print. Collection is driven by the
+       `evolver_histograms` input rather than by an environment variable, so the
+       gate follows the data instead of a second, hidden switch. */
+    long long histogram_entries = 0;
+    for (int i = 0; i < ErkHistograms::kErrBins; i++) {
+      histogram_entries += erk_hist.err_accepted[i] + erk_hist.err_rejected[i];
+    }
+    if (histogram_entries > 0) {
       printf("  log10(err/rtol)   accepted   rejected      (1.0 = the acceptance boundary)\n");
       for (int i = 0; i < ErkHistograms::kErrBins; i++) {
         if (erk_hist.err_accepted[i] + erk_hist.err_rejected[i] == 0)

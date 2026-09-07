@@ -48,23 +48,20 @@
  * throughout. minimum_variation, evaluate_timescale and timestep_over_timescale are
  * part of the shared CLASS evolver signature and unused here, as in rkdp45.
  */
-void evolver_etd(
-    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-    double x_ini,
-    double x_end,
-    double* y,
-    int* used_in_output,
-    int y_size,
-    void* parameters_and_workspace_for_derivs,
-    double tolerance,
-    double minimum_variation,
-    void (*evaluate_timescale)(double x, void* parameters_and_workspace, double* timescale),
-    double timestep_over_timescale,
-    double* x_sampling,
-    int x_size,
-    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
-    void (*derivs_diagonal)(double x, double* y, double* diag, void* parameters_and_workspace));
+/** Exponential time differencing (ETDRK4).
+ *
+ *  The ONLY evolver that honours EvolverFeature::Diagonal, which it
+ *  exponentiates. With a null diagonal it sets L = 0, and the phi functions
+ *  reduce it to classical RK4 -- see the discussion further up this header. */
+#include "evolver_options.h"
+
+void evolver_etd(EvolverDerivs derivs,
+                 double x_ini,
+                 double x_end,
+                 double* y,
+                 int y_size,
+                 void* parameters_and_workspace_for_derivs,
+                 const EvolverOptions& options);
 
 /**************************************************************/
 

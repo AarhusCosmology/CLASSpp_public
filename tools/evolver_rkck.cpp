@@ -1,26 +1,30 @@
 #include "evolver_rkck.h"
 
+#include <limits>
 #include <vector>
 
-void evolver_rk(
-    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-    double x_ini,
-    double x_end,
-    double* y,
-    int* used_in_output,
-    int y_size,
-    void* parameters_and_workspace_for_derivs,
-    double tolerance,
-    double minimum_variation,
-    void (*evaluate_timescale)(double x, void* parameters_and_workspace, double* timescale),
-    double timestep_over_timescale,
-    double* x_sampling,
-    int x_size,
-    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
-    /* Part of the shared evolver signature; unused here. See evolver_rkck.h. */
-    void (* /*derivs_diagonal*/)(
-        double x, double* y, double* diag, void* parameters_and_workspace)) {
+void evolver_rk(EvolverDerivs derivs,
+                double x_ini,
+                double x_end,
+                double* y,
+                int y_size,
+                void* parameters_and_workspace_for_derivs,
+                const EvolverOptions& options) {
+  EvolverOptionsCheck(options, "evolver_rk", x_ini, {EvolverFeature::Timescale});
+
+  const double tolerance                    = options.rtol;
+  const double* x_sampling                  = options.x_sampling;
+  const int x_size                          = options.x_sampling_size;
+  const int* used_in_output                 = options.used_in_output;
+  const EvolverOutput output                = options.output;
+  const EvolverPrint print_variables        = options.print_variables;
+  const EvolverTimescale evaluate_timescale = options.evaluate_timescale;
+  const double timestep_over_timescale      = options.timestep_over_timescale;
+  /* Every caller filled this with ppr->smallest_allowed_variation, which is
+     never read from the input file and so is always DBL_EPSILON. Taken directly
+     rather than passed through sixteen arguments. */
+  const double minimum_variation = std::numeric_limits<double>::epsilon();
+
   int next_index_x;
   double x1, x2 = 0., timestep, timescale;
   struct generic_integrator_workspace gi;

@@ -1,9 +1,11 @@
 #ifndef PERTURBATIONS_MODULE_H
 #define PERTURBATIONS_MODULE_H
 
+#include <mutex>
 #include <vector>
 
 #include "base_module.h"
+#include "evolver_options.h"
 #include "input_module.h"
 
 class PpfFluid;
@@ -220,7 +222,19 @@ class PerturbationsModule : public BaseModule {
   //@}
 
   std::vector<double> tau_sampling_; /**< array of tau values */
-  int tau_size_;                     /**< number of values in this array */
+
+  /** Evolver step statistics, summed over every wavenumber and every thread.
+   *
+   *  These used to be process-wide atomics inside the explicit-RK evolver,
+   *  incremented once per STEP across threads. They are now per-call counters
+   *  that each task accumulates here once, under the mutex below -- thousands of
+   *  times fewer synchronisations, and no global state. Filled unconditionally,
+   *  because a plain increment per step is free; the histograms beside them are
+   *  not, and are collected only when ppr->evolver_histograms asks. */
+  EvolverStats evolver_stats_;
+  ErkHistograms erk_histograms_;
+  std::mutex evolver_stats_mutex_; /**< guards the two above; taken once per task */
+  int tau_size_;                   /**< number of values in this array */
 
   std::vector<int> k_size_cl_;         /**< k_size_cl[index_md] number of k values used
                        for non-CMB \f$ C_l \f$ calculations, requiring a coarse

@@ -531,6 +531,16 @@ struct precision {
   evolver_type evolver_perturbations  = evolver_type::ndf15;
 
   /**
+   * Collect explicit-RK step-acceptance histograms during the perturbations.
+   *
+   * Step COUNTERS are always collected -- they are a plain increment per step
+   * into a per-call struct, so they cost nothing measurable. The histograms are
+   * different: each step costs a log10 to find its bin, so they are opt-in. Only
+   * the explicit Runge-Kutta evolvers produce them.
+   */
+  bool evolver_histograms = false;
+
+  /**
    * Step-size controller, error norm and interpolant for the explicit embedded
    * pairs (rkdp45, tsit5). They do nothing for the other integrators.
    *

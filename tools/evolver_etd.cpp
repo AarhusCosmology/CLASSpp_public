@@ -73,33 +73,36 @@ inline void PhiFuncs(double z, double& e0, double& p1, double& p2, double& p3) {
 
 }  // namespace
 
-void evolver_etd(
-    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-    double x_ini,
-    double x_end,
-    double* y,
-    int* used_in_output,
-    int y_size,
-    void* parameters_and_workspace_for_derivs,
-    double tolerance,
-    double minimum_variation,
-    void (*evaluate_timescale)(double x, void* parameters_and_workspace, double* timescale),
-    double timestep_over_timescale,
-    double* x_sampling,
-    int x_size,
-    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace),
-    void (*derivs_diagonal)(double x, double* y, double* diag, void* parameters_and_workspace)) {
-  (void) minimum_variation;
-  (void) evaluate_timescale;
-  (void) timestep_over_timescale;
+void evolver_etd(EvolverDerivs derivs,
+                 double x_ini,
+                 double x_end,
+                 double* y,
+                 int y_size,
+                 void* parameters_and_workspace_for_derivs,
+                 const EvolverOptions& options) {
+  EvolverOptionsCheck(options,
+                      "evolver_etd",
+                      x_ini,
+                      {EvolverFeature::Diagonal, EvolverFeature::Stats, EvolverFeature::AbsTol});
+
+  const double tolerance                = options.rtol;
+  const double* x_sampling              = options.x_sampling;
+  const int x_size                      = options.x_sampling_size;
+  const int* used_in_output             = options.used_in_output;
+  const EvolverOutput output            = options.output;
+  const EvolverPrint print_variables    = options.print_variables;
+  const EvolverDiagonal derivs_diagonal = options.derivs_diagonal;
+
+  /* Counted unconditionally: a local increment costs nothing, and the copy at
+     the end is all the caller asked for. */
+  EvolverStats counters;
 
   class_test(x_sampling == nullptr, "etd requires a non-null x_sampling array");
   class_test(tolerance <= 0., "etd requires tolerance > 0 (got %e)", tolerance);
 
   const int neq          = y_size;
   const double rtol      = tolerance;
-  const double abstol    = 1e-15; /* matches ndf15 / rkdp45 */
+  const double abstol    = options.abstol;
   const double threshold = abstol / rtol;
 
   /* The accepted solution is order 4 and the embedded companion below is order 3, so
@@ -117,6 +120,7 @@ void evolver_etd(
   std::vector<double> yinterp(neq), dyinterp(neq), fnew(neq), scratch((size_t) 8 * neq);
 
   double t = x_ini;
+  ++counters.derivs_evaluations;
   (*derivs)(t, y, f0.data(), parameters_and_workspace_for_derivs);
 
   const double hmax = std::fabs(x_end - x_ini) / 10.0;
@@ -215,6 +219,7 @@ void evolver_etd(
         N1[k] = fin[k] - diag[k] * yin[k];
         U2[k] = e0 * yin[k] + 0.5 * hh * p1 * N1[k];
       }
+      ++counters.derivs_evaluations;
       (*derivs)(tin + 0.5 * hh, U2, tmp, parameters_and_workspace_for_derivs);
       for (int k = 0; k < neq; k++) {
         double e0, p1, p2, p3;
@@ -222,6 +227,7 @@ void evolver_etd(
         N2[k] = tmp[k] - diag[k] * U2[k];
         U3[k] = e0 * yin[k] + 0.5 * hh * p1 * N2[k];
       }
+      ++counters.derivs_evaluations;
       (*derivs)(tin + 0.5 * hh, U3, tmp, parameters_and_workspace_for_derivs);
       for (int k = 0; k < neq; k++) {
         double e0, p1, p2, p3;
@@ -229,6 +235,7 @@ void evolver_etd(
         N3[k] = tmp[k] - diag[k] * U3[k];
         U4[k] = e0 * U2[k] + 0.5 * hh * p1 * (2. * N3[k] - N1[k]);
       }
+      ++counters.derivs_evaluations;
       (*derivs)(tin + hh, U4, tmp, parameters_and_workspace_for_derivs);
       for (int k = 0; k < neq; k++) {
         double e0, p1, p2, p3;
@@ -252,6 +259,7 @@ void evolver_etd(
        At L=0 this is the classical RK4 tableau with a fifth endpoint-derivative stage
        and weights [1/6, 1/3, 1/3, 0, 1/6]. For a constant remainder N, N4=N5, so the
        stiff scalar relaxation stays exact and does not limit the step. */
+    ++counters.derivs_evaluations;
     (*derivs)(t + h, ynew.data(), fnew.data(), parameters_and_workspace_for_derivs);
     {
       const double* N4 = scratch.data() + 3 * neq;
@@ -299,6 +307,7 @@ void evolver_etd(
     }
 
     if (errmax > rtol) {
+      ++counters.steps_rejected;
       if (nofailed) {
         nofailed = false;
         hnew     = tdir *
@@ -312,6 +321,7 @@ void evolver_etd(
 
     /* Step accepted. fnew was already computed for the embedded estimate and becomes
        both this step's reported derivative and the next step's f0. */
+    ++counters.steps_accepted;
     const double tnew = t + h;
 
     if (print_variables != nullptr)
@@ -389,5 +399,9 @@ void evolver_etd(
       f0[k] = fnew[k];
     }
     t = tnew;
+  }
+
+  if (options.stats != nullptr) {
+    *options.stats = counters;
   }
 }

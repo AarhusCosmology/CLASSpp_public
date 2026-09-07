@@ -2641,6 +2641,13 @@ void read(const FileContent& fc, const char* name, int& v) {
 void read(const FileContent& fc, const char* name, std::string& v) {
   v = fc.get_or(name, v);
 }
+void read(const FileContent& fc, const char* name, bool& v) {
+  /* Accepts the y/n spellings used elsewhere in the input, and 0/1. */
+  if (auto text = fc.get<std::string>(name)) {
+    const char first = text->empty() ? 'n' : static_cast<char>(std::tolower(text->front()));
+    v                = (first == 'y' || first == 't' || first == '1');
+  }
+}
 template <typename E>
 void read_enum(const FileContent& fc, const char* name, E& v) {
   v = static_cast<E>(fc.get_or<int>(name, static_cast<int>(v)));
@@ -2674,6 +2681,7 @@ void precision::parse(const FileContent& fc) {
   read(fc, "sBBN file", sBBN_file);
   read(fc, "bbn_rates_file", bbn_rates_file);
   read(fc, "tol_bbn_integration", tol_bbn_integration);
+  read(fc, "evolver_histograms", evolver_histograms);
   read(fc, "bbn_T9_initial", bbn_T9_initial);
   read(fc, "bbn_T9_final", bbn_T9_final);
   read(fc, "bbn_history_file", bbn_history_file);

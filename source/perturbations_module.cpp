@@ -652,11 +652,6 @@ void PerturbationsModule::perturb_init() {
   /** - create an array of workspaces in multi-thread case */
 
   /** - loop over modes (scalar, tensors, etc). For each mode: */
-  /* Configure the shared explicit-RK controller from THIS module's ppr, and do it
-     before the task system fans out: Cosmology is lazy, so setting it at parse
-     time would let a second object parsed in between decide what this run uses. */
-  evolver_erk_configure(ppr->erk_controller_config());
-
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<void>> future_output;
 
@@ -2310,36 +2305,70 @@ void PerturbationsModule::perturb_solve(int index_md,
 
     /** - --> (d) integrate the perturbations over the current interval. */
 
+    /* Built per call rather than once outside the thread fan-out: the options are
+       a local, so there is no shared mutable controller state to establish in the
+       right order any more. Only what the chosen evolver honours is set. */
+    EvolverOptions options;
+    options.rtol            = ppr->tol_perturb_integration;
+    options.x_sampling      = tau_sampling_.data();
+    options.x_sampling_size = tau_actual_size;
+    options.used_in_output  = ppw->pv->used_in_sources.data();
+    options.output          = perturb_sources;
+    options.print_variables = perhaps_print_variables;
+
     auto generic_evolver = &evolver_ndf15;
     if (ppr->evolver_perturbations == evolver_type::rk) {
-      generic_evolver = &evolver_rk;
+      generic_evolver                 = &evolver_rk;
+      options.evaluate_timescale      = perturb_timescale;
+      options.timestep_over_timescale = ppr->perturb_integration_stepsize;
     }
     else if (ppr->evolver_perturbations == evolver_type::rkdp45) {
       generic_evolver = &evolver_rkdp45;
+      options.erk     = ppr->erk_controller_config();
     }
     else if (ppr->evolver_perturbations == evolver_type::etd) {
-      generic_evolver = &evolver_etd;
+      generic_evolver         = &evolver_etd;
+      options.derivs_diagonal = perturb_derivs_diagonal;
     }
     else if (ppr->evolver_perturbations == evolver_type::tsit5) {
       generic_evolver = &evolver_tsit5;
+      options.erk     = ppr->erk_controller_config();
+    }
+
+    /* Counters are per call and unsynchronised, so collecting them is free; the
+       histograms cost a log10 per step and are collected only on request. */
+    EvolverStats call_stats;
+    ErkHistograms call_histograms;
+    /* Only where the chosen evolver reports them: setting an option an evolver
+       does not honour is an error, so this cannot be unconditional. The legacy rk
+       delegates its stepping to generic_integrator and has no counters of its
+       own. */
+    if (ppr->evolver_perturbations != evolver_type::rk) {
+      options.stats = &call_stats;
+    }
+    if (ppr->evolver_histograms && (ppr->evolver_perturbations == evolver_type::rkdp45 ||
+                                    ppr->evolver_perturbations == evolver_type::tsit5)) {
+      options.histograms = &call_histograms;
     }
 
     generic_evolver(perturb_derivs,
                     interval_limit[index_interval],
                     interval_limit[index_interval + 1],
                     ppw->pv->y.data(),
-                    ppw->pv->used_in_sources.data(),
                     ppw->pv->pt_size,
                     &ppaw,
-                    ppr->tol_perturb_integration,
-                    ppr->smallest_allowed_variation,
-                    perturb_timescale,
-                    ppr->perturb_integration_stepsize,
-                    tau_sampling_.data(),
-                    tau_actual_size,
-                    perturb_sources,
-                    perhaps_print_variables,
-                    perturb_derivs_diagonal);
+                    options);
+
+    /* One lock per interval rather than an atomic per step. */
+    {
+      std::lock_guard<std::mutex> guard(evolver_stats_mutex_);
+      if (options.stats != nullptr) {
+        evolver_stats_.Add(call_stats);
+      }
+      if (options.histograms != nullptr) {
+        erk_histograms_.Add(call_histograms);
+      }
+    }
   }
 
   /** - complete the N-body-gauge gamma source. The stored k2gamma_Nb still

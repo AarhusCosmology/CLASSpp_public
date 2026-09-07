@@ -61,22 +61,16 @@ void test_stiff_constant_remainder_exact() {
   int used               = 1;
   std::vector<double> xs = {0., 0.25, 0.5, 0.75, 1.};
 
-  evolver_etd(linear_derivs,
-              0.,
-              1.,
-              &y,
-              &used,
-              1,
-              &problem,
-              1e-8,
-              1e-10,
-              nullptr,
-              0.,
-              xs.data(),
-              static_cast<int>(xs.size()),
-              output_store,
-              nullptr,
-              linear_diag);
+  {
+    EvolverOptions opt;
+    opt.rtol            = 1e-8;
+    opt.used_in_output  = &used;
+    opt.x_sampling      = xs.data();
+    opt.x_sampling_size = static_cast<int>(xs.size());
+    opt.output          = output_store;
+    opt.derivs_diagonal = linear_diag;
+    evolver_etd(linear_derivs, 0., 1., &y, 1, &problem, opt);
+  }
 
   for (int i = 0; i < static_cast<int>(xs.size()); ++i) {
     const double expected = linear_exact(0.2, problem.lambda, problem.gain, xs[i]);
@@ -101,22 +95,15 @@ void test_zero_diagonal_rk4_fallback() {
   int used               = 1;
   std::vector<double> xs = {0., 0.25, 0.5};
 
-  evolver_etd(quadratic_derivs,
-              0.,
-              0.5,
-              &y,
-              &used,
-              1,
-              &problem,
-              1e-8,
-              1e-10,
-              nullptr,
-              0.,
-              xs.data(),
-              static_cast<int>(xs.size()),
-              output_store,
-              nullptr,
-              nullptr);
+  {
+    EvolverOptions opt;
+    opt.rtol            = 1e-8;
+    opt.used_in_output  = &used;
+    opt.x_sampling      = xs.data();
+    opt.x_sampling_size = static_cast<int>(xs.size());
+    opt.output          = output_store;
+    evolver_etd(quadratic_derivs, 0., 0.5, &y, 1, &problem, opt);
+  }
 
   assert(std::fabs(y - 2.) < 2e-5);
   assert(std::fabs(problem.sampled_y[1] - 4. / 3.) < 2e-5);
@@ -182,22 +169,16 @@ double solve_layer(double rtol, int nsample, int* rhs) {
 
   double y = Layer::exact(0.);
   int used = 1;
-  evolver_etd(layer_derivs,
-              0.,
-              1.,
-              &y,
-              &used,
-              1,
-              &l,
-              rtol,
-              0.,
-              nullptr,
-              0.,
-              xs.data(),
-              nsample,
-              layer_store,
-              nullptr,
-              layer_diag);
+  {
+    EvolverOptions opt;
+    opt.rtol            = rtol;
+    opt.used_in_output  = &used;
+    opt.x_sampling      = xs.data();
+    opt.x_sampling_size = nsample;
+    opt.output          = layer_store;
+    opt.derivs_diagonal = layer_diag;
+    evolver_etd(layer_derivs, 0., 1., &y, 1, &l, opt);
+  }
 
   double worst = 0.;
   for (int i = 0; i < nsample; ++i)
@@ -288,22 +269,16 @@ void test_nonlinear_coupled_converges() {
     double y[2]            = {0.3, 0.8};
     int used[2]            = {1, 1};
     std::vector<double> xs = {0., 1., 2.};
-    evolver_etd(coupled_derivs,
-                0.,
-                2.,
-                y,
-                used,
-                2,
-                &c,
-                rtol,
-                0.,
-                nullptr,
-                0.,
-                xs.data(),
-                3,
-                coupled_none,
-                nullptr,
-                coupled_diag);
+    {
+      EvolverOptions opt;
+      opt.rtol            = rtol;
+      opt.used_in_output  = used;
+      opt.x_sampling      = xs.data();
+      opt.x_sampling_size = 3;
+      opt.output          = coupled_none;
+      opt.derivs_diagonal = coupled_diag;
+      evolver_etd(coupled_derivs, 0., 2., y, 2, &c, opt);
+    }
     out[0] = y[0];
     out[1] = y[1];
     return c.derivs;

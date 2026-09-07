@@ -206,9 +206,13 @@ struct ErkControllerConfig {
   double pi_beta                    = 0.04; /* PI memory exponent; Hairer's DOPRI5 default */
 };
 
-/** Process-wide controller settings. Set once from input, read by every thread. */
-void evolver_erk_configure(const ErkControllerConfig& config);
-const ErkControllerConfig& evolver_erk_config();
+/* The process-wide evolver_erk_configure/evolver_erk_config pair is GONE. The
+   controller settings now travel in EvolverOptions::erk, per call. They were
+   global because the old sixteen-argument evolver signature had nowhere to put
+   them, which meant three modules each re-establishing them before evolving with
+   the same warning comment about Cosmology being lazy -- and a fourth evolving
+   module that forgot would silently inherit another cosmology's controller.
+   See docs/superpowers/specs/2026-09-06-evolver-options-design.md. */
 
 /** Aggregate step statistics, accumulated across threads when enabled. */
 struct ErkStats {
@@ -219,10 +223,11 @@ struct ErkStats {
   long long exact_points   = 0; /* output points that landed exactly on a step end */
 };
 
-void evolver_erk_stats_enable(bool on);
-bool evolver_erk_stats_enabled();
-void evolver_erk_stats_reset();
-ErkStats evolver_erk_stats_get();
+/* The process-wide stats API is GONE, as the controller config already was.
+   Counters now travel in EvolverOptions::stats, per call: they need no
+   synchronisation there, so the relaxed atomics -- a per-STEP cost the profiling
+   binary had an environment variable to switch off before timing -- are gone
+   too, and ndf15 reports through exactly the same struct. */
 
 /**
  * Where the steps and the rejections actually happen.
@@ -242,23 +247,35 @@ struct ErkHistograms {
   long long err_rejected[kErrBins] = {0};
   long long x_accepted[kXBins]     = {0};
   long long x_rejected[kXBins]     = {0};
+
+  /** Accumulate another run's bins, for a caller summing many calls. */
+  void Add(const ErkHistograms& other) {
+    for (int i = 0; i < kErrBins; ++i) {
+      err_accepted[i] += other.err_accepted[i];
+      err_rejected[i] += other.err_rejected[i];
+    }
+    for (int i = 0; i < kXBins; ++i) {
+      x_accepted[i] += other.x_accepted[i];
+      x_rejected[i] += other.x_rejected[i];
+    }
+  }
 };
 
 /* Histogram accumulation is a SEPARATE switch from the counters: it costs four
    more atomic increments per step, which is enough to move a wall-time
    measurement, and the counters are wanted in every benchmark while the
    histograms are wanted only when diagnosing the controller. */
-void evolver_erk_histograms_enable(bool on);
-ErkHistograms evolver_erk_histograms_get();
+/* Histograms likewise travel in EvolverOptions::histograms. Unlike the counters
+   they are NOT free -- each step costs a log10 to find its bin -- so a null
+   pointer, meaning "not collecting", is the gate. */
 
-/* Counter hooks used by the templated driver; out of line so the header stays
-   free of the atomics. */
 namespace erk_detail {
-void CountDerivs();
-void CountAccepted(double x, double err_ratio);
-void CountRejected(double x, double err_ratio);
-void CountDense();
-void CountExact();
+/** Count one step, and bin it if histograms are being collected.
+ *
+ *  Out of line only to keep log10 and the bin arithmetic out of the templated
+ *  driver; there is no hidden state behind it any more. */
+void Record(
+    long long* counter, ErkHistograms* histograms, bool accepted, double x, double err_ratio);
 }  // namespace erk_detail
 
 #endif

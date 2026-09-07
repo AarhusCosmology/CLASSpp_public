@@ -8,6 +8,7 @@
 
 #include "common.h"  // class_test, class_stop
 #include "evolver_erk.h"
+#include "evolver_options.h"
 #include "nonfinite.h"
 
 /**
@@ -20,19 +21,26 @@
  * evolver_erk.h on why that is load-bearing rather than cosmetic.
  */
 template <class Tab>
-void evolver_erk_run(
-    void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
-    double x_ini,
-    double x_end,
-    double* y,
-    int* used_in_output,
-    int y_size,
-    void* parameters_and_workspace_for_derivs,
-    double tolerance,
-    double* x_sampling,
-    int x_size,
-    void (*output)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace),
-    void (*print_variables)(double x, double y[], double dy[], void* parameters_and_workspace)) {
+void evolver_erk_run(EvolverDerivs derivs,
+                     double x_ini,
+                     double x_end,
+                     double* y,
+                     int y_size,
+                     void* parameters_and_workspace_for_derivs,
+                     const EvolverOptions& options) {
+  const double tolerance             = options.rtol;
+  const int* used_in_output          = options.used_in_output;
+  const double* x_sampling           = options.x_sampling;
+  const int x_size                   = options.x_sampling_size;
+  const EvolverOutput output         = options.output;
+  const EvolverPrint print_variables = options.print_variables;
+
+  /* Step-controller settings travel per call. They used to live in process-wide
+     state because the old evolver signature had nowhere to put them, which meant
+     three modules each re-establishing them before evolving, and a fourth that
+     forgot would silently inherit another cosmology's controller. */
+  const ErkControllerConfig cfg = options.erk.value_or(ErkControllerConfig{});
+
   /* Every step-size rule below reads cfg.safety and cfg.fac_min, including the
      `legacy` ones, which used to hard-code 0.8 and 0.1. At the defaults those ARE
      0.8 and 0.1, so `legacy` is unchanged; the point is that a knob the input
@@ -44,12 +52,16 @@ void evolver_erk_run(
   class_test(x_sampling == nullptr, "%s requires a non-null x_sampling array", Tab::kName);
   class_test(tolerance <= 0., "%s requires tolerance > 0 (got %e)", Tab::kName, tolerance);
 
-  const ErkControllerConfig cfg = evolver_erk_config(); /* one snapshot per call */
-  const bool track              = evolver_erk_stats_enabled();
+  /* Counters are local to this call, so they need no synchronisation -- the
+     relaxed atomics they replace cost a handful of operations per STEP, which
+     was enough that the profiling binary had an environment variable to switch
+     them off before timing. Null means "not collecting". */
+  EvolverStats counters;
+  ErkHistograms* const histograms = options.histograms;
 
   const int neq          = y_size;
   const double rtol      = tolerance;
-  const double abstol    = 1e-15; /* matches ndf15 */
+  const double abstol    = options.abstol;
   const double threshold = abstol / rtol;
   const double pow_grow  = 1.0 / Tab::kOrder;
   constexpr int s        = Tab::kStages;
@@ -81,8 +93,7 @@ void evolver_erk_run(
 
   /* initialise k0 = f(t, y) */
   (*derivs)(t, y, ki.data(), parameters_and_workspace_for_derivs);
-  if (track)
-    erk_detail::CountDerivs();
+  ++counters.derivs_evaluations;
 
   const double hmax = fabs(x_end - x_ini) / 10.0;
   double absh;
@@ -167,8 +178,7 @@ void evolver_erk_run(
                 ytemp.data(),
                 ki.data() + i * neq,
                 parameters_and_workspace_for_derivs);
-      if (track)
-        erk_detail::CountDerivs();
+      ++counters.derivs_evaluations;
       for (int k = 0; k < neq; k++) {
         ynew[k] += h * Tab::b[i] * ki[i * neq + k];
         err[k]  += h * Tab::e[i] * ki[i * neq + k];
@@ -240,8 +250,7 @@ void evolver_erk_run(
     }
 
     if (errnorm > rtol) {
-      if (track)
-        erk_detail::CountRejected(t, errnorm / rtol);
+      erk_detail::Record(&counters.steps_rejected, histograms, false, t, errnorm / rtol);
       if (cfg.kind == ErkControllerKind::legacy) {
         /* Standard ode45 control: first failure shrinks by the error-proportional
            factor and marks nofailed; consecutive failures halve. (This corrects a
@@ -269,8 +278,7 @@ void evolver_erk_run(
     }
 
     /* step accepted */
-    if (track)
-      erk_detail::CountAccepted(t, errnorm / rtol);
+    erk_detail::Record(&counters.steps_accepted, histograms, true, t, errnorm / rtol);
 
     if (!Tab::kFsal) {
       for (int k = 0; k < neq; k++)
@@ -279,8 +287,7 @@ void evolver_erk_run(
                 ytemp.data(),
                 ki.data() + idx_end * neq,
                 parameters_and_workspace_for_derivs);
-      if (track)
-        erk_detail::CountDerivs();
+      ++counters.derivs_evaluations;
     }
 
     if (print_variables != nullptr)
@@ -326,8 +333,7 @@ void evolver_erk_run(
     /* emit output at all sampling points within (t, tnew] */
     for (; (idx < x_size) && ((tnew - x_sampling[idx]) * tdir >= 0.0); idx++) {
       if (tnew == x_sampling[idx]) {
-        if (track)
-          erk_detail::CountExact();
+        ++counters.exact_points;
         (*output)(tnew,
                   ynew.data(),
                   ki.data() + idx_end * neq,
@@ -335,8 +341,7 @@ void evolver_erk_run(
                   parameters_and_workspace_for_derivs);
       }
       else {
-        if (track)
-          erk_detail::CountDense();
+        ++counters.dense_points;
         const double ti = x_sampling[idx];
         const double th = (ti - t) / h;
         /* theta^m, m = 0..deg. Squaring for m = 2 and m = 4 is not an
@@ -450,6 +455,10 @@ void evolver_erk_run(
       ki[k] = ki[idx_end * neq + k]; /* FSAL: last stage becomes next k0 */
     }
     t = tnew;
+  }
+
+  if (options.stats != nullptr) {
+    *options.stats = counters;
   }
 }
 

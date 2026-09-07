@@ -19,6 +19,7 @@
 #include "cosmology.h"
 #include "evolver_erk.h"
 #include "input_module.h"
+#include "perturbations_module.h"
 
 namespace {
 
@@ -41,11 +42,10 @@ FileContent input(int controller) {
 
 long long steps_for(FileContent fc) {
   Cosmology cosmology{fc};
-  evolver_erk_stats_reset();
-  evolver_erk_stats_enable(true);
-  cosmology.GetPerturbationsModule();
-  evolver_erk_stats_enable(false);
-  return evolver_erk_stats_get().steps_accepted;
+  /* Step counts come from the module, which sums them over every wavenumber and
+     thread. There is no enable/reset dance because there is no shared counter to
+     reset: each evolver call fills its own struct. */
+  return cosmology.GetPerturbationsModule()->evolver_stats_.steps_accepted;
 }
 
 }  // namespace
@@ -68,15 +68,16 @@ int main() {
   first.GetInputModule();
   second.GetInputModule();  // the hazard: the LAST parse used to win for everyone
 
-  evolver_erk_stats_reset();
-  evolver_erk_stats_enable(true);
-  first.GetPerturbationsModule();
-  evolver_erk_stats_enable(false);
-  const long long interleaved = evolver_erk_stats_get().steps_accepted;
+  const long long interleaved = first.GetPerturbationsModule()->evolver_stats_.steps_accepted;
 
   printf("  PI with a legacy cosmology parsed in between: %lld accepted steps\n", interleaved);
   assert(interleaved == alone_pi);
 
+  /* This hazard is now structurally impossible rather than merely absent: the
+     controller travels in EvolverOptions, per call, so there is no process-wide
+     setting for a second parse to overwrite. The test is kept because it checks
+     the surviving requirement -- that each cosmology's controller reaches its own
+     evolver calls -- and because it would catch a reintroduction. */
   printf("evolver_erk_config_test: the controller follows the cosmology, not the last parse\n");
   return 0;
 }

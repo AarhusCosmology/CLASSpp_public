@@ -686,23 +686,35 @@ void BackgroundModule::background_solve_evolver() {
   background_table_.resize(bt_size_ * bg_size_);
   d2background_dtau2_table_.resize(bt_size_ * bg_size_);
 
-  /* Configure the shared explicit-RK controller from THIS module's ppr, here
-     rather than at parse time: Cosmology is lazy, so a second object parsed in
-     between would otherwise be the one whose settings this run reads. */
-  evolver_erk_configure(ppr->erk_controller_config());
+  /* The options are built alongside the evolver choice, and carry ONLY what the
+     chosen evolver honours -- setting anything else is now an error rather than
+     a silent ignore. That makes visible here what used to be buried in the
+     evolver implementations: the Jacobian diagonal matters to etd alone, and the
+     timescale pair to the legacy rk alone. */
+  EvolverOptions options;
+  options.rtol            = ppr->tol_background_integration;
+  options.x_sampling      = loga.data();
+  options.x_sampling_size = bt_size_;
+  options.used_in_output  = used_in_output.data();
+  options.output          = background_add_line_to_bg_table;
 
   auto generic_evolver = &evolver_ndf15;
   if (ppr->evolver_background == evolver_type::rk) {
-    generic_evolver = &evolver_rk;
+    generic_evolver                 = &evolver_rk;
+    options.evaluate_timescale      = background_timescale;
+    options.timestep_over_timescale = ppr->perturb_integration_stepsize;
   }
   else if (ppr->evolver_background == evolver_type::rkdp45) {
     generic_evolver = &evolver_rkdp45;
+    options.erk     = ppr->erk_controller_config();
   }
   else if (ppr->evolver_background == evolver_type::tsit5) {
     generic_evolver = &evolver_tsit5;
+    options.erk     = ppr->erk_controller_config();
   }
   else if (ppr->evolver_background == evolver_type::etd) {
-    generic_evolver = &evolver_etd;
+    generic_evolver         = &evolver_etd;
+    options.derivs_diagonal = background_derivs_diagonal_loga;
   }
 
   /* Size of vector to integrate is (bi_size_-1) rather than
@@ -712,18 +724,9 @@ void BackgroundModule::background_solve_evolver() {
                   loga_ini,
                   loga_final,
                   pvecback_integration.data(),
-                  used_in_output.data(),
                   bi_size_ - 1,
                   &bpaw,
-                  ppr->tol_background_integration,
-                  ppr->smallest_allowed_variation,
-                  background_timescale,
-                  ppr->perturb_integration_stepsize,
-                  loga.data(),
-                  bt_size_,
-                  background_add_line_to_bg_table,
-                  nullptr,
-                  background_derivs_diagonal_loga);
+                  options);
 
   /** - deduce age of the Universe */
   /* -> age in Gyears */

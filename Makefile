@@ -2,6 +2,8 @@
 BUILD_DIR ?= build/cmake
 
 TEST_TARGETS := \
+	test-evolver-options \
+	test-evolver-selection \
 	test-bbn-plasma \
 	test-bbn-rates \
 	test-bbn-weak \

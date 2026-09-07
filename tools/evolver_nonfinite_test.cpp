@@ -84,22 +84,15 @@ void test_evolver_aborts_on_nonfinite() {
   bool threw             = false;
   std::string msg;
   try {
-    evolver_rkdp45(derivs_goes_nan,
-                   0.,
-                   1.,
-                   &y,
-                   &used,
-                   1,
-                   nullptr,
-                   1e-5,
-                   1e-10,
-                   nullptr,
-                   0.,
-                   xs.data(),
-                   static_cast<int>(xs.size()),
-                   output_noop,
-                   nullptr,
-                   nullptr);
+    {
+      EvolverOptions opt;
+      opt.rtol            = 1e-5;
+      opt.used_in_output  = &used;
+      opt.x_sampling      = xs.data();
+      opt.x_sampling_size = static_cast<int>(xs.size());
+      opt.output          = output_noop;
+      evolver_rkdp45(derivs_goes_nan, 0., 1., &y, 1, nullptr, opt);
+    }
   }
   catch (const std::runtime_error& e) {
     threw = true;
@@ -118,22 +111,15 @@ void test_finite_run_still_completes() {
   double y               = 0.;
   int used               = 1;
   std::vector<double> xs = {0., 1.};
-  evolver_rkdp45(derivs_finite,
-                 0.,
-                 1.,
-                 &y,
-                 &used,
-                 1,
-                 nullptr,
-                 1e-5,
-                 1e-10,
-                 nullptr,
-                 0.,
-                 xs.data(),
-                 static_cast<int>(xs.size()),
-                 output_noop,
-                 nullptr,
-                 nullptr);
+  {
+    EvolverOptions opt;
+    opt.rtol            = 1e-5;
+    opt.used_in_output  = &used;
+    opt.x_sampling      = xs.data();
+    opt.x_sampling_size = static_cast<int>(xs.size());
+    opt.output          = output_noop;
+    evolver_rkdp45(derivs_finite, 0., 1., &y, 1, nullptr, opt);
+  }
   assert(y > 0.999 && y < 1.001);  // y' = 1 over [0,1]
   std::printf("nonfinite: finite run unaffected (y=%.6f)\n", y);
 }

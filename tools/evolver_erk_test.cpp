@@ -245,7 +245,11 @@ void counting_derivs(double t, double* y, double* dy, void* p) {
 }
 
 template <class Tab>
-double run_to_tolerance(double rtol, int* rhs_calls) {
+double run_to_tolerance(double rtol,
+                        int* rhs_calls,
+                        const ErkControllerConfig& cfg = ErkControllerConfig{},
+                        EvolverStats* stats            = nullptr,
+                        ErkHistograms* histograms      = nullptr) {
   const int n = 41;
   Sampled s;
   s.t.resize(n);
@@ -256,8 +260,16 @@ double run_to_tolerance(double rtol, int* rhs_calls) {
 
   double y[2] = {1.0, 1.0};
   int used[2] = {1, 1};
-  evolver_erk_run<
-      Tab>(counting_derivs, 0.0, 2.0, y, used, 2, &s, rtol, xs.data(), n, store, nullptr);
+  EvolverOptions options;
+  options.rtol            = rtol;
+  options.x_sampling      = xs.data();
+  options.x_sampling_size = n;
+  options.used_in_output  = used;
+  options.output          = store;
+  options.erk             = cfg;
+  options.stats           = stats;
+  options.histograms      = histograms;
+  evolver_erk_run<Tab>(counting_derivs, 0.0, 2.0, y, 2, &s, options);
 
   double worst = 0.0;
   for (int i = 1; i < n; i++) {
@@ -302,30 +314,20 @@ void test_pairs_agree() {
   b.y0.resize(n);
   double ya[2] = {1.0, 1.0}, yb[2] = {1.0, 1.0};
   int used[2] = {1, 1};
-  evolver_erk_run<ErkDormandPrince45>(counting_derivs,
-                                      0.0,
-                                      2.0,
-                                      ya,
-                                      used,
-                                      2,
-                                      &a,
-                                      1e-8,
-                                      xs.data(),
-                                      n,
-                                      store,
-                                      nullptr);
-  evolver_erk_run<ErkTsitouras54>(counting_derivs,
-                                  0.0,
-                                  2.0,
-                                  yb,
-                                  used,
-                                  2,
-                                  &b,
-                                  1e-8,
-                                  xs.data(),
-                                  n,
-                                  store,
-                                  nullptr);
+  EvolverOptions opt_a;
+  opt_a.rtol            = 1e-8;
+  opt_a.x_sampling      = xs.data();
+  opt_a.x_sampling_size = n;
+  opt_a.used_in_output  = used;
+  opt_a.output          = store;
+  evolver_erk_run<ErkDormandPrince45>(counting_derivs, 0.0, 2.0, ya, 2, &a, opt_a);
+  EvolverOptions opt_b;
+  opt_b.rtol            = 1e-8;
+  opt_b.x_sampling      = xs.data();
+  opt_b.x_sampling_size = n;
+  opt_b.used_in_output  = used;
+  opt_b.output          = store;
+  evolver_erk_run<ErkTsitouras54>(counting_derivs, 0.0, 2.0, yb, 2, &b, opt_b);
   double worst = 0.0;
   for (int i = 1; i < n; i++)
     worst = std::max(worst, fabs(a.y0[i] - b.y0[i]) / fabs(a.y0[i]));
@@ -336,16 +338,12 @@ void test_pairs_agree() {
 /* Exact output stepping must actually deliver what it claims: no output point
    may be served by the interpolant, and the answer must still be right. */
 void test_exact_output_stepping() {
-  const ErkControllerConfig saved = evolver_erk_config();
   ErkControllerConfig cfg;
   cfg.output_stepping = ErkOutputStepping::exact;
-  evolver_erk_configure(cfg);
-  evolver_erk_stats_reset();
-  evolver_erk_stats_enable(true);
-  int calls    = 0;
-  double worst = run_to_tolerance<ErkTsitouras54>(1e-8, &calls);
-  evolver_erk_stats_enable(false);
-  const ErkStats st = evolver_erk_stats_get();
+  int calls           = 0;
+  EvolverStats st;
+  double worst = run_to_tolerance<ErkTsitouras54>(1e-8, &calls, cfg, &st);
+
   printf(
       "  exact output stepping: error %.2e, %lld accepted, %lld dense points "
       "(only the interval start), %lld exact points\n",
@@ -360,7 +358,6 @@ void test_exact_output_stepping() {
   assert(st.dense_points <= 1);
   assert(st.exact_points == 40);
   assert(worst < 50.0 * 1e-8);
-  evolver_erk_configure(saved);
 }
 
 /* The quintic Hermite interpolant must beat the tableau's own continuous
@@ -368,20 +365,17 @@ void test_exact_output_stepping() {
    Both are compared at the same tolerance so the step sequences are identical
    and the only difference measured is the polynomial. */
 void test_hermite_interpolant() {
-  const ErkControllerConfig saved = evolver_erk_config();
   double err_tab = 0.0, err_her = 0.0;
   int calls_tab = 0, calls_her = 0;
   {
     ErkControllerConfig cfg;
     cfg.interpolant = ErkInterpolant::tableau;
-    evolver_erk_configure(cfg);
-    err_tab = run_to_tolerance<ErkTsitouras54>(1e-6, &calls_tab);
+    err_tab         = run_to_tolerance<ErkTsitouras54>(1e-6, &calls_tab, cfg);
   }
   {
     ErkControllerConfig cfg;
     cfg.interpolant = ErkInterpolant::hermite3;
-    evolver_erk_configure(cfg);
-    err_her = run_to_tolerance<ErkTsitouras54>(1e-6, &calls_her);
+    err_her         = run_to_tolerance<ErkTsitouras54>(1e-6, &calls_her, cfg);
   }
   printf(
       "  at rtol=1e-6, same %d RHS calls: tableau extension %.2e, quintic Hermite %.2e "
@@ -392,14 +386,12 @@ void test_hermite_interpolant() {
       err_tab / err_her);
   assert(calls_tab == calls_her); /* the interpolant must not change the stepping */
   assert(err_her < err_tab);
-  evolver_erk_configure(saved);
 }
 
 /* Every controller must reach the requested accuracy. What differs is the COST
    and the fraction of attempts thrown away, which is the whole reason the
    alternatives exist -- so the counters are reported, not asserted on. */
 void test_controllers() {
-  const ErkControllerConfig saved = evolver_erk_config();
   struct Case {
     const char* name;
     ErkControllerKind kind;
@@ -411,15 +403,12 @@ void test_controllers() {
                         {"pi+rms", ErkControllerKind::pi, ErkErrorNorm::rms_norm}};
   for (const Case& c : cases) {
     ErkControllerConfig cfg;
-    cfg.kind = c.kind;
-    cfg.norm = c.norm;
-    evolver_erk_configure(cfg);
-    evolver_erk_stats_reset();
-    evolver_erk_stats_enable(true);
-    int calls    = 0;
-    double worst = run_to_tolerance<ErkTsitouras54>(1e-8, &calls);
-    evolver_erk_stats_enable(false);
-    const ErkStats st  = evolver_erk_stats_get();
+    cfg.kind  = c.kind;
+    cfg.norm  = c.norm;
+    int calls = 0;
+    EvolverStats st;
+    double worst = run_to_tolerance<ErkTsitouras54>(1e-8, &calls, cfg, &st);
+
     const long long at = st.steps_accepted + st.steps_rejected;
     printf(
         "  controller %-7s error %.2e, %lld accepted / %lld attempted (%.1f%% rejected), "
@@ -432,9 +421,8 @@ void test_controllers() {
         st.dense_points);
     assert(worst < 50.0 * 1e-8);
     assert(st.steps_accepted > 0);
-    assert(st.derivs_calls == calls);
+    assert(st.derivs_evaluations == calls);
   }
-  evolver_erk_configure(saved);
 }
 
 }  // namespace

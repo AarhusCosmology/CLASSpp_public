@@ -174,12 +174,6 @@ void BbnDerivs(double tau, double* y, double* dy, void* parameters) {
   }
 }
 
-/** Required by the shared evolver signature; ndf15 ignores it, as it ignores
- *  minimum_variation and timestep_over_timescale. */
-void BbnTimescale(double, void*, double* timescales) {
-  timescales[0] = 1.0;
-}
-
 void BbnOutput(double tau, double* y, double* /*dy*/, int index, void* parameters) {
   BbnWorkspace& ws = *static_cast<BbnWorkspace*>(parameters);
 
@@ -364,22 +358,14 @@ BbnResult SolveBbn(const BbnInput& input) {
                         eta_target * BbnPlasma::NumberDensityPhoton(T_initial_mev),
                         &y[kIdxY]);
 
-  evolver_ndf15(BbnDerivs,
-                0.0,
-                tau_end,
-                y.data(),
-                used_in_output.data(),
-                kNeq,
-                &ws,
-                input.tolerance,
-                0.0,
-                BbnTimescale,
-                0.0,
-                prepass_tau.data(),
-                prepass_samples,
-                BbnOutput,
-                nullptr,
-                nullptr);
+  EvolverOptions options;
+  options.rtol            = input.tolerance;
+  options.used_in_output  = used_in_output.data();
+  options.output          = BbnOutput;
+  options.x_sampling      = prepass_tau.data();
+  options.x_sampling_size = prepass_samples;
+
+  evolver_ndf15(BbnDerivs, 0.0, tau_end, y.data(), kNeq, &ws, options);
 
   const double eta_growth = y[kIdxEta] / eta_target;
   result.aT_ratio         = std::exp(y[kIdxLnA]) * input.T9_final / input.T9_initial;
@@ -428,22 +414,10 @@ BbnResult SolveBbn(const BbnInput& input) {
                           eta_initial * BbnPlasma::NumberDensityPhoton(T_initial_mev),
                           &y[kIdxY]);
 
-    evolver_ndf15(BbnDerivs,
-                  0.0,
-                  tau_end,
-                  y.data(),
-                  used_in_output.data(),
-                  kNeq,
-                  &ws,
-                  input.tolerance,
-                  0.0,
-                  BbnTimescale,
-                  0.0,
-                  tau_samples.data(),
-                  static_cast<int>(tau_samples.size()),
-                  BbnOutput,
-                  nullptr,
-                  nullptr);
+    options.x_sampling      = tau_samples.data();
+    options.x_sampling_size = static_cast<int>(tau_samples.size());
+
+    evolver_ndf15(BbnDerivs, 0.0, tau_end, y.data(), kNeq, &ws, options);
 
     /* The pre-pass promised this; if it is not delivered, the assumption that the
        growth factor is eta-independent has failed and the answer is not the
