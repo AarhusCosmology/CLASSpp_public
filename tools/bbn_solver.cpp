@@ -198,7 +198,7 @@ void BbnOutput(double tau, double* y, double* /*dy*/, int index, void* parameter
 /** Thermal number-density scale (m T / 2 pi hbar^2)^{3/2} in cm^-3, for the Saha
  *  initial conditions. Deliberately the same expression detailed balance uses. */
 double ThermalScale(const BbnNuclide& nuc, double T_mev) {
-  const double theta = NuclearMassMeV(nuc) * T_mev / (2.0 * M_PI);
+  const double theta = NuclearMassMeV(nuc) * T_mev / (2.0 * _PI_);
   return std::pow(theta, 1.5) / BbnPlasma::InvCm3ToMeV3();
 }
 

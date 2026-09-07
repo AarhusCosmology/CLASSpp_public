@@ -769,6 +769,43 @@ class BaseSpecies {
     return false;
   }
 
+  /**
+   * Does this species carry a stiff Jacobian DIAGONAL that it reports through
+   * PerturbDerivsDiagonal, so the exponential evolver (`etd`) integrates that
+   * stiffness EXACTLY rather than resolving it?
+   *
+   * This is deliberately independent of SupportsExplicitPerturbationEvolver().
+   * A species can be unsafe under a plain explicit method and still be best
+   * served by etd, which is the self-interacting-neutrino case: its collision
+   * term is a pure relaxation -alpha_l * taudot * Psi_l reaching 1e7 * aH, so
+   * rkdp45 and tsit5 do not complete at ANY tolerance (measured: >380x, and
+   * loosening the tolerance 30x changes nothing because the limit is stability,
+   * not accuracy), while etd is 1.8-2.5x FASTER than ndf15.
+   *
+   * Answering true is a claim that the diagonal is both reported and correct.
+   * Pin it against finite differences of PerturbDerivs before setting it -- a
+   * wrong diagonal costs efficiency and conditioning silently rather than
+   * producing a visibly wrong answer.
+   */
+  virtual bool PrefersExponentialPerturbationEvolver() const {
+    return false;
+  }
+
+  /**
+   * Is this species well-conditioned under `etd`? A species is, if either it is
+   * safe under any explicit method, or its stiffness is the diagonal etd
+   * integrates exactly.
+   *
+   * Separate from the two above because a COMPOSITE cannot answer it by
+   * combining their answers: a composite that merely reports "some child prefers
+   * etd" and "not every child is explicit-safe" would hide a child that is
+   * neither. CompositeSpecies therefore overrides this to scan its children,
+   * exactly as it does for the explicit gate.
+   */
+  virtual bool SupportsExponentialPerturbationEvolver() const {
+    return SupportsExplicitPerturbationEvolver() || PrefersExponentialPerturbationEvolver();
+  }
+
  protected:
   BaseSpecies(std::string name, EnergyType energy_type)
       : name_(std::move(name)), energy_type_(energy_type) {}

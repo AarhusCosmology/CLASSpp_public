@@ -138,6 +138,26 @@ class CompositeSpecies : public BaseSpecies {
     return true;
   }
 
+  /** A composite benefits from `etd` if ANY child does -- the exponential step
+   *  is chosen for the whole system, so one stiff diagonal in the subtree is
+   *  enough to make it worth taking. */
+  bool PrefersExponentialPerturbationEvolver() const override {
+    for (const auto& c : children_)
+      if (c->PrefersExponentialPerturbationEvolver())
+        return true;
+    return false;
+  }
+
+  /** ...but it is only SAFE under etd if EVERY child is, which is why this
+   *  scans rather than combining the two answers above; see
+   *  BaseSpecies::SupportsExponentialPerturbationEvolver(). */
+  bool SupportsExponentialPerturbationEvolver() const override {
+    for (const auto& c : children_)
+      if (!c->SupportsExponentialPerturbationEvolver())
+        return false;
+    return true;
+  }
+
   /** Sums GetRadiationOmega0() over all children (dark-radiation children
    *  contribute their Omega0; matter children contribute 0). */
   double GetRadiationOmega0() const override {

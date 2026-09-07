@@ -16,6 +16,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "constants.h"
+
 namespace {
 
 std::string RatesFile() {
@@ -53,7 +55,7 @@ double ExpectedReverseOverForward(const BbnReaction& r, double T9) {
   /* One leftover factor of (m T / 2 pi)^{3/2} per unbalanced massive particle. */
   const int surplus  = r.n_reactants - r.n_products;
   ratio             *= std::pow(mass_ratio, 1.5);
-  ratio             *= std::pow(T / (2.0 * M_PI), 1.5 * surplus);
+  ratio             *= std::pow(T / (2.0 * _PI_), 1.5 * surplus);
   ratio             *= std::pow(kMeV3ToInvCm3, surplus);
 
   return ratio * std::exp(-ReactionQValueMeV(r) / T);

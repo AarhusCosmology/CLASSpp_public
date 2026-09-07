@@ -12,6 +12,7 @@
 #include <cstdio>
 
 #include "bbn_rates.h"
+#include "constants.h"
 
 namespace {
 
@@ -87,7 +88,7 @@ void test_hubble_conversion() {
   const double T           = MeVFromT9(10.0);
   const double rho         = BbnPlasma::RhoPhoton(T);
   const double mev4_to_cgs = 2.3200e5; /* g cm^-3 per MeV^4, to 5 digits */
-  const double expected    = std::sqrt(8.0 * M_PI * 6.67428e-8 * rho * mev4_to_cgs / 3.0);
+  const double expected    = std::sqrt(8.0 * _PI_ * 6.67428e-8 * rho * mev4_to_cgs / 3.0);
   assert(Close(BbnPlasma::HubbleFromRho(rho), expected, 1.0e-4));
 }
 

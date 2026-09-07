@@ -4,6 +4,7 @@
 
 #include "arrays.h"
 #include "bbn_nuclides.h"
+#include "constants.h"
 #include "errors.h"
 #include "quadrature.h"
 
@@ -33,7 +34,7 @@ inline double Occupation(double energy_over_T) {
  *  F would hit for a repelled positron near threshold. */
 double BetaTimesFermi(double eps, int sign) {
   const double beta = std::sqrt(std::max(eps * eps - 1.0, 0.0));
-  const double y    = 2.0 * M_PI * kAlphaEM * eps; /* = 2 pi eta * beta */
+  const double y    = 2.0 * _PI_ * kAlphaEM * eps; /* = 2 pi eta * beta */
 
   if (sign > 0) {
     /* Attractive (electron): beta*F = y / (1 - exp(-y/beta)).

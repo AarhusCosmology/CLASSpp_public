@@ -5,6 +5,7 @@
 #include <set>
 #include <sstream>
 
+#include "constants.h"
 #include "errors.h"
 
 namespace {
@@ -32,7 +33,7 @@ constexpr double kAvogadro = 6.02214076e23;
  *  every right-hand side was a pow() call per nuclide, for a number that never
  *  changes. */
 double ThermalScaleConstant(const BbnNuclide& nuc) {
-  const double theta = NuclearMassMeV(nuc) / (2.0 * M_PI);
+  const double theta = NuclearMassMeV(nuc) / (2.0 * _PI_);
   return std::pow(theta, 1.5) * kMeV3ToInvCm3;
 }
 

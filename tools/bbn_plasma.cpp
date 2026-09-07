@@ -55,11 +55,11 @@ BbnPlasma::BbnPlasma(int nodes, double u_max) : u_(nodes), w_(nodes) {
 }
 
 double BbnPlasma::RhoPhoton(double T_mev) {
-  return (M_PI * M_PI / 15.0) * T_mev * T_mev * T_mev * T_mev;
+  return (_PI_ * _PI_ / 15.0) * T_mev * T_mev * T_mev * T_mev;
 }
 
 double BbnPlasma::NumberDensityPhoton(double T_mev) {
-  const double n_natural = 2.0 * kZeta3 / (M_PI * M_PI) * T_mev * T_mev * T_mev;
+  const double n_natural = 2.0 * kZeta3 / (_PI_ * _PI_) * T_mev * T_mev * T_mev;
   return n_natural * kMeV3ToInvCm3;
 }
 
@@ -67,12 +67,12 @@ double BbnPlasma::RhoNeutrino(double T_nu_mev, double n_eff) {
   /* Per effective species (neutrino plus antineutrino, one helicity each):
      rho = 7/8 * 2 * pi^2/30 * T^4 = 7/8 * pi^2/15 * T^4. */
   const double t2 = T_nu_mev * T_nu_mev;
-  return n_eff * (7.0 / 8.0) * (M_PI * M_PI / 15.0) * t2 * t2;
+  return n_eff * (7.0 / 8.0) * (_PI_ * _PI_ / 15.0) * t2 * t2;
 }
 
 double BbnPlasma::HubbleFromRho(double rho_mev4) {
   const double rho_cgs = rho_mev4 * kMeV4ToGramPerCm3;
-  return std::sqrt(8.0 * M_PI * kNewtonCgs * rho_cgs / 3.0);
+  return std::sqrt(8.0 * _PI_ * kNewtonCgs * rho_cgs / 3.0);
 }
 
 double BbnPlasma::InvCm3ToMeV3() {
@@ -86,7 +86,7 @@ BbnEmState BbnPlasma::ElectromagneticState(double T_mev) const {
 
   /* Photons: analytic. */
   BbnEmState state;
-  state.rho      = (M_PI * M_PI / 15.0) * t4;
+  state.rho      = (_PI_ * _PI_ / 15.0) * t4;
   state.pressure = state.rho / 3.0;
   state.drho_dT  = 4.0 * state.rho / T_mev;
 
@@ -118,7 +118,7 @@ BbnEmState BbnPlasma::ElectromagneticState(double T_mev) const {
     integral_c   += w_[i] * u2 * eps * eps * fp;
   }
 
-  const double prefactor  = 2.0 / (M_PI * M_PI);
+  const double prefactor  = 2.0 / (_PI_ * _PI_);
   state.rho              += prefactor * t4 * integral_rho;
   state.pressure         += prefactor * t4 * integral_p;
   state.drho_dT          += prefactor * t3 * integral_c;

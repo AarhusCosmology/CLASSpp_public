@@ -284,6 +284,14 @@ InputModule::InputModule(FileContent& fc) : file_content_(fc) {
  *   - every species present opts in via SupportsExplicitPerturbationEvolver(), and
  *   - no non-species option adds stiffness to the perturbation system.
  *
+ * There is a third case above that one. A DIAGONAL stiffness does not have to be
+ * resolved at all: the exponential evolver integrates it exactly, so a species
+ * that reports one via PerturbDerivsDiagonal prefers `etd` even though it is not
+ * safe under rkdp45. Self-interacting neutrinos are that case -- rkdp45 and tsit5
+ * do not complete at any tolerance, while etd beats ndf15 by 1.8-2.5x. etd is
+ * taken when something present asks for it and EVERY species is well-conditioned
+ * under it; otherwise the rkdp45 question is asked as before.
+ *
  * The last clause is why perturbed recombination is tested here rather than being
  * left to the species: it is a flag on an otherwise ordinary LCDM content, so no
  * species could report it. Any future option of that kind belongs in this list.
@@ -301,11 +309,32 @@ void InputModule::SelectPerturbationEvolver() {
   if (perturbations_.has_perturbed_recombination)
     return;
 
+  /* Three-way choice. A species can be unsafe under a plain explicit method and
+     still be best served by the exponential one, when its stiffness is the
+     Jacobian DIAGONAL that etd integrates exactly -- so "wants etd" and "is safe
+     under an explicit method" are asked separately, and etd is taken only when
+     something actually benefits AND nothing else in the content would suffer. */
+  bool any_prefers_exponential = false;
+  bool all_support_explicit    = true;
+  bool all_support_exponential = true;
   for (const auto& [key, species] : all_species_) {
     (void) key;
-    if (!species->SupportsExplicitPerturbationEvolver())
-      return;
+    any_prefers_exponential |= species->PrefersExponentialPerturbationEvolver();
+    all_support_explicit    &= species->SupportsExplicitPerturbationEvolver();
+    all_support_exponential &= species->SupportsExponentialPerturbationEvolver();
   }
+
+  if (any_prefers_exponential && all_support_exponential) {
+    precision_.evolver_perturbations = evolver_type::etd;
+    if (perturbations_.perturbations_verbose > 0)
+      printf(
+          " -> a species reports a stiff Jacobian diagonal, using the exponential etd"
+          " perturbations evolver\n");
+    return;
+  }
+
+  if (!all_support_explicit)
+    return;
 
   precision_.evolver_perturbations = evolver_type::rkdp45;
   if (perturbations_.perturbations_verbose > 0)
