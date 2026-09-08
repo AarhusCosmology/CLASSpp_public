@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -136,6 +137,16 @@ class CompositeSpecies : public BaseSpecies {
       if (!c->SupportsExplicitPerturbationEvolver())
         return false;
     return true;
+  }
+
+  /** s_l must cover the deepest hierarchy anywhere in the subtree, so this DOES
+   *  scan children -- a composite owns no multipoles of its own, and the whole
+   *  point of #421 is that the daughter's requirement must reach the module. */
+  int MaxMultipole(const precision* ppr, bool tensors) const override {
+    int l_max = 0;
+    for (const auto& c : children_)
+      l_max = std::max(l_max, c->MaxMultipole(ppr, tensors));
+    return l_max;
   }
 
   /** A composite benefits from `etd` if ANY child does -- the exponential step

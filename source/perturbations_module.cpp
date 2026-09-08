@@ -1846,27 +1846,20 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
   for (const auto& entry : all_species_)
     ppw->species_scratch.push_back(entry->CreatePerturbScratch());
 
-  /** - Compute maximum l_max for any multipole */;
-  if (_scalars_) {
-    ppw->max_l_max = std::max(ppr->l_max_g, ppr->l_max_pol_g);
-    if (all_species_.count("UR"))
-      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ur);
-    if ((all_species_.count("IDM_DR_IDR")) &&
-        (static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"))
-             .idr()
-             .idr_nature() == idr_free_streaming))
-      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_idr);
-    if (all_species_.has_ncdm())
-      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ncdm);
-    if (all_species_.count("DCDM_DR"))
-      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_dr);
-  }
+  /** - Compute maximum l_max for any multipole.
+      Ask the species, do not name them. The previous version tested species KEYS
+      ("UR", "IDM_DR_IDR", "DCDM_DR") and so missed the DarkRadiationSpecies
+      daughter inside a DNCDM composite, which is keyed by its instance name --
+      s_l came out 18 entries long (indices 0..17) while that daughter's ladder
+      reads s_l[l+1] for l < l_max_dr, i.e. up to s_l[l_max_dr] (#421). The first
+      out-of-bounds read is therefore s_l[18], which is what ASan reports as
+      "0 bytes after" the region. MaxMultipole() is answered by each species and
+      forwarded by composites, so a new species cannot reintroduce the bug by
+      being named something this function has never heard of. */
+  ppw->max_l_max = 0;
+  for (const auto& species : all_species_)
+    ppw->max_l_max = std::max(ppw->max_l_max, species->MaxMultipole(ppr, _tensors_));
   if (_tensors_) {
-    ppw->max_l_max = std::max(ppr->l_max_g_ten, ppr->l_max_pol_g_ten);
-    if (all_species_.count("UR"))
-      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ur);
-    if (all_species_.has_ncdm())
-      ppw->max_l_max = std::max(ppw->max_l_max, ppr->l_max_ncdm);
     /* The tensor relativistic-neutrino hierarchy is owned by pv rather than by a
        species, and always runs to l_max_ur -- including when it is fed by
        massless-approximated ncdm instead of by a UR species (see the

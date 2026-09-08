@@ -41,6 +41,11 @@ class IDRSpecies : public BaseSpecies {
   double b_idr() const {
     return b_idr_;
   }
+  /** Only a free-streaming IDR carries a hierarchy; a fluid IDR does not. */
+  int MaxMultipole(const precision* ppr, bool tensors) const override {
+    return (!tensors && idr_nature_ == idr_free_streaming) ? ppr->l_max_idr : 0;
+  }
+
   int idr_nature() const {
     return idr_nature_;
   }

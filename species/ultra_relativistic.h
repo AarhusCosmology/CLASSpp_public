@@ -28,6 +28,11 @@ class UltraRelativisticSpecies : public BaseSpecies {
 
   UltraRelativisticSpecies(const background& pba, double omega0_ur);
 
+  /** Both modes: the scalar and tensor ur hierarchies both run to l_max_ur. */
+  int MaxMultipole(const precision* ppr, bool /*tensors*/) const override {
+    return ppr->l_max_ur;
+  }
+
   double GetOmega0() const override {
     return Omega0_ur_;
   }

@@ -41,6 +41,11 @@ class DarkRadiationSpecies : public BaseSpecies {
     return true;
   }
 
+  /** Scalars only: DR carries no tensor hierarchy. */
+  int MaxMultipole(const precision* ppr, bool tensors) const override {
+    return tensors ? 0 : ppr->l_max_dr;
+  }
+
   // ── Background ──────────────────────────────────────────────────────────────
   void SetBackgroundModule(const BackgroundModule* bgm) override {
     bgm_ = bgm;

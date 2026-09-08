@@ -748,6 +748,25 @@ class BaseSpecies {
   }
 
   /**
+   * Highest multipole index this species' hierarchy will address in this mode,
+   * or 0 if it carries none.
+   *
+   * Consumed by PerturbationsModule::perturb_workspace_init to size ppw->s_l,
+   * which the free-streaming loops index up to s_l[l_max] (they read s_l[l+1]
+   * for l < l_max). That sizing used to be
+   * a hard-coded list of species KEYS, which silently missed the
+   * DarkRadiationSpecies daughter inside a DNCDM composite -- keyed by its
+   * instance name, not "DCDM_DR" -- so its hierarchy read past the end of s_l
+   * (#421). A species answers for its own storage; a module cannot know.
+   *
+   * Over-reporting is safe (s_l is merely longer, and the unused entries are
+   * never read); under-reporting is a heap overflow. When in doubt, report more.
+   */
+  virtual int MaxMultipole(const precision* /*ppr*/, bool /*tensors*/) const {
+    return 0;
+  }
+
+  /**
    * Whether this species' PERTURBATION sector is known to integrate efficiently
    * with an explicit evolver (rkdp45).
    *

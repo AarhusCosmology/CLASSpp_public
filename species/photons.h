@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <string_view>
 
 #include "../species/base_species.h"
@@ -16,6 +17,11 @@ class PhotonsSpecies : public BaseSpecies {
     return true;
   }
   static constexpr std::string_view kTypeName = "photons";
+
+  int MaxMultipole(const precision* ppr, bool tensors) const override {
+    return tensors ? std::max(ppr->l_max_g_ten, ppr->l_max_pol_g_ten)
+                   : std::max(ppr->l_max_g, ppr->l_max_pol_g);
+  }
 
   explicit PhotonsSpecies(const background& pba)
       : BaseSpecies("Photons", EnergyType::Radiation), pba_(pba) {}

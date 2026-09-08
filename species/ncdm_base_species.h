@@ -41,6 +41,12 @@ struct NcdmSettings {
  */
 class NCDMBaseSpecies : public BaseSpecies {
  public:
+  /** Every NCDM-family hierarchy (ncdm, dncdm, dr_psd, wdm daughters) runs to
+   *  l_max_ncdm, in both modes. */
+  int MaxMultipole(const precision* ppr, bool /*tensors*/) const override {
+    return ppr->l_max_ncdm;
+  }
+
   /** Every NCDM species is, by definition, a momentum-resolved hierarchy. */
   bool HasNcdm() const override {
     return true;
