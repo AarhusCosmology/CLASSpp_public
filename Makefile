@@ -40,6 +40,7 @@ TEST_TARGETS := \
 	test-dncdm-inv \
 	test-dncdm-proxy \
 	test-dr-psd \
+	test-dr-closure \
 	test-ncdm-family \
 	test-species-budget
 

@@ -1,5 +1,6 @@
 #include "dark_radiation_species.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "background_module.h"
@@ -46,11 +47,22 @@ void DarkRadiationSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayou
                                                        int& index_pt,
                                                        const perturb_workspace* /*ppw*/,
                                                        int /*gauge*/) {
-  auto& layout   = static_cast<PerturbLayout&>(base);
-  layout.idx_F0  = index_pt;
-  layout.l_max   = ppr->l_max_dr;
-  index_pt_F0_   = index_pt;
-  index_pt      += ppr->l_max_dr + 1;
+  auto& layout      = static_cast<PerturbLayout&>(base);
+  layout.idx_F0     = index_pt;
+  layout.l_max      = ppr->l_max_dr;
+  layout.closure_L  = LimberClosureOrder(ppr->l_max_dr);
+  index_pt_F0_      = index_pt;
+  index_pt         += ppr->l_max_dr + 1;
+}
+
+double DarkRadiationSpecies::LimberClosureOrder(int l) {
+  return 2. * (l + 1.) / l * std::exp(2. * (std::lgamma((l + 1.) / 2.) - std::lgamma(l / 2.)));
+}
+
+double DarkRadiationSpecies::LimberClosureCot(double L, double k, double K) {
+  if (K == 0.)
+    return 1. / L;
+  return std::sqrt(std::max(1. - K * (L * L - 1.) / (k * k), 0.)) / L;
 }
 
 void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
@@ -66,7 +78,6 @@ void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double metric_continuity  = ctx.metric_continuity;
   const double metric_euler       = ctx.metric_euler;
   const double metric_shear       = ctx.metric_shear;
-  const double cotKgen            = ctx.cotKgen;
   const double s2_squared         = ctx.s2_squared;
   const double a                  = ctx.a;
   const double* pvecback          = ppw->pvecback.data();
@@ -94,10 +105,23 @@ void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
     dy[base_idx + l] = k / (2. * l + 1.) *
                        (l * s_l[l] * y[base_idx + l - 1] -
                         (l + 1.) * s_l[l + 1] * y[base_idx + l + 1]);
-  // l=lmax (truncation)
+  // l=lmax (truncation). Inverting this branch shows it asserts the hyperspherical
+  // recurrence s_{l+1}F_{l+1} + s_l F_{l-1} = (2l+1) k cot_K F_l, so the only thing a
+  // closure has to supply is the argument cot_K is evaluated at. Ma & Bertschinger use
+  // the current distance chi = tau, i.e. one coherent wave released at tau = 0. Decay
+  // radiation is not that: it is injected continuously at l = 0,1, so F_l is a
+  // superposition of shells free-streaming as j_l(k(tau-tau')), and each multipole is
+  // dominated by the shell whose age matches its own Bessel peak. Evaluating cot_K at
+  // that Limber distance instead is the whole fix -- and it is why MB returns the top
+  // multipole with the WRONG SIGN here (at k tau >> l its prefactor (2l+1)/(k tau)
+  // vanishes, collapsing it to F_{l+1} ~ -F_{l-1}: right for the alternating
+  // free-streaming ladder ur has, guaranteed wrong for the monotone one dr has).
+  // See docs/superpowers/specs/2026-09-07-dr-limber-closure-design.md.
   {
-    int l            = lmax;
-    dy[base_idx + l] = k * (s_l[l] * y[base_idx + l - 1] - (1. + l) * cotKgen * y[base_idx + l]);
+    int l                    = lmax;
+    const double closure_cot = LimberClosureCot(layout.closure_L, k, pba_->K);
+    dy[base_idx + l] = k *
+                       (s_l[l] * y[base_idx + l - 1] - (1. + l) * closure_cot * y[base_idx + l]);
   }
 }
 
