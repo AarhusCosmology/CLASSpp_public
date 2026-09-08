@@ -141,6 +141,27 @@ void TransferModule::transfer_init() {
 
   transfer_indices_of_transfers(q_period, pba->K, pba->sgnK);
 
+  /** - warn if the closed-space Limber delta is incomplete: past the equator
+      the far turning point at pi R - chi_L falls inside the sources and is not
+      accounted for (issue #423). */
+
+  /* The CMB lensing source is tabulated from recombination to today, so the
+     largest distance it reaches is tau0 - tau_rec, not tau0. */
+  if (ppt->has_cl_cmb_lensing_potential &&
+      LimberSourceCrossesEquator(tau0 - tau_rec, pba->sgnK, pba->K) && ptr->transfer_verbose > 0) {
+    fprintf(stdout,
+            " -> [WARNING:] the CMB lensing sources reach past the equator of this closed "
+            "universe (tau0-tau_rec=%.4g exceeds (pi/2)/sqrt(K)=%.4g).\n    The Limber "
+            "approximation used for the CMB lensing potential above l_switch_limber=%g places "
+            "its delta at the near turning point only,\n    and the second turning point at "
+            "pi/sqrt(K) - chi now falls inside the sources, so C_l^phiphi is systematically "
+            "incomplete there.\n    This needs |Omega_k| greater than about 0.25; reduce the "
+            "curvature or raise l_switch_limber to integrate exactly instead.\n",
+            tau0 - tau_rec,
+            0.5 * _PI_ / sqrt(pba->K),
+            ppr->l_switch_limber);
+  }
+
   /** - copy sources to a local array sources (in fact, only the pointers are copied, not the data), and eventually apply non-linear corrections to the sources */
 
   std::vector<std::vector<double*>> sources_storage(md_size_);
@@ -901,6 +922,31 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
  * lensing calculation. Its upper limit follows the complete perturbation
  * source grid, not k_size_cl.
  */
+/**
+ * Lower anchor of the full-Limber CMB lensing grid.
+ *
+ * @param k_min      Input: smallest wavenumber solved by the perturbation module
+ * @param k_min_flat Input: the flat truncation scale, k_min_tau0/tau0
+ * @param sgnK       Input: sign of the spatial curvature
+ * @param K          Input: spatial curvature
+ * @return the q value at which the geometric grid starts
+ */
+double TransferModule::LimberGridQMin(double k_min, double k_min_flat, int sgnK, double K) {
+  if (sgnK == 0)
+    return k_min;
+
+  /* Closed: the lowest scalar mode is nu = 3. Never anchor below the scale at
+     which the flat run truncates, or the grid slides with K instead of
+     converging to the flat one. Written as a pure clamp of the existing
+     3 sqrt(K), so that every curvature above the crossover is untouched. */
+  if (sgnK == 1)
+    return std::max(3. * sqrt(K), k_min_flat);
+
+  /* Open: sqrt(k_min^2 + K) with k_min = sqrt(-K + k_min_flat^2) already
+     collapses to the flat anchor, so this converges on its own. */
+  return sqrt(k_min * k_min + K);
+}
+
 void TransferModule::transfer_get_q_limber_list(double K, int sgnK) {
   double q_min = 0.;
   double q_max = 0.;
@@ -909,8 +955,12 @@ void TransferModule::transfer_get_q_limber_list(double K, int sgnK) {
              "q_logstep_limber=%e should be strictly larger than one",
              ppr->q_logstep_limber);
 
+  q_min = LimberGridQMin(perturbations_module_->k_min_,
+                         ppr->k_min_tau0 / background_module_->conformal_age_,
+                         sgnK,
+                         K);
+
   if (sgnK == 0) {
-    q_min = perturbations_module_->k_min_;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
       q_max = std::max(q_max,
                        perturbations_module_
@@ -918,7 +968,6 @@ void TransferModule::transfer_get_q_limber_list(double K, int sgnK) {
     }
   }
   else if (sgnK == -1) {
-    q_min        = sqrt(perturbations_module_->k_min_ * perturbations_module_->k_min_ + K);
     double k_max = 0.;
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
       k_max = std::max(k_max,
@@ -932,7 +981,6 @@ void TransferModule::transfer_get_q_limber_list(double K, int sgnK) {
       q_max = std::min(q_max, sqrt(k_max * k_max + 3. * K));
   }
   else {
-    q_min = 3. * sqrt(K);
     for (int index_md = 0; index_md < perturbations_module_->md_size_; index_md++) {
       q_max = std::max(q_max,
                        perturbations_module_
@@ -2605,6 +2653,59 @@ void TransferModule::transfer_integrate(struct transfer_workspace* ptw,
 }
 
 /**
+ * Locate the Limber delta and the curvature factor that belongs to it.
+ *
+ * @param l     Input: multipole
+ * @param q     Input: wavenumber
+ * @param sgnK  Input: sign of the spatial curvature
+ * @param K     Input: spatial curvature
+ * @return the evaluation distance tau0-tau and the amplitude at that distance
+ */
+TransferModule::LimberPoint TransferModule::LimberDeltaPoint(double l,
+                                                             double q,
+                                                             int sgnK,
+                                                             double K) {
+  /* The Langer-corrected multipole, in every geometry: the delta of the Limber
+     prescription sits at sin_K(chi_L) = L/q, and its weight carries
+     cos_K(chi_L)^(-1/2) evaluated at that same L. Using the classical turning
+     point sqrt(l(l+1)) in one geometry and l+1/2 in another made the lensing
+     output discontinuous across Omega_k = 0 (issue #423). */
+  const double L = l + 0.5;
+
+  LimberPoint point{0., 1.};
+
+  if (sgnK == 0) {
+    point.tau0_minus_tau = L / q;
+  }
+  else if (sgnK == 1) {
+    /* nu = q/sqrt(K) is an integer >= l+1 in a closed universe, so L/nu < 1
+       and the near turning point always exists. */
+    point.tau0_minus_tau = asin(L / q * sqrt(K)) / sqrt(K);
+    point.amplitude      = pow(1. - K * L * L / q / q, -1. / 4.);
+  }
+  else if (sgnK == -1) {
+    point.tau0_minus_tau = asinh(L / q * sqrt(-K)) / sqrt(-K);
+    point.amplitude      = pow(1. - K * L * L / q / q, -1. / 4.);
+  }
+
+  return point;
+}
+
+/**
+ * Does the source support reach past the equator of a closed universe?
+ *
+ * @param tau0_minus_tau_max Input: largest distance at which sources are held
+ * @param sgnK               Input: sign of the spatial curvature
+ * @param K                  Input: spatial curvature
+ * @return whether the far turning point can fall inside the sources
+ */
+bool TransferModule::LimberSourceCrossesEquator(double tau0_minus_tau_max, int sgnK, double K) {
+  if (sgnK != 1)
+    return false;
+  return tau0_minus_tau_max > 0.5 * _PI_ / sqrt(K);
+}
+
+/**
  * This routine computes the transfer functions \f$ \Delta_l^{X} (k) \f$)
  * for each mode, initial condition, type, multipole l and wavenumber k,
  * by using the Limber approximation, i.e by evaluating the source function
@@ -2636,7 +2737,6 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
   /* interpolated source and its derivatives at this value */
   double S, Sp, Sm;
 
-  double x_limber              = 0.;
   double tau0_minus_tau_limber = 0.;
   double IPhiFlat              = 0.;
 
@@ -2644,17 +2744,8 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
     /** - get k, l and infer tau such that k(tau0-tau)=l+1/2;
         check that tau is in appropriate range */
 
-    if (ptw->sgnK == 0) {
-      tau0_minus_tau_limber = (l + 0.5) / q;
-    }
-    else if (ptw->sgnK == 1) {
-      x_limber              = asin(sqrt(l * (l + 1.)) / q * sqrt(ptw->K));
-      tau0_minus_tau_limber = x_limber / sqrt(ptw->K);
-    }
-    else if (ptw->sgnK == -1) {
-      x_limber              = asinh((l + 0.5) / q * sqrt(-ptw->K));
-      tau0_minus_tau_limber = x_limber / sqrt(-ptw->K);
-    }
+    const LimberPoint limber = LimberDeltaPoint(l, q, ptw->sgnK, ptw->K);
+    tau0_minus_tau_limber    = limber.tau0_minus_tau;
 
     if ((tau0_minus_tau_limber > ptw->tau0_minus_tau[0]) ||
         (tau0_minus_tau_limber < ptw->tau0_minus_tau[ptw->tau_size - 1])) {
@@ -2677,10 +2768,13 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
     *trsf = IPhiFlat * S;
 
     if (ptw->sgnK == 0) {
+      /* Identical to the curved expression below (amplitude is 1 and
+         tau0_minus_tau_limber * q is l + 1/2), but spelled without the
+         round trip so flat space stays bit-identical. */
       *trsf /= (l + 0.5);
     }
     else {
-      *trsf *= pow(1. - ptw->K * l * l / q / q, -1. / 4.) / (tau0_minus_tau_limber * q);
+      *trsf *= limber.amplitude / (tau0_minus_tau_limber * q);
     }
   }
 

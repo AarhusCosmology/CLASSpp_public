@@ -75,6 +75,50 @@ class TransferModule : public BaseModule {
       transfer_; /**< table of transfer functions for each mode, initial condition, type, multipole and wavenumber, with argument transfer[index_md][((index_ic * transfer_module_->tt_size_[index_md] + index_tt) * transfer_module_->l_size_[index_md] + index_l) * transfer_module_->q_size_ + index_q] */
                  //@}
 
+  /** @name - the Limber delta */
+  //@{
+  /**
+   * Where the Limber delta sits, and the curvature factor that belongs there.
+   *
+   * The prescription is j_l(x) -> Int_0^inf j_l dx * delta(x - L) at the
+   * Langer-corrected multipole L = l + 1/2. Substituting U = Phi sin_K(chi)
+   * turns the hyperspherical radial equation into the flat one with
+   * chi -> sin_K(chi), so the delta sits at sin_K(chi_L) = L/q and its weight
+   * picks up the WKB factor cos_K(chi_L)^(-1/2) = (1 - K L^2/q^2)^(-1/4),
+   * evaluated at that same L. Issue #423; see
+   * docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md.
+   */
+  struct LimberPoint {
+    double tau0_minus_tau; /**< chi_L: the distance at which the source is read */
+    double amplitude;      /**< cos_K(chi_L)^(-1/2); exactly 1 in flat space */
+  };
+  static LimberPoint LimberDeltaPoint(double l, double q, int sgnK, double K);
+
+  /**
+   * True when the source support reaches past the equator of a closed universe.
+   *
+   * `LimberDeltaPoint` places the delta at the near turning point, the only one
+   * `asin` can return. A closed universe has a second one at `pi R - chi_L`, so
+   * the approximation is complete only while the sources stay inside the first
+   * quarter circumference. Flat and open geometries have no equator.
+   */
+  static bool LimberSourceCrossesEquator(double tau0_minus_tau_max, int sgnK, double K);
+
+  /**
+   * Lower anchor of the separate full-Limber CMB lensing quadrature grid.
+   *
+   * That grid is a geometric progression, so its anchor fixes every node. A
+   * closed universe has modes down to `nu = 3` (`q = 3 sqrt(K)`), and anchoring
+   * there made the whole grid slide with `K`, so it never converged to the flat
+   * grid as `K -> 0` and `C_l^phiphi` inherited the quadrature-phase difference.
+   * Below the flat truncation scale those nodes carry no integrand anyway -- the
+   * Limber transfer vanishes for `q < l_switch_limber/tau0` -- so the closed
+   * anchor is clamped by the flat one. Flat and open are unchanged: open's
+   * `sqrt(k_min^2 + K)` already collapses to the flat anchor.
+   */
+  static double LimberGridQMin(double k_min, double k_min_flat, int sgnK, double K);
+  //@}
+
  private:
   void transfer_functions_at_q(
       int index_md, int index_ic, int index_type, int index_l, double q, double* ptransfer_local);

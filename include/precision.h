@@ -674,9 +674,9 @@ struct precision {
   double hyper_sampling_flat =
       8.0; /**< flat case: number of sampled points x per approximate wavelength \f$ 2\pi \f$, should remain >7.5 */
   double hyper_sampling_curved_low_nu =
-      7.0; /**< open/closed cases: number of sampled points x per approximate wavelength \f$ 2\pi/\nu\f$, when \f$ \nu \f$ smaller than hyper_nu_sampling_step */
+      8.0; /**< open/closed cases: number of sampled points x per approximate wavelength \f$ 2\pi/\nu\f$, when \f$ \nu \f$ smaller than hyper_nu_sampling_step. Matches hyper_sampling_flat: below it the low-l spectra lose accuracy at no saving in time (see docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md) */
   double hyper_sampling_curved_high_nu =
-      3.0; /**< open/closed cases: number of sampled points x per approximate wavelength \f$ 2\pi/\nu\f$, when \f$ \nu \f$ greater than hyper_nu_sampling_step */
+      3.0; /**< open/closed cases: number of sampled points x per approximate wavelength \f$ 2\pi/\nu\f$, when \f$ \nu \f$ greater than hyper_nu_sampling_step. Deliberately below the >7.5 floor that hyper_sampling_flat documents, and it does cost accuracy: the nu in (hyper_nu_sampling_step, hyper_flat_approximation_nu) band slides down in q as \f$ K \to 0 \f$ until it carries the low-l power, so raising this to 8 buys 15x/51x/420x on \f$ C_l^{\phi\phi} \f$ at l<=10 for Omega_k = -1e-4/-1e-5/-1e-6, and 23% on \f$ C_l^{EE} \f$ at -1e-6. It buys nothing measurable at |Omega_k| >= 0.01 while costing +52% there (closed; +12% open), and a linearly sampled MCMC almost never visits |Omega_k| < 1e-4, so 3.0 is kept: speed at the expense of very nearly flat models. Raise it if you take numerical dC_l/dOmega_k with a step below ~1e-4. See docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md */
   double hyper_nu_sampling_step =
       1000.0; /**< open/closed cases: value of nu at which sampling changes  */
   double hyper_phi_min_abs =
@@ -719,7 +719,7 @@ struct precision {
   // UNHANDLED: must be smooth for spline) */
 
   double q_logstep_limber =
-      1.1; /**< logarithmic q-step ratio for the separate full-Limber CMB lensing grid */
+      1.1; /**< logarithmic q-step ratio for the separate full-Limber CMB lensing grid. Accepted as a default, but it is coarse: against a converged 1.01 grid this leaves ~3.1e-3 in \f$ C_l^{\phi\phi} \f$ in every geometry, flat included, converging as O(h^2) (7.4e-4 at 1.05, 1.5e-4 at 1.02). Tighten it if you need lensing-potential accuracy better than a few 0.1%. See docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md */
   double k_max_limber_over_l_max_scalars =
       0.0005; /**< full-Limber perturbation source cutoff k_max/l_max_scalars in 1/Mpc */
 

@@ -14,6 +14,7 @@ TEST_TARGETS := \
 	test-tca-ic-guard \
 	test-deposition \
 	test-hyrec \
+	test-limber-point \
 	test-bisection \
 	test-quadrature \
 	test-decay-kernel \
