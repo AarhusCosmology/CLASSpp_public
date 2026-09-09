@@ -289,11 +289,11 @@ if(NOT SKBUILD)
   add_executable(test-dncdm-inv species/dncdm_inv_test.cpp)
   add_executable(test-dncdm-proxy species/dncdm_proxy_test.cpp)
   add_executable(test-dr-psd species/dr_psd_test.cpp)
-  add_executable(test-dr-closure species/dr_closure_test.cpp)
+  add_executable(test-limber-closure species/limber_closure_test.cpp)
   add_executable(test-max-multipole species/max_multipole_test.cpp)
   add_executable(test-ncdm-family species/ncdm_family_test.cpp)
   add_executable(test-species-budget species/species_budget_test.cpp)
-  foreach(_t IN ITEMS test-evolver-options test-evolver-selection test-bbn-plasma test-bbn-rates test-bbn-weak test-bbn-solver test-parser test-precision-evolver test-errors test-tca-ic-guard test-deposition test-hyrec test-limber-point test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-tensor-tca test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-dr-closure test-max-multipole test-ncdm-family test-species-budget)
+  foreach(_t IN ITEMS test-evolver-options test-evolver-selection test-bbn-plasma test-bbn-rates test-bbn-weak test-bbn-solver test-parser test-precision-evolver test-errors test-tca-ic-guard test-deposition test-hyrec test-limber-point test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-tensor-tca test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-limber-closure test-max-multipole test-ncdm-family test-species-budget)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for

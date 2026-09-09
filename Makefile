@@ -41,7 +41,7 @@ TEST_TARGETS := \
 	test-dncdm-inv \
 	test-dncdm-proxy \
 	test-dr-psd \
-	test-dr-closure \
+	test-limber-closure \
 	test-max-multipole \
 	test-ncdm-family \
 	test-species-budget

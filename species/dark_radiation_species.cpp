@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "background_module.h"
+#include "limber_closure.h"
 #include "perturbations_module.h"
 
 // ── Background ─────────────────────────────────────────────────────────────
@@ -50,19 +51,9 @@ void DarkRadiationSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayou
   auto& layout      = static_cast<PerturbLayout&>(base);
   layout.idx_F0     = index_pt;
   layout.l_max      = ppr->l_max_dr;
-  layout.closure_L  = LimberClosureOrder(ppr->l_max_dr);
+  layout.closure_L  = limber_closure::Order(ppr->l_max_dr);
   index_pt_F0_      = index_pt;
   index_pt         += ppr->l_max_dr + 1;
-}
-
-double DarkRadiationSpecies::LimberClosureOrder(int l) {
-  return 2. * (l + 1.) / l * std::exp(2. * (std::lgamma((l + 1.) / 2.) - std::lgamma(l / 2.)));
-}
-
-double DarkRadiationSpecies::LimberClosureCot(double L, double k, double K) {
-  if (K == 0.)
-    return 1. / L;
-  return std::sqrt(std::max(1. - K * (L * L - 1.) / (k * k), 0.)) / L;
 }
 
 void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
@@ -119,7 +110,7 @@ void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   // See docs/superpowers/specs/2026-09-07-dr-limber-closure-design.md.
   {
     int l                    = lmax;
-    const double closure_cot = LimberClosureCot(layout.closure_L, k, pba_->K);
+    const double closure_cot = limber_closure::Cot(layout.closure_L, k, pba_->K);
     dy[base_idx + l] = k *
                        (s_l[l] * y[base_idx + l - 1] - (1. + l) * closure_cot * y[base_idx + l]);
   }

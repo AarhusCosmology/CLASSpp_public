@@ -6,6 +6,7 @@
 #include "background_module.h"
 #include "dcdm.h"
 #include "errors.h"
+#include "limber_closure.h"
 #include "perturbations_module.h"
 #include "precision.h"
 #include "species/species_input.h"
@@ -528,11 +529,12 @@ void WdmDecayProductSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLay
                                                          int& index_pt,
                                                          const perturb_workspace* /*ppw*/,
                                                          int /*gauge*/) {
-  auto& layout = static_cast<NCDMBaseSpecies::PerturbLayout&>(base);
+  auto& layout = static_cast<PerturbLayout&>(base);
 
   // No fluid approximation: always the full Boltzmann hierarchy (DNCDM precedent).
-  layout.l_max  = (l_max_input_ > 0) ? l_max_input_ : ppr->l_max_ncdm;
-  layout.q_size = q_size();
+  layout.l_max     = (l_max_input_ > 0) ? l_max_input_ : ppr->l_max_ncdm;
+  layout.q_size    = q_size();
+  layout.closure_L = limber_closure::Order(layout.l_max);
 
   layout.index_per_q.clear();
   layout.index_per_q.reserve(layout.q_size);
@@ -547,7 +549,7 @@ void WdmDecayProductSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& bas
                                            const double* y,
                                            double* dy,
                                            const perturb_parameters_and_workspace& ppaw) const {
-  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  const auto& layout = static_cast<const PerturbLayout&>(base);
   if (layout.q_size <= 0 || layout.index_per_q.empty())
     return;
 
@@ -559,11 +561,12 @@ void WdmDecayProductSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& bas
   const double metric_continuity  = ctx.metric_continuity;
   const double metric_euler       = ctx.metric_euler;
   const double metric_shear       = ctx.metric_shear;
-  const double cotKgen            = ctx.cotKgen;
 
   const double* pvecback = ppw->pvecback.data();
   const double M_wdm     = M_;
   const int lmax         = layout.l_max;
+  // Depends only on l_max and k, so it is hoisted out of the momentum loop.
+  const double closure_cot = limber_closure::Cot(layout.closure_L, k, pba_->K);
 
   for (int iq = 0; iq < layout.q_size; ++iq) {
     const double q = q_[iq];
@@ -583,7 +586,27 @@ void WdmDecayProductSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& bas
     for (int l = 3; l < lmax; ++l)
       dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                     (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
-    dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
+    // Truncation, closed at the Limber distance rather than at the current one.
+    // Inverting this branch gives the recurrence it asserts,
+    //   F_{L+1} = (2L+1) C F_L - F_{L-1},
+    // so a closure supplies nothing but C. Ma & Bertschinger take C = eps/(q k tau),
+    // i.e. cot_K at the distance a particle of this momentum has ALREADY streamed --
+    // right for one coherent shell released at tau = 0. This daughter is not that: it
+    // is injected continuously at l = 0,1 over the parent's whole lifetime, so F_l is a
+    // superposition of shells, each free-streaming at its own age, and the recurrence
+    // does not survive a superposition over different arguments. C = cot_K at the
+    // Limber distance is the fix, exactly as for DarkRadiationSpecies.
+    //
+    // What differs here, and is the only new term: the daughter is MASSIVE, so its
+    // transport rate qk/eps is not k. MB's eps/q cancelled against it and left a bare
+    // k*cotKgen; the Limber argument carries no eps/q, so the transport rate survives
+    // and multiplies the closure. Dropping it -- porting the massless DR line as-is --
+    // is MEASURED to be worth nothing at all (P(k) 1.16e-2 against MB's 1.03e-2, where
+    // the form below reads 1.64e-4). Derivation, that control, and why DrPsdSpecies
+    // gets the OPPOSITE answer on the same code shape:
+    // docs/superpowers/specs/2026-09-09-massive-daughter-limber-closure-design.md §3.1
+    dy[idx + lmax] = qk_div_epsilon *
+                     (y[idx + lmax - 1] - (1. + lmax) * closure_cot * y[idx + lmax]);
   }
 }
 

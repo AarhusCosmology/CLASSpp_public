@@ -20,9 +20,10 @@ class DarkRadiationSpecies : public BaseSpecies {
  public:
   // ── PerturbLayout ──────────────────────────────────────────────────────────
   struct PerturbLayout : BaseSpecies::PerturbLayout {
-    int idx_F0       = -1;  ///< base offset for the DR multipole hierarchy in pv->y
-    int l_max        = -1;  ///< max multipole (ppr->l_max_dr)
-    double closure_L = 0.;  ///< Limber order of the l_max truncation, = LimberClosureOrder(l_max)
+    int idx_F0 = -1;  ///< base offset for the DR multipole hierarchy in pv->y
+    int l_max  = -1;  ///< max multipole (ppr->l_max_dr)
+    double closure_L =
+        0.;  ///< Limber order of the l_max truncation, = limber_closure::Order(l_max)
   };
 
   std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
@@ -81,27 +82,6 @@ class DarkRadiationSpecies : public BaseSpecies {
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) const override;
-
-  /**
-   * Limber order of the hierarchy truncation: the argument at which the Bessel
-   * weight of the shell superposition sits. Exactly the flat moment ratio
-   *   L(l) = Int j_l dy / Int j_l dy/y = 2(l+1)/l [Gamma((l+1)/2)/Gamma(l/2)]^2
-   *        = l + 1/2 - 3/(8l) + 3/(16 l^2) + O(l^-3),
-   * whose leading term is Limber's l+1/2. Depends only on l, so it is cached in
-   * PerturbLayout rather than recomputed in the RHS.
-   * See docs/superpowers/specs/2026-09-07-dr-limber-closure-design.md.
-   */
-  static double LimberClosureOrder(int l);
-
-  /**
-   * cot_K evaluated at the Limber distance for order L, in the units of
-   * perturb_workspace::cotKgen (that is, cot_K(chi)/k):
-   *   sqrt(1 - K(L^2-1)/k^2) / L,
-   * the s_l expression at non-integer order L, over L. Reduces to 1/L when
-   * flat, and clamps to zero above nu = q/sqrt(K) in a closed universe, where
-   * the turning point does not exist and s_l clamps too.
-   */
-  static double LimberClosureCot(double L, double k, double K);
 
   StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
                                         const perturb_vector* pv,

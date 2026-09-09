@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -162,6 +163,23 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
   void PrintMassInfo() const override;
 
   // ── Perturbations (Task 4) ─────────────────────────────────────────────────
+
+  /** Adds the cached Limber order to the shared NCDM layout. The daughter is
+   *  injected continuously, so its hierarchy is closed at the Limber distance
+   *  rather than at the current one (see PerturbDerivs and
+   *  docs/superpowers/specs/2026-09-09-massive-daughter-limber-closure-design.md);
+   *  the order depends only on l_max, so it is computed once here rather than in
+   *  the RHS. It lives on the layout and not on the species because
+   *  RegisterPerturbationIndices runs once per perturb_vector, i.e. concurrently
+   *  across k-modes. */
+  struct PerturbLayout : NCDMBaseSpecies::PerturbLayout {
+    double closure_L = 0.;  ///< = limber_closure::Order(l_max)
+  };
+
+  std::unique_ptr<BaseSpecies::PerturbLayout> CreatePerturbLayout() const override {
+    return std::make_unique<PerturbLayout>();
+  }
+
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
                                    perturb_vector* pv,
                                    const precision* ppr,
