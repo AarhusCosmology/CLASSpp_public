@@ -38,6 +38,25 @@ from cclassy cimport *
 
 cdef ClassConstants constvals
 
+# Derived parameters of the form "<species key>.<field>", served by
+# BackgroundModule::GetSpeciesParam (the species answers through its GetParam
+# override, or generically from the background table). GetSpeciesParam reports
+# an unanswered name as 0.0, which is indistinguishable from a value, so a
+# request is refused unless all three of these hold: the field is listed below,
+# HasSpecies() knows the species key, and HasSpeciesParam() says that species
+# answers that field.
+#   f_peak, a_peak, z_peak  -- any species: peak of rho/rho_crit(a) and where it
+#                              sits. For an early-dark-energy species (the
+#                              pheno_axion fluid, or an axion scalar field) this
+#                              is f_EDE and its peak location.
+#   a_c, n_axion, m_fld, alpha_fld, omega_axion -- pheno-axion fluid scales.
+#   alpha, q0, x, M_2, M_3, M_4                 -- greybody NCDM shape/moments.
+_SPECIES_DERIVED_FIELDS = frozenset((
+    'f_peak', 'a_peak', 'z_peak',
+    'a_c', 'n_axion', 'm_fld', 'alpha_fld', 'omega_axion',
+    'alpha', 'q0', 'x', 'M_2', 'M_3', 'M_4',
+))
+
 # Nils : Added for python 3.x and python 2.x compatibility
 cdef viewdictitems(dict d):
     if sys.version_info >= (3,0):
@@ -1582,7 +1601,12 @@ cdef class PyCosmology:
         ----------
         names : list
                 Derived parameters that can be asked from Monte Python, or
-                elsewhere.
+                elsewhere. Besides the flat names, "<species key>.<field>"
+                reads a species' own derived quantities, e.g. "Fluid.f_peak"
+                for the peak EDE fraction f_EDE of a pheno-axion fluid,
+                "Fluid.z_peak" for the redshift where it peaks, or
+                "ScalarField.f_peak" for the same quantity of an axion field
+                integrated exactly. See _SPECIES_DERIVED_FIELDS for the fields.
 
         Returns
         -------
@@ -1830,10 +1854,18 @@ cdef class PyCosmology:
                 value = self.z_dec_drmd()
             elif name == 'f_idr_drmd':
                 value = self.f_idr_drmd()
-            elif name.endswith('.M_2') or name.endswith('.M_3') or name.endswith('.M_4') \
-                 or name.endswith('.alpha') or name.endswith('.q0') or name.endswith('.x'):
+            elif '.' in name and name.rpartition('.')[2] in _SPECIES_DERIVED_FIELDS:
                 instance, _, field = name.rpartition('.')
                 background_module = deref(self._cosmo()).GetBackgroundModule()
+                if not deref(background_module).HasSpecies(instance.encode('utf-8')):
+                    raise CosmoSevereError(
+                        "%s is not a derived parameter of this cosmology: it has "
+                        "no species '%s'" % (name, instance))
+                if not deref(background_module).HasSpeciesParam(
+                        instance.encode('utf-8'), field.encode('utf-8')):
+                    raise CosmoSevereError(
+                        "%s is not a derived parameter of this cosmology: species "
+                        "'%s' does not report '%s'" % (name, instance, field))
                 value = deref(background_module).GetSpeciesParam(
                     instance.encode('utf-8'), field.encode('utf-8'))
             else:

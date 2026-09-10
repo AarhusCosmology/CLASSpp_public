@@ -75,12 +75,59 @@ double BackgroundModule::GetOmega0Species(const std::string& key) const {
   return 0.;
 }
 
+bool BackgroundModule::HasSpecies(const std::string& key) const {
+  return all_species_.find(key) != nullptr;
+}
+
+bool BackgroundModule::HasSpeciesParam(const std::string& key, const std::string& param) const {
+  if (auto* ptr = all_species_.find(key))
+    return (*ptr)->GetParam(param).has_value() || PeakEnergyFraction(**ptr, param).has_value();
+  return false;
+}
+
 double BackgroundModule::GetSpeciesParam(const std::string& key, const std::string& param) const {
   if (auto* ptr = all_species_.find(key)) {
     if (auto val = (*ptr)->GetParam(param))
       return *val;
+    if (auto val = PeakEnergyFraction(**ptr, param))
+      return *val;
   }
   return 0.;
+}
+
+std::optional<double> BackgroundModule::PeakEnergyFraction(const BaseSpecies& species,
+                                                           const std::string& param) const {
+  const bool want_f = (param == "f_peak");
+  const bool want_a = (param == "a_peak");
+  const bool want_z = (param == "z_peak");
+  if (!want_f && !want_a && !want_z)
+    return std::nullopt;
+  if (bt_size_ == 0)
+    return std::nullopt;
+
+  // Maximum over the solved table rows of rho/rho_crit(a). The density comes
+  // from Rho(), not from bg_rho_index(): a composite registers background slots
+  // for its children and none for itself, so indexing the table directly would
+  // exclude exactly the species whose total is only defined by asking it.
+  // No sub-step interpolation: the table is dense in log(a)
+  // (back_integration_stepsize) and the peak is a smooth maximum, so the row
+  // value IS the peak to within the curvature times a step squared.
+  double f_peak = 0., a_peak = 0.;
+  for (int index_loga = 0; index_loga < bt_size_; ++index_loga) {
+    const double* pvecback = background_table_.data() + index_loga * bg_size_;
+    const double f         = species.Rho(pvecback) / pvecback[index_bg_rho_crit_];
+    if (f > f_peak) {
+      f_peak = f;
+      a_peak = pvecback[index_bg_a_];
+    }
+  }
+  if (want_f)
+    return f_peak;
+  if (a_peak <= 0.)  // no density anywhere in the table: the location is undefined
+    return std::nullopt;
+  if (want_a)
+    return a_peak;
+  return 1. / a_peak - 1.;
 }
 
 // Wrapper functions to pass non-static member functions

@@ -121,6 +121,19 @@ int main() {
     assert(std::fabs(ax->GetOmega0() - om0) < 1e-12 * om0);
     assert(std::fabs(ax->a_c() - ac) < 1e-15);
     assert(std::fabs(ax->n_axion() - 3.) < 1e-15);
+
+    // ── GetParam (read from the wrapper as "Fluid.<name>"): the inputs answer
+    //    immediately, the DeriveAxionScales diagnostics only after a background
+    //    module is attached (still 0 here), and an unknown name must stay
+    //    nullopt -- including "f_peak", which BackgroundModule serves generically
+    //    from the solved table rather than the species.
+    assert(ax->GetParam("a_c").value() == ax->a_c());
+    assert(ax->GetParam("n_axion").value() == 3.);
+    assert(ax->GetParam("m_fld").value() == 0.);
+    assert(ax->GetParam("alpha_fld").value() == 0.);
+    assert(ax->GetParam("omega_axion").value() == 0.);
+    assert(!ax->GetParam("f_peak").has_value());
+    assert(!ax->GetParam("no_such_param").has_value());
   }
 
   // Valid: direct Omega_fld path.

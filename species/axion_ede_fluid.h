@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <string>
+
 #include "fluid.h"
 
 /**
@@ -50,6 +53,17 @@ class AxionEDEFluid : public FluidSpecies {
                               double* y,
                               const PerturbIcContext& ctx) override;
   void SetBackgroundModule(const BackgroundModule* bgm) override;
+
+  /** Derived diagnostics, reached from the Python wrapper as
+   *  "Fluid.<name>" (BackgroundModule::GetSpeciesParam): the input transition
+   *  scale "a_c" and exponent "n_axion", and the scales DeriveAxionScales
+   *  reconstructs from them -- "m_fld" (axion mass in units of H0), "alpha_fld"
+   *  (decay constant, reduced-Planck units) and "omega_axion" (oscillation
+   *  frequency today, 1/Mpc; the quantity the GDM sound speed is built from).
+   *  The peak EDE fraction and its location are NOT here: they follow from the
+   *  background table alone and every species answers them generically
+   *  ("Fluid.f_peak", "Fluid.a_peak", "Fluid.z_peak"). */
+  std::optional<double> GetParam(const std::string& name) const override;
 
   double a_c() const {
     return a_c_;

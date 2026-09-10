@@ -1,6 +1,9 @@
 #ifndef BACKGROUND_MODULE_H
 #define BACKGROUND_MODULE_H
 
+#include <optional>
+#include <string>
+
 #include "base_module.h"
 #include "input_module.h"
 
@@ -33,11 +36,23 @@ class BackgroundModule : public BaseModule {
    *  number of DNCDM_DR_Species composites in all_species_. */
   int GetNDecayDr() const;
 
+  /** True iff a species with this all_species_ key is present. Lets a caller
+   *  (the Python wrapper) refuse an unknown key instead of reporting the 0.0
+   *  GetSpeciesParam returns for a species that is not there. */
+  bool HasSpecies(const std::string& key) const;
+
   /** Generic look-up: find species by all_species_ key, then call
-   *  GetParam(param).  Returns 0.0 if either is absent.  Used by the
-   *  Python wrapper to read species-specific quantities without
-   *  downcasting. */
+   *  GetParam(param).  Falls back to the table-derived parameters every
+   *  species can answer (see PeakEnergyFraction).  Returns 0.0 if the
+   *  species or the parameter is absent.  Used by the Python wrapper to read
+   *  species-specific quantities without downcasting. */
   double GetSpeciesParam(const std::string& key, const std::string& param) const;
+
+  /** True iff `key` names a present species that answers `param`.  This is the
+   *  existence question behind GetSpeciesParam's 0.0-when-absent value: without
+   *  it a caller cannot tell "this species has no such parameter" (say
+   *  `CDM.m_fld`) from "the parameter is zero", since both read back as 0.0. */
+  bool HasSpeciesParam(const std::string& key, const std::string& param) const;
 
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
 
@@ -125,6 +140,17 @@ class BackgroundModule : public BaseModule {
   }
 
  private:
+  /** Parameters that follow from the solved background table alone, so any
+   *  species can answer them without writing code: "f_peak" is the maximum of
+   *  rho/rho_crit(a) over the table, "a_peak"/"z_peak" say where that maximum
+   *  sits.  For an early-dark-energy species this is f_EDE and its peak
+   *  location, the headline derived parameter of published EDE analyses
+   *  (Poulin et al. 1811.04083) -- and it reads the same way for the pheno-axion
+   *  fluid and for an exact Klein-Gordon axion field, which is what makes the
+   *  two comparable.  std::nullopt for any other param name. */
+  std::optional<double> PeakEnergyFraction(const BaseSpecies& species,
+                                           const std::string& param) const;
+
   void background_functions(double* pvecback_B, short return_format, double* pvecback);
   bool storing_background_table_ = false;
 

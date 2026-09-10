@@ -113,6 +113,20 @@ void AxionEDEFluid::ApplyInitialConditions(const BaseSpecies::PerturbLayout& bas
                         ctx.s2_squared;
 }
 
+std::optional<double> AxionEDEFluid::GetParam(const std::string& name) const {
+  if (name == "a_c")
+    return a_c_;
+  if (name == "n_axion")
+    return n_axion_;
+  if (name == "m_fld")
+    return m_fld_;
+  if (name == "alpha_fld")
+    return alpha_fld_;
+  if (name == "omega_axion")
+    return omega_axion_;
+  return FluidSpecies::GetParam(name);
+}
+
 void AxionEDEFluid::SetBackgroundModule(const BackgroundModule* bgm) {
   FluidSpecies::SetBackgroundModule(bgm);
   DeriveAxionScales();

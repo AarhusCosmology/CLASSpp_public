@@ -1143,6 +1143,115 @@ class TestReviewRegressions(TestClass):
         self.assertLess(math.hypot(coefficients[0], coefficients[1]),
                         0.2*delta_ns)
 
+    def test_pheno_axion_reports_its_peak_ede_fraction(self):
+        """f_EDE at its peak is the headline derived parameter of a published
+        EDE analysis (Poulin et al. 1811.04083), and the pheno-axion fluid's
+        internally derived scales (m_fld, alpha_fld, omega_axion) were likewise
+        unreachable from python. Both now come through the generic
+        "<species key>.<field>" derived-parameter form. Resolves #367."""
+        scenario = {
+            'output': 'tCl',
+            'fluid_equation_of_state': 'pheno_axion',
+            'n_pheno_axion': 3,
+            'log10_axion_ac': -3.5,
+            'fraction_fld_ac': 0.1,
+            'Theta_initial_fld': 2.8,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute(level=['background'])
+
+        names = ['Fluid.f_peak', 'Fluid.a_peak', 'Fluid.z_peak', 'Fluid.a_c',
+                 'Fluid.n_axion', 'Fluid.m_fld', 'Fluid.alpha_fld',
+                 'Fluid.omega_axion']
+        derived = self.cosmo.get_current_derived_parameters(names)
+
+        # f_peak/a_peak/z_peak are read off the same table the background
+        # columns are printed from, so they must agree with it row for row.
+        background = self.cosmo.get_background()
+        f_ede = background['(.)rho_fld']/background['(.)rho_crit']
+        i_peak = np.argmax(f_ede)
+        self.assertAlmostEqual(derived['Fluid.f_peak']/f_ede[i_peak], 1.,
+                               places=12)
+        self.assertAlmostEqual(derived['Fluid.z_peak']/background['z'][i_peak],
+                               1., places=12)
+        self.assertAlmostEqual(derived['Fluid.a_peak']
+                               * (1. + background['z'][i_peak]), 1., places=12)
+
+        # The injection peaks just after the transition, a little above the
+        # fraction the input fixes AT a_c (where w has only turned halfway).
+        self.assertGreater(derived['Fluid.f_peak'], 0.1)
+        self.assertLess(derived['Fluid.f_peak'], 0.15)
+        self.assertGreater(derived['Fluid.a_peak'], 10**-3.5)
+        self.assertLess(derived['Fluid.a_peak'], 10**-3.)
+
+        self.assertAlmostEqual(derived['Fluid.a_c']/10**-3.5, 1., places=12)
+        self.assertEqual(derived['Fluid.n_axion'], 3.)
+        for name in ('Fluid.m_fld', 'Fluid.alpha_fld', 'Fluid.omega_axion'):
+            self.assertGreater(derived[name], 0., msg=name)
+
+        # GetSpeciesParam answers an unknown name with 0.0, so the wrapper must
+        # keep refusing names it does not know rather than reporting that 0:
+        # an unlisted field, a species that is not there, and -- the case the
+        # whitelist alone cannot catch -- a listed field this species does not
+        # answer. Raised in Copilot's review of PR #428.
+        for bad in ('Fluid.f_pea', 'NoSuchSpecies.f_peak', 'CDM.m_fld',
+                    'Fluid.M_2'):
+            with self.assertRaises(CosmoSevereError, msg=bad):
+                self.cosmo.get_current_derived_parameters([bad])
+
+    def test_axion_scalar_field_peak_fraction_is_its_shooting_target(self):
+        """The peak energy fraction is derived from the background table alone,
+        so it is not a fluid feature: the exact Klein-Gordon axion answers it
+        too, which is what makes the two axion treatments comparable. A field
+        still frozen today peaks today, at the Omega_scf the shooting hit."""
+        scenario = {
+            'output': 'tCl',
+            'Omega_scf': 0.05,
+            'scf_potential': 'axion',
+            'f_axion': 0.5,
+            'n_axion': 1,
+            'Theta_initial_scf': 2.0,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute(level=['background'])
+
+        derived = self.cosmo.get_current_derived_parameters(
+            ['ScalarField.f_peak', 'ScalarField.z_peak'])
+        self.assertAlmostEqual(derived['ScalarField.f_peak'], 0.05, places=4)
+        self.assertLess(derived['ScalarField.z_peak'], 1e-3)
+
+    def test_composite_species_reports_its_peak_fraction(self):
+        """A composite registers background slots for its children and none for
+        itself, so its density exists only through Rho(). Reading the table by
+        the species' own rho index would silently report 0 for exactly the
+        species whose total has to be asked for. Raised in Copilot's review of
+        PR #428."""
+        scenario = {
+            'output': 'tCl',
+            'Omega_dcdmdr': 0.12,
+            'Gamma_dcdm': 10.0,
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute(level=['background'])
+
+        derived = self.cosmo.get_current_derived_parameters(
+            ['DCDM_DR.f_peak', 'DCDM_DR.a_peak', 'DCDM_DR.z_peak'])
+        background = self.cosmo.get_background()
+        # The composite total is its children summed, which is what Rho() does.
+        f_total = ((background['(.)rho_dcdm'] + background['(.)rho_dr'])
+                   / background['(.)rho_crit'])
+        i_peak = np.argmax(f_total)
+        self.assertGreater(derived['DCDM_DR.f_peak'], 0.)
+        self.assertAlmostEqual(derived['DCDM_DR.f_peak']/f_total[i_peak], 1.,
+                               places=12)
+        self.assertAlmostEqual(derived['DCDM_DR.z_peak']
+                               / background['z'][i_peak], 1., places=12)
+        self.assertAlmostEqual(derived['DCDM_DR.a_peak']
+                               * (1. + background['z'][i_peak]), 1., places=12)
+
     def test_monodromy_parameter_domain_is_rejected(self):
         """The monodromy potential divides by the decay constant V_1, so V_1 = 0
         reaches primordial_inflation_check_potential as a NaN -- and its V<=0 and
