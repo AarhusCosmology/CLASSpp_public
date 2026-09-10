@@ -68,6 +68,12 @@ jobs:
         source venv/bin/activate
         cd main_class/python
         TEST_LEVEL=1 COMPARE_OUTPUT_REF=0 python -m pytest -v -m test_scenario test_class.py
+        # The regression tests PRs add to test_class.py carry no test_scenario
+        # marker, so the selection above never ran a single one of them. That is
+        # how the l_max_dr_col default broke: test_dncdm_dr_computes was sitting
+        # in the file, failing, unread. The classyref-comparison tests among them
+        # skip themselves when classyref is not installed, which it is not here.
+        python -m pytest -v -m "not test_scenario" test_class.py
         python -m pytest -v test_greybody.py
         deactivate
     - name: Remove virtual Python environment

@@ -3011,6 +3011,21 @@ void precision::parse(const FileContent& fc) {
   read(fc, "num_mu_minus_lmax", num_mu_minus_lmax);
   read(fc, "delta_l_max", delta_l_max);
   read(fc, "tol_gauss_legendre", tol_gauss_legendre);
+
+  /* Derived defaults: parameters whose only sensible default is another
+     parameter's value, resolved after every read so the order above does not
+     matter. An explicitly given value is left exactly as given (and still
+     validated where it is used). */
+
+  // The decay-radiation collision term at multipole l reads the parent NCDM's
+  // l-th multipole (DNCDM_DR_Species::AddCouplingDerivs), so it can reach no
+  // further than either hierarchy -- which perturb_init enforces. That makes
+  // l_max_dr_col's default a function of the other two rather than a constant
+  // of its own: 17 was consistent while l_max_ncdm was also 17, but the #397
+  // precision defaults lowered l_max_ncdm to 10, and from then on the DEFAULT
+  // configuration failed that check, aborting every decaying-NCDM run.
+  if (!fc.get<int>("l_max_dr_col").has_value())
+    l_max_dr_col = std::min(l_max_dr, l_max_ncdm);
 }
 
 // ── Hook-based shooting (the species-owned replacement for the enum dispatch) ──

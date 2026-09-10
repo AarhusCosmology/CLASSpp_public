@@ -811,6 +811,54 @@ class TestReviewRegressions(TestClass):
             cosmo.struct_cleanup()
             cosmo.empty()
 
+    def test_dncdm_dr_collision_lmax_default_tracks_the_hierarchies(self):
+        """l_max_dr_col has no default of its own: the DR collision at multipole
+        l reads the parent NCDM's l-th multipole, so perturb_init refuses
+        l_max_dr_col > l_max_ncdm. Its literal default of 17 was consistent
+        until the #397 precision defaults lowered l_max_ncdm to 10, after which
+        the DEFAULT configuration hit that check and every decaying-NCDM run
+        aborted (test_dncdm_dr_computes above is the same regression). The
+        default is now min(l_max_dr, l_max_ncdm); an explicit value is still
+        validated, not clamped."""
+        base = {
+            'output': 'tCl',
+            'l_max_scalars': 200,
+            'N_ur': 3.046,
+            'omega_b': 0.022032,
+            'omega_cdm': 0.12038,
+            'YHe': 0.25,
+            'dncdm1.type': 'ncdm_decay_dr',
+            'dncdm1.m': 1.0,
+            'dncdm1.T': 0.71611,
+            'dncdm1.Gamma': 1e3,
+            'dncdm1.Omega_ini': 0.001,
+        }
+        self.scenario = dict(base)
+        spectra = {}
+        for label, extra in (('derived', {}), ('explicit', {'l_max_dr_col': 10})):
+            cosmo = Class()
+            cosmo.set(dict(self.verbose, **base, **extra))
+            try:
+                cosmo.compute()
+                spectra[label] = cosmo.raw_cl(100)['tt'].copy()
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+        # The derived default must BE min(l_max_dr, l_max_ncdm) = 10, not merely
+        # something that runs.
+        np.testing.assert_array_equal(spectra['derived'], spectra['explicit'])
+
+        # An explicit value beyond the hierarchies still fails loudly: the
+        # collision would read multipoles the parent does not have.
+        cosmo = Class()
+        cosmo.set(dict(self.verbose, **base, **{'l_max_dr_col': 30}))
+        try:
+            with self.assertRaises(CosmoComputationError):
+                cosmo.compute()
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
     def test_tensor_with_dncdm_dr_is_rejected(self):
         """#345 guard: evolving tensor modes with the exact NCDM method
         together with a decaying-NCDM (DNCDM_DR) species is not supported and
