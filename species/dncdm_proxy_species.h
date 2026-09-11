@@ -312,10 +312,26 @@ class DNCDMProxySpecies : public CompositeSpecies {
   }
 
   /** Comoving number of a daughter, in the kernel's bare grid units (no factor):
-   *  sum dq q^2 f, halved for the boson. */
+   *  sum dq q^2 f, halved for the boson.
+   *
+   *  BARE PER-DOF, and deliberately NOT weighted by n_daughter, unlike DaughterRho:
+   *  its only use is as the denominator of the per-dof exchange rate nu_l, whose
+   *  numerator is also per-dof. The published number COLUMN applies the weight at the
+   *  point of publication instead. */
   double DaughterNumber(const double* f, bool boson) const;
-  /** Physical energy density of a daughter from its PSD. */
+  /** Physical energy density of a daughter from its PSD, INCLUDING the species weight
+   *  (n_daughter for the fermion, 1 for the boson -- phi is always one species). */
   double DaughterRho(const double* f, double a, bool boson) const;
+
+  /** Channel multiplicity: how many parent / daughter mass eigenstates the sector
+   *  carries. See DecayTransitionKernel::Config::n_parent for the counting, and the
+   *  design note for why the parent's is tied to `deg`. */
+  int n_parent() const {
+    return n_parent_;
+  }
+  int n_daughter() const {
+    return n_daughter_;
+  }
   /** n = BareFactorNumber(a) * sum dq q^2 f: divides a published number column back
    *  into the bare grid moment the gross rate is expressed in. */
   double BareFactorNumber(double a) const;
@@ -389,6 +405,12 @@ class DNCDMProxySpecies : public CompositeSpecies {
   std::unique_ptr<DecayTransitionKernel> kernel_;
 
   double f_ini_l_ = 1.0, f_ini_phi_ = 0.0;
+  // Channel multiplicity (dr_n_parent / dr_n_daughter). The parent's is held EQUAL to
+  // its `deg` by a guard in Create -- deg carries the parent's momentum-integration
+  // weight and n_parent_ carries its rate count, and a sector where those disagree
+  // conserves neither number nor energy while running perfectly happily.
+  int n_parent_   = 1;
+  int n_daughter_ = 1;
 
   /** Fitted transport-rate coefficients (`dr_rta_C3` / `dr_rta_C5` / `dr_rta_n3`).
    *  These are a CALIBRATION, not a derivation -- see Create -- so they stay inputs:

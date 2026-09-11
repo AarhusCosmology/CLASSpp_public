@@ -53,6 +53,21 @@ static void SetProxyBase(FileContent& fc) {
   fc.set("dncdm1.dr_N_q", "16");
 }
 
+// As SetProxyBase, but the parent's normalisation comes from `deg` rather than
+// Omega_dncdmdr: channel multiplicity on the parent side is only meaningful when the
+// parent's weight counts SPECIES, which is the neutrino case the campaign runs.
+static void SetProxyBaseDeg(FileContent& fc, const char* deg) {
+  fc.set("dncdm1.type", "ncdm_decay_dr");
+  fc.set("dncdm1.dr_representation", "proxy");
+  fc.set("dncdm1.m", "1.0");
+  fc.set("dncdm1.Gamma", "10");
+  fc.set("dncdm1.T", "0.71611");
+  fc.set("dncdm1.deg", deg);
+  fc.set("dncdm1.quadrature_strategy", "3");
+  fc.set("dncdm1.momenta_bins", "16");
+  fc.set("dncdm1.dr_N_q", "16");
+}
+
 static std::unique_ptr<DNCDMProxySpecies> BuildProxy(FileContent& fc,
                                                      background& pba,
                                                      NcdmSettings& settings) {
@@ -530,6 +545,89 @@ int main() {
     // l(l+1)/2 - 2 = 8 at l = 4 against l(l+1)/6 = 10/3.
     Check(legs->TransportRate(4, aB, p1.data()) > leg->TransportRate(4, aB, p2.data()),
           "dr_rta_beta = legs is steeper than legendre at l = 4");
+  }
+
+  // ── channel multiplicity: the weights, and the guard that keeps them honest ──
+  //
+  // Two separate things carry a multiplicity, and the whole design rests on not
+  // confusing them (design 2026-09-11-dncdm-scenario-b-multiplicity):
+  //   * the kernel's channel COUNT, which scales rates;
+  //   * the species' momentum-integration WEIGHT, which scales rho/n/Pi.
+  // The daughter has no `deg` of its own, so `dr_n_daughter` has to supply its weight;
+  // the parent's weight is `deg`, which already works (measured: deg = 2 doubles
+  // rho_dncdm1 exactly). What must not be spellable is the two disagreeing -- a parent
+  // weighted 2 whose daughter is fed at the 1-parent rate runs, errors nothing, and
+  // silently violates sector energy conservation.
+  {
+    background pba  = MakeBackground();
+    NcdmSettings st = TestSettings();
+    const int Nd    = 16;
+    std::vector<double> f(Nd, 0.3);
+    const double aD = 1e-3;
+
+    FileContent f1{};
+    SetProxyBaseDeg(f1, "1");
+    auto one = BuildProxy(f1, pba, st);
+
+    FileContent f2{};
+    SetProxyBaseDeg(f2, "1");
+    f2.set("dncdm1.dr_n_daughter", "2");
+    auto two = BuildProxy(f2, pba, st);
+
+    // The fermion daughter is n_daughter species; the boson is always one.
+    CheckClose(two->DaughterRho(f.data(), aD, false),
+               2. * one->DaughterRho(f.data(), aD, false),
+               1e-14,
+               "dr_n_daughter = 2 doubles the fermion daughter's rho");
+    CheckClose(two->DaughterRho(f.data(), aD, true),
+               one->DaughterRho(f.data(), aD, true),
+               1e-14,
+               "dr_n_daughter does not change the boson's rho (phi is one species)");
+
+    // PARENT SIDE: rejected outright, at any deg. `deg` is overloaded and cannot carry
+    // a species count.
+    //
+    // In the Omega_dncdmdr shooting path deg is a PSD AMPLITUDE -- a genuinely diluted
+    // population, where f_bare = deg * f0 is the physical occupation and the kernel
+    // boundary (KappaStoredToBare, which carries GetDeg()) is right to scale it. A
+    // species COUNT is the opposite: n identical species share ONE per-dof occupation,
+    // and scaling it corrupts the (1 -+ f) blocking terms, which are nonlinear in f.
+    //
+    // Measured, proxy background, m = 0.06, Gamma = 1e7, sector a^4 rho drift across the
+    // decay epoch: 0.0043% at (deg 1, n_p 1), 0.0207% at (deg 2, n_p 1), and 3.64% at
+    // (deg 2, n_p 2) -- an 850x leak on exactly the combination a naive guard would
+    // bless. rho_phi, which starts empty and is therefore pure decay product, comes out
+    // 7.4x at deg = 2 rather than the 2x a pure weight would give: proof the occupation
+    // itself scaled.
+    //
+    // The daughter side has no such problem and is NOT rejected: n_daughter is applied
+    // to rho/n outside the kernel and never reaches the boundary (measured drift 0.003%,
+    // i.e. the baseline).
+    for (const char* deg : {"1", "2"}) {
+      FileContent fx{};
+      SetProxyBaseDeg(fx, deg);
+      fx.set("dncdm1.dr_n_parent", "2");
+      bool rejected = false;
+      try {
+        auto bad = BuildProxy(fx, pba, st);
+      }
+      catch (const std::exception&) {
+        rejected = true;
+      }
+      Check(rejected, "dr_n_parent > 1 is rejected (deg cannot carry a species count)");
+    }
+    // n_parent = 1 stays spellable, so the key is not simply dead.
+    FileContent f5{};
+    SetProxyBaseDeg(f5, "1");
+    f5.set("dncdm1.dr_n_parent", "1");
+    bool ok1 = true;
+    try {
+      auto fine = BuildProxy(f5, pba, st);
+    }
+    catch (const std::exception&) {
+      ok1 = false;
+    }
+    Check(ok1, "dr_n_parent = 1 is accepted");
   }
 
   if (failures > 0) {

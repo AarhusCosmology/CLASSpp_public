@@ -37,7 +37,7 @@ DrPsdSpecies::DrPsdSpecies(FileContent* pfc,
   // Bare-occupation storage (kernel boundary, #385) => factor carries g/(2*pi)^3,
   // so deg means physical dof (g=2 fermion = particle+antiparticle, matching a
   // deg=1 standard NCDM neutrino; g=1 boson).
-  SetDegAndFactor((stat_ == Statistics::Fermion ? 2.0 : 1.0) / pow(2 * _PI_, 3));
+  SetDegAndFactor(PerSpeciesDeg(stat_));
 
   // Grid controls. dr_q_min/dr_q_max/dr_N_q define the BACKGROUND grid; the
   // perturbation grid is its exact dr_bg_refine-subsample (no independent endpoints —
@@ -165,6 +165,11 @@ DrPsdSpecies::DrPsdSpecies(FileContent* pfc,
 void DrPsdSpecies::PinTemperature(double T) {
   T_ = T;
   SetDegAndFactor(GetDeg());
+}
+
+void DrPsdSpecies::SetSpeciesMultiplicity(int n) {
+  class_test_severe(n < 1, "daughter species multiplicity must be >= 1 (got %d)", n);
+  SetDegAndFactor(PerSpeciesDeg(stat_) * n);
 }
 
 Statistics DrPsdSpecies::ParseStatistics(FileContent* pfc, const std::string& instance_name) {

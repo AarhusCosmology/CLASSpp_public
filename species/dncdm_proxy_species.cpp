@@ -546,6 +546,57 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                     name.c_str());
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = in.get_flag("quantum_statistics", true);
+
+  // ── channel multiplicity (scenario B) ────────────────────────────────────────
+  // How many parent / daughter mass eigenstates are in the sector. (1,1) is the
+  // two-state system and Chen et al.'s scenario A; (1,2) is their B1 (normal
+  // ordering, nu_3 -> nu_1, nu_2) and (2,1) their B2 (inverted, nu_1, nu_2 -> nu_3).
+  // The kernel's Config::n_parent documents the per-leg counting.
+  //
+  // Structural (it names the sector's content, not a value a sampler varies), so a
+  // bad one is severe rather than clamped.
+  const int n_parent   = in.get_or("dr_n_parent", 1);
+  const int n_daughter = in.get_or("dr_n_daughter", 1);
+  class_test_severe(n_parent < 1 || n_daughter < 1,
+                    "species '%s': dr_n_parent (=%d) and dr_n_daughter (=%d) are counts "
+                    "of mass eigenstates and must both be >= 1",
+                    name.c_str(),
+                    n_parent,
+                    n_daughter);
+
+  // dr_n_parent > 1 IS NOT SUPPORTED, and the reason is worth stating because the
+  // obvious workaround is wrong.
+  //
+  // `deg` cannot carry a species count. In the Omega_dncdmdr shooting path it is a PSD
+  // AMPLITUDE -- a genuinely diluted population, for which f_bare = deg * f0 IS the
+  // physical occupation and KappaStoredToBare() is right to carry GetDeg(). A species
+  // count is the opposite: n identical species share ONE per-dof occupation. Setting
+  // deg = n to weight the parent therefore also scales the occupation the kernel sees,
+  // and the collision is nonlinear in it (Lambda carries f_l f_phi and f_H(f_l - f_phi)),
+  // so the rate comes out far more than n times too large.
+  //
+  // MEASURED (proxy background, m = 0.06, Gamma = 1e7), sector a^4 rho drift across the
+  // decay epoch: 0.0043% at (deg 1, n_p 1); 0.0207% at (deg 2, n_p 1); 3.64% at
+  // (deg 2, n_p 2). And rho_phi, which starts empty and is pure decay product, is 7.4x
+  // at deg = 2 where a pure weight would give 2x.
+  //
+  // Supporting it properly means giving the parent a species count SEPARATE from deg --
+  // one that multiplies factor() (hence rho/n/Pi) without touching the kernel boundary.
+  // That is a change to NCDMBaseSpecies, not to this file, and it is deliberately not
+  // bundled here. Until then scenario B2 (inverted ordering, two parents) cannot be run;
+  // B1 (normal ordering, two daughters) is unaffected and IS supported, because
+  // dr_n_daughter is applied to rho/n outside the kernel and never reaches the boundary.
+  class_test_severe(n_parent != 1,
+                    "species '%s': dr_n_parent (=%d) > 1 is not supported yet. `deg` is a "
+                    "PSD amplitude, not a species count, so it cannot weight a second "
+                    "parent without also scaling the occupation the collision kernel "
+                    "sees -- measured, that leaks 3.64%% of the sector's comoving energy "
+                    "across the decay epoch. Use dr_n_daughter for scenario B1 (normal "
+                    "ordering); B2 needs a parent species count separate from deg.",
+                    name.c_str(),
+                    n_parent);
+  cfg.n_parent   = n_parent;
+  cfg.n_daughter = n_daughter;
   // Stiffness cap, ON here and off in the exact scheme.
   //
   // The per-bin collision rate is K/eps -> a*Gamma once the parent is
@@ -569,16 +620,18 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   auto fermion = std::make_unique<DarkRadiationSpecies>("dr_" + name + "_l", ctx.pba, ctx.bgm);
   auto boson   = std::make_unique<DarkRadiationSpecies>("dr_" + name + "_phi", ctx.pba, ctx.bgm);
 
-  auto composite        = std::make_unique<DNCDMProxySpecies>(std::move(parent),
-                                                              std::move(fermion),
-                                                              std::move(boson),
-                                                              std::move(q_d),
-                                                              std::move(dq_d),
-                                                              cfg,
-                                                              ctx.pba,
-                                                              ctx.bgm);
-  composite->f_ini_l_   = in.get_or("dr_f_ini_l", 1.0);
-  composite->f_ini_phi_ = in.get_or("dr_f_ini_phi", 0.0);
+  auto composite         = std::make_unique<DNCDMProxySpecies>(std::move(parent),
+                                                               std::move(fermion),
+                                                               std::move(boson),
+                                                               std::move(q_d),
+                                                               std::move(dq_d),
+                                                               cfg,
+                                                               ctx.pba,
+                                                               ctx.bgm);
+  composite->n_parent_   = n_parent;
+  composite->n_daughter_ = n_daughter;
+  composite->f_ini_l_    = in.get_or("dr_f_ini_l", 1.0);
+  composite->f_ini_phi_  = in.get_or("dr_f_ini_phi", 0.0);
 
   // Parsed BEFORE the coefficients below, which default differently per form.
   // Structural (names a closed set of forms, not a value a sampler varies) -> severe.
@@ -718,7 +771,9 @@ void DNCDMProxySpecies::SetBackgroundInitialConditions(const BackgroundICContext
 }
 
 double DNCDMProxySpecies::DaughterRho(const double* f, double a, bool boson) const {
-  const double fac = BareFactor() * (boson ? 0.5 : 1.0) / (a * a * a * a);
+  // (boson ? 0.5 : n_daughter_): phi is always ONE species and takes the g_phi/g_l
+  // half; the fermion daughter is n_daughter_ identical species.
+  const double fac = BareFactor() * (boson ? 0.5 : n_daughter_) / (a * a * a * a);
   double sum       = 0.;
   const int Nd     = static_cast<int>(q_d_.size());
   for (int i = 0; i < Nd; ++i) {
@@ -766,12 +821,21 @@ void DNCDMProxySpecies::ComputeDerivedBackground(double a,
   const int lnf_idx  = parent_->bg_lnf_index();
   const double kappa = KappaStoredToBare();
 
-  double gross = 0.;
+  // Gross transitions PER CHANNEL, per bare parent dof. Each rate built from it
+  // below picks up its own leg's multiplicity, exactly as in the kernel: the parent
+  // sees n_daughter channels, a daughter dof is fed by n_parent species, and phi
+  // counts every channel.
+  double gross_channel = 0.;
   for (int i = 0; i < Np; ++i) {
     const double eps  = std::sqrt(q[i] * q[i] + a * a * m * m);
     const double fH   = kappa * std::exp(pvecback[lnf_idx + i]);
-    gross            += dq[i] * q[i] * q[i] * (K / eps) * fH;
+    gross_channel    += dq[i] * q[i] * q[i] * (K / eps) * fH;
   }
+  // The published rate column and eps_ne are both the PARENT's, so both carry
+  // n_daughter. eps_ne is then invariant under multiplicity, as it must be: it is a
+  // dimensionless departure from detailed balance, and net (from df_H_) and gross
+  // now carry the same factor.
+  const double gross       = n_daughter_ * gross_channel;
   pvecback[index_bg_rate_] = gross;
 
   // eps_ne needs the NET parent rate, which needs a kernel pass -- and this
@@ -819,11 +883,14 @@ void DNCDMProxySpecies::ComputeDerivedBackground(double a,
   const double N_phi = DaughterNumber(&pvecback_B[index_bi_f_phi_], true);
   // Published as physical number densities: WriteBackgroundData needs them and only
   // ever sees pvecback, and the per-bin PSD columns it used to sum are optional.
-  pvecback[index_bg_n_l_]    = N_l * BareFactorNumber(a);
-  pvecback[index_bg_n_phi_]  = N_phi * BareFactorNumber(a);
+  // The number COLUMNS are physical, so the fermion daughter takes its species
+  // weight here (N_l itself stays bare -- it is a per-dof rate denominator below).
+  pvecback[index_bg_n_l_]   = n_daughter_ * N_l * BareFactorNumber(a);
+  pvecback[index_bg_n_phi_] = N_phi * BareFactorNumber(a);
+  // One leg factor each, numerator and denominator both per dof.
   pvecback[index_bg_nu_H_]   = (N_H > 0.) ? gross / N_H : 0.;
-  pvecback[index_bg_nu_l_]   = (N_l > 0.) ? gross / N_l : 0.;
-  pvecback[index_bg_nu_phi_] = (N_phi > 0.) ? gross / N_phi : 0.;
+  pvecback[index_bg_nu_l_]   = (N_l > 0.) ? n_parent_ * gross_channel / N_l : 0.;
+  pvecback[index_bg_nu_phi_] = (N_phi > 0.) ? n_parent_ * n_daughter_ * gross_channel / N_phi : 0.;
 }
 
 double DNCDMProxySpecies::BareFactorNumber(double a) const {
@@ -880,7 +947,7 @@ void DNCDMProxySpecies::ApplyKernelBackgroundDerivs(double a,
     e_l             += q3 * df_l_[i];
     e_phi           += q3 * df_phi_[i];
   }
-  dy[fermion_->bi_rho_index()] += fac * e_l;
+  dy[fermion_->bi_rho_index()] += n_daughter_ * fac * e_l;
   dy[boson_->bi_rho_index()]   += fac * 0.5 * e_phi;
 
   // Fingerprint the state this kernel pass was prepared at, so the diagonal can

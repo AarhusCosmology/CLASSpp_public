@@ -224,6 +224,57 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // approximation of unquantified accuracy. DNCDMProxySpecies, whose whole point is
   // cheapness, does cap -- see its dr_rate_cap.
 
+  // ── channel multiplicity (scenario B) ────────────────────────────────────────
+  // Same two keys, same counting and the same guard as DNCDMProxySpecies; see
+  // DecayTransitionKernel::Config::n_parent and
+  // docs/superpowers/specs/2026-09-11-dncdm-scenario-b-multiplicity-design.md.
+  //
+  // The exact scheme needs these MORE than the proxy does, not less: scenario B's
+  // whole claim is that its rate can be measured against a q-resolved reference
+  // rather than inherited from arXiv:2203.09075's analytic factor of two, and that
+  // reference is this class.
+  const int n_parent   = in.get_or("dr_n_parent", 1);
+  const int n_daughter = in.get_or("dr_n_daughter", 1);
+  class_test_severe(n_parent < 1 || n_daughter < 1,
+                    "species '%s': dr_n_parent (=%d) and dr_n_daughter (=%d) are counts "
+                    "of mass eigenstates and must both be >= 1",
+                    name.c_str(),
+                    n_parent,
+                    n_daughter);
+  // dr_n_parent > 1 IS NOT SUPPORTED, and the reason is worth stating because the
+  // obvious workaround is wrong.
+  //
+  // `deg` cannot carry a species count. In the Omega_dncdmdr shooting path it is a PSD
+  // AMPLITUDE -- a genuinely diluted population, for which f_bare = deg * f0 IS the
+  // physical occupation and KappaStoredToBare() is right to carry GetDeg(). A species
+  // count is the opposite: n identical species share ONE per-dof occupation. Setting
+  // deg = n to weight the parent therefore also scales the occupation the kernel sees,
+  // and the collision is nonlinear in it (Lambda carries f_l f_phi and f_H(f_l - f_phi)),
+  // so the rate comes out far more than n times too large.
+  //
+  // MEASURED (proxy background, m = 0.06, Gamma = 1e7), sector a^4 rho drift across the
+  // decay epoch: 0.0043% at (deg 1, n_p 1); 0.0207% at (deg 2, n_p 1); 3.64% at
+  // (deg 2, n_p 2). And rho_phi, which starts empty and is pure decay product, is 7.4x
+  // at deg = 2 where a pure weight would give 2x.
+  //
+  // Supporting it properly means giving the parent a species count SEPARATE from deg --
+  // one that multiplies factor() (hence rho/n/Pi) without touching the kernel boundary.
+  // That is a change to NCDMBaseSpecies, not to this file, and it is deliberately not
+  // bundled here. Until then scenario B2 (inverted ordering, two parents) cannot be run;
+  // B1 (normal ordering, two daughters) is unaffected and IS supported, because
+  // dr_n_daughter is applied to rho/n outside the kernel and never reaches the boundary.
+  class_test_severe(n_parent != 1,
+                    "species '%s': dr_n_parent (=%d) > 1 is not supported yet. `deg` is a "
+                    "PSD amplitude, not a species count, so it cannot weight a second "
+                    "parent without also scaling the occupation the collision kernel "
+                    "sees -- measured, that leaks 3.64%% of the sector's comoving energy "
+                    "across the decay epoch. Use dr_n_daughter for scenario B1 (normal "
+                    "ordering); B2 needs a parent species count separate from deg.",
+                    name.c_str(),
+                    n_parent);
+  cfg.n_parent   = n_parent;
+  cfg.n_daughter = n_daughter;
+
   // Daughter grid sizing. The emission band's top is closed-form (see
   // MaxDaughterMomentum) and SATURATES at a = 1, so the daughters can be sized once,
   // here, from the parent that will feed them. This is the composite's job and not
@@ -248,6 +299,17 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                                                 ctx.bgm,
                                                 Statistics::Boson,
                                                 q_star_max);
+
+  // The fermion daughter's momentum-integration WEIGHT. Unlike the proxy's
+  // DarkRadiationSpecies, DrPsdSpecies already carries a deg (2 for the fermion's two
+  // helicity states, 1 for the boson), so n_daughter rides that -- and because its rho
+  // is computed from the PSD through factor() on every row, no source term needs
+  // scaling either. The boson is untouched: phi is always ONE species however many
+  // decay channels feed it.
+  //
+  // Set before the composite ctor, which calls PinTemperature -> SetDegAndFactor(
+  // GetDeg()) and so preserves whatever is set here.
+  fermion->SetSpeciesMultiplicity(n_daughter);
 
   // An explicit dr_q_max is always honoured — a narrow grid is sometimes a deliberate
   // cost choice, and refusing it would make published configurations unreproducible.

@@ -139,6 +139,18 @@ class DrPsdSpecies : public NCDMBaseSpecies {
    *  daughters, before anything reads factor_. */
   void PinTemperature(double T);
 
+  /** Make this one object stand for `n` IDENTICAL daughter species (scenario B's
+   *  dr_n_daughter). Multiplies the per-species dof count set at construction, so
+   *  rho/n/Pi come out n times larger while the stored per-dof occupation -- which is
+   *  what the kernel's (1 -+ f) blocking terms read -- is untouched. That separation is
+   *  the whole point: folding the count into the occupation instead would push f > 1
+   *  into Pauli blocking, which is wrong in a way that still looks like physics.
+   *
+   *  Idempotent (it sets the degeneracy absolutely, not cumulatively), but intended to
+   *  be called once, by DNCDMInvSpecies::Create, before anything reads factor_.
+   *  The RATE half of the multiplicity lives in DecayTransitionKernel::Config. */
+  void SetSpeciesMultiplicity(int n);
+
   // ── Background ─────────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void RegisterIntegrationIndices(int& index_bi) override;
@@ -316,6 +328,14 @@ class DrPsdSpecies : public NCDMBaseSpecies {
   /** Parse the statistics dot-key into the enum; class_test_severe on anything
    *  other than "fermion"/"boson". Used by the standalone CreateAll. */
   static Statistics ParseStatistics(FileContent* pfc, const std::string& instance_name);
+
+  /** Physical dof of ONE daughter species, in the bare-occupation normalisation the
+   *  kernel boundary (#385) requires: g/(2*pi)^3, with g = 2 for a fermion
+   *  (particle+antiparticle, matching a deg=1 standard NCDM neutrino) and 1 for a
+   *  boson. Shared by the ctor and SetSpeciesMultiplicity so the two cannot drift. */
+  static double PerSpeciesDeg(Statistics stat) {
+    return (stat == Statistics::Fermion ? 2.0 : 1.0) / pow(2 * _PI_, 3);
+  }
 
   /** Fill q_bg_/dq_bg_ (log-trapezoid, half-weight endpoints, thesis §3), then the
    *  perturbation grid q_/dq_ as the exact refine_-subsample of it. */

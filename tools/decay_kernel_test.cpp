@@ -136,6 +136,200 @@ void test_conservation(bool balanced = false) {
   assert(std::fabs(M.N_H) > 0.);  // guard against a trivially-zero kernel "passing"
 }
 
+// CHANNEL MULTIPLICITY (scenario B, design 2026-09-11-dncdm-scenario-b-multiplicity).
+// n_parent parent mass eigenstates and n_daughter daughter eigenstates, identical
+// within each group, give n_parent*n_daughter channels. Every leg then scales by the
+// number of channels the OTHER side opens to it:
+//
+//     parent legs (forward loss AND inverse gain)  x n_daughter
+//     daughter legs                                x n_parent
+//     boson legs                                   x n_parent * n_daughter
+//
+// Two consequences are tested, and they are independent claims.
+//
+// (1) The legs scale EXACTLY. At fixed input f the whole network is linear in each
+//     leg's factor -- Lambda and the (1+-f) blocking coefficients depend on f alone,
+//     never on the multiplicity -- so df must be the (1,1) df times the factor, to
+//     round-off. A failure here means multiplicity leaked into a blocking term, which
+//     is the one way to get this wrong that still looks like physics.
+//
+// (2) Conservation survives, with each species' bare moment weighted by its own
+//     multiplicity. The (1,1) identities of test_conservation generalise to
+//         n_parent*N_H + n_daughter*N_l == 0
+//         2*n_parent*N_H + N_phi == 0
+//         2*n_parent*E_H + 2*n_daughter*E_l + E_phi == 0
+//     because each leg carries n_parent*n_daughter once the weights are applied.
+//     These are the kernel's own identities and must hold at round-off for arbitrary
+//     f, exactly as at (1,1) -- never a tolerance to loosen.
+void test_channel_multiplicity(int n_parent, int n_daughter, bool balanced = false) {
+  Grid P      = MakeGrid(1e-3, 1e2, 64);
+  Grid F      = MakeGrid(1e-4, 2e2, 64);
+  Grid B      = MakeGrid(1e-4, 2e2, 64);
+  const int N = 64;
+
+  std::mt19937 rng(4242u);
+  std::uniform_real_distribution<double> U(0.01, 0.9);
+  std::vector<double> fH(N), fl(N), fphi(N);
+  for (auto& x : fH)
+    x = U(rng);
+  for (auto& x : fl)
+    x = U(rng);
+  for (auto& x : fphi)
+    x = U(rng);
+
+  const double a = 0.5, m = 2.0, Gamma = 0.3;
+
+  double split_resid = 0.;
+  auto run           = [&](int np,
+                           int nd,
+                           std::vector<double>& dfH,
+                           std::vector<double>& dfl,
+                           std::vector<double>& dfphi) {
+    DecayTransitionKernel::Config cfg;
+    cfg.inverse_decays     = true;
+    cfg.quantum_statistics = true;
+    cfg.balanced_gather    = balanced;
+    cfg.n_parent           = np;
+    cfg.n_daughter         = nd;
+    DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
+    dfH.assign(N, 0.);
+    dfl.assign(N, 0.);
+    dfphi.assign(N, 0.);
+    K.ComputeBackgroundDerivs(a,
+                              m,
+                              Gamma,
+                              fH.data(),
+                              fl.data(),
+                              fphi.data(),
+                              dfH.data(),
+                              dfl.data(),
+                              dfphi.data());
+    assert(K.clamped_energy_residual() == 0.);
+    split_resid = K.split_energy_residual();
+    return K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
+  };
+
+  std::vector<double> dfH1(N), dfl1(N), dfphi1(N), dfH(N), dfl(N), dfphi(N);
+  run(1, 1, dfH1, dfl1, dfphi1);
+  auto M = run(n_parent, n_daughter, dfH, dfl, dfphi);
+
+  // (1) exact leg scaling against the (1,1) run on the same f
+  const double scale1 = MaxAbs(dfH1, dfl1, dfphi1);
+  double leg          = 0.;
+  for (int i = 0; i < N; ++i) {
+    leg = std::fmax(leg, std::fabs(dfH[i] - n_daughter * dfH1[i]));
+    leg = std::fmax(leg, std::fabs(dfl[i] - n_parent * dfl1[i]));
+    leg = std::fmax(leg, std::fabs(dfphi[i] - n_parent * n_daughter * dfphi1[i]));
+  }
+  leg /= scale1 * n_parent * n_daughter;
+
+  // (2) the multiplicity-weighted conservation identities
+  const double wN_H = n_parent * M.N_H, wN_l = n_daughter * M.N_l;
+  const double num_f = std::fabs(wN_H + wN_l) / Scale(wN_H, wN_l);
+  const double num_b = std::fabs(2. * wN_H + M.N_phi) / Scale(2. * wN_H, M.N_phi);
+  const double wE_H = n_parent * M.E_H, wE_l = n_daughter * M.E_l;
+  const double escale = Scale3(2. * wE_H, 2. * wE_l, M.E_phi);
+  const double ene    = std::fabs(2. * wE_H + 2. * wE_l + M.E_phi - split_resid) / escale;
+
+  std::printf(
+      "channel multiplicity (%d,%d)%s: legs=%.2e |nH*N_H+nl*N_l|=%.2e "
+      "|2nH*N_H+N_phi|=%.2e |energy - booked|=%.2e\n",
+      n_parent,
+      n_daughter,
+      balanced ? " (balanced_gather)" : "",
+      leg,
+      num_f,
+      num_b,
+      ene);
+  assert(leg < 1e-12);
+  assert(num_f < 1e-12);
+  assert(num_b < 1e-12);
+  assert(ene < 1e-12);
+  assert(std::fabs(M.N_H) > 0.);
+}
+
+// THE STIFFNESS CAP UNDER MULTIPLICITY (Config::max_rate, `dr_rate_cap`).
+//
+// The cap exists to bound the stiffest eigenvalue of the background system -- the
+// parent's per-bin collision rate, which is what sets an explicit stepper's step. Its
+// units are the expansion rate: "limited to max_rate * (a'/a)".
+//
+// That leaves a choice once the parent's leg carries n_daughter, and the choice is not
+// free. Capping K alone bounds the rate PER CHANNEL, so at n_daughter = 2 the parent's
+// actual eigenvalue is twice the cap and `dr_rate_cap = 1e3` means a different thing in
+// scenario A than in scenario B -- which would make an A-vs-B comparison partly an
+// artefact of the cap. Capping the parent's LEG keeps the knob's documented meaning
+// fixed across scenarios, which is what a comparison needs, and is still ONE global
+// scale on K, so the conservation identities are untouched.
+//
+// The control matters as much as the claim: with the cap disarmed the same two runs
+// must differ by exactly n_daughter. Without it, a test that finds the capped rates
+// equal would also pass if multiplicity did nothing at all.
+void test_rate_cap_bounds_stiffness(int n_daughter) {
+  Grid P      = MakeGrid(1e-3, 1e2, 48);
+  Grid F      = MakeGrid(1e-4, 2e2, 48);
+  Grid B      = MakeGrid(1e-4, 2e2, 48);
+  const int N = 48;
+
+  std::mt19937 rng(777u);
+  std::uniform_real_distribution<double> U(0.01, 0.9);
+  std::vector<double> fH(N), fl(N), fphi(N);
+  for (auto& x : fH)
+    x = U(rng);
+  for (auto& x : fl)
+    x = U(rng);
+  for (auto& x : fphi)
+    x = U(rng);
+
+  const double a = 0.5, m = 2.0, Gamma = 3e3;  // Gamma large so the cap actually binds
+  const double aH = 1e-2;
+
+  auto max_diag_H = [&](int nd, double cap) {
+    DecayTransitionKernel::Config cfg;
+    cfg.inverse_decays     = true;
+    cfg.quantum_statistics = true;
+    cfg.max_rate           = cap;
+    cfg.n_daughter         = nd;
+    DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
+    std::vector<double> dfH(N), dfl(N), dfphi(N);
+    K.ComputeBackgroundDerivs(a,
+                              m,
+                              Gamma,
+                              fH.data(),
+                              fl.data(),
+                              fphi.data(),
+                              dfH.data(),
+                              dfl.data(),
+                              dfphi.data(),
+                              aH);
+    std::vector<double> dH(N), dl(N), dp(N);
+    K.CollisionDiagonal(dH.data(), dl.data(), dp.data());
+    double mx = 0.;
+    for (double v : dH)
+      mx = std::fmax(mx, std::fabs(v));
+    return mx;
+  };
+
+  const double capped_1   = max_diag_H(1, 1e3);
+  const double capped_n   = max_diag_H(n_daughter, 1e3);
+  const double uncapped_1 = max_diag_H(1, 0.);
+  const double uncapped_n = max_diag_H(n_daughter, 0.);
+
+  const double capped_ratio   = capped_n / capped_1;
+  const double uncapped_ratio = uncapped_n / uncapped_1;
+  std::printf(
+      "rate cap under multiplicity (1,%d): capped ratio=%.6f (want 1) "
+      "uncapped ratio=%.6f (want %d)\n",
+      n_daughter,
+      capped_ratio,
+      uncapped_ratio,
+      n_daughter);
+  // The cap binds: it must actually be doing something, or both assertions are vacuous.
+  assert(capped_1 < 0.5 * uncapped_1);
+  assert(std::fabs(capped_ratio - 1.) < 1e-12);
+  assert(std::fabs(uncapped_ratio - n_daughter) < 1e-12);
+}
+
 // Equilibrium residual (Fable review -- replaces the unachievable hard
 // detailed-balance tolerance). For FD parent+fermion, BE boson with common T and
 // mu_H = mu_l + mu_phi the continuum Lambda == 0 on eps1 = q2*+q3*; on the grid
@@ -783,7 +977,7 @@ void test_perturbation_operator(bool balanced = false) {
 // on the daughter profile a future change might alter. What the scheme needs to be
 // CORRECT is the diagonal matching the operator, which is asserted; whether it is
 // FAST is a question about trajectories, which the timings answer.
-void test_collision_diagonal(bool balanced = false) {
+void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daughter = 1) {
   Grid P       = MakeGrid(1e-3, 1e2, 24);
   Grid F       = MakeGrid(1e-4, 2e2, 48);
   Grid B       = MakeGrid(1e-4, 2e2, 48);
@@ -802,6 +996,8 @@ void test_collision_diagonal(bool balanced = false) {
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
   cfg.balanced_gather    = balanced;
+  cfg.n_parent           = n_parent;
+  cfg.n_daughter         = n_daughter;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   auto rhs = [&](const std::vector<double>& yy, std::vector<double>& out) {
@@ -1810,7 +2006,7 @@ void test_all_l_matches_per_l(bool balanced = false) {
 // what the hierarchy delivers and what makes f + h F stay positive for the difference.
 // The step is scanned rather than fixed: the quotient is a cancellation, so it has a
 // truncation branch and a round-off branch and the minimum over the scan is the signal.
-void test_perturbation_jacobian(bool balanced, bool chain) {
+void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int n_daughter = 1) {
   const int N = 48;
   Grid P      = MakeGrid(1e-3, 1e2, N);
   Grid F      = MakeGrid(1e-4, 2e2, N);
@@ -1837,6 +2033,12 @@ void test_perturbation_jacobian(bool balanced, bool chain) {
   cfg.balanced_gather    = balanced;
   cfg.balanced_pert      = chain;
   cfg.lumped_loss        = !balanced;
+  // Channel multiplicity belongs in THIS test, not only in a bespoke one: the operator
+  // must remain the Jacobian of the background RHS at every (n_parent, n_daughter), and
+  // a leg factor applied to the background but not to the operator shows up here as a
+  // finite-difference mismatch of exactly that factor. No new machinery needed.
+  cfg.n_parent   = n_parent;
+  cfg.n_daughter = n_daughter;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   std::vector<double> oH(N), ol(N), ophi(N);
@@ -2085,6 +2287,13 @@ int main() {
   test_separate_bg_grids(true);
   test_conservation();
   test_conservation(true);
+  test_channel_multiplicity(1, 1);        // control: the new path must reproduce (1,1)
+  test_channel_multiplicity(1, 2);        // B1 (NO): one parent, two daughters
+  test_channel_multiplicity(2, 1);        // B2 (IO): two parents, one daughter
+  test_channel_multiplicity(2, 3);        // no hidden assumption that a factor is 1 or 2
+  test_channel_multiplicity(1, 2, true);  // identities are deposit-weight properties
+  test_rate_cap_bounds_stiffness(2);
+  test_rate_cap_bounds_stiffness(3);
   test_equilibrium();
   test_rhs_continuity();
   test_perturbation_operator();
@@ -2094,6 +2303,10 @@ int main() {
   test_perturbation_jacobian(false, false);  // linear gather: already a Jacobian
   test_perturbation_jacobian(true, false);   // control: balanced band factor, linear gather
   test_perturbation_jacobian(true, true);    // the claim
+  // Channel multiplicity must leave the operator the Jacobian of the background RHS.
+  test_perturbation_jacobian(false, false, 1, 2);
+  test_perturbation_jacobian(false, false, 2, 1);
+  test_perturbation_jacobian(true, true, 2, 3);
   test_chain_factor_cap();
   test_chain_cap_reaches_background_diagonal();
   test_daughter_positivity();              // shipped: linear gather, lumped loss
@@ -2102,6 +2315,8 @@ int main() {
   test_daughter_positivity(true, false);   // balanced gather, EXACT split -- the claim
   test_collision_diagonal();
   test_collision_diagonal(true);
+  test_collision_diagonal(false, 1, 2);  // the diagonal is a leg too
+  test_collision_diagonal(true, 2, 1);
   test_perturbation_diagonal();
   test_perturbation_diagonal(true);
   test_mode_reduction();

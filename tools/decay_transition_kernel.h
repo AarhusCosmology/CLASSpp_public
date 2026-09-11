@@ -322,6 +322,38 @@ class DecayTransitionKernel {
      *  That is worth about 1.5x in step count against 2x the nodes, so as a speed measure
      *  it is a small net loss; it is here for the accuracy. */
     int emission_gauss = 1;
+
+    /** Number of parent / daughter mass eigenstates participating in the decay, all
+     *  identical within each group. (1,1) is the two-state system this kernel was
+     *  written for and Chen et al.'s "scenario A"; (1,2) is their B1 (normal ordering,
+     *  nu_3 -> nu_1, nu_2) and (2,1) their B2 (inverted, nu_1, nu_2 -> nu_3).
+     *  See docs/superpowers/specs/2026-09-11-dncdm-scenario-b-multiplicity-design.md.
+     *
+     *  Treating the members of a group as identical is what the oscillation data allow:
+     *  |dm31^2| and |dm32^2| differ by dm21^2/|dm31^2| ~ 3%, and arXiv:2203.09075 does
+     *  not distinguish them either.
+     *
+     *  THE COUNTING. There are n_parent*n_daughter channels, and each leg scales by the
+     *  number of channels the OTHER side opens to it:
+     *
+     *      parent legs    x n_daughter   (each parent dof has n_daughter channels)
+     *      daughter legs  x n_parent     (each daughter dof is fed by n_parent species)
+     *      boson legs     x n_parent*n_daughter   (phi is one species, counts them all)
+     *
+     *  Detailed balance survives this WITHOUT a new argument, which is the reason it is
+     *  written per leg rather than per species: forward and inverse on the same leg
+     *  carry the same factor, so the equilibrium condition Lambda == 0 is untouched at
+     *  any (n_parent, n_daughter). Number and energy conservation likewise survive, with
+     *  each species' bare moment weighted by its own multiplicity -- decay_kernel_test's
+     *  test_channel_multiplicity pins both that and the exact leg scaling.
+     *
+     *  MULTIPLICITY IS NOT A DEGENERACY AND MUST NOT BE ONE. It scales RATES here; the
+     *  weight a species carries in rho/n/Pi is a separate thing applied by the caller
+     *  (see the moment convention on ComputeMoments). Folding it into the stored
+     *  occupation instead would push f > 1 into the (1 -+ f) blocking coefficients,
+     *  which is wrong in a way that still looks like physics. */
+    int n_parent   = 1;
+    int n_daughter = 1;
   };
 
   struct Moments {
@@ -878,9 +910,17 @@ class DecayTransitionKernel {
   // valid for the duration of one RHS, i.e. until the next PrepareTransitions). Only
   // f_H is kept: the operator needs it for the quantum-statistics coefficients, while
   // the node-gathered daughter f's already live in fl_gather_/fphi_gather_.
-  mutable const double* fH_bg_                 = nullptr;
-  mutable double k_coeff_                      = 0.;  // a^2 m Gamma
-  mutable double am2_                          = 0.;  // a^2 m^2
+  mutable const double* fH_bg_ = nullptr;
+  mutable double k_coeff_      = 0.;  // a^2 m Gamma
+  mutable double am2_          = 0.;  // a^2 m^2
+  // Channel-multiplicity leg factors, from Config::n_parent / n_daughter (see there
+  // for the counting). Set once in the ctor; every leg accumulation in the background
+  // sweep, the perturbation operator and the diagonal multiplies by exactly one of
+  // them, and the cached per-node quantities carry none.
+  double mult_parent_leg_   = 1.;  // n_daughter
+  double mult_daughter_leg_ = 1.;  // n_parent
+  double mult_boson_leg_    = 1.;  // n_parent * n_daughter
+  double mult_energy_       = 1.;  // n_parent * n_daughter (weighted-identity bookkeeping)
   mutable double clamped_energy_residual_      = 0.;
   mutable double split_energy_residual_        = 0.;
   mutable double split_energy_residual_pert_   = 0.;

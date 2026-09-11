@@ -899,6 +899,58 @@ int main() {
     assert(std::fabs(dN_H) > 1e-6 * n_moment_scale);
   }
 
+  // ── channel multiplicity on the EXACT scheme ────────────────────────────────
+  //
+  // The exact scheme is where scenario B has to be validated, so it needs the same
+  // two keys as the proxy -- otherwise there is no exact reference to measure the
+  // RTA's factor of two against, and scenario B would rest on Chen et al.'s analytic
+  // argument carried on this campaign's fitted amplitudes.
+  //
+  // The daughters here are DrPsdSpecies, which already carry a `deg` (2 for the
+  // fermion's two helicity states, 1 for the boson), so n_daughter rides that rather
+  // than needing a weight of its own -- and because their rho is COMPUTED from the PSD
+  // through factor() each step, no source term needs scaling either. The kernel's leg
+  // factors are shared with the proxy and are tested in decay_kernel_test.
+  {
+    background pba  = MakeBackground();
+    NcdmSettings st = TestSettings();
+
+    FileContent f1{};
+    SetInvBase(f1);
+    auto one = BuildComposite(f1, pba, st);
+
+    FileContent f2{};
+    SetInvBase(f2);
+    f2.set("dncdm1.dr_n_daughter", "2");
+    auto two = BuildComposite(f2, pba, st);
+
+    assert(std::fabs(two->fermion().GetDeg() - 2. * one->fermion().GetDeg()) <
+           1e-14 * one->fermion().GetDeg());
+    assert(two->boson().GetDeg() == one->boson().GetDeg());  // phi is always one species
+
+    // dr_n_parent > 1 is rejected outright, same as the proxy: `deg` is a PSD amplitude
+    // in the Omega_dncdmdr path, not a species count, and the kernel boundary scales the
+    // occupation by it -- which corrupts the (1 -+ f) blocking terms. See the proxy test
+    // for the measured 3.64% energy leak that settled this.
+    FileContent f3{};
+    SetInvBase(f3);
+    f3.set("dncdm1.dr_n_parent", "2");
+    bool rejected = false;
+    try {
+      auto bad = BuildComposite(f3, pba, st);
+    }
+    catch (const std::exception&) {
+      rejected = true;
+    }
+    assert(rejected);
+    std::printf(
+        "inv channel multiplicity: fermion deg %g -> %g, boson %g unchanged; "
+        "mismatched dr_n_parent rejected\n",
+        one->fermion().GetDeg(),
+        two->fermion().GetDeg(),
+        two->boson().GetDeg());
+  }
+
   std::printf("dncdm inv test passed\n");
   return 0;
 }
