@@ -416,7 +416,7 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *  These are a CALIBRATION, not a derivation -- see Create -- so they stay inputs:
    *  re-fit them if the measurement improves. n3_ is an exponent of the fitted form
    *  only; kCOPW ignores all three and carries its own amplitude. */
-  double C3_ = 0.2336, C5_ = 1.3283, n3_ = 0.5;
+  double C3_ = 0.2335, C5_ = 1.4945, n3_ = 0.5;
 
   RtaForm rta_form_     = RtaForm::kPowers;
   AlphaForm alpha_form_ = AlphaForm::kQuartic;

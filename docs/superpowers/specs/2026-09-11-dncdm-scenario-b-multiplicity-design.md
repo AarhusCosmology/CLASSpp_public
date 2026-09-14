@@ -22,6 +22,14 @@ representations, and §5 step 1 passes:
 * The `nu_H` / `nu_l` / `nu_phi` exchange rates turned out to carry the same three leg
   factors, which is why `gross` is now split into a per-channel quantity. `eps_ne` is
   invariant under multiplicity, as a dimensionless departure from balance must be.
+  **[?] — see the *Measurement status — 2026-09-14* note below; this was never measured
+  in isolation.**
+* **MISSED on 2026-09-11, fixed 2026-09-14:** the proxy's `TransportRate` was left out
+  of this list. Every other rate in the sector counted channels and the closure's damping
+  term did not, so scenario B1 ran with a correct background and a Γ_T a factor of two
+  short. It is not a form C3/C5 could absorb — they are calibrated per channel, and
+  `frac_H` moves the *wrong* way under multiplicity (rho_H/rho_sec falls to ~0.61 of its
+  scenario-A value, so the rate came out ~0.95× instead of 2×).
 * **`dr_rate_cap` resolved**, and it was NOT a free choice. The cap documents itself as
   bounding the parent's per-bin rate in units of the expansion rate; capping `K` alone
   bounds the rate *per channel*, so `dr_rate_cap = 1e3` would permit a 2x stiffer system
@@ -85,10 +93,34 @@ falsification test of §5 step 3 is a B1 test, so the campaign is not blocked.
 The kernel's `n_parent` leg factor is kept, and tested: it is correct where it lives,
 and it is what a proper parent species count will drive.
 
-Still open, and it is a measurement rather than code: **§5 steps 2 and 3 have not been
-run.** Nothing here says the A-calibrated `Gamma_T` formula times two reproduces the
-measured scenario-B rate; that is what step 3 is for, and §6 says what is expected to
-survive it and what is not.
+**Measurement status — 2026-09-14. §5 step 3 HAS now been run, the ×2 SURVIVED, and
+the proxy has been changed to carry it.** `hpc_scenb` measured the sector-normalised
+transport-rate ratio B1/A against the exact q-resolved solve, m = 0.3 eV, on the same
+base inis with only the scenario keys changed:
+
+| Γ | γ bins | y(B1)/y(A) | vs 2 |
+|---|---|---|---|
+| 1e8 | 11 | 1.912 ± 0.027 | −4.4% |
+| 1e9 | 12 | 2.006 ± 0.037 | +0.3% |
+
+with a same-binary scenario-A control reproducing the base round to 0.014% rms, so the
+binary is not in the answer [M]. Two consequences:
+
+* **§7's rejection of a transport-rate multiplier is superseded**, and on its own terms:
+  it was rejected because it "cannot be validated — there is no reference to measure the
+  closure against". Step 3 built that reference. What ships is not the rejected
+  `dr_rta_C` knob but the **species count itself**, `n_daughter_`, applied in
+  `DNCDMProxySpecies::TransportRate` — structural, not a sampled amplitude.
+* **The bullet below claiming `eps_ne` is invariant under multiplicity is [?], not [M].**
+  Measured at fixed `a` with `N_ur` held fixed and only `dr_n_daughter` 1→2, the ε ratio
+  runs 0.48–0.88 — but that run also changes the expansion history, so the invariance
+  has not been isolated from it either way. The unit test pins the transport rate at a
+  FIXED background state, which is the statement the code actually needs.
+
+Still open: **§5 step 2 (m = 0.06) has not been run**, and **scenario B2 still cannot be
+run** — `dr_n_parent > 1` is rejected, because `deg` is a PSD amplitude rather than a
+species count, so B2 needs a parent species count separate from `deg` before it can be
+measured at all.
 
 Evidence tags below: **[M]** measured in this session, **[C]** stated by the code,
 **[P]** earlier campaign, not re-measured, **[?]** no evidence — do not act on it
@@ -272,3 +304,10 @@ the closure, so the exact scheme has nothing to say about it and there is no ref
 to measure the closure against. It would put scenario A and scenario B on different
 evidentiary footings within one paper, which is the specific failure this design exists
 to avoid.
+
+> **Superseded 2026-09-14 — and note what did and did not change.** The transport rate
+> now does carry a factor of `n_daughter_`. What made `dr_rta_C` the wrong answer was
+> never the factor; it was that a free knob set by hand could not be checked. Building
+> the exact scenario-B reference first (§4, §5 step 3) is what turned the same number
+> into a measurement, 2.006 ± 0.037 at Γ = 1e9. So the rejection stands as written for a
+> *sampled* multiplier, and what ships is the species count the sector already knows.

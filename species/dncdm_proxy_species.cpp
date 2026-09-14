@@ -323,7 +323,31 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
     // matters, and once they are refit the term earns nothing.
   }
 
-  return a * parent_->Gamma() * frac_H * (BetaFor(l) * rate3 + AlphaFor(l, X) * rate5);
+  // ── channel multiplicity ────────────────────────────────────────────────────
+  // n_daughter_ identical daughter species means n_daughter_ times as many
+  // transitions per parent per unit time, so the transport rate carries the count for
+  // exactly the reason the background's `gross` does (ApplyKernelBackgroundDerivs:
+  // `gross = n_daughter_ * gross_channel`). It multiplies the assembled rate rather
+  // than either amplitude because both terms are the SAME collision integral one order
+  // apart -- a per-term factor would be a claim about their relative weight, and there
+  // is none. It applies to `copw` too: eq. (13) is the single-channel rate and the
+  // paper's own factor of two lives in its section 4.3, not in the formula.
+  //
+  // Without this the closure was the only part of the sector that did not count
+  // channels -- rho/n, the gross rate and the nu_H/nu_l/nu_phi exchange rates all do --
+  // so scenario B1 came out a factor of two short in Gamma_T while its background was
+  // right. That is not a form the fitted C3/C5 can absorb: they are calibrated per
+  // channel, and frac_H moves the WRONG way under multiplicity (the daughter sector
+  // grows, so rho_H/rho_sec falls to ~0.61 of its scenario-A value).
+  //
+  // MEASURED against the exact q-resolved solve rather than asserted -- the campaign
+  // ran the ten cells the design asked for (hpc_scenb, m = 0.3 eV, the same base inis
+  // with only the scenario keys changed). Sector-normalised rate ratio B1/A:
+  // 2.006 +- 0.037 at Gamma = 1e9 and 1.912 +- 0.027 at 1e8, against a same-binary
+  // scenario-A control reproducing the base round to 0.014% rms. So the factor is the
+  // species count, to a few per cent, and not a fitted one.
+  return n_daughter_ * a * parent_->Gamma() * frac_H *
+         (BetaFor(l) * rate3 + AlphaFor(l, X) * rate5);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -686,15 +710,23 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // eps_H ~ eps_ne^0.745.
   //
   // Under `structured` the amplitudes are the same global fit redone in X: C3 =
-  // 0.0848, C5 = 0.5283, n3 = 0.5 (best-fit n3 = 0.480, and pinning it to 1/2 costs
-  // nothing -- rel-rms 0.3012 against 0.3011). C5 = 0.53 +- 0.02 is worth reading as
+  // 0.0743, C5 = 0.5532, n3 = 0.5 (best-fit n3 = 0.580, and pinning it to 1/2 costs
+  // 0.5% -- rel-rms 0.2603 against 0.2590). C5 = 0.55 +- 0.01 is worth reading as
   // a result rather than a fudge: it says COPW's SHAPE is right and their amplitude
-  // is 1.9x too large, and pinning C5 = 1 wrecks the fit (0.472) and drives C3
+  // is 1.8x too large, and pinning C5 = 1 wrecks the fit (0.677) and drives C3
   // negative. Their MB assumption against these runs' quantum_statistics = yes is
   // one candidate; the separable ansatz and the common-contrast assumption are two
   // more. None is tested.
-  composite->C3_ = in.get_or("dr_rta_C3", copw ? 0.0 : (structured ? 0.0848 : 0.2336));
-  composite->C5_ = in.get_or("dr_rta_C5", copw ? 1.0 : (structured ? 0.5283 : 1.3283));
+  //
+  // RECALIBRATED 2026-09-14 on 1214 bins / 151 cells, against 483/60 before. Two
+  // things grew the set and neither is new physics: the half-decade rungs entered
+  // once their proxy backgrounds existed (they had been dropped by a hand-written
+  // table of the seven integer rungs), and a usable-cell fallback recovered cells
+  // that round precedence had discarded before the quality gate. The amplitudes moved
+  // by 9% and 5% and the fit improved, rel-rms 0.3012 -> 0.2603. See
+  // ~/dncdm-harness/proxynote (tools/fit_structured.py is the fit itself).
+  composite->C3_ = in.get_or("dr_rta_C3", copw ? 0.0 : (structured ? 0.0743 : 0.2335));
+  composite->C5_ = in.get_or("dr_rta_C5", copw ? 1.0 : (structured ? 0.5532 : 1.4945));
   composite->n3_ = in.get_or("dr_rta_n3", 0.5);
 
   // Both name a closed set of forms -> severe, for the same reason dr_rta_form is:

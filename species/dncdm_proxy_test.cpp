@@ -500,9 +500,9 @@ int main() {
     const double G0S                     = st->parent().Gamma();
     for (int l : {2, 4, 7}) {
       const double b3   = l * (l + 1.) / 6.;
-      const double r3   = 0.0848 * std::pow(epsS, 0.5) * (1. / 12.) * XS * XS * XS *
+      const double r3   = 0.0743 * std::pow(epsS, 0.5) * (1. / 12.) * XS * XS * XS *
                           DNCDMProxySpecies::PhiLO(XS);
-      const double r5   = 0.5283 * (1. / 12.) * XS * XS * XS * XS * XS *
+      const double r5   = 0.5532 * (1. / 12.) * XS * XS * XS * XS * XS *
                           DNCDMProxySpecies::PhiNLO(XS);
       const double want = aS * G0S * (rhoS / secS) * (b3 * r3 + DNCDMProxySpecies::AlphaL(l) * r5);
       char msg[112];
@@ -573,6 +573,47 @@ int main() {
     SetProxyBaseDeg(f2, "1");
     f2.set("dncdm1.dr_n_daughter", "2");
     auto two = BuildProxy(f2, pba, st);
+
+    // ── and the TRANSPORT RATE carries it too ─────────────────────────────────
+    // The closure's damping term is a rate of transitions, so it counts channels for
+    // the same reason `gross` does. Held at a FIXED background state -- same pvecback
+    // for both species -- so nothing but the count can move: a run-level A/B would also
+    // change rho_sec and eps_ne and could not separate the three.
+    //
+    // Exact scaling, not approximate: the factor multiplies the assembled rate, so it
+    // must survive both amplitudes, both beta forms and every l. Measured against the
+    // exact q-resolved solve at 2.006 +- 0.037 (hpc_scenb, Gamma = 1e9).
+    {
+      int i1 = 0, i2 = 0;
+      one->RegisterBackgroundIndices(i1);
+      two->RegisterBackgroundIndices(i2);
+      std::vector<double> pv1(i1 + 8, 0.), pv2(i2 + 8, 0.);
+      const double aT = 2e-3;
+      for (auto* pr : {&pv1, &pv2}) {
+        auto& sp                             = (pr == &pv1) ? *one : *two;
+        (*pr)[sp.parent().bg_rho_index()]    = 3.0;
+        (*pr)[sp.parent().bg_number_index()] = 2.0;
+        (*pr)[sp.bg_rho_sec_index()]         = 10.0;
+        (*pr)[sp.bg_eps_ne_index()]          = 0.9;  // far from balance: LO term lives
+      }
+      for (int l : {2, 4, 9, 17}) {
+        char msg[128];
+        std::snprintf(msg,
+                      sizeof(msg),
+                      "dr_n_daughter = 2 doubles TransportRate(l=%d) at fixed background",
+                      l);
+        CheckClose(two->TransportRate(l, aT, pv2.data()),
+                   2. * one->TransportRate(l, aT, pv1.data()),
+                   1e-12,
+                   msg);
+      }
+      // l <= 1 stays identically zero -- those collision integrals vanish by
+      // energy/momentum conservation, and a multiplicity must not resurrect them.
+      for (int l : {0, 1}) {
+        Check(two->TransportRate(l, aT, pv2.data()) == 0.,
+              "dr_n_daughter does not give l <= 1 a transport rate");
+      }
+    }
 
     // The fermion daughter is n_daughter species; the boson is always one.
     CheckClose(two->DaughterRho(f.data(), aD, false),
