@@ -41,9 +41,9 @@ class BackgroundModule;
  *               source they should not.
  *
  *     ℓ ≥ 2     damping:   anisotropic stress and higher moments are damped at
- *               Γ_T,ℓ = a Γ⁰ (ρ_H/ρ_sec) [β_ℓ r₃ + α_ℓ r₅], with β_ℓ = ℓ(ℓ+1)/6,
- *               α_ℓ = (3ℓ⁴+2ℓ³−11ℓ²+6ℓ)/32 (arXiv:2203.09075 eq. 16) and r₃, r₅ set
- *               by `dr_rta_form`.
+ *               Γ_T,ℓ = a Γ⁰ (ρ_H/ρ_sec) [β_ℓ r₃ + α_ℓ r₅], with β_ℓ = ℓ(ℓ+1)/2 − 2
+ *               (BetaL), α_ℓ the momentum-integrated ℓ-dependence α_ℓ^eff(X)
+ *               (`dr_rta_alpha`, see AlphaForm) and r₃, r₅ set by `dr_rta_form`.
  *
  * Under the DEFAULT form the two exponents are not rivals: the γ⁻⁵ piece is what
  * survives AT detailed balance (arXiv:2011.01502 §5, re-derived in arXiv:2203.09075),
@@ -154,10 +154,10 @@ class DNCDMProxySpecies : public CompositeSpecies {
 
   /** `dr_rta_form`: which transport rate the ℓ ≥ 2 damping uses.
    *
-   *  kPowers (default) is the fitted two-power form Γ_T/Γ = C₃ ε_ne^n₃ γ⁻³ + C₅ γ⁻⁵,
+   *  kPowers is the fitted two-power form Γ_T/Γ = C₃ ε_ne^n₃ γ⁻³ + C₅ γ⁻⁵,
    *  with NO shut-off factor. It is a CALIBRATION of this code's own runs over the
-   *  window they converge on, γ ∈ [2,15], and it is what the shipped defaults are
-   *  tuned for.
+   *  window they converge on, γ ∈ [2,15]. It was the default until kStructured
+   *  replaced it.
    *
    *  ⚠ It is a calibration, so it carries no statement outside that window. In
    *  particular it does NOT vanish as γ → 1: it saturates at C₅ (times the parent's
@@ -177,7 +177,7 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *  why it is worth being able to run, but it is derived AT detailed balance and
    *  does not reproduce the measured γ-dependence inside the converged window; see
    *  TransportRate. */
-  /** kStructured is the same two components written in the variable the derivation
+  /** kStructured (default) is the same two components written in the variable the derivation
    *  produces, X = a m_νH/T₀, rather than in powers of the parent's mean Lorentz
    *  factor: (1/12)[C₃ε^n₃ X³Φ₂(X) + C₅ X⁵Φ₄(X)]. It recovers γ⁻³ and γ⁻⁵ as X → 0
    *  instead of assuming them, needs no shut-off factor because both Φ's die as
@@ -188,9 +188,10 @@ class DNCDMProxySpecies : public CompositeSpecies {
   /** Which ℓ-dependence the γ⁻⁵ term carries (`dr_rta_alpha`).
    *
    *  kQuartic is arXiv:2203.09075 eq. (16), α_ℓ = (3ℓ⁴+2ℓ³−11ℓ²+6ℓ)/32 — the
-   *  default, and the published prescription.
+   *  published prescription, and the default under kCOPW only.
    *
-   *  kIntegrated is the same collision integral with the ℓ-expansion NOT taken.
+   *  kIntegrated (default under kStructured and kPowers) is the same collision
+   *  integral with the ℓ-expansion NOT taken.
    *  α_ℓ is exact as the coefficient of the μ² term at fixed q₁ (checked to six
    *  digits for ℓ = 0…10), but the expansion behind it converges only for
    *  q₁/(a m_H) ≳ ℓ², and the momentum integral runs over the whole thermal
@@ -201,33 +202,17 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *
    *  ⚠ Unlike `dr_rta_C3` / `dr_rta_n3`, this applies to BOTH RtaForms: AlphaFor
    *  multiplies the γ⁻⁵ term on the common return path, whichever branch built it.
-   *  kCOPW out of the box is still exactly the paper (the default IS the paper's
+   *  kCOPW out of the box is still exactly the paper (its default IS the paper's
    *  quartic), and kCOPW with kIntegrated is deliberate rather than accidental --
    *  arguably the more self-consistent pairing, since kCOPW's ℓ = 2 normalisation
    *  X⁵𝓕(X) and α^eff's ℓ-ratio then come from the same momentum integral. */
   enum class AlphaForm { kQuartic, kIntegrated };
 
-  /** Which ℓ-dependence the γ⁻³ term carries (`dr_rta_beta`).
-   *
-   *  kLegendre (default) is β_ℓ = ℓ(ℓ+1)/6, the O(x) Legendre coefficient normalised
-   *  at ℓ = 2. It has never had a derivation: it is NOT in arXiv:2203.09075 (that
-   *  paper contains no β_ℓ at all — its eq. (16) is α_ℓ only), and taking the leading
-   *  Legendre coefficient is a guess, because the γ⁻³ term exists only where the
-   *  cancellation FAILS and nothing in the balanced expansion computes the failure.
-   *
-   *  kLegs is the computed alternative: the O(μ) coefficient of the collision integral
-   *  is ℓ(ℓ+1)/2 − 2 for the ν_H leg and IDENTICALLY the same for the ν_l/φ leg —
-   *  which is why they cancel — so the leakage should inherit that. Unlike α_ℓ this
-   *  one is q₁-INDEPENDENT (checked over q₁ = 0.3…30), so the momentum integral leaves
-   *  it alone and there is no X-dependent β^eff to compute.
-   *
-   *  Measured against the exact solve in the s₃ > 0.5 corner: ℓ(ℓ+1)/2 − 2 is right at
-   *  ℓ = 3 (ratio 1.00) and increasingly too steep above, turning over near ℓ = 8 —
-   *  the same pattern α_ℓ shows, and here the momentum integral cannot explain it. */
-  enum class BetaForm { kLegendre, kLegs };
-
   RtaForm rta_form() const {
     return rta_form_;
+  }
+  AlphaForm alpha_form() const {
+    return alpha_form_;
   }
 
   /** The transport rate Γ_T,ℓ (conformal, 1/Mpc) at the current background row. */
@@ -240,6 +225,12 @@ class DNCDMProxySpecies : public CompositeSpecies {
   }
   int bg_eps_ne_index() const {
     return index_bg_eps_ne_;
+  }
+
+  /** The background kernel's configuration, for asserting the input-layer defaults
+   *  (balanced_gather, lumped_loss) in the unit test. */
+  const DecayTransitionKernel::Config& kernel_config() const {
+    return kernel_->config();
   }
 
   /** Same, with the scale factor passed in rather than read out of pvecback through
@@ -282,11 +273,22 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *  AlphaL outside the tabulated ℓ range. */
   static double AlphaLEff(int l, double X);
 
-  /** β_ℓ, honouring `dr_rta_beta`. Both are normalised to 1 at ℓ = 2, so C₃ does not
-   *  move with the choice. */
-  double BetaFor(int l) const {
-    const double L = l * (l + 1.) / 2.;
-    return beta_form_ == BetaForm::kLegs ? L - 2. : L / 3.;
+  /** β_ℓ = ℓ(ℓ+1)/2 − 2, the ℓ-dependence of the γ⁻³ term (proxynote eq. beta).
+   *
+   *  The O(μ) coefficient of the collision integral is ℓ(ℓ+1)/2 − 2 for the ν_H leg and
+   *  IDENTICALLY the same for the ν_l/φ leg — which is why they cancel at balance — so
+   *  the leakage inherits it. Unlike α_ℓ it is q₁-INDEPENDENT (checked over
+   *  q₁ = 0.3…30), so the momentum integral leaves it alone and there is no
+   *  X-dependent β^eff. It is 1 at ℓ = 2, so C₃ keeps its calibrated meaning.
+   *
+   *  Measured against the exact solve in the s₃ > 0.5 corner it is right at ℓ = 3
+   *  (ratio 1.00) and increasingly too steep above, turning over near ℓ = 8 — the
+   *  pattern α_ℓ shows too, and here the momentum integral cannot explain it.
+   *
+   *  It is not selectable. The former alternative, ℓ(ℓ+1)/6, had no derivation (it is
+   *  not in arXiv:2203.09075, which has no β_ℓ at all) and is 2x low at ℓ = 3. */
+  static constexpr double BetaL(int l) {
+    return l * (l + 1.) / 2. - 2.;
   }
 
   /** The ℓ-dependence actually in force, honouring `dr_rta_alpha`. */
@@ -416,11 +418,10 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *  These are a CALIBRATION, not a derivation -- see Create -- so they stay inputs:
    *  re-fit them if the measurement improves. n3_ is an exponent of the fitted form
    *  only; kCOPW ignores all three and carries its own amplitude. */
-  double C3_ = 0.2335, C5_ = 1.4945, n3_ = 0.5;
+  double C3_ = 0.0743, C5_ = 0.5532, n3_ = 0.5;
 
-  RtaForm rta_form_     = RtaForm::kPowers;
-  AlphaForm alpha_form_ = AlphaForm::kQuartic;
-  BetaForm beta_form_   = BetaForm::kLegendre;
+  RtaForm rta_form_     = RtaForm::kStructured;
+  AlphaForm alpha_form_ = AlphaForm::kIntegrated;
 
   // Composite-owned background integration state: the two daughter PSDs.
   int index_bi_f_l_   = -1;

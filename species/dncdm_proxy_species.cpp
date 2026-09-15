@@ -287,7 +287,7 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
     //
     // The fitted two-power form, Gamma_T/Gamma = C3 eps_ne^n3 gamma^-3 + C5 gamma^-5,
     // good to a few per cent everywhere with C5 constant across four decades of Gamma
-    // and both masses. This is the form the shipped defaults are calibrated for.
+    // and both masses. Superseded as the default by kStructured.
     rate3 = C3_ * std::pow(eps_ne > 1e-12 ? eps_ne : 1e-12, n3_) * g3i;
     rate5 = C5_ * g3i / g2;
 
@@ -346,8 +346,7 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
   // 2.006 +- 0.037 at Gamma = 1e9 and 1.912 +- 0.027 at 1e8, against a same-binary
   // scenario-A control reproducing the base round to 0.014% rms. So the factor is the
   // species count, to a few per cent, and not a fitted one.
-  return n_daughter_ * a * parent_->Gamma() * frac_H *
-         (BetaFor(l) * rate3 + AlphaFor(l, X) * rate5);
+  return n_daughter_ * a * parent_->Gamma() * frac_H * (BetaL(l) * rate3 + AlphaFor(l, X) * rate5);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -482,8 +481,11 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   //     wall[s]    1.6      2.1      3.8      8.1     18.6
   //
   // 96 reproduces the reference to 3e-4 and costs under four seconds, so that is
-  // the default. The requirement grows slowly with Gamma (the emission band
-  // narrows); re-run the ladder rather than assuming it if a cell matters.
+  // the default. That ladder, and the observation that the requirement grows slowly
+  // with Gamma, predate the balanced gather: under the linear gather the growth is
+  // the ratchet (see balanced_gather below). With the balanced gather dr_N_q = 64 and
+  // 96 are converged over Gamma = 1e11..1e14 at m = 0.05 eV; re-run the ladder
+  // rather than assuming it for a mass or Gamma not swept.
   //
   // ⚠ dr_q_min IS THE BIGGER LEVER, and it is not the one you would guess. The
   // default here is 5e-2, not the exact scheme's 1e-2, because the proxy only needs
@@ -570,6 +572,29 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                     name.c_str());
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = in.get_flag("quantum_statistics", true);
+  // Well-balanced band factor (Config::balanced_gather), ON by default here whenever
+  // quantum_statistics is. The proxy's only grid is this background daughter grid, and
+  // under the linear gather its error is a ratchet that grows with Gamma AND with
+  // dr_rate_cap: measured at m = 0.05 eV, dr_N_q = 96, against 384 (plik_lite TTTEEE
+  // parameter shifts), the linear gather moves omega_cdm by -0.13 / -0.21 / -0.28
+  // sigma at Gamma = 1e12 / 1e13 / 1e14, where the balanced gather stays within 0.011
+  // sigma from dr_N_q = 64 upwards over Gamma = 1e11..1e14, and the two agree at
+  // dr_N_q = 384 (0.009 in the Fisher norm). Same coupling to lumped_loss as
+  // DNCDMInvSpecies::Create; `balanced_gather = no` recovers the linear gather.
+  //
+  // WHY IT FOLLOWS quantum_statistics. The gather interpolates the FD/BE log-odds
+  // log((1-+f)/f) (EtaOf), which makes Lambda vanish exactly at the QUANTUM equilibrium.
+  // Without the f_H(f_l - f_phi) term the equilibrium is the classical f_H = f_l f_phi,
+  // whose exact gather would be log f, so `quantum_statistics = no` keeps the linear
+  // gather it always had unless balanced_gather is asked for explicitly.
+  cfg.balanced_gather = in.get_flag("balanced_gather", cfg.quantum_statistics);
+  cfg.lumped_loss     = in.get_flag("lumped_loss", !cfg.balanced_gather);
+  class_test_severe(!cfg.lumped_loss && !cfg.balanced_gather,
+                    "species '%s': lumped_loss = no requires balanced_gather = yes. Without it the "
+                    "exact two-bin split has a negative off-diagonal, so an empty daughter bin is "
+                    "billed for its neighbour's particles and the right-hand side drives it "
+                    "negative -- no integrator can repair that",
+                    name.c_str());
 
   // ── channel multiplicity (scenario B) ────────────────────────────────────────
   // How many parent / daughter mass eigenstates are in the sector. (1,1) is the
@@ -662,11 +687,14 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // Rejected rather than defaulted: the two forms differ by more than the effects
   // being measured with them, so a silently-ignored typo would be indistinguishable
   // from a physics result.
-  const std::string rta_form = in.get<std::string>("dr_rta_form").value_or("powers");
+  // `structured` is the default: it is the form the shipped C3/C5/n3 were calibrated in
+  // (proxynote, fit_structured.py) and the model the MCMC runs. `powers` keeps its own
+  // calibration below for comparison with earlier results.
+  const std::string rta_form = in.get<std::string>("dr_rta_form").value_or("structured");
   class_test_severe(rta_form != "powers" && rta_form != "copw" && rta_form != "structured",
-                    "species '%s': dr_rta_form (='%s') must be 'powers' (fitted gamma "
-                    "powers, default), 'copw' (analytic, arXiv:2203.09075) or "
-                    "'structured' (both components in X, see RtaForm)",
+                    "species '%s': dr_rta_form (='%s') must be 'structured' (both components "
+                    "in X, default, see RtaForm), 'powers' (fitted gamma powers) or 'copw' "
+                    "(analytic, arXiv:2203.09075)",
                     name.c_str(),
                     rta_form.c_str());
   const bool copw       = (rta_form == "copw");
@@ -729,24 +757,32 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   composite->C5_ = in.get_or("dr_rta_C5", copw ? 1.0 : (structured ? 0.5532 : 1.4945));
   composite->n3_ = in.get_or("dr_rta_n3", 0.5);
 
-  // Both name a closed set of forms -> severe, for the same reason dr_rta_form is:
-  // a silently-ignored typo would be indistinguishable from a physics result.
-  const std::string alpha_form = in.get<std::string>("dr_rta_alpha").value_or("quartic");
+  // A closed set of forms -> severe, for the same reason dr_rta_form is: a
+  // silently-ignored typo would be indistinguishable from a physics result.
+  //
+  // The default depends on the form, like C3/C5 above: `integrated` (the momentum
+  // average of alpha_l, proxynote eq. alphaeff) wherever the rate is our calibration,
+  // and the paper's own quartic under copw, so copw out of the box stays eq. (13).
+  const std::string alpha_form =
+      in.get<std::string>("dr_rta_alpha").value_or(copw ? "quartic" : "integrated");
   class_test_severe(alpha_form != "quartic" && alpha_form != "integrated",
-                    "species '%s': dr_rta_alpha (='%s') must be 'quartic' (published "
-                    "arXiv:2203.09075 eq. 16, default) or 'integrated'",
+                    "species '%s': dr_rta_alpha (='%s') must be 'integrated' (momentum-"
+                    "averaged, default) or 'quartic' (arXiv:2203.09075 eq. 16, default "
+                    "under copw)",
                     name.c_str(),
                     alpha_form.c_str());
   composite->alpha_form_ = (alpha_form == "integrated") ? AlphaForm::kIntegrated
                                                         : AlphaForm::kQuartic;
 
-  const std::string beta_form = in.get<std::string>("dr_rta_beta").value_or("legendre");
-  class_test_severe(beta_form != "legendre" && beta_form != "legs",
-                    "species '%s': dr_rta_beta (='%s') must be 'legendre' (l(l+1)/6, "
-                    "default) or 'legs' (l(l+1)/2 - 2, the computed O(mu) coefficient)",
+  // beta_l is no longer selectable (see BetaL). The key is still READ so that an old
+  // ini asking for the removed l(l+1)/6 fails instead of silently running l(l+1)/2 - 2;
+  // `legs` names what is now hard-coded and is accepted as a no-op.
+  const auto beta_form = in.get<std::string>("dr_rta_beta");
+  class_test_severe(beta_form.has_value() && *beta_form != "legs",
+                    "species '%s': dr_rta_beta = '%s' is no longer available. beta_l is fixed "
+                    "to l(l+1)/2 - 2 (the computed O(mu) coefficient); remove the key",
                     name.c_str(),
-                    beta_form.c_str());
-  composite->beta_form_ = (beta_form == "legs") ? BetaForm::kLegs : BetaForm::kLegendre;
+                    beta_form.value_or("").c_str());
   return Named{name, std::move(composite)};
 }
 

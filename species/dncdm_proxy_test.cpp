@@ -228,8 +228,8 @@ int main() {
 
     FileContent fc;
     SetProxyBase(fc);
-    Check(BuildProxy(fc, pba, settings)->rta_form() == DNCDMProxySpecies::RtaForm::kPowers,
-          "dr_rta_form defaults to the fitted two-power form");
+    Check(BuildProxy(fc, pba, settings)->rta_form() == DNCDMProxySpecies::RtaForm::kStructured,
+          "dr_rta_form defaults to the structured form");
 
     FileContent fc_powers;
     SetProxyBase(fc_powers);
@@ -365,6 +365,7 @@ int main() {
     // through and every comparison made with it would be vacuous.
     FileContent fcp;
     SetProxyBase(fcp);
+    fcp.set("dncdm1.dr_rta_form", "powers");
     auto powers = BuildProxy(fcp, pba, settings);
     int idx_p   = 0;
     powers->RegisterBackgroundIndices(idx_p);
@@ -498,53 +499,116 @@ int main() {
     pv_s[st->bg_eps_ne_index()]          = epsS;
     const double XS                      = aS * st->parent().GetMass();
     const double G0S                     = st->parent().Gamma();
+    // Defaults: beta_l = l(l+1)/2 - 2 and the momentum-integrated alpha_l^eff(X).
     for (int l : {2, 4, 7}) {
-      const double b3   = l * (l + 1.) / 6.;
+      const double b3   = l * (l + 1.) / 2. - 2.;
       const double r3   = 0.0743 * std::pow(epsS, 0.5) * (1. / 12.) * XS * XS * XS *
                           DNCDMProxySpecies::PhiLO(XS);
       const double r5   = 0.5532 * (1. / 12.) * XS * XS * XS * XS * XS *
                           DNCDMProxySpecies::PhiNLO(XS);
-      const double want = aS * G0S * (rhoS / secS) * (b3 * r3 + DNCDMProxySpecies::AlphaL(l) * r5);
+      const double want = aS * G0S * (rhoS / secS) *
+                          (b3 * r3 + DNCDMProxySpecies::AlphaLEff(l, XS) * r5);
       char msg[112];
       std::snprintf(msg, sizeof(msg), "structured TransportRate(l=%d) assembly", l);
       CheckClose(st->TransportRate(l, aS, pv_s.data()), want, 1e-12, msg);
     }
   }
 
-  // ── beta_l: both forms normalised at l = 2, and distinct above ────────────
+  // ── beta_l: fixed to l(l+1)/2 - 2, and the removed form is refused ─────────
   {
+    // 1 at l = 2, so C3 keeps its calibrated meaning -- if that drifts, every
+    // calibrated amplitude silently changes meaning.
+    CheckClose(DNCDMProxySpecies::BetaL(2), 1.0, 0., "BetaL(2) == 1");
+    CheckClose(DNCDMProxySpecies::BetaL(3), 4.0, 0., "BetaL(3) == 4");
+    CheckClose(DNCDMProxySpecies::BetaL(4), 8.0, 0., "BetaL(4) == 8");
+
     NcdmSettings settings = TestSettings();
     background pba        = MakeBackground();
+    // `legs` names the hard-coded form, so old inis carrying it still run ...
     FileContent fcb;
     SetProxyBase(fcb);
     fcb.set("dncdm1.dr_rta_beta", "legs");
-    auto legs = BuildProxy(fcb, pba, settings);
+    bool threw = false;
+    try {
+      BuildProxy(fcb, pba, settings);
+    }
+    catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    Check(!threw, "dr_rta_beta = legs is accepted (it is what is hard-coded)");
+    // ... and one asking for the removed l(l+1)/6 fails rather than silently
+    // running a different model.
     FileContent fcl;
     SetProxyBase(fcl);
-    auto leg = BuildProxy(fcl, pba, settings);
-
-    int i1 = 0, i2 = 0;
-    legs->RegisterBackgroundIndices(i1);
-    leg->RegisterBackgroundIndices(i2);
-    std::vector<double> p1(i1 + 8, 0.), p2(i2 + 8, 0.);
-    const double aB = 2e-3, rB = 3.0, sB = 10.0, nB = 2.0;
-    for (auto* pr : {&p1, &p2}) {
-      auto& sp                             = (pr == &p1) ? *legs : *leg;
-      (*pr)[sp.parent().bg_rho_index()]    = rB;
-      (*pr)[sp.parent().bg_number_index()] = nB;
-      (*pr)[sp.bg_rho_sec_index()]         = sB;
-      (*pr)[sp.bg_eps_ne_index()]          = 0.9;  // far from balance: LO term lives
+    fcl.set("dncdm1.dr_rta_beta", "legendre");
+    threw = false;
+    try {
+      BuildProxy(fcl, pba, settings);
     }
-    // Both are 1 at l = 2 by construction, so C3 does not move with the choice --
-    // if that drifts, every calibrated amplitude silently changes meaning.
-    CheckClose(legs->TransportRate(2, aB, p1.data()),
-               leg->TransportRate(2, aB, p2.data()),
-               1e-12,
-               "beta forms agree at l = 2");
-    // ... and differ above it, in the direction the O(mu) coefficient says:
-    // l(l+1)/2 - 2 = 8 at l = 4 against l(l+1)/6 = 10/3.
-    Check(legs->TransportRate(4, aB, p1.data()) > leg->TransportRate(4, aB, p2.data()),
-          "dr_rta_beta = legs is steeper than legendre at l = 4");
+    catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    Check(threw, "dr_rta_beta = legendre is rejected");
+  }
+
+  // ── the background gather: defaults, coupling, override, rejection ─────────
+  {
+    NcdmSettings settings = TestSettings();
+    background pba        = MakeBackground();
+    auto build            = [&](std::initializer_list<std::pair<const char*, const char*>> kv) {
+      FileContent f;
+      SetProxyBase(f);
+      for (const auto& [k, v] : kv)
+        f.set(k, v);
+      return BuildProxy(f, pba, settings);
+    };
+
+    const auto def = build({})->kernel_config();
+    Check(def.balanced_gather && !def.lumped_loss,
+          "proxy defaults to the balanced gather with the exact (unlumped) loss");
+
+    const auto lin = build({{"dncdm1.balanced_gather", "no"}})->kernel_config();
+    Check(!lin.balanced_gather && lin.lumped_loss,
+          "balanced_gather = no restores the linear gather with the lumped loss");
+
+    const auto ovr = build({{"dncdm1.lumped_loss", "yes"}})->kernel_config();
+    Check(ovr.balanced_gather && ovr.lumped_loss, "an explicit lumped_loss overrides the coupling");
+
+    // The log-odds gather is exact only at the QUANTUM equilibrium, so without
+    // quantum statistics the default falls back to the linear gather ...
+    const auto cls = build({{"dncdm1.quantum_statistics", "no"}})->kernel_config();
+    Check(!cls.balanced_gather && cls.lumped_loss,
+          "quantum_statistics = no defaults to the linear gather");
+    // ... unless asked for.
+    const auto cls_bal = build({{"dncdm1.quantum_statistics", "no"},
+                                {"dncdm1.balanced_gather", "yes"}})
+                             ->kernel_config();
+    Check(cls_bal.balanced_gather, "balanced_gather = yes is honoured without quantum statistics");
+
+    // The exact split under the linear gather drives empty bins negative: refused.
+    bool threw = false;
+    try {
+      build({{"dncdm1.balanced_gather", "no"}, {"dncdm1.lumped_loss", "no"}});
+    }
+    catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    Check(threw, "lumped_loss = no without balanced_gather is rejected");
+  }
+
+  // ── dr_rta_alpha defaults per form ────────────────────────────────────────
+  {
+    NcdmSettings settings = TestSettings();
+    background pba        = MakeBackground();
+    FileContent fs;
+    SetProxyBase(fs);
+    Check(BuildProxy(fs, pba, settings)->alpha_form() == DNCDMProxySpecies::AlphaForm::kIntegrated,
+          "dr_rta_alpha defaults to integrated");
+    FileContent fc;
+    SetProxyBase(fc);
+    fc.set("dncdm1.dr_rta_form", "copw");
+    Check(BuildProxy(fc, pba, settings)->alpha_form() == DNCDMProxySpecies::AlphaForm::kQuartic,
+          "dr_rta_alpha defaults to the paper's quartic under copw");
   }
 
   // ── channel multiplicity: the weights, and the guard that keeps them honest ──

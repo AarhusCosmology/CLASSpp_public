@@ -405,6 +405,12 @@ class DecayTransitionKernel {
     return 0.5 * (std::sqrt(q1_max * q1_max + a_m * a_m) + q1_max);
   }
 
+  /** The configuration this kernel was built with. Read-only, so an owning species'
+   *  input-layer defaults can be asserted without integrating anything. */
+  const Config& config() const {
+    return cfg_;
+  }
+
   /** Where one transition's daughter momentum q* is placed on the daughter grid:
    *  two consecutive weights starting at bin `j0`. `clamped` says q* fell off the
    *  grid and the energy was filed at the edge bin rather than at q*.
