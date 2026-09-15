@@ -75,6 +75,10 @@ jobs:
         # skip themselves when classyref is not installed, which it is not here.
         python -m pytest -v -m "not test_scenario" test_class.py
         python -m pytest -v test_greybody.py
+        # Cobaya's own classy theory driving this wrapper. REQUIRE makes a
+        # missing Cobaya fail here instead of skipping the module green.
+        pip install cobaya
+        CLASSPP_REQUIRE_COBAYA=1 python -m pytest -v test_cobaya.py
         deactivate
     - name: Remove virtual Python environment
       if: success() || failure()

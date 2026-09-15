@@ -76,6 +76,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pytest
+import re
 import shutil
 import unittest
 
@@ -1802,6 +1803,73 @@ class TestLazyLifecycle(unittest.TestCase):
             cosmo.struct_cleanup()
             cosmo.empty()
         self.assertEqual(caller_dict, {'h': 0.67})
+
+
+class TestCobayaCompatibility(unittest.TestCase):
+    """What Cobaya's `classy` theory (cobaya/theories/classy/classy.py) needs
+    from the wrapper, pinned without importing Cobaya. Each of these stopped a
+    Cobaya run cold; test_cobaya.py drives Cobaya itself end to end.
+
+    """
+
+    def test_version_is_exposed_and_matches_pyproject(self):
+        # Cobaya refuses a classy without __version__, or older than v3.3.3.
+        import classy
+        pyproject = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 os.pardir, 'pyproject.toml')
+        with open(pyproject) as f:
+            expected = re.search(r'^version\s*=\s*"([^"]+)"', f.read(),
+                                 re.M).group(1)
+        self.assertEqual(classy.__version__, expected)
+        parts = tuple(int(p) for p in classy.__version__.split('.')[:3])
+        self.assertGreaterEqual(parts, (3, 3, 3))
+
+    def test_set_accepts_keyword_arguments(self):
+        # Cobaya calls classy.set(**args).
+        by_keyword, by_dict = Class(), Class()
+        try:
+            by_keyword.set(h=0.70)
+            by_dict.set({'h': 0.70})
+            self.assertEqual(by_keyword.angular_distance(1.0),
+                             by_dict.angular_distance(1.0))
+        finally:
+            for cosmo in (by_keyword, by_dict):
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+    def test_set_merges_dict_and_keywords(self):
+        # A CLASS key that is not a Python identifier can only travel in the
+        # dict, so both forms must be usable in one call.
+        merged, reference = Class(), Class({'h': 0.70, 'Omega_k': 0.01})
+        try:
+            merged.set({'Omega_k': 0.01}, h=0.70)
+            self.assertEqual(merged.angular_distance(1.0),
+                             reference.angular_distance(1.0))
+        finally:
+            for cosmo in (merged, reference):
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+    def test_non_linear_underscore_spelling_is_read(self):
+        # class_public v3 spells the key non_linear, and Cobaya always sends
+        # that spelling. The legacy 'non linear' must keep working.
+        base = {'output': 'mPk', 'P_k_max_1/Mpc': 3.0}
+        underscore = Class(dict(base, non_linear='halofit'))
+        legacy = Class(dict(base, **{'non linear': 'halofit'}))
+        try:
+            pk_underscore = underscore.pk(1.0, 0.0)
+            self.assertEqual(pk_underscore, legacy.pk(1.0, 0.0))
+            # and the correction is really applied, not silently dropped
+            self.assertGreater(pk_underscore / underscore.pk_lin(1.0, 0.0), 1.5)
+        finally:
+            for cosmo in (underscore, legacy):
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+    def test_both_non_linear_spellings_is_an_error(self):
+        with self.assertRaises(CosmoSevereError):
+            Class({'output': 'mPk', 'non_linear': 'halofit',
+                   'non linear': 'hmcode'})
 
 
 if __name__ == '__main__':

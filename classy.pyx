@@ -36,6 +36,13 @@ import os
 import sys
 from cclassy cimport *
 
+cdef extern from "version.h":
+    const char* _VERSION_
+
+# The version CMake stamps into version.h from pyproject.toml, so the module and
+# the wheel metadata cannot disagree. Cobaya refuses a classy without it.
+__version__ = _VERSION_.decode("utf-8")
+
 cdef ClassConstants constvals
 
 # Derived parameters of the form "<species key>.<field>", served by
@@ -502,7 +509,10 @@ cdef class PyCosmology:
         self.parameters_changed = True
         return self
 
-    cpdef set(self, input_parameters):
+    def set(self, input_parameters=None, **kwargs):
+        # Keywords as well as a dict: Cobaya calls set(**args). Keys that are not
+        # Python identifiers ('100*theta_s', 'nu1.m') can only travel in the dict.
+        input_parameters = dict(input_parameters or {}, **kwargs)
         if viewdictitems(input_parameters) <= viewdictitems(self._pars):
             return
         self._pars.update(input_parameters)

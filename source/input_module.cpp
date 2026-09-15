@@ -2297,7 +2297,17 @@ void InputModule::ReadDerived() {
 
   /** (f) parameter related to the non-linear spectra computation */
 
-  if (auto non_linear = pfc->get<std::string>("non linear")) {
+  // class_public v3 spells the key non_linear, and Cobaya always sends that
+  // spelling; "non linear" is the legacy one. Both are read, so giving both is
+  // refused here instead of one of them landing in the unread-parameter list.
+  auto non_linear = pfc->get<std::string>("non_linear");
+  if (auto legacy_non_linear = pfc->get<std::string>("non linear")) {
+    class_test_severe(non_linear.has_value(),
+                      "Both 'non_linear' and 'non linear' are set. They are two spellings "
+                      "of the same parameter: keep one.");
+    non_linear = legacy_non_linear;
+  }
+  if (non_linear) {
     class_test_severe(!ppt->has_perturbations,
                       "You requested non linear computation but no linear computation. You must "
                       "set "
