@@ -1872,6 +1872,223 @@ class TestCobayaCompatibility(unittest.TestCase):
                    'non linear': 'hmcode'})
 
 
+LSS_BASE = {
+    'omega_b': 0.02237,
+    'omega_cdm': 0.1200,
+    'h': 0.6736,
+    'A_s': 2.1e-9,
+    'n_s': 0.9649,
+    'tau_reio': 0.0544,
+    'P_k_max_1/Mpc': 3.0,
+    'z_max_pk': 3.0,
+    # halofit needs k_NL well above P_k_max to reach the top of the z grid; the
+    # extension costs integrand points, not perturbation modes.
+    'nonlinear_min_k_max': 30.0,
+}
+
+
+class TestLargeScaleStructureProducts(unittest.TestCase):
+    """The grid and growth products Cobaya's LSS requirements call for (#435).
+
+    Everything is checked against the wrapper's own scalar calls on the same
+    instance, so these pin the plumbing rather than agreement with another code.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cosmo = Class(dict(LSS_BASE, output='mPk,dTk,vTk',
+                               non_linear='halofit'))
+        cls.h = cls.cosmo.h()
+        cls.pk, cls.k, cls.z = cls.cosmo.get_pk_and_k_and_z(nonlinear=True)
+        cls.pk_lin, _, _ = cls.cosmo.get_pk_and_k_and_z(nonlinear=False)
+        cls.tk, cls.k_tk, cls.z_tk = cls.cosmo.get_transfer_and_k_and_z()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.cosmo.struct_cleanup()
+        cls.cosmo.empty()
+
+    def sample_indices(self):
+        return ([0, len(self.k) // 3, len(self.k) // 2, len(self.k) - 1],
+                [0, len(self.z) // 2, len(self.z) - 1])
+
+    def test_every_node_of_the_k_axis_is_callable(self):
+        # The scalar API used to bound k by exp(ln_k_[-1]) while the grid hands
+        # out k_[-1]; exp(log(k)) lands an ulp low, so the topmost node the grid
+        # advertised was rejected by pk().
+        for k in (self.k[0], self.k[-1]):
+            self.assertGreater(self.cosmo.pk(k, 0.0), 0.0)
+            self.assertGreater(self.cosmo.pk_lin(k, 0.0), 0.0)
+
+    def test_pk_grid_shape_and_axes(self):
+        self.assertEqual(self.pk.shape, (len(self.k), len(self.z)))
+        self.assertTrue(np.all(np.diff(self.k) > 0))
+        # redshifts run downwards and end exactly at today
+        self.assertTrue(np.all(np.diff(self.z) < 0))
+        self.assertEqual(self.z[-1], 0.0)
+        self.assertTrue(np.all(np.isfinite(self.pk)) and np.all(self.pk > 0))
+
+    def test_pk_grid_matches_the_scalar_calls_at_its_own_nodes(self):
+        for ik in self.sample_indices()[0]:
+            for iz in self.sample_indices()[1]:
+                self.assertAlmostEqual(
+                    self.pk[ik, iz] / self.cosmo.pk(self.k[ik], self.z[iz]), 1.0,
+                    places=10)
+                self.assertAlmostEqual(
+                    self.pk_lin[ik, iz] / self.cosmo.pk_lin(self.k[ik], self.z[iz]), 1.0,
+                    places=10)
+
+    def test_non_linear_grid_is_boosted_over_the_linear_one(self):
+        # otherwise a silently-linear table would pass every other test here
+        self.assertGreater(self.pk[-2, -1] / self.pk_lin[-2, -1], 1.5)
+
+    def test_pk_grid_h_units_rescales_k_and_leaves_pk_alone(self):
+        pk_h, k_h, z_h = self.cosmo.get_pk_and_k_and_z(nonlinear=True, h_units=True)
+        np.testing.assert_allclose(k_h, self.k / self.h, rtol=1e-14)
+        np.testing.assert_array_equal(pk_h, self.pk)
+        np.testing.assert_array_equal(z_h, self.z)
+
+    def test_non_linear_grid_without_a_non_linear_method_is_an_error(self):
+        cosmo = Class(dict(LSS_BASE, output='mPk'))
+        try:
+            cosmo.get_pk_and_k_and_z(nonlinear=False)  # linear is fine
+            with self.assertRaises(CosmoSevereError):
+                cosmo.get_pk_and_k_and_z(nonlinear=True)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_grid_without_a_redshift_range_is_an_error(self):
+        # no z_max_pk: the table is stored at z=0 only, so there is no grid
+        cosmo = Class({'output': 'mPk', 'P_k_max_1/Mpc': 1.0})
+        try:
+            with self.assertRaises(CosmoSevereError):
+                cosmo.get_pk_and_k_and_z(nonlinear=False)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_only_clustering_species_excludes_massive_neutrinos(self):
+        cosmo = Class(dict(LSS_BASE, output='mPk', N_ur=2.0308,
+                           **{'nu1.type': 'ncdm_standard', 'nu1.m': 0.3}))
+        try:
+            total, k, z = cosmo.get_pk_and_k_and_z(nonlinear=False)
+            clustering, _, _ = cosmo.get_pk_and_k_and_z(nonlinear=False,
+                                                        only_clustering_species=True)
+            for ik in (0, len(k) // 2, len(k) - 2):
+                self.assertAlmostEqual(
+                    total[ik, -1] / cosmo.pk_lin(k[ik], z[-1]), 1.0, places=10)
+                self.assertAlmostEqual(
+                    clustering[ik, -1] / cosmo.pk_cb_lin(k[ik], z[-1]), 1.0, places=10)
+            # free-streaming neutrinos suppress the total spectrum below P_cb
+            self.assertGreater(clustering[-2, -1] / total[-2, -1], 1.01)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_sigma_h_units_is_the_same_radius_in_other_units(self):
+        for z in (0.0, 1.0):
+            self.assertAlmostEqual(
+                self.cosmo.sigma(8.0, z, h_units=True) / self.cosmo.sigma(8.0 / self.h, z),
+                1.0, places=12)
+        self.assertAlmostEqual(
+            self.cosmo.sigma(8.0, 0.0, h_units=True) / self.cosmo.sigma8(), 1.0, places=12)
+
+    def test_effective_f_sigma8_is_its_own_finite_difference(self):
+        for z, step in ((1.5, 0.1), (0.5, 0.1), (0.05, 0.1), (0.0, 0.1)):
+            got = self.cosmo.effective_f_sigma8(z, z_step=step)
+            if z < step / 10.0:
+                step = step / 10.0
+                want = (self.cosmo.sigma(8, z, h_units=True)
+                        - self.cosmo.sigma(8, z + step, h_units=True)) / step * (1 + z)
+            else:
+                step = min(step, z) if z < step else step
+                want = (self.cosmo.sigma(8, z - step, h_units=True)
+                        - self.cosmo.sigma(8, z + step, h_units=True)) / (2 * step) * (1 + z)
+            self.assertAlmostEqual(got / want, 1.0, places=12)
+
+    def test_effective_f_sigma8_tracks_f_times_sigma8(self):
+        # a loose check that it is fsigma8 and not, say, its negative
+        for z in (0.0, 0.5, 1.5):
+            approx = (self.cosmo.scale_independent_growth_factor_f(z)
+                      * self.cosmo.sigma(8, z, h_units=True))
+            self.assertAlmostEqual(self.cosmo.effective_f_sigma8(z) / approx,
+                                   1.0, places=2)
+
+    def test_angular_distance_from_to(self):
+        # flat space: d_A(z1,z2) = (chi2 - chi1)/(1 + z2)
+        chi = self.cosmo.z_of_r(np.array([0.5, 1.5]))[0]
+        self.assertAlmostEqual(
+            self.cosmo.angular_distance_from_to(0.5, 1.5) / ((chi[1] - chi[0]) / 2.5),
+            1.0, places=12)
+        # from here it is the ordinary angular diameter distance
+        self.assertAlmostEqual(
+            self.cosmo.angular_distance_from_to(0.0, 1.5) / self.cosmo.angular_distance(1.5),
+            1.0, places=10)
+        # Cobaya hands it unordered pairs and expects zero for the wrong order
+        self.assertEqual(self.cosmo.angular_distance_from_to(1.5, 0.5), 0.0)
+        self.assertEqual(self.cosmo.angular_distance_from_to(1.5, 1.5), 0.0)
+
+    def test_transfer_grid_shares_the_axes_of_the_pk_grid(self):
+        np.testing.assert_array_equal(self.k_tk, self.k)
+        np.testing.assert_array_equal(self.z_tk, self.z)
+        for name in ('d_m', 'd_tot', 'phi', 'psi', 'd_b', 'd_cdm'):
+            self.assertIn(name, self.tk)
+            self.assertEqual(self.tk[name].shape, (len(self.k), len(self.z)))
+        self.assertNotIn('k (h/Mpc)', self.tk)
+
+    def test_transfer_grid_matches_get_transfer_at_a_node(self):
+        index_z = 3
+        one = self.cosmo.get_transfer(self.z[index_z])
+        for name in ('d_m', 'phi', 'psi'):
+            np.testing.assert_allclose(self.tk[name][:, index_z], one[name], rtol=1e-9)
+
+    def test_d_m_is_the_contrast_the_matter_spectrum_is_built_from(self):
+        # P_lin(k,z) = P_primordial(k) * d_m(k,z)^2, so the ratio must not depend
+        # on z. That pins d_m to the right quantity without fixing a convention.
+        ratio = self.pk_lin / self.tk['d_m'] ** 2
+        for index_z in range(len(self.z)):
+            np.testing.assert_allclose(ratio[:, index_z], ratio[:, -1], rtol=1e-6)
+
+    def test_weyl_grid_is_the_matter_grid_rescaled(self):
+        weyl, k, z = self.cosmo.get_Weyl_pk_and_k_and_z(nonlinear=False)
+        np.testing.assert_array_equal(k, self.k)
+        np.testing.assert_array_equal(z, self.z)
+        expected = (self.pk_lin
+                    * ((self.tk['phi'] + self.tk['psi']) / 2.0 / self.tk['d_m']) ** 2
+                    * self.k[:, None] ** 4)
+        np.testing.assert_allclose(weyl, expected, rtol=1e-12)
+        self.assertTrue(np.all(np.isfinite(weyl)))
+
+    def test_weyl_grid_h_units_carries_through_the_k4(self):
+        weyl, k, _ = self.cosmo.get_Weyl_pk_and_k_and_z(nonlinear=False)
+        weyl_h, k_h, _ = self.cosmo.get_Weyl_pk_and_k_and_z(nonlinear=False, h_units=True)
+        np.testing.assert_allclose(k_h, k / self.h, rtol=1e-14)
+        np.testing.assert_allclose(weyl_h, weyl / self.h ** 4, rtol=1e-12)
+
+    def test_transfer_grid_without_transfers_is_an_error(self):
+        cosmo = Class(dict(LSS_BASE, output='mPk'))
+        try:
+            with self.assertRaises(CosmoSevereError):
+                cosmo.get_transfer_and_k_and_z()
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_transfer_grid_without_a_redshift_range_is_an_error(self):
+        # No z_max_pk means no late-time sampling, and late_sources_ is null in
+        # that case -- this has to raise rather than reach the node reader.
+        cosmo = Class({'output': 'mPk,dTk', 'P_k_max_1/Mpc': 1.0})
+        try:
+            with self.assertRaises(CosmoSevereError):
+                cosmo.get_transfer_and_k_and_z()
+            # the z=0 path stays available
+            self.assertIn('d_m', cosmo.get_transfer(0.0))
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+
 if __name__ == '__main__':
     toto = TestClass()
     unittest.main()

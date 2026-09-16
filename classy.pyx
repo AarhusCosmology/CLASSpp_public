@@ -128,6 +128,24 @@ cdef int raise_my_py_error() except *:
         # abort loudly rather than surfacing a misleading NotImplementedError.
         raise CosmoSevereError(cpp_exception.second)
 
+cdef reraise_as_cosmo_error(exc):
+    """Say which kind of error a module method threw.
+
+    Only the Cosmology getters declared below carry `except +raise_my_py_error`.
+    The module methods harvested into cclassy.pxd carry a plain `except +`, so a
+    C++ throw arrives here as ValueError (std::invalid_argument, i.e. severe) or
+    RuntimeError (std::runtime_error, i.e. reject this point). Callers key on the
+    wrapper's own two types -- Cobaya aborts on one and rejects on the other --
+    so the boundary has to restate which it was. Teaching generate_wrapper.py to
+    emit the handler for every harvested method would fix this everywhere; until
+    then, translate where it matters.
+    """
+    if isinstance(exc, ValueError):
+        raise CosmoSevereError(str(exc)) from exc
+    if isinstance(exc, RuntimeError):
+        raise CosmoComputationError(str(exc)) from exc
+    raise exc
+
 cdef extern from "cosmology.h":
     ctypedef shared_ptr[const InputModule] InputModulePtr
     ctypedef shared_ptr[const BackgroundModule] BackgroundModulePtr
@@ -718,6 +736,31 @@ cdef class PyCosmology:
         index_bg_lum_distance = deref(background_module).index_bg_lum_distance_
         return self.get_background_value_at_z(z, index_bg_lum_distance)
 
+    cdef pk_outputs _pk_output_default(self) except *:
+        """Which P(k) a bare pk()/get_pk() call means: non-linear if one was asked for."""
+        if self.nl().method == nl_none:
+            return pk_linear
+        return pk_nonlinear
+
+    cdef int _index_pk_m(self) except -1:
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return deref(nonlinear_module).index_pk_m_
+
+    cdef int _index_pk_cb(self) except -1:
+        """Index of the cdm+b P(k), which exists only alongside warm matter."""
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        if not deref(nonlinear_module).has_pk_cb_:
+            raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
+        return deref(nonlinear_module).index_pk_cb_
+
+    cdef int _index_pk_cluster(self) except -1:
+        """Index of the P(k) galaxies cluster in: cdm+b where that differs from
+        the total matter, otherwise the total matter itself."""
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        if deref(nonlinear_module).has_pk_cb_:
+            return deref(nonlinear_module).index_pk_cb_
+        return deref(nonlinear_module).index_pk_m_
+
     cdef pk_general(self, double k, double z, int index_pk, pk_outputs linear_or_nonlinear):
         cdef:
             double pk
@@ -739,19 +782,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        cdef:
-            int index_pk_m
-            pk_outputs linear_or_nonlinear
-
-        if self.nl().method == nl_none:
-            linear_or_nonlinear = pk_linear
-        else:
-            linear_or_nonlinear = pk_nonlinear
-
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_m = deref(nonlinear_module).index_pk_m_
-
-        return self.pk_general(k, z, index_pk_m, linear_or_nonlinear)
+        return self.pk_general(k, z, self._index_pk_m(), self._pk_output_default())
 
     # Gives the cdm+b pk for a given (k,z)
     cpdef pk_cb(self, double k, double z):
@@ -764,24 +795,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        cdef:
-            int index_pk_cb
-            pk_outputs linear_or_nonlinear
-            short has_pk_cb
-
-        if self.nl().method == nl_none:
-            linear_or_nonlinear = pk_linear
-        else:
-            linear_or_nonlinear = pk_nonlinear
-
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_cb = deref(nonlinear_module).index_pk_cb_
-        has_pk_cb = deref(nonlinear_module).has_pk_cb_
-
-        if (has_pk_cb == constvals.sFALSE):
-            raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
-
-        return self.pk_general(k, z, index_pk_cb, linear_or_nonlinear)
+        return self.pk_general(k, z, self._index_pk_cb(), self._pk_output_default())
 
     # Gives the total matter pk for a given (k,z)
     cpdef pk_lin(self, double k, double z):
@@ -794,11 +808,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        cdef int index_pk_m
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_m = deref(nonlinear_module).index_pk_m_
-
-        return self.pk_general(k, z, index_pk_m, pk_linear)
+        return self.pk_general(k, z, self._index_pk_m(), pk_linear)
 
     # Gives the cdm+b pk for a given (k,z)
     cpdef pk_cb_lin(self,double k,double z):
@@ -811,17 +821,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        cdef:
-            int index_pk_cb
-            short has_pk_cb
-
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_cb = deref(nonlinear_module).index_pk_cb_
-        has_pk_cb = deref(nonlinear_module).has_pk_cb_
-
-        if (has_pk_cb == constvals.sFALSE):
-            raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
-        return self.pk_general(k, z, index_pk_cb, pk_linear)
+        return self.pk_general(k, z, self._index_pk_cb(), pk_linear)
 
     cdef get_pk_general(self, double[:,:,::1] k, double[::1] z, Py_ssize_t k_size, Py_ssize_t z_size, Py_ssize_t mu_size, Py_ssize_t index_pk, pk_outputs linear_or_nonlinear):
         cdef:
@@ -847,96 +847,215 @@ cdef class PyCosmology:
 
     cpdef get_pk(self, double[:,:,::1] k, double[::1] z, Py_ssize_t k_size, Py_ssize_t z_size, Py_ssize_t mu_size):
         """ Fast function to get the power spectrum on a k and z array """
-        cdef:
-            int index_pk_m
-            pk_outputs linear_or_nonlinear
-
-        if self.nl().method == nl_none:
-            linear_or_nonlinear = pk_linear
-        else:
-            linear_or_nonlinear = pk_nonlinear
-
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_m = deref(nonlinear_module).index_pk_m_
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, index_pk_m, linear_or_nonlinear)
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_m(), self._pk_output_default())
 
     cpdef get_pk_cb(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the power spectrum on a k and z array """
-        cdef:
-            int index_pk_cb
-            short has_pk_cb
-            pk_outputs linear_or_nonlinear
-
-        if self.nl().method == nl_none:
-            linear_or_nonlinear = pk_linear
-        else:
-            linear_or_nonlinear = pk_nonlinear
-
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_cb = deref(nonlinear_module).index_pk_cb_
-        has_pk_cb = deref(nonlinear_module).has_pk_cb_
-
-        if (has_pk_cb == constvals.sFALSE):
-            raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
-
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, index_pk_cb, linear_or_nonlinear)
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_cb(), self._pk_output_default())
 
     cpdef get_pk_lin(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the linear power spectrum on a k and z array """
-        cdef int index_pk_m
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_m = deref(nonlinear_module).index_pk_m_
-
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, index_pk_m, pk_linear)
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_m(), pk_linear)
 
     cpdef get_pk_cb_lin(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the linear power spectrum on a k and z array """
-        cdef:
-            int index_pk_cb
-            short has_pk_cb
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_cb(), pk_linear)
+
+    def _z_grid_for_output(self):
+        """The redshifts P(k,z) and T_i(k,z) are tabulated at, decreasing to 0.
+
+        One owner for this axis. Both tables live on the perturbation module's
+        ln_tau grid -- the Fourier module holds a copy -- so anything that
+        combines them, as get_Weyl_pk_and_k_and_z does, is aligned by
+        construction rather than by coincidence.
+        """
+        cdef Py_ssize_t index_tau
+        cdef Py_ssize_t ln_tau_size
+
+        perturbations_module = deref(self._cosmo()).GetPerturbationsModule()
+        ln_tau_size = deref(perturbations_module).ln_tau_size_
+
+        if ln_tau_size == 1:
+            raise CosmoSevereError(
+                "The output was stored at z=0 only, so there is no redshift grid to return. Pass "
+                "either a list of redshifts in 'z_pk' or one non-zero value in 'z_max_pk'.")
+
+        z = np.empty(ln_tau_size, np.double)
+        for index_tau in range(ln_tau_size - 1):
+            z[index_tau] = self.z_of_tau(exp(deref(perturbations_module).ln_tau_[index_tau]))
+        # The grid ends at today; say so exactly rather than to interpolation accuracy.
+        z[ln_tau_size - 1] = 0.
+
+        return z
+
+    def get_pk_and_k_and_z(self, nonlinear=True, only_clustering_species=False, h_units=False):
+        """
+        Return the stored grid of matter power spectrum values with the k and z it
+        was computed on. Useful for building interpolators.
+
+        Parameters
+        ----------
+        nonlinear : bool
+                Return the non-linear spectrum (default) or the linear one
+        only_clustering_species : bool
+                Exclude massive neutrinos, as galaxy clustering does, rather than
+                including everything (default)
+        h_units : bool
+                Return k in h/Mpc rather than 1/Mpc (default)
+
+        Returns
+        -------
+        pk : grid of power spectrum values, pk[index_k, index_z], in Mpc**3
+        k : vector of k values, k[index_k]
+        z : vector of z values, z[index_z]
+        """
+        cdef vector[double] k_vector
+        cdef vector[double] pk_vector
+        cdef pk_outputs pk_output
+        cdef int index_pk
+
+        pk_output = pk_nonlinear if nonlinear else pk_linear
+        index_pk = self._index_pk_cluster() if only_clustering_species else self._index_pk_m()
 
         nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_cb = deref(nonlinear_module).index_pk_cb_
-        has_pk_cb = deref(nonlinear_module).has_pk_cb_
+        try:
+            deref(nonlinear_module).GetPkGrid(pk_output, index_pk, k_vector, pk_vector)
+        except (ValueError, RuntimeError) as error:
+            reraise_as_cosmo_error(error)
 
-        if (has_pk_cb == constvals.sFALSE):
-            raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
+        z = self._z_grid_for_output()
+        k = np.asarray(<double[:k_vector.size()]> k_vector.data()).copy()
+        # GetPkGrid hands back the table in its stored order, z-major.
+        pk = np.asarray(<double[:pk_vector.size()]> pk_vector.data()).reshape(z.size, k.size).T.copy()
 
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, index_pk_cb, pk_linear)
+        if h_units:
+            k = k/self.ba().h
 
-    # Gives sigma(R,z) for a given (R,z)
-    cpdef sigma(self, double R, double z):
+        return pk, k, z
+
+    def get_transfer_and_k_and_z(self, output_format='class', h_units=False):
         """
-        Gives sigma (total matter) for a given R and z
-        (R is the radius in units of Mpc, so if R=8/h this will be the usual sigma8(z)
+        Return a dictionary of density and/or velocity transfer function grids with
+        the k and z they were computed on. Useful for building interpolators.
 
-        .. note::
+        Include at least one of 'dTk' or 'vTk' in 'output'. With the default
+        output_format='class' the transfer functions are normalised to curvature
+        R=1 at initial time, and the newtonian metric fluctuations phi and psi are
+        included; output_format='camb' switches to the CAMB convention, which
+        outputs density transfer functions only.
 
-            there is an additional check to verify whether output contains `mPk`,
-            and whether k_max > ...
-            because otherwise a segfault will occur
+        Parameters
+        ----------
+        output_format : 'class' or 'camb'
+        h_units : bool
+                Return k in h/Mpc rather than 1/Mpc (default)
 
+        Returns
+        -------
+        tk : dict of grids, tk[name][index_k, index_z]
+        k : vector of k values, k[index_k]
+        z : vector of z values, z[index_z]
         """
-        cdef:
-            double sigma
-            int index_pk_m
+        cdef Py_ssize_t index_k
+        cdef Py_ssize_t k_size
+        cdef int index_md
+
+        if (not self.pt().has_density_transfers) and (not self.pt().has_velocity_transfers):
+            raise CosmoSevereError(
+                "No transfer functions were computed. Add 'dTk' and/or 'vTk' to the list of outputs.")
+
+        perturbations_module = deref(self._cosmo()).GetPerturbationsModule()
+        index_md = deref(perturbations_module).index_md_scalars_
+
+        if deref(perturbations_module).ic_size_[index_md] > 1:
+            raise CosmoSevereError(
+                "get_transfer_and_k_and_z() assumes adiabatic initial conditions: the grids it "
+                "returns have no axis to hold several of them.")
+
+        z = self._z_grid_for_output()
+
+        k_size = deref(perturbations_module).k_size_[index_md]
+        k = np.empty(k_size, np.double)
+        for index_k in range(k_size):
+            k[index_k] = deref(perturbations_module).k_[index_md][index_k]
+        if h_units:
+            k = k/self.ba().h
+
+        tk = {}
+        for index_z in range(z.size):
+            # By node, not by redshift: the stored table is what these grids are,
+            # and its topmost node does not survive the round trip through z.
+            transfers = self.transfer_general(0., index_z, output_format)
+            # get_transfer leads with the k column; k is returned separately here.
+            transfers.pop('k (h/Mpc)', None)
+            for name, values in transfers.items():
+                if name not in tk:
+                    tk[name] = np.empty((k_size, z.size), np.double)
+                tk[name][:, index_z] = values
+
+        return tk, k, z
+
+    def get_Weyl_pk_and_k_and_z(self, nonlinear=False, h_units=False):
+        """
+        Return the grid of k**4 times the power spectrum of the Weyl potential
+        (phi+psi)/2, with the k and z it was computed on.
+
+        This is the matter power spectrum rescaled by [(phi+psi)/2/d_m]**2. The
+        factor k**4 is a convention: the Poisson equation carries a k**2, so the
+        rescaled spectrum has a shape similar to the matter one.
+
+        Parameters
+        ----------
+        nonlinear : bool
+                Rescale the non-linear matter spectrum; the default is to rescale
+                the linear one
+        h_units : bool
+                Return k in h/Mpc rather than 1/Mpc (default)
+
+        Returns
+        -------
+        Weyl_pk : grid of values, Weyl_pk[index_k, index_z]
+        k : vector of k values, k[index_k]
+        z : vector of z values, z[index_z]
+        """
+        pk, k, z = self.get_pk_and_k_and_z(nonlinear=nonlinear,
+                                           only_clustering_species=False,
+                                           h_units=h_units)
+        tk, _, _ = self.get_transfer_and_k_and_z(output_format='class', h_units=h_units)
+
+        for name in ('phi', 'psi', 'd_m'):
+            if name not in tk:
+                raise CosmoSevereError(
+                    "The Weyl spectrum is built from the '%s' transfer function, which was not "
+                    "computed. It needs 'dTk' in 'output' (and, for d_m, 'mPk')." % name)
+
+        # k enters in whichever units the caller asked for, so that the convention
+        # is the same on both sides of the rescaling.
+        return pk*((tk['phi'] + tk['psi'])/2./tk['d_m'])**2*k[:, None]**4, k, z
+
+    cdef double sigma_general(self, double R, double z, int index_pk, bint h_units) except? -1.:
+        cdef double sigma
 
         if self.pt().has_pk_matter == constvals.sFALSE:
             raise CosmoSevereError("Power spectrum not computed. In order to get sigma(R, z) you must add mPk to the list of outputs.")
         if self.pt().k_max_for_pk < self.ba().h:
             raise CosmoSevereError("In order to get sigma(R,z) you must set 'P_k_max_h/Mpc' to 1 or bigger, in order to have k_max > 1 h/Mpc.")
 
+        if h_units:
+            R = R/self.ba().h
+
         nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_m = deref(nonlinear_module).index_pk_m_
-        deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk_m, out_sigma, &sigma)
+        deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk, out_sigma, &sigma)
 
         return sigma
 
-    # Gives sigma(R, z) for a given (R, z)
-    cpdef sigma_cb(self, double R, double z):
+    # Gives sigma(R,z) for a given (R,z)
+    cpdef sigma(self, double R, double z, bint h_units=False):
         """
-        Gives sigma (cdm+b) for a given R and z
-        (R is the radius in units of Mpc, so if R=8/h this will be the usual sigma8(z)
+        Gives sigma (total matter) for a given R and z
+
+        R is the radius in units of Mpc, so R=8/h gives the usual sigma8(z) --
+        unless h_units is set, in which case R is in Mpc/h and R=8 gives it.
 
         .. note::
 
@@ -945,24 +1064,53 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        cdef:
-            double sigma_cb
-            int index_pk_cb
+        return self.sigma_general(R, z, self._index_pk_m(), h_units)
 
-        if self.pt().has_pk_matter == constvals.sFALSE:
-            raise CosmoSevereError("Power spectrum not computed. In order to get sigma(R,z) you must add mPk to the list of outputs.")
-        if self.pt().k_max_for_pk < self.ba().h:
-            raise CosmoSevereError("In order to get sigma(R,z) you must set 'P_k_max_h/Mpc' to 1 or bigger, in order to have k_max > 1 h/Mpc.")
+    # Gives sigma(R, z) for a given (R, z)
+    cpdef sigma_cb(self, double R, double z, bint h_units=False):
+        """
+        Gives sigma (cdm+b) for a given R and z
 
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_cb = deref(nonlinear_module).index_pk_cb_
-        has_pk_cb = deref(nonlinear_module).has_pk_cb_
-        if (has_pk_cb == constvals.sFALSE):
-            raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
+        R is the radius in units of Mpc, so R=8/h gives the usual sigma8(z) --
+        unless h_units is set, in which case R is in Mpc/h and R=8 gives it.
 
-        deref(nonlinear_module).nonlinear_sigmas_at_z(R, z, index_pk_cb, out_sigma, &sigma_cb)
+        .. note::
 
-        return sigma_cb
+            there is an additional check to verify whether output contains `mPk`,
+            and whether k_max > ...
+            because otherwise a segfault will occur
+
+        """
+        return self.sigma_general(R, z, self._index_pk_cb(), h_units)
+
+    def effective_f_sigma8(self, z, z_step=0.1):
+        """
+        Estimate f(z)*sigma8(z) as (d sigma8 / d ln a)(z), by finite difference.
+
+        Parameters
+        ----------
+        z : float
+                Desired redshift
+        z_step : float
+                Step of the two-sided derivative. For z below z_step the step
+                shrinks to z, so the derivative stays two-sided; below z_step/10
+                it goes one-sided instead.
+
+        Returns
+        -------
+        (d sigma8/d ln a)(z) (dimensionless)
+        """
+        # d sigma8/d ln a = -(d sigma8/dz)*(1+z)
+        if z < z_step/10.:
+            z_step = z_step/10.
+            return (self.sigma(8, z, h_units=True)
+                    - self.sigma(8, z + z_step, h_units=True))/z_step*(1 + z)
+
+        if z < z_step:
+            z_step = z
+
+        return (self.sigma(8, z - z_step, h_units=True)
+                - self.sigma(8, z + z_step, h_units=True))/(2.*z_step)*(1 + z)
 
     # Gives effective logarithmic slope of P_L(k,z) (total matter) for a given (k,z)
     cpdef pk_tilt(self, double k, double z):
@@ -1155,6 +1303,40 @@ cdef class PyCosmology:
         background_module = deref(self._cosmo()).GetBackgroundModule()
         index_bg_ang_distance = deref(background_module).index_bg_ang_distance_
         return self.get_background_value_at_z(z, index_bg_ang_distance)
+
+    def angular_distance_from_to(self, z1, z2):
+        """
+        Angular diameter distance of an object at z2 as seen by an observer at z1,
+        that is, sin_K((chi2 - chi1)*sqrt(|K|))/sqrt(|K|)/(1 + z2). Zero if z1 >= z2.
+
+        Parameters
+        ----------
+        z1 : float
+                Observer redshift
+        z2 : float
+                Source redshift
+
+        Returns
+        -------
+        d_A(z1, z2) in Mpc
+        """
+        cdef int index_bg_conf_distance
+        cdef double K
+
+        if z1 >= z2:
+            return 0.
+
+        background_module = deref(self._cosmo()).GetBackgroundModule()
+        index_bg_conf_distance = deref(background_module).index_bg_conf_distance_
+        chi1 = self.get_background_value_at_z(z1, index_bg_conf_distance)
+        chi2 = self.get_background_value_at_z(z2, index_bg_conf_distance)
+
+        K = self.ba().K
+        if K == 0.:
+            return (chi2 - chi1)/(1 + z2)
+        if K > 0.:
+            return np.sin(np.sqrt(K)*(chi2 - chi1))/np.sqrt(K)/(1 + z2)
+        return np.sinh(np.sqrt(-K)*(chi2 - chi1))/np.sqrt(-K)/(1 + z2)
 
     cpdef scale_independent_growth_factor(self, z):
         """
@@ -1514,6 +1696,12 @@ cdef class PyCosmology:
         -------
         tk : dictionary containing transfer functions.
         """
+        return self.transfer_general(z, -1, output_format)
+
+    cdef transfer_general(self, double z, int index_tau, output_format):
+        """Transfer functions at a redshift, or -- when index_tau is not negative
+        -- at that node of the stored late-time sampling, which is exact where
+        converting the node to a redshift and back is not."""
         cdef:
             string titles
             vector[double] data
@@ -1554,7 +1742,10 @@ cdef class PyCosmology:
 
         data.resize(size_ic_data*ic_num)
 
-        deref(perturbations_module).perturb_output_data(outf, z, number_of_titles, &data[0])
+        if index_tau < 0:
+            deref(perturbations_module).perturb_output_data(outf, z, number_of_titles, &data[0])
+        else:
+            deref(perturbations_module).perturb_output_data_at_index_tau(outf, index_tau, number_of_titles, &data[0])
 
         transfers = {}
         view = <double[:ic_num,:timesteps,:number_of_titles]> &data[0]

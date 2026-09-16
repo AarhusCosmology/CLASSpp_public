@@ -190,11 +190,7 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
                                               double z,
                                               int number_of_titles,
                                               double* data) const {
-  double k, k_over_h, k2;
   std::vector<double> tkfull;
-  double* tk;
-  double* dataptr;
-
   std::vector<double> pvecsources;
 
   double tau;
@@ -231,17 +227,101 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
 
     pvecsources.resize(k_size_[index_md]);
 
-    for (int index_k = 0; index_k < k_size_[index_md]; index_k++) {
-      for (int index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
-        for (int index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
-          perturb_sources_at_tau(index_md, index_ic, index_tp, tau, pvecsources.data());
+    /* perturb_sources_at_tau interpolates the source for every k in one call,
+       so it belongs outside the k loop. With it inside, the routine did
+       k_size*tp_size*ic_size full-array interpolations and discarded all but one
+       value from each -- a factor of k_size (~600) of pure waste. Same
+       interpolant read at the same points, so the output is unchanged. */
+    for (int index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
+      for (int index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
+        perturb_sources_at_tau(index_md, index_ic, index_tp, tau, pvecsources.data());
 
+        for (int index_k = 0; index_k < k_size_[index_md]; index_k++) {
           tkfull[(index_k * ic_size_[index_md] + index_ic) * tp_size_[index_md] + index_tp] =
               pvecsources[index_k];
         }
       }
     }
   }
+
+  perturb_store_columns(output_format, tkfull, number_of_titles, data);
+}
+
+/**
+ * Same as perturb_output_data, but at a node of the late-time (ln_tau) sampling
+ * rather than at an arbitrary redshift.
+ *
+ * Reading the stored table at a node is both exact and cheaper than
+ * interpolating to the redshift that node corresponds to -- and it is the only
+ * way to get the topmost node at all, since converting it to z and back lands
+ * marginally outside the tabulation range and trips the guard there.
+ *
+ * @param output_format    Input: output format (CLASS or CAMB)
+ * @param index_tau        Input: index in the late-time sampling, in [0, ln_tau_size_)
+ * @param number_of_titles Input: number of requested titles
+ * @param data             Output: vector of all source functions for all k values and initial conditions (previously allocated with the right size)
+ */
+
+void PerturbationsModule::perturb_output_data_at_index_tau(file_format output_format,
+                                                           int index_tau,
+                                                           int number_of_titles,
+                                                           double* data) const {
+  std::vector<double> tkfull;
+
+  int index_md = index_md_scalars_;
+
+  /* late_sources_ is filled only when there is a late-time sampling to point
+     into (perturb_indices_of_perturbs); with ln_tau_size_ == 1 its entries are
+     still null, so the one-point case has to be refused rather than indexed.
+     That case carries no node anyway: z=0 is reached through
+     perturb_output_data(0.), which reads sources_ directly. */
+  class_test_severe(ln_tau_size_ <= 1,
+                    "there is no late-time sampling to index: the sources were stored at z=0 "
+                    "only. Pass either a list of redshifts in 'z_pk' or one non-zero value in "
+                    "'z_max_pk', or ask for z=0 through perturb_output_data.");
+
+  class_test_severe((index_tau < 0) || (index_tau >= ln_tau_size_),
+                    "index_tau=%d is outside the late-time sampling [0,%d)",
+                    index_tau,
+                    ln_tau_size_);
+
+  if (k_size_[index_md] * ic_size_[index_md] * tp_size_[index_md] > 0) {
+    tkfull.resize(k_size_[index_md] * ic_size_[index_md] * tp_size_[index_md]);
+  }
+
+  for (int index_k = 0; index_k < k_size_[index_md]; index_k++) {
+    for (int index_tp = 0; index_tp < tp_size_[index_md]; index_tp++) {
+      for (int index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
+        tkfull[(index_k * ic_size_[index_md] + index_ic) * tp_size_[index_md] + index_tp] =
+            late_sources_[index_md][index_ic * tp_size_[index_md] + index_tp]
+                         [index_tau * k_size_[index_md] + index_k];
+      }
+    }
+  }
+
+  perturb_store_columns(output_format, tkfull, number_of_titles, data);
+}
+
+/**
+ * Lay a table of transfer functions out into the output columns, in the order
+ * perturb_output_titles names them. Shared by the two entry points above, which
+ * differ only in how they fill that table.
+ *
+ * @param output_format    Input: output format (CLASS or CAMB)
+ * @param tkfull           Input: T_i(k) for every k, initial condition and type
+ * @param number_of_titles Input: number of requested titles
+ * @param data             Output: vector of all source functions for all k values and initial conditions (previously allocated with the right size)
+ */
+
+void PerturbationsModule::perturb_store_columns(file_format output_format,
+                                                const std::vector<double>& tkfull,
+                                                int number_of_titles,
+                                                double* data) const {
+  double k, k_over_h, k2;
+  const double* tk;
+  double* dataptr;
+
+  int index_md = index_md_scalars_;
 
   /** - store data */
 
@@ -267,6 +347,7 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
                                    *this,
                                    output_format,
                                    BaseSpecies::TransferColumnSection::density);
+          class_store_double(dataptr, tk[index_tp_delta_m_], has_source_delta_m_, storeidx);
           class_store_double(dataptr, tk[index_tp_delta_tot_], has_source_delta_tot_, storeidx);
           class_store_double(dataptr, tk[index_tp_phi_], has_source_phi_, storeidx);
           class_store_double(dataptr, tk[index_tp_psi_], has_source_psi_, storeidx);
@@ -329,6 +410,12 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
                                *this,
                                output_format,
                                BaseSpecies::TransferColumnSection::density);
+      /* d_m, the total *matter* contrast, is the one P(k) is built from, and is
+         what turns a matter spectrum into a Weyl one. Written only when a
+         request that defines it (mPk, non-linear corrections, number counts)
+         set the source; same condition and same column position as
+         class_public. */
+      class_store_columntitle(titles, "d_m", has_source_delta_m_);
       class_store_columntitle(titles, "d_tot", true);
       class_store_columntitle(titles, "phi", has_source_phi_);
       class_store_columntitle(titles, "psi", has_source_psi_);

@@ -48,6 +48,14 @@ class NonlinearModule : public BaseModule {
                                       int zvec_size,
                                       double* out_pk,
                                       double* out_pk_cb) const;
+  /* Hand back the stored P(k,z) table on CLASS's own k sampling, so that a
+     caller (the Python wrapper) never has to know this module's array layout.
+     These are the tabulated nodes, not an interpolation.
+     Design: docs/superpowers/specs/2026-09-16-classy-lss-methods-design.md */
+  void GetPkGrid(enum pk_outputs pk_output,
+                 int index_pk,
+                 std::vector<double>& k,
+                 std::vector<double>& pk) const;
   void nonlinear_sigmas_at_z(
       double R, double z, int index_pk, enum out_sigmas sigma_output, double* result) const;
   void nonlinear_pk_tilt_at_k_and_z(

@@ -360,11 +360,16 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
   /** - first step: check that k is in valid range [0:kmax]
       (the test for z will be done when calling nonlinear_pk_linear_at_z()) */
 
-  class_test((k < 0.) || (k > exp(ln_k_[k_size_ - 1])),
+  /* Bound by the last tabulated k itself, not by exp(ln_k_[k_size_ - 1]).
+     ln_k_ is log(k_), and exp(log(x)) can land an ulp below x, which made the
+     topmost node of the table -- the one GetPkGrid hands out -- fail its own
+     range check. log(k) of an accepted k still lands on ln_k_[k_size_ - 1] at
+     worst, so the interpolation below is unaffected. */
+  class_test((k < 0.) || (k > k_[k_size_ - 1]),
              "k=%e out of bounds [%e:%e]",
              k,
              0.,
-             exp(ln_k_[k_size_ - 1]));
+             k_[k_size_ - 1]);
 
   /** - deal with case k = 0 for which P(k) is set to zero
       (this non-physical result can be useful for interpolations) */
@@ -706,6 +711,89 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
       /* (If needed, one could add instead some extrapolation here) */
     }
     index_kvec++;
+  }
+}
+
+/**
+ * Return the stored P(k,z) table on CLASS's own k and time sampling.
+ *
+ * These are the tabulated nodes, not an interpolation: the caller gets exactly
+ * what this module computed. The time axis is the ln_tau_ grid (ln_tau_size_
+ * entries, ending at z=0), which the caller reads from
+ * PerturbationsModule::ln_tau_ -- that array is a copy of this module's, and
+ * keeping one owner for the redshift axis is what lets a caller multiply a P(k)
+ * grid by a transfer-function grid element-wise.
+ *
+ * The three guards below are here, rather than at the call site, because they
+ * are the conditions under which the arrays mean anything.
+ *
+ * @param pk_output   Input: linear or nonlinear
+ * @param index_pk    Input: index of pk type (_m, _cb)
+ * @param k           Output: k[index_k] in 1/Mpc, k_size_ entries
+ * @param pk          Output: pk[index_tau*k_size_ + index_k] in Mpc^3
+ */
+
+void NonlinearModule::GetPkGrid(enum pk_outputs pk_output,
+                                int index_pk,
+                                std::vector<double>& k,
+                                std::vector<double>& pk) const {
+  class_test_severe(!ppt->has_pk_matter,
+                    "No power spectrum was computed, so there is no P(k,z) table to return. Add "
+                    "'mPk' to the list of outputs.");
+
+  class_test_severe(ln_tau_size_ == 1,
+                    "The P(k,z) table was stored at z=0 only, so it is not a grid. Pass either a "
+                    "list of redshifts in 'z_pk' or one non-zero value in 'z_max_pk'.");
+
+  class_test_severe((pk_output == pk_nonlinear) && (pnl->method == nl_none),
+                    "A non-linear P(k,z) table was requested, but no non-linear method was "
+                    "asked for. Add e.g. 'halofit' or 'HMcode' to 'non_linear'.");
+
+  /* ln_tau_ covers the last ln_tau_size_ entries of the tau_ grid that
+     index_tau_min_nl_ indexes, so the non-linear corrections reach the top of
+     the stored redshift range exactly when index_tau_min_nl_ does not exceed
+     the first of those entries. */
+  if (pk_output == pk_nonlinear) {
+    const int index_tau_pk_min = tau_size_ - ln_tau_size_;
+
+    if (index_tau_min_nl_ > index_tau_pk_min) {
+      std::vector<double> pvecback(background_module_->bg_size_);
+      int last_index = 0;
+
+      background_module_->background_at_tau(tau_[index_tau_min_nl_],
+                                            pba->short_info,
+                                            pba->inter_normal,
+                                            &last_index,
+                                            pvecback.data());
+      const double z_max_nonlinear = 1. / pvecback[background_module_->index_bg_a_] - 1.;
+
+      background_module_->background_at_tau(tau_[index_tau_pk_min],
+                                            pba->short_info,
+                                            pba->inter_normal,
+                                            &last_index,
+                                            pvecback.data());
+      const double z_max_requested = 1. / pvecback[background_module_->index_bg_a_] - 1.;
+
+      class_stop(
+          "the non-linear P(k,z) table was requested up to z=%e, but the non-linear "
+          "corrections could only be computed consistently up to z=%e (k_max is too small "
+          "for the algorithm to find k_NL above that). Increase 'nonlinear_min_k_max', or "
+          "ask for the linear table.",
+          z_max_requested,
+          z_max_nonlinear);
+    }
+  }
+
+  k.resize(k_size_);
+  for (int index_k = 0; index_k < k_size_; index_k++) {
+    k[index_k] = k_[index_k];
+  }
+
+  const std::vector<double>& ln_pk = (pk_output == pk_linear) ? ln_pk_l_[index_pk]
+                                                              : ln_pk_nl_[index_pk];
+  pk.resize(ln_tau_size_ * k_size_);
+  for (int index = 0; index < ln_tau_size_ * k_size_; index++) {
+    pk[index] = exp(ln_pk[index]);
   }
 }
 

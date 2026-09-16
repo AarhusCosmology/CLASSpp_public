@@ -50,6 +50,15 @@ class PerturbationsModule : public BaseModule {
                            double z,
                            int number_of_titles,
                            double* data) const;
+  /* As above, but reading the stored table at a node of the late-time (ln_tau)
+     sampling instead of interpolating to a redshift. Exact, cheaper, and the
+     only way to reach the topmost node, whose round trip through z lands just
+     outside the tabulation range.
+     Design: docs/superpowers/specs/2026-09-16-classy-lss-methods-design.md */
+  void perturb_output_data_at_index_tau(file_format output_format,
+                                        int index_tau,
+                                        int number_of_titles,
+                                        double* data) const;
   void perturb_output_titles(file_format output_format, std::string& titles) const;
   void perturb_output_firstline_and_ic_suffix(int index_ic,
                                               std::string& first_line,
@@ -247,6 +256,10 @@ class PerturbationsModule : public BaseModule {
   double k_max_;                       /**< maximum value (over all modes) */
 
  private:
+  void perturb_store_columns(file_format output_format,
+                             const std::vector<double>& tkfull,
+                             int number_of_titles,
+                             double* data) const;
   void perturb_sources_at_tau(
       int index_md, int index_ic, int index_tp, double tau, double* pvecsources) const;
   void perturb_init();

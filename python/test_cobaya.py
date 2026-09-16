@@ -22,6 +22,8 @@ from cobaya.likelihood import Likelihood  # noqa: E402
 from cobaya.model import get_model  # noqa: E402
 
 Z = np.array([0.3, 0.51, 0.93, 1.32, 2.33])
+Z_PAIRS = [(0.3, 0.93), (0.51, 2.33)]
+K_MAX = 3.0
 L_MAX = 2500
 
 
@@ -33,6 +35,15 @@ class Probe(Likelihood):
             "angular_diameter_distance": {"z": Z},
             "comoving_radial_distance": {"z": Z},
             "rdrag": None,
+            # The LSS side (#435): each of these reaches a wrapper method that
+            # CLASS++ did not have, and fails on the first evaluation without it.
+            "Pk_interpolator": {
+                "z": Z, "k_max": K_MAX, "nonlinear": (False, True),
+                "vars_pairs": [("delta_tot", "delta_tot")],
+            },
+            "sigma8_z": {"z": Z},
+            "fsigma8": {"z": Z},
+            "angular_diameter_distance_2": {"z_pairs": Z_PAIRS},
         }
 
     def logp(self, **params):
@@ -46,6 +57,10 @@ def _model():
         "theory": {"classy": {"extra_args": {
             "N_ur": 2.0308,
             "nu1.type": "ncdm_standard",
+            # halofit needs k_NL well above P_k_max to reach the top of the
+            # redshift grid Cobaya asks for; without this the non-linear
+            # Pk_interpolator is refused rather than silently linear.
+            "nonlinear_min_k_max": 30.0,
         }}},
         "params": {
             # Cobaya's documented pattern for a CLASS name that is not a Python
@@ -102,6 +117,47 @@ def test_requested_products_reach_the_likelihood(model):
         values = getter(Z)
         assert np.all(np.isfinite(values)) and np.all(values > 0)
     assert 140.0 < provider.get_param("rdrag") < 155.0
+
+
+def test_lss_products_reach_the_likelihood(model):
+    """The #435 requirements, each checked against the wrapper's own scalar calls
+    on the very instance Cobaya drove -- so this pins the plumbing, not agreement
+    with a reference code."""
+    _evaluate(model, 0.06)
+    provider = model.provider
+    cosmo = model.theory["classy"].classy
+    h = cosmo.h()
+
+    for nonlinear in (False, True):
+        interpolator = provider.get_Pk_interpolator(
+            var_pair=("delta_tot", "delta_tot"), nonlinear=nonlinear)
+        scalar = cosmo.pk if nonlinear else cosmo.pk_lin
+        for z in (0.3, 1.32, 2.33):
+            for k in (0.02, 0.1, 0.5):
+                assert interpolator.P(z, k) == pytest.approx(scalar(k, z), rel=1e-3)
+    # and the non-linear one really is boosted, not a relabelled linear table
+    linear = provider.get_Pk_interpolator(nonlinear=False)
+    boosted = provider.get_Pk_interpolator(nonlinear=True)
+    assert boosted.P(0.0, 2.0) / linear.P(0.0, 2.0) > 1.5
+
+    sigma8_z = provider.get_sigma8_z(Z)
+    assert sigma8_z == pytest.approx([cosmo.sigma(8, z, h_units=True) for z in Z], rel=1e-10)
+    assert sigma8_z[0] > sigma8_z[-1] > 0.0  # growth, and the right way round
+
+    # fsigma8 is the finite-difference definition Cobaya asks for (z_step=0.1)
+    fsigma8 = provider.get_fsigma8(Z)
+    expected = [(cosmo.sigma(8, z - 0.1, h_units=True)
+                 - cosmo.sigma(8, z + 0.1, h_units=True)) / 0.2 * (1 + z) for z in Z]
+    assert fsigma8 == pytest.approx(expected, rel=1e-10)
+    assert np.all(np.array(fsigma8) > 0.0)
+
+    # D_A(z1,z2) = (chi2 - chi1)/(1 + z2) in a flat cosmology
+    d_a_2 = provider.get_angular_diameter_distance_2(Z_PAIRS)
+    chi = dict(zip(Z, provider.get_comoving_radial_distance(Z)))
+    assert d_a_2 == pytest.approx(
+        [(chi[z2] - chi[z1]) / (1 + z2) for z1, z2 in Z_PAIRS], rel=1e-8)
+
+    assert h > 0.0  # the instance we interrogated is the one that was computed
 
 
 def test_dotted_input_parameter_reaches_class(model):
