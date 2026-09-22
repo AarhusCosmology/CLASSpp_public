@@ -96,6 +96,19 @@ class FileContent {
     legacy_ncdm_transmuted_ = true;
   }
 
+  /** Single-instance dot-syntax translation state, for the same reason as the
+   *  NCDM flag above. TranslateSingleInstanceDotSyntax copies e.g. "f.w0" into
+   *  "w0_fld" on the first pass; from then on the legacy key is the live copy.
+   *  A reparse of a copy (pk_eq overriding w0_fld, a shooting step) must neither
+   *  re-copy the dot value over the override nor read the override as the user
+   *  setting both spellings. Not a parameter, and it survives mark_all_unread(). */
+  bool single_instance_translated() const {
+    return single_instance_translated_;
+  }
+  void set_single_instance_translated() {
+    single_instance_translated_ = true;
+  }
+
   /** Return every instance name N such that the entry "N.<field>" has the
    *  given value. The dot is a literal separator; N must match the instance
    *  regex [A-Za-z_][A-Za-z0-9_]*. Results are returned in insertion order.
@@ -110,7 +123,8 @@ class FileContent {
   std::vector<std::string> keys_; /**< insertion-order key list */
   std::map<std::string, std::string> params_;
   mutable std::set<std::string> read_params_;
-  bool legacy_ncdm_transmuted_ = false;
+  bool legacy_ncdm_transmuted_     = false;
+  bool single_instance_translated_ = false;
 
  public:
   /** Invoke @p fn for every parameter in insertion order.

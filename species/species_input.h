@@ -96,6 +96,13 @@ bool SynthesiseIdenticalScalarField(FileContent* pfc,
  * appears more than once, or if a translated legacy key is already present with
  * a different value. Unknown "N.<field>" entries are left untouched (and unread,
  * so the usual unrecognised-parameter warning still fires).
+ *
+ * Copies at most once per FileContent (FileContent::single_instance_translated).
+ * A reparse of the same content or a copy of it consumes "N.type" and the dot
+ * fields but leaves the legacy keys alone, so a later override of a legacy key
+ * wins: pk_eq's effective w0_fld/wa_fld on a dot-syntax fluid used to abort here
+ * as "sets both legacy key and dot-syntax" (see
+ * docs/superpowers/specs/2026-09-22-dot-syntax-translate-once-design.md).
  */
 void TranslateSingleInstanceDotSyntax(FileContent* pfc);
 

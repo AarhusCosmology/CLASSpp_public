@@ -217,6 +217,51 @@ static void test_dot_unknown_field_left_unread() {
   assert(!fc.was_read("x.Omeega"));  // stays unread -> warned later
 }
 
+static void test_dot_reparse_keeps_legacy_override() {
+  // pk_eq copies the translated input, overrides w0_fld/wa_fld with the effective
+  // equation of state, and builds a new InputModule from the copy. The reparse must
+  // keep the override rather than read it as the user setting both spellings.
+  FileContent fc;
+  fc.set("f.type", "fluid");
+  fc.set("f.w0", "-0.9");
+  fc.set("f.wa", "0.1");
+  TranslateSingleInstanceDotSyntax(&fc);
+  assert(*fc.get<std::string>("w0_fld") == "-0.9");
+
+  FileContent copy = fc;  // the flag travels with the copy, as in pk_eq
+  copy.set("w0_fld", "-0.95");
+  copy.set("wa_fld", "0");
+  copy.mark_all_unread();                   // what InputModule's constructor does
+  TranslateSingleInstanceDotSyntax(&copy);  // must not throw
+  assert(*copy.get<std::string>("w0_fld") == "-0.95");
+  assert(*copy.get<std::string>("wa_fld") == "0");
+  // Still consumed on the reparse: RejectUnbuiltSpeciesInstances and the unread
+  // warnings need to see the instance as built.
+  assert(copy.was_read("f.type"));
+  assert(copy.was_read("f.w0"));
+  assert(copy.was_read("f.wa"));
+
+  // The original is untouched by the copy's override.
+  assert(*fc.get<std::string>("w0_fld") == "-0.9");
+}
+
+static void test_dot_conflict_still_caught_on_fresh_input() {
+  // The once-only rule must not weaken the user-input check: a fresh FileContent
+  // giving both spellings with different values still throws.
+  FileContent fc;
+  fc.set("w0_fld", "-0.95");
+  fc.set("f.type", "fluid");
+  fc.set("f.w0", "-0.9");
+  bool threw = false;
+  try {
+    TranslateSingleInstanceDotSyntax(&fc);
+  }
+  catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 int main() {
   test_instances_with_basic();
   test_species_input_prefixing();
@@ -231,5 +276,7 @@ int main() {
   test_dot_conflict_with_legacy_throws();
   test_dot_identical_legacy_ok();
   test_dot_unknown_field_left_unread();
+  test_dot_reparse_keeps_legacy_override();
+  test_dot_conflict_still_caught_on_fresh_input();
   return 0;
 }

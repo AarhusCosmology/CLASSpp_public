@@ -132,6 +132,10 @@ void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
   if (!pfc) {
     throw std::logic_error("TranslateSingleInstanceDotSyntax: null FileContent*");
   }
+  // A reparse of an already translated FileContent (pk_eq's w0_eff copies, shooting
+  // steps) still consumes the dot keys, but copies nothing: the legacy key is the
+  // live copy by then, and a caller that overrode it meant to.
+  const bool reparse = pfc->single_instance_translated();
   for (const auto& spec : SingleInstanceTable()) {
     const std::string type(spec.type);
     const auto instances = pfc->instances_with("type", type);
@@ -153,7 +157,7 @@ void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
     for (const auto& fm : spec.fields) {
       const std::string dot(fm.dot);
       auto value = input.get<std::string>(dot);  // consumes "<name>.<dot>" if present
-      if (!value) {
+      if (!value || reparse) {
         continue;
       }
       const std::string legacy(fm.legacy);
@@ -169,6 +173,7 @@ void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
           *value);  // set() resets the read flag so the downstream consumer still sees this key
     }
   }
+  pfc->set_single_instance_translated();
 }
 
 namespace {

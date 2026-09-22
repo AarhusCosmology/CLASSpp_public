@@ -1414,6 +1414,21 @@ class TestReviewRegressions(TestClass):
         }
         self._assert_compute_fails(scenario, "'ncdm' is not a species type")
 
+    def test_dot_syntax_fluid_with_pk_eq_matches_legacy(self):
+        """pk_eq rebuilds the input with an effective w0_fld/wa_fld. With the fluid in
+        dot syntax, that override used to abort as "input sets both legacy key 'w0_fld'
+        and dot-syntax 'f.w0'", while the legacy spelling ran."""
+        base = {
+            'output': 'mPk',
+            'non_linear': 'halofit',
+            'pk_eq': 'yes',
+            'Omega_Lambda': 0,
+            'P_k_max_1/Mpc': 1.0,
+        }
+        scenario = dict(base, **{'f.type': 'fluid', 'f.w0': -0.9, 'f.wa': 0.1})
+        reference = dict(base, **{'w0_fld': -0.9, 'wa_fld': 0.1})
+        self._assert_scenarios_match(scenario, reference, "Legacy fluid keys")
+
     def test_dot_syntax_standard_psd_filenames_follow_true_flags(self):
         scenario = {
             **self._dot_syntax_base(),
