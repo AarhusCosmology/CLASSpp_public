@@ -9,7 +9,7 @@ Bird, Samuel Brieden, Jesus Torrado, Miguel Zumalacarregui, Francesco
 Montanari, Jeppe Dakin, Emil Brinch Holm, etc.
 
 For download and information, see [class-code.net](http://class-code.net),
-[original Github](https://github.com/lesgourg/class_public) and [this fork](https://github.com/AarhusCosmology/CLASSpp).
+[original Github](https://github.com/lesgourg/class_public) and [this fork](https://github.com/AarhusCosmology/CLASSpp_public).
 
 ## About this fork
 
@@ -137,7 +137,7 @@ plot_CLASS_output.m'
 If you discover a bug or have a nice idea for a feature that you would like to see, open an issue at 
 [https://github.com/AarhusCosmology/CLASSpp_public/issues](https://github.com/AarhusCosmology/CLASSpp_public/issues). *A bug report should provide clear instructions on how to reproduce the bug*.
 
-If you want to contribute to CLASS, make a fork of (https://github.com/AarhusCosmology/CLASSpp_public)[https://github.com/AarhusCosmology/CLASSpp_public]. Before submitting the PR, make sure that an **issue** exists which clearly explains the bug or feature that the PR aims to solve.
+If you want to contribute to CLASS, make a fork of [https://github.com/AarhusCosmology/CLASSpp_public](https://github.com/AarhusCosmology/CLASSpp_public). Before submitting the PR, make sure that an **issue** exists which clearly explains the bug or feature that the PR aims to solve.
 
 ## Using and citing the code
 

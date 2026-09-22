@@ -13,6 +13,10 @@ authors = [
 description = "Python interface to the C++ community-edition of the cosmological Boltzmann code CLASS"
 readme = "README.md"
 requires-python = ">=3.10"
+# classy.pyx cimports numpy, so import fails without it. Each wheel refuses a NumPy
+# older than the C-API it was compiled for; 1.25 is the highest such target among
+# the wheels (cp312+; the cp310/cp311 ones accept older), so it is safe for all.
+dependencies = ["numpy>=1.25"]
 license-files = ["COPYING.txt", "LICENSE.txt", "AUTHORS.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
