@@ -98,3 +98,23 @@ bool SynthesiseIdenticalScalarField(FileContent* pfc,
  * so the usual unrecognised-parameter warning still fires).
  */
 void TranslateSingleInstanceDotSyntax(FileContent* pfc);
+
+/**
+ * Reject every dot-syntax species instance that no factory built (#430).
+ *
+ * Call once, after every factory in kAllSpeciesFactories has run. Rejects:
+ *   - "N.type" that no factory consumed: a type name that is not a species type,
+ *     a species type that is configured by legacy keys only, or an N that is not
+ *     a legal instance name;
+ *   - "N.<field>" with no "N.type" line at all (the type line misspelled or
+ *     forgotten).
+ * Either way the species would otherwise be silently absent while the run
+ * reports success. Relies on the factory contract stated in all_species.h: a
+ * factory reads "N.type" for exactly the instances it builds. Structural, hence
+ * severe; every offending instance is named in one message.
+ *
+ * Unread fields of an instance that WAS built are not checked here.
+ *
+ * Design: docs/superpowers/specs/2026-09-21-unbuilt-species-instances-design.md
+ */
+void RejectUnbuiltSpeciesInstances(const FileContent& fc);

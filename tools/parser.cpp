@@ -78,19 +78,7 @@ std::vector<std::string> FileContent::instances_with(const std::string& field,
     if (key.compare(key.size() - suffix.size(), suffix.size(), suffix) != 0)
       continue;
     const std::string name = key.substr(0, key.size() - suffix.size());
-    if (name.empty())
-      continue;
-    char c0 = name[0];
-    if (!(std::isalpha(static_cast<unsigned char>(c0)) || c0 == '_'))
-      continue;
-    bool ok = true;
-    for (char c : name) {
-      if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) {
-        ok = false;
-        break;
-      }
-    }
-    if (!ok)
+    if (!is_instance_name(name))
       continue;
     auto it = params_.find(key);
     if (it == params_.end())
@@ -99,6 +87,19 @@ std::vector<std::string> FileContent::instances_with(const std::string& field,
       out.push_back(name);
   }
   return out;
+}
+
+/* static */ bool FileContent::is_instance_name(const std::string& name) {
+  if (name.empty())
+    return false;
+  const char c0 = name[0];
+  if (!(std::isalpha(static_cast<unsigned char>(c0)) || c0 == '_'))
+    return false;
+  for (char c : name) {
+    if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_'))
+      return false;
+  }
+  return true;
 }
 
 std::vector<std::string> FileContent::unread_parameters() const {

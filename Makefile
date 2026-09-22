@@ -44,7 +44,8 @@ TEST_TARGETS := \
 	test-limber-closure \
 	test-max-multipole \
 	test-ncdm-family \
-	test-species-budget
+	test-species-budget \
+	test-species-instances
 
 .PHONY: all class class_profiled classy classy-pip-dev test clean $(TEST_TARGETS)
 

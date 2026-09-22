@@ -5,6 +5,12 @@
  *
  * Adding a new species: write the class, include its header here, add one
  * row to kAllSpeciesFactories below.
+ *
+ * Factory contract for dot-syntax input: a factory that builds a species from
+ * an instance N reads "N.type" (FileContent::get marks it read), and reads it
+ * for exactly the instances it builds. RejectUnbuiltSpeciesInstances
+ * (species_input.h) runs after every factory and rejects any "N.type" left
+ * unread, so a factory that builds N without reading it fails every such input.
  */
 #include <array>
 #include <string_view>

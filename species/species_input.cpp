@@ -1,8 +1,11 @@
 #include "species/species_input.h"
 
 #include <cstdlib>
+#include <set>
 #include <stdexcept>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "errors.h"
@@ -166,4 +169,95 @@ void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
           *value);  // set() resets the read flag so the downstream consumer still sees this key
     }
   }
+}
+
+namespace {
+
+bool IsSpeciesType(const std::string& name) {
+  for (const auto& entry : kAllSpeciesFactories) {
+    if (entry.name == name)
+      return true;
+  }
+  return false;
+}
+
+std::string SpeciesTypeList() {
+  std::string out;
+  for (const auto& entry : kAllSpeciesFactories)
+    out += (out.empty() ? "" : ", ") + std::string(entry.name);
+  return out;
+}
+
+}  // namespace
+
+void RejectUnbuiltSpeciesInstances(const FileContent& fc) {
+  // Collect first, judge second: the orphan test asks whether "N.type" exists
+  // anywhere in the input, which is not known until the whole input is seen.
+  struct DotEntry {
+    std::string key;
+    std::string instance;
+    std::string field;
+    std::string value;
+    bool read;
+  };
+  std::vector<DotEntry> entries;
+  std::set<std::string> declared;  // instances that have an "N.type" line
+  fc.for_each([&](const std::string& key, const std::string& value, bool read) {
+    const auto dot = key.find('.');
+    if (dot == std::string::npos)
+      return;
+    DotEntry e{key, key.substr(0, dot), key.substr(dot + 1), value, read};
+    if (e.field == "type")
+      declared.insert(e.instance);
+    entries.push_back(std::move(e));
+  });
+
+  std::vector<std::string> problems;
+  std::vector<std::pair<std::string, std::string>> orphans;  // instance -> its keys, in input order
+  for (const auto& e : entries) {
+    if (e.field == "type") {
+      // An illegal name is rejected even when the key was read: no factory can
+      // build it (instances_with skips it), but a key-pattern scan may still read it.
+      if (!FileContent::is_instance_name(e.instance)) {
+        problems.push_back("'" + e.key + "': '" + e.instance +
+                           "' is not a legal instance name (letters, digits and '_', not "
+                           "starting with a digit)");
+      }
+      else if (e.read) {
+        continue;  // a factory built this instance
+      }
+      else if (!IsSpeciesType(e.value)) {
+        problems.push_back("'" + e.key + " = " + e.value + "': '" + e.value +
+                           "' is not a species type. Species types: " + SpeciesTypeList());
+      }
+      else {
+        problems.push_back("'" + e.key + " = " + e.value + "': species type '" + e.value +
+                           "' cannot be declared with '<instance>.type' yet; configure it "
+                           "with its legacy input keys (see explanatory.ini)");
+      }
+    }
+    else if (declared.count(e.instance) == 0) {
+      auto it = orphans.begin();
+      while (it != orphans.end() && it->first != e.instance)
+        ++it;
+      if (it == orphans.end())
+        orphans.emplace_back(e.instance, "'" + e.key + "'");
+      else
+        it->second += ", '" + e.key + "'";
+    }
+  }
+  for (const auto& [instance, keys] : orphans) {
+    problems.push_back(keys + " set, but there is no '" + instance +
+                       ".type', so no species is built from them");
+  }
+
+  if (problems.empty())
+    return;
+  std::string listed;
+  for (const auto& p : problems)
+    listed += "\n  - " + p;
+  class_stop_severe(
+      "dot-syntax species input that builds no species (the run would silently compute a "
+      "cosmology without it):%s",
+      listed.c_str());
 }

@@ -1404,6 +1404,16 @@ class TestReviewRegressions(TestClass):
         }
         self._assert_compute_fails(scenario, "must be identical for all dot-syntax NCDM-family species")
 
+    def test_dot_syntax_unrecognised_species_type_is_rejected(self):
+        """#430: a misspelled <instance>.type built no species. classy already refused
+        the run for its unread keys; the error now names the cause and the fix."""
+        scenario = {
+            **self._dot_syntax_base(),
+            'nuM.type': 'ncdm',
+            'nuM.m': 0.06,
+        }
+        self._assert_compute_fails(scenario, "'ncdm' is not a species type")
+
     def test_dot_syntax_standard_psd_filenames_follow_true_flags(self):
         scenario = {
             **self._dot_syntax_base(),

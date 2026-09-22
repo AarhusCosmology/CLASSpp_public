@@ -413,6 +413,10 @@ void InputModule::ConstructSpecies() {
     ctx.omega0_closure_override.reset();
   }
 
+  // Every factory has run, so a dot-syntax instance nobody built is now an
+  // input error rather than a species the run silently goes without (#430).
+  RejectUnbuiltSpeciesInstances(file_content_);
+
   all_species_.freeze();
 
   // Precision-parameter consistency check that fires when any NCDM-family

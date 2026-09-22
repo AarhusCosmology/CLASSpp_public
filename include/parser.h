@@ -127,6 +127,9 @@ class FileContent {
 
   /** Split a comma-separated value string into trimmed substrings. */
   static std::vector<std::string> split_csv(const std::string& s);
+
+  /** True if @p name is a legal species instance name: [A-Za-z_][A-Za-z0-9_]*. */
+  static bool is_instance_name(const std::string& name);
 };
 
 // Explicit specialization declarations — definitions are in parser.cpp.
