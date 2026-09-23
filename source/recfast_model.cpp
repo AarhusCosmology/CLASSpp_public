@@ -15,10 +15,20 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
   const double x                = state.x;
   const double n                = state.n_H;
   const double n_He             = preco_->fHe * n;
-  const double Tmat             = state.T_mat;
   const double Hz               = state.H;
   const bool hydrogen_frozen    = state.hydrogen_frozen;
   const bool helium_corrections = state.helium_ode;
+
+  /* Varying fundamental constants (Hart & Chluba, arXiv:1705.03925), with the powers of
+     class_public's wrap_recfast.c: every ionization temperature moves with alpha^2 m_e,
+     applied by dividing T, and the rate coefficients carry the rest. */
+  const FundamentalConstants& constants = state.constants;
+  const double Tmat                     = state.T_mat / constants.TemperatureRescale();
+  const double alpha2                   = constants.alpha * constants.alpha;
+  const double rescale_Rdown            = alpha2 / (constants.me * constants.me);
+  const double rescale_Rup              = alpha2 * alpha2 * constants.alpha * constants.me;
+  const double rescale_K                = pow(constants.TemperatureRescale(), -3);
+  const double rescale_Lambda           = pow(constants.alpha, 8) * constants.me;
 
   double Rdown = 1.e-19 * _a_PPB_ * pow((Tmat / 1.e4), _b_PPB_) /
                  (1. + _c_PPB_ * pow((Tmat / 1.e4), _d_PPB_));
@@ -29,7 +39,7 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
   double Rdown_He = _a_VF_ /
                     (sq_0 * pow((1. + sq_0), (1. - _b_VF_)) * pow((1. + sq_1), (1. + _b_VF_)));
   double Rup_He   = 4. * Rdown_He * pow((preco_->CR * Tmat), 1.5) * exp(-preco_->CDB_He / Tmat);
-  double K        = preco_->CK / Hz;
+  double K        = preco_->CK / Hz * rescale_K;
 
   /* following is from recfast 1.5 */
 
@@ -48,6 +58,15 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
                                   pow((1. + sq_1), (1. + _b_trip_)));
   double Rup_trip   = Rdown_trip * exp(-_h_P_ * _c_ * _L_He2St_ion_ / (_k_B_ * Tmat)) *
                       pow(preco_->CR * Tmat, 1.5) * 4. / 3.;
+
+  /* The rates' own powers of alpha and m_e go on last: each Rup is built from its
+     unscaled Rdown. */
+  Rdown      *= rescale_Rdown;
+  Rdown_He   *= rescale_Rdown;
+  Rdown_trip *= rescale_Rdown;
+  Rup        *= rescale_Rup;
+  Rup_He     *= rescale_Rup;
+  Rup_trip   *= rescale_Rup;
 
   int Heflag = 0;
   if (helium_corrections && (x_He >= 5.e-9))
@@ -106,7 +125,12 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
     }
   }
 
+  K_He *= rescale_K;
+
   /* end of new recfast 1.4 piece */
+
+  const double Lambda_H  = _Lambda_ * rescale_Lambda;
+  const double Lambda_He = _Lambda_He_ * rescale_Lambda;
 
   /************/
   /* hydrogen */
@@ -119,8 +143,8 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
        ionization fraction is very close to one) */
     double C = 0.;
     if (x_H < ppr_->recfast_x_H0_trigger2) {
-      C = (1. + K * _Lambda_ * n * (1. - x_H)) /
-          (1. / preco_->fu + K * _Lambda_ * n * (1. - x_H) / preco_->fu + K * Rup * n * (1. - x_H));
+      C = (1. + K * Lambda_H * n * (1. - x_H)) /
+          (1. / preco_->fu + K * Lambda_H * n * (1. - x_H) / preco_->fu + K * Rup * n * (1. - x_H));
     }
     else {
       C = 1.;
@@ -157,10 +181,10 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
 
     result.dx_He_dz =
         ((x * x_He * n * Rdown_He - Rup_He * (1. - x_He) * exp(-preco_->CL_He / Tmat)) *
-         (1. + K_He * _Lambda_He_ * n_He * (1. - x_He) * He_Boltz)) /
+         (1. + K_He * Lambda_He * n_He * (1. - x_He) * He_Boltz)) /
         (Hz * (1 + z) *
          (1. +
-          K_He * (_Lambda_He_ + Rup_He) * n_He * (1. - x_He) *
+          K_He * (Lambda_He + Rup_He) * n_He * (1. - x_He) *
               He_Boltz)); /* in case of energy injection due to DM, we neglect the contribution to helium ionization */
 
     /* following is from recfast 1.4 */

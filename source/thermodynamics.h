@@ -18,6 +18,14 @@
 enum recombination_algorithm { recfast, hyrec };
 
 /**
+ * Time dependence of the fine-structure constant and the electron mass: none, or a
+ * single step at varconst_transition_redshift, with the varied values above it and
+ * today's below.
+ */
+
+enum varconst_dependence { varconst_none, varconst_instant };
+
+/**
  * List of possible reionization schemes.
  */
 
@@ -74,6 +82,15 @@ struct thermo {
   double tau_n = 878.4;
 
   enum recombination_algorithm recombination = recfast; /**< recombination code */
+
+  /** @name - varying fundamental constants (Hart & Chluba, arXiv:1705.03925) */
+  //@{
+  enum varconst_dependence varconst_dep = varconst_none;
+  double varconst_alpha                 = 1.;  /**< alpha at early times, relative to today */
+  double varconst_me                    = 1.;  /**< m_e at early times, relative to today */
+  double varconst_transition_redshift   = 50.; /**< where varconst_instant steps back */
+  double bbn_alpha_sensitivity          = 1.;  /**< d ln Y_He / d alpha, for a Y_He from BBN */
+  //@}
 
   enum reionization_parametrization reio_parametrization = reio_camb; /**< reionization scheme */
 

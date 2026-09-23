@@ -144,6 +144,10 @@ class ThermodynamicsModule : public BaseModule {
   double thermodynamics_recfast_hydrogen_saha_xH(const recombination* preco, double z) const;
   double thermodynamics_recfast_helium_first_saha_xe(const recombination* preco, double z) const;
   double thermodynamics_recfast_helium_second_saha_xe(const recombination* preco, double z) const;
+  /** alpha and m_e at z, relative to today (Hart & Chluba, arXiv:1705.03925). */
+  FundamentalConstants FundamentalConstantsAt(double z) const;
+  double RedshiftOfBbn() const;
+  double SahaRhs(const recombination* preco, double z, double CB) const;
   void thermodynamics_recfast_store_row(
       recombination* preco, int sample_index, double z, double xe, double Tb, double dTbdz) const;
   double thermodynamics_recfast_xe_after_helium_ode(const recombination* preco,

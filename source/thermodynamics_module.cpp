@@ -145,7 +145,8 @@ void ThermodynamicsModule::thermodynamics_at_z(
     pvecthermo[index_th_xe_] = x0;
 
     /* Calculate dkappa/dtau (dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T in units of 1/Mpc) */
-    pvecthermo[index_th_dkappa_] = (1. + z) * (1. + z) * n_e_ * x0 * _sigma_ * _Mpc_over_m_;
+    pvecthermo[index_th_dkappa_] = (1. + z) * (1. + z) * n_e_ * x0 * _sigma_ * _Mpc_over_m_ *
+                                   FundamentalConstantsAt(z).ThomsonRescale();
 
     /* tau_d scales like (1+z)**2 */
     pvecthermo[index_th_tau_d_] =
@@ -372,6 +373,15 @@ void ThermodynamicsModule::thermodynamics_init() {
   else {
     if (pth->thermodynamics_verbose > 0)
       printf("\n");
+  }
+
+  /* A varying fine-structure constant shifts the helium yield of BBN, linearly in
+     bbn_alpha_sensitivity as in class_public. A typed Y_He is left alone. */
+  const double alpha_bbn = FundamentalConstantsAt(RedshiftOfBbn()).alpha;
+  if ((pth->YHe == _BBN_ || pth->YHe == _BBN_NETWORK_) && alpha_bbn != 1.) {
+    YHe_ *= 1. + pth->bbn_alpha_sensitivity * (alpha_bbn - 1.);
+    if (pth->thermodynamics_verbose > 0)
+      printf(" -> Y_He=%.4f for alpha/alpha_0=%g at BBN\n", YHe_, alpha_bbn);
   }
 
   class_test((YHe_ < _YHE_SMALL_) || (YHe_ > _YHE_BIG_),
@@ -1514,8 +1524,7 @@ double ThermodynamicsModule::thermodynamics_delta_neff_at_bbn() {
   int last_index;
   std::vector<double> pvecback(background_module_->bg_size_);
 
-  /** - 8.6173e-11 converts from Kelvin to MeV. We randomly choose 0.1 MeV to be the temperature of BBN */
-  double z_bbn = 0.1 / (8.6173e-11 * pba->T_cmb) - 1.0;
+  double z_bbn = RedshiftOfBbn();
 
   double tau_bbn;
   background_module_->background_tau_of_z(z_bbn, &tau_bbn);
@@ -2690,7 +2699,8 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
                                         pvecback);
 
   reio_vector[preio->index_re_dkappadtau] = (1. + z) * (1. + z) * n_e_ * xe * _sigma_ *
-                                            _Mpc_over_m_;
+                                            _Mpc_over_m_ *
+                                            FundamentalConstantsAt(z).ThomsonRescale();
 
   class_test(pvecback[background_module_->index_bg_H_] == 0., "stop to avoid division by zero");
 
@@ -2751,11 +2761,10 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
 
     class_test(pvecback[background_module_->index_bg_H_] == 0., "stop to avoid division by zero");
 
-    double dkappadz_next = (1. + z_next) * (1. + z_next) * n_e_ * xe_next * _sigma_ * _Mpc_over_m_ /
-                           pvecback[background_module_->index_bg_H_];
-
     double dkappadtau_next = (1. + z_next) * (1. + z_next) * n_e_ * xe_next * _sigma_ *
-                             _Mpc_over_m_;
+                             _Mpc_over_m_ * FundamentalConstantsAt(z_next).ThomsonRescale();
+
+    double dkappadz_next = dkappadtau_next / pvecback[background_module_->index_bg_H_];
 
     class_test((dkappadz == 0.) || (dkappadtau == 0.), "stop to avoid division by zero");
 
@@ -2830,9 +2839,10 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
     dz = (preio->reionization_table[i * preio->re_size + preio->index_re_z] -
           preio->reionization_table[(i - 1) * preio->re_size + preio->index_re_z]);
 
+    const FundamentalConstants constants = FundamentalConstantsAt(z);
     double opacity = (1. + z) * (1. + z) * n_e_ *
                      preio->reionization_table[i * preio->re_size + preio->index_re_xe] * _sigma_ *
-                     _Mpc_over_m_;
+                     _Mpc_over_m_ * constants.ThomsonRescale();
 
     double mu = _m_H_ /
                 (1. + (1. / _not4_ - 1.) * YHe_ +
@@ -2842,8 +2852,8 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
 
     double dTdz = 2. / (1 + z) *
                       preio->reionization_table[i * preio->re_size + preio->index_re_Tb] -
-                  2. * mu / _m_e_ * 4. * all_species_.photons().Rho(pvecback) / 3. /
-                      all_species_.baryons().Rho(pvecback) * opacity *
+                  2. * mu / (_m_e_ * constants.me) * 4. * all_species_.photons().Rho(pvecback) /
+                      3. / all_species_.baryons().Rho(pvecback) * opacity *
                       (pba->T_cmb * (1. + z) -
                        preio->reionization_table[i * preio->re_size + preio->index_re_Tb]) /
                       pvecback[background_module_->index_bg_H_];
@@ -2905,6 +2915,23 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
  *
  */
 
+/* BBN is taken to happen at 0.1 MeV; 8.6173e-11 converts from Kelvin to MeV. */
+double ThermodynamicsModule::RedshiftOfBbn() const {
+  return 0.1 / (8.6173e-11 * pba->T_cmb) - 1.0;
+}
+
+FundamentalConstants ThermodynamicsModule::FundamentalConstantsAt(double z) const {
+  switch (pth->varconst_dep) {
+    case varconst_none:
+      break;
+    case varconst_instant:
+      if (z > pth->varconst_transition_redshift)
+        return {pth->varconst_alpha, pth->varconst_me};
+      break;
+  }
+  return {};
+}
+
 void ThermodynamicsModule::thermodynamics_recombination(recombination* preco, double* pvecback) {
   /* Both recombination codes go through the same integration: they differ only
      in the atomic physics supplying dx_H/dz and dx_He/dz, which is selected
@@ -2912,29 +2939,35 @@ void ThermodynamicsModule::thermodynamics_recombination(recombination* preco, do
   thermodynamics_recombination_integrate(preco, pvecback);
 }
 
+/* The Saha right-hand side n_e n_+ / (n_0 n_H) for a level with ionization temperature
+   CB. The (1+z)^3 of n_H is folded into the 3/2 power, which is why the log carries a
+   single 1/(1+z). Varying constants move every ionization temperature by
+   TemperatureRescale(), applied by dividing T, and leave SahaRescale() on the prefactor. */
+double ThermodynamicsModule::SahaRhs(const recombination* preco, double z, double CB) const {
+  const FundamentalConstants constants = FundamentalConstantsAt(z);
+  const double R                       = constants.TemperatureRescale();
+  return constants.SahaRescale() *
+         exp(1.5 * log(preco->CR * preco->Tnow / ((1. + z) * R)) -
+             CB * R / (preco->Tnow * (1. + z))) /
+         preco->Nnow;
+}
+
 double ThermodynamicsModule::thermodynamics_recfast_hydrogen_saha_xH(const recombination* preco,
                                                                      double z) const {
-  const double rhs = exp(1.5 * log(preco->CR * preco->Tnow / (1. + z)) -
-                         preco->CB1 / (preco->Tnow * (1. + z))) /
-                     preco->Nnow;
+  const double rhs = SahaRhs(preco, z, preco->CB1);
   return 0.5 * (sqrt(rhs * rhs + 4. * rhs) - rhs);
 }
 
 double ThermodynamicsModule::thermodynamics_recfast_helium_first_saha_xe(const recombination* preco,
                                                                          double z) const {
-  const double rhs = exp(1.5 * log(preco->CR * preco->Tnow / (1. + z)) -
-                         preco->CB1_He2 / (preco->Tnow * (1. + z))) /
-                     preco->Nnow;
+  const double rhs = SahaRhs(preco, z, preco->CB1_He2);
   return 0.5 * (sqrt(pow(rhs - 1. - preco->fHe, 2) + 4. * (1. + 2. * preco->fHe) * rhs) -
                 (rhs - 1. - preco->fHe));
 }
 
 double ThermodynamicsModule::thermodynamics_recfast_helium_second_saha_xe(
     const recombination* preco, double z) const {
-  const double rhs = 4. *
-                     exp(1.5 * log(preco->CR * preco->Tnow / (1. + z)) -
-                         preco->CB1_He1 / (preco->Tnow * (1. + z))) /
-                     preco->Nnow;
+  const double rhs = 4. * SahaRhs(preco, z, preco->CB1_He1);
   return 0.5 * (sqrt(pow(rhs - 1., 2) + 4. * (1. + preco->fHe) * rhs) - (rhs - 1.));
 }
 
@@ -2955,7 +2988,8 @@ void ThermodynamicsModule::thermodynamics_recfast_store_row(
       (1. + (1. + z) * dTbdz / Tb / 3.);
 
   preco->recombination_table[table_index * preco->re_size + preco->index_re_dkappadtau] =
-      (1. + z) * (1. + z) * preco->Nnow * xe * _sigma_ * _Mpc_over_m_;
+      (1. + z) * (1. + z) * preco->Nnow * xe * _sigma_ * _Mpc_over_m_ *
+      FundamentalConstantsAt(z).ThomsonRescale();
 }
 
 double ThermodynamicsModule::thermodynamics_recfast_xe_after_helium_ode(const recombination* preco,
@@ -3063,6 +3097,17 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   /* z_initial */
   double zinitial = ppr->recfast_z_initial;
 
+  /* RECFAST's analytic helium phases start at hard-coded redshifts, which move with
+     the ionization energies under varying constants, as in class_public. The hydrogen
+     and second-helium switches need nothing: they are found by bisecting the Saha
+     branches, which carry the shift already. */
+  auto shifted = [&](double z_phase) {
+    return z_phase * FundamentalConstantsAt(z_phase).TemperatureRescale();
+  };
+  const double z_He_1 = shifted(ppr->recfast_z_He_1);
+  const double z_He_2 = shifted(ppr->recfast_z_He_2);
+  const double z_He_3 = shifted(ppr->recfast_z_He_3);
+
   /* H_frac */
   preco->H_frac = ppr->recfast_H_frac;
 
@@ -3155,7 +3200,7 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
 
   /** - impose initial conditions at early times */
 
-  class_test(zinitial < ppr->recfast_z_He_3,
+  class_test(zinitial < z_He_3,
              "increase zinitial, otherwise should get initial conditions from recfast's get_init "
              "routine (less precise anyway)");
 
@@ -3216,9 +3261,9 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   auto recfast_analytic_second_helium_xHe = [&](double z_analytic) {
     double x0_analytic = thermodynamics_recfast_helium_second_saha_xe(preco, z_analytic);
 
-    if (z_analytic > ppr->recfast_z_He_3 - ppr->recfast_delta_z_He_3) {
+    if (z_analytic > z_He_3 - ppr->recfast_delta_z_He_3) {
       const double x0_previous = 1. + preco->fHe;
-      const double s           = (ppr->recfast_z_He_3 - z_analytic) / ppr->recfast_delta_z_He_3;
+      const double s           = (z_He_3 - z_analytic) / ppr->recfast_delta_z_He_3;
       const double weight      = f1(s);
       x0_analytic              = weight * x0_analytic + (1. - weight) * x0_previous;
     }
@@ -3231,7 +3276,7 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
         return recfast_analytic_second_helium_xHe(z_root) - ppr->recfast_x_He0_trigger;
       },
       0.,
-      ppr->recfast_z_He_3 + ppr->recfast_delta_z_He_3);
+      z_He_3 + ppr->recfast_delta_z_He_3);
 
   const double z_hydrogen_ode_start = bisection_root(
       [&](double z_root) {
@@ -3304,17 +3349,17 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
 
     /** - --> first approximation: H and Helium fully ionized */
 
-    if (z > ppr->recfast_z_He_1 + ppr->recfast_delta_z_He_1) {
+    if (z > z_He_1 + ppr->recfast_delta_z_He_1) {
       x0 = 1. + 2. * preco->fHe;
     }
 
     /** - --> second approximation: first Helium recombination (analytic approximation) */
 
-    else if (z > ppr->recfast_z_He_2 + ppr->recfast_delta_z_He_2) {
-      if (z > ppr->recfast_z_He_1 - ppr->recfast_delta_z_He_1) {
+    else if (z > z_He_2 + ppr->recfast_delta_z_He_2) {
+      if (z > z_He_1 - ppr->recfast_delta_z_He_1) {
         x0_previous = 1. + 2. * preco->fHe;
         x0_new      = thermodynamics_recfast_helium_first_saha_xe(preco, z);
-        s           = (ppr->recfast_z_He_1 - z) / ppr->recfast_delta_z_He_1;
+        s           = (z_He_1 - z) / ppr->recfast_delta_z_He_1;
         weight      = f1(s);
         x0          = weight * x0_new + (1. - weight) * x0_previous;
       }
@@ -3325,11 +3370,11 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
 
     /** - --> third approximation: first Helium recombination completed */
 
-    else if (z > ppr->recfast_z_He_3 + ppr->recfast_delta_z_He_3) {
-      if (z > ppr->recfast_z_He_2 - ppr->recfast_delta_z_He_2) {
+    else if (z > z_He_3 + ppr->recfast_delta_z_He_3) {
+      if (z > z_He_2 - ppr->recfast_delta_z_He_2) {
         x0_previous = thermodynamics_recfast_helium_first_saha_xe(preco, z);
         x0_new      = 1. + preco->fHe;
-        s           = (ppr->recfast_z_He_2 - z) / ppr->recfast_delta_z_He_2;
+        s           = (z_He_2 - z) / ppr->recfast_delta_z_He_2;
         weight      = f1(s);
         x0          = weight * x0_new + (1. - weight) * x0_previous;
       }
@@ -3343,9 +3388,9 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
     else if (y[1] > ppr->recfast_x_He0_trigger) {
       x0_new = thermodynamics_recfast_helium_second_saha_xe(preco, z);
 
-      if (z > ppr->recfast_z_He_3 - ppr->recfast_delta_z_He_3) {
+      if (z > z_He_3 - ppr->recfast_delta_z_He_3) {
         x0_previous = 1. + preco->fHe;
-        s           = (ppr->recfast_z_He_3 - z) / ppr->recfast_delta_z_He_3;
+        s           = (z_He_3 - z) / ppr->recfast_delta_z_He_3;
         weight      = f1(s);
         x0          = weight * x0_new + (1. - weight) * x0_previous;
       }
@@ -3513,22 +3558,24 @@ void ThermodynamicsModule::thermodynamics_recombination_derivs_member(
   /* Hz is H in inverse seconds (while pvecback returns [H0/c] in inverse Mpcs) */
   double Hz = pvecback[background_module_->index_bg_H_] * _c_ / _Mpc_over_m_;
 
+  const FundamentalConstants constants = FundamentalConstantsAt(z);
   const RecombinationState state =
-      {z, x_H, x_He, x, n, Hz, Tmat, Trad, hydrogen_frozen, helium_corrections};
+      {z, x_H, x_He, x, n, Hz, Tmat, Trad, hydrogen_frozen, helium_corrections, constants};
 
   const IonisationDerivatives dx = ptpaw->recombination_model->Derivatives(state, dep, energy_rate);
   dy[0]                          = dx.dx_H_dz;
   dy[1]                          = dx.dx_He_dz;
 
-  double timeTh = (1. / (preco->CT * pow(Trad, 4))) * (1. + x + preco->fHe) / x;
-  double timeH  = 2. / (3. * preco->H0 * pow(1. + z, 1.5));
+  const double CT = preco->CT * constants.ComptonRescale();
+  double timeTh   = (1. / (CT * pow(Trad, 4))) * (1. + x + preco->fHe) / x;
+  double timeH    = 2. / (3. * preco->H0 * pow(1. + z, 1.5));
 
   if (timeTh < preco->H_frac * timeH) {
     /*   dy[2]=Tmat/(1.+z); */
     /* v 1.5: like in camb, add here a smoothing term as suggested by Adam Moss */
     double dHdz    = -pvecback[background_module_->index_bg_H_prime_] /
                      pvecback[background_module_->index_bg_H_] * _c_ / _Mpc_over_m_;
-    double epsilon = Hz * (1. + x + preco->fHe) / (preco->CT * pow(Trad, 3) * x);
+    double epsilon = Hz * (1. + x + preco->fHe) / (CT * pow(Trad, 3) * x);
     dy[2]          = preco->Tnow +
                      epsilon * ((1. + preco->fHe) / (1. + preco->fHe + x)) *
                          ((dy[0] + preco->fHe * dy[1]) / x) -
@@ -3537,7 +3584,7 @@ void ThermodynamicsModule::thermodynamics_recombination_derivs_member(
   else {
     /* equations modified to take into account energy injection from dark matter */
 
-    dy[2] = preco->CT * pow(Trad, 4) * x / (1. + x + preco->fHe) * (Tmat - Trad) / (Hz * (1. + z)) +
+    dy[2] = CT * pow(Trad, 4) * x / (1. + x + preco->fHe) * (Tmat - Trad) / (Hz * (1. + z)) +
             2. * Tmat / (1. + z) -
             2. / (3. * _k_B_) * energy_rate * dep.heat / n / (1. + preco->fHe + x) /
                 (Hz * (1. + z)); /* energy injection */
@@ -3648,13 +3695,12 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
                                          preio->index_reco_when_reio_start - 2) *
                                             th_size_ +
                                         index_th_xe_];
-      thermodynamics_table_[index_th * th_size_ + index_th_xe_]     = x0;
-      thermodynamics_table_[index_th * th_size_ + index_th_dkappa_] = (1. + z_table_[index_th]) *
-                                                                      (1. + z_table_[index_th]) *
-                                                                      n_e_ * x0 * _sigma_ *
-                                                                      _Mpc_over_m_;
-      thermodynamics_table_[index_th * th_size_ + index_th_Tb_]     = pba->T_cmb *
-                                                                      (1. + z_table_[index_th]);
+      thermodynamics_table_[index_th * th_size_ + index_th_xe_] = x0;
+      thermodynamics_table_[index_th * th_size_ + index_th_dkappa_] =
+          (1. + z_table_[index_th]) * (1. + z_table_[index_th]) * n_e_ * x0 * _sigma_ *
+          _Mpc_over_m_ * FundamentalConstantsAt(z_table_[index_th]).ThomsonRescale();
+      thermodynamics_table_[index_th * th_size_ + index_th_Tb_] = pba->T_cmb *
+                                                                  (1. + z_table_[index_th]);
       thermodynamics_table_[index_th * th_size_ + index_th_wb_] =
           _k_B_ / (_c_ * _c_ * _m_H_) * (1. + (1. / _not4_ - 1.) * YHe_ + x0 * (1. - YHe_)) *
           pba->T_cmb * (1. + z_table_[index_th]);

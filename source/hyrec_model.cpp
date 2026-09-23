@@ -60,7 +60,7 @@ HyrecModel::HyrecModel(const std::string& path,
   cosmo->fHe             = fHe;
   cosmo->nH0             = nH0 * 1e-6; /* HYREC-2 wants cm^-3 */
 
-  /* No varying fundamental constants in CLASS++. */
+  /* Varying fundamental constants: set per call in Derivatives(). */
   cosmo->fsR = 1.;
   cosmo->meR = 1.;
 
@@ -107,6 +107,11 @@ IonisationDerivatives HyrecModel::Derivatives(const RecombinationState& state,
   const double T_rad_eV = state.T_rad * kBoltz;
   INJ_PARAMS* inj       = data_->d.cosmo->inj_params;
 
+  /* HYREC-2 applies varying alpha and m_e itself, throughout hydrogen.c and helium.c;
+     they are z-dependent, so they are published on every call. */
+  data_->d.cosmo->fsR = state.constants.alpha;
+  data_->d.cosmo->meR = state.constants.me;
+
   /* HYREC-2 wants deposition rates per hydrogen atom per second, and applies the
      branching between ionization and Lyman-alpha escape itself -- unlike RECFAST,
      which needs the Peebles factor C to do the same job. */
@@ -128,7 +133,9 @@ IonisationDerivatives HyrecModel::Derivatives(const RecombinationState& state,
        recfast_x_H0_trigger puts it, which is a precision parameter. Peebles is
        the right answer at both ends: above TR_MAX hydrogen is fully ionized, and
        below TR_MIN recombination has long finished. */
-    const bool outside_tables = (T_rad_eV <= TR_MIN || T_rad_eV >= TR_MAX ||
+    /* The tables are in atomic units of temperature, which move with alpha^2 m_e. */
+    const double T_rad_atomic = T_rad_eV / state.constants.TemperatureRescale();
+    const bool outside_tables = (T_rad_atomic <= TR_MIN || T_rad_atomic >= TR_MAX ||
                                  state.T_mat / state.T_rad <= T_RATIO_MIN);
     const int model           = outside_tables ? PEEBLES : MODEL;
 

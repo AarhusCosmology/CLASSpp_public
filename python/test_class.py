@@ -1078,6 +1078,42 @@ class TestReviewRegressions(TestClass):
             candidate.struct_cleanup()
             candidate.empty()
 
+    def test_varying_constants_follow_their_power_laws(self):
+        """varying_fundamental_constants (Hart & Chluba, arXiv:1705.03925; the
+        H0 Olympics 'varying m_e' model) moves every atomic energy level, and so
+        recombination, by alpha^2 m_e, and the Thomson rate by alpha^2/m_e^2,
+        above varying_transition_redshift only. RECFAST and HyRec apply this
+        through different atomic physics, so each is checked."""
+        def thermodynamics(alpha, me, **extra):
+            cosmo = Class(dict({'varying_fundamental_constants': 'instantaneous',
+                                'varying_alpha': alpha, 'varying_me': me}, **extra))
+            try:
+                cosmo.compute(level=['thermodynamics'])
+                return (cosmo.get_current_derived_parameters(['z_rec', 'YHe']),
+                        cosmo.get_thermodynamics())
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+        for recombination in ('RECFAST', 'HyRec'):
+            # A fixed Y_He, since BBN would move n_e with alpha (checked below).
+            fixed = {'recombination': recombination, 'YHe': 0.25}
+            derived0, thermo0 = thermodynamics(1., 1., **fixed)
+            for alpha, me in ((1., 1.05), (1.02, 1.)):
+                msg = f"{recombination}, alpha = {alpha}, m_e = {me}"
+                derived, thermo = thermodynamics(alpha, me, **fixed)
+                self.assertAlmostEqual((1. + derived['z_rec'])/(1. + derived0['z_rec']),
+                                       alpha**2*me, delta=3e-3, msg=msg)
+                # Reionized below the transition, fully ionized at z = 1e4.
+                kappa_dot = [np.interp([2., 1e4], th['z'], th["kappa' [Mpc^-1]"])
+                             for th in (thermo, thermo0)]
+                np.testing.assert_allclose(kappa_dot[0]/kappa_dot[1],
+                                           [1., alpha**2/me**2], rtol=1e-5, err_msg=msg)
+
+        # Only alpha moves the helium yield of BBN, linearly as in class_public.
+        self.assertAlmostEqual(thermodynamics(1.02, 1.)[0]['YHe']
+                               / thermodynamics(1., 1.)[0]['YHe'], 1.02, places=10)
+
     def test_halofit_tail_accepts_non_analytic_primordial_table(self):
         """Halofit's extended sigma tail must not query non-analytic primordial
         tables above their computed k range."""

@@ -1050,6 +1050,29 @@ void InputModule::ReadDerived() {
     }
   }
 
+  /** - varying fundamental constants, with the keys of class_public */
+  if (auto varconst = pfc->get<std::string>("varying_fundamental_constants")) {
+    class_test_severe(*varconst != "none" && *varconst != "instantaneous",
+                      "varying_fundamental_constants = '%s' must be 'none' or 'instantaneous'",
+                      varconst->c_str());
+    if (*varconst == "instantaneous")
+      pth->varconst_dep = varconst_instant;
+  }
+  if (pth->varconst_dep != varconst_none) {
+    pth->varconst_alpha               = pfc->get_or("varying_alpha", pth->varconst_alpha);
+    pth->varconst_me                  = pfc->get_or("varying_me", pth->varconst_me);
+    pth->varconst_transition_redshift = pfc->get_or("varying_transition_redshift",
+                                                    pth->varconst_transition_redshift);
+    pth->bbn_alpha_sensitivity = pfc->get_or("bbn_alpha_sensitivity", pth->bbn_alpha_sensitivity);
+    class_test(pth->varconst_alpha <= 0. || pth->varconst_me <= 0.,
+               "varying_alpha = %g and varying_me = %g must be positive",
+               pth->varconst_alpha,
+               pth->varconst_me);
+    class_test(pth->varconst_transition_redshift < 0.,
+               "varying_transition_redshift = %g must be non-negative",
+               pth->varconst_transition_redshift);
+  }
+
   /** - how injected energy is split between deposition channels */
   if (auto chi_type = pfc->get<std::string>("chi_type")) {
     bool recognized = false;
