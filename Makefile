@@ -14,6 +14,7 @@ TEST_TARGETS := \
 	test-tca-ic-guard \
 	test-deposition \
 	test-hyrec \
+	test-baryon-clumping \
 	test-limber-point \
 	test-bisection \
 	test-quadrature \

@@ -1091,6 +1091,19 @@ void InputModule::ReadDerived() {
                       "(the analytic fits CLASS used before, for reproducing older results)");
   }
 
+  /** - three-zone baryon clumping; read whenever b is given, so b = 0 is an ordinary point */
+  if (auto b = pfc->get<double>("baryon_clumping_b")) {
+    pth->baryon_clumping_b       = *b;
+    pth->baryon_clumping_f_V_2   = pfc->get_or("baryon_clumping_f_V_2", pth->baryon_clumping_f_V_2);
+    pth->baryon_clumping_Delta_1 = pfc->get_or("baryon_clumping_Delta_1",
+                                               pth->baryon_clumping_Delta_1);
+    pth->baryon_clumping_Delta_2 = pfc->get_or("baryon_clumping_Delta_2",
+                                               pth->baryon_clumping_Delta_2);
+    class_test(*b < 0., "baryon_clumping_b = %g is a variance and must be >= 0", *b);
+    class_test_severe(pth->recombination != recfast,
+                      "baryon clumping is implemented for RECFAST only");
+  }
+
   /** - reionization parametrization */
   if (auto reio_parametrization = pfc->get<std::string>("reio_parametrization")) {
     bool recognized = false;

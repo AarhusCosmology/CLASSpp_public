@@ -107,6 +107,15 @@ struct thermo {
   bool compute_damping_scale =
       false; /**< do we want to compute the simplest analytic approximation to the photon damping (or diffusion) scale? */
 
+  /** @name - three-zone baryon clumping (H0 Olympics 2107.10291 sec. 2.4.1). On for
+   *  b > 0; the zone shape defaults are the paper's one-parameter model M1. */
+  //@{
+  double baryon_clumping_b       = 0.;      /**< variance of n_b over its mean squared */
+  double baryon_clumping_f_V_2   = 1. / 3.; /**< volume fraction of zone 2 */
+  double baryon_clumping_Delta_1 = 0.1;     /**< baryon density of zone 1 over the mean */
+  double baryon_clumping_Delta_2 = 1.;      /**< baryon density of zone 2 over the mean */
+  //@}
+
   /** parameters for reio_camb */
 
   double reionization_width = 0.5; /**< width of H reionization */

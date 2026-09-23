@@ -1048,6 +1048,31 @@ class TestReviewRegressions(TestClass):
         self.cosmo.compute()
         self.assertTrue(self.cosmo.state)
 
+    def test_baryon_clumping_recombines_earlier(self):
+        """Three-zone baryon clumping (H0 Olympics 2107.10291 sec. 2.4.1, its
+        model M1): a clumpy plasma recombines earlier, while the fully ionized
+        one, and its Thomson rate, is that of the mean density. b = 0 is an
+        ordinary point, shape keys and all."""
+        def thermodynamics(**clumping):
+            cosmo = Class(clumping)
+            try:
+                cosmo.compute(level=['thermodynamics'])
+                return (cosmo.get_current_derived_parameters(['z_rec'])['z_rec'],
+                        cosmo.get_thermodynamics())
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+        z_rec0, thermo0 = thermodynamics()
+        self.assertEqual(thermodynamics(baryon_clumping_b=0.,
+                                        baryon_clumping_Delta_1=0.2)[0], z_rec0)
+        z_rec, thermo = thermodynamics(baryon_clumping_b=0.5)
+        self.assertAlmostEqual(z_rec - z_rec0, 16.6, delta=0.5)
+        for key in ('x_e', "kappa' [Mpc^-1]"):
+            self.assertAlmostEqual(np.interp(1e4, thermo['z'], thermo[key])
+                                   / np.interp(1e4, thermo0['z'], thermo0[key]), 1.,
+                                   places=10, msg=key)
+
     def test_hyrec_and_recfast_agree_to_a_few_tenths_of_a_percent(self):
         """The point of the upgrade. Before it, HyRec sat ~1% from CLASS's own
         RECFAST in TT and cost dchi2 ~ +25 against Planck; the two codes should

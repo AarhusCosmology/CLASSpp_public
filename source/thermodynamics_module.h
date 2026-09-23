@@ -1,11 +1,28 @@
 #ifndef THERMODYNAMICS_MODULE_H
 #define THERMODYNAMICS_MODULE_H
 
+#include <array>
 #include <vector>
 
 #include "base_module.h"
 #include "input_module.h"
 #include "recombination_model.h"
+
+/** One zone of the three-zone baryon-clumping model. */
+struct BaryonClumpingZone {
+  double f_V;   /**< volume fraction */
+  double Delta; /**< baryon density over the mean */
+};
+
+/**
+ * The zones of the three-zone model (H0 Olympics 2107.10291 sec. 2.4.1; Jedamzik &
+ * Pogosian arXiv:2004.09487) given b, f_V^2, Delta_1 and Delta_2: the other three
+ * numbers follow from sum f_V = 1, sum f_V Delta = 1 and sum f_V Delta^2 = 1 + b.
+ */
+std::array<BaryonClumpingZone, 3> BaryonClumpingZones(double b,
+                                                      double f_V_2,
+                                                      double Delta_1,
+                                                      double Delta_2);
 
 class ThermodynamicsModule : public BaseModule {
  public:
@@ -140,7 +157,11 @@ class ThermodynamicsModule : public BaseModule {
                                           double* pvecback);
   void thermodynamics_get_xe_before_reionization(recombination* preco, double z, double* xe);
   void thermodynamics_recombination(recombination* preco, double* pvecback);
-  void thermodynamics_recombination_integrate(recombination* prec, double* pvecback);
+  void thermodynamics_recombination_clumpy(recombination* preco, double* pvecback);
+  /** density_factor: the baryon density recombining, over the mean (a clumping zone). */
+  void thermodynamics_recombination_integrate(recombination* prec,
+                                              double* pvecback,
+                                              double density_factor);
   double thermodynamics_recfast_hydrogen_saha_xH(const recombination* preco, double z) const;
   double thermodynamics_recfast_helium_first_saha_xe(const recombination* preco, double z) const;
   double thermodynamics_recfast_helium_second_saha_xe(const recombination* preco, double z) const;

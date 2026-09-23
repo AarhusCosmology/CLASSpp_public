@@ -2936,7 +2936,10 @@ void ThermodynamicsModule::thermodynamics_recombination(recombination* preco, do
   /* Both recombination codes go through the same integration: they differ only
      in the atomic physics supplying dx_H/dz and dx_He/dz, which is selected
      inside. */
-  thermodynamics_recombination_integrate(preco, pvecback);
+  if (pth->baryon_clumping_b > 0.)
+    thermodynamics_recombination_clumpy(preco, pvecback);
+  else
+    thermodynamics_recombination_integrate(preco, pvecback, 1.);
 }
 
 /* The Saha right-hand side n_e n_+ / (n_0 n_H) for a level with ionization temperature
@@ -3019,6 +3022,84 @@ double ThermodynamicsModule::thermodynamics_recfast_xe_after_full_ode(const reco
   return y[0] + preco->fHe * y[1];
 }
 
+std::array<BaryonClumpingZone, 3> BaryonClumpingZones(double b,
+                                                      double f_V_2,
+                                                      double Delta_1,
+                                                      double Delta_2) {
+  /* Zones 1 and 3 hold A = 1 - f_2 of the volume, B = 1 - f_2 D_2 of the baryons and
+     C = 1 + b - f_2 D_2^2 of the second moment. Eliminating f_1 and f_3 leaves
+     (B - A D_1)(D_3 + D_1) = C - A D_1^2. */
+  const double A = 1. - f_V_2;
+  const double B = 1. - f_V_2 * Delta_2;
+  const double C = 1. + b - f_V_2 * Delta_2 * Delta_2;
+  class_test(B == A * Delta_1,
+             "baryon clumping: zones 1 and 3 cannot be told apart for f_V_2 = %g, Delta_1 = "
+             "%g and Delta_2 = %g",
+             f_V_2,
+             Delta_1,
+             Delta_2);
+  const double Delta_3 = (C - A * Delta_1 * Delta_1) / (B - A * Delta_1) - Delta_1;
+  const double f_V_3   = (B - A * Delta_1) / (Delta_3 - Delta_1);
+
+  std::array<BaryonClumpingZone, 3> zones{
+      {{A - f_V_3, Delta_1}, {f_V_2, Delta_2}, {f_V_3, Delta_3}}};
+  for (auto& zone : zones) {
+    /* The tolerance absorbs rounding: as b -> 0, zone 1's volume goes to zero. */
+    class_test(zone.f_V < -1e-10 || zone.Delta < 0.,
+               "baryon clumping: no three-zone density distribution has b = %g, f_V_2 = %g, "
+               "Delta_1 = %g and Delta_2 = %g",
+               b,
+               f_V_2,
+               Delta_1,
+               Delta_2);
+    zone.f_V = std::max(zone.f_V, 0.);
+  }
+  return zones;
+}
+
+/* Recombination in a clumpy plasma: each zone recombines at its own density, and
+   <x_e> = sum f_V Delta x_e (H0 Olympics 2107.10291 sec. 2.4.1), with T_b and dT_b/dz
+   averaged the same way. The background is the homogeneous one, and w_b, c_b^2 and the
+   Thomson rate are rebuilt from the averages at the mean density. */
+void ThermodynamicsModule::thermodynamics_recombination_clumpy(recombination* preco,
+                                                               double* pvecback) {
+  const auto zones = BaryonClumpingZones(pth->baryon_clumping_b,
+                                         pth->baryon_clumping_f_V_2,
+                                         pth->baryon_clumping_Delta_1,
+                                         pth->baryon_clumping_Delta_2);
+
+  std::vector<double> xe(ppr->recfast_Nz0, 0.), Tb(ppr->recfast_Nz0, 0.),
+      dTbdz(ppr->recfast_Nz0, 0.);
+  for (const auto& zone : zones) {
+    const double weight = zone.f_V * zone.Delta; /* the zone's share of the baryons */
+    if (weight == 0.)
+      continue;
+    thermodynamics_recombination_integrate(preco, pvecback, zone.Delta);
+    for (int j = 0; j < preco->rt_size; ++j) {
+      const double* row  = &preco->recombination_table[j * preco->re_size];
+      const double z     = row[preco->index_re_z];
+      xe[j]             += weight * row[preco->index_re_xe];
+      Tb[j]             += weight * row[preco->index_re_Tb];
+      /* dT_b/dz from c_b^2 = w_b (1 + (1+z) dT_b/dz / (3 T_b)) */
+      dTbdz[j] += weight * 3. * row[preco->index_re_Tb] *
+                  (row[preco->index_re_cb2] / row[preco->index_re_wb] - 1.) / (1. + z);
+    }
+  }
+
+  preco->Nnow = n_e_;
+  for (int j = 0; j < preco->rt_size; ++j) {
+    const double z = preco->recombination_table[j * preco->re_size + preco->index_re_z];
+    thermodynamics_recfast_store_row(preco, preco->rt_size - j - 1, z, xe[j], Tb[j], dTbdz[j]);
+  }
+
+  if (pth->thermodynamics_verbose > 0) {
+    printf(" -> baryon clumping b = %g, zones (f_V, Delta):", pth->baryon_clumping_b);
+    for (const auto& zone : zones)
+      printf(" (%g, %g)", zone.f_V, zone.Delta);
+    printf("\n");
+  }
+}
+
 /**
  * Integrate thermodynamics with RECFAST.
  *
@@ -3062,7 +3143,8 @@ double ThermodynamicsModule::thermodynamics_recfast_xe_after_full_ode(const reco
  */
 
 void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination* preco,
-                                                                  double* pvecback) {
+                                                                  double* pvecback,
+                                                                  double density_factor) {
   /** Summary: */
 
   /** - define local variables */
@@ -3126,9 +3208,10 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   double z    = zinitial;
   double mu_H = 1. / (1. - preco->YHe);
   //mu_T = _not4_ /(_not4_ - (_not4_-1.)*preco->YHe); /* recfast 1.4*/
-  preco->fHe  = preco->YHe / (_not4_ * (1. - preco->YHe)); /* recfast 1.4 */
-  preco->Nnow = 3. * preco->H0 * preco->H0 * OmegaB / (8. * _PI_ * _G_ * mu_H * _m_H_);
-  n_e_        = preco->Nnow;
+  preco->fHe   = preco->YHe / (_not4_ * (1. - preco->YHe)); /* recfast 1.4 */
+  preco->Nnow  = 3. * preco->H0 * preco->H0 * OmegaB / (8. * _PI_ * _G_ * mu_H * _m_H_);
+  n_e_         = preco->Nnow;
+  preco->Nnow *= density_factor; /* n_e_ stays the mean */
 
   /* energy injection parameters */
   preco->annihilation           = pth->annihilation;
