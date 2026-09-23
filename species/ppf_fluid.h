@@ -24,6 +24,7 @@ class PpfFluid : public FluidSpecies {
            double wa_fld,
            double cs2_fld,
            double Omega_EDE,
+           double Delta_pede,
            double c_gamma_over_c_fld);
 
   void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,

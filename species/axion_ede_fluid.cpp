@@ -28,7 +28,8 @@ AxionEDEFluid::AxionEDEFluid(const background& pba,
                    /*w0_fld=*/w_i,
                    /*wa_fld=*/0.,
                    /*cs2_fld=*/1.,
-                   /*Omega_EDE=*/0.),
+                   /*Omega_EDE=*/0.,
+                   /*Delta_pede=*/1.),
       a_c_(a_c), n_axion_(n_axion), nu_(nu), w_i_(w_i), w_f_(w_f), theta_i_(theta_i), pba_ref_(pba),
       omega_ac_(OmegaAcFromOmegaZero(omega0_fld, a_c, nu, w_i, w_f)) {}
 

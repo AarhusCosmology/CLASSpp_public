@@ -318,15 +318,15 @@ int main() {
     assert(!fld.ReachesPhantomDivide());
 
     // Base fluid, CLP w0 = -1, wa = 0 (exact divide contact): reaches it.
-    FluidSpecies lambda_like(pba, 0.7, CLP, -1., 0., 1., 0.);
+    FluidSpecies lambda_like(pba, 0.7, CLP, -1., 0., 1., 0., 1.);
     assert(lambda_like.ReachesPhantomDivide());
 
     // Base fluid, CLP w0 = -0.9, wa = 0: never reaches -1.
-    FluidSpecies quint(pba, 0.7, CLP, -0.9, 0., 1., 0.);
+    FluidSpecies quint(pba, 0.7, CLP, -0.9, 0., 1., 0., 1.);
     assert(!quint.ReachesPhantomDivide());
 
     // Base fluid, CLP crossing (w(0) = w0+wa = -1.4, w(1) = -0.9): reaches it.
-    FluidSpecies crosser(pba, 0.7, CLP, -0.9, -0.5, 1., 0.);
+    FluidSpecies crosser(pba, 0.7, CLP, -0.9, -0.5, 1., 0., 1.);
     assert(crosser.ReachesPhantomDivide());
   }
 

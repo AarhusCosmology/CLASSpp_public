@@ -1249,6 +1249,31 @@ class TestReviewRegressions(TestClass):
             with self.assertRaises(CosmoSevereError, msg=bad):
                 self.cosmo.get_current_derived_parameters([bad])
 
+    def test_pede_follows_its_closed_form(self):
+        """(G)PEDE (H0 Olympics 2107.10291 sec. 2.5.2-3) is defined by
+        rho_de(z) = rho_de,0 [1 - tanh(Delta log10(1+z))]. The fluid integrates
+        rho from w(a), starting from the closed-form integral at a_ini, so the
+        table matching the definition checks both. At Delta = 2.5,
+        1 - tanh(x) is 1e-30 at a_ini, where the naive form cancels to zero
+        and the fluid would never switch on. Delta = 0 is LambdaCDM."""
+        for delta, eos, use_ppf in ((0., 'PEDE', 'yes'), (1., 'PEDE', 'no'),
+                                    (2.5, 'GPEDE', 'yes')):
+            cosmo = Class({'Omega_Lambda': 0., 'fluid_equation_of_state': eos,
+                           'Delta_pede': delta, 'use_ppf': use_ppf})
+            try:
+                cosmo.compute(level=['background'])
+                background = cosmo.get_background()
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+            x = delta*np.log10(1. + background['z'])
+            rho = background['(.)rho_fld']
+            np.testing.assert_allclose(
+                np.log(rho/rho[-1]), np.log(2.) - 2.*x - np.log1p(np.exp(-2.*x)),
+                atol=1e-3, err_msg=f"Delta_pede = {delta}")
+            self.assertAlmostEqual(background['(.)w_fld'][-1],
+                                   -1. - delta/(3.*np.log(10.)), places=10)
+
     def test_axion_scalar_field_peak_fraction_is_its_shooting_target(self):
         """The peak energy fraction is derived from the background table alone,
         so it is not a fluid feature: the exact Klein-Gordon axion answers it

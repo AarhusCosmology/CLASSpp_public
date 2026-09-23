@@ -22,10 +22,11 @@ FluidSpecies::FluidSpecies(const background& pba,
                            double w0_fld,
                            double wa_fld,
                            double cs2_fld,
-                           double Omega_EDE)
+                           double Omega_EDE,
+                           double Delta_pede)
     : BaseSpecies("Fluid", EnergyType::DarkEnergy), pba_(pba), Omega0_fld_(omega0_fld),
       fluid_eos_(fluid_eos), w0_fld_(w0_fld), wa_fld_(wa_fld), cs2_fld_(cs2_fld),
-      Omega_EDE_(Omega_EDE) {}
+      Omega_EDE_(Omega_EDE), Delta_pede_(Delta_pede) {}
 
 void FluidSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_fld_, true, index_bg, 1);
@@ -304,6 +305,14 @@ void FluidSpecies::ComputeWFld(double a,
   double dOmega_ede_over_da = 0.;
   double a_eq               = 0.0;
 
+  /* (G)PEDE (H0 Olympics 2107.10291 sec. 2.5.2-3) has rho(a) = rho_0 [1 - tanh(x)] with
+     x = Delta log10(1+z). It is written through t = e^{-2x} = a^{2 Delta/ln10}, so that
+     1 + tanh(x) = 2/(1+t) and 1 - tanh(x) = 2t/(1+t): at a_ini x reaches 14 Delta, where
+     1 - tanh(x) cancels to zero, and at a = 0 x is infinite but t is plain 0. The checks
+     that ask for a = 0 read w alone; as in AxionEDEFluid, dw/da and the integral are set
+     to 0 there instead of forming 0/0 and log(0). */
+  const double t_pede = (fluid_eos_ == PEDE) ? pow(a, 2. * Delta_pede_ / log(10.)) : 0.;
+
   /** - first, define the function w(a) */
   switch (fluid_eos_) {
     case CLP:
@@ -349,6 +358,9 @@ void FluidSpecies::ComputeWFld(double a,
       *w_fld = -dOmega_ede_over_da * a / Omega_ede / 3. / (1. - Omega_ede) + a_eq / 3. / (a + a_eq);
       break;
     }
+    case PEDE:
+      *w_fld = -1. - 2. * Delta_pede_ / (3. * log(10.) * (1. + t_pede));
+      break;
     case PhenoAxion:
       class_stop(
           "internal error: base FluidSpecies::ComputeWFld reached with PhenoAxion eos "
@@ -374,6 +386,11 @@ void FluidSpecies::ComputeWFld(double a,
                         a_eq / 3. / (a + a_eq) / (a + a_eq);
       break;
     }
+    case PEDE:
+      *dw_over_da_fld = (a > 0.) ? 4. * Delta_pede_ * Delta_pede_ * t_pede /
+                                       (3. * a * pow(log(10.) * (1. + t_pede), 2))
+                                 : 0.;
+      break;
     case PhenoAxion:
       class_stop(
           "internal error: base FluidSpecies::ComputeWFld reached with PhenoAxion eos "
@@ -399,6 +416,9 @@ void FluidSpecies::ComputeWFld(double a,
       class_stop(
           "EDE implementation not finished: to finish it, read the comments in background.c "
           "just before this line\n");
+      break;
+    case PEDE:
+      *integral_fld = (a > 0.) ? log(2. * t_pede / (1. + t_pede)) : 0.;
       break;
     case PhenoAxion:
       class_stop(
@@ -461,6 +481,11 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
     else if (eos_str.find("CLP") != std::string::npos || eos_str.find("clp") != std::string::npos) {
       fluid_eos = CLP;
     }
+    // Before EDE, which is a substring of (G)PEDE.
+    else if (eos_str.find("PEDE") != std::string::npos ||
+             eos_str.find("pede") != std::string::npos) {
+      fluid_eos = PEDE;
+    }
     else if (eos_str.find("EDE") != std::string::npos || eos_str.find("ede") != std::string::npos) {
       fluid_eos = EDE;
     }
@@ -482,13 +507,19 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
     return result;
 
   // ── numeric params ────────────────────────────────────────────────────────
-  double w0_fld    = -1.;
-  double wa_fld    = 0.;
-  double cs2_fld   = 1.;
-  double Omega_EDE = 0.;
+  double w0_fld     = -1.;
+  double wa_fld     = 0.;
+  double cs2_fld    = 1.;
+  double Omega_EDE  = 0.;
+  double Delta_pede = 1.;  // the original PEDE; 0 is LambdaCDM
   if (fluid_eos == CLP) {
     w0_fld  = ctx.pfc->get_or("w0_fld", w0_fld);
     wa_fld  = ctx.pfc->get_or("wa_fld", wa_fld);
+    cs2_fld = ctx.pfc->get_or("cs2_fld", cs2_fld);
+  }
+  else if (fluid_eos == PEDE) {
+    Delta_pede = ctx.pfc->get_or("Delta_pede", Delta_pede);
+    class_test(Delta_pede < 0., "Delta_pede = %g must be >= 0", Delta_pede);
     cs2_fld = ctx.pfc->get_or("cs2_fld", cs2_fld);
   }
   else {  // EDE
@@ -518,6 +549,7 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
                                     wa_fld,
                                     cs2_fld,
                                     Omega_EDE,
+                                    Delta_pede,
                                     c_gamma_over_c_fld);
   }
   else {
@@ -527,7 +559,8 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
                                         w0_fld,
                                         wa_fld,
                                         cs2_fld,
-                                        Omega_EDE);
+                                        Omega_EDE,
+                                        Delta_pede);
   }
   result.push_back({"Fluid", std::move(sp)});
   return result;

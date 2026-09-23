@@ -10,8 +10,9 @@ PpfFluid::PpfFluid(const background& pba,
                    double wa_fld,
                    double cs2_fld,
                    double Omega_EDE,
+                   double Delta_pede,
                    double c_gamma_over_c_fld)
-    : FluidSpecies(pba, omega0_fld, fluid_eos, w0_fld, wa_fld, cs2_fld, Omega_EDE),
+    : FluidSpecies(pba, omega0_fld, fluid_eos, w0_fld, wa_fld, cs2_fld, Omega_EDE, Delta_pede),
       c_gamma_over_c_fld_(c_gamma_over_c_fld) {}
 
 void PpfFluid::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,

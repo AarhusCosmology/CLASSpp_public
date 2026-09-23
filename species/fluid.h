@@ -38,7 +38,8 @@ class FluidSpecies : public BaseSpecies {
                double w0_fld,
                double wa_fld,
                double cs2_fld,
-               double Omega_EDE);
+               double Omega_EDE,
+               double Delta_pede);
 
   double GetOmega0() const override {
     return Omega0_fld_;
@@ -193,6 +194,7 @@ class FluidSpecies : public BaseSpecies {
   double w0_fld_               = -1.;
   double wa_fld_               = 0.;
   double Omega_EDE_            = 0.;
+  double Delta_pede_           = 1.;
 
   int index_bi_rho_fld_ = -1;
 };
