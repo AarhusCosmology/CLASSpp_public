@@ -9,6 +9,7 @@
 #include "input_module.h"
 
 class PpfFluid;
+class ModifiedGravity;
 class IDM_DR_IDR_Species;
 class IDM_DRMD_IDR_DRMD_Species;
 
@@ -27,6 +28,7 @@ struct ResolvedSpecies {
   std::size_t idm_dr_idr_index = static_cast<std::size_t>(-1);  // its species_layouts[] index
   const IDM_DRMD_IDR_DRMD_Species* idm_drmd = nullptr;          // TCA-idm_drmd
   PpfFluid* ppf_fluid                       = nullptr;          // PPF fluid (absorbs ppf_fluid_)
+  const ModifiedGravity* gravity            = nullptr;          // replaces GR's Einstein eqs
   const BaseSpecies* lambda                 = nullptr;          // excluded from rho_tot (delta_tot)
   int idr_nature                            = idr_free_streaming;  // absorbs idr_nature_
   std::size_t cdm_index = static_cast<std::size_t>(-1);            // h source (sync gauge)

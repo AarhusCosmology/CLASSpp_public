@@ -1459,6 +1459,123 @@ class TestReviewRegressions(TestClass):
             ratio = spectra[1][key][ell]/spectra[0][key][ell]
             np.testing.assert_allclose(ratio, expected, atol=3e-3, err_msg=key)
 
+    def test_scalar_tensor_closes_on_H0(self):
+        """The scalar-tensor species shoots its potential's constant so that its
+        effective density vanishes today, i.e. H(z=0) = H0, beside Lambda's usual
+        closure. The massless strongly coupled case (xi = 0.3, lambda = 0) grows
+        f to ~70 by today, far from the guess: the unknown once lived in 1/Mpc^2,
+        where Newton's step tolerance of 1e-3 declared convergence after one step
+        and left H(0) 34% off. 100*theta_s shoots h at the same time."""
+        emg = {'xi_st': 0.3, 'phi_ini_st': 0.49, 'lambda_st': 3.42e-108}
+        massless = {'xi_st': 0.3, 'phi_ini_st': 0.49}
+        for model, extra in ((emg, {'h': 0.6781}), (massless, {'h': 0.6781}),
+                             (emg, {'100*theta_s': 1.04092})):
+            cosmo = Class(dict(model, **extra))
+            try:
+                cosmo.compute(level=['thermodynamics'])
+                H_today = cosmo.get_background()['H [1/Mpc]'][-1]
+                h = cosmo.h()
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+            self.assertAlmostEqual(H_today * 299792.458 / (100. * h), 1., delta=1e-3,
+                                   msg=str(model))
+
+    def test_scalar_tensor_refuses_what_it_does_not_solve(self):
+        """The species replaces GR's synchronous-gauge scalar equations only. A
+        Newtonian gauge, tensor modes, curvature, a PPF fluid (another closure of
+        the Einstein equations), NEDE (which locates its transition from the
+        densities before the background exists), or N-body-gauge sources would
+        silently run GR's or unchecked equations; each is refused instead."""
+        from classy import CosmoSevereError
+        emg = {'xi_st': 0.3, 'phi_ini_st': 0.49, 'lambda_st': 3.42e-108}
+        refused = [{'gauge': 'newtonian'},
+                   {'modes': 's,t', 'r': 0.1},
+                   {'Omega_k': 0.01},
+                   {'Omega_Lambda': 0., 'w0_fld': -0.9, 'use_ppf': 'yes'},
+                   {'f_NEDE': 0.1, 'm_NEDE': 10**2.5},
+                   # N-body-gauge sources use GR's Poisson equation and p_tot'; both
+                   # routes that switch them on are refused.
+                   {'output': 'mTk', 'Nbody gauge transfer functions': 'yes'},
+                   {'output': 'dTk', 'extra metric transfer functions': 'yes'}]
+        for extra in refused:
+            with self.assertRaises(CosmoSevereError, msg=str(extra)):
+                cosmo = Class(dict(dict(emg, output='tCl'), **extra))
+                try:
+                    cosmo.compute()
+                finally:
+                    cosmo.struct_cleanup()
+                    cosmo.empty()
+
+    def test_scalar_tensor_solar_system_parameters(self):
+        """G_eff_today (Cavendish, over the action's G) and gamma_PPN - 1 today, for
+        a massless field (Boisseau et al. gr-qc/0001066). EMG's field rolls to 0,
+        so both are GR's; induced gravity keeps a coupling today and must match
+        the formulas at the last background row. A massive neutrino rides along:
+        it is minimally coupled and nothing about the species should notice it."""
+        emg = {'xi_st': 0.3, 'phi_ini_st': 0.49, 'lambda_st': 3.42e-108,
+               'N_ur': 2.0328, 'N_ncdm': 1, 'm_ncdm': 0.06}
+        xi = 1./200.
+        induced = {'N_st': 0., 'xi_st': xi, 'phi_ini_st': (1./xi)**0.5}
+        names = ['ScalarTensor.G_eff_today', 'ScalarTensor.gamma_PPN_minus_1']
+        for model in (emg, induced):
+            cosmo = Class(dict(model, output='tCl'))
+            try:
+                cosmo.compute()
+                derived = cosmo.get_current_derived_parameters(names)
+                phi = cosmo.get_background()['phi_st'][-1]
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+            f = model.get('N_st', 1.) + model['xi_st']*phi**2
+            f_phi = 2.*model['xi_st']*phi
+            self.assertAlmostEqual(derived[names[0]],
+                                   (2.*f + 4.*f_phi**2)/(f*(2.*f + 3.*f_phi**2)), places=12)
+            self.assertAlmostEqual(derived[names[1]], -f_phi**2/(f + 2.*f_phi**2), places=12)
+            if model is emg:
+                self.assertAlmostEqual(derived[names[0]], 1., places=6)
+                self.assertAlmostEqual(derived[names[1]], 0., places=6)
+
+    def test_scalar_tensor_matches_hi_class_brans_dicke(self):
+        """Brans-Dicke against hi_class (public hi_class, commit ece81a57,
+        gravity_model = brans_dicke, omega_BD = 50, phi_ini = 1, closure through
+        Omega_smg = -1, run at tol_perturbations_integration = 1e-6 and
+        perturbations_sampling_stepsize = 0.02). The scalar-tensor species is
+        induced gravity there: N = 0, xi = 1/(4 omega_BD), phi_BD = xi phi^2.
+        hi_class solves it with alpha functions and a V_X variable, written
+        independently of this code; the two agree to 2e-7 in f = M*^2, 3.5e-5 in
+        H(z), 1e-4 in P(k) and 4e-4 rms in lensed TT, on effects of 20-110%. The
+        pins avoid l < 200, where CLASS++'s default source sampling costs 6e-3
+        (perturb_sampling_stepsize = 0.02 brings it to 3e-4)."""
+        cosmology = {'h': 0.6781, 'omega_b': 0.02238, 'omega_cdm': 0.1201,
+                     'N_ur': 3.044, 'YHe': 0.245, 'tau_reio': 0.0544,
+                     'A_s': 2.1e-9, 'n_s': 0.9660, 'output': 'tCl,pCl,lCl,mPk',
+                     'lensing': 'yes', 'l_max_scalars': 2000, 'P_k_max_1/Mpc': 1.}
+        brans_dicke = {'N_st': 0., 'xi_st': 1./(4.*50.), 'phi_ini_st': (1./(1./200.))**0.5}
+        h = cosmology['h']
+        results = []
+        for model in ({}, brans_dicke):
+            cosmo = Class(dict(cosmology, **model))
+            try:
+                cosmo.compute()
+                results.append({'cl': cosmo.lensed_cl(2000),
+                                'pk': [cosmo.pk_lin(k*h, 0.) for k in (0.01, 0.03, 0.2, 0.5)],
+                                'background': cosmo.get_background()})
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+        hi_class = {'tt': ([220, 810, 1000, 1500, 2000], [0.99950, 0.95510, 1.16679, 1.15780, 1.02967]),
+                    'ee': ([100, 220, 810, 1000], [0.93747, 0.84802, 1.42878, 0.94746])}
+        for key, (ell, expected) in hi_class.items():
+            ratio = results[1]['cl'][key][ell]/results[0]['cl'][key][ell]
+            np.testing.assert_allclose(ratio, expected, atol=3e-3, err_msg=key)
+        np.testing.assert_allclose(np.array(results[1]['pk'])/np.array(results[0]['pk']),
+                                   [1.21923, 1.21351, 1.22084, 1.22645], atol=1e-3, err_msg='P(k)')
+        background = results[1]['background']
+        z = background['z'][::-1]
+        f = np.interp(np.log1p([1100., 100., 0.]), np.log1p(z), background['f_st'][::-1])
+        np.testing.assert_allclose(f, [1.022987, 1.064279, 1.171768], rtol=1e-5, err_msg='f')
+
     def test_monodromy_parameter_domain_is_rejected(self):
         """The monodromy potential divides by the decay constant V_1, so V_1 = 0
         reaches primordial_inflation_check_potential as a NaN -- and its V<=0 and

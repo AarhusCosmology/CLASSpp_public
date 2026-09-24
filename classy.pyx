@@ -59,11 +59,15 @@ cdef ClassConstants constvals
 #   a_c, n_axion, m_fld, alpha_fld, omega_axion -- pheno-axion fluid scales.
 #   alpha, q0, x, M_2, M_3, M_4                 -- greybody NCDM shape/moments.
 #   z_star                                      -- redshift of the NEDE transition.
+#   G_eff_today, gamma_PPN_minus_1              -- scalar-tensor: Cavendish Newton constant
+#                                                  over the action's, and gamma_PPN - 1,
+#                                                  today, for a massless field.
 _SPECIES_DERIVED_FIELDS = frozenset((
     'f_peak', 'a_peak', 'z_peak',
     'a_c', 'n_axion', 'm_fld', 'alpha_fld', 'omega_axion',
     'alpha', 'q0', 'x', 'M_2', 'M_3', 'M_4',
     'z_star',
+    'G_eff_today', 'gamma_PPN_minus_1',
 ))
 
 # Nils : Added for python 3.x and python 2.x compatibility

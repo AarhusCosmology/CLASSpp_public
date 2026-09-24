@@ -41,6 +41,7 @@
 #include "nede_species.h"
 #include "photons.h"
 #include "scalar_field.h"
+#include "scalar_tensor_species.h"
 #include "species_build_context.h"
 #include "type3_species.h"
 #include "ultra_relativistic.h"
@@ -74,6 +75,8 @@ inline constexpr std::array kAllSpeciesFactories = {
     SpeciesFactoryEntry{FluidSpecies::kTypeName, &FluidSpecies::CreateAll},
     SpeciesFactoryEntry{ScalarFieldSpecies::kTypeName, &ScalarFieldSpecies::CreateAll},
     SpeciesFactoryEntry{Type3Species::kTypeName, &Type3Species::CreateAll},
+    // Before NEDE, which then asks it for a density it cannot give and refuses to run.
+    SpeciesFactoryEntry{ScalarTensorSpecies::kTypeName, &ScalarTensorSpecies::CreateAll},
     // Last: it locates its transition from the densities of the species built before it.
     SpeciesFactoryEntry{NEDESpecies::kTypeName, &NEDESpecies::CreateAll},
 };

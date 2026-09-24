@@ -775,6 +775,24 @@ class BaseSpecies {
   }
 
   /**
+   * The rate, in 1/Mpc of conformal time, at which this species makes the source
+   * functions vary, or 0 for the default rates only.
+   *
+   * perturb_timesampling_for_sources samples the sources at the fastest of the
+   * visibility, late-ISW and species rates, taking perturb_sampling_stepsize / rate
+   * steps. A field that oscillates faster than aH makes the metric ring at its own
+   * frequency; sampled at the default rates, that ringing aliases into the late ISW
+   * (an oscillating Early Modified Gravity field put a factor 2.9 into TT at l = 30).
+   * Report omega / pi for a field oscillating at omega: twenty samples per period
+   * at the default step, which brings that TT back within 0.4% of the converged
+   * spectrum (ten samples left 1.2%). Design:
+   * docs/superpowers/specs/2026-09-24-scalar-tensor-gravity-design.md
+   */
+  virtual double SourceSamplingRate(const double* /*pvecback*/) const {
+    return 0.;
+  }
+
+  /**
    * Highest multipole index this species' hierarchy will address in this mode,
    * or 0 if it carries none.
    *

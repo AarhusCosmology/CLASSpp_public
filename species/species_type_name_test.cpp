@@ -29,6 +29,7 @@ int main() {
   assert(FluidSpecies::kTypeName == "fluid");
   assert(ScalarFieldSpecies::kTypeName == "scalar_field");
   assert(Type3Species::kTypeName == "cdm_scf_momentum");
+  assert(ScalarTensorSpecies::kTypeName == "scalar_tensor");
   assert(NEDESpecies::kTypeName == "nede");
 
   // The factory registry carries exactly these type strings.
@@ -56,6 +57,7 @@ int main() {
       "fluid",
       "scalar_field",
       "cdm_scf_momentum",
+      "scalar_tensor",
       "nede",
   };
   assert(names == expected);

@@ -112,6 +112,7 @@ set(CLASS_SPECIES_FILES
   species/perturb_column_writer.cpp
   species/photons.cpp
   species/scalar_field.cpp
+  species/scalar_tensor_species.cpp
   species/scalar_field_potential.cpp
   species/species_collection.cpp
   species/species_input.cpp
@@ -297,7 +298,8 @@ if(NOT SKBUILD)
   add_executable(test-ncdm-family species/ncdm_family_test.cpp)
   add_executable(test-species-budget species/species_budget_test.cpp)
   add_executable(test-species-instances species/species_instance_check_test.cpp)
-  foreach(_t IN ITEMS test-evolver-options test-evolver-selection test-bbn-plasma test-bbn-rates test-bbn-weak test-bbn-solver test-parser test-precision-evolver test-errors test-tca-ic-guard test-deposition test-hyrec test-baryon-clumping test-limber-point test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-tensor-tca test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-limber-closure test-max-multipole test-ncdm-family test-species-budget test-species-instances)
+  add_executable(test-scalar-tensor species/scalar_tensor_test.cpp)
+  foreach(_t IN ITEMS test-evolver-options test-evolver-selection test-bbn-plasma test-bbn-rates test-bbn-weak test-bbn-solver test-parser test-precision-evolver test-errors test-tca-ic-guard test-deposition test-hyrec test-baryon-clumping test-limber-point test-bisection test-quadrature test-decay-kernel test-reduced-operator test-evolver-erk test-evolver-erk-config test-evolver-etd test-evolver-nonfinite test-photons test-tensor-tca test-species-types test-scf-potential test-cdm-coupled test-scf-beta test-composite-classification test-type3-gauge-guard test-composite-layout test-type3-coupling test-axion-scf-factory test-axion-ede-fluid test-dcdm-wdm test-axion-ncdm test-dncdm-switch-copy test-dncdm-inv test-dncdm-proxy test-dr-psd test-limber-closure test-max-multipole test-ncdm-family test-species-budget test-species-instances test-scalar-tensor)
     target_link_libraries(${_t} PRIVATE classpp)
     # These tests assert on values; keep their assert()s live even under
     # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for

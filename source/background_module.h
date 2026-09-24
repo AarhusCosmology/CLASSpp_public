@@ -7,6 +7,8 @@
 #include "base_module.h"
 #include "input_module.h"
 
+class ModifiedGravity;
+
 class BackgroundModule : public BaseModule {
  public:
   /** Look up a species by key (CDM, Lambda, Fluid, ScalarField, UR, IDM_DR_IDR,
@@ -153,6 +155,10 @@ class BackgroundModule : public BaseModule {
 
   void background_functions(double* pvecback_B, short return_format, double* pvecback);
   bool storing_background_table_ = false;
+
+  /** The species that modifies gravity, if any: it closes the Friedmann equations in
+   *  background_functions. Resolved once in background_indices. */
+  const ModifiedGravity* gravity_ = nullptr;
 
   void background_init();
   void background_indices();

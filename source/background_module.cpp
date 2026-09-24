@@ -17,6 +17,7 @@
 #include "../species/fluid.h"
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
+#include "../species/modified_gravity.h"
 #include "../species/ncdm_species.h"
 #include "../species/scalar_field.h"
 #include "../species/type3_species.h"
@@ -372,6 +373,11 @@ void BackgroundModule::background_functions(
     accumulate(*sp);
   }
 
+  /* Modified gravity: the species that modifies it adds the effective density and
+     pressure that make the two GR lines below exact. */
+  if (gravity_)
+    gravity_->CloseFriedmann(a, pba->K, pvecback_B, pvecback, rho_tot, p_tot, rho_r, rho_m);
+
   /** - compute expansion rate H from Friedmann equation: this is the
       only place where the Friedmann equation is assumed. Remember
       that densities are all expressed in units of \f$ [3c^2/8\pi G] \f$, ie
@@ -688,6 +694,10 @@ void BackgroundModule::background_indices() {
   /* Set BackgroundModule pointer on all active species (default is no-op) */
   for (const auto& [name, sp] : all_species_)
     sp->SetBackgroundModule(this);
+
+  /* A species that modifies gravity closes the Friedmann equations (as the PPF fluid
+     closes the Einstein equations, the module asks for the role, not the type). */
+  gravity_ = FindModifiedGravity(all_species_);
 }
 
 void BackgroundModule::background_solve_evolver() {

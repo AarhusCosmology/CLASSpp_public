@@ -18,6 +18,7 @@
 #include "../species/fluid.h"
 #include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
+#include "../species/modified_gravity.h"
 #include "../species/ncdm_species.h"
 #include "../species/photons.h"
 #include "../species/ppf_fluid.h"
@@ -68,6 +69,13 @@ void PerturbationsModule::ResolveSpecies() {
   if (auto* p = all_species_.find("Fluid"))
     if (auto* f = dynamic_cast<PpfFluid*>(p->get()))
       resolved_.ppf_fluid = f;
+
+  /* A species that modifies gravity replaces GR's scalar Einstein equations in
+     perturb_einstein. PPF closes those equations too, relative to GR. */
+  resolved_.gravity = FindModifiedGravity(all_species_);
+  class_test_severe(resolved_.gravity && resolved_.ppf_fluid,
+                    "the PPF dark-energy fluid assumes General Relativity; it cannot be "
+                    "combined with a species that modifies gravity (set use_ppf = no)");
 }
 
 PerturbationsModule::~PerturbationsModule() {}
@@ -1018,6 +1026,13 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
         has_source_k2gamma_Nb_ = true;
       }
 
+      /* Both routes above: the N-body-gauge sources take delta_rho_com from GR's Poisson
+         equation and c_a^2 from p_tot', neither of which holds when gravity is modified. */
+      class_test_severe(resolved_.gravity && has_source_H_T_Nb_prime_,
+                        "N-body gauge sources (requested by 'Nbody gauge transfer functions' "
+                        "or 'extra metric transfer functions') assume General Relativity; they "
+                        "cannot be combined with a species that modifies gravity");
+
       index_type = index_type_common;
       class_define_index(index_tp_t0_, has_source_t_, index_type, 1);
       class_define_index(index_tp_t1_, has_source_t_, index_type, 1);
@@ -1153,7 +1168,7 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
 
   /** - allocate background/thermodynamics vectors */
 
-  std::vector<double> pvecback(background_module_->bg_size_short_);
+  std::vector<double> pvecback(background_module_->bg_size_normal_);  // species slots too
   std::vector<double> pvecthermo(thermodynamics_module_->th_size_);
 
   /** - build the list of sampling points, appending each value to tau_sampling_ */
@@ -1282,7 +1297,7 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
 
   while (tau < background_module_->conformal_age_) {
     background_module_->background_at_tau(tau,
-                                          pba->short_info,
+                                          pba->normal_info,
                                           pba->inter_closeby,
                                           &last_index_back,
                                           pvecback.data());
@@ -1316,6 +1331,12 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
 
       timescale_source = a_prime_over_a;
     }
+
+    /* a species whose contribution to the sources varies faster (an oscillating field) */
+    double rate_species = 0.;
+    for (const auto& [name, sp] : all_species_)
+      rate_species = std::max(rate_species, sp->SourceSamplingRate(pvecback.data()));
+    timescale_source = sqrt(timescale_source * timescale_source + rate_species * rate_species);
 
     /* check it is non-zero */
     class_test(timescale_source == 0., "null evolution rate, integration is diverging");
@@ -4642,10 +4663,14 @@ void PerturbationsModule::perturb_einstein(
 
     /* synchronous gauge */
     if (ppt->gauge == possible_gauges::synchronous) {
+      /* A species that modifies gravity replaces each of the four equations below. */
+      const ModifiedGravity* gravity = resolved_.gravity;
+
       /* first equation involving total density fluctuation */
-      ppw->pvecmetric[ppw->index_mt_h_prime] = (k2 * s2_squared * y[ppw->pv->index_pt_eta] +
-                                                1.5 * a2 * ppw->delta_rho) /
-                                               (0.5 * a_prime_over_a); /* h' */
+      ppw->pvecmetric[ppw->index_mt_h_prime] =
+          gravity ? gravity->HPrime(k, y, ppw)
+                  : (k2 * s2_squared * y[ppw->pv->index_pt_eta] + 1.5 * a2 * ppw->delta_rho) /
+                        (0.5 * a_prime_over_a); /* h' */
 
       /* eventually, infer radiation streaming approximation for
          gamma and ur (this is exactly the right place to do it
@@ -4663,15 +4688,17 @@ void PerturbationsModule::perturb_einstein(
       }
 
       /* second equation involving total velocity */
-      ppw->pvecmetric[ppw->index_mt_eta_prime] = (1.5 * a2 * ppw->rho_plus_p_theta +
-                                                  0.5 * pba->K *
-                                                      ppw->pvecmetric[ppw->index_mt_h_prime]) /
-                                                 k2 / s2_squared; /* eta' */
+      ppw->pvecmetric[ppw->index_mt_eta_prime] =
+          gravity ? gravity->EtaPrime(k, y, ppw)
+                  : (1.5 * a2 * ppw->rho_plus_p_theta +
+                     0.5 * pba->K * ppw->pvecmetric[ppw->index_mt_h_prime]) /
+                        k2 / s2_squared; /* eta' */
 
       /* third equation involving total pressure */
       ppw->pvecmetric[ppw->index_mt_h_prime_prime] =
-          -2. * a_prime_over_a * ppw->pvecmetric[ppw->index_mt_h_prime] +
-          2. * k2 * s2_squared * y[ppw->pv->index_pt_eta] - 9. * a2 * ppw->delta_p;
+          gravity ? gravity->HPrimePrime(k, y, ppw)
+                  : -2. * a_prime_over_a * ppw->pvecmetric[ppw->index_mt_h_prime] +
+                        2. * k2 * s2_squared * y[ppw->pv->index_pt_eta] - 9. * a2 * ppw->delta_p;
 
       /* alpha = (h'+6eta')/2k^2 */
       ppw->pvecmetric[ppw->index_mt_alpha] = (ppw->pvecmetric[ppw->index_mt_h_prime] +
@@ -4703,8 +4730,9 @@ void PerturbationsModule::perturb_einstein(
 
       /* fourth equation involving total shear */
       ppw->pvecmetric[ppw->index_mt_alpha_prime] =  //TBC
-          -2. * a_prime_over_a * ppw->pvecmetric[ppw->index_mt_alpha] + y[ppw->pv->index_pt_eta] -
-          4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
+          gravity ? gravity->AlphaPrime(k, y, ppw)
+                  : -2. * a_prime_over_a * ppw->pvecmetric[ppw->index_mt_alpha] +
+                        y[ppw->pv->index_pt_eta] - 4.5 * (a2 / k2) * ppw->rho_plus_p_shear;
     }
 
     /* transform (delta_m, theta_m) of the current gauge into

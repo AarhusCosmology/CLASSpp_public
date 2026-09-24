@@ -46,7 +46,8 @@ TEST_TARGETS := \
 	test-max-multipole \
 	test-ncdm-family \
 	test-species-budget \
-	test-species-instances
+	test-species-instances \
+	test-scalar-tensor
 
 .PHONY: all class class_profiled classy classy-pip-dev test clean $(TEST_TARGETS)
 
