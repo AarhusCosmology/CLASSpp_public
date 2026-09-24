@@ -28,6 +28,7 @@ int main() {
   assert(FluidSpecies::kTypeName == "fluid");
   assert(ScalarFieldSpecies::kTypeName == "scalar_field");
   assert(Type3Species::kTypeName == "cdm_scf_momentum");
+  assert(NEDESpecies::kTypeName == "nede");
 
   // The factory registry carries exactly these type strings.
   std::set<std::string> names;
@@ -35,24 +36,11 @@ int main() {
     names.insert(std::string(e.name));
   }
   const std::set<std::string> expected = {
-      "photons",
-      "baryons",
-      "cdm",
-      "ur",
-      "dcdm_dr",
-      "ncdm_standard",
-      "ncdm_greybody",
-      "ncdm_axion",
-      "ncdm_decay_dr",
-      "dcdm_wdm",
-      "dr_psd",
-      "ncdm_self_interacting",
-      "idm_dr_idr",
-      "idm_drmd_idr_drmd",
-      "lambda",
-      "fluid",
-      "scalar_field",
-      "cdm_scf_momentum",
+      "photons",       "baryons",           "cdm",           "ur",
+      "dcdm_dr",       "ncdm_standard",     "ncdm_greybody", "ncdm_axion",
+      "ncdm_decay_dr", "dcdm_wdm",          "dr_psd",        "ncdm_self_interacting",
+      "idm_dr_idr",    "idm_drmd_idr_drmd", "lambda",        "fluid",
+      "scalar_field",  "cdm_scf_momentum",  "nede",
   };
   assert(names == expected);
 

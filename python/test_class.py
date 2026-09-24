@@ -1387,6 +1387,62 @@ class TestReviewRegressions(TestClass):
         self.assertAlmostEqual(derived['DCDM_DR.a_peak']
                                * (1. + background['z'][i_peak]), 1., places=12)
 
+    def test_nede_transition_is_where_H_reaches_its_trigger(self):
+        """Cold NEDE (H0 Olympics 2107.10291 sec. 2.4.5) decays where H falls to
+        H_* = H_over_m_NEDE m_NEDE, and f_NEDE is its share of the density
+        there: rho_NEDE = f_NEDE H_*^2 before the transition, and the rest of
+        the universe reaches H_*^2 (1 - f_NEDE) at z_star. The massive neutrino
+        is still relativistic at z_star; counting it as matter would move the
+        transition."""
+        f_NEDE, m_NEDE = 0.1, 10**2.5
+        H_star = 0.2*m_NEDE
+        cosmo = Class({'f_NEDE': f_NEDE, 'm_NEDE': m_NEDE,
+                       'N_ur': 2.0328, 'N_ncdm': 1, 'm_ncdm': 0.06})
+        try:
+            cosmo.compute(level=['background'])
+            z_star = cosmo.get_current_derived_parameters(['NEDE.z_star'])['NEDE.z_star']
+            background = cosmo.get_background()
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+        z = background['z']
+        nede = background['(.)rho_NEDE']
+        others = background['(.)rho_tot'] - nede
+        # The two table rows just before the transition, where `others` is smooth.
+        before = np.where(z > z_star)[0]
+        i, j = before[np.argsort(z[before])[:2]]
+        self.assertAlmostEqual(nede[i]/(f_NEDE*H_star**2), 1., places=12)
+        slope = np.log(others[j]/others[i])/np.log((1. + z[j])/(1. + z[i]))
+        self.assertAlmostEqual(others[i]*((1. + z_star)/(1. + z[i]))**slope
+                               / (H_star**2*(1. - f_NEDE)), 1., delta=1e-4)
+
+    def test_nede_spectra_match_triggerclass(self):
+        """NEDE/LambdaCDM in lensed TT and EE against TriggerCLASS (commit
+        174227ad, z_decay_NEDE = 4589.54 -- this z_star -- with three_eos_NEDE =
+        three_ceff2_NEDE = 2, no viscosity and a negligible trigger), for the
+        same cosmology. The two agree to 2.1e-3 over 2 <= l <= 2500. This
+        exercises the trigger, the junction conditions, and carrying NEDE
+        across the later tca/rsa switches: dropping it there costs 1e-2."""
+        cosmology = {'h': 0.6781, 'omega_b': 0.0223828, 'omega_cdm': 0.1201075,
+                     'N_ur': 3.046, 'YHe': 0.245, 'A_s': 2.1e-9, 'n_s': 0.9660499,
+                     'z_reio': 11.357, 'output': 'tCl,pCl,lCl', 'lensing': 'yes',
+                     'l_max_scalars': 2500}
+        spectra = []
+        for nede in ({}, {'f_NEDE': 0.1, 'm_NEDE': 10**2.5, 'w_NEDE': 2./3.}):
+            cosmo = Class(dict(cosmology, **nede))
+            try:
+                cosmo.compute()
+                spectra.append(cosmo.lensed_cl(1500))
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+        triggerclass = {'tt': [0.99554, 1.03684, 1.06018],
+                        'ee': [1.16450, 1.00847, 0.88217]}
+        ell = [500, 1000, 1500]
+        for key, expected in triggerclass.items():
+            ratio = spectra[1][key][ell]/spectra[0][key][ell]
+            np.testing.assert_allclose(ratio, expected, atol=3e-3, err_msg=key)
+
     def test_monodromy_parameter_domain_is_rejected(self):
         """The monodromy potential divides by the decay constant V_1, so V_1 = 0
         reaches primordial_inflation_check_potential as a NaN -- and its V<=0 and

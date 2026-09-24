@@ -854,3 +854,9 @@ void NCDMBaseSpecies::RegisterTransferSourceIndices(int& index_tp,
   class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
   class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
 }
+
+double NCDMBaseSpecies::BackgroundDensityOverH0Sq(double a, double H0) const {
+  double rho = 0.;
+  ComputeMomenta(1. / a - 1., nullptr, &rho, nullptr, nullptr, nullptr);
+  return rho / (H0 * H0);
+}

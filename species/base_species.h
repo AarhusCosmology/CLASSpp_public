@@ -518,6 +518,27 @@ class BaseSpecies {
                                       double* /*y*/,
                                       const PerturbIcContext& /*ctx*/) {}
 
+  // ── Approximations owned by the species (scalar modes) ────────────────────
+  //
+  // A species whose set of evolved variables changes at some time declares an
+  // approximation. The module reserves its slot in ppw->approx, asks
+  // ApproximationRegimeAt at each (k, tau), bisects for the switch time, and calls
+  // CopyPerturbationsAcrossSwitch there. Regimes are numbered chronologically.
+  // Design: docs/superpowers/specs/2026-09-23-species-owned-approximations-design.md
+
+  /** How many approximations this species owns. Default 0. */
+  virtual int ApproximationCount() const {
+    return 0;
+  }
+
+  /** The regime of approximation `which` for wavenumber k at the time of pvecback. */
+  virtual int ApproximationRegimeAt(int /*which*/, double /*k*/, const double* /*pvecback*/) const {
+    return 0;
+  }
+
+  /** The regime of approximation `which` that the workspace is integrating in. */
+  int ApproximationRegime(const perturb_workspace* ppw, int which = 0) const;
+
   /**
    * Copy perturbation state from one layout to another across an approximation switch.
    * Called when the perturbation vector is reallocated (e.g., NCDM FA collapse from
@@ -606,6 +627,12 @@ class BaseSpecies {
    * decay-product species starting at zero, override returning 0.
    */
   virtual double GetOmega0() const = 0;
+
+  /** This species' density at scale factor a in units of H0^2, without a background
+   *  table, for events that must be located before the background is solved. The
+   *  default scales GetOmega0() by the energy type, which is exact for a constant
+   *  equation of state, and refuses EnergyType::Other; NCDM overrides it. */
+  virtual double BackgroundDensityOverH0Sq(double a, double H0) const;
 
   /** Relativistic (radiation-like) Omega0 contribution at early times.
    *  Default 0; ultra-relativistic and interacting-dark-radiation species override. */

@@ -385,6 +385,9 @@ struct perturb_workspace {
    *  switches. See BaseSpecies::PerturbScratch for why hot-path scratch belongs
    *  here rather than on the species. */
   std::vector<std::unique_ptr<BaseSpecies::PerturbScratch>> species_scratch;
+  /** Parallel to all_species_: each species' first slot in approx, or -1 (scalars
+   *  only). See BaseSpecies::ApproximationCount. */
+  std::vector<int> species_approx_index;
 
   double delta_rho;        /**< total density perturbation (gives delta Too) */
   double rho_plus_p_theta; /**< total (rho+p)*theta perturbation (gives delta Toi) */

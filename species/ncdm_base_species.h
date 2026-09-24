@@ -132,6 +132,9 @@ class NCDMBaseSpecies : public BaseSpecies {
   void ComputeMomenta(
       double z, double* n, double* rho, double* p, double* drho_dM, double* pseudo_p) const;
 
+  /** From the momentum quadrature: a relic still relativistic at a is not matter. */
+  double BackgroundDensityOverH0Sq(double a, double H0) const override;
+
   int q_size() const {
     return static_cast<int>(q_.size());
   }

@@ -2037,6 +2037,15 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
                        index_ap,
                        1); /* DRMD */
     class_define_index(ppw->index_ap_rsa_idr, all_species_.count("IDM_DR_IDR"), index_ap, 1);
+
+    /* Approximations owned by species, after the module's own. */
+    ppw->species_approx_index.assign(all_species_.size(), -1);
+    for (size_t i = 0; i < all_species_.size(); ++i) {
+      if (const int count = all_species_[i]->ApproximationCount(); count > 0) {
+        ppw->species_approx_index[i]  = index_ap;
+        index_ap                     += count;
+      }
+    }
   }
 
   ppw->ap_size = index_ap;
@@ -4362,6 +4371,12 @@ void PerturbationsModule::perturb_approximations(int index_md,
         ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_off;
       }
     }
+
+    /** - --> (d) approximations owned by species */
+    for (size_t i = 0; i < all_species_.size(); ++i)
+      for (int which = 0; which < all_species_[i]->ApproximationCount(); ++which)
+        ppw->approx[ppw->species_approx_index[i] + which] =
+            all_species_[i]->ApproximationRegimeAt(which, k, ppw->pvecback.data());
   }
 
   /** - for tensor modes: */

@@ -107,6 +107,7 @@ set(CLASS_SPECIES_FILES
   species/ncdm_family.cpp
   species/ncdm_interacting_species.cpp
   species/ncdm_species.cpp
+  species/nede_species.cpp
   species/perturb_column_writer.cpp
   species/photons.cpp
   species/scalar_field.cpp

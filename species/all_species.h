@@ -37,6 +37,7 @@
 #include "lambda.h"
 #include "ncdm_interacting_species.h"
 #include "ncdm_species.h"
+#include "nede_species.h"
 #include "photons.h"
 #include "scalar_field.h"
 #include "species_build_context.h"
@@ -71,6 +72,8 @@ inline constexpr std::array kAllSpeciesFactories = {
     SpeciesFactoryEntry{FluidSpecies::kTypeName, &FluidSpecies::CreateAll},
     SpeciesFactoryEntry{ScalarFieldSpecies::kTypeName, &ScalarFieldSpecies::CreateAll},
     SpeciesFactoryEntry{Type3Species::kTypeName, &Type3Species::CreateAll},
+    // Last: it locates its transition from the densities of the species built before it.
+    SpeciesFactoryEntry{NEDESpecies::kTypeName, &NEDESpecies::CreateAll},
 };
 
 /** Maps the closure-species enum to the matching factory entry name. */
