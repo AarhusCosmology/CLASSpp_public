@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 
 #include "base_species.h"
@@ -142,9 +143,18 @@ class UltraRelativisticSpecies : public BaseSpecies {
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
 
+ protected:
+  /** For a massless species that follows UR's equations, named `name` and writing its
+   *  output columns as rho_<label>, d_<label>, delta_<label>, ... */
+  UltraRelativisticSpecies(const background& pba,
+                           double omega0_ur,
+                           const std::string& name,
+                           std::string label);
+
  private:
   double Omega0_ur_;
   double H0_;
+  std::string label_;
 
   int index_tp_delta_ = -1;  // #309 transfer-source slot
   int index_tp_theta_ = -1;

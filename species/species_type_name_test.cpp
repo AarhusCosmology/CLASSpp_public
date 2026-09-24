@@ -13,6 +13,7 @@ int main() {
   assert(BaryonsSpecies::kTypeName == "baryons");
   assert(CDMSpecies::kTypeName == "cdm");
   assert(UltraRelativisticSpecies::kTypeName == "ur");
+  assert(MajoronSpecies::kTypeName == "majoron");
   assert(DCDM_DR_Species::kTypeName == "dcdm_dr");
   assert(NCDMSpecies::kTypeName == "ncdm_standard");
   assert(GreyBodyNCDMSpecies::kTypeName == "ncdm_greybody");
@@ -36,11 +37,26 @@ int main() {
     names.insert(std::string(e.name));
   }
   const std::set<std::string> expected = {
-      "photons",       "baryons",           "cdm",           "ur",
-      "dcdm_dr",       "ncdm_standard",     "ncdm_greybody", "ncdm_axion",
-      "ncdm_decay_dr", "dcdm_wdm",          "dr_psd",        "ncdm_self_interacting",
-      "idm_dr_idr",    "idm_drmd_idr_drmd", "lambda",        "fluid",
-      "scalar_field",  "cdm_scf_momentum",  "nede",
+      "photons",
+      "baryons",
+      "cdm",
+      "ur",
+      "majoron",
+      "dcdm_dr",
+      "ncdm_standard",
+      "ncdm_greybody",
+      "ncdm_axion",
+      "ncdm_decay_dr",
+      "dcdm_wdm",
+      "dr_psd",
+      "ncdm_self_interacting",
+      "idm_dr_idr",
+      "idm_drmd_idr_drmd",
+      "lambda",
+      "fluid",
+      "scalar_field",
+      "cdm_scf_momentum",
+      "nede",
   };
   assert(names == expected);
 

@@ -20,6 +20,7 @@
 #include "../species/ncdm_species.h"
 #include "../species/scalar_field.h"
 #include "../species/type3_species.h"
+#include "../species/ultra_relativistic.h"
 #include "bisection.h"
 #include "evolver_erk.h"
 #include "evolver_etd.h"
@@ -490,7 +491,11 @@ void BackgroundModule::background_init() {
                                         .idr()
                                         .GetOmega0()
                                   : 0.;
-    const double Omega0_ur  = all_species_.count("UR") ? all_species_.at("UR")->GetOmega0() : 0.;
+    /* Every UltraRelativisticSpecies, at its early-time density. */
+    double Omega0_ur = 0.;
+    for (const auto& [name, sp] : all_species_)
+      if (dynamic_cast<const UltraRelativisticSpecies*>(sp.get()))
+        Omega0_ur += sp->GetRadiationOmega0();
     if (!GetNcdmSpecies(all_species_).empty() || (Omega0_idr != 0.)) {
       /* contribution of ultra-relativistic species _ur to N_eff */
       double Neff = Omega0_ur / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;

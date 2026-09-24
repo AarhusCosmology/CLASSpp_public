@@ -11,7 +11,14 @@
 #include "perturbations_module.h"
 
 UltraRelativisticSpecies::UltraRelativisticSpecies(const background& pba, double omega0_ur)
-    : BaseSpecies("UR", EnergyType::Radiation), Omega0_ur_(omega0_ur), H0_(pba.H0) {}
+    : UltraRelativisticSpecies(pba, omega0_ur, "UR", "ur") {}
+
+UltraRelativisticSpecies::UltraRelativisticSpecies(const background& pba,
+                                                   double omega0_ur,
+                                                   const std::string& name,
+                                                   std::string label)
+    : BaseSpecies(name, EnergyType::Radiation), Omega0_ur_(omega0_ur), H0_(pba.H0),
+      label_(std::move(label)) {}
 
 // ── Background ────────────────────────────────────────────────────────────────
 
@@ -42,12 +49,12 @@ double UltraRelativisticSpecies::PPrime(double a,
 }
 
 void UltraRelativisticSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_ur", 0.);
+  w.Add("(.)rho_" + label_, 0.);
 }
 
 void UltraRelativisticSpecies::WriteBackgroundData(const double* pvecback,
                                                    BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_ur", Rho(pvecback));
+  w.Add("(.)rho_" + label_, Rho(pvecback));
 }
 
 // ── Perturbations ─────────────────────────────────────────────────────────────
@@ -330,13 +337,13 @@ void UltraRelativisticSpecies::WriteOutputColumns(
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
-      w.Add("d_ur", index_tp_delta_, index_tp_delta_ >= 0);
+      w.Add("d_" + label_, index_tp_delta_, index_tp_delta_ >= 0);
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
-      w.Add("t_ur", index_tp_theta_, index_tp_theta_ >= 0);
+      w.Add("t_" + label_, index_tp_theta_, index_tp_theta_ >= 0);
   }
   else if (fmt == file_format::camb_format) {
     if (section != TransferColumnSection::velocity)
-      w.Add("-T_ur/k2", index_tp_delta_, index_tp_delta_ >= 0);
+      w.Add("-T_" + label_ + "/k2", index_tp_delta_, index_tp_delta_ >= 0);
   }
 }
 
@@ -376,9 +383,9 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
     }
   }
 
-  w.Add("delta_ur", delta_ur, true);
-  w.Add("theta_ur", theta_ur, true);
-  w.Add("shear_ur", shear_ur, true);
+  w.Add("delta_" + label_, delta_ur, true);
+  w.Add("theta_" + label_, theta_ur, true);
+  w.Add("shear_" + label_, shear_ur, true);
 }
 
 // ── MarkUsedInSources ─────────────────────────────────────────────────────────

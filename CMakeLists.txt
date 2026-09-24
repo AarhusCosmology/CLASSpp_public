@@ -103,6 +103,7 @@ set(CLASS_SPECIES_FILES
   species/idm_drmd_idr_drmd_species.cpp
   species/interacting_species.cpp
   species/lambda.cpp
+  species/majoron_species.cpp
   species/ncdm_base_species.cpp
   species/ncdm_family.cpp
   species/ncdm_interacting_species.cpp

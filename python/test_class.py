@@ -1387,17 +1387,14 @@ class TestReviewRegressions(TestClass):
         self.assertAlmostEqual(derived['DCDM_DR.a_peak']
                                * (1. + background['z'][i_peak]), 1., places=12)
 
-    def test_nede_transition_is_where_H_reaches_its_trigger(self):
-        """Cold NEDE (H0 Olympics 2107.10291 sec. 2.4.5) decays where H falls to
-        H_* = H_over_m_NEDE m_NEDE, and f_NEDE is its share of the density
-        there: rho_NEDE = f_NEDE H_*^2 before the transition, and the rest of
-        the universe reaches H_*^2 (1 - f_NEDE) at z_star. The massive neutrino
-        is still relativistic at z_star; counting it as matter would move the
-        transition."""
+    def _nede_trigger(self, params):
+        """Cold NEDE with f_NEDE = 0.1, H_* = 0.2 m_NEDE on top of params:
+        rho_NEDE/(f_NEDE H_*^2) just before the transition, and the rest of the
+        universe at z_star over H_*^2 (1 - f_NEDE). Both are 1 where the
+        transition is placed right."""
         f_NEDE, m_NEDE = 0.1, 10**2.5
         H_star = 0.2*m_NEDE
-        cosmo = Class({'f_NEDE': f_NEDE, 'm_NEDE': m_NEDE,
-                       'N_ur': 2.0328, 'N_ncdm': 1, 'm_ncdm': 0.06})
+        cosmo = Class(dict({'f_NEDE': f_NEDE, 'm_NEDE': m_NEDE}, **params))
         try:
             cosmo.compute(level=['background'])
             z_star = cosmo.get_current_derived_parameters(['NEDE.z_star'])['NEDE.z_star']
@@ -1411,10 +1408,29 @@ class TestReviewRegressions(TestClass):
         # The two table rows just before the transition, where `others` is smooth.
         before = np.where(z > z_star)[0]
         i, j = before[np.argsort(z[before])[:2]]
-        self.assertAlmostEqual(nede[i]/(f_NEDE*H_star**2), 1., places=12)
         slope = np.log(others[j]/others[i])/np.log((1. + z[j])/(1. + z[i]))
-        self.assertAlmostEqual(others[i]*((1. + z_star)/(1. + z[i]))**slope
-                               / (H_star**2*(1. - f_NEDE)), 1., delta=1e-4)
+        return (nede[i]/(f_NEDE*H_star**2),
+                others[i]*((1. + z_star)/(1. + z[i]))**slope/(H_star**2*(1. - f_NEDE)))
+
+    def test_nede_transition_is_where_H_reaches_its_trigger(self):
+        """Cold NEDE (H0 Olympics 2107.10291 sec. 2.4.5) decays where H falls to
+        H_* = H_over_m_NEDE m_NEDE, and f_NEDE is its share of the density
+        there: rho_NEDE = f_NEDE H_*^2 before the transition, and the rest of
+        the universe reaches H_*^2 (1 - f_NEDE) at z_star. The massive neutrino
+        is still relativistic at z_star; counting it as matter would move the
+        transition."""
+        nede, others = self._nede_trigger({'N_ur': 2.0328, 'N_ncdm': 1, 'm_ncdm': 0.06})
+        self.assertAlmostEqual(nede, 1., places=12)
+        self.assertAlmostEqual(others, 1., delta=1e-4)
+
+    def test_nede_transition_counts_the_majoron_before_it_heats_the_neutrinos(self):
+        """NEDE places its transition before the background is solved, so the
+        majoron gives its density from the fit. Today's density scaled back as
+        a^-4 counts the Delta N_eff ~ 0.11 of the majoron decays from the start,
+        and put the rest of the universe 0.8% below H_*^2 (1 - f_NEDE) at z_star
+        (T_gamma ~ m_phi = 1 eV, before most of the heating)."""
+        _, others = self._nede_trigger({'m_majoron': 1., 'Gamma_eff_majoron': 10., 'N_ur': 0})
+        self.assertAlmostEqual(others, 1., delta=1e-4)
 
     def test_nede_spectra_match_triggerclass(self):
         """NEDE/LambdaCDM in lensed TT and EE against TriggerCLASS (commit
@@ -1639,6 +1655,34 @@ class TestReviewRegressions(TestClass):
             'scf_parameters': '10, 0, 0, 0',
         }
         self._assert_compute_succeeds(scenario)
+
+    def test_majoron_heats_the_neutrinos_and_damps_their_free_streaming(self):
+        """Majoron (Escudero & Witte 1909.04044, 2103.03249; H0 Olympics
+        2107.10291 sec. 2.3.6): on Escudero & Witte's fitted background, majoron
+        decays raise N_eff by ~0.11 near T ~ m_phi, and the l >= 2 multipoles
+        relax at the inverse-decay rate. For Gamma_eff -> 0 the fluid is three
+        free-streaming neutrinos."""
+        def run(**params):
+            cosmo = Class(dict({'output': 'tCl', 'N_ur': 0}, **params))
+            try:
+                cosmo.compute()
+                return cosmo.get_background(), cosmo.raw_cl(1000)['tt']
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+        per_neutrino = 7./8.*(4./11.)**(4./3.)
+        background, coupled = run(m_majoron=1., Gamma_eff_majoron=10.)
+        N_eff = background['(.)rho_nuphi']/background['(.)rho_g']/per_neutrino
+        self.assertAlmostEqual(N_eff[-1] - N_eff[0], 0.1127, delta=2e-3)
+
+        background, weak = run(m_majoron=1., Gamma_eff_majoron=1e-4)
+        N_eff = background['(.)rho_nuphi'][0]/background['(.)rho_g'][0]/per_neutrino
+        _, free = run(N_ur=N_eff)
+        np.testing.assert_allclose(weak[2:], free[2:], rtol=1e-3)
+
+        # The damping of free streaming, pinned at m_phi = 1 eV, Gamma_eff = 10.
+        self.assertAlmostEqual(coupled[600]/weak[600], 1.145, delta=0.01)
 
     def test_type3_synchronous_computes(self):
         # Type-3 composite (coupled CDM + beta scalar field) end-to-end, in the

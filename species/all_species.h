@@ -35,6 +35,7 @@
 #include "idr.h"
 #include "idr_drmd.h"
 #include "lambda.h"
+#include "majoron_species.h"
 #include "ncdm_interacting_species.h"
 #include "ncdm_species.h"
 #include "nede_species.h"
@@ -57,6 +58,7 @@ inline constexpr std::array kAllSpeciesFactories = {
     SpeciesFactoryEntry{BaryonsSpecies::kTypeName, &BaryonsSpecies::CreateAll},
     SpeciesFactoryEntry{CDMSpecies::kTypeName, &CDMSpecies::CreateAll},
     SpeciesFactoryEntry{UltraRelativisticSpecies::kTypeName, &UltraRelativisticSpecies::CreateAll},
+    SpeciesFactoryEntry{MajoronSpecies::kTypeName, &MajoronSpecies::CreateAll},
     SpeciesFactoryEntry{DCDM_DR_Species::kTypeName, &DCDM_DR_Species::CreateAll},
     SpeciesFactoryEntry{NCDMSpecies::kTypeName, &NCDMSpecies::CreateAll},
     SpeciesFactoryEntry{GreyBodyNCDMSpecies::kTypeName, &GreyBodyNCDMSpecies::CreateAll},
