@@ -54,8 +54,12 @@ void PerturbationsModule::ResolveSpecies() {
   if (auto* p = all_species_.find("IDM_DRMD_IDR_DRMD"))
     resolved_.idm_drmd = static_cast<const IDM_DRMD_IDR_DRMD_Species*>(p->get());
 
-  if (auto* p = all_species_.find("UR"))
-    resolved_.ur = p->get();
+  /* Every massless species built on UltraRelativisticSpecies follows the module's ur
+     approximations (ufa, rsa, the tensor hierarchy); their flags do not depend on
+     which one it is. */
+  for (const auto& [name, sp] : all_species_)
+    if (dynamic_cast<const UltraRelativisticSpecies*>(sp.get()))
+      resolved_.ur.push_back(sp.get());
   if (auto* p = all_species_.find("Lambda"))
     resolved_.lambda = p->get();
 
@@ -571,7 +575,7 @@ void PerturbationsModule::perturb_init() {
                ppr->idr_streaming_approximation);
   }
 
-  if (all_species_.count("UR")) {
+  if (!resolved_.ur.empty()) {
     class_test((ppr->ur_fluid_approximation < static_cast<int>(ufa_method::ufa_mb)) ||
                    (ppr->ur_fluid_approximation > static_cast<int>(ufa_method::ufa_none)),
                "your ur_fluid_approximation is set to %d, out of range defined in perturbations.h",
@@ -663,12 +667,12 @@ void PerturbationsModule::perturb_init() {
         break;
 
       case (tm_massless_approximation):
-        if ((all_species_.count("UR")) || all_species_.has_ncdm())
+        if (!resolved_.ur.empty() || all_species_.has_ncdm())
           evolve_tensor_ur_ = true;
         break;
 
       case (tm_exact):
-        if (all_species_.count("UR"))
+        if (!resolved_.ur.empty())
           evolve_tensor_ur_ = true;
         if (all_species_.has_ncdm()) {
           // The exact tensor-NCDM path only handles plain NCDMSpecies; the
@@ -2029,7 +2033,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
   class_define_index(ppw->index_ap_rsa, true, index_ap, 1);
 
   if (_scalars_) {
-    class_define_index(ppw->index_ap_ufa, all_species_.count("UR"), index_ap, 1);
+    class_define_index(ppw->index_ap_ufa, !resolved_.ur.empty(), index_ap, 1);
     class_define_index(ppw->index_ap_ncdmfa, all_species_.has_ncdm(), index_ap, 1);
     class_define_index(ppw->index_ap_tca_idm_dr, all_species_.count("IDM_DR_IDR"), index_ap, 1);
     class_define_index(ppw->index_ap_tca_idm_drmd,
@@ -2070,7 +2074,7 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
             "IDM_DRMD_IDR_DRMD")) { /* DRMD : Only if both fluids are present, does it make sense to have the tight coupling approximation.*/
       ppw->approx[ppw->index_ap_tca_idm_drmd] = (int) tca_idm_drmd_on;
     }
-    if (all_species_.count("UR")) {
+    if (!resolved_.ur.empty()) {
       ppw->approx[ppw->index_ap_ufa] = (int) ufa_off;
     }
     if (all_species_.has_ncdm()) {
@@ -2828,7 +2832,7 @@ void PerturbationsModule::perturb_find_approximation_switches(
                       interval_limit[index_switch]);
           }
 
-          if (all_species_.count("UR")) {
+          if (!resolved_.ur.empty()) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_ufa] == (int) ufa_off) &&
                 (interval_approx[index_switch][ppw->index_ap_ufa] == (int) ufa_on)) {
               fprintf(stdout,
@@ -3133,7 +3137,7 @@ void PerturbationsModule::perturb_vector_init(
 
       /* we do not need to do a check for tca_idm_dr, as the initial conditions are consistent with any tca_idm_dr */
 
-      if (all_species_.count("UR")) {
+      if (!resolved_.ur.empty()) {
         class_test(ppw->approx[ppw->index_ap_ufa] == (int) ufa_on,
                    "scalar initial conditions assume ur fluid approximation turned off");
       }
@@ -3312,7 +3316,7 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if (all_species_.count("UR")) {
+      if (!resolved_.ur.empty()) {
         if ((pa_old[ppw->index_ap_ufa] == (int) ufa_off) &&
             (ppw->approx[ppw->index_ap_ufa] == (int) ufa_on)) {
           if (ppt->perturbations_verbose > 2)
@@ -3774,8 +3778,8 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.shear_ur = 0.;
       ic_ctx.l3_ur    = 0.;
       ic_ctx.delta_dr = 0.;
-      if ((all_species_.count("UR")) || (all_species_.has_ncdm()) ||
-          (all_species_.count("DCDM_DR")) || (all_species_.count("IDM_DR_IDR"))) {
+      if (!resolved_.ur.empty() || (all_species_.has_ncdm()) || (all_species_.count("DCDM_DR")) ||
+          (all_species_.count("IDM_DR_IDR"))) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = -k * ktau_three / 36. / (4. * fracnu + 15.) *
                           (4. * fracnu + 11. + 12. * s2_squared -
@@ -3826,7 +3830,7 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.l3_ur      = 0.;
       ic_ctx.delta_dr   = 0.;
 
-      if ((all_species_.count("UR")) || (all_species_.has_ncdm())) {
+      if (!resolved_.ur.empty() || (all_species_.has_ncdm())) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = ic_ctx.theta_g_ic;
         ic_ctx.shear_ur = -ppr->entropy_ini * fraccdm * ktau_two * tau * om / 6. /
@@ -3854,7 +3858,7 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.l3_ur      = 0.;
       ic_ctx.delta_dr   = 0.;
 
-      if ((all_species_.count("UR")) || (all_species_.has_ncdm())) {
+      if (!resolved_.ur.empty() || (all_species_.has_ncdm())) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = ic_ctx.theta_g_ic;
         ic_ctx.shear_ur = -ppr->entropy_ini * fracb * ktau_two * tau * om / 6. /
@@ -3868,7 +3872,7 @@ void PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.4.) Neutrino density Isocurvature */
 
     if ((ppt->has_nid) && (index_ic == index_ic_nid_)) {
-      class_test((all_species_.count("UR") == 0) && !all_species_.has_ncdm(),
+      class_test(resolved_.ur.empty() && !all_species_.has_ncdm(),
                  "not consistent to ask for NID in absence of ur or ncdm species!");
 
       class_test((all_species_.count("IDM_DR_IDR") != 0),
@@ -3892,7 +3896,7 @@ void PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.5.) Neutrino velocity Isocurvature */
 
     if ((ppt->has_niv) && (index_ic == index_ic_niv_)) {
-      class_test((all_species_.count("UR") == 0) && !all_species_.has_ncdm(),
+      class_test(resolved_.ur.empty() && !all_species_.has_ncdm(),
                  "not consistent to ask for NIV in absence of ur or ncdm species!");
 
       class_test((all_species_.count("IDM_DR_IDR") != 0),
@@ -4352,7 +4356,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
       }
     }
 
-    if (resolved_.ur) {
+    if (!resolved_.ur.empty()) {
       if ((tau / tau_k > ppr->ur_fluid_trigger_tau_over_tau_k) &&
           (ppr->ur_fluid_approximation != static_cast<int>(ufa_method::ufa_none))) {
         ppw->approx[ppw->index_ap_ufa] = (int) ufa_on;
@@ -4900,15 +4904,10 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     if (evolve_tensor_ur_) {
       double rho_relativistic = 0.;
 
-      if (ppt->tensor_method == tm_exact) {
-        if (resolved_.ur)
-          rho_relativistic += resolved_.ur->Rho(ppw->pvecback.data());
-      }
+      for (const BaseSpecies* sp : resolved_.ur)
+        rho_relativistic += sp->Rho(ppw->pvecback.data());
 
       if (ppt->tensor_method == tm_massless_approximation) {
-        if (resolved_.ur)
-          rho_relativistic += resolved_.ur->Rho(ppw->pvecback.data());
-
         if (all_species_.has_ncdm()) {
           for (auto& sp : all_species_)
             rho_relativistic += sp->TensorMasslessRelativisticRho(ppw->pvecback.data());
@@ -6361,7 +6360,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
                                 k2 * y[ppw->pv->index_pt_phi]));
     }
 
-    if (resolved_.ur) {
+    if (!resolved_.ur.empty()) {
       if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
         ppw->rsa_delta_ur = 0.;
         ppw->rsa_theta_ur = 0.;
@@ -6402,7 +6401,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
                 k2 * y[ppw->pv->index_pt_eta]));
     }
 
-    if (resolved_.ur) {
+    if (!resolved_.ur.empty()) {
       if (ppr->radiation_streaming_approximation == static_cast<int>(rsa_method::rsa_null)) {
         ppw->rsa_delta_ur = 0.;
         ppw->rsa_theta_ur = 0.;
@@ -6423,8 +6422,8 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
   ppw->rho_plus_p_theta += 4. / 3. * all_species_.photons().Rho(ppw->pvecback.data()) *
                            ppw->rsa_theta_g;
 
-  if (resolved_.ur) {
-    const double rho_ur    = resolved_.ur->Rho(ppw->pvecback.data());
+  for (const BaseSpecies* sp : resolved_.ur) {
+    const double rho_ur    = sp->Rho(ppw->pvecback.data());
     ppw->delta_rho        += rho_ur * ppw->rsa_delta_ur;
     ppw->delta_p          += 1. / 3. * rho_ur * ppw->rsa_delta_ur;
     ppw->rho_plus_p_theta += 4. / 3. * rho_ur * ppw->rsa_theta_ur;
