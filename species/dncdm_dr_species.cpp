@@ -67,6 +67,17 @@ std::vector<Named> DNCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
       result.push_back(DNCDMInvSpecies::Create(std::move(e.species), ctx));
     }
     else {
+      // The parent's ln f is evolved on its perturbation grid and published on the background
+      // one (DNCDMSpecies::ComputeBackground): with two grids the extra background bins never
+      // decay and keep sourcing decay radiation (Omega_DR = 0.70 today at Gamma = 1e6 km/s/Mpc
+      // from a 1.2e-3 parent). psd and proxy refuse this the same way.
+      class_test_severe(e.species->q_size() != e.species->q_size_bg(),
+                        "species '%s': a decaying NCDM needs a single parent momentum grid "
+                        "(q_size=%d != q_size_bg=%d); set quadrature_strategy and momenta_bins "
+                        "(or momenta_bins_bg == momenta_bins, or tol_ncdm == tol_ncdm_bg)",
+                        e.key.c_str(),
+                        e.species->q_size(),
+                        e.species->q_size_bg());
       result.push_back(
           {e.key, std::make_unique<DNCDM_DR_Species>(std::move(e.species), ctx.pba, ctx.bgm)});
     }
@@ -77,7 +88,7 @@ std::vector<Named> DNCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
 DNCDM_DR_Species::DNCDM_DR_Species(std::unique_ptr<DNCDMSpecies> dncdm_arg,
                                    const background* pba,
                                    const BackgroundModule* bgm)
-    : CompositeSpecies(dncdm_arg->name(), BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm) {
+    : DNCDMSector(dncdm_arg.get()), pba_(pba), bgm_(bgm) {
   auto dr_sp = std::make_unique<DarkRadiationSpecies>(dncdm_arg->name() + "_DR", pba, bgm);
   dncdm_     = dncdm_arg.get();
   dr_sp_     = dr_sp.get();
@@ -279,76 +290,3 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────
-
-// ── Closure ───────────────────────────────────────────────────────────────────
-
-double DNCDM_DR_Species::GetOmega0() const {
-  // Combined mode: Omega_dncdmdr is the user input; initial-shooting iterations:
-  // the shooter writes <flavor>.Omega_dncdmdr, read into Omega_dncdmdr_pending_.
-  if (dncdm_->Omega_dncdmdr_pending().has_value())
-    return *dncdm_->Omega_dncdmdr_pending();
-  // Pre-shooting discovery build with no pinned value yet: fall back to the
-  // child-sum (matter child + DR child(0)). Replaced by the pinned value once
-  // DoShooting writes the unknown.
-  return CompositeSpecies::GetOmega0();
-}
-
-// ── Shooter hooks ─────────────────────────────────────────────────────────────
-
-std::vector<ShootingTarget> DNCDM_DR_Species::GetShootingTargets() const {
-  if (dncdm_->InitialAbundanceMode()) {
-    // Initial mode: the given initial abundance drives deg; shoot Omega_dncdmdr itself (the
-    // closure reserve) as a fixed point, driven to the integrated combined density.
-    // target_value is only a Newton seed (the residual is a fixed point, not a difference to it).
-    const double seed = dncdm_->Omega_dncdmdr_pending().value_or(
-        dncdm_->Omega_ini_pending().value_or(0.1));
-    return {{name() + ".Omega_dncdmdr_fixedpoint", name() + ".Omega_dncdmdr", seed}};
-  }
-  if (dncdm_->Omega_dncdmdr_pending().has_value()) {
-    // Combined mode: shoot deg to hit the user-specified combined today-density.
-    // target_name = the input key; unknown_param = the fc key DoShooting varies (.deg).
-    return {{name() + ".Omega_dncdmdr", name() + ".deg", *dncdm_->Omega_dncdmdr_pending()}};
-  }
-  return {};
-}
-
-void DNCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
-                                            std::vector<double>& guess,
-                                            std::vector<double>& dxdy) const {
-  if (dncdm_->InitialAbundanceMode()) {
-    // Seed Omega_dncdmdr with the given initial abundance. The fixed-point residual is ~linear
-    // in this unknown (it sets only Lambda, weakly coupled to the integrated combined via H),
-    // so Newton converges in ~1-2 steps; d(unknown)/d(residual) ~= 1.
-    // For a Neff_ini-only spec (no Omega_ini) convert to Omega scale via the photon energy
-    // density, matching ApplyDncdmInitialClosure(), rather than falling back to the 0.1 default.
-    double seed = 0.1;
-    if (dncdm_->Omega_ini_pending().has_value()) {
-      seed = *dncdm_->Omega_ini_pending();
-    }
-    else if (dncdm_->Neff_ini_pending().has_value() && ctx.pba) {
-      seed = *dncdm_->Neff_ini_pending() * 7. / 8. * std::pow(4. / 11., 4. / 3.) *
-             ctx.pba->Omega0_g;
-    }
-    guess.push_back(seed);
-    dxdy.push_back(1.0);
-    return;
-  }
-  if (!dncdm_->Omega_dncdmdr_pending().has_value())
-    return;
-  auto [g, d] = dncdm_->DegGuessFromOmegaToday(ctx, *dncdm_->Omega_dncdmdr_pending());
-  guess.push_back(g);
-  dxdy.push_back(d);
-}
-
-double DNCDM_DR_Species::ComputeShootingResidual(const ShootingResidualContext& ctx,
-                                                 const ShootingTarget& target) const {
-  const double* bg      = ctx.bg_today;
-  const double H0       = ctx.pba->H0;
-  const double combined = (dncdm_->Rho(bg) + dr_sp_->Rho(bg)) / (H0 * H0);
-  if (target.target_name == name() + ".Omega_dncdmdr_fixedpoint") {
-    // Initial mode: drive the reserved Omega_dncdmdr (= GetOmega0()) to the integrated combined.
-    return -combined + GetOmega0();
-  }
-  // Combined mode: drive the integrated combined to the requested target (Omega units).
-  return combined - target.target_value;
-}

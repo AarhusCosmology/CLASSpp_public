@@ -38,15 +38,12 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   const std::optional<double>& Neff_ini_pending() const {
     return Neff_ini_pending_;
   }
+  /** The budget reserve the shooter wrote (initial and deg modes), in Omega units. */
+  const std::optional<double>& Omega_dncdmdr_reserve() const {
+    return Omega_dncdmdr_reserve_;
+  }
   const std::optional<double>& Omega_dncdmdr_pending() const {
     return Omega_dncdmdr_pending_;
-  }
-
-  /** True iff this flavor is normalized by initial abundance (Omega_ini/omega_ini/Neff_ini) —
-   *  the mode that needs the Omega_dncdmdr fixed-point shoot for closure (vs combined mode,
-   *  which shoots deg). */
-  bool InitialAbundanceMode() const {
-    return Omega_ini_pending_.has_value() || Neff_ini_pending_.has_value();
   }
 
   /** Backfill this species' today density fraction Omega0_ from its integrated density
@@ -232,6 +229,7 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   std::optional<double> Neff_ini_pending_;
   // Today-density target: shoot deg so that (rho_dncdm+rho_dr)/H0^2 == this value at z=0.
   std::optional<double> Omega_dncdmdr_pending_;
+  std::optional<double> Omega_dncdmdr_reserve_;
 
   // Absorbed from DecayDRProperties
   double Gamma_ = 0.;

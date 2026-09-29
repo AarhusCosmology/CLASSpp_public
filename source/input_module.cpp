@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -2745,6 +2746,8 @@ void precision::parse(const FileContent& fc) {
   read(fc, "a_ini_over_a_today_default", a_ini_over_a_today_default);
   read(fc, "back_integration_stepsize", back_integration_stepsize);
   read(fc, "tol_background_integration", tol_background_integration);
+  read(fc, "tol_shooting_deltax", tol_shooting_deltax);
+  read(fc, "tol_shooting_deltaF", tol_shooting_deltaF);
   read(fc, "tol_initial_Omega_r", tol_initial_Omega_r);
   read(fc, "tol_M_ncdm", tol_M_ncdm);
   // "tol_ncdm" is a convenience input that sets BOTH gauge-specific tolerances;
@@ -3080,22 +3083,39 @@ void precision::parse(const FileContent& fc) {
 
 // ── Hook-based shooting (the species-owned replacement for the enum dispatch) ──
 
+namespace {
+
+// The one spelling of an unknown in the file content, so an evaluation and the final module
+// can be compared as strings: equal strings mean an identical build.
+std::string FormatUnknown(double x) {
+  char buf[64];
+  snprintf(buf, sizeof(buf), "%.17g", x);
+  return buf;
+}
+
+}  // namespace
+
 void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, double* output) {
   auto* w = static_cast<ShootingWorkspace*>(pworkspace);
 
-  // Write each trial unknown into the file content.
+  // Only the latest evaluation can be returned without evaluating again: drop the previous one
+  // first, so at most one extra Cosmology is alive at a time.
+  w->last.reset();
+  w->last_input = nullptr;
+  std::vector<std::string> unknowns(x_size);
   for (int i = 0; i < x_size; ++i) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%.17g", x[i]);
-    w->fc.set(w->targets[i].unknown_param, buf);
+    unknowns[i] = FormatUnknown(x[i] * w->unknown_scale[i]);
+    w->fc.set(w->targets[i].unknown_param, unknowns[i]);
   }
   // Mark as a shooting build so the lazily-evaluated module does not re-enter DoShooting.
   w->fc.is_shooting = true;
 
-  Cosmology cosmology{std::make_unique<InputModule>(w->fc)};
-  BackgroundModulePtr bgm  = cosmology.GetBackgroundModule();
+  auto input               = std::make_unique<InputModule>(w->fc);
+  InputModule* input_raw   = input.get();
+  auto cosmology           = std::make_shared<Cosmology>(std::move(input));
+  BackgroundModulePtr bgm  = cosmology->GetBackgroundModule();
   const double* bg_today   = bgm->background_table_.data() + (bgm->bt_size_ - 1) * bgm->bg_size_;
-  const InputModulePtr& im = cosmology.GetInputModule();
+  const InputModulePtr& im = cosmology->GetInputModule();
 
   bool need_thermo = false;
   for (const auto& t : w->targets)
@@ -3103,13 +3123,14 @@ void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, doub
       need_thermo = true;
   ThermodynamicsModulePtr thm;
   if (need_thermo)
-    thm = cosmology.GetThermodynamicsModule();
+    thm = cosmology->GetThermodynamicsModule();
 
-  // Assemble residuals in workspace order. theta_s is module-level (from thermo rs/ra);
-  // each species target is routed to its owning species via the recorded key, passing the
-  // authoritative target collected at discovery (the species must not re-derive it — in
-  // this iteration build DoShooting has set the unknown, so for species with overlapping
-  // target/unknown keys the user's target is not recoverable from the file content).
+  // Assemble residuals in workspace order. theta_s is module-level (from thermo rs/ra); each
+  // species target is routed to its owning species via the recorded key, passing the
+  // authoritative target collected at discovery (the species must not re-derive it — in this
+  // iteration build DoShooting has set the unknown, so for species with overlapping
+  // target/unknown keys the user's target is not recoverable from the file content). Every
+  // residual is in its natural units (Omega, or 100*theta_s), where tol_shooting_deltaF is set.
   ShootingResidualContext ctx{&im->background_, bg_today};
   for (size_t i = 0; i < w->targets.size(); ++i) {
     const ShootingTarget& t = w->targets[i];
@@ -3121,12 +3142,17 @@ void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, doub
       output[i]      = sp->ComputeShootingResidual(ctx, t);
     }
   }
+
+  ++w->evaluations;
+  w->last          = std::move(cosmology);
+  w->last_input    = input_raw;
+  w->last_unknowns = std::move(unknowns);
 }
 
-InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
+ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
   // Guard: never shoot from within a shooting build (the residual marks its fc this way).
   if (input_module->file_content_.is_shooting)
-    return input_module;
+    return {input_module, nullptr};
 
   FileContent& fc = input_module->file_content_;
 
@@ -3185,7 +3211,17 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
   }
 
   if (w.targets.empty())
-    return input_module;  // nothing to shoot — the common path
+    return {input_module, nullptr};  // nothing to shoot — the common path
+
+  // Solve for each unknown in units of its seed's magnitude, so tol_shooting_deltax is relative
+  // for every target. dxdF, the seed's inverse slope, scales with the unknown (the residuals
+  // are already in their natural units): Newton uses it for its first Jacobian probe.
+  for (size_t i = 0; i < xguess.size(); ++i) {
+    const double scale = (xguess[i] != 0.) ? std::fabs(xguess[i]) : 1.;
+    w.unknown_scale.push_back(scale);
+    xguess[i] /= scale;
+    dxdF[i]   /= scale;
+  }
 
   // Solve (fzero_Newton handles n>=1 and writes the solution back into xguess).
   fc.is_shooting = true;
@@ -3194,16 +3230,25 @@ InputModulePtr InputModule::DoShooting(InputModulePtr input_module) {
                xguess.data(),
                dxdF.data(),
                static_cast<int>(w.targets.size()),
-               1e-3,
-               1e-3,
+               input_module->precision_.tol_shooting_deltax,
+               input_module->precision_.tol_shooting_deltaF,
                &w,
                &fevals);
 
-  // Write the resolved unknowns; build and return a fresh, fully-resolved module.
+  std::vector<std::string> resolved(w.targets.size());
   for (size_t i = 0; i < w.targets.size(); ++i) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%.17g", xguess[i]);
-    fc.set(w.targets[i].unknown_param, buf);
+    resolved[i] = FormatUnknown(xguess[i] * w.unknown_scale[i]);
+    fc.set(w.targets[i].unknown_param, resolved[i]);
   }
-  return std::make_shared<InputModule>(fc);
+
+  // The last evaluation was built from exactly these unknowns: it is the production cosmology.
+  if (w.last && w.last_unknowns == resolved) {
+    w.last_input->shooting_evaluations_ = w.evaluations;
+    w.last_input->shooting_build_kept_  = true;
+    return {nullptr, w.last};
+  }
+  // The solver stopped on its step criterion, at a point it never evaluated: build it.
+  auto resolved_module                   = std::make_shared<InputModule>(fc);
+  resolved_module->shooting_evaluations_ = w.evaluations;
+  return {resolved_module, nullptr};
 }

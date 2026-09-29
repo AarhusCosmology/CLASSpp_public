@@ -127,6 +127,18 @@ struct precision {
    */
   double tol_background_integration = 1e-7;
   /**
+   * Shooting (InputModule::DoShooting) stops once the summed |Newton step| in the unknowns
+   * falls below this. Each unknown is measured in units of its own seed's magnitude, so this
+   * is relative. class_public's name and default.
+   */
+  double tol_shooting_deltax = 1e-4;
+  /**
+   * Shooting stops once the summed |residual| falls below this. Every residual is in the units
+   * the data see it in: Omega (fractions of the critical density) for densities and budget
+   * closures, and 100*theta_s itself. class_public's name and default.
+   */
+  double tol_shooting_deltaF = 1e-6;
+  /**
    * Tolerance of the deviation of \f$ \Omega_r \f$ from 1 for which to start integration:
    * The starting point of integration will be chosen,
    * such that the Omega of radiation at that point is close to 1 within tolerance.

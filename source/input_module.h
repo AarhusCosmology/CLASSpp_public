@@ -23,15 +23,26 @@
 #include "thermodynamics.h"
 #include "transfer.h"
 
+class Cosmology;
+
+/** InputModule::DoShooting's answer. `converged` is the Cosmology the solver's last residual
+ *  evaluation built, when that evaluation was at exactly the resolved unknowns: it is then the
+ *  production cosmology, modules included. Otherwise `input` is a freshly built module.
+ *  (At namespace scope: generate_wrapper.py ends a class at its first `};`.) */
+struct ShootingResult {
+  InputModulePtr input;
+  std::shared_ptr<Cosmology> converged;
+};
+
 class InputModule {
  public:
   InputModule(FileContent& fc);
   static void file_content_from_arguments(int argc, char** argv, FileContent& fc);
 
-  /** Resolve any per-species / theta_s shooting targets by root-finding, returning a fully
-   *  resolved module. No targets (or already inside a shooting context) → returns the input
-   *  unchanged. Called lazily by Cosmology::GetInputModule. */
-  static InputModulePtr DoShooting(InputModulePtr input_module);
+  /** Resolve any per-species / theta_s shooting targets by root-finding. No targets (or
+   *  already inside a shooting context) → returns the input unchanged. Called lazily by
+   *  Cosmology::GetInputModule. */
+  static ShootingResult DoShooting(InputModulePtr input_module);
 
   FileContent& file_content_;
   precision precision_;
@@ -54,6 +65,11 @@ class InputModule {
    *  physics construction. Populated by ReadCoupledCluster alongside
    *  omega_budget_ and threaded through SpeciesBuildContext. */
   CoupledClusterInputs coupled_inputs_;
+  /** How DoShooting resolved this module: the residual evaluations it took, and whether the
+   *  last one (built from exactly the resolved unknowns) was kept as the production build.
+   *  0 / false when there was nothing to shoot. */
+  int shooting_evaluations_ = 0;
+  bool shooting_build_kept_ = false;
 
  private:
   // Hook-based shooting (used by DoShooting). theta_s is identified by
@@ -66,6 +82,15 @@ class InputModule {
     // theta_s). Lets ShootingResidual route each slot to its species' ComputeShootingResidual
     // with the authoritative target (so the species never re-derives it from the file content).
     std::vector<std::string> target_species_keys;
+    // Parallel to targets: each unknown is solved for in units of its seed's magnitude, so one
+    // tol_shooting_deltax is relative for every target.
+    std::vector<double> unknown_scale;
+    // The most recent successful evaluation: the only one a solver can return without
+    // evaluating again. Its unknowns are the exact strings written into the file content.
+    std::shared_ptr<Cosmology> last;
+    InputModule* last_input = nullptr;
+    std::vector<std::string> last_unknowns;
+    int evaluations = 0;
   };
   static void ShootingResidual(double* x, int x_size, void* pworkspace, double* output);
 

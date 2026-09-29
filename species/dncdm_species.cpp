@@ -160,17 +160,24 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
     has_Omega_dncdmdr   = true;
   }
 
-  // Omega_dncdmdr is mutually exclusive with Omega_ini/omega_ini/Neff_ini — EXCEPT inside a
-  // shooting build, where DoShooting legitimately writes <flavor>.Omega_dncdmdr as the
-  // initial-mode fixed-point unknown (or .deg for combined mode) alongside the user's key.
-  const bool in_shooting = (pfc != nullptr) && pfc->is_shooting;
-  class_test_severe(has_Omega_dncdmdr && (has_Omega_ini || has_omega_ini || has_Neff_ini) &&
-                        !in_shooting,
+  class_test_severe(has_Omega_dncdmdr && (has_Omega_ini || has_omega_ini || has_Neff_ini),
                     "species '%s': Omega_dncdmdr conflicts with Omega_ini/omega_ini/Neff_ini",
                     instance_name.c_str());
 
-  // Count mutually-exclusive target specs (skip inside a shooting build: the shooter adds
-  // Omega_dncdmdr alongside the user's initial-abundance key).
+  // The budget reserve of the initial and deg modes: a fixed point only the shooter writes
+  // (DNCDMSector). It is not an input.
+  const bool in_shooting = (pfc != nullptr) && pfc->is_shooting;
+  if (auto reserve = input.get<double>("Omega_dncdmdr_reserve")) {
+    class_test_severe(!in_shooting,
+                      "species '%s': Omega_dncdmdr_reserve is written by the shooter, not an "
+                      "input; normalise the sector with deg, Omega_ini/omega_ini/Neff_ini or "
+                      "Omega_dncdmdr",
+                      instance_name.c_str());
+    Omega_dncdmdr_reserve_ = *reserve;
+  }
+
+  // Count mutually-exclusive target specs (skip inside a shooting build: in combined mode the
+  // shooter adds deg alongside the user's Omega_dncdmdr).
   if (!in_shooting) {
     int n_deg_options = (int) has_deg + (int) has_Omega_ini + (int) has_omega_ini +
                         (int) has_Neff_ini + (int) has_Omega_dncdmdr;
@@ -180,15 +187,13 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
                       instance_name.c_str());
   }
 
-  // Stash Omega_dncdmdr_pending_ whenever Omega_dncdmdr is present: combined mode (user input),
-  // or the initial-mode fixed-point unknown the shooter wrote. GetOmega0() on the DNCDM_DR
-  // composite reads this to reserve the combined sector density.
+  // Combined mode: the requested sector density, which DNCDMSector reserves and shoots deg to.
   if (has_Omega_dncdmdr)
     Omega_dncdmdr_pending_ = Omega_dncdmdr_local;
 
   // Stash the initial-abundance target; deg is set later by DNCDMSpecies::CreateAll's
-  // ApplyDncdmInitialClosure (a_ini-driven). In a shooting iteration this co-occurs with the
-  // shot Omega_dncdmdr above — the initial key drives deg, Omega_dncdmdr only the closure reserve.
+  // ApplyDncdmInitialClosure (a_ini-driven). In a shooting iteration the reserve above
+  // co-occurs with it: the initial key drives deg, the reserve only the closure.
   const bool has_initial = has_Omega_ini || has_omega_ini || has_Neff_ini;
   if (has_Omega_ini)
     Omega_ini_pending_ = Omega_ini_local;  // already in Omega units
@@ -249,6 +254,14 @@ std::vector<DNCDMSpecies::Named> DNCDMSpecies::CreateAll(const SpeciesBuildConte
 std::pair<double, double> DNCDMSpecies::DegGuessFromOmegaToday(const SpeciesBuildContext& ctx,
                                                                double Omega_target) const {
   const background& ba = *ctx.pba;
+  if (Gamma() / ba.H0 <= 1.0) {
+    // Barely decayed today: the target is the stable parent's density today, which is linear
+    // in deg. (Scaling it by the radiation-era density instead overshot deg by ~m/T.)
+    const double today_deg1 = BackgroundDensityOverH0Sq(1., ba.H0) / GetDeg();
+    const double guess      = (today_deg1 > 0.) ? Omega_target / today_deg1 : 0.;
+    return {guess, (Omega_target != 0.) ? guess / Omega_target : 0.};
+  }
+
   // a_ini: earliest scale factor at which the NCDM distribution is non-relativistic enough
   // to integrate numerically.  Mirror input_module.cpp:3764-3769.
   double a_ini         = ctx.ppr ? ctx.ppr->a_ini_over_a_today_default : 1e-14;
@@ -263,23 +276,20 @@ std::pair<double, double> DNCDMSpecies::DegGuessFromOmegaToday(const SpeciesBuil
   const double rho_deg1   = (GetDeg() > 0.) ? rho_actual / GetDeg() : 0.;
   const double Omega_deg1 = rho_deg1 * std::pow(a_ini, 4.0) / (ba.H0 * ba.H0);
 
-  double Omega_ini = Omega_target;
-  if (Gamma() / ba.H0 > 1.0) {
-    // Approximately fully decayed today: compute correction factor.
-    const double a_nr = 3.15 / GetMass();
-    /* The early radiation, summed as the background's initial conditions sum it. */
-    double Omega0_rad = ba.Omega0_g;
-    if (ctx.all_species)
-      for (const auto& sp : *ctx.all_species)
-        Omega0_rad += sp->GetRadiationOmega0();
-    const double k_rad        = std::sqrt(2.0 * ba.H0 * std::sqrt(Omega0_rad));
-    const double t_nr         = std::pow(a_nr / k_rad, 2.0);
-    const double x            = Gamma() * t_nr;
-    const double experfcsqrtx = (x < 20.) ? std::exp(x) * std::erfc(std::sqrt(x))
-                                          : 1.0 / std::sqrt(x * _PI_);
-    Omega_ini                 = std::sqrt(2.0) * a_nr * std::sqrt(Gamma()) * Omega_target / k_rad /
-                                (2.0 * std::sqrt(x) + std::sqrt(_PI_) * experfcsqrtx);
-  }
+  // Approximately fully decayed today: compute correction factor.
+  const double a_nr = 3.15 / GetMass();
+  /* The early radiation, summed as the background's initial conditions sum it. */
+  double Omega0_rad = ba.Omega0_g;
+  if (ctx.all_species)
+    for (const auto& sp : *ctx.all_species)
+      Omega0_rad += sp->GetRadiationOmega0();
+  const double k_rad        = std::sqrt(2.0 * ba.H0 * std::sqrt(Omega0_rad));
+  const double t_nr         = std::pow(a_nr / k_rad, 2.0);
+  const double x            = Gamma() * t_nr;
+  const double experfcsqrtx = (x < 20.) ? std::exp(x) * std::erfc(std::sqrt(x))
+                                        : 1.0 / std::sqrt(x * _PI_);
+  const double Omega_ini    = std::sqrt(2.0) * a_nr * std::sqrt(Gamma()) * Omega_target / k_rad /
+                              (2.0 * std::sqrt(x) + std::sqrt(_PI_) * experfcsqrtx);
 
   const double guess = (Omega_deg1 > 0.) ? Omega_ini / Omega_deg1 : 0.;
   const double dxdy  = (Omega_target != 0.) ? guess / Omega_target : 0.;

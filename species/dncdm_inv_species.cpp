@@ -412,7 +412,7 @@ DNCDMInvSpecies::DNCDMInvSpecies(std::unique_ptr<DNCDMSpecies> parent,
                                  DecayTransitionKernel::Config cfg,
                                  const background* pba,
                                  const BackgroundModule* bgm)
-    : CompositeSpecies(parent->name(), BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm) {
+    : DNCDMSector(parent.get()), pba_(pba), bgm_(bgm) {
   parent_  = parent.get();
   fermion_ = fermion.get();
   boson_   = boson.get();
@@ -1486,56 +1486,11 @@ void DNCDMInvSpecies::WriteBackgroundData(const double* pvecback, BackgroundColu
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Closure + shooter hooks (combined parent+fermion+boson reserve, mirrors DNCDM_DR)
+// Budget-closure hooks for DNCDMSector
 // ─────────────────────────────────────────────────────────────────────────────
 
-double DNCDMInvSpecies::GetOmega0() const {
-  if (parent_->Omega_dncdmdr_pending().has_value())
-    return *parent_->Omega_dncdmdr_pending();
-  return CompositeSpecies::GetOmega0();  // pre-shooting discovery fallback
-}
-
-std::vector<ShootingTarget> DNCDMInvSpecies::GetShootingTargets() const {
-  if (parent_->InitialAbundanceMode()) {
-    const double seed = parent_->Omega_dncdmdr_pending().value_or(
-        parent_->Omega_ini_pending().value_or(0.1));
-    return {{name() + ".Omega_dncdmdr_fixedpoint", name() + ".Omega_dncdmdr", seed}};
-  }
-  if (parent_->Omega_dncdmdr_pending().has_value()) {
-    return {{name() + ".Omega_dncdmdr", name() + ".deg", *parent_->Omega_dncdmdr_pending()}};
-  }
-  return {};
-}
-
-void DNCDMInvSpecies::ComputeShootingGuess(const SpeciesBuildContext& ctx,
-                                           std::vector<double>& guess,
-                                           std::vector<double>& dxdy) const {
-  if (parent_->InitialAbundanceMode()) {
-    double seed = 0.1;
-    if (parent_->Omega_ini_pending().has_value())
-      seed = *parent_->Omega_ini_pending();
-    else if (parent_->Neff_ini_pending().has_value() && ctx.pba)
-      seed = *parent_->Neff_ini_pending() * 7. / 8. * std::pow(4. / 11., 4. / 3.) *
-             ctx.pba->Omega0_g;
-    guess.push_back(seed);
-    dxdy.push_back(1.0);
-    return;
-  }
-  if (!parent_->Omega_dncdmdr_pending().has_value())
-    return;
-  auto [g, d] = parent_->DegGuessFromOmegaToday(ctx, *parent_->Omega_dncdmdr_pending());
-  guess.push_back(g);
-  dxdy.push_back(d);
-}
-
-double DNCDMInvSpecies::ComputeShootingResidual(const ShootingResidualContext& ctx,
-                                                const ShootingTarget& target) const {
-  const double* bg      = ctx.bg_today;
-  const double H0       = ctx.pba->H0;
-  const double combined = (parent_->Rho(bg) + fermion_->Rho(bg) + boson_->Rho(bg)) / (H0 * H0);
-  if (target.target_name == name() + ".Omega_dncdmdr_fixedpoint")
-    return -combined + GetOmega0();
-  return combined - target.target_value;
+double DNCDMInvSpecies::DaughtersInitialRadiationOmega0(double H0) const {
+  return fermion_->InitialRadiationOmega0(H0) + boson_->InitialRadiationOmega0(H0);
 }
 
 void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,

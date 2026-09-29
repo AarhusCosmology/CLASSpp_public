@@ -12,13 +12,23 @@
 
 InputModulePtr& Cosmology::GetInputModule() {
   if (!shot_) {
-    input_module_ptr_ = InputModule::DoShooting(std::move(input_module_ptr_));
-    shot_             = true;
+    ShootingResult shoot = InputModule::DoShooting(std::move(input_module_ptr_));
+    if (shoot.converged) {
+      // The solver's last evaluation was built from exactly the resolved file content, so it
+      // IS this cosmology: adopt it whole, with every module the residual already built.
+      // docs/superpowers/specs/2026-09-29-shooting-reuse-and-dncdm-budget-design.md (B)
+      *this = std::move(*shoot.converged);
+    }
+    else {
+      input_module_ptr_ = std::move(shoot.input);
+    }
+    shot_ = true;
   }
   return input_module_ptr_;
 }
 
 BackgroundModulePtr& Cosmology::GetBackgroundModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!background_module_ptr_) {
     background_module_ptr_ = BackgroundModulePtr(new BackgroundModule(GetInputModule()));
   }
@@ -26,6 +36,7 @@ BackgroundModulePtr& Cosmology::GetBackgroundModule() {
 }
 
 ThermodynamicsModulePtr& Cosmology::GetThermodynamicsModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!thermodynamics_module_ptr_) {
     thermodynamics_module_ptr_ = ThermodynamicsModulePtr(
         new ThermodynamicsModule(GetInputModule(), GetBackgroundModule()));
@@ -34,6 +45,7 @@ ThermodynamicsModulePtr& Cosmology::GetThermodynamicsModule() {
 }
 
 PerturbationsModulePtr& Cosmology::GetPerturbationsModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!perturbations_module_ptr_) {
     perturbations_module_ptr_ = PerturbationsModulePtr(
         new PerturbationsModule(GetInputModule(),
@@ -44,6 +56,7 @@ PerturbationsModulePtr& Cosmology::GetPerturbationsModule() {
 }
 
 PrimordialModulePtr& Cosmology::GetPrimordialModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!primordial_module_ptr_) {
     /** If sigma8 was input, compute local pm and nl module here, compute sigma8, update As and continue*/
     if (GetInputModule()->primordial_.sigma8 > 0) {
@@ -72,6 +85,7 @@ PrimordialModulePtr& Cosmology::GetPrimordialModule() {
 }
 
 NonlinearModulePtr& Cosmology::GetNonlinearModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!nonlinear_module_ptr_) {
     nonlinear_module_ptr_ = NonlinearModulePtr(new NonlinearModule(GetInputModule(),
                                                                    GetBackgroundModule(),
@@ -82,6 +96,7 @@ NonlinearModulePtr& Cosmology::GetNonlinearModule() {
 }
 
 TransferModulePtr& Cosmology::GetTransferModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!transfer_module_ptr_) {
     transfer_module_ptr_ = TransferModulePtr(new TransferModule(GetInputModule(),
                                                                 GetBackgroundModule(),
@@ -93,6 +108,7 @@ TransferModulePtr& Cosmology::GetTransferModule() {
 }
 
 SpectraModulePtr& Cosmology::GetSpectraModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!spectra_module_ptr_) {
     spectra_module_ptr_ = SpectraModulePtr(new SpectraModule(GetInputModule(),
                                                              GetPerturbationsModule(),
@@ -104,6 +120,7 @@ SpectraModulePtr& Cosmology::GetSpectraModule() {
 }
 
 LensingModulePtr& Cosmology::GetLensingModule() {
+  GetInputModule();  // may adopt a converged shooting build, filling the pointers below
   if (!lensing_module_ptr_) {
     lensing_module_ptr_ = LensingModulePtr(new LensingModule(GetInputModule(), GetSpectraModule()));
   }

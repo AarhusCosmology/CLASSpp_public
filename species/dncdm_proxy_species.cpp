@@ -361,8 +361,8 @@ DNCDMProxySpecies::DNCDMProxySpecies(std::unique_ptr<DNCDMSpecies> parent,
                                      DecayTransitionKernel::Config cfg,
                                      const background* pba,
                                      const BackgroundModule* bgm)
-    : CompositeSpecies(parent->name(), BaseSpecies::EnergyType::Other), pba_(pba), bgm_(bgm),
-      q_d_(std::move(q_d)), dq_d_(std::move(dq_d)) {
+    : DNCDMSector(parent.get()), pba_(pba), bgm_(bgm), q_d_(std::move(q_d)),
+      dq_d_(std::move(dq_d)) {
   parent_  = parent.get();
   fermion_ = fermion.get();
   boson_   = boson.get();
@@ -818,17 +818,13 @@ void DNCDMProxySpecies::RegisterIntegrationIndices(int& index_bi) {
 
 void DNCDMProxySpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
   CompositeSpecies::SetBackgroundInitialConditions(ctx);
-  const int Nd = static_cast<int>(q_d_.size());
-  for (int i = 0; i < Nd; ++i) {
-    const double q = q_d_[i];
-    // f_ini_l = 1 seeds nu_l with a FULL Fermi-Dirac at the parent's temperature
-    // (the published A = [0,1,1] initial state: phi empty, nu_l thermal). Seeded at
-    // the true occupation, never at a large subtracted offset -- f-bar feeds the
-    // kernel's (1±f) coefficients directly.
-    const double fl = (f_ini_l_ > 0.) ? f_ini_l_ / (std::exp(q) + 1.) : 0.;
-    const double fp = (f_ini_phi_ > 0.) ? f_ini_phi_ / std::expm1(q) : 0.;
-    ctx.pvecback_integration[index_bi_f_l_ + i]   = fl + kFFloor;
-    ctx.pvecback_integration[index_bi_f_phi_ + i] = fp + kFFloor;
+  // Seeded at the true occupation, never at a large subtracted offset -- f-bar feeds the
+  // kernel's (1±f) coefficients directly.
+  const std::vector<double> fl = InitialDaughterOccupation(false);
+  const std::vector<double> fp = InitialDaughterOccupation(true);
+  for (size_t i = 0; i < q_d_.size(); ++i) {
+    ctx.pvecback_integration[index_bi_f_l_ + i]   = fl[i] + kFFloor;
+    ctx.pvecback_integration[index_bi_f_phi_ + i] = fp[i] + kFFloor;
   }
   // The daughters' DarkRadiationSpecies rho slots must agree with the PSDs they are
   // driven from, or the sector's energy is double-booked at the first step.
@@ -836,6 +832,24 @@ void DNCDMProxySpecies::SetBackgroundInitialConditions(const BackgroundICContext
       DaughterRho(&ctx.pvecback_integration[index_bi_f_l_], ctx.a_ini, false);
   ctx.pvecback_integration[boson_->bi_rho_index()] =
       DaughterRho(&ctx.pvecback_integration[index_bi_f_phi_], ctx.a_ini, true);
+}
+
+std::vector<double> DNCDMProxySpecies::InitialDaughterOccupation(bool boson) const {
+  // f_ini_l = 1 seeds nu_l with a FULL Fermi-Dirac at the parent's temperature (the
+  // published A = [0,1,1] initial state: phi empty, nu_l thermal).
+  const double amplitude = boson ? f_ini_phi_ : f_ini_l_;
+  std::vector<double> f(q_d_.size(), 0.);
+  if (amplitude > 0.)
+    for (size_t i = 0; i < q_d_.size(); ++i)
+      f[i] = amplitude / (boson ? std::expm1(q_d_[i]) : std::exp(q_d_[i]) + 1.);
+  return f;
+}
+
+double DNCDMProxySpecies::DaughtersInitialRadiationOmega0(double H0) const {
+  // DaughterRho at a = 1 is a^4 rho: the seeded populations as free radiation today.
+  return (DaughterRho(InitialDaughterOccupation(false).data(), 1., false) +
+          DaughterRho(InitialDaughterOccupation(true).data(), 1., true)) /
+         (H0 * H0);
 }
 
 double DNCDMProxySpecies::DaughterRho(const double* f, double a, bool boson) const {

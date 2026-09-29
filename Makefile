@@ -12,6 +12,7 @@ TEST_TARGETS := \
 	test-precision-evolver \
 	test-errors \
 	test-tca-ic-guard \
+	test-shooting \
 	test-deposition \
 	test-hyrec \
 	test-baryon-clumping \

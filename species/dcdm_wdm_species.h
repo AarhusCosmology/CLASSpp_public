@@ -64,7 +64,7 @@ class DCDM_WDM_Species : public CompositeSpecies {
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 
   /** Combined sector density today (pinned/shot Omega_dcdmwdm), mirroring
-   *  DNCDM_DR_Species::GetOmega0: at closure time the daughter's density is
+   *  DNCDMSector::GetOmega0: at closure time the daughter's density is
    *  not yet integrated, so the child sum alone would under-reserve. */
   double GetOmega0() const override;
 

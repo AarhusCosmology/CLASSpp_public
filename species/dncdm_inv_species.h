@@ -5,6 +5,7 @@
 #include "background.h"
 #include "composite_species.h"
 #include "decay_transition_kernel.h"
+#include "dncdm_sector.h"
 #include "dncdm_species.h"
 #include "dr_psd_species.h"
 #include "reduced_collision_operator.h"
@@ -42,7 +43,7 @@ class BackgroundModule;
  * coupled trio (all guarded at Create). The parent must be a single momentum grid
  * (q_size == q_size_bg), also guarded at Create.
  */
-class DNCDMInvSpecies : public CompositeSpecies {
+class DNCDMInvSpecies : public DNCDMSector {
  public:
   /** Parent and both daughters are momentum-resolved NCDM hierarchies. */
   bool HasNcdm() const override {
@@ -126,15 +127,6 @@ class DNCDMInvSpecies : public CompositeSpecies {
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
-
-  // ── Closure + shooter hooks (combined 3-child reserve; mirrors DNCDM_DR) ────
-  double GetOmega0() const override;
-  std::vector<ShootingTarget> GetShootingTargets() const override;
-  void ComputeShootingGuess(const SpeciesBuildContext& ctx,
-                            std::vector<double>& guess,
-                            std::vector<double>& dxdy) const override;
-  double ComputeShootingResidual(const ShootingResidualContext& ctx,
-                                 const ShootingTarget& target) const override;
 
   // ── Perturbations: the per-ℓ collision coupling (design §4.3) ───────────────
   /** Runs after each child's free-streaming PerturbDerivs (CompositeSpecies two-
@@ -405,6 +397,12 @@ class DNCDMInvSpecies : public CompositeSpecies {
    *  after ApplyKernelPerturbDerivs only THIS one is fresh. */
   double ClampedEnergyResidualPert(const Scratch& scratch) const {
     return scratch.kernel_pt->clamped_energy_residual();
+  }
+
+ protected:
+  double DaughtersInitialRadiationOmega0(double H0) const override;
+  bool HasInverseDecays() const override {
+    return cfg_.inverse_decays;
   }
 
  private:

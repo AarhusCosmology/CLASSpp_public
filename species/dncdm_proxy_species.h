@@ -8,6 +8,7 @@
 #include "composite_species.h"
 #include "dark_radiation_species.h"
 #include "decay_transition_kernel.h"
+#include "dncdm_sector.h"
 #include "dncdm_species.h"
 #include "species/species_build_context.h"
 
@@ -62,7 +63,7 @@ class BackgroundModule;
  * exact composite, for the same reasons. Calibration and the accuracy-vs-cost ladder:
  * docs/superpowers/specs/2026-08-14-dncdm-proxy-representation.md.
  */
-class DNCDMProxySpecies : public CompositeSpecies {
+class DNCDMProxySpecies : public DNCDMSector {
  public:
   /** The parent keeps its momentum-resolved hierarchy; only the daughters collapse. */
   bool HasNcdm() const override {
@@ -325,6 +326,13 @@ class DNCDMProxySpecies : public CompositeSpecies {
    *  (n_daughter for the fermion, 1 for the boson -- phi is always one species). */
   double DaughterRho(const double* f, double a, bool boson) const;
 
+ protected:
+  double DaughtersInitialRadiationOmega0(double H0) const override;
+  /** The proxy is an inverse-decay sector by construction (Create refuses inverse_decays = no). */
+  bool HasInverseDecays() const override {
+    return true;
+  }
+
   /** Channel multiplicity: how many parent / daughter mass eigenstates the sector
    *  carries. See DecayTransitionKernel::Config::n_parent for the counting, and the
    *  design note for why the parent's is tied to `deg`. */
@@ -339,6 +347,10 @@ class DNCDMProxySpecies : public CompositeSpecies {
   double BareFactorNumber(double a) const;
 
  private:
+  /** A daughter's seeded occupation on the coarse grid (dr_f_ini_l / dr_f_ini_phi times the
+   *  parent's thermal shape), before the positivity floor. */
+  std::vector<double> InitialDaughterOccupation(bool boson) const;
+
   /** Gather the three background PSDs into bare-occupation buffers, run the
    *  kernel, and hand back the per-species number/energy sources. */
   void ApplyKernelBackgroundDerivs(double a, const double* y, double* dy, double a_prime_over_a);

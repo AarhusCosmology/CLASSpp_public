@@ -5,9 +5,9 @@
 #include "background.h"
 #include "composite_species.h"
 #include "dark_radiation_species.h"
+#include "dncdm_sector.h"
 #include "dncdm_species.h"
 #include "parser.h"
-#include "species/shooting_target.h"
 #include "species/species_build_context.h"
 
 class BackgroundModule;
@@ -15,7 +15,7 @@ class BackgroundModule;
 /**
  * DNCDM_DR_Species: composite for one flavor of Decaying Non-Cold Dark Matter + its decay radiation.
  */
-class DNCDM_DR_Species : public CompositeSpecies {
+class DNCDM_DR_Species : public DNCDMSector {
  public:
   /** The parent is a momentum-resolved NCDM hierarchy. */
   bool HasNcdm() const override {
@@ -45,14 +45,6 @@ class DNCDM_DR_Species : public CompositeSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  // ── Shooter hooks ──────────────────────────────────────────────────────────
-  std::vector<ShootingTarget> GetShootingTargets() const override;
-  void ComputeShootingGuess(const SpeciesBuildContext& ctx,
-                            std::vector<double>& guess,
-                            std::vector<double>& dxdy) const override;
-  double ComputeShootingResidual(const ShootingResidualContext& ctx,
-                                 const ShootingTarget& target) const override;
-
   void SetBackgroundModule(const BackgroundModule* bgm) override;
   void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
 
@@ -65,12 +57,6 @@ class DNCDM_DR_Species : public CompositeSpecies {
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override {
     dncdm_->WriteBackgroundData(pvecback, w);
   }
-
-  /** Total density fraction of the whole decaying sector today (matter + decay
-   *  radiation) = the closure-reserved Omega_dncdmdr. Mirrors DCDMSpecies::GetOmega0().
-   *  Surfaces the pinned/shot combined rather than summing children, because at
-   *  Pass-1 closure time the emergent DR is not yet integrated. */
-  double GetOmega0() const override;
 
   DNCDMSpecies& dncdm() {
     return *dncdm_;
@@ -111,6 +97,14 @@ class DNCDM_DR_Species : public CompositeSpecies {
                          const double* y,
                          double* dy,
                          const perturb_parameters_and_workspace& ppaw) const override;
+
+  /** The integrated daughter fluid starts empty. */
+  double DaughtersInitialRadiationOmega0(double /*H0*/) const override {
+    return 0.;
+  }
+  bool HasInverseDecays() const override {
+    return false;
+  }
 
  private:
   DNCDMSpecies* dncdm_         = nullptr;

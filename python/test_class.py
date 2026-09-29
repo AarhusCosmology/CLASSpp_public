@@ -805,6 +805,9 @@ class TestReviewRegressions(TestClass):
                 'dncdm1.T': 0.71611,
                 'dncdm1.Gamma': 1e3,
                 'dncdm1.Omega_ini': 0.001,
+                # A decaying parent needs one momentum grid for background and perturbations.
+                'dncdm1.quadrature_strategy': 3,
+                'dncdm1.momenta_bins': 8,
             })
             cosmo.compute()
             self.assertTrue(cosmo.raw_cl(100)['tt'].size > 0)
@@ -833,6 +836,9 @@ class TestReviewRegressions(TestClass):
             'dncdm1.T': 0.71611,
             'dncdm1.Gamma': 1e3,
             'dncdm1.Omega_ini': 0.001,
+            # A decaying parent needs one momentum grid for background and perturbations.
+            'dncdm1.quadrature_strategy': 3,
+            'dncdm1.momenta_bins': 8,
         }
         self.scenario = dict(base)
         spectra = {}
@@ -882,6 +888,9 @@ class TestReviewRegressions(TestClass):
             'dncdm1.T': 0.71611,
             'dncdm1.Gamma': 1e3,
             'dncdm1.Omega_ini': 0.001,
+            # A decaying parent needs one momentum grid for background and perturbations.
+            'dncdm1.quadrature_strategy': 3,
+            'dncdm1.momenta_bins': 8,
         }
         self.scenario = dict(scenario)
         self.name = self._testMethodName
@@ -1970,6 +1979,11 @@ class TestReviewRegressions(TestClass):
             'nu2.type': 'ncdm_decay_dr',
             'nu2.m': 0.08,
             'nu2.Gamma': 2e-3,
+            # A decaying parent needs one momentum grid for background and perturbations.
+            'nu1.quadrature_strategy': 3,
+            'nu1.momenta_bins': 8,
+            'nu2.quadrature_strategy': 3,
+            'nu2.momenta_bins': 8,
         }
         reference = dict(scenario, **{'nu2.deg': 1.0})
         self._assert_scenarios_match(scenario, reference, "Explicit legacy default")

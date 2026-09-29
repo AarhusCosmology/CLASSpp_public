@@ -157,6 +157,10 @@ class DrPsdSpecies : public NCDMBaseSpecies {
   void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
   void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
 
+  /** Its seeded population (f_ini, SetBackgroundInitialConditions) as free radiation today,
+   *  a^4 rho / H0^2: the quadrature ComputeBackground integrates, before anything decays. */
+  double InitialRadiationOmega0(double H0) const;
+
   double Rho(const double* pvecback) const override {
     return pvecback[index_bg_rho_];
   }

@@ -321,6 +321,18 @@ void DrPsdSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   }
 }
 
+double DrPsdSpecies::InitialRadiationOmega0(double H0) const {
+  if (f_ini_ <= 0.)
+    return 0.;
+  // ComputeMomenta's sum at a = 1 with epsilon = q (massless), on the seeded occupation.
+  double sum = 0.;
+  for (int i = 0; i < N_q_bg_; ++i) {
+    const double q  = q_bg_[i];
+    sum            += q * q * q * f_ini_ * ThermalF0(q) * dq_bg_[i];
+  }
+  return factor_ * sum / (H0 * H0);
+}
+
 void DrPsdSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
   const int N = N_q_bg_;
   std::vector<double> f_df(2 * N), ddf(N), lnq(N);
