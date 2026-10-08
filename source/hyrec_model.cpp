@@ -1,5 +1,6 @@
 #include "hyrec_model.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
@@ -26,6 +27,25 @@ namespace {
 constexpr double kE_H_ion = 13.5984336478;
 constexpr double kE_H_lya = 10.1988356821;
 
+/* HYREC-2's helium rate calibrated to CosmoRec, in the form CAMB 2 uses for RECFAST (Lewis,
+   arXiv:2607.14854 eq. 23) but refitted to HYREC-2: dx_HeII/dlna is multiplied by
+   F = 1 + (a0 + a1 u + a2 u^2) / (1 + d2 u^2 + d4 u^4), u = (z_scale - z0) / w, where z_scale is
+   the redshift at which a 2.7255 K sky has today's photon temperature (in atomic units, so it
+   follows He I recombination under varying alpha and m_e). F peaks at 1.65 near z = 1780, where
+   CosmoRec's 584 A photons, diffusing into the H I wings, recombine helium fastest relative to
+   HYREC-2's escape probability. No window: F -> 1 away from the peak (1.005 at z = 3000), so the
+   rate stays continuous. Fitted at one cosmology to direct CosmoRec (Lewis' reference settings);
+   docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md has the fit and its transfer. */
+double HeliumRateCorrection(double T_rad_atomic_eV) {
+  constexpr double a0 = 0.635977, a1 = 0.298024, a2 = 0.239789;
+  constexpr double d2 = 2.91828, d4 = 3.31521;
+  constexpr double z0 = 1751.94, w = 286.606;
+  const double z_scale = T_rad_atomic_eV / (kBoltz * 2.7255) - 1.;
+  const double u       = (z_scale - z0) / w;
+  const double u2      = u * u;
+  return 1. + (a0 + a1 * u + a2 * u2) / (1. + d2 * u2 + d4 * u2 * u2);
+}
+
 }  // namespace
 
 HyrecModel::HyrecModel(const std::string& path,
@@ -37,8 +57,9 @@ HyrecModel::HyrecModel(const std::string& path,
                        double YHe,
                        double fHe,
                        double nH0,
-                       double z_initial)
-    : data_(new HyrecData), path_(path), fHe_(fHe) {
+                       double z_initial,
+                       bool He_rate_correction)
+    : data_(new HyrecData), path_(path), fHe_(fHe), He_rate_correction_(He_rate_correction) {
   /* hyrec_allocate reads the effective-rate and SWIFT-fit tables from this
      directory, so it has to be set first. HYREC-2 keeps the pointer, hence the
      copy that outlives the call. */
@@ -168,17 +189,38 @@ IonisationDerivatives HyrecModel::Derivatives(const RecombinationState& state,
      from HeIII (x_He = 2) down through the second Saha transition, which is
      outside that range, and holds helium at Saha rather than evolving it -- so
      the derivative is unused there anyway, entering only a negligible correction
-     term in dT_mat/dz. Below XHEII_MIN helium has finished recombining and
-     HYREC-2 stops tracking it. */
-  if (state.helium_ode && xHeII >= XHEII_MIN && xHeII < fHe_) {
-    inj->ion = (energy_rate > 0.) ? energy_rate * dep.ion_He / (state.n_H * kE_H_ion * _eV_) : 0.;
-    inj->exclya = lya_rate;
+     term in dT_mat/dz.
 
-    const double dxHeIIdlna =
-        rec_helium_dxHeIIdlna(&data_->d, state.z, 1. - state.x_H, xHeII, state.H);
-    class_test(data_->d.error != 0,
-               "HYREC-2 failed in rec_helium_dxHeIIdlna: %s",
-               data_->d.error_message);
+     Below XHEII_MIN HYREC-2 stops tracking helium and takes it to be entirely
+     neutral (history.c). Here it relaxes to zero at kRelax e-folds per e-fold of
+     the scale factor. Holding it at XHEII_MIN instead, as this wrapper used to,
+     left 1e-6 free electrons per hydrogen in the late tail, and made XHEII_MIN a
+     trap: with a zero derivative below it, a stiff step that landed there -- even
+     below zero -- was self-consistent and stuck. The two rates are blended over
+     [XHEII_MIN, 2 XHEII_MIN] so the derivative stays continuous, and HYREC-2 is
+     never asked about helium at the low temperatures where its Boltzmann factors
+     overflow. */
+  if (state.helium_ode && xHeII < fHe_) {
+    constexpr double kRelax = 100.;
+    const double relax      = -kRelax * xHeII;
+    double dxHeIIdlna       = relax;
+
+    if (xHeII >= XHEII_MIN) {
+      inj->ion = (energy_rate > 0.) ? energy_rate * dep.ion_He / (state.n_H * kE_H_ion * _eV_) : 0.;
+      inj->exclya = lya_rate;
+
+      double hyrec = rec_helium_dxHeIIdlna(&data_->d, state.z, 1. - state.x_H, xHeII, state.H);
+      class_test(data_->d.error != 0,
+                 "HYREC-2 failed in rec_helium_dxHeIIdlna: %s",
+                 data_->d.error_message);
+
+      if (He_rate_correction_) {
+        hyrec *= HeliumRateCorrection(T_rad_eV / state.constants.TemperatureRescale());
+      }
+
+      const double weight = std::min(1., (xHeII - XHEII_MIN) / XHEII_MIN);
+      dxHeIIdlna          = weight * hyrec + (1. - weight) * relax;
+    }
 
     result.dx_He_dz = -dxHeIIdlna / (1. + state.z) / fHe_;
   }

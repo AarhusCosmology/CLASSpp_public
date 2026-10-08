@@ -27,9 +27,23 @@ std::string DefaultPath() {
   return std::string(__CLASSDIR__) + "/hyrec/";
 }
 
-HyrecModel MakeModel(const std::string& path = DefaultPath()) {
-  return HyrecModel(path, kT_cmb, kObh2, kOcbh2, kOkh2, kNeff, kYHe, kFHe, kNH0, kZInitial);
+HyrecModel MakeModel(const std::string& path = DefaultPath(), bool He_rate_correction = false) {
+  return HyrecModel(path,
+                    kT_cmb,
+                    kObh2,
+                    kOcbh2,
+                    kOkh2,
+                    kNeff,
+                    kYHe,
+                    kFHe,
+                    kNH0,
+                    kZInitial,
+                    He_rate_correction);
 }
+
+/* HYREC-2's XHEII_MIN (history.h, opaque to this test): helium per hydrogen below which
+   it stops tracking helium. */
+constexpr double kXHeIIMin = 1e-6;
 
 /* A state deep in hydrogen recombination, where SWIFT's fitting function is the
    branch that runs. Densities and rates are the ones CLASS would supply. */
@@ -144,10 +158,90 @@ void test_helium_window() {
   RecombinationState ionized = StateAt(2200., 0.999999, 1.);
   ionized.hydrogen_frozen    = true;
   assert(model.Derivatives(ionized, kNoInjection, 0.).dx_He_dz == 0.);
+}
 
-  /* Helium finished: below HYREC-2's XHEII_MIN it stops tracking. */
-  RecombinationState done = StateAt(1400., 0.9, 1e-9);
-  assert(model.Derivatives(done, kNoInjection, 0.).dx_He_dz == 0.);
+/* Below XHEII_MIN HYREC-2 takes helium to be entirely neutral, so the wrapper relaxes it
+   to zero: dx_He/dlna = -100 x_He, i.e. dx_He/dz = +100 x_He / (1 + z). Holding it there
+   instead left 1e-6 electrons per hydrogen in the tail, and a zero derivative let a stiff
+   step that overshot below XHEII_MIN -- even below zero -- stay put. */
+void test_helium_relaxes_to_zero_below_xheii_min() {
+  HyrecModel model = MakeModel();
+  const double z   = 1400.;
+
+  const double x_He_done = 0.5 * kXHeIIMin / kFHe;
+  const double d_done    = model.Derivatives(StateAt(z, 0.9, x_He_done), kNoInjection, 0.).dx_He_dz;
+  assert(std::fabs(d_done - 100. * x_He_done / (1. + z)) < 1e-12 * std::fabs(d_done));
+
+  /* An overshoot below zero is pulled back up as z falls (dx_He/dz < 0), not held. */
+  const double d_negative =
+      model.Derivatives(StateAt(z, 0.9, -x_He_done), kNoInjection, 0.).dx_He_dz;
+  assert(d_negative < 0.);
+
+  /* Continuous across XHEII_MIN: HYREC-2's rate is blended in over [XHEII_MIN, 2 XHEII_MIN]. */
+  const double below =
+      model.Derivatives(StateAt(z, 0.9, 0.9999 * kXHeIIMin / kFHe), kNoInjection, 0.).dx_He_dz;
+  const double above =
+      model.Derivatives(StateAt(z, 0.9, 1.0001 * kXHeIIMin / kFHe), kNoInjection, 0.).dx_He_dz;
+  assert(std::isfinite(below) && std::isfinite(above));
+  assert(std::fabs(above - below) < 1e-2 * std::fabs(below));
+}
+
+/* hyrec_calibration = cosmorec scales HYREC-2's helium rate by F(T_rad): 1.65 at its peak
+   near z = 1780, back to 1 far from it, and leaves hydrogen alone. */
+void test_cosmorec_calibration_scales_helium_only() {
+  HyrecModel plain      = MakeModel();
+  HyrecModel calibrated = MakeModel(DefaultPath(), true);
+
+  auto ratio = [&](double z) {
+    RecombinationState s = StateAt(z, 0.999999, 0.3);
+    s.hydrogen_frozen    = true;
+    return calibrated.Derivatives(s, kNoInjection, 0.).dx_He_dz /
+           plain.Derivatives(s, kNoInjection, 0.).dx_He_dz;
+  };
+  assert(std::fabs(ratio(1777.) - 1.649) < 0.005);
+  assert(ratio(1777.) > ratio(1600.) && ratio(1777.) > ratio(2000.));
+  assert(std::fabs(ratio(3000.) - 1.) < 1e-2);
+  for (double z = 1500.; z <= 3500.; z += 100.) {
+    assert(ratio(z) >= 1. && ratio(z) < 1.7);
+  }
+
+  RecombinationState h = StateAt(1100., 0.5, 1e-8);
+  assert(calibrated.Derivatives(h, kNoInjection, 0.).dx_H_dz ==
+         plain.Derivatives(h, kNoInjection, 0.).dx_H_dz);
+}
+
+/* The input key: 'cosmorec' (the default) and 'none' set the switch; anything else is an
+   error. */
+void test_hyrec_calibration_key() {
+  {
+    precision ppr;
+    assert(ppr.hyrec_He_rate_correction);
+  }
+  {
+    FileContent fc;
+    fc.set("hyrec_calibration", "none");
+    precision ppr;
+    ppr.parse(fc);
+    assert(!ppr.hyrec_He_rate_correction);
+  }
+  {
+    FileContent fc;
+    fc.set("hyrec_calibration", "cosmorec");
+    precision ppr;
+    ppr.parse(fc);
+    assert(ppr.hyrec_He_rate_correction);
+  }
+  bool threw = false;
+  try {
+    FileContent fc;
+    fc.set("hyrec_calibration", "CosmoRec2");
+    precision ppr;
+    ppr.parse(fc);
+  }
+  catch (const std::exception&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 /* Outside HYREC-2's effective-rate tables the multilevel atom has no data, and
@@ -203,6 +297,9 @@ int main() {
   test_hydrogen_relaxes_towards_equilibrium();
   test_frozen_hydrogen_reports_zero();
   test_helium_window();
+  test_helium_relaxes_to_zero_below_xheii_min();
+  test_cosmorec_calibration_scales_helium_only();
+  test_hyrec_calibration_key();
   test_peebles_fallback_outside_the_tables();
   test_injection_slows_recombination();
   test_derivative_magnitude_is_sane();

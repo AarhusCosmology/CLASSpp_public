@@ -1112,6 +1112,59 @@ class TestReviewRegressions(TestClass):
             candidate.struct_cleanup()
             candidate.empty()
 
+    def test_hyrec_calibration_brings_helium_to_cosmorec(self):
+        """hyrec_calibration = cosmorec (the default) scales HYREC-2's He I rate by a
+        fit to CosmoRec (docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md).
+        RECFAST's own CosmoRec calibration is an independent route to the same
+        reference, so through He I recombination the calibrated HyRec must sit far
+        closer to it than HYREC-2 as distributed does, and hydrogen must not move."""
+        def x_e(**extra):
+            cosmo = Class(extra)
+            try:
+                cosmo.compute(level=['thermodynamics'])
+                thermo = cosmo.get_thermodynamics()
+                return thermo['z'], thermo['x_e']
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+        plain = x_e(recombination='HyRec', hyrec_calibration='none')
+        calibrated = x_e(recombination='HyRec')
+        recfast = x_e(recombination='RECFAST')
+
+        def gap(a, b, z):
+            return np.max(np.abs(np.interp(z, *a) / np.interp(z, *b) - 1.))
+
+        helium = np.arange(1601., 3000.)
+        self.assertGreater(gap(plain, recfast, helium), 3e-3)
+        self.assertLess(gap(calibrated, recfast, helium), 1e-3)
+        self.assertLess(gap(calibrated, plain, np.arange(801., 1500.)), 1e-5)
+
+    @parameterized.expand([
+        ('omega_b_0.02425', {'omega_b': 0.02425, 'omega_cdm': 0.11122, 'h': 0.67763, 'YHe': 0.27884}),
+        ('omega_b_0.02012', {'omega_b': 0.02012, 'omega_cdm': 0.1388, 'h': 0.68257, 'YHe': 0.22695}),
+    ])
+    def test_hyrec_at_tight_thermo_tolerance(self, name, cosmology):
+        """With tol_thermo_integration = 1e-9, HyRec failed in ndf15 on 36 of 100
+        random LCDM cosmologies -- a singular LU, or a bogus z_rec < 500. The cause was
+        the zero derivative the wrapper returned below XHEII_MIN, a trap for stiff
+        steps; helium now relaxes to zero there. These two failed that way.
+        Completion alone would miss the bogus-z_rec mode, so z_rec is checked against
+        RECFAST's at the same cosmology (they differ by ~0.2)."""
+        def z_rec(**extra):
+            cosmo = Class(dict(cosmology, N_ur=3.044, tol_thermo_integration=1e-9, **extra))
+            try:
+                cosmo.compute(level=['thermodynamics'])
+                return cosmo.get_current_derived_parameters(['z_rec'])['z_rec']
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+
+        reference = z_rec(recombination='RECFAST')
+        for calibration in ('cosmorec', 'none'):
+            self.assertAlmostEqual(z_rec(recombination='HyRec', hyrec_calibration=calibration),
+                                   reference, delta=1.0, msg=calibration)
+
     def test_varying_constants_follow_their_power_laws(self):
         """varying_fundamental_constants (Hart & Chluba, arXiv:1705.03925; the
         H0 Olympics 'varying m_e' model) moves every atomic energy level, and so

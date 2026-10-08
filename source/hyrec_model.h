@@ -49,6 +49,7 @@ class HyrecModel : public RecombinationModel {
    * @param fHe       helium abundance by number, relative to hydrogen
    * @param nH0       hydrogen number density today in m^-3
    * @param z_initial redshift at which CLASS starts the recombination integration
+   * @param He_rate_correction multiply the helium rate by its CosmoRec calibration
    */
   HyrecModel(const std::string& path,
              double T_cmb,
@@ -59,7 +60,8 @@ class HyrecModel : public RecombinationModel {
              double YHe,
              double fHe,
              double nH0,
-             double z_initial);
+             double z_initial,
+             bool He_rate_correction);
   ~HyrecModel() override;
 
   HyrecModel(const HyrecModel&)            = delete;
@@ -75,4 +77,5 @@ class HyrecModel : public RecombinationModel {
   HyrecData* data_;
   std::string path_; /**< kept alive: HYREC-2 stores the pointer, not a copy */
   double fHe_;
+  bool He_rate_correction_;
 };

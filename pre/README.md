@@ -30,8 +30,8 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 ¹ Not scored on `plik_lite`. Its own metric is the ACT DR6 ACT-lite distance to a
 converged reference at one ACT-like point: 0.009, against 0.394 for the defaults
 and 0.059 for ACT's published CLASS settings, translated key by key (they leave
-two CLASS++ defaults looser than class_public's). It also selects RECFAST
-calibrated to CosmoRec. See the file's
+two CLASS++ defaults looser than class_public's). It was measured with RECFAST
+calibrated to CosmoRec, the compiled default since 2026-10-08. See the file's
 header and `docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md`.
 ² At `l_max_scalars = 9500`, both sides: 4.9 s against 1.2 s.
 

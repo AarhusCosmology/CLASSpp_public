@@ -45,8 +45,8 @@ q_logstep_limber = 1.025
 # CMB sources are kept until the visibility falls below this (0.072 -> 0.016 alone)
 neglect_CMB_sources_below_visibility = 1e-4
 
-# recombination: RECFAST refitted to CosmoRec (Lewis, arXiv:2607.14854); CosmoRec
-# is ACT DR6's baseline recombination. This is physics, not numerics -- it moves the
-# spectra by 0.027 on the scale above, exactly as it does in CAMB 2. Delete it
-# to keep the Planck-era RECFAST; with recombination = HyRec it has no effect.
-recfast_calibration = cosmorec
+# recombination: CosmoRec, ACT DR6's baseline, is matched by both of CLASS++'s
+# recombination codes by default since 2026-10-08 (recfast_calibration and
+# hyrec_calibration = cosmorec; docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md).
+# This preset was measured with the RECFAST one. Planck-era RECFAST would move the
+# spectra by 0.027 on the scale above.

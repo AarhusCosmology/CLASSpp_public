@@ -38,3 +38,13 @@ l_switch_limber = 10
 k_max_limber_over_l_max_scalars = 0.001
 q_logstep_limber = 1.025
 hyper_phi_min_abs = 1e-10
+
+# Added 2026-10-08, when recombination's defaults moved: the Planck-era RECFAST
+# constants, HYREC-2 as distributed, and the Saha->ODE switches at 0.995. The x_e
+# blend back towards Saha that went with them is gone and has no key (it moves
+# lensed C_l by ~1e-4); see docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md.
+recfast_calibration = planck
+hyrec_calibration = none
+recfast_x_He0_trigger = 0.995
+recfast_x_H0_trigger = 0.995
+recfast_x_H0_trigger2 = 0.995

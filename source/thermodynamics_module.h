@@ -171,12 +171,6 @@ class ThermodynamicsModule : public BaseModule {
   double SahaRhs(const recombination* preco, double z, double CB) const;
   void thermodynamics_recfast_store_row(
       recombination* preco, int sample_index, double z, double xe, double Tb, double dTbdz) const;
-  double thermodynamics_recfast_xe_after_helium_ode(const recombination* preco,
-                                                    double z,
-                                                    const double* y) const;
-  double thermodynamics_recfast_xe_after_full_ode(const recombination* preco,
-                                                  double z,
-                                                  const double* y) const;
   void thermodynamics_recombination_derivs_member(double z,
                                                   double* y,
                                                   double* dy,

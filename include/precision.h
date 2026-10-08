@@ -267,7 +267,7 @@ struct precision {
   int recfast_Heswitch =
       6; /**< from recfast 1.4, specifies how accurate the Helium recombination should be handled */
   double recfast_fudge_He =
-      0.86; /**< from recfast 1.4, fugde factor for Peeble's equation coefficient of Helium */
+      0.8472367977; /**< fudge factor for Peeble's equation coefficient of Helium: CAMB 2's CosmoRec refit (recfast 1.4: 0.86, see recfast_calibration) */
 
   /*
    * Recfast 1.5 parameters
@@ -278,24 +278,39 @@ struct precision {
       1.14; /**< from recfast 1.4, fudge factor for Peeble's equation coeffient of Hydrogen */
   double recfast_delta_fudge_H =
       -0.015; /**< from recfast 1.5.2, increasing Hydrogen fudge factor if Hswitch is enabled */
-  double recfast_AGauss1 = -0.14; /**< from recfast 1.5, Gaussian Peeble prefactor fit, amplitude */
-  double recfast_AGauss2 =
-      0.079; /**< from recfast 1.5.2, Gaussian Peeble prefactor fit, amplitude */
-  double recfast_zGauss1 = 7.28; /**< from recfast 1.5, Gaussian Peeble prefactor fit, center */
-  double recfast_zGauss2 = 6.73; /**< from recfast 1.5.2, Gaussian Peeble prefactor fit, center */
-  double recfast_wGauss1 = 0.18; /**< from recfast 1.5, Gaussian Peeble prefactor fit, width */
-  double recfast_wGauss2 = 0.33; /**< from recfast 1.5, Gaussian Peeble prefactor fit, width */
+  /* The six Gaussian constants of recfast 1.5's Peebles-prefactor fit, as refitted to CosmoRec
+     by CAMB 2; recfast 1.5.2's own values (-0.14, 0.079, 7.28, 6.73, 0.18, 0.33) are
+     recfast_calibration = planck. */
+  double recfast_AGauss1 = -0.1395272483; /**< Gaussian Peeble prefactor fit, amplitude */
+  double recfast_AGauss2 = 0.0729891952;  /**< Gaussian Peeble prefactor fit, amplitude */
+  double recfast_zGauss1 = 7.2813061282;  /**< Gaussian Peeble prefactor fit, center */
+  double recfast_zGauss2 = 6.7667038679;  /**< Gaussian Peeble prefactor fit, center */
+  double recfast_wGauss1 = 0.1638966410;  /**< Gaussian Peeble prefactor fit, width */
+  double recfast_wGauss2 = 0.2785834127;  /**< Gaussian Peeble prefactor fit, width */
 
   /*
    * RECFAST calibrated to CosmoRec (CAMB 2: Lewis, arXiv:2607.14854). The input
    * 'recfast_calibration' sets recfast_fudge_He, the six Gaussian constants above and this
-   * switch as a group: 'planck' (the default: the RECFAST 1.5 values above, which Planck
-   * used and which ACT DR6 found no longer sufficient) or 'cosmorec' (Lewis' refit to a
-   * CosmoRec reference, x_e to 1.1e-4 through H and 7.8e-5 through He I recombination).
-   * Why and how it was validated: docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md
+   * switch as a group: 'cosmorec' (the default since 2026-10-08, as in CAMB 2: Lewis' refit
+   * to a CosmoRec reference, x_e to 1.1e-4 through H and 7.8e-5 through He I recombination)
+   * or 'planck' (RECFAST 1.5.2 as Planck used it, which ACT DR6 found no longer sufficient).
+   * Why and how it was validated: docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md;
+   * why it is the default: docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md
    */
   bool recfast_He_rate_correction =
-      false; /**< multiply dx_He/dz by CAMB 2's He I rate correction F_He (arXiv:2607.14854, 'Recombination model and calibration'), which carries CosmoRec's helium radiative transfer; part of recfast_calibration = cosmorec */
+      true; /**< multiply dx_He/dz by CAMB 2's He I rate correction F_He (arXiv:2607.14854, 'Recombination model and calibration'), which carries CosmoRec's helium radiative transfer; part of recfast_calibration = cosmorec */
+
+  /*
+   * HYREC-2 calibrated to CosmoRec. HYREC-2's helium is a Peebles-type equation whose
+   * 2^1P escape probability treats H I continuum absorption analytically; CosmoRec solves
+   * the radiative transfer of the 584 A photons, which diffuse in frequency into the H I
+   * wings and recombine helium faster. 'hyrec_calibration = cosmorec' multiplies HYREC-2's
+   * dx_HeII/dlna by a rational function of the photon temperature fitted to CosmoRec, as
+   * recfast_He_rate_correction does for RECFAST. 'cosmorec' is the default; 'none' is
+   * HYREC-2 as distributed. See docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md.
+   */
+  bool hyrec_He_rate_correction =
+      true; /**< multiply HYREC-2's helium rate by its CosmoRec calibration; set by hyrec_calibration */
 
   double recfast_z_He_1 = 8000.0; /**< from recfast 1.4, Starting value of Helium recombination 1 */
   double recfast_delta_z_He_1 =
@@ -306,16 +321,17 @@ struct precision {
   double recfast_z_He_3 = 3500.0; /**< from recfast 1.4, Starting value of Helium recombination 2 */
   double recfast_delta_z_He_3 =
       50.0; /**< Smoothing factor for recombination approximation switching, found to be OK on 3.09.10 */
+  /* The ODE takes over from Saha where the Saha fraction falls to these values. 0.999 rather
+     than RECFAST's 0.995: the true solution already lags Saha there by 1e-4 in x_e, and
+     starting the ODE from the Saha value leaves a kink in x_e(z) that an earlier start
+     removes; the integrators handle the extra stiffness at no measurable cost. The
+     hydrogen value also stays below HYREC-2's TR_MAX (z ~ 1700). */
   double recfast_x_He0_trigger =
-      0.995; /**< Switch for Helium full calculation during reco, raised from 0.99 to 0.995 for smoother Helium */
-  double recfast_x_He0_trigger_delta =
-      0.05; /**< Smoothing factor for recombination approximation switching, found to be OK on 3.09.10 */
+      0.999; /**< Saha fraction of HeII at which the helium ODE takes over */
   double recfast_x_H0_trigger =
-      0.995; /**< Switch for Hydrogen full calculation during reco, raised from 0.99 to 0.995 for smoother Hydrogen */
+      0.999; /**< Saha fraction of HII at which the hydrogen ODE takes over */
   double recfast_x_H0_trigger2 =
-      0.995; /**< Switch for Hydrogen full calculation during reco, for changing Hydrogen flag, raised from 0.98 to same as previous one for smoother Hydrogen */
-  double recfast_x_H0_trigger_delta =
-      0.05; /**< Smoothing factor for recombination approximation switching, found to be OK on 3.09.10 */
+      0.999; /**< x_H below which RECFAST uses Peebles' C factor rather than 1; kept equal to recfast_x_H0_trigger */
 
   double recfast_H_frac =
       1.0e-3; /**< from recfast 1.4, specifies the time at which the temperature evolution is calculated by the more precise equation */

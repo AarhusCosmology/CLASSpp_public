@@ -2782,8 +2782,9 @@ void precision::parse(const FileContent& fc) {
      The hydrogen fudge is 1.125 in both (recfast_fudge_H + recfast_delta_fudge_H). */
   if (auto calibration = fc.get<std::string>("recfast_calibration")) {
     class_test_severe(*calibration != "planck" && *calibration != "cosmorec",
-                      "recfast_calibration = '%s' must be 'planck' (RECFAST 1.5, the default) or "
-                      "'cosmorec' (CAMB 2's refit to CosmoRec, arXiv:2607.14854)",
+                      "recfast_calibration = '%s' must be 'cosmorec' (CAMB 2's refit to CosmoRec, "
+                      "arXiv:2607.14854, the default) or 'planck' (RECFAST 1.5.2 as Planck used "
+                      "it)",
                       calibration->c_str());
     if (*calibration == "cosmorec") {
       recfast_fudge_He           = 0.8472367977;
@@ -2807,6 +2808,14 @@ void precision::parse(const FileContent& fc) {
     }
   }
   read(fc, "recfast_He_rate_correction", recfast_He_rate_correction);
+  if (auto calibration = fc.get<std::string>("hyrec_calibration")) {
+    class_test_severe(*calibration != "none" && *calibration != "cosmorec",
+                      "hyrec_calibration = '%s' must be 'cosmorec' (its helium rate calibrated to "
+                      "CosmoRec, the default) or 'none' (HYREC-2 as distributed)",
+                      calibration->c_str());
+    hyrec_He_rate_correction = (*calibration == "cosmorec");
+  }
+  read(fc, "hyrec_He_rate_correction", hyrec_He_rate_correction);
   read(fc, "recfast_Heswitch", recfast_Heswitch);
   read(fc, "recfast_fudge_He", recfast_fudge_He);
   read(fc, "recfast_Hswitch", recfast_Hswitch);
@@ -2825,10 +2834,16 @@ void precision::parse(const FileContent& fc) {
   read(fc, "recfast_z_He_3", recfast_z_He_3);
   read(fc, "recfast_delta_z_He_3", recfast_delta_z_He_3);
   read(fc, "recfast_x_He0_trigger", recfast_x_He0_trigger);
-  read(fc, "recfast_x_He0_trigger_delta", recfast_x_He0_trigger_delta);
   read(fc, "recfast_x_H0_trigger", recfast_x_H0_trigger);
   read(fc, "recfast_x_H0_trigger2", recfast_x_H0_trigger2);
-  read(fc, "recfast_x_H0_trigger_delta", recfast_x_H0_trigger_delta);
+  /* The ODE solution is no longer blended back towards Saha after each switch (the blend
+     biased x_e low by up to 1.3e-3), so the two widths that set the blend are gone. */
+  for (const char* retired : {"recfast_x_He0_trigger_delta", "recfast_x_H0_trigger_delta"}) {
+    class_test_severe(fc.get<std::string>(retired).has_value(),
+                      "'%s' no longer exists: x_e is the ODE solution from the Saha switch on, "
+                      "with no blend to set the width of",
+                      retired);
+  }
   read(fc, "recfast_H_frac", recfast_H_frac);
   read(fc, "reionization_z_start_max", reionization_z_start_max);
   read(fc, "reionization_sampling", reionization_sampling);

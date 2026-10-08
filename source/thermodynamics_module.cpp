@@ -84,15 +84,18 @@ void ThermodynamicsModule::thermodynamics_recfast_output(
   const double z         = -minus_z;
   const int sample_index = ws->recfast_output_index_offset + index_x;
 
+  /* x_e is what the ODE says from the first step of each phase on. Each phase starts from
+     the Saha value of the species it begins to evolve, so there is nothing to smooth over;
+     an earlier version blended the ODE value back towards Saha for the next 0.05 in x_H
+     (or x_He), and since recombination lags Saha that pulled x_e down by up to 1.3e-3 at
+     z ~ 1500-1640 and 5e-4 at z ~ 2630-2850, in every recombination model. See
+     docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md. */
   if (ws->recombination_phase == RecombinationPhase::helium) {
-    const double y_full[3] = {module->thermodynamics_recfast_hydrogen_saha_xH(preco, z),
-                              y[0],
-                              y[1]};
-    const double xe        = module->thermodynamics_recfast_xe_after_helium_ode(preco, z, y_full);
+    const double xe = module->thermodynamics_recfast_hydrogen_saha_xH(preco, z) + preco->fHe * y[0];
     module->thermodynamics_recfast_store_row(preco, sample_index, z, xe, y[1], -dy[1]);
   }
   else {
-    const double xe = module->thermodynamics_recfast_xe_after_full_ode(preco, z, y);
+    const double xe = y[0] + preco->fHe * y[1];
     module->thermodynamics_recfast_store_row(preco, sample_index, z, xe, y[2], -dy[2]);
   }
 }
@@ -2995,33 +2998,6 @@ void ThermodynamicsModule::thermodynamics_recfast_store_row(
       FundamentalConstantsAt(z).ThomsonRescale();
 }
 
-double ThermodynamicsModule::thermodynamics_recfast_xe_after_helium_ode(const recombination* preco,
-                                                                        double z,
-                                                                        const double* y) const {
-  if (ppr->recfast_x_He0_trigger - y[1] < ppr->recfast_x_He0_trigger_delta) {
-    const double x0_previous = thermodynamics_recfast_helium_second_saha_xe(preco, z);
-    const double x0_new      = y[0] + preco->fHe * y[1];
-    const double s      = (ppr->recfast_x_He0_trigger - y[1]) / ppr->recfast_x_He0_trigger_delta;
-    const double weight = f2(s);
-    return weight * x0_new + (1. - weight) * x0_previous;
-  }
-
-  return y[0] + preco->fHe * y[1];
-}
-
-double ThermodynamicsModule::thermodynamics_recfast_xe_after_full_ode(const recombination* preco,
-                                                                      double z,
-                                                                      const double* y) const {
-  if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
-    const double x_H0   = thermodynamics_recfast_hydrogen_saha_xH(preco, z);
-    const double s      = (ppr->recfast_x_H0_trigger - y[0]) / ppr->recfast_x_H0_trigger_delta;
-    const double weight = f2(s);
-    return weight * y[0] + (1. - weight) * x_H0 + preco->fHe * y[1];
-  }
-
-  return y[0] + preco->fHe * y[1];
-}
-
 std::array<BaryonClumpingZone, 3> BaryonClumpingZones(double b,
                                                       double f_V_2,
                                                       double Delta_1,
@@ -3271,7 +3247,8 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
                                                        YHe_,
                                                        preco->fHe,
                                                        preco->Nnow,
-                                                       ppr->recfast_z_initial);
+                                                       ppr->recfast_z_initial,
+                                                       ppr->hyrec_He_rate_correction);
   }
   else {
     recombination_model = std::make_unique<RecfastModel>(ppr, preco);

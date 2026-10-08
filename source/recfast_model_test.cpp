@@ -67,21 +67,20 @@ double CambHeRateFactor(double z) {
                   (1. + 3.752520187028219 * u * u + 18.126758791787946 * u * u * u * u);
 }
 
-/* The calibration sets all seven fit constants and the switch as a group, 'planck'
-   restores the compiled defaults, and an unknown name is refused. */
+/* The calibration sets all seven fit constants and the switch as a group, 'cosmorec'
+   restores the compiled defaults, 'planck' gives RECFAST 1.5.2's own values, and an
+   unknown name is refused. */
 void test_calibration_sets_the_group() {
   const precision defaults;
-  const precision planck = Parse("planck");
-  assert(planck.recfast_fudge_He == defaults.recfast_fudge_He);
-  assert(planck.recfast_AGauss1 == defaults.recfast_AGauss1);
-  assert(planck.recfast_AGauss2 == defaults.recfast_AGauss2);
-  assert(planck.recfast_zGauss1 == defaults.recfast_zGauss1);
-  assert(planck.recfast_zGauss2 == defaults.recfast_zGauss2);
-  assert(planck.recfast_wGauss1 == defaults.recfast_wGauss1);
-  assert(planck.recfast_wGauss2 == defaults.recfast_wGauss2);
-  assert(!planck.recfast_He_rate_correction);
-
   const precision cosmorec = Parse("cosmorec");
+  assert(cosmorec.recfast_fudge_He == defaults.recfast_fudge_He);
+  assert(cosmorec.recfast_AGauss1 == defaults.recfast_AGauss1);
+  assert(cosmorec.recfast_AGauss2 == defaults.recfast_AGauss2);
+  assert(cosmorec.recfast_zGauss1 == defaults.recfast_zGauss1);
+  assert(cosmorec.recfast_zGauss2 == defaults.recfast_zGauss2);
+  assert(cosmorec.recfast_wGauss1 == defaults.recfast_wGauss1);
+  assert(cosmorec.recfast_wGauss2 == defaults.recfast_wGauss2);
+  assert(cosmorec.recfast_He_rate_correction && defaults.recfast_He_rate_correction);
   assert(cosmorec.recfast_fudge_He == 0.8472367977);
   assert(cosmorec.recfast_AGauss1 == -0.1395272483);
   assert(cosmorec.recfast_AGauss2 == 0.0729891952);
@@ -89,10 +88,19 @@ void test_calibration_sets_the_group() {
   assert(cosmorec.recfast_zGauss2 == 6.7667038679);
   assert(cosmorec.recfast_wGauss1 == 0.1638966410);
   assert(cosmorec.recfast_wGauss2 == 0.2785834127);
-  assert(cosmorec.recfast_He_rate_correction);
+
+  const precision planck = Parse("planck");
+  assert(planck.recfast_fudge_He == 0.86);
+  assert(planck.recfast_AGauss1 == -0.14);
+  assert(planck.recfast_AGauss2 == 0.079);
+  assert(planck.recfast_zGauss1 == 7.28);
+  assert(planck.recfast_zGauss2 == 6.73);
+  assert(planck.recfast_wGauss1 == 0.18);
+  assert(planck.recfast_wGauss2 == 0.33);
+  assert(!planck.recfast_He_rate_correction);
   /* The hydrogen fudge is 1.125 in both calibrations. */
-  assert(cosmorec.recfast_fudge_H == defaults.recfast_fudge_H);
-  assert(cosmorec.recfast_delta_fudge_H == defaults.recfast_delta_fudge_H);
+  assert(planck.recfast_fudge_H == defaults.recfast_fudge_H);
+  assert(planck.recfast_delta_fudge_H == defaults.recfast_delta_fudge_H);
 
   bool threw = false;
   try {
@@ -122,8 +130,9 @@ void test_individual_keys_override_the_group() {
 void test_he_rate_factor_matches_camb() {
   precision off;
   precision on;
-  on.recfast_He_rate_correction = true;
-  const recombination preco     = MakeRecombination(off);
+  off.recfast_He_rate_correction = false;
+  on.recfast_He_rate_correction  = true;
+  const recombination preco      = MakeRecombination(off);
   const RecfastModel model_off(&off, &preco);
   const RecfastModel model_on(&on, &preco);
 
