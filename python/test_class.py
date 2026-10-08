@@ -78,6 +78,7 @@ import os
 import pytest
 import re
 import shutil
+import tempfile
 import unittest
 
 from classy import Class
@@ -2483,6 +2484,154 @@ class TestLargeScaleStructureProducts(unittest.TestCase):
             cosmo.struct_cleanup()
             cosmo.empty()
 
+
+
+class TestTabulatedSelection(unittest.TestCase):
+    """selection = tabulated: the dN/dz of each bin read in a file.
+
+    The file has the redshift in the first column and one column per bin. The
+    reference is the same cosmology with analytic gaussian bins, tabulated here
+    on a grid fine enough for the spline to reproduce them.
+    """
+
+    MEANS = (0.5, 1.0)
+    WIDTHS = (0.07, 0.1)
+    BASE = {'output': 'nCl', 'number count contributions': 'density',
+            'l_max_lss': 300, 'non_diagonal': 1}
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.cosmo = Class()
+
+    def tearDown(self):
+        self.cosmo.struct_cleanup()
+        self.cosmo.empty()
+        shutil.rmtree(self.tmp)
+
+    def write(self, name, text):
+        path = os.path.join(self.tmp, name)
+        with open(path, 'w') as f:
+            f.write(text)
+        return path
+
+    def gaussian_file(self):
+        """The gaussian bins of CLASS, cut at 5 sigma like selection_cut_at_sigma."""
+        z = np.arange(0., 2.0001, 0.002)
+        columns = [z]
+        for mean, width in zip(self.MEANS, self.WIDTHS):
+            x = (z - mean) / width
+            columns.append(np.where(np.abs(x) <= 5., np.exp(-0.5 * x**2), 0.))
+        lines = ['# z  dN/dz_1  dN/dz_2']
+        lines += [' '.join('%.10e' % c[i] for c in columns) for i in range(len(z))]
+        return self.write('bins.dat', '\n'.join(lines) + '\n')
+
+    def density_cl(self, params):
+        self.cosmo.set(dict(self.BASE, **params))
+        self.cosmo.compute()
+        cl = self.cosmo.raw_cl(300)
+        self.cosmo.struct_cleanup()
+        self.cosmo.empty()
+        return {key: cl[key][2:] for key in cl if key.startswith('dens')}
+
+    def test_tabulated_bins_reproduce_gaussian_bins(self):
+        gaussian = self.density_cl({'selection': 'gaussian',
+                                    'selection_mean': '0.5,1.0',
+                                    'selection_width': '0.07,0.1'})
+        tabulated = self.density_cl({'selection': 'tabulated',
+                                     'selection_file': self.gaussian_file()})
+        for key in ('dens[1]-dens[1]', 'dens[2]-dens[2]', 'dens[1]-dens[2]'):
+            scale = np.max(np.abs(gaussian[key]))
+            error = np.max(np.abs(tabulated[key] - gaussian[key])) / scale
+            self.assertLess(error, 1e-3, key)
+
+    def test_bias_of_each_tabulated_bin_scales_its_spectra(self):
+        path = self.gaussian_file()
+        unbiased = self.density_cl({'selection': 'tabulated', 'selection_file': path})
+        biased = self.density_cl({'selection': 'tabulated', 'selection_file': path,
+                                  'selection_bias': '1.,2.'})
+        np.testing.assert_allclose(biased['dens[1]-dens[1]'], unbiased['dens[1]-dens[1]'], rtol=1e-10)
+        np.testing.assert_allclose(biased['dens[1]-dens[2]'], 2. * unbiased['dens[1]-dens[2]'], rtol=1e-10)
+        np.testing.assert_allclose(biased['dens[2]-dens[2]'], 4. * unbiased['dens[2]-dens[2]'], rtol=1e-10)
+
+    def test_malformed_selection_files_are_rejected(self):
+        cases = {
+            'missing': (None, 'could not open'),
+            'single_column': ('0.0\n0.1\n0.2\n', 'at least two columns'),
+            'one_line': ('0.0 1.0 1.0\n', 'at least two lines'),
+            'ragged': ('0.0 0.0 0.0\n0.1 1.0\n0.2 0.0 0.0\n', 'contains 2 numbers'),
+            'unreadable': ('0.0 0.0 0.0\n0.1 1.0 one\n0.2 0.0 0.0\n', 'could not read'),
+            'decreasing_z': ('0.0 0.0 0.0\n0.2 1.0 1.0\n0.1 0.0 0.0\n', 'strictly growing'),
+            'negative_z': ('-0.1 0.0 0.0\n0.1 1.0 1.0\n0.2 0.0 0.0\n', 'is negative'),
+            'negative_dNdz': ('0.0 0.0 0.0\n0.1 -1.0 1.0\n0.2 0.0 0.0\n', 'negative at z'),
+            'empty_bin': ('0.0 0.0 0.0\n0.1 1.0 0.0\n0.2 0.0 0.0\n', 'vanishes everywhere'),
+            'unordered_bins': ('0.0 0.0 0.0\n0.1 0.0 1.0\n0.2 1.0 0.0\n0.3 0.0 0.0\n',
+                               'growing mean redshift'),
+            'infinite': ('0.0 0.0 0.0\n0.1 inf 1.0\n0.2 0.0 0.0\n', 'not a finite number'),
+            'nan': ('0.0 0.0 0.0\n0.1 nan 1.0\n0.2 0.0 0.0\n', 'not a finite number'),
+            'overflow': ('0.0 0.0 0.0\n0.1 1e999 1.0\n0.2 0.0 0.0\n', 'not a finite number'),
+        }
+        for name, (text, message) in cases.items():
+            path = (os.path.join(self.tmp, 'nowhere.dat') if text is None
+                    else self.write(name + '.dat', text))
+            self.cosmo.set(dict(self.BASE, selection='tabulated', selection_file=path))
+            with self.assertRaises(CosmoSevereError, msg=name) as ctx:
+                self.cosmo.compute()
+            self.assertIn(message, str(ctx.exception), name)
+            self.cosmo.struct_cleanup()
+            self.cosmo.empty()
+
+    def test_bin_with_weight_only_at_z0_has_a_positive_mean(self):
+        """The first moment of the linear interpolant is z1/3 > 0. The trapezoidal rule
+        applied to z dN/dz gave a mean of exactly zero, and k_max = l_max/(tau0 - tau(mean))
+        diverged: the run never finished."""
+        path = self.write('z0.dat', '0 1\n0.1 0\n')
+        self.cosmo.set({'output': 'nCl', 'number count contributions': 'density',
+                        'l_max_lss': 100, 'selection': 'tabulated', 'selection_file': path})
+        self.cosmo.compute()
+        cl = self.cosmo.raw_cl(100)['dens[1]-dens[1]'][2:]
+        self.assertTrue(np.all(np.isfinite(cl)))
+        self.assertTrue(np.all(cl > 0.))
+
+    def test_inconsistent_selection_inputs_are_rejected(self):
+        path = self.gaussian_file()
+        cases = {
+            'no_file': ({'selection': 'tabulated'}, "selection_file"),
+            'with_mean': ({'selection': 'tabulated', 'selection_file': path,
+                           'selection_mean': '0.5,1.0'}, 'do not pass'),
+            'with_dNdz': ({'selection': 'tabulated', 'selection_file': path,
+                           'dNdz_selection': 'analytic'}, 'dNdz_selection'),
+        }
+        for name, (params, message) in cases.items():
+            self.cosmo.set(dict(self.BASE, **params))
+            with self.assertRaises(CosmoSevereError, msg=name) as ctx:
+                self.cosmo.compute()
+            self.assertIn(message, str(ctx.exception), name)
+            self.cosmo.struct_cleanup()
+            self.cosmo.empty()
+
+    def test_out_of_range_sampling_parameters_are_rejected(self):
+        """Range checks reject the point (CosmoComputationError). A negative lensing
+        factor and fraction used to pass the check on their product and loop forever,
+        and so did a selection_mean of zero (k_max diverges)."""
+        cases = {
+            'negative_lensing': ({'output': 'tCl,lCl', 'lensing': 'yes',
+                                  'cmb_lensing_sampling_factor': -1.,
+                                  'cmb_lensing_sampling_fraction': -0.001},
+                                 'cmb_lensing_sampling_factor'),
+            'lensing_fraction': ({'output': 'tCl,lCl', 'lensing': 'yes',
+                                  'cmb_lensing_sampling_fraction': 1.5},
+                                 'cmb_lensing_sampling_fraction'),
+            'mean_at_z0': (dict(self.BASE, selection='gaussian', selection_mean='0.',
+                                selection_width='0.1', non_diagonal=0),
+                           'mean redshift'),
+        }
+        for name, (params, message) in cases.items():
+            self.cosmo.set(params)
+            with self.assertRaises(CosmoComputationError, msg=name) as ctx:
+                self.cosmo.compute()
+            self.assertIn(message, str(ctx.exception), name)
+            self.cosmo.struct_cleanup()
+            self.cosmo.empty()
 
 if __name__ == '__main__':
     toto = TestClass()

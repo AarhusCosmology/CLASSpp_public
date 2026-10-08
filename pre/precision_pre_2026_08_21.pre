@@ -48,3 +48,12 @@ hyrec_calibration = none
 recfast_x_He0_trigger = 0.995
 recfast_x_H0_trigger = 0.995
 recfast_x_H0_trigger2 = 0.995
+
+# Added 2026-10-08, when the transfer module adopted class_public #267 and #268:
+# the CMB lensing source sampled at the perturbation times only, and the
+# line-of-sight integrals of number counts computed up to the largest q even
+# where their time sampling aliases. With 'output = lCl' alone, the sources now
+# start before recombination; that fix has no key. See
+# docs/superpowers/specs/2026-10-08-transfer-restructure-design.md.
+cmb_lensing_sampling_factor = 1e30
+selection_sampling_bessel_min = 1e-30

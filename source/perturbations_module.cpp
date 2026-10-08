@@ -1261,8 +1261,13 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
     /* check the time corresponding to the highest redshift requested in output plus one */
     background_module_->background_tau_of_z(ppt->z_max_pk + 1, &tau_ini);
 
-    /* obsolete: previous choice was to start always at recombination time */
-    /* tau_ini = thermodynamics_module_->tau_rec_; */
+    /* the CMB lensing potential should be known for tau >= tau_rec. Take a small margin
+       below tau_rec for safe interpolation: tau_ini = (1-epsilon) tau_rec, with epsilon = 10
+       times machine precision (class_public #267) */
+    if (ppt->has_cl_cmb_lensing_potential)
+      tau_ini = std::min(tau_ini,
+                         (1. - 10. * ppr->smallest_allowed_variation) *
+                             thermodynamics_module_->tau_rec_);
 
     /* set values of first_index_back/thermo */
     background_module_->background_at_tau(tau_ini,

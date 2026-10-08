@@ -470,8 +470,10 @@ struct precision {
    */
   double perturb_sampling_stepsize = 0.1;
   /**
-   * Age fraction above which source sampling is twice as fine. This improves
-   * the low-l CMB lensing line-of-sight integral; 1.0 disables the boost.
+   * Age fraction above which source sampling is twice as fine; 1.0 disables the
+   * boost. It used to improve the low-l CMB lensing line-of-sight integral, which
+   * the transfer module now samples with its own logarithmic late-time step
+   * (cmb_lensing_sampling_factor, cmb_lensing_sampling_fraction).
    */
   double perturbations_sampling_boost_above_age_fraction = 1.;
 
@@ -790,6 +792,10 @@ struct precision {
 
   double l_switch_limber =
       40.; /**< when to use the Limber approximation for project gravitational potential cl's */
+  double cmb_lensing_sampling_factor =
+      1.; /**< logarithmic time step of the CMB lensing line-of-sight integral at late times, Delta tau = (tau0-tau) cmb_lensing_sampling_factor / min(l_switch_limber, l_max_scalars). Decrease for more precision. */
+  double cmb_lensing_sampling_fraction =
+      0.001; /**< the CMB lensing source is sampled until tau = (1-cmb_lensing_sampling_fraction) tau0 (closer to us, it does not contribute). Decrease for more precision. */
   // For density Cl, we recommend not to use the Limber approximation
   // at all, and hence to put here a very large number (e.g. 10000); but
   // if you have wide and smooth selection functions you may wish to
@@ -812,6 +818,8 @@ struct precision {
       20.0; /**< controls sampling of integral over time when selection functions vary slower than Bessel functions. Increase for better sampling. IMPORTANT for lensed contributions. */
   double selection_sampling_bessel_los =
       20.0; /**< controls sampling of integral over time when selection functions vary slower than Bessel functions. This parameter is specific to number counts contributions to Cl integrated along the line of sight. Increase for better sampling */
+  double selection_sampling_bessel_min =
+      1.; /**< for evenly spaced time samplings (number counts, galaxy lensing): minimum number of sampled points per radian of the Bessel functions j_l(q(tau0-tau)) for computing a line-of-sight integral. Above the corresponding q, the sampled Bessel function stops oscillating and the trapezoidal sum aliases; the Limber approximation is used instead. Results are identical between Nyquist (1/pi) and 1. */
   double selection_tophat_edge =
       0.1; /**< controls how smooth are the edge of top-hat window function (<<1 for very sharp, 0.1 for sharp) */
 

@@ -9,50 +9,6 @@
 #include "hyperspherical.h"
 #include "nonlinear.h"
 
-/* macro: test if index_tt is in the range between index and index+num, while the flag is true */
-#define _index_tt_in_range_(index, num, flag) \
-  (flag) && (index_tt >= index) && (index_tt < index + num)
-/* macro: test if index_tt corresponds to an integrated nCl/sCl contribution */
-#define _integrated_ncl_                                                                         \
-  (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) || \
-      (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens)) ||          \
-      (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr)) ||              \
-      (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
-/* macro: test if index_tt corresponds to an non-integrated nCl/sCl contribution */
-#define _nonintegrated_ncl_                                                            \
-  (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density)) || \
-      (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd)) ||     \
-      (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd)) ||      \
-      (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd)) ||      \
-      (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr)) ||    \
-      (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr)) ||    \
-      (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
-/* macro: bin number associated to particular redshift bin and selection function for non-integrated contributions*/
-#define _get_bin_nonintegrated_ncl_(index_tt)                                          \
-  if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density)) \
-    bin = index_tt - index_tt_density_;                                                \
-  if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))         \
-    bin = index_tt - index_tt_rsd_;                                                    \
-  if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))          \
-    bin = index_tt - index_tt_d0_;                                                     \
-  if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))          \
-    bin = index_tt - index_tt_d1_;                                                     \
-  if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))        \
-    bin = index_tt - index_tt_nc_g1_;                                                  \
-  if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))        \
-    bin = index_tt - index_tt_nc_g2_;                                                  \
-  if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))        \
-    bin = index_tt - index_tt_nc_g3_;
-/* macro: bin number associated to particular redshift bin and selection function for integrated contributions*/
-#define _get_bin_integrated_ncl_(index_tt)                                                       \
-  if (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential)) \
-    bin = index_tt - index_tt_lensing_;                                                          \
-  if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))              \
-    bin = index_tt - index_tt_nc_lens_;                                                          \
-  if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr))                  \
-    bin = index_tt - index_tt_nc_g4_;                                                            \
-  if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))                  \
-    bin = index_tt - index_tt_nc_g5_;
 /**
  * Input parameters for transfer functions.
  *
@@ -91,6 +47,16 @@ struct transfers {
       false; /**< Use analytic form for dN/dz (evolution function) distribution? */
   std::string nz_evo_file_name; /**< dN/dz (evolution function) input file name */
 
+  std::string
+      selection_file_name; /**< for selection=tabulated: file with the redshift z in the first column and the selection function dN/dz of each bin in the next ones */
+  std::vector<double> selection_file_z; /**< for selection=tabulated: redshifts of this file */
+  std::vector<std::vector<double>>
+      selection_file_dNdz; /**< for selection=tabulated: selection function of each bin, selection_file_dNdz[bin][index_z] */
+  std::vector<double>
+      selection_z_min; /**< for selection=tabulated: smallest redshift at which the selection function of each bin is non-zero (one tabulated point before the first non-zero value) */
+  std::vector<double>
+      selection_z_max; /**< for selection=tabulated: largest redshift at which the selection function of each bin is non-zero (one tabulated point after the last non-zero value) */
+
   //@}
 
   /** @name - technical parameters */
@@ -104,6 +70,115 @@ struct transfers {
       0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
   //@}
+};
+
+/**
+ * enumeration of possible radial function types (Bessel function or
+ * combination of its derivatives) convolved with the transfer source,
+ * see transfer_radial_function()
+ */
+
+typedef enum {
+  SCALAR_TEMPERATURE_0,
+  SCALAR_TEMPERATURE_1,
+  SCALAR_TEMPERATURE_2,
+  SCALAR_POLARISATION_E,
+  VECTOR_TEMPERATURE_1,
+  VECTOR_TEMPERATURE_2,
+  VECTOR_POLARISATION_E,
+  VECTOR_POLARISATION_B,
+  TENSOR_TEMPERATURE_2,
+  TENSOR_POLARISATION_E,
+  TENSOR_POLARISATION_B,
+  NC_RSD
+} radial_function_type;
+
+/**
+ * The physical contribution carried by a transfer type: a CMB term, or
+ * one term of the number counts (see the CLASSgal paper arXiv:1307.1459)
+ * or of the galaxy lensing potential in a given redshift bin.
+ */
+enum class TransferTerm {
+  cmb_t0,
+  cmb_t1,
+  cmb_t2,
+  cmb_e,
+  cmb_b,
+  cmb_lensing,
+  /* local in a redshift bin */
+  nc_density,
+  nc_rsd,
+  nc_d0,
+  nc_d1,
+  nc_g1,
+  nc_g2,
+  nc_g3,
+  /* integrated along the line of sight from a redshift bin to us */
+  nc_lens,
+  nc_g4,
+  nc_g5,
+  galaxy_lensing
+};
+
+/** The window function W(tau) multiplying the perturbation source of a transfer type. */
+enum class TransferWindow {
+  none,        /**< W=1 (CMB temperature and polarisation) */
+  cmb_lensing, /**< CMB lensing kernel, with support [tau_rec, tau0] */
+  selection, /**< selection function of a bin times a function of the background, with the support of the bin */
+  integrated /**< selection function of a bin convolved with a kernel, with support [tau_min of the bin, tau0] */
+};
+
+/** The ways of sampling a line-of-sight integral in time. */
+enum class TransferSampling {
+  from_perturbations, /**< the times of the perturbation module larger than tau_min */
+  uniform, /**< tau_size evenly spaced times between tau_min and tau_max (just tau_min if tau_size=1) */
+  logarithmic /**< the times of the perturbation module larger than tau_min as long as their step is smaller than (tau0-tau)*log_step; then this logarithmic step until tau_max; then tau0 */
+};
+
+/** The ways of computing a transfer function at a given (q, l). */
+enum class TransferMethod {
+  zero,         /**< it vanishes or can be neglected */
+  limber,       /**< Limber approximation */
+  line_of_sight /**< line-of-sight integral of the transfer source times a radial function */
+};
+
+/**
+ * Everything that distinguishes a transfer type X, defined once for all
+ * in TransferModule::transfer_type_properties(). The transfer source is
+ * \f$ S^{Y(X)}(k(q),\tau) \, W^X(\tau) \, (k/k_{pivot})^{k_{power}} \f$ for every type.
+ */
+struct TransferType {
+  TransferTerm term;                     /**< physical contribution */
+  int index_tp                     = -1; /**< index of the perturbation source Y(X) */
+  int bin                          = -1; /**< redshift bin (-1 for CMB types) */
+  int l_max                        = 0;  /**< largest multipole needed */
+  radial_function_type radial_type = SCALAR_TEMPERATURE_0; /**< radial function */
+  TransferWindow window_type       = TransferWindow::none; /**< kind of window W(tau) */
+  double k_power                   = 0.;                   /**< power of the factor (k/k_pivot) */
+  double k_pivot                   = 1.;                   /**< pivot of the factor (k/k_pivot) */
+  double l_limber        = _HUGE_; /**< the Limber approximation is used for l >= l_limber */
+  double delta_k_neglect = _HUGE_; /**< Delta_l(q)=0 for l < (q-delta_k_neglect) r_a(tau_rec) */
+  bool late_source_cut =
+      false; /**< sources at tau > tau_cut can be neglected for l > ppr->transfer_neglect_late_source */
+  bool full_limber = false;   /**< also computed on the full-Limber grid q_limber */
+  int index_ts     = -1;      /**< index of its time sampling */
+  std::vector<double> window; /**< W(tau) on this time sampling */
+};
+
+/**
+ * A time sampling of the line-of-sight integrals, shared by all transfer
+ * types with an identical sampling, defined once for all in
+ * TransferModule::transfer_time_samplings().
+ */
+struct TransferTimeSampling {
+  std::vector<double> tau0_minus_tau; /**< sampled values of (tau0-tau), in decreasing order */
+  std::vector<double> w_trapz;        /**< weights of the trapezoidal integration rule */
+  std::vector<int>
+      index_tau_pt; /**< for each sampled time, index of the perturbation time just before it, for linear interpolation of the perturbation sources */
+  std::vector<double> weight_tau_pt; /**< corresponding weight of the next perturbation time */
+  double q_max_sampled =
+      _HUGE_; /**< largest q at which the sampling resolves the Bessel functions with ppr->selection_sampling_bessel_min points per radian (evenly spaced samplings only); above it, the Limber approximation is used */
+  std::vector<int> types; /**< the transfer types using this sampling */
 };
 
 /**
@@ -124,28 +199,24 @@ struct transfer_workspace {
   HyperInterpStruct*
       pBIS; /**< pointer to structure containing all the spherical bessel functions of the flat case (used even in the non-flat case, for approximation schemes). pBIS = pointer to Bessel Interpolation Structure. */
 
-  int l_size; /**< number of l values */
-
   //@}
 
-  /** @name - quantities related to the integrand of the transfer functions (most of them are arrays of time) */
+  /** @name - transfer sources of the current wavenumber and time sampling */
 
   //@{
 
-  int tau_size;     /**< number of discrete time values for a given type */
-  int tau_size_max; /**< maximum number of discrete time values for all types */
-  std::vector<double> interpolated_sources; /**< interpolated_sources[index_tau]:
-                                    sources interpolated from the
-                                    perturbation module at the right
-                                    value of k */
-  std::vector<double> sources;              /**< sources[index_tau]: sources
-                                    used in transfer module, possibly
-                                    differing from those in the
-                                    perturbation module by some
-                                    resampling or rescaling */
-  std::vector<double> tau0_minus_tau; /**< tau0_minus_tau[index_tau]: values of (tau0 - tau) */
+  std::vector<std::vector<double>>
+      interpolated_sources; /**< interpolated_sources[index_ic*tp_size+index_tp][index_tau]: perturbation sources interpolated at the current k, on the time sampling of the perturbation module (only allocated for the sources used by some type) */
+  std::vector<char>
+      is_interpolated; /**< has the previous source been interpolated at the current k? */
   std::vector<double>
-      w_trapz; /**< w_trapz[index_tau]: values of weights in trapezoidal integration (related to time steps) */
+      sources; /**< sources[index_n*tau_size_max+index_tau]: transfer source of the n-th (initial condition, type) pair using the current time sampling */
+  std::vector<TransferMethod> method; /**< method[index_n] for the current l */
+  std::vector<int>
+      index_tau_max; /**< index_tau_max[index_n]: last sampled time contributing to the line-of-sight integral */
+  std::vector<char>
+      bessel_truncation; /**< bessel_truncation[index_n]: is the integral truncated by the lower cut of the Bessel function? */
+
   std::vector<double> chi;     /**< chi[index_tau]: value of argument of bessel
                                     function: k(tau0-tau) (flat case)
                                     or sqrt(|K|)(tau0-tau) (non-flat
@@ -153,13 +224,19 @@ struct transfer_workspace {
   std::vector<double> cscKgen; /**< cscKgen[index_tau]: useful trigonometric function */
   std::vector<double> cotKgen; /**< cotKgen[index_tau]: useful trigonometric function */
 
-  /** Pre-allocated temporary buffers for transfer_radial_function and transfer_integrate.
-   *  Size tau_size_max. Avoids repeated malloc/free in the hot per-(k,l) loop. */
-  std::vector<double> Phi;        /**< Phi[index_tau]: Bessel function values */
-  std::vector<double> dPhi;       /**< dPhi[index_tau]: first derivative of Bessel function */
-  std::vector<double> d2Phi;      /**< d2Phi[index_tau]: second derivative of Bessel function */
-  std::vector<double> chireverse; /**< chireverse[index_tau]: reversed chi grid */
-  std::vector<double> rescale_function; /**< rescale_function[index_tau]: amplitude rescaling */
+  /** Bessel functions of the current (q, l) at the first bessel_size times of the current
+   *  sampling, interpolated once for all types by transfer_bessel_interpolate(), in reverse
+   *  order (order of increasing argument): the value at index_tau is at bessel_size-1-index_tau.
+   *  Buffers of size tau_size_max, allocated once per wavenumber. */
+  int bessel_size; /**< number of times at which they have been interpolated */
+  double
+      rescale_argument; /**< rescaling of their argument in the flat rescaling approximation (curved space) */
+  std::vector<double> Phi;        /**< Bessel function */
+  std::vector<double> dPhi;       /**< first derivative of Bessel function */
+  std::vector<double> d2Phi;      /**< second derivative of Bessel function */
+  std::vector<double> chireverse; /**< their argument (curved space) */
+  std::vector<double>
+      rescale_function; /**< amplitude rescaling of the flat rescaling approximation (curved space) */
   std::vector<double>
       radial_function; /**< radial_function[index_tau]: output of transfer_radial_function */
   std::vector<double> chi_full_reverse; /**< workspace: reversed chi array */
@@ -177,31 +254,7 @@ struct transfer_workspace {
 
   double
       tau0_minus_tau_cut; /**< critical value of (tau0-tau) in time cut approximation for the wavenumber at hand */
-  short
-      neglect_late_source; /**< flag stating whether we use the time cut approximation for the wavenumber at hand */
 };
-
-/**
- * enumeration of possible source types. This looks redundant with
- * respect to the definition of indices index_tt_... This definition is however
- * convenient and time-saving: it allows to use a "case" statement in
- * transfer_radial_function()
- */
-
-typedef enum {
-  SCALAR_TEMPERATURE_0,
-  SCALAR_TEMPERATURE_1,
-  SCALAR_TEMPERATURE_2,
-  SCALAR_POLARISATION_E,
-  VECTOR_TEMPERATURE_1,
-  VECTOR_TEMPERATURE_2,
-  VECTOR_POLARISATION_E,
-  VECTOR_POLARISATION_B,
-  TENSOR_TEMPERATURE_2,
-  TENSOR_POLARISATION_E,
-  TENSOR_POLARISATION_B,
-  NC_RSD
-} radial_function_type;
 
 enum Hermite_Interpolation_Order { HERMITE4, HERMITE6 };
 

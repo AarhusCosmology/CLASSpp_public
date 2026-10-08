@@ -14,6 +14,7 @@
 #include "background_module.h"
 #include "cosmology.h"
 #include "lensing_module.h"
+#include "nonfinite.h"
 #include "nonlinear_module.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
@@ -111,6 +112,82 @@ void check_monodromy_parameters(const primordial* ppm) {
              "x = V_4 - phi, and the observable window sits at x > 0. V_4 = %g leaves no "
              "branch to roll down",
              ppm->V4);
+}
+
+// Read the file of selection = tabulated: the redshift z in the first column (non-negative,
+// strictly growing) and the selection function dN/dz of each bin (non-negative, arbitrary
+// normalization) in the next columns. Empty lines and lines starting with '#' are ignored.
+void read_selection_file(const std::string& name,
+                         std::vector<double>& z,
+                         std::vector<std::vector<double>>& dNdz) {
+  std::ifstream file(name);
+  class_test_severe(!file.good(),
+                    "could not open the file '%s' passed in 'selection_file'",
+                    name.c_str());
+  z.clear();
+  dNdz.clear();
+  size_t columns = 0;
+  std::string line;
+  while (std::getline(file, line)) {
+    const size_t first = line.find_first_not_of(" \t\r");
+    if ((first == std::string::npos) || (line[first] == '#'))
+      continue;
+
+    std::vector<double> values;
+    const char* left = line.c_str();
+    char* end        = nullptr;
+    for (double value = strtod(left, &end); end != left; value = strtod(left, &end)) {
+      values.push_back(value);
+      left = end;
+    }
+    class_test_severe(left[strspn(left, " \t\r")] != '\0',
+                      "In file %s, could not read the line '%s'",
+                      name.c_str(),
+                      line.c_str());
+    /* strtod accepts nan, inf and overflowing literals such as 1e999 (read as inf) */
+    class_test_severe(std::any_of(values.begin(), values.end(), IsNonFinite),
+                      "In file %s, the line '%s' contains a value that is not a finite number",
+                      name.c_str(),
+                      line.c_str());
+    if (columns == 0) {
+      columns = values.size();
+      class_test_severe(columns < 2,
+                        "File %s should contain at least two columns (the redshift and the "
+                        "selection function of at least one bin)",
+                        name.c_str());
+      dNdz.resize(columns - 1);
+    }
+    class_test_severe(values.size() != columns,
+                      "In file %s, the line '%s' contains %d numbers, while the first one "
+                      "contained "
+                      "%d (the redshift and the selection function of each bin)",
+                      name.c_str(),
+                      line.c_str(),
+                      static_cast<int>(values.size()),
+                      static_cast<int>(columns));
+    class_test_severe(values[0] < 0.,
+                      "In file %s, the redshift z=%e is negative",
+                      name.c_str(),
+                      values[0]);
+    class_test_severe(!z.empty() && (values[0] <= z.back()),
+                      "In file %s, the redshifts must be in strictly growing order, but z=%e comes "
+                      "after z=%e",
+                      name.c_str(),
+                      values[0],
+                      z.back());
+    z.push_back(values[0]);
+    for (size_t bin = 0; bin < dNdz.size(); bin++) {
+      class_test_severe(values[bin + 1] < 0.,
+                        "In file %s, the selection function of bin %d is negative at z=%e",
+                        name.c_str(),
+                        static_cast<int>(bin),
+                        values[0]);
+      dNdz[bin].push_back(values[bin + 1]);
+    }
+  }
+  class_test_severe(z.size() < 2,
+                    "File %s should contain at least two lines of values",
+                    name.c_str());
 }
 
 }  // namespace
@@ -2108,15 +2185,95 @@ void InputModule::ReadDerived() {
       else if (selection->find("dirac") != std::string::npos) {
         ppt->selection = dirac;
       }
+      else if (selection->find("tabulated") != std::string::npos) {
+        ppt->selection = tabulated;
+      }
       else {
-        class_stop_severe("In selection function input: type '%s' is unclear", selection->c_str());
+        class_stop_severe(
+            "In selection function input: type '%s' is unclear (expected gaussian, tophat, dirac "
+            "or tabulated)",
+            selection->c_str());
       }
     }
 
     std::vector<double> selectionValues;
-    readDoubleList(pfc, "selection_mean", selectionValues, &found);
 
-    if ((found) && !selectionValues.empty()) {
+    if (ppt->selection == tabulated) {
+      /* the dN/dz of each bin is read in a file; the input module reads it once to find the
+         number of bins, their mean redshift (Limber thresholds, k_max) and their redshift
+         range (z_max_pk, time sampling) */
+      auto file = pfc->get<std::string>("selection_file");
+      class_test_severe(!file,
+                        "With selection = tabulated, pass the name of the file containing the "
+                        "selection functions in 'selection_file'");
+      class_test_severe(pfc->get<std::vector<double>>("selection_mean").has_value() ||
+                            pfc->get<std::vector<double>>("selection_width").has_value(),
+                        "With selection = tabulated, the selection functions are read in the file "
+                        "%s: do not pass 'selection_mean' or 'selection_width'",
+                        file->c_str());
+      ptr->selection_file_name = *file;
+      read_selection_file(*file, ptr->selection_file_z, ptr->selection_file_dNdz);
+
+      const std::vector<double>& z = ptr->selection_file_z;
+      const int z_size             = static_cast<int>(z.size());
+      ppt->selection_num           = static_cast<int>(ptr->selection_file_dNdz.size());
+      class_test_severe(ppt->selection_num > _SELECTION_NUM_MAX_,
+                        "File %s contains the selection functions of %d bins, hence you should "
+                        "increase _SELECTION_NUM_MAX_ in include/perturbations.h to at least this "
+                        "number",
+                        file->c_str(),
+                        ppt->selection_num);
+      ptr->selection_z_min.assign(ppt->selection_num, 0.);
+      ptr->selection_z_max.assign(ppt->selection_num, 0.);
+
+      for (int bin = 0; bin < ppt->selection_num; bin++) {
+        const std::vector<double>& dNdz = ptr->selection_file_dNdz[bin];
+
+        /* redshift range where dN/dz is non-zero, with one more point on each side (the
+           interpolated function is non-zero between the last zero and the first non-zero value) */
+        auto positive = [](double value) { return value > 0.; };
+        auto first    = std::find_if(dNdz.begin(), dNdz.end(), positive);
+        class_test_severe(first == dNdz.end(),
+                          "In file %s, the selection function of bin %d vanishes everywhere",
+                          file->c_str(),
+                          bin);
+        const int index_first = static_cast<int>(first - dNdz.begin());
+        const int index_last =
+            static_cast<int>(dNdz.rend() - std::find_if(dNdz.rbegin(), dNdz.rend(), positive)) - 1;
+        ptr->selection_z_min[bin] = z[std::max(index_first - 1, 0)];
+        ptr->selection_z_max[bin] = z[std::min(index_last + 1, z_size - 1)];
+
+        /* mean redshift = int z dN/dz dz / int dN/dz dz, exact for dN/dz linear between the
+           tabulated points (the trapezoidal rule applied to z dN/dz would give zero for a bin
+           whose only non-zero value is at z=0, and k_max diverges for a mean at z=0) */
+        double norm = 0., mean = 0.;
+        for (int index_z = 0; index_z < z_size - 1; index_z++) {
+          const double dz  = z[index_z + 1] - z[index_z];
+          norm            += 0.5 * (dNdz[index_z] + dNdz[index_z + 1]) * dz;
+          mean            += dz / 6. *
+                             (z[index_z] * (2. * dNdz[index_z] + dNdz[index_z + 1]) +
+                              z[index_z + 1] * (dNdz[index_z] + 2. * dNdz[index_z + 1]));
+        }
+        ppt->selection_mean[bin]  = mean / norm;
+        ppt->selection_width[bin] = 0.;
+
+        class_test_severe((bin > 0) && (ppt->selection_mean[bin] <= ppt->selection_mean[bin - 1]),
+                          "the bins in file %s must be ordered by growing mean redshift; bin %d "
+                          "has "
+                          "mean redshift %e, bin %d has mean redshift %e",
+                          file->c_str(),
+                          bin - 1,
+                          ppt->selection_mean[bin - 1],
+                          bin,
+                          ppt->selection_mean[bin]);
+        if (bin > 0) {
+          ptr->selection_bias[bin]               = ptr->selection_bias[0];
+          ptr->selection_magnification_bias[bin] = ptr->selection_magnification_bias[0];
+        }
+      }
+    }
+    else if (readDoubleList(pfc, "selection_mean", selectionValues, &found);
+             (found) && !selectionValues.empty()) {
       n_list = static_cast<int>(selectionValues.size());
 
       class_test_severe(n_list > _SELECTION_NUM_MAX_,
@@ -2127,7 +2284,7 @@ void InputModule::ReadDerived() {
 
       ppt->selection_num = n_list;
       for (i = 0; i < n_list; i++) {
-        class_test((selectionValues[i] < 0.) || (selectionValues[i] > 1000.),
+        class_test((selectionValues[i] <= 0.) || (selectionValues[i] > 1000.),
                    "input of selection functions: you asked for a mean redshift equal to %e, "
                    "sounds odd",
                    selectionValues[i]);
@@ -2171,59 +2328,59 @@ void InputModule::ReadDerived() {
               ppt->selection_num);
         }
       }
+    }
 
-      selectionValues.clear();
-      readDoubleList(pfc, "selection_bias", selectionValues, &found);
+    selectionValues.clear();
+    readDoubleList(pfc, "selection_bias", selectionValues, &found);
 
-      if ((found) && !selectionValues.empty()) {
-        n_list = static_cast<int>(selectionValues.size());
+    if ((found) && !selectionValues.empty()) {
+      n_list = static_cast<int>(selectionValues.size());
 
-        if (n_list == 1) {
-          for (i = 0; i < ppt->selection_num; i++) {
-            ptr->selection_bias[i] = selectionValues[0];
-          }
-        }
-        else if (n_list == ppt->selection_num) {
-          for (i = 0; i < n_list; i++) {
-            ptr->selection_bias[i] = selectionValues[i];
-          }
-        }
-        else {
-          class_stop_severe(
-              "In input for selection function, you asked for %d bin centers and %d bin "
-              "biases; number of bins unclear; you should pass either one bin bias (common "
-              "to all bins) or %d bin biases",
-              ppt->selection_num,
-              n_list,
-              ppt->selection_num);
+      if (n_list == 1) {
+        for (i = 0; i < ppt->selection_num; i++) {
+          ptr->selection_bias[i] = selectionValues[0];
         }
       }
-
-      selectionValues.clear();
-      readDoubleList(pfc, "selection_magnification_bias", selectionValues, &found);
-
-      if ((found) && !selectionValues.empty()) {
-        n_list = static_cast<int>(selectionValues.size());
-
-        if (n_list == 1) {
-          for (i = 0; i < ppt->selection_num; i++) {
-            ptr->selection_magnification_bias[i] = selectionValues[0];
-          }
+      else if (n_list == ppt->selection_num) {
+        for (i = 0; i < n_list; i++) {
+          ptr->selection_bias[i] = selectionValues[i];
         }
-        else if (n_list == ppt->selection_num) {
-          for (i = 0; i < n_list; i++) {
-            ptr->selection_magnification_bias[i] = selectionValues[i];
-          }
+      }
+      else {
+        class_stop_severe(
+            "In input for selection function, you asked for %d bin centers and %d bin "
+            "biases; number of bins unclear; you should pass either one bin bias (common "
+            "to all bins) or %d bin biases",
+            ppt->selection_num,
+            n_list,
+            ppt->selection_num);
+      }
+    }
+
+    selectionValues.clear();
+    readDoubleList(pfc, "selection_magnification_bias", selectionValues, &found);
+
+    if ((found) && !selectionValues.empty()) {
+      n_list = static_cast<int>(selectionValues.size());
+
+      if (n_list == 1) {
+        for (i = 0; i < ppt->selection_num; i++) {
+          ptr->selection_magnification_bias[i] = selectionValues[0];
         }
-        else {
-          class_stop_severe(
-              "In input for selection function, you asked for %d bin centers and %d bin "
-              "biases; number of bins unclear; you should pass either one bin bias (common "
-              "to all bins) or %d bin biases",
-              ppt->selection_num,
-              n_list,
-              ppt->selection_num);
+      }
+      else if (n_list == ppt->selection_num) {
+        for (i = 0; i < n_list; i++) {
+          ptr->selection_magnification_bias[i] = selectionValues[i];
         }
+      }
+      else {
+        class_stop_severe(
+            "In input for selection function, you asked for %d bin centers and %d bin "
+            "biases; number of bins unclear; you should pass either one bin bias (common "
+            "to all bins) or %d bin biases",
+            ppt->selection_num,
+            n_list,
+            ppt->selection_num);
       }
     }
 
@@ -2237,6 +2394,12 @@ void InputModule::ReadDerived() {
     }
 
     if (auto dNdz_selection = pfc->get<std::string>("dNdz_selection")) {
+      class_test_severe(ppt->selection == tabulated,
+                        "With selection = tabulated, the selection function of each bin is the "
+                        "full "
+                        "dN/dz read in the file %s; it cannot be multiplied by the one passed in "
+                        "'dNdz_selection'",
+                        ptr->selection_file_name.c_str());
       if ((dNdz_selection->find("analytic") != std::string::npos)) {
         ptr->has_nz_analytic = true;
       }
@@ -2301,6 +2464,9 @@ void InputModule::ReadDerived() {
           }
           if (ppt->selection == dirac) {
             z_max = ppt->selection_mean[bin];
+          }
+          if (ppt->selection == tabulated) {
+            z_max = ptr->selection_z_max[bin];
           }
           ppt->z_max_pk = std::max(ppt->z_max_pk, z_max);
         }
@@ -3075,12 +3241,15 @@ void precision::parse(const FileContent& fc) {
   read(fc, "transfer_neglect_delta_k_T_b", transfer_neglect_delta_k_T_b);
   read(fc, "transfer_neglect_late_source", transfer_neglect_late_source);
   read(fc, "l_switch_limber", l_switch_limber);
+  read(fc, "cmb_lensing_sampling_factor", cmb_lensing_sampling_factor);
+  read(fc, "cmb_lensing_sampling_fraction", cmb_lensing_sampling_fraction);
   read(fc, "l_switch_limber_for_nc_local_over_z", l_switch_limber_for_nc_local_over_z);
   read(fc, "l_switch_limber_for_nc_los_over_z", l_switch_limber_for_nc_los_over_z);
   read(fc, "selection_cut_at_sigma", selection_cut_at_sigma);
   read(fc, "selection_sampling", selection_sampling);
   read(fc, "selection_sampling_bessel", selection_sampling_bessel);
   read(fc, "selection_sampling_bessel_los", selection_sampling_bessel_los);
+  read(fc, "selection_sampling_bessel_min", selection_sampling_bessel_min);
   read(fc, "selection_tophat_edge", selection_tophat_edge);
 
   /* Nonlinear */

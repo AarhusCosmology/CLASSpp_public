@@ -124,6 +124,7 @@ class TransferModule : public BaseModule {
       int index_md, int index_ic, int index_type, int index_l, double q, double* ptransfer_local);
   void transfer_init();
   void transfer_indices_of_transfers(double q_period, double K, int sgnK);
+  void transfer_type_properties();
   void transfer_perturbation_copy_sources_and_nl_corrections(
       std::vector<std::vector<double*>>& sources,
       std::vector<std::vector<std::vector<double>>>& owned_sources);
@@ -133,120 +134,98 @@ class TransferModule : public BaseModule {
       std::vector<std::vector<std::vector<double>>>& sources_spline_storage);
   void transfer_get_l_list();
   void transfer_get_q_list(double q_period, double K, int sgnK);
-  int transfer_get_q_list_v1(double q_period, double K, int sgnK);
   void transfer_get_q_limber_list(double K, int sgnK);
   void transfer_get_k_list(double K);
-  void transfer_get_source_correspondence(std::vector<std::vector<int>>& tp_of_tt);
-  void transfer_source_tau_size_max(double tau_rec, double tau0, int* tau_size_max);
-  void transfer_source_tau_size(
-      double tau_rec, double tau0, int index_md, int index_tt, int* tau_size);
-  void transfer_compute_for_each_q(int* const* tp_of_tt,
-                                   int index_q,
-                                   int tau_size_max,
+  void transfer_selection_times();
+  void transfer_time_samplings(double tau_rec);
+  std::vector<double> transfer_logarithmic_sampling(double tau_min,
+                                                    double tau_max,
+                                                    double log_step);
+  void transfer_precompute_windows(double tau_rec);
+  void transfer_compute_for_each_q(int index_q,
                                    double tau_rec,
-                                   double** const* sources,
-                                   double** const* sources_spline,
-                                   double* window,
+                                   double** const* pert_sources,
+                                   double** const* pert_sources_spline,
                                    struct transfer_workspace* ptw,
                                    bool use_full_limber);
-  void transfer_radial_coordinates(struct transfer_workspace* ptw, int index_md, int index_q);
+  void transfer_radial_coordinates(struct transfer_workspace* ptw,
+                                   const double* tau0_minus_tau,
+                                   int tau_size,
+                                   double k);
   void transfer_interpolate_sources(double k,
                                     int index_md,
-                                    int index_ic,
-                                    int index_type,
-                                    double* sources,
-                                    double* source_spline,
+                                    const double* pert_source,
+                                    const double* pert_source_spline,
                                     double* interpolated_sources);
-  void transfer_sources(double* interpolated_sources,
-                        double tau_rec,
-                        double k,
-                        int index_md,
-                        int index_tt,
-                        double* sources,
-                        double* window,
-                        int tau_size_max,
-                        double* tau0_minus_tau,
-                        double* delta_tau,
-                        int* tau_size_out);
+  void transfer_sources(
+      const double* interpolated_sources, double k, int index_md, int index_tt, double* sources);
   void transfer_selection_function(int bin, double z, double* selection);
   void transfer_dNdz_analytic(double z, double* dNdz, double* dln_dNdz_dz);
-  void transfer_selection_sampling(int bin, double* tau0_minus_tau, int tau_size);
-  void transfer_lensing_sampling(int bin, double tau0, double* tau0_minus_tau, int tau_size);
-  void transfer_source_resample(int bin,
-                                double* tau0_minus_tau,
-                                int tau_size,
-                                int index_md,
-                                double tau0,
-                                double* interpolated_sources,
-                                double* sources);
-  void transfer_selection_times(int bin, double* tau_min, double* tau_mean, double* tau_max);
   void transfer_selection_compute(double* selection,
-                                  double* tau0_minus_tau,
-                                  double* delta_tau,
+                                  const double* tau0_minus_tau,
+                                  const double* w_trapz,
                                   int tau_size,
                                   double* pvecback,
                                   double tau0,
                                   int bin);
-  void transfer_compute_for_each_l(struct transfer_workspace* ptw,
-                                   int index_q,
-                                   int index_md,
-                                   int index_ic,
-                                   int index_tt,
-                                   int index_l,
-                                   double l,
-                                   double q_max_bessel,
-                                   radial_function_type radial_type,
-                                   bool use_full_limber);
-  void transfer_use_limber(
-      double q_max_bessel, int index_md, int index_tt, double q, double l, short* use_limber);
+  TransferMethod transfer_select_method(struct transfer_workspace* ptw,
+                                        int index_q,
+                                        int index_md,
+                                        int index_tt,
+                                        int index_l,
+                                        double q,
+                                        double ra_rec,
+                                        double q_max_bessel,
+                                        const TransferTimeSampling& sampling,
+                                        const double* sources,
+                                        bool use_full_limber,
+                                        double tau0_minus_tau_min_bessel,
+                                        int* index_tau_max,
+                                        char* bessel_truncation);
   void transfer_integrate(struct transfer_workspace* ptw,
-                          int index_q,
-                          int index_md,
-                          int index_tt,
-                          double l,
                           int index_l,
-                          double q,
+                          double k,
                           radial_function_type radial_type,
+                          const TransferTimeSampling& sampling,
+                          const double* sources,
+                          int index_tau_max,
+                          bool bessel_truncation,
+                          double tau0_minus_tau_min_bessel,
                           double* trsf);
   void transfer_limber(struct transfer_workspace* ptw,
-                       int index_md,
-                       int index_q,
                        double l,
                        double q,
                        radial_function_type radial_type,
+                       const std::vector<double>& tau0_minus_tau,
+                       const double* sources,
                        double* trsf);
-  void transfer_limber_interpolate(double* tau0_minus_tau,
-                                   double* sources,
+  void transfer_limber_interpolate(const double* tau0_minus_tau,
+                                   const double* sources,
                                    int tau_size,
                                    double tau0_minus_tau_limber,
                                    double* S);
-  void transfer_limber2(int tau_size,
-                        int index_md,
-                        int index_q,
-                        double l,
-                        double q,
-                        double* tau0_minus_tau,
-                        double* sources,
-                        radial_function_type radial_type,
-                        double* trsf);
-  void transfer_can_be_neglected(
-      int index_md, int index_ic, int index_tt, double ra_rec, double q, double l, short* neglect);
-  void transfer_late_source_can_be_neglected(int index_md, int index_tt, double l, short* neglect);
-  void transfer_select_radial_function(int index_md,
-                                       int index_tt,
-                                       radial_function_type* radial_type);
+  /** which of the Bessel function and its first two derivatives a radial function needs */
+  struct BesselNeeds {
+    bool Phi;
+    bool dPhi;
+    bool d2Phi;
+  };
+  static BesselNeeds transfer_radial_function_needs(radial_function_type radial_type);
+  double transfer_bessel_cut(struct transfer_workspace* ptw, int index_q, int index_l, double k);
+  void transfer_bessel_interpolate(struct transfer_workspace* ptw,
+                                   int index_q,
+                                   int index_l,
+                                   int tau_size,
+                                   int x_size,
+                                   BesselNeeds needs);
   void transfer_radial_function(struct transfer_workspace* ptw,
                                 double k,
-                                int index_q,
                                 int index_l,
                                 int x_size,
                                 double* radial_function,
                                 radial_function_type radial_type);
-  int transfer_init_HIS_from_bessel(HyperInterpStruct* pHIS);
   void transfer_global_selection_read();
   void transfer_workspace_init(struct transfer_workspace* ptw,
-                               int perturb_tau_size,
-                               int tau_size_max,
                                double K,
                                int sgnK,
                                double tau0_minus_tau_cut,
@@ -268,7 +247,6 @@ class TransferModule : public BaseModule {
                          double xtol,
                          int* index_l_left,
                          int* index_l_right);
-  void transfer_precompute_selection(double tau_rec, int tau_size_max, std::vector<double>& window);
   void transfer_f_evo(double* pvecback, int last_index, double cotKgen, double* f_evo);
 
   BackgroundModulePtr background_module_;
@@ -278,6 +256,22 @@ class TransferModule : public BaseModule {
 
   bool has_cls_; /**< copy of same flag in perturbation structure */
   int md_size_;  /**< number of modes included in computation */
+
+  /** @name - transfer types and time samplings, defined once before the loop over wavenumbers
+   *  (see docs/superpowers/specs/2026-10-08-transfer-restructure-design.md) */
+  //@{
+  std::vector<std::vector<TransferType>>
+      types_; /**< properties of each type, types_[index_md][index_tt] */
+  std::vector<std::vector<TransferTimeSampling>>
+      samplings_; /**< distinct time samplings of each mode, samplings_[index_md][index_ts] */
+  int tau_size_max_  = 0; /**< largest number of sampled times over all samplings */
+  int tt_per_ts_max_ = 0; /**< largest number of types sharing a time sampling */
+  std::vector<double>
+      selection_tau_min_; /**< smallest time at which the selection function of each bin is non-zero */
+  std::vector<double> selection_tau_mean_; /**< time at the mean redshift of each bin */
+  std::vector<double>
+      selection_tau_max_; /**< largest time at which the selection function of each bin is non-zero */
+  //@}
 
   int nz_size_;              /**< number of redshift values in input tabulated selection function */
   std::vector<double> nz_z_; /**< redshift values in input tabulated selection function */
@@ -290,6 +284,9 @@ class TransferModule : public BaseModule {
   std::vector<double> nz_evo_dlog_nz_; /**< log of tabulated values of evolution function */
   std::vector<double>
       nz_evo_dd_dlog_nz_; /**< second derivatives in splined log of evolution function */
+
+  std::vector<std::vector<double>>
+      selection_file_ddNdz_; /**< for selection=tabulated: second derivatives of the selection function of each bin with respect to z, selection_file_ddNdz_[bin][index_z] */
 };
 
 #endif  //TRANSFER_MODULE_H

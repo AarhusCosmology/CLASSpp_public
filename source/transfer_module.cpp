@@ -101,9 +101,6 @@ void TransferModule::transfer_init() {
   /* order of magnitude of the oscillation period of transfer functions */
   double q_period;
 
-  /* maximum number of sampling times for transfer sources */
-  int tau_size_max;
-
   /** - check whether any spectrum in harmonic space (i.e., any \f$C_l\f$'s) is actually requested */
 
   if (!ppt->has_cls) {
@@ -176,16 +173,16 @@ void TransferModule::transfer_init() {
                                       sources_spline_storage,
                                       spline_owned_storage);
 
-  /** - allocate and fill array describing the correspondence between perturbation types and transfer types */
+  /** - eventually read the selection and evolution functions */
 
-  std::vector<std::vector<int>> tp_of_tt_storage(md_size_);
-  transfer_get_source_correspondence(tp_of_tt_storage);
+  transfer_global_selection_read();
 
-  /** - evaluate maximum number of sampled times in the transfer
-      sources: needs to be known here, in order to allocate a large
-      enough workspace */
+  /** - define once for all the time sampling of each type, and its
+      window function W(tau) on this sampling */
 
-  transfer_source_tau_size_max(tau_rec, tau0, &tau_size_max);
+  transfer_selection_times();
+  transfer_time_samplings(tau_rec);
+  transfer_precompute_windows(tau_rec);
 
   /** - compute flat spherical bessel functions */
 
@@ -204,113 +201,54 @@ void TransferModule::transfer_init() {
                         l_[l_size_max_ - 1] + 1,
                         ppr->hyper_phi_min_abs);
 
-  /*
-    fprintf(stderr,"tau:%d   l:%d   q:%d\n",
-    perturbations_module_->tau_size_,
-    l_size_max_,
-    q_size_
-    );
-  */
-
-  /** - eventually read the selection and evolution functions */
-
-  transfer_global_selection_read();
-
-  /** - precompute window function for integrated nCl/sCl quantities*/
-  std::vector<double> window;
-  if (ppt->has_scalars) {
-    // transfer_precompute_selection() assumes perturbations_module_->index_md_scalars_ to be valid.
-    // window will only be used for scalar modes and only for certain sources.
-    transfer_precompute_selection(tau_rec, tau_size_max, window);
-  }
-  double* window_ptr = window.empty() ? nullptr : window.data();
   std::vector<double**> sources(md_size_);
   std::vector<double**> sources_spline(md_size_);
-  std::vector<int*> tp_of_tt(md_size_);
   for (int index_md = 0; index_md < md_size_; ++index_md) {
     sources[index_md]        = sources_storage[index_md].data();
     sources_spline[index_md] = sources_spline_storage[index_md].data();
-    tp_of_tt[index_md]       = tp_of_tt_storage[index_md].data();
   }
+
+  /** - loop over all wavenumbers (parallelized), in the normal scheme and,
+      if needed, in the full Limber scheme */
+
   Tools::TaskSystem task_system(pba->number_of_threads);
   std::vector<std::future<void>> future_output;
-  /** - loop over all wavenumbers (parallelized).*/
-  /* For each wavenumber: */
-  for (int index_q = 0; index_q < q_size_; index_q++) {
-    future_output.push_back(task_system.AsyncTask([this,
-                                                   tau_size_max,
-                                                   tp_of_tt,
-                                                   tau_rec,
-                                                   sources_spline,
-                                                   &BIS,
-                                                   tau0,
-                                                   index_q,
-                                                   sources,
-                                                   window_ptr]() {
-      struct transfer_workspace ptw = {};
-      transfer_workspace_init(&ptw,
-                              perturbations_module_->tau_size_,
-                              tau_size_max,
-                              pba->K,
-                              pba->sgnK,
-                              tau0 - thermodynamics_module_->tau_cut_,
-                              &BIS);
-
-      if (ptr->transfer_verbose > 2)
-        printf("Compute transfer for wavenumber [%d/%d]\n", index_q, q_size_ - 1);
-
-      /* Update interpolation structure: */
-      transfer_update_HIS(&ptw, index_q, tau0);
-
-      transfer_compute_for_each_q(tp_of_tt.data(),
-                                  index_q,
-                                  tau_size_max,
-                                  tau_rec,
-                                  sources.data(),
-                                  sources_spline.data(),
-                                  window_ptr,
-                                  &ptw,
-                                  false);
-      return;
-    }));
-  } /* end of loop over wavenumber */
-
-  if (do_lcmb_full_limber_) {
-    for (int index_q = 0; index_q < q_size_limber_; index_q++) {
+  for (int pass = 0; pass < (do_lcmb_full_limber_ ? 2 : 1); pass++) {
+    const bool use_full_limber = (pass == 1);
+    const int q_size           = use_full_limber ? q_size_limber_ : q_size_;
+    for (int index_q = 0; index_q < q_size; index_q++) {
       future_output.push_back(task_system.AsyncTask([this,
-                                                     tau_size_max,
-                                                     tp_of_tt,
+                                                     use_full_limber,
+                                                     q_size,
                                                      tau_rec,
-                                                     sources_spline,
-                                                     &BIS,
                                                      tau0,
                                                      index_q,
-                                                     sources,
-                                                     window_ptr]() {
+                                                     &sources,
+                                                     &sources_spline,
+                                                     &BIS]() {
         struct transfer_workspace ptw = {};
         transfer_workspace_init(&ptw,
-                                perturbations_module_->tau_size_,
-                                tau_size_max,
                                 pba->K,
                                 pba->sgnK,
                                 tau0 - thermodynamics_module_->tau_cut_,
                                 &BIS);
 
         if (ptr->transfer_verbose > 2)
-          printf("Compute full-Limber transfer for wavenumber [%d/%d]\n",
+          printf("Compute %stransfer for wavenumber [%d/%d]\n",
+                 use_full_limber ? "full-Limber " : "",
                  index_q,
-                 q_size_limber_ - 1);
+                 q_size - 1);
 
-        transfer_compute_for_each_q(tp_of_tt.data(),
-                                    index_q,
-                                    tau_size_max,
+        /* Update interpolation structure (not needed in the full Limber scheme): */
+        if (!use_full_limber)
+          transfer_update_HIS(&ptw, index_q, tau0);
+
+        transfer_compute_for_each_q(index_q,
                                     tau_rec,
                                     sources.data(),
                                     sources_spline.data(),
-                                    window_ptr,
                                     &ptw,
-                                    true);
-        return;
+                                    use_full_limber);
       }));
     }
   }
@@ -431,25 +369,8 @@ void TransferModule::transfer_indices_of_transfers(double q_period, double K, in
   /** - get k values using transfer_get_k_list() */
   transfer_get_k_list(K);
 
-  /* for testing, it can be useful to print the q list in a file: */
-
-  /*
-    FILE * out=fopen("output/q","w");
-    int index_q;
-
-    for (index_q=0; index_q < q_size_; index_q++) {
-
-    fprintf(out,"%d %e %e %e %e\n",
-    index_q,
-    q_[index_q],
-    k_[0][index_q],
-    q_[index_q]/sqrt(sgnK*K),
-    q_[index_q + 1] - q_[index_q]);
-
-    }
-
-    fclose(out);
-  */
+  /** - define once for all the properties of each transfer type */
+  transfer_type_properties();
 
   /** - get l values using transfer_get_l_list() */
   transfer_get_l_list();
@@ -599,12 +520,6 @@ void TransferModule::transfer_get_l_list() {
   int l_max = 0;
   int increment;
   /** Summary: */
-  /*
-    fprintf(stderr,"rescaling %e logstep %e linstep %e\n",
-    thermodynamics_module_->angular_rescaling_,
-    pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_),
-    ppr->l_linstep*thermodynamics_module_->angular_rescaling_);
-  */
 
   /* check that largests need value of l_max */
 
@@ -617,6 +532,9 @@ void TransferModule::transfer_get_l_list() {
       if ((ppt->has_cl_lensing_potential) || (ppt->has_cl_number_count))
         l_max = std::max(ppt->l_lss_max, l_max);
     }
+
+    if (ppt->has_vectors)
+      l_max = std::max(ppt->l_vector_max, l_max);
 
     if (ppt->has_tensors)
       l_max = std::max(ppt->l_tensor_max, l_max);
@@ -668,38 +586,7 @@ void TransferModule::transfer_get_l_list() {
     l_size_[index_md] = 0;
 
     for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-      if (_scalarsEXT_) {
-        if ((ppt->has_cl_cmb_temperature) &&
-            ((index_tt == index_tt_t0_) || (index_tt == index_tt_t1_) ||
-             (index_tt == index_tt_t2_)))
-          l_max = ppt->l_scalar_max;
-
-        if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_))
-          l_max = ppt->l_scalar_max;
-
-        if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_))
-          l_max = ppt->l_scalar_max;
-
-        if ((_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density)) ||
-            (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens)) ||
-            (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr)) ||
-            (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr)) ||
-            (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr)) ||
-            (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr)) ||
-            (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr)))
-          l_max = ppt->l_lss_max;
-
-        if ((ppt->has_cl_lensing_potential) && (index_tt >= index_tt_lensing_) &&
-            (index_tt < index_tt_lensing_ + ppt->selection_num))
-          l_max = ppt->l_lss_max;
-      }
-
-      if (_tensorsEXT_) {
-        l_max = ppt->l_tensor_max;
-      }
+      l_max = types_[index_md][index_tt].l_max;
 
       class_test(l_max > l_[l_size_max_ - 1],
                  "For mode %d, type %d, asked for l_max=%d greater than in Bessel table where "
@@ -1071,13 +958,6 @@ void TransferModule::transfer_get_k_list(double K) {
       }
     }
 
-    /*
-      class_test(k_[index_md][0] < perturbations_module_->k_[index_md][0],
-      "bug in k_list calculation: in perturbation module k_min=%e, in transfer module k_min[mode=%d]=%e, interpolation impossible",
-      perturbations_module_->k_[0][0],
-      index_md,
-      k_[index_md][0]);
-    */
     class_test(k_[index_md][q_size_ - 1] >
                    perturbations_module_->k_[0][perturbations_module_->k_size_cl_[0] - 1],
                "bug in k_list calculation: in perturbation module k_max=%e, in transfer module "
@@ -1100,332 +980,554 @@ void TransferModule::transfer_get_k_list(double K) {
 }
 
 /**
- * This routine defines the correspondence between the sources in the
- * perturbation and transfer module.
- *
- * @param tp_of_tt Input/Output: array with the correspondence (allocated before, filled here)
- * @return the error status
+ * Define once for all the properties of each transfer type: perturbation
+ * source, redshift bin, largest multipole, radial function, window, power
+ * of k, Limber threshold and neglect rules. Every per-type decision in
+ * this module reads these properties.
  */
 
-void TransferModule::transfer_get_source_correspondence(std::vector<std::vector<int>>& tp_of_tt) {
-  /** Summary: */
+void TransferModule::transfer_type_properties() {
+  const int nbin = ppt->selection_num;
 
-  /** - which source are we considering? Define correspondence
-      between transfer types and source types */
+  types_.assign(md_size_, {});
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
-    tp_of_tt[index_md].resize(tt_size_[index_md]);
+    types_[index_md].resize(tt_size_[index_md]);
 
     for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
+      TransferType& type = types_[index_md][index_tt];
+
+      /* is index_tt one of the nbin types starting at index_first? Then set its term and bin. */
+      auto in_bins = [&](int index_first, bool flag, TransferTerm term) {
+        if (flag && (index_tt >= index_first) && (index_tt < index_first + nbin)) {
+          type.term = term;
+          type.bin  = index_tt - index_first;
+        }
+      };
+
       if (_scalarsEXT_) {
-        if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t0_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t0_;
+        if (ppt->has_cl_cmb_temperature) {
+          if (index_tt == index_tt_t0_)
+            type.term = TransferTerm::cmb_t0;
+          if (index_tt == index_tt_t1_)
+            type.term = TransferTerm::cmb_t1;
+          if (index_tt == index_tt_t2_)
+            type.term = TransferTerm::cmb_t2;
+        }
+        if (ppt->has_cl_cmb_polarization && (index_tt == index_tt_e_))
+          type.term = TransferTerm::cmb_e;
+        if (ppt->has_cl_cmb_lensing_potential && (index_tt == index_tt_lcmb_))
+          type.term = TransferTerm::cmb_lensing;
+        in_bins(index_tt_density_, ppt->has_nc_density, TransferTerm::nc_density);
+        in_bins(index_tt_rsd_, ppt->has_nc_rsd, TransferTerm::nc_rsd);
+        in_bins(index_tt_d0_, ppt->has_nc_rsd, TransferTerm::nc_d0);
+        in_bins(index_tt_d1_, ppt->has_nc_rsd, TransferTerm::nc_d1);
+        in_bins(index_tt_nc_g1_, ppt->has_nc_gr, TransferTerm::nc_g1);
+        in_bins(index_tt_nc_g2_, ppt->has_nc_gr, TransferTerm::nc_g2);
+        in_bins(index_tt_nc_g3_, ppt->has_nc_gr, TransferTerm::nc_g3);
+        in_bins(index_tt_nc_lens_, ppt->has_nc_lens, TransferTerm::nc_lens);
+        in_bins(index_tt_nc_g4_, ppt->has_nc_gr, TransferTerm::nc_g4);
+        in_bins(index_tt_nc_g5_, ppt->has_nc_gr, TransferTerm::nc_g5);
+        in_bins(index_tt_lensing_, ppt->has_cl_lensing_potential, TransferTerm::galaxy_lensing);
+      }
+      else {
+        if (ppt->has_cl_cmb_temperature) {
+          if (_vectorsEXT_ && (index_tt == index_tt_t1_))
+            type.term = TransferTerm::cmb_t1;
+          if (index_tt == index_tt_t2_)
+            type.term = TransferTerm::cmb_t2;
+        }
+        if (ppt->has_cl_cmb_polarization) {
+          if (index_tt == index_tt_e_)
+            type.term = TransferTerm::cmb_e;
+          if (index_tt == index_tt_b_)
+            type.term = TransferTerm::cmb_b;
+        }
+      }
 
-        if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t1_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t1_;
+      /* the transfer function can be neglected for l < (q-delta_k_neglect) r_a(tau_rec) */
+      auto cmb = [&](int index_tp, radial_function_type radial, double delta_k, bool late_cut) {
+        type.index_tp        = index_tp;
+        type.radial_type     = radial;
+        type.delta_k_neglect = delta_k;
+        type.late_source_cut = late_cut;
+      };
+      /* number counts and galaxy lensing: the Limber threshold scales with the mean redshift of the bin */
+      auto lss = [&](int index_tp,
+                     radial_function_type radial,
+                     TransferWindow window,
+                     double k_power,
+                     double l_limber_over_z) {
+        type.index_tp    = index_tp;
+        type.radial_type = radial;
+        type.window_type = window;
+        type.k_power     = k_power;
+        type.l_limber    = l_limber_over_z * ppt->selection_mean[type.bin];
+        type.l_max       = ppt->l_lss_max;
+      };
+      const auto* pt        = perturbations_module_.get();
+      const double nc_local = ppr->l_switch_limber_for_nc_local_over_z;
+      const double nc_los   = ppr->l_switch_limber_for_nc_los_over_z;
+      const auto selection  = TransferWindow::selection;
+      const auto integrated = TransferWindow::integrated;
 
-        if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t2_;
-
-        if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_p_;
-
-        if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
-
-        if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density))
+      if (_scalarsEXT_) {
+        type.l_max = ppt->l_scalar_max;
+        switch (type.term) {
+          /* sources at late times can be neglected at high l for CMB
+             types, excepted T0 which contains the late ISW effect */
+          case TransferTerm::cmb_t0:
+            cmb(pt->index_tp_t0_, SCALAR_TEMPERATURE_0, ppr->transfer_neglect_delta_k_S_t0, false);
+            break;
+          case TransferTerm::cmb_t1:
+            cmb(pt->index_tp_t1_, SCALAR_TEMPERATURE_1, ppr->transfer_neglect_delta_k_S_t1, true);
+            break;
+          case TransferTerm::cmb_t2:
+            cmb(pt->index_tp_t2_, SCALAR_TEMPERATURE_2, ppr->transfer_neglect_delta_k_S_t2, true);
+            break;
+          case TransferTerm::cmb_e:
+            cmb(pt->index_tp_p_, SCALAR_POLARISATION_E, ppr->transfer_neglect_delta_k_S_e, true);
+            break;
+          case TransferTerm::cmb_b:
+            break;
+          /* CMB lensing potential: an integrated type with support [tau_rec, tau0] */
+          case TransferTerm::cmb_lensing:
+            type.index_tp    = pt->index_tp_phi_plus_psi_;
+            type.window_type = TransferWindow::cmb_lensing;
+            type.k_power     = ptr->lcmb_tilt;
+            type.k_pivot     = ptr->lcmb_pivot;
+            type.l_limber    = floor(ppr->l_switch_limber) + 1.;
+            type.full_limber = do_lcmb_full_limber_;
+            break;
           /* use here delta_cb rather than delta_m if density number counts calculated only for cold dark matter + baryon */
           /* (this important comment is referenced in a WARNING message in perturbations.c) */
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_delta_m_;
+          case TransferTerm::nc_density:
+            lss(pt->index_tp_delta_m_, SCALAR_TEMPERATURE_0, selection, 0., nc_local);
+            break;
+          case TransferTerm::nc_rsd:
+            lss(pt->index_tp_theta_m_, NC_RSD, selection, 0., nc_local);
+            break;
+          /* factors 1/k^2 and 1/k from the original CLASSgal paper (arXiv:1307.1459) */
+          case TransferTerm::nc_d0:
+            lss(pt->index_tp_theta_m_, SCALAR_TEMPERATURE_0, selection, -2., nc_local);
+            break;
+          case TransferTerm::nc_d1:
+            lss(pt->index_tp_theta_m_, SCALAR_TEMPERATURE_1, selection, -1., nc_local);
+            break;
+          case TransferTerm::nc_g1:
+            lss(pt->index_tp_psi_, SCALAR_TEMPERATURE_0, selection, 0., nc_local);
+            break;
+          case TransferTerm::nc_g2:
+            lss(pt->index_tp_phi_, SCALAR_TEMPERATURE_0, selection, 0., nc_local);
+            break;
+          case TransferTerm::nc_g3:
+            lss(pt->index_tp_phi_prime_, SCALAR_TEMPERATURE_0, selection, 0., nc_local);
+            break;
+          case TransferTerm::nc_lens:
+            lss(pt->index_tp_phi_plus_psi_, SCALAR_TEMPERATURE_0, integrated, 0., nc_los);
+            break;
+          case TransferTerm::nc_g4:
+            lss(pt->index_tp_phi_plus_psi_, SCALAR_TEMPERATURE_0, integrated, 0., nc_los);
+            break;
+          /* factor k from the chi derivative d/dchi j_l(k chi) = k j_l'(k chi). Even if G5 is
+             integrated along the line-of-sight, it has the Limber threshold of local terms,
+             because it involves the derivative of the Bessel function */
+          case TransferTerm::nc_g5:
+            lss(pt->index_tp_phi_plus_psi_, SCALAR_TEMPERATURE_1, integrated, 1., nc_local);
+            break;
+          case TransferTerm::galaxy_lensing:
+            lss(pt->index_tp_phi_plus_psi_, SCALAR_TEMPERATURE_0, integrated, 0., nc_los);
+            break;
+        }
 
-        if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_theta_m_;
-
-        if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_theta_m_;
-
-        if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_theta_m_;
-
-        if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
-
-        if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_psi_;
-
-        if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_;
-
-        if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_prime_;
-
-        if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
-
-        if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
-
-        if ((ppt->has_cl_lensing_potential) && (index_tt >= index_tt_lensing_) &&
-            (index_tt < index_tt_lensing_ + ppt->selection_num))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_phi_plus_psi_;
+        /* number counts with Dirac selection functions never use the Limber approximation */
+        if ((type.bin >= 0) && (ppt->selection == dirac) &&
+            (type.term != TransferTerm::galaxy_lensing))
+          type.l_limber = _HUGE_;
       }
 
       if (_vectorsEXT_) {
-        if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t1_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t1_;
-
-        if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t2_;
-
-        if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_p_;
-
-        if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_b_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_p_;
+        type.l_max = ppt->l_vector_max;
+        switch (type.term) {
+          case TransferTerm::cmb_t1:
+            cmb(pt->index_tp_t1_, VECTOR_TEMPERATURE_1, ppr->transfer_neglect_delta_k_V_t1, true);
+            break;
+          case TransferTerm::cmb_t2:
+            cmb(pt->index_tp_t2_, VECTOR_TEMPERATURE_2, ppr->transfer_neglect_delta_k_V_t2, true);
+            break;
+          case TransferTerm::cmb_e:
+            cmb(pt->index_tp_p_, VECTOR_POLARISATION_E, ppr->transfer_neglect_delta_k_V_e, true);
+            break;
+          case TransferTerm::cmb_b:
+            cmb(pt->index_tp_p_, VECTOR_POLARISATION_B, ppr->transfer_neglect_delta_k_V_b, true);
+            break;
+          default:
+            break;
+        }
       }
 
+      /* the late time sources of tensor temperature can never be neglected */
       if (_tensorsEXT_) {
-        if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_t2_;
-
-        if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_p_;
-
-        if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_b_))
-          tp_of_tt[index_md][index_tt] = perturbations_module_->index_tp_p_;
+        type.l_max = ppt->l_tensor_max;
+        switch (type.term) {
+          case TransferTerm::cmb_t2:
+            cmb(pt->index_tp_t2_, TENSOR_TEMPERATURE_2, ppr->transfer_neglect_delta_k_T_t2, false);
+            break;
+          case TransferTerm::cmb_e:
+            cmb(pt->index_tp_p_, TENSOR_POLARISATION_E, ppr->transfer_neglect_delta_k_T_e, true);
+            break;
+          case TransferTerm::cmb_b:
+            cmb(pt->index_tp_p_, TENSOR_POLARISATION_B, ppr->transfer_neglect_delta_k_T_b, true);
+            break;
+          default:
+            break;
+        }
       }
-    }
-  }
-}
 
-void TransferModule::transfer_source_tau_size_max(double tau_rec, double tau0, int* tau_size_max) {
-  int tau_size_tt = 0;
-
-  *tau_size_max = 0;
-
-  for (int index_md = 0; index_md < md_size_; index_md++) {
-    for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-      transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size_tt);
-
-      *tau_size_max = std::max(*tau_size_max, tau_size_tt);
+      class_test(type.index_tp < 0,
+                 "no perturbation source associated to transfer type %d of mode %d",
+                 index_tt,
+                 index_md);
     }
   }
 }
 
 /**
- * the code makes a distinction between "perturbation sources"
- * (e.g. gravitational potential) and "transfer sources" (e.g. total
- * density fluctuations, obtained through the Poisson equation, and
- * observed with a given selection function).
- *
- * This routine computes the number of sampled time values for each type
- * of transfer sources.
- *
- * @param tau_rec               Input: recombination time
- * @param tau0                  Input: time today
- * @param index_md              Input: index of the mode (scalar, tensor)
- * @param index_tt              Input: index of transfer type
- * @param tau_size              Output: pointer to number of sampled times
- * @return the error status
+ * For each selection function, compute once for all the min, mean and
+ * max values of conformal time (associated to the min, mean and max
+ * values of redshift specified by the user)
  */
 
-void TransferModule::transfer_source_tau_size(
-    double tau_rec, double tau0, int index_md, int index_tt, int* tau_size) {
-  /* values of conformal time */
-  double tau_min, tau_mean, tau_max;
+void TransferModule::transfer_selection_times() {
+  const int nbin = ppt->selection_num;
+  selection_tau_min_.assign(nbin, 0.);
+  selection_tau_mean_.assign(nbin, 0.);
+  selection_tau_max_.assign(nbin, 0.);
 
-  /* minimum value of index_tt */
-  int index_tau_min;
-
-  /* value of l at which limber approximation is switched on */
-  int l_limber;
-
-  /* current redshift bin number */
-  int bin = 0;
-
-  /* scalar mode */
-  if (_scalarsEXT_) {
-    /* scalar temperature */
-    if ((ppt->has_cl_cmb_temperature) &&
-        ((index_tt == index_tt_t0_) || (index_tt == index_tt_t1_) || (index_tt == index_tt_t2_)))
-      *tau_size = perturbations_module_->tau_size_;
-
-    /* scalar polarization */
-    if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_))
-      *tau_size = perturbations_module_->tau_size_;
-
-    /* cmb lensing potential */
-    if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_)) {
-      /* find times before recombination, that will be thrown away */
-      index_tau_min = 0;
-      while (perturbations_module_->tau_sampling_[index_tau_min] <= tau_rec)
-        index_tau_min++;
-
-      /* infer number of time steps after removing early times */
-      *tau_size = perturbations_module_->tau_size_ - index_tau_min;
+  for (int bin = 0; bin < nbin; bin++) {
+    /* redshift interval of the bin; the few lines below should be consistent with their
+       counterpart in the input module */
+    double half_width = 0.;
+    if (ppt->selection == gaussian)
+      half_width = ppt->selection_width[bin] * ppr->selection_cut_at_sigma;
+    if (ppt->selection == tophat)
+      half_width = (1. + ppr->selection_cut_at_sigma * ppr->selection_tophat_edge) *
+                   ppt->selection_width[bin];
+    double z_high = ppt->selection_mean[bin] + half_width;
+    double z_low  = std::max(ppt->selection_mean[bin] - half_width, 0.);
+    if (ppt->selection == tabulated) {
+      z_high = ptr->selection_z_max[bin];
+      z_low  = ptr->selection_z_min[bin];
     }
 
-    /* density Cl's */
-    if (_nonintegrated_ncl_) {
-      /* bin number associated to particular redshift bin and selection function */
-      if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density))
-        bin = index_tt - index_tt_density_;
-
-      if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))
-        bin = index_tt - index_tt_rsd_;
-
-      if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
-        bin = index_tt - index_tt_d0_;
-
-      if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
-        bin = index_tt - index_tt_d1_;
-
-      if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))
-        bin = index_tt - index_tt_nc_g1_;
-
-      if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))
-        bin = index_tt - index_tt_nc_g2_;
-
-      if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
-        bin = index_tt - index_tt_nc_g3_;
-
-      /* time interval for this bin */
-      transfer_selection_times(bin, &tau_min, &tau_mean, &tau_max);
-
-      /* case selection=dirac */
-      if (tau_min == tau_max) {
-        *tau_size = 1;
-      }
-      /* other cases (gaussian, top-hat...) */
-      else {
-        /* check that selection function well sampled */
-        *tau_size = (int) ppr->selection_sampling;
-
-        /* value of l at which the code switches to Limber approximation
-           (necessary for next step) */
-        l_limber = ppr->l_switch_limber_for_nc_local_over_z * ppt->selection_mean[bin];
-        /* check that bessel well sampled, if not define finer sampling
-           overwriting the previous one.
-           One Bessel oscillations corresponds to [Delta tau]=2pi/k.
-           This is minimal for largest relevant k_max,
-           namely k_max=l_limber/(tau0-tau_mean).
-           We need to cut the interval (tau_max-tau_min) in pieces of size
-           [Delta tau]=2pi/k_max. This gives the number below.
-        */
-        *tau_size =
-            std::max(*tau_size,
-                     (int) ((int) ((tau_max - tau_min) /
-                                   ((tau0 - tau_mean) / std::min(l_limber, ppt->l_lss_max))) *
-                            ppr->selection_sampling_bessel));
-      }
-    }
-
-    /* galaxy lensing Cl's, differs from density Cl's since the source
-       function will spread from the selection function region up to
-       tau0 */
-    if (_integrated_ncl_) {
-      /* bin number associated to particular redshift bin and selection function */
-      if (_index_tt_in_range_(index_tt_lensing_, ppt->selection_num, ppt->has_cl_lensing_potential))
-        bin = index_tt - index_tt_lensing_;
-
-      if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens))
-        bin = index_tt - index_tt_nc_lens_;
-
-      if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr))
-        bin = index_tt - index_tt_nc_g4_;
-
-      if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
-        bin = index_tt - index_tt_nc_g5_;
-
-      /* time interval for this bin */
-      transfer_selection_times(bin, &tau_min, &tau_mean, &tau_max);
-
-      /* check that selection function well sampled */
-      *tau_size = (int) ppr->selection_sampling;
-
-      /* value of l at which the code switches to Limber approximation
-         (necessary for next step) */
-      if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr)) {
-        /* Even if G5 is integrated along the line-of-sight, we do not apply the same Limber criteria as for the other integrated terms, because here we have the derivative of the Bessel.  */
-        l_limber = ppr->l_switch_limber_for_nc_local_over_z * ppt->selection_mean[bin];
-        *tau_size =
-            std::max(*tau_size,
-                     (int) ((int) ((tau0 - tau_min) /
-                                   ((tau0 - tau_mean) / 2. / std::min(l_limber, ppt->l_lss_max))) *
-                            ppr->selection_sampling_bessel));
-      }
-      else {
-        l_limber = ppr->l_switch_limber_for_nc_los_over_z * ppt->selection_mean[bin];
-        /* check that bessel well sampled, if not define finer sampling
-           overwriting the previous one.
-           One Bessel oscillations corresponds to [Delta tau]=2pi/k.
-           This is minimal for largest relevant k_max,
-           namely k_max=l_limber/((tau0-tau_mean)/2).
-           We need to cut the interval (tau_0-tau_min) in pieces of size
-           [Delta tau]=2pi/k_max. This gives the number below.
-        */
-        *tau_size =
-            std::max(*tau_size,
-                     (int) ((int) ((tau0 - tau_min) /
-                                   ((tau0 - tau_mean) / 2. / std::min(l_limber, ppt->l_lss_max))) *
-                            ppr->selection_sampling_bessel_los));
-      }
-    }
-  }
-
-  /* tensor mode */
-  if (_tensorsEXT_) {
-    /* for all tensor types */
-    *tau_size = perturbations_module_->tau_size_;
+    /* lower edge of time interval, higher edge, and central value */
+    background_module_->background_tau_of_z(z_high, &selection_tau_min_[bin]);
+    background_module_->background_tau_of_z(z_low, &selection_tau_max_[bin]);
+    background_module_->background_tau_of_z(std::max(ppt->selection_mean[bin], 0.),
+                                            &selection_tau_mean_[bin]);
   }
 }
 
-void TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt,
-                                                 int index_q,
-                                                 int tau_size_max,
+/**
+ * Define once for all the time sampling of the line-of-sight integral of
+ * each transfer type. Types with an identical sampling share it. For each
+ * sampling, store the values of (tau0-tau), the weights of the trapezoidal
+ * rule, and the indices and weights for resampling the perturbation
+ * sources by linear interpolation.
+ *
+ * The sampling must catch both the time dependence of the transfer source
+ * W(tau) S(k, tau) and the oscillations of the Bessel functions. CMB
+ * types use the times of the perturbation module. Number count and galaxy
+ * lensing types use evenly spaced times: at least ppr->selection_sampling,
+ * and enough to sample the oscillations of \f$ j_l(k (\tau_0-\tau)) \f$
+ * (period \f$ \Delta \tau = 2\pi/k \f$) for the largest relevant wavenumber,
+ * k_max = l_limber/(tau0-tau_mean) for local types and
+ * l_limber/((tau0-tau_mean)/2) for integrated ones.
+ *
+ * @param tau_rec Input: recombination time
+ */
+
+void TransferModule::transfer_time_samplings(double tau_rec) {
+  const double tau0                 = background_module_->conformal_age_;
+  const std::vector<double>& tau_pt = perturbations_module_->tau_sampling_;
+  const int tau_size_pt             = perturbations_module_->tau_size_;
+
+  /* description of a time sampling: two types share a sampling if these are equal */
+  struct Spec {
+    TransferSampling kind;
+    double tau_min;
+    double tau_max;
+    int tau_size;
+    double log_step;
+    bool operator==(const Spec& o) const {
+      return kind == o.kind && tau_min == o.tau_min && tau_max == o.tau_max &&
+             tau_size == o.tau_size && log_step == o.log_step;
+    }
+  };
+
+  class_test(ppr->selection_sampling_bessel_min <= 0.,
+             "selection_sampling_bessel_min=%e should be strictly positive (it is a minimum number "
+             "of "
+             "sampled points per radian of the Bessel functions)",
+             ppr->selection_sampling_bessel_min);
+
+  samplings_.assign(md_size_, {});
+  tau_size_max_  = 0;
+  tt_per_ts_max_ = 0;
+
+  for (int index_md = 0; index_md < md_size_; index_md++) {
+    std::vector<Spec> specs;
+
+    for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
+      TransferType& type = types_[index_md][index_tt];
+      const int bin      = type.bin;
+      Spec spec{TransferSampling::from_perturbations, 0., tau0, 0, 0.};
+
+      switch (type.window_type) {
+        /* CMB temperature and polarisation: all times of the perturbation module */
+        case TransferWindow::none:
+          break;
+
+        /* CMB lensing potential: logarithmic late-time sampling after recombination (class_public #267) */
+        case TransferWindow::cmb_lensing:
+          spec = {TransferSampling::logarithmic,
+                  tau_rec,
+                  (1. - ppr->cmb_lensing_sampling_fraction) * tau0,
+                  0,
+                  ppr->cmb_lensing_sampling_factor /
+                      std::min(ppr->l_switch_limber, (double) ppt->l_scalar_max)};
+          class_test(ppr->cmb_lensing_sampling_factor <= 0.,
+                     "cmb_lensing_sampling_factor=%e should be strictly positive",
+                     ppr->cmb_lensing_sampling_factor);
+          class_test((ppr->cmb_lensing_sampling_fraction <= 0.) ||
+                         (ppr->cmb_lensing_sampling_fraction >= 1.),
+                     "cmb_lensing_sampling_fraction=%e should be strictly between 0 and 1",
+                     ppr->cmb_lensing_sampling_fraction);
+          class_test(
+              ppr->cmb_lensing_sampling_fraction * spec.log_step <
+                  10. * ppr->smallest_allowed_variation,
+              "cmb_lensing_sampling_fraction=%e and/or cmb_lensing_sampling_factor=%e are too "
+              "small, and/or l_switch_limber=%g and/or l_scalar_max=%d too big: the logarithmic "
+              "step sampling the CMB lensing source would reach machine precision",
+              ppr->cmb_lensing_sampling_fraction,
+              ppr->cmb_lensing_sampling_factor,
+              ppr->l_switch_limber,
+              ppt->l_scalar_max);
+          break;
+
+        /* local number count contributions: the support of the selection function of the bin,
+           with one point for a Dirac selection function */
+        case TransferWindow::selection: {
+          spec = {TransferSampling::uniform,
+                  selection_tau_min_[bin],
+                  selection_tau_max_[bin],
+                  1,
+                  0.};
+          if (spec.tau_min != spec.tau_max) {
+            const int l_limber = ppr->l_switch_limber_for_nc_local_over_z *
+                                 ppt->selection_mean[bin];
+            spec.tau_size      = std::max((int) ppr->selection_sampling,
+                                          (int) ((int) ((spec.tau_max - spec.tau_min) /
+                                                        ((tau0 - selection_tau_mean_[bin]) /
+                                                         std::min(l_limber, ppt->l_lss_max))) *
+                                                 ppr->selection_sampling_bessel));
+          }
+          break;
+        }
+
+        /* number count contributions integrated along the line of sight, and galaxy
+           lensing: from the beginning of the selection function of the bin till today */
+        case TransferWindow::integrated: {
+          spec               = {TransferSampling::uniform, selection_tau_min_[bin], tau0, 0, 0.};
+          const bool g5      = (type.term == TransferTerm::nc_g5);
+          const int l_limber = (g5 ? ppr->l_switch_limber_for_nc_local_over_z
+                                   : ppr->l_switch_limber_for_nc_los_over_z) *
+                               ppt->selection_mean[bin];
+          spec.tau_size      = std::max((int) ppr->selection_sampling,
+                                        (int) ((int) ((tau0 - spec.tau_min) /
+                                                      ((tau0 - selection_tau_mean_[bin]) / 2. /
+                                                       std::min(l_limber, ppt->l_lss_max))) *
+                                               (g5 ? ppr->selection_sampling_bessel
+                                                   : ppr->selection_sampling_bessel_los)));
+          break;
+        }
+      }
+
+      if (spec.kind == TransferSampling::from_perturbations) {
+        spec.tau_size = static_cast<int>(
+            tau_pt.end() - std::upper_bound(tau_pt.begin(), tau_pt.end(), spec.tau_min));
+      }
+
+      /* reuse the sampling of a previous type if identical */
+      auto found    = std::find(specs.begin(), specs.end(), spec);
+      type.index_ts = static_cast<int>(found - specs.begin());
+      if (found == specs.end())
+        specs.push_back(spec);
+    }
+
+    /* fill each sampling */
+    samplings_[index_md].resize(specs.size());
+
+    for (size_t index_ts = 0; index_ts < specs.size(); index_ts++) {
+      const Spec& spec               = specs[index_ts];
+      TransferTimeSampling& sampling = samplings_[index_md][index_ts];
+      std::vector<double>& t0mt      = sampling.tau0_minus_tau;
+
+      switch (spec.kind) {
+        /* a subset of the perturbation times: no interpolation needed */
+        case TransferSampling::from_perturbations:
+          for (int index_tau_pt = tau_size_pt - spec.tau_size; index_tau_pt < tau_size_pt;
+               index_tau_pt++) {
+            t0mt.push_back(tau0 - tau_pt[index_tau_pt]);
+            sampling.index_tau_pt.push_back(std::min(index_tau_pt, tau_size_pt - 2));
+            sampling.weight_tau_pt.push_back((index_tau_pt == tau_size_pt - 1) ? 1. : 0.);
+          }
+          break;
+
+        /* evenly spaced times */
+        case TransferSampling::uniform:
+          if (spec.tau_size == 1) {
+            t0mt.push_back(tau0 - spec.tau_min);
+          }
+          else {
+            for (int index_tau = 0; index_tau < spec.tau_size - 1; index_tau++) {
+              t0mt.push_back(tau0 - spec.tau_min -
+                             ((double) index_tau) / ((double) spec.tau_size - 1.) *
+                                 (spec.tau_max - spec.tau_min));
+            }
+            t0mt.push_back(tau0 - spec.tau_max);
+          }
+          break;
+
+        case TransferSampling::logarithmic:
+          t0mt = transfer_logarithmic_sampling(spec.tau_min, spec.tau_max, spec.log_step);
+          break;
+      }
+
+      /* bracketing perturbation times by bisection */
+      const int tau_size = static_cast<int>(t0mt.size());
+      if (spec.kind != TransferSampling::from_perturbations) {
+        for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+          const double tau = tau0 - t0mt[index_tau];
+          int inf;
+          array_search_bisect(tau_size_pt, tau_pt.data(), tau, &inf);
+          sampling.index_tau_pt.push_back(inf);
+          sampling.weight_tau_pt.push_back((tau - tau_pt[inf]) / (tau_pt[inf + 1] - tau_pt[inf]));
+        }
+      }
+
+      /* for evenly spaced times: largest q at which the Bessel functions j_l(q(tau0-tau))
+         are sampled with at least selection_sampling_bessel_min points per radian. (The
+         logarithmic sampling is built to resolve them down to tau0.) */
+      if ((spec.kind == TransferSampling::uniform) && (tau_size > 1))
+        sampling.q_max_sampled = (tau_size - 1.) / (spec.tau_max - spec.tau_min) /
+                                 ppr->selection_sampling_bessel_min;
+
+      sampling.w_trapz.resize(tau_size);
+      array_trapezoidal_mweights(t0mt.data(), tau_size, sampling.w_trapz.data());
+      tau_size_max_ = std::max(tau_size_max_, tau_size);
+    }
+
+    for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
+      std::vector<int>& types = samplings_[index_md][types_[index_md][index_tt].index_ts].types;
+      types.push_back(index_tt);
+      tt_per_ts_max_ = std::max(tt_per_ts_max_, static_cast<int>(types.size()));
+    }
+  }
+}
+
+/**
+ * Time sampling of the CMB lensing source (class_public #267): keep the
+ * perturbation times after tau_min as long as their step is smaller than
+ * (tau0-tau)*log_step; then continue with the logarithmic step
+ * Delta tau = (tau0-tau)*log_step until tau_max; then end at tau0. The
+ * logarithmic steps resolve the 1/chi lensing kernel and the Bessel
+ * functions down to small distances, which the perturbation sampling,
+ * designed for the time dependence of the sources, does not.
+ *
+ * @param tau_min  Input: sampled times are larger than tau_min
+ * @param tau_max  Input: largest time sampled with logarithmic steps
+ * @param log_step Input: logarithmic step Delta tau/(tau0-tau)
+ * @return values of (tau0-tau) in decreasing order
+ */
+
+std::vector<double> TransferModule::transfer_logarithmic_sampling(double tau_min,
+                                                                  double tau_max,
+                                                                  double log_step) {
+  const double tau0                 = background_module_->conformal_age_;
+  const std::vector<double>& tau_pt = perturbations_module_->tau_sampling_;
+  const int tau_size_pt             = perturbations_module_->tau_size_;
+  std::vector<double> tau0_minus_tau;
+
+  /* throw away times before tau_min */
+  int index_tau_pt = static_cast<int>(std::upper_bound(tau_pt.begin(), tau_pt.end(), tau_min) -
+                                      tau_pt.begin());
+  class_test((index_tau_pt < 1) || (index_tau_pt >= tau_size_pt),
+             "the perturbation sources should be sampled on both sides of tau=%e (index %d of %d)",
+             tau_min,
+             index_tau_pt,
+             tau_size_pt);
+
+  /* use the time steps of the perturbation module as long as they are smaller than (tau0-tau)*log_step */
+  while ((index_tau_pt < tau_size_pt) && (tau_pt[index_tau_pt] - tau_pt[index_tau_pt - 1] <
+                                          (tau0 - tau_pt[index_tau_pt - 1]) * log_step)) {
+    tau0_minus_tau.push_back(tau0 - tau_pt[index_tau_pt]);
+    index_tau_pt++;
+  }
+
+  /* if we have not reached tau0 already, use the logarithmic step until tau = tau_max, then tau0
+     (replacing the last value if it overshoots tau0) */
+  if (index_tau_pt < tau_size_pt) {
+    double tau = tau_pt[index_tau_pt - 1];
+    while (tau < tau_max) {
+      tau += (tau0 - tau) * log_step;
+      tau0_minus_tau.push_back(tau0 - tau);
+    }
+    if (tau0_minus_tau.back() > 0.)
+      tau0_minus_tau.push_back(0.);
+    else
+      tau0_minus_tau.back() = 0.;
+  }
+
+  return tau0_minus_tau;
+}
+
+/**
+ * Compute the transfer functions \f$ \Delta_l^{X} (q) \f$ for a given
+ * wavenumber q, for all modes, initial conditions, types and multipoles.
+ *
+ * For each mode, interpolate all the needed perturbation sources at k(q).
+ * Then, for each time sampling, build the transfer sources of all the types
+ * sharing it with transfer_sources(). For each l, choose the method for each
+ * of these types and initial conditions with transfer_select_method(),
+ * interpolate the needed Bessel functions once for all of them with
+ * transfer_bessel_interpolate(), and compute the transfer functions with
+ * transfer_limber() or transfer_integrate().
+ *
+ * @param index_q             Input: index of wavenumber in q_ or q_limber_
+ * @param tau_rec             Input: recombination time
+ * @param pert_sources        Input: perturbation sources
+ * @param pert_sources_spline Input: second derivatives of the perturbation sources with respect to k
+ * @param ptw                 Input: workspace
+ * @param use_full_limber     Input: whether index_q refers to the full-Limber grid q_limber_
+ */
+
+void TransferModule::transfer_compute_for_each_q(int index_q,
                                                  double tau_rec,
                                                  double** const* pert_sources,
                                                  double** const* pert_sources_spline,
-                                                 double* window,
                                                  struct transfer_workspace* ptw,
                                                  bool use_full_limber) {
-  /** Summary: */
-
-  /** - define local variables */
-
-  /** - we deal with workspaces, i.e. with contiguous memory zones (one
-      per thread) containing various fields used by the integration
-      routine */
-
-  /* - first workspace field: perturbation source interpolated from perturbation structure */
-  double* interpolated_sources;
-
-  /* - second workspace field: list of tau0-tau values, tau0_minus_tau[index_tau] */
-  double* tau0_minus_tau;
-
-  /* - third workspace field: list of trapezoidal weights for integration over tau */
-  double* w_trapz;
-
-  /* - fourth workspace field, containing just a double: number of time values */
-  int* tau_size;
-
-  /* - fifth workspace field, identical to above interpolated sources:
-     sources[index_tau] */
-  double* sources;
-
-  /** - store the sources in the workspace and define all
-      fields in this workspace */
-  interpolated_sources = ptw->interpolated_sources.data();
-  tau0_minus_tau       = ptw->tau0_minus_tau.data();
-  w_trapz              = ptw->w_trapz.data();
-  tau_size             = &(ptw->tau_size);
-  sources              = ptw->sources.data();
-
-  /** - loop over all modes. For each mode */
+  const double ra_rec = (background_module_->conformal_age_ - tau_rec) *
+                        thermodynamics_module_->angular_rescaling_;
 
   for (int index_md = 0; index_md < md_size_; index_md++) {
-    if (use_full_limber && index_md != perturbations_module_->index_md_scalars_)
-      continue;
+    const std::vector<TransferType>& types = types_[index_md];
+    const int ic_size                      = perturbations_module_->ic_size_[index_md];
+    const int tp_size                      = perturbations_module_->tp_size_[index_md];
+
+    /* in the full Limber scheme, only the types with the full_limber flag are computed */
+    auto computed = [&](int index_tt) { return !use_full_limber || types[index_tt].full_limber; };
 
     const double q = use_full_limber ? q_limber_[index_q] : q_[index_q];
     const double k = use_full_limber ? k_limber_[index_md][index_q] : k_[index_md][index_q];
@@ -1433,194 +1535,194 @@ void TransferModule::transfer_compute_for_each_q(int* const* tp_of_tt,
         use_full_limber
             ? perturbations_module_->k_[index_md][perturbations_module_->k_size_[index_md] - 1]
             : perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1];
+    std::vector<double>& transfer = use_full_limber ? transfer_limber_[index_md]
+                                                    : transfer_[index_md];
+    const int q_size              = use_full_limber ? q_size_limber_ : q_size_;
 
     /* if we reached q_max for this mode, there is nothing to be done */
+    if (k > k_max)
+      continue;
 
-    if (k <= k_max) {
-      /** - loop over initial conditions. */
-      /* For each of them: */
+    /** - interpolate at k all the perturbation sources needed by this mode */
 
-      for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
-        /* initialize the previous type index */
-        int previous_type = -1;
-
-        /* - loop over types. For each of them: */
-
-        for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-          if (use_full_limber && index_tt != index_tt_lcmb_)
-            continue;
-
-          /** - check if we must now deal with a new source with a
-              new index ppt->index_type. If yes, interpolate it at the
-              right values of k. */
-
-          if (tp_of_tt[index_md][index_tt] != previous_type) {
-            transfer_interpolate_sources(
-                k,
-                index_md,
-                index_ic,
-                tp_of_tt[index_md][index_tt],
-                pert_sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] +
-                                       tp_of_tt[index_md][index_tt]],
-                pert_sources_spline[index_md][index_ic * perturbations_module_->tp_size_[index_md] +
-                                              tp_of_tt[index_md][index_tt]],
-                interpolated_sources);
-          }
-
-          previous_type = tp_of_tt[index_md][index_tt];
-
-          /* the code makes a distinction between "perturbation
-             sources" (e.g. gravitational potential) and "transfer
-             sources" (e.g. total density fluctuations, obtained
-             through the Poisson equation, and observed with a given
-             selection function).
-
-             The next routine computes the transfer source given the
-             interpolated perturbation source, and copies it in the
-             workspace. */
-
-          transfer_sources(interpolated_sources,
-                           tau_rec,
-                           k,
-                           index_md,
-                           index_tt,
-                           sources,
-                           window,
-                           tau_size_max,
-                           tau0_minus_tau,
-                           w_trapz,
-                           tau_size);
-
-          /* now that the array of times tau0_minus_tau is known, we can
-             infer the array of radial coordinates r(tau0_minus_tau) as well as a
-             few other quantities related by trigonometric functions */
-
-          if (!use_full_limber) {
-            transfer_radial_coordinates(ptw, index_md, index_q);
-
-            /* For flat case, precompute fully-reversed chi array once per (q, tt) */
-            if (ptw->sgnK == 0) {
-              for (int j = 0; j < ptw->tau_size; j++) {
-                ptw->chi_full_reverse[j] = ptw->chi[ptw->tau_size - 1 - j];
-              }
-            }
-          }
-
-          /** - Select radial function type */
-          radial_function_type radial_type;
-          transfer_select_radial_function(index_md, index_tt, &radial_type);
-
-          for (int index_l = 0; index_l < l_size_[index_md]; index_l++) {
-            const double l = (double) l_[index_l];
-
-            /* neglect transfer function when l is much smaller than k*tau0 */
-            short neglect;
-            transfer_can_be_neglected(index_md,
-                                      index_ic,
-                                      index_tt,
-                                      (background_module_->conformal_age_ - tau_rec) *
-                                          thermodynamics_module_->angular_rescaling_,
-                                      q,
-                                      l,
-                                      &neglect);
-
-            /* for K>0 (closed), transfer functions only defined for l<nu */
-            if ((ptw->sgnK == 1) && (l_[index_l] >= (int) (q / sqrt(ptw->K) + 0.2))) {
-              neglect = true;
-            }
-            /* This would maybe go into transfer_can_be_neglected later: */
-            if ((ptw->sgnK != 0) && (index_l >= ptw->HIS.l_size) && !use_full_limber &&
-                (index_q < index_q_flat_approximation_)) {
-              neglect = true;
-            }
-            if (neglect) {
-              if (use_full_limber) {
-                transfer_limber_[index_md]
-                                [((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] +
-                                  index_l) *
-                                     q_size_limber_ +
-                                 index_q] = 0.;
-              }
-              else {
-                transfer_[index_md]
-                         [((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] +
-                           index_l) *
-                              q_size_ +
-                          index_q] = 0.;
-              }
-            }
-            else {
-              /* for a given l, maximum value of k such that we can
-                 convolve the source with Bessel functions j_l(x)
-                 without reaching x_max (this is relevant in the flat
-                 case when the bessels are computed with the old bessel
-                 module. otherwise this condition is guaranteed by the
-                 choice of proper xmax when computing bessels) */
-              double q_max_bessel = 0.;
-              if (!use_full_limber) {
-                if (ptw->sgnK == 0) {
-                  q_max_bessel = ptw->pBIS->x[ptw->pBIS->x_size - 1] / tau0_minus_tau[0];
-                }
-                else {
-                  q_max_bessel = q_[q_size_ - 1];
-                }
-
-                /* neglect late time CMB sources when l is above threshold */
-                transfer_late_source_can_be_neglected(index_md,
-                                                      index_tt,
-                                                      l,
-                                                      &(ptw->neglect_late_source));
-              }
-
-              /* compute the transfer function for this l */
-              transfer_compute_for_each_l(ptw,
-                                          index_q,
-                                          index_md,
-                                          index_ic,
-                                          index_tt,
-                                          index_l,
-                                          l,
-                                          q_max_bessel,
-                                          radial_type,
-                                          use_full_limber);
-            }
-
-          } /* end of loop over l */
-
-        } /* end of loop over type */
-
-      } /* end of loop over initial condition */
+    std::fill(ptw->is_interpolated.begin(), ptw->is_interpolated.end(), 0);
+    for (int index_ic = 0; index_ic < ic_size; index_ic++) {
+      for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
+        const int index_source = index_ic * tp_size + types[index_tt].index_tp;
+        if (!computed(index_tt) || ptw->is_interpolated[index_source])
+          continue;
+        ptw->interpolated_sources[index_source].resize(perturbations_module_->tau_size_);
+        transfer_interpolate_sources(k,
+                                     index_md,
+                                     pert_sources[index_md][index_source],
+                                     pert_sources_spline[index_md][index_source],
+                                     ptw->interpolated_sources[index_source].data());
+        ptw->is_interpolated[index_source] = 1;
+      }
     }
 
-  } /* end of loop over mode */
+    /** - loop over time samplings */
+
+    for (const TransferTimeSampling& sampling : samplings_[index_md]) {
+      const int tt_size_ts = static_cast<int>(sampling.types.size());
+      if (std::none_of(sampling.types.begin(), sampling.types.end(), computed))
+        continue;
+
+      const std::vector<double>& tau0_minus_tau = sampling.tau0_minus_tau;
+      const int tau_size                        = static_cast<int>(tau0_minus_tau.size());
+
+      /* radial coordinates r(tau0-tau) and a few related trigonometric functions,
+         and the largest q at which the Bessel functions are tabulated */
+      double q_max_bessel = 0.;
+      if (!use_full_limber) {
+        transfer_radial_coordinates(ptw, tau0_minus_tau.data(), tau_size, k);
+        if (ptw->sgnK == 0)
+          q_max_bessel = ptw->pBIS->x[ptw->pBIS->x_size - 1] / tau0_minus_tau[0];
+        else
+          q_max_bessel = q_[q_size_ - 1];
+      }
+
+      /* transfer sources W(tau) S(k,tau) (k/k_pivot)^k_power of the types using this sampling */
+      for (int index_ic = 0; index_ic < ic_size; index_ic++) {
+        for (int n = 0; n < tt_size_ts; n++) {
+          const int index_tt = sampling.types[n];
+          if (computed(index_tt))
+            transfer_sources(ptw->interpolated_sources[index_ic * tp_size +
+                                                       types[index_tt].index_tp]
+                                 .data(),
+                             k,
+                             index_md,
+                             index_tt,
+                             ptw->sources.data() + (index_ic * tt_per_ts_max_ + n) * tau_size_max_);
+        }
+      }
+
+      for (int index_l = 0; index_l < l_size_[index_md]; index_l++) {
+        const double l = (double) l_[index_l];
+
+        /* choose the method for each (initial condition, type) using this sampling, and find
+           which Bessel functions are needed, and at how many times */
+        const double tau0_minus_tau_min_bessel =
+            use_full_limber ? 0. : transfer_bessel_cut(ptw, index_q, index_l, k);
+        int bessel_size = 0;
+        BesselNeeds needs{false, false, false};
+
+        for (int index_ic = 0; index_ic < ic_size; index_ic++) {
+          for (int n = 0; n < tt_size_ts; n++) {
+            const int index_tt   = sampling.types[n];
+            const int index_n    = index_ic * tt_per_ts_max_ + n;
+            ptw->method[index_n] = transfer_select_method(ptw,
+                                                          index_q,
+                                                          index_md,
+                                                          index_tt,
+                                                          index_l,
+                                                          q,
+                                                          ra_rec,
+                                                          q_max_bessel,
+                                                          sampling,
+                                                          ptw->sources.data() +
+                                                              index_n * tau_size_max_,
+                                                          use_full_limber,
+                                                          tau0_minus_tau_min_bessel,
+                                                          &ptw->index_tau_max[index_n],
+                                                          &ptw->bessel_truncation[index_n]);
+            if (ptw->method[index_n] == TransferMethod::line_of_sight) {
+              bessel_size                  = std::max(bessel_size, ptw->index_tau_max[index_n] + 1);
+              const BesselNeeds type_needs = transfer_radial_function_needs(
+                  types[index_tt].radial_type);
+              needs.Phi   = needs.Phi || type_needs.Phi;
+              needs.dPhi  = needs.dPhi || type_needs.dPhi;
+              needs.d2Phi = needs.d2Phi || type_needs.d2Phi;
+            }
+          }
+        }
+
+        /* interpolate these Bessel functions once for all types and initial conditions */
+        if (bessel_size > 0)
+          transfer_bessel_interpolate(ptw, index_q, index_l, tau_size, bessel_size, needs);
+
+        /* compute and store the transfer functions */
+        for (int index_ic = 0; index_ic < ic_size; index_ic++) {
+          for (int n = 0; n < tt_size_ts; n++) {
+            const int index_tt    = sampling.types[n];
+            const int index_n     = index_ic * tt_per_ts_max_ + n;
+            const double* sources = ptw->sources.data() + index_n * tau_size_max_;
+
+            double transfer_function = 0.;
+            if (ptw->method[index_n] == TransferMethod::limber) {
+              transfer_limber(ptw,
+                              l,
+                              q,
+                              types[index_tt].radial_type,
+                              tau0_minus_tau,
+                              sources,
+                              &transfer_function);
+            }
+            else if (ptw->method[index_n] == TransferMethod::line_of_sight) {
+              transfer_integrate(ptw,
+                                 index_l,
+                                 k,
+                                 types[index_tt].radial_type,
+                                 sampling,
+                                 sources,
+                                 ptw->index_tau_max[index_n],
+                                 ptw->bessel_truncation[index_n],
+                                 tau0_minus_tau_min_bessel,
+                                 &transfer_function);
+            }
+
+            if (computed(index_tt))
+              transfer[((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] + index_l) *
+                           q_size +
+                       index_q] = transfer_function;
+          }
+        }
+      } /* end of loop over l */
+    } /* end of loop over time samplings */
+  } /* end of loop over modes */
 }
 
+/**
+ * Compute the radial coordinates (argument of the Bessel functions) of a
+ * time sampling, and some trigonometric functions of them.
+ *
+ * @param ptw            Input/Output: workspace (results stored there)
+ * @param tau0_minus_tau Input: sampled values of (tau0-tau)
+ * @param tau_size       Input: number of sampled values
+ * @param k              Input: wavenumber
+ */
+
 void TransferModule::transfer_radial_coordinates(struct transfer_workspace* ptw,
-                                                 int index_md,
-                                                 int index_q) {
+                                                 const double* tau0_minus_tau,
+                                                 int tau_size,
+                                                 double k) {
   double sqrt_absK = 0.;
 
   switch (ptw->sgnK) {
     case 1:
       sqrt_absK = sqrt(ptw->K);
-      for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
-        ptw->chi[index_tau]     = sqrt_absK * ptw->tau0_minus_tau[index_tau];
-        ptw->cscKgen[index_tau] = sqrt_absK / k_[index_md][index_q] / sin(ptw->chi[index_tau]);
+      for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+        ptw->chi[index_tau]     = sqrt_absK * tau0_minus_tau[index_tau];
+        ptw->cscKgen[index_tau] = sqrt_absK / k / sin(ptw->chi[index_tau]);
         ptw->cotKgen[index_tau] = ptw->cscKgen[index_tau] * cos(ptw->chi[index_tau]);
       }
       break;
     case 0:
-      for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
-        ptw->chi[index_tau]     = k_[index_md][index_q] * ptw->tau0_minus_tau[index_tau];
+      for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+        ptw->chi[index_tau]     = k * tau0_minus_tau[index_tau];
         ptw->cscKgen[index_tau] = 1.0 / ptw->chi[index_tau];
         ptw->cotKgen[index_tau] = 1.0 / ptw->chi[index_tau];
+      }
+      /* fully-reversed chi array, used by the flat-space Bessel interpolation */
+      for (int j = 0; j < tau_size; j++) {
+        ptw->chi_full_reverse[j] = ptw->chi[tau_size - 1 - j];
       }
       break;
     case -1:
       sqrt_absK = sqrt(-ptw->K);
-      for (int index_tau = 0; index_tau < ptw->tau_size; index_tau++) {
-        ptw->chi[index_tau]     = sqrt_absK * ptw->tau0_minus_tau[index_tau];
-        ptw->cscKgen[index_tau] = sqrt_absK / k_[index_md][index_q] / sinh(ptw->chi[index_tau]);
+      for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+        ptw->chi[index_tau]     = sqrt_absK * tau0_minus_tau[index_tau];
+        ptw->cscKgen[index_tau] = sqrt_absK / k / sinh(ptw->chi[index_tau]);
         ptw->cotKgen[index_tau] = ptw->cscKgen[index_tau] * cosh(ptw->chi[index_tau]);
       }
       break;
@@ -1634,8 +1736,6 @@ void TransferModule::transfer_radial_coordinates(struct transfer_workspace* ptw,
  *
  * @param k                     Input: wavenumber
  * @param index_md              Input: index of mode
- * @param index_ic              Input: index of initial condition
- * @param index_type            Input: index of type of source (in perturbation module)
  * @param pert_source           Input: array of sources
  * @param pert_source_spline    Input: array of second derivative of sources
  * @param interpolated_sources  Output: array of interpolated sources (filled here but allocated in transfer_init() to avoid numerous reallocation)
@@ -1645,11 +1745,9 @@ void TransferModule::transfer_radial_coordinates(struct transfer_workspace* ptw,
 void TransferModule::transfer_interpolate_sources(
     double k,
     int index_md,
-    int index_ic,
-    int index_type,
-    double*
+    const double*
         pert_source, /* array with argument pert_source[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
-    double*
+    const double*
         pert_source_spline, /* array with argument pert_source_spline[index_tau*perturbations_module_->k_size_[index_md]+index_k] (must be allocated) */
     double*
         interpolated_sources /* array with argument interpolated_sources[index_tau] (must be allocated) */
@@ -1704,254 +1802,35 @@ void TransferModule::transfer_interpolate_sources(
  * density fluctuations, obtained through the Poisson equation, and
  * observed with a given selection function).
  *
- * This routine computes the transfer source given the interpolated
- * perturbation source, and copies it in the workspace.
+ * This routine computes the transfer source of a type on its time
+ * sampling, \f$ S(k,\tau) W(\tau) (k/k_{pivot})^{k_{power}} \f$, by
+ * resampling the interpolated perturbation source with the precomputed
+ * linear-interpolation weights of the sampling.
  *
- * @param interpolated_sources  Input: interpolated perturbation source
- * @param tau_rec               Input: recombination time
+ * @param interpolated_sources  Input: perturbation source at k, on the times of the perturbation module
  * @param k                     Input: wavenumber
  * @param index_md              Input: index of mode
- * @param index_tt              Input: index of type of (transfer) source
+ * @param index_tt              Input: index of type
  * @param sources               Output: transfer source
- * @param window                Input: window functions for each type and time
- * @param tau_size_max          Input: number of times at wich window fucntions are sampled
- * @param tau0_minus_tau        Output: values of (tau0-tau) at which source are sample
- * @param w_trapz               Output: trapezoidal weights for integration over tau
- * @param tau_size_out          Output: pointer to size of previous two arrays, converted to double
- * @return the error status
  */
 
-void TransferModule::transfer_sources(double* interpolated_sources,
-                                      double tau_rec,
-                                      double k,
-                                      int index_md,
-                                      int index_tt,
-                                      double* sources,
-                                      double* window,
-                                      int tau_size_max,
-                                      double* tau0_minus_tau,
-                                      double* w_trapz,
-                                      int* tau_size_out) {
-  /** Summary: */
+void TransferModule::transfer_sources(
+    const double* interpolated_sources, double k, int index_md, int index_tt, double* sources) {
+  const TransferType& type             = types_[index_md][index_tt];
+  const TransferTimeSampling& sampling = samplings_[index_md][type.index_ts];
+  const int tau_size                   = static_cast<int>(sampling.tau0_minus_tau.size());
+  const int* index_tau_pt              = sampling.index_tau_pt.data();
+  const double* weight_tau_pt          = sampling.weight_tau_pt.data();
+  const double* window                 = type.window.data();
 
-  /** - define local variables */
+  const double k_factor = (type.k_power != 0.) ? pow(k / type.k_pivot, type.k_power) : 1.;
 
-  /* index running on time */
-  int index_tau;
-
-  /* bin for computation of cl_density */
-  int bin = 0;
-
-  /* number of tau values */
-  int tau_size;
-
-  /* minimum tau index kept in transfer sources */
-  int index_tau_min;
-
-  /* conformal time */
-  double tau, tau0;
-
-  /* rescaling factor depending on the background at a given time */
-  double rescaling = 0.;
-
-  /* flag: is there any difference between the perturbation and transfer source? */
-  short redefine_source;
-
-  /** - in which cases are perturbation and transfer sources are different?
-      I.e., in which case do we need to multiply the sources by some
-      background and/or window function, and eventually to resample it,
-      or redefine its time limits? */
-
-  redefine_source = false;
-
-  if (_scalarsEXT_) {
-    /* cmb lensing potential */
-    if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_))
-      redefine_source = true;
-
-    /* number count Cl's */
-    if (_nonintegrated_ncl_ || _integrated_ncl_)
-      redefine_source = true;
+  for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+    const int i        = index_tau_pt[index_tau];
+    const double w     = weight_tau_pt[index_tau];
+    sources[index_tau] = (interpolated_sources[i] * (1. - w) + w * interpolated_sources[i + 1]) *
+                         window[index_tau] * k_factor;
   }
-
-  /* conformal time today */
-  tau0 = background_module_->conformal_age_;
-
-  /** - case where we need to redefine by a window function (or any
-      function of the background and of k) */
-  if (redefine_source) {
-    transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size);
-
-    if (_scalarsEXT_) {
-      /* lensing source: throw away times before recombination, and multiply psi by window function */
-
-      if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_)) {
-        /* first time step after removing early times */
-        index_tau_min = perturbations_module_->tau_size_ - tau_size;
-
-        /* loop over time and rescale */
-        for (index_tau = index_tau_min; index_tau < perturbations_module_->tau_size_; index_tau++) {
-          /* conformal time */
-          tau = perturbations_module_->tau_sampling_[index_tau];
-
-          /* lensing source =  - W(tau) (phi(k,tau) + psi(k,tau)) Heaviside(tau-tau_rec)
-             with
-             psi,phi = metric perturbation in newtonian gauge (phi+psi = Phi_A-Phi_H of Bardeen)
-             W = (tau-tau_rec)/(tau_0-tau)/(tau_0-tau_rec)
-             H(x) = Heaviside
-             (in tau = tau_0, set source = 0 to avoid division by zero;
-             regulated anyway by Bessel).
-          */
-
-          if (index_tau == perturbations_module_->tau_size_ - 1) {
-            rescaling = 0.;
-          }
-          else {
-            switch (pba->sgnK) {
-              case 1:
-                rescaling = sqrt(pba->K) * sin((tau_rec - tau) * sqrt(pba->K)) /
-                            sin((tau0 - tau) * sqrt(pba->K)) / sin((tau0 - tau_rec) * sqrt(pba->K));
-                break;
-              case 0:
-                rescaling = (tau_rec - tau) / (tau0 - tau) / (tau0 - tau_rec);
-                break;
-              case -1:
-                rescaling = sqrt(-pba->K) * sinh((tau_rec - tau) * sqrt(-pba->K)) /
-                            sinh((tau0 - tau) * sqrt(-pba->K)) /
-                            sinh((tau0 - tau_rec) * sqrt(-pba->K));
-                break;
-            }
-            // Note: until 2.4.3 there was a bug here: the curvature effects had been omitted.
-          }
-
-          /* copy from input array to output array */
-          sources[index_tau - index_tau_min] = interpolated_sources[index_tau] * rescaling *
-                                               ptr->lcmb_rescale *
-                                               pow(k / ptr->lcmb_pivot, ptr->lcmb_tilt);
-
-          /* store value of (tau0-tau) */
-          tau0_minus_tau[index_tau - index_tau_min] = tau0 - tau;
-        }
-
-        /* Compute trapezoidal weights for integration over tau */
-        array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz);
-      }
-
-      /* Non-integrated contributions to dCl/nCl need selection time sampling*/
-
-      if (_nonintegrated_ncl_) {
-        _get_bin_nonintegrated_ncl_(index_tt)
-
-            /* redefine the time sampling */
-            transfer_selection_sampling(bin, tau0_minus_tau, tau_size);
-
-        class_test(tau0 - tau0_minus_tau[0] >
-                       perturbations_module_->tau_sampling_[perturbations_module_->tau_size_ - 1],
-                   "this should not happen, there was probably a rounding error, if this error "
-                   "occurred, then this must be coded more carefully");
-
-        /* resample the source at those times */
-        transfer_source_resample(bin,
-                                 tau0_minus_tau,
-                                 tau_size,
-                                 index_md,
-                                 tau0,
-                                 interpolated_sources,
-                                 sources);
-
-        /* Compute trapezoidal weights for integration over tau */
-        array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz);
-
-        /* loop over time and rescale */
-        for (index_tau = 0; index_tau < tau_size; index_tau++) {
-          /* matter density source =  [- (dz/dtau) W(z)] * delta_m(k,tau)
-             = W(tau) delta_m(k,tau)
-             with
-             delta_m = total matter perturbation (defined in gauge-independent way, see arXiv 1307.1459)
-             W(z) = redshift space selection function = dN/dz
-             W(tau) = same wrt conformal time = dN/dtau
-             (in tau = tau_0, set source = 0 to avoid division by zero;
-             regulated anyway by Bessel).
-          */
-
-          rescaling = window[index_tt * tau_size_max + index_tau];
-
-          if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
-            rescaling *= 1. / k / k;  // Factor from original ClassGAL paper ( arXiv 1307.1459 )
-
-          if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
-            rescaling *= 1. / k;  // Factor from original ClassGAL paper ( arXiv 1307.1459 )
-
-          sources[index_tau] *= rescaling;
-        }
-      }
-      /* End normal contributions */
-
-      /* Integrated contributions to dCl/nCl/sCl need integrated selection time sampling */
-
-      if (_integrated_ncl_) {
-        _get_bin_integrated_ncl_(index_tt)
-
-            /* redefine the time sampling */
-            transfer_lensing_sampling(bin, tau0, tau0_minus_tau, tau_size);
-
-        /* resample the source at those times */
-        transfer_source_resample(bin,
-                                 tau0_minus_tau,
-                                 tau_size,
-                                 index_md,
-                                 tau0,
-                                 interpolated_sources,
-                                 sources);
-
-        /* Compute trapezoidal weights for integration over tau */
-        array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz);
-
-        /* loop over time and rescale */
-        for (index_tau = 0; index_tau < tau_size; index_tau++) {
-          /* lensing source =  - W(tau) (phi(k,tau) + psi(k,tau)) Heaviside(tau-tau_rec)
-             with
-             psi,phi = metric perturbation in newtonian gauge (phi+psi = Phi_A-Phi_H of Bardeen)
-             W = (tau-tau_rec)/(tau_0-tau)/(tau_0-tau_rec)
-             H(x) = Heaviside
-             (in tau = tau_0, set source = 0 to avoid division by zero;
-             regulated anyway by Bessel).
-          */
-
-          /* copy from input array to output array */
-          sources[index_tau] *= window[index_tt * tau_size_max + index_tau];
-
-          if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
-            sources[index_tau] *=
-                k;  // Factor from chi derivative of d/dchi j_ell(k*chi)= d/d(kchi) j_ell(k chi) * k = k * j_ell'(kchi)
-        }
-      }
-      /* End integrated contributions */
-    }
-  }
-
-  /** - case where we do not need to redefine */
-
-  else {
-    /* number of sampled time values */
-    tau_size = perturbations_module_->tau_size_;
-
-    /* plain copy from input array to output array */
-    memcpy(sources, interpolated_sources, perturbations_module_->tau_size_ * sizeof(double));
-
-    /* store values of (tau0-tau) */
-    for (index_tau = 0; index_tau < perturbations_module_->tau_size_; index_tau++) {
-      tau0_minus_tau[index_tau] = tau0 - perturbations_module_->tau_sampling_[index_tau];
-    }
-
-    /* Compute trapezoidal weights for integration over tau */
-    array_trapezoidal_mweights(tau0_minus_tau, tau_size, w_trapz);
-  }
-
-  /** - return tau_size value that will be stored in the workspace (the
-      workspace wants a double) */
-
-  *tau_size_out = tau_size;
 }
 
 /**
@@ -1972,6 +1851,29 @@ void TransferModule::transfer_selection_function(int bin, double z, double* sele
   /* trivial dirac case */
   if (ppt->selection == dirac) {
     *selection = 1.;
+
+    return;
+  }
+
+  /* tabulated case: spline interpolation of the selection function of the bin, set to zero
+     outside of the tabulated range (and wherever the spline would become negative) */
+  if (ppt->selection == tabulated) {
+    const std::vector<double>& z_file = ptr->selection_file_z;
+    if ((z < z_file.front()) || (z > z_file.back())) {
+      *selection = 0.;
+    }
+    else {
+      array_interpolate_spline(z_file.data(),
+                               static_cast<int>(z_file.size()),
+                               ptr->selection_file_dNdz[bin].data(),
+                               selection_file_ddNdz_[bin].data(),
+                               1,
+                               z,
+                               &last_index,
+                               selection,
+                               1);
+      *selection = std::max(*selection, 0.);
+    }
 
     return;
   }
@@ -2095,177 +1997,6 @@ void TransferModule::transfer_dNdz_analytic(double z, double* dNdz, double* dln_
 }
 
 /**
- * For sources that need to be multiplied by a selection function,
- * redefine a finer time sampling in a small range
- *
- * @param bin                   Input: redshift bin number
- * @param tau0_minus_tau        Output: values of (tau0-tau) at which source are sample
- * @param tau_size              Output: pointer to size of previous array
- * @return the error status
- */
-
-void TransferModule::transfer_selection_sampling(int bin, double* tau0_minus_tau, int tau_size) {
-  /* running index on time */
-  int index_tau;
-
-  /* minimum and maximal value of time in new sampled interval */
-  double tau_min, tau_mean, tau_max;
-
-  /* time interval for this bin */
-  transfer_selection_times(bin, &tau_min, &tau_mean, &tau_max);
-
-  class_test(tau_size <= 0, "should be at least one");
-
-  /* case selection == dirac */
-  if (tau_min == tau_max) {
-    class_test(tau_size != 1,
-               "for Dirac selection function tau_size should be 1, not %d",
-               tau_size);
-    tau0_minus_tau[0] = background_module_->conformal_age_ - tau_mean;
-  }
-  /* for other cases (gaussian, tophat...) define new sampled values
-     of (tau0-tau) with even spacing */
-  else {
-    for (index_tau = 0; index_tau < tau_size - 1; index_tau++) {
-      tau0_minus_tau[index_tau] = background_module_->conformal_age_ - tau_min -
-                                  ((double) index_tau) / ((double) tau_size - 1.) *
-                                      (tau_max - tau_min);
-    }
-    tau0_minus_tau[tau_size - 1] = background_module_->conformal_age_ - tau_max;
-  }
-}
-
-/**
- * For lensing sources that need to be convolved with a selection
- * function, redefine the sampling within the range extending from the
- * tau_min of the selection function up to tau0
- *
- *
- * @param bin                   Input: redshift bin number
- * @param tau0                  Input: time today
- * @param tau0_minus_tau        Output: values of (tau0-tau) at which source are sample
- * @param tau_size              Output: pointer to size of previous array
- * @return the error status
- */
-
-void TransferModule::transfer_lensing_sampling(int bin,
-                                               double tau0,
-                                               double* tau0_minus_tau,
-                                               int tau_size) {
-  /* minimum and maximal value of time in new sampled interval */
-  double tau_min, tau_mean, tau_max;
-
-  /* time interval for this bin */
-  transfer_selection_times(bin, &tau_min, &tau_mean, &tau_max);
-
-  for (int index_tau = 0; index_tau < tau_size; index_tau++) {
-    //tau0_minus_tau[index_tau]=background_module_->conformal_age_-tau_min-((double)index_tau)/((double)tau_size-1.)*(tau0-tau_min);
-    tau0_minus_tau[index_tau] = ((double) (tau_size - 1 - index_tau)) / ((double) (tau_size - 1)) *
-                                (tau0 - tau_min);
-  }
-}
-
-/**
- * For sources that need to be multiplied by a selection function,
- * redefine a finer time sampling in a small range, and resample the
- * perturbation sources at the new value by linear interpolation
- *
- * @param bin                   Input: redshift bin number
- * @param tau0_minus_tau        Output: values of (tau0-tau) at which source are sample
- * @param tau_size              Output: pointer to size of previous array
- * @param index_md              Input: index of mode
- * @param tau0                  Input: time today
- * @param interpolated_sources  Input: interpolated perturbation source
- * @param sources               Output: resampled transfer source
- * @return the error status
- */
-
-void TransferModule::transfer_source_resample(int bin,
-                                              double* tau0_minus_tau,
-                                              int tau_size,
-                                              int index_md,
-                                              double tau0,
-                                              double* interpolated_sources,
-                                              double* sources) {
-  /* array of values of source */
-  std::vector<double> source_at_tau(1);
-
-  /* interpolate the sources linearly at the new time values */
-  for (int index_tau = 0; index_tau < tau_size; index_tau++) {
-    array_interpolate_two(perturbations_module_->tau_sampling_.data(),
-                          1,
-                          0,
-                          interpolated_sources,
-                          perturbations_module_->tau_size_,
-                          tau0 - tau0_minus_tau[index_tau],
-                          source_at_tau.data(),
-                          1);
-
-    /* copy the new values in the output sources array */
-    sources[index_tau] = source_at_tau[0];
-  }
-}
-
-/**
- * For each selection function, compute the min, mean and max values
- * of conformal time (associated to the min, mean and max values of
- * redshift specified by the user)
- *
- * @param bin                   Input: redshift bin number
- * @param tau_min               Output: smallest time in the selection interval
- * @param tau_mean              Output: time corresponding to z_mean
- * @param tau_max               Output: largest time in the selection interval
- * @return the error status
- */
-
-void TransferModule::transfer_selection_times(int bin,
-                                              double* tau_min,
-                                              double* tau_mean,
-                                              double* tau_max) {
-  /* a value of redshift */
-  double z = 0.;
-
-  /* lower edge of time interval for this bin */
-  /* the few lines below should be consistent with their counterpart in input.c */
-  if (ppt->selection == gaussian) {
-    z = ppt->selection_mean[bin] + ppt->selection_width[bin] * ppr->selection_cut_at_sigma;
-  }
-  if (ppt->selection == tophat) {
-    z = ppt->selection_mean[bin] +
-        (1. + ppr->selection_cut_at_sigma * ppr->selection_tophat_edge) * ppt->selection_width[bin];
-  }
-  if (ppt->selection == dirac) {
-    z = ppt->selection_mean[bin];
-  }
-
-  background_module_->background_tau_of_z(z, tau_min);
-
-  /* higher edge of time interval for this bin */
-
-  if (ppt->selection == gaussian) {
-    z = std::max(ppt->selection_mean[bin] - ppt->selection_width[bin] * ppr->selection_cut_at_sigma,
-                 0.);
-  }
-  if (ppt->selection == tophat) {
-    z = std::max(ppt->selection_mean[bin] -
-                     (1. + ppr->selection_cut_at_sigma * ppr->selection_tophat_edge) *
-                         ppt->selection_width[bin],
-                 0.);
-  }
-  if (ppt->selection == dirac) {
-    z = ppt->selection_mean[bin];
-  }
-
-  background_module_->background_tau_of_z(z, tau_max);
-
-  /* central value of time interval for this bin */
-
-  z = std::max(ppt->selection_mean[bin], 0.);
-
-  background_module_->background_tau_of_z(z, tau_mean);
-}
-
-/**
  * Compute and normalize selection function for a set of time values
  *
  * @param selection             Output: normalized selection function
@@ -2279,8 +2010,8 @@ void TransferModule::transfer_selection_times(int bin,
  */
 
 void TransferModule::transfer_selection_compute(double* selection,
-                                                double* tau0_minus_tau,
-                                                double* w_trapz,
+                                                const double* tau0_minus_tau,
+                                                const double* w_trapz,
                                                 int tau_size,
                                                 double* pvecback,
                                                 double tau0,
@@ -2336,308 +2067,156 @@ void TransferModule::transfer_selection_compute(double* selection,
 }
 
 /**
- * This routine computes the transfer functions \f$ \Delta_l^{X} (k) \f$)
- * as a function of wavenumber k for a given mode, initial condition,
- * type and multipole l passed in input.
+ * Choose how to compute the transfer function of a type at a given (q, l):
+ * zero (above l_max, neglected, or no overlap between the source and the
+ * Bessel function), Limber approximation, or line-of-sight integral. For
+ * the latter, also find the last sampled time contributing to the integral.
  *
- * For a given value of k, the transfer function is inferred from
- * the source function (passed in input in the array interpolated_sources)
- * and from Bessel functions (passed in input in the bessels structure),
- * either by convolving them along tau, or by a Limber approximation.
- * This elementary task is distributed either to transfer_integrate()
- * or to transfer_limber(). The task of this routine is mainly to
- * loop over k values, and to decide at which k_max the calculation can
- * be stopped, according to some approximation scheme designed to find a
- * compromise between execution time and precision. The approximation scheme
- * is defined by parameters in the precision structure.
- *
- * @param ptw                   Input: pointer to transfer_workspace structure (allocated in transfer_init() to avoid numerous reallocation)
- * @param index_q               Input: index of wavenumber
- * @param index_md              Input: index of mode
- * @param index_ic              Input: index of initial condition
- * @param index_tt              Input: index of type of transfer
- * @param index_l               Input: index of multipole
- * @param l                     Input: multipole
- * @param q_max_bessel          Input: maximum value of argument q at which Bessel functions are computed
- * @param radial_type           Input: type of radial (Bessel) functions to convolve with
- * @param use_full_limber       Input: whether to use the separate full-Limber grid
- * @return the error status
+ * @param ptw                       Input: workspace
+ * @param index_q                   Input: index of wavenumber
+ * @param index_md                  Input: index of mode
+ * @param index_tt                  Input: index of type
+ * @param index_l                   Input: index of multipole
+ * @param q                         Input: wavenumber
+ * @param ra_rec                    Input: angular diameter distance to recombination
+ * @param q_max_bessel              Input: largest q at which the Bessel functions are tabulated
+ * @param sampling                  Input: time sampling of the type
+ * @param sources                   Input: transfer source of the type
+ * @param use_full_limber           Input: whether we are on the full-Limber grid
+ * @param tau0_minus_tau_min_bessel Input: (tau0-tau) below which the Bessel function is negligible (see transfer_bessel_cut())
+ * @param index_tau_max             Output: for line_of_sight, last contributing sampled time
+ * @param bessel_truncation         Output: for line_of_sight, is the integral truncated by the Bessel cut?
+ * @return the method
  */
 
-void TransferModule::transfer_compute_for_each_l(struct transfer_workspace* ptw,
-                                                 int index_q,
-                                                 int index_md,
-                                                 int index_ic,
-                                                 int index_tt,
-                                                 int index_l,
-                                                 double l,
-                                                 double q_max_bessel,
-                                                 radial_function_type radial_type,
-                                                 bool use_full_limber) {
-  /** Summary: */
+TransferMethod TransferModule::transfer_select_method(struct transfer_workspace* ptw,
+                                                      int index_q,
+                                                      int index_md,
+                                                      int index_tt,
+                                                      int index_l,
+                                                      double q,
+                                                      double ra_rec,
+                                                      double q_max_bessel,
+                                                      const TransferTimeSampling& sampling,
+                                                      const double* sources,
+                                                      bool use_full_limber,
+                                                      double tau0_minus_tau_min_bessel,
+                                                      int* index_tau_max,
+                                                      char* bessel_truncation) {
+  const TransferType& type                  = types_[index_md][index_tt];
+  const std::vector<double>& tau0_minus_tau = sampling.tau0_minus_tau;
+  const int tau_size                        = static_cast<int>(tau0_minus_tau.size());
+  const double l                            = (double) l_[index_l];
 
-  double transfer_function = 0.;
-  if (index_l >= l_size_tt_[index_md][index_tt]) {
-    transfer_function = 0.;
+  *index_tau_max     = -1;
+  *bessel_truncation = 0;
+
+  /** - zero above the l_max of the type, and in the full Limber scheme for types not computed there */
+  if ((index_l >= l_size_tt_[index_md][index_tt]) || (use_full_limber && !type.full_limber))
+    return TransferMethod::zero;
+
+  /** - neglect the transfer function when l is much smaller than k*tau0 */
+  if (l < (q - type.delta_k_neglect) * ra_rec)
+    return TransferMethod::zero;
+
+  /** - for K>0 (closed), transfer functions only defined for l<nu */
+  if ((ptw->sgnK == 1) && (l_[index_l] >= (int) (q / sqrt(ptw->K) + 0.2)))
+    return TransferMethod::zero;
+
+  /** - in the full Limber scheme, always use the Limber approximation */
+  if (use_full_limber)
+    return TransferMethod::limber;
+
+  /** - in curved space, hyperspherical Bessel functions are not computed above some l */
+  if ((ptw->sgnK != 0) && (index_q < index_q_flat_approximation_) && (index_l >= ptw->HIS.l_size))
+    return TransferMethod::zero;
+
+  if (ptr->transfer_verbose > 3)
+    printf("Compute transfer for l=%d type=%d\n", (int) l, index_tt);
+
+  /** - Limber approximation above the largest q at which the Bessel functions are tabulated,
+      above the largest q at which the time sampling resolves their oscillations (otherwise
+      the line-of-sight integral aliases), and above the l threshold of the type */
+  //TBC: in principle the Limber condition should be adapted to account for curvature effects
+  if ((q > q_max_bessel) || (q > sampling.q_max_sampled) || (l >= type.l_limber))
+    return TransferMethod::limber;
+
+  /** - otherwise, line-of-sight integral */
+  const double cut = tau0_minus_tau_min_bessel;
+
+  /** - if there is no overlap between the region in which bessels and sources are non-zero, return zero */
+  if (cut >= tau0_minus_tau[0])
+    return TransferMethod::zero;
+
+  /** - index of the last point in the overlapping region. After this step, it can be as small
+      as zero, but not negative. Remember it, to know if the truncation of the integral is due to
+      the Bessel function and not to the source. */
+  int index = tau_size - 1;
+  while (tau0_minus_tau[index] < cut)
+    index--;
+  const int index_tau_max_Bessel = index;
+
+  /** - the source function can vanish at large \f$ \tau \f$. Check if further points can be eliminated. */
+  while (sources[index] == 0.) {
+    index--;
+    if (index < 0)
+      return TransferMethod::zero;
   }
-  else {
-    const double q = use_full_limber ? q_limber_[index_q] : q_[index_q];
-    const double k = use_full_limber ? k_limber_[index_md][index_q] : k_[index_md][index_q];
 
-    if (ptr->transfer_verbose > 3)
-      printf("Compute transfer for l=%d type=%d\n", (int) l, index_tt);
-
-    short use_limber = true;
-    if (!use_full_limber)
-      transfer_use_limber(q_max_bessel, index_md, index_tt, q, l, &use_limber);
-
-    if (use_limber) {
-      transfer_limber(ptw, index_md, index_q, l, q, radial_type, &transfer_function);
-    }
-    else {
-      transfer_integrate(ptw,
-                         index_q,
-                         index_md,
-                         index_tt,
-                         l,
-                         index_l,
-                         k,
-                         radial_type,
-                         &transfer_function);
-    }
-  }
-
-  /** - store transfer function in transfer structure */
-  if (use_full_limber) {
-    transfer_limber_[index_md]
-                    [((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] + index_l) *
-                         q_size_limber_ +
-                     index_q] = transfer_function;
-  }
-  else {
-    transfer_[index_md]
-             [((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] + index_l) * q_size_ +
-              index_q] = transfer_function;
-  }
-}
-
-void TransferModule::transfer_use_limber(
-    double q_max_bessel, int index_md, int index_tt, double q, double l, short* use_limber) {
-  /* criteria for choosing between integration and Limber
-     must be implemented here */
-
-  *use_limber = false;
-
-  if (q > q_max_bessel) {
-    *use_limber = true;
-  }
-  else {
-    if (_scalarsEXT_) {
-      //TBC: in principle the Limber condition should be adapted to account for curvature effects
-
-      if ((ppt->has_cl_cmb_lensing_potential) && (index_tt == index_tt_lcmb_) &&
-          (l > ppr->l_switch_limber)) {
-        *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_density_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_rsd_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_d0_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_d1_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens) &&
-          (l >= ppr->l_switch_limber_for_nc_los_over_z *
-                    ppt->selection_mean[index_tt - index_tt_nc_lens_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_nc_g1_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_nc_g2_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_nc_g3_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_los_over_z *
-                    ppt->selection_mean[index_tt - index_tt_nc_g4_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr) &&
-          (l >= ppr->l_switch_limber_for_nc_local_over_z *
-                    ppt->selection_mean[index_tt - index_tt_nc_g5_])) {
-        if (ppt->selection != dirac)
-          *use_limber = true;
-      }
-      if (_index_tt_in_range_(index_tt_lensing_,
-                              ppt->selection_num,
-                              ppt->has_cl_lensing_potential) &&
-          (l >= ppr->l_switch_limber_for_nc_los_over_z *
-                    ppt->selection_mean[index_tt - index_tt_lensing_])) {
-        *use_limber = true;
-      }
+  /** - neglect late time CMB sources when l is above threshold */
+  if (type.late_source_cut &&
+      (l > ppr->transfer_neglect_late_source * thermodynamics_module_->angular_rescaling_)) {
+    while (tau0_minus_tau[index] < ptw->tau0_minus_tau_cut) {
+      index--;
+      if (index < 0)
+        return TransferMethod::zero;
     }
   }
+
+  *index_tau_max     = index;
+  *bessel_truncation = (index != tau_size - 1) && (index == index_tau_max_Bessel);
+  return TransferMethod::line_of_sight;
 }
 
 /**
- * This routine computes the transfer functions \f$ \Delta_l^{X} (k) \f$)
- * for each mode, initial condition, type, multipole l and wavenumber k,
- * by convolving  the source function (passed in input in the array
- * interpolated_sources) with Bessel functions (passed in input in the
- * bessels structure).
+ * This routine computes the transfer functions \f$ \Delta_l^{X} (k) \f$
+ * for a given type, multipole l and wavenumber k, by convolving the
+ * transfer source with the radial function (Bessel function or a
+ * combination of its derivatives) of the type.
  *
- * @param ptw            Input: pointer to transfer_workspace structure (allocated in transfer_init() to avoid numerous reallocation)
- * @param index_q        Input: index of wavenumber
- * @param index_md       Input: index of mode
- * @param index_tt       Input: index of type
- * @param l              Input: multipole
- * @param index_l        Input: index of multipole
- * @param k              Input: wavenumber
- * @param radial_type    Input: type of radial (Bessel) functions to convolve with
- * @param trsf           Output: transfer function \f$ \Delta_l(k) \f$
- * @return the error status
+ * @param ptw                       Input: workspace, with the Bessel functions interpolated by transfer_bessel_interpolate()
+ * @param index_l                   Input: index of multipole
+ * @param k                         Input: wavenumber
+ * @param radial_type               Input: type of radial function
+ * @param sampling                  Input: time sampling of the transfer source
+ * @param sources                   Input: transfer source
+ * @param index_tau_max             Input: last sampled time contributing to the integral
+ * @param bessel_truncation         Input: whether the integral is truncated by the Bessel cut
+ * @param tau0_minus_tau_min_bessel Input: (tau0-tau) below which the Bessel function is negligible
+ * @param trsf                      Output: transfer function \f$ \Delta_l(k) \f$
  */
 
 void TransferModule::transfer_integrate(struct transfer_workspace* ptw,
-                                        int index_q,
-                                        int index_md,
-                                        int index_tt,
-                                        double l,
                                         int index_l,
                                         double k,
                                         radial_function_type radial_type,
+                                        const TransferTimeSampling& sampling,
+                                        const double* sources,
+                                        int index_tau_max,
+                                        bool bessel_truncation,
+                                        double tau0_minus_tau_min_bessel,
                                         double* trsf) {
-  /** Summary: */
-
-  /** - define local variables */
-
-  double* tau0_minus_tau = ptw->tau0_minus_tau.data();
-  double* w_trapz        = ptw->w_trapz.data();
-  double* sources        = ptw->sources.data();
-
-  /* minimum value of \f$ (\tau0-\tau) \f$ at which \f$ j_l(k[\tau_0-\tau]) \f$ is known, given that \f$ j_l(x) \f$ is sampled above some finite value \f$ x_{\min} \f$ (below which it can be approximated by zero) */
-  double tau0_minus_tau_min_bessel;
-
-  /* index in the source's tau list corresponding to the last point in the overlapping region between sources and bessels. Also the index of possible Bessel truncation. */
-  int index_tau_max, index_tau_max_Bessel;
-
-  double bessel;
-
-  double x_turning_point;
-
-  /** - find minimum value of (tau0-tau) at which \f$ j_l(k[\tau_0-\tau]) \f$ is known, given that \f$ j_l(x) \f$ is sampled above some finite value \f$ x_{\min} \f$ (below which it can be approximated by zero) */
-  //tau0_minus_tau_min_bessel = x_min_l/k; /* segmentation fault impossible, checked before that k != 0 */
-  //printf("index_l=%d\n",index_l);
-  if (ptw->sgnK == 0) {
-    tau0_minus_tau_min_bessel = ptw->pBIS->chi_at_phimin[index_l] /
-                                k; /* segmentation fault impossible, checked before that k != 0 */
-  }
-  else {
-    if (index_q < index_q_flat_approximation_) {
-      tau0_minus_tau_min_bessel = ptw->HIS.chi_at_phimin[index_l] / sqrt(ptw->sgnK * ptw->K);
-    }
-    else {
-      tau0_minus_tau_min_bessel = ptw->pBIS->chi_at_phimin[index_l] / sqrt(ptw->sgnK * ptw->K);
-
-      if (ptw->sgnK == 1) {
-        x_turning_point = asin(sqrt(l * (l + 1.)) / q_[index_q] * sqrt(ptw->sgnK * ptw->K));
-        tau0_minus_tau_min_bessel *= x_turning_point / sqrt(l * (l + 1.));
-      }
-      else {
-        x_turning_point = asinh(sqrt(l * (l + 1.)) / q_[index_q] * sqrt(ptw->sgnK * ptw->K));
-        tau0_minus_tau_min_bessel *= x_turning_point / sqrt(l * (l + 1.));
-      }
-    }
-  }
-  /** - if there is no overlap between the region in which bessels and sources are non-zero, return zero */
-  if (tau0_minus_tau_min_bessel >= tau0_minus_tau[0]) {
-    *trsf = 0.;
-    return;
-  }
-
-  /** - if there is an overlap: */
-
-  /** - --> trivial case: the source is a Dirac function and is sampled in only one point */
-  if (ptw->tau_size == 1) {
-    transfer_radial_function(ptw, k, index_q, index_l, 1, &bessel, radial_type);
-
-    *trsf = sources[0] * bessel;
-    return;
-  }
-
-  /** - --> other cases */
-
-  /** - ---> (a) find index in the source's tau list corresponding to the last point in the overlapping region. After this step, index_tau_max can be as small as zero, but not negative. */
-  index_tau_max = ptw->tau_size - 1;
-  while (tau0_minus_tau[index_tau_max] < tau0_minus_tau_min_bessel)
-    index_tau_max--;
-  /* Set index so we know if the truncation of the convolution integral is due to Bessel and not
-     due to the source. */
-  index_tau_max_Bessel = index_tau_max;
-
-  /** - ---> (b) the source function can vanish at large \f$ \tau \f$. Check if further points can be eliminated. After this step and if we did not return a null transfer function, index_tau_max can be as small as zero, but not negative. */
-  while (sources[index_tau_max] == 0.) {
-    index_tau_max--;
-    if (index_tau_max < 0) {
-      *trsf = 0.;
-      return;
-    }
-  }
-
-  if (ptw->neglect_late_source) {
-    while (tau0_minus_tau[index_tau_max] < ptw->tau0_minus_tau_cut) {
-      index_tau_max--;
-      if (index_tau_max < 0) {
-        *trsf = 0.;
-        return;
-      }
-    }
-  }
-
-  /** - Compute the radial function: */
   double* radial_function = ptw->radial_function.data();
 
-  transfer_radial_function(ptw,
-                           k,
-                           index_q,
-                           index_l,
-                           index_tau_max + 1,
-                           radial_function,
-                           radial_type);
+  /** - Compute the radial function from the Bessel functions interpolated before: */
+  transfer_radial_function(ptw, k, index_l, index_tau_max + 1, radial_function, radial_type);
 
   /** - Now we do most of the convolution integral: */
-  array_trapezoidal_convolution(sources, radial_function, index_tau_max + 1, w_trapz, trsf);
+  array_trapezoidal_convolution(sources,
+                                radial_function,
+                                index_tau_max + 1,
+                                sampling.w_trapz.data(),
+                                trsf);
 
   /** - This integral is correct for the case where no truncation has
       occurred. If it has been truncated at some index_tau_max because
@@ -2645,9 +2224,8 @@ void TransferModule::transfer_integrate(struct transfer_workspace* ptw,
       the wrong weight w_trapz[index_tau_max] is exactly compensated by the
       triangle we miss. However, for the Bessel cut off, we must subtract the
       wrong triangle and add the correct triangle. */
-  if ((index_tau_max != (ptw->tau_size - 1)) && (index_tau_max == index_tau_max_Bessel)) {
-    //Bessel truncation
-    *trsf -= 0.5 * (tau0_minus_tau[index_tau_max + 1] - tau0_minus_tau_min_bessel) *
+  if (bessel_truncation) {
+    *trsf -= 0.5 * (sampling.tau0_minus_tau[index_tau_max + 1] - tau0_minus_tau_min_bessel) *
              radial_function[index_tau_max] * sources[index_tau_max];
   }
 }
@@ -2707,28 +2285,25 @@ bool TransferModule::LimberSourceCrossesEquator(double tau0_minus_tau_max, int s
 
 /**
  * This routine computes the transfer functions \f$ \Delta_l^{X} (k) \f$)
- * for each mode, initial condition, type, multipole l and wavenumber k,
- * by using the Limber approximation, i.e by evaluating the source function
- * (passed in input in the array interpolated_sources) at a single value of
- * tau (the Bessel function being approximated as a Dirac distribution).
- *
+ * for a given type, multipole l and wavenumber k, by using the Limber
+ * approximation, i.e by evaluating the transfer source at a single value
+ * of tau (the Bessel function being approximated as a Dirac distribution).
  *
  * @param ptw            Input: pointer to transfer workspace structure
- * @param index_md       Input: index of mode
- * @param index_q        Input: index of wavenumber
  * @param l              Input: multipole
  * @param q              Input: wavenumber
  * @param radial_type    Input: type of radial (Bessel) functions to convolve with
+ * @param tau0_minus_tau Input: time sampling of the transfer source
+ * @param sources        Input: transfer source
  * @param trsf           Output: transfer function \f$ \Delta_l(k) \f$
- * @return the error status
  */
 
 void TransferModule::transfer_limber(struct transfer_workspace* ptw,
-                                     int index_md,
-                                     int index_q,
                                      double l,
                                      double q,
                                      radial_function_type radial_type,
+                                     const std::vector<double>& tau0_minus_tau,
+                                     const double* sources,
                                      double* trsf) {
   /** Summary: */
 
@@ -2736,6 +2311,8 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
 
   /* interpolated source and its derivatives at this value */
   double S, Sp, Sm;
+
+  const int tau_size = static_cast<int>(tau0_minus_tau.size());
 
   double tau0_minus_tau_limber = 0.;
   double IPhiFlat              = 0.;
@@ -2747,15 +2324,15 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
     const LimberPoint limber = LimberDeltaPoint(l, q, ptw->sgnK, ptw->K);
     tau0_minus_tau_limber    = limber.tau0_minus_tau;
 
-    if ((tau0_minus_tau_limber > ptw->tau0_minus_tau[0]) ||
-        (tau0_minus_tau_limber < ptw->tau0_minus_tau[ptw->tau_size - 1])) {
+    if ((tau0_minus_tau_limber > tau0_minus_tau[0]) ||
+        (tau0_minus_tau_limber < tau0_minus_tau[tau_size - 1])) {
       *trsf = 0.;
       return;
     }
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
-                                ptw->sources.data(),
-                                ptw->tau_size,
+    transfer_limber_interpolate(tau0_minus_tau.data(),
+                                sources,
+                                tau_size,
                                 tau0_minus_tau_limber,
                                 &S);
 
@@ -2779,52 +2356,30 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
   }
 
   else if (radial_type == SCALAR_TEMPERATURE_1) {
-    if (((l + 1.5) / q > ptw->tau0_minus_tau[0]) ||
-        ((l - 0.5) / q < ptw->tau0_minus_tau[ptw->tau_size - 1])) {
+    if (((l + 1.5) / q > tau0_minus_tau[0]) || ((l - 0.5) / q < tau0_minus_tau[tau_size - 1])) {
       *trsf = 0.;
       return;
     }
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
-                                ptw->sources.data(),
-                                ptw->tau_size,
-                                (l + 1.5) / q,
-                                &Sp);
+    transfer_limber_interpolate(tau0_minus_tau.data(), sources, tau_size, (l + 1.5) / q, &Sp);
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
-                                ptw->sources.data(),
-                                ptw->tau_size,
-                                (l - 0.5) / q,
-                                &Sm);
+    transfer_limber_interpolate(tau0_minus_tau.data(), sources, tau_size, (l - 0.5) / q, &Sm);
 
     *trsf = -sqrt(_PI_ / (2. * l + 3.)) * Sp / (l + 1.5) * (l + 1.) / (2. * l + 1) +
             sqrt(_PI_ / (2. * l - 1.)) * Sm / (l - 0.5) * l / (2. * l + 1.);
   }
 
   else if (radial_type == NC_RSD) {
-    if (((l + 2.5) / q > ptw->tau0_minus_tau[0]) ||
-        ((l - 1.5) / q < ptw->tau0_minus_tau[ptw->tau_size - 1])) {
+    if (((l + 2.5) / q > tau0_minus_tau[0]) || ((l - 1.5) / q < tau0_minus_tau[tau_size - 1])) {
       *trsf = 0.;
       return;
     }
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
-                                ptw->sources.data(),
-                                ptw->tau_size,
-                                (l + 2.5) / q,
-                                &Sp);
+    transfer_limber_interpolate(tau0_minus_tau.data(), sources, tau_size, (l + 2.5) / q, &Sp);
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
-                                ptw->sources.data(),
-                                ptw->tau_size,
-                                (l - 1.5) / q,
-                                &Sm);
+    transfer_limber_interpolate(tau0_minus_tau.data(), sources, tau_size, (l - 1.5) / q, &Sm);
 
-    transfer_limber_interpolate(ptw->tau0_minus_tau.data(),
-                                ptw->sources.data(),
-                                ptw->tau_size,
-                                (l + 0.5) / q,
-                                &S);
+    transfer_limber_interpolate(tau0_minus_tau.data(), sources, tau_size, (l + 0.5) / q, &S);
 
     *trsf =
         sqrt(_PI_ / (2. * l + 5.)) * Sp / (l + 2.5) * l * (l + 2.) / (2. * l + 1.) / (2. * l + 3.) -
@@ -2839,21 +2394,25 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
   }
 }
 
-void TransferModule::transfer_limber_interpolate(double* tau0_minus_tau,
-                                                 double* sources,
+void TransferModule::transfer_limber_interpolate(const double* tau0_minus_tau,
+                                                 const double* sources,
                                                  int tau_size,
                                                  double tau0_minus_tau_limber,
                                                  double* S) {
   int index_tau;
   double dS, ddS;
 
-  /** - find  bracketing indices.
-      index_tau must be at least 1 (so that index_tau-1 is at least 0)
+  /** - find  bracketing indices by bisection: the first index_tau with
+      tau0_minus_tau[index_tau] <= tau0_minus_tau_limber (the times are in decreasing
+      order). index_tau must be at least 1 (so that index_tau-1 is at least 0)
       and at most tau_size-2 (so that index_tau+1 is at most tau_size-1).
   */
-  index_tau = 1;
-  while ((tau0_minus_tau[index_tau] > tau0_minus_tau_limber) && (index_tau < tau_size - 2))
-    index_tau++;
+  index_tau = static_cast<int>(std::partition_point(tau0_minus_tau + 1,
+                                                    tau0_minus_tau + std::max(tau_size - 2, 1),
+                                                    [tau0_minus_tau_limber](double t) {
+                                                      return t > tau0_minus_tau_limber;
+                                                    }) -
+                               tau0_minus_tau);
 
   /** - interpolate by fitting a polynomial of order two; get source
       and its first two derivatives. Note that we are not
@@ -2891,197 +2450,99 @@ void TransferModule::transfer_limber_interpolate(double* tau0_minus_tau,
 }
 
 /**
- * This routine computes the transfer functions \f$ \Delta_l^{X} (k)
- * \f$) for each mode, initial condition, type, multipole l and
- * wavenumber k, by using the Limber approximation at order two, i.e
- * as a function of the source function and its first two derivatives
- * at a single value of tau
+ * Which of the Bessel function \f$ \Phi_l \f$ and its first two derivatives
+ * enter the radial function of a given type.
  *
- * @param tau_size        Input: size of conformal time array
- * @param index_md        Input: index of mode
- * @param index_k         Input: index of wavenumber
- * @param l               Input: multipole
- * @param k               Input: wavenumber
- * @param tau0_minus_tau  Input: array of values of (tau_today - tau)
- * @param sources         Input: source functions
- * @param radial_type     Input: type of radial (Bessel) functions to convolve with
- * @param trsf            Output: transfer function \f$ \Delta_l(k) \f$
- * @return the error status
+ * @param radial_type Input: type of radial function
+ * @return the needed functions
  */
 
-void TransferModule::transfer_limber2(int tau_size,
-                                      int index_md,
-                                      int index_k,
-                                      double l,
-                                      double k,
-                                      double* tau0_minus_tau,
-                                      double* sources,
-                                      radial_function_type radial_type,
-                                      double* trsf) {
-  /** Summary: */
-
-  /** - define local variables */
-
-  /* conformal time at which source must be computed */
-  double tau0_minus_tau_limber;
-  int index_tau;
-
-  /* interpolated source and its derivatives */
-  double S, dS, ddS;
-
-  /** - get k, l and infer tau such that k(tau0-tau)=l+1/2;
-      check that tau is in appropriate range */
-
-  tau0_minus_tau_limber = (l + 0.5) / k;  //TBC: to be updated to include curvature effects
-
-  if ((tau0_minus_tau_limber > tau0_minus_tau[0]) ||
-      (tau0_minus_tau_limber < tau0_minus_tau[tau_size - 1])) {
-    *trsf = 0.;
-    return;
-  }
-
-  /** - find  bracketing indices */
-  index_tau = 0;
-  while ((tau0_minus_tau[index_tau] > tau0_minus_tau_limber) && (index_tau < tau_size - 2))
-    index_tau++;
-
-  /** - interpolate by fitting a polynomial of order two; get source
-      and its first two derivatives */
-  array_interpolate_parabola(tau0_minus_tau[index_tau - 1],
-                             tau0_minus_tau[index_tau],
-                             tau0_minus_tau[index_tau + 1],
-                             tau0_minus_tau_limber,
-                             sources[index_tau - 1],
-                             sources[index_tau],
-                             sources[index_tau + 1],
-                             &S,
-                             &dS,
-                             &ddS);
-
-  /** - get transfer from 2nd order Limber approx (inferred from 0809.5112 [astro-ph]) */
-
-  *trsf = sqrt(_PI_ / (2. * l + 1.)) / k *
-          ((1. - 3. / 2. / (2. * l + 1.) / (2. * l + 1.)) * S + dS / k / (2. * l + 1.) -
-           0.5 * ddS / k / k);
-}
-
-void TransferModule::transfer_can_be_neglected(
-    int index_md, int index_ic, int index_tt, double ra_rec, double k, double l, short* neglect) {
-  *neglect = false;
-
-  if (_scalarsEXT_) {
-    if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t0_) &&
-        (l < (k - ppr->transfer_neglect_delta_k_S_t0) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t1_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_S_t1) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_S_t2) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_S_e) * ra_rec))
-      *neglect = true;
-  }
-
-  else if (_vectorsEXT_) {
-    if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t1_) &&
-        (l < (k - ppr->transfer_neglect_delta_k_V_t1) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_V_t2) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_V_e) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_b_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_V_b) * ra_rec))
-      *neglect = true;
-  }
-
-  else if (_tensorsEXT_) {
-    if ((ppt->has_cl_cmb_temperature) && (index_tt == index_tt_t2_) &&
-        (l < (k - ppr->transfer_neglect_delta_k_T_t2) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_e_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_T_e) * ra_rec))
-      *neglect = true;
-
-    else if ((ppt->has_cl_cmb_polarization) && (index_tt == index_tt_b_) &&
-             (l < (k - ppr->transfer_neglect_delta_k_T_b) * ra_rec))
-      *neglect = true;
+TransferModule::BesselNeeds TransferModule::transfer_radial_function_needs(
+    radial_function_type radial_type) {
+  switch (radial_type) {
+    case SCALAR_TEMPERATURE_1:
+      return {false, true, false};
+    case SCALAR_TEMPERATURE_2:
+      return {true, false, true};
+    case VECTOR_TEMPERATURE_2:
+    case VECTOR_POLARISATION_E:
+    case TENSOR_POLARISATION_B:
+      return {true, true, false};
+    case TENSOR_POLARISATION_E:
+      return {true, true, true};
+    case NC_RSD:
+      return {false, false, true};
+    default:
+      return {true, false, false};
   }
 }
 
-void TransferModule::transfer_late_source_can_be_neglected(int index_md,
-                                                           int index_tt,
-                                                           double l,
-                                                           short* neglect) {
-  *neglect = false;
+/**
+ * Minimum value of \f$ (\tau_0-\tau) \f$ at which \f$ j_l(k[\tau_0-\tau]) \f$ is
+ * known, given that \f$ j_l(x) \f$ is sampled above some finite value
+ * \f$ x_{\min} \f$ (below which it can be approximated by zero).
+ *
+ * @param ptw      Input: workspace
+ * @param index_q  Input: index of wavenumber
+ * @param index_l  Input: index of multipole
+ * @param k        Input: wavenumber
+ * @return the minimum value of (tau0-tau); _HUGE_ where the hyperspherical Bessel functions are not computed
+ */
 
-  if (l > ppr->transfer_neglect_late_source * thermodynamics_module_->angular_rescaling_) {
-    /* sources at late times can be neglected for CMB, excepted when
-       there is a LISW: this means for tt_t1, t2, e */
+double TransferModule::transfer_bessel_cut(struct transfer_workspace* ptw,
+                                           int index_q,
+                                           int index_l,
+                                           double k) {
+  const double l = (double) l_[index_l];
 
-    if (_scalarsEXT_) {
-      if (ppt->has_cl_cmb_temperature) {
-        if ((index_tt == index_tt_t1_) || (index_tt == index_tt_t2_))
-          *neglect = true;
-      }
-      if (ppt->has_cl_cmb_polarization) {
-        if (index_tt == index_tt_e_)
-          *neglect = true;
-      }
-    }
-    else if (_vectorsEXT_) {
-      if (ppt->has_cl_cmb_temperature) {
-        if ((index_tt == index_tt_t1_) || (index_tt == index_tt_t2_))
-          *neglect = true;
-      }
-      if (ppt->has_cl_cmb_polarization) {
-        if ((index_tt == index_tt_e_) || (index_tt == index_tt_b_))
-          *neglect = true;
-      }
-    }
-    else if (_tensorsEXT_) {
-      if (ppt->has_cl_cmb_polarization) {
-        if ((index_tt == index_tt_e_) || (index_tt == index_tt_b_))
-          *neglect = true;
-      }
-    }
+  if (ptw->sgnK == 0)
+    return ptw->pBIS->chi_at_phimin[index_l] /
+           k; /* segmentation fault impossible, checked before that k != 0 */
+
+  if (index_q < index_q_flat_approximation_) {
+    /* above HIS.l_size, transfer_select_method() returns zero anyway */
+    if (index_l >= ptw->HIS.l_size)
+      return _HUGE_;
+    return ptw->HIS.chi_at_phimin[index_l] / sqrt(ptw->sgnK * ptw->K);
   }
+
+  const double x_turning_point =
+      (ptw->sgnK == 1) ? asin(sqrt(l * (l + 1.)) / q_[index_q] * sqrt(ptw->sgnK * ptw->K))
+                       : asinh(sqrt(l * (l + 1.)) / q_[index_q] * sqrt(ptw->sgnK * ptw->K));
+  return ptw->pBIS->chi_at_phimin[index_l] / sqrt(ptw->sgnK * ptw->K) * x_turning_point /
+         sqrt(l * (l + 1.));
 }
 
-void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
-                                              double k,
-                                              int index_q,
-                                              int index_l,
-                                              int x_size,
-                                              double* radial_function,
-                                              radial_function_type radial_type) {
+/**
+ * Interpolate the Bessel functions (hyperspherical Bessel functions in
+ * non-flat space) and the requested derivatives at the first x_size radial
+ * coordinates of the current time sampling (stored in the workspace by
+ * transfer_radial_coordinates()), once for all the types and initial
+ * conditions using this sampling. They are stored in the workspace in
+ * reverse order (order of increasing argument), and combined into the
+ * radial function of each type by transfer_radial_function().
+ *
+ * @param ptw         Input/Output: workspace
+ * @param index_q     Input: index of wavenumber
+ * @param index_l     Input: index of multipole
+ * @param tau_size    Input: number of times of the current time sampling
+ * @param x_size      Input: number of times at which the functions are needed
+ * @param needs       Input: which functions are needed
+ */
+
+void TransferModule::transfer_bessel_interpolate(struct transfer_workspace* ptw,
+                                                 int index_q,
+                                                 int index_l,
+                                                 int tau_size,
+                                                 int x_size,
+                                                 BesselNeeds needs) {
   HyperInterpStruct* pHIS;
-  double* chi     = ptw->chi.data();
-  double* cscKgen = ptw->cscKgen.data();
-  double* cotKgen = ptw->cotKgen.data();
-  int j;
-  double* Phi              = ptw->Phi.data();
-  double* dPhi             = ptw->dPhi.data();
-  double* d2Phi            = ptw->d2Phi.data();
+  const double* chi        = ptw->chi.data();
   double* chireverse       = ptw->chireverse.data();
   double* rescale_function = ptw->rescale_function.data();
-  double K = 0., k2 = 1.0;
-  double sqrt_absK_over_k;
-  double absK_over_k2;
+  const double K           = ptw->K;
+  const double l           = (double) l_[index_l];
   double nu = 0., chi_tp = 0.;
-  double factor, s0, s2, ssqrt3, si, ssqrt2, ssqrt2i;
-  double l = (double) l_[index_l];
   double rescale_argument;
   double rescale_amplitude;
   using HermiteInterpolation =
@@ -3089,19 +2550,6 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
   HermiteInterpolation interpolate_Phi, interpolate_dPhi, interpolate_PhidPhi, interpolate_Phid2Phi,
       interpolate_PhidPhid2Phi;
   enum Hermite_Interpolation_Order HIorder;
-
-  K  = ptw->K;
-  k2 = k * k;
-
-  if (ptw->sgnK == 0) {
-    /* This is the choice consistent with chi=k*(tau0-tau) and nu=1 */
-    sqrt_absK_over_k = 1.0;
-  }
-  else {
-    K                = ptw->K;
-    sqrt_absK_over_k = sqrt(ptw->sgnK * K) / k;
-  }
-  absK_over_k2 = sqrt_absK_over_k * sqrt_absK_over_k;
 
   if (ptw->sgnK == 0) {
     pHIS              = ptw->pBIS;
@@ -3119,17 +2567,19 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
     pHIS = ptw->pBIS;
     if (ptw->sgnK == 1) {
       nu     = q_[index_q] / sqrt(K);
-      chi_tp = asin(sqrt(l_[index_l] * (l_[index_l] + 1.)) / nu);
+      chi_tp = asin(sqrt(l * (l + 1.)) / nu);
     }
     else {
       nu     = q_[index_q] / sqrt(-K);
-      chi_tp = asinh(sqrt(l_[index_l] * (l_[index_l] + 1.)) / nu);
+      chi_tp = asinh(sqrt(l * (l + 1.)) / nu);
     }
-    rescale_argument  = sqrt(l_[index_l] * (l_[index_l] + 1.)) / chi_tp;
-    rescale_amplitude = pow(1. - K * l_[index_l] * (l_[index_l] + 1.) / q_[index_q] / q_[index_q],
-                            -1. / 12.);
+    rescale_argument  = sqrt(l * (l + 1.)) / chi_tp;
+    rescale_amplitude = pow(1. - K * l * (l + 1.) / q_[index_q] / q_[index_q], -1. / 12.);
     HIorder           = HERMITE4;
   }
+
+  ptw->bessel_size      = x_size;
+  ptw->rescale_argument = rescale_argument;
 
   if (HIorder == HERMITE4) {
     interpolate_Phi          = hyperspherical_Hermite_interpolation<4, true, false, false>;
@@ -3148,50 +2598,34 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
 
   //Reverse chi
   if (ptw->sgnK == 0) {
-    chireverse = ptw->chi_full_reverse.data() + (ptw->tau_size - x_size);
-    for (j = 0; j < x_size; j++) {
+    chireverse = ptw->chi_full_reverse.data() + (tau_size - x_size);
+    for (int j = 0; j < x_size; j++) {
       rescale_function[j] = 1.;
     }
   }
   else {
-    for (j = 0; j < x_size; j++) {
+    for (int j = 0; j < x_size; j++) {
       chireverse[j] = chi[x_size - 1 - j] * rescale_argument;
       if (rescale_amplitude == 1.) {
         rescale_function[j] = 1.;
       }
       else {
+        const double x = chireverse[j] / rescale_argument;
         if (ptw->sgnK == 1) {
-          rescale_function[j] =
-              std::min(rescale_amplitude *
-                           (1 +
-                            0.34 * atan(l_[index_l] / nu) *
-                                (chireverse[j] / rescale_argument - chi_tp) +
-                            2.00 * pow(atan(l_[index_l] / nu) *
-                                           (chireverse[j] / rescale_argument - chi_tp),
-                                       2)),
-                       chireverse[j] / rescale_argument / sin(chireverse[j] / rescale_argument));
+          rescale_function[j] = std::min(rescale_amplitude *
+                                             (1 + 0.34 * atan(l / nu) * (x - chi_tp) +
+                                              2.00 * pow(atan(l / nu) * (x - chi_tp), 2)),
+                                         x / sin(x));
         }
         else {
-          rescale_function[j] =
-              std::max(rescale_amplitude *
-                           (1 -
-                            0.38 * atan(l_[index_l] / nu) *
-                                (chireverse[j] / rescale_argument - chi_tp) +
-                            0.40 * pow(atan(l_[index_l] / nu) *
-                                           (chireverse[j] / rescale_argument - chi_tp),
-                                       2)),
-                       chireverse[j] / rescale_argument / sinh(chireverse[j] / rescale_argument));
+          rescale_function[j] = std::max(rescale_amplitude *
+                                             (1 - 0.38 * atan(l / nu) * (x - chi_tp) +
+                                              0.40 * pow(atan(l / nu) * (x - chi_tp), 2)),
+                                         x / sinh(x));
         }
       }
     }
   }
-
-  /*
-    class_test(pHIS->x[0] > chireverse[0],
-    "Bessels need to be interpolated at %e, outside the range in which they have been computed (>%e). Decrease their x_min.",
-    chireverse[0],
-    pHIS->x[0]);
-  */
 
   class_test((pHIS->x[pHIS->x_size - 1] < chireverse[x_size - 1]) && (ptw->sgnK != 1),
              "Bessels need to be interpolated at %e, outside the range in which they have been "
@@ -3199,199 +2633,188 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
              chireverse[x_size - 1],
              pHIS->x[pHIS->x_size - 1]);
 
+  /* interpolate only the needed functions (Phi comes for free with d2Phi) */
+  double* Phi   = ptw->Phi.data();
+  double* dPhi  = ptw->dPhi.data();
+  double* d2Phi = ptw->d2Phi.data();
+  if (needs.d2Phi) {
+    if (needs.dPhi)
+      interpolate_PhidPhid2Phi(pHIS, x_size, index_l, chireverse, Phi, dPhi, d2Phi);
+    else
+      interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
+  }
+  else if (needs.Phi) {
+    if (needs.dPhi)
+      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
+    else
+      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
+  }
+  else {
+    interpolate_dPhi(pHIS, x_size, index_l, chireverse, nullptr, dPhi, nullptr);
+  }
+}
+
+/**
+ * Compute the radial function (Bessel function or combination of its
+ * derivatives) of a given type at the first x_size times of the current
+ * time sampling, from the Bessel functions interpolated by
+ * transfer_bessel_interpolate() for at least x_size times.
+ *
+ * @param ptw             Input: workspace (radial coordinates and Bessel functions)
+ * @param k               Input: wavenumber
+ * @param index_l         Input: index of multipole
+ * @param x_size          Input: number of values
+ * @param radial_function Output: radial function, in the order of the time sampling
+ * @param radial_type     Input: type of radial function
+ */
+
+void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
+                                              double k,
+                                              int index_l,
+                                              int x_size,
+                                              double* radial_function,
+                                              radial_function_type radial_type) {
+  const double* cscKgen = ptw->cscKgen.data();
+  const double* cotKgen = ptw->cotKgen.data();
+  /* the Bessel functions are stored in reverse order: the value at index i of the time sampling is at n-i */
+  const double* Phi              = ptw->Phi.data();
+  const double* dPhi             = ptw->dPhi.data();
+  const double* d2Phi            = ptw->d2Phi.data();
+  const double* rescale_function = ptw->rescale_function.data();
+  const int n                    = ptw->bessel_size - 1;
+  const double rescale_argument  = ptw->rescale_argument;
+  const double K                 = ptw->K;
+  const double k2                = k * k;
+  const double l                 = (double) l_[index_l];
+  double factor, s0, s2, ssqrt3, si, ssqrt2, ssqrt2i;
+
+  class_test(x_size > ptw->bessel_size,
+             "radial function needed at %d times, but Bessel functions interpolated at only %d "
+             "times",
+             x_size,
+             ptw->bessel_size);
+
+  /* sqrt(|K|)/k; in flat space, the choice consistent with chi=k*(tau0-tau) and nu=1 */
+  const double sqrt_absK_over_k = (ptw->sgnK == 0) ? 1.0 : sqrt(ptw->sgnK * K) / k;
+  const double absK_over_k2     = sqrt_absK_over_k * sqrt_absK_over_k;
+
   switch (radial_type) {
     case SCALAR_TEMPERATURE_0:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = Phi[j] * rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = Phi[n - i] * rescale_function[n - i];
       break;
     case SCALAR_TEMPERATURE_1:
-      interpolate_dPhi(pHIS, x_size, index_l, chireverse, nullptr, dPhi, nullptr);
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = sqrt_absK_over_k * dPhi[j] * rescale_argument *
-                                          rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = sqrt_absK_over_k * dPhi[n - i] * rescale_argument *
+                             rescale_function[n - i];
       break;
     case SCALAR_TEMPERATURE_2:
-      interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
       s2     = sqrt(1.0 - 3.0 * K / k2);
       factor = 1.0 / (2.0 * s2);
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] =
-            factor * (3 * absK_over_k2 * d2Phi[j] * rescale_argument * rescale_argument + Phi[j]) *
-            rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] =
+            factor *
+            (3 * absK_over_k2 * d2Phi[n - i] * rescale_argument * rescale_argument + Phi[n - i]) *
+            rescale_function[n - i];
       break;
     case SCALAR_POLARISATION_E:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s2     = sqrt(1.0 - 3.0 * K / k2);
       factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / s2;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
-                                          cscKgen[x_size - 1 - j] * Phi[j] * rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor * cscKgen[i] * cscKgen[i] * Phi[n - i] *
+                             rescale_function[n - i];
       break;
     case VECTOR_TEMPERATURE_1:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s0     = sqrt(1.0 + K / k2);
       factor = sqrt(0.5 * l * (l + 1)) / s0;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] * Phi[j] *
-                                          rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor * cscKgen[i] * Phi[n - i] * rescale_function[n - i];
       break;
     case VECTOR_TEMPERATURE_2:
-      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       factor = sqrt(1.5 * l * (l + 1)) / s0 / ssqrt3;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
-                                          (sqrt_absK_over_k * dPhi[j] * rescale_argument -
-                                           cotKgen[j] * Phi[j]) *
-                                          rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor * cscKgen[i] *
+                             (sqrt_absK_over_k * dPhi[n - i] * rescale_argument -
+                              cotKgen[i] * Phi[n - i]) *
+                             rescale_function[n - i];
       break;
     case VECTOR_POLARISATION_E:
-      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       factor = 0.5 * sqrt((l - 1.0) * (l + 2.0)) / s0 / ssqrt3;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
-                                          (cotKgen[j] * Phi[j] +
-                                           sqrt_absK_over_k * dPhi[j] * rescale_argument) *
-                                          rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor * cscKgen[i] *
+                             (cotKgen[i] * Phi[n - i] +
+                              sqrt_absK_over_k * dPhi[n - i] * rescale_argument) *
+                             rescale_function[n - i];
       break;
     case VECTOR_POLARISATION_B:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       s0     = sqrt(1.0 + K / k2);
       ssqrt3 = sqrt(1.0 - 2.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
       factor = 0.5 * sqrt((l - 1.0) * (l + 2.0)) * si / s0 / ssqrt3;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] * Phi[j] *
-                                          rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor * cscKgen[i] * Phi[n - i] * rescale_function[n - i];
       break;
     case TENSOR_TEMPERATURE_2:
-      interpolate_Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, nullptr);
       ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
       factor = sqrt(3.0 / 8.0 * (l + 2.0) * (l + 1.0) * l * (l - 1.0)) / si / ssqrt2;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor * cscKgen[x_size - 1 - j] *
-                                          cscKgen[x_size - 1 - j] * Phi[j] * rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor * cscKgen[i] * cscKgen[i] * Phi[n - i] *
+                             rescale_function[n - i];
       break;
     case TENSOR_POLARISATION_E:
-      interpolate_PhidPhid2Phi(pHIS, x_size, index_l, chireverse, Phi, dPhi, d2Phi);
       ssqrt2 = sqrt(1.0 - 1.0 * K / k2);
       si     = sqrt(1.0 + 2.0 * K / k2);
       factor = 0.25 / si / ssqrt2;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] =
-            factor *
-            (absK_over_k2 * d2Phi[j] * rescale_argument * rescale_argument +
-             4.0 * cotKgen[x_size - 1 - j] * sqrt_absK_over_k * dPhi[j] * rescale_argument -
-             (1.0 + 4 * K / k2 - 2.0 * cotKgen[x_size - 1 - j] * cotKgen[x_size - 1 - j]) *
-                 Phi[j]) *
-            rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor *
+                             (absK_over_k2 * d2Phi[n - i] * rescale_argument * rescale_argument +
+                              4.0 * cotKgen[i] * sqrt_absK_over_k * dPhi[n - i] * rescale_argument -
+                              (1.0 + 4 * K / k2 - 2.0 * cotKgen[i] * cotKgen[i]) * Phi[n - i]) *
+                             rescale_function[n - i];
       break;
     case TENSOR_POLARISATION_B:
-      interpolate_PhidPhi(pHIS, x_size, index_l, chireverse, Phi, dPhi, nullptr);
       ssqrt2i = sqrt(1.0 + 3.0 * K / k2);
       ssqrt2  = sqrt(1.0 - 1.0 * K / k2);
       si      = sqrt(1.0 + 2.0 * K / k2);
       factor  = 0.5 * ssqrt2i / ssqrt2 / si;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor *
-                                          (sqrt_absK_over_k * dPhi[j] * rescale_argument +
-                                           2.0 * cotKgen[x_size - 1 - j] * Phi[j]) *
-                                          rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = factor *
+                             (sqrt_absK_over_k * dPhi[n - i] * rescale_argument +
+                              2.0 * cotKgen[i] * Phi[n - i]) *
+                             rescale_function[n - i];
       break;
     case NC_RSD:
-      interpolate_Phid2Phi(pHIS, x_size, index_l, chireverse, Phi, nullptr, d2Phi);
-      //s2 = sqrt(1.0-3.0*K/k2);
-      factor = 1.0;
-      for (j = 0; j < x_size; j++)
-        radial_function[x_size - 1 - j] = factor * absK_over_k2 * d2Phi[j] * rescale_argument *
-                                          rescale_argument * rescale_function[j];
+      for (int i = 0; i < x_size; i++)
+        radial_function[i] = absK_over_k2 * d2Phi[n - i] * rescale_argument * rescale_argument *
+                             rescale_function[n - i];
       // Note: in previous line there was a missing factor absK_over_k2 until version 2.4.3. Credits Francesco Montanari.
       break;
   }
 }
 
-void TransferModule::transfer_select_radial_function(int index_md,
-                                                     int index_tt,
-                                                     radial_function_type* radial_type) {
-  /* generic case leading to generic bessel function (it applies also to all nonCMB types: lcmb, density, lensing) */
-  *radial_type = SCALAR_TEMPERATURE_0;
-
-  /* other specific cases */
-  if (_scalarsEXT_) {
-    if (ppt->has_cl_cmb_temperature) {
-      if (index_tt == index_tt_t0_) {
-        *radial_type = SCALAR_TEMPERATURE_0;
-      }
-      if (index_tt == index_tt_t1_) {
-        *radial_type = SCALAR_TEMPERATURE_1;
-      }
-      if (index_tt == index_tt_t2_) {
-        *radial_type = SCALAR_TEMPERATURE_2;
-      }
-    }
-
-    if (ppt->has_cl_cmb_polarization) {
-      if (index_tt == index_tt_e_) {
-        *radial_type = SCALAR_POLARISATION_E;
-      }
-    }
-
-    if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
-      *radial_type = SCALAR_TEMPERATURE_1;
-
-    if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))
-      *radial_type = NC_RSD;
-
-    if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr))
-      *radial_type = SCALAR_TEMPERATURE_1;
-  }
-
-  if (_vectorsEXT_) {
-    if (ppt->has_cl_cmb_temperature) {
-      if (index_tt == index_tt_t1_) {
-        *radial_type = VECTOR_TEMPERATURE_1;
-      }
-      if (index_tt == index_tt_t2_) {
-        *radial_type = VECTOR_TEMPERATURE_2;
-      }
-    }
-
-    if (ppt->has_cl_cmb_polarization) {
-      if (index_tt == index_tt_e_) {
-        *radial_type = VECTOR_POLARISATION_E;
-      }
-      if (index_tt == index_tt_b_) {
-        *radial_type = VECTOR_POLARISATION_B;
-      }
-    }
-  }
-
-  if (_tensorsEXT_) {
-    if (ppt->has_cl_cmb_temperature) {
-      if (index_tt == index_tt_t2_) {
-        *radial_type = TENSOR_TEMPERATURE_2;
-      }
-    }
-
-    if (ppt->has_cl_cmb_polarization) {
-      if (index_tt == index_tt_e_) {
-        *radial_type = TENSOR_POLARISATION_E;
-      }
-      if (index_tt == index_tt_b_) {
-        *radial_type = TENSOR_POLARISATION_B;
-      }
-    }
-  }
-}
-
-/* for reading global selection function (ie the one multiplying the selection function of each bin) */
+/* for reading the global selection function (ie the one multiplying the selection function of each
+   bin), the evolution function, and splining the selection functions of selection=tabulated */
 
 void TransferModule::transfer_global_selection_read() {
+  /* for selection=tabulated, spline the selection function of each bin (read in the input module) */
+  if (ppt->selection == tabulated) {
+    selection_file_ddNdz_.assign(ptr->selection_file_dNdz.size(), {});
+    for (size_t bin = 0; bin < ptr->selection_file_dNdz.size(); bin++) {
+      selection_file_ddNdz_[bin].resize(ptr->selection_file_z.size());
+      array_spline_table_lines(ptr->selection_file_z.data(),
+                               static_cast<int>(ptr->selection_file_z.size()),
+                               ptr->selection_file_dNdz[bin].data(),
+                               1,
+                               selection_file_ddNdz_[bin].data(),
+                               _SPLINE_EST_DERIV_);
+    }
+  }
+
   /* for reading selection function */
   FILE* input_file;
   int row, status;
@@ -3474,34 +2897,41 @@ void TransferModule::transfer_global_selection_read() {
 };
 
 void TransferModule::transfer_workspace_init(struct transfer_workspace* ptw,
-                                             int perturb_tau_size,
-                                             int tau_size_max,
                                              double K,
                                              int sgnK,
                                              double tau0_minus_tau_cut,
                                              HyperInterpStruct* pBIS) {
-  ptw->tau_size_max        = tau_size_max;
-  ptw->l_size              = l_size_max_;
-  ptw->pBIS                = pBIS;
-  ptw->K                   = K;
-  ptw->sgnK                = sgnK;
-  ptw->tau0_minus_tau_cut  = tau0_minus_tau_cut;
-  ptw->neglect_late_source = false;
+  ptw->pBIS               = pBIS;
+  ptw->K                  = K;
+  ptw->sgnK               = sgnK;
+  ptw->tau0_minus_tau_cut = tau0_minus_tau_cut;
 
-  ptw->interpolated_sources.resize(perturb_tau_size);
-  ptw->sources.resize(tau_size_max);
-  ptw->tau0_minus_tau.resize(tau_size_max);
-  ptw->w_trapz.resize(tau_size_max);
-  ptw->chi.resize(tau_size_max);
-  ptw->cscKgen.resize(tau_size_max);
-  ptw->cotKgen.resize(tau_size_max);
-  ptw->Phi.resize(tau_size_max);
-  ptw->dPhi.resize(tau_size_max);
-  ptw->d2Phi.resize(tau_size_max);
-  ptw->chireverse.resize(tau_size_max);
-  ptw->rescale_function.resize(tau_size_max);
-  ptw->radial_function.resize(tau_size_max);
-  ptw->chi_full_reverse.resize(tau_size_max);
+  int ic_tp_max = 0;
+  int ic_max    = 0;
+  for (int index_md = 0; index_md < md_size_; index_md++) {
+    ic_tp_max = std::max(ic_tp_max,
+                         perturbations_module_->ic_size_[index_md] *
+                             perturbations_module_->tp_size_[index_md]);
+    ic_max    = std::max(ic_max, perturbations_module_->ic_size_[index_md]);
+  }
+  const int n_max = ic_max * tt_per_ts_max_;
+
+  ptw->interpolated_sources.resize(ic_tp_max);
+  ptw->is_interpolated.resize(ic_tp_max);
+  ptw->sources.resize(n_max * tau_size_max_);
+  ptw->method.resize(n_max);
+  ptw->index_tau_max.resize(n_max);
+  ptw->bessel_truncation.resize(n_max);
+  ptw->chi.resize(tau_size_max_);
+  ptw->cscKgen.resize(tau_size_max_);
+  ptw->cotKgen.resize(tau_size_max_);
+  ptw->Phi.resize(tau_size_max_);
+  ptw->dPhi.resize(tau_size_max_);
+  ptw->d2Phi.resize(tau_size_max_);
+  ptw->chireverse.resize(tau_size_max_);
+  ptw->rescale_function.resize(tau_size_max_);
+  ptw->radial_function.resize(tau_size_max_);
+  ptw->chi_full_reverse.resize(tau_size_max_);
 }
 
 void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int index_q, double tau0) {
@@ -3613,10 +3043,8 @@ void TransferModule::transfer_get_lmax(
   int fevals = 0, index_l_mid;
   int multiplier;
   int right_boundary_checked = false;
-  int hil = 0, hir = 0, bini = 0;
   get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals);
   if (x_nonzero >= xmax) {
-    //printf("None relevant\n");
     //x at left boundary is already larger than xmax.
     *index_l_right = std::max(lsize - 1, 1);
     return;
@@ -3625,15 +3053,12 @@ void TransferModule::transfer_get_lmax(
 
   if (x_nonzero < xmax) {
     //All Bessels are relevant
-    //printf("All relevant\n");
     *index_l_left = std::max(0, (lsize - 2));
     return;
   }
   /* Hunt for left boundary: */
   for (multiplier = 1;; multiplier *= 5) {
-    hil++;
     get_xmin_generic(sgnK, lvec[*index_l_left], nu, xtol, phiminabs, &x_nonzero, &fevals);
-    //printf("Hunt left, iter = %d, x_nonzero=%g\n",hil,x_nonzero);
     if (x_nonzero <= xmax) {
       //Boundary found
       break;
@@ -3653,8 +3078,6 @@ void TransferModule::transfer_get_lmax(
   /* If not found, hunt for right boundary: */
   if (!right_boundary_checked) {
     for (multiplier = 1;; multiplier *= 5) {
-      hir++;
-      //printf("right iteration %d,index_l_right:%d\n",hir,*index_l_right);
       get_xmin_generic(sgnK, lvec[*index_l_right], nu, xtol, phiminabs, &x_nonzero, &fevals);
       if (x_nonzero >= xmax) {
         //Boundary found
@@ -3672,63 +3095,42 @@ void TransferModule::transfer_get_lmax(
       }
     }
   }
-  //  int fevalshunt=fevals;
-  fevals = 0;
-  //Do binary search
-  //  printf("Do binary search in get_lmax. \n");
-  //printf("Region: [%d, %d]\n",*index_l_left,*index_l_right);
+  /* binary search */
   while (((*index_l_right) - (*index_l_left)) > 1) {
-    bini++;
     index_l_mid = (int) (0.5 * ((*index_l_right) + (*index_l_left)));
-    //printf("left:%d, mid=%d, right=%d\n",*index_l_left,index_l_mid,*index_l_right);
     get_xmin_generic(sgnK, lvec[index_l_mid], nu, xtol, phiminabs, &x_nonzero, &fevals);
     if (x_nonzero < xmax)
       *index_l_left = index_l_mid;
     else
       *index_l_right = index_l_mid;
   }
-  //printf("Done\n");
-  /*  printf("Hunt left iter=%d, hunt right iter=%d (fevals: %d). For binary search: %d (fevals: %d)\n",
-      hil,hir,fevalshunt,bini,fevals);
-  */
 }
 
 /**
- * Here we can precompute the window functions for the final integration
- * For each type of nCl/dCl/sCl we combine the selection function
- *  with the corresponding prefactor (e.g. 1/aH), and, if required,
- *  we also integrate for integrated (lensed) contributions
- * (In the original ClassGAL paper these would be labeled g4,g5, and lens)
+ * Compute once for all the window function W(tau) of each type on its
+ * time sampling:
  *
- * All factors of k have to be added later (at least in the current version)
+ * - 1 for CMB temperature and polarisation;
+ * - the lensing kernel for the CMB lensing potential;
+ * - for number count contributions local in a bin, the selection
+ *   function combined with the corresponding prefactor (e.g. 1/aH);
+ * - for galaxy lensing and number count contributions integrated along
+ *   the line of sight (labeled lens, g4, g5 in the original CLASSgal
+ *   paper), the selection function convolved with the corresponding
+ *   kernel.
+ *
+ * Factors of k are added later, through (k/k_pivot)^k_power.
  *
  * @param tau_rec               Input: recombination time
- * @param tau_size_max          Input: maximum size that tau array can have
- * @param window                Output: pointer to array of selection functions
- * @return the error status
  */
 
-void TransferModule::transfer_precompute_selection(double tau_rec,
-                                                   int tau_size_max,
-                                                   std::vector<double>& window) {
-  /** Summary: */
+void TransferModule::transfer_precompute_windows(double tau_rec) {
+  /* conformal time today */
+  const double tau0 = background_module_->conformal_age_;
 
-  /** - define local variables */
-
-  /* index running on time */
-  int index_tau;
-
-  /* bin for computation of cl_density */
-  int bin = 0;
-
-  /* number of tau values */
-  int tau_size;
-
-  /* for calling background_at_eta */
+  /* for calling background_at_tau */
   int last_index;
-
-  /* conformal time */
-  double tau, tau0;
+  std::vector<double> pvecback(background_module_->bg_size_);
 
   /* geometrical quantities */
   double sinKgen_source         = 0.;
@@ -3736,325 +3138,285 @@ void TransferModule::transfer_precompute_selection(double tau_rec,
   double cotKgen_source         = 0.;
   double cscKgen_lens           = 0.;
 
-  /* rescaling factor depending on the background at a given time */
-  double rescaling = 0.;
-
-  /* index running on time in previous two arrays */
-  int index_tau_sources;
-
-  /* number of time values in previous two arrays */
-  int tau_sources_size;
-
   /* source evolution factor */
   double f_evo = 0.;
 
-  /* Setup initial variables and arrays*/
-  int index_md = perturbations_module_->index_md_scalars_;
+  for (int index_md = 0; index_md < md_size_; index_md++) {
+    for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
+      TransferType& type                        = types_[index_md][index_tt];
+      const TransferTimeSampling& sampling      = samplings_[index_md][type.index_ts];
+      const std::vector<double>& tau0_minus_tau = sampling.tau0_minus_tau;
+      const int tau_size                        = static_cast<int>(tau0_minus_tau.size());
+      const int bin                             = type.bin;
+      const double mag_bias       = (bin >= 0) ? ptr->selection_magnification_bias[bin] : 0.;
+      std::vector<double>& window = type.window;
 
-  /* allocate temporary arrays for storing selections, weights, times, and output; and for calling background */
-  std::vector<double> tau0_minus_tau(tau_size_max);
-  std::vector<double> selection(tau_size_max);
-  std::vector<double> w_trapz(tau_size_max);
-  window.resize(tau_size_max * tt_size_[index_md]);
-  std::vector<double> pvecback(background_module_->bg_size_);
+      window.assign(tau_size, 1.);
 
-  /* conformal time today */
-  tau0 = background_module_->conformal_age_;
+      switch (type.window_type) {
+        /* CMB temperature and polarisation: no window */
+        case TransferWindow::none:
+          break;
 
-  /* Loop through different types to be precomputed */
-  for (int index_tt = 0; index_tt < tt_size_[index_md]; index_tt++) {
-    /* First set the corresponding tau size */
-    transfer_source_tau_size(tau_rec, tau0, index_md, index_tt, &tau_size);
-
-    /* Start with non-integrated contributions */
-    if (_nonintegrated_ncl_) {
-      _get_bin_nonintegrated_ncl_(index_tt)
-
-          /* redefine the time sampling */
-          transfer_selection_sampling(bin, tau0_minus_tau.data(), tau_size);
-
-      class_test(tau0 - tau0_minus_tau[0] >
-                     perturbations_module_->tau_sampling_[perturbations_module_->tau_size_ - 1],
-                 "this should not happen, there was probably a rounding error, if this error "
-                 "occurred, then this must be coded more carefully");
-
-      /* Compute trapezoidal weights for integration over tau */
-      array_trapezoidal_mweights(tau0_minus_tau.data(), tau_size, w_trapz.data());
-
-      /* compute values of selection function at sampled values of tau */
-      transfer_selection_compute(selection.data(),
-                                 tau0_minus_tau.data(),
-                                 w_trapz.data(),
-                                 tau_size,
-                                 pvecback.data(),
-                                 tau0,
-                                 bin);
-
-      /* loop over time and rescale */
-      for (index_tau = 0; index_tau < tau_size; index_tau++) {
-        /* conformal time */
-        tau = tau0 - tau0_minus_tau[index_tau];
-
-        /* geometrical quantity */
-        switch (pba->sgnK) {
-          case 1:
-            cotKgen_source = sqrt(pba->K) * cos(tau0_minus_tau[index_tau] * sqrt(pba->K)) /
-                             sin(tau0_minus_tau[index_tau] * sqrt(pba->K));
-            break;
-          case 0:
-            cotKgen_source = 1. / (tau0_minus_tau[index_tau]);
-            break;
-          case -1:
-            cotKgen_source = sqrt(-pba->K) * cosh(tau0_minus_tau[index_tau] * sqrt(-pba->K)) /
-                             sinh(tau0_minus_tau[index_tau] * sqrt(-pba->K));
-            break;
-        }
-
-        /* corresponding background quantities */
-        background_module_->background_at_tau(tau,
-                                              pba->long_info,
-                                              pba->inter_normal,
-                                              &last_index,
-                                              pvecback.data());
-
-        /* Source evolution, used by nCl doppler and nCl gravity terms */
-
-        if ((_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd)) ||
-            (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))) {
-          transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo);
-          /* Error in old CLASS 2.6.3 : Number count evolution did not respect curvature */
-        }
-
-        /* matter density source =  [- (dz/dtau) W(z)] * delta_m(k,tau)
-           = W(tau) delta_m(k,tau)
-           with
-           delta_m = total matter perturbation (defined in gauge-independent way, see arXiv 1307.1459)
-           W(z) = redshift space selection function = dN/dz
-           W(tau) = same wrt conformal time = dN/dtau
-           (in tau = tau_0, set source = 0 to avoid division by zero;
-           regulated anyway by Bessel).
-        */
-
-        if (_index_tt_in_range_(index_tt_density_, ppt->selection_num, ppt->has_nc_density))
-          rescaling = ptr->selection_bias[bin] * selection[index_tau];
-
-        /* redshift space distortion source = - [- (dz/dtau) W(z)] * (k/H) * theta(k,tau) */
-
-        if (_index_tt_in_range_(index_tt_rsd_, ppt->selection_num, ppt->has_nc_rsd))
-          rescaling = selection[index_tau] / pvecback[background_module_->index_bg_H_] /
-                      pvecback[background_module_->index_bg_a_];
-
-        if (_index_tt_in_range_(index_tt_d0_, ppt->selection_num, ppt->has_nc_rsd))
-          rescaling = (f_evo - 3.) * selection[index_tau] *
-                      pvecback[background_module_->index_bg_H_] *
-                      pvecback[background_module_->index_bg_a_];
-
-        if (_index_tt_in_range_(index_tt_d1_, ppt->selection_num, ppt->has_nc_rsd))
-
-          rescaling = selection[index_tau] * (1. +
-                                              pvecback[background_module_->index_bg_H_prime_] /
-                                                  pvecback[background_module_->index_bg_a_] /
-                                                  pvecback[background_module_->index_bg_H_] /
-                                                  pvecback[background_module_->index_bg_H_] +
-                                              (2. - 5. * ptr->selection_magnification_bias[bin])
-                                                  // /tau0_minus_tau[index_tau] // in flat space
-                                                  * cotKgen_source  // in general case
-                                                  / pvecback[background_module_->index_bg_a_] /
-                                                  pvecback[background_module_->index_bg_H_] +
-                                              5. * ptr->selection_magnification_bias[bin] - f_evo);
-
-        if (_index_tt_in_range_(index_tt_nc_g1_, ppt->selection_num, ppt->has_nc_gr))
-
-          rescaling = selection[index_tau];
-
-        if (_index_tt_in_range_(index_tt_nc_g2_, ppt->selection_num, ppt->has_nc_gr))
-
-          rescaling = -selection[index_tau] * (3. +
-                                               pvecback[background_module_->index_bg_H_prime_] /
-                                                   pvecback[background_module_->index_bg_a_] /
-                                                   pvecback[background_module_->index_bg_H_] /
-                                                   pvecback[background_module_->index_bg_H_] +
-                                               (2. - 5. * ptr->selection_magnification_bias[bin])
-                                                   // /tau0_minus_tau[index_tau]  // in flat space
-                                                   * cotKgen_source  // in general case
-                                                   / pvecback[background_module_->index_bg_a_] /
-                                                   pvecback[background_module_->index_bg_H_] -
-                                               f_evo);
-
-        if (_index_tt_in_range_(index_tt_nc_g3_, ppt->selection_num, ppt->has_nc_gr))
-          rescaling = selection[index_tau] / pvecback[background_module_->index_bg_a_] /
-                      pvecback[background_module_->index_bg_H_];
-
-        /* finally store in array */
-        window[index_tt * tau_size_max + index_tau] = rescaling;
-      }
-    }
-    /* End non-integrated contribution */
-
-    /* Now deal with integrated contributions */
-    if (_integrated_ncl_) {
-      _get_bin_integrated_ncl_(index_tt)
-
-          /* dirac case */
-          if (ppt->selection == dirac) {
-        tau_sources_size = 1;
-      }
-      /* other cases (gaussian, tophat...) */
-      else {
-        tau_sources_size = ppr->selection_sampling;
-      }
-
-      std::vector<double> tau0_minus_tau_lensing_sources(tau_sources_size);
-
-      std::vector<double> w_trapz_lensing_sources(tau_sources_size);
-
-      /* time sampling for source selection function */
-      transfer_selection_sampling(bin, tau0_minus_tau_lensing_sources.data(), tau_sources_size);
-
-      /* Compute trapezoidal weights for integration over tau */
-      array_trapezoidal_mweights(tau0_minus_tau_lensing_sources.data(),
-                                 tau_sources_size,
-                                 w_trapz_lensing_sources.data());
-
-      /* compute values of selection function at sampled values of tau */
-      transfer_selection_compute(selection.data(),
-                                 tau0_minus_tau_lensing_sources.data(),
-                                 w_trapz_lensing_sources.data(),
-                                 tau_sources_size,
-                                 pvecback.data(),
-                                 tau0,
-                                 bin);
-
-      /* redefine the time sampling */
-      transfer_lensing_sampling(bin, tau0, tau0_minus_tau.data(), tau_size);
-
-      /* Compute trapezoidal weights for integration over tau */
-      array_trapezoidal_mweights(tau0_minus_tau.data(), tau_size, w_trapz.data());
-
-      /* loop over time and rescale */
-      for (index_tau = 0; index_tau < tau_size; index_tau++) {
         /* lensing source =  - W(tau) (phi(k,tau) + psi(k,tau)) Heaviside(tau-tau_rec)
            with
            psi,phi = metric perturbation in newtonian gauge (phi+psi = Phi_A-Phi_H of Bardeen)
            W = (tau-tau_rec)/(tau_0-tau)/(tau_0-tau_rec)
            H(x) = Heaviside
            (in tau = tau_0, set source = 0 to avoid division by zero;
-           regulated anyway by Bessel).
-        */
+           regulated anyway by Bessel). Possibly rescaled by hand by lcmb_rescale. */
+        case TransferWindow::cmb_lensing:
+          for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+            const double tau = tau0 - tau0_minus_tau[index_tau];
+            double rescaling = 0.;
+            if (index_tau < tau_size - 1) {
+              switch (pba->sgnK) {
+                case 1:
+                  rescaling = sqrt(pba->K) * sin((tau_rec - tau) * sqrt(pba->K)) /
+                              sin((tau0 - tau) * sqrt(pba->K)) /
+                              sin((tau0 - tau_rec) * sqrt(pba->K));
+                  break;
+                case 0:
+                  rescaling = (tau_rec - tau) / (tau0 - tau) / (tau0 - tau_rec);
+                  break;
+                case -1:
+                  rescaling = sqrt(-pba->K) * sinh((tau_rec - tau) * sqrt(-pba->K)) /
+                              sinh((tau0 - tau) * sqrt(-pba->K)) /
+                              sinh((tau0 - tau_rec) * sqrt(-pba->K));
+                  break;
+              }
+              // Note: until 2.4.3 there was a bug here: the curvature effects had been omitted.
+            }
+            window[index_tau] = rescaling * ptr->lcmb_rescale;
+          }
+          break;
 
-        if (index_tau == tau_size - 1) {
-          rescaling = 0.;
-        }
-        else {
-          rescaling = 0.;
+        /* number count contributions local in the bin */
+        case TransferWindow::selection: {
+          /* values of selection function at sampled values of tau */
+          std::vector<double> selection(tau_size);
+          transfer_selection_compute(selection.data(),
+                                     tau0_minus_tau.data(),
+                                     sampling.w_trapz.data(),
+                                     tau_size,
+                                     pvecback.data(),
+                                     tau0,
+                                     bin);
 
-          for (index_tau_sources = 0; index_tau_sources < tau_sources_size; index_tau_sources++) {
+          for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+            /* conformal time */
+            const double tau = tau0 - tau0_minus_tau[index_tau];
+
+            /* geometrical quantity */
             switch (pba->sgnK) {
               case 1:
-                sinKgen_source         = sin(tau0_minus_tau_lensing_sources[index_tau_sources] *
-                                             sqrt(pba->K)) /
-                                         sqrt(pba->K);
-                sinKgen_source_to_lens = sin((tau0_minus_tau[index_tau] -
-                                              tau0_minus_tau_lensing_sources[index_tau_sources]) *
-                                             sqrt(pba->K)) /
-                                         sqrt(pba->K);
-                cotKgen_source         = cos(tau0_minus_tau_lensing_sources[index_tau_sources] *
-                                             sqrt(pba->K)) /
-                                         sinKgen_source;
-                cscKgen_lens = sqrt(pba->K) / sin(sqrt(pba->K) * tau0_minus_tau[index_tau]);
+                cotKgen_source = sqrt(pba->K) * cos(tau0_minus_tau[index_tau] * sqrt(pba->K)) /
+                                 sin(tau0_minus_tau[index_tau] * sqrt(pba->K));
                 break;
               case 0:
-                sinKgen_source         = tau0_minus_tau_lensing_sources[index_tau_sources];
-                sinKgen_source_to_lens = (tau0_minus_tau[index_tau] -
-                                          tau0_minus_tau_lensing_sources[index_tau_sources]);
-                cotKgen_source         = 1. / (tau0_minus_tau_lensing_sources[index_tau_sources]);
-                cscKgen_lens           = 1. / (tau0_minus_tau[index_tau]);
+                cotKgen_source = 1. / (tau0_minus_tau[index_tau]);
                 break;
               case -1:
-                sinKgen_source         = sinh(tau0_minus_tau_lensing_sources[index_tau_sources] *
-                                              sqrt(-pba->K)) /
-                                         sqrt(-pba->K);
-                sinKgen_source_to_lens = sinh((tau0_minus_tau[index_tau] -
-                                               tau0_minus_tau_lensing_sources[index_tau_sources]) *
-                                              sqrt(-pba->K)) /
-                                         sqrt(-pba->K);
-                cotKgen_source         = cosh(tau0_minus_tau_lensing_sources[index_tau_sources] *
-                                              sqrt(-pba->K)) /
-                                         sinKgen_source;
-                cscKgen_lens = sqrt(-pba->K) / sinh(sqrt(-pba->K) * tau0_minus_tau[index_tau]);
+                cotKgen_source = sqrt(-pba->K) * cosh(tau0_minus_tau[index_tau] * sqrt(-pba->K)) /
+                                 sinh(tau0_minus_tau[index_tau] * sqrt(-pba->K));
                 break;
             }
 
-            /* condition for excluding from the sum the sources located in z=zero */
-            if ((tau0_minus_tau_lensing_sources[index_tau_sources] > 0.) &&
-                (tau0_minus_tau_lensing_sources[index_tau_sources] - tau0_minus_tau[index_tau] >
-                 0.)) {
-              if (_index_tt_in_range_(index_tt_lensing_,
-                                      ppt->selection_num,
-                                      ppt->has_cl_lensing_potential)) {
-                rescaling +=
-                    //  *(tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])
-                    //  /tau0_minus_tau[index_tau]
-                    //  /tau0_minus_tau_lensing_sources[index_tau_sources]
-                    sinKgen_source_to_lens * cscKgen_lens / sinKgen_source *
-                    selection[index_tau_sources] * w_trapz_lensing_sources[index_tau_sources];
-              }
+            /* corresponding background quantities */
+            background_module_->background_at_tau(tau,
+                                                  pba->long_info,
+                                                  pba->inter_normal,
+                                                  &last_index,
+                                                  pvecback.data());
+            const double a       = pvecback[background_module_->index_bg_a_];
+            const double H       = pvecback[background_module_->index_bg_H_];
+            const double H_prime = pvecback[background_module_->index_bg_H_prime_];
 
-              if (_index_tt_in_range_(index_tt_nc_lens_, ppt->selection_num, ppt->has_nc_lens)) {
-                rescaling -=
-                    (2. - 5. * ptr->selection_magnification_bias[bin]) /
-                    2.
-                    //  *(tau0_minus_tau[index_tau]-tau0_minus_tau_lensing_sources[index_tau_sources])
-                    //  /tau0_minus_tau[index_tau]
-                    //  /tau0_minus_tau_lensing_sources[index_tau_sources]
-                    * sinKgen_source_to_lens * cscKgen_lens / sinKgen_source *
-                    selection[index_tau_sources] * w_trapz_lensing_sources[index_tau_sources];
-              }
-
-              if (_index_tt_in_range_(index_tt_nc_g4_, ppt->selection_num, ppt->has_nc_gr)) {
-                rescaling += (2. - 5. * ptr->selection_magnification_bias[bin])
-                             // /tau0_minus_tau_lensing_sources[index_tau_sources]
-                             * cotKgen_source * selection[index_tau_sources] *
-                             w_trapz_lensing_sources[index_tau_sources];
-              }
-
-              if (_index_tt_in_range_(index_tt_nc_g5_, ppt->selection_num, ppt->has_nc_gr)) {
-                /* background quantities at time tau_lensing_source */
-
-                background_module_
-                    ->background_at_tau(tau0 - tau0_minus_tau_lensing_sources[index_tau_sources],
-                                        pba->long_info,
-                                        pba->inter_normal,
-                                        &last_index,
-                                        pvecback.data());
-
-                /* Source evolution at time tau_lensing_source */
-
-                transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo);
-
-                rescaling += (1. +
-                              pvecback[background_module_->index_bg_H_prime_] /
-                                  pvecback[background_module_->index_bg_a_] /
-                                  pvecback[background_module_->index_bg_H_] /
-                                  pvecback[background_module_->index_bg_H_] +
-                              (2. - 5. * ptr->selection_magnification_bias[bin])
-                                  //  /tau0_minus_tau_lensing_sources[index_tau_sources]
-                                  * cotKgen_source / pvecback[background_module_->index_bg_a_] /
-                                  pvecback[background_module_->index_bg_H_] +
-                              5. * ptr->selection_magnification_bias[bin] - f_evo) *
-                             selection[index_tau_sources] *
-                             w_trapz_lensing_sources[index_tau_sources];
-              }
+            /* Source evolution, used by nCl doppler and nCl gravity terms */
+            if ((type.term == TransferTerm::nc_d0) || (type.term == TransferTerm::nc_d1) ||
+                (type.term == TransferTerm::nc_g2)) {
+              transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo);
+              /* Error in old CLASS 2.6.3 : Number count evolution did not respect curvature */
             }
+
+            double rescaling = 0.;
+            switch (type.term) {
+              /* matter density source =  [- (dz/dtau) W(z)] * delta_m(k,tau)
+                 = W(tau) delta_m(k,tau)
+                 with
+                 delta_m = total matter perturbation (defined in gauge-independent way, see arXiv 1307.1459)
+                 W(z) = redshift space selection function = dN/dz
+                 W(tau) = same wrt conformal time = dN/dtau
+                 (in tau = tau_0, set source = 0 to avoid division by zero;
+                 regulated anyway by Bessel). */
+              case TransferTerm::nc_density:
+                rescaling = ptr->selection_bias[bin] * selection[index_tau];
+                break;
+              /* redshift space distortion source = - [- (dz/dtau) W(z)] * (k/H) * theta(k,tau) */
+              case TransferTerm::nc_rsd:
+                rescaling = selection[index_tau] / H / a;
+                break;
+              case TransferTerm::nc_d0:
+                rescaling = (f_evo - 3.) * selection[index_tau] * H * a;
+                break;
+              case TransferTerm::nc_d1:
+                rescaling = selection[index_tau] *
+                            (1. + H_prime / a / H / H +
+                             (2. - 5. * mag_bias)
+                                 // /tau0_minus_tau[index_tau] // in flat space
+                                 * cotKgen_source  // in general case
+                                 / a / H +
+                             5. * mag_bias - f_evo);
+                break;
+              case TransferTerm::nc_g1:
+                rescaling = selection[index_tau];
+                break;
+              case TransferTerm::nc_g2:
+                rescaling = -selection[index_tau] *
+                            (3. + H_prime / a / H / H +
+                             (2. - 5. * mag_bias)
+                                 // /tau0_minus_tau[index_tau]  // in flat space
+                                 * cotKgen_source  // in general case
+                                 / a / H -
+                             f_evo);
+                break;
+              case TransferTerm::nc_g3:
+                rescaling = selection[index_tau] / a / H;
+                break;
+              default:
+                break;
+            }
+
+            window[index_tau] = rescaling;
           }
+          break;
         }
 
-        /* Finally store integrated result for later use */
-        window[index_tt * tau_size_max + index_tau] = rescaling;
+        /* galaxy lensing and number count contributions integrated along the line of sight */
+        case TransferWindow::integrated: {
+          /* time sampling of the source selection function: evenly spaced over the bin
+             (just its centre for a Dirac selection function) */
+          const int tau_sources_size = (ppt->selection == dirac) ? 1
+                                                                 : (int) ppr->selection_sampling;
+          std::vector<double> tau0_minus_tau_lensing_sources(tau_sources_size);
+          std::vector<double> w_trapz_lensing_sources(tau_sources_size);
+          std::vector<double> selection(tau_sources_size);
+
+          if (tau_sources_size == 1) {
+            tau0_minus_tau_lensing_sources[0] = tau0 - selection_tau_mean_[bin];
+          }
+          else {
+            for (int index_tau = 0; index_tau < tau_sources_size - 1; index_tau++) {
+              tau0_minus_tau_lensing_sources[index_tau] =
+                  tau0 - selection_tau_min_[bin] -
+                  ((double) index_tau) / ((double) tau_sources_size - 1.) *
+                      (selection_tau_max_[bin] - selection_tau_min_[bin]);
+            }
+            tau0_minus_tau_lensing_sources[tau_sources_size - 1] = tau0 - selection_tau_max_[bin];
+          }
+
+          /* Compute trapezoidal weights for integration over tau */
+          array_trapezoidal_mweights(tau0_minus_tau_lensing_sources.data(),
+                                     tau_sources_size,
+                                     w_trapz_lensing_sources.data());
+
+          /* compute values of selection function at sampled values of tau */
+          transfer_selection_compute(selection.data(),
+                                     tau0_minus_tau_lensing_sources.data(),
+                                     w_trapz_lensing_sources.data(),
+                                     tau_sources_size,
+                                     pvecback.data(),
+                                     tau0,
+                                     bin);
+
+          /* loop over time and rescale */
+          for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+            /* lensing source =  - W(tau) (phi(k,tau) + psi(k,tau)) Heaviside(tau-tau_rec)
+               with
+               psi,phi = metric perturbation in newtonian gauge (phi+psi = Phi_A-Phi_H of Bardeen)
+               W = (tau-tau_rec)/(tau_0-tau)/(tau_0-tau_rec)
+               H(x) = Heaviside
+               (in tau = tau_0, set source = 0 to avoid division by zero;
+               regulated anyway by Bessel).
+            */
+            double rescaling = 0.;
+
+            if (index_tau < tau_size - 1) {
+              for (int index_tau_sources = 0; index_tau_sources < tau_sources_size;
+                   index_tau_sources++) {
+                const double t0mt_source = tau0_minus_tau_lensing_sources[index_tau_sources];
+                switch (pba->sgnK) {
+                  case 1:
+                    sinKgen_source         = sin(t0mt_source * sqrt(pba->K)) / sqrt(pba->K);
+                    sinKgen_source_to_lens = sin((tau0_minus_tau[index_tau] - t0mt_source) *
+                                                 sqrt(pba->K)) /
+                                             sqrt(pba->K);
+                    cotKgen_source         = cos(t0mt_source * sqrt(pba->K)) / sinKgen_source;
+                    cscKgen_lens = sqrt(pba->K) / sin(sqrt(pba->K) * tau0_minus_tau[index_tau]);
+                    break;
+                  case 0:
+                    sinKgen_source         = t0mt_source;
+                    sinKgen_source_to_lens = (tau0_minus_tau[index_tau] - t0mt_source);
+                    cotKgen_source         = 1. / (t0mt_source);
+                    cscKgen_lens           = 1. / (tau0_minus_tau[index_tau]);
+                    break;
+                  case -1:
+                    sinKgen_source         = sinh(t0mt_source * sqrt(-pba->K)) / sqrt(-pba->K);
+                    sinKgen_source_to_lens = sinh((tau0_minus_tau[index_tau] - t0mt_source) *
+                                                  sqrt(-pba->K)) /
+                                             sqrt(-pba->K);
+                    cotKgen_source         = cosh(t0mt_source * sqrt(-pba->K)) / sinKgen_source;
+                    cscKgen_lens = sqrt(-pba->K) / sinh(sqrt(-pba->K) * tau0_minus_tau[index_tau]);
+                    break;
+                }
+
+                /* condition for excluding from the sum the sources located in z=zero */
+                if ((t0mt_source > 0.) && (t0mt_source - tau0_minus_tau[index_tau] > 0.)) {
+                  const double sel = selection[index_tau_sources];
+                  const double w   = w_trapz_lensing_sources[index_tau_sources];
+
+                  switch (type.term) {
+                    case TransferTerm::galaxy_lensing:
+                      rescaling += sinKgen_source_to_lens * cscKgen_lens / sinKgen_source * sel * w;
+                      break;
+                    case TransferTerm::nc_lens:
+                      rescaling -= (2. - 5. * mag_bias) / 2. * sinKgen_source_to_lens *
+                                   cscKgen_lens / sinKgen_source * sel * w;
+                      break;
+                    case TransferTerm::nc_g4:
+                      rescaling += (2. - 5. * mag_bias) * cotKgen_source * sel * w;
+                      break;
+                    case TransferTerm::nc_g5: {
+                      /* background quantities and source evolution at time tau_lensing_source */
+                      background_module_->background_at_tau(tau0 - t0mt_source,
+                                                            pba->long_info,
+                                                            pba->inter_normal,
+                                                            &last_index,
+                                                            pvecback.data());
+                      transfer_f_evo(pvecback.data(), last_index, cotKgen_source, &f_evo);
+                      const double a       = pvecback[background_module_->index_bg_a_];
+                      const double H       = pvecback[background_module_->index_bg_H_];
+                      const double H_prime = pvecback[background_module_->index_bg_H_prime_];
+                      rescaling += (1. + H_prime / a / H / H +
+                                    (2. - 5. * mag_bias) * cotKgen_source / a / H + 5. * mag_bias -
+                                    f_evo) *
+                                   sel * w;
+                      break;
+                    }
+                    default:
+                      break;
+                  }
+                }
+              }
+            }
+
+            /* Finally store integrated result for later use */
+            window[index_tau] = rescaling;
+          }
+          break;
+        }
       }
     }
-    /* End integrated contribution */
   }
 }
 
