@@ -1705,6 +1705,23 @@ class TestReviewRegressions(TestClass):
         self.cosmo.compute()
         self.assertIn('mTk', self.cosmo.pars['output'])
 
+    def test_lensed_polarisation_without_temperature(self):
+        """output = pCl,lCl with lensing is a documented combination. lensing_init()
+        used to read the unlensed TT spectrum through an index that is only set when
+        TT is computed (AddressSanitizer: BUS at lensing_module.cpp). Lensed EE, BB
+        and phiphi do not depend on TT, so they must equal those of tCl,pCl,lCl."""
+        spectra = {}
+        for output in ('tCl,pCl,lCl', 'pCl,lCl'):
+            self.cosmo.set(dict(self.verbose, output=output, lensing='yes', l_max_scalars=1500))
+            self.cosmo.compute()
+            spectra[output] = self.cosmo.lensed_cl(1500)
+            self.cosmo.struct_cleanup()
+            self.cosmo.empty()
+        reference, candidate = spectra['tCl,pCl,lCl'], spectra['pCl,lCl']
+        self.assertNotIn('tt', candidate)
+        for key in ('ee', 'bb', 'pp'):
+            np.testing.assert_allclose(candidate[key], reference[key], rtol=1e-12, atol=0., err_msg=key)
+
     def test_retired_hyrec_file_parameters_are_rejected(self):
         """HYREC-2 takes one directory, so the three per-file paths are gone. A
         user who set them should hear about it rather than be ignored."""

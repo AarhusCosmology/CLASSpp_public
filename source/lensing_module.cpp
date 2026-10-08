@@ -227,7 +227,10 @@ void LensingModule::lensing_init() {
 
   for (int l = 2; l <= l_unlensed_max_; l++) {
     spectra_module_->spectra_cl_at_l(l, cl_unlensed.data(), cl_md.data(), cl_md_ic.data());
-    cl_tt[l] = cl_unlensed[index_lt_tt_];
+    /* lensed EE and BB can be requested without TT (output = pCl,lCl): index_lt_tt_ is then unset */
+    if (has_tt_) {
+      cl_tt[l] = cl_unlensed[index_lt_tt_];
+    }
     cl_pp[l] = cl_unlensed[index_lt_pp_];
     if (has_te_) {
       cl_te[l] = cl_unlensed[index_lt_te_];
