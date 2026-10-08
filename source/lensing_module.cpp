@@ -136,13 +136,6 @@ void LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
 
 void LensingModule::lensing_init() {
   /** Summary: */
-  /** - Define local variables */
-
-  double* sqrt1;
-  double* sqrt2;
-  double* sqrt3;
-  double* sqrt4;
-  double* sqrt5;
 
   /** - check that we really want to compute at least one spectrum */
 
@@ -200,128 +193,8 @@ void LensingModule::lensing_init() {
     }
   }
 
-  /** - Compute \f$ d^l_{mm'} (\mu) \f$*/
-
-  int icount = 0;
-  std::vector<double*> d00(num_mu);
-  std::vector<double*> d11(num_mu);
-  std::vector<double*> d1m1(num_mu);
-  std::vector<double*> d2m2(num_mu);
-  icount += 4 * num_mu * (l_unlensed_max_ + 1);
-
-  std::vector<double*> d20, d3m1, d4m2;
-  if (has_te_) {
-    d20.resize(num_mu);
-    d3m1.resize(num_mu);
-    d4m2.resize(num_mu);
-    icount += 3 * num_mu * (l_unlensed_max_ + 1);
-  }
-
-  std::vector<double*> d22, d31, d3m3, d40, d4m4;
-  if (has_ee_ || has_bb_) {
-    d22.resize(num_mu);
-    d31.resize(num_mu);
-    d3m3.resize(num_mu);
-    d40.resize(num_mu);
-    d4m4.resize(num_mu);
-    icount += 5 * num_mu * (l_unlensed_max_ + 1);
-  }
-
-  icount += 5 * (l_unlensed_max_ + 1); /* for arrays sqrt1[l] to sqrt5[l] */
-
-  /** - Allocate main contiguous buffer **/
-  std::vector<double> buf_dxx(icount);
-
-  icount = 0;
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d00[index_mu]  = &(buf_dxx[icount + (index_mu + 0 * num_mu) * (l_unlensed_max_ + 1)]);
-    d11[index_mu]  = &(buf_dxx[icount + (index_mu + 1 * num_mu) * (l_unlensed_max_ + 1)]);
-    d1m1[index_mu] = &(buf_dxx[icount + (index_mu + 2 * num_mu) * (l_unlensed_max_ + 1)]);
-    d2m2[index_mu] = &(buf_dxx[icount + (index_mu + 3 * num_mu) * (l_unlensed_max_ + 1)]);
-  }
-  icount += 4 * num_mu * (l_unlensed_max_ + 1);
-
-  if (has_te_) {
-    for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-      d20[index_mu]  = &(buf_dxx[icount + (index_mu + 0 * num_mu) * (l_unlensed_max_ + 1)]);
-      d3m1[index_mu] = &(buf_dxx[icount + (index_mu + 1 * num_mu) * (l_unlensed_max_ + 1)]);
-      d4m2[index_mu] = &(buf_dxx[icount + (index_mu + 2 * num_mu) * (l_unlensed_max_ + 1)]);
-    }
-    icount += 3 * num_mu * (l_unlensed_max_ + 1);
-  }
-
-  if (has_ee_ || has_bb_) {
-    for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-      d22[index_mu]  = &(buf_dxx[icount + (index_mu + 0 * num_mu) * (l_unlensed_max_ + 1)]);
-      d31[index_mu]  = &(buf_dxx[icount + (index_mu + 1 * num_mu) * (l_unlensed_max_ + 1)]);
-      d3m3[index_mu] = &(buf_dxx[icount + (index_mu + 2 * num_mu) * (l_unlensed_max_ + 1)]);
-      d40[index_mu]  = &(buf_dxx[icount + (index_mu + 3 * num_mu) * (l_unlensed_max_ + 1)]);
-      d4m4[index_mu] = &(buf_dxx[icount + (index_mu + 4 * num_mu) * (l_unlensed_max_ + 1)]);
-    }
-    icount += 5 * num_mu * (l_unlensed_max_ + 1);
-  }
-
-  sqrt1   = &(buf_dxx[icount]);
-  icount += l_unlensed_max_ + 1;
-  sqrt2   = &(buf_dxx[icount]);
-  icount += l_unlensed_max_ + 1;
-  sqrt3   = &(buf_dxx[icount]);
-  icount += l_unlensed_max_ + 1;
-  sqrt4   = &(buf_dxx[icount]);
-  icount += l_unlensed_max_ + 1;
-  sqrt5   = &(buf_dxx[icount]);
-  Tools::TaskSystem task_system(pba->number_of_threads);
-  std::vector<std::future<void>> dXX_tasks;
-
-  dXX_tasks.push_back(task_system.AsyncTask(
-      [&]() { return lensing_d00(mu.data(), num_mu, l_unlensed_max_, d00.data()); }));
-
-  dXX_tasks.push_back(task_system.AsyncTask(
-      [&]() { return lensing_d11(mu.data(), num_mu, l_unlensed_max_, d11.data()); }));
-
-  dXX_tasks.push_back(task_system.AsyncTask(
-      [&]() { return lensing_d1m1(mu.data(), num_mu, l_unlensed_max_, d1m1.data()); }));
-
-  dXX_tasks.push_back(task_system.AsyncTask(
-      [&]() { return lensing_d2m2(mu.data(), num_mu, l_unlensed_max_, d2m2.data()); }));
-
-  if (has_te_) {
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d20(mu.data(), num_mu, l_unlensed_max_, d20.data()); }));
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d3m1(mu.data(), num_mu, l_unlensed_max_, d3m1.data()); }));
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d4m2(mu.data(), num_mu, l_unlensed_max_, d4m2.data()); }));
-  }
-
-  if (has_ee_ || has_bb_) {
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d22(mu.data(), num_mu, l_unlensed_max_, d22.data()); }));
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d31(mu.data(), num_mu, l_unlensed_max_, d31.data()); }));
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d3m3(mu.data(), num_mu, l_unlensed_max_, d3m3.data()); }));
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d40(mu.data(), num_mu, l_unlensed_max_, d40.data()); }));
-    dXX_tasks.push_back(task_system.AsyncTask(
-        [&]() { return lensing_d4m4(mu.data(), num_mu, l_unlensed_max_, d4m4.data()); }));
-  }
-
-  for (auto& task : dXX_tasks) {
-    task.get();
-  }
-
-  /** - compute \f$ Cgl(\mu)\f$, \f$ Cgl2(\mu) \f$ and sigma2(\f$\mu\f$) */
-
-  std::vector<double> Cgl(num_mu);
-
-  std::vector<double> Cgl2(num_mu);
-
-  std::vector<double> sigma2(num_mu - 1);
-
-  std::vector<double> cl_unlensed(spectra_module_->ct_size_);
-
   /** - Locally store unlensed temperature \f$ cl_{tt}\f$ and potential \f$ cl_{pp}\f$ spectra **/
+  std::vector<double> cl_unlensed(spectra_module_->ct_size_);
   std::vector<double> cl_tt(l_unlensed_max_ + 1);
   std::vector<double> cl_te;
   if (has_te_) {
@@ -365,47 +238,8 @@ void LensingModule::lensing_init() {
     }
   }
 
-  /** - Compute sigma2\f$(\mu)\f$ and Cgl2(\f$\mu\f$) **/
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    Cgl[index_mu]  = 0;
-    Cgl2[index_mu] = 0;
-
-    for (int l = 2; l <= l_unlensed_max_; l++) {
-      Cgl[index_mu] += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d11[index_mu][l];
-
-      Cgl2[index_mu] += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d1m1[index_mu][l];
-    }
-
-    Cgl[index_mu]  /= 4. * _PI_;
-    Cgl2[index_mu] /= 4. * _PI_;
-  }
-
-  for (int index_mu = 0; index_mu < num_mu - 1; index_mu++) {
-    /* Cgl(1.0) - Cgl(mu) */
-    sigma2[index_mu] = Cgl[num_mu - 1] - Cgl[index_mu];
-  }
-
-  /** - compute ksi, ksi+, ksi-, ksiX */
-
-  /** - --> ksi is for TT **/
-  std::vector<double> ksi;
-  if (has_tt_) {
-    ksi.assign(num_mu - 1, 0.0);
-  }
-
-  /** - --> ksiX is for TE **/
-  std::vector<double> ksiX;
-  if (has_te_) {
-    ksiX.assign(num_mu - 1, 0.0);
-  }
-
-  /** - --> ksip, ksim for EE, BB **/
-  std::vector<double> ksip, ksim;
-  if (has_ee_ || has_bb_) {
-    ksip.assign(num_mu - 1, 0.0);
-    ksim.assign(num_mu - 1, 0.0);
-  }
-
+  std::vector<double> sqrt1(l_unlensed_max_ + 1), sqrt2(l_unlensed_max_ + 1),
+      sqrt3(l_unlensed_max_ + 1), sqrt4(l_unlensed_max_ + 1), sqrt5(l_unlensed_max_ + 1);
   for (int l = 2; l <= l_unlensed_max_; l++) {
     double ll = (double) l;
     sqrt1[l]  = sqrt((ll + 2) * (ll + 1) * ll * (ll - 1));
@@ -415,127 +249,279 @@ void LensingModule::lensing_init() {
     sqrt5[l]  = sqrt(ll * (ll + 1));
   }
 
-  for (int index_mu = 0; index_mu < num_mu - 1; index_mu++) {
+  /** - \f$ Cgl(\mu=1) \f$, the point sigma2\f$(\mu)\f$ = Cgl(1) - Cgl(\f$\mu\f$) is measured from */
+  double Cgl_at_1 = 0.;
+  {
+    std::vector<double> d11_row(l_unlensed_max_ + 1);
+    double* d11_ptr = d11_row.data();
+    lensing_d11(&mu[num_mu - 1], 1, l_unlensed_max_, &d11_ptr);
     for (int l = 2; l <= l_unlensed_max_; l++) {
-      double ll = (double) l;
+      Cgl_at_1 += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d11_row[l];
+    }
+    Cgl_at_1 /= 4. * _PI_;
+  }
 
-      double fac  = ll * (ll + 1) / 4.;
-      double fac1 = (2 * ll + 1) / (4. * _PI_);
+  /** - Lensed correlation functions and their transform back to multipoles, streamed over \f$ \mu \f$.
 
-      /* In the following we will keep terms of the form (sigma2)^k*(Cgl2)^m
-         with k+m <= 2 */
+      Both steps need every Wigner \f$ d^l_{mm'}(\mu) \f$ at every node and multipole, for up to
+      twelve (m,m') pairs. Tabulated all at once that is 12 x num_mu x l_max doubles -- 12 GB at
+      the l_max ~ 11000 a high-l CMB likelihood needs, with accurate_lensing's num_mu ~ l_max --
+      and the transform then read it with a stride of a whole row, one cache miss per term. Neither
+      step needs more than one node at a time, so the nodes are cut into chunks of fixed size:
+      a task tabulates the d-functions of its chunk only, forms the correlation functions there,
+      and adds the chunk's share of the Gauss-Legendre (or Riemann) sum into that chunk's own row
+      of partial sums. The partial sums are then added in chunk order. Chunks, not threads, are
+      the unit of summation, so the result does not depend on the number of threads. */
 
-      double X_000  = exp(-fac * sigma2[index_mu]);
-      double X_p000 = -fac * X_000;
-      /* X_220 = 0.25*sqrt1[l] * exp(-(fac-0.5)*sigma2[index_mu]); */
-      double X_220 = 0.25 * sqrt1[l] * X_000; /* Order 0 */
-      /* next 5 lines useless, but avoid compiler warning 'may be used uninitialized' */
-      double X_242  = 0.;
-      double X_132  = 0.;
-      double X_121  = 0.;
-      double X_p022 = 0.;
-      double X_022  = 0.;
+  const int num_nodes  = num_mu - 1; /* the last mu (=1) only serves Cgl_at_1 */
+  const int chunk_size = 32;
+  const int num_chunks = (num_nodes + chunk_size - 1) / chunk_size;
+  const int row_size   = l_unlensed_max_ + 1;
 
-      if (has_te_ || has_ee_ || has_bb_) {
-        /* X_022 = exp(-(fac-1.)*sigma2[index_mu]); */
-        X_022  = X_000 * (1 + sigma2[index_mu] * (1 + 0.5 * sigma2[index_mu])); /* Order 2 */
-        X_p022 = -(fac - 1.) * X_022; /* Old versions were missing the
-        minus sign in this line, which introduced a very small error
-        on the high-l C_l^TE lensed spectrum [credits for bug fix:
-        Selim Hotinli] */
+  std::vector<double> partial_tt, partial_te, partial_p, partial_m;
+  if (has_tt_) {
+    partial_tt.assign((size_t) num_chunks * l_size_, 0.0);
+  }
+  if (has_te_) {
+    partial_te.assign((size_t) num_chunks * l_size_, 0.0);
+  }
+  if (has_ee_ || has_bb_) {
+    partial_p.assign((size_t) num_chunks * l_size_, 0.0);
+    partial_m.assign((size_t) num_chunks * l_size_, 0.0);
+  }
 
-        /* X_242 = 0.25*sqrt4[l] * exp(-(fac-5./2.)*sigma2[index_mu]); */
-        X_242 = 0.25 * sqrt4[l] * X_000; /* Order 0 */
-        if (has_ee_ || has_bb_) {
-          /* X_121 = - 0.5*sqrt2[l] * exp(-(fac-2./3.)*sigma2[index_mu]);
-             X_132 = - 0.5*sqrt3[l] * exp(-(fac-5./3.)*sigma2[index_mu]); */
-          X_121 = -0.5 * sqrt2[l] * X_000 * (1 + 2. / 3. * sigma2[index_mu]); /* Order 1 */
-          X_132 = -0.5 * sqrt3[l] * X_000 * (1 + 5. / 3. * sigma2[index_mu]); /* Order 1 */
-        }
+  const int num_d = 4 + (has_te_ ? 3 : 0) + ((has_ee_ || has_bb_) ? 5 : 0);
+
+  /* One task per thread, each walking its own stride of chunks with one reused buffer. */
+  auto process_chunks = [&](int first_chunk, int stride) {
+    std::vector<double> buf((size_t) num_d * chunk_size * row_size);
+    int next_d = 0;
+    auto rows  = [&]() {
+      std::vector<double*> row_ptrs(chunk_size);
+      for (int j = 0; j < chunk_size; j++) {
+        row_ptrs[j] = &buf[((size_t) next_d * chunk_size + j) * row_size];
       }
+      next_d++;
+      return row_ptrs;
+    };
+    std::vector<double*> d00 = rows(), d11 = rows(), d1m1 = rows(), d2m2 = rows();
+    std::vector<double*> d20, d3m1, d4m2, d22, d31, d3m3, d40, d4m4;
+    if (has_te_) {
+      d20  = rows();
+      d3m1 = rows();
+      d4m2 = rows();
+    }
+    if (has_ee_ || has_bb_) {
+      d22  = rows();
+      d31  = rows();
+      d3m3 = rows();
+      d40  = rows();
+      d4m4 = rows();
+    }
 
-      if (has_tt_) {
-        double res = fac1 * cl_tt[l];
+    for (int index_chunk = first_chunk; index_chunk < num_chunks; index_chunk += stride) {
+      const int mu_first = index_chunk * chunk_size;
+      const int n        = std::min(chunk_size, num_nodes - mu_first);
+      double* mu_chunk   = &mu[mu_first];
 
-        double lens = (X_000 * X_000 * d00[index_mu][l] +
-                       X_p000 * X_p000 * d1m1[index_mu][l] * Cgl2[index_mu] * 8. / (ll * (ll + 1)) +
-                       (X_p000 * X_p000 * d00[index_mu][l] + X_220 * X_220 * d2m2[index_mu][l]) *
-                           Cgl2[index_mu] * Cgl2[index_mu]);
-        if (!ppr->accurate_lensing) {
-          /* Remove unlensed correlation function */
-          lens -= d00[index_mu][l];
-        }
-        res           *= lens;
-        ksi[index_mu] += res;
-      }
-
+      /** - --> Wigner d-functions of this chunk, computed by recurrence in l */
+      lensing_d00(mu_chunk, n, l_unlensed_max_, d00.data());
+      lensing_d11(mu_chunk, n, l_unlensed_max_, d11.data());
+      lensing_d1m1(mu_chunk, n, l_unlensed_max_, d1m1.data());
+      lensing_d2m2(mu_chunk, n, l_unlensed_max_, d2m2.data());
       if (has_te_) {
-        double resX = fac1 * cl_te[l];
-
-        double lens = (X_022 * X_000 * d20[index_mu][l] +
-                       Cgl2[index_mu] * 2. * X_p000 / sqrt5[l] *
-                           (X_121 * d11[index_mu][l] + X_132 * d3m1[index_mu][l]) +
-                       0.5 * Cgl2[index_mu] * Cgl2[index_mu] *
-                           ((2. * X_p022 * X_p000 + X_220 * X_220) * d20[index_mu][l] +
-                            X_220 * X_242 * d4m2[index_mu][l]));
-        if (!ppr->accurate_lensing) {
-          lens -= d20[index_mu][l];
-        }
-        resX           *= lens;
-        ksiX[index_mu] += resX;
+        lensing_d20(mu_chunk, n, l_unlensed_max_, d20.data());
+        lensing_d3m1(mu_chunk, n, l_unlensed_max_, d3m1.data());
+        lensing_d4m2(mu_chunk, n, l_unlensed_max_, d4m2.data());
       }
-
       if (has_ee_ || has_bb_) {
-        double resp = fac1 * (cl_ee[l] + cl_bb[l]);
-        double resm = fac1 * (cl_ee[l] - cl_bb[l]);
-
-        double lensp =
-            (X_022 * X_022 * d22[index_mu][l] +
-             2. * Cgl2[index_mu] * X_132 * X_121 * d31[index_mu][l] +
-             Cgl2[index_mu] * Cgl2[index_mu] *
-                 (X_p022 * X_p022 * d22[index_mu][l] + X_242 * X_220 * d40[index_mu][l]));
-
-        double lensm = (X_022 * X_022 * d2m2[index_mu][l] +
-                        Cgl2[index_mu] * (X_121 * X_121 * d1m1[index_mu][l] +
-                                          X_132 * X_132 * d3m3[index_mu][l]) +
-                        0.5 * Cgl2[index_mu] * Cgl2[index_mu] *
-                            (2. * X_p022 * X_p022 * d2m2[index_mu][l] +
-                             X_220 * X_220 * d00[index_mu][l] + X_242 * X_242 * d4m4[index_mu][l]));
-        if (!ppr->accurate_lensing) {
-          lensp -= d22[index_mu][l];
-          lensm -= d2m2[index_mu][l];
-        }
-        resp           *= lensp;
-        resm           *= lensm;
-        ksip[index_mu] += resp;
-        ksim[index_mu] += resm;
+        lensing_d22(mu_chunk, n, l_unlensed_max_, d22.data());
+        lensing_d31(mu_chunk, n, l_unlensed_max_, d31.data());
+        lensing_d3m3(mu_chunk, n, l_unlensed_max_, d3m3.data());
+        lensing_d40(mu_chunk, n, l_unlensed_max_, d40.data());
+        lensing_d4m4(mu_chunk, n, l_unlensed_max_, d4m4.data());
       }
+
+      for (int j = 0; j < n; j++) {
+        const int index_mu = mu_first + j;
+
+        /** - --> Cgl(\f$\mu\f$), Cgl2(\f$\mu\f$) and sigma2(\f$\mu\f$) */
+        double Cgl  = 0.;
+        double Cgl2 = 0.;
+        for (int l = 2; l <= l_unlensed_max_; l++) {
+          Cgl  += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d11[j][l];
+          Cgl2 += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d1m1[j][l];
+        }
+        Cgl  /= 4. * _PI_;
+        Cgl2 /= 4. * _PI_;
+
+        const double sigma2 = Cgl_at_1 - Cgl;
+
+        /** - --> ksi (TT), ksiX (TE), ksip and ksim (EE, BB) at this node */
+        double ksi  = 0.;
+        double ksiX = 0.;
+        double ksip = 0.;
+        double ksim = 0.;
+
+        for (int l = 2; l <= l_unlensed_max_; l++) {
+          double ll = (double) l;
+
+          double fac  = ll * (ll + 1) / 4.;
+          double fac1 = (2 * ll + 1) / (4. * _PI_);
+
+          /* In the following we will keep terms of the form (sigma2)^k*(Cgl2)^m
+             with k+m <= 2 */
+
+          double X_000  = exp(-fac * sigma2);
+          double X_p000 = -fac * X_000;
+          /* X_220 = 0.25*sqrt1[l] * exp(-(fac-0.5)*sigma2); */
+          double X_220 = 0.25 * sqrt1[l] * X_000; /* Order 0 */
+          /* next 5 lines useless, but avoid compiler warning 'may be used uninitialized' */
+          double X_242  = 0.;
+          double X_132  = 0.;
+          double X_121  = 0.;
+          double X_p022 = 0.;
+          double X_022  = 0.;
+
+          if (has_te_ || has_ee_ || has_bb_) {
+            /* X_022 = exp(-(fac-1.)*sigma2); */
+            X_022  = X_000 * (1 + sigma2 * (1 + 0.5 * sigma2)); /* Order 2 */
+            X_p022 = -(fac - 1.) * X_022;                       /* Old versions were missing the
+            minus sign in this line, which introduced a very small error
+            on the high-l C_l^TE lensed spectrum [credits for bug fix:
+            Selim Hotinli] */
+
+            /* X_242 = 0.25*sqrt4[l] * exp(-(fac-5./2.)*sigma2); */
+            X_242 = 0.25 * sqrt4[l] * X_000; /* Order 0 */
+            if (has_ee_ || has_bb_) {
+              /* X_121 = - 0.5*sqrt2[l] * exp(-(fac-2./3.)*sigma2);
+                 X_132 = - 0.5*sqrt3[l] * exp(-(fac-5./3.)*sigma2); */
+              X_121 = -0.5 * sqrt2[l] * X_000 * (1 + 2. / 3. * sigma2); /* Order 1 */
+              X_132 = -0.5 * sqrt3[l] * X_000 * (1 + 5. / 3. * sigma2); /* Order 1 */
+            }
+          }
+
+          if (has_tt_) {
+            double res = fac1 * cl_tt[l];
+
+            double lens = (X_000 * X_000 * d00[j][l] +
+                           X_p000 * X_p000 * d1m1[j][l] * Cgl2 * 8. / (ll * (ll + 1)) +
+                           (X_p000 * X_p000 * d00[j][l] + X_220 * X_220 * d2m2[j][l]) * Cgl2 *
+                               Cgl2);
+            if (!ppr->accurate_lensing) {
+              /* Remove unlensed correlation function */
+              lens -= d00[j][l];
+            }
+            res *= lens;
+            ksi += res;
+          }
+
+          if (has_te_) {
+            double resX = fac1 * cl_te[l];
+
+            double lens = (X_022 * X_000 * d20[j][l] +
+                           Cgl2 * 2. * X_p000 / sqrt5[l] *
+                               (X_121 * d11[j][l] + X_132 * d3m1[j][l]) +
+                           0.5 * Cgl2 * Cgl2 *
+                               ((2. * X_p022 * X_p000 + X_220 * X_220) * d20[j][l] +
+                                X_220 * X_242 * d4m2[j][l]));
+            if (!ppr->accurate_lensing) {
+              lens -= d20[j][l];
+            }
+            resX *= lens;
+            ksiX += resX;
+          }
+
+          if (has_ee_ || has_bb_) {
+            double resp = fac1 * (cl_ee[l] + cl_bb[l]);
+            double resm = fac1 * (cl_ee[l] - cl_bb[l]);
+
+            double lensp = (X_022 * X_022 * d22[j][l] + 2. * Cgl2 * X_132 * X_121 * d31[j][l] +
+                            Cgl2 * Cgl2 *
+                                (X_p022 * X_p022 * d22[j][l] + X_242 * X_220 * d40[j][l]));
+
+            double lensm = (X_022 * X_022 * d2m2[j][l] +
+                            Cgl2 * (X_121 * X_121 * d1m1[j][l] + X_132 * X_132 * d3m3[j][l]) +
+                            0.5 * Cgl2 * Cgl2 *
+                                (2. * X_p022 * X_p022 * d2m2[j][l] + X_220 * X_220 * d00[j][l] +
+                                 X_242 * X_242 * d4m4[j][l]));
+            if (!ppr->accurate_lensing) {
+              lensp -= d22[j][l];
+              lensm -= d2m2[j][l];
+            }
+            resp *= lensp;
+            resm *= lensm;
+            ksip += resp;
+            ksim += resm;
+          }
+        }
+
+        /** - --> this node's share of the transform back to the lensed \f$ C_l\f$'s */
+        const size_t offset = (size_t) index_chunk * l_size_;
+        for (int index_l = 0; index_l < l_size_; index_l++) {
+          const int l = (int) l_[index_l];
+          if (has_tt_) {
+            partial_tt[offset + index_l] += ksi * d00[j][l] * w8[index_mu];
+          }
+          if (has_te_) {
+            partial_te[offset + index_l] += ksiX * d20[j][l] * w8[index_mu];
+          }
+          if (has_ee_ || has_bb_) {
+            partial_p[offset + index_l] += ksip * d22[j][l] * w8[index_mu];
+            partial_m[offset + index_l] += ksim * d2m2[j][l] * w8[index_mu];
+          }
+        }
+      }
+    }
+  };
+
+  const int num_tasks = std::max(1, std::min((int) pba->number_of_threads, num_chunks));
+  Tools::TaskSystem task_system(num_tasks);
+  std::vector<std::future<void>> tasks;
+  for (int index_task = 0; index_task < num_tasks; index_task++) {
+    tasks.push_back(
+        task_system.AsyncTask([&, index_task]() { process_chunks(index_task, num_tasks); }));
+  }
+  for (auto& task : tasks) {
+    task.get();
+  }
+
+  /** - compute lensed \f$ C_l\f$'s by adding up the chunks' partial sums, in chunk order */
+  for (int index_l = 0; index_l < l_size_; index_l++) {
+    double cltt = 0., clte = 0., clp = 0., clm = 0.;
+    for (int index_chunk = 0; index_chunk < num_chunks; index_chunk++) {
+      const size_t index = (size_t) index_chunk * l_size_ + index_l;
+      if (has_tt_) {
+        cltt += partial_tt[index];
+      }
+      if (has_te_) {
+        clte += partial_te[index];
+      }
+      if (has_ee_ || has_bb_) {
+        clp += partial_p[index];
+        clm += partial_m[index];
+      }
+    }
+    if (has_tt_) {
+      cl_lens_[index_l * lt_size_ + index_lt_tt_] = cltt * 2.0 * _PI_;
+    }
+    if (has_te_) {
+      cl_lens_[index_l * lt_size_ + index_lt_te_] = clte * 2.0 * _PI_;
+    }
+    if (has_ee_ || has_bb_) {
+      cl_lens_[index_l * lt_size_ + index_lt_ee_] = (clp + clm) * _PI_;
+      cl_lens_[index_l * lt_size_ + index_lt_bb_] = (clp - clm) * _PI_;
     }
   }
 
-  /** - compute lensed \f$ C_l\f$'s by integration */
-  if (has_tt_) {
-    lensing_lensed_cl_tt(ksi.data(), d00.data(), w8.data(), num_mu - 1);
-    if (!ppr->accurate_lensing) {
+  if (!ppr->accurate_lensing) {
+    if (has_tt_) {
       lensing_addback_cl_tt(cl_tt.data());
     }
-  }
-
-  if (has_te_) {
-    lensing_lensed_cl_te(ksiX.data(), d20.data(), w8.data(), num_mu - 1);
-    if (!ppr->accurate_lensing) {
+    if (has_te_) {
       lensing_addback_cl_te(cl_te.data());
     }
-  }
-
-  if (has_ee_ || has_bb_) {
-    lensing_lensed_cl_ee_bb(ksip.data(),
-                            ksim.data(),
-                            d22.data(),
-                            d2m2.data(),
-                            w8.data(),
-                            num_mu - 1);
-    if (!ppr->accurate_lensing) {
+    if (has_ee_ || has_bb_) {
       lensing_addback_cl_ee_bb(cl_ee.data(), cl_bb.data());
     }
   }
@@ -722,28 +708,6 @@ void LensingModule::lensing_indices() {
 }
 
 /**
- * This routine computes the lensed power spectra by Gaussian quadrature
- *
- * @param ksi  Input: Lensed correlation function (ksi[index_mu])
- * @param d00  Input: Legendre polynomials (\f$ d^l_{00}\f$[l][index_mu])
- * @param w8   Input: Legendre quadrature weights (w8[index_mu])
- * @param nmu  Input: Number of quadrature points (0<=index_mu<=nmu)
- * @return the error status
- */
-
-void LensingModule::lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, int nmu) {
-  /** Integration by Gauss-Legendre quadrature. **/
-
-  for (int index_l = 0; index_l < l_size_; index_l++) {
-    double cle = 0;
-    for (int imu = 0; imu < nmu; imu++) {
-      cle += ksi[imu] * d00[imu][(int) l_[index_l]] * w8[imu]; /* loop could be optimized */
-    }
-    cl_lens_[index_l * lt_size_ + index_lt_tt_] = cle * 2.0 * _PI_;
-  }
-}
-
-/**
  * This routine adds back the unlensed \f$ cl_{tt}\f$ power spectrum
  * Used in case of fast (and BB inaccurate) integration of
  * correlation functions.
@@ -755,28 +719,6 @@ void LensingModule::lensing_addback_cl_tt(double* cl_tt) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = (int) l_[index_l];
     cl_lens_[index_l * lt_size_ + index_lt_tt_] += cl_tt[l];
-  }
-}
-
-/**
- * This routine computes the lensed power spectra by Gaussian quadrature
- *
- * @param ksiX Input: Lensed correlation function (ksiX[index_mu])
- * @param d20  Input: Wigner d-function (\f$ d^l_{20}\f$[l][index_mu])
- * @param w8   Input: Legendre quadrature weights (w8[index_mu])
- * @param nmu  Input: Number of quadrature points (0<=index_mu<=nmu)
- * @return the error status
- */
-
-void LensingModule::lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, int nmu) {
-  /** Integration by Gauss-Legendre quadrature. **/
-
-  for (int index_l = 0; index_l < l_size_; index_l++) {
-    double clte = 0;
-    for (int imu = 0; imu < nmu; imu++) {
-      clte += ksiX[imu] * d20[imu][(int) l_[index_l]] * w8[imu]; /* loop could be optimized */
-    }
-    cl_lens_[index_l * lt_size_ + index_lt_te_] = clte * 2.0 * _PI_;
   }
 }
 
@@ -793,33 +735,6 @@ void LensingModule::lensing_addback_cl_te(double* cl_te) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = (int) l_[index_l];
     cl_lens_[index_l * lt_size_ + index_lt_te_] += cl_te[l];
-  }
-}
-
-/**
- * This routine computes the lensed power spectra by Gaussian quadrature
- *
- * @param ksip Input: Lensed correlation function (ksi+[index_mu])
- * @param ksim Input: Lensed correlation function (ksi-[index_mu])
- * @param d22  Input: Wigner d-function (\f$ d^l_{22}\f$[l][index_mu])
- * @param d2m2 Input: Wigner d-function (\f$ d^l_{2-2}\f$[l][index_mu])
- * @param w8   Input: Legendre quadrature weights (w8[index_mu])
- * @param nmu  Input: Number of quadrature points (0<=index_mu<=nmu)
- * @return the error status
- */
-
-void LensingModule::lensing_lensed_cl_ee_bb(
-    double* ksip, double* ksim, double** d22, double** d2m2, double* w8, int nmu) {
-  /** Integration by Gauss-Legendre quadrature. **/
-
-  for (int index_l = 0; index_l < l_size_; index_l++) {
-    double clp = 0, clm = 0;
-    for (int imu = 0; imu < nmu; imu++) {
-      clp += ksip[imu] * d22[imu][(int) l_[index_l]] * w8[imu];  /* loop could be optimized */
-      clm += ksim[imu] * d2m2[imu][(int) l_[index_l]] * w8[imu]; /* loop could be optimized */
-    }
-    cl_lens_[index_l * lt_size_ + index_lt_ee_] = (clp + clm) * _PI_;
-    cl_lens_[index_l * lt_size_ + index_lt_bb_] = (clp - clm) * _PI_;
   }
 }
 

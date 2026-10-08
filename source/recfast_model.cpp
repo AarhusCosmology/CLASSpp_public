@@ -197,6 +197,27 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
                                               CfHe_t / (Hz * (1. + z));
 
     /* end of new recfast 1.4 piece */
+
+    /* CAMB 2's He I rate correction (Lewis, arXiv:2607.14854, 'Recombination model and
+       calibration'; constants from CAMB's recfast.f90): CosmoRec's explicit helium radiative transfer does more than one overall
+       recfast_fudge_He can represent, so the total dx_He/dz is scaled by a rational function
+       of the photon temperature, fitted together with the recfast_calibration = cosmorec
+       constants. As in CAMB it acts only while the helium corrections run (1e-8 <= x_He <= 0.98)
+       and over 1500 < z_scale < 3000, z_scale being the redshift at which a 2.7255 K sky would
+       have today's photon temperature. That temperature is divided by TemperatureRescale()
+       like every other one here, so under varying constants the correction follows He I
+       recombination to where it moved. */
+    if (ppr_->recfast_He_rate_correction && helium_corrections && (x_He >= 1.e-8) &&
+        (x_He <= 0.98)) {
+      const double z_scale = state.T_rad / constants.TemperatureRescale() / 2.7255 - 1.;
+      if ((z_scale > 1500.) && (z_scale < 3000.)) {
+        const double u   = (z_scale - 1968.1134791219417) / 774.0312440582285;
+        const double u2  = u * u;
+        result.dx_He_dz *= 1. +
+                           (0.07805480599148856 + 0.899368710079757 * u - 3.063896868095767 * u2) /
+                               (1. + 3.752520187028219 * u2 + 18.126758791787946 * u2 * u2);
+      }
+    }
   }
 
   return result;

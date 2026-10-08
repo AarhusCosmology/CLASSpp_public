@@ -286,6 +286,17 @@ struct precision {
   double recfast_wGauss1 = 0.18; /**< from recfast 1.5, Gaussian Peeble prefactor fit, width */
   double recfast_wGauss2 = 0.33; /**< from recfast 1.5, Gaussian Peeble prefactor fit, width */
 
+  /*
+   * RECFAST calibrated to CosmoRec (CAMB 2: Lewis, arXiv:2607.14854). The input
+   * 'recfast_calibration' sets recfast_fudge_He, the six Gaussian constants above and this
+   * switch as a group: 'planck' (the default: the RECFAST 1.5 values above, which Planck
+   * used and which ACT DR6 found no longer sufficient) or 'cosmorec' (Lewis' refit to a
+   * CosmoRec reference, x_e to 1.1e-4 through H and 7.8e-5 through He I recombination).
+   * Why and how it was validated: docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md
+   */
+  bool recfast_He_rate_correction =
+      false; /**< multiply dx_He/dz by CAMB 2's He I rate correction F_He (arXiv:2607.14854, 'Recombination model and calibration'), which carries CosmoRec's helium radiative transfer; part of recfast_calibration = cosmorec */
+
   double recfast_z_He_1 = 8000.0; /**< from recfast 1.4, Starting value of Helium recombination 1 */
   double recfast_delta_z_He_1 =
       50.0; /**< Smoothing factor for recombination approximation switching, found to be OK on 3.09.10 */

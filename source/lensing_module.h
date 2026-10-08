@@ -24,10 +24,6 @@ class LensingModule : public BaseModule {
   void lensing_indices();
   std::map<std::string, std::vector<double>> cl_output_at_l_values(
       const std::vector<int>& l_values) const;
-  void lensing_lensed_cl_tt(double* ksi, double** d00, double* w8, int nmu);
-  void lensing_lensed_cl_te(double* ksiX, double** d20, double* w8, int nmu);
-  void lensing_lensed_cl_ee_bb(
-      double* ksip, double* ksim, double** d22, double** d2m2, double* w8, int nmu);
   void lensing_addback_cl_tt(double* cl_tt);
   void lensing_addback_cl_te(double* cl_te);
   void lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb);

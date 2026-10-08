@@ -15,6 +15,7 @@ TEST_TARGETS := \
 	test-shooting \
 	test-deposition \
 	test-hyrec \
+	test-recfast \
 	test-baryon-clumping \
 	test-limber-point \
 	test-bisection \

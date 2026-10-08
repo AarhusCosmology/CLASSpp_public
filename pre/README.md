@@ -25,6 +25,15 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 | `precision_tuned.pre` | 0.301 | 1.7× slower | when accuracy matters more than throughput |
 | `precision_precise.pre` | 0.009 | ~60× slower | reference-grade, for convergence tests |
 | `precision_pre_2026_08_21.pre` | 1.725 | 2.2× slower | reproducing results from before 2026-08-21 |
+| `act_dr6.pre` | — ¹ | 4.2× slower ² | ACT DR6 and other data to ℓ ≈ 8500 |
+
+¹ Not scored on `plik_lite`. Its own metric is the ACT DR6 ACT-lite distance to a
+converged reference at one ACT-like point: 0.009, against 0.394 for the defaults
+and 0.059 for ACT's published CLASS settings, translated key by key (they leave
+two CLASS++ defaults looser than class_public's). It also selects RECFAST
+calibrated to CosmoRec. See the file's
+header and `docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md`.
+² At `l_max_scalars = 9500`, both sides: 4.9 s against 1.2 s.
 
 ## Two things these files do not cover
 

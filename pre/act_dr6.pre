@@ -1,0 +1,52 @@
+# CLASS++ precision preset: act_dr6 -- lensed TT/TE/EE for ACT DR6 (to l = 8500)
+#
+# Pair it with, in your own input:
+#   output = tCl,pCl,lCl      lensing = yes      l_max_scalars = 9500
+#   non_linear = hmcode (or halofit)
+#
+# Measured at one ACT-like LambdaCDM point (omega_b 0.0225, omega_cdm 0.1193,
+# H0 67.6, n_s 0.974, tau 0.056, one 0.06 eV neutrino) through the ACT DR6
+# CMB-only likelihood ACT-lite, as the distance (t - t_ref)^T C^-1 (t - t_ref)
+# to a reference converged to 0.001 on the same scale:
+#
+#   this preset                          0.009    4.9 s
+#   ACT DR6's published CLASS settings   0.059    8.3 s   (198 s before the lensing fix)
+#   the compiled defaults                0.394    1.2 s
+#
+# (Apple M3 Pro, 11 threads.) Lensed TT is within 1e-3 of the reference to
+# l = 6500 and within 5e-3 to l = 8500. ACT's own settings, translated key by key,
+# are NOT enough in CLASS++: they never set neglect_CMB_sources_below_visibility or
+# q_logstep_limber, which CLASS++ defaults to 0.008 and 1.1 where class_public has
+# 1e-3 and 1.025. With those two values ACT's settings reach 0.003 in 8.7 s here.
+# CLASS refuses a key given both here and in your input, so to change a line,
+# copy this file and edit it.
+# Design and every number:
+# docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md
+#
+# Not a posterior-averaged S like the other presets: no ACT posterior draws
+# were available, so this is one point. The low-l EE, tensor and P(k) caveats of
+# pre/README.md do not apply: k_step_super, k_min_tau0 and k_max_tau0_over_l_max
+# stay at the compiled defaults.
+
+# lensing: headroom above the lensed range, the full-sky correlation function,
+# and the high-k lensing source (1/Mpc; P_k_max_h/Mpc = 100 without needing mPk)
+delta_l_max = 1800
+accurate_lensing = 1
+nonlinear_min_k_max = 70
+
+# the damping tail (of the defaults' 0.39, this first knob is 0.35)
+radiation_streaming_trigger_tau_over_tau_k = 240
+l_linstep = 20
+perturb_sampling_stepsize = 0.05
+l_max_ur = 35
+ur_fluid_trigger_tau_over_tau_k = 130
+q_logstep_limber = 1.025
+
+# CMB sources are kept until the visibility falls below this (0.072 -> 0.016 alone)
+neglect_CMB_sources_below_visibility = 1e-4
+
+# recombination: RECFAST refitted to CosmoRec (Lewis, arXiv:2607.14854); CosmoRec
+# is ACT DR6's baseline recombination. This is physics, not numerics -- it moves the
+# spectra by 0.027 on the scale above, exactly as it does in CAMB 2. Delete it
+# to keep the Planck-era RECFAST; with recombination = HyRec it has no effect.
+recfast_calibration = cosmorec

@@ -2775,6 +2775,38 @@ void precision::parse(const FileContent& fc) {
   read(fc, "thermo_Nz1_idm_dr", thermo_Nz1_idm_dr);
   read(fc, "thermo_Nz2_idm_dr", thermo_Nz2_idm_dr);
   read(fc, "tol_thermo_integration", tol_thermo_integration);
+  /* A named RECFAST calibration sets the fit constants as a group, BEFORE the individual keys
+     below, so any one of them can still be overridden. The constants are CAMB's
+     recfast_approx_model_params (camb/recombination.py, v2.0), fitted in CAMB's own RECFAST;
+     CLASS++'s planck-calibrated RECFAST reproduces CAMB's to 2e-4 in x_e, so they carry over.
+     The hydrogen fudge is 1.125 in both (recfast_fudge_H + recfast_delta_fudge_H). */
+  if (auto calibration = fc.get<std::string>("recfast_calibration")) {
+    class_test_severe(*calibration != "planck" && *calibration != "cosmorec",
+                      "recfast_calibration = '%s' must be 'planck' (RECFAST 1.5, the default) or "
+                      "'cosmorec' (CAMB 2's refit to CosmoRec, arXiv:2607.14854)",
+                      calibration->c_str());
+    if (*calibration == "cosmorec") {
+      recfast_fudge_He           = 0.8472367977;
+      recfast_AGauss1            = -0.1395272483;
+      recfast_AGauss2            = 0.0729891952;
+      recfast_zGauss1            = 7.2813061282;
+      recfast_zGauss2            = 6.7667038679;
+      recfast_wGauss1            = 0.1638966410;
+      recfast_wGauss2            = 0.2785834127;
+      recfast_He_rate_correction = true;
+    }
+    else {
+      recfast_fudge_He           = 0.86;
+      recfast_AGauss1            = -0.14;
+      recfast_AGauss2            = 0.079;
+      recfast_zGauss1            = 7.28;
+      recfast_zGauss2            = 6.73;
+      recfast_wGauss1            = 0.18;
+      recfast_wGauss2            = 0.33;
+      recfast_He_rate_correction = false;
+    }
+  }
+  read(fc, "recfast_He_rate_correction", recfast_He_rate_correction);
   read(fc, "recfast_Heswitch", recfast_Heswitch);
   read(fc, "recfast_fudge_He", recfast_fudge_He);
   read(fc, "recfast_Hswitch", recfast_Hswitch);
