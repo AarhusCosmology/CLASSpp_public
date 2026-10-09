@@ -262,6 +262,13 @@ bool CompositeSpecies::HasWarmMatter() const {
   return false;
 }
 
+double CompositeSpecies::NonClusteringOmega0() const {
+  double Omega0 = 0.;
+  for (const auto& child : children_)
+    Omega0 += child->NonClusteringOmega0();
+  return Omega0;
+}
+
 void CompositeSpecies::FinalizeMatterClassification() {
   BaseSpecies::
       FinalizeMatterClassification();  // stamp this composite's own (unused but valid) bits

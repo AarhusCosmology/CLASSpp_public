@@ -729,6 +729,11 @@ class TestReviewRegressions(TestClass):
             candidate.struct_cleanup()
             candidate.empty()
 
+    # The classyref comparisons below guard refactors, whose mistakes are O(1). A numerical
+    # change on master moves them by more than rounding: the spline integrals of
+    # tools/arrays.cpp moved rs_drag by 2e-6 and delta_idr by 3e-6 (2026-10-08).
+    REFERENCE_RTOL = 1e-5
+
     def _compute_candidate_and_reference(self, scenario):
         try:
             import classyref
@@ -758,7 +763,8 @@ class TestReviewRegressions(TestClass):
             'compute damping scale': 'yes',
         })
         try:
-            self.assertAlmostEqual(candidate.rs_drag(), reference.rs_drag(), places=8)
+            self.assertAlmostEqual(candidate.rs_drag() / reference.rs_drag(), 1.,
+                                   delta=self.REFERENCE_RTOL)
         finally:
             reference.struct_cleanup()
             reference.empty()
@@ -942,7 +948,7 @@ class TestReviewRegressions(TestClass):
             np.testing.assert_allclose(
                 candidate_scalar['delta_idr'][:10],
                 reference_scalar['delta_idr'][:10],
-                rtol=1e-10,
+                rtol=self.REFERENCE_RTOL,
                 atol=1e-12)
         finally:
             reference.struct_cleanup()
@@ -2644,6 +2650,151 @@ class TestTabulatedSelection(unittest.TestCase):
         }
         for name, (params, message) in cases.items():
             self.cosmo.set(params)
+            with self.assertRaises(CosmoComputationError, msg=name) as ctx:
+                self.cosmo.compute()
+            self.assertIn(message, str(ctx.exception), name)
+            self.cosmo.struct_cleanup()
+            self.cosmo.empty()
+
+
+class TestHMcode(unittest.TestCase):
+    """HMcode 2016 and 2020 (Mead et al. 2021), with and without baryonic feedback.
+
+    The references are the boosts P_nl/P_lin of CAMB 2.0.4 (halofit_version mead2016,
+    mead2020 and mead2020_feedback), which runs Mead's own HMcode, for the same cosmology.
+    The boost cancels most of the differences between the linear spectra of the two codes;
+    what remains is below 1e-3 at these k, for both versions. The tolerance of 3e-3 is ten
+    times smaller than the differences between the versions at k = 0.1, 1 and 3/Mpc.
+    """
+
+    BASE = {'output': 'mPk', 'non_linear': 'hmcode', 'h': 0.6736, 'omega_b': 0.02237,
+            'omega_cdm': 0.12, 'A_s': 2.1e-9, 'n_s': 0.9649, 'tau_reio': 0.0544,
+            'N_ur': 3.044, 'P_k_max_1/Mpc': 20., 'z_max_pk': 1.}
+    K = (0.1, 0.3, 1., 3.)  # 1/Mpc
+    CAMB = {
+        'mead2016': {0.: (1.11534, 2.10407, 9.63662, 27.18714),
+                     1.: (1.04123, 1.50186, 5.03742, 16.37017)},
+        'mead2020': {0.: (1.05982, 2.10976, 9.35522, 26.20411),
+                     1.: (1.04047, 1.51836, 5.01971, 16.49750)},
+        'mead2020_feedback, log10T_AGN = 8.3': {0.: (1.04300, 1.94759, 7.63480, 19.30947),
+                                                1.: (1.03575, 1.45914, 4.24738, 12.87991)},
+        # dark energy w0 = -0.9, wa = 0.1 (PPF in CAMB) and curvature Omega_k = 0.02, which
+        # differ through the growth and the Dolag correction of the concentrations
+        'mead2016, w0wa': {0.: (1.10864, 2.04693, 9.35441, 27.38723),
+                           1.: (1.03883, 1.48323, 4.92397, 16.52766)},
+        'mead2016, Omega_k': {0.: (1.11204, 2.07562, 9.49323, 27.22785),
+                              1.: (1.03969, 1.48970, 4.95468, 16.35080)},
+        'mead2020, w0wa': {0.: (1.06014, 2.06238, 9.21963, 26.97426),
+                           1.: (1.03954, 1.50009, 4.90261, 16.63141)},
+        'mead2020, Omega_k': {0.: (1.05990, 2.08530, 9.26173, 26.39346),
+                              1.: (1.03992, 1.50672, 4.93988, 16.50623)},
+    }
+    W0WA = {'Omega_Lambda': 0., 'w0_fld': -0.9, 'wa_fld': 0.1}
+    OMEGA_K = {'Omega_k': 0.02}
+
+    def setUp(self):
+        self.cosmo = Class()
+
+    def tearDown(self):
+        self.cosmo.struct_cleanup()
+        self.cosmo.empty()
+
+    def boost(self, params, k=K, z=(0., 1.)):
+        self.cosmo.struct_cleanup()
+        self.cosmo.empty()
+        self.cosmo.set(dict(self.BASE, **params))
+        self.cosmo.compute()
+        return {zz: np.array([self.cosmo.pk(kk, zz) / self.cosmo.pk_lin(kk, zz) for kk in k])
+                for zz in z}
+
+    def assert_matches_camb(self, params, reference):
+        boost = self.boost(params)
+        for z, expected in self.CAMB[reference].items():
+            np.testing.assert_allclose(boost[z], expected, rtol=3e-3,
+                                       err_msg=f'{reference} at z = {z}')
+
+    def test_2016_matches_camb(self):
+        self.assert_matches_camb({'hmcode_version': '2016'}, 'mead2016')
+
+    def test_2020_matches_camb(self):
+        self.assert_matches_camb({'hmcode_version': '2020'}, 'mead2020')
+
+    def test_2020_baryonic_feedback_matches_camb(self):
+        self.assert_matches_camb({'hmcode_version': '2020_baryonic_feedback',
+                                  'log10T_heat_hmcode': 8.3},
+                                 'mead2020_feedback, log10T_AGN = 8.3')
+
+    def test_dark_energy_and_curvature_match_camb(self):
+        """The Dolag correction of the concentrations, in both versions: it applies to every
+        halo and in every cosmology, relative to a flat LCDM with the same Omega_m."""
+        for version in ('2016', '2020'):
+            for name, params in (('w0wa', self.W0WA), ('Omega_k', self.OMEGA_K)):
+                self.assert_matches_camb(dict(params, hmcode_version=version),
+                                         f'mead{version}, {name}')
+
+    def test_default_version_is_2020_and_2015_is_2016(self):
+        for pair in (({}, {'hmcode_version': '2020'}),
+                     ({'hmcode_version': '2015'}, {'hmcode_version': '2016'})):
+            first, second = (self.boost(params) for params in pair)
+            for z in first:
+                np.testing.assert_array_equal(first[z], second[z], err_msg=str(pair))
+
+    def test_feedback_suppression_grows_with_the_heating_temperature(self):
+        """Feedback leaves large scales alone and suppresses small ones, the more so the
+        hotter the AGN heating."""
+        k = (0.01, 3.)
+        fitted = self.boost({}, k=k, z=(0.,))[0.]
+        ratios = [self.boost({'hmcode_version': '2020_baryonic_feedback',
+                              'log10T_heat_hmcode': t}, k=k, z=(0.,))[0.] / fitted
+                  for t in (7.3, 7.8, 8.3)]
+        for ratio in ratios:
+            self.assertAlmostEqual(ratio[0], 1., delta=1e-3)
+        self.assertTrue(1. > ratios[0][1] > ratios[1][1] > ratios[2][1] > 0.5,
+                        [r[1] for r in ratios])
+
+    def test_2020_runs_with_massive_neutrinos_and_a_w0wa_fluid(self):
+        for params in ({'N_ur': 2.0308, 'N_ncdm': 1, 'm_ncdm': 0.06},
+                       {'Omega_Lambda': 0., 'w0_fld': -0.9, 'wa_fld': 0.1}):
+            boost = self.boost(params)
+            for z in boost:
+                self.assertTrue(np.all(np.isfinite(boost[z])), params)
+                self.assertGreater(boost[z][2], 3., params)
+
+    def test_inconsistent_hmcode_inputs_are_rejected(self):
+        """Structural errors: a version that does not exist, and the inputs of one version
+        given to another."""
+        cases = {
+            'unknown_version': ({'hmcode_version': '2018'}, 'is not one of'),
+            'eta_0_with_2020': ({'eta_0': 0.6}, 'parameters of HMcode 2016'),
+            'c_min_with_2020': ({'c_min': 3.}, 'parameters of HMcode 2016'),
+            'feedback_model_with_2020': ({'feedback model': 'owls_agn'},
+                                         'parameters of HMcode 2016'),
+            'T_heat_without_feedback': ({'log10T_heat_hmcode': 8.},
+                                        'only used with hmcode_version = 2020_baryonic'),
+            'T_heat_with_2016': ({'hmcode_version': '2016', 'log10T_heat_hmcode': 8.},
+                                 'only used with hmcode_version = 2020_baryonic'),
+            'nk_wiggle_with_2016': ({'hmcode_version': '2016', 'nk_wiggle': 256},
+                                    'only used by HMcode 2020'),
+        }
+        for name, (params, message) in cases.items():
+            self.cosmo.set(dict(self.BASE, **params))
+            with self.assertRaises(CosmoSevereError, msg=name) as ctx:
+                self.cosmo.compute()
+            self.assertIn(message, str(ctx.exception), name)
+            self.cosmo.struct_cleanup()
+            self.cosmo.empty()
+
+    def test_unsupported_hmcode_2020_points_are_rejected(self):
+        """Range errors: too few wavenumbers for the wiggle split, and dark energy that the
+        growth without radiation of HMcode 2020 cannot represent."""
+        cases = {
+            'nk_wiggle': ({'nk_wiggle': 8}, 'nk_wiggle = 8 is too small'),
+            'scalar_field': ({'Omega_scf': 0.1, 'attractor_ic_scf': 'yes',
+                              'scf_parameters': '10, 0, 0, 0'},
+                             'HMcode 2020 knows dark energy as Lambda and the fluid only'),
+        }
+        for name, (params, message) in cases.items():
+            self.cosmo.set(dict(self.BASE, **params))
             with self.assertRaises(CosmoComputationError, msg=name) as ctx:
                 self.cosmo.compute()
             self.assertIn(message, str(ctx.exception), name)

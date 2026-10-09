@@ -105,9 +105,12 @@ void array_integrate_spline_table_line_to_line(const double* x_array,
   for (i = 0; i < n_lines - 1; i++) {
     h = (x_array[i + 1] - x_array[i]);
 
+    /* integral of the cubic spline on one interval: trapezoid minus a curvature correction (the
+       sign was + until 2026-10, doubling the trapezoidal error instead of removing it; class_public
+       fixed it after v3.2, credits: C. Radermacher) */
     *(array + (i + 1) * n_columns + index_inty) =
         *(array + i * n_columns + index_inty) +
-        (array[i * n_columns + index_y] + array[(i + 1) * n_columns + index_y]) * h / 2. +
+        (array[i * n_columns + index_y] + array[(i + 1) * n_columns + index_y]) * h / 2. -
         (array[i * n_columns + index_ddy] + array[(i + 1) * n_columns + index_ddy]) * h * h * h /
             24.;
   }
@@ -678,7 +681,10 @@ void array_integrate_all_spline(const double* array,
   for (i = 0; i < n_lines - 1; i++) {
     h = (array[(i + 1) * n_columns + index_x] - array[i * n_columns + index_x]);
 
-    *result += (array[i * n_columns + index_y] + array[(i + 1) * n_columns + index_y]) * h / 2. +
+    /* integral of the cubic spline on one interval: trapezoid minus a curvature correction (the
+       sign was + until 2026-10, doubling the trapezoidal error instead of removing it; class_public
+       fixed it after v3.2, credits: C. Radermacher) */
+    *result += (array[i * n_columns + index_y] + array[(i + 1) * n_columns + index_y]) * h / 2. -
                (array[i * n_columns + index_ddy] + array[(i + 1) * n_columns + index_ddy]) * h * h *
                    h / 24.;
   }
@@ -713,7 +719,10 @@ void array_integrate_all_trapzd_or_spline(const double* array,
   for (i = index_start_spline; i < n_lines - 1; i++) {
     h = (array[(i + 1) * n_columns + index_x] - array[i * n_columns + index_x]);
 
-    *result += (array[i * n_columns + index_y] + array[(i + 1) * n_columns + index_y]) * h / 2. +
+    /* integral of the cubic spline on one interval: trapezoid minus a curvature correction (the
+       sign was + until 2026-10, doubling the trapezoidal error instead of removing it; class_public
+       fixed it after v3.2, credits: C. Radermacher) */
+    *result += (array[i * n_columns + index_y] + array[(i + 1) * n_columns + index_y]) * h / 2. -
                (array[i * n_columns + index_ddy] + array[(i + 1) * n_columns + index_ddy]) * h * h *
                    h / 24.;
   }

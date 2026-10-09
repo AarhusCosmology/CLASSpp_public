@@ -5,7 +5,8 @@ accurate-lensing transform (§4.1), `recfast_calibration` (§4.2) and
 `pre/act_dr6.pre` (§4.3). **Not done:** HMcode 2020 (§5.1), a posterior-averaged
 S for ACT (§5.2), the multi-frequency likelihood (§5.3), any change to the
 compiled defaults (§5.4). The harness is on the not-for-merge branch
-`benchmarks/act-dr6`.
+`benchmarks/act-dr6`. **Update (2026-10-08):** HMcode 2020 is done, with its
+baryonic feedback, and is the default HMcode (§5.1).
 
 Evidence tags: **[M]** measured here, **[C]** the code says so, **[L]** published,
 quoted with its source, **[?]** no evidence, do not act on it.
@@ -178,10 +179,13 @@ values (0.003, 8.7 s): better, but 1.8× dearer for a gain of √0.009 − √0.
 
 ## 5. Open
 
-1. **HMcode 2020 [C].** CLASS++ implements HMcode 2016 only, and
-   `hmcode_version` is not a key. Through `classy`, ACT's yaml fails loudly with
-   "Class did not read input parameter(s)" rather than silently falling back
-   [C]. Physics gap: 0.09 in C25's ddata, plus baryonic feedback [L].
+1. **HMcode 2020 — done 2026-10-08.** See
+   `2026-10-08-hmcode-2020-design.md`; ACT's `hmcode_version: '2020'` is now
+   read. What follows is the state before. **[C]** CLASS++ implemented HMcode
+   2016 only, and `hmcode_version` was not a key. Through `classy`, ACT's yaml
+   failed loudly with "Class did not read input parameter(s)" rather than
+   silently falling back [C]. Physics gap: 0.09 in C25's ddata, plus baryonic
+   feedback [L].
 2. **One point, not a posterior [?].** No ACT posterior draws were available,
    so there is no S like the Planck presets have. Extended models are
    unmeasured.

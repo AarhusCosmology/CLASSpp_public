@@ -20,6 +20,7 @@ TEST_TARGETS := \
 	test-limber-point \
 	test-bisection \
 	test-quadrature \
+	test-spline-integral \
 	test-decay-kernel \
 	test-reduced-operator \
 	test-evolver-erk \

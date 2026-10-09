@@ -57,3 +57,13 @@ recfast_x_H0_trigger2 = 0.995
 # docs/superpowers/specs/2026-10-08-transfer-restructure-design.md.
 cmb_lensing_sampling_factor = 1e30
 selection_sampling_bessel_min = 1e-30
+
+# Added 2026-10-08, when HMcode 2020 became the HMcode of 'non_linear = hmcode',
+# as in class_public (the key is read only with HMcode). The spline integrals of
+# tools/arrays.cpp also subtract their curvature correction since then, which
+# moves TT and EE by up to 2e-3 at l = 2, phiphi by 4e-3 near L = 50, lensed BB
+# by 3e-3 and sigma8 by 6e-5; that fix has no key. Since 2026-10-09 the dark-energy
+# correction of HMcode 2016 follows HMcode, which moves 2016 with a fluid or curvature
+# (by 1.6e-2 for w0 = -0.9, wa = 0.1 and 1.4e-2 for Omega_k = 0.02); that has no key either.
+# See docs/superpowers/specs/2026-10-08-hmcode-2020-design.md.
+hmcode_version = 2016

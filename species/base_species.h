@@ -754,6 +754,17 @@ class BaseSpecies {
   }
 
   /**
+   * Today's density fraction in components that neither cluster as matter nor are
+   * radiation or dark energy: a quintessence-like field. HMcode 2020 integrates its
+   * growth in a cosmology of matter, Lambda and a w0-wa fluid, and refuses these.
+   * Default: GetOmega0() for an EnergyType::Other species that does not cluster as
+   * matter, else 0. Override: composites sum over children.
+   */
+  virtual double NonClusteringOmega0() const {
+    return ((energy_type_ == EnergyType::Other) && !ClustersAsMatter()) ? GetOmega0() : 0.;
+  }
+
+  /**
    * Does this species present a momentum-resolved NCDM hierarchy to the module?
    * Gates the ncdm-shaped machinery (the fluid-approximation index, the ncdm initial
    * conditions, several radiation-streaming branches) through

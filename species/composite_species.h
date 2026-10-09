@@ -264,6 +264,7 @@ class CompositeSpecies : public BaseSpecies {
   bool ClustersAsMatter() const override;
   bool IsColdMatterSpecies() const override;
   bool HasWarmMatter() const override;
+  double NonClusteringOmega0() const override;
   void FinalizeMatterClassification() override;
 
  protected:

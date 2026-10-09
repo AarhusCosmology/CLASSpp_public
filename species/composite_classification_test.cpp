@@ -22,8 +22,12 @@ class TestComposite : public CompositeSpecies {
 // tally test hands in are fine. Used to verify per-child bucketing/delegation.
 class FakeSpecies : public BaseSpecies {
  public:
-  FakeSpecies(BaseSpecies::StressEnergyContribution se, bool clusters, bool cold)
-      : BaseSpecies("fake", EnergyType::Other), se_(se), clusters_(clusters), cold_(cold) {}
+  FakeSpecies(BaseSpecies::StressEnergyContribution se,
+              bool clusters,
+              bool cold,
+              double omega0 = 0.)
+      : BaseSpecies("fake", EnergyType::Other), se_(se), clusters_(clusters), cold_(cold),
+        omega0_(omega0) {}
   void RegisterBackgroundIndices(int&) override {}
   void ComputeBackground(double, const double*, double*) override {}
   double Rho(const double*) const override {
@@ -45,7 +49,7 @@ class FakeSpecies : public BaseSpecies {
     return se_;
   }
   double GetOmega0() const override {
-    return 0.;
+    return omega0_;
   }
   bool ClustersAsMatter() const override {
     return clusters_;
@@ -58,6 +62,7 @@ class FakeSpecies : public BaseSpecies {
   BaseSpecies::StressEnergyContribution se_;
   bool clusters_;
   bool cold_;
+  double omega0_;
 };
 
 int main() {
@@ -151,6 +156,17 @@ int main() {
   // Discriminator: the w=-1 child (rho=0.7) reached neither matter bucket. A wrong
   // composite-level bucketing would have folded all three into total_cold (3.7).
   assert(total_cold.rho + total_warm.rho == se_cold.rho + se_warm.rho);
+
+  // ── Non-clustering density, which HMcode 2020 refuses: matter contributes none, and a
+  // composite sums over its children, so a field is found inside a composite that
+  // clusters (as the scalar field of Type3 is). The base default would read the
+  // composite's own energy type and return 0. ─────────────────────────────────────
+  assert(cdm.NonClusteringOmega0() == 0.);
+  TestComposite field_comp;
+  field_comp.AddChild(std::make_unique<FakeSpecies>(SE{}, /*clusters=*/true, /*cold=*/true, 0.25));
+  field_comp.AddChild(std::make_unique<FakeSpecies>(SE{}, /*clusters=*/false, /*cold=*/false, 0.1));
+  assert(field_comp.ClustersAsMatter());
+  assert(field_comp.NonClusteringOmega0() == 0.1);
 
   std::printf("composite classification test passed\n");
   return 0;

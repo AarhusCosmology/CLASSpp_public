@@ -2540,49 +2540,98 @@ void InputModule::ReadDerived() {
           (enum source_extrapolation) pfc->get_or<int>("extrapolation_method",
                                                        pnl->extrapolation_method);
 
-      auto feedback_model = pfc->get<std::string>("feedback model");
-
-      if (feedback_model) {
-        if (feedback_model->find("emu_dmonly") != std::string::npos) {
-          pnl->feedback = nl_emu_dmonly;
+      /* version: 2016 (Mead et al. 2016) or 2020 (Mead et al. 2021), with the spellings that
+         class_public documents. They are matched exactly: class_public searches for "20" in
+         the string, so it reads, e.g., 2018 as 2020. */
+      if (auto version = pfc->get<std::string>("hmcode_version")) {
+        if ((*version == "2015") || (*version == "2016") || (*version == "15") ||
+            (*version == "16")) {
+          pnl->hmcode_version = HMcodeVersion::v2016;
         }
-        if (feedback_model->find("owls_dmonly") != std::string::npos) {
-          pnl->feedback = nl_owls_dmonly;
+        else if ((*version == "2020") || (*version == "20")) {
+          pnl->hmcode_version = HMcodeVersion::v2020;
         }
-        if (feedback_model->find("owls_ref") != std::string::npos) {
-          pnl->feedback = nl_owls_ref;
+        else if (*version == "2020_baryonic_feedback") {
+          pnl->hmcode_version = HMcodeVersion::v2020_baryonic_feedback;
         }
-        if (feedback_model->find("owls_agn") != std::string::npos) {
-          pnl->feedback = nl_owls_agn;
-        }
-        if (feedback_model->find("owls_dblim") != std::string::npos) {
-          pnl->feedback = nl_owls_dblim;
+        else {
+          class_stop_severe(
+              "hmcode_version = '%s' is not one of 2016 (or 2015), 2020, "
+              "2020_baryonic_feedback",
+              version->c_str());
         }
       }
 
-      auto eta_0 = pfc->get<double>("eta_0");
-      auto c_min = pfc->get<double>("c_min");
+      if (pnl->hmcode_version == HMcodeVersion::v2016) {
+        auto feedback_model = pfc->get<std::string>("feedback model");
 
-      class_test_severe((feedback_model && (eta_0 || c_min)),
-                        "In input file, you cannot enter both a baryonic feedback model and a "
-                        "choice of "
-                        "baryonic feedback parameters, choose one of both methods");
+        if (feedback_model) {
+          if (feedback_model->find("emu_dmonly") != std::string::npos) {
+            pnl->feedback = nl_emu_dmonly;
+          }
+          if (feedback_model->find("owls_dmonly") != std::string::npos) {
+            pnl->feedback = nl_owls_dmonly;
+          }
+          if (feedback_model->find("owls_ref") != std::string::npos) {
+            pnl->feedback = nl_owls_ref;
+          }
+          if (feedback_model->find("owls_agn") != std::string::npos) {
+            pnl->feedback = nl_owls_agn;
+          }
+          if (feedback_model->find("owls_dblim") != std::string::npos) {
+            pnl->feedback = nl_owls_dblim;
+          }
+        }
 
-      if (eta_0 && c_min) {
-        pnl->feedback = nl_user_defined;
-        pnl->eta_0    = pfc->get_or("eta_0", pnl->eta_0);
-        pnl->c_min    = pfc->get_or("c_min", pnl->c_min);
+        auto eta_0 = pfc->get<double>("eta_0");
+        auto c_min = pfc->get<double>("c_min");
+
+        class_test_severe((feedback_model && (eta_0 || c_min)),
+                          "In input file, you cannot enter both a baryonic feedback model and a "
+                          "choice of "
+                          "baryonic feedback parameters, choose one of both methods");
+
+        if (eta_0 && c_min) {
+          pnl->feedback = nl_user_defined;
+          pnl->eta_0    = pfc->get_or("eta_0", pnl->eta_0);
+          pnl->c_min    = pfc->get_or("c_min", pnl->c_min);
+        }
+        else if (eta_0 && !c_min) {
+          pnl->feedback = nl_user_defined;
+          pnl->eta_0    = pfc->get_or("eta_0", pnl->eta_0);
+          pnl->c_min    = (0.98 - pnl->eta_0) / 0.12;
+        }
+        else if (!eta_0 && c_min) {
+          pnl->feedback = nl_user_defined;
+          pnl->c_min    = pfc->get_or("c_min", pnl->c_min);
+          pnl->eta_0    = 0.98 - 0.12 * pnl->c_min;
+        }
       }
-      else if (eta_0 && !c_min) {
-        pnl->feedback = nl_user_defined;
-        pnl->eta_0    = pfc->get_or("eta_0", pnl->eta_0);
-        pnl->c_min    = (0.98 - pnl->eta_0) / 0.12;
+      else {
+        class_test_severe(pfc->get<std::string>("feedback model").has_value() ||
+                              pfc->get<double>("eta_0").has_value() ||
+                              pfc->get<double>("c_min").has_value(),
+                          "'feedback model', 'eta_0' and 'c_min' are the baryonic feedback "
+                          "parameters of HMcode 2016. HMcode 2020 models baryonic feedback with "
+                          "hmcode_version = 2020_baryonic_feedback and log10T_heat_hmcode");
+        pnl->nk_wiggle = pfc->get_or("nk_wiggle", pnl->nk_wiggle);
+        class_test(pnl->nk_wiggle < 16,
+                   "nk_wiggle = %d is too small to split the linear spectrum into wiggle and "
+                   "no-wiggle parts",
+                   pnl->nk_wiggle);
       }
-      else if (!eta_0 && c_min) {
-        pnl->feedback = nl_user_defined;
-        pnl->c_min    = pfc->get_or("c_min", pnl->c_min);
-        pnl->eta_0    = 0.98 - 0.12 * pnl->c_min;
+
+      if (pnl->hmcode_version == HMcodeVersion::v2020_baryonic_feedback) {
+        pnl->log10T_heat_hmcode = pfc->get_or("log10T_heat_hmcode", pnl->log10T_heat_hmcode);
       }
+      else {
+        class_test_severe(pfc->get<double>("log10T_heat_hmcode").has_value(),
+                          "log10T_heat_hmcode is only used with hmcode_version = "
+                          "2020_baryonic_feedback");
+      }
+      class_test_severe((pnl->hmcode_version == HMcodeVersion::v2016) &&
+                            pfc->get<int>("nk_wiggle").has_value(),
+                        "nk_wiggle is only used by HMcode 2020");
 
       if (pfc->get<double>("z_infinity")) {
         pnl->z_infinity = pfc->get_or("z_infinity", pnl->z_infinity);

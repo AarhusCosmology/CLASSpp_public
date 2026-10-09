@@ -14,9 +14,69 @@
 #include "../species/idm_dr_idr_species.h"
 #include "background_module.h"
 #include "cosmology.h"
+#include "evolver_ndf15.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
 #include "thermodynamics_module.h"
+
+namespace {
+
+/* The cosmology of the linear growth in HMcode 2020: no radiation, Lambda, the fluid, and
+   neutrinos that only enter a small correction to H^2 (a_nu = 1), as in Mead et al. (2021) and in
+   class_public. HMcode integrates its own growth in this cosmology, rather than using the one of
+   the background module, so that P_nl/P_lin is the one HMcode was calibrated with. HMcode knows
+   the fluid as w0 + (1-a) wa; here it follows the fluid's own w(a), which is the same for that
+   parametrisation and keeps the history of the others (PEDE). */
+struct HMcodeNoRadiation {
+  double Omega_cdm; /* cold dark matter and massive neutrinos */
+  double Omega_b;
+  double Omega_v;                     /* Lambda */
+  double Omega_w;                     /* fluid */
+  const BackgroundModule* background; /* for the fluid's w(a) and density */
+  double Omega_nu;                    /* neutrinos counted as radiation */
+  double a_nu;
+  double Omega_m; /* matter today: 1 - Omega_m - Omega_v - Omega_w is curvature, as in CAMB */
+
+  /* H^2/H0^2, (a''/a)/H0^2 and Omega_m(a) */
+  void at(double a, double* H2, double* AH, double* Om) const {
+    double w_de = -1., X_de = 1.;
+    if (Omega_w > 0.) {
+      double dw_over_da, integral;
+      background->background_w_fld(a, &w_de, &dw_over_da, &integral);
+      X_de = exp(integral); /* rho_fld(a) / rho_fld(today) */
+    }
+    const double a3 = a * a * a;
+    const double nu = (a > a_nu) ? Omega_nu / a3 : 0.;
+    *AH = -(Omega_cdm / a3 + Omega_b / a3 + nu - 2. * Omega_v + Omega_w * (1. + 3. * w_de) * X_de) /
+          2.;
+    *H2 = Omega_cdm / a3 + Omega_b / a3 + nu + Omega_v + Omega_w * X_de +
+          (1. - Omega_m - Omega_v - Omega_w) / a / a;
+    /* correction from the inconsistent modelling of neutrinos between X_nu and H2 in HMcode */
+    *H2 += Omega_nu * (pow(1. + pow(0.3173 * a / a_nu, 1.83), 1. / 1.83) - 1.) / a3 / a;
+    *Om  = ((a > a_nu) ? Omega_m : (Omega_cdm + Omega_b)) / a3 / *H2;
+  }
+};
+
+/* what the evolver passes to both callbacks below */
+struct HMcodeGrowthWorkspace {
+  const HMcodeNoRadiation* cosmology;
+  std::vector<double>* g; /* g(a) at the output values of a */
+};
+
+/* the linear growth g(a), y = (g, dg/da) */
+void hmcode_growth_derivs(double a, double* y, double* dy, void* parameters) {
+  double H2, AH, Om;
+  static_cast<HMcodeGrowthWorkspace*>(parameters)->cosmology->at(a, &H2, &AH, &Om);
+  dy[0] = y[1];
+  dy[1] = 1.5 * Om * y[0] / (a * a) - (2. + AH / H2) * y[1] / a;
+}
+
+void hmcode_growth_output(
+    double /*a*/, double y[], double /*dy*/[], int index_a, void* parameters) {
+  (*static_cast<HMcodeGrowthWorkspace*>(parameters)->g)[index_a] = y[0];
+}
+
+}  // namespace
 
 NonlinearModule::NonlinearModule(InputModulePtr input_module,
                                  BackgroundModulePtr background_module,
@@ -2488,18 +2548,23 @@ void NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
 }
 
 /**
- * Computes the nonlinear correction on the linear power spectrum via
- * the method presented in Mead et al. 1505.07833
+ * Computes the nonlinear power spectrum with HMcode: 2016 (Mead et al. 2015, arXiv:1505.07833,
+ * and 2016, arXiv:1602.02154) or 2020 (Mead et al. 2021, arXiv:2009.01858), with or without
+ * baryonic feedback. See docs/superpowers/specs/2026-10-08-hmcode-2020-design.md.
  *
+ * The baryonic feedback of HMcode 2020 is a response: the halo model with feedback, relative to the
+ * halo model without the fitted parameters, multiplies HMcode 2020. The three are computed with the
+ * version passed explicitly to nonlinear_hmcode_compute().
+ *
+ * @param index_pk   Input: index of the pk type (m or cb)
  * @param index_tau  Input: index of tau, at which to compute the nl correction
  * @param tau        Input: tau, at which to compute the nl correction
- * @param pk_nl      Output:nonlinear power spectrum
+ * @param pk_nl      Output: nonlinear power spectrum
  * @param lnpk_l     Input: logarithm of the linear power spectrum for both index_m and index_cb
  * @param ddlnpk_l   Input: spline of the logarithm of the linear power spectrum for both index_m and index_cb
- * @param nl_corr_not_computable_at_this_k Ouput: was the computation doable?
- * @param k_nl       Output: nonlinear scale for index_m and index_cb
+ * @param k_nl       Output: nonlinear scale
+ * @param nl_corr_not_computable_at_this_k Output: was the computation doable?
  * @param pnw        Input/Output: pointer to nonlinear workspace
- * @return the error status
  */
 
 void NonlinearModule::nonlinear_hmcode(int index_pk,
@@ -2511,6 +2576,69 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
                                        double* k_nl,
                                        short* nl_corr_not_computable_at_this_k,
                                        struct nonlinear_workspace* pnw) {
+  const HMcodeVersion version = pnl->hmcode_version;
+
+  /* HMcode 2020 damps the wiggles of the linear spectrum in the 2-halo term */
+  if (version != HMcodeVersion::v2016)
+    nonlinear_hmcode_nowiggle(lnpk_l[index_pk].data(), ddlnpk_l[index_pk].data(), pnw);
+
+  nonlinear_hmcode_compute(version,
+                           index_pk,
+                           index_tau,
+                           tau,
+                           pk_nl,
+                           lnpk_l,
+                           ddlnpk_l,
+                           k_nl,
+                           nl_corr_not_computable_at_this_k,
+                           pnw);
+
+  if ((version != HMcodeVersion::v2020_baryonic_feedback) || *nl_corr_not_computable_at_this_k)
+    return;
+
+  std::vector<double> pk_2020(k_size_), pk_unfitted(k_size_);
+  for (auto [v, pk] : {std::pair{HMcodeVersion::v2020, pk_2020.data()},
+                       std::pair{HMcodeVersion::v2020_unfitted, pk_unfitted.data()}}) {
+    nonlinear_hmcode_compute(v,
+                             index_pk,
+                             index_tau,
+                             tau,
+                             pk,
+                             lnpk_l,
+                             ddlnpk_l,
+                             k_nl,
+                             nl_corr_not_computable_at_this_k,
+                             pnw);
+  }
+  for (int index_k = 0; index_k < k_size_; index_k++)
+    pk_nl[index_k] *= pk_2020[index_k] / pk_unfitted[index_k];
+}
+
+/**
+ * The halo model of HMcode, for one version, at one time. All that depends on the version is the
+ * collapse threshold and virial overdensity, the halo parameters (concentration amplitude, halo
+ * bloating, 1-halo and 2-halo damping, transition smoothing), the growth used for formation times,
+ * and the halo window (neutrino mass fraction, gas and stars).
+ *
+ * @param version    Input: HMcode version
+ * (other parameters as in nonlinear_hmcode())
+ */
+
+void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
+                                               int index_pk,
+                                               int index_tau,
+                                               double tau,
+                                               double* pk_nl,
+                                               std::vector<std::vector<double>>& lnpk_l,
+                                               std::vector<std::vector<double>>& ddlnpk_l,
+                                               double* k_nl,
+                                               short* nl_corr_not_computable_at_this_k,
+                                               struct nonlinear_workspace* pnw) {
+  const bool hm2020   = (version != HMcodeVersion::v2016);
+  const bool feedback = (version == HMcodeVersion::v2020_baryonic_feedback);
+  const bool unfitted = (version == HMcodeVersion::v2020_unfitted);
+  const double T_heat = pnl->log10T_heat_hmcode - 7.8;
+
   /* integers */
   int index_mass, i, ng, nsig;
   int index_ncol;
@@ -2536,7 +2664,7 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   /* HMcode parameters */
   double mmin, mmax, nu_min;
 
-  double sigma_disp, sigma_disp100, sigma8;
+  double sigma_disp, sigma_disp100, sigma8, sigma8_cb = 0.;
   double delta_c, Delta_v;
   double fraction;
 
@@ -2548,11 +2676,10 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
 
   double z_form, g_form;
 
-  double eta;
+  double A_conc, eta, k_star, fdamp, kdamp = 0.;
   double gst, window_nfw;
   double nu_cut;
-  double fac, k_star, fdamp;
-  double pk_lin, pk_2h, pk_1h;
+  double fac, pk_lin, pk_2h, pk_1h;
 
   /* data fields */
   std::vector<double> pvecback;
@@ -2563,6 +2690,7 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   std::vector<double> r_virial;
   std::vector<double> r_real;
   std::vector<double> nu_arr;
+  std::vector<double> window_factor; /* HMcode 2020 with feedback: mass fraction in haloes */
 
   std::vector<double> p1h_integrand;
 
@@ -2596,9 +2724,28 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
       [background_module_
            ->index_bg_Omega_m_];  //TBC (i.e. check if for P_cb here we should use Omega_cb) here the total time varying Omega_m is used for delta_c and for Delta_v according to the Mead fit of the Massara simulations.
 
-  growth = pvecback[background_module_->index_bg_D_];
+  /* (a today can exceed 1 by rounding, beyond the growth tables of HMcode 2020) */
+  const double a_at_tau = std::min(pvecback[background_module_->index_bg_a_], 1.);
+  z_at_tau              = 1. / a_at_tau - 1.;
 
-  z_at_tau = 1. / pvecback[background_module_->index_bg_a_] - 1.;
+  /* growth: the one of the background for 2016; for 2020, the one of the cosmology without
+     radiation of HMcode (normalised to 1 today), with g/a, the accumulated growth and Omega_m */
+  double norad[3] = {0., 0., 0.};
+  if (hm2020) {
+    growth = nonlinear_hmcode_growth_norad(pnw, a_at_tau);
+    array_interpolate_spline(pnw->a_norad.data(),
+                             static_cast<int>(pnw->a_norad.size()),
+                             pnw->growth_norad.data(),
+                             pnw->dd_growth_norad.data(),
+                             3,
+                             a_at_tau,
+                             &last_index,
+                             norad,
+                             3);
+  }
+  else {
+    growth = pvecback[background_module_->index_bg_D_];
+  }
 
   /* The number below is the critical density today, rho_c = 3 * H0^2 / 8*pi*G, in units of M_sun over Mpc^3 */
   rho_crit_today_in_msun_mpc3 = 3. * pow(1.e5 * pba->h, 2) / 8. / _PI_ / _G_ * _Mpc_over_m_ /
@@ -2621,6 +2768,17 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
                    ppr->sigma_k_per_decade,
                    out_sigma,
                    &sigma8);
+
+  /* HMcode 2020 parameters depend on sigma8 of the cold matter */
+  if (hm2020) {
+    nonlinear_sigmas(8. / pba->h,
+                     lnpk_l[index_pk_cb].data(),
+                     ddlnpk_l[index_pk_cb].data(),
+                     k_size_extra_,
+                     ppr->sigma_k_per_decade,
+                     out_sigma,
+                     &sigma8_cb);
+  }
 
   nonlinear_sigmas(0.,
                    lnpk_l[index_pk].data(),
@@ -2654,19 +2812,44 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   sigmaf_r.resize(ppr->nsteps_for_p1h_integral);
   nu_arr.resize(ppr->nsteps_for_p1h_integral);
 
-  // Linear theory density perturbation threshold for spherical collapse
-  delta_c = 1.59 + 0.0314 * log(sigma8);  //Mead et al. (2015; arXiv 1505.07833)
-  delta_c =
-      delta_c *
-      (1. +
-       0.0123 *
-           log10(
-               Omega_m));  //Nakamura & Suto (1997) fitting formula for LCDM models (as in Mead 2016)
-  delta_c = delta_c * (1. + 0.262 * fnu);  //Mead et al. (2016; arXiv 1602.02154) neutrino addition
+  // Linear theory density perturbation threshold for spherical collapse, and virialized overdensity
+  if (!hm2020) {
+    delta_c = 1.59 + 0.0314 * log(sigma8);  //Mead et al. (2015; arXiv 1505.07833)
+    delta_c =
+        delta_c *
+        (1. +
+         0.0123 *
+             log10(
+                 Omega_m));  //Nakamura & Suto (1997) fitting formula for LCDM models (as in Mead 2016)
+    delta_c = delta_c *
+              (1. + 0.262 * fnu);  //Mead et al. (2016; arXiv 1602.02154) neutrino addition
 
-  // virialized overdensity
-  Delta_v = 418. * pow(Omega_m, -0.352);   //Mead et al. (2015; arXiv 1505.07833)
-  Delta_v = Delta_v * (1. + 0.916 * fnu);  //Mead et al. (2016; arXiv 1602.02154) neutrino addition
+    Delta_v = 418. * pow(Omega_m, -0.352);  //Mead et al. (2015; arXiv 1505.07833)
+    Delta_v = Delta_v *
+              (1. + 0.916 * fnu);  //Mead et al. (2016; arXiv 1602.02154) neutrino addition
+  }
+  else {
+    /* Mead et al. (2021), eqs. (A1)-(A2), fits in Omega_m(a), g(a)/a and the accumulated growth
+       of the cosmology without radiation */
+    const double dv_x  = norad[0];
+    const double dv_y  = norad[1] * (1. + z_at_tau);
+    const double logOm = log10(norad[2]);
+    delta_c            = 1. +
+                         (-0.0069 - 0.0208 * (1. - dv_x) + 0.0312 * (1. - dv_x) * (1. - dv_x) +
+                          0.0021 * (1. - dv_y)) *
+                             logOm +
+                         (+0.0001 - 0.0647 * (1. - dv_x) - 0.0417 * (1. - dv_x) * (1. - dv_x) +
+                          0.0646 * (1. - dv_y));
+    delta_c            = delta_c * ((3. / 20.) * pow(12. * _PI_, 2. / 3.)) * (1. - 0.041 * fnu);
+
+    Delta_v =
+        1. +
+        (-0.79 - 10.17 * (1. - dv_x) + 2.51 * (1. - dv_x) * (1. - dv_x) + 6.51 * (1. - dv_y)) *
+            logOm +
+        (-1.89 + 0.38 * (1. - dv_x) + 18.8 * (1. - dv_x) * (1. - dv_x) - 15.87 * (1. - dv_y)) *
+            logOm * logOm;
+    Delta_v = Delta_v * (18. * _PI_ * _PI_) * (1. + 0.763 * fnu);
+  }
 
   // mass or radius fraction respectively
   fraction = pow(0.01, 1. / 3.);
@@ -2737,10 +2920,6 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   r1 = r_real[index_nl - 1];
   r2 = r_real[index_nl + 2];
 
-  /* // for debugging: (if it happens that r_nl is not between r1 and r2, which should never be the case)
-     fprintf(stdout, "%e %e %e %e\n", r1, nu_arr[index_nl-1], r2, nu_arr[index_nl+2]);
-  */
-
   /* do bisectional iteration between r1 and r2 to find the precise value of r_nl */
   counter = 0;
   do {
@@ -2794,11 +2973,58 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
 
   dlnsigdlnR = r_nl * pow(sigma_nl, -2) * sigma_prime;
   n_eff      = -3. - dlnsigdlnR;
-  alpha      = 3.24 * pow(1.85, n_eff);
 
   pnw->sigma_prime[index_pk][index_tau] = sigma_prime;
 
-  /** Calculate halo concentration-mass relation conc(mass) (Bullock et al. 2001) */
+  /** Halo parameters: concentration amplitude, halo bloating, damping of the 1-halo term at large
+      scales (k_star) and of the 2-halo term (fdamp, kdamp), smoothing of the transition (alpha). */
+  if (!hm2020) {
+    A_conc = c_min_;
+    alpha  = 3.24 * pow(1.85, n_eff);
+    eta    = eta_0_ - 0.3 * sigma8;  // halo bloating parameter
+    k_star = 0.584 / sigma_disp;     // Damping wavenumber of the 1-halo term at very large scales;
+    fdamp  = 0.0095 * pow(sigma_disp100 * pba->h, 1.37);  // Damping factor for 2-halo term
+  }
+  else {
+    /* Mead et al. (2021), table 2, as in HMcode in CAMB. The damping of the 1-halo term at large
+       scales applies to the three variants of 2020; the halo bloating, the damping of the 2-halo
+       term and the smoothing of the transition only to the fitted one. */
+    k_star = 0.05618 * pow(sigma8_cb, -1.013) * pba->h;
+    if (version == HMcodeVersion::v2020) {
+      A_conc = 5.196;
+      alpha  = 1.875 * pow(1.603, n_eff);
+      eta    = 0.1281 * pow(sigma8_cb, -0.3644);
+      fdamp  = 0.2696 * pow(sigma8_cb, 0.9403);
+      kdamp  = 0.05699 * pow(sigma8_cb, -1.089) * pba->h;
+    }
+    else {
+      A_conc = feedback ? (3.44 - 0.496 * T_heat) * pow(10., z_at_tau * (-0.0671 - 0.0371 * T_heat))
+                        : 4.;
+      alpha  = 1.;
+      eta    = 0.;
+      fdamp  = 0.; /* unused: the 2-halo term of these variants is the linear spectrum */
+    }
+  }
+  if (!(feedback || unfitted)) {
+    if (fdamp < 1.e-3)
+      fdamp = 1.e-3;
+    if (fdamp > 0.99)
+      fdamp = 0.99;
+  }
+
+  /** Calculate halo concentration-mass relation conc(mass) (Bullock et al. 2001), with the dark
+      energy correction of Dolag et al. (2004) for every halo at z < z_infinity, as in HMcode: the
+      growth at z_infinity relative to a flat LCDM (in the workspace), and for 2020 also the LCDM
+      growth at z relative to the actual one. */
+  double dark_energy_correction = 1.;
+  if (z_at_tau < pnl->z_infinity) {
+    dark_energy_correction = pnw->dark_energy_correction;
+    if (hm2020) {
+      double g_lcdm;
+      nonlinear_hmcode_growint(a_at_tau, -1., 0., 0., 1. - background_module_->Omega0_m_, &g_lcdm);
+      dark_energy_correction *= g_lcdm / growth;
+    }
+  }
   conc.resize(ppr->nsteps_for_p1h_integral);
 
   for (index_mass = 0; index_mass < ppr->nsteps_for_p1h_integral; index_mass++) {
@@ -2807,35 +3033,61 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
     if (g_form > 1.)
       g_form = 1.;
 
-    //
-    array_interpolate_two_arrays_one_column(pnw->growtable.data(),
-                                            pnw->ztable.data(),
-                                            0,
-                                            ng,
-                                            g_form,
-                                            &z_form);
-    if (z_form < z_at_tau) {
-      conc[index_mass] = c_min_;
+    if (!hm2020) {
+      array_interpolate_two_arrays_one_column(pnw->growtable.data(),
+                                              pnw->ztable.data(),
+                                              0,
+                                              ng,
+                                              g_form,
+                                              &z_form);
     }
     else {
-      conc[index_mass] = c_min_ * (1. + z_form) / (1. + z_at_tau) * pnw->dark_energy_correction;
+      /* formation time from the growth without radiation (haloes forming before a = 1e-4 are
+         given that formation time; g_norad today is 1 up to rounding) */
+      double a_form = pnw->a_norad[0];
+      if (g_form >= pnw->g_norad.back()) {
+        a_form = pnw->a_norad.back();
+      }
+      else if (g_form > pnw->g_norad[0]) {
+        array_interpolate_spline(pnw->g_norad.data(),
+                                 static_cast<int>(pnw->g_norad.size()),
+                                 pnw->a_norad.data(),
+                                 pnw->dd_a_norad.data(),
+                                 1,
+                                 g_form,
+                                 &last_index,
+                                 &a_form,
+                                 1);
+      }
+      z_form = 1. / a_form - 1.;
+    }
+    conc[index_mass]  = (z_form < z_at_tau) ? A_conc : A_conc * (1. + z_form) / (1. + z_at_tau);
+    conc[index_mass] *= dark_energy_correction;
+  }
+
+  /** HMcode 2020 with feedback: fraction of the halo mass in matter (Mead et al. 2021, eq. 25),
+      gas expelled below a mass mb, and the stars added below */
+  double f_star = 0.;
+  if (feedback) {
+    const double fb = pba->Omega0_b / background_module_->Omega0_m_;
+    const double fc = background_module_->GetOmega0Species("CDM") / background_module_->Omega0_m_;
+    f_star = std::min((-0.0030 * T_heat + 0.0201) * pow(10., z_at_tau * (0.0224 * T_heat + 0.409)),
+                      fb);
+    const double mb = pow(10., 1.81 * T_heat + 13.87) *
+                      pow(10., z_at_tau * (0.195 * T_heat - 0.108));
+    window_factor.resize(ppr->nsteps_for_p1h_integral);
+    for (index_mass = 0; index_mass < ppr->nsteps_for_p1h_integral; index_mass++) {
+      const double ratio        = pow(pba->h * mass[index_mass] / mb, 2.);
+      window_factor[index_mass] = fc + (fb - f_star) * ratio / (1. + ratio);
     }
   }
 
-  /** Compute the nonlinear correction */
-  eta    = eta_0_ - 0.3 * sigma8;  // halo bloating parameter
-  k_star = 0.584 / sigma_disp;     // Damping wavenumber of the 1-halo term at very large scales;
-  fdamp  = 0.0095 * pow(sigma_disp100 * pba->h, 1.37);  // Damping factor for 2-halo term
-  if (fdamp < 1.e-3)
-    fdamp = 1.e-3;
-  if (fdamp > 0.99)
-    fdamp = 0.99;
-
   /* the 1h integral contains the halo mass function proportional to exp(-nu^2).
    * To save time, the integration loop cuts, when nu exceeds a large value,
-   * where the integrand is 0 anyhow. This cut index is found here. */
+   * where the integrand is 0 anyhow. This cut index is found here. (Not for 2020, as in
+   * class_public, which found that the cut changes the result slightly.) */
   nu_cut = 10.;
-  if (nu_cut < nu_arr[ppr->nsteps_for_p1h_integral - 1]) {
+  if (!hm2020 && (nu_cut < nu_arr[ppr->nsteps_for_p1h_integral - 1])) {
     array_search_bisect(ppr->nsteps_for_p1h_integral, nu_arr.data(), nu_cut, &index_cut);
   }
   else {
@@ -2852,28 +3104,32 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   index_ncol = i;
 
   for (int index_k = 0; index_k < k_size_; index_k++) {
+    const double k = k_[index_k];
     p1h_integrand.resize(index_cut * index_ncol);
 
-    pk_lin = exp(lnpk_l[index_pk][index_k]) * pow(k_[index_k], 3) *
-             anorm;  //convert P_k to Delta_k^2
+    pk_lin = exp(lnpk_l[index_pk][index_k]) * pow(k, 3) * anorm;  //convert P_k to Delta_k^2
 
     for (index_mass = 0; index_mass < index_cut;
          index_mass++) {  //Calculates the integrand for the ph1 integral at all nu values
       //get the nu^eta-value of the window
-      nonlinear_hmcode_window_nfw(pow(nu_arr[index_mass], eta) * k_[index_k],
+      nonlinear_hmcode_window_nfw(pow(nu_arr[index_mass], eta) * k,
                                   r_virial[index_mass],
                                   conc[index_mass],
                                   &window_nfw);
       //get the value of the halo mass function
       nonlinear_hmcode_halomassfunction(nu_arr[index_mass], &gst);
 
+      /* HMcode 2020: haloes contain the cold matter only; with feedback, the gas expelled from
+         and the stars added to haloes */
+      if (feedback)
+        window_nfw = window_nfw * window_factor[index_mass] + f_star;
+      else if (hm2020)
+        window_nfw *= (1. - fnu);
+
       p1h_integrand[index_mass * index_ncol + index_nu] = nu_arr[index_mass];
 
       p1h_integrand[index_mass * index_ncol + index_y] = mass[index_mass] * gst *
                                                          pow(window_nfw, 2.);
-      //if ((tau==background_module_->conformal_age_) && (index_k == 0)) {
-      //fprintf(stdout, "%d %e %e\n", index_cut, p1h_integrand[index_mass*index_ncol+index_nu], p1h_integrand[index_mass*index_ncol+index_y]);
-      //}
     }
     array_spline(p1h_integrand.data(),
                  index_ncol,
@@ -2892,27 +3148,63 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
                                          index_ddy,
                                          &pk_1h);
 
-    if (pow(k_[index_k] / k_star, 2) > 7.) {
-      fac = 0.;  //prevents problems if (k/k*)^2 is large
+    /* damping of the 1-halo term at large scales */
+    if (!hm2020) {
+      if (pow(k / k_star, 2) > 7.) {
+        fac = 0.;  //prevents problems if (k/k*)^2 is large
+      }
+      else {
+        fac = exp(-pow((k / k_star), 2.));
+      }
+      fac = 1. - fac;
+    }
+    else if (k_star > 0.) {
+      fac = pow(k / k_star, 4) / (1. + pow(k / k_star, 4));
     }
     else {
-      fac = exp(-pow((k_[index_k] / k_star), 2.));
+      fac = 1.;
     }
 
-    pk_1h = pk_1h * anorm * pow(k_[index_k], 3) * (1. - fac) /
+    pk_1h = pk_1h * anorm * pow(k, 3) * fac /
             (rho_crit_today_in_msun_mpc3 * Omega0_m);  // dimensionless power
 
-    if (fdamp == 0) {
-      pk_2h = pk_lin;
+    /* 2-halo term: damped linear spectrum; for the fitted 2020, with damped wiggles (the
+       unfitted and feedback variants use the linear spectrum, as HMcode in CAMB does) */
+    if (!hm2020) {
+      if (fdamp == 0) {
+        pk_2h = pk_lin;
+      }
+      else {
+        pk_2h = pk_lin *
+                (1. - fdamp * pow(tanh(k * sigma_disp / sqrt(fdamp)), 2.));  //dimensionless power
+      }
+    }
+    else if (version == HMcodeVersion::v2020) {
+      double pk_wiggle  = 0.;
+      const double ln_k = log(k);
+      if ((ln_k >= pnw->lnk_wiggle.front()) && (ln_k <= pnw->lnk_wiggle.back())) {
+        int last_index_wiggle = 0;
+        array_interpolate_spline(pnw->lnk_wiggle.data(),
+                                 pnl->nk_wiggle,
+                                 pnw->pk_wiggle.data(),
+                                 pnw->ddpk_wiggle.data(),
+                                 1,
+                                 ln_k,
+                                 &last_index_wiggle,
+                                 &pk_wiggle,
+                                 1);
+      }
+      const double x = pow(k / kdamp, 2.85);
+      pk_2h          = (pk_lin + (exp(-k * k * sigma_disp * sigma_disp) - 1.) * pk_wiggle) *
+                       (1. - fdamp * x / (1. + x));
     }
     else {
-      pk_2h = pk_lin * (1. - fdamp * pow(tanh(k_[index_k] * sigma_disp / sqrt(fdamp)),
-                                         2.));  //dimensionless power
+      pk_2h = pk_lin;
     }
     if (pk_2h < 0.)
       pk_2h = 0.;
-    pk_nl[index_k] = pow((pow(pk_1h, alpha) + pow(pk_2h, alpha)), (1. / alpha)) /
-                     pow(k_[index_k], 3) / anorm;  //converted back to P_k
+    pk_nl[index_k] = pow((pow(pk_1h, alpha) + pow(pk_2h, alpha)), (1. / alpha)) / pow(k, 3) /
+                     anorm;  //converted back to P_k
   }
 
   // print parameter values
@@ -2939,7 +3231,7 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
     fprintf(stdout, "    dc:			%e\n", delta_c);
     fprintf(stdout, "    eta:		%e\n", eta);
     fprintf(stdout, "    k*:			%e\n", k_star / pba->h);
-    fprintf(stdout, "    Abary:		%e\n", c_min_);
+    fprintf(stdout, "    Abary:		%e\n", A_conc);
     fprintf(stdout, "    fdamp:		%e\n", fdamp);
     fprintf(stdout, "    alpha:		%e\n", alpha);
     fprintf(stdout,
@@ -2948,6 +3240,294 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
             k_[0] / pba->h,
             k_[k_size_ - 1] / pba->h);
   }
+}
+
+/**
+ * HMcode 2020: integrate the linear growth g(a) of the cosmology without radiation of Mead et
+ * al. (2021), on 128 values of a from 1e-4 to 1 (the tolerance 1e-10 and the grid are those of
+ * HMcode). Fills, in the workspace, g/a and its integral over a (the accumulated growth),
+ * Omega_m(a), and g normalised to 1 today with the splines needed to invert it.
+ *
+ * @param pnw Input/Output: nonlinear workspace
+ */
+
+void NonlinearModule::nonlinear_hmcode_noradiation_growth(struct nonlinear_workspace* pnw) {
+  const double Omega_v = background_module_->GetOmega0Species("Lambda");
+  const double Omega_w = background_module_->GetOmega0Species("Fluid");
+
+  /* the cosmology without radiation has matter, Lambda and the fluid only: refuse other
+     dark energy, and fields that do not cluster (class_public refuses scalar fields) */
+  double Omega_other = fabs(background_module_->Omega0_de_ - Omega_v - Omega_w);
+  for (const auto& [name, sp] : all_species_)
+    Omega_other += sp->NonClusteringOmega0();
+  class_test(Omega_other > 1.e-4,
+             "HMcode 2020 knows dark energy as Lambda and the fluid only, but a density "
+             "fraction %e today is in other dark energy or in fields that do not cluster. Use "
+             "HMcode 2016 (hmcode_version = 2016) or Halofit",
+             Omega_other);
+
+  HMcodeNoRadiation cosmology;
+  cosmology.Omega_cdm  = background_module_->Omega0_m_ - pba->Omega0_b;
+  cosmology.Omega_b    = pba->Omega0_b;
+  cosmology.Omega_v    = Omega_v;
+  cosmology.Omega_w    = Omega_w;
+  cosmology.background = background_module_.get();
+  cosmology.Omega_nu = pba->Omega0_g * background_module_->Neff_ * 7. / 8. * pow(4. / 11., 4. / 3.);
+  cosmology.a_nu     = 1.;
+  cosmology.Omega_m  = background_module_->Omega0_m_;
+
+  const int a_size   = 128;
+  const double a_ini = 1.e-4;
+  const double a_end = 1.;
+  pnw->a_norad.resize(a_size);
+  for (int i = 0; i < a_size; i++)
+    pnw->a_norad[i] = a_ini * exp(i * log(a_end / a_ini) / (a_size - 1));
+  pnw->a_norad[a_size - 1] = a_end;
+
+  /* growing mode in matter domination, corrected for the dark energy fraction */
+  double H2, AH, Om;
+  cosmology.at(a_ini, &H2, &AH, &Om);
+  const double f = 1. - Om;
+  double y[2]    = {pow(a_ini, 1. - 3. * f / 5.), (1. - 3. * f / 5.) * pow(a_ini, -3. * f / 5.)};
+
+  std::vector<double> g(a_size);
+  HMcodeGrowthWorkspace workspace{&cosmology, &g};
+  int used_in_output[2] = {1, 0};
+  EvolverOptions options;
+  options.rtol            = 1.e-10;
+  options.x_sampling      = pnw->a_norad.data();
+  options.x_sampling_size = a_size;
+  options.used_in_output  = used_in_output;
+  options.output          = hmcode_growth_output;
+  evolver_ndf15(hmcode_growth_derivs, a_ini, a_end, y, 2, &workspace, options);
+
+  /* g/a, its integral over a (the accumulated growth) and Omega_m(a), with their splines in a
+     (built in one table with the splines interleaved, as the integration helper wants) */
+  std::vector<double> table(a_size * 6, 0.);
+  for (int i = 0; i < a_size; i++) {
+    cosmology.at(pnw->a_norad[i], &H2, &AH, &Om);
+    table[i * 6 + 0] = g[i] / pnw->a_norad[i];
+    table[i * 6 + 4] = Om;
+  }
+  array_spline_table_line_to_line(pnw->a_norad.data(),
+                                  a_size,
+                                  table.data(),
+                                  6,
+                                  0,
+                                  1,
+                                  _SPLINE_EST_DERIV_);
+  array_integrate_spline_table_line_to_line(pnw->a_norad.data(), a_size, table.data(), 6, 0, 1, 2);
+  array_spline_table_line_to_line(pnw->a_norad.data(),
+                                  a_size,
+                                  table.data(),
+                                  6,
+                                  2,
+                                  3,
+                                  _SPLINE_EST_DERIV_);
+  array_spline_table_line_to_line(pnw->a_norad.data(),
+                                  a_size,
+                                  table.data(),
+                                  6,
+                                  4,
+                                  5,
+                                  _SPLINE_EST_DERIV_);
+  pnw->growth_norad.resize(a_size * 3);
+  pnw->dd_growth_norad.resize(a_size * 3);
+  for (int i = 0; i < a_size; i++) {
+    for (int c = 0; c < 3; c++) {
+      pnw->growth_norad[i * 3 + c]    = table[i * 6 + 2 * c];
+      pnw->dd_growth_norad[i * 3 + c] = table[i * 6 + 2 * c + 1];
+    }
+  }
+
+  /* g normalised to 1 today, and the splines of g(a) and a(g) */
+  pnw->g_norad.resize(a_size);
+  for (int i = 0; i < a_size; i++)
+    pnw->g_norad[i] = g[i] / g[a_size - 1];
+  pnw->dd_g_norad.resize(a_size);
+  pnw->dd_a_norad.resize(a_size);
+  array_spline_table_columns(pnw->a_norad.data(),
+                             a_size,
+                             pnw->g_norad.data(),
+                             1,
+                             pnw->dd_g_norad.data(),
+                             _SPLINE_EST_DERIV_);
+  array_spline_table_columns(pnw->g_norad.data(),
+                             a_size,
+                             pnw->a_norad.data(),
+                             1,
+                             pnw->dd_a_norad.data(),
+                             _SPLINE_EST_DERIV_);
+}
+
+/**
+ * HMcode 2020: growth g(a) of the cosmology without radiation, normalised to 1 today.
+ *
+ * @param pnw Input: nonlinear workspace
+ * @param a   Input: scale factor
+ * @return g(a)
+ */
+
+double NonlinearModule::nonlinear_hmcode_growth_norad(const struct nonlinear_workspace* pnw,
+                                                      double a) const {
+  int last_index = 0;
+  double g;
+  array_interpolate_spline(pnw->a_norad.data(),
+                           static_cast<int>(pnw->a_norad.size()),
+                           pnw->g_norad.data(),
+                           pnw->dd_g_norad.data(),
+                           1,
+                           a,
+                           &last_index,
+                           &g,
+                           1);
+  return g;
+}
+
+/**
+ * HMcode 2020: no-wiggle spectrum of Eisenstein & Hu (1998) on the extended k grid. It only serves
+ * to reduce the dynamic range of the linear spectrum before the smoothing that removes the
+ * wiggles, so its normalisation does not matter (the one of class_public is kept).
+ *
+ * @param pnw Input/Output: nonlinear workspace
+ */
+
+void NonlinearModule::nonlinear_hmcode_eisenstein_hu(struct nonlinear_workspace* pnw) {
+  const double h           = pba->h;
+  const double Om          = 1. - background_module_->GetOmega0Species("Lambda") -
+                             background_module_->GetOmega0Species("Fluid");
+  const double OL          = 1. - Om;
+  const double wm          = Om * h * h;
+  const double wb          = pba->Omega0_b * h * h;
+  const double rb          = wb / wm;
+  const double s           = 44.5 * log(9.83 / wm) / sqrt(1. + 10. * pow(wb, 0.75));
+  const double alpha_gamma = 1. - 0.328 * log(431. * wm) * rb + 0.38 * log(22.3 * wm) * rb * rb;
+  const double ns          = ppm->n_s;
+  const double g           = pow(Om, 0.2) / (1. + 0.003 * pow(OL / Om, 4. / 3.));
+  const double coeff       = g / Om / pba->H0 / pba->H0;
+  const double norm = pow(coeff, 2) * 8 * _PI_ * _PI_ / 25. * ppm->A_s / pow(ppm->k_pivot, ns - 1.);
+
+  pnw->ln_pk_eh.resize(k_size_extra_);
+  pnw->dd_ln_pk_eh.resize(k_size_extra_);
+  for (int index_k = 0; index_k < k_size_extra_; index_k++) {
+    const double k         = exp(ln_k_[index_k]);
+    const double Gamma     = (wm / h) *
+                             (alpha_gamma + (1. - alpha_gamma) / (1. + pow(0.43 * k * s, 4)));
+    const double q         = k / h * pow(pba->T_cmb / 2.7, 2) / Gamma;
+    const double L         = log(2. * exp(1.) + 1.8 * q);
+    const double C         = 14.2 + 731. / (1. + 62.5 * q);
+    const double T_nw      = L / (L + C * q * q);
+    pnw->ln_pk_eh[index_k] = log(norm * pow(k, ns) * T_nw * T_nw);
+  }
+  array_spline_table_columns(ln_k_.data(),
+                             k_size_extra_,
+                             pnw->ln_pk_eh.data(),
+                             1,
+                             pnw->dd_ln_pk_eh.data(),
+                             _SPLINE_NATURAL_);
+}
+
+/**
+ * HMcode 2020: grid in ln k on which the linear spectrum is split into wiggle and no-wiggle parts,
+ * from 5e-3 to 5 h/Mpc as in HMcode (class_public uses the same numbers in 1/Mpc), and the
+ * weights of the Gaussian smoothing in ln k (width 0.25). Points closer than three widths to an
+ * edge are not smoothed, as in HMcode.
+ *
+ * @param pnw Input/Output: nonlinear workspace
+ */
+
+void NonlinearModule::nonlinear_hmcode_wiggle_init(struct nonlinear_workspace* pnw) {
+  const int n           = pnl->nk_wiggle;
+  const double sigma    = 0.25;
+  const double ln_k_min = log(5.e-3 * pba->h);
+  const double ln_k_max = log(5. * pba->h);
+
+  pnw->lnk_wiggle.resize(n);
+  pnw->pk_wiggle.resize(n);
+  pnw->ddpk_wiggle.resize(n);
+  for (int i = 0; i < n; i++)
+    pnw->lnk_wiggle[i] = ln_k_min + i * (ln_k_max - ln_k_min) / (n - 1);
+
+  class_test((pnw->lnk_wiggle[0] < ln_k_[0]) || (pnw->lnk_wiggle[n - 1] > ln_k_[k_size_extra_ - 1]),
+             "HMcode 2020 splits the linear spectrum into wiggle and no-wiggle parts between k = "
+             "%e and %e 1/Mpc, beyond the range [%e, %e] 1/Mpc of the linear spectrum",
+             exp(pnw->lnk_wiggle[0]),
+             exp(pnw->lnk_wiggle[n - 1]),
+             exp(ln_k_[0]),
+             exp(ln_k_[k_size_extra_ - 1]));
+
+  pnw->smoothing_weights.assign(n * n, 0.);
+  for (int i = 0; i < n; i++) {
+    double* row = pnw->smoothing_weights.data() + i * n;
+    if ((fabs(pnw->lnk_wiggle[i] - pnw->lnk_wiggle[0]) < 3. * sigma) ||
+        (fabs(pnw->lnk_wiggle[i] - pnw->lnk_wiggle[n - 1]) < 3. * sigma)) {
+      row[i] = 1.;
+      continue;
+    }
+    double total = 0.;
+    for (int j = 0; j < n; j++) {
+      const double dx  = pnw->lnk_wiggle[i] - pnw->lnk_wiggle[j];
+      row[j]           = exp(-dx * dx / (2. * sigma * sigma));
+      total           += row[j];
+    }
+    for (int j = 0; j < n; j++)
+      row[j] /= total;
+  }
+}
+
+/**
+ * HMcode 2020: split the linear spectrum at the current time into wiggle and no-wiggle parts. The
+ * no-wiggle part is the linear spectrum divided by the Eisenstein & Hu no-wiggle spectrum,
+ * smoothed in ln k, and multiplied back. Stores the wiggle part as a dimensionless spectrum
+ * k^3/(2 pi^2) (P_l - P_nw), with its spline in ln k.
+ *
+ * @param lnpk_l   Input: ln of the linear spectrum on the extended k grid
+ * @param ddlnpk_l Input: its spline in ln k
+ * @param pnw      Input/Output: nonlinear workspace
+ */
+
+void NonlinearModule::nonlinear_hmcode_nowiggle(const double* lnpk_l,
+                                                const double* ddlnpk_l,
+                                                struct nonlinear_workspace* pnw) {
+  const int n = pnl->nk_wiggle;
+  std::vector<double> lnpk_lin(n), lnpk_eh(n), ratio(n);
+  int last_index = 0;
+  for (int i = 0; i < n; i++) {
+    array_interpolate_spline(ln_k_.data(),
+                             k_size_extra_,
+                             lnpk_l,
+                             ddlnpk_l,
+                             1,
+                             pnw->lnk_wiggle[i],
+                             &last_index,
+                             &lnpk_lin[i],
+                             1);
+    array_interpolate_spline(ln_k_.data(),
+                             k_size_extra_,
+                             pnw->ln_pk_eh.data(),
+                             pnw->dd_ln_pk_eh.data(),
+                             1,
+                             pnw->lnk_wiggle[i],
+                             &last_index,
+                             &lnpk_eh[i],
+                             1);
+    ratio[i] = exp(lnpk_lin[i] - lnpk_eh[i]);
+  }
+  for (int i = 0; i < n; i++) {
+    const double* row = pnw->smoothing_weights.data() + i * n;
+    double smoothed   = 0.;
+    for (int j = 0; j < n; j++)
+      smoothed += row[j] * ratio[j];
+    const double pk_nw = smoothed * exp(lnpk_eh[i]);
+    pnw->pk_wiggle[i]  = (exp(lnpk_lin[i]) - pk_nw) * exp(3. * pnw->lnk_wiggle[i]) /
+                         (2. * _PI_ * _PI_);
+  }
+  array_spline_table_columns(pnw->lnk_wiggle.data(),
+                             n,
+                             pnw->pk_wiggle.data(),
+                             1,
+                             pnw->ddpk_wiggle.data(),
+                             _SPLINE_EST_DERIV_);
 }
 
 /**
@@ -2992,6 +3572,15 @@ void NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace
   /** - fill table with scale independent growth factor */
 
   nonlinear_hmcode_fill_growtab(pnw);
+
+  /** - HMcode 2020: growth of the cosmology without radiation, no-wiggle reference spectrum and
+        smoothing weights for the wiggle/no-wiggle split */
+
+  if (pnl->hmcode_version != HMcodeVersion::v2016) {
+    nonlinear_hmcode_noradiation_growth(pnw);
+    nonlinear_hmcode_eisenstein_hu(pnw);
+    nonlinear_hmcode_wiggle_init(pnw);
+  }
 }
 
 /**
@@ -3003,46 +3592,48 @@ void NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace
  */
 
 /**
- * set the HMcode dark energy correction (if w is not -1)
+ * set the dark energy correction of the halo concentrations (Dolag et al. 2004): the growth at
+ * z_infinity relative to that of a flat LCDM with the same Omega_m, in every cosmology, as in
+ * HMcode
  *
  * @param pnw         Output: pointer to nonlinear workspace
  * @return the error status
  */
 
 void NonlinearModule::nonlinear_hmcode_dark_energy_correction(struct nonlinear_workspace* pnw) {
-  int last_index;
-  std::vector<double> pvecback;
-  double tau_growth;
-  double g_lcdm, g_wcdm;
-  double w0, dw_over_da_fld, integral_fld;
+  const double a_infinity = 1. / (1. + pnl->z_infinity);
+  const double Omega0_m   = background_module_->Omega0_m_;
+  double g_lcdm;
+  nonlinear_hmcode_growint(a_infinity, -1., 0., 0., 1. - Omega0_m, &g_lcdm);
 
-  /** - if there is dynamical Dark Energy (w is not -1) modeled as a fluid */
+  /** - HMcode 2020: the growth without radiation (in LCDM too, since the two growth functions
+        are different approximations) */
 
+  if (pnl->hmcode_version != HMcodeVersion::v2016) {
+    pnw->dark_energy_correction = nonlinear_hmcode_growth_norad(pnw, a_infinity) / g_lcdm;
+    return;
+  }
+
+  /** - HMcode 2016: the same approximate growth for the actual curvature and the fluid's w0-wa
+        at a = 1 (w = -1 without a fluid), with dark energy closing the budget, to the power 1.5
+        (Mead et al. 2016). Until 2026-10 it was set only with a fluid, relative to an LCDM with
+        the actual curvature, and applied only to haloes formed before z; the gaps to CAMB were
+        1.6e-2 for w0 = -0.9, wa = 0.1 and 1.4e-2 for Omega_k = 0.02. */
+
+  double w0 = -1., wa = 0.;
   if (all_species_.count("Fluid")) {
-    pvecback.resize(background_module_->bg_size_);
-
-    background_module_->background_tau_of_z(pnl->z_infinity, &tau_growth);
-
-    background_module_->background_at_tau(tau_growth,
-                                          pba->long_info,
-                                          pba->inter_normal,
-                                          &last_index,
-                                          pvecback.data());
-
+    double dw_over_da_fld, integral_fld;
     background_module_->background_w_fld(1., &w0, &dw_over_da_fld, &integral_fld);
-
-    nonlinear_hmcode_growint(1. / (1. + pnl->z_infinity), -1., 0., &g_lcdm);
-
-    nonlinear_hmcode_growint(1. / (1. + pnl->z_infinity), w0, dw_over_da_fld * (-1.), &g_wcdm);
-
-    pnw->dark_energy_correction = pow(g_wcdm / g_lcdm, 1.5);
+    wa = -dw_over_da_fld;
   }
-
-  /** - otherwise, we assume no dynamical Dark Energy (w is -1) */
-
-  else {
-    pnw->dark_energy_correction = 1.;
-  }
+  double g_actual;
+  nonlinear_hmcode_growint(a_infinity,
+                           w0,
+                           wa,
+                           pba->Omega0_k,
+                           1. - Omega0_m - pba->Omega0_k,
+                           &g_actual);
+  pnw->dark_energy_correction = pow(g_actual / g_lcdm, 1.5);
 }
 
 /**
@@ -3203,11 +3794,14 @@ void NonlinearModule::nonlinear_hmcode_fill_growtab(struct nonlinear_workspace* 
  * @param a   Input: scalefactor
  * @param w0  Input: dark energy equation of state today
  * @param wa  Input: dark energy equation of state varying with a: w=w0+(1-a)wa
+ * @param Omega_k  Input: curvature density today (0 for the flat LCDM reference of HMcode 2020)
+ * @param Omega_de Input: dark energy density today (1 - Omega_m for that reference)
  * @param growth Output: scale independent growth factor at a
  * @return the error status
  */
 
-void NonlinearModule::nonlinear_hmcode_growint(double a, double w0, double wa, double* growth) {
+void NonlinearModule::nonlinear_hmcode_growint(
+    double a, double w0, double wa, double Omega_k, double Omega_de, double* growth) {
   std::vector<double> pvecback;
   std::vector<double> integrand;
 
@@ -3239,7 +3833,7 @@ void NonlinearModule::nonlinear_hmcode_growint(double a, double w0, double wa, d
       /* This will compute Omega_m(z) for the input values of w0 and wa, to let the user compare the wCDM and LCDM cases. This is why we cannot extract Omega_m(z) fromn the background module in this place. */
       double X_de    = pow(scalefactor, -3. * (1. + w0 + wa)) * exp(-3. * wa * (1. - scalefactor));
       double Hubble2 = background_module_->Omega0_m_ * pow((1. + z), 3) +
-                       pba->Omega0_k * pow((1. + z), 2) + background_module_->Omega0_de_ * X_de;
+                       Omega_k * pow((1. + z), 2) + Omega_de * X_de;
       double Omega_m = background_module_->Omega0_m_ * pow((1. + z), 3) / Hubble2;
       /* Samuel brieden: TBC: check that the matching between the
          background quantity and this fitting formula improves by
