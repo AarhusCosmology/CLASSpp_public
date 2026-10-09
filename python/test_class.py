@@ -830,7 +830,8 @@ class TestReviewRegressions(TestClass):
         the DEFAULT configuration hit that check and every decaying-NCDM run
         aborted (test_dncdm_dr_computes above is the same regression). The
         default is now min(l_max_dr, l_max_ncdm); an explicit value is still
-        validated, not clamped."""
+        validated, not clamped. l_max_ncdm is set to 10 here so that the minimum
+        binds whatever the compiled defaults are (17 again since 2026-10-09)."""
         base = {
             'output': 'tCl',
             'l_max_scalars': 200,
@@ -846,6 +847,7 @@ class TestReviewRegressions(TestClass):
             # A decaying parent needs one momentum grid for background and perturbations.
             'dncdm1.quadrature_strategy': 3,
             'dncdm1.momenta_bins': 8,
+            'l_max_ncdm': 10,
         }
         self.scenario = dict(base)
         spectra = {}

@@ -45,6 +45,16 @@ q_logstep_limber = 1.025
 # CMB sources are kept until the visibility falls below this (0.072 -> 0.016 alone)
 neglect_CMB_sources_below_visibility = 1e-4
 
+# massive neutrinos: the compiled defaults of 2026-08-21 to 2026-10-09, kept because
+# the 0.009 above was measured with them. They are not accurate here: they cancel a
+# TT residual of the transfer integrals at 600 < l < 2000. With the defaults of
+# 2026-10-09 (delete these three lines) this preset measures 0.044, and adding
+# transfer_neglect_delta_k_S_t0 = 1 and transfer_neglect_delta_k_S_t2 = 1 then
+# gives 0.0046 at 7.3 s. See docs/superpowers/specs/2026-10-09-ncdm-precision-defaults-design.md.
+ncdm_fluid_trigger_tau_over_tau_k = 15
+l_max_ncdm = 10
+tol_ncdm_synchronous = 0.03
+
 # recombination: CosmoRec, ACT DR6's baseline, is matched by both of CLASS++'s
 # recombination codes by default since 2026-10-08 (recfast_calibration and
 # hyrec_calibration = cosmorec; docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md).

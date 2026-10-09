@@ -1,0 +1,15 @@
+# CLASS++ precision: the neutrino defaults as they were from 2026-08-21 to 2026-10-09.
+#
+# On 2026-10-09 three non-cold-relic knobs went back to their values from before
+# 2026-08-21. The precision campaign of #397 had loosened them on a CMB-only
+# objective with no P(k) in it, and there they cost the linear P(k) of every
+# cosmology with massive neutrinos 1.3e-3 at k = 1/Mpc and 3.8e-3 at k = 5/Mpc
+# (z = 0, the same for m_nu = 0.06 and 0.3 eV), against a converged run.
+# Pass this file to reproduce a result computed in that period, or to bisect.
+#
+# The other knobs of #397 are unchanged; for the defaults from before 2026-08-21
+# use precision_pre_2026_08_21.pre instead.
+# See docs/superpowers/specs/2026-10-09-ncdm-precision-defaults-design.md.
+ncdm_fluid_trigger_tau_over_tau_k = 15
+l_max_ncdm = 10
+tol_ncdm_synchronous = 0.03

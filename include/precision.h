@@ -155,8 +155,12 @@ struct precision {
    * Tolerance on the relative precision of the integration over
    * non-cold dark matter phase-space distributions in the synchronous gauge.
    * The convenience input key "tol_ncdm" sets both this and tol_ncdm_newtonian.
+   * 0.0034 again since 2026-10-09: with 0.03 (2026-08-21 to 2026-10-09), together
+   * with l_max_ncdm and ncdm_fluid_trigger_tau_over_tau_k, P(k) with massive
+   * neutrinos was 3.8e-3 low at k = 5/Mpc (see
+   * docs/superpowers/specs/2026-10-09-ncdm-precision-defaults-design.md).
    */
-  double tol_ncdm_synchronous = 0.03;
+  double tol_ncdm_synchronous = 0.0034;
   /**
    * Tolerance on the relative precision of the integration over
    * non-cold dark matter phase-space distributions in the newtonian gauge.
@@ -450,7 +454,8 @@ struct precision {
   int l_max_idr =
       17; /**< number of momenta in Boltzmann hierarchy for interacting dark radiation */
   int l_max_ncdm =
-      10; /**< number of momenta in Boltzmann hierarchy for relativistic neutrino/relics (scalar), at least 4 */
+      17; /**< number of momenta in Boltzmann hierarchy for non-cold relics (scalar), at least 4;
+             17 again since 2026-10-09 (10 from 2026-08-21), see tol_ncdm_synchronous */
   int l_max_g_ten =
       5; /**< number of momenta in Boltzmann hierarchy for photon temperature (tensor), at least 4 */
   int l_max_pol_g_ten =
@@ -540,9 +545,11 @@ struct precision {
 
   /**
    * when to switch off ncdm (massive neutrinos / non-cold
-   * relics) fluid approximation
+   * relics) fluid approximation. 31 again since 2026-10-09: at 15 (from 2026-08-21)
+   * the switch came while neutrinos are still relativistic at k > 0.5/Mpc, see
+   * tol_ncdm_synchronous.
    */
-  double ncdm_fluid_trigger_tau_over_tau_k = 15.;
+  double ncdm_fluid_trigger_tau_over_tau_k = 31.;
 
   /**
    * whether CMB source functions can be approximated as zero when

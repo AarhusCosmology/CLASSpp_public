@@ -3341,7 +3341,8 @@ void precision::parse(const FileContent& fc) {
   // l_max_dr_col's default a function of the other two rather than a constant
   // of its own: 17 was consistent while l_max_ncdm was also 17, but the #397
   // precision defaults lowered l_max_ncdm to 10, and from then on the DEFAULT
-  // configuration failed that check, aborting every decaying-NCDM run.
+  // configuration failed that check, aborting every decaying-NCDM run. l_max_ncdm
+  // is 17 again since 2026-10-09; the rule stays, since either can be set.
   if (!fc.get<int>("l_max_dr_col").has_value())
     l_max_dr_col = std::min(l_max_dr, l_max_ncdm);
 }
