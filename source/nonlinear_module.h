@@ -123,7 +123,7 @@ class NonlinearModule : public BaseModule {
                          double* lnpk_l,
                          double* ddlnpk_l,
                          double* k_nl,
-                         short* halofit_found_k_max);
+                         short* nl_corr_not_computable_at_this_k);
   void nonlinear_halofit_integrate(double* integrand_array,
                                    int integrand_size,
                                    int ia_size,
@@ -141,7 +141,7 @@ class NonlinearModule : public BaseModule {
                         std::vector<std::vector<double>>& lnpk_l,
                         std::vector<std::vector<double>>& ddlnpk_l,
                         double* k_nl,
-                        short* halofit_found_k_max,
+                        short* nl_corr_not_computable_at_this_k,
                         nonlinear_workspace* pnw);
   void nonlinear_hmcode_compute(HMcodeVersion version,
                                 int index_pk,

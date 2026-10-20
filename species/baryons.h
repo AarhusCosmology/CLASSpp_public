@@ -62,14 +62,14 @@ class BaryonsSpecies : public BaseSpecies {
 
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
 
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  void RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                          perturb_vector* pv,
                                          const precision* ppr,
                                          int& index_pt,
@@ -78,7 +78,7 @@ class BaryonsSpecies : public BaseSpecies {
 
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
@@ -86,21 +86,21 @@ class BaryonsSpecies : public BaseSpecies {
 
   // ── Source filling and initial conditions ──────────────────────────────────
 
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
+  void FillSources(const BaseSpecies::PerturbLayout& base,
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
 
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
@@ -119,7 +119,7 @@ class BaryonsSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,

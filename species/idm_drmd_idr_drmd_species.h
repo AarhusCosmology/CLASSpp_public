@@ -103,11 +103,11 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   // Registration, derivs (children + AddCouplingDerivs), stress-energy,
   // sync->Newtonian and approximation-switch copies all use the generic
   // CompositeSpecies child loops. Only composite-specific logic is overridden.
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
+  void FillSources(const BaseSpecies::PerturbLayout& base,
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;

@@ -267,7 +267,7 @@ class PerturbationsModule : public BaseModule {
                              int number_of_titles,
                              double* data) const;
   void perturb_sources_at_tau(
-      int index_md, int index_ic, int index_tp, double tau, double* pvecsources) const;
+      int index_md, int index_ic, int index_tp, double tau, double* psource) const;
   void perturb_init();
   void perturb_indices_of_perturbs();
   void perturb_timesampling_for_sources();
@@ -301,11 +301,8 @@ class PerturbationsModule : public BaseModule {
   void perturb_total_stress_energy(int index_md, double k, double* y, perturb_workspace* ppw);
   void perturb_timescale_member(double tau, void* parameters_and_workspace, double* timescale);
   static void perturb_timescale(double tau, void* parameters_and_workspace, double* timescale);
-  void perturb_sources_member(double tau,
-                              double* pvecperturbations,
-                              double* pvecderivs,
-                              int index_tau,
-                              void* parameters_and_workspace);
+  void perturb_sources_member(
+      double tau, double* y, double* dy, int index_tau, void* parameters_and_workspace);
   static void perturb_sources(double tau,
                               double* pvecperturbations,
                               double* pvecderivs,

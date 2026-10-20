@@ -180,26 +180,26 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
     return std::make_unique<PerturbLayout>();
   }
 
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) const override;
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,
                                         const perturb_workspace* ppw) const override;
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
+  void FillSources(const BaseSpecies::PerturbLayout& base,
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;

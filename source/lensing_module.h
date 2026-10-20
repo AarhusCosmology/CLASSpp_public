@@ -41,7 +41,7 @@ class LensingModule : public BaseModule {
   void lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2);
   void lensing_d22(double* mu, int num_mu, int lmax, double** d22);
   void lensing_d20(double* mu, int num_mu, int lmax, double** d20);
-  void lensing_d31(double* mu, int num_mu, int lmax, double** d3m1);
+  void lensing_d31(double* mu, int num_mu, int lmax, double** d31);
   void lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1);
   void lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3);
   void lensing_d40(double* mu, int num_mu, int lmax, double** d40);

@@ -105,7 +105,7 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   // ── Perturbations ────────────────────────────────────────────────────────
 
   // Layout-based scalar register (writes both layout and legacy pv arrays).
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
@@ -113,20 +113,20 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                                    int gauge) override;
 
   // Scalar PerturbDerivs (called by DNCDM_DR_Species composite with my.dncdm).
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) const override;
 
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
   /** Fused override: one RescaledPerturbations call for delta/theta/shear;
    *  DeltaP uses its own independent loop (different weights), matching the
    *  individual methods' per-term expressions and operand order exactly. */
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,

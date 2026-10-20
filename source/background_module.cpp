@@ -194,7 +194,7 @@ void BackgroundModule::background_timescale(double loga,
  *
  * @param tau           Input: value of conformal time
  * @param return_format Input: format of output vector (short, normal, long)
- * @param intermode     Input: interpolation mode (normal or closeby)
+ * @param inter_mode    Input: interpolation mode (normal or closeby)
  * @param last_index    Input/Output: index of the previous/current point in the interpolation array (input only for closeby mode, output for both)
  * @param pvecback      Output: vector (assumed to be already allocated)
  * @return the error status
@@ -203,7 +203,7 @@ void BackgroundModule::background_timescale(double loga,
 void BackgroundModule::background_at_tau(
     double tau,
     short return_format,
-    short intermode,
+    short inter_mode,
     int* last_index,
     double*
         pvecback /* vector with argument pvecback[index_bg] (must be already allocated with a size compatible with return_format) */
@@ -257,7 +257,7 @@ void BackgroundModule::background_at_tau(
       or array_interpolate_spline_growing_closeby() (depending on
       interpolation mode) */
 
-  if (intermode == pba->inter_normal) {
+  if (inter_mode == pba->inter_normal) {
     array_interpolate_spline(tau_table_.data(),
                              bt_size_,
                              background_table_.data(),
@@ -268,7 +268,7 @@ void BackgroundModule::background_at_tau(
                              pvecback,
                              pvecback_size);
   }
-  if (intermode == pba->inter_closeby) {
+  if (inter_mode == pba->inter_closeby) {
     array_interpolate_spline_growing_closeby(tau_table_.data(),
                                              bt_size_,
                                              background_table_.data(),

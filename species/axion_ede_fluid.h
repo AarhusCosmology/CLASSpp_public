@@ -49,7 +49,7 @@ class AxionEDEFluid : public FluidSpecies {
     // the exact -1 at the a = 0 asymptote lies outside the integration domain.
     return false;
   }
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
   void SetBackgroundModule(const BackgroundModule* bgm) override;

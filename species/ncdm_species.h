@@ -55,14 +55,14 @@ class NCDMSpecies : public NCDMBaseSpecies {
   // ── Perturbations ────────────────────────────────────────────────────────
 
   // Layout-based scalar register (implementation writes both layout and legacy pv arrays).
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
@@ -73,7 +73,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
 
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
@@ -82,15 +82,15 @@ class NCDMSpecies : public NCDMBaseSpecies {
    *  that accumulates all four quantities in a single pass (epsilon and the
    *  (a0/a)^4 factor computed once per bin). ULP-equivalent to the four
    *  individual methods — benign reduction drift, validated <0.1% on Cl/P(k). */
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,
                                         const perturb_workspace* ppw) const override;
 
   // FA-collapse switch hook.
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;

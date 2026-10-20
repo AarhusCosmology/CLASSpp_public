@@ -54,7 +54,7 @@ class MajoronSpecies : public UltraRelativisticSpecies {
                 const double* pvecback_B,
                 const double* pvecback) const override;
 
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,

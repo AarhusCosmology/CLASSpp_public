@@ -180,7 +180,7 @@ class ThermodynamicsModule : public BaseModule {
   void thermodynamics_recombination_derivs_member(double z,
                                                   double* y,
                                                   double* dy,
-                                                  void* fixed_parameters);
+                                                  void* parameters_and_workspace);
   static void thermodynamics_recombination_derivs(double z,
                                                   double* y,
                                                   double* dy,
@@ -188,7 +188,7 @@ class ThermodynamicsModule : public BaseModule {
   static void thermodynamics_recfast_derivs(double minus_z,
                                             double* y,
                                             double* dy,
-                                            void* fixed_parameters);
+                                            void* parameters_and_workspace);
   static void thermodynamics_recfast_output(
       double minus_z, double y[], double dy[], int index_x, void* parameters_and_workspace);
   static void thermodynamics_recfast_output_none(

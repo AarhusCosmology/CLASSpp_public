@@ -75,20 +75,20 @@ class DNCDM_DR_Species : public DNCDMSector {
   // PerturbDerivs (children + AddCouplingDerivs), ICs, stress-energy and
   // approximation-switch copies all use the generic CompositeSpecies child
   // loops. Registration stays overridden for its DR-first slot ordering.
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
                            double tau,
                            const double* y,
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) const override;
 
-  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 

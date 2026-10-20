@@ -77,7 +77,7 @@ void interp_from_dif(double tinterp,
                      double* yinterp,
                      double* ypinterp,
                      double* yppinterp,
-                     int* index,
+                     int* mask,
                      int neq,
                      int output);
 void new_linearisation(struct jacobian* jac, double hinvGak, int neq);

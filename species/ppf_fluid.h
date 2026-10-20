@@ -27,13 +27,13 @@ class PpfFluid : public FluidSpecies {
            double Delta_pede,
            double c_gamma_over_c_fld);
 
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
@@ -48,8 +48,8 @@ class PpfFluid : public FluidSpecies {
                       const double* y,
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;

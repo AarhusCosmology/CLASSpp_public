@@ -188,7 +188,7 @@ class NCDMBaseSpecies : public BaseSpecies {
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
 
   // ── Layout-based tensor register (shared by NCDM and DNCDM) ──────────────
-  void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                          perturb_vector* pv,
                                          const precision* ppr,
                                          int& index_pt,
@@ -199,7 +199,7 @@ class NCDMBaseSpecies : public BaseSpecies {
   /** Tensor-mode Boltzmann hierarchy for NCDM species.
    *  Subclasses must provide GetDlnf0Dlnq to specialise the driving
    *  term (static table for NCDMSpecies; pvecback array for DNCDMSpecies). */
-  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
                            double tau,
                            const double* y,
                            double* dy,
@@ -208,18 +208,18 @@ class NCDMBaseSpecies : public BaseSpecies {
   // ── Tensor GW source contribution ────────────────────────────────────────
   /** Contributes this species' anisotropic-stress integral to ppw->gw_source.
    *  Uses the species's per-pv NCDMBaseSpecies::PerturbLayout slot. */
-  void ContributeTensorGwSource(const BaseSpecies::PerturbLayout& layout,
+  void ContributeTensorGwSource(const BaseSpecies::PerturbLayout& base,
                                 double a,
                                 const double* y,
                                 perturb_workspace* ppw) const override;
 
   // ── MarkUsedInSources ────────────────────────────────────────────────────
   /** NCDM multipoles l > 2 do not enter source functions. */
-  void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+  void MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
                          const perturb_workspace* ppw,
                          int* used_in_sources) const override;
 
-  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 
@@ -231,8 +231,8 @@ class NCDMBaseSpecies : public BaseSpecies {
    *  its slots or lose its hierarchy mid-integration (#372). Subclasses whose
    *  layout shape can change across a switch must override (NCDMSpecies'
    *  fluid-approximation collapse). */
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;

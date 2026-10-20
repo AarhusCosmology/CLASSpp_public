@@ -167,7 +167,7 @@ class BackgroundModule : public BaseModule {
   void background_solve_evolver();
   void background_initial_conditions(double* pvecback, double* pvecback_integration);
   void background_find_equality();
-  void background_derivs_member(double z, double* y, double* dy, void* parameters_and_workspace);
+  void background_derivs_member(double tau, double* y, double* dy, void* parameters_and_workspace);
   void background_derivs_loga_member(double loga,
                                      double* y,
                                      double* dy,

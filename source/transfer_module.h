@@ -133,7 +133,7 @@ class TransferModule : public BaseModule {
 
  private:
   void transfer_functions_at_q(
-      int index_md, int index_ic, int index_type, int index_l, double q, double* ptransfer_local);
+      int index_md, int index_ic, int index_tt, int index_l, double q, double* transfer_function);
   void transfer_init();
   void transfer_indices_of_transfers(double q_period, double K, int sgnK);
   void transfer_type_properties();

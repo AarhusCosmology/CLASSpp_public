@@ -91,7 +91,7 @@ class Type3Species : public CompositeSpecies {
   // -(2 beta/3) Zbar^2 theta_cdm contribution to the total (rho+p)theta. Used
   // un-tallied at the IC delta_tot loop; the hot-path total goes through
   // DelegateTally below, which adds the same cross-term.
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,
@@ -100,7 +100,7 @@ class Type3Species : public CompositeSpecies {
   // Hot-path total stress-energy for composites bypasses StressEnergy (it sums
   // each child's StressEnergy via TallyStressEnergy). Override so the coupling
   // cross-term reaches ppw->rho_plus_p_theta during the ODE, not only at ICs.
-  void DelegateTally(const BaseSpecies::PerturbLayout& layout,
+  void DelegateTally(const BaseSpecies::PerturbLayout& base,
                      const perturb_vector* pv,
                      const double* y,
                      const double* pvecback,
@@ -118,7 +118,7 @@ class Type3Species : public CompositeSpecies {
  private:
   // The -(2 beta/3) Zbar^2 theta_cdm coupling contribution to (rho+p)theta, shared
   // by StressEnergy (ICs) and DelegateTally (hot path). Returns 0 at beta = 0.
-  double CrossTermRhoPlusPTheta(const BaseSpecies::PerturbLayout& layout,
+  double CrossTermRhoPlusPTheta(const BaseSpecies::PerturbLayout& base,
                                 const double* y,
                                 const double* pvecback,
                                 const perturb_workspace* ppw) const;

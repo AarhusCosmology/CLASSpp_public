@@ -70,26 +70,26 @@ class DarkRadiationSpecies : public BaseSpecies {
   }
 
   // ── Perturbations ────────────────────────────────────────────────────────────
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) const override;
 
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,
                                         const perturb_workspace* ppw) const override;
 
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
@@ -100,8 +100,8 @@ class DarkRadiationSpecies : public BaseSpecies {
                               const PerturbIcContext& ctx,
                               double decay_corr) const;
 
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
@@ -126,7 +126,7 @@ class DarkRadiationSpecies : public BaseSpecies {
    *  named wherever it is allocated. The proxy DNCDM daughters are constructed as
    *  `dr_<instance>_l` / `_phi`, which makes these column names identical to the
    *  ones DrPsdSpecies emits under `dr_representation = psd`. */
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
+  void FillSources(const BaseSpecies::PerturbLayout& base,
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;

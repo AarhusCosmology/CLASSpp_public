@@ -56,7 +56,7 @@ class DCDM_DR_Species : public CompositeSpecies {
   // Registration, derivs (children + AddCouplingDerivs), ICs, stress-energy and
   // approximation-switch copies all use the generic CompositeSpecies child
   // loops. Only composite-specific logic is overridden.
-  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 

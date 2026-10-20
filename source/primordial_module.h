@@ -12,8 +12,8 @@ class PrimordialModule : public BaseModule {
 
   void primordial_spectrum_at_k(int index_md,
                                 enum linear_or_logarithmic mode,
-                                double k,
-                                double* pk) const;
+                                double input,
+                                double* output) const;
   void primordial_output_titles(std::string& titles) const;
   void primordial_output_data(int number_of_titles, double* data) const;
 

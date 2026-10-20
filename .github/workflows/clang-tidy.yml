@@ -5,7 +5,7 @@ on: [pull_request]
 # Only the checks listed in CHECKS are enforced; the rest of .clang-tidy is the target
 # that the code does not meet yet. A check joins CHECKS once the code base passes it.
 env:
-  CHECKS: '-*,cppcoreguidelines-pro-type-member-init,clang-analyzer-optin.cplusplus.UninitializedObject,readability-isolate-declaration,modernize-avoid-c-style-cast,cppcoreguidelines-pro-type-cstyle-cast,readability-braces-around-statements'
+  CHECKS: '-*,cppcoreguidelines-pro-type-member-init,clang-analyzer-optin.cplusplus.UninitializedObject,readability-isolate-declaration,modernize-avoid-c-style-cast,cppcoreguidelines-pro-type-cstyle-cast,readability-braces-around-statements,readability-inconsistent-declaration-parameter-name'
 
 jobs:
   tidy:

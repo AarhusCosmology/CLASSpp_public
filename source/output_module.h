@@ -27,7 +27,10 @@ class OutputModule : public BaseModule {
   void output_thermodynamics();
   void output_perturbations();
   void output_primordial();
-  void output_print_data(FILE* out, const std::string& titles, const double* dataptr, int tau_size);
+  void output_print_data(FILE* out,
+                         const std::string& titles,
+                         const double* dataptr,
+                         int size_dataptr);
   void output_open_cl_file(FILE** clfile,
                            const std::string& filename,
                            const char* first_line,
@@ -37,7 +40,7 @@ class OutputModule : public BaseModule {
                            const std::string& filename,
                            const char* first_line,
                            double z);
-  void output_one_line_of_pk(FILE* tkfile, double one_k, double one_pk);
+  void output_one_line_of_pk(FILE* pkfile, double one_k, double one_pk);
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;

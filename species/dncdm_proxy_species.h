@@ -131,7 +131,7 @@ class DNCDMProxySpecies : public DNCDMSector {
   /** The RTA's Jacobian diagonal, -(nu_i + Gamma_T,l) per state variable. Reported
    *  so the exponential evolver can integrate the relaxation exactly rather than
    *  resolving it with the step size. */
-  void PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& base,
                              double tau,
                              const double* y,
                              double* diag,

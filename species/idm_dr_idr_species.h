@@ -76,7 +76,7 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
 
   /** IDR l>=3 multipoles not needed in sources when rsa_idr is off, idr is
    *  free-streaming, and tca_idm_dr is off. */
-  void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+  void MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
                          const perturb_workspace* ppw,
                          int* used_in_sources) const override;
 
@@ -89,11 +89,11 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
   // Registration, derivs (children + AddCouplingDerivs), stress-energy,
   // sync->Newtonian and approximation-switch copies all use the generic
   // CompositeSpecies child loops. Only composite-specific logic is overridden.
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
+  void FillSources(const BaseSpecies::PerturbLayout& base,
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;

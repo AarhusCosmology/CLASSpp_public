@@ -137,7 +137,7 @@ class IDRSpecies : public BaseSpecies {
 
   // ── Perturbation index registration ────────────────────────────────────────
 
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
@@ -146,7 +146,7 @@ class IDRSpecies : public BaseSpecies {
 
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
@@ -154,13 +154,13 @@ class IDRSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,
                                         const perturb_workspace* ppw) const override;
 
-  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 
@@ -173,8 +173,8 @@ class IDRSpecies : public BaseSpecies {
    * is handled by the module (Task 23/25) since it needs IDM_DR_IDR_Species context.
    * This method covers the simpler slot-by-slot copies (RSA and UFA transitions).
    */
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;

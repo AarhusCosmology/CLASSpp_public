@@ -40,8 +40,8 @@ void array_spline(double* array,
                   int index_ddydx2,
                   short spline_mode);
 
-void array_spline_table_line_to_line(const double* x, /* vector of size x_size */
-                                     int x_size,
+void array_spline_table_line_to_line(const double* x, /* vector of size n_lines */
+                                     int n_lines,
                                      double* array,
                                      int n_columns,
                                      int index_y,

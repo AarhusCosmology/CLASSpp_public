@@ -78,21 +78,21 @@ class PhotonsSpecies : public BaseSpecies {
 
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
 
-  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                    perturb_vector* pv,
                                    const precision* ppr,
                                    int& index_pt,
                                    const perturb_workspace* ppw,
                                    int gauge) override;
 
-  void RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                          perturb_vector* pv,
                                          const precision* ppr,
                                          int& index_pt,
                                          const perturb_workspace* ppw,
                                          int gauge) override;
 
-  void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& layout,
+  void RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                          perturb_vector* pv,
                                          const precision* ppr,
                                          int& index_pt,
@@ -101,19 +101,19 @@ class PhotonsSpecies : public BaseSpecies {
 
   // ── PerturbDerivs ──────────────────────────────────────────────────────────
 
-  void PerturbDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                      double tau,
                      const double* y,
                      double* dy,
                      const perturb_parameters_and_workspace& ppaw) const override;
 
-  void PerturbVectorDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
                            double tau,
                            const double* y,
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) const override;
 
-  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& layout,
+  void PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
                            double tau,
                            const double* y,
                            double* dy,
@@ -155,16 +155,16 @@ class PhotonsSpecies : public BaseSpecies {
 
   // ── Source filling and initial conditions ──────────────────────────────────
 
-  void FillSources(const BaseSpecies::PerturbLayout& layout,
+  void FillSources(const BaseSpecies::PerturbLayout& base,
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
 
-  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& layout,
+  void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
 
-  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& layout,
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
                                      double* y,
                                      const PerturbIcContext& ctx) override;
 
@@ -173,20 +173,20 @@ class PhotonsSpecies : public BaseSpecies {
   /** Photon temperature l>=3 and polarization l=1,3+ are not needed in source
    *  evaluation when both rsa and tca are off. Called only in scalar mode
    *  (the dispatch loop in the module is guarded by if (_scalars_)). */
-  void MarkUsedInSources(const BaseSpecies::PerturbLayout& layout,
+  void MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
                          const perturb_workspace* ppw,
                          int* used_in_sources) const override;
 
   /** In tensor mode, photon temperature l=0,2,4 and pol l=0,2,4 are needed;
    *  mark higher multipoles as unused when both rsa and tca are off. */
-  void MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& layout,
+  void MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& base,
                                const perturb_workspace* ppw,
                                int* used_in_sources) const override;
 
   // ── Switch-copy hook ────────────────────────────────────────────────────────
 
-  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_layout,
-                                     const BaseSpecies::PerturbLayout& new_layout,
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
@@ -205,7 +205,7 @@ class PhotonsSpecies : public BaseSpecies {
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 
-  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& layout,
+  StressEnergyContribution StressEnergy(const BaseSpecies::PerturbLayout& base,
                                         const perturb_vector* pv,
                                         const double* y,
                                         const double* pvecback,
