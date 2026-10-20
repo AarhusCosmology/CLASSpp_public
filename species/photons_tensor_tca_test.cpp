@@ -173,8 +173,9 @@ void test_drift_enters_linearly() {
 
 /* D itself: d/dtau of (hdot/kappa'), from the quantities a call site has. */
 void test_drift_is_the_derivative_of_gwdot_over_dkappa() {
-  const double gw_second = -7.3e-3, ddkappa = -1.9e5;
-  const double expected = gw_second / kDkappa - kGwdot * ddkappa / (kDkappa * kDkappa);
+  const double gw_second = -7.3e-3;
+  const double ddkappa   = -1.9e5;
+  const double expected  = gw_second / kDkappa - kGwdot * ddkappa / (kDkappa * kDkappa);
   assert(Close(PhotonsSpecies::TensorTcaDrift(kGwdot, kDkappa, gw_second, ddkappa), expected));
 }
 

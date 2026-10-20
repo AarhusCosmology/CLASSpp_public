@@ -187,7 +187,8 @@ void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
                                 const double* y,
                                 const PerturbationsModule& mod,
                                 const perturb_workspace* ppw) const {
-  double delta_cdm = 0., theta_cdm = 0.;
+  double delta_cdm = 0.;
+  double theta_cdm = 0.;
 
   if (!w.IsTitleMode()) {
     const auto& layout       = static_cast<const PerturbLayout&>(*base);

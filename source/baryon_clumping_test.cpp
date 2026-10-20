@@ -13,7 +13,9 @@ int main() {
   const double shapes[2][3] = {{1. / 3., 0.1, 1.}, {0.5, 0.3, 1.2}};
   for (const auto& shape : shapes) {
     for (double b : {0.1, 0.5, 2.}) {
-      double volume = 0., baryons = 0., second_moment = 0.;
+      double volume        = 0.;
+      double baryons       = 0.;
+      double second_moment = 0.;
       for (const auto& zone : BaryonClumpingZones(b, shape[0], shape[1], shape[2])) {
         assert(zone.f_V >= 0. && zone.Delta >= 0.);
         volume        += zone.f_V;

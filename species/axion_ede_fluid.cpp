@@ -103,7 +103,9 @@ void AxionEDEFluid::ApplyInitialConditions(const BaseSpecies::PerturbLayout& bas
   if (layout.idx_delta < 0 || layout.idx_theta < 0)
     return;
 
-  double w_fld, dw_over_da, integral;
+  double w_fld;
+  double dw_over_da;
+  double integral;
   ComputeWFld(ctx.a, &w_fld, &dw_over_da, &integral);
   const double cs2   = Cs2(ctx.k * ctx.k, ctx.a);
   const double denom = 32. + 6. * cs2 + 12. * w_f_;
@@ -139,7 +141,9 @@ void AxionEDEFluid::DeriveAxionScales() {
   // (Radiation a^-4, Matter a^-3, DarkEnergy flat) + our own Omega_fld_ac.
   // Composites and EnergyType::Other are skipped, matching the approximate
   // nature of AxiCLASS's E(a_c) (this only calibrates omega_axion, not rho_fld).
-  double omega_r = 0., omega_m = 0., omega_de = 0.;
+  double omega_r  = 0.;
+  double omega_m  = 0.;
+  double omega_de = 0.;
   for (const auto& sp : bgm_->all_species_) {
     if (sp.get() == static_cast<const BaseSpecies*>(this))
       continue;

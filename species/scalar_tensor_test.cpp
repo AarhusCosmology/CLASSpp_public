@@ -148,11 +148,15 @@ int main() {
     fc.set("phi_ini_st", "0.4");
     fc.set("Omega_Lambda_st", "0");
     Built b = Build(fc, pba);
-    std::vector<double> y(b.bi_size, 0.), back(b.bg_size, 0.);
+    std::vector<double> y(b.bi_size, 0.);
+    std::vector<double> back(b.bg_size, 0.);
     const double a          = 1e-3;
     y[b.st->bi_phi_index()] = 0.4;
     b.st->ComputeBackground(a, y.data(), back.data());
-    double rho = 2.5, p = 0.8, rho_r = 2.4, rho_m = 0.1;
+    double rho   = 2.5;
+    double p     = 0.8;
+    double rho_r = 2.4;
+    double rho_m = 0.1;
     b.st->CloseFriedmann(a, 0., y.data(), back.data(), rho, p, rho_r, rho_m);
     assert(std::fabs(rho - 2.5) < 1e-15 && std::fabs(p - 0.8) < 1e-15);
     assert(rho_r == 2.4 && rho_m == 0.1);
@@ -168,20 +172,30 @@ int main() {
     FileContent fc = Emg();
     fc.set("Omega_Lambda_st", "1.4e6");  // V_Lambda ~ 0.2 in the units of this state
     Built b = Build(fc, pba);
-    std::vector<double> y(b.bi_size, 0.), back(b.bg_size, 0.);
-    const double a = 0.5, phi = 0.5, phi_prime = 0.3;
+    std::vector<double> y(b.bi_size, 0.);
+    std::vector<double> back(b.bg_size, 0.);
+    const double a                = 0.5;
+    const double phi              = 0.5;
+    const double phi_prime        = 0.3;
     y[b.st->bi_phi_index()]       = phi;
     y[b.st->bi_phi_prime_index()] = phi_prime;
     b.st->ComputeBackground(a, y.data(), back.data());
-    const double rho_rest = 1.0, p_rest = 0.2;
-    double rho = rho_rest, p = p_rest, rho_r = 0.6, rho_m = 0.4;
+    const double rho_rest = 1.0;
+    const double p_rest   = 0.2;
+    double rho            = rho_rest;
+    double p              = p_rest;
+    double rho_r          = 0.6;
+    double rho_m          = 0.4;
     b.st->CloseFriedmann(a, 0., y.data(), back.data(), rho, p, rho_r, rho_m);
 
-    const double H     = std::sqrt(rho);  // GR's line, now exact
-    const double H_dot = -(3. * p + 3. * H * H) / 2.;
-    const double f = b.st->F(phi), f_phi = 0.6 * phi, f_phiphi = 0.6;
-    const double h = 1e-6;
-    const double V = b.st->V(phi), V_phi = (b.st->V(phi + h) - b.st->V(phi - h)) / (2. * h);
+    const double H        = std::sqrt(rho);  // GR's line, now exact
+    const double H_dot    = -(3. * p + 3. * H * H) / 2.;
+    const double f        = b.st->F(phi);
+    const double f_phi    = 0.6 * phi;
+    const double f_phiphi = 0.6;
+    const double h        = 1e-6;
+    const double V        = b.st->V(phi);
+    const double V_phi    = (b.st->V(phi + h) - b.st->V(phi - h)) / (2. * h);
     const double phi_dot  = phi_prime / a;
     const double phi_ddot = (b.st->PhiPrimePrime(back.data()) - a * H * phi_prime) / (a * a);
     const double f_dot    = f_phi * phi_dot;
@@ -207,10 +221,14 @@ int main() {
     fc.set("phi_ini_st", "1.5");
     fc.set("Omega_Lambda_st", "0");
     Built b = Build(fc, pba);
-    std::vector<double> y(b.bi_size, 0.), back(b.bg_size, 0.);
+    std::vector<double> y(b.bi_size, 0.);
+    std::vector<double> back(b.bg_size, 0.);
     y[b.st->bi_phi_index()] = 1.5;  // f = 1 - 2.25 < 0
     b.st->ComputeBackground(1e-3, y.data(), back.data());
-    double rho = 1., p = 0.3, rho_r = 0.9, rho_m = 0.1;
+    double rho   = 1.;
+    double p     = 0.3;
+    double rho_r = 0.9;
+    double rho_m = 0.1;
     assert(Throws(
         [&] { b.st->CloseFriedmann(1e-3, 0., y.data(), back.data(), rho, p, rho_r, rho_m); }));
   }
@@ -225,11 +243,15 @@ int main() {
       fc.set("phi_ini_st", "0.5");
       fc.set("Omega_Lambda_st", "0");
       Built b = Build(fc, pba);
-      std::vector<double> y(b.bi_size, 0.), back(b.bg_size, 0.);
+      std::vector<double> y(b.bi_size, 0.);
+      std::vector<double> back(b.bg_size, 0.);
       y[b.st->bi_phi_index()]       = 0.5;
       y[b.st->bi_phi_prime_index()] = phi_prime;
       b.st->ComputeBackground(0.5, y.data(), back.data());
-      double rho = -1., p = 0., rho_r = 0., rho_m = 0.;
+      double rho   = -1.;
+      double p     = 0.;
+      double rho_r = 0.;
+      double rho_m = 0.;
       assert(Throws(
           [&] { b.st->CloseFriedmann(0.5, 0., y.data(), back.data(), rho, p, rho_r, rho_m); }));
     }

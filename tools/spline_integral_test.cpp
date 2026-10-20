@@ -22,7 +22,8 @@ int main() {
   const int n        = 21;
   const double exact = 2.;
   enum { ix, iy, iddy, iint, ncol };
-  std::vector<double> x(n), table(n * ncol);
+  std::vector<double> x(n);
+  std::vector<double> table(n * ncol);
   for (int i = 0; i < n; i++) {
     x[i]                 = _PI_ * i / (n - 1.);
     table[i * ncol + ix] = x[i];
@@ -34,7 +35,8 @@ int main() {
   for (int i = 0; i < n - 1; i++)
     trapezoid += 0.5 * (table[i * ncol + iy] + table[(i + 1) * ncol + iy]) * (x[i + 1] - x[i]);
 
-  double all_spline, trapzd_or_spline;
+  double all_spline;
+  double trapzd_or_spline;
   array_integrate_all_spline(table.data(), ncol, n, ix, iy, iddy, &all_spline);
   array_integrate_all_trapzd_or_spline(table.data(), ncol, n, 0, ix, iy, iddy, &trapzd_or_spline);
   array_integrate_spline_table_line_to_line(x.data(), n, table.data(), ncol, iy, iddy, iint);

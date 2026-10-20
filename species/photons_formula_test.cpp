@@ -5,7 +5,8 @@
 #include "common.h"
 
 int main() {
-  const double h = 0.67556, T = 2.7255;
+  const double h = 0.67556;
+  const double T = 2.7255;
 
   // Round-trip identity in both directions.
   const double og = Omega0gFromTcmb(T, h);

@@ -90,7 +90,8 @@ void BbnDerivs(double tau, double* y, double* dy, void* parameters) {
   double dYdt[kBbnNumNuclides] = {0.0};
 
   if (!ws.freeze_network) {
-    double lambda_np = 0.0, lambda_pn = 0.0;
+    double lambda_np = 0.0;
+    double lambda_pn = 0.0;
     if (ws.weak_table != nullptr) {
       ws.weak_table->Rates(tau, &lambda_np, &lambda_pn);
     }
@@ -210,7 +211,8 @@ double ThermalScale(const BbnNuclide& nuc, double T_mev) {
  *  proton and neutron densities eliminated in favour of their abundances. */
 void SahaInitialConditions(
     const BbnWeakRates& weak, double T_mev, double T_nu_mev, double n_b_cm3, double* Y) {
-  double lambda_np = 0.0, lambda_pn = 0.0;
+  double lambda_np = 0.0;
+  double lambda_pn = 0.0;
   weak.Rates(T_mev, T_nu_mev, &lambda_np, &lambda_pn);
 
   Y[kNucN] = lambda_pn / (lambda_np + lambda_pn);
@@ -378,7 +380,8 @@ BbnResult SolveBbn(const BbnInput& input) {
      bbn_solver_test measures what it costs rather than assuming it is nothing. */
   std::unique_ptr<BbnWeakTable> weak_table;
   if (tabulate_weak) {
-    std::vector<double> T_gamma(prepass_samples), T_nu(prepass_samples);
+    std::vector<double> T_gamma(prepass_samples);
+    std::vector<double> T_nu(prepass_samples);
     for (int i = 0; i < prepass_samples; ++i) {
       T_gamma[i] = TemperatureMeV(prepass_tau[i], input.T9_initial);
       T_nu[i]    = T_initial_mev * std::exp(-ws.trajectory_lna[i]);

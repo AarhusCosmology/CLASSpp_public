@@ -34,7 +34,8 @@ double riemann_zeta(double s) {
     e[j]  = e[j + 1] + bnj;
   }
 
-  double S1 = 0., S2 = 0.;
+  double S1 = 0.;
+  double S2 = 0.;
   for (int k = 1; k <= n; ++k) {
     if ((k - 1) % 2 == 0)
       S1 += 1. / std::pow(k, s);
@@ -53,7 +54,12 @@ double riemann_zeta(double s) {
 // J_alpha = (1 - 2^-(alpha+1)) zeta(alpha+2), with Taylor fallback near alpha=-1.
 double J_alpha(double alpha) {
   if (std::fabs(alpha + 1.) < 1e-3) {
-    double j = alpha + 1., j2 = j * j, j3 = j2 * j, j4 = j3 * j, j5 = j4 * j, j6 = j5 * j;
+    double j  = alpha + 1.;
+    double j2 = j * j;
+    double j3 = j2 * j;
+    double j4 = j3 * j;
+    double j5 = j4 * j;
+    double j6 = j5 * j;
     return 0.693147180559945309 + 0.159868903742430972 * j - 0.0326862962794492996 * j2 +
            0.00156899170541551496 * j3 + 0.000749872421120475325 * j4 -
            0.000204290897136748191 * j5 + 0.0000231747166672581420 * j6;
@@ -91,8 +97,10 @@ double solve_alpha(double r) {
   // Initial guess from inverting the rational approximation
   // r_M(alpha) ~ (alpha + 2*kRMatZero) / (alpha + 2) (exact at alpha=0, -> 1 as
   // alpha -> inf): alpha ~ 2*(kRMatZero - r)/(r - 1).
-  double a    = 2. * (kRMatZero - r) / (r - 1.);
-  double left = a, right = a, lim = 1.;
+  double a     = 2. * (kRMatZero - r) / (r - 1.);
+  double left  = a;
+  double right = a;
+  double lim   = 1.;
   while (f(left) < 0.) {  // walk left toward alpha = -2
     lim   *= 0.1;
     right  = left;
@@ -272,7 +280,9 @@ std::optional<double> GreyBodyNCDMSpecies::GetParam(const std::string& name) con
   if (name == "x")
     return gb_.x();
   if (name == "M_2" || name == "M_3" || name == "M_4") {
-    double M2, M3, M4;
+    double M2;
+    double M3;
+    double M4;
     GreyBodyMoments(M2, M3, M4);
     if (name == "M_2")
       return M2;

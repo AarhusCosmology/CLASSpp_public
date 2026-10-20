@@ -118,7 +118,8 @@ int main() {
       return 1;
     }
 
-    NCDMBaseSpecies::PerturbLayout old_l, new_l;
+    NCDMBaseSpecies::PerturbLayout old_l;
+    NCDMBaseSpecies::PerturbLayout new_l;
     FillNcdmLayout(old_l, q_size, l_max, /*idx0=*/7);
     FillNcdmLayout(new_l, q_size, l_max, /*idx0=*/3);
 
@@ -141,7 +142,8 @@ int main() {
 
     // Uninitialized layouts (shape -1, e.g. mode without this species) must be
     // a safe no-op.
-    NCDMBaseSpecies::PerturbLayout empty_old, empty_new;
+    NCDMBaseSpecies::PerturbLayout empty_old;
+    NCDMBaseSpecies::PerturbLayout empty_new;
     sp->CopyPerturbationsAcrossSwitch(empty_old, empty_new, old_y.data(), new_y.data(), ctx);
   }
 
@@ -209,7 +211,8 @@ int main() {
     }
 
     sp->SetCollisionOwned(true);
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     sp->RegisterBackgroundIndices(index_bg);
     sp->RegisterIntegrationIndices(index_bi);
     // Collision-owned integration registers ONLY the f-variable (q_size), not the
@@ -219,7 +222,8 @@ int main() {
       rc = 1;
     }
 
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     BackgroundICContext icc{};
     icc.a_ini                = 1e-14;
     icc.pvecback_integration = bi.data();
@@ -347,12 +351,14 @@ int main() {
   {
     auto sp          = MakeDncdmSingleGrid(&pba);  // collision_owned_ defaults to false
     const int q_size = sp->q_size();
-    int index_bi = 0, index_bg = 0;
+    int index_bi     = 0;
+    int index_bg     = 0;
     sp->RegisterIntegrationIndices(index_bi);
     sp->RegisterBackgroundIndices(index_bg);
 
     const double kLnf = -1000.;
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     for (int i = 0; i < q_size; ++i) {
       bi[sp->bi_lnf_index() + i]          = kLnf;
       bi[sp->bi_dlnfdlnq_sep_index() + i] = -0.5 * (i + 1);  // any distinctive value

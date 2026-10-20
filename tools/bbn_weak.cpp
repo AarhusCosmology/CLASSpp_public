@@ -70,7 +70,8 @@ BbnWeakRates::BbnWeakRates(double tau_n_seconds, int nodes) : tau_n_(tau_n_secon
 
   x_.resize(nodes);
   w_.resize(nodes);
-  std::vector<double> mu(nodes), weight(nodes);
+  std::vector<double> mu(nodes);
+  std::vector<double> weight(nodes);
   quadrature_gauss_legendre(mu.data(), weight.data(), nodes, 1.0e-14);
   for (int i = 0; i < nodes; ++i) {
     x_[i] = 0.5 * (mu[i] + 1.0);
@@ -178,7 +179,8 @@ BbnWeakTable::BbnWeakTable(const BbnWeakRates& exact,
   ln_second_.resize(ln_rates_.size());
 
   for (int i = 0; i < n_; ++i) {
-    double np = 0., pn = 0.;
+    double np = 0.;
+    double pn = 0.;
     exact.Rates(T_gamma[i], T_nu[i], &np, &pn);
     /* Clamped rather than guarded with an if: log(0) is -inf, and these
        translation units are built with -ffinite-math-only, where materialising

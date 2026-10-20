@@ -42,8 +42,13 @@ void generic_integrator(
     struct generic_integrator_workspace* pgi)
 
 {
-  int nstp, i;
-  double x, hnext, hdid, h, h1;
+  int nstp;
+  int i;
+  double x;
+  double hnext;
+  double hdid;
+  double h;
+  double h1;
 
   h1 = x2 - x1;
   x  = x1;
@@ -87,7 +92,10 @@ void rkqs(double* x,
           void* parameters_and_workspace_for_derivs,
           struct generic_integrator_workspace* pgi) {
   int i;
-  double errmax, h, htemp, xnew;
+  double errmax;
+  double h;
+  double htemp;
+  double xnew;
 
   h = htry;
   for (;;) {

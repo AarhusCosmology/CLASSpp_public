@@ -182,7 +182,8 @@ std::vector<Named> DCDM_WDM_Species::CreateAll(const SpeciesBuildContext& ctx) {
     // Mode (b) discovery build needs an Omega_ini seed for the DCDM child.
     double Omega_ini_dcdm = Omega_ini;
     if (!has_initial) {
-      std::vector<double> g, d;
+      std::vector<double> g;
+      std::vector<double> d;
       auto tmp = std::make_unique<
           DCDM_WDM_Species>(std::make_unique<WdmDecayProductSpecies>(ctx.pfc,
                                                                      nm,

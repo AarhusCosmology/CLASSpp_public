@@ -330,7 +330,8 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
                                         const double* y,
                                         const PerturbationsModule& mod,
                                         const perturb_workspace* ppw) const {
-  double delta_scf = 0., theta_scf = 0.;
+  double delta_scf = 0.;
+  double theta_scf = 0.;
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
@@ -606,7 +607,8 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
       species->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
       species->needs_shooting_  = true;
 
-      std::vector<double> g, d;
+      std::vector<double> g;
+      std::vector<double> d;
       species->ComputeShootingGuess(ctx, g, d);
 
       // Seed the guess into this discovery-build species' scf_parameters_[tuning_index]
@@ -674,7 +676,8 @@ std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ct
     species->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega0_scf};
     species->needs_shooting_  = true;
     if (species->scf_parameters_[0] <= 0.) {
-      std::vector<double> g, d;
+      std::vector<double> g;
+      std::vector<double> d;
       species->ComputeShootingGuess(ctx, g, d);
       species->scf_parameters_[0] = g[0];
     }
@@ -775,7 +778,8 @@ std::vector<Named> ScalarFieldSpecies::CreateAllForComposite(const SpeciesBuildC
       field->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
       field->needs_shooting_  = true;
 
-      std::vector<double> g, d;
+      std::vector<double> g;
+      std::vector<double> d;
       field->ComputeShootingGuess(ctx, g, d);                   // 1EXP guess: V0 ~ 3 H0^2 Omega
       field->scf_parameters_[field->scf_tuning_index_] = g[0];  // seed V0 guess
     }

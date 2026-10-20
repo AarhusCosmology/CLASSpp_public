@@ -69,7 +69,9 @@ int main() {
 
   // ── Fiducial cosmic-time helpers (Task 1) ──────────────────────────────────
   {
-    const double H0 = 0.674 * 1.0e5 / _c_, Om = 0.31, Or = 9.2e-5;
+    const double H0 = 0.674 * 1.0e5 / _c_;
+    const double Om = 0.31;
+    const double Or = 9.2e-5;
     // Matter-era limit t(a) -> (2/3) a^{3/2} / (H0 sqrt(Om)) for a >> a_eq (=Or/Om ~ 3e-4).
     for (double a : {0.1, 0.5, 1.0}) {
       const double t_matter = (2.0 / 3.0) * std::pow(a, 1.5) / (H0 * std::sqrt(Om));
@@ -99,7 +101,8 @@ int main() {
     WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
     assert(sp.q_size() == 96);
     // M = kQKick * eps / v with eps = sqrt(1 - v^2)
-    const double v = 0.1, eps = std::sqrt(1. - v * v);
+    const double v   = 0.1;
+    const double eps = std::sqrt(1. - v * v);
     assert(std::fabs(sp.M() - 10.0 * eps / v) < 1e-12 * sp.M());
     // Injection-adapted grid: equal-injected-decay quantiles. Reconstruct the
     // decayed fraction F at each bin centre; it must be the uniform F-grid.
@@ -182,7 +185,8 @@ int main() {
     FileContent fc = BaseFc();
     WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
     const int N = sp.q_size();
-    std::vector<double> J(N), dJ(N);
+    std::vector<double> J(N);
+    std::vector<double> dJ(N);
     const int Nsr = sp.q_size();
     for (double a : {sp.q()[Nsr / 5] / 10.0,
                      sp.q()[2 * Nsr / 5] / 10.0,
@@ -251,7 +255,8 @@ int main() {
       const double a     = std::exp(u_cut) / 10.0;                 // u_cut = ln(a*kQKick)
       const double sigma = sp.SigmaAt(u_cut);
       sp.FillInjection(a, 0.7, J.data(), nullptr);
-      double A = 0., Au = 0.;
+      double A      = 0.;
+      double Au     = 0.;
       bool negative = false;
       for (int i = 0; i < N; ++i) {
         const double q   = sp.q()[i];
@@ -316,7 +321,8 @@ int main() {
     FileContent fc = BaseFc();
     WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
     const int N = sp.q_size();
-    std::vector<double> J(N), dJ(N);
+    std::vector<double> J(N);
+    std::vector<double> dJ(N);
 
     // J itself still peaks near the cutoff (unaffected by the dJ/dlnq fix).
     {
@@ -333,7 +339,8 @@ int main() {
 
     auto moment_check = [&](double a) {
       sp.FillInjection(a, 0.7, J.data(), dJ.data());
-      double lhs = 0., rhs = 0.;
+      double lhs = 0.;
+      double rhs = 0.;
       for (int i = 0; i < N; ++i) {
         const double q   = sp.q()[i];
         const double ep  = std::sqrt(q * q + a * a * sp.M() * sp.M());
@@ -355,13 +362,15 @@ int main() {
     WdmDecayProductSpecies sp(&fc, "ddm", TestSettings(), &pba, nullptr);
     const int N = sp.q_size();
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     sp.RegisterBackgroundIndices(index_bg);
     sp.RegisterIntegrationIndices(index_bi);
     assert(index_bg == 4 + 3 * N);
     assert(index_bi == 2 * N);
 
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     BackgroundICContext icc{};
     icc.a_ini                = 1e-14;
     icc.pvecback_integration = bi.data();
@@ -450,7 +459,8 @@ int main() {
     // rho_wdm(a) must equal the injection-time integral
     //   Int dtau' a' Gamma rho_dcdm(a') (a'/a)^3 sqrt(eps^2 + (1-eps^2)(a'/a)^2)
     // (each daughter is born with energy m_parent/2 and redshifts kinetically).
-    const double v = 0.1, eps2 = 1. - v * v;
+    const double v     = 0.1;
+    const double eps2  = 1. - v * v;
     const double Gamma = 100. * 1.e3 / _c_;  // same double conversion as the species
     const int n_rows   = bgm->bt_size_;
     auto row           = [&](int r, int c) { return data[(size_t) r * n_titles + c]; };

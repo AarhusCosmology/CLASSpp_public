@@ -84,36 +84,91 @@ void evolver_ndf15(EvolverDerivs derivs,
   /* Constants: */
   double G[5]     = {1.0, 3.0 / 2.0, 11.0 / 6.0, 25.0 / 12.0, 137.0 / 60.0};
   double alpha[5] = {-37.0 / 200, -1.0 / 9.0, -8.23e-2, -4.15e-2, 0};
-  double invGa[5], erconst[5];
+  double invGa[5];
+  double erconst[5];
   /* abstol was hardwired here; it is the error-weight floor, so it decides which
      variables are resolved relatively at all, and the default preserves the old
      value exactly. */
   const double abstol = options.abstol;
-  double eps = 1e-16, threshold = abstol;
-  int maxit = 4;
+  double eps          = 1e-16;
+  double threshold    = abstol;
+  int maxit           = 4;
   /* 0 means "the evolver's own default", which keeps "the caller asked for 5"
      distinguishable from "the caller said nothing". */
   const int maxk = options.max_order > 0 ? options.max_order : 5;
 
   /* Logicals: */
-  int Jcurrent, havrate, done, at_hmin, nofailed, gotynew, tooslow, *interpidx;
+  int Jcurrent;
+  int havrate;
+  int done;
+  int at_hmin;
+  int nofailed;
+  int gotynew;
+  int tooslow;
+  int* interpidx;
 
   /* Storage: */
-  double *f0, *y, *wt, *ddfddt, *pred, *ynew, *invwt, *rhs, *psi, *difkp1, *del, *yinterp;
-  double *tempvec1, *ypinterp, *yppinterp;
+  double* f0;
+  double* y;
+  double* wt;
+  double* ddfddt;
+  double* pred;
+  double* ynew;
+  double* invwt;
+  double* rhs;
+  double* psi;
+  double* difkp1;
+  double* del;
+  double* yinterp;
+  double* tempvec1;
+  double* ypinterp;
+  double* yppinterp;
   double** dif;
   struct jacobian jac;
   struct numjac_workspace nj_ws;
 
   /* Method variables: */
-  double t, t0, tfinal, tnew = 0;
-  double rh, htspan, absh, hmin, hmax, h, tdel;
-  double abshlast, hinvGak, minnrm, oldnrm = 0., newnrm;
-  double err, hopt, errkm1, hkm1, errit, rate = 0., temp, errkp1, hkp1, maxtmp;
-  int k, klast, nconhk, iter, next, kopt, tdir;
+  double t;
+  double t0;
+  double tfinal;
+  double tnew = 0;
+  double rh;
+  double htspan;
+  double absh;
+  double hmin;
+  double hmax;
+  double h;
+  double tdel;
+  double abshlast;
+  double hinvGak;
+  double minnrm;
+  double oldnrm = 0.;
+  double newnrm;
+  double err;
+  double hopt;
+  double errkm1;
+  double hkm1;
+  double errit;
+  double rate = 0.;
+  double temp;
+  double errkp1;
+  double hkp1;
+  double maxtmp;
+  int k;
+  int klast;
+  int nconhk;
+  int iter;
+  int next;
+  int kopt;
+  int tdir;
 
   /* Misc: */
-  int nfenj, j, ii, jj, numidx, neqp = neq + 1;
+  int nfenj;
+  int j;
+  int ii;
+  int jj;
+  int numidx;
+  int neqp = neq + 1;
   /* Named, rather than a six-slot int array whose meaning lived in a comment
      nearly two hundred lines above every use of it. */
   EvolverStats counters;
@@ -741,9 +796,17 @@ void eqvec(double* datavec, double* emptyvec, int n) {
 }
 
 void calc_C(struct jacobian* jac) {
-  int nz, j, k, n, col, row;
+  int nz;
+  int j;
+  int k;
+  int n;
+  int col;
+  int row;
   int duplicate;
-  int *Ci, *Cp, *Ai, *Ap;
+  int* Ci;
+  int* Cp;
+  int* Ai;
+  int* Ap;
   n  = jac->Numerical->n;
   Ci = jac->Ci.data();
   Cp = jac->Cp.data();
@@ -818,10 +881,14 @@ void interp_from_dif(double tinterp,
                      int neq,
                      int output) {
   /* Output=1: only y_vector. Output=2: y and y prime. Output=3: y, yp and ypp*/
-  double fact, prod, sumfrac;
+  double fact;
+  double prod;
+  double sumfrac;
   double vecy[5]  = {0., 0., 0., 0., 0.};
   double vecdy[5] = {0., 0., 0., 0., 0.};
-  double s, sumtmp, sumtmp2;
+  double s;
+  double sumtmp;
+  double sumtmp2;
 
   s = (tinterp - tnew) / h;
 
@@ -858,7 +925,9 @@ void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
                          {0, 0, 0, 0, -1}};
   double tempvec[5];
   double mydifRU[5][5];
-  int ii, jj, kk;
+  int ii;
+  int jj;
+  int kk;
 
   for (ii = 1; ii <= 5; ii++)
     mydifRU[0][ii - 1] = -ii * abshdivabshlast;
@@ -895,8 +964,12 @@ void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
 }
 
 void new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
-  double luparity, *Ax;
-  int i, j, *Ap, *Ai;
+  double luparity;
+  double* Ax;
+  int i;
+  int j;
+  int* Ap;
+  int* Ai;
   if (jac->use_sparse == 1) {
     Ap = jac->spJ->Ap.data();
     Ai = jac->spJ->Ai.data();
@@ -955,7 +1028,9 @@ void new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
 
 /** Helper functions */
 void lubksb(double** a, int n, int* indx, double b[]) {
-  int i, ii = 0, ip;
+  int i;
+  int ii = 0;
+  int ip;
   double sum;
   for (i = 1; i <= n; i++) {
     ip    = indx[i];
@@ -977,8 +1052,14 @@ void lubksb(double** a, int n, int* indx, double b[]) {
 }
 
 bool ludcmp(double** a, int n, int* indx, double* d, double* vv) {
-  int i, imax = 0, j, k;
-  double big, dum, sum, temp;
+  int i;
+  int imax = 0;
+  int j;
+  int k;
+  double big;
+  double dum;
+  double sum;
+  double temp;
   *d = 1.0;
   for (i = 1; i <= n; i++) {
     big = 0.0;
@@ -1040,8 +1121,17 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
      take ntrial Newton-Raphson steps to improve the root.
      Stop if the root converges in either summed absolute
      variable increments tolx or summed absolute function values tolf.*/
-  int i, *indx, ntrial = 20;
-  double errx, errf, d, *F0, *Fdel, **Fjac, *p, *lu_work;
+  int i;
+  int* indx;
+  int ntrial = 20;
+  double errx;
+  double errf;
+  double d;
+  double* F0;
+  double* Fdel;
+  double** Fjac;
+  double* p;
+  double* lu_work;
   int has_converged = false;
   double toljac     = 1e-1;
   double* delx;
@@ -1184,16 +1274,33 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
 	implementation in MATLAB, but a feature for recognising sparsity in the
 	jacobian and taking advantage of that has been added.
   */
-  double eps = 1e-16, br = pow(eps, 0.875), bl = pow(eps, 0.75), bu = pow(eps, 0.25);
-  double facmin = pow(eps, 0.78), facmax = 0.1;
-  int logjpos, pattern_broken;
-  double tmpfac, difmax2 = 0., del2, ffscale;
-  int i, j;
-  double maxval1, maxval2;
-  int colmax, group, row, nz, nz2;
-  double Fdiff_absrm, Fdiff_new;
-  double **dFdy, *fac;
-  int *Ap = nullptr, *Ai = nullptr;
+  double eps    = 1e-16;
+  double br     = pow(eps, 0.875);
+  double bl     = pow(eps, 0.75);
+  double bu     = pow(eps, 0.25);
+  double facmin = pow(eps, 0.78);
+  double facmax = 0.1;
+  int logjpos;
+  int pattern_broken;
+  double tmpfac;
+  double difmax2 = 0.;
+  double del2;
+  double ffscale;
+  int i;
+  int j;
+  double maxval1;
+  double maxval2;
+  int colmax;
+  int group;
+  int row;
+  int nz;
+  int nz2;
+  double Fdiff_absrm;
+  double Fdiff_new;
+  double** dFdy;
+  double* fac;
+  int* Ap = nullptr;
+  int* Ai = nullptr;
 
   dFdy = jac->dfdy.data(); /* Assign pointer to dfdy directly for easier notation. */
   fac  = jac->jacvec.data();

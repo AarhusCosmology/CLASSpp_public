@@ -203,7 +203,8 @@ void LensingModule::lensing_init() {
   if (has_te_) {
     cl_te.resize(l_unlensed_max_ + 1);
   }
-  std::vector<double> cl_ee, cl_bb;
+  std::vector<double> cl_ee;
+  std::vector<double> cl_bb;
   if (has_ee_ || has_bb_) {
     cl_ee.resize(l_unlensed_max_ + 1);
     cl_bb.resize(l_unlensed_max_ + 1);
@@ -244,8 +245,11 @@ void LensingModule::lensing_init() {
     }
   }
 
-  std::vector<double> sqrt1(l_unlensed_max_ + 1), sqrt2(l_unlensed_max_ + 1),
-      sqrt3(l_unlensed_max_ + 1), sqrt4(l_unlensed_max_ + 1), sqrt5(l_unlensed_max_ + 1);
+  std::vector<double> sqrt1(l_unlensed_max_ + 1);
+  std::vector<double> sqrt2(l_unlensed_max_ + 1);
+  std::vector<double> sqrt3(l_unlensed_max_ + 1);
+  std::vector<double> sqrt4(l_unlensed_max_ + 1);
+  std::vector<double> sqrt5(l_unlensed_max_ + 1);
   for (int l = 2; l <= l_unlensed_max_; l++) {
     double ll = (double) l;
     sqrt1[l]  = sqrt((ll + 2) * (ll + 1) * ll * (ll - 1));
@@ -284,7 +288,10 @@ void LensingModule::lensing_init() {
   const int num_chunks = (num_nodes + chunk_size - 1) / chunk_size;
   const int row_size   = l_unlensed_max_ + 1;
 
-  std::vector<double> partial_tt, partial_te, partial_p, partial_m;
+  std::vector<double> partial_tt;
+  std::vector<double> partial_te;
+  std::vector<double> partial_p;
+  std::vector<double> partial_m;
   if (has_tt_) {
     partial_tt.assign((size_t) num_chunks * l_size_, 0.0);
   }
@@ -310,8 +317,18 @@ void LensingModule::lensing_init() {
       next_d++;
       return row_ptrs;
     };
-    std::vector<double*> d00 = rows(), d11 = rows(), d1m1 = rows(), d2m2 = rows();
-    std::vector<double*> d20, d3m1, d4m2, d22, d31, d3m3, d40, d4m4;
+    std::vector<double*> d00  = rows();
+    std::vector<double*> d11  = rows();
+    std::vector<double*> d1m1 = rows();
+    std::vector<double*> d2m2 = rows();
+    std::vector<double*> d20;
+    std::vector<double*> d3m1;
+    std::vector<double*> d4m2;
+    std::vector<double*> d22;
+    std::vector<double*> d31;
+    std::vector<double*> d3m3;
+    std::vector<double*> d40;
+    std::vector<double*> d4m4;
     if (has_te_) {
       d20  = rows();
       d3m1 = rows();
@@ -494,7 +511,10 @@ void LensingModule::lensing_init() {
 
   /** - compute lensed \f$ C_l\f$'s by adding up the chunks' partial sums, in chunk order */
   for (int index_l = 0; index_l < l_size_; index_l++) {
-    double cltt = 0., clte = 0., clp = 0., clm = 0.;
+    double cltt = 0.;
+    double clte = 0.;
+    double clp  = 0.;
+    double clm  = 0.;
     for (int index_chunk = 0; index_chunk < num_chunks; index_chunk++) {
       const size_t index = (size_t) index_chunk * l_size_ + index_l;
       if (has_tt_) {
@@ -776,7 +796,9 @@ void LensingModule::lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb) {
  **/
 
 void LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
 
   for (int l = 1; l < lmax; l++) {
     double ll = (double) l;
@@ -814,7 +836,10 @@ void LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) 
  **/
 
 void LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / (ll * (ll + 2));
@@ -854,7 +879,10 @@ void LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) 
  **/
 
 void LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / (ll * (ll + 2));
@@ -894,7 +922,10 @@ void LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1
  **/
 
 void LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / ((ll - 1) * (ll + 3));
@@ -934,7 +965,10 @@ void LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2
  **/
 
 void LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / ((ll - 1) * (ll + 3));
@@ -974,7 +1008,9 @@ void LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) 
  **/
 
 void LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) {
-  std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 2; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 1) * (ll + 3)));
@@ -1012,7 +1048,10 @@ void LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) 
  **/
 
 void LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 3; l < lmax; l++) {
     double ll = (double) l;
     fac1[l] = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 2) * (ll + 4) * ll * (ll + 2))) * (ll + 1);
@@ -1055,7 +1094,10 @@ void LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) 
  **/
 
 void LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 3; l < lmax; l++) {
     double ll = (double) l;
     fac1[l] = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 2) * (ll + 4) * ll * (ll + 2))) * (ll + 1);
@@ -1098,7 +1140,10 @@ void LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1
  **/
 
 void LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 3; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1)) * (ll + 1) / ((ll - 2) * (ll + 4));
@@ -1140,7 +1185,9 @@ void LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3
  **/
 
 void LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) {
-  std::vector<double> fac1(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 4; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 3) * (ll + 5)));
@@ -1181,7 +1228,10 @@ void LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) 
  **/
 
 void LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 4; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 3) * (ll + 5) * (ll - 1) * (ll + 3))) *
@@ -1226,7 +1276,10 @@ void LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2
  **/
 
 void LensingModule::lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4) {
-  std::vector<double> fac1(lmax), fac2(lmax), fac3(lmax), fac4(lmax);
+  std::vector<double> fac1(lmax);
+  std::vector<double> fac2(lmax);
+  std::vector<double> fac3(lmax);
+  std::vector<double> fac4(lmax);
   for (int l = 4; l < lmax; l++) {
     double ll = (double) l;
     fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1)) * (ll + 1) / ((ll - 3) * (ll + 5));

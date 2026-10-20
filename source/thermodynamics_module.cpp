@@ -809,7 +809,13 @@ void ThermodynamicsModule::thermodynamics_init() {
     const auto& comp_ref = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
     const double Omega0_idr_local = comp_ref.idr().GetOmega0();
     const double T_idr_param      = comp_ref.idr().T_idr();
-    double Gamma_heat_idm_dr, dTdz_idm_dr, T_idm_dr, T_idr, dz, T_adia, z_adia;
+    double Gamma_heat_idm_dr;
+    double dTdz_idm_dr;
+    double T_idm_dr;
+    double T_idr;
+    double dz;
+    double T_adia;
+    double z_adia;
     double z;
 
     /** - --> second derivative with respect to tau of dmu_idm_dr (in view of spline interpolation) */
@@ -1193,7 +1199,8 @@ void ThermodynamicsModule::thermodynamics_init() {
   ds_d_ = rs_d_ / (1. + z_d_);
 
   /** - find idm_dr and idr drag times */
-  double tau_idm_dr = 0.0, tau_idr = 0.0;
+  double tau_idm_dr = 0.0;
+  double tau_idr    = 0.0;
   if (all_species_.count("IDM_DR_IDR") > 0) {
     if ((thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_idm_dr_] > 1.) &&
         (thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_idr_] > 1.)) {
@@ -2157,8 +2164,10 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
   /** - define local variables */
 
-  double z_sup, z_inf;
-  double tau_sup, tau_inf;
+  double z_sup;
+  double z_inf;
+  double tau_sup;
+  double tau_inf;
 
   /** - allocate the vector of parameters defining the function \f$ X_e(z) \f$ */
 
@@ -3044,8 +3053,9 @@ void ThermodynamicsModule::thermodynamics_recombination_clumpy(recombination* pr
                                          pth->baryon_clumping_Delta_1,
                                          pth->baryon_clumping_Delta_2);
 
-  std::vector<double> xe(ppr->recfast_Nz0, 0.), Tb(ppr->recfast_Nz0, 0.),
-      dTbdz(ppr->recfast_Nz0, 0.);
+  std::vector<double> xe(ppr->recfast_Nz0, 0.);
+  std::vector<double> Tb(ppr->recfast_Nz0, 0.);
+  std::vector<double> dTbdz(ppr->recfast_Nz0, 0.);
   for (const auto& zone : zones) {
     const double weight = zone.f_V * zone.Delta; /* the zone's share of the baryons */
     if (weight == 0.)
@@ -3126,7 +3136,8 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   /** - define local variables */
 
   /* vector of variables to be integrated: x_H, x_He, Tmat */
-  double y[3], dy[3];
+  double y[3];
+  double dy[3];
 
   /* contains all fixed parameters which should be passed to thermodynamics_recombination_derivs */
   thermodynamics_parameters_and_workspace tpaw{this};
@@ -3667,7 +3678,8 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
 
   /** - define local variables */
 
-  int index_th, index_re;
+  int index_th;
+  int index_re;
 
   /** - first, a little check that the two tables match each other and can be merged */
 
@@ -3811,7 +3823,8 @@ void ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) con
 void ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, double* data) const {
   int storeidx;
   double* dataptr;
-  double z, tau;
+  double z;
+  double tau;
 
   /* Store quantities: */
   for (int index_z = 0; index_z < tt_size_; index_z++) {

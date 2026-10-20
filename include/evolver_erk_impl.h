@@ -73,15 +73,22 @@ void evolver_erk_run(EvolverDerivs derivs,
   constexpr int idx_end = Tab::kFsal ? (s - 1) : s;
   constexpr int k_rows  = Tab::kFsal ? s : (s + 1);
 
-  std::vector<double> ynew(neq), ytemp(neq), err(neq), yinterp(neq), dyinterp(neq);
+  std::vector<double> ynew(neq);
+  std::vector<double> ytemp(neq);
+  std::vector<double> err(neq);
+  std::vector<double> yinterp(neq);
+  std::vector<double> dyinterp(neq);
   std::vector<double> ki(static_cast<size_t>(k_rows) * neq);
-  double bi_vec_y[s], bi_vec_dy[s], thpow[deg + 1];
+  double bi_vec_y[s];
+  double bi_vec_dy[s];
+  double thpow[deg + 1];
 
   /* History for the quintic Hermite interpolant: the value and the derivative at
      the END of the step before this one. Allocated only when that interpolant is
      selected -- it is two more vectors of the state size per workspace. */
   const bool want_hermite = (cfg.interpolant == ErkInterpolant::hermite3);
-  std::vector<double> y_prev, f_prev;
+  std::vector<double> y_prev;
+  std::vector<double> f_prev;
   double t_prev  = 0.0;
   bool have_prev = false;
   if (want_hermite) {
@@ -359,7 +366,8 @@ void evolver_erk_run(EvolverDerivs derivs,
         for (int m = 5; m <= deg; m++)
           thpow[m] = thpow[m - 1] * th;
         for (int i = 0; i < s; i++) {
-          double vy = 0.0, vd = 0.0;
+          double vy = 0.0;
+          double vd = 0.0;
           for (int m = 0; m < deg; m++) {
             const double r  = Tab::R[i * deg + m];
             vy             += r * thpow[m + 1];
@@ -388,13 +396,19 @@ void evolver_erk_run(EvolverDerivs derivs,
              h_i(x)    = [1 - 2 (x - x_i) L_i'(x_i)] L_i(x)^2
              hbar_i(x) = (x - x_i) L_i(x)^2
              with L_i the Lagrange basis of the three nodes. */
-          const double x0 = t_prev, x1 = t, x2 = tnew;
-          const double d01 = x0 - x1, d02 = x0 - x2, d12 = x1 - x2;
+          const double x0  = t_prev;
+          const double x1  = t;
+          const double x2  = tnew;
+          const double d01 = x0 - x1;
+          const double d02 = x0 - x2;
+          const double d12 = x1 - x2;
           /* Coincident nodes would make this singular; they cannot occur (each
              node is a strictly later accepted step end) but a zero-length step
              would, so fall back rather than divide by it. */
           if (d01 != 0.0 && d02 != 0.0 && d12 != 0.0) {
-            const double u0 = ti - x0, u1 = ti - x1, u2 = ti - x2;
+            const double u0 = ti - x0;
+            const double u1 = ti - x1;
+            const double u2 = ti - x2;
             const double L0 = (u1 * u2) / (d01 * d02);
             const double L1 = (u0 * u2) / (-d01 * d12);
             const double L2 = (u0 * u1) / (d02 * d12);
@@ -407,11 +421,15 @@ void evolver_erk_run(EvolverDerivs derivs,
             const double dL1 = (u0 + u2) / (-d01 * d12);
             const double dL2 = (u0 + u1) / (d02 * d12);
 
-            const double L0s = L0 * L0, L1s = L1 * L1, L2s = L2 * L2;
-            const double w0 = (1.0 - 2.0 * u0 * Lp0) * L0s;
-            const double w1 = (1.0 - 2.0 * u1 * Lp1) * L1s;
-            const double w2 = (1.0 - 2.0 * u2 * Lp2) * L2s;
-            const double v0 = u0 * L0s, v1 = u1 * L1s, v2 = u2 * L2s;
+            const double L0s = L0 * L0;
+            const double L1s = L1 * L1;
+            const double L2s = L2 * L2;
+            const double w0  = (1.0 - 2.0 * u0 * Lp0) * L0s;
+            const double w1  = (1.0 - 2.0 * u1 * Lp1) * L1s;
+            const double w2  = (1.0 - 2.0 * u2 * Lp2) * L2s;
+            const double v0  = u0 * L0s;
+            const double v1  = u1 * L1s;
+            const double v2  = u2 * L2s;
             const double dw0 = -2.0 * Lp0 * L0s + (1.0 - 2.0 * u0 * Lp0) * 2.0 * L0 * dL0;
             const double dw1 = -2.0 * Lp1 * L1s + (1.0 - 2.0 * u1 * Lp1) * 2.0 * L1 * dL1;
             const double dw2 = -2.0 * Lp2 * L2s + (1.0 - 2.0 * u2 * Lp2) * 2.0 * L2 * dL2;

@@ -176,10 +176,12 @@ int main() {
     fc.set("dncdm1.inverse_decays", "yes");
     auto comp = BuildComposite(fc, pba, settings);
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     comp->RegisterBackgroundIndices(index_bg);
     comp->RegisterIntegrationIndices(index_bi);
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
 
     BackgroundICContext icc{};
     icc.a_ini                = 1e-14;
@@ -218,10 +220,12 @@ int main() {
     fc.set("dncdm1.quantum_statistics", "yes");
     auto comp = BuildComposite(fc, pba, settings);
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     comp->RegisterBackgroundIndices(index_bg);
     comp->RegisterIntegrationIndices(index_bi);
-    std::vector<double> y(index_bi, 0.), dy(index_bi, 0.);
+    std::vector<double> y(index_bi, 0.);
+    std::vector<double> dy(index_bi, 0.);
 
     auto& parent = comp->parent();
     auto& ferm   = comp->fermion();
@@ -286,7 +290,8 @@ int main() {
     assert(targets[0].unknown_param == "dncdm1.deg");
     assert(comp->GetOmega0() == 0.001);  // pinned combined reserve
 
-    std::vector<double> guess, dxdy;
+    std::vector<double> guess;
+    std::vector<double> dxdy;
     SpeciesBuildContext gctx{};
     gctx.pfc           = &fc;
     gctx.pba           = &pba;
@@ -294,10 +299,12 @@ int main() {
     comp->ComputeShootingGuess(gctx, guess, dxdy);
     assert(guess.size() == 1 && guess[0] > 0.);  // finite deg guess
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     comp->RegisterBackgroundIndices(index_bg);
     comp->RegisterIntegrationIndices(index_bi);
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     BackgroundICContext icc{};
     icc.pvecback_integration = bi.data();
     comp->SetBackgroundInitialConditions(icc);
@@ -365,7 +372,8 @@ int main() {
     noff += qf * (l_max + 1);
     FillNcdmLayout(nB, qb, l_max, noff);
 
-    std::vector<double> old_y(total, 0.), new_y(total, 0.);
+    std::vector<double> old_y(total, 0.);
+    std::vector<double> new_y(total, 0.);
     const NCDMBaseSpecies::PerturbLayout* olay[3] = {&oP, &oF, &oB};
     const int qn[3]                               = {qp, qf, qb};
     for (int c = 0; c < 3; ++c)
@@ -440,7 +448,8 @@ int main() {
       FillNcdmLayout(bL, qb, l_max, off);
       off += qb * (l_max + 1);
 
-      std::vector<double> y(off, 0.), dy(off, 0.);
+      std::vector<double> y(off, 0.);
+      std::vector<double> dy(off, 0.);
       unsigned s = 0xBEEF01u;
       auto rnd   = [&]() {
         s = s * 1664525u + 1013904223u;
@@ -474,7 +483,8 @@ int main() {
       // sides are ratios, so the kappa unit boundary (#385) drops out.
       const std::vector<double>& dfH = comp->KernelDfBgH(scratch);
       const double kappa             = comp->KappaStoredToBare();
-      double max_rate_mismatch = 0., max_daughter = 0.;
+      double max_rate_mismatch       = 0.;
+      double max_daughter            = 0.;
       for (int iq = 0; iq < qp; ++iq) {
         const double fbar    = kappa * std::exp(bg[parent.bg_lnf_index() + iq]);
         const double bg_rate = dfH[iq] / fbar;
@@ -548,7 +558,8 @@ int main() {
       FillNcdmLayout(bL, qb, l_max, off);
       off += qb * (l_max + 1);
 
-      std::vector<double> y(off, 0.), dy(off, 0.);
+      std::vector<double> y(off, 0.);
+      std::vector<double> dy(off, 0.);
       unsigned s = 0x51A7Eu;
       auto rnd   = [&]() {
         s = s * 1664525u + 1013904223u;
@@ -580,10 +591,19 @@ int main() {
       // kernel's identities are stated on bare occupation — so its leg, and only
       // its leg, is scaled by kappa, exactly as ApplyKernelPerturbDerivs does.
       const double kappa = comp->KappaStoredToBare();
-      double numH = 0, numl = 0, numphi = 0, eH = 0, el = 0, ephi = 0;
-      double momH = 0, moml = 0, momphi = 0;
+      double numH        = 0;
+      double numl        = 0;
+      double numphi      = 0;
+      double eH          = 0;
+      double el          = 0;
+      double ephi        = 0;
+      double momH        = 0;
+      double moml        = 0;
+      double momphi      = 0;
       for (int i = 0; i < qp; ++i) {
-        const double q = parent.GetQ()[i], w = parent.dq()[i] * q * q, eps = std::sqrt(q * q + A);
+        const double q    = parent.GetQ()[i];
+        const double w    = parent.dq()[i] * q * q;
+        const double eps  = std::sqrt(q * q + A);
         const double Fr0  = kappa * dy[pL.index_per_q[i] + 0];
         const double Fr1  = kappa * dy[pL.index_per_q[i] + 1];
         numH             += w * Fr0;
@@ -591,7 +611,8 @@ int main() {
         momH             += parent.dq()[i] * q * q * q * Fr1;
       }
       for (int j = 0; j < qf; ++j) {
-        const double q = ferm.q()[j], w = ferm.dq()[j] * q * q;  // PT grid: where the op deposits
+        const double q    = ferm.q()[j];
+        const double w    = ferm.dq()[j] * q * q;  // PT grid: where the op deposits
         const double Fr0  = dy[fL.index_per_q[j] + 0];
         const double Fr1  = dy[fL.index_per_q[j] + 1];
         numl             += w * Fr0;
@@ -599,7 +620,8 @@ int main() {
         moml             += ferm.dq()[j] * q * q * q * Fr1;
       }
       for (int k = 0; k < qb; ++k) {
-        const double q = bos.q()[k], w = bos.dq()[k] * q * q;
+        const double q    = bos.q()[k];
+        const double w    = bos.dq()[k] * q * q;
         const double Fr0  = dy[bL.index_per_q[k] + 0];
         const double Fr1  = dy[bL.index_per_q[k] + 1];
         numphi           += w * Fr0;
@@ -696,7 +718,9 @@ int main() {
       // Independent reference: repeat the worker's gather, then take ONE
       // CollisionDiagonal straight off the perturbation kernel. bgm_ is null under
       // BuildCompositeDirect, so the worker's a'/a cap is 0 here — match it.
-      std::vector<double> refH(qp, 0.), refl(qf, 0.), refb(qb, 0.);
+      std::vector<double> refH(qp, 0.);
+      std::vector<double> refl(qf, 0.);
+      std::vector<double> refb(qb, 0.);
       {
         const double kappa = comp->KappaStoredToBare();
         std::vector<double> fH(qp);
@@ -715,7 +739,9 @@ int main() {
       // Magnitude before agreement: with inverse decays and quantum statistics on,
       // all three legs must carry a nonzero diagonal, or every assertion below is
       // vacuous. (Decay-only would zero g_l and g_phi and make the daughters trivial.)
-      double magH = 0., magl = 0., magb = 0.;
+      double magH = 0.;
+      double magl = 0.;
+      double magb = 0.;
       for (int i = 0; i < qp; ++i)
         magH = std::max(magH, std::fabs(refH[i]));
       for (int j = 0; j < qf; ++j)
@@ -808,10 +834,12 @@ int main() {
     fc.set("dncdm1.deg", "0.015");
     auto comp = BuildComposite(fc, pba, settings);
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     comp->RegisterBackgroundIndices(index_bg);
     comp->RegisterIntegrationIndices(index_bi);
-    std::vector<double> y(index_bi, 0.), dy(index_bi, 0.);
+    std::vector<double> y(index_bi, 0.);
+    std::vector<double> dy(index_bi, 0.);
 
     auto& parent = comp->parent();
     auto& ferm   = comp->fermion();
@@ -833,7 +861,8 @@ int main() {
 
     // Per-species raw grid moments of dy (parent: bg grid GetQ()/dq(), eps from
     // GetMass(); daughters: q_bg()/dq_bg(), eps == q). Public accessors only.
-    double dN_H = 0., dE_H = 0.;
+    double dN_H       = 0.;
+    double dE_H       = 0.;
     const double a2m2 = a * a * parent.GetMass() * parent.GetMass();
     for (int i = 0; i < parent.q_size(); ++i) {
       const double q    = parent.GetQ()[i];
@@ -843,7 +872,8 @@ int main() {
       dN_H             += w * d;
       dE_H             += w * eps * d;
     }
-    double dN_l = 0., dE_l = 0.;
+    double dN_l = 0.;
+    double dE_l = 0.;
     for (int i = 0; i < (int) ferm.q_bg().size(); ++i) {
       const double q  = ferm.q_bg()[i];
       const double w  = ferm.dq_bg()[i] * q * q;
@@ -851,7 +881,8 @@ int main() {
       dN_l           += w * d;
       dE_l           += w * q * d;  // massless daughter: eps == q
     }
-    double dN_phi = 0., dE_phi = 0.;
+    double dN_phi = 0.;
+    double dE_phi = 0.;
     for (int i = 0; i < (int) bos.q_bg().size(); ++i) {
       const double q  = bos.q_bg()[i];
       const double w  = bos.dq_bg()[i] * q * q;

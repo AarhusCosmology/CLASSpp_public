@@ -48,7 +48,10 @@ inline void PhiFuncs(double z, double& e0, double& p1, double& p2, double& p3) {
     p1        = 0.;
     p2        = 0.;
     p3        = 0.;
-    double f1 = 1.0, f2 = 0.5, f3 = 1.0 / 6.0, zp = 1.;  // j = 0: 1/1!, 1/2!, 1/3!
+    double f1 = 1.0;
+    double f2 = 0.5;
+    double f3 = 1.0 / 6.0;
+    double zp = 1.;  // j = 0: 1/1!, 1/2!, 1/3!
     for (int j = 0; j <= 8; ++j) {
       if (j > 0) {
         zp *= z;
@@ -116,8 +119,14 @@ void evolver_etd(EvolverDerivs derivs,
   const double pow_grow = 0.25;
 
   /* Eight scratch blocks: the stage remainders N1..N4, the stage states U2..U4, tmp. */
-  std::vector<double> f0(neq), ynew(neq), diag(neq), err(neq);
-  std::vector<double> yinterp(neq), dyinterp(neq), fnew(neq), scratch((size_t) 8 * neq);
+  std::vector<double> f0(neq);
+  std::vector<double> ynew(neq);
+  std::vector<double> diag(neq);
+  std::vector<double> err(neq);
+  std::vector<double> yinterp(neq);
+  std::vector<double> dyinterp(neq);
+  std::vector<double> fnew(neq);
+  std::vector<double> scratch((size_t) 8 * neq);
 
   double t = x_ini;
   ++counters.derivs_evaluations;
@@ -214,7 +223,10 @@ void evolver_etd(EvolverDerivs derivs,
       // constant, which is the late-time collision: a fixed relaxation rate onto a
       // slowly-drifting attractor.
       for (int k = 0; k < neq; k++) {
-        double e0, p1, p2, p3;
+        double e0;
+        double p1;
+        double p2;
+        double p3;
         PhiFuncs(0.5 * hh * diag[k], e0, p1, p2, p3);
         N1[k] = fin[k] - diag[k] * yin[k];
         U2[k] = e0 * yin[k] + 0.5 * hh * p1 * N1[k];
@@ -222,7 +234,10 @@ void evolver_etd(EvolverDerivs derivs,
       ++counters.derivs_evaluations;
       (*derivs)(tin + 0.5 * hh, U2, tmp, parameters_and_workspace_for_derivs);
       for (int k = 0; k < neq; k++) {
-        double e0, p1, p2, p3;
+        double e0;
+        double p1;
+        double p2;
+        double p3;
         PhiFuncs(0.5 * hh * diag[k], e0, p1, p2, p3);
         N2[k] = tmp[k] - diag[k] * U2[k];
         U3[k] = e0 * yin[k] + 0.5 * hh * p1 * N2[k];
@@ -230,7 +245,10 @@ void evolver_etd(EvolverDerivs derivs,
       ++counters.derivs_evaluations;
       (*derivs)(tin + 0.5 * hh, U3, tmp, parameters_and_workspace_for_derivs);
       for (int k = 0; k < neq; k++) {
-        double e0, p1, p2, p3;
+        double e0;
+        double p1;
+        double p2;
+        double p3;
         PhiFuncs(0.5 * hh * diag[k], e0, p1, p2, p3);
         N3[k] = tmp[k] - diag[k] * U3[k];
         U4[k] = e0 * U2[k] + 0.5 * hh * p1 * (2. * N3[k] - N1[k]);
@@ -238,7 +256,10 @@ void evolver_etd(EvolverDerivs derivs,
       ++counters.derivs_evaluations;
       (*derivs)(tin + hh, U4, tmp, parameters_and_workspace_for_derivs);
       for (int k = 0; k < neq; k++) {
-        double e0, p1, p2, p3;
+        double e0;
+        double p1;
+        double p2;
+        double p3;
         PhiFuncs(hh * diag[k], e0, p1, p2, p3);
         N4[k]           = tmp[k] - diag[k] * U4[k];
         const double c1 = p1 - 3. * p2 + 4. * p3;
@@ -264,7 +285,10 @@ void evolver_etd(EvolverDerivs derivs,
     {
       const double* N4 = scratch.data() + 3 * neq;
       for (int k = 0; k < neq; k++) {
-        double e0, p1, p2, p3;
+        double e0;
+        double p1;
+        double p2;
+        double p3;
         PhiFuncs(h * diag[k], e0, p1, p2, p3);
         const double c4 = -p2 + 4. * p3;
         const double N5 = fnew[k] - diag[k] * ynew[k];
@@ -369,7 +393,10 @@ void evolver_etd(EvolverDerivs derivs,
         for (int k = 0; k < neq; k++) {
           if (used_in_output[k] == 0)
             continue;
-          double e0, p1, p2, p3;
+          double e0;
+          double p1;
+          double p2;
+          double p3;
           PhiFuncs(th * h * diag[k], e0, p1, p2, p3);
           const double mid = N2[k] + N3[k];
           const double A   = N1[k];

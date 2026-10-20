@@ -67,10 +67,17 @@ template <class Tab>
 std::vector<Condition> conditions() {
   constexpr int s = Tab::kStages;
   const double* A = Tab::A;
-  Vec one(s, 1.0), c(Tab::c, Tab::c + s);
-  Vec c2 = mul(c, c), c3 = mul(c2, c), c4 = mul(c3, c);
-  Vec Ac = apply_A(A, s, c), Ac2 = apply_A(A, s, c2), Ac3 = apply_A(A, s, c3);
-  Vec AAc = apply_A(A, s, Ac), AcAc = apply_A(A, s, mul(c, Ac)), AAc2 = apply_A(A, s, Ac2);
+  Vec one(s, 1.0);
+  Vec c(Tab::c, Tab::c + s);
+  Vec c2   = mul(c, c);
+  Vec c3   = mul(c2, c);
+  Vec c4   = mul(c3, c);
+  Vec Ac   = apply_A(A, s, c);
+  Vec Ac2  = apply_A(A, s, c2);
+  Vec Ac3  = apply_A(A, s, c3);
+  Vec AAc  = apply_A(A, s, Ac);
+  Vec AcAc = apply_A(A, s, mul(c, Ac));
+  Vec AAc2 = apply_A(A, s, Ac2);
   Vec AAAc = apply_A(A, s, AAc);
   return {
       {"1", 1, one, 1.0},
@@ -117,11 +124,15 @@ void test_tableau() {
     assert(worst < 1e-14);
   }
 
-  Vec b(Tab::b, Tab::b + s), e(Tab::e, Tab::e + s), bhat(s);
+  Vec b(Tab::b, Tab::b + s);
+  Vec e(Tab::e, Tab::e + s);
+  Vec bhat(s);
   for (int j = 0; j < s; j++)
     bhat[j] = b[j] - e[j];
 
-  double worst_b = 0.0, worst_bhat4 = 0.0, best_bhat5 = 1e300;
+  double worst_b     = 0.0;
+  double worst_bhat4 = 0.0;
+  double best_bhat5  = 1e300;
   for (const Condition& cond : conds) {
     const double rb = dot(b, cond.phi) - 1.0 / cond.gamma;
     worst_b         = std::max(worst_b, fabs(rb));
@@ -171,8 +182,10 @@ void test_dense() {
      must return the step the controller actually accepted -- otherwise the
      source functions are sampled off a different trajectory than the one being
      error-controlled. */
-  const Vec b0 = dense_weights<Tab>(0.0), b1 = dense_weights<Tab>(1.0);
-  double w0 = 0.0, w1 = 0.0;
+  const Vec b0 = dense_weights<Tab>(0.0);
+  const Vec b1 = dense_weights<Tab>(1.0);
+  double w0    = 0.0;
+  double w1    = 0.0;
   for (int i = 0; i < s; i++) {
     w0 = std::max(w0, fabs(b0[i]));
     w1 = std::max(w1, fabs(b1[i] - Tab::b[i]));
@@ -184,7 +197,8 @@ void test_dense() {
      for every tree of order <= 4. Checked at several theta because they are
      polynomial identities, so a coefficient error that happens to cancel at one
      theta cannot cancel at all of them. */
-  double worst4 = 0.0, worst5 = 0.0;
+  double worst4 = 0.0;
+  double worst5 = 0.0;
   for (double theta : {0.1, 0.25, 0.5, 0.75, 0.9}) {
     const Vec bt = dense_weights<Tab>(theta);
     double thp   = 1.0;
@@ -307,13 +321,15 @@ void test_pairs_agree() {
   std::vector<double> xs(n);
   for (int i = 0; i < n; i++)
     xs[i] = 0.05 * i;
-  Sampled a, b;
+  Sampled a;
+  Sampled b;
   a.t.resize(n);
   a.y0.resize(n);
   b.t.resize(n);
   b.y0.resize(n);
-  double ya[2] = {1.0, 1.0}, yb[2] = {1.0, 1.0};
-  int used[2] = {1, 1};
+  double ya[2] = {1.0, 1.0};
+  double yb[2] = {1.0, 1.0};
+  int used[2]  = {1, 1};
   EvolverOptions opt_a;
   opt_a.rtol            = 1e-8;
   opt_a.x_sampling      = xs.data();
@@ -365,8 +381,10 @@ void test_exact_output_stepping() {
    Both are compared at the same tolerance so the step sequences are identical
    and the only difference measured is the polynomial. */
 void test_hermite_interpolant() {
-  double err_tab = 0.0, err_her = 0.0;
-  int calls_tab = 0, calls_her = 0;
+  double err_tab = 0.0;
+  double err_her = 0.0;
+  int calls_tab  = 0;
+  int calls_her  = 0;
   {
     ErkControllerConfig cfg;
     cfg.interpolant = ErkInterpolant::tableau;

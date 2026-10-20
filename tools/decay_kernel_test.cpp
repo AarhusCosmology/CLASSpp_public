@@ -83,7 +83,9 @@ void test_conservation(bool balanced = false) {
 
   std::mt19937 rng(12345u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
-  std::vector<double> fH(N), fl(N), fphi(N);
+  std::vector<double> fH(N);
+  std::vector<double> fl(N);
+  std::vector<double> fphi(N);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -91,14 +93,18 @@ void test_conservation(bool balanced = false) {
   for (auto& x : fphi)
     x = U(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3;  // A = a^2 m^2 = 1 -> bands in [1e-4,2e2]
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;  // A = a^2 m^2 = 1 -> bands in [1e-4,2e2]
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
   cfg.balanced_gather    = balanced;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
-  std::vector<double> dfH(N), dfl(N), dfphi(N);
+  std::vector<double> dfH(N);
+  std::vector<double> dfl(N);
+  std::vector<double> dfphi(N);
   K.ComputeBackgroundDerivs(a,
                             m,
                             Gamma,
@@ -169,7 +175,9 @@ void test_channel_multiplicity(int n_parent, int n_daughter, bool balanced = fal
 
   std::mt19937 rng(4242u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
-  std::vector<double> fH(N), fl(N), fphi(N);
+  std::vector<double> fH(N);
+  std::vector<double> fl(N);
+  std::vector<double> fphi(N);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -177,7 +185,9 @@ void test_channel_multiplicity(int n_parent, int n_daughter, bool balanced = fal
   for (auto& x : fphi)
     x = U(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
 
   double split_resid = 0.;
   auto run           = [&](int np,
@@ -209,7 +219,12 @@ void test_channel_multiplicity(int n_parent, int n_daughter, bool balanced = fal
     return K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
   };
 
-  std::vector<double> dfH1(N), dfl1(N), dfphi1(N), dfH(N), dfl(N), dfphi(N);
+  std::vector<double> dfH1(N);
+  std::vector<double> dfl1(N);
+  std::vector<double> dfphi1(N);
+  std::vector<double> dfH(N);
+  std::vector<double> dfl(N);
+  std::vector<double> dfphi(N);
   run(1, 1, dfH1, dfl1, dfphi1);
   auto M = run(n_parent, n_daughter, dfH, dfl, dfphi);
 
@@ -224,10 +239,12 @@ void test_channel_multiplicity(int n_parent, int n_daughter, bool balanced = fal
   leg /= scale1 * n_parent * n_daughter;
 
   // (2) the multiplicity-weighted conservation identities
-  const double wN_H = n_parent * M.N_H, wN_l = n_daughter * M.N_l;
-  const double num_f = std::fabs(wN_H + wN_l) / Scale(wN_H, wN_l);
-  const double num_b = std::fabs(2. * wN_H + M.N_phi) / Scale(2. * wN_H, M.N_phi);
-  const double wE_H = n_parent * M.E_H, wE_l = n_daughter * M.E_l;
+  const double wN_H   = n_parent * M.N_H;
+  const double wN_l   = n_daughter * M.N_l;
+  const double num_f  = std::fabs(wN_H + wN_l) / Scale(wN_H, wN_l);
+  const double num_b  = std::fabs(2. * wN_H + M.N_phi) / Scale(2. * wN_H, M.N_phi);
+  const double wE_H   = n_parent * M.E_H;
+  const double wE_l   = n_daughter * M.E_l;
   const double escale = Scale3(2. * wE_H, 2. * wE_l, M.E_phi);
   const double ene    = std::fabs(2. * wE_H + 2. * wE_l + M.E_phi - split_resid) / escale;
 
@@ -273,7 +290,9 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
 
   std::mt19937 rng(777u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
-  std::vector<double> fH(N), fl(N), fphi(N);
+  std::vector<double> fH(N);
+  std::vector<double> fl(N);
+  std::vector<double> fphi(N);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -281,8 +300,10 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
   for (auto& x : fphi)
     x = U(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 3e3;  // Gamma large so the cap actually binds
-  const double aH = 1e-2;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 3e3;  // Gamma large so the cap actually binds
+  const double aH    = 1e-2;
 
   auto max_diag_H = [&](int nd, double cap) {
     DecayTransitionKernel::Config cfg;
@@ -291,7 +312,9 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
     cfg.max_rate           = cap;
     cfg.n_daughter         = nd;
     DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
-    std::vector<double> dfH(N), dfl(N), dfphi(N);
+    std::vector<double> dfH(N);
+    std::vector<double> dfl(N);
+    std::vector<double> dfphi(N);
     K.ComputeBackgroundDerivs(a,
                               m,
                               Gamma,
@@ -302,7 +325,9 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
                               dfl.data(),
                               dfphi.data(),
                               aH);
-    std::vector<double> dH(N), dl(N), dp(N);
+    std::vector<double> dH(N);
+    std::vector<double> dl(N);
+    std::vector<double> dp(N);
     K.CollisionDiagonal(dH.data(), dl.data(), dp.data());
     double mx = 0.;
     for (double v : dH)
@@ -338,17 +363,24 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
 // rate (same f/grids, resolution-independent) and test the convergence ratio.
 double parent_only_resid = 0.;
 double EquilibResidual(int Nd, bool balanced = false) {
-  Grid P         = MakeGrid(1e-3, 1e2, 64);  // parent grid FIXED across the refinement
-  Grid F         = MakeGrid(1e-4, 2e2, Nd);
-  Grid B         = MakeGrid(1e-4, 2e2, Nd);
-  const double a = 0.5, m = 2.0, Gamma = 0.3, A = a * a * m * m;
-  const double T = 1.0, mu_l = -0.5, mu_phi = -2.0,
-               mu_H = mu_l + mu_phi;  // mu_phi < q_min: BE regular
+  Grid P              = MakeGrid(1e-3, 1e2, 64);  // parent grid FIXED across the refinement
+  Grid F              = MakeGrid(1e-4, 2e2, Nd);
+  Grid B              = MakeGrid(1e-4, 2e2, Nd);
+  const double a      = 0.5;
+  const double m      = 2.0;
+  const double Gamma  = 0.3;
+  const double A      = a * a * m * m;
+  const double T      = 1.0;
+  const double mu_l   = -0.5;
+  const double mu_phi = -2.0;
+  const double mu_H   = mu_l + mu_phi;  // mu_phi < q_min: BE regular
   auto fH_of   = [&](double q) { return 1. / (std::exp((std::sqrt(q * q + A) - mu_H) / T) + 1.); };
   auto fl_of   = [&](double q) { return 1. / (std::exp((q - mu_l) / T) + 1.); };
   auto fphi_of = [&](double q) { return 1. / (std::exp((q - mu_phi) / T) - 1.); };
 
-  std::vector<double> fH(64), fl(Nd), fphi(Nd);
+  std::vector<double> fH(64);
+  std::vector<double> fl(Nd);
+  std::vector<double> fphi(Nd);
   for (int i = 0; i < 64; ++i)
     fH[i] = fH_of(P.q[i]);
   for (int i = 0; i < Nd; ++i) {
@@ -366,7 +398,9 @@ double EquilibResidual(int Nd, bool balanced = false) {
                               Statistics::Fermion,
                               Statistics::Boson,
                               cfg);
-  std::vector<double> dfH(64), dfl(Nd), dfphi(Nd);
+  std::vector<double> dfH(64);
+  std::vector<double> dfl(Nd);
+  std::vector<double> dfphi(Nd);
   Kfull.ComputeBackgroundDerivs(a,
                                 m,
                                 Gamma,
@@ -394,7 +428,9 @@ double EquilibResidual(int Nd, bool balanced = false) {
                              Statistics::Fermion,
                              Statistics::Boson,
                              cfg0);
-  std::vector<double> gH(64), gl(Nd), gphi(Nd);
+  std::vector<double> gH(64);
+  std::vector<double> gl(Nd);
+  std::vector<double> gphi(Nd);
   Kdec.ComputeBackgroundDerivs(a,
                                m,
                                Gamma,
@@ -477,7 +513,9 @@ void test_mode_reduction() {
 
   std::mt19937 rng(777u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
-  std::vector<double> fH(64), fl(48), fphi(48);
+  std::vector<double> fH(64);
+  std::vector<double> fl(48);
+  std::vector<double> fphi(48);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -485,7 +523,11 @@ void test_mode_reduction() {
   for (auto& x : fphi)
     x = U(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3, A = a * a * m * m, K = a * a * m * Gamma;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
+  const double A     = a * a * m * m;
+  const double K     = a * a * m * Gamma;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = false;
   cfg.quantum_statistics = false;
@@ -494,7 +536,9 @@ void test_mode_reduction() {
   // scheme here keeps that a statement about the parent leg rather than about the
   // default quadrature.
   DecayTransitionKernel Kd(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
-  std::vector<double> dfH(64), dfl(48), dfphi(48);
+  std::vector<double> dfH(64);
+  std::vector<double> dfl(48);
+  std::vector<double> dfphi(48);
   Kd.ComputeBackgroundDerivs(a,
                              m,
                              Gamma,
@@ -547,11 +591,14 @@ void test_rhs_continuity() {
   Grid P = MakeGrid(1e-3, 1e2, 64);
   Grid F = MakeGrid(1e-4, 2e2, 40);  // coarse daughter grid: nodes cross bins during the sweep
   Grid B = MakeGrid(1e-4, 2e2, 40);
-  const int Np = 64, Nd = 40;
+  const int Np = 64;
+  const int Nd = 40;
 
   std::mt19937 rng(2024u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
-  std::vector<double> fH(Np), fl(Nd), fphi(Nd);
+  std::vector<double> fH(Np);
+  std::vector<double> fl(Nd);
+  std::vector<double> fphi(Nd);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -559,7 +606,8 @@ void test_rhs_continuity() {
   for (auto& x : fphi)
     x = U(rng);
 
-  const double m = 2.0, Gamma = 0.3;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -570,8 +618,14 @@ void test_rhs_continuity() {
   // the claim under test, not an assumption.
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
-  std::vector<double> dfH(Np), dfl(Nd), dfphi(Nd), pH(Np), pl(Nd), pphi(Nd);
-  const double a0 = 0.2, a1 = 0.8;
+  std::vector<double> dfH(Np);
+  std::vector<double> dfl(Nd);
+  std::vector<double> dfphi(Nd);
+  std::vector<double> pH(Np);
+  std::vector<double> pl(Nd);
+  std::vector<double> pphi(Nd);
+  const double a0 = 0.2;
+  const double a1 = 0.8;
   K.ComputeBackgroundDerivs(0.5,
                             m,
                             Gamma,
@@ -625,8 +679,10 @@ void test_rhs_continuity() {
   const auto fine   = sweep(0.5 * da);
   // Bins whose motion is at roundoff carry no information and a noisy ratio.
   const double kFloor = 1e-6;
-  double worst_R = 0., worst_m = 0.;
-  int at = -1, n_live = 0;
+  double worst_R      = 0.;
+  double worst_m      = 0.;
+  int at              = -1;
+  int n_live          = 0;
   for (size_t i = 0; i < coarse.size(); ++i) {
     worst_m = std::fmax(worst_m, coarse[i]);
     if (coarse[i] <= kFloor)
@@ -675,7 +731,12 @@ void test_perturbation_operator(bool balanced = false) {
   std::mt19937 rng(98765u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::uniform_real_distribution<double> Upm(-1.0, 1.0);
-  std::vector<double> fH(N), fl(N), fphi(N), FH(N), Fl(N), Fphi(N);
+  std::vector<double> fH(N);
+  std::vector<double> fl(N);
+  std::vector<double> fphi(N);
+  std::vector<double> FH(N);
+  std::vector<double> Fl(N);
+  std::vector<double> Fphi(N);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -691,7 +752,10 @@ void test_perturbation_operator(bool balanced = false) {
   for (auto& x : Fphi)
     x = Upm(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3, A = a * a * m * m;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
+  const double A     = a * a * m * m;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -706,7 +770,11 @@ void test_perturbation_operator(bool balanced = false) {
 
   // P_l built by recurrence (never a table): spot-check P_2 = 1.5 cos^2 - 0.5 at a node.
   {
-    double q2, q3, ca, cb, cg;
+    double q2;
+    double q3;
+    double ca;
+    double cb;
+    double cg;
     K.NodeKinematics(10, 2, q2, q3, ca, cb, cg);
     assert(std::fabs(DecayTransitionKernel::LegendreP(2, ca) - (1.5 * ca * ca - 0.5)) < 1e-13);
     assert(std::fabs(DecayTransitionKernel::LegendreP(0, cb) - 1.0) < 1e-14);
@@ -715,7 +783,9 @@ void test_perturbation_operator(bool balanced = false) {
 
   // l=0: number & energy conservation of the perturbed operator.
   {
-    std::vector<double> dH(N), dl(N), dphi(N);
+    std::vector<double> dH(N);
+    std::vector<double> dl(N);
+    std::vector<double> dphi(N);
     K.ApplyPerturbationOperator(0,
                                 FH.data(),
                                 Fl.data(),
@@ -723,21 +793,30 @@ void test_perturbation_operator(bool balanced = false) {
                                 dH.data(),
                                 dl.data(),
                                 dphi.data());
-    double numH = 0, numl = 0, numphi = 0, eH = 0, el = 0, ephi = 0;
+    double numH   = 0;
+    double numl   = 0;
+    double numphi = 0;
+    double eH     = 0;
+    double el     = 0;
+    double ephi   = 0;
     for (int i = 0; i < N; ++i) {
-      const double q = P.q[i], w = P.dq[i] * q * q, eps = std::sqrt(q * q + A);
-      numH += w * dH[i];
-      eH   += w * eps * dH[i];
+      const double q    = P.q[i];
+      const double w    = P.dq[i] * q * q;
+      const double eps  = std::sqrt(q * q + A);
+      numH             += w * dH[i];
+      eH               += w * eps * dH[i];
     }
     for (int j = 0; j < N; ++j) {
-      const double q = F.q[j], w = F.dq[j] * q * q;
-      numl += w * dl[j];
-      el   += w * q * dl[j];
+      const double q  = F.q[j];
+      const double w  = F.dq[j] * q * q;
+      numl           += w * dl[j];
+      el             += w * q * dl[j];
     }
     for (int k = 0; k < N; ++k) {
-      const double q = B.q[k], w = B.dq[k] * q * q;
-      numphi += w * dphi[k];
-      ephi   += w * q * dphi[k];
+      const double q  = B.q[k];
+      const double w  = B.dq[k] * q * q;
+      numphi         += w * dphi[k];
+      ephi           += w * q * dphi[k];
     }
     // NUMBER stays exactly conserved under the lumped operator -- lumping moves where
     // a deposit lands, never how much -- so those two are still asserted at zero. The
@@ -762,7 +841,9 @@ void test_perturbation_operator(bool balanced = false) {
 
   // l=1: momentum conservation of the perturbed operator.
   {
-    std::vector<double> dH(N), dl(N), dphi(N);
+    std::vector<double> dH(N);
+    std::vector<double> dl(N);
+    std::vector<double> dphi(N);
     K.ApplyPerturbationOperator(1,
                                 FH.data(),
                                 Fl.data(),
@@ -770,7 +851,9 @@ void test_perturbation_operator(bool balanced = false) {
                                 dH.data(),
                                 dl.data(),
                                 dphi.data());
-    double momH = 0, moml = 0, momphi = 0;
+    double momH   = 0;
+    double moml   = 0;
+    double momphi = 0;
     for (int i = 0; i < N; ++i) {
       const double q  = P.q[i];
       momH           += P.dq[i] * q * q * q * dH[i];
@@ -811,7 +894,9 @@ void test_perturbation_operator(bool balanced = false) {
                              Statistics::Boson,
                              cfg0);
     Kd.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
-    std::vector<double> dH(N), dl(N), dphi(N);
+    std::vector<double> dH(N);
+    std::vector<double> dl(N);
+    std::vector<double> dphi(N);
     // The operator advances its per-node Legendre recurrence one l per call, so l=2 is
     // only reachable through l=0 and l=1 (whose outputs are discarded here); calling it
     // cold at l=2 is an API violation and now throws. The parent's decay-only result is
@@ -844,11 +929,14 @@ void test_perturbation_operator(bool balanced = false) {
   // pins the cache reset and the prev/curr shift.
   {
     const int LMAX = 5;
-    std::vector<double> sweep1, sweep2;
+    std::vector<double> sweep1;
+    std::vector<double> sweep2;
     for (int pass = 0; pass < 2; ++pass) {
       K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
       bool threw = false;
-      std::vector<double> dH(N), dl(N), dphi(N);
+      std::vector<double> dH(N);
+      std::vector<double> dl(N);
+      std::vector<double> dphi(N);
       try {  // cold kernel expects l=0; anything else is API misuse
         K.ApplyPerturbationOperator(1,
                                     FH.data(),
@@ -926,7 +1014,10 @@ void test_perturbation_operator(bool balanced = false) {
                              cfg0);
     Kd.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
 
-    std::vector<double> zero(N, 0.), dH(N), dl(N), dphi(N);
+    std::vector<double> zero(N, 0.);
+    std::vector<double> dH(N);
+    std::vector<double> dl(N);
+    std::vector<double> dphi(N);
     double worst = 0.;
     for (int l = 0; l <= 12; ++l) {
       Kd.ApplyPerturbationOperator(l,
@@ -936,16 +1027,23 @@ void test_perturbation_operator(bool balanced = false) {
                                    dH.data(),
                                    dl.data(),
                                    dphi.data());
-      double got_l = 0., got_phi = 0.;
+      double got_l   = 0.;
+      double got_phi = 0.;
       for (int j = 0; j < N; ++j)
         got_l += F.dq[j] * F.q[j] * F.q[j] * dl[j];
       for (int k = 0; k < N; ++k)
         got_phi += B.dq[k] * B.q[k] * B.q[k] * dphi[k];
-      double ref_l = 0., ref_phi = 0.;
+      double ref_l   = 0.;
+      double ref_phi = 0.;
       for (int i = 0; i < N; ++i) {
-        const double q1 = P.q[i], eps1 = std::sqrt(q1 * q1 + A);
+        const double q1   = P.q[i];
+        const double eps1 = std::sqrt(q1 * q1 + A);
         for (int sN = 0; sN < Kd.node_count(i); ++sN) {
-          double q2, q3, ca, cb, cg;
+          double q2;
+          double q3;
+          double ca;
+          double cb;
+          double cg;
           Kd.NodeKinematics(i, sN, q2, q3, ca, cb, cg);
           const double Bn  = (a * a * m * Gamma) * P.dq[i] * (q1 / eps1) * Kd.node_weight(i, sN);
           ref_l           += Bn * FH[i] * DecayTransitionKernel::LegendreP(l, ca);
@@ -981,7 +1079,9 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   Grid P       = MakeGrid(1e-3, 1e2, 24);
   Grid F       = MakeGrid(1e-4, 2e2, 48);
   Grid B       = MakeGrid(1e-4, 2e2, 48);
-  const int Np = 24, Nd = 48, N = Np + 2 * Nd;
+  const int Np = 24;
+  const int Nd = 48;
+  const int N  = Np + 2 * Nd;
 
   std::mt19937 rng(31337u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
@@ -991,7 +1091,9 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   for (int j = 0; j < 2 * Nd; ++j)
     y[Np + j] = U(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -1015,7 +1117,9 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   // Analytic diagonal (needs the transitions prepared for THIS state).
   std::vector<double> d0(N);
   rhs(y, d0);
-  std::vector<double> dH(Np), dl(Nd), dphi(Nd);
+  std::vector<double> dH(Np);
+  std::vector<double> dl(Nd);
+  std::vector<double> dphi(Nd);
   K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
   std::vector<double> analytic(N);
   for (int i = 0; i < Np; ++i)
@@ -1026,14 +1130,20 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
     analytic[Np + Nd + j] = dphi[j];
 
   // Central-difference Jacobian: diagonal for the comparison, full for the premise.
-  std::vector<double> Jrow(N), dp(N), dm(N), offsum(N, 0.), numeric(N);
-  double worst = 0., dscale = 0.;
-  int at = -1;
+  std::vector<double> Jrow(N);
+  std::vector<double> dp(N);
+  std::vector<double> dm(N);
+  std::vector<double> offsum(N, 0.);
+  std::vector<double> numeric(N);
+  double worst  = 0.;
+  double dscale = 0.;
+  int at        = -1;
   for (int c = 0; c < N; ++c) {
-    const double h         = std::fmax(1e-7 * std::fabs(y[c]), 1e-13);
-    std::vector<double> yp = y, ym = y;
-    yp[c] += h;
-    ym[c] -= h;
+    const double h          = std::fmax(1e-7 * std::fabs(y[c]), 1e-13);
+    std::vector<double> yp  = y;
+    std::vector<double> ym  = y;
+    yp[c]                  += h;
+    ym[c]                  -= h;
     rhs(yp, dp);
     rhs(ym, dm);
     for (int r = 0; r < N; ++r) {
@@ -1087,10 +1197,11 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
     analytic[Np + Nd + j] = dphi[j];
   std::fill(offsum.begin(), offsum.end(), 0.);
   for (int c = 0; c < N; ++c) {
-    const double h         = std::fmax(1e-7 * std::fabs(y[c]), 1e-13);
-    std::vector<double> yp = y, ym = y;
-    yp[c] += h;
-    ym[c] -= h;
+    const double h          = std::fmax(1e-7 * std::fabs(y[c]), 1e-13);
+    std::vector<double> yp  = y;
+    std::vector<double> ym  = y;
+    yp[c]                  += h;
+    ym[c]                  -= h;
     rhs(yp, dp);
     rhs(ym, dm);
     for (int r = 0; r < N; ++r) {
@@ -1101,7 +1212,8 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
         offsum[r] += std::fabs(J);
     }
   }
-  double Dmax = 0., Offmax = 0.;
+  double Dmax   = 0.;
+  double Offmax = 0.;
   for (int i = 0; i < N; ++i) {
     Dmax   = std::fmax(Dmax, std::fabs(numeric[i]));
     Offmax = std::fmax(Offmax, offsum[i]);
@@ -1158,16 +1270,18 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   // h/y = 1e-4/1e-5/1e-6/1e-7 gives 5.3e-6/8.3e-5/4.2e-4/1.8e-3 -- growing as h
   // SHRINKS, i.e. the5.3e-6 is the estimator, not the diagonal.
   for (int c = 0; c < N; ++c) {
-    const double h         = 1e-4 * std::fabs(y[c]);
-    std::vector<double> yp = y, ym = y;
-    yp[c] += h;
-    ym[c] -= h;
+    const double h          = 1e-4 * std::fabs(y[c]);
+    std::vector<double> yp  = y;
+    std::vector<double> ym  = y;
+    yp[c]                  += h;
+    ym[c]                  -= h;
     rhs(yp, dp);
     rhs(ym, dm);
     numeric[c] = (dp[c] - dm[c]) / (2 * h);
   }
-  double dscale3 = 0., worst3 = 0.;
-  int at3 = -1;
+  double dscale3 = 0.;
+  double worst3  = 0.;
+  int at3        = -1;
   for (int i = 0; i < N; ++i)
     dscale3 = std::fmax(dscale3, std::fabs(numeric[i]));
   for (int i = 0; i < N; ++i) {
@@ -1206,15 +1320,19 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
 // j at level l costs one PrepareTransitions plus a replay of ll = 0..l. Same
 // shape as DumpCollisionSpectrum, which is where this construction comes from.
 void test_perturbation_diagonal(bool balanced = false) {
-  Grid P       = MakeGrid(1e-3, 1e2, 16);
-  Grid F       = MakeGrid(1e-4, 2e2, 24);  // wider than the parent bands: no off-grid clamp
-  Grid B       = MakeGrid(1e-4, 2e2, 24);
-  const int Np = 16, Nd = 24, N = Np + 2 * Nd;
+  Grid P         = MakeGrid(1e-3, 1e2, 16);
+  Grid F         = MakeGrid(1e-4, 2e2, 24);  // wider than the parent bands: no off-grid clamp
+  Grid B         = MakeGrid(1e-4, 2e2, 24);
+  const int Np   = 16;
+  const int Nd   = 24;
+  const int N    = Np + 2 * Nd;
   const int LMAX = 4;
 
   std::mt19937 rng(4242u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
-  std::vector<double> fH(Np), fl(Nd), fphi(Nd);
+  std::vector<double> fH(Np);
+  std::vector<double> fl(Nd);
+  std::vector<double> fphi(Nd);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -1222,7 +1340,9 @@ void test_perturbation_diagonal(bool balanced = false) {
   for (auto& x : fphi)
     x = U(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -1234,7 +1354,9 @@ void test_perturbation_diagonal(bool balanced = false) {
   // Analytic diagonal, taken ONCE from the background decomposition. The same
   // vector is compared at every l, so an l-dependent diagonal fails here.
   K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
-  std::vector<double> dH(Np), dl(Nd), dphi(Nd);
+  std::vector<double> dH(Np);
+  std::vector<double> dl(Nd);
+  std::vector<double> dphi(Nd);
   K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
   std::vector<double> analytic(N);
   for (int i = 0; i < Np; ++i)
@@ -1249,9 +1371,16 @@ void test_perturbation_diagonal(bool balanced = false) {
     scale = std::fmax(scale, std::fabs(analytic[i]));
   assert(scale > 0.);  // else every comparison below is vacuous
 
-  std::vector<double> FH(Np), Fl(Nd), Fphi(Nd), oH(Np), ol(Nd), ophi(Nd);
-  double worst = 0., worst_parent = 0.;
-  int at = -1, at_l = -1;
+  std::vector<double> FH(Np);
+  std::vector<double> Fl(Nd);
+  std::vector<double> Fphi(Nd);
+  std::vector<double> oH(Np);
+  std::vector<double> ol(Nd);
+  std::vector<double> ophi(Nd);
+  double worst        = 0.;
+  double worst_parent = 0.;
+  int at              = -1;
+  int at_l            = -1;
 
   for (int l = 0; l <= LMAX; ++l) {
     for (int c = 0; c < N; ++c) {
@@ -1321,16 +1450,23 @@ void test_band_bound() {
     DecayTransitionKernel::Config cfg;
     DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
     const int NP = static_cast<int>(P.q.size());
-    std::vector<double> fH(NP, 0.5), fl(32, 0.), fphi(32, 0.);
+    std::vector<double> fH(NP, 0.5);
+    std::vector<double> fl(32, 0.);
+    std::vector<double> fphi(32, 0.);
     for (double am : {1e-3, 1e-1, 1.0, 1e1, 1e3, 1e5}) {
-      const double a = 1.0, m = am;
+      const double a     = 1.0;
+      const double m     = am;
       const double bound = DecayTransitionKernel::MaxDaughterMomentum(P.q.back(), a * m);
       double worst       = 0.;
       // The node list is laid out per call, so it has to exist before it can be walked.
       K.PrepareTransitions(a, m, 1.0, fH.data(), fl.data(), fphi.data());
       for (int i = 0; i < NP; ++i) {
         for (int sN = 0; sN < K.node_count(i); ++sN) {
-          double q2, q3, ca, cb, cg;
+          double q2;
+          double q3;
+          double ca;
+          double cb;
+          double cg;
           K.NodeKinematics(i, sN, q2, q3, ca, cb, cg);
           assert(q2 <= bound && q3 <= bound);  // the bound is a bound
           worst = std::fmax(worst, std::fmax(q2, q3));
@@ -1350,12 +1486,18 @@ void test_band_bound() {
   // Regression: a grid sized to the bound clamps nothing; one sized just under it does.
   // This is the defect in its smallest reproducible form.
   {
-    Grid P         = MakeGrid(1e-3, 1e1, 32);
-    const int N    = 32;
-    const double a = 1.0, m = 6e3, Gamma = 0.3;  // non-relativistic parent, band at ~a*m/2
+    Grid P             = MakeGrid(1e-3, 1e1, 32);
+    const int N        = 32;
+    const double a     = 1.0;
+    const double m     = 6e3;
+    const double Gamma = 0.3;  // non-relativistic parent, band at ~a*m/2
     const double bound = DecayTransitionKernel::MaxDaughterMomentum(P.q.back(), a * m);
-    std::vector<double> fH(N, 0.3), fl(N, 0.), fphi(N, 0.);
-    std::vector<double> dfH(N), dfl(N), dfphi(N);
+    std::vector<double> fH(N, 0.3);
+    std::vector<double> fl(N, 0.);
+    std::vector<double> fphi(N, 0.);
+    std::vector<double> dfH(N);
+    std::vector<double> dfl(N);
+    std::vector<double> dfphi(N);
     DecayTransitionKernel::Config cfg;
 
     Grid Fok = MakeGrid(1e-6, 1.05 * bound, N);
@@ -1435,9 +1577,12 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
   Grid P       = MakeGrid(1e-3, 1e2, 24);
   Grid F       = MakeGrid(1e-4, 2e2, 48);
   Grid B       = MakeGrid(1e-4, 2e2, 48);
-  const int Np = 24, Nd = 48;
+  const int Np = 24;
+  const int Nd = 48;
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -1449,12 +1594,16 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
   // and because stratified spreads a band over many more bins, so far more bins are
   // near-empty-but-touched, which is exactly the state that used to go negative.
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
-  std::vector<double> dfH(Np), dfl(Nd), dfphi(Nd);
+  std::vector<double> dfH(Np);
+  std::vector<double> dfl(Nd);
+  std::vector<double> dfphi(Nd);
 
   // (a) boson front: one populated bin, everything else empty. f_l > f_H makes
   //     dLambda/df_phi = f_l - f_H > 0, i.e. a net drain -- the production case.
   for (int spike = 12; spike < Nd - 12; spike += 7) {
-    std::vector<double> fH(Np, 0.05), fl(Nd, 0.5), fphi(Nd, 0.);
+    std::vector<double> fH(Np, 0.05);
+    std::vector<double> fl(Nd, 0.5);
+    std::vector<double> fphi(Nd, 0.);
     fphi[spike] = 2.0;
     K.ComputeBackgroundDerivs(a,
                               m,
@@ -1479,7 +1628,9 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
   //     is a drain in EVERY configuration -- it is only spared in production
   //     because a thermally-seeded nu_l has no front to fall off.
   for (int spike = 12; spike < Nd - 12; spike += 7) {
-    std::vector<double> fH(Np, 0.05), fl(Nd, 0.), fphi(Nd, 0.5);
+    std::vector<double> fH(Np, 0.05);
+    std::vector<double> fl(Nd, 0.);
+    std::vector<double> fphi(Nd, 0.5);
     fl[spike] = 0.9;
     K.ComputeBackgroundDerivs(a,
                               m,
@@ -1503,7 +1654,9 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
   // (c) The energy the lumped split misplaces is BOOKED, never silent: the residual
   //     accessor must reproduce the energy identity's defect to machine precision.
   //     (Sibling of clamped_energy_residual(); both are zero for smooth f.)
-  std::vector<double> fH(Np, 0.05), fl(Nd), fphi(Nd, 0.);
+  std::vector<double> fH(Np, 0.05);
+  std::vector<double> fl(Nd);
+  std::vector<double> fphi(Nd, 0.);
   for (int k = 0; k < Nd; ++k)
     fl[k] = 1. / (std::exp(F.q[k]) + 1.);
   fphi[26] = 2.0;
@@ -1540,7 +1693,10 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
                              Statistics::Fermion,
                              Statistics::Boson,
                              cfg);
-    std::vector<double> flr(Nref), fphir(Nref), dflr(Nref), dfphir(Nref);
+    std::vector<double> flr(Nref);
+    std::vector<double> fphir(Nref);
+    std::vector<double> dflr(Nref);
+    std::vector<double> dfphir(Nref);
     for (int k = 0; k < Nref; ++k) {
       flr[k]   = 1. / (std::exp(Fr.q[k]) + 1.);
       fphir[k] = 1. / (std::exp(Fr.q[k] + 2.) - 1.);
@@ -1583,15 +1739,18 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
 // properties the whole conservative-network design rests on, so a new deposit rule
 // is only admissible if it keeps all three exactly -- they are not tolerances.
 void test_deposit_moments() {
-  Grid D           = MakeGrid(1e-4, 20.0, 200);  // a production-sized daughter grid
-  double worst_num = 0., worst_ene = 0., most_negative = 0.;
+  Grid D               = MakeGrid(1e-4, 20.0, 200);  // a production-sized daughter grid
+  double worst_num     = 0.;
+  double worst_ene     = 0.;
+  double most_negative = 0.;
   // Sweep q* densely across the interior, including exactly-on-node values.
   for (int i = 3; i < 196; ++i) {
     for (double frac : {0.0, 0.013, 0.25, 0.5, 0.749, 0.99}) {
       const double q_star = D.q[i] + frac * (D.q[i + 1] - D.q[i]);
       DecayTransitionKernel::DepositStencil st;
       DecayTransitionKernel::BuildDeposit(View(D), q_star, st);
-      double sw = 0., sq = 0.;
+      double sw = 0.;
+      double sq = 0.;
       for (int e = 0; e < DecayTransitionKernel::DepositStencil::kWidth; ++e) {
         sw            += st.w[e];
         sq            += st.w[e] * D.q[st.j0 + e];
@@ -1626,14 +1785,18 @@ void test_deposit_moments() {
 // integrand is smooth across a cell, so refining BOTH daughter grids (which refines
 // the partition) must leave the total decay rate essentially unchanged.
 void test_band_partition() {
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
 
   auto total_rate = [&](int ND) {
     Grid P       = MakeGrid(1e-3, 1e2, 16);
     Grid F       = MakeGrid(1e-4, 2e2, ND);
     Grid B       = MakeGrid(1e-4, 2e2, ND);
     const int NP = 16;
-    std::vector<double> fH(NP), fl(ND), fphi(ND);
+    std::vector<double> fH(NP);
+    std::vector<double> fl(ND);
+    std::vector<double> fphi(ND);
     for (int i = 0; i < NP; ++i)
       fH[i] = 1. / (std::exp(P.q[i]) + 1.);
     for (int i = 0; i < ND; ++i) {
@@ -1644,7 +1807,9 @@ void test_band_partition() {
     cfg.inverse_decays     = true;
     cfg.quantum_statistics = true;
     DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
-    std::vector<double> dH(NP), dl(ND), dp(ND);
+    std::vector<double> dH(NP);
+    std::vector<double> dl(ND);
+    std::vector<double> dp(ND);
     K.ComputeBackgroundDerivs(a,
                               m,
                               Gamma,
@@ -1663,8 +1828,9 @@ void test_band_partition() {
     for (int i = 0; i < NP; ++i) {
       const double q1   = P.q[i];
       const double eps1 = std::sqrt(q1 * q1 + A);
-      const double qlo = 0.5 * (eps1 - q1), qhi = qlo + q1;
-      int cuts = 0;
+      const double qlo  = 0.5 * (eps1 - q1);
+      const double qhi  = qlo + q1;
+      int cuts          = 0;
       for (int k = 0; k < ND; ++k) {
         if (F.q[k] > qlo && F.q[k] < qhi)
           ++cuts;
@@ -1707,15 +1873,21 @@ void test_band_partition() {
 // resolve exactly. That costs O(dq^2) accuracy and NOTHING in conservation, which is
 // per transition; this test pins that distinction.
 void test_separate_bg_grids(bool balanced = false) {
-  const int NP = 16, NST = 64, NBG = 64 * 3;  // refine = 3
-  Grid P         = MakeGrid(1e-3, 1e2, NP);
-  Grid FS        = MakeGrid(1e-4, 2e2, NST);
-  Grid BS        = MakeGrid(1e-4, 2e2, NST);
-  Grid FB        = MakeGrid(1e-4, 2e2, NBG);
-  Grid BB        = MakeGrid(1e-4, 2e2, NBG);
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const int NP       = 16;
+  const int NST      = 64;
+  const int NBG      = 64 * 3;  // refine = 3
+  Grid P             = MakeGrid(1e-3, 1e2, NP);
+  Grid FS            = MakeGrid(1e-4, 2e2, NST);
+  Grid BS            = MakeGrid(1e-4, 2e2, NST);
+  Grid FB            = MakeGrid(1e-4, 2e2, NBG);
+  Grid BB            = MakeGrid(1e-4, 2e2, NBG);
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
 
-  std::vector<double> fH(NP), fl(NBG), fphi(NBG);
+  std::vector<double> fH(NP);
+  std::vector<double> fl(NBG);
+  std::vector<double> fphi(NBG);
   for (int i = 0; i < NP; ++i)
     fH[i] = 1. / (std::exp(P.q[i]) + 1.);
   for (int i = 0; i < NBG; ++i) {
@@ -1744,7 +1916,9 @@ void test_separate_bg_grids(bool balanced = false) {
                           View(FB),
                           View(BB));
 
-  std::vector<double> dH(NP), dl(NST), dp(NST);
+  std::vector<double> dH(NP);
+  std::vector<double> dl(NST);
+  std::vector<double> dp(NST);
   K.ComputeBackgroundDerivs(a,
                             m,
                             Gamma,
@@ -1778,7 +1952,9 @@ void test_separate_bg_grids(bool balanced = false) {
   // the trap the lumped-loss comment in PrepareTransitions records, and one I walked
   // into while writing the limiter's Jacobian.
   {
-    std::vector<double> dgH(NP), dgl(NST), dgp(NST);
+    std::vector<double> dgH(NP);
+    std::vector<double> dgl(NST);
+    std::vector<double> dgp(NST);
     K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
     K.CollisionDiagonal(dgH.data(), dgl.data(), dgp.data());
 
@@ -1805,8 +1981,12 @@ void test_separate_bg_grids(bool balanced = false) {
     double worst = 0.;
     int worst_k  = -1;
     for (int k = 0; k < NST; ++k) {
-      std::vector<double> FH(NP, 0.), Fl(NST, 0.), Fp(NST, 0.);
-      std::vector<double> dH2(NP), dl2(NST), dp2(NST);
+      std::vector<double> FH(NP, 0.);
+      std::vector<double> Fl(NST, 0.);
+      std::vector<double> Fp(NST, 0.);
+      std::vector<double> dH2(NP);
+      std::vector<double> dl2(NST);
+      std::vector<double> dp2(NST);
       Fl[k] = 1.;
       K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
       K.ApplyPerturbationOperator(0,
@@ -1834,10 +2014,14 @@ void test_separate_bg_grids(bool balanced = false) {
 
   // And the perturbation operator on the same layout must stay conservative too.
   K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
-  std::vector<double> FH(NP), Fl(NST, 0.), Fp(NST, 0.);
+  std::vector<double> FH(NP);
+  std::vector<double> Fl(NST, 0.);
+  std::vector<double> Fp(NST, 0.);
   for (int i = 0; i < NP; ++i)
     FH[i] = 0.05 * fH[i];
-  std::vector<double> gH(NP), gl(NST), gp(NST);
+  std::vector<double> gH(NP);
+  std::vector<double> gl(NST);
+  std::vector<double> gp(NST);
   K.ApplyPerturbationOperator(0, FH.data(), Fl.data(), Fp.data(), gH.data(), gl.data(), gp.data());
   auto Mp         = K.ComputeMoments(a, m, gH.data(), gl.data(), gp.data());
   const double pf = std::fabs(Mp.N_H + Mp.N_l) / Scale(Mp.N_H, Mp.N_l);
@@ -1864,13 +2048,16 @@ void test_all_l_matches_per_l(bool balanced = false) {
   Grid P       = MakeGrid(1e-3, 1e2, 48);
   Grid F       = MakeGrid(1e-4, 2e2, 64);
   Grid B       = MakeGrid(1e-4, 2e2, 64);
-  const int NP = 48, ND = 64;
-  const int L = 17;  // l_max_dncdm_col's default, i.e. the production sweep length
+  const int NP = 48;
+  const int ND = 64;
+  const int L  = 17;  // l_max_dncdm_col's default, i.e. the production sweep length
 
   std::mt19937 rng(31337u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::uniform_real_distribution<double> Upm(-1.0, 1.0);
-  std::vector<double> fH(NP), fl(ND), fphi(ND);
+  std::vector<double> fH(NP);
+  std::vector<double> fl(ND);
+  std::vector<double> fphi(ND);
   for (auto& x : fH)
     x = U(rng);
   for (auto& x : fl)
@@ -1879,7 +2066,9 @@ void test_all_l_matches_per_l(bool balanced = false) {
     x = U(rng);
 
   const int stride = L + 1;
-  std::vector<double> FH(NP * stride), Fl(ND * stride), Fphi(ND * stride);
+  std::vector<double> FH(NP * stride);
+  std::vector<double> Fl(ND * stride);
+  std::vector<double> Fphi(ND * stride);
   for (auto& x : FH)
     x = Upm(rng);
   for (auto& x : Fl)
@@ -1887,7 +2076,9 @@ void test_all_l_matches_per_l(bool balanced = false) {
   for (auto& x : Fphi)
     x = Upm(rng);
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -1898,10 +2089,17 @@ void test_all_l_matches_per_l(bool balanced = false) {
 
   // Reference: the per-l form, one multipole at a time into contiguous slices, then
   // transposed into the [bin][stride] layout the sweep writes.
-  std::vector<double> refH(NP * stride, 0.), refl(ND * stride, 0.), refp(ND * stride, 0.);
+  std::vector<double> refH(NP * stride, 0.);
+  std::vector<double> refl(ND * stride, 0.);
+  std::vector<double> refp(ND * stride, 0.);
   K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
   {
-    std::vector<double> sFH(NP), sFl(ND), sFp(ND), sdH(NP), sdl(ND), sdp(ND);
+    std::vector<double> sFH(NP);
+    std::vector<double> sFl(ND);
+    std::vector<double> sFp(ND);
+    std::vector<double> sdH(NP);
+    std::vector<double> sdl(ND);
+    std::vector<double> sdp(ND);
     for (int l = 0; l <= L; ++l) {
       for (int i = 0; i < NP; ++i)
         sFH[i] = FH[(size_t) i * stride + l];
@@ -1928,7 +2126,9 @@ void test_all_l_matches_per_l(bool balanced = false) {
   const double ref_resid_m = K.split_momentum_residual_pert();
 
   // The sweep. PrepareTransitions again: it resets next_l_, which the sweep requires.
-  std::vector<double> gH(NP * stride, 0.), gl(ND * stride, 0.), gp(ND * stride, 0.);
+  std::vector<double> gH(NP * stride, 0.);
+  std::vector<double> gl(ND * stride, 0.);
+  std::vector<double> gp(ND * stride, 0.);
   K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
   K.ApplyPerturbationOperatorAllL(L,
                                   stride,
@@ -2014,7 +2214,12 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
 
   std::mt19937 rng(98765u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
-  std::vector<double> fH(N), fl(N), fphi(N), FH(N), Fl(N), Fphi(N);
+  std::vector<double> fH(N);
+  std::vector<double> fl(N);
+  std::vector<double> fphi(N);
+  std::vector<double> FH(N);
+  std::vector<double> Fl(N);
+  std::vector<double> Fphi(N);
   for (int i = 0; i < N; ++i) {
     fH[i]   = U(rng);
     fl[i]   = U(rng);
@@ -2026,7 +2231,9 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
     Fphi[i] = fphi[i] * 0.41 * std::sin(0.7 * std::log(B.q[i]) + 0.3);
   }
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -2041,7 +2248,9 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
   cfg.n_daughter = n_daughter;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
-  std::vector<double> oH(N), ol(N), ophi(N);
+  std::vector<double> oH(N);
+  std::vector<double> ol(N);
+  std::vector<double> ophi(N);
   K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
   K.ApplyPerturbationOperator(0,
                               FH.data(),
@@ -2052,7 +2261,8 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
                               ophi.data());
 
   auto rel = [](const std::vector<double>& x, const std::vector<double>& y) {
-    double num = 0., den = 0.;
+    double num = 0.;
+    double den = 0.;
     for (size_t i = 0; i < x.size(); ++i) {
       num = std::fmax(num, std::fabs(x[i] - y[i]));
       den = std::fmax(den, std::fabs(y[i]));
@@ -2060,9 +2270,20 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
     return den > 0. ? num / den : num;
   };
 
-  std::vector<double> pH(N), pl(N), pphi(N);
-  std::vector<double> aH(N), al(N), aphi(N), bH(N), bl(N), bphi(N), gH(N), gl(N), gphi(N);
-  double best = 1e300, best_h = 0.;
+  std::vector<double> pH(N);
+  std::vector<double> pl(N);
+  std::vector<double> pphi(N);
+  std::vector<double> aH(N);
+  std::vector<double> al(N);
+  std::vector<double> aphi(N);
+  std::vector<double> bH(N);
+  std::vector<double> bl(N);
+  std::vector<double> bphi(N);
+  std::vector<double> gH(N);
+  std::vector<double> gl(N);
+  std::vector<double> gphi(N);
+  double best   = 1e300;
+  double best_h = 0.;
   for (double h : {1e-3, 3e-4, 1e-4, 3e-5, 1e-5, 3e-6, 1e-6}) {
     for (int i = 0; i < N; ++i) {
       pH[i]   = fH[i] + h * FH[i];
@@ -2136,7 +2357,12 @@ void test_chain_factor_cap() {
 
   // Injection front: the daughters are filled up to a cut and empty above it, spanning
   // ~80 decades across two bins -- the geometry that makes G/f_e ~ 1e40.
-  std::vector<double> fH(N), fl(N), fphi(N), FH(N), Fl(N), Fphi(N);
+  std::vector<double> fH(N);
+  std::vector<double> fl(N);
+  std::vector<double> fphi(N);
+  std::vector<double> FH(N);
+  std::vector<double> Fl(N);
+  std::vector<double> Fphi(N);
   for (int i = 0; i < N; ++i) {
     fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
     fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
@@ -2150,7 +2376,10 @@ void test_chain_factor_cap() {
     Fphi[i] = 0.5 * fphi[i];
   }
 
-  const double a = 0.5, m = 2.0, Gamma = 0.3, A = a * a * m * m;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
+  const double A     = a * a * m * m;
   DecayTransitionKernel::Config cfg;
   cfg.inverse_decays     = true;
   cfg.quantum_statistics = true;
@@ -2160,7 +2389,9 @@ void test_chain_factor_cap() {
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
   K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
 
-  std::vector<double> dH(N), dl(N), dphi(N);
+  std::vector<double> dH(N);
+  std::vector<double> dl(N);
+  std::vector<double> dphi(N);
   K.ApplyPerturbationOperator(0,
                               FH.data(),
                               Fl.data(),
@@ -2177,9 +2408,12 @@ void test_chain_factor_cap() {
   // The l = 0 number identities do not care what the gather did -- all three legs are
   // built from the same node source terms -- so they must still be exact ON THIS STATE.
   // That is what says the cap did not quietly break conservation to buy finiteness.
-  double numH = 0, numl = 0, numphi = 0;
+  double numH   = 0;
+  double numl   = 0;
+  double numphi = 0;
   for (int i = 0; i < N; ++i) {
-    const double q = P.q[i], w = P.dq[i] * q * q;
+    const double q = P.q[i];
+    const double w = P.dq[i] * q * q;
     (void) A;
     numH += w * dH[i];
   }
@@ -2223,13 +2457,17 @@ void test_chain_cap_reaches_background_diagonal() {
 
   // Same injection front as test_chain_factor_cap: daughters filled to a cut and empty
   // above it, which is the geometry that drives X = G(1-+G)/(f_e(1-+f_e)) to ~1e40.
-  std::vector<double> fH(N), fl(N), fphi(N);
+  std::vector<double> fH(N);
+  std::vector<double> fl(N);
+  std::vector<double> fphi(N);
   for (int i = 0; i < N; ++i) {
     fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
     fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
     fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
   }
-  const double a = 0.5, m = 2.0, Gamma = 0.3;
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
 
   auto diagonal_with = [&](bool balanced_pert,
                            std::vector<double>& dH,
@@ -2247,7 +2485,12 @@ void test_chain_cap_reaches_background_diagonal() {
     return K.chain_factor_max();
   };
 
-  std::vector<double> dH0(N), dl0(N), dphi0(N), dH1(N), dl1(N), dphi1(N);
+  std::vector<double> dH0(N);
+  std::vector<double> dl0(N);
+  std::vector<double> dphi0(N);
+  std::vector<double> dH1(N);
+  std::vector<double> dl1(N);
+  std::vector<double> dphi1(N);
   const double raw = diagonal_with(false, dH0, dl0, dphi0);  // `bal`: the shipped config
   diagonal_with(true, dH1, dl1, dphi1);                      // `chn`: always capped
 

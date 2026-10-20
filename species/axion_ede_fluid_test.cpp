@@ -17,7 +17,9 @@ static double QuadIntegral(const AxionEDEFluid& fld, double a) {
   const double la = std::log(a);
   const double h  = -la / N;
   auto f          = [&](double lna) {
-    double w, dw, integ;
+    double w;
+    double dw;
+    double integ;
     fld.ComputeWFld(std::exp(lna), &w, &dw, &integ);
     return 3. * (1. + w);
   };
@@ -31,14 +33,19 @@ int main() {
   background pba{};
   pba.H0 = 2.2e-4;
 
-  const double a_c = std::pow(10., -3.5), nu = 1., w_i = -1., n = 3.;
+  const double a_c = std::pow(10., -3.5);
+  const double nu  = 1.;
+  const double w_i = -1.;
+  const double n   = 3.;
   const double w_f = AxionEDEFluid::WFinal(n);
   assert(std::fabs(w_f - 0.5) < 1e-15);
 
   AxionEDEFluid fld(pba, /*omega0=*/1e-6, a_c, n, nu, w_i, w_f, /*theta_i=*/2.8);
 
   // ── w(a): sigmoid limits and midpoint.
-  double w, dw, integ;
+  double w;
+  double dw;
+  double integ;
   fld.ComputeWFld(1e-8, &w, &dw, &integ);
   assert(std::fabs(w - w_i) < 1e-10);
   fld.ComputeWFld(1.0, &w, &dw, &integ);
@@ -55,7 +62,9 @@ int main() {
   // ── dw/da vs central finite difference over the transition.
   for (double a : {a_c / 10., a_c / 2., a_c, 2. * a_c, 10. * a_c}) {
     const double h = a * 1e-6;
-    double wp, wm, d_;
+    double wp;
+    double wm;
+    double d_;
     fld.ComputeWFld(a + h, &wp, &d_, &integ);
     fld.ComputeWFld(a - h, &wm, &d_, &integ);
     const double fd = (wp - wm) / (2. * h);

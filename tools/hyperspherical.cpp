@@ -90,9 +90,19 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
                                                                            double phiminabs) {
   /** Size the std::vector members for this geometry, then compute the values
       of Phi and dPhi to complete the interpolation structure. */
-  double deltax, beta2, lambda, x, xfwd;
-  int j, k, l, nx, lmax, l_recurrence_max;
-  int current_chunk, index_x;
+  double deltax;
+  double beta2;
+  double lambda;
+  double x;
+  double xfwd;
+  int j;
+  int k;
+  int l;
+  int nx;
+  int lmax;
+  int l_recurrence_max;
+  int current_chunk;
+  int index_x;
 
   beta2  = beta * beta;
   lmax   = lvec[nl - 1];
@@ -341,9 +351,19 @@ void hyperspherical_backwards_recurrence(int K,
                                          double* sqrtK,
                                          double* one_over_sqrtK,
                                          double* PhiL) {
-  double phi0_exact, phi1_exact, phi_top, phipr1 = 0.0, phi, phi_plus_1_times_sqrtK, phi_minus_1,
-                                          phi1_down = 0.0, phi0_down, scaling;
-  int l, k, isign;
+  double phi0_exact;
+  double phi1_exact;
+  double phi_top;
+  double phipr1 = 0.0;
+  double phi;
+  double phi_plus_1_times_sqrtK;
+  double phi_minus_1;
+  double phi1_down = 0.0;
+  double phi0_down;
+  double scaling;
+  int l;
+  int k;
+  int isign;
   bool cf1_found = false;
   hyperspherical_phi01_exact(K, beta, x, sinK, cotK, &phi0_exact, &phi1_exact);
 
@@ -369,7 +389,8 @@ void hyperspherical_backwards_recurrence(int K,
   //  phi_plus_1 = 1/sqrtK[lmax+1]*(lmax*cotK*phi1-phipr1);
   phi_plus_1_times_sqrtK = lmax * cotK * phi_top - phipr1;
 
-  int l_ini, l_align;
+  int l_ini;
+  int l_align;
   l_align = lmax - lmax % _HYPER_BLOCK_;
 
   // Bring l down to _HYPER_BLOCK_ aligned region:
@@ -453,11 +474,17 @@ void hyperspherical_backwards_recurrence_chunk(int K,
                                                double* sqrtK,
                                                double* one_over_sqrtK,
                                                double* PhiL) {
-  double phi0_exact, phi1_exact, phi_top, phipr1 = 0.0;
-  int l, k, isign;
+  double phi0_exact;
+  double phi1_exact;
+  double phi_top;
+  double phipr1 = 0.0;
+  int l;
+  int k;
+  int isign;
   bool cf1_found = false;
   int index_x;
-  double scalevec[_HYPER_CHUNK_] = {0}, phi1_down[_HYPER_CHUNK_] = {0};
+  double scalevec[_HYPER_CHUNK_]  = {0};
+  double phi1_down[_HYPER_CHUNK_] = {0};
 
   for (index_x = 0; index_x < chunk; index_x++) {
     if (K == 1) {
@@ -549,7 +576,12 @@ bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
   int maxiter   = 1000000;
   double tiny   = 1e-100;
   double reltol = DBL_EPSILON;
-  double aj, bj, fj, Cj, Dj, Delj;
+  double aj;
+  double bj;
+  double fj;
+  double Cj;
+  double Dj;
+  double Delj;
   double beta2 = beta * beta;
   double sqrttmp;
   int j;
@@ -588,8 +620,14 @@ bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
 }
 
 bool CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF) {
-  int n, alpha, k;
-  double x, G, dG, Gkm1, Gkm2;
+  int n;
+  int alpha;
+  int k;
+  double x;
+  double G;
+  double dG;
+  double Gkm1;
+  double Gkm2;
   n = beta - l - 1;
   if (n < 0)
     return false;
@@ -639,9 +677,23 @@ bool CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF) 
 }
 
 bool hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) {
-  double e, w, w2, alpha, alpha2, CscK, ytp, t;
-  double S      = 0.0, Q, C, argu, Ai;
-  int airy_sign = 1, phisign = 1, dphisign = 1, intbeta;
+  double e;
+  double w;
+  double w2;
+  double alpha;
+  double alpha2;
+  double CscK;
+  double ytp;
+  double t;
+  double S = 0.0;
+  double Q;
+  double C;
+  double argu;
+  double Ai;
+  int airy_sign = 1;
+  int phisign   = 1;
+  int dphisign  = 1;
+  int intbeta;
   double ldbl = l;
 
   if (K == 1) {
@@ -718,7 +770,16 @@ double airy_cheb_approx(double z) {
 double coef1(double z) {
   const double A[5] = {1.1282427601, -0.6803534e-4, 0.16687e-6, -0.128e-8, 0.2e-10};
   const double B[5] = {0.7822108673e-1, -0.6895649e-4, 0.32857e-6, -0.37e-8, 0.7e-10};
-  double x, y, t, Ai, zeta, theta, sintheta, costheta, FA, FB;
+  double x;
+  double y;
+  double t;
+  double Ai;
+  double zeta;
+  double theta;
+  double sintheta;
+  double costheta;
+  double FA;
+  double FB;
 
   x        = -z;
   zeta     = _TWO_OVER_THREE_ * x * sqrt(x);
@@ -771,8 +832,12 @@ double coef2(double z) {
                         0.137e-8,
                         -0.6e-10};
   //Ej = 3^(-j/3)/Gamma(j/3);
-  double E1 = 0.355028053887817, E2 = 0.258819403792807;
-  double x, FA, FB, Ai;
+  double E1 = 0.355028053887817;
+  double E2 = 0.258819403792807;
+  double x;
+  double FA;
+  double FB;
+  double Ai;
   x  = -(z / 7.0) * (z / 7.0) * (z / 7.0);
   FA = E1 * cheb(x, 17, A);
   FB = E2 * z * cheb(x, 16, B);
@@ -795,7 +860,10 @@ double B[25]={0.47839902387,-0.6881732880e-1,0.20938146768,
             -0.13436e-6,0.4231e-7,-0.967e-8,0.135e-8,0.7e-10,
             -0.12e-9,0.4e-10,-0.1e-10};
   */
-  double x, EX, EY, Ai;
+  double x;
+  double EX;
+  double EY;
+  double Ai;
   x  = z / 7.0;
   EX = exp(1.75 * z);
   EY = 1.0 / EX;
@@ -811,7 +879,13 @@ double coef4(double z) {
   /**  double B[7]={1.1316635302,0.166141673e-02,0.1968882e-04,0.47047e-06,
             0.1769e-7,0.94e-9,0.6e-10};
   */
-  double x, Y, t, zeta, EX, EY, Ai;
+  double x;
+  double Y;
+  double t;
+  double zeta;
+  double EX;
+  double EY;
+  double Ai;
 
   Y    = z * sqrt(z);
   zeta = 2.0 / 3.0 * Y;
@@ -826,7 +900,12 @@ double coef4(double z) {
 }
 
 double cheb(double x, int n, const double A[]) {
-  double b, d, u, y, c, F;
+  double b;
+  double d;
+  double u;
+  double y;
+  double c;
+  double F;
   int j;
   b = 0.0;
   d = A[n - 1];
@@ -869,9 +948,17 @@ void ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign) {
 
 void hyperspherical_get_xmin_from_Airy(
     int K, int l, double beta, double xtol, double phiminabs, double* xmin, int* fevals) {
-  double xold, xtp = 0, xleft, xright, xnew;
-  double Fnew, Fold, Fleft, Fright;
-  double delx, lambda;
+  double xold;
+  double xtp = 0;
+  double xleft;
+  double xright;
+  double xnew;
+  double Fnew;
+  double Fold;
+  double Fleft;
+  double Fright;
+  double delx;
+  double lambda;
   double AIRY_SAFETY = 1e-6;
   struct WKB_parameters wkbstruct{};
   //Start searching from turning point:
@@ -973,8 +1060,18 @@ bool fzero_ridder(double (*func)(double, void*),
       lie between x1 and x2. The root, returned as zriddr, will be found to
       an approximate accuracy xtol.
    */
-  int j, MAXIT = 1000;
-  double ans, fh, fl, fm, fnew, s, xh, xl, xm, xnew;
+  int j;
+  int MAXIT = 1000;
+  double ans;
+  double fh;
+  double fl;
+  double fm;
+  double fnew;
+  double s;
+  double xh;
+  double xl;
+  double xm;
+  double xnew;
   if ((Fx1 != nullptr) && (Fx2 != nullptr)) {
     fl = *Fx1;
     fh = *Fx2;
@@ -1089,9 +1186,18 @@ void hyperspherical_bessel_direct_vector(
         - turning-point stability (backwards below xfwd, forwards above),
         - maximum l in the closed case (l < beta).
       Phi is row-major: Phi[il*nx + ix]. */
-  int il, ix, l, lmax, intbeta = 0;
-  double beta2 = beta * beta, xfwd, folded_y, sinK, cotK;
-  int phisign, dphisign;
+  int il;
+  int ix;
+  int l;
+  int lmax;
+  int intbeta  = 0;
+  double beta2 = beta * beta;
+  double xfwd;
+  double folded_y;
+  double sinK;
+  double cotK;
+  int phisign;
+  int dphisign;
 
   class_test((K != 0) && (K != 1) && (K != -1), "K must be -1, 0, or 1 (got %d)", K);
   class_test(beta <= 0.0, "beta must be positive (got %g)", beta);
@@ -1121,7 +1227,8 @@ void hyperspherical_bessel_direct_vector(
   // closed case (lmax = beta-1), avoiding sqrt(beta^2 - l^2) for l >= beta which
   // would be a NaN.
   int nsqrtK = (lmax >= 1) ? lmax : 1;
-  std::vector<double> sqrtK(nsqrtK + 1), one_over_sqrtK(nsqrtK + 1);
+  std::vector<double> sqrtK(nsqrtK + 1);
+  std::vector<double> one_over_sqrtK(nsqrtK + 1);
   for (l = 0; l <= nsqrtK; l++) {
     if (K == 0)
       sqrtK[l] = beta;
@@ -1234,14 +1341,37 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
   // Derivative levels 0..kDepth at the left (..m) and right (..p) border of
   // the current grid interval, and the Hermite coefficients per output
   // (a: Phi, b: dPhi, c: d2Phi). Unused ones are optimized away.
-  double ym = 0, dym = 0, d2ym = 0, d3ym = 0, d4ym = 0;
-  double yp = 0, dyp = 0, d2yp = 0, d3yp = 0, d4yp = 0;
-  double a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0;
-  double b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
-  double c1 = 0, c2 = 0, c3 = 0, c4 = 0, c5 = 0;
-  double left_border = xmax, right_border = xmin, next_border = xmin;
+  double ym              = 0;
+  double dym             = 0;
+  double d2ym            = 0;
+  double d3ym            = 0;
+  double d4ym            = 0;
+  double yp              = 0;
+  double dyp             = 0;
+  double d2yp            = 0;
+  double d3yp            = 0;
+  double d4yp            = 0;
+  double a1              = 0;
+  double a2              = 0;
+  double a3              = 0;
+  double a4              = 0;
+  double a5              = 0;
+  double b1              = 0;
+  double b2              = 0;
+  double b3              = 0;
+  double b4              = 0;
+  double b5              = 0;
+  double c1              = 0;
+  double c2              = 0;
+  double c3              = 0;
+  double c4              = 0;
+  double c5              = 0;
+  double left_border     = xmax;
+  double right_border    = xmin;
+  double next_border     = xmin;
   int current_border_idx = 0;
-  int phisign = 1, dphisign = 1;
+  int phisign            = 1;
+  int dphisign           = 1;
 
   for (int j = 0; j < nxi; j++) {
     double x = xinterp[j];

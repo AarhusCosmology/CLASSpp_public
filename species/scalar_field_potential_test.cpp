@@ -11,7 +11,10 @@ int main() {
   const ScalarFieldPotential pot = DefaultScalarFieldPotential();
 
   // Default bundle reproduces V = exp(-lambda*phi)*((phi-B)^alpha + A).
-  const double lambda = p[0], alpha = p[1], A = p[2], B = p[3];
+  const double lambda      = p[0];
+  const double alpha       = p[1];
+  const double A           = p[2];
+  const double B           = p[3];
   const double Ve          = std::exp(-lambda * phi);
   const double V_expected  = Ve * (std::pow(phi - B, alpha) + A);
   const double dV_expected = -lambda * Ve * (std::pow(phi - B, alpha) + A) +
@@ -37,7 +40,8 @@ int main() {
     const ScalarFieldPotential ax = AxionScalarFieldPotential();
     for (double n : {1.0, 2.0, 2.5, 3.0}) {
       const std::vector<double> ap = {2.0e-3, 0.5, n, 2.0};  // m, f, n, Theta
-      const double m = ap[0], f = ap[1];
+      const double m               = ap[0];
+      const double f               = ap[1];
       // V matches the closed form away from the minimum.
       for (double ph : {0.05, 0.4, 1.0, 1.4}) {
         const double u     = 1.0 - std::cos(ph / f);
@@ -59,7 +63,8 @@ int main() {
     assert(std::fabs(ax.ddV(0.0, a1) - a1[0] * a1[0]) < 1e-15);
 
     // Frozen-field shooting guess: V(Theta*f) = 3 H0^2 Omega at the guessed m.
-    const double H0 = 2.2e-4, omega = 0.05;
+    const double H0        = 2.2e-4;
+    const double omega     = 0.05;
     const auto [mg, dmdo]  = ax.shooting_guess(omega, H0, a1, 0);
     std::vector<double> ag = a1;
     ag[0]                  = mg;

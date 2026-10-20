@@ -193,7 +193,8 @@ int main(int argc, char** argv) {
       }
       printf("  log10(tau/Mpc)    accepted   rejected   reject%%\n");
       for (int i = 0; i < ErkHistograms::kXBins; i++) {
-        const long long a = erk_hist.x_accepted[i], r = erk_hist.x_rejected[i];
+        const long long a = erk_hist.x_accepted[i];
+        const long long r = erk_hist.x_rejected[i];
         if (a + r == 0)
           continue;
         printf("   %6.2f          %9lld  %9lld   %6.2f%%\n",

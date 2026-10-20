@@ -279,7 +279,9 @@ void TransferModule::transfer_indices_of_transfers(double q_period, double K, in
 
   /** - define local variables */
 
-  int index_md, index_tt, index_tt_common;
+  int index_md;
+  int index_tt;
+  int index_tt_common;
 
   /** - define indices for transfer types */
 
@@ -624,8 +626,13 @@ void TransferModule::transfer_get_l_list() {
 
 void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
   int index_q;
-  double q, q_min = 0., q_max = 0., q_step;
-  int nu, nu_min, nu_proposed;
+  double q;
+  double q_min = 0.;
+  double q_max = 0.;
+  double q_step;
+  int nu;
+  int nu_min;
+  int nu_proposed;
   double q_approximation;
   double last_step = 0.;
   int last_index   = 0;
@@ -1763,7 +1770,9 @@ void TransferModule::transfer_interpolate_sources(
   int index_tau;
 
   /* variables used for spline interpolation algorithm */
-  double h, a, b;
+  double h;
+  double a;
+  double b;
 
   /** - interpolate at each k value using the usual
       spline interpolation algorithm. */
@@ -1984,7 +1993,9 @@ void TransferModule::transfer_dNdz_analytic(double z, double* dNdz, double* dln_
      evolution uses only dln(dN/dz)/dz, it is possible to use
      different functions for dN/dz and dln(dN/dz)/dz */
 
-  double z0, alpha, beta;
+  double z0;
+  double alpha;
+  double beta;
 
   //Euclid IST dNdz, do not change this!
   z0    = 0.9 / pow(2., 1. / 2.);
@@ -2310,7 +2321,9 @@ void TransferModule::transfer_limber(struct transfer_workspace* ptw,
   /** - define local variables */
 
   /* interpolated source and its derivatives at this value */
-  double S, Sp, Sm;
+  double S;
+  double Sp;
+  double Sm;
 
   const int tau_size = static_cast<int>(tau0_minus_tau.size());
 
@@ -2400,7 +2413,8 @@ void TransferModule::transfer_limber_interpolate(const double* tau0_minus_tau,
                                                  double tau0_minus_tau_limber,
                                                  double* S) {
   int index_tau;
-  double dS, ddS;
+  double dS;
+  double ddS;
 
   /** - find  bracketing indices by bisection: the first index_tau with
       tau0_minus_tau[index_tau] <= tau0_minus_tau_limber (the times are in decreasing
@@ -2542,13 +2556,17 @@ void TransferModule::transfer_bessel_interpolate(struct transfer_workspace* ptw,
   double* rescale_function = ptw->rescale_function.data();
   const double K           = ptw->K;
   const double l           = (double) l_[index_l];
-  double nu = 0., chi_tp = 0.;
+  double nu                = 0.;
+  double chi_tp            = 0.;
   double rescale_argument;
   double rescale_amplitude;
   using HermiteInterpolation =
       void (*)(const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
-  HermiteInterpolation interpolate_Phi, interpolate_dPhi, interpolate_PhidPhi, interpolate_Phid2Phi,
-      interpolate_PhidPhid2Phi;
+  HermiteInterpolation interpolate_Phi;
+  HermiteInterpolation interpolate_dPhi;
+  HermiteInterpolation interpolate_PhidPhi;
+  HermiteInterpolation interpolate_Phid2Phi;
+  HermiteInterpolation interpolate_PhidPhid2Phi;
   enum Hermite_Interpolation_Order HIorder;
 
   if (ptw->sgnK == 0) {
@@ -2686,7 +2704,13 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
   const double K                 = ptw->K;
   const double k2                = k * k;
   const double l                 = (double) l_[index_l];
-  double factor, s0, s2, ssqrt3, si, ssqrt2, ssqrt2i;
+  double factor;
+  double s0;
+  double s2;
+  double ssqrt3;
+  double si;
+  double ssqrt2;
+  double ssqrt2i;
 
   class_test(x_size > ptw->bessel_size,
              "radial function needed at %d times, but Bessel functions interpolated at only %d "
@@ -2817,8 +2841,10 @@ void TransferModule::transfer_global_selection_read() {
 
   /* for reading selection function */
   FILE* input_file;
-  int row, status;
-  double tmp1, tmp2;
+  int row;
+  int status;
+  double tmp1;
+  double tmp2;
 
   nz_size_ = 0;
 
@@ -2935,12 +2961,18 @@ void TransferModule::transfer_workspace_init(struct transfer_workspace* ptw,
 }
 
 void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int index_q, double tau0) {
-  double nu, new_nu;
+  double nu;
+  double new_nu;
   int int_nu;
-  double xmin, xmax, sampling, phiminabs, xtol;
+  double xmin;
+  double xmax;
+  double sampling;
+  double phiminabs;
+  double xtol;
   double sqrt_absK;
   int l_size_max;
-  int index_l_left, index_l_right;
+  int index_l_left;
+  int index_l_right;
 
   if ((ptw->sgnK != 0) && (index_q < index_q_flat_approximation_)) {
     xmin = ppr->hyper_x_min;
@@ -3040,7 +3072,8 @@ void TransferModule::transfer_get_lmax(
     int* index_l_left,
     int* index_l_right) {
   double x_nonzero;
-  int fevals = 0, index_l_mid;
+  int fevals = 0;
+  int index_l_mid;
   int multiplier;
   int right_boundary_checked = false;
   get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals);

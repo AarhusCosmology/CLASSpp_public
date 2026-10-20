@@ -20,15 +20,18 @@
 
 double WdmDecayProductSpecies::FiducialCosmicTime(double a) {
   const double H0 = kFidH * 1.0e5 / _c_;  // Mpc^-1
-  const double Om = kFidOmegaM, Or = kFidOmegaR;
-  const double s = std::sqrt(Or + Om * a);
+  const double Om = kFidOmegaM;
+  const double Or = kFidOmegaR;
+  const double s  = std::sqrt(Or + Om * a);
   return (2.0 / (3.0 * H0 * Om * Om)) * (s * (Om * a - 2.0 * Or) + 2.0 * Or * std::sqrt(Or));
 }
 
 double WdmDecayProductSpecies::FiducialScaleFactorAtTime(double t_mpc) {
   const double H0 = kFidH * 1.0e5 / _c_;
-  const double Om = kFidOmegaM, Or = kFidOmegaR;
-  double a_lo = 1e-12, a_hi = 1.0;
+  const double Om = kFidOmegaM;
+  const double Or = kFidOmegaR;
+  double a_lo     = 1e-12;
+  double a_hi     = 1.0;
   while (FiducialCosmicTime(a_hi) < t_mpc && a_hi < 1e3)
     a_hi *= 2.0;
   // Matter-limit seed; refine with bracketed Newton (dt/da = a / (H0 sqrt(Or+Om a)))
@@ -460,7 +463,10 @@ void WdmDecayProductSpecies::ComputeBackground(double a,
     pvecback[index_bg_f_ + i]      = f;
     pvecback[index_bg_dfdlnq_ + i] = pvecback_B[index_bi_dfdlnq_ + i];
   }
-  double n_wdm, rho_wdm, p_wdm, pseudo_p_wdm;
+  double n_wdm;
+  double rho_wdm;
+  double p_wdm;
+  double pseudo_p_wdm;
   ComputeMomenta(z, &n_wdm, &rho_wdm, &p_wdm, nullptr, &pseudo_p_wdm);
   pvecback[index_bg_number_]   = n_wdm;
   pvecback[index_bg_rho_]      = rho_wdm;
@@ -644,7 +650,10 @@ BaseSpecies::StressEnergyContribution WdmDecayProductSpecies::StressEnergy(
   const double k  = ppw->scalar_ctx.k;
   const double a2 = ppw->scalar_ctx.a2;
 
-  double s_drho = 0., s_theta = 0., s_dp = 0., s_shear = 0.;
+  double s_drho  = 0.;
+  double s_theta = 0.;
+  double s_dp    = 0.;
+  double s_shear = 0.;
   for (int iq = 0; iq < layout.q_size; ++iq) {
     const double q        = q_[iq];
     const double q2       = q * q;
@@ -680,7 +689,8 @@ void WdmDecayProductSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double a2        = ctx.a2;
   const double k         = ctx.k;
 
-  double s_drho = 0., s_theta = 0.;
+  double s_drho  = 0.;
+  double s_theta = 0.;
   if (layout.q_size > 0 && !layout.index_per_q.empty()) {
     for (int iq = 0; iq < layout.q_size; ++iq) {
       const double q        = q_[iq];

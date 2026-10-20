@@ -49,7 +49,9 @@ void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   const double rho_fld_today = GetOmega0() * pow(pba_.H0, 2);
 
   /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0). */
-  double w_fld, dw_over_da_fld, integral_fld;
+  double w_fld;
+  double dw_over_da_fld;
+  double integral_fld;
   ComputeWFld(ctx.a_ini, &w_fld, &dw_over_da_fld, &integral_fld);
 
   /* Note: for complicated w_fld(a) functions with no simple
@@ -64,7 +66,9 @@ void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
 
 void FluidSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
   // Compute w(a) ourselves rather than having the module pre-fill the slots.
-  double w_fld, dw_over_da_fld, integral_fld;
+  double w_fld;
+  double dw_over_da_fld;
+  double integral_fld;
   ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
   pvecback[index_bg_w_fld_]          = w_fld;
   pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
@@ -197,7 +201,9 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
   if (layout.idx_delta < 0 || layout.idx_theta < 0)
     return;
 
-  double w_fld, dw_over_da, integral;
+  double w_fld;
+  double dw_over_da;
+  double integral;
   auto* bgm = ctx.p_mod->GetBackgroundModule().get();
   bgm->background_w_fld(ctx.a, &w_fld, &dw_over_da, &integral);
   const double cs2 = Cs2(ctx.k * ctx.k, ctx.a);
@@ -229,7 +235,9 @@ void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
                                   const double* y,
                                   const PerturbationsModule& mod,
                                   const perturb_workspace* ppw) const {
-  double delta_rho_fld = 0., rho_plus_p_theta_fld = 0., delta_p_fld = 0.;
+  double delta_rho_fld        = 0.;
+  double rho_plus_p_theta_fld = 0.;
+  double delta_p_fld          = 0.;
 
   if (!w.IsTitleMode()) {
     const auto& layout   = static_cast<const PerturbLayout&>(*base);
@@ -278,7 +286,9 @@ BaseSpecies::StressEnergyContribution FluidSpecies::StressEnergy(
     const double a_prime_over_a = pvecback[bgm_->index_bg_H_] * a;
     const double cs2            = Cs2(k2, a);
 
-    double w_fld, dw_over_da_fld, integral_fld;
+    double w_fld;
+    double dw_over_da_fld;
+    double integral_fld;
     ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
     const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
@@ -433,7 +443,10 @@ void FluidSpecies::ComputeWFld(double a,
 }
 
 bool FluidSpecies::ReachesPhantomDivide() const {
-  double w_ini, w_0, dw_over_da, integral;
+  double w_ini;
+  double w_0;
+  double dw_over_da;
+  double integral;
   ComputeWFld(0., &w_ini, &dw_over_da, &integral);
   ComputeWFld(1., &w_0, &dw_over_da, &integral);
   return (w_ini + 1.) * (w_0 + 1.) <= 0.;
@@ -578,7 +591,8 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
   const auto wf_opt = ctx.pfc->get<double>("w_fld_f");
   class_test_severe(n_opt && wf_opt, "give only one of 'n_pheno_axion' and 'w_fld_f'");
   class_test_severe(!n_opt && !wf_opt, "pheno_axion needs 'n_pheno_axion' (or 'w_fld_f')");
-  double n, w_f;
+  double n;
+  double w_f;
   if (n_opt) {
     n = *n_opt;
     class_test(n < 1., "n_pheno_axion must be >= 1");

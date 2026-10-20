@@ -37,7 +37,8 @@ double ExpInt1(double x) {
     return 0.;  // e^-700 is already zero in double
   }
   if (x < 1.) {
-    double sum = 0., term = 1.;
+    double sum  = 0.;
+    double term = 1.;
     for (int k = 1; k <= 30; ++k) {
       term *= -x / k;
       sum  += -term / k;  // (-1)^(k+1) x^k / (k k!)
@@ -53,7 +54,10 @@ double ExpInt1(double x) {
   // result, so that 5e-5 lands as 1e-4 to 3e-3 on Phi -- which the unit test against
   // an independent quadrature catches.
   constexpr double kTiny = 1e-300;
-  double b = x + 1., c = 1. / kTiny, d = 1. / b, h = d;
+  double b               = x + 1.;
+  double c               = 1. / kTiny;
+  double d               = 1. / b;
+  double h               = d;
   for (int i = 1; i <= 200; ++i) {
     const double an  = -1.0 * i * i;
     b               += 2.;
@@ -212,7 +216,8 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
   const double g3i    = 1. / (g2 * gamma);
   const double eps_ne = pvecback[index_bg_eps_ne_];
 
-  double rate3 = 0., rate5 = 0.;
+  double rate3 = 0.;
+  double rate5 = 0.;
   if (rta_form_ == RtaForm::kStructured) {
     // Both terms are the SAME momentum integral, one order apart (see PhiLO/PhiNLO):
     //
@@ -535,7 +540,8 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                     name.c_str(),
                     sampling.c_str());
 
-  std::vector<double> q_d(N_q), dq_d(N_q);
+  std::vector<double> q_d(N_q);
+  std::vector<double> dq_d(N_q);
   if (sampling == "linear") {
     // Uniform trapezoid over [0, q_max] with q = 0 an implicit zero-weight point
     // (q^2 f vanishes there), so the FIRST node takes full weight and only the last
@@ -1023,7 +1029,8 @@ void DNCDMProxySpecies::ApplyKernelBackgroundDerivs(double a,
   // construction-plus-hope. DarkRadiationSpecies::BackgroundDerivs has already
   // written the -4(a'/a)rho dilution; this is the source on top of it.
   const double fac = BareFactor() / (a * a * a * a);
-  double e_l = 0., e_phi = 0.;
+  double e_l       = 0.;
+  double e_phi     = 0.;
   for (int i = 0; i < Nd; ++i) {
     const double q3  = q_d_[i] * q_d_[i] * q_d_[i] * dq_d_[i];
     e_l             += q3 * df_l_[i];
@@ -1276,7 +1283,8 @@ void DNCDMProxySpecies::AddCouplingDerivs(double /*tau*/,
   // q outer / l inner, with (q/eps)^l built by one multiply per step: the paper's
   // weight costs a pow() per (q, l) if written directly, which at 16 bins x 18
   // multipoles is ~300 pow calls on every RHS evaluation of every k-mode.
-  double A_H[kLMaxScratch], B_H[kLMaxScratch];
+  double A_H[kLMaxScratch];
+  double B_H[kLMaxScratch];
   for (int l = 0; l <= l_max; ++l) {
     A_H[l] = 0.;
     B_H[l] = 0.;
@@ -1309,7 +1317,8 @@ void DNCDMProxySpecies::AddCouplingDerivs(double /*tau*/,
   }
 
   // ── per-multipole relaxation ──────────────────────────────────────────────
-  double target[kLMaxScratch], GT[kLMaxScratch];
+  double target[kLMaxScratch];
+  double GT[kLMaxScratch];
   for (int l = 0; l <= l_max; ++l) {
     const double A_l   = y[f_lay.idx_F0 + l];
     const double A_phi = y[b_lay.idx_F0 + l];
@@ -1377,7 +1386,9 @@ void DNCDMProxySpecies::PrintVariables(PerturbColumnWriter& w,
   // the daughters from their integrated F_2 — so this only sums the three and
   // multiplies by a⁴. Column names match DNCDMInvSpecies exactly, which is the
   // point: it lets one script read a proxy run against an exact one.
-  double pi_H = 0., pi_l = 0., pi_phi = 0.;
+  double pi_H   = 0.;
+  double pi_l   = 0.;
+  double pi_phi = 0.;
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback.data();

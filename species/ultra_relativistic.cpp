@@ -353,7 +353,9 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
                                               const double* y,
                                               const PerturbationsModule& mod,
                                               const perturb_workspace* ppw) const {
-  double delta_ur = 0., theta_ur = 0., shear_ur = 0.;
+  double delta_ur = 0.;
+  double theta_ur = 0.;
+  double shear_ur = 0.;
 
   if (!w.IsTitleMode()) {
     const double k           = ppw->scalar_ctx.k;

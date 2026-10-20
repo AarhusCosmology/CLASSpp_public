@@ -133,7 +133,8 @@ void DCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
   const double Omega0_dcdmdr_eff   = budget ? budget->dcdmdr.value_or(0.) : 0.;
   if (t == "Omega_dcdmdr" || t == "omega_dcdmdr") {
     double Omega_M = Omega0_cdm_eff + Omega0_idm_dr_eff + Omega0_dcdmdr_eff + ba.Omega0_b;
-    double gamma = dcdm_->Gamma_dcdm() / ba.H0, a_decay = 1.0;
+    double gamma   = dcdm_->Gamma_dcdm() / ba.H0;
+    double a_decay = 1.0;
     if (gamma > 1)
       a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
     double tgt = (t == "omega_dcdmdr") ? tv / ba.h / ba.h : tv;
@@ -143,7 +144,8 @@ void DCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
   else {  // Omega_ini_dcdm / omega_ini_dcdm
     double Omega0_dcdmdr_ini = (t == "omega_ini_dcdm") ? tv / (ba.h * ba.h) : tv;
     double Omega_M           = Omega0_cdm_eff + Omega0_idm_dr_eff + Omega0_dcdmdr_ini + ba.Omega0_b;
-    double gamma = dcdm_->Gamma_dcdm() / ba.H0, a_decay = 1.0;
+    double gamma             = dcdm_->Gamma_dcdm() / ba.H0;
+    double a_decay           = 1.0;
     if (gamma > 1)
       a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
     guess.push_back(tv * a_decay);
@@ -271,7 +273,8 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
       tmp_composite->shooting_target_ = shooting_target;
       tmp_composite->needs_shooting_  = true;
 
-      std::vector<double> g, d;
+      std::vector<double> g;
+      std::vector<double> d;
       tmp_composite->ComputeShootingGuess(ctx, g, d);
 
       // Seed the guess into the UNKNOWN so this (discovery) build is valid.

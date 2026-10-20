@@ -455,7 +455,10 @@ void DNCDMSpecies::ComputeBackground(double a, const double* pvecback_B, double*
       pvecback[index_bg_dlnfdlnq_decay_ + i] = lnf_dlnf[q_sz + i];
       pvecback[index_bg_dlnfdlnq_sep_ + i]   = 0.;
     }
-    double number_ncdm, rho_ncdm, p_ncdm, pseudo_p_ncdm;
+    double number_ncdm;
+    double rho_ncdm;
+    double p_ncdm;
+    double pseudo_p_ncdm;
     ComputeMomenta(z, &number_ncdm, &rho_ncdm, &p_ncdm, nullptr, &pseudo_p_ncdm);
     pvecback[index_bg_number_]   = number_ncdm;
     pvecback[index_bg_rho_]      = rho_ncdm;
@@ -515,7 +518,10 @@ void DNCDMSpecies::ComputeBackground(double a, const double* pvecback_B, double*
     w_bg_[i]                               = std::exp(lnf_dlnf_array[i]) * dq_[i];
   }
 
-  double number_ncdm, rho_ncdm, p_ncdm, pseudo_p_ncdm;
+  double number_ncdm;
+  double rho_ncdm;
+  double p_ncdm;
+  double pseudo_p_ncdm;
   ComputeMomenta(z, &number_ncdm, &rho_ncdm, &p_ncdm, nullptr, &pseudo_p_ncdm);
   pvecback[index_bg_number_]   = number_ncdm;
   pvecback[index_bg_rho_]      = rho_ncdm;

@@ -72,7 +72,9 @@ void PpfFluid::PrintVariables(PerturbColumnWriter& w,
                               const double* /*y*/,
                               const PerturbationsModule& /*mod*/,
                               const perturb_workspace* ppw) const {
-  double delta_rho_fld = 0., rho_plus_p_theta_fld = 0., delta_p_fld = 0.;
+  double delta_rho_fld        = 0.;
+  double rho_plus_p_theta_fld = 0.;
+  double delta_p_fld          = 0.;
   if (!w.IsTitleMode()) {
     delta_rho_fld        = ppw->delta_rho_fld;
     rho_plus_p_theta_fld = ppw->rho_plus_p_theta_fld;
@@ -103,7 +105,9 @@ void PpfFluid::ComputePpf(double k,
   const double a2 = a * a;
   const double k2 = k * k;
 
-  double w_fld, dw_over_da_fld, integral_fld;
+  double w_fld;
+  double dw_over_da_fld;
+  double integral_fld;
   ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
   const double w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
@@ -126,7 +130,9 @@ void PpfFluid::ComputePpf(double k,
     Gamma_fld = y[layout.idx_Gamma];
   }
 
-  double alpha, alpha_prime, metric_euler;
+  double alpha;
+  double alpha_prime;
+  double metric_euler;
   if (ppw->scalar_ctx.gauge == static_cast<int>(possible_gauges::synchronous)) {
     alpha        = (y[ppw->pv->index_pt_eta] +
                     1.5 * a2 / k2 / s2sq *

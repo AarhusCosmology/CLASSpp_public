@@ -44,7 +44,8 @@ inline double FermiDiracSlope(double x) {
 }  // namespace
 
 BbnPlasma::BbnPlasma(int nodes, double u_max) : u_(nodes), w_(nodes) {
-  std::vector<double> mu(nodes), weight(nodes);
+  std::vector<double> mu(nodes);
+  std::vector<double> weight(nodes);
   quadrature_gauss_legendre(mu.data(), weight.data(), nodes, 1.0e-14);
 
   /* Map the [-1,1] rule onto [0, u_max]. */

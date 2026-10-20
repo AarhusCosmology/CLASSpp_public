@@ -123,8 +123,12 @@ void array_spline(double* array,
                   int index_y,
                   int index_ddydx2,
                   short spline_mode) {
-  int i, k;
-  double p, qn, sig, un;
+  int i;
+  int k;
+  double p;
+  double qn;
+  double sig;
+  double un;
   std::vector<double> vec_u(n_lines - 1);
   double* u = vec_u.data();
   double dy_first;
@@ -230,8 +234,12 @@ void array_spline_table_line_to_line(const double* x, /* vector of size x_size *
                                      int index_y,
                                      int index_ddydx2,
                                      short spline_mode) {
-  int i, k;
-  double p, qn, sig, un;
+  int i;
+  int k;
+  double p;
+  double qn;
+  double sig;
+  double un;
   std::vector<double> vec_u(n_lines - 1);
   double* u = vec_u.data();
   double dy_first;
@@ -1070,7 +1078,9 @@ void array_interpolate_parabola(double x1,
                                 double* y,
                                 double* dy,
                                 double* ddy) {
-  double a, b, c;
+  double a;
+  double b;
+  double c;
 
   /*
     a x_i**2 + b x_i + c = y_i
@@ -1104,7 +1114,10 @@ void array_smooth(double* array,
                   int radius) {
   std::vector<double> vec_smooth(n_lines);
   double* smooth = vec_smooth.data();
-  int i, j, jmin, jmax;
+  int i;
+  int j;
+  int jmin;
+  int jmax;
   double weigth;
 
   for (i = 0; i < n_lines; i++) {

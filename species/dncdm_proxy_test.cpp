@@ -102,7 +102,8 @@ static double E1(double x) {
   constexpr double kEulerGamma = 0.5772156649015329;
   if (x <= 1.) {
     // E_1(x) = -gamma - ln x + sum_{n>=1} (-1)^(n+1) x^n / (n n!)
-    double sum = 0., term = 1.;
+    double sum  = 0.;
+    double term = 1.;
     for (int n = 1; n <= 60; ++n) {
       term *= -x / n;
       sum  -= term / n;
@@ -111,7 +112,10 @@ static double E1(double x) {
   }
   // E_1(x) = e^-x / (x + 1 - 1/(x + 3 - 4/(x + 5 - ...))), by modified Lentz.
   constexpr double kTiny = 1e-300;
-  double b = x + 1., c = 1. / kTiny, d = 1. / b, h = d;
+  double b               = x + 1.;
+  double c               = 1. / kTiny;
+  double d               = 1. / b;
+  double h               = d;
   for (int i = 1; i <= 200; ++i) {
     const double an   = -1. * i * i;
     b                += 2.;
@@ -463,9 +467,11 @@ int main() {
     }
     // BOTH die once the parent is non-relativistic -- the whole point of the form.
     // A gamma-power model saturates here instead and isotropises forever.
-    double pl = DNCDMProxySpecies::PhiLO(1.), pn = DNCDMProxySpecies::PhiNLO(1.);
+    double pl = DNCDMProxySpecies::PhiLO(1.);
+    double pn = DNCDMProxySpecies::PhiNLO(1.);
     for (double X : {2., 4., 8., 16.}) {
-      const double l2 = DNCDMProxySpecies::PhiLO(X), n2 = DNCDMProxySpecies::PhiNLO(X);
+      const double l2 = DNCDMProxySpecies::PhiLO(X);
+      const double n2 = DNCDMProxySpecies::PhiNLO(X);
       char msg[128];
       std::snprintf(msg, sizeof(msg), "PhiLO decreasing at X = %g", X);
       Check(l2 < pl && l2 > 0., msg);
@@ -492,7 +498,11 @@ int main() {
     int idx_s = 0;
     st->RegisterBackgroundIndices(idx_s);
     std::vector<double> pv_s(idx_s + 8, 0.);
-    const double aS = 1e-3, rhoS = 3.0, secS = 10.0, numS = 2.0, epsS = 0.25;
+    const double aS                      = 1e-3;
+    const double rhoS                    = 3.0;
+    const double secS                    = 10.0;
+    const double numS                    = 2.0;
+    const double epsS                    = 0.25;
     pv_s[st->parent().bg_rho_index()]    = rhoS;
     pv_s[st->parent().bg_number_index()] = numS;
     pv_s[st->bg_rho_sec_index()]         = secS;
@@ -648,10 +658,12 @@ int main() {
     // must survive both amplitudes, both beta forms and every l. Measured against the
     // exact q-resolved solve at 2.006 +- 0.037 (hpc_scenb, Gamma = 1e9).
     {
-      int i1 = 0, i2 = 0;
+      int i1 = 0;
+      int i2 = 0;
       one->RegisterBackgroundIndices(i1);
       two->RegisterBackgroundIndices(i2);
-      std::vector<double> pv1(i1 + 8, 0.), pv2(i2 + 8, 0.);
+      std::vector<double> pv1(i1 + 8, 0.);
+      std::vector<double> pv2(i2 + 8, 0.);
       const double aT = 2e-3;
       for (auto* pr : {&pv1, &pv2}) {
         auto& sp                             = (pr == &pv1) ? *one : *two;

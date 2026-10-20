@@ -335,7 +335,9 @@ double DrPsdSpecies::InitialRadiationOmega0(double H0) const {
 
 void DrPsdSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
   const int N = N_q_bg_;
-  std::vector<double> f_df(2 * N), ddf(N), lnq(N);
+  std::vector<double> f_df(2 * N);
+  std::vector<double> ddf(N);
+  std::vector<double> lnq(N);
   for (int i = 0; i < N; ++i) {
     // Floor at kFFloor (gains dominate; f stays strictly positive). No seed
     // subtraction: f̄ is the true occupation (see the IC seed).
@@ -403,7 +405,10 @@ void DrPsdSpecies::ComputeBackground(double a, const double* pvecback_B, double*
   for (int i = 0; i < N; ++i)
     pvecback[index_bg_dfdlnq_ + i] = f_df[N + i];
 
-  double number, rho, p, pseudo_p;
+  double number;
+  double rho;
+  double p;
+  double pseudo_p;
   ComputeMomenta(1. / a - 1., &number, &rho, &p, nullptr, &pseudo_p);  // M_ = 0 ⇒ ε = q
   pvecback[index_bg_number_]   = number;
   pvecback[index_bg_rho_]      = rho;
@@ -648,7 +653,10 @@ BaseSpecies::StressEnergyContribution DrPsdSpecies::StressEnergy(
 
   // UNNORMALIZED weights: w0 = dq only. The state IS δf, so the f̄ that the
   // normalized-Ψ convention carries in the weight is already baked into y.
-  double s_drho = 0., s_theta = 0., s_dp = 0., s_shear = 0.;
+  double s_drho  = 0.;
+  double s_theta = 0.;
+  double s_dp    = 0.;
+  double s_shear = 0.;
 
   if (reduced()) {
     // For a massless daughter eps = q, so ALL FOUR sums carry the same weight q^3 --
@@ -702,7 +710,8 @@ void DrPsdSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double a2        = ctx.a2;
   const double k         = ctx.k;
 
-  double s_drho = 0., s_theta = 0.;
+  double s_drho  = 0.;
+  double s_theta = 0.;
   if (reduced() && layout.q_size > 0 && !layout.index_per_q.empty()) {
     s_drho  = ReducedEnergyAtL(layout, y, 0);
     s_theta = ReducedEnergyAtL(layout, y, 1);

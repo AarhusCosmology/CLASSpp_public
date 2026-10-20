@@ -194,7 +194,9 @@ int main() {
   {
     FileContent fc = BaseFc();
     AxionNCDMSpecies sp(&fc, "ax", TestSettings(), &pba, nullptr);
-    const double T = 0.39, T_cmb = 2.7255, m_eV = 1.0;
+    const double T        = 0.39;
+    const double T_cmb    = 2.7255;
+    const double m_eV     = 1.0;
     const double factor   = 4. * _PI_ * std::pow(T_cmb * T * _k_B_, 4) * 8. * _PI_ * _G_ / 3. /
                             std::pow(_h_P_ / 2. / _PI_, 3) / std::pow(_c_, 7) * _Mpc_over_m_ *
                             _Mpc_over_m_;
@@ -209,7 +211,8 @@ int main() {
   {
     FileContent fc = BaseFc();
     AxionNCDMSpecies sp(&fc, "ax", TestSettings(), &pba, nullptr);
-    double n = 0., rho = 0.;
+    double n   = 0.;
+    double rho = 0.;
     sp.ComputeMomenta(0., &n, &rho, nullptr, nullptr, nullptr);
     assert(std::fabs(rho / n / sp.M() - 1.) < 1e-6);
   }
@@ -253,7 +256,8 @@ int main() {
       assert(f != nullptr);
       const double kPref = 1.0 / std::pow(2. * _PI_, 3);
       const int n_rows   = 5000;
-      const double q_lo = 1e-4, q_hi = 30.;
+      const double q_lo  = 1e-4;
+      const double q_hi  = 30.;
       for (int i = 0; i < n_rows; ++i) {
         const double q = q_lo * std::pow(q_hi / q_lo, i / (double) (n_rows - 1));
         std::fprintf(f, "%.16e %.16e\n", q, kPref / std::expm1(q));
@@ -270,7 +274,8 @@ int main() {
     fn.set("nu.psd_filename", psd_path);
     NCDMSpecies nu(&fn, "nu", TestSettings(), &pba, nullptr);
     for (double z : {0., 100., 3000.}) {
-      double rho_ax = 0., rho_nu = 0.;
+      double rho_ax = 0.;
+      double rho_nu = 0.;
       ax.ComputeMomenta(z, nullptr, &rho_ax, nullptr, nullptr, nullptr);
       nu.ComputeMomenta(z, nullptr, &rho_nu, nullptr, nullptr, nullptr);
       assert(std::fabs(rho_ax / rho_nu - 1.) < 1e-4);
@@ -295,7 +300,10 @@ int main() {
     Cosmology cosmo(fc);
     auto& bgm = cosmo.GetBackgroundModule();
 
-    const double T = 0.39, T_cmb_v = 2.7255, m_eV = 1.0, h = 0.67;
+    const double T           = 0.39;
+    const double T_cmb_v     = 2.7255;
+    const double m_eV        = 1.0;
+    const double h           = 0.67;
     const double factor      = 4. * _PI_ * std::pow(T_cmb_v * T * _k_B_, 4) * 8. * _PI_ * _G_ / 3. /
                                std::pow(_h_P_ / 2. / _PI_, 3) / std::pow(_c_, 7) * _Mpc_over_m_ *
                                _Mpc_over_m_;

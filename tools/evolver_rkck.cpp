@@ -26,7 +26,10 @@ void evolver_rk(EvolverDerivs derivs,
   const double minimum_variation = std::numeric_limits<double>::epsilon();
 
   int next_index_x;
-  double x1, x2 = 0., timestep, timescale;
+  double x1;
+  double x2 = 0.;
+  double timestep;
+  double timescale;
   struct generic_integrator_workspace gi;
   std::vector<double> dy(y_size);
   short call_output;

@@ -188,7 +188,8 @@ double solve_layer(double rtol, int nsample, int* rhs) {
 }
 
 void test_dense_output_resolves_the_layer() {
-  int rhs_coarse = 0, rhs_fine = 0;
+  int rhs_coarse      = 0;
+  int rhs_fine        = 0;
   const double coarse = solve_layer(1e-6, 11, &rhs_coarse);
   const double fine   = solve_layer(1e-6, 1001, &rhs_fine);
 
@@ -284,7 +285,9 @@ void test_nonlinear_coupled_converges() {
     return c.derivs;
   };
 
-  double ref[2], loose[2], tighter[2];
+  double ref[2];
+  double loose[2];
+  double tighter[2];
   solve(1e-12, ref);
   const int rhs_loose = solve(1e-6, loose);
   solve(1e-8, tighter);

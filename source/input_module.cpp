@@ -1876,9 +1876,21 @@ void InputModule::ReadDerived() {
 
   else if ((ppm->primordial_spec_type == inflation_V) ||
            (ppm->primordial_spec_type == inflation_H)) {
-    double R0, R1, R2, R3, R4;
-    double PSR0, PSR1, PSR2, PSR3, PSR4;
-    double HSR0, HSR1, HSR2, HSR3, HSR4;
+    double R0;
+    double R1;
+    double R2;
+    double R3;
+    double R4;
+    double PSR0;
+    double PSR1;
+    double PSR2;
+    double PSR3;
+    double PSR4;
+    double HSR0;
+    double HSR1;
+    double HSR2;
+    double HSR3;
+    double HSR4;
 
     if (ppm->primordial_spec_type == inflation_V) {
       if (auto potential_name = pfc->get<std::string>("potential")) {
@@ -2246,7 +2258,8 @@ void InputModule::ReadDerived() {
         /* mean redshift = int z dN/dz dz / int dN/dz dz, exact for dN/dz linear between the
            tabulated points (the trapezoidal rule applied to z dN/dz would give zero for a bin
            whose only non-zero value is at z=0, and k_max diverges for a mean at z=0) */
-        double norm = 0., mean = 0.;
+        double norm = 0.;
+        double mean = 0.;
         for (int index_z = 0; index_z < z_size - 1; index_z++) {
           const double dz  = z[index_z + 1] - z[index_z];
           norm            += 0.5 * (dNdz[index_z] + dNdz[index_z + 1]) * dz;
@@ -3423,7 +3436,8 @@ ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
   FileContent& fc = input_module->file_content_;
 
   ShootingWorkspace w(fc);
-  std::vector<double> xguess, dxdF;
+  std::vector<double> xguess;
+  std::vector<double> dxdF;
 
   // Cosmological target: 100*theta_s varies h (residual from thermo rs/ra). Module-level.
   if (auto theta_s = fc.get<double>("100*theta_s")) {
@@ -3459,7 +3473,8 @@ ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
     std::vector<ShootingTarget> tgts = sp->GetShootingTargets();
     if (tgts.empty())
       continue;
-    std::vector<double> g, d;
+    std::vector<double> g;
+    std::vector<double> d;
     sp->ComputeShootingGuess(gctx, g, d);
     // A species must report one guess + one Jacobian seed per target (same order), or the
     // flattened unknown vector below desyncs. Guard against a mis-implemented hook.

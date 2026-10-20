@@ -114,7 +114,8 @@ std::optional<double> BackgroundModule::PeakEnergyFraction(const BaseSpecies& sp
   // No sub-step interpolation: the table is dense in log(a)
   // (back_integration_stepsize) and the peak is a smooth maximum, so the row
   // value IS the peak to within the curvature times a step squared.
-  double f_peak = 0., a_peak = 0.;
+  double f_peak = 0.;
+  double a_peak = 0.;
   for (int index_loga = 0; index_loga < bt_size_; ++index_loga) {
     const double* pvecback = background_table_.data() + index_loga * bg_size_;
     const double f         = species.Rho(pvecback) / pvecback[index_bg_rho_crit_];
@@ -532,7 +533,9 @@ void BackgroundModule::background_init() {
 
   /* fluid equation of state */
   if (all_species_.count("Fluid")) {
-    double w_fld, dw_over_da, integral_fld;
+    double w_fld;
+    double dw_over_da;
+    double integral_fld;
     background_w_fld(0., &w_fld, &dw_over_da, &integral_fld);
 
     class_test(w_fld >= 1. / 3.,
@@ -1160,7 +1163,9 @@ void BackgroundModule::background_derivs_member(
 
   /** - define local variables */
 
-  double *pvecback, a, H;
+  double* pvecback;
+  double a;
+  double H;
 
   background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
       parameters_and_workspace);

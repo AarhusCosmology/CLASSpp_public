@@ -37,9 +37,13 @@ constexpr double kE_H_lya = 10.1988356821;
    rate stays continuous. Fitted at one cosmology to direct CosmoRec (Lewis' reference settings);
    docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md has the fit and its transfer. */
 double HeliumRateCorrection(double T_rad_atomic_eV) {
-  constexpr double a0 = 0.635977, a1 = 0.298024, a2 = 0.239789;
-  constexpr double d2 = 2.91828, d4 = 3.31521;
-  constexpr double z0 = 1751.94, w = 286.606;
+  constexpr double a0  = 0.635977;
+  constexpr double a1  = 0.298024;
+  constexpr double a2  = 0.239789;
+  constexpr double d2  = 2.91828;
+  constexpr double d4  = 3.31521;
+  constexpr double z0  = 1751.94;
+  constexpr double w   = 286.606;
   const double z_scale = T_rad_atomic_eV / (kBoltz * 2.7255) - 1.;
   const double u       = (z_scale - z0) / w;
   const double u2      = u * u;

@@ -601,7 +601,9 @@ DecayTransitionKernel::Moments DNCDMInvSpecies::ConservationMoments(double a,
 void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
                                         int n_rows,
                                         int row_stride) {
-  const int Np = parent_->q_size(), Nf = fermion_->q_size(), Nb = boson_->q_size();
+  const int Np = parent_->q_size();
+  const int Nf = fermion_->q_size();
+  const int Nb = boson_->q_size();
   const GridView parent_view{parent_->GetQ().data(), parent_->dq().data(), Np};
   const GridView fermion_view{fermion_->q().data(), fermion_->dq().data(), Nf};
   const GridView boson_view{boson_->q().data(), boson_->dq().data(), Nb};
@@ -627,7 +629,10 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
                                                                          fermion_bg_view,
                                                                          boson_bg_view);
   DecayTransitionKernel& probe = *reduced_basis_kernel_;
-  std::vector<double> fH(Np), diagH(Np), diagl(Nf), diagp(Nb);
+  std::vector<double> fH(Np);
+  std::vector<double> diagH(Np);
+  std::vector<double> diagl(Nf);
+  std::vector<double> diagp(Nb);
 
   // Find the DECAY EPOCH: the row where the parent's comoving number falls fastest.
   //
@@ -676,7 +681,8 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
     fH[i] = kappa * std::exp(bg[pf + i]);
   // The daughters' PSDs on their STATE grid (pvecback carries them on the finer
   // background grid; bg_index is the exact subsample).
-  std::vector<double> fl(Nf), fphi(Nb);
+  std::vector<double> fl(Nf);
+  std::vector<double> fphi(Nb);
   for (int j = 0; j < Nf; ++j)
     fl[j] = bg[fbase + fermion_->bg_index(j)];
   for (int j = 0; j < Nb; ++j)
@@ -747,7 +753,9 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
 void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
                                         int n_rows,
                                         int row_stride) {
-  const int Np = parent_->q_size(), Nf = fermion_->q_size(), Nb = boson_->q_size();
+  const int Np = parent_->q_size();
+  const int Nf = fermion_->q_size();
+  const int Nb = boson_->q_size();
   const GridView parent_view{parent_->GetQ().data(), parent_->dq().data(), Np};
   const GridView fermion_view{fermion_->q().data(), fermion_->dq().data(), Nf};
   const GridView boson_view{boson_->q().data(), boson_->dq().data(), Nb};
@@ -776,7 +784,10 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
                               cfg_,
                               fermion_bg_view,
                               boson_bg_view);
-  std::vector<double> fH(Np), diagH(Np), diagl(Nf), diagp(Nb);
+  std::vector<double> fH(Np);
+  std::vector<double> diagH(Np);
+  std::vector<double> diagl(Nf);
+  std::vector<double> diagp(Nb);
   int row_lo = -1;
   for (int row = 0; row < n_rows; ++row) {
     const double* bg = background_table + (size_t) row * row_stride;
@@ -907,7 +918,10 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
                                 fermion_->statistics(),
                                 boson_->statistics(),
                                 ReducedCollisionOperator::Config{reduced_moments_});
-    std::vector<double> f(Np), f_l(Nf), f_phi(Nb), M;
+    std::vector<double> f(Np);
+    std::vector<double> f_l(Nf);
+    std::vector<double> f_phi(Nb);
+    std::vector<double> M;
     for (long long p = lo; p < hi; ++p) {
       const int row    = row_lo + static_cast<int>(p / n_sub);
       const int sub    = static_cast<int>(p % n_sub);
@@ -916,7 +930,8 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
       // sub == 0 reads the row itself, so the last row -- which has no successor -- is only
       // ever reached there and bg1 is never formed past the end of the table.
       const double* bg1 = (sub == 0) ? bg : background_table + (size_t) (row + 1) * row_stride;
-      double a, aH;
+      double a;
+      double aH;
       const double* f_l_src;
       const double* f_phi_src;
       if (sub == 0) {
@@ -1283,7 +1298,9 @@ void DNCDMInvSpecies::ApplyKernelPerturbDiagonal(double a,
   DecayTransitionKernel& kern = *scratch.kernel_pt;
   const double m              = parent_->GetMass();
   const double Gamma          = parent_->Gamma();
-  const int Np = parent_->q_size(), Nf = fermion_->q_size(), Nb = boson_->q_size();
+  const int Np                = parent_->q_size();
+  const int Nf                = fermion_->q_size();
+  const int Nb                = boson_->q_size();
 
   // Identical gather to ApplyKernelPerturbDerivs: same columns, same kappa, so the
   // diagonal linearises the same discrete network the RHS evaluates.
@@ -1356,7 +1373,8 @@ void DNCDMInvSpecies::ApplyKernelPerturbDiagonal(double a,
       const std::vector<double>& psi = reduced_op_->psi(d);
       const std::vector<double>& w   = reduced_op_->weight(d);
       for (int j = 0; j < reduced_moments_; ++j) {
-        double num = 0., den = 0.;
+        double num = 0.;
+        double den = 0.;
         for (int i = 0; i < n_grid; ++i) {
           const double p2   = psi[(size_t) j * n_grid + i] * psi[(size_t) j * n_grid + i];
           const double dmu  = sp->dq()[i] * sp->q()[i] * sp->q()[i] * w[i] * p2;
@@ -1517,7 +1535,9 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   // Composite-owned (mirrors Type3Species::PrintVariables): the children are not
   // separately registered in the collection, so their layouts are reached through
   // this composite's nested layout, never through their own collection_index_.
-  double pi_H = 0., pi_l = 0., pi_phi = 0.;
+  double pi_H   = 0.;
+  double pi_l   = 0.;
+  double pi_phi = 0.;
   // The sector's OTHER two moments, on the same footing as a4Pi: δ is ρ-weighted,
   // θ and σ are (ρ+p)-weighted, all three summed over {H, l, φ}. Assembled here
   // rather than downstream from three published ratios because the sum has to be
@@ -1526,8 +1546,15 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   // Γ=1e5) and any weighting applied to the published ratio inherits that noise,
   // while Σδρ / Σρ never forms it. The per-component columns are published too, so
   // the decomposition stays checkable — they are the ones to distrust late.
-  double d_sec = 0., t_sec = 0., s_sec = 0.;
-  double d_H = 0., d_l = 0., d_phi = 0., t_H = 0., t_l = 0., t_phi = 0.;
+  double d_sec = 0.;
+  double t_sec = 0.;
+  double s_sec = 0.;
+  double d_H   = 0.;
+  double d_l   = 0.;
+  double d_phi = 0.;
+  double t_H   = 0.;
+  double t_l   = 0.;
+  double t_phi = 0.;
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback.data();
@@ -1613,7 +1640,10 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   // d(a⁴Π)/dτ = -aΓ_T·a⁴Π. ⚠ Γ_T is a small residual of two much larger terms, so
   // read it as an emitted quantity to be checked, not as a converged observable.
   // Sampling-point cost only; never touched on the RHS.
-  double pidot_H = 0., pidot_l = 0., pidot_phi = 0., gamma_H = 0.;
+  double pidot_H   = 0.;
+  double pidot_l   = 0.;
+  double pidot_phi = 0.;
+  double gamma_H   = 0.;
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback.data();
@@ -1661,7 +1691,8 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
       // there is no second copy of the normalisation to drift out of sync.
       // Weights are the collision-owned ones; the composite always sets that mode on
       // its parent (SetCollisionOwned(true) in this constructor).
-      double num = 0., den = 0.;
+      double num = 0.;
+      double den = 0.;
       for (int i = 0; i < parent_->q_size(); ++i) {
         const double q    = parent_->GetQ()[i];
         const double eps  = std::sqrt(q * q + a * a * parent_->GetMass() * parent_->GetMass());
@@ -1681,7 +1712,8 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
     if (M > 0. && a > 0.) {
       const auto& q  = parent_->GetQ();
       const auto& dq = parent_->dq();
-      double num = 0., den = 0.;
+      double num     = 0.;
+      double den     = 0.;
       for (int i = 0; i < parent_->q_size(); ++i) {
         const double f   = std::exp(pvecback[parent_->bg_lnf_index() + i]);
         const double w0  = dq[i] * q[i] * q[i] * f;
@@ -1720,7 +1752,8 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   // starts. Off by default (dr_emit_l_moments) -- it is 3*(l_max-1) extra columns
   // and only a dedicated measurement wants them.
   if (emit_l_moments_) {
-    double m_num[kLMomentMax + 1] = {0.}, m_den[kLMomentMax + 1] = {0.};
+    double m_num[kLMomentMax + 1] = {0.};
+    double m_den[kLMomentMax + 1] = {0.};
     double m_can[kLMomentMax + 1] = {0.};
     if (!w.IsTitleMode()) {
       const perturb_vector* pv = ppw->pv.get();
@@ -1774,7 +1807,9 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
           l_top = std::min(l_top, L.lay->l_max);
         l_top = std::min(l_top, kLMomentMax);
         for (int l = 2; l <= l_top; ++l) {
-          double sn = 0., sd = 0., an = 0.;
+          double sn = 0.;
+          double sd = 0.;
+          double an = 0.;
           for (const Leg& L : legs) {
             const double n  = L.norm * raw(L, dyc, l);
             sn             += n;
@@ -1808,7 +1843,9 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   // way to see whether a large delta_H = drho_H/rho_H is a harmless ratio of two
   // vanishing numbers or is genuinely driving the metric — the two look identical
   // in any normalized output.
-  double rho_H = 0., drho_H = 0., rpp_shear_H = 0.;
+  double rho_H       = 0.;
+  double drho_H      = 0.;
+  double rpp_shear_H = 0.;
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
     const double* pvecback   = ppw->pvecback.data();

@@ -315,7 +315,10 @@ void DecayTransitionKernel::PrepareTransitions(double a,
   // across bins the band edges move smoothly, so carrying these over the whole sweep
   // makes every BuildDeposit an O(1) hunt from the previous answer. Purely a search
   // accelerator; the stencils are unchanged.
-  int hint_f = -1, hint_b = -1, hint_fbg = -1, hint_bbg = -1;
+  int hint_f   = -1;
+  int hint_b   = -1;
+  int hint_fbg = -1;
+  int hint_bbg = -1;
   for (int i = 0; i < parent_.n; ++i) {
     const double q1   = parent_.q[i];
     const double dq1  = parent_.dq[i];
@@ -829,7 +832,8 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
 
   // Booked into locals and added once at the end, so the accumulation order within each
   // residual matches the per-l form's (ascending i, then n) even though l now interleaves.
-  double resid_e = 0., resid_m = 0.;
+  double resid_e = 0.;
+  double resid_m = 0.;
 
   // Per-node, per-multipole scratch. On the STACK deliberately: it is written and read
   // within one node's block, so heap members would add nothing but an aliasing question
@@ -843,15 +847,21 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
                     "ApplyPerturbationOperatorAllL",
                     l_max,
                     kMaxSweepL);
-  double Pa_l[kMaxSweepL + 1], Pb_l[kMaxSweepL + 1], Pg_l[kMaxSweepL + 1];
-  double Fl_node_l[kMaxSweepL + 1], Fphi_node_l[kMaxSweepL + 1];
-  double dthg_l_l[kMaxSweepL + 1], dthg_p_l[kMaxSweepL + 1];
+  double Pa_l[kMaxSweepL + 1];
+  double Pb_l[kMaxSweepL + 1];
+  double Pg_l[kMaxSweepL + 1];
+  double Fl_node_l[kMaxSweepL + 1];
+  double Fphi_node_l[kMaxSweepL + 1];
+  double dthg_l_l[kMaxSweepL + 1];
+  double dthg_p_l[kMaxSweepL + 1];
   // The band factor's gather and its offset from the linear one (Config::balanced_pert).
   // Both are filled for every node whether or not the chain rule is on -- Fl_g_l is then
   // a copy of Fl_node_l and dFl_l is exactly 0.0 -- so the hot loops below stay
   // branch-free and the off path stays bit-identical (x + 0.0 == x).
-  double Fl_g_l[kMaxSweepL + 1], Fphi_g_l[kMaxSweepL + 1];
-  double dFl_l[kMaxSweepL + 1], dFphi_l[kMaxSweepL + 1];
+  double Fl_g_l[kMaxSweepL + 1];
+  double Fphi_g_l[kMaxSweepL + 1];
+  double dFl_l[kMaxSweepL + 1];
+  double dFphi_l[kMaxSweepL + 1];
 
   for (int i = 0; i < parent_.n; ++i) {
     const double q1            = parent_.q[i];
@@ -884,7 +894,9 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
       const double* const devp = &dev_phi_edge_[W * n];
       const double* const dthl = &dth_l_edge_[W * n];
       const double* const dthp = &dth_phi_edge_[W * n];
-      const double ca = cos_a_[n], cb = cos_b_[n], cg = cos_g_[n];
+      const double ca          = cos_a_[n];
+      const double cb          = cos_b_[n];
+      const double cg          = cos_g_[n];
 
       double c_H   = -1.0;
       double c_l   = cfg_.inverse_decays ? fphi_g : 0.0;

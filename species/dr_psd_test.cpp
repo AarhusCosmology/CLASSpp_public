@@ -114,7 +114,8 @@ int main() {
       assert(std::fabs(sp->dq()[j] - expect) <= 1e-13 * expect);
     }
     // Both grids integrate d(ln q) over the SAME range: sum dq/q = ln(qmax/qmin).
-    double s_pt = 0., s_bg = 0.;
+    double s_pt = 0.;
+    double s_bg = 0.;
     for (int j = 0; j < sp->q_size(); ++j)
       s_pt += sp->dq()[j] / sp->q()[j];
     for (int i = 0; i < (int) sp->q_bg().size(); ++i)
@@ -246,7 +247,8 @@ int main() {
   {
     auto seed_max = [](FileContent& fc, Statistics stat) {
       auto sp      = MakeDrPsd(fc, stat);
-      int index_bg = 0, index_bi = 0;
+      int index_bg = 0;
+      int index_bi = 0;
       sp->RegisterBackgroundIndices(index_bg);
       sp->RegisterIntegrationIndices(index_bi);
       std::vector<double> bi(index_bi, 0.);
@@ -338,13 +340,15 @@ int main() {
     auto sp        = MakeDrPsd(fc, Statistics::Fermion);
     const int N    = sp->q_size();
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     sp->RegisterBackgroundIndices(index_bg);
     sp->RegisterIntegrationIndices(index_bi);
     assert(index_bg == 4 + 2 * N);  // number,rho,p,pseudo_p + f(N) + dlnfdlnq(N)
     assert(index_bi == N);          // f(N) only
 
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     BackgroundICContext icc{};
     icc.a_ini                = 1e-14;
     icc.pvecback_integration = bi.data();
@@ -379,10 +383,12 @@ int main() {
     auto sp        = MakeDrPsd(fc, Statistics::Fermion);
     const int N    = sp->q_size();
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     sp->RegisterBackgroundIndices(index_bg);
     sp->RegisterIntegrationIndices(index_bi);
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     BackgroundICContext icc{};
     icc.pvecback_integration = bi.data();
     sp->SetBackgroundInitialConditions(icc);
@@ -414,10 +420,12 @@ int main() {
     auto sp     = MakeDrPsd(fc, Statistics::Boson);
     const int N = sp->q_size();
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     sp->RegisterBackgroundIndices(index_bg);
     sp->RegisterIntegrationIndices(index_bi);
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     BackgroundICContext icc{};
     icc.pvecback_integration = bi.data();
     sp->SetBackgroundInitialConditions(icc);
@@ -493,7 +501,8 @@ int main() {
     const int l_max = 5;
     assert(qn > 0);
 
-    NCDMBaseSpecies::PerturbLayout old_l, new_l;
+    NCDMBaseSpecies::PerturbLayout old_l;
+    NCDMBaseSpecies::PerturbLayout new_l;
     FillNcdmLayout(old_l, qn, l_max, /*idx0=*/7);
     FillNcdmLayout(new_l, qn, l_max, /*idx0=*/3);
 
@@ -513,7 +522,8 @@ int main() {
     for (int i = 0; i < 3; ++i)
       assert(new_y[i] == 0.);
     // Uninitialized layouts (shape -1) must be a safe no-op.
-    NCDMBaseSpecies::PerturbLayout empty_old, empty_new;
+    NCDMBaseSpecies::PerturbLayout empty_old;
+    NCDMBaseSpecies::PerturbLayout empty_new;
     sp->CopyPerturbationsAcrossSwitch(empty_old, empty_new, old_y.data(), new_y.data(), ctx);
   }
 
@@ -564,10 +574,12 @@ int main() {
     auto sp     = MakeDrPsd(fc, Statistics::Fermion);
     const int N = sp->q_size();
 
-    int index_bg = 0, index_bi = 0;
+    int index_bg = 0;
+    int index_bi = 0;
     sp->RegisterBackgroundIndices(index_bg);
     sp->RegisterIntegrationIndices(index_bi);
-    std::vector<double> bi(index_bi, 0.), bg(index_bg, 0.);
+    std::vector<double> bi(index_bi, 0.);
+    std::vector<double> bg(index_bg, 0.);
     BackgroundICContext icc{};
     icc.pvecback_integration = bi.data();
     sp->SetBackgroundInitialConditions(icc);

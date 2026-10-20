@@ -128,7 +128,8 @@ void test_curvature_sign_and_continuity() {
    clamp the same way rather than take the square root of a negative number. */
 void test_closed_space_clamps_above_nu() {
   const double L = limber_closure::Order(17);
-  const double k = 0.1, K = 1.e-4;  // sqrt(K) L / q = 1.74 > 1: no turning point
+  const double k = 0.1;
+  const double K = 1.e-4;  // sqrt(K) L / q = 1.74 > 1: no turning point
   assert(std::isfinite(limber_closure::Cot(L, k, K)));
   assert(limber_closure::Cot(L, k, K) == 0.);
 }
@@ -150,8 +151,9 @@ double ImpliedNextMultipoleCoefficient(double D, int L, double qk_div_epsilon) {
 }
 
 void test_massive_daughter_damping_carries_the_transport_rate() {
-  const int L    = 10;
-  const double k = 0.1, tau = 1.4e4;
+  const int L          = 10;
+  const double k       = 0.1;
+  const double tau     = 1.4e4;
   const double cotKgen = 1. / (k * tau);
   const double Lord    = limber_closure::Order(L);
 

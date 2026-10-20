@@ -103,7 +103,8 @@ bool any_dot_key_with_prefix(const FileContent& pfc, const std::string& prefix) 
 
 void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
   // 1. Resolve N from N_ncdm / N_ncdm_standard.
-  int N1 = 0, N2 = 0;
+  int N1      = 0;
+  int N2      = 0;
   auto n1_opt = pfc.get<int>("N_ncdm_standard");
   auto n2_opt = pfc.get<int>("N_ncdm");
   bool has1   = n1_opt.has_value();
@@ -236,7 +237,10 @@ void NCDMSpecies::RegisterIntegrationIndices(int& /*index_bi*/) {
 void NCDMSpecies::ComputeBackground(double a, const double* /*pvecback_B*/, double* pvecback) {
   double z = 1. / a - 1.;
 
-  double number_ncdm, rho_ncdm, p_ncdm, pseudo_p_ncdm;
+  double number_ncdm;
+  double rho_ncdm;
+  double p_ncdm;
+  double pseudo_p_ncdm;
   ComputeMomenta(z, &number_ncdm, &rho_ncdm, &p_ncdm, nullptr, &pseudo_p_ncdm);
   pvecback[index_bg_number_]   = number_ncdm;
   pvecback[index_bg_rho_]      = rho_ncdm;
@@ -468,7 +472,11 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
                                  const double* y,
                                  const PerturbationsModule& mod,
                                  const perturb_workspace* ppw) const {
-  double delta_ncdm = 0., theta_ncdm = 0., shear_ncdm = 0., cs2_ncdm = 0., a4Pi_ncdm = 0.;
+  double delta_ncdm = 0.;
+  double theta_ncdm = 0.;
+  double shear_ncdm = 0.;
+  double cs2_ncdm   = 0.;
+  double a4Pi_ncdm  = 0.;
 
   if (!w.IsTitleMode()) {
     const perturb_vector* pv = ppw->pv.get();
@@ -583,7 +591,10 @@ BaseSpecies::StressEnergyContribution NCDMSpecies::StressEnergy(
   const double ma2    = M_ * M_ * a * a;
   const double factor = factor_ * std::pow(1. / a, 4);
 
-  double s_drho = 0., s_theta = 0., s_dp = 0., s_shear = 0.;
+  double s_drho  = 0.;
+  double s_theta = 0.;
+  double s_dp    = 0.;
+  double s_shear = 0.;
   for (int iq = 0; iq < layout.q_size; ++iq) {
     const double q        = q_[iq];
     const double w0       = w_[iq];
@@ -638,7 +649,9 @@ void NCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout
     for (int l = 0; l <= 2; ++l)
       new_y[idx_new + l] = 0.0;
 
-    double delta = 0., theta = 0., shear = 0.;
+    double delta = 0.;
+    double theta = 0.;
+    double shear = 0.;
     for (int iq = 0; iq < old_l.q_size; ++iq) {
       const int idx_old    = old_l.index_per_q[iq];
       const double w0      = w_[iq];

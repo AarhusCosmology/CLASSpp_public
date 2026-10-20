@@ -132,7 +132,8 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
   if (got_file_) {
     FILE* psdfile = fopen(psd_file_.c_str(), "r");
     class_test(psdfile == nullptr, "Could not open file %s!", psd_file_.c_str());
-    double tmp1, tmp2;
+    double tmp1;
+    double tmp2;
     int row = 0;
     while (fscanf(psdfile, "%lf %lf", &tmp1, &tmp2) == 2)
       ++row;
@@ -241,7 +242,9 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     double f0;
     DistributionFunction(&pbadist, q, &f0);
 
-    double dq = 1., f0m2 = 0., f0p2 = 0.;
+    double dq   = 1.;
+    double f0m2 = 0.;
+    double f0p2 = 0.;
     for (int tolexp = _PSD_DERIVATIVE_EXP_MIN_; tolexp < _PSD_DERIVATIVE_EXP_MAX_; tolexp++) {
       if (index_q == 0)
         dq = std::min((0.5 - DBL_EPSILON) * q, 2 * exp(tolexp) * (q_[index_q + 1] - q));
@@ -256,7 +259,8 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
         break;
     }
 
-    double f0m1, f0p1;
+    double f0m1;
+    double f0p1;
     DistributionFunction(&pbadist, q - dq, &f0m1);
     DistributionFunction(&pbadist, q + dq, &f0p1);
     double df0dq = (+f0m2 - 8 * f0m1 + 8 * f0p1 - f0p2) / 12.0 / dq;
@@ -523,7 +527,8 @@ double NCDMBaseSpecies::GetNeff(double z) const {
 }
 
 double NCDMBaseSpecies::GetIni(double a, double tol_ncdm_initial_w) const {
-  double rho_ncdm, p_ncdm;
+  double rho_ncdm;
+  double p_ncdm;
   bool converged = false;
   for (int counter = 0; counter < _MAX_IT_; counter++) {
     ComputeMomenta(1. / a - 1.0, nullptr, &rho_ncdm, &p_ncdm, nullptr, nullptr);

@@ -7,7 +7,11 @@
 
 /** this is the Cosine Integral function Ci(x) */
 void cosine_integral(double x, double* Ci) {
-  double x2, y, f, g, ci8;
+  double x2;
+  double y;
+  double f;
+  double g;
+  double ci8;
   double em_const = 0.577215664901532861e0;
 
   if (fabs(x) <= 4.) {
@@ -83,7 +87,11 @@ void cosine_integral(double x, double* Ci) {
 
 /** this is the Sine Integral function Si(x) */
 void sine_integral(double x, double* Si) {
-  double x2, y, f, g, si8;
+  double x2;
+  double y;
+  double f;
+  double g;
+  double si8;
   double pi8 = 3.1415926535897932384626433;
 
   if (fabs(x) <= 4.) {

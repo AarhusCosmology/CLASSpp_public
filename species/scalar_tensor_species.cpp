@@ -451,7 +451,8 @@ void ScalarTensorSpecies::PrintVariables(PerturbColumnWriter& w,
                                          const double* y,
                                          const PerturbationsModule& /*mod*/,
                                          const perturb_workspace* /*ppw*/) const {
-  double dphi = 0., dphi_prime = 0.;
+  double dphi       = 0.;
+  double dphi_prime = 0.;
   if (!w.IsTitleMode()) {
     const auto& layout = static_cast<const PerturbLayout&>(*base);
     dphi               = y[layout.idx_phi];

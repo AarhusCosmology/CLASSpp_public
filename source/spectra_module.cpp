@@ -241,7 +241,9 @@ void SpectraModule::spectra_cl_at_l(
 
   int last_index;
   int index_md;
-  int index_ic1, index_ic2, index_ic1_ic2;
+  int index_ic1;
+  int index_ic2;
+  int index_ic1_ic2;
   int index_ct;
 
   /** - (a) treat case in which there is only one mode and one initial condition.
@@ -740,7 +742,9 @@ void SpectraModule::spectra_cls() {
   /** - define local variables */
 
   int index_md;
-  int index_ic1, index_ic2, index_ic1_ic2;
+  int index_ic1;
+  int index_ic2;
+  int index_ic1_ic2;
   int index_ct;
   int cl_integrand_num_columns;
 
@@ -885,7 +889,8 @@ void SpectraModule::spectra_compute_cl(int index_md,
   int index_q;
   int index_tt;
   int index_ct;
-  int index_d1, index_d2;
+  int index_d1;
+  int index_d2;
   double k;
   double clvalue;
   int index_ic1_ic2;

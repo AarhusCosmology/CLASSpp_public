@@ -36,7 +36,8 @@ constexpr double kTauN = 878.4;
 
 void test_free_decay_normalization() {
   const BbnWeakRates weak(kTauN);
-  double np = 0.0, pn = 0.0;
+  double np = 0.0;
+  double pn = 0.0;
   /* Cold enough that every occupation has underflowed away. */
   weak.Rates(MeVFromT9(1.0e-4), MeVFromT9(1.0e-4), &np, &pn);
   assert(Close(np, 1.0 / kTauN, 1.0e-10));
@@ -44,7 +45,8 @@ void test_free_decay_normalization() {
 
   /* The normalization must track tau_n linearly. */
   const BbnWeakRates slow(2.0 * kTauN);
-  double np2 = 0.0, pn2 = 0.0;
+  double np2 = 0.0;
+  double pn2 = 0.0;
   slow.Rates(MeVFromT9(1.0e-4), MeVFromT9(1.0e-4), &np2, &pn2);
   assert(Close(np2, 0.5 * np, 1.0e-10));
 }
@@ -55,7 +57,8 @@ void test_detailed_balance_at_common_temperature() {
   const BbnWeakRates weak(kTauN);
   for (double T9 : {100.0, 30.0, 10.0, 3.0, 1.0, 0.3, 0.1}) {
     const double T = MeVFromT9(T9);
-    double np = 0.0, pn = 0.0;
+    double np      = 0.0;
+    double pn      = 0.0;
     weak.Rates(T, T, &np, &pn);
     assert(Close(pn / np, std::exp(-kDeltaMnpMeV / T), 1.0e-12));
   }
@@ -69,8 +72,10 @@ void test_two_temperatures_are_distinct() {
   const double T    = MeVFromT9(3.0);
   const double T_nu = T / 1.40102; /* post-annihilation ratio */
 
-  double same_np = 0.0, same_pn = 0.0;
-  double split_np = 0.0, split_pn = 0.0;
+  double same_np  = 0.0;
+  double same_pn  = 0.0;
+  double split_np = 0.0;
+  double split_pn = 0.0;
   weak.Rates(T, T, &same_np, &same_pn);
   weak.Rates(T, T_nu, &split_np, &split_pn);
 
@@ -91,7 +96,8 @@ void test_high_temperature_limit() {
   double previous = 0.0;
   for (double T9 : {30.0, 100.0, 300.0, 1000.0, 3000.0}) {
     const double T = MeVFromT9(T9);
-    double np = 0.0, pn = 0.0;
+    double np      = 0.0;
+    double pn      = 0.0;
     weak.Rates(T, T, &np, &pn);
     const double ratio = pn / np;
     assert(ratio > previous); /* monotonically rising towards 1 */
@@ -107,7 +113,8 @@ void test_high_temperature_limit() {
    every ratio test above intact. */
 void test_rate_scale_at_freeze_out() {
   const BbnWeakRates weak(kTauN);
-  double np = 0.0, pn = 0.0;
+  double np = 0.0;
+  double pn = 0.0;
   weak.Rates(MeVFromT9(10.0), MeVFromT9(10.0), &np, &pn);
   assert(np > 0.1 && np < 10.0);
 }
@@ -120,7 +127,10 @@ void test_quadrature_is_converged() {
   const BbnWeakRates fine(kTauN, 2048);
   for (double T9 : {300.0, 100.0, 30.0, 10.0, 3.0, 1.0, 0.3, 0.1}) {
     const double T = MeVFromT9(T9);
-    double cn = 0.0, cp = 0.0, fn = 0.0, fp = 0.0;
+    double cn      = 0.0;
+    double cp      = 0.0;
+    double fn      = 0.0;
+    double fp      = 0.0;
     coarse.Rates(T, T, &cn, &cp);
     fine.Rates(T, T, &fn, &fp);
     assert(Close(cn, fn, 1.0e-7));
@@ -129,7 +139,10 @@ void test_quadrature_is_converged() {
 
   const BbnWeakRates too_coarse(kTauN, 64);
   const double T = MeVFromT9(3.0);
-  double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+  double a       = 0.0;
+  double b       = 0.0;
+  double c       = 0.0;
+  double d       = 0.0;
   too_coarse.Rates(T, T, &a, &b);
   fine.Rates(T, T, &c, &d);
   assert(!Close(a, c, 1.0e-7));
@@ -145,7 +158,9 @@ void test_weak_table_reproduces_the_integrals() {
   const double tau_end    = std::log(T9_initial / 0.01);
   const int nodes         = 512;
 
-  std::vector<double> tau(nodes), T_gamma(nodes), T_nu(nodes);
+  std::vector<double> tau(nodes);
+  std::vector<double> T_gamma(nodes);
+  std::vector<double> T_nu(nodes);
   for (int i = 0; i < nodes; ++i) {
     tau[i]     = tau_end * i / (nodes - 1.0);
     T_gamma[i] = MeVFromT9(T9_initial * std::exp(-tau[i]));
@@ -164,7 +179,10 @@ void test_weak_table_reproduces_the_integrals() {
     const double frac  = 1.0 / (1.0 + std::exp((mid - 4.5) * 2.0));
     const double T_nu_ = T * (frac + (1.0 - frac) / 1.40102);
 
-    double enp = 0.0, epn = 0.0, tnp = 0.0, tpn = 0.0;
+    double enp = 0.0;
+    double epn = 0.0;
+    double tnp = 0.0;
+    double tpn = 0.0;
     exact.Rates(T, T_nu_, &enp, &epn);
     table.Rates(mid, &tnp, &tpn);
     worst_np = std::max(worst_np, std::fabs(tnp / enp - 1.0));
@@ -173,7 +191,10 @@ void test_weak_table_reproduces_the_integrals() {
 
   /* Outside the tabulated range the endpoints are held rather than extrapolated;
      the evolver can ask marginally past tau_end on its final step. */
-  double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+  double a = 0.0;
+  double b = 0.0;
+  double c = 0.0;
+  double d = 0.0;
   table.Rates(tau_end, &a, &b);
   table.Rates(tau_end + 1.0, &c, &d);
   assert(Close(a, c, 1.0e-12) && Close(b, d, 1.0e-12));
@@ -211,7 +232,8 @@ void test_construction_guards() {
 
   /* The smallest accepted node count must still construct. */
   BbnWeakRates minimal(kTauN, 8);
-  double np = 0.0, pn = 0.0;
+  double np = 0.0;
+  double pn = 0.0;
   minimal.Rates(MeVFromT9(1.0), MeVFromT9(1.0), &np, &pn);
   assert(np > 0.0 && pn > 0.0);
 }

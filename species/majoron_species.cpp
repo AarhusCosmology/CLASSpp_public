@@ -84,7 +84,9 @@ void MajoronSpecies::Fit(double x, double* F, double* dF, double* d2F) const {
 }
 
 double MajoronSpecies::GetOmega0() const {
-  double F, dF, d2F;
+  double F;
+  double dF;
+  double d2F;
   Fit(x0_, &F, &dF, &d2F);
   return Omega_nu_per_F_ * F;
 }
@@ -95,7 +97,9 @@ double MajoronSpecies::GetRadiationOmega0() const {
 }
 
 double MajoronSpecies::BackgroundDensityOverH0Sq(double a, double /*H0*/) const {
-  double F, dF, d2F;
+  double F;
+  double dF;
+  double d2F;
   Fit(x0_ / a, &F, &dF, &d2F);
   return Omega_nu_per_F_ * F / (a * a * a * a);
 }
@@ -110,7 +114,9 @@ void MajoronSpecies::RegisterBackgroundIndices(int& index_bg) {
 void MajoronSpecies::ComputeBackground(double a, const double* /*pvecback_B*/, double* pvecback) {
   /* rho = rho_gamma F(x) / (pi^2/15); continuity then gives p = (rho/3) (1 + x F'/F). */
   const double x = x0_ / a;
-  double F, dF, d2F;
+  double F;
+  double dF;
+  double d2F;
   Fit(x, &F, &dF, &d2F);
   const double rho        = Omega_nu_per_F_ * H0_ * H0_ / (a * a * a * a) * F;
   pvecback[index_bg_rho_] = rho;
@@ -128,7 +134,9 @@ double MajoronSpecies::PPrime(double a,
   /* With G = x F'/F and x = x0/a: d ln rho/d ln a = -4 - G and dG/d ln a = -x G', so
      dp/d ln a = (rho/3) [-(4 + G)(1 + G) - x G']. */
   const double x = x0_ / a;
-  double F, dF, d2F;
+  double F;
+  double dF;
+  double d2F;
   Fit(x, &F, &dF, &d2F);
   const double G     = x * dF / F;
   const double dG_dx = dF / F + x * d2F / F - x * (dF / F) * (dF / F);

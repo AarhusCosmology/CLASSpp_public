@@ -239,7 +239,8 @@ void ReducedCollisionOperator::SetBackground(
     // O(1) across the basis. The Gram matrix is a Hilbert-like moment matrix and its
     // conditioning is the only thing limiting how many moments can be carried; with
     // this scaling n_moments = 4 is comfortable and 6 is where it starts to bite.
-    double s2 = 0., s3 = 0.;
+    double s2 = 0.;
+    double s3 = 0.;
     for (int k = 0; k < g[d]->n; ++k) {
       const double base  = g[d]->dq[k] * g[d]->q[k] * g[d]->q[k] * B.w[k];
       s2                += base;
@@ -255,7 +256,8 @@ void ReducedCollisionOperator::SetBackground(
     // The recurrence never forms t^j, which is exactly why it survives where the
     // monomial Gram does not.
     const int ng = g[d]->n;
-    std::vector<double> dmu(ng), t(ng);
+    std::vector<double> dmu(ng);
+    std::vector<double> t(ng);
     for (int k = 0; k < ng; ++k) {
       dmu[k] = g[d]->dq[k] * g[d]->q[k] * g[d]->q[k] * B.w[k];
       t[k]   = g[d]->q[k] / B.q_ref;
@@ -371,12 +373,16 @@ void ReducedCollisionOperator::Assemble(int l_max, std::vector<double>& out) con
   const int stride = l_max + 1;
   out.assign((size_t) (l_max + 1) * S * S, 0.);
 
-  std::vector<double> FH((size_t) Np * stride), Fl((size_t) fermion_.n * stride),
-      Fp((size_t) boson_.n * stride);
-  std::vector<double> dH((size_t) Np * stride), dl((size_t) fermion_.n * stride),
-      dp((size_t) boson_.n * stride);
+  std::vector<double> FH((size_t) Np * stride);
+  std::vector<double> Fl((size_t) fermion_.n * stride);
+  std::vector<double> Fp((size_t) boson_.n * stride);
+  std::vector<double> dH((size_t) Np * stride);
+  std::vector<double> dl((size_t) fermion_.n * stride);
+  std::vector<double> dp((size_t) boson_.n * stride);
   std::vector<double> recon(std::max(fermion_.n, boson_.n));
-  std::vector<double> slice(std::max(fermion_.n, boson_.n)), mom(nm), coeff(nm);
+  std::vector<double> slice(std::max(fermion_.n, boson_.n));
+  std::vector<double> mom(nm);
+  std::vector<double> coeff(nm);
 
   for (int col = 0; col < S; ++col) {
     std::fill(FH.begin(), FH.end(), 0.);
@@ -439,8 +445,12 @@ void ReducedCollisionOperator::AssembleExact(int l_max, std::vector<double>& out
   const int stride = l_max + 1;
   out.assign((size_t) (l_max + 1) * N * N, 0.);
 
-  std::vector<double> FH((size_t) Np * stride), Fl((size_t) Nf * stride), Fp((size_t) Nb * stride);
-  std::vector<double> dH((size_t) Np * stride), dl((size_t) Nf * stride), dp((size_t) Nb * stride);
+  std::vector<double> FH((size_t) Np * stride);
+  std::vector<double> Fl((size_t) Nf * stride);
+  std::vector<double> Fp((size_t) Nb * stride);
+  std::vector<double> dH((size_t) Np * stride);
+  std::vector<double> dl((size_t) Nf * stride);
+  std::vector<double> dp((size_t) Nb * stride);
 
   for (int col = 0; col < N; ++col) {
     std::fill(FH.begin(), FH.end(), 0.);
@@ -486,9 +496,11 @@ double LeftNullResidual(const std::vector<double>& w, const double* M, int n) {
   if (!(wnorm > 0.))
     return 0.;
 
-  double res = 0., scale = 0.;
+  double res   = 0.;
+  double scale = 0.;
   for (int j = 0; j < n; ++j) {
-    double s = 0., col = 0.;
+    double s   = 0.;
+    double col = 0.;
     for (int i = 0; i < n; ++i) {
       s   += w[i] * M[(size_t) i * n + j];
       col += w[i] * w[i] * M[(size_t) i * n + j] * M[(size_t) i * n + j];
@@ -653,7 +665,8 @@ void ReducedCollisionOperator::EquilibriumNullVectors(std::vector<double>& out) 
   const int nm = cfg_.n_moments;
   out.assign((size_t) 3 * S, 0.);
 
-  std::vector<double> df(std::max(fermion_.n, boson_.n)), mom(nm);
+  std::vector<double> df(std::max(fermion_.n, boson_.n));
+  std::vector<double> mom(nm);
   auto put_daughter = [&](int vec, int d, bool linear) {
     const GridView& g = (d == 0) ? fermion_ : boson_;
     for (int k = 0; k < g.n; ++k)
@@ -739,7 +752,8 @@ void ReducedOperatorTable::AddRow(double a, const std::vector<double>& M) {
 }
 
 int ReducedOperatorTable::LowerRow(double a) const {
-  int lo = 0, hi = static_cast<int>(a_.size()) - 1;
+  int lo = 0;
+  int hi = static_cast<int>(a_.size()) - 1;
   if (hi < 0 || a < a_[0])
     return -1;
   if (uniform_ln_a_) {

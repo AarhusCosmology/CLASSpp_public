@@ -872,7 +872,8 @@ void OutputModule::output_thermodynamics() {
 void OutputModule::output_perturbations() {
   FILE* out;
   std::string file_name;
-  int index_ikout, index_md;
+  int index_ikout;
+  int index_md;
   double k;
 
   for (index_ikout = 0; index_ikout < ppt->k_output_values_num; index_ikout++) {
@@ -1002,7 +1003,8 @@ void OutputModule::output_open_cl_file(FILE** clfile,
                                        int lmax) {
   /** Summary */
 
-  int index_d1, index_d2;
+  int index_d1;
+  int index_d2;
   int colnum            = 1;
   const size_t tmp_size = 60;
   char tmp
@@ -1144,7 +1146,8 @@ void OutputModule::output_one_line_of_cl(FILE* clfile,
                                          double l,
                                          double* cl, /* array with argument cl[index_ct] */
                                          int ct_size) {
-  int index_ct, index_ct_rest;
+  int index_ct;
+  int index_ct_rest;
   double factor;
 
   factor = l * (l + 1) / 2. / _PI_;

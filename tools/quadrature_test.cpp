@@ -47,7 +47,8 @@ void check_power_moments(const std::vector<double>& x, const std::vector<double>
 
 void test_fundamental_rule() {
   constexpr int N = 8;
-  std::vector<double> x(N), w(N);
+  std::vector<double> x(N);
+  std::vector<double> w(N);
   assert(compute_FermiDirac(x.data(), w.data(), N));
   for (int i = 0; i < N; ++i) {
     assert(x[i] > 0.);
@@ -57,7 +58,8 @@ void test_fundamental_rule() {
   }
   check_power_moments(x, w);
 
-  std::vector<double> x_max(17), w_max(17);
+  std::vector<double> x_max(17);
+  std::vector<double> w_max(17);
   assert(compute_FermiDirac(x_max.data(), w_max.data(), 17));
   double normalization = 0.;
   for (double weight : w_max)
@@ -69,7 +71,9 @@ void test_fundamental_rule() {
 
 void test_manual_selection() {
   constexpr int N = 8;
-  std::vector<double> x(N), w(N), dq(N);
+  std::vector<double> x(N);
+  std::vector<double> w(N);
+  std::vector<double> dq(N);
   GBQuadParams gb;
   assert(get_qsampling_manual(x.data(),
                               w.data(),

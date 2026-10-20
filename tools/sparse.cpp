@@ -42,7 +42,12 @@ sparse_numerical::sparse_numerical(int n) : n(n) {
 }
 
 int reachr(sp_mat* G, sp_mat* B, int k, int* xik, int* pinv) {
-  int p, n, top, *Bp, *Bi, *Gp;
+  int p;
+  int n;
+  int top;
+  int* Bp;
+  int* Bi;
+  int* Gp;
   n   = G->ncols;
   Bp  = B->Ap.data();
   Bi  = B->Ai.data();
@@ -59,8 +64,14 @@ int reachr(sp_mat* G, sp_mat* B, int k, int* xik, int* pinv) {
 }
 
 void dfsr(int j, sp_mat* G, int* top, int* xik, int* pinv) {
-  int i, p, p1, p2, jnew, *Gp = G->Ap.data(), *Gi = G->Ai.data();
-  jnew = pinv[j];
+  int i;
+  int p;
+  int p1;
+  int p2;
+  int jnew;
+  int* Gp = G->Ap.data();
+  int* Gi = G->Ai.data();
+  jnew    = pinv[j];
   SPMARK(Gp, j);
   if (jnew >= 0) {           /*We should consider the jnew column.*/
     p1 = SPUNFLIP(Gp[jnew]); /*Get true column pointers of neighbours:*/
@@ -76,8 +87,18 @@ void dfsr(int j, sp_mat* G, int* top, int* xik, int* pinv) {
 }
 
 void sp_splsolve(sp_mat* G, sp_mat* B, int k, int* xik, int top, double* x, int* pinv) {
-  int j, J, p, q, px, n, *Gp, *Gi, *Bp, *Bi;
-  double *Gx, *Bx;
+  int j;
+  int J;
+  int p;
+  int q;
+  int px;
+  int n;
+  int* Gp;
+  int* Gi;
+  int* Bp;
+  int* Bi;
+  double* Gx;
+  double* Bx;
   Gp = G->Ap.data();
   Gi = G->Ai.data();
   Gx = G->Ax.data();
@@ -105,9 +126,28 @@ void sp_splsolve(sp_mat* G, sp_mat* B, int k, int* xik, int top, double* x, int*
 }
 
 bool sp_ludcmp(sp_num* N, sp_mat* A, double pivtol) {
-  double pivot, *Lx, *Ux, *x, a, t;
-  int *Lp, *Li, *Up, *Ui, *pinv, *pvec, *q;
-  int n, ipiv, k, top, p, i, col, lnz, unz;
+  double pivot;
+  double* Lx;
+  double* Ux;
+  double* x;
+  double a;
+  double t;
+  int* Lp;
+  int* Li;
+  int* Up;
+  int* Ui;
+  int* pinv;
+  int* pvec;
+  int* q;
+  int n;
+  int ipiv;
+  int k;
+  int top;
+  int p;
+  int i;
+  int col;
+  int lnz;
+  int unz;
   n    = A->ncols;
   q    = N->q.data();
   Li   = N->L->Ai.data();
@@ -188,8 +228,13 @@ bool sp_ludcmp(sp_num* N, sp_mat* A, double pivtol) {
 }
 
 void sp_lusolve(sp_num* N, double* b, double* x) {
-  int p, j, n, *Ap, *Ai;
-  double *Ax, *w;
+  int p;
+  int j;
+  int n;
+  int* Ap;
+  int* Ai;
+  double* Ax;
+  double* w;
   n = N->n;
   /* permute b and initialize x:*/
   for (j = 0; j < n; j++)
@@ -225,9 +270,26 @@ void sp_lusolve(sp_num* N, double* b, double* x) {
 }
 
 void sp_refactor(sp_num* N, sp_mat* A) {
-  double pivot, *Lx, *Ux, *x;
-  int *Lp, *Li, *Up, *Ui, *pinv, *pvec, *q;
-  int n, ipiv, k, top, p, i, col, lnz, unz;
+  double pivot;
+  double* Lx;
+  double* Ux;
+  double* x;
+  int* Lp;
+  int* Li;
+  int* Up;
+  int* Ui;
+  int* pinv;
+  int* pvec;
+  int* q;
+  int n;
+  int ipiv;
+  int k;
+  int top;
+  int p;
+  int i;
+  int col;
+  int lnz;
+  int unz;
   n    = A->ncols;
   Li   = N->L->Ai.data();
   Lp   = N->L->Ap.data();
@@ -284,8 +346,14 @@ void sp_refactor(sp_num* N, sp_mat* A) {
 }
 
 int column_grouping(sp_mat* G, int* col_g, int* filled) {
-  int testcol, groupnum, fitted, neq;
-  int i, *Ap, *Ai, done;
+  int testcol;
+  int groupnum;
+  int fitted;
+  int neq;
+  int i;
+  int* Ap;
+  int* Ai;
+  int done;
 
   neq = G->ncols;
   Ai  = G->Ai.data();
@@ -331,10 +399,51 @@ int column_grouping(sp_mat* G, int* col_g, int* filled) {
 }
 
 void sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
-  int *last, *len, *nv, *next, *head, *elen, *degree, *w, *hhead;
-  int d, dk, dext, lemax = 0, e, elenk, eln, i, j, k, k1, k2, k3, jlast, ln;
-  int dense, mindeg = 0, nvi, nvj, nvk, mark, wnvi, ok, nel = 0;
-  int p, p1, p2, p3, p4, pj, pk, pk1, pk2, pn, q, cnz;
+  int* last;
+  int* len;
+  int* nv;
+  int* next;
+  int* head;
+  int* elen;
+  int* degree;
+  int* w;
+  int* hhead;
+  int d;
+  int dk;
+  int dext;
+  int lemax = 0;
+  int e;
+  int elenk;
+  int eln;
+  int i;
+  int j;
+  int k;
+  int k1;
+  int k2;
+  int k3;
+  int jlast;
+  int ln;
+  int dense;
+  int mindeg = 0;
+  int nvi;
+  int nvj;
+  int nvk;
+  int mark;
+  int wnvi;
+  int ok;
+  int nel = 0;
+  int p;
+  int p1;
+  int p2;
+  int p3;
+  int p4;
+  int pj;
+  int pk;
+  int pk1;
+  int pk2;
+  int pn;
+  int q;
+  int cnz;
   unsigned int h;
   /*	I assume that the sparse matrix C is symmetrix (C = A + A' in our case)
 		and that the diagonal elements has been removed. C must be large enough,
@@ -637,7 +746,9 @@ int sp_wclear(int mark, int lemax, int* w, int n) {
 }
 
 int sp_tdfs(int j, int k, int* head, const int* next, int* post, int* stack) {
-  int i, p, top = 0;
+  int i;
+  int p;
+  int top  = 0;
   stack[0] = j;
   while (top >= 0) {
     p = stack[top];

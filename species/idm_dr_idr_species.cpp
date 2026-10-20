@@ -156,8 +156,11 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
   // Chain first (children currently publish nothing) so a child that later gains
   // PrintVariables is picked up without editing this.
   CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
-  double delta_idm_dr = 0., theta_idm_dr = 0.;
-  double delta_idr = 0., theta_idr = 0., shear_idr = 0.;
+  double delta_idm_dr = 0.;
+  double theta_idm_dr = 0.;
+  double delta_idr    = 0.;
+  double theta_idr    = 0.;
+  double shear_idr    = 0.;
 
   if (!w.IsTitleMode()) {
     const double* pvecback   = ppw->pvecback.data();
@@ -383,7 +386,9 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     double b_idr         = 0.;
     int idr_nature       = idr_free_streaming;  // perturbs struct default (== 0)
 
-    double a_param = 0., a_dark = 0., gamma0 = 0.;
+    double a_param   = 0.;
+    double a_dark    = 0.;
+    double gamma0    = 0.;
     auto a_param_opt = ctx.pfc->get<double>("a_idm_dr");
     auto a_dark_opt  = ctx.pfc->get<double>("a_dark");
     auto gamma0_opt  = ctx.pfc->get<double>("Gamma_0_nadm");
@@ -438,7 +443,8 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     }
     else {
       // nindex_dark / nindex_idm_dr — at most one may be set.
-      double nd_dark = 0., nd_idm = 0.;
+      double nd_dark       = 0.;
+      double nd_idm        = 0.;
       auto nd_dark_opt     = ctx.pfc->get<double>("nindex_dark");
       auto nd_idm_opt      = ctx.pfc->get<double>("nindex_idm_dr");
       const bool h_nd_dark = nd_dark_opt.has_value();
@@ -473,7 +479,8 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
 
     // m_idm / m_dm — at most one may be set.
     {
-      double m1 = 0., m2 = 0.;
+      double m1              = 0.;
+      double m2              = 0.;
       auto m1_opt            = ctx.pfc->get<double>("m_idm");
       auto m2_opt            = ctx.pfc->get<double>("m_dm");
       const bool found_m_idm = m1_opt.has_value();
@@ -492,7 +499,8 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
 
     // b_dark / b_idr — at most one may be set.
     {
-      double b1 = 0., b2 = 0.;
+      double b1               = 0.;
+      double b2               = 0.;
       auto b1_opt             = ctx.pfc->get<double>("b_dark");
       auto b2_opt             = ctx.pfc->get<double>("b_idr");
       const bool found_b_dark = b1_opt.has_value();

@@ -329,7 +329,9 @@ void PerturbationsModule::perturb_store_columns(file_format output_format,
                                                 const std::vector<double>& tkfull,
                                                 int number_of_titles,
                                                 double* data) const {
-  double k, k_over_h, k2;
+  double k;
+  double k_over_h;
+  double k2;
   const double* tk;
   double* dataptr;
 
@@ -540,7 +542,10 @@ void PerturbationsModule::perturb_init() {
   /* running index for type of perturbation */
   int index_tp;
   /* background quantities */
-  double w_fld_ini, w_fld_0, dw_over_da_fld, integral_fld;
+  double w_fld_ini;
+  double w_fld_0;
+  double dw_over_da_fld;
+  double integral_fld;
 
   /** - perform preliminary checks */
 
@@ -1459,7 +1464,11 @@ void PerturbationsModule::perturb_timesampling_for_sources() {
 
 void PerturbationsModule::perturb_get_k_list() {
   int index_mode;
-  double k, k_min = 0., k_rec, step, tau1;
+  double k;
+  double k_min = 0.;
+  double k_rec;
+  double step;
+  double tau1;
   std::vector<double> k_max_cmb;
   std::vector<double> k_max_cl;
   double k_max = 0.;
@@ -2158,7 +2167,10 @@ void PerturbationsModule::perturb_solve(int index_md,
   perturb_parameters_and_workspace ppaw(this);
 
   /* conformal time */
-  double tau, tau_lower, tau_upper, tau_mid;
+  double tau;
+  double tau_lower;
+  double tau_upper;
+  double tau_mid;
 
   /* multipole */
   int l;
@@ -2632,7 +2644,8 @@ void PerturbationsModule::perturb_find_approximation_number(
   int index_ap;
 
   /* value of a given approximation at tau_ini and tau_end */
-  int flag_ini, flag_end;
+  int flag_ini;
+  int flag_end;
 
   /** - fix default number of intervals to one (if no approximation switch) */
 
@@ -3428,7 +3441,9 @@ void PerturbationsModule::perturb_vector_init(
           a                     = ppw->pvecback[background_module_->index_bg_a_];
           double a_prime_over_a = ppw->pvecback[background_module_->index_bg_H_] * a;
 
-          double Rint, csp2, Gint;
+          double Rint;
+          double csp2;
+          double Gint;
 
           background_module_->background_idm_drmd(a,
                                                   static_cast<IDM_DRMD_IDR_DRMD_Species&>(
@@ -3645,7 +3660,8 @@ void PerturbationsModule::perturb_initial_conditions(
   /** --> For scalars */
 
   if (_scalars_) {
-    double eta = 0., alpha = 0.;
+    double eta   = 0.;
+    double alpha = 0.;
 
     /** - (a) compute relevant background quantities: compute rho_r,
         rho_m, rho_nu (= all relativistic except photons), and their
@@ -4001,7 +4017,8 @@ void PerturbationsModule::perturb_initial_conditions(
       ppw->scalar_ctx.k     = k;
       ppw->scalar_ctx.k2    = k * k;
 
-      double delta_rho_ic = 0., rho_plus_p_theta_ic = 0.;
+      double delta_rho_ic        = 0.;
+      double rho_plus_p_theta_ic = 0.;
       {
         for (size_t i = 0; i < all_species_.size(); ++i) {
           const BaseSpecies* sp = all_species_[i];
@@ -4320,7 +4337,9 @@ void PerturbationsModule::perturb_approximations(int index_md,
 
     /* DRMD -- Here, we decide when to switch off the tight coupling approximation between iDR (still self-interacting!) and idm */
     if (resolved_.idm_drmd) {
-      double Rint, csp2, Gint;
+      double Rint;
+      double csp2;
+      double Gint;
       double conformalH = ppw->pvecback[background_module_->index_bg_H_] *
                           ppw->pvecback[background_module_->index_bg_a_];
 
@@ -4835,8 +4854,9 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     ppw->scalar_ctx.gauge      = static_cast<int>(ppt->gauge);
     ppw->scalar_ctx.idr_nature = resolved_.idr_nature;
 
-    BaseSpecies::StressEnergyContribution total, total_cold,
-        total_warm;  // module-owned accumulators
+    BaseSpecies::StressEnergyContribution total;
+    BaseSpecies::StressEnergyContribution total_cold;
+    BaseSpecies::StressEnergyContribution total_warm;  // module-owned accumulators
 
     /* Single pass: each species (or composite, via DelegateTally over its children)
        accumulates its stress-energy into `total` and folds its matter contribution
@@ -5469,7 +5489,8 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
 
   /** - calculate perturbed recombination */
 
-  double delta_temp = 0., delta_chi = 0.;
+  double delta_temp = 0.;
+  double delta_chi  = 0.;
   if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
     delta_temp = y[ppw->pv->index_pt_perturbed_recombination_delta_temp];
     delta_chi  = y[ppw->pv->index_pt_perturbed_recombination_delta_chi];
@@ -5477,11 +5498,17 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
 
   /* Physics variables: used in _tensors_ block (photon/UR multipoles set fresh there);
    * phi, psi, alpha computed in _scalars_ block for the gauge-potential output columns. */
-  double delta_g = 0.;
-  double shear_g = 0., pol0_g = 0., pol2_g = 0.;
-  double l4_g = 0., pol4_g = 0.;
-  double delta_ur = 0., shear_ur = 0.;
-  double phi = 0., psi = 0., alpha = 0.;
+  double delta_g  = 0.;
+  double shear_g  = 0.;
+  double pol0_g   = 0.;
+  double pol2_g   = 0.;
+  double l4_g     = 0.;
+  double pol4_g   = 0.;
+  double delta_ur = 0.;
+  double shear_ur = 0.;
+  double phi      = 0.;
+  double psi      = 0.;
+  double alpha    = 0.;
   double* dataptr = nullptr;
 
   /** - for scalar modes */
@@ -5742,7 +5769,8 @@ void PerturbationsModule::perturb_derivs_member(double tau,
   int l;
 
   /* photon perturbations, used in scalars, vectors and tensors */
-  double delta_g = 0., theta_g = 0.;
+  double delta_g = 0.;
+  double theta_g = 0.;
 
   /** - get background/thermo quantities in this point */
 
@@ -5789,14 +5817,24 @@ void PerturbationsModule::perturb_derivs_member(double tau,
 
   /** - for scalar modes: */
   if (_scalars_) {
-    double metric_continuity = 0., metric_euler = 0., metric_shear = 0., metric_ufa_class = 0.;
+    double metric_continuity = 0.;
+    double metric_euler      = 0.;
+    double metric_shear      = 0.;
+    double metric_ufa_class  = 0.;
 
     /* perturbed recombination (just to simplify the notation) */
-    double H0 = 0., Nnow = 0., n_H = 0., fHe = 0.;
-    double delta_temp = 0., delta_chi = 0., chi = 0.;
-    double alpha_rec = 0., delta_alpha_rec = 0.;
-    double a_rad = 0., Compton_CR = 0.;
-    double Tb_in_K = 0.;
+    double H0              = 0.;
+    double Nnow            = 0.;
+    double n_H             = 0.;
+    double fHe             = 0.;
+    double delta_temp      = 0.;
+    double delta_chi       = 0.;
+    double chi             = 0.;
+    double alpha_rec       = 0.;
+    double delta_alpha_rec = 0.;
+    double a_rad           = 0.;
+    double Compton_CR      = 0.;
+    double Tb_in_K         = 0.;
 
     /** - --> (a) define short-cut notations for the scalar perturbations */
     const auto& g_dr_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(*pv->photon_layout);
@@ -6084,7 +6122,8 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   /** - --> (a) define short-cut notations for the scalar perturbations */
   const auto& g_tca_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(*pv->photon_layout);
   const auto& b_tca_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(*pv->baryon_layout);
-  double delta_g = 0., theta_g = 0.;
+  double delta_g        = 0.;
+  double theta_g        = 0.;
   if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
     delta_g = y[g_tca_lay.idx_delta];
     theta_g = y[g_tca_lay.idx_theta];
@@ -6098,10 +6137,11 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
 
   /** - --> (b) define short-cut notations used only in tight-coupling approximation */
   double tau_c = 1. / pvecthermo[thermodynamics_module_->index_th_dkappa_]; /* inverse of opacity */
-  double dtau_c  = -pvecthermo[thermodynamics_module_->index_th_ddkappa_] * tau_c *
-                   tau_c;           /* its first derivative wrt conformal time */
-  double F       = tau_c / (1 + R); /* F = tau_c/(1+R) */
-  double F_prime = 0., F_prime_prime = 0.;
+  double dtau_c        = -pvecthermo[thermodynamics_module_->index_th_ddkappa_] * tau_c *
+                         tau_c;           /* its first derivative wrt conformal time */
+  double F             = tau_c / (1 + R); /* F = tau_c/(1+R) */
+  double F_prime       = 0.;
+  double F_prime_prime = 0.;
   if (ppr->tight_coupling_approximation >= static_cast<int>(tca_method::second_order_CLASS)) {
     F_prime = dtau_c / (1 + R) +
               tau_c * a_prime_over_a * R / (1 + R) /
@@ -6137,7 +6177,10 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
       - In the ufa_class approximation, the leading-order source term is (h_prime/2) in synchronous gauge,
       (-3 (phi_prime+psi_prime)) in newtonian gauge: we approximate the later by (-6 phi_prime) */
 
-  double metric_continuity = 0., metric_euler = 0., metric_shear = 0., metric_shear_prime = 0.;
+  double metric_continuity  = 0.;
+  double metric_euler       = 0.;
+  double metric_shear       = 0.;
+  double metric_shear_prime = 0.;
 
   if (ppt->gauge == possible_gauges::synchronous) {
     metric_continuity  = pvecmetric[ppw->index_mt_h_prime] / 2.;

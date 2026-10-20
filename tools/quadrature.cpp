@@ -142,7 +142,9 @@ bool get_qsampling_manual(double* x,
                           void (*function)(void* params_for_function, double q, double* f0),
                           void* params_for_function,
                           const GBQuadParams& gb) {
-  double y, h, t;
+  double y;
+  double h;
+  double t;
   switch (method) {
     case (qm_auto):
       return false;
@@ -243,20 +245,46 @@ void get_qsampling(double* x,
      This function combines two completely different strategies: Adaptive Gauss-Kronrod
      quadrature and Laguerres quadrature formula. */
 
-  int i, NL = 2, NR, level, Nadapt = 0, NLag, NLag_max, Nold = NL;
-  int NFD, NFD_max;
-  int adapt_converging = false, Laguerre_converging = false, FermiDirac_converging = false,
-      combined_converging = false;
-  double y, y1, y2, I, Igk, err, ILag, IFD;
+  int i;
+  int NL = 2;
+  int NR;
+  int level;
+  int Nadapt = 0;
+  int NLag;
+  int NLag_max;
+  int Nold = NL;
+  int NFD;
+  int NFD_max;
+  int adapt_converging      = false;
+  int Laguerre_converging   = false;
+  int FermiDirac_converging = false;
+  int combined_converging   = false;
+  double y;
+  double y1;
+  double y2;
+  double I;
+  double Igk;
+  double err;
+  double ILag;
+  double IFD;
   std::unique_ptr<qss_node> root      = nullptr;
   std::unique_ptr<qss_node> root_comb = nullptr;
-  double I_comb, I_atzero, I_atinf, I_comb2;
-  int N_comb = 0, N_comb_leg = 4;
-  double a_comb, b_comb;
-  double q_leg[4], w_leg[4];
-  double q_lag[_N_COMB_LAG_], w_lag[_N_COMB_LAG_];
+  double I_comb;
+  double I_atzero;
+  double I_atinf;
+  double I_comb2;
+  int N_comb     = 0;
+  int N_comb_leg = 4;
+  double a_comb;
+  double b_comb;
+  double q_leg[4];
+  double w_leg[4];
+  double q_lag[_N_COMB_LAG_];
+  double w_lag[_N_COMB_LAG_];
   std::string method_chosen;
-  double qmin = 0., qmax = 0., qmaxm1 = 0.;
+  double qmin   = 0.;
+  double qmax   = 0.;
+  double qmaxm1 = 0.;
   std::vector<double> wcomb2;
   double delq;
   double Itot  = 0.0;
@@ -575,7 +603,9 @@ void get_qsampling(double* x,
 }
 
 void sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx) {
-  int i, top = endidx, bot = startidx;
+  int i;
+  int top = endidx;
+  int bot = startidx;
   double pivot;
   /* End recursion if only one element left in array: */
   if ((endidx - startidx) < 1) {
@@ -669,7 +699,8 @@ void leaf_count(qss_node* node) {
 double get_integral(qss_node* node, int level) {
   /* Traverse the tree and return the estimate of the integral at a given level.
      level 1 is the best estimate. */
-  double IL, IR;
+  double IL;
+  double IR;
   /* An updated leaf_count is assumed. */
   if (node->leaf_childs <= level) {
     return node->I;
@@ -741,9 +772,23 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
 
 void compute_Laguerre(
     double* x, double* w, int N, double alpha, double* b, double* c, int totalweight) {
-  int i, j, iter, maxiter = 10;
-  double x0 = 0., r1, r2, ratio, d, logprod, logcc;
-  double p0, p1 = 0.0, p2, dp0, dp1, dp2 = 0.0;
+  int i;
+  int j;
+  int iter;
+  int maxiter = 10;
+  double x0   = 0.;
+  double r1;
+  double r2;
+  double ratio;
+  double d;
+  double logprod;
+  double logcc;
+  double p0;
+  double p1 = 0.0;
+  double p2;
+  double dp0;
+  double dp1;
+  double dp2 = 0.0;
   double eps = 1e-14;
   /* Initialise recursion coefficients: */
   for (i = 0; i < N; i++) {
@@ -917,8 +962,16 @@ void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
                           0.381830050505119,
                           0.279705391489277,
                           0.129484966168870};
-  int i, j;
-  double x, wg, wk, t, Ik, Ig, y, y2;
+  int i;
+  int j;
+  double x;
+  double wg;
+  double wk;
+  double t;
+  double Ik;
+  double Ig;
+  double y;
+  double y2;
 
   /* 	Loop through abscissas, transform the interval and form the Kronrod
      15 point estimate of the integral.
@@ -979,8 +1032,16 @@ void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
  **/
 
 void quadrature_gauss_legendre(double* mu, double* w8, int n, double tol) {
-  int m, j, i, counter;
-  double z1, z, pp, p3, p2, p1;
+  int m;
+  int j;
+  int i;
+  int counter;
+  double z1;
+  double z;
+  double pp;
+  double p3;
+  double p2;
+  double p1;
 
   m = (n + 1) / 2;
   for (i = 1; i <= m; i++) {

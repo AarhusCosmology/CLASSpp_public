@@ -102,7 +102,9 @@ struct Background {
  *  every equilibrium perturbation and question 3 has a machine-precision answer to
  *  measure against. mu_phi must be <= 0 or the Bose distribution is not defined. */
 Background EquilibriumBackground(const Grid& P, const Grid& F, const Grid& B, double a, double m) {
-  const double mu_l = 0.2, mu_phi = -0.3, mu_H = mu_l + mu_phi;
+  const double mu_l   = 0.2;
+  const double mu_phi = -0.3;
+  const double mu_H   = mu_l + mu_phi;
   Background bg;
   bg.a = a;
   bg.fH.resize(P.q.size());
@@ -147,7 +149,10 @@ Background AnalyticBackground(const Grid& P, const Grid& F, const Grid& B, doubl
   // mu_phi just below zero is what produces the measured peak f_phi ~ O(100); mu_l
   // near the fermion's own scale is what Pauli-saturates nu_l. T_d != 1 is the
   // departure from detailed balance.
-  const double mu_H = 0.29, mu_l = 0.3, mu_phi = -1e-3, T_d = 1.15;
+  const double mu_H    = 0.29;
+  const double mu_l    = 0.3;
+  const double mu_phi  = -1e-3;
+  const double T_d     = 1.15;
   const double q_front = 0.35 * DecayTransitionKernel::MaxDaughterMomentum(15.0, a * m);
   auto front           = [&](double q) { return 1. / (1. + std::pow(q / q_front, 6.)); };
 
@@ -171,7 +176,9 @@ Background AnalyticBackground(const Grid& P, const Grid& F, const Grid& B, doubl
 
 /** ||M z|| / (||M|| ||z||) in the plain 2-norm: how far z is from a null vector. */
 double NullResidual(const double* M, int n, const double* z) {
-  double num = 0., zn = 0., mn = 0.;
+  double num = 0.;
+  double zn  = 0.;
+  double mn  = 0.;
   for (int i = 0; i < n; ++i) {
     double s = 0.;
     for (int j = 0; j < n; ++j) {
@@ -231,7 +238,9 @@ void q1_projection_identity() {
     ReducedCollisionOperator
         R(K, View(s.P), View(s.F), View(s.B), Statistics::Fermion, Statistics::Boson, {nm});
     R.SetBackground(bg.a, kMass, bg.fH.data(), bg.fl.data(), bg.fphi.data());
-    std::vector<double> c(nm), c2(nm), df(std::max(s.F.q.size(), s.B.q.size()));
+    std::vector<double> c(nm);
+    std::vector<double> c2(nm);
+    std::vector<double> df(std::max(s.F.q.size(), s.B.q.size()));
     for (int d = 0; d < 2; ++d)
       for (int j = 0; j < nm; ++j) {
         std::fill(c.begin(), c.end(), 0.);
@@ -273,7 +282,8 @@ void q1b_energy_coordinate() {
       const Grid& g = (d == 0) ? s.F : s.B;
       // An arbitrary df, NOT one in the reduced span: the energy identity is a property
       // of the projection alone and must hold for anything.
-      std::vector<double> df(g.q.size()), m(nm);
+      std::vector<double> df(g.q.size());
+      std::vector<double> m(nm);
       for (size_t i = 0; i < g.q.size(); ++i)
         df[i] = std::sin(3.1 * i) * std::exp(-g.q[i] / 4.);
       R.Project(d, df.data(), m.data());
@@ -320,9 +330,12 @@ void q2_in_span_agreement() {
   z[kNParent + nm + 1] = 0.25;
 
   const int stride = kLMax + 1;
-  std::vector<double> FH((size_t) kNParent * stride, 0.), Fl(s.F.q.size() * stride, 0.),
-      Fp(s.B.q.size() * stride, 0.);
-  std::vector<double> dH(FH.size()), dl(Fl.size()), dp(Fp.size());
+  std::vector<double> FH((size_t) kNParent * stride, 0.);
+  std::vector<double> Fl(s.F.q.size() * stride, 0.);
+  std::vector<double> Fp(s.B.q.size() * stride, 0.);
+  std::vector<double> dH(FH.size());
+  std::vector<double> dl(Fl.size());
+  std::vector<double> dp(Fp.size());
   std::vector<double> rec(std::max(s.F.q.size(), s.B.q.size()));
 
   for (int b = 0; b < kNParent; ++b)
@@ -348,7 +361,8 @@ void q2_in_span_agreement() {
                                   dp.data());
 
   double worst = 0.;
-  std::vector<double> slice(std::max(s.F.q.size(), s.B.q.size())), mom(nm);
+  std::vector<double> slice(std::max(s.F.q.size(), s.B.q.size()));
+  std::vector<double> mom(nm);
   for (int l = 0; l <= kLMax; ++l) {
     const double* Ml = Mred.data() + (size_t) l * S * S;
     std::vector<double> want(S, 0.);
@@ -391,7 +405,8 @@ void q3_equilibrium_annihilation() {
   ReducedCollisionOperator
       ref(K, View(s.P), View(s.F), View(s.B), Statistics::Fermion, Statistics::Boson, {2});
   ref.SetBackground(bg.a, kMass, bg.fH.data(), bg.fl.data(), bg.fphi.data());
-  std::vector<double> Mex, veq_ex;
+  std::vector<double> Mex;
+  std::vector<double> veq_ex;
   ref.AssembleExact(1, Mex);
   ref.EquilibriumNullVectorsExact(veq_ex);
   const int N = ref.full_size();
@@ -427,8 +442,9 @@ void q3_equilibrium_annihilation() {
     // in the entropy norm ||x||^2 = Sum dq q^2 x^2 / w, which is the norm the
     // H-theorem is stated in.
     double rec[2] = {0., 0.};
-    std::vector<double> c(nm), v(std::max(s.F.q.size(), s.B.q.size())),
-        vr(std::max(s.F.q.size(), s.B.q.size()));
+    std::vector<double> c(nm);
+    std::vector<double> v(std::max(s.F.q.size(), s.B.q.size()));
+    std::vector<double> vr(std::max(s.F.q.size(), s.B.q.size()));
     for (int d = 0; d < 2; ++d) {
       const Grid& g                 = (d == 0) ? s.F : s.B;
       const std::vector<double>& we = R.weight(d);
@@ -437,7 +453,8 @@ void q3_equilibrium_annihilation() {
           v[k] = we[k] * (dir == 0 ? 1. : g.q[k]);
         R.Project(d, v.data(), c.data());
         R.Reconstruct(d, c.data(), vr.data());
-        double num = 0., den = 0.;
+        double num = 0.;
+        double den = 0.;
         for (size_t k = 0; k < g.q.size(); ++k) {
           if (!(we[k] > 0.))
             continue;
@@ -450,7 +467,9 @@ void q3_equilibrium_annihilation() {
     }
 
     // And the identity, on the fermion chemical-potential direction.
-    std::vector<double> M, veq, veq_full;
+    std::vector<double> M;
+    std::vector<double> veq;
+    std::vector<double> veq_full;
     R.Assemble(0, M);
     R.EquilibriumNullVectors(veq);
     R.EquilibriumNullVectorsExact(veq_full);
@@ -463,7 +482,9 @@ void q3_equilibrium_annihilation() {
     for (int i = 0; i < N; ++i)
       for (int j = 0; j < N; ++j)
         rhs_full[i] += Mex[(size_t) i * N + j] * veq_full[j];
-    std::vector<double> rhs(S, 0.), mom(nm), slice(std::max(s.F.q.size(), s.B.q.size()));
+    std::vector<double> rhs(S, 0.);
+    std::vector<double> mom(nm);
+    std::vector<double> slice(std::max(s.F.q.size(), s.B.q.size()));
     for (int b = 0; b < kNParent; ++b)
       rhs[b] = rhs_full[b];
     for (int d = 0; d < 2; ++d) {
@@ -475,7 +496,8 @@ void q3_equilibrium_annihilation() {
       for (int j = 0; j < nm; ++j)
         rhs[kNParent + d * nm + j] = mom[j];
     }
-    double id = 0., sc = 0.;
+    double id = 0.;
+    double sc = 0.;
     for (int i = 0; i < S; ++i) {
       id = std::fmax(id, std::fabs(lhs[i] - rhs[i]));
       sc = std::fmax(sc, std::fabs(rhs[i]));
@@ -627,10 +649,12 @@ void q6_the_milestone() {
         R(K, View(s.P), View(s.F), View(s.B), Statistics::Fermion, Statistics::Boson, {2});
     R.SetBackground(bg.a, kMass, bg.fH.data(), bg.fl.data(), bg.fphi.data());
 
-    std::vector<double> Mex, Mred;
+    std::vector<double> Mex;
+    std::vector<double> Mred;
     R.AssembleExact(1, Mex);
     R.Assemble(1, Mred);
-    const int N = R.full_size(), S = R.size();
+    const int N     = R.full_size();
+    const int S     = R.size();
     const double e0 = R.DissipativityBoundExact(Mex.data());
     const double e1 = R.DissipativityBoundExact(Mex.data() + (size_t) N * N);
     const double r0 = R.DissipativityBound(Mred.data());
@@ -758,7 +782,9 @@ void q7_entropy_weight_stays_nonnegative() {
       R(kern, View(s.P), View(s.F), View(s.B), Statistics::Fermion, Statistics::Boson, {4});
   R.SetBackground(kA, kMass, bg.fH.data(), bg.fl.data(), bg.fphi.data());
 
-  double w_min = 1e300, w_eq_min = 1e300, f_max = 0.;
+  double w_min    = 1e300;
+  double w_eq_min = 1e300;
+  double f_max    = 0.;
   for (int k = 0; k < n_daughter; ++k) {
     w_min    = std::fmin(w_min, R.weight(0)[k]);
     w_eq_min = std::fmin(w_eq_min, R.weight(0)[k]);
@@ -842,7 +868,8 @@ void q7b_overshoot_is_reported() {
 
 /** P_l(u) = sum_k c[k] u^k, by the standard three-term recurrence on coefficients. */
 std::vector<double> LegendreCoeffs(int l) {
-  std::vector<double> prev{1.}, cur{0., 1.};
+  std::vector<double> prev{1.};
+  std::vector<double> cur{0., 1.};
   if (l == 0)
     return prev;
   for (int n = 1; n < l; ++n) {
@@ -867,8 +894,10 @@ std::vector<double> LegendreCoeffs(int l) {
  *  precision at small x; every parent bin in this test has x >= 0.28, where the loss
  *  is a few digits out of sixteen. */
 double IntegralK(int k, double x) {
-  const double s_lo = 1. - x, s_hi = 1. + x;
-  double binom = 1., sum = 0.;
+  const double s_lo = 1. - x;
+  const double s_hi = 1. + x;
+  double binom      = 1.;
+  double sum        = 0.;
   for (int j = 0; j <= k; ++j) {
     const double J  = (j == 2) ? std::log(s_hi / s_lo)
                                : (std::pow(s_hi, j - 2) - std::pow(s_lo, j - 2)) / (j - 2.);
@@ -916,8 +945,10 @@ void q8_analytic_kernel_oracle() {
   std::printf("     N_q  |   l=1        l=2        l=3        l=4   (worst over parent bins)\n");
   std::printf("          |   fermion then boson, ABSOLUTE deviation (F_0 = 1 sets the scale)\n");
 
-  double converged[kLMax + 1] = {0.}, converged_abs[kLMax + 1] = {0.}, prev_abs[kLMax + 1] = {0.};
-  int n_rungs = 0;
+  double converged[kLMax + 1]     = {0.};
+  double converged_abs[kLMax + 1] = {0.};
+  double prev_abs[kLMax + 1]      = {0.};
+  int n_rungs                     = 0;
   for (int n_daughter = 51; n_daughter <= 801; n_daughter = 2 * n_daughter - 1) {
     Setup s                  = MakeSetup(n_daughter, kA);
     s.cfg.inverse_decays     = false;
@@ -935,12 +966,20 @@ void q8_analytic_kernel_oracle() {
     kern.PrepareTransitions(kA, kMass, kGamma, bg.fH.data(), bg.fl.data(), bg.fphi.data(), kA2H);
 
     const int L1 = kLMax + 1;
-    const int Np = (int) s.P.q.size(), Nf = n_daughter, Nb = n_daughter;
-    std::vector<double> FH((size_t) Np * L1), Fl((size_t) Nf * L1), Fp((size_t) Nb * L1);
-    std::vector<double> dH(FH.size()), dl(Fl.size()), dp(Fp.size());
+    const int Np = (int) s.P.q.size();
+    const int Nf = n_daughter;
+    const int Nb = n_daughter;
+    std::vector<double> FH((size_t) Np * L1);
+    std::vector<double> Fl((size_t) Nf * L1);
+    std::vector<double> Fp((size_t) Nb * L1);
+    std::vector<double> dH(FH.size());
+    std::vector<double> dl(Fl.size());
+    std::vector<double> dp(Fp.size());
 
-    double worst[kLMax + 1] = {0.}, worst_abs[kLMax + 1] = {0.};
-    double worst_f[kLMax + 1] = {0.}, worst_b[kLMax + 1] = {0.};
+    double worst[kLMax + 1]     = {0.};
+    double worst_abs[kLMax + 1] = {0.};
+    double worst_f[kLMax + 1]   = {0.};
+    double worst_b[kLMax + 1]   = {0.};
     for (int b = 0; b < Np; ++b) {
       const double x = s.P.q[b] / std::sqrt(s.P.q[b] * s.P.q[b] + kA * kA * kMass * kMass);
 
@@ -961,7 +1000,8 @@ void q8_analytic_kernel_oracle() {
                                          dp.data());
 
       // Energy-moment rate of each daughter at each l.  eps = q for a massless daughter.
-      double E_f[kLMax + 1] = {0.}, E_b[kLMax + 1] = {0.};
+      double E_f[kLMax + 1] = {0.};
+      double E_b[kLMax + 1] = {0.};
       for (int l = 0; l <= kLMax; ++l) {
         for (int j = 0; j < Nf; ++j)
           E_f[l] += s.F.dq[j] * std::pow(s.F.q[j], 3) * dl[(size_t) j * L1 + l];
@@ -1058,7 +1098,8 @@ void q9_operator_table() {
 
   // Two background rows, a factor 2 apart in a -- far wider than any real table row
   // spacing, so an interpolation error shows up rather than hiding under the tolerance.
-  const double a0 = kA, a1 = 2. * kA;
+  const double a0 = kA;
+  const double a1 = 2. * kA;
   std::vector<double> M[2];
   for (int r = 0; r < 2; ++r) {
     const double a = (r == 0) ? a0 : a1;
@@ -1100,7 +1141,8 @@ void q9_operator_table() {
         out[i] += Ml[(size_t) i * S + j] * z[j];
   };
   auto rel = [&](const std::vector<double>& x, const std::vector<double>& ref) {
-    double num = 0., den = 0.;
+    double num = 0.;
+    double den = 0.;
     for (int i = 0; i < S; ++i) {
       num = std::fmax(num, std::fabs(x[i] - ref[i]));
       den = std::fmax(den, std::fabs(ref[i]));
@@ -1113,7 +1155,8 @@ void q9_operator_table() {
   double worst_exact = 0.;
   for (int r = 0; r < 2; ++r) {
     for (int l = 0; l <= l_max; ++l) {
-      std::vector<double> ref, got(S, 0.);
+      std::vector<double> ref;
+      std::vector<double> got(S, 0.);
       matvec(M[r], l, ref);
       table.Apply((r == 0) ? a0 : a1, l, z.data(), got.data());
       worst_exact = std::fmax(worst_exact, rel(got, ref));
@@ -1127,7 +1170,10 @@ void q9_operator_table() {
   // interpolation and not the operator.
   double worst_mid = 0.;
   for (int l = 0; l <= l_max; ++l) {
-    std::vector<double> r0, r1, got(S, 0.), want(S);
+    std::vector<double> r0;
+    std::vector<double> r1;
+    std::vector<double> got(S, 0.);
+    std::vector<double> want(S);
     matvec(M[0], l, r0);
     matvec(M[1], l, r1);
     for (int i = 0; i < S; ++i)
@@ -1142,7 +1188,8 @@ void q9_operator_table() {
   // "zero" means it must leave dz untouched. The table covers the collision window; M1
   // says the collision falls ten or more orders outside it, and the species is what
   // chooses the window wide enough for that to be true.
-  std::vector<double> outside(S, 1.0), before(S, 1.0);
+  std::vector<double> outside(S, 1.0);
+  std::vector<double> before(S, 1.0);
   table.Apply(0.1 * a0, 0, z.data(), outside.data());
   table.Apply(10. * a1, 0, z.data(), outside.data());
   assert(rel(outside, before) == 0.);
@@ -1155,8 +1202,9 @@ void q9_operator_table() {
 // invisible in q9, whose two-row table is uniform by construction.
 void q11_row_lookup() {
   std::printf("\n== 11. row lookup: O(1) uniform path == binary search ==\n");
-  const int S = 2, l_max = 0;
-  auto block = [&](double tag) {
+  const int S     = 2;
+  const int l_max = 0;
+  auto block      = [&](double tag) {
     std::vector<double> M((size_t) (l_max + 1) * S * S, 0.);
     M[0] = tag;  // identifies the row it came from
     return M;
@@ -1179,7 +1227,8 @@ void q11_row_lookup() {
     for (size_t i = 0; i + 1 < as.size(); ++i) {
       for (double frac : {0.0, 0.001, 0.5, 0.999}) {
         const double a = std::exp(std::log(as[i]) + frac * (std::log(as[i + 1]) - std::log(as[i])));
-        double z[2] = {1., 0.}, dz[2] = {0., 0.};
+        double z[2]    = {1., 0.};
+        double dz[2]   = {0., 0.};
         t.Apply(a, 0, z, dz);
         // The blend of tags i and i+1 at weight `frac` is exactly i + frac.
         worst = std::fmax(worst, std::fabs(dz[0] - ((double) i + frac)));

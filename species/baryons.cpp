@@ -200,7 +200,8 @@ void BaryonsSpecies::PrintVariables(PerturbColumnWriter& w,
                                     const double* y,
                                     const PerturbationsModule& mod,
                                     const perturb_workspace* ppw) const {
-  double delta_b = 0., theta_b = 0.;
+  double delta_b = 0.;
+  double theta_b = 0.;
 
   if (!w.IsTitleMode()) {
     const auto& layout       = static_cast<const PerturbLayout&>(*base);

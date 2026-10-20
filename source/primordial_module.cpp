@@ -83,7 +83,9 @@ void PrimordialModule::primordial_spectrum_at_k(
 
   /** - define local variables */
 
-  int index_ic1, index_ic2, index_ic1_ic2;
+  int index_ic1;
+  int index_ic2;
+  int index_ic1_ic2;
   double lnk;
   int last_index;
 
@@ -190,9 +192,13 @@ void PrimordialModule::primordial_init() {
 
   /** - define local variables */
 
-  double k, k_min, k_max;
+  double k;
+  double k_min;
+  double k_max;
   int index_ic1_ic2;
-  double pk, pk1, pk2;
+  double pk;
+  double pk1;
+  double pk2;
   /* uncomment if you use optional test below
      (for correlated isocurvature modes) */
   //double cos_delta_k;
@@ -368,7 +374,11 @@ void PrimordialModule::primordial_init() {
 
   if (ppm->primordial_spec_type != analytic_Pk) {
     double dlnk = log(10.) / ppr->k_per_decade_primordial;
-    double lnpk_pivot, lnpk_minus, lnpk_plus, lnpk_minusminus, lnpk_plusplus;
+    double lnpk_pivot;
+    double lnpk_minus;
+    double lnpk_plus;
+    double lnpk_minusminus;
+    double lnpk_plusplus;
 
     if (ppt->has_scalars) {
       primordial_spectrum_at_k(perturbations_module_->index_md_scalars_,
@@ -515,8 +525,12 @@ void PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double 
  */
 
 void PrimordialModule::primordial_analytic_spectrum_init() {
-  int index_md, index_ic1, index_ic2;
-  int index_ic1_ic2, index_ic1_ic1, index_ic2_ic2;
+  int index_md;
+  int index_ic1;
+  int index_ic2;
+  int index_ic1_ic2;
+  int index_ic1_ic1;
+  int index_ic2_ic2;
   double one_amplitude   = 0.;
   double one_tilt        = 0.;
   double one_running     = 0.;
@@ -769,7 +783,18 @@ void PrimordialModule::primordial_inflation_potential(double phi,
                                                       double* V,
                                                       double* dV,
                                                       double* ddV) const {
-  double e, de, dde, mu, dmu, ddmu, l, dl, ddl, p, dp, ddp;
+  double e;
+  double de;
+  double dde;
+  double mu;
+  double dmu;
+  double ddmu;
+  double l;
+  double dl;
+  double ddl;
+  double p;
+  double dp;
+  double ddp;
 
   switch (ppm->potential) {
       /* V(phi)=polynomial in phi */
@@ -971,8 +996,10 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
   double H_pivot;
   double dphidt_pivot = 0.0;
   double dphidt_try;
-  double aH_ini, aH_end;
-  double k_max, k_min;
+  double aH_ini;
+  double aH_end;
+  double k_max;
+  double k_min;
 
   /** - eventually, needs first to find phi_pivot */
   if (ppm->primordial_spec_type == inflation_V_end) {
@@ -1022,7 +1049,9 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
       /** - check positivity and negative slope of \f$ H(\phi)\f$ in field pivot
         value, and get H_pivot */
 
-      double dH, ddH, dddH;
+      double dH;
+      double ddH;
+      double dddH;
 
       primordial_inflation_check_hubble(phi_pivot_, &H_pivot, &dH, &ddH, &dddH);
       break;
@@ -1272,7 +1301,9 @@ void PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
     double phi_k = y[index_in_phi_];
 
     /** - get potential (and its derivatives) at this value */
-    double V, dV, ddV;
+    double V;
+    double dV;
+    double ddV;
     primordial_inflation_check_potential(phi_k, &V, &dV, &ddV);
 
     /** - calculate the analytic slow-roll formula for the spectra */
@@ -1333,7 +1364,8 @@ void PrimordialModule::primordial_inflation_spectra(double* y_ini) {
 
 void PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int index_k) {
   double k;
-  double curvature, tensors;
+  double curvature;
+  double tensors;
   std::vector<double> y(in_size_);
   std::vector<double> dy(in_size_);
 
@@ -1392,8 +1424,13 @@ void PrimordialModule::primordial_inflation_one_k(
   /** Summary: */
 
   /** - define local variables */
-  double tau_start, tau_end, dtau, dtau_done;
-  double z, ksi2, ah2;
+  double tau_start;
+  double tau_end;
+  double dtau;
+  double dtau_done;
+  double z;
+  double ksi2;
+  double ah2;
   double aH;
   double curvature_old;
   double curvature_new;
@@ -1545,10 +1582,17 @@ void PrimordialModule::primordial_inflation_one_k(
 
 void PrimordialModule::primordial_inflation_find_attractor(
     double phi_0, double precision, double* y, double* dy, double* H_0, double* dphidt_0) {
-  double V_0, dV_0, ddV_0;
-  double V = 0., dV = 0., ddV = 0.;
+  double V_0;
+  double dV_0;
+  double ddV_0;
+  double V   = 0.;
+  double dV  = 0.;
+  double ddV = 0.;
   double a;
-  double dphidt, dphidt_0new, dphidt_0old, phi;
+  double dphidt;
+  double dphidt_0new;
+  double dphidt_0old;
+  double phi;
   int counter;
 
   /* we want a series of value of phi' in phi_0, obtained by
@@ -1661,11 +1705,19 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
                                                               enum time_definition time) {
   struct primordial_inflation_parameters_and_workspace pipaw{this};
   struct generic_integrator_workspace gi;
-  double tau_start, tau_end, dtau = 0.;
-  double H, dH, ddH, dddH;
-  double epsilon  = 0.0, epsilon_old;
+  double tau_start;
+  double tau_end;
+  double dtau = 0.;
+  double H;
+  double dH;
+  double ddH;
+  double dddH;
+  double epsilon = 0.0;
+  double epsilon_old;
   double quantity = 0.;
-  double V, dV, ddV;
+  double V;
+  double dV;
+  double ddV;
   double sign_dtau = 0.;
 
   pipaw.N = in_bg_size_;
@@ -1991,8 +2043,13 @@ void PrimordialModule::primordial_inflation_check_hubble(
  */
 
 void PrimordialModule::primordial_inflation_get_epsilon(double phi, double* epsilon) {
-  double V, dV, ddV;
-  double H, dH, ddH, dddH;
+  double V;
+  double dV;
+  double ddV;
+  double H;
+  double dH;
+  double ddH;
+  double dddH;
 
   switch (ppm->primordial_spec_type) {
     case inflation_V:
@@ -2030,16 +2087,24 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
   /** Summary: */
 
   /** - define local variables */
-  double epsilon, dphi;
-  double phi_try, H_try, dphidt_try, ratio_try = 0.;
-  double phi_left, phi_right, phi_mid;
-  double phi_small_epsilon, phi_stop;
+  double epsilon;
+  double dphi;
+  double phi_try;
+  double H_try;
+  double dphidt_try;
+  double ratio_try = 0.;
+  double phi_left;
+  double phi_right;
+  double phi_mid;
+  double phi_small_epsilon;
+  double phi_stop;
   double dphidt_small_epsilon;
   double H_small_epsilon;
   double aH_ratio_after_small_epsilon = 0.;
   double a_ratio_after_small_epsilon  = 0.;
   double target                       = 0.;
-  double a_pivot, aH_pivot;
+  double a_pivot;
+  double aH_pivot;
 
   double rho_end;
   double h;
@@ -2653,9 +2718,14 @@ void PrimordialModule::primordial_external_spectrum_init() {
   /** Summary: */
 
   FILE* process;
-  int n_data_guess, n_data = 0;
-  std::vector<double> k, pks, pkt;
-  double this_k, this_pks, this_pkt = 0.0;
+  int n_data_guess;
+  int n_data = 0;
+  std::vector<double> k;
+  std::vector<double> pks;
+  std::vector<double> pkt;
+  double this_k;
+  double this_pks;
+  double this_pkt = 0.0;
   int status;
 
   /** - Initialization */
@@ -2779,7 +2849,8 @@ void PrimordialModule::primordial_output_titles(std::string& titles) const {
 }
 
 void PrimordialModule::primordial_output_data(int number_of_titles, double* data) const {
-  int index_k, storeidx;
+  int index_k;
+  int storeidx;
   double* dataptr;
 
   for (index_k = 0; index_k < lnk_size_; index_k++) {

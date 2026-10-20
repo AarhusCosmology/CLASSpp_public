@@ -131,7 +131,9 @@ int main() {
   tally_comp.FinalizeMatterClassification();  // stamp the child caches the tally reads
 
   auto layout = tally_comp.CreatePerturbLayout();
-  SE total, total_cold, total_warm;
+  SE total;
+  SE total_cold;
+  SE total_warm;
   tally_comp.TallyStressEnergy(*layout,
                                nullptr,
                                nullptr,

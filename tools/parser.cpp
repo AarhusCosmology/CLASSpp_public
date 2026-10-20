@@ -26,7 +26,8 @@
 
   std::string line;
   while (std::getline(in, line)) {
-    std::string name, value;
+    std::string name;
+    std::string value;
     if (!parse_line(line, name, value))
       continue;
     if (fc.params_.count(name)) {

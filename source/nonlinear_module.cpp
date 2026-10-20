@@ -39,9 +39,11 @@ struct HMcodeNoRadiation {
 
   /* H^2/H0^2, (a''/a)/H0^2 and Omega_m(a) */
   void at(double a, double* H2, double* AH, double* Om) const {
-    double w_de = -1., X_de = 1.;
+    double w_de = -1.;
+    double X_de = 1.;
     if (Omega_w > 0.) {
-      double dw_over_da, integral;
+      double dw_over_da;
+      double integral;
       background->background_w_fld(a, &w_de, &dw_over_da, &integral);
       X_de = exp(integral); /* rho_fld(a) / rho_fld(today) */
     }
@@ -65,7 +67,9 @@ struct HMcodeGrowthWorkspace {
 
 /* the linear growth g(a), y = (g, dg/da) */
 void hmcode_growth_derivs(double a, double* y, double* dy, void* parameters) {
-  double H2, AH, Om;
+  double H2;
+  double AH;
+  double Om;
   static_cast<HMcodeGrowthWorkspace*>(parameters)->cosmology->at(a, &H2, &AH, &Om);
   dy[0] = y[1];
   dy[1] = 1.5 * Om * y[0] / (a * a) - (2. + AH / H2) * y[1] / a;
@@ -656,7 +660,9 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
   std::vector<double> ddln_pk_table;
   std::vector<double> ln_pk_cb_table;
   std::vector<double> ddln_pk_cb_table;
-  double h, a, b;
+  double h;
+  double a;
+  double b;
 
   class_test_severe(!ppt->has_pk_matter,
                     "No power spectrum was computed. Add 'mPk' to the list of outputs.");
@@ -900,7 +906,8 @@ double NonlinearModule::GetSigma8(int index_pk) const {
 void NonlinearModule::nonlinear_pk_tilt_at_k_and_z(
     enum pk_outputs pk_output, double k, double z, int index_pk, double* pk_tilt) const {
   double dlnk;
-  double out_pk1, out_pk2;
+  double out_pk1;
+  double out_pk2;
 
   class_test_severe(!ppt->has_pk_matter,
                     "No power spectrum was computed. Add 'mPk' to the list of outputs.");
@@ -1048,7 +1055,8 @@ void NonlinearModule::nonlinear_init() {
 
   std::vector<double> pvecback;
   int last_index;
-  double a, z;
+  double a;
+  double z;
 
   struct nonlinear_workspace nw;
   struct nonlinear_workspace* pnw = &nw;
@@ -1500,7 +1508,8 @@ void NonlinearModule::nonlinear_indices() {
 
 void NonlinearModule::nonlinear_get_k_list() {
   double k = 0;
-  double k_max, exponent;
+  double k_max;
+  double exponent;
   int index_k;
 
   k_size_ = perturbations_module_->k_size_[index_md_scalars_];
@@ -1619,8 +1628,11 @@ void NonlinearModule::nonlinear_get_source(int index_k,
                                            int index_tau,
                                            const std::vector<std::vector<double>>& sources,
                                            double* source) {
-  double k, k_max, k_previous;
-  double source_max, source_previous;
+  double k;
+  double k_max;
+  double k_previous;
+  double source_max;
+  double source_previous;
   double scaled_factor;
 
   /** - use precomputed values */
@@ -1758,7 +1770,9 @@ void NonlinearModule::nonlinear_pk_linear(
     double* lnpk_ic  //lnpk[index_k * ic_ic_size_ + index_ic1_ic2]
 ) {
   int index_tp;
-  int index_ic1_ic1, index_ic1_ic2, index_ic2_ic2;
+  int index_ic1_ic1;
+  int index_ic1_ic2;
+  int index_ic2_ic2;
   std::vector<double> primordial_pk;
   double pk;
   std::vector<double> pk_ic;
@@ -1944,7 +1958,8 @@ void NonlinearModule::nonlinear_sigmas(double R,
                                        double k_per_decade,
                                        enum out_sigmas sigma_output,
                                        double* result) const {
-  double pk, lnpk;
+  double pk;
+  double lnpk;
 
   std::vector<double> array_for_sigma;
   int index_num;
@@ -1955,7 +1970,11 @@ void NonlinearModule::nonlinear_sigmas(double R,
   int integrand_size;
   int last_index = 0;
 
-  double k, W, W_prime, x, t;
+  double k;
+  double W;
+  double W_prime;
+  double x;
+  double t;
 
   /** - allocate temporary array for an integral over y(x) */
 
@@ -2141,18 +2160,50 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                                         double* ddlnpk_l,
                                         double* k_nl,
                                         short* nl_corr_not_computable_at_this_k) {
-  double Omega_m, Omega_v, fnu, w0, dw_over_da_fld, integral_fld;
+  double Omega_m;
+  double Omega_v;
+  double fnu;
+  double w0;
+  double dw_over_da_fld;
+  double integral_fld;
 
   /** Determine non linear ratios (from pk) **/
 
-  double pk_lin, pk_quasi, pk_halo, rk;
-  double sigma, rknl, rneff, rncur, d1, d2;
-  double diff, xlogr1, xlogr2, rmid;
+  double pk_lin;
+  double pk_quasi;
+  double pk_halo;
+  double rk;
+  double sigma;
+  double rknl;
+  double rneff;
+  double rncur;
+  double d1;
+  double d2;
+  double diff;
+  double xlogr1;
+  double xlogr2;
+  double rmid;
 
-  double gam, a, b, c, xmu, xnu, alpha, beta, f1, f2, f3;
+  double gam;
+  double a;
+  double b;
+  double c;
+  double xmu;
+  double xnu;
+  double alpha;
+  double beta;
+  double f1;
+  double f2;
+  double f3;
   double pk_linaa;
   double y;
-  double f1a, f2a, f3a, f1b, f2b, f3b, frac;
+  double f1a;
+  double f2a;
+  double f3a;
+  double f1b;
+  double f2b;
+  double f3b;
+  double frac;
 
   std::vector<double> pvecback;
 
@@ -2551,7 +2602,10 @@ void NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
                                                   double R,
                                                   enum halofit_integral_type type,
                                                   double* sum) {
-  double k, pk, x2, integrand;
+  double k;
+  double pk;
+  double x2;
+  double integrand;
   double anorm = 1. / (2 * pow(_PI_, 2));
 
   for (int index_k = 0; index_k < integrand_size; index_k++) {
@@ -2636,7 +2690,8 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   if ((version != HMcodeVersion::v2020_baryonic_feedback) || *nl_corr_not_computable_at_this_k)
     return;
 
-  std::vector<double> pk_2020(k_size_), pk_unfitted(k_size_);
+  std::vector<double> pk_2020(k_size_);
+  std::vector<double> pk_unfitted(k_size_);
   for (auto [v, pk] : {std::pair{HMcodeVersion::v2020, pk_2020.data()},
                        std::pair{HMcodeVersion::v2020_unfitted, pk_unfitted.data()}}) {
     nonlinear_hmcode_compute(v,
@@ -2680,46 +2735,76 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
   const double T_heat = pnl->log10T_heat_hmcode - 7.8;
 
   /* integers */
-  int index_mass, i, ng, nsig;
+  int index_mass;
+  int i;
+  int ng;
+  int nsig;
   int index_ncol;
   int last_index = 0;
   int index_pk_cb;
-  int counter, index_nl;
+  int counter;
+  int index_nl;
 
-  int index_nu, index_cut;
+  int index_nu;
+  int index_cut;
   int index_y;
   int index_ddy;
 
   /* Background parameters */
-  double Omega_m, fnu, Omega0_m;
+  double Omega_m;
+  double fnu;
+  double Omega0_m;
   double z_at_tau;
   double rho_crit_today_in_msun_mpc3;
   double growth;
   double anorm;
 
   /* temporary numbers */
-  double m, r, nu, sig, sigf;
-  double diff, r1, r2;
+  double m;
+  double r;
+  double nu;
+  double sig;
+  double sigf;
+  double diff;
+  double r1;
+  double r2;
 
   /* HMcode parameters */
-  double mmin, mmax, nu_min;
+  double mmin;
+  double mmax;
+  double nu_min;
 
-  double sigma_disp, sigma_disp100, sigma8, sigma8_cb = 0.;
-  double delta_c, Delta_v;
+  double sigma_disp;
+  double sigma_disp100;
+  double sigma8;
+  double sigma8_cb = 0.;
+  double delta_c;
+  double Delta_v;
   double fraction;
 
-  double sigma_nl, nu_nl, r_nl;
+  double sigma_nl;
+  double nu_nl;
+  double r_nl;
   double sigma_prime;
   double dlnsigdlnR;
   double n_eff;
   double alpha;
 
-  double z_form, g_form;
+  double z_form;
+  double g_form;
 
-  double A_conc, eta, k_star, fdamp, kdamp = 0.;
-  double gst, window_nfw;
+  double A_conc;
+  double eta;
+  double k_star;
+  double fdamp;
+  double kdamp = 0.;
+  double gst;
+  double window_nfw;
   double nu_cut;
-  double fac, pk_lin, pk_2h, pk_1h;
+  double fac;
+  double pk_lin;
+  double pk_2h;
+  double pk_1h;
 
   /* data fields */
   std::vector<double> pvecback;
@@ -3325,7 +3410,9 @@ void NonlinearModule::nonlinear_hmcode_noradiation_growth(struct nonlinear_works
   pnw->a_norad[a_size - 1] = a_end;
 
   /* growing mode in matter domination, corrected for the dark energy fraction */
-  double H2, AH, Om;
+  double H2;
+  double AH;
+  double Om;
   cosmology.at(a_ini, &H2, &AH, &Om);
   const double f = 1. - Om;
   double y[2]    = {pow(a_ini, 1. - 3. * f / 5.), (1. - 3. * f / 5.) * pow(a_ini, -3. * f / 5.)};
@@ -3530,7 +3617,9 @@ void NonlinearModule::nonlinear_hmcode_nowiggle(const double* lnpk_l,
                                                 const double* ddlnpk_l,
                                                 struct nonlinear_workspace* pnw) {
   const int n = pnl->nk_wiggle;
-  std::vector<double> lnpk_lin(n), lnpk_eh(n), ratio(n);
+  std::vector<double> lnpk_lin(n);
+  std::vector<double> lnpk_eh(n);
+  std::vector<double> ratio(n);
   int last_index = 0;
   for (int i = 0; i < n; i++) {
     array_interpolate_spline(ln_k_.data(),
@@ -3660,9 +3749,11 @@ void NonlinearModule::nonlinear_hmcode_dark_energy_correction(struct nonlinear_w
         the actual curvature, and applied only to haloes formed before z; the gaps to CAMB were
         1.6e-2 for w0 = -0.9, wa = 0.1 and 1.4e-2 for Omega_k = 0.02. */
 
-  double w0 = -1., wa = 0.;
+  double w0 = -1.;
+  double wa = 0.;
   if (all_species_.count("Fluid")) {
-    double dw_over_da_fld, integral_fld;
+    double dw_over_da_fld;
+    double integral_fld;
     background_module_->background_w_fld(1., &w0, &dw_over_da_fld, &integral_fld);
     wa = -dw_over_da_fld;
   }
@@ -3741,10 +3832,16 @@ void NonlinearModule::nonlinear_hmcode_fill_sigtab(int index_tau,
                                                    double* ddlnpk_l,
                                                    struct nonlinear_workspace* pnw) {
   double r;
-  double rmin, rmax;
+  double rmin;
+  double rmax;
   double sig;
   std::vector<double> sigtab;
-  int i, index_r, index_sig, index_ddsig, index_n, nsig;
+  int i;
+  int index_r;
+  int index_sig;
+  int index_ddsig;
+  int index_n;
+  int nsig;
 
   rmin = ppr->rmin_for_sigtab / pba->h;
   rmax = ppr->rmax_for_sigtab / pba->h;

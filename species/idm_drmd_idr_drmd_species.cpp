@@ -52,7 +52,9 @@ void IDM_DRMD_IDR_DRMD_Species::FinalizeBackground(double a,
                                                    double H,
                                                    const double* /*pvecback_B*/,
                                                    double* pvecback) {
-  double Rint, csp2, Gint;
+  double Rint;
+  double csp2;
+  double Gint;
   ComputeIdmDrmd(a, idm_drmd_->Rho(pvecback) / idr_drmd_->Rho(pvecback), &Rint, &csp2, &Gint);
   pvecback[index_bg_G_over_aH_drmd_] = Gint / (H * a);
 }
@@ -107,7 +109,9 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
           y[idm_drm_lay.idx_theta] = (idr_drm_lay.idx_theta >= 0) ? y[idr_drm_lay.idx_theta] : 0.;
         }
         else {
-          double Rint, csp2, Gint;
+          double Rint;
+          double csp2;
+          double Gint;
           auto* bgm = ctx.p_mod->GetBackgroundModule().get();
           ComputeIdmDrmd(ctx.ppw->pvecback[bgm->index_bg_a_],
                          idm_drmd_->Rho(ctx.ppw->pvecback.data()) /
@@ -198,8 +202,10 @@ void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
   // Chain first (children currently publish nothing) so a child that later gains
   // PrintVariables is picked up without editing this.
   CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
-  double delta_idm_drmd = 0., theta_idm_drmd = 0.;
-  double delta_idr_drmd = 0., theta_idr_drmd = 0.;
+  double delta_idm_drmd = 0.;
+  double theta_idm_drmd = 0.;
+  double delta_idr_drmd = 0.;
+  double theta_idr_drmd = 0.;
 
   if (!w.IsTitleMode()) {
     const double* pvecback   = ppw->pvecback.data();
@@ -282,7 +288,9 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
   if (rho_idm_drmd <= 0. || rho_idr_drmd <= 0.)
     return;
 
-  double Rint, csp2, Gint;
+  double Rint;
+  double csp2;
+  double Gint;
   ComputeIdmDrmd(ctx.a, rho_idm_drmd / rho_idr_drmd, &Rint, &csp2, &Gint);
 
   const auto& idm_drm_acc_lay = idm_drmd_layout(*pv->species_layouts[collection_index_]);
