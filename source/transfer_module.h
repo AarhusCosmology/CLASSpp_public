@@ -18,24 +18,35 @@ class TransferModule : public BaseModule {
   /** @name - number of modes and transfer function types */
   //@{
 
-  int index_tt_t0_;      /**< index for transfer type = temperature (j=0 term) */
-  int index_tt_t1_;      /**< index for transfer type = temperature (j=1 term) */
-  int index_tt_t2_;      /**< index for transfer type = temperature (j=2 term) */
-  int index_tt_e_;       /**< index for transfer type = E-polarization */
-  int index_tt_b_;       /**< index for transfer type = B-polarization */
-  int index_tt_lcmb_;    /**< index for transfer type = CMB lensing */
-  int index_tt_density_; /**< index for first bin of transfer type = matter density */
-  int index_tt_lensing_; /**< index for first bin of transfer type = galaxy lensing */
+  /* class_define_index assigns only the requested types; the others stay -1, and are still
+     read (transfer_type_properties passes every one of them by value) */
+  int index_tt_t0_      = -1; /**< index for transfer type = temperature (j=0 term) */
+  int index_tt_t1_      = -1; /**< index for transfer type = temperature (j=1 term) */
+  int index_tt_t2_      = -1; /**< index for transfer type = temperature (j=2 term) */
+  int index_tt_e_       = -1; /**< index for transfer type = E-polarization */
+  int index_tt_b_       = -1; /**< index for transfer type = B-polarization */
+  int index_tt_lcmb_    = -1; /**< index for transfer type = CMB lensing */
+  int index_tt_density_ = -1; /**< index for first bin of transfer type = matter density */
+  int index_tt_lensing_ = -1; /**< index for first bin of transfer type = galaxy lensing */
 
-  int index_tt_rsd_; /**< index for first bin of transfer type = redshift space distortion of number count */
-  int index_tt_d0_; /**< index for first bin of transfer type = doppler effect for of number count (j=0 term) */
-  int index_tt_d1_; /**< index for first bin of transfer type = doppler effect for of number count (j=1 term) */
-  int index_tt_nc_lens_; /**< index for first bin of transfer type = lensing for of number count */
-  int index_tt_nc_g1_; /**< index for first bin of transfer type = gravity term G1 for of number count */
-  int index_tt_nc_g2_; /**< index for first bin of transfer type = gravity term G2 for of number count */
-  int index_tt_nc_g3_; /**< index for first bin of transfer type = gravity term G3 for of number count */
-  int index_tt_nc_g4_; /**< index for first bin of transfer type = gravity term G3 for of number count */
-  int index_tt_nc_g5_; /**< index for first bin of transfer type = gravity term G3 for of number count */
+  int index_tt_rsd_ =
+      -1; /**< index for first bin of transfer type = redshift space distortion of number count */
+  int index_tt_d0_ =
+      -1; /**< index for first bin of transfer type = doppler effect for of number count (j=0 term) */
+  int index_tt_d1_ =
+      -1; /**< index for first bin of transfer type = doppler effect for of number count (j=1 term) */
+  int index_tt_nc_lens_ =
+      -1; /**< index for first bin of transfer type = lensing for of number count */
+  int index_tt_nc_g1_ =
+      -1; /**< index for first bin of transfer type = gravity term G1 for of number count */
+  int index_tt_nc_g2_ =
+      -1; /**< index for first bin of transfer type = gravity term G2 for of number count */
+  int index_tt_nc_g3_ =
+      -1; /**< index for first bin of transfer type = gravity term G3 for of number count */
+  int index_tt_nc_g4_ =
+      -1; /**< index for first bin of transfer type = gravity term G3 for of number count */
+  int index_tt_nc_g5_ =
+      -1; /**< index for first bin of transfer type = gravity term G3 for of number count */
 
   std::vector<int>
       tt_size_; /**< number of requested transfer types tt_size[index_md] for each mode */
