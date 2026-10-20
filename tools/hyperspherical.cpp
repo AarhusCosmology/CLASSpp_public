@@ -873,7 +873,7 @@ void hyperspherical_get_xmin_from_Airy(
   double Fnew, Fold, Fleft, Fright;
   double delx, lambda;
   double AIRY_SAFETY = 1e-6;
-  struct WKB_parameters wkbstruct;
+  struct WKB_parameters wkbstruct{};
   //Start searching from turning point:
   switch (K) {
     case -1:

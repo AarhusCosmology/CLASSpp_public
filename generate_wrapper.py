@@ -243,6 +243,7 @@ for file in h_files:
                     variable_name = words[1].strip(';')
                     if len(words) > 2 and words[2].startswith('['):
                         variable_name += words[2].strip(';')
+                    variable_name = variable_name.split('{')[0]  # drop a brace initialiser
                     if '*' in variable_name:
                         # It is a pointer, like this: double * a_pointer.
                         index_line += 1
@@ -252,10 +253,11 @@ for file in h_files:
                     variable_name = words[2].strip(';')
                     if len(words) > 3 and words[3].startswith('['):
                         variable_name += words[3].strip(';')
+                    variable_name = variable_name.split('{')[0]
                     structs.append('        ' + words[1] + ' ' + variable_name)
                 elif len(words)>1 and words[0] in enum_names:
                     # Scoped enum field: 'file_format output_format = ...'
-                    variable_name = words[1].strip(';')
+                    variable_name = words[1].strip(';').split('{')[0]
                     structs.append('        ' + words[0] + ' ' + variable_name)
                 index_line += 1
 
@@ -367,8 +369,10 @@ for file in h_files:
         bracket_count = 0
         is_function = False
         for index in range(variable_name_begin, len(line)):
+            # A brace initialiser (`int n{};`, `double a[3]{};`) ends the name as a space would.
             if ((line[index] == ' ' and parantheses_count == 0) or
-                (line[index] == ';' and parantheses_count == 0)):
+                (line[index] == ';' and parantheses_count == 0) or
+                (line[index] == '{' and parantheses_count == 0 and bracket_count == 0)):
                 if line[index] == ' ' and index + 1 < len(line) and line[index + 1] == '[':
                     continue
                 if bracket_count > 0:

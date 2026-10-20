@@ -6,7 +6,7 @@
 #include "common.h"
 
 struct generic_integrator_workspace {
-  int n;
+  int n = 0;
 
   std::vector<double> yscal;
   std::vector<double> y;
@@ -22,7 +22,7 @@ struct generic_integrator_workspace {
   std::vector<double> ak6;
   std::vector<double> ytemp;
 
-  double stepmin;
+  double stepmin = 0.0;
 };
 
 /**************************************************************/

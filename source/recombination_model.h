@@ -43,17 +43,17 @@ struct FundamentalConstants {
  */
 
 struct RecombinationState {
-  double z;     /**< redshift */
-  double x_H;   /**< HII fraction, relative to total hydrogen */
-  double x_He;  /**< HeII fraction, relative to total helium */
-  double x;     /**< x_H + f_He x_He, the free-electron fraction per hydrogen nucleus */
-  double n_H;   /**< hydrogen number density in m^-3 */
-  double H;     /**< Hubble rate in s^-1 */
-  double T_mat; /**< baryon temperature in K */
-  double T_rad; /**< photon temperature in K */
+  double z     = 0.0; /**< redshift */
+  double x_H   = 0.0; /**< HII fraction, relative to total hydrogen */
+  double x_He  = 0.0; /**< HeII fraction, relative to total helium */
+  double x     = 0.0; /**< x_H + f_He x_He, the free-electron fraction per hydrogen nucleus */
+  double n_H   = 0.0; /**< hydrogen number density in m^-3 */
+  double H     = 0.0; /**< Hubble rate in s^-1 */
+  double T_mat = 0.0; /**< baryon temperature in K */
+  double T_rad = 0.0; /**< photon temperature in K */
 
-  bool hydrogen_frozen; /**< hydrogen follows its Saha branch; report dx_H/dz = 0 */
-  bool helium_ode;      /**< helium is being evolved rather than held at Saha equilibrium */
+  bool hydrogen_frozen = false; /**< hydrogen follows its Saha branch; report dx_H/dz = 0 */
+  bool helium_ode      = false; /**< helium is being evolved rather than held at Saha equilibrium */
 
   FundamentalConstants constants; /**< alpha and m_e at z */
 };

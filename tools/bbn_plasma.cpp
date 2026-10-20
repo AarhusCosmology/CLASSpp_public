@@ -85,7 +85,7 @@ BbnEmState BbnPlasma::ElectromagneticState(double T_mev) const {
   const double t4 = t3 * T_mev;
 
   /* Photons: analytic. */
-  BbnEmState state;
+  BbnEmState state{};
   state.rho      = (_PI_ * _PI_ / 15.0) * t4;
   state.pressure = state.rho / 3.0;
   state.drho_dT  = 4.0 * state.rho / T_mev;

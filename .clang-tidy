@@ -21,7 +21,9 @@ Checks: >
 
 WarningsAsErrors: '*'
 
-HeaderFilterRegex: '^(?!.*hyrec/).*'
+# LLVM's regex has no lookahead: '^(?!.*hyrec/).*' silently matched almost no header.
+HeaderFilterRegex: '.*'
+ExcludeHeaderFilterRegex: 'hyrec/'
 
 CheckOptions:
 

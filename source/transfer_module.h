@@ -54,7 +54,7 @@ class TransferModule : public BaseModule {
 
   /** @name - number and list of multipoles */
   //@{
-  int l_size_max_; /**< greatest of all l_size[index_md] */
+  int l_size_max_ = 0; /**< greatest of all l_size[index_md] */
   std::vector<std::vector<int>>
       l_size_tt_; /**< number of multipole values for which we effectively compute the transfer function,l_size_tt[index_md][index_tt] */
   std::vector<int>
@@ -64,11 +64,12 @@ class TransferModule : public BaseModule {
 
   /** @name - number and list of wavenumbers */
   //@{
-  int q_size_;            /**< number of wavenumber values */
+  int q_size_ = 0;        /**< number of wavenumber values */
   std::vector<double> q_; /**< list of wavenumber values, q[index_q] */
   std::vector<std::vector<double>>
       k_; /**< list of wavenumber values for each requested mode, k[index_md][index_q]. In flat universes k=q. In non-flat universes q and k differ through q2 = k2 + K(1+m), where m=0,1,2 for scalar, vector, tensor. q should be used throughout the transfer module, excepted when interpolating or manipulating the source functions S(k,tau): for a given value of q this should be done in k(q). */
-  int index_q_flat_approximation_; /**< index of the first q value using the flat rescaling approximation */
+  int index_q_flat_approximation_ =
+      -1; /**< index of the first q value using the flat rescaling approximation */
   //@}
 
   /** @name - full Limber scheme for CMB lensing */
@@ -265,8 +266,8 @@ class TransferModule : public BaseModule {
   PerturbationsModulePtr perturbations_module_;
   NonlinearModulePtr nonlinear_module_;
 
-  bool has_cls_; /**< copy of same flag in perturbation structure */
-  int md_size_;  /**< number of modes included in computation */
+  bool has_cls_ = false; /**< copy of same flag in perturbation structure */
+  int md_size_  = 0;     /**< number of modes included in computation */
 
   /** @name - transfer types and time samplings, defined once before the loop over wavenumbers
    *  (see docs/superpowers/specs/2026-10-08-transfer-restructure-design.md) */
@@ -284,12 +285,12 @@ class TransferModule : public BaseModule {
       selection_tau_max_; /**< largest time at which the selection function of each bin is non-zero */
   //@}
 
-  int nz_size_;              /**< number of redshift values in input tabulated selection function */
+  int nz_size_ = 0;          /**< number of redshift values in input tabulated selection function */
   std::vector<double> nz_z_; /**< redshift values in input tabulated selection function */
   std::vector<double> nz_nz_;   /**< input tabulated values of selection function */
   std::vector<double> nz_ddnz_; /**< second derivatives in splined selection function*/
 
-  int nz_evo_size_; /**< number of redshift values in input tabulated evolution function */
+  int nz_evo_size_ = 0; /**< number of redshift values in input tabulated evolution function */
   std::vector<double> nz_evo_z_;       /**< redshift values in input tabulated evolution function */
   std::vector<double> nz_evo_nz_;      /**< input tabulated values of evolution function */
   std::vector<double> nz_evo_dlog_nz_; /**< log of tabulated values of evolution function */

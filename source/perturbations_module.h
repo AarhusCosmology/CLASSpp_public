@@ -98,10 +98,10 @@ class PerturbationsModule : public BaseModule {
 
   /** @name - indices running on modes (scalar, vector, tensor) */
   //@{
-  int index_md_scalars_; /**< index value for scalars */
-  int index_md_tensors_; /**< index value for tensors */
-  int index_md_vectors_; /**< index value for vectors */
-  int md_size_;          /**< number of modes included in computation */
+  int index_md_scalars_ = -1; /**< index value for scalars */
+  int index_md_tensors_ = -1; /**< index value for tensors */
+  int index_md_vectors_ = -1; /**< index value for vectors */
+  int md_size_          = 0;  /**< number of modes included in computation */
   //@}
   /** @name - indices running on initial conditions (for scalars: ad, cdi, nid, niv; for tensors: only one) */
   //@{
@@ -122,31 +122,32 @@ class PerturbationsModule : public BaseModule {
      terms that we call 0,1,2 (since the strategy in class v > 1.7 is
      to avoid the integration by part that would reduce the source to
      a single term) */
-  int index_tp_t0_;        /**< index value for temperature (j=0 term) */
-  int index_tp_t1_;        /**< index value for temperature (j=1 term) */
-  int index_tp_t2_;        /**< index value for temperature (j=2 term) */
-  int index_tp_p_;         /**< index value for polarization */
-  int index_tp_delta_tot_; /**< index value for total density fluctuation */
-  int index_tp_perturbed_recombination_delta_temp_; /**< Gas temperature perturbation */
-  int index_tp_perturbed_recombination_delta_chi_;  /**< Inionization fraction perturbation */
+  int index_tp_t0_        = -1; /**< index value for temperature (j=0 term) */
+  int index_tp_t1_        = -1; /**< index value for temperature (j=1 term) */
+  int index_tp_t2_        = -1; /**< index value for temperature (j=2 term) */
+  int index_tp_p_         = -1; /**< index value for polarization */
+  int index_tp_delta_tot_ = -1; /**< index value for total density fluctuation */
+  int index_tp_perturbed_recombination_delta_temp_ = -1; /**< Gas temperature perturbation */
+  int index_tp_perturbed_recombination_delta_chi_  = -1; /**< Inionization fraction perturbation */
 
-  int index_tp_theta_m_;   /**< index value for matter velocity fluctuation */
-  int index_tp_theta_cb_;  /**< index value for theta cb */
-  int index_tp_theta_tot_; /**< index value for total velocity fluctuation */
+  int index_tp_theta_m_   = -1; /**< index value for matter velocity fluctuation */
+  int index_tp_theta_cb_  = -1; /**< index value for theta cb */
+  int index_tp_theta_tot_ = -1; /**< index value for total velocity fluctuation */
 
-  int index_tp_phi_;          /**< index value for metric fluctuation phi */
-  int index_tp_phi_prime_;    /**< index value for metric fluctuation phi' */
-  int index_tp_phi_plus_psi_; /**< index value for metric fluctuation phi+psi */
-  int index_tp_psi_;          /**< index value for metric fluctuation psi */
-  int index_tp_h_;            /**< index value for metric fluctuation h */
-  int index_tp_h_prime_;      /**< index value for metric fluctuation h' */
-  int index_tp_eta_;          /**< index value for metric fluctuation eta */
-  int index_tp_eta_prime_;    /**< index value for metric fluctuation eta' */
-  int index_tp_H_T_Nb_prime_; /**< index value for metric fluctuation H_T_Nb' */
-  int index_tp_k2gamma_Nb_; /**< index value for metric fluctuation gamma times k^2 in Nbody gauge */
+  int index_tp_phi_          = -1; /**< index value for metric fluctuation phi */
+  int index_tp_phi_prime_    = -1; /**< index value for metric fluctuation phi' */
+  int index_tp_phi_plus_psi_ = -1; /**< index value for metric fluctuation phi+psi */
+  int index_tp_psi_          = -1; /**< index value for metric fluctuation psi */
+  int index_tp_h_            = -1; /**< index value for metric fluctuation h */
+  int index_tp_h_prime_      = -1; /**< index value for metric fluctuation h' */
+  int index_tp_eta_          = -1; /**< index value for metric fluctuation eta */
+  int index_tp_eta_prime_    = -1; /**< index value for metric fluctuation eta' */
+  int index_tp_H_T_Nb_prime_ = -1; /**< index value for metric fluctuation H_T_Nb' */
+  int index_tp_k2gamma_Nb_ =
+      -1; /**< index value for metric fluctuation gamma times k^2 in Nbody gauge */
 
-  int index_tp_delta_m_;  /**< index value for matter density fluctuation */
-  int index_tp_delta_cb_; /**< index value for delta cb */
+  int index_tp_delta_m_  = -1; /**< index value for matter density fluctuation */
+  int index_tp_delta_cb_ = -1; /**< index value for delta cb */
   std::vector<int>
       tp_size_; /**< number of types tp_size[index_md] included in computation for each mode */
 
@@ -165,25 +166,27 @@ class PerturbationsModule : public BaseModule {
        dTk/mTk/k_output is requested. */
   std::vector<char> species_emits_source_;
 
-  bool has_source_t_;            /**< do we need source for CMB temperature? */
-  bool has_source_p_;            /**< do we need source for CMB polarization? */
-  bool has_source_delta_m_;      /**< do we need source for delta of total matter? */
-  bool has_source_delta_cb_;     /**< do we ALSO need source for delta of ONLY cdm and baryon? */
-  bool has_source_delta_tot_;    /**< do we need source for delta total? */
-  bool has_source_theta_m_;      /**< do we need source for theta of total matter? */
-  bool has_source_theta_cb_;     /**< do we ALSO need source for theta of ONLY cdm and baryon? */
-  bool has_source_theta_tot_;    /**< do we need source for theta total? */
-  bool has_source_phi_;          /**< do we need source for metric fluctuation phi? */
-  bool has_source_phi_prime_;    /**< do we need source for metric fluctuation phi'? */
-  bool has_source_phi_plus_psi_; /**< do we need source for metric fluctuation (phi+psi)? */
-  bool has_source_psi_;          /**< do we need source for metric fluctuation psi? */
-  bool has_source_h_;            /**< do we need source for metric fluctuation h? */
-  bool has_source_h_prime_;      /**< do we need source for metric fluctuation h'? */
-  bool has_source_eta_;          /**< do we need source for metric fluctuation eta? */
-  bool has_source_eta_prime_;    /**< do we need source for metric fluctuation eta'? */
-  bool has_source_H_T_Nb_prime_; /**< do we need source for metric fluctuation H_T_Nb'? */
-  bool
-      has_source_k2gamma_Nb_; /**< do we need source for metric fluctuation gamma in Nbody gauge? */
+  bool has_source_t_       = false; /**< do we need source for CMB temperature? */
+  bool has_source_p_       = false; /**< do we need source for CMB polarization? */
+  bool has_source_delta_m_ = false; /**< do we need source for delta of total matter? */
+  bool has_source_delta_cb_ =
+      false; /**< do we ALSO need source for delta of ONLY cdm and baryon? */
+  bool has_source_delta_tot_ = false; /**< do we need source for delta total? */
+  bool has_source_theta_m_   = false; /**< do we need source for theta of total matter? */
+  bool has_source_theta_cb_ =
+      false; /**< do we ALSO need source for theta of ONLY cdm and baryon? */
+  bool has_source_theta_tot_    = false; /**< do we need source for theta total? */
+  bool has_source_phi_          = false; /**< do we need source for metric fluctuation phi? */
+  bool has_source_phi_prime_    = false; /**< do we need source for metric fluctuation phi'? */
+  bool has_source_phi_plus_psi_ = false; /**< do we need source for metric fluctuation (phi+psi)? */
+  bool has_source_psi_          = false; /**< do we need source for metric fluctuation psi? */
+  bool has_source_h_            = false; /**< do we need source for metric fluctuation h? */
+  bool has_source_h_prime_      = false; /**< do we need source for metric fluctuation h'? */
+  bool has_source_eta_          = false; /**< do we need source for metric fluctuation eta? */
+  bool has_source_eta_prime_    = false; /**< do we need source for metric fluctuation eta'? */
+  bool has_source_H_T_Nb_prime_ = false; /**< do we need source for metric fluctuation H_T_Nb'? */
+  bool has_source_k2gamma_Nb_ =
+      false; /**< do we need source for metric fluctuation gamma in Nbody gauge? */
 
   /** @name - arrays storing the evolution of all sources for given k values, passed as k_output_values */
   //@{
@@ -206,11 +209,11 @@ class PerturbationsModule : public BaseModule {
       [_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for tensors */
 
   int size_scalar_perturbation_data_
-      [_MAX_NUMBER_OF_K_FILES_]; /**< Array of sizes of scalar double pointers  */
+      [_MAX_NUMBER_OF_K_FILES_]{}; /**< Array of sizes of scalar double pointers  */
   int size_vector_perturbation_data_
-      [_MAX_NUMBER_OF_K_FILES_]; /**< Array of sizes of vector double pointers  */
+      [_MAX_NUMBER_OF_K_FILES_]{}; /**< Array of sizes of vector double pointers  */
   int size_tensor_perturbation_data_
-      [_MAX_NUMBER_OF_K_FILES_]; /**< Array of sizes of tensor double pointers  */
+      [_MAX_NUMBER_OF_K_FILES_]{}; /**< Array of sizes of tensor double pointers  */
   //@}
 
   /** @name - source functions interpolation table */
@@ -229,7 +232,7 @@ class PerturbationsModule : public BaseModule {
   std::vector<double>
       ln_tau_; /**< log of the arrau tau_sampling, covering only the final time range required for the output of
                             Fourier transfer functions (used for interpolations) */
-  int ln_tau_size_; /**< number of values in this array */
+  int ln_tau_size_ = 0; /**< number of values in this array */
 
   //@}
 
@@ -246,7 +249,7 @@ class PerturbationsModule : public BaseModule {
   EvolverStats evolver_stats_;
   ErkHistograms erk_histograms_;
   std::mutex evolver_stats_mutex_; /**< guards the two above; taken once per task */
-  int tau_size_;                   /**< number of values in this array */
+  int tau_size_ = 0;               /**< number of values in this array */
 
   std::vector<int> k_size_cl_;         /**< k_size_cl[index_md] number of k values used
                        for non-CMB \f$ C_l \f$ calculations, requiring a coarse
@@ -255,8 +258,8 @@ class PerturbationsModule : public BaseModule {
                        values, including those needed for P(k) but not
                        for \f$ C_l \f$'s */
   std::vector<std::vector<double>> k_; /**< k[index_md][index_k] = list of values */
-  double k_min_;                       /**< minimum value (over all modes) */
-  double k_max_;                       /**< maximum value (over all modes) */
+  double k_min_ = 0.0;                 /**< minimum value (over all modes) */
+  double k_max_ = 0.0;                 /**< maximum value (over all modes) */
 
  private:
   void perturb_store_columns(file_format output_format,
@@ -334,17 +337,17 @@ class PerturbationsModule : public BaseModule {
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;
-  short
-      evolve_tensor_ur_; /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */
-  short
-      evolve_tensor_ncdm_; /**< will we evolve ncdm tensor perturbations (if we have ncdm species and we use the exact method) ? */
+  short evolve_tensor_ur_ =
+      0; /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */
+  short evolve_tensor_ncdm_ =
+      0; /**< will we evolve ncdm tensor perturbations (if we have ncdm species and we use the exact method) ? */
 
   /** @name - useful flags  */
 
   //@{
 
-  bool has_cmb_; /**< do we need CMB-related sources (temperature, polarization) ? */
-  bool has_lss_; /**< do we need LSS-related sources (lensing potential, ...) ? */
+  bool has_cmb_ = false; /**< do we need CMB-related sources (temperature, polarization) ? */
+  bool has_lss_ = false; /**< do we need LSS-related sources (lensing potential, ...) ? */
 
   //@}
 
@@ -360,9 +363,12 @@ class PerturbationsModule : public BaseModule {
                                             [index_tau * perturbations_module_->k_size_ + index_k] */
 
   //@}
-  int number_of_scalar_titles_; /**< number of titles/columns in scalar perturbation output files */
-  int number_of_vector_titles_; /**< number of titles/columns in vector perturbation output files*/
-  int number_of_tensor_titles_; /**< number of titles/columns in tensor perturbation output files*/
+  int number_of_scalar_titles_ =
+      0; /**< number of titles/columns in scalar perturbation output files */
+  int number_of_vector_titles_ =
+      0; /**< number of titles/columns in vector perturbation output files*/
+  int number_of_tensor_titles_ =
+      0; /**< number of titles/columns in tensor perturbation output files*/
 
   /** @name - list of k values for each mode */
 
@@ -384,11 +390,11 @@ class PerturbationsModule : public BaseModule {
 struct perturb_parameters_and_workspace {
   perturb_parameters_and_workspace(PerturbationsModule* p_m) : perturbations_module(p_m) {}
   PerturbationsModule* const perturbations_module;
-  int index_md;           /**< index of mode (scalar/.../vector/tensor) */
-  int index_ic;           /**< index of initial condition (adiabatic/isocurvature(s)/...) */
-  int index_k;            /**< index of wavenumber */
-  double k;               /**< current value of wavenumber in 1/Mpc */
-  perturb_workspace* ppw; /**< workspace defined above */
+  int index_md           = -1;  /**< index of mode (scalar/.../vector/tensor) */
+  int index_ic           = -1;  /**< index of initial condition (adiabatic/isocurvature(s)/...) */
+  int index_k            = -1;  /**< index of wavenumber */
+  double k               = 0.0; /**< current value of wavenumber in 1/Mpc */
+  perturb_workspace* ppw = nullptr; /**< workspace defined above */
 };
 
 #endif  //PERTURBATIONS_MODULE_H

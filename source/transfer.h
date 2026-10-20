@@ -148,7 +148,7 @@ enum class TransferMethod {
  * \f$ S^{Y(X)}(k(q),\tau) \, W^X(\tau) \, (k/k_{pivot})^{k_{power}} \f$ for every type.
  */
 struct TransferType {
-  TransferTerm term;                     /**< physical contribution */
+  TransferTerm term{};                   /**< physical contribution */
   int index_tp                     = -1; /**< index of the perturbation source Y(X) */
   int bin                          = -1; /**< redshift bin (-1 for CMB types) */
   int l_max                        = 0;  /**< largest multipole needed */

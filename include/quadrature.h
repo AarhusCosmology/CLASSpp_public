@@ -37,11 +37,11 @@ struct GBQuadParams {
 
 typedef struct adaptive_integration_tree_node {
   /* binary tree node: */
-  double I;              /* Estimate of integral */
-  double err;            /* Estimated error */
+  double I   = 0.0;      /* Estimate of integral */
+  double err = 0.0;      /* Estimated error */
   std::vector<double> x; /* Pointer to the abscissas of node */
   std::vector<double> w; /* Pointer to the corresponding weights */
-  int leaf_childs;       /* Number of leafs under current node. 1 means that the node is a leaf. */
+  int leaf_childs = 0;   /* Number of leafs under current node. 1 means that the node is a leaf. */
   /* Pointer to children: */
   std::unique_ptr<struct adaptive_integration_tree_node> left, right; /* Pointer to left child. */
 } qss_node;

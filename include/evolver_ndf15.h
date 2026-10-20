@@ -18,18 +18,19 @@ struct jacobian {
   std::vector<double> LUw;
   std::vector<int> luidx;
   /*Sparse stuff:*/
-  int use_sparse;
-  int sparse_stuff_initialized;
-  int max_nonzero; /*Maximal number of non-zero entries to be considered sparse */
-  int repeated_pattern;
-  int trust_sparse; /* Number of times a pattern is repeated (actually included) before we trust it. */
-  int has_grouping;
-  int has_pattern;
-  int new_jacobian; /* True if sp_ludcmp has not been run on the current jacobian. */
-  int cnzmax;
+  int use_sparse               = 0;
+  int sparse_stuff_initialized = 0;
+  int max_nonzero              = 0; /*Maximal number of non-zero entries to be considered sparse */
+  int repeated_pattern         = 0;
+  int trust_sparse =
+      0; /* Number of times a pattern is repeated (actually included) before we trust it. */
+  int has_grouping = 0;
+  int has_pattern  = 0;
+  int new_jacobian = 0; /* True if sp_ludcmp has not been run on the current jacobian. */
+  int cnzmax       = 0;
   std::vector<int> col_group;  /* Column grouping. Groups go from 0 to max_group*/
   std::vector<int> col_wi;     /* Workarray for column grouping*/
-  int max_group;               /*Number of columngroups -1 */
+  int max_group = 0;           /*Number of columngroups -1 */
   std::unique_ptr<sp_mat> spJ; /* Stores the matrix we want to decompose */
   std::vector<double> xjac;    /*Stores the values of the sparse jacobian. (Same pattern as spJ) */
   std::unique_ptr<sp_num> Numerical; /*Stores the LU decomposition.*/

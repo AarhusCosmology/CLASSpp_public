@@ -3306,7 +3306,7 @@ void NonlinearModule::nonlinear_hmcode_noradiation_growth(struct nonlinear_works
              "HMcode 2016 (hmcode_version = 2016) or Halofit",
              Omega_other);
 
-  HMcodeNoRadiation cosmology;
+  HMcodeNoRadiation cosmology{};
   cosmology.Omega_cdm  = background_module_->Omega0_m_ - pba->Omega0_b;
   cosmology.Omega_b    = pba->Omega0_b;
   cosmology.Omega_v    = Omega_v;

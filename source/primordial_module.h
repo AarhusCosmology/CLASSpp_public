@@ -22,29 +22,29 @@ class PrimordialModule : public BaseModule {
   std::vector<int>
       ic_ic_size_; /**< number of ordered pairs of (index_ic1, index_ic2); this number is just N(N+1)/2  where N = ic_size[index_md] */
   std::vector<std::vector<short>>
-      is_non_zero_; /**< is_non_zero[index_md][index_ic1_ic2] set to false if pair
+      is_non_zero_;  /**< is_non_zero[index_md][index_ic1_ic2] set to false if pair
                           (index_ic1, index_ic2) is uncorrelated
                           (ensures more precision and saves time with respect to the option
                           of simply setting P(k)_(index_ic1, index_ic2) to zero) */
-  int lnk_size_;    /**< number of ln(k) values */
+  int lnk_size_ = 0; /**< number of ln(k) values */
 
   /** @name - derived parameters */
   //@{
-  double phi_pivot_; /**< in inflationary module, value of
+  double phi_pivot_ = 0.0; /**< in inflationary module, value of
                             phi_pivot (set to 0 for inflation_V,
                             inflation_H; found by code for
                             inflation_V_end) */
-  double phi_min_;   /**< in inflationary module, value of phi when \f$ k_{min}=aH \f$*/
-  double phi_max_;   /**< in inflationary module, value of phi when \f$ k_{max}=aH \f$*/
-  double phi_stop_;  /**< in inflationary module, value of phi at the end of inflation */
+  double phi_min_   = 0.0; /**< in inflationary module, value of phi when \f$ k_{min}=aH \f$*/
+  double phi_max_   = 0.0; /**< in inflationary module, value of phi when \f$ k_{max}=aH \f$*/
+  double phi_stop_  = 0.0; /**< in inflationary module, value of phi at the end of inflation */
   //@}
-  double A_s_;
-  double n_s_;
-  double alpha_s_;
-  double beta_s_;
-  double r_;
-  double n_t_;
-  double alpha_t_;
+  double A_s_     = 0.0;
+  double n_s_     = 0.0;
+  double alpha_s_ = 0.0;
+  double beta_s_  = 0.0;
+  double r_       = 0.0;
+  double n_t_     = 0.0;
+  double alpha_t_ = 0.0;
 
  private:
   void primordial_init();
@@ -91,7 +91,7 @@ class PrimordialModule : public BaseModule {
   /** @name - pre-computed table of primordial spectra, and related quantities */
 
   //@{
-  int md_size_;             /**< number of modes included in computation */
+  int md_size_ = 0;         /**< number of modes included in computation */
   std::vector<double> lnk_; /**< list of ln(k) values lnk[index_k] */
   std::vector<std::vector<double>>
       lnpk_; /**< depends on indices index_md, index_ic1, index_ic2, index_k as:
@@ -133,19 +133,19 @@ class PrimordialModule : public BaseModule {
   //@{
   /** @name - for the inflation simulator, indices in vector of
       background/perturbation */
-  int index_in_a_;       /**< scale factor */
-  int index_in_phi_;     /**< inflaton vev */
-  int index_in_dphi_;    /**< its time derivative */
-  int index_in_ksi_re_;  /**< Mukhanov variable (real part) */
-  int index_in_ksi_im_;  /**< Mukhanov variable (imaginary part) */
-  int index_in_dksi_re_; /**< Mukhanov variable (real part, time derivative) */
-  int index_in_dksi_im_; /**< Mukhanov variable (imaginary part, time derivative) */
-  int index_in_ah_re_;   /**< tensor perturbation (real part) */
-  int index_in_ah_im_;   /**< tensor perturbation (imaginary part) */
-  int index_in_dah_re_;  /**< tensor perturbation (real part, time derivative) */
-  int index_in_dah_im_;  /**< tensor perturbation (imaginary part, time derivative) */
-  int in_bg_size_;       /**< size of vector of background quantities only */
-  int in_size_;          /**< full size of vector */
+  int index_in_a_       = -1; /**< scale factor */
+  int index_in_phi_     = -1; /**< inflaton vev */
+  int index_in_dphi_    = -1; /**< its time derivative */
+  int index_in_ksi_re_  = -1; /**< Mukhanov variable (real part) */
+  int index_in_ksi_im_  = -1; /**< Mukhanov variable (imaginary part) */
+  int index_in_dksi_re_ = -1; /**< Mukhanov variable (real part, time derivative) */
+  int index_in_dksi_im_ = -1; /**< Mukhanov variable (imaginary part, time derivative) */
+  int index_in_ah_re_   = -1; /**< tensor perturbation (real part) */
+  int index_in_ah_im_   = -1; /**< tensor perturbation (imaginary part) */
+  int index_in_dah_re_  = -1; /**< tensor perturbation (real part, time derivative) */
+  int index_in_dah_im_  = -1; /**< tensor perturbation (imaginary part, time derivative) */
+  int in_bg_size_       = 0;  /**< size of vector of background quantities only */
+  int in_size_          = 0;  /**< full size of vector */
   //@}
 };
 

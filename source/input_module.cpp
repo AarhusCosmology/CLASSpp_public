@@ -422,7 +422,7 @@ void InputModule::SelectPerturbationEvolver() {
 void InputModule::ConstructSpecies() {
   background* pba = &background_;  // need non-const to write closure Omega
 
-  NcdmSettings ncdm_settings;
+  NcdmSettings ncdm_settings{};
   ncdm_settings.h     = pba->h;
   ncdm_settings.T_cmb = pba->T_cmb;
   // The ncdm perturbation momentum grid is gauge-dependent: synchronous gauge
@@ -3438,7 +3438,7 @@ ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
   // guessed their unknowns at construction; query them for {target, guess} here.
   // SpeciesBuildContext::ncdm_settings is non-null by contract (some guesses fall back to
   // it when ppr is unavailable); build it from the module as ConstructSpecies does.
-  NcdmSettings ncdm_settings;
+  NcdmSettings ncdm_settings{};
   ncdm_settings.h     = input_module->background_.h;
   ncdm_settings.T_cmb = input_module->background_.T_cmb;
   // Gauge-dependent ncdm momentum tolerance (see ConstructSpecies for rationale).

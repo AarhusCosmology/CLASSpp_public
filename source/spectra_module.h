@@ -24,7 +24,7 @@ class SpectraModule : public BaseModule {
   /** @name - information on number of modes and pairs of initial conditions */
 
   //@{
-  int md_size_; /**< number of modes (scalar, tensor, ...) included in computation */
+  int md_size_ = 0; /**< number of modes (scalar, tensor, ...) included in computation */
   std::vector<int>
       ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
   std::vector<int>
@@ -51,25 +51,27 @@ class SpectraModule : public BaseModule {
   bool has_tl_ = false; /**< do we want \f$ C_l^{Tl}\f$? */
   bool has_dl_ = false; /**< do we want \f$ C_l^{dl}\f$? */
 
-  int index_ct_tt_; /**< index for type \f$ C_l^{TT} \f$*/
-  int index_ct_ee_; /**< index for type \f$ C_l^{EE} \f$*/
-  int index_ct_te_; /**< index for type \f$ C_l^{TE} \f$*/
-  int index_ct_bb_; /**< index for type \f$ C_l^{BB} \f$*/
-  int index_ct_pp_; /**< index for type \f$ C_l^{\phi\phi} \f$*/
-  int index_ct_tp_; /**< index for type \f$ C_l^{T\phi} \f$*/
-  int index_ct_ep_; /**< index for type \f$ C_l^{E\phi} \f$*/
-  int index_ct_dd_; /**< first index for type \f$ C_l^{dd} \f$((d_size*d_size-(d_size-non_diag)*(d_size-non_diag-1)/2) values) */
-  int index_ct_td_; /**< first index for type \f$ C_l^{Td} \f$(d_size values) */
-  int index_ct_pd_; /**< first index for type \f$ C_l^{pd} \f$(d_size values) */
-  int index_ct_ll_; /**< first index for type \f$ C_l^{ll} \f$((d_size*d_size-(d_size-non_diag)*(d_size-non_diag-1)/2) values) */
-  int index_ct_tl_; /**< first index for type \f$ C_l^{Tl} \f$(d_size values) */
-  int index_ct_dl_; /**< first index for type \f$ C_l^{dl} \f$(d_size values) */
+  int index_ct_tt_ = -1; /**< index for type \f$ C_l^{TT} \f$*/
+  int index_ct_ee_ = -1; /**< index for type \f$ C_l^{EE} \f$*/
+  int index_ct_te_ = -1; /**< index for type \f$ C_l^{TE} \f$*/
+  int index_ct_bb_ = -1; /**< index for type \f$ C_l^{BB} \f$*/
+  int index_ct_pp_ = -1; /**< index for type \f$ C_l^{\phi\phi} \f$*/
+  int index_ct_tp_ = -1; /**< index for type \f$ C_l^{T\phi} \f$*/
+  int index_ct_ep_ = -1; /**< index for type \f$ C_l^{E\phi} \f$*/
+  int index_ct_dd_ =
+      -1; /**< first index for type \f$ C_l^{dd} \f$((d_size*d_size-(d_size-non_diag)*(d_size-non_diag-1)/2) values) */
+  int index_ct_td_ = -1; /**< first index for type \f$ C_l^{Td} \f$(d_size values) */
+  int index_ct_pd_ = -1; /**< first index for type \f$ C_l^{pd} \f$(d_size values) */
+  int index_ct_ll_ =
+      -1; /**< first index for type \f$ C_l^{ll} \f$((d_size*d_size-(d_size-non_diag)*(d_size-non_diag-1)/2) values) */
+  int index_ct_tl_ = -1; /**< first index for type \f$ C_l^{Tl} \f$(d_size values) */
+  int index_ct_dl_ = -1; /**< first index for type \f$ C_l^{dl} \f$(d_size values) */
 
   int ct_size_ = 0; /**< number of \f$ C_l \f$ types requested */
   int d_size_  = 0; /**< number of bins for which density Cl's are computed */
   //@}
 
-  int l_size_max_;                         /**< greatest of all l_size[index_md] */
+  int l_size_max_ = 0;                     /**< greatest of all l_size[index_md] */
   std::vector<double> l_;                  /**< list of multipole values l[index_l] */
   std::vector<std::vector<int>> l_max_ct_; /**< last multipole (given as an input) at which
                          we want to output \f$ C_l\f$'s for a given mode and type;
@@ -133,7 +135,7 @@ class SpectraModule : public BaseModule {
   NonlinearModulePtr nonlinear_module_;
   TransferModulePtr transfer_module_;
 
-  int index_md_scalars_; /**< index for scalar modes */
+  int index_md_scalars_ = -1; /**< index for scalar modes */
 
   /** @name - table of pre-computed C_l values, and related quantities */
 

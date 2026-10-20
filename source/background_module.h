@@ -60,61 +60,63 @@ class BackgroundModule : public BaseModule {
 
   //@{
 
-  int index_bg_a_;       /**< scale factor */
-  int index_bg_H_;       /**< Hubble parameter in \f$Mpc^{-1}\f$ */
-  int index_bg_H_prime_; /**< its derivative w.r.t. conformal time */
+  int index_bg_a_       = -1; /**< scale factor */
+  int index_bg_H_       = -1; /**< Hubble parameter in \f$Mpc^{-1}\f$ */
+  int index_bg_H_prime_ = -1; /**< its derivative w.r.t. conformal time */
 
   /* end of vector in short format, now quantities in normal format */
 
-  int index_bg_rho_tot_;     /**< Total density */
-  int index_bg_p_tot_;       /**< Total pressure */
-  int index_bg_p_tot_prime_; /**< Conf. time derivative of total pressure */
+  int index_bg_rho_tot_     = -1; /**< Total density */
+  int index_bg_p_tot_       = -1; /**< Total pressure */
+  int index_bg_p_tot_prime_ = -1; /**< Conf. time derivative of total pressure */
 
-  int index_bg_Omega_r_; /**< relativistic density fraction (\f$ \Omega_{\gamma} + \Omega_{\nu r} \f$) */
+  int index_bg_Omega_r_ =
+      -1; /**< relativistic density fraction (\f$ \Omega_{\gamma} + \Omega_{\nu r} \f$) */
 
   /* end of vector in normal format, now quantities in long format */
 
-  int index_bg_rho_crit_; /**< critical density */
-  int index_bg_Omega_m_; /**< non-relativistic density fraction (\f$ \Omega_b + \Omega_cdm + \Omega_{\nu nr} \f$) */
-  int index_bg_conf_distance_; /**< conformal distance (from us) in Mpc */
-  int index_bg_ang_distance_;  /**< angular diameter distance in Mpc */
-  int index_bg_lum_distance_;  /**< luminosity distance in Mpc */
-  int index_bg_time_;          /**< proper (cosmological) time in Mpc */
-  int index_bg_rs_;            /**< comoving sound horizon in Mpc */
+  int index_bg_rho_crit_ = -1; /**< critical density */
+  int index_bg_Omega_m_ =
+      -1; /**< non-relativistic density fraction (\f$ \Omega_b + \Omega_cdm + \Omega_{\nu nr} \f$) */
+  int index_bg_conf_distance_ = -1; /**< conformal distance (from us) in Mpc */
+  int index_bg_ang_distance_  = -1; /**< angular diameter distance in Mpc */
+  int index_bg_lum_distance_  = -1; /**< luminosity distance in Mpc */
+  int index_bg_time_          = -1; /**< proper (cosmological) time in Mpc */
+  int index_bg_rs_            = -1; /**< comoving sound horizon in Mpc */
 
-  int index_bg_D_; /**< scale independent growth factor D(a) for CDM perturbations */
-  int index_bg_f_; /**< corresponding velocity growth factor [dlnD]/[dln a] */
+  int index_bg_D_ = -1; /**< scale independent growth factor D(a) for CDM perturbations */
+  int index_bg_f_ = -1; /**< corresponding velocity growth factor [dlnD]/[dln a] */
 
-  int bg_size_short_;  /**< size of background vector in the "short format" */
-  int bg_size_normal_; /**< size of background vector in the "normal format" */
-  int bg_size_;        /**< size of background vector in the "long format" */
+  int bg_size_short_  = 0; /**< size of background vector in the "short format" */
+  int bg_size_normal_ = 0; /**< size of background vector in the "normal format" */
+  int bg_size_        = 0; /**< size of background vector in the "long format" */
 
   //@}
-  int bt_size_; /**< number of lines (i.e. time-steps) in the array */
+  int bt_size_ = 0; /**< number of lines (i.e. time-steps) in the array */
   std::vector<double>
       tau_table_; /**< vector tau_table[index_tau] with values of \f$ \tau \f$ (conformal time) */
   std::vector<double>
       background_table_; /**< table background_table[index_tau*bg_size_+pba->index_bg] with all other quantities (array of size bg_size*bt_size) **/
 
-  double conformal_age_; /**< conformal age in Mpc */
-  double
-      Neff_; /**< so-called "effective neutrino number", computed at earliest time in interpolation table */
-  double a_eq_;     /**< scale factor at radiation/matter equality */
-  double H_eq_;     /**< Hubble rate at radiation/matter equality [Mpc^-1] */
-  double Omega0_m_; /**< total non-relativistic matter today */
-  double
-      Omega0_de_; /**< total dark energy density today, currently defined as 1 - Omega0_m - Omega0_r - Omega0_k */
+  double conformal_age_ = 0.0; /**< conformal age in Mpc */
+  double Neff_ =
+      0.0; /**< so-called "effective neutrino number", computed at earliest time in interpolation table */
+  double a_eq_     = 0.0; /**< scale factor at radiation/matter equality */
+  double H_eq_     = 0.0; /**< Hubble rate at radiation/matter equality [Mpc^-1] */
+  double Omega0_m_ = 0.0; /**< total non-relativistic matter today */
+  double Omega0_de_ =
+      0.0; /**< total dark energy density today, currently defined as 1 - Omega0_m - Omega0_r - Omega0_k */
 
-  double age_;         /**< age in Gyears */
-  double Omega0_r_;    /**< total ultra-relativistic radiation today */
-  double z_eq_;        /**< redshift at radiation/matter equality */
-  double tau_eq_;      /**< conformal time at radiation/matter equality [Mpc] */
-  double Omega0_dcdm_; /**< \f$ \Omega_{0 dcdm} \f$: decaying cold dark matter */
-  double Omega0_dr_;   /**< \f$ \Omega_{0 dr} \f$: decay radiation */
+  double age_         = 0.0; /**< age in Gyears */
+  double Omega0_r_    = 0.0; /**< total ultra-relativistic radiation today */
+  double z_eq_        = 0.0; /**< redshift at radiation/matter equality */
+  double tau_eq_      = 0.0; /**< conformal time at radiation/matter equality [Mpc] */
+  double Omega0_dcdm_ = 0.0; /**< \f$ \Omega_{0 dcdm} \f$: decaying cold dark matter */
+  double Omega0_dr_   = 0.0; /**< \f$ \Omega_{0 dr} \f$: decay radiation */
 
-  double Omega0_idr_drmd_;
-  double Omega0_idm_drmd_;
-  double Omega0_idm_;
+  double Omega0_idr_drmd_ = 0.0;
+  double Omega0_idm_drmd_ = 0.0;
+  double Omega0_idm_      = 0.0;
 
   // DRMD diagnostics exposed to the Python wrapper. The data now lives on
   // IDM_DRMD_IDR_DRMD_Species (#319); these delegate to it (neutral values if
@@ -208,16 +210,17 @@ class BackgroundModule : public BaseModule {
 
   //@{
 
-  int index_bi_a_; /**< {B} scale factor */
+  int index_bi_a_ = -1; /**< {B} scale factor */
 
-  int index_bi_time_;    /**< {C} proper (cosmological) time in Mpc */
-  int index_bi_rs_;      /**< {C} sound horizon */
-  int index_bi_tau_;     /**< {C} conformal time in Mpc */
-  int index_bi_D_;       /**< {C} scale independent growth factor D(a) for CDM perturbations. */
-  int index_bi_D_prime_; /**< {C} D satisfies \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
+  int index_bi_time_ = -1; /**< {C} proper (cosmological) time in Mpc */
+  int index_bi_rs_   = -1; /**< {C} sound horizon */
+  int index_bi_tau_  = -1; /**< {C} conformal time in Mpc */
+  int index_bi_D_    = -1; /**< {C} scale independent growth factor D(a) for CDM perturbations. */
+  int index_bi_D_prime_ =
+      -1; /**< {C} D satisfies \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
 
-  int bi_B_size_; /**< Number of {B} parameters */
-  int bi_size_;   /**< Number of {B}+{C} parameters */
+  int bi_B_size_ = 0; /**< Number of {B} parameters */
+  int bi_size_   = 0; /**< Number of {B}+{C} parameters */
 
   //@}
 
@@ -249,7 +252,7 @@ class BackgroundModule : public BaseModule {
 struct background_parameters_and_workspace {
   background_parameters_and_workspace(BackgroundModule* b_m) : background_module(b_m) {}
   BackgroundModule* const background_module;
-  double* pvecback;
+  double* pvecback = nullptr;
 };
 
 #endif  //BACKGROUND_MODULE_H

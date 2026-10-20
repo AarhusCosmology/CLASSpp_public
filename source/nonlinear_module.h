@@ -67,7 +67,7 @@ class NonlinearModule : public BaseModule {
   void nonlinear_sigma_at_z(
       double R, double z, int index_pk, double k_per_decade, double* result) const;
 
-  int k_size_;               /**< k_size = total number of k values */
+  int k_size_ = 0;           /**< k_size = total number of k values */
   std::vector<double> ln_k_; /**< ln_k[index_k] = list of log(k) values */
 
   std::vector<std::vector<double>>
@@ -75,24 +75,26 @@ class NonlinearModule : public BaseModule {
 
   std::vector<short>
       is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
-  int ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
-  int ic_ic_size_; /**< for a given mode, ic_ic_size[index_md] = number of pairs of (index_ic1, index_ic2) with index_ic2 >= index_ic1; this number is just N(N+1)/2  where N = ic_size[index_md] */
+  int ic_size_ =
+      0; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
+  int ic_ic_size_ =
+      0; /**< for a given mode, ic_ic_size[index_md] = number of pairs of (index_ic1, index_ic2) with index_ic2 >= index_ic1; this number is just N(N+1)/2  where N = ic_size[index_md] */
   bool has_pk_m_  = false; /**< do we want spectra for total matter? */
   bool has_pk_cb_ = false; /**< do we want spectra for cdm+baryons? */
 
-  int index_pk_m_  = 0; /**< index of pk for matter (meaningful only when has_pk_m_) */
-  int index_pk_cb_ = 0; /**< index of pk for cdm+baryons (meaningful only when has_pk_cb_) */
+  int index_pk_m_  = -1; /**< index of pk for matter (meaningful only when has_pk_m_) */
+  int index_pk_cb_ = -1; /**< index of pk for cdm+baryons (meaningful only when has_pk_cb_) */
 
   /* and two redundent but useful indices: */
 
-  int index_pk_total_   = 0; /**< always equal to index_pk_m
+  int index_pk_total_   = -1; /**< always equal to index_pk_m
                                   (always defined, useful e.g. for weak lensing spectrum) */
-  int index_pk_cluster_ = 0; /**< equal to index_pk_cb if it exists, otherwise to index_pk_m
+  int index_pk_cluster_ = -1; /**< equal to index_pk_cb if it exists, otherwise to index_pk_m
                                   (always defined, useful e.g. for galaxy clustering spectrum).
                                   delta_cb is the cold part of delta_m, so without warm matter
                                   P_cb is P_m and is stored only once */
 
-  int pk_size_;                /**< k_size = total number of pk */
+  int pk_size_ = 0;            /**< k_size = total number of pk */
   std::vector<double> sigma8_; /**< sigma8[index_pk] */
 
  private:
@@ -196,7 +198,7 @@ class NonlinearModule : public BaseModule {
 
   //@{
 
-  bool has_pk_matter_; /**< do we need matter Fourier spectrum? */
+  bool has_pk_matter_ = false; /**< do we need matter Fourier spectrum? */
 
   std::vector<double> k_; /**< k[index_k] = list of k values */
 
@@ -206,7 +208,7 @@ class NonlinearModule : public BaseModule {
                         output of P(k) or T(k), and matching the
                         condition z(tau) < z_max_pk */
 
-  int ln_tau_size_; /**< number of values in this array */
+  int ln_tau_size_ = 0; /**< number of values in this array */
 
   std::vector<std::vector<double>> ln_pk_ic_l_; /**< Matter power spectrum (linear).
                              Depends on indices index_pk, index_ic1_ic2, index_k, index_tau as:
@@ -259,16 +261,17 @@ class NonlinearModule : public BaseModule {
 
   //@{
 
-  int k_size_extra_; /** total number of k values of extrapolated k array (high k)*/
+  int k_size_extra_ = 0; /** total number of k values of extrapolated k array (high k)*/
 
-  int tau_size_;            /**< tau_size = number of values */
+  int tau_size_ = 0;        /**< tau_size = number of values */
   std::vector<double> tau_; /**< tau[index_tau] = list of time values, covering
                       all the values of the perturbation module */
 
   std::vector<std::vector<double>>
-      k_nl_;             /**< wavenumber at which non-linear corrections become important,
+      k_nl_; /**< wavenumber at which non-linear corrections become important,
                                     defined differently by different non_linear_method's */
-  int index_tau_min_nl_; /**< index of smallest value of tau at which nonlinear corrections have been computed
+  int index_tau_min_nl_ =
+      -1; /**< index of smallest value of tau at which nonlinear corrections have been computed
                                     (so, for tau<tau_min_nl, the array nl_corr_density only contains some factors 1 */
 
   //@}
@@ -277,7 +280,7 @@ class NonlinearModule : public BaseModule {
 
   //@{
 
-  int index_md_scalars_; /**< set equal to psp->index_md_scalars
+  int index_md_scalars_ = -1; /**< set equal to psp->index_md_scalars
                            (useful since this module only deals with
                            scalars) */
 
@@ -287,9 +290,9 @@ class NonlinearModule : public BaseModule {
 
   //@{
 
-  double
-      c_min_; /** for HMcode: minimum concentration in Bullock 2001 mass-concentration relation */
-  double eta_0_; /** for HMcode: halo bloating parameter */
+  double c_min_ =
+      0.0; /** for HMcode: minimum concentration in Bullock 2001 mass-concentration relation */
+  double eta_0_ = 0.0; /** for HMcode: halo bloating parameter */
 
   //@}
 
@@ -297,10 +300,10 @@ class NonlinearModule : public BaseModule {
 
   //@{
 
-  int index_pk_eq_w_;             /**< index of w in table pk_eq_w_and_Omega */
-  int index_pk_eq_Omega_m_;       /**< index of Omega_m in table pk_eq_w_and_Omega */
-  int pk_eq_size_;                /**< number of indices in table pk_eq_w_and_Omega */
-  int pk_eq_tau_size_;            /**< number of times (and raws in table pk_eq_w_and_Omega) */
+  int index_pk_eq_w_       = -1;  /**< index of w in table pk_eq_w_and_Omega */
+  int index_pk_eq_Omega_m_ = -1;  /**< index of Omega_m in table pk_eq_w_and_Omega */
+  int pk_eq_size_          = 0;   /**< number of indices in table pk_eq_w_and_Omega */
+  int pk_eq_tau_size_      = 0;   /**< number of times (and raws in table pk_eq_w_and_Omega) */
   std::vector<double> pk_eq_tau_; /**< table of time values */
   std::vector<double> pk_eq_w_and_Omega_;     /**< table of background quantites */
   std::vector<double> pk_eq_ddw_and_ddOmega_; /**< table of second derivatives */

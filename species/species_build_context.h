@@ -56,11 +56,11 @@ struct CoupledClusterInputs {
  * Bundled into one struct to keep factory signatures uniform.
  */
 struct SpeciesBuildContext {
-  FileContent* pfc;
-  const background* pba;
-  const precision* ppr;
-  const NcdmSettings* ncdm_settings;  // non-null
-  const BackgroundModule* bgm;        // nullptr at species-construction time
+  FileContent* pfc                     = nullptr;
+  const background* pba                = nullptr;
+  const precision* ppr                 = nullptr;
+  const NcdmSettings* ncdm_settings    = nullptr;  // every caller sets it
+  const BackgroundModule* bgm          = nullptr;  // nullptr at species-construction time
   const SpeciesCollection* all_species = nullptr;
   // ^ ConstructSpecies passes a non-null pointer for the whole build, but the
   // collection is filled incrementally — earlier factories in Pass 1 see fewer

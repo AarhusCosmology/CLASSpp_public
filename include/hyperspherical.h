@@ -20,14 +20,14 @@
 #define _HIS_BYTE_ALIGNMENT_ 16
 
 typedef struct HypersphericalInterpolationStructure {
-  int K;  //Sign of the curvature, (0,-1,1)
-  double beta;
-  double delta_x;                     //x-spacing. (xvec is uniformly spaced)
-  int trig_order;                     //Order of the interpolation formula for SinK and CosK.
-  int l_size;                         //Number of l values
+  int K          = 0;  //Sign of the curvature, (0,-1,1)
+  double beta    = 0.0;
+  double delta_x = 0.0;               //x-spacing. (xvec is uniformly spaced)
+  int trig_order = 0;                 //Order of the interpolation formula for SinK and CosK.
+  int l_size     = 0;                 //Number of l values
   std::vector<int> l;                 //Vector of l values stored
   std::vector<double> chi_at_phimin;  // vector x_min[index-l] below which neglect Bessels
-  int x_size;                         //Number of x-values
+  int x_size = 0;                     //Number of x-values
   std::vector<double> x;              //Pointer to x-values
   std::vector<double> sinK;           //Vector of sin_K(xvec)
   std::vector<double> cotK;           //Vector of cot_K(xvec)

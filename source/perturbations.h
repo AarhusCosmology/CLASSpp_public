@@ -105,10 +105,10 @@ struct perturbs {
 
   //@{
 
-  bool has_perturbations; /**< do we need to compute perturbations at all ? */
+  bool has_perturbations = false; /**< do we need to compute perturbations at all ? */
 
-  bool
-      has_cls; /**< do we need any harmonic space spectrum \f$ C_l \f$ (and hence Bessel functions, transfer functions, ...)? */
+  bool has_cls =
+      false; /**< do we need any harmonic space spectrum \f$ C_l \f$ (and hence Bessel functions, transfer functions, ...)? */
 
   bool has_scalars = true;  /**< do we need scalars? */
   bool has_vectors = false; /**< do we need vectors? */
@@ -185,7 +185,7 @@ struct perturbs {
   int store_perturbations = false; /**< Do we want to store perturbations? */
   int k_output_values_num = 0;     /**< Number of perturbation outputs (default=0) */
   double k_output_values
-      [_MAX_NUMBER_OF_K_FILES_]; /**< List of k values where perturbation output is requested. */
+      [_MAX_NUMBER_OF_K_FILES_]{}; /**< List of k values where perturbation output is requested. */
 
   double three_ceff2_ur =
       1.; /**< 3 x effective squared sound speed for the ultrarelativistic perturbations */
@@ -212,21 +212,21 @@ struct perturbs {
 
   //@{
 
-  double
-      selection_min_of_tau_min; /**< used in presence of selection functions (for matter density, cosmic shear...) */
-  double
-      selection_max_of_tau_max; /**< used in presence of selection functions (for matter density, cosmic shear...) */
+  double selection_min_of_tau_min =
+      0.0; /**< used in presence of selection functions (for matter density, cosmic shear...) */
+  double selection_max_of_tau_max =
+      0.0; /**< used in presence of selection functions (for matter density, cosmic shear...) */
 
-  double
-      selection_delta_tau; /**< used in presence of selection functions (for matter density, cosmic shear...) */
+  double selection_delta_tau =
+      0.0; /**< used in presence of selection functions (for matter density, cosmic shear...) */
 
-  double*
-      selection_tau_min; /**< value of conformal time below which W(tau) is considered to vanish for each bin */
-  double*
-      selection_tau_max; /**< value of conformal time above which W(tau) is considered to vanish for each bin */
-  double* selection_tau; /**< value of conformal time at the center of each bin */
-  double*
-      selection_function; /**< selection function W(tau), normalized to \f$ \int W(tau) dtau=1 \f$, stored in selection_function[bin*tau_size_+index_tau] */
+  double* selection_tau_min =
+      nullptr; /**< value of conformal time below which W(tau) is considered to vanish for each bin */
+  double* selection_tau_max =
+      nullptr; /**< value of conformal time above which W(tau) is considered to vanish for each bin */
+  double* selection_tau = nullptr; /**< value of conformal time at the center of each bin */
+  double* selection_function =
+      nullptr; /**< selection function W(tau), normalized to \f$ \int W(tau) dtau=1 \f$, stored in selection_function[bin*tau_size_+index_tau] */
 
   //@}
 
@@ -298,16 +298,16 @@ struct perturb_vector {
      IDM_DRMD_IDR_DRMD_Species::idr_drmd_layout(*pv->species_layouts[idm_drmd_idr_drmd_i]). */
 
   /* perturbed recombination */
-  int index_pt_perturbed_recombination_delta_temp; /**< Gas temperature perturbation */
-  int index_pt_perturbed_recombination_delta_chi;  /**< Inionization fraction perturbation */
+  int index_pt_perturbed_recombination_delta_temp = -1; /**< Gas temperature perturbation */
+  int index_pt_perturbed_recombination_delta_chi  = -1; /**< Inionization fraction perturbation */
 
-  int index_pt_eta;      /**< synchronous gauge metric perturbation eta*/
-  int index_pt_phi;      /**< newtonian gauge metric perturbation phi */
-  int index_pt_hv_prime; /**< vector metric perturbation h_v' in synchronous gauge */
-  int index_pt_V;        /**< vector metric perturbation V in Newtonian gauge */
+  int index_pt_eta      = -1; /**< synchronous gauge metric perturbation eta*/
+  int index_pt_phi      = -1; /**< newtonian gauge metric perturbation phi */
+  int index_pt_hv_prime = -1; /**< vector metric perturbation h_v' in synchronous gauge */
+  int index_pt_V        = -1; /**< vector metric perturbation V in Newtonian gauge */
 
-  int index_pt_gw;    /**< tensor metric perturbation h (gravitational waves) */
-  int index_pt_gwdot; /**< its time-derivative */
+  int index_pt_gw    = -1; /**< tensor metric perturbation h (gravitational waves) */
+  int index_pt_gwdot = -1; /**< its time-derivative */
 
   /** Tensor "relativistic neutrino" Boltzmann hierarchy. Unlike the scalar/vector
       hierarchies this is NOT owned by a species: it is a single hierarchy sourced
@@ -324,7 +324,7 @@ struct perturb_vector {
     int l_max     = -1; /**< was l_max_ur */
   } tensor_ur_layout;
 
-  int pt_size; /**< size of perturbation vector */
+  int pt_size = 0; /**< size of perturbation vector */
 
   std::vector<double> y;  /**< vector of perturbations to be integrated */
   std::vector<double> dy; /**< time-derivative of the same vector */
@@ -348,17 +348,19 @@ struct perturb_workspace {
 
   //@{
 
-  int index_mt_psi;           /**< psi in longitudinal gauge */
-  int index_mt_phi_prime;     /**< (d phi/d conf.time) in longitudinal gauge */
-  int index_mt_h_prime;       /**< h' (wrt conf. time) in synchronous gauge */
-  int index_mt_h_prime_prime; /**< h'' (wrt conf. time) in synchronous gauge */
-  int index_mt_eta_prime;     /**< eta' (wrt conf. time) in synchronous gauge */
-  int index_mt_alpha;         /**< \f$ \alpha = (h' + 6 \eta') / (2 k^2) \f$ in synchronous gauge */
-  int index_mt_alpha_prime;   /**< \f$ \alpha'\f$ wrt conf. time) in synchronous gauge */
-  int index_mt_gw_prime_prime; /**< second derivative wrt conformal time of gravitational wave field, often called h */
-  int index_mt_V_prime; /**< derivative of Newtonian gauge vector metric perturbation V */
-  int index_mt_hv_prime_prime; /**< Second derivative of Synchronous gauge vector metric perturbation \f$ h_v\f$ */
-  int mt_size;                 /**< size of metric perturbation vector */
+  int index_mt_psi           = -1; /**< psi in longitudinal gauge */
+  int index_mt_phi_prime     = -1; /**< (d phi/d conf.time) in longitudinal gauge */
+  int index_mt_h_prime       = -1; /**< h' (wrt conf. time) in synchronous gauge */
+  int index_mt_h_prime_prime = -1; /**< h'' (wrt conf. time) in synchronous gauge */
+  int index_mt_eta_prime     = -1; /**< eta' (wrt conf. time) in synchronous gauge */
+  int index_mt_alpha = -1; /**< \f$ \alpha = (h' + 6 \eta') / (2 k^2) \f$ in synchronous gauge */
+  int index_mt_alpha_prime = -1; /**< \f$ \alpha'\f$ wrt conf. time) in synchronous gauge */
+  int index_mt_gw_prime_prime =
+      -1; /**< second derivative wrt conformal time of gravitational wave field, often called h */
+  int index_mt_V_prime = -1; /**< derivative of Newtonian gauge vector metric perturbation V */
+  int index_mt_hv_prime_prime =
+      -1; /**< Second derivative of Synchronous gauge vector metric perturbation \f$ h_v\f$ */
+  int mt_size = 0; /**< size of metric perturbation vector */
 
   //@}
 
@@ -389,17 +391,19 @@ struct perturb_workspace {
    *  only). See BaseSpecies::ApproximationCount. */
   std::vector<int> species_approx_index;
 
-  double delta_rho;        /**< total density perturbation (gives delta Too) */
-  double rho_plus_p_theta; /**< total (rho+p)*theta perturbation (gives delta Toi) */
-  double rho_plus_p_shear; /**< total (rho+p)*shear (gives delta Tij) */
-  double delta_p;          /**< total pressure perturbation (gives Tii) */
+  double delta_rho        = 0.0; /**< total density perturbation (gives delta Too) */
+  double rho_plus_p_theta = 0.0; /**< total (rho+p)*theta perturbation (gives delta Toi) */
+  double rho_plus_p_shear = 0.0; /**< total (rho+p)*shear (gives delta Tij) */
+  double delta_p          = 0.0; /**< total pressure perturbation (gives Tii) */
 
-  double rho_plus_p_tot; /**< total (rho+p) (used to infer theta_tot from rho_plus_p_theta) */
+  double rho_plus_p_tot = 0.0; /**< total (rho+p) (used to infer theta_tot from rho_plus_p_theta) */
 
-  double
-      gw_source; /**< stress-energy source term in Einstein's tensor equations (gives Tij[tensor]) */
-  double vector_source_pi; /**< first stress-energy source term in Einstein's vector equations */
-  double vector_source_v;  /**< second stress-energy source term in Einstein's vector equations */
+  double gw_source =
+      0.0; /**< stress-energy source term in Einstein's tensor equations (gives Tij[tensor]) */
+  double vector_source_pi =
+      0.0; /**< first stress-energy source term in Einstein's vector equations */
+  double vector_source_v =
+      0.0; /**< second stress-energy source term in Einstein's vector equations */
 
   /* Module-owned approximation closures. Computed by the perturbations module
      (perturb_tca_slip_and_shear and perturb_rsa_* / perturb_rsa_idr_*, the
@@ -408,22 +412,22 @@ struct perturb_workspace {
      (photons, ultra-relativistic, IDM_DR). These are not per-species private
      state despite the species-suffixed names: they live here because the module
      owns the approximation machinery and several consumers cross species. */
-  double tca_shear_g;  /**< photon shear in tight-coupling approximation */
-  double tca_slip;     /**< photon-baryon slip in tight-coupling approximation */
-  double rsa_delta_g;  /**< photon density in radiation streaming approximation */
-  double rsa_theta_g;  /**< photon velocity in radiation streaming approximation */
-  double rsa_delta_ur; /**< photon density in radiation streaming approximation */
-  double rsa_theta_ur; /**< photon velocity in radiation streaming approximation */
-  double
-      rsa_delta_idr; /**< interacting dark radiation density in dark radiation streaming approximation */
-  double
-      rsa_theta_idr; /**< interacting dark radiation velocity in dark radiation streaming approximation */
+  double tca_shear_g  = 0.0; /**< photon shear in tight-coupling approximation */
+  double tca_slip     = 0.0; /**< photon-baryon slip in tight-coupling approximation */
+  double rsa_delta_g  = 0.0; /**< photon density in radiation streaming approximation */
+  double rsa_theta_g  = 0.0; /**< photon velocity in radiation streaming approximation */
+  double rsa_delta_ur = 0.0; /**< photon density in radiation streaming approximation */
+  double rsa_theta_ur = 0.0; /**< photon velocity in radiation streaming approximation */
+  double rsa_delta_idr =
+      0.0; /**< interacting dark radiation density in dark radiation streaming approximation */
+  double rsa_theta_idr =
+      0.0; /**< interacting dark radiation velocity in dark radiation streaming approximation */
 
-  double delta_m; /**< relative density perturbation of all non-relativistic species */
-  double theta_m; /**< velocity divergence theta of all non-relativistic species */
+  double delta_m = 0.0; /**< relative density perturbation of all non-relativistic species */
+  double theta_m = 0.0; /**< velocity divergence theta of all non-relativistic species */
 
-  double delta_cb; /**< relative density perturbation of only cdm and baryon */
-  double theta_cb; /**< velocity divergence theta of only cdm and baryon */
+  double delta_cb = 0.0; /**< relative density perturbation of only cdm and baryon */
+  double theta_cb = 0.0; /**< velocity divergence theta of only cdm and baryon */
 
   /* Module-owned PPF dark-energy closure. Written by FluidSpecies::ComputePpf
      during stress-energy assembly (it depends on the totals of every other
@@ -432,13 +436,15 @@ struct perturb_workspace {
      so this is genuine module-level coupling state, not fluid-private scratch.
      (The S quantity of eq. 15 in 0808.3125 is a ComputePpf-internal temporary,
      no longer stored here.) */
-  double delta_rho_fld; /**< density perturbation of fluid, not so trivial in PPF scheme */
-  double delta_p_fld;   /**< pressure perturbation of fluid, very non-trivial in PPF scheme */
-  double rho_plus_p_theta_fld; /**< velocity divergence of fluid, not so trivial in PPF scheme */
-  double Gamma_prime_fld;      /**< Gamma_prime in PPF scheme (equivalent to eq. 14 in 0808.3125) */
+  double delta_rho_fld = 0.0; /**< density perturbation of fluid, not so trivial in PPF scheme */
+  double delta_p_fld   = 0.0; /**< pressure perturbation of fluid, very non-trivial in PPF scheme */
+  double rho_plus_p_theta_fld =
+      0.0; /**< velocity divergence of fluid, not so trivial in PPF scheme */
+  double Gamma_prime_fld =
+      0.0; /**< Gamma_prime in PPF scheme (equivalent to eq. 14 in 0808.3125) */
 
-  FILE* perturb_output_file; /**< filepointer to output file*/
-  int index_ikout;           /**< index for output k value (when k_output_values is set) */
+  FILE* perturb_output_file = nullptr; /**< filepointer to output file*/
+  int index_ikout           = -1; /**< index for output k value (when k_output_values is set) */
 
   //@}
 
@@ -452,11 +458,13 @@ struct perturb_workspace {
 
   //@{
 
-  short
-      inter_mode; /**< flag defining the method used for interpolation background/thermo quantities tables */
+  short inter_mode =
+      0; /**< flag defining the method used for interpolation background/thermo quantities tables */
 
-  int last_index_back; /**< the background interpolation function background_at_tau() keeps memory of the last point called through this index */
-  int last_index_thermo; /**< the thermodynamics interpolation function thermodynamics_at_z() keeps memory of the last point called through this index */
+  int last_index_back =
+      0; /**< the background interpolation function background_at_tau() keeps memory of the last point called through this index */
+  int last_index_thermo =
+      0; /**< the thermodynamics interpolation function thermodynamics_at_z() keeps memory of the last point called through this index */
 
   //@}
 
@@ -464,14 +472,14 @@ struct perturb_workspace {
 
   //@{
 
-  int index_ap_tca;          /**< index for tight-coupling approximation */
-  int index_ap_rsa;          /**< index for radiation streaming approximation */
-  int index_ap_tca_idm_dr;   /**< index for dark tight-coupling approximation (idm-idr) */
-  int index_ap_tca_idm_drmd; /**< index for dark tight-coupling approximation (DRMD) */
-  int index_ap_rsa_idr;      /**< index for dark radiation streaming approximation */
-  int index_ap_ufa;          /**< index for ur fluid approximation */
-  int index_ap_ncdmfa;       /**< index for ncdm fluid approximation */
-  int ap_size;               /**< number of relevant approximations for a given mode */
+  int index_ap_tca          = -1; /**< index for tight-coupling approximation */
+  int index_ap_rsa          = -1; /**< index for radiation streaming approximation */
+  int index_ap_tca_idm_dr   = -1; /**< index for dark tight-coupling approximation (idm-idr) */
+  int index_ap_tca_idm_drmd = -1; /**< index for dark tight-coupling approximation (DRMD) */
+  int index_ap_rsa_idr      = -1; /**< index for dark radiation streaming approximation */
+  int index_ap_ufa          = -1; /**< index for ur fluid approximation */
+  int index_ap_ncdmfa       = -1; /**< index for ncdm fluid approximation */
+  int ap_size               = 0;  /**< number of relevant approximations for a given mode */
 
   std::vector<int>
       approx; /**< array of approximation flags holding at a given time: approx[index_ap] */
@@ -482,11 +490,11 @@ struct perturb_workspace {
 
   //@{
 
-  int max_l_max; /**< maximum l_max for any multipole */
+  int max_l_max = 0; /**< maximum l_max for any multipole */
   std::vector<double>
       s_l; /**< array of freestreaming coefficients \f$ s_l = \sqrt{1-K*(l^2-1)/k^2} \f$*/
-  double
-      cotKgen; /**< generalised cot(sqrt(|K|)*tau)/k, for closing free-streaming hierarchies; valid for all modes */
+  double cotKgen =
+      0.0; /**< generalised cot(sqrt(|K|)*tau)/k, for closing free-streaming hierarchies; valid for all modes */
 
   //@}
 };

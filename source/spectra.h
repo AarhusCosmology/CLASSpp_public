@@ -32,7 +32,7 @@ struct spectra {
 
   //@{
 
-  struct nonlinear* pnl; /**< a pointer to the nonlinear structure is
+  struct nonlinear* pnl = nullptr; /**< a pointer to the nonlinear structure is
                             stored in the spectra structure. This odd,
                             unusual and unelegant feature has been
                             introduced in v2.8 in order to keep in use

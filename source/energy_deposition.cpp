@@ -53,7 +53,7 @@ constexpr double kChi[kLines*kChannels] = {
 /* Second derivatives for the cubic spline through kChi. Built once on first use;
    the table is compile-time constant, so this needs no per-run state. */
 struct GalliSpline {
-  std::array<double, kLines * kChannels> ddchi;
+  std::array<double, kLines * kChannels> ddchi{};
 
   GalliSpline() {
     array_spline_table_lines(kX, kLines, kChi, kChannels, ddchi.data(), _SPLINE_NATURAL_);

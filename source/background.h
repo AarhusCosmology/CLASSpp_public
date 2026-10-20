@@ -101,14 +101,14 @@ struct background {
 
   //@{
 
-  short short_info;  /**< flag for calling background_at_eta and return little information */
-  short normal_info; /**< flag for calling background_at_eta and return medium information */
-  short long_info;   /**< flag for calling background_at_eta and return all information */
+  short short_info  = 0; /**< flag for calling background_at_eta and return little information */
+  short normal_info = 0; /**< flag for calling background_at_eta and return medium information */
+  short long_info   = 0; /**< flag for calling background_at_eta and return all information */
 
-  short
-      inter_normal; /**< flag for calling background_at_eta and find position in interpolation table normally */
-  short
-      inter_closeby; /**< flag for calling background_at_eta and find position in interpolation table starting from previous position in previous call */
+  short inter_normal =
+      0; /**< flag for calling background_at_eta and find position in interpolation table normally */
+  short inter_closeby =
+      0; /**< flag for calling background_at_eta and find position in interpolation table starting from previous position in previous call */
 
   //@}
 
@@ -116,7 +116,7 @@ struct background {
 
   //@{
 
-  unsigned int number_of_threads;
+  unsigned int number_of_threads = 0U;
 
   short background_verbose =
       0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */

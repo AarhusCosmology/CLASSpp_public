@@ -60,7 +60,7 @@ BbnRates::BbnRates(const std::string& rates_file) : source_file_(rates_file) {
 
     std::istringstream in(line);
     std::string name, label;
-    FitSet set;
+    FitSet set{};
     in >> name >> label;
     for (double& coefficient : set.a) {
       in >> coefficient;

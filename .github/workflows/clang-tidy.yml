@@ -1,0 +1,25 @@
+name: clang-tidy
+
+on: [pull_request]
+
+# Only the checks listed in CHECKS are enforced; the rest of .clang-tidy is a draft
+# that the code does not follow yet. A check joins CHECKS once the code base passes it.
+env:
+  CHECKS: '-*,cppcoreguidelines-pro-type-member-init,clang-analyzer-optin.cplusplus.UninitializedObject'
+
+jobs:
+  tidy:
+    runs-on: [self-hosted, linux, heavy]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure (compile_commands.json only, no build)
+        run: cmake -S . -B build/tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Run clang-tidy
+        run: |
+          clang-tidy-22 --version
+          run-clang-tidy-22 -clang-tidy-binary clang-tidy-22 -p build/tidy -quiet -j "$(nproc)" \
+            -checks="$CHECKS"

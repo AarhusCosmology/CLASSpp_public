@@ -24,16 +24,16 @@ constexpr int kNeq     = kIdxY + kBbnNumNuclides;
 
 /** Everything the right-hand side needs, plus the history buffer. */
 struct BbnWorkspace {
-  const BbnInput* input;
-  const BbnRates* rates;
-  const BbnWeakRates* weak;
-  const BbnWeakTable* weak_table; /**< null -> evaluate the integrals directly */
-  const BbnPlasma* plasma;
+  const BbnInput* input          = nullptr;
+  const BbnRates* rates          = nullptr;
+  const BbnWeakRates* weak       = nullptr;
+  const BbnWeakTable* weak_table = nullptr; /**< null -> evaluate the integrals directly */
+  const BbnPlasma* plasma        = nullptr;
 
-  double T9_initial;
-  double T_nu_initial_mev; /**< neutrino temperature at a = 1 */
-  double neff_total;       /**< 3 Standard-Model species plus delta_neff */
-  bool freeze_network;     /**< normalization pre-pass: expansion only, no reactions */
+  double T9_initial       = 0.0;
+  double T_nu_initial_mev = 0.0;   /**< neutrino temperature at a = 1 */
+  double neff_total       = 0.0;   /**< 3 Standard-Model species plus delta_neff */
+  bool freeze_network     = false; /**< normalization pre-pass: expansion only, no reactions */
 
   std::vector<double> history;        /**< flattened rows of (T9, t, and the abundances) */
   std::vector<double> trajectory_lna; /**< ln a at each sampled tau, from the pre-pass */

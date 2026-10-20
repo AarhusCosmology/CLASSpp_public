@@ -16,8 +16,8 @@ class LensingModule : public BaseModule {
   std::map<std::string, std::vector<double>> cl_output_computed() const;
   void lensing_cl_at_l(int l, double* cl_lensed) const;
 
-  int l_unlensed_max_;   /**< last multipole in all calculations (same as in spectra module)*/
-  int l_lensed_max_ = 0; /**< last multipole at which lensed spectra are computed */
+  int l_unlensed_max_ = 0; /**< last multipole in all calculations (same as in spectra module)*/
+  int l_lensed_max_   = 0; /**< last multipole at which lensed spectra are computed */
 
  private:
   void lensing_init();
@@ -52,29 +52,30 @@ class LensingModule : public BaseModule {
 
   //@{
 
-  bool has_tt_; /**< do we want lensed \f$ C_l^{TT}\f$? (T = temperature) */
-  bool has_ee_; /**< do we want lensed \f$ C_l^{EE}\f$? (E = E-polarization) */
-  bool has_te_; /**< do we want lensed \f$ C_l^{TE}\f$? */
-  bool has_bb_; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
-  bool has_pp_; /**< do we want \f$ C_l^{\phi\phi}\f$? (\f$ \phi \f$ = CMB lensing potential) */
-  bool has_tp_; /**< do we want \f$ C_l^{T\phi}\f$? */
-  bool has_dd_; /**< do we want \f$ C_l^{dd}\f$? (d = matter density) */
-  bool has_td_; /**< do we want \f$ C_l^{Td}\f$? */
-  bool has_ll_; /**< do we want \f$ C_l^{ll}\f$? (l = lensing potential) */
-  bool has_tl_; /**< do we want \f$ C_l^{Tl}\f$? */
+  bool has_tt_ = false; /**< do we want lensed \f$ C_l^{TT}\f$? (T = temperature) */
+  bool has_ee_ = false; /**< do we want lensed \f$ C_l^{EE}\f$? (E = E-polarization) */
+  bool has_te_ = false; /**< do we want lensed \f$ C_l^{TE}\f$? */
+  bool has_bb_ = false; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
+  bool has_pp_ =
+      false; /**< do we want \f$ C_l^{\phi\phi}\f$? (\f$ \phi \f$ = CMB lensing potential) */
+  bool has_tp_ = false; /**< do we want \f$ C_l^{T\phi}\f$? */
+  bool has_dd_ = false; /**< do we want \f$ C_l^{dd}\f$? (d = matter density) */
+  bool has_td_ = false; /**< do we want \f$ C_l^{Td}\f$? */
+  bool has_ll_ = false; /**< do we want \f$ C_l^{ll}\f$? (l = lensing potential) */
+  bool has_tl_ = false; /**< do we want \f$ C_l^{Tl}\f$? */
 
-  int index_lt_tt_; /**< index for type \f$ C_l^{TT} \f$*/
-  int index_lt_ee_; /**< index for type \f$ C_l^{EE} \f$*/
-  int index_lt_te_; /**< index for type \f$ C_l^{TE} \f$*/
-  int index_lt_bb_; /**< index for type \f$ C_l^{BB} \f$*/
-  int index_lt_pp_; /**< index for type \f$ C_l^{\phi\phi} \f$*/
-  int index_lt_tp_; /**< index for type \f$ C_l^{T\phi} \f$*/
-  int index_lt_dd_; /**< index for type \f$ C_l^{dd} \f$*/
-  int index_lt_td_; /**< index for type \f$ C_l^{Td} \f$*/
-  int index_lt_ll_; /**< index for type \f$ C_l^{dd} \f$*/
-  int index_lt_tl_; /**< index for type \f$ C_l^{Td} \f$*/
+  int index_lt_tt_ = -1; /**< index for type \f$ C_l^{TT} \f$*/
+  int index_lt_ee_ = -1; /**< index for type \f$ C_l^{EE} \f$*/
+  int index_lt_te_ = -1; /**< index for type \f$ C_l^{TE} \f$*/
+  int index_lt_bb_ = -1; /**< index for type \f$ C_l^{BB} \f$*/
+  int index_lt_pp_ = -1; /**< index for type \f$ C_l^{\phi\phi} \f$*/
+  int index_lt_tp_ = -1; /**< index for type \f$ C_l^{T\phi} \f$*/
+  int index_lt_dd_ = -1; /**< index for type \f$ C_l^{dd} \f$*/
+  int index_lt_td_ = -1; /**< index for type \f$ C_l^{Td} \f$*/
+  int index_lt_ll_ = -1; /**< index for type \f$ C_l^{dd} \f$*/
+  int index_lt_tl_ = -1; /**< index for type \f$ C_l^{Td} \f$*/
 
-  int lt_size_; /**< number of \f$ C_l\f$ types requested */
+  int lt_size_ = 0; /**< number of \f$ C_l\f$ types requested */
 
   //@}
 
@@ -84,7 +85,7 @@ class LensingModule : public BaseModule {
 
   /* interpolable version: */
 
-  int l_size_; /**< number of l values */
+  int l_size_ = 0; /**< number of l values */
 
   std::vector<int> l_max_lt_; /**< last multipole (given as an input) at which
         we want to output \f$ C_l \f$'s for a given mode and type */

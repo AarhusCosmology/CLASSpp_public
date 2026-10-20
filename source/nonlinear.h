@@ -68,8 +68,9 @@ struct nonlinear {
   enum hmcode_baryonic_feedback_model feedback =
       nl_emu_dmonly; /** to choose between different baryonic feedback models
                                                 in hmcode (dmonly, gas cooling, Agn or supernova feedback) */
-  double c_min; /** for HMcode: minimum concentration in Bullock 2001 mass-concentration relation */
-  double eta_0; /** for HMcode: halo bloating parameter */
+  double c_min =
+      0.0; /** for HMcode: minimum concentration in Bullock 2001 mass-concentration relation */
+  double eta_0 = 0.0; /** for HMcode: halo bloating parameter */
   double z_infinity =
       10.; /** for HMcode: z value at which Dark Energy correction is evaluated; should be at early times (default: 10.) */
   HMcodeVersion hmcode_version = HMcodeVersion::
@@ -120,7 +121,8 @@ struct nonlinear_workspace {
   std::vector<std::vector<double>> sigma_disp_100_storage;
   std::vector<std::vector<double>> sigma_prime_storage;
 
-  double dark_energy_correction; /** this is the ratio [g(z_infinity)/g_lcdm(z_infinity)]^1.5 for
+  double dark_energy_correction =
+      0.0; /** this is the ratio [g(z_infinity)/g_lcdm(z_infinity)]^1.5 for
                                   * HMcode 2016 (power from Dolag et al. (2004) as in Mead et al. 2016)
                                   * and g(z_infinity)/g_lcdm(z_infinity) for 2020, with g_lcdm the
                                   * growth of a flat LCDM with the same Omega_m, in every cosmology.

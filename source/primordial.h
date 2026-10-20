@@ -199,26 +199,26 @@ class PrimordialModule;
 struct primordial_inflation_parameters_and_workspace {
   primordial_inflation_parameters_and_workspace(PrimordialModule* p_m) : primordial_module(p_m) {}
   const PrimordialModule* primordial_module;
-  double N;
-  double a2;
+  double N  = 0.0;
+  double a2 = 0.0;
 
-  double V;
-  double dV;
-  double ddV;
-  double aH;
+  double V   = 0.0;
+  double dV  = 0.0;
+  double ddV = 0.0;
+  double aH  = 0.0;
 
-  double H;
-  double dH;
-  double ddH;
-  double dddH;
+  double H    = 0.0;
+  double dH   = 0.0;
+  double ddH  = 0.0;
+  double dddH = 0.0;
 
-  double zpp_over_z;
-  double app_over_a;
+  double zpp_over_z = 0.0;
+  double app_over_a = 0.0;
 
-  double k;
+  double k = 0.0;
 
-  enum integration_direction integrate;
-  enum time_definition time;
+  integration_direction integrate{};
+  time_definition time{};
 };
 
 /**
