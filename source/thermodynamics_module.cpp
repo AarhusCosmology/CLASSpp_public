@@ -26,14 +26,14 @@ ThermodynamicsModule::ThermodynamicsModule(InputModulePtr input_module,
   thermodynamics_init();
 }
 
-ThermodynamicsModule::~ThermodynamicsModule() {}
+ThermodynamicsModule::~ThermodynamicsModule() = default;
 
 // Wrapper functions to pass non-static member functions
 void ThermodynamicsModule::thermodynamics_recombination_derivs(double z,
                                                                double* y,
                                                                double* dy,
                                                                void* fixed_parameters) {
-  auto tppaw = static_cast<thermodynamics_parameters_and_workspace*>(fixed_parameters);
+  auto* tppaw = static_cast<thermodynamics_parameters_and_workspace*>(fixed_parameters);
   tppaw->thermodynamics_module->thermodynamics_recombination_derivs_member(z,
                                                                            y,
                                                                            dy,
@@ -51,7 +51,7 @@ void ThermodynamicsModule::thermodynamics_recfast_derivs(double minus_z,
                                                          double* y,
                                                          double* dy,
                                                          void* parameters_and_workspace) {
-  auto ws        = static_cast<thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
+  auto* ws       = static_cast<thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
   auto* module   = ws->thermodynamics_module;
   const double z = -minus_z;
 
@@ -79,7 +79,7 @@ void ThermodynamicsModule::thermodynamics_recfast_derivs(double minus_z,
 // Single dense-output shim: stores one recombination-table row, dispatching on phase.
 void ThermodynamicsModule::thermodynamics_recfast_output(
     double minus_z, double y[], double dy[], int index_x, void* parameters_and_workspace) {
-  auto ws      = static_cast<thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
+  auto* ws     = static_cast<thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
   auto* module = ws->thermodynamics_module;
   recombination* preco   = ws->preco;
   const double z         = -minus_z;
@@ -123,7 +123,7 @@ void ThermodynamicsModule::thermodynamics_recfast_output_none(double /*minus_z*/
  */
 
 void ThermodynamicsModule::thermodynamics_at_z(
-    double z, short inter_mode, int* last_index, double* pvecback, double* pvecthermo) const {
+    double z, short inter_mode, int* last_index, const double* pvecback, double* pvecthermo) const {
   /** Summary: */
 
   /** - define local variables */
@@ -849,7 +849,7 @@ void ThermodynamicsModule::thermodynamics_init() {
 
     z = z_table_[tt_size_ - 1];
 
-    background_module_->background_tau_of_z(z, &(tau));
+    background_module_->background_tau_of_z(z, &tau);
 
     background_module_->background_at_tau(tau,
                                           pba->short_info,
@@ -911,7 +911,7 @@ void ThermodynamicsModule::thermodynamics_init() {
         Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
                             pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                             pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-        background_module_->background_tau_of_z(z, &(tau));
+        background_module_->background_tau_of_z(z, &tau);
         background_module_->background_at_tau(tau,
                                               pba->short_info,
                                               pba->inter_normal,
@@ -934,7 +934,7 @@ void ThermodynamicsModule::thermodynamics_init() {
                                comp_ref.idm_dr().a_idm_dr() *
                                pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                                pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-          background_module_->background_tau_of_z(z, &(tau));
+          background_module_->background_tau_of_z(z, &tau);
           background_module_->background_at_tau(tau,
                                                 pba->short_info,
                                                 pba->inter_normal,
@@ -972,7 +972,7 @@ void ThermodynamicsModule::thermodynamics_init() {
                                  comp_ref.idm_dr().a_idm_dr() *
                                  pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                                  pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-            background_module_->background_tau_of_z(z, &(tau));
+            background_module_->background_tau_of_z(z, &tau);
             background_module_->background_at_tau(tau,
                                                   pba->short_info,
                                                   pba->inter_normal,
@@ -997,7 +997,7 @@ void ThermodynamicsModule::thermodynamics_init() {
         Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
                             pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
                             pow(1.e7, comp_ref.idm_dr().nindex_idm_dr());
-        background_module_->background_tau_of_z(z, &(tau));
+        background_module_->background_tau_of_z(z, &tau);
         background_module_->background_at_tau(tau,
                                               pba->short_info,
                                               pba->inter_normal,
@@ -1045,9 +1045,9 @@ void ThermodynamicsModule::thermodynamics_init() {
   /* approximation for maximum of g, using cubic interpolation, assuming equally spaced z's */
   z_rec_ = z_table_[index_tau + 1] +
            0.5 * (z_table_[index_tau + 1] - z_table_[index_tau]) *
-               (thermodynamics_table_[(index_tau) *th_size_ + index_th_g_] -
+               (thermodynamics_table_[index_tau * th_size_ + index_th_g_] -
                 1. * thermodynamics_table_[(index_tau + 2) * th_size_ + index_th_g_]) /
-               (thermodynamics_table_[(index_tau) *th_size_ + index_th_g_] -
+               (thermodynamics_table_[index_tau * th_size_ + index_th_g_] -
                 2. * thermodynamics_table_[(index_tau + 1) * th_size_ + index_th_g_] +
                 thermodynamics_table_[(index_tau + 2) * th_size_ + index_th_g_]);
 
@@ -1081,7 +1081,7 @@ void ThermodynamicsModule::thermodynamics_init() {
 
   if (pth->compute_damping_scale) {
     rd_rec_ = (z_table_[index_tau + 1] - z_rec_) / (z_table_[index_tau + 1] - z_table_[index_tau]) *
-                  thermodynamics_table_[(index_tau) *th_size_ + index_th_r_d_] +
+                  thermodynamics_table_[index_tau * th_size_ + index_th_r_d_] +
               (z_rec_ - z_table_[index_tau]) / (z_table_[index_tau + 1] - z_table_[index_tau]) *
                   thermodynamics_table_[(index_tau + 1) * th_size_ + index_th_r_d_];
   }
@@ -1091,7 +1091,7 @@ void ThermodynamicsModule::thermodynamics_init() {
 
   background_module_->background_tau_of_z(z_table_[index_tau], &tau);
 
-  while ((1. / thermodynamics_table_[(index_tau) *th_size_ + index_th_dkappa_] / tau <
+  while ((1. / thermodynamics_table_[index_tau * th_size_ + index_th_dkappa_] / tau <
           ppr->radiation_streaming_trigger_tau_c_over_tau) &&
          (index_tau > 0)) {
     index_tau--;
@@ -1119,7 +1119,7 @@ void ThermodynamicsModule::thermodynamics_init() {
 
       background_module_->background_tau_of_z(z_table_[index_tau], &tau);
 
-      while ((1. / thermodynamics_table_[(index_tau) *th_size_ + index_th_dmu_idm_dr_] / tau <
+      while ((1. / thermodynamics_table_[index_tau * th_size_ + index_th_dmu_idm_dr_] / tau <
               ppr->idr_streaming_trigger_tau_c_over_tau) &&
              ((comp.idm_dr().nindex_idm_dr() >= 2 && index_tau > 0) ||
               (comp.idm_dr().nindex_idm_dr() < 2 && index_tau < tt_size_ - 1))) {
@@ -1150,14 +1150,14 @@ void ThermodynamicsModule::thermodynamics_init() {
       interpolation) and sound horizon at that time */
 
   index_tau = 0;
-  while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_exp_m_kappa_] > 1. / _E_) &&
+  while ((thermodynamics_table_[index_tau * th_size_ + index_th_exp_m_kappa_] > 1. / _E_) &&
          (index_tau < tt_size_)) {
     index_tau++;
   }
 
   z_star_ = z_table_[index_tau - 1] +
             (1. / _E_ - thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_exp_m_kappa_]) /
-                (thermodynamics_table_[(index_tau) *th_size_ + index_th_exp_m_kappa_] -
+                (thermodynamics_table_[index_tau * th_size_ + index_th_exp_m_kappa_] -
                  thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_exp_m_kappa_]) *
                 (z_table_[index_tau] - z_table_[index_tau - 1]);
 
@@ -1177,7 +1177,7 @@ void ThermodynamicsModule::thermodynamics_init() {
   if (pth->compute_damping_scale) {
     rd_star_ = (z_table_[index_tau + 1] - z_star_) /
                    (z_table_[index_tau + 1] - z_table_[index_tau]) *
-                   thermodynamics_table_[(index_tau) *th_size_ + index_th_r_d_] +
+                   thermodynamics_table_[index_tau * th_size_ + index_th_r_d_] +
                (z_star_ - z_table_[index_tau]) / (z_table_[index_tau + 1] - z_table_[index_tau]) *
                    thermodynamics_table_[(index_tau + 1) * th_size_ + index_th_r_d_];
   }
@@ -1186,14 +1186,14 @@ void ThermodynamicsModule::thermodynamics_init() {
       interpolation) and sound horizon at that time */
 
   index_tau = 0;
-  while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_d_] < 1.) &&
+  while ((thermodynamics_table_[index_tau * th_size_ + index_th_tau_d_] < 1.) &&
          (index_tau < tt_size_)) {
     index_tau++;
   }
 
   z_d_ = z_table_[index_tau - 1] +
          (1. - thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_d_]) /
-             (thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_d_] -
+             (thermodynamics_table_[index_tau * th_size_ + index_th_tau_d_] -
               thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_d_]) *
              (z_table_[index_tau] - z_table_[index_tau - 1]);
 
@@ -1216,7 +1216,7 @@ void ThermodynamicsModule::thermodynamics_init() {
         (thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_idr_] > 1.)) {
       index_tau = 0;
 
-      while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_idm_dr_] < 1.) &&
+      while ((thermodynamics_table_[index_tau * th_size_ + index_th_tau_idm_dr_] < 1.) &&
              (index_tau < tt_size_ - 1)) {
         index_tau++;
       }
@@ -1224,33 +1224,33 @@ void ThermodynamicsModule::thermodynamics_init() {
       double z_idm_dr =
           z_table_[index_tau - 1] +
           (1. - thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_idm_dr_]) /
-              (thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_idm_dr_] -
+              (thermodynamics_table_[index_tau * th_size_ + index_th_tau_idm_dr_] -
                thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_idm_dr_]) *
               (z_table_[index_tau] - z_table_[index_tau - 1]);
 
-      background_module_->background_tau_of_z(z_idm_dr, &(tau_idm_dr));
+      background_module_->background_tau_of_z(z_idm_dr, &tau_idm_dr);
 
       index_tau = 0;
 
-      while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_idr_] < 1.) &&
+      while ((thermodynamics_table_[index_tau * th_size_ + index_th_tau_idr_] < 1.) &&
              (index_tau < tt_size_ - 1)) {
         index_tau++;
       }
 
       double z_idr = z_table_[index_tau - 1] +
                      (1. - thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_idr_]) /
-                         (thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_idr_] -
+                         (thermodynamics_table_[index_tau * th_size_ + index_th_tau_idr_] -
                           thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_idr_]) *
                          (z_table_[index_tau] - z_table_[index_tau - 1]);
 
-      background_module_->background_tau_of_z(z_idr, &(tau_idr));
+      background_module_->background_tau_of_z(z_idr, &tau_idr);
     }
   }
 
   /** - find time above which visibility falls below a given fraction of its maximum */
 
   index_tau = index_tau_max;
-  while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_g_] >
+  while ((thermodynamics_table_[index_tau * th_size_ + index_th_g_] >
           g_max * ppr->neglect_CMB_sources_below_visibility) &&
          (index_tau > 0)) {
     index_tau--;
@@ -2246,13 +2246,10 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
 
         /* if starting redshift for helium is larger, take that one
            (does not happen in realistic models) */
-        if (preio->reionization_parameters[preio->index_reio_start] <
-            pth->helium_fullreio_redshift +
-                ppr->reionization_start_factor * pth->helium_fullreio_width) {
-          preio->reionization_parameters[preio->index_reio_start] = pth->helium_fullreio_redshift +
-                                                                    ppr->reionization_start_factor *
-                                                                        pth->helium_fullreio_width;
-        }
+        preio->reionization_parameters[preio->index_reio_start] =
+            std::max(preio->reionization_parameters[preio->index_reio_start],
+                     pth->helium_fullreio_redshift +
+                         ppr->reionization_start_factor * pth->helium_fullreio_width);
       }
       else {
         preio->reionization_parameters[preio->index_reio_start] = z_reionization_;
@@ -2325,13 +2322,10 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
             ppr->reionization_start_factor * pth->reionization_width;
         /* if starting redshift for helium is larger, take that one
            (does not happen in realistic models) */
-        if (preio->reionization_parameters[preio->index_reio_start] <
-            pth->helium_fullreio_redshift +
-                ppr->reionization_start_factor * pth->helium_fullreio_width) {
-          preio->reionization_parameters[preio->index_reio_start] = pth->helium_fullreio_redshift +
-                                                                    ppr->reionization_start_factor *
-                                                                        pth->helium_fullreio_width;
-        }
+        preio->reionization_parameters[preio->index_reio_start] =
+            std::max(preio->reionization_parameters[preio->index_reio_start],
+                     pth->helium_fullreio_redshift +
+                         ppr->reionization_start_factor * pth->helium_fullreio_width);
 
         class_test(preio->reionization_parameters[preio->index_reio_start] >
                        ppr->reionization_z_start_max,
@@ -2774,9 +2768,7 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
 
     /* - try next step */
     double z_next = z - dz;
-    if (z_next < 0.) {
-      z_next = 0.;
-    }
+    z_next        = std::max(z_next, 0.);
 
     double xe_next;
     thermodynamics_reionization_function(z_next, preio, &xe_next);
@@ -3610,7 +3602,7 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
  */
 
 void ThermodynamicsModule::thermodynamics_recombination_derivs_member(
-    double z, double* y, double* dy, void* parameters_and_workspace) {
+    double z, const double* y, double* dy, void* parameters_and_workspace) {
   /* define local variables */
 
   struct thermodynamics_parameters_and_workspace* ptpaw =

@@ -22,9 +22,7 @@ double riemann_zeta(double s) {
   // (3 + sqrt(8))^(-n), so n = 21 - floor(s) suffices for s <= 20. Clamp to 6
   // (ample for large s, where zeta(s) -> 1 exponentially fast).
   int n = (s > 0.) ? static_cast<int>(21 - s) : 21;
-  if (n < 6) {
-    n = 6;
-  }
+  n     = std::max(n, 6);
 
   // Borwein d_k coefficients via the e_j auxiliary array.
   std::vector<double> e(n + 1);

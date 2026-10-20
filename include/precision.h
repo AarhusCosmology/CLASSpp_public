@@ -223,7 +223,7 @@ struct precision {
    * If non-empty, the solved BBN run writes its abundance history here, one row
    * per sampled temperature. Diagnostic only; empty means no file.
    */
-  std::string bbn_history_file = "";
+  std::string bbn_history_file;
 
   /*
    *  Thermodynamical quantities

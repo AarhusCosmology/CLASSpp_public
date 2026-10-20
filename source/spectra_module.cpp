@@ -25,7 +25,7 @@ SpectraModule::SpectraModule(InputModulePtr input_module,
   spectra_init();
 }
 
-SpectraModule::~SpectraModule() {}
+SpectraModule::~SpectraModule() = default;
 
 std::map<std::string, int> SpectraModule::cl_output_index_map() const {
   std::map<std::string, int> index_map;
@@ -462,10 +462,8 @@ void SpectraModule::spectra_init() {
     }
     return;
   }
-  else {
-    if (psp->spectra_verbose > 0) {
-      printf("Computing unlensed harmonic spectra\n");
-    }
+  if (psp->spectra_verbose > 0) {
+    printf("Computing unlensed harmonic spectra\n");
   }
 
   /** - initialize indices and allocate some of the arrays in the
@@ -937,7 +935,7 @@ void SpectraModule::spectra_compute_cl(int index_md,
                                        int index_l,
                                        int cl_integrand_num_columns,
                                        double* cl_integrand,
-                                       double* primordial_pk_cached,
+                                       const double* primordial_pk_cached,
                                        double* transfer_ic1,
                                        double* transfer_ic2) {
   int index_q;

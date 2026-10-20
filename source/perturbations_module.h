@@ -289,11 +289,11 @@ class PerturbationsModule : public BaseModule {
                                            double tau_end,
                                            double precision,
                                            int interval_number,
-                                           int* interval_number_of,
+                                           const int* interval_number_of,
                                            double* interval_limit,
                                            int** interval_approx);
   void perturb_vector_init(
-      int index_md, int index_ic, double k, double tau, perturb_workspace* ppw, int* pa_old);
+      int index_md, int index_ic, double k, double tau, perturb_workspace* ppw, const int* pa_old);
   void perturb_initial_conditions(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw);
   void perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);
@@ -326,11 +326,11 @@ class PerturbationsModule : public BaseModule {
                                       double* y,
                                       double* diag,
                                       void* parameters_and_workspace);
-  void perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace);
+  void perturb_tca_slip_and_shear(const double* y, void* parameters_and_workspace);
   void perturb_rsa_delta_and_theta(
-      double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
+      double k, const double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
   void perturb_rsa_idr_delta_and_theta(
-      double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
+      double k, const double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw);
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;

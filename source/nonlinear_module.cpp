@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 
 #include "../species/fluid.h"
@@ -92,7 +93,7 @@ NonlinearModule::NonlinearModule(InputModulePtr input_module,
   nonlinear_init();
 }
 
-NonlinearModule::~NonlinearModule() {}
+NonlinearModule::~NonlinearModule() = default;
 
 /**
  * Return the P(k,z) for a given redshift z and pk type (_m, _cb)
@@ -1084,10 +1085,8 @@ void NonlinearModule::nonlinear_init() {
     }
     return;
   }
-  else {
-    if (pnl->nonlinear_verbose > 0) {
-      printf("Computing linear Fourier spectra.\n");
-    }
+  if (pnl->nonlinear_verbose > 0) {
+    printf("Computing linear Fourier spectra.\n");
   }
 
   if (pnl->has_pk_eq) {
@@ -1104,7 +1103,7 @@ void NonlinearModule::nonlinear_init() {
 
   /** --> check applicability of Halofit and HMcode */
   if (pnl->method > nl_none) {
-    for (auto& sp : all_species_) {
+    for (const auto& sp : all_species_) {
       sp->WarnIfTooHeavyForHalofit(_M_EV_TOO_BIG_FOR_HALOFIT_);
     }
     if (all_species_.count("IDM_DR_IDR") &&
@@ -1205,7 +1204,7 @@ void NonlinearModule::nonlinear_init() {
   }
 
   /** --> Then go through common preliminary steps to the HALOFIT and HMcode methods */
-  else if ((pnl->method == nl_halofit) || ((pnl->method == nl_HMcode))) {
+  else if ((pnl->method == nl_halofit) || (pnl->method == nl_HMcode)) {
     if ((pnl->nonlinear_verbose > 0) && (pnl->method == nl_halofit)) {
       printf(
           "Computing non-linear matter power spectrum with Halofit (including update Takahashi et "
@@ -2419,9 +2418,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
     *nl_corr_not_computable_at_this_k = true;
     return;
   }
-  else {
-    *nl_corr_not_computable_at_this_k = false;
-  }
+  *nl_corr_not_computable_at_this_k = false;
 
   xlogr1 = log(R) / log(10.);
 
@@ -2566,10 +2563,10 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
       if (fabs(1 - Omega_m) > 0.01) { /*then omega evolution */
         f1a  = pow(Omega_m, (-0.0732));
         f2a  = pow(Omega_m, (-0.1423));
-        f3a  = pow(Omega_m, (0.0725));
+        f3a  = pow(Omega_m, 0.0725);
         f1b  = pow(Omega_m, (-0.0307));
         f2b  = pow(Omega_m, (-0.0585));
-        f3b  = pow(Omega_m, (0.0743));
+        f3b  = pow(Omega_m, 0.0743);
         frac = Omega_v / (1. - Omega_m);
         f1   = frac * f1b + (1 - frac) * f1a;
         f2   = frac * f2b + (1 - frac) * f2a;
@@ -3016,7 +3013,7 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
    * The halo concentration-mass-relation c(M) will be found later.  */
 
   for (index_mass = 0; index_mass < ppr->nsteps_for_p1h_integral; index_mass++) {
-    m = exp(log(mmin) + log(mmax / mmin) * (index_mass) / (ppr->nsteps_for_p1h_integral - 1));
+    m = exp(log(mmin) + log(mmax / mmin) * index_mass / (ppr->nsteps_for_p1h_integral - 1));
     r = pow((3. * m / (4. * _PI_ * rho_crit_today_in_msun_mpc3 * Omega0_m)), (1. / 3.));
     mass[index_mass]     = m;
     r_real[index_mass]   = r;
@@ -3113,9 +3110,7 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
     *nl_corr_not_computable_at_this_k = true;
     return;
   }
-  else {
-    *nl_corr_not_computable_at_this_k = false;
-  }
+  *nl_corr_not_computable_at_this_k = false;
 
   /* call sigma_prime function at r_nl to find the effective spectral index n_eff */
 
@@ -3162,12 +3157,8 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
     }
   }
   if (!(feedback || unfitted)) {
-    if (fdamp < 1.e-3) {
-      fdamp = 1.e-3;
-    }
-    if (fdamp > 0.99) {
-      fdamp = 0.99;
-    }
+    fdamp = std::max(fdamp, 1.e-3);
+    fdamp = std::min(fdamp, 0.99);
   }
 
   /** Calculate halo concentration-mass relation conc(mass) (Bullock et al. 2001), with the dark
@@ -3188,9 +3179,7 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
   for (index_mass = 0; index_mass < ppr->nsteps_for_p1h_integral; index_mass++) {
     //find growth rate at formation
     g_form = delta_c * growth / sigmaf_r[index_mass];
-    if (g_form > 1.) {
-      g_form = 1.;
-    }
+    g_form = std::min(g_form, 1.);
 
     if (!hm2020) {
       array_interpolate_two_arrays_one_column(pnw->growtable.data(),
@@ -3362,9 +3351,7 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
     else {
       pk_2h = pk_lin;
     }
-    if (pk_2h < 0.) {
-      pk_2h = 0.;
-    }
+    pk_2h          = std::max(pk_2h, 0.);
     pk_nl[index_k] = pow((pow(pk_1h, alpha) + pow(pk_2h, alpha)), (1. / alpha)) / pow(k, 3) /
                      anorm;  //converted back to P_k
   }
@@ -3946,7 +3933,7 @@ void NonlinearModule::nonlinear_hmcode_fill_growtab(struct nonlinear_workspace* 
   pvecback.resize(background_module_->bg_size_);
 
   for (int index_scalefactor = 0; index_scalefactor < ng; index_scalefactor++) {
-    double scalefactor = ainit + (amax - ainit) * (index_scalefactor) / (ng - 1);
+    double scalefactor = ainit + (amax - ainit) * index_scalefactor / (ng - 1);
     double z           = 1. / scalefactor - 1.;
 
     pnw->ztable[index_scalefactor] = z;
@@ -4007,7 +3994,7 @@ void NonlinearModule::nonlinear_hmcode_growint(
   }
   else {
     for (int index_scalefactor = 0; index_scalefactor < ng; index_scalefactor++) {
-      double scalefactor = ainit + (amax - ainit) * (index_scalefactor) / (ng - 1);
+      double scalefactor = ainit + (amax - ainit) * index_scalefactor / (ng - 1);
       double z           = 1. / scalefactor - 1.;
 
       /* This will compute Omega_m(z) for the input values of w0 and wa, to let the user compare the wCDM and LCDM cases. This is why we cannot extract Omega_m(z) fromn the background module in this place. */
@@ -4351,7 +4338,7 @@ void NonlinearModule::prepare_pk_eq() {
   pk_eq_ddw_and_ddOmega_.resize(pk_eq_tau_size_ * pk_eq_size_);
 
   /** - call the background module in order to fill a table of tau_i[z_i] */
-  std::unique_ptr<InputModule> input{new InputModule(input_module_->file_content_)};
+  std::unique_ptr<InputModule> input = std::make_unique<InputModule>(input_module_->file_content_);
   /** - the fake calls of the background and thermodynamics module will be done in non-verbose mode */
   input->background_.background_verbose         = 0;
   input->thermodynamics_.thermodynamics_verbose = 0;
@@ -4387,7 +4374,7 @@ void NonlinearModule::prepare_pk_eq() {
     /* launch iterations in order to coverge to effective model with wa=0 but the same chi = (tau[z_i] - tau_rec) */
 
     double w0_fld = -1.;
-    if (auto* p = all_species_.find("Fluid")) {
+    if (const auto* p = all_species_.find("Fluid")) {
       w0_fld = static_cast<const FluidSpecies*>(p->get())->w0_fld();
     }
     /* Local copy of the input file content so that overrides for w0/wa do not
@@ -4403,7 +4390,7 @@ void NonlinearModule::prepare_pk_eq() {
     do {
       fc_local.set("w0_fld", format_double(w0_fld));
       fc_local.set("wa_fld", format_double(0.0));
-      input.reset(new InputModule(fc_local));
+      input                                         = std::make_unique<InputModule>(fc_local);
       input->background_.background_verbose         = 0;
       input->thermodynamics_.thermodynamics_verbose = 0;
 

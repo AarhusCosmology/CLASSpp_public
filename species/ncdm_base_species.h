@@ -282,7 +282,7 @@ class NCDMBaseSpecies : public BaseSpecies {
                   FileContent* pfc,
                   const std::string& instance_name,
                   const NcdmSettings& settings,
-                  DeferInit);
+                  DeferInit defer);
 
   /** Build perturbation/background quadrature and the dimensionless mass M_.
    *  Calls InitQuadrature (which dispatches the virtual PSD) then computes M_

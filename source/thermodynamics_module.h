@@ -30,8 +30,11 @@ class ThermodynamicsModule : public BaseModule {
   ~ThermodynamicsModule();
   void thermodynamics_output_titles(std::string& titles) const;
   void thermodynamics_output_data(int number_of_titles, double* data) const;
-  void thermodynamics_at_z(
-      double z, short inter_mode, int* last_index, double* pvecback, double* pvecthermo) const;
+  void thermodynamics_at_z(double z,
+                           short inter_mode,
+                           int* last_index,
+                           const double* pvecback,
+                           double* pvecthermo) const;
 
   const thermo* GetThermodynamics() const {
     return pth;
@@ -178,7 +181,7 @@ class ThermodynamicsModule : public BaseModule {
   void thermodynamics_recfast_store_row(
       recombination* preco, int sample_index, double z, double xe, double Tb, double dTbdz) const;
   void thermodynamics_recombination_derivs_member(double z,
-                                                  double* y,
+                                                  const double* y,
                                                   double* dy,
                                                   void* parameters_and_workspace);
   static void thermodynamics_recombination_derivs(double z,

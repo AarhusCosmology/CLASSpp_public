@@ -212,12 +212,8 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
   // OOB write of phi/dphi 3 elements before the buffer). This is latent in the
   // transfer module (large multipoles keep xfwd > xmin) but is reachable when
   // the constructor is called directly with small l.
-  if (xfwdidx < 0) {
-    xfwdidx = 0;
-  }
-  if (xfwdidx > nx) {
-    xfwdidx = nx;
-  }
+  xfwdidx = std::max(xfwdidx, 0);
+  xfwdidx = std::min(xfwdidx, nx);
   //Calculate and assign Phi and dPhi values:
 
   std::vector<double> PhiL((lmax + 2) * _HYPER_CHUNK_);
@@ -308,8 +304,8 @@ void hyperspherical_forwards_recurrence(int K,
                                         double x,
                                         double sinK,
                                         double cotK,
-                                        double* sqrtK,
-                                        double* one_over_sqrtK,
+                                        const double* sqrtK,
+                                        const double* one_over_sqrtK,
                                         double* PhiL) {
   int l;
   hyperspherical_phi01_exact(K, beta, x, sinK, cotK, PhiL, PhiL + 1);
@@ -325,8 +321,8 @@ void hyperspherical_forwards_recurrence_chunk(int K,
                                               double* sinK,
                                               double* cotK,
                                               int chunk,
-                                              double* sqrtK,
-                                              double* one_over_sqrtK,
+                                              const double* sqrtK,
+                                              const double* one_over_sqrtK,
                                               double* PhiL) {
   int l;
   int index_x;
@@ -354,8 +350,8 @@ void hyperspherical_backwards_recurrence(int K,
                                          double x,
                                          double sinK,
                                          double cotK,
-                                         double* sqrtK,
-                                         double* one_over_sqrtK,
+                                         const double* sqrtK,
+                                         const double* one_over_sqrtK,
                                          double* PhiL) {
   double phi0_exact;
   double phi1_exact;
@@ -481,8 +477,8 @@ void hyperspherical_backwards_recurrence_chunk(int K,
                                                double* sinK,
                                                double* cotK,
                                                int chunk,
-                                               double* sqrtK,
-                                               double* one_over_sqrtK,
+                                               const double* sqrtK,
+                                               const double* one_over_sqrtK,
                                                double* PhiL) {
   double phi0_exact;
   double phi1_exact;
@@ -536,9 +532,7 @@ void hyperspherical_backwards_recurrence_chunk(int K,
     double maxabs = 0.0;
     for (index_x = 0; index_x < chunk; index_x++) {
       double v = fabs(PhiL[l * chunk + index_x]);
-      if (v > maxabs) {
-        maxabs = v;
-      }
+      maxabs   = std::max(maxabs, v);
     }
     if (maxabs > _HYPER_OVERFLOW_) {
       //Rescale whole Phi vector until this point.
@@ -1032,9 +1026,7 @@ void hyperspherical_get_xmin_from_Airy(
         *xmin = xnew;
         return;
       }
-      else {
-        break;
-      }
+      break;
     }
     Fnew    = PhiWKB_minus_phiminabs(xnew, &wkbstruct);
     *fevals = (*fevals) + 1;
@@ -1082,8 +1074,8 @@ bool fzero_ridder(double (*func)(double, void*),
                   double x2,
                   double xtol,
                   void* param,
-                  double* Fx1,
-                  double* Fx2,
+                  const double* Fx1,
+                  const double* Fx2,
                   double* xzero,
                   int* fevals) {
   /**Using Ridders' method, return the root of a function func known to
@@ -1164,21 +1156,19 @@ bool fzero_ridder(double (*func)(double, void*),
     fprintf(stderr, "zriddr exceed maximum iterations");
     return false;
   }
-  else {
-    /* An endpoint is already a root. (This used to `return x1;` / `return
+  /* An endpoint is already a root. (This used to `return x1;` / `return
        x2;`, silently truncating the coordinate to an int status and leaving
        *xzero unset.) */
-    if (fl == 0.0) {
-      *xzero = x1;
-      return true;
-    }
-    if (fh == 0.0) {
-      *xzero = x2;
-      return true;
-    }
-    fprintf(stderr, "root must be bracketed in zriddr.");
-    return false;
+  if (fl == 0.0) {
+    *xzero = x1;
+    return true;
   }
+  if (fh == 0.0) {
+    *xzero = x2;
+    return true;
+  }
+  fprintf(stderr, "root must be bracketed in zriddr.");
+  return false;
 }
 
 void hyperspherical_get_xmin_from_approx(
@@ -1209,7 +1199,7 @@ void hyperspherical_get_xmin_from_approx(
 }
 
 void hyperspherical_bessel_direct_vector(
-    int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi) {
+    int K, double beta, int* lvec, int nl, const double* xvec, int nx, double* Phi) {
   /** Evaluate Phi_l^beta(x) by direct forwards/backwards recurrence at each
       requested x, for every requested l. Keeps the numerical considerations
       that are otherwise spread across hyperspherical_HIS_create:
@@ -1236,9 +1226,7 @@ void hyperspherical_bessel_direct_vector(
   lmax = 0;
   for (il = 0; il < nl; il++) {
     class_test(lvec[il] < 0, "l must be non-negative (got %d)", lvec[il]);
-    if (lvec[il] > lmax) {
-      lmax = lvec[il];
-    }
+    lmax = std::max(lmax, lvec[il]);
   }
 
   if (K == 1) {

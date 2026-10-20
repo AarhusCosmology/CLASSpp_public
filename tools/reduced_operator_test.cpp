@@ -795,9 +795,9 @@ Background OvershootBackground(const Grid& P, const Grid& F, const Grid& B, doub
   Background bg = AnalyticBackground(P, F, B, a, m);
   // Push the populated core just past saturation, the way a discrete gather that does
   // not enforce Pauli blocking does. 1.01 is the measured value, not a stress test.
-  for (size_t i = 0; i < bg.fl.size(); ++i) {
-    if (bg.fl[i] > 0.5) {
-      bg.fl[i] = 1.01;
+  for (double& fl : bg.fl) {
+    if (fl > 0.5) {
+      fl = 1.01;
     }
   }
   return bg;
@@ -1173,10 +1173,10 @@ void q9_operator_table() {
   table.AddRow(a1, M[1]);
   assert(table.n_rows() == 2);
 
-  unsigned seed = 0xC0FFEEu;
+  unsigned seed = 0xC0FFEEU;
   auto rnd      = [&]() {
-    seed = seed * 1664525u + 1013904223u;
-    return -1.0 + 2.0 * (((seed >> 9) & 0xffffu) / 65535.0);
+    seed = seed * 1664525U + 1013904223U;
+    return -1.0 + 2.0 * (((seed >> 9) & 0xffffU) / 65535.0);
   };
   std::vector<double> z(S);
   for (int i = 0; i < S; ++i) {

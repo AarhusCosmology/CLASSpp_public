@@ -825,12 +825,8 @@ int ReducedOperatorTable::LowerRow(double a) const {
     // round identically at a row boundary, and an index off by one past the end would
     // read the next row's block.
     int i = static_cast<int>((std::log(a) - ln_a_[0]) * inv_dlna_);
-    if (i < 0) {
-      i = 0;
-    }
-    if (i > hi) {
-      i = hi;
-    }
+    i     = std::max(i, 0);
+    i     = std::min(i, hi);
     while (i < hi && a_[i + 1] <= a) {
       ++i;
     }

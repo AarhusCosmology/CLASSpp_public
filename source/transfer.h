@@ -78,7 +78,7 @@ struct transfers {
  * see transfer_radial_function()
  */
 
-typedef enum {
+using radial_function_type = enum {
   SCALAR_TEMPERATURE_0,
   SCALAR_TEMPERATURE_1,
   SCALAR_TEMPERATURE_2,
@@ -91,7 +91,7 @@ typedef enum {
   TENSOR_POLARISATION_E,
   TENSOR_POLARISATION_B,
   NC_RSD
-} radial_function_type;
+};
 
 /**
  * The physical contribution carried by a transfer type: a CMB term, or

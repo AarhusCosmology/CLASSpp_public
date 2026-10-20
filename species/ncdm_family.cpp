@@ -1,5 +1,6 @@
 #include "species/ncdm_family.h"
 
+#include <algorithm>
 #include <stdexcept>
 #include <string_view>
 
@@ -27,12 +28,9 @@ constexpr std::string_view kFluidApproximationConsumers[] = {
 };
 
 bool ConsumesFluidApproximation(std::string_view type) {
-  for (const auto known : kFluidApproximationConsumers) {
-    if (known == type) {
-      return true;
-    }
-  }
-  return false;
+  return std::find(std::begin(kFluidApproximationConsumers),
+                   std::end(kFluidApproximationConsumers),
+                   type) != std::end(kFluidApproximationConsumers);
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "parser.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cstdio>
@@ -104,12 +105,9 @@ std::vector<std::string> FileContent::instances_with(const std::string& field,
   if (!(std::isalpha(static_cast<unsigned char>(c0)) || c0 == '_')) {
     return false;
   }
-  for (char c : name) {
-    if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(name.begin(), name.end(), [](char c) {
+    return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
+  });
 }
 
 std::vector<std::string> FileContent::unread_parameters() const {
@@ -225,7 +223,7 @@ std::string FileContent::get_or(const std::string& name, const char* fallback) c
   if (auto v = get<std::string>(name)) {
     return *v;
   }
-  return std::string(fallback);
+  return {fallback};
 }
 
 /* static */ bool FileContent::parse_line(const std::string& line,

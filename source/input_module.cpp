@@ -1086,8 +1086,11 @@ void InputModule::ReadContext() {
  * thermodynamics, reionization, energy injection, output / perturbation /
  * primordial / transfer / spectra / lensing configuration, and the
  * species-dependent S8 and halofit reads. Runs after ConstructSpecies.
+ *
+ * At about 1,600 statements it is the one function over readability-function-size's
+ * threshold (800); it will be split with the C-heritage cleanup.
  */
-void InputModule::ReadDerived() {
+void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   /** - define local variables */
   FileContent* pfc = &file_content_;
   precision* ppr   = &precision_;      /* for precision parameters */
@@ -2379,7 +2382,7 @@ void InputModule::ReadDerived() {
       }
     }
     else if (readDoubleList(pfc, "selection_mean", selectionValues, &found);
-             (found) && !selectionValues.empty()) {
+             found && !selectionValues.empty()) {
       n_list = static_cast<int>(selectionValues.size());
 
       class_test_severe(n_list > _SELECTION_NUM_MAX_,
@@ -2411,7 +2414,7 @@ void InputModule::ReadDerived() {
       selectionValues.clear();
       readDoubleList(pfc, "selection_width", selectionValues, &found);
 
-      if ((found) && !selectionValues.empty()) {
+      if (found && !selectionValues.empty()) {
         n_list = static_cast<int>(selectionValues.size());
 
         if (n_list == 1) {
@@ -2439,7 +2442,7 @@ void InputModule::ReadDerived() {
     selectionValues.clear();
     readDoubleList(pfc, "selection_bias", selectionValues, &found);
 
-    if ((found) && !selectionValues.empty()) {
+    if (found && !selectionValues.empty()) {
       n_list = static_cast<int>(selectionValues.size());
 
       if (n_list == 1) {
@@ -2466,7 +2469,7 @@ void InputModule::ReadDerived() {
     selectionValues.clear();
     readDoubleList(pfc, "selection_magnification_bias", selectionValues, &found);
 
-    if ((found) && !selectionValues.empty()) {
+    if (found && !selectionValues.empty()) {
       n_list = static_cast<int>(selectionValues.size());
 
       if (n_list == 1) {
@@ -2634,8 +2637,8 @@ void InputModule::ReadDerived() {
         (non_linear->find("Halofit") != std::string::npos) ||
         (non_linear->find("HALOFIT") != std::string::npos)) {
       pnl->method       = nl_halofit;
-      ppt->k_max_for_pk = std::max(ppt->k_max_for_pk,
-                                   std::max(ppr->halofit_min_k_max, ppr->nonlinear_min_k_max));
+      ppt->k_max_for_pk = std::max(
+          {ppt->k_max_for_pk, ppr->halofit_min_k_max, ppr->nonlinear_min_k_max});
       ppt->has_nl_corrections_based_on_delta_m = true;
     }
     if ((non_linear->find("hmcode") != std::string::npos) ||
@@ -2643,8 +2646,8 @@ void InputModule::ReadDerived() {
         (non_linear->find("HMcode") != std::string::npos) ||
         (non_linear->find("Hmcode") != std::string::npos)) {
       pnl->method       = nl_HMcode;
-      ppt->k_max_for_pk = std::max(ppt->k_max_for_pk,
-                                   std::max(ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max));
+      ppt->k_max_for_pk = std::max(
+          {ppt->k_max_for_pk, ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max});
       ppt->has_nl_corrections_based_on_delta_m = true;
       pnl->extrapolation_method                = static_cast<enum source_extrapolation>(
           pfc->get_or<int>("extrapolation_method", pnl->extrapolation_method));

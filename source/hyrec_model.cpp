@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
 #include "constants.h"
 #include "errors.h"
@@ -52,7 +53,7 @@ double HeliumRateCorrection(double T_rad_atomic_eV) {
 
 }  // namespace
 
-HyrecModel::HyrecModel(const std::string& path,
+HyrecModel::HyrecModel(std::string path,
                        double T_cmb,
                        double obh2,
                        double ocbh2,
@@ -63,7 +64,8 @@ HyrecModel::HyrecModel(const std::string& path,
                        double nH0,
                        double z_initial,
                        bool He_rate_correction)
-    : data_(new HyrecData), path_(path), fHe_(fHe), He_rate_correction_(He_rate_correction) {
+    : data_(new HyrecData), path_(std::move(path)), fHe_(fHe),
+      He_rate_correction_(He_rate_correction) {
   /* hyrec_allocate reads the effective-rate and SWIFT-fit tables from this
      directory, so it has to be set first. HYREC-2 keeps the pointer, hence the
      copy that outlives the call. */

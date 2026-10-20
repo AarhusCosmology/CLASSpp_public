@@ -70,9 +70,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   int num_loops = (argc >= 3) ? std::atoi(argv[2]) : 5;
-  if (num_loops < 1) {
-    num_loops = 1;
-  }
+  num_loops     = std::max(num_loops, 1);
 
   // Parse arguments once into a master FileContent; copy it per loop so each
   // run starts from an identical, all-unread parameter set.

@@ -70,24 +70,24 @@ void uninitialize_numjac_workspace(struct numjac_workspace* nj_ws);
 void calc_C(struct jacobian* jac);
 void interp_from_dif(double tinterp,
                      double tnew,
-                     double* ynew,
+                     const double* ynew,
                      double h,
                      double** dif,
                      int k,
                      double* yinterp,
                      double* ypinterp,
                      double* yppinterp,
-                     int* mask,
+                     const int* mask,
                      int neq,
                      int output);
 void new_linearisation(struct jacobian* jac, double hinvGak, int neq);
 void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k);
-void eqvec(double* datavec, double* emptyvec, int n);
-void lubksb(double** a, int n, int* indx, double b[]);
+void eqvec(const double* datavec, double* emptyvec, int n);
+void lubksb(double** a, int n, const int* indx, double b[]);
 bool ludcmp(double** a, int n, int* indx, double* d, double* vv);
 void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
                   double* x_inout,
-                  double* dxdF,
+                  const double* dxdF,
                   int x_size,
                   double tolx,
                   double tolF,

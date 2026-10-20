@@ -1,5 +1,6 @@
 #include "decay_transition_kernel.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "errors.h"
@@ -183,9 +184,7 @@ void DecayTransitionKernel::TwoBinSplit(
         inc <<= 1;
         hi    = lo + inc;
       }
-      if (hi > g.n - 1) {
-        hi = g.n - 1;
-      }
+      hi = std::min(hi, g.n - 1);
     }
     else {  // hunt downward
       hi = hint;
@@ -195,9 +194,7 @@ void DecayTransitionKernel::TwoBinSplit(
         inc <<= 1;
         lo    = hi - inc;
       }
-      if (lo < 0) {
-        lo = 0;
-      }
+      lo = std::max(lo, 0);
     }
   }
   while (hi - lo > 1) {

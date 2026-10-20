@@ -28,17 +28,17 @@ std::string DefaultPath() {
 }
 
 HyrecModel MakeModel(const std::string& path = DefaultPath(), bool He_rate_correction = false) {
-  return HyrecModel(path,
-                    kT_cmb,
-                    kObh2,
-                    kOcbh2,
-                    kOkh2,
-                    kNeff,
-                    kYHe,
-                    kFHe,
-                    kNH0,
-                    kZInitial,
-                    He_rate_correction);
+  return {path,
+          kT_cmb,
+          kObh2,
+          kOcbh2,
+          kOkh2,
+          kNeff,
+          kYHe,
+          kFHe,
+          kNH0,
+          kZInitial,
+          He_rate_correction};
 }
 
 /* HYREC-2's XHEII_MIN (history.h, opaque to this test): helium per hydrogen below which

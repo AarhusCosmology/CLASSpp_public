@@ -35,7 +35,7 @@ struct GBQuadParams {
 
 /* Structures for QSS */
 
-typedef struct adaptive_integration_tree_node {
+struct adaptive_integration_tree_node {
   /* binary tree node: */
   double I   = 0.0;      /* Estimate of integral */
   double err = 0.0;      /* Estimated error */
@@ -44,7 +44,8 @@ typedef struct adaptive_integration_tree_node {
   int leaf_childs = 0;   /* Number of leafs under current node. 1 means that the node is a leaf. */
   /* Pointer to children: */
   std::unique_ptr<struct adaptive_integration_tree_node> left, right; /* Pointer to left child. */
-} qss_node;
+};
+using qss_node = adaptive_integration_tree_node;
 
 void get_qsampling(double* x,
                    double* w,
@@ -53,8 +54,8 @@ void get_qsampling(double* x,
                    double rtol,
                    double* qvec,
                    int qsiz,
-                   void (*test)(void* params_for_function, double q, double* psi),
-                   void (*function)(void* params_for_function, double q, double* f0),
+                   void (*test_function)(void* params_for_function, double q, double* psi),
+                   void (*distribution_function)(void* params_for_function, double q, double* f0),
                    void* params_for_function);
 bool get_qsampling_manual(double* x,
                           double* w,

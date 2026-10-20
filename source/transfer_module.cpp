@@ -25,7 +25,7 @@ TransferModule::TransferModule(InputModulePtr input_module,
   transfer_init();
 }
 
-TransferModule::~TransferModule() {}
+TransferModule::~TransferModule() = default;
 
 /**
  * Transfer function \f$ \Delta_l^{X} (q) \f$ at a given wavenumber q.
@@ -111,9 +111,7 @@ void TransferModule::transfer_init() {
     }
     return;
   }
-  else {
-    has_cls_ = true;
-  }
+  has_cls_ = true;
 
   if (ptr->transfer_verbose > 0) {
     fprintf(stdout, "Computing transfers\n");
@@ -3190,11 +3188,10 @@ void TransferModule::transfer_get_lmax(
       //Boundary found
       break;
     }
-    else {
-      //We can use current index_l_left as index_l_right:
-      *index_l_right         = *index_l_left;
-      right_boundary_checked = true;
-    }
+    //We can use current index_l_left as index_l_right:
+    *index_l_right         = *index_l_left;
+    right_boundary_checked = true;
+
     //Update index_l_left:
     *index_l_left = (*index_l_left) - multiplier;
     if (*index_l_left <= 0) {
@@ -3210,10 +3207,9 @@ void TransferModule::transfer_get_lmax(
         //Boundary found
         break;
       }
-      else {
-        //We can use current index_l_right as index_l_left:
-        *index_l_left = *index_l_right;
-      }
+      //We can use current index_l_right as index_l_left:
+      *index_l_left = *index_l_right;
+
       //Update index_l_right:
       *index_l_right = (*index_l_right) + multiplier;
       if (*index_l_right >= (lsize - 1)) {
@@ -3487,7 +3483,7 @@ void TransferModule::transfer_precompute_windows(double tau_rec) {
                   case 0:
                     sinKgen_source         = t0mt_source;
                     sinKgen_source_to_lens = (tau0_minus_tau[index_tau] - t0mt_source);
-                    cotKgen_source         = 1. / (t0mt_source);
+                    cotKgen_source         = 1. / t0mt_source;
                     cscKgen_lens           = 1. / (tau0_minus_tau[index_tau]);
                     break;
                   case -1:
@@ -3551,7 +3547,7 @@ void TransferModule::transfer_precompute_windows(double tau_rec) {
 }
 
 void TransferModule::transfer_f_evo(
-    double* pvecback,
+    const double* pvecback,
     int last_index,
     double cotKgen, /* Should be FILLED with values of corresponding time */
     double* f_evo) {

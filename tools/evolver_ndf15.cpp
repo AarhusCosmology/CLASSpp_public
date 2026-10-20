@@ -495,7 +495,7 @@ void evolver_ndf15(EvolverDerivs derivs,
             gotynew = true;
             break; /* Break Newton loop */
           }
-          else if (iter == 1) {
+          if (iter == 1) {
             if (havrate) {
               errit = newnrm * rate / (1.0 - rate);
               if (errit <= 0.05 * rtol) {
@@ -519,11 +519,11 @@ void evolver_ndf15(EvolverDerivs derivs,
               gotynew = true;
               break; /* exit newton */
             }
-            else if (iter == maxit) {
+            if (iter == maxit) {
               tooslow = true;
               break; /*exit newton */
             }
-            else if (0.5 * rtol < errit * pow(rate, (maxit - iter))) {
+            if (0.5 * rtol < errit * pow(rate, (maxit - iter))) {
               tooslow = true;
               break; /*exit Newton */
             }
@@ -797,7 +797,7 @@ void evolver_ndf15(EvolverDerivs derivs,
 /* "new_linearisation", "relevant_indices", "ludcmp", "lubksb".       */
 /**********************************************************************/
 
-void eqvec(double* datavec, double* emptyvec, int n) {
+void eqvec(const double* datavec, double* emptyvec, int n) {
   for (int i = 1; i <= n; i++) {
     emptyvec[i] = datavec[i];
   }
@@ -879,14 +879,14 @@ void calc_C(struct jacobian* jac) {
 /* Subroutine that interpolates from information stored in dif */
 void interp_from_dif(double tinterp,
                      double tnew,
-                     double* ynew,
+                     const double* ynew,
                      double h,
                      double** dif,
                      int k,
                      double* yinterp,
                      double* ypinterp,
                      double* yppinterp,
-                     int* mask,
+                     const int* mask,
                      int neq,
                      int output) {
   /* Output=1: only y_vector. Output=2: y and y prime. Output=3: y, yp and ypp*/
@@ -1040,7 +1040,7 @@ void new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
 }
 
 /** Helper functions */
-void lubksb(double** a, int n, int* indx, double b[]) {
+void lubksb(double** a, int n, const int* indx, double b[]) {
   int i;
   int ii = 0;
   int ip;
@@ -1135,7 +1135,7 @@ bool ludcmp(double** a, int n, int* indx, double* d, double* vv) {
 
 void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
                   double* x_inout,
-                  double* dxdF,
+                  const double* dxdF,
                   int x_size,
                   double tolx,
                   double tolF,
@@ -1237,9 +1237,7 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
             //Significant difference
             break;
           }
-          else {
-            delx[i - 1] *= 2;
-          }
+          delx[i - 1] *= 2;
         }
         else {
           delx[i - 1] *= -0.5;

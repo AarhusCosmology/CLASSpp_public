@@ -5,6 +5,7 @@
 #include "primordial_module.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "thread_pool.h"
 
@@ -37,11 +38,11 @@ bool read_line(FILE* file, std::string& line) {
 
 PrimordialModule::PrimordialModule(InputModulePtr input_module,
                                    PerturbationsModulePtr perturbation_module)
-    : BaseModule(std::move(input_module)), perturbations_module_(perturbation_module) {
+    : BaseModule(std::move(input_module)), perturbations_module_(std::move(perturbation_module)) {
   primordial_init();
 }
 
-PrimordialModule::~PrimordialModule() {}
+PrimordialModule::~PrimordialModule() = default;
 
 /**
  * Primordial spectra for arbitrary argument and for all initial conditions.
@@ -212,10 +213,8 @@ void PrimordialModule::primordial_init() {
     }
     return;
   }
-  else {
-    if (ppm->primordial_verbose > 0) {
-      printf("Computing primordial spectra");
-    }
+  if (ppm->primordial_verbose > 0) {
+    printf("Computing primordial spectra");
   }
 
   A_s_     = ppm->A_s;
@@ -1300,7 +1299,7 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
  * @return the error status
  */
 
-void PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
+void PrimordialModule::primordial_inflation_analytic_spectra(const double* y_ini) {
   std::vector<double> y(in_size_);
   std::vector<double> dy(in_size_);
 
@@ -1385,7 +1384,7 @@ void PrimordialModule::primordial_inflation_spectra(double* y_ini) {
  * @return the error status
  */
 
-void PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int index_k) {
+void PrimordialModule::primordial_inflation_one_wavenumber(const double* y_ini, int index_k) {
   double k;
   double curvature;
   double tensors;

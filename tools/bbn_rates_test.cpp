@@ -62,12 +62,11 @@ double ExpectedReverseOverForward(const BbnReaction& r, double T9) {
 }
 
 void test_network_topology_is_conserved() {
-  for (int r = 0; r < kBbnNumReactions; ++r) {
-    const BbnReaction& rxn = kReactions[r];
-    int A_in               = 0;
-    int Z_in               = 0;
-    int A_out              = 0;
-    int Z_out              = 0;
+  for (const auto& rxn : kReactions) {
+    int A_in  = 0;
+    int Z_in  = 0;
+    int A_out = 0;
+    int Z_out = 0;
     for (int i = 0; i < rxn.n_reactants; ++i) {
       A_in += kNuclides[rxn.reactants[i]].A;
       Z_in += kNuclides[rxn.reactants[i]].Z;

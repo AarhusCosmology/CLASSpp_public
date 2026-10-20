@@ -51,7 +51,7 @@ class HyrecModel : public RecombinationModel {
    * @param z_initial redshift at which CLASS starts the recombination integration
    * @param He_rate_correction multiply the helium rate by its CosmoRec calibration
    */
-  HyrecModel(const std::string& path,
+  HyrecModel(std::string path,
              double T_cmb,
              double obh2,
              double ocbh2,

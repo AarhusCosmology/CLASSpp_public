@@ -57,9 +57,9 @@ class PrimordialModule : public BaseModule {
       double phi, double* H, double* dH, double* ddH, double* dddH) const;
   void primordial_inflation_indices();
   void primordial_inflation_solve_inflation();
-  void primordial_inflation_analytic_spectra(double* y_ini);
+  void primordial_inflation_analytic_spectra(const double* y_ini);
   void primordial_inflation_spectra(double* y_ini);
-  void primordial_inflation_one_wavenumber(double* y_ini, int index_k);
+  void primordial_inflation_one_wavenumber(const double* y_ini, int index_k);
   void primordial_inflation_one_k(
       double k, double* y, double* dy, double* curvature, double* tensor);
   void primordial_inflation_find_attractor(

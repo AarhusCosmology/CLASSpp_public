@@ -86,7 +86,7 @@ void test_conservation(bool balanced = false) {
   Grid B      = MakeGrid(1e-4, 2e2, 64);
   const int N = 64;
 
-  std::mt19937 rng(12345u);
+  std::mt19937 rng(12345U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> fH(N);
   std::vector<double> fl(N);
@@ -181,7 +181,7 @@ void test_channel_multiplicity(int n_parent, int n_daughter, bool balanced = fal
   Grid B      = MakeGrid(1e-4, 2e2, 64);
   const int N = 64;
 
-  std::mt19937 rng(4242u);
+  std::mt19937 rng(4242U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> fH(N);
   std::vector<double> fl(N);
@@ -299,7 +299,7 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
   Grid B      = MakeGrid(1e-4, 2e2, 48);
   const int N = 48;
 
-  std::mt19937 rng(777u);
+  std::mt19937 rng(777U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> fH(N);
   std::vector<double> fl(N);
@@ -527,7 +527,7 @@ void test_mode_reduction() {
   Grid F = MakeGrid(1e-4, 2e2, 48);
   Grid B = MakeGrid(1e-4, 2e2, 48);
 
-  std::mt19937 rng(777u);
+  std::mt19937 rng(777U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> fH(64);
   std::vector<double> fl(48);
@@ -613,7 +613,7 @@ void test_rhs_continuity() {
   const int Np = 64;
   const int Nd = 40;
 
-  std::mt19937 rng(2024u);
+  std::mt19937 rng(2024U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> fH(Np);
   std::vector<double> fl(Nd);
@@ -752,7 +752,7 @@ void test_perturbation_operator(bool balanced = false) {
   Grid B      = MakeGrid(1e-4, 2e2, 64);
   const int N = 64;
 
-  std::mt19937 rng(98765u);
+  std::mt19937 rng(98765U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::uniform_real_distribution<double> Upm(-1.0, 1.0);
   std::vector<double> fH(N);
@@ -1117,7 +1117,7 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   const int Nd = 48;
   const int N  = Np + 2 * Nd;
 
-  std::mt19937 rng(31337u);
+  std::mt19937 rng(31337U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> y(N);
   for (int i = 0; i < Np; ++i) {
@@ -1296,7 +1296,7 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   // random state barely exercises it; here the daughters are log-uniform over eight
   // decades, which makes the factor range over many orders while every bin stays far
   // enough above the 1e-13 step floor for the quotient to mean something.
-  std::mt19937 rng2(90210u);
+  std::mt19937 rng2(90210U);
   std::uniform_real_distribution<double> LU(-8., -0.05);
   for (int i = 0; i < Np; ++i) {
     y[i] = U(rng2);
@@ -1382,7 +1382,7 @@ void test_perturbation_diagonal(bool balanced = false) {
   const int N    = Np + 2 * Nd;
   const int LMAX = 4;
 
-  std::mt19937 rng(4242u);
+  std::mt19937 rng(4242U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> fH(Np);
   std::vector<double> fl(Nd);
@@ -1636,9 +1636,7 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
   // control can be shown to be a real one.
   const bool must_hold = lumped || balanced;
   auto check           = [&](double df) {
-    if (df < worst_neg) {
-      worst_neg = df;
-    }
+    worst_neg = std::min(worst_neg, df);
     assert(!must_hold || df >= 0.);
   };
   Grid P       = MakeGrid(1e-3, 1e2, 24);
@@ -2130,7 +2128,7 @@ void test_all_l_matches_per_l(bool balanced = false) {
   const int ND = 64;
   const int L  = 17;  // l_max_dncdm_col's default, i.e. the production sweep length
 
-  std::mt19937 rng(31337u);
+  std::mt19937 rng(31337U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::uniform_real_distribution<double> Upm(-1.0, 1.0);
   std::vector<double> fH(NP);
@@ -2307,7 +2305,7 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
   Grid F      = MakeGrid(1e-4, 2e2, N);
   Grid B      = MakeGrid(1e-4, 2e2, N);
 
-  std::mt19937 rng(98765u);
+  std::mt19937 rng(98765U);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> fH(N);
   std::vector<double> fl(N);

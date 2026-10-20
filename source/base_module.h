@@ -34,7 +34,6 @@ class BaseModule {
   }
   BaseModule(const BaseModule&) = delete;
 
- public:
   /** Const reference to the species owned by InputModule. Use .at("CDM")
    *  (throws if absent) or .find("CDM") (returns pointer-or-nullptr). */
   const SpeciesCollection& all_species_;

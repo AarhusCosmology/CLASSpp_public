@@ -73,7 +73,7 @@ inline constexpr BbnNuclide kNuclides[kBbnNumNuclides] = {
  *  cancel between the two sides -- a radiative capture has two nuclei on one side
  *  and one on the other -- so using atomic masses here would be a ~0.05% error per
  *  nuclide in the reverse rates. Electron binding energy (eV scale) is ignored. */
-inline constexpr double NuclearMassMeV(const BbnNuclide& nuc) {
+constexpr double NuclearMassMeV(const BbnNuclide& nuc) {
   return nuc.atomic_mass_mev - nuc.Z * kElectronMassMeV;
 }
 

@@ -30,7 +30,7 @@ LensingModule::LensingModule(InputModulePtr input_module, SpectraModulePtr spect
   lensing_init();
 }
 
-LensingModule::~LensingModule() {}
+LensingModule::~LensingModule() = default;
 
 std::map<std::string, std::vector<double>> LensingModule::cl_output(int lmax) const {
   class_test_severe(!ple->has_lensed_cls,
@@ -88,7 +88,7 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
   std::vector<std::string> keys;
 
   for (const auto& element : index_map) {
-    data_vectors.push_back(std::vector<double>(l_values.size() + 2, 0.0));
+    data_vectors.emplace_back(l_values.size() + 2, 0.0);
     indices.push_back(element.second);
     keys.push_back(element.first);
   }
@@ -156,15 +156,13 @@ void LensingModule::lensing_init() {
     }
     return;
   }
-  else {
-    if (ple->lensing_verbose > 0) {
-      printf("Computing lensed spectra ");
-      if (ppr->accurate_lensing) {
-        printf("(accurate mode)\n");
-      }
-      else {
-        printf("(fast mode)\n");
-      }
+  if (ple->lensing_verbose > 0) {
+    printf("Computing lensed spectra ");
+    if (ppr->accurate_lensing) {
+      printf("(accurate mode)\n");
+    }
+    else {
+      printf("(fast mode)\n");
     }
   }
 
@@ -754,7 +752,7 @@ void LensingModule::lensing_indices() {
  * @return the error status
  */
 
-void LensingModule::lensing_addback_cl_tt(double* cl_tt) {
+void LensingModule::lensing_addback_cl_tt(const double* cl_tt) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = static_cast<int>(l_[index_l]);
     cl_lens_[index_l * lt_size_ + index_lt_tt_] += cl_tt[l];
@@ -770,7 +768,7 @@ void LensingModule::lensing_addback_cl_tt(double* cl_tt) {
  * @return the error status
  */
 
-void LensingModule::lensing_addback_cl_te(double* cl_te) {
+void LensingModule::lensing_addback_cl_te(const double* cl_te) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = static_cast<int>(l_[index_l]);
     cl_lens_[index_l * lt_size_ + index_lt_te_] += cl_te[l];
@@ -787,7 +785,7 @@ void LensingModule::lensing_addback_cl_te(double* cl_te) {
  * @return the error status
  */
 
-void LensingModule::lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb) {
+void LensingModule::lensing_addback_cl_ee_bb(const double* cl_ee, const double* cl_bb) {
   for (int index_l = 0; index_l < l_size_; index_l++) {
     int l                                        = static_cast<int>(l_[index_l]);
     cl_lens_[index_l * lt_size_ + index_lt_ee_] += cl_ee[l];
@@ -808,7 +806,7 @@ void LensingModule::lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb) {
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) {
+void LensingModule::lensing_d00(const double* mu, int num_mu, int lmax, double** d00) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -848,7 +846,7 @@ void LensingModule::lensing_d00(double* mu, int num_mu, int lmax, double** d00) 
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) {
+void LensingModule::lensing_d11(const double* mu, int num_mu, int lmax, double** d11) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -891,7 +889,7 @@ void LensingModule::lensing_d11(double* mu, int num_mu, int lmax, double** d11) 
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1) {
+void LensingModule::lensing_d1m1(const double* mu, int num_mu, int lmax, double** d1m1) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -934,7 +932,7 @@ void LensingModule::lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2) {
+void LensingModule::lensing_d2m2(const double* mu, int num_mu, int lmax, double** d2m2) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -977,7 +975,7 @@ void LensingModule::lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) {
+void LensingModule::lensing_d22(const double* mu, int num_mu, int lmax, double** d22) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -1020,7 +1018,7 @@ void LensingModule::lensing_d22(double* mu, int num_mu, int lmax, double** d22) 
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) {
+void LensingModule::lensing_d20(const double* mu, int num_mu, int lmax, double** d20) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac3(lmax);
   std::vector<double> fac4(lmax);
@@ -1060,7 +1058,7 @@ void LensingModule::lensing_d20(double* mu, int num_mu, int lmax, double** d20) 
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) {
+void LensingModule::lensing_d31(const double* mu, int num_mu, int lmax, double** d31) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -1106,7 +1104,7 @@ void LensingModule::lensing_d31(double* mu, int num_mu, int lmax, double** d31) 
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1) {
+void LensingModule::lensing_d3m1(const double* mu, int num_mu, int lmax, double** d3m1) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -1152,7 +1150,7 @@ void LensingModule::lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3) {
+void LensingModule::lensing_d3m3(const double* mu, int num_mu, int lmax, double** d3m3) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -1197,7 +1195,7 @@ void LensingModule::lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) {
+void LensingModule::lensing_d40(const double* mu, int num_mu, int lmax, double** d40) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac3(lmax);
   std::vector<double> fac4(lmax);
@@ -1240,7 +1238,7 @@ void LensingModule::lensing_d40(double* mu, int num_mu, int lmax, double** d40) 
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2) {
+void LensingModule::lensing_d4m2(const double* mu, int num_mu, int lmax, double** d4m2) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);
@@ -1288,7 +1286,7 @@ void LensingModule::lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2
  * Formulae from Kostelec & Rockmore 2003
  **/
 
-void LensingModule::lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4) {
+void LensingModule::lensing_d4m4(const double* mu, int num_mu, int lmax, double** d4m4) {
   std::vector<double> fac1(lmax);
   std::vector<double> fac2(lmax);
   std::vector<double> fac3(lmax);

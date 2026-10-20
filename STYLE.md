@@ -285,12 +285,12 @@ The following are not allowed:
 All code must pass:
 
 * `.clang-format`, on every file a pull request changes
-* the clang-tidy checks listed in `CHECKS` in `.github/workflows/clang-tidy.yml`
+* `.clang-tidy`, less the checks that `CHECKS` in `.github/workflows/clang-tidy.yml` switches off
 * the same workflow's grep for POSIX math constants (`M_PI` and the rest): MSVC does not
   define them, so use `_PI_` and the others in `include/constants.h`
 
-CI enforces all three. `.clang-tidy` lists the checks we aim for; a check joins `CHECKS`
-once the code passes it.
+CI enforces all three. `CHECKS` lists what the code does not pass yet; an entry goes once
+it does.
 
 These tools are part of the definition of correctness.
 

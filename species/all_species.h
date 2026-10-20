@@ -82,7 +82,7 @@ inline constexpr std::array kAllSpeciesFactories = {
 };
 
 /** Maps the closure-species enum to the matching factory entry name. */
-inline constexpr std::string_view ClosureSpeciesName(ClosureSpecies cs) {
+constexpr std::string_view ClosureSpeciesName(ClosureSpecies cs) {
   switch (cs) {
     case ClosureSpecies::Lambda:
       return LambdaSpecies::kTypeName;

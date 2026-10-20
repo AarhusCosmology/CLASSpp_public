@@ -5,6 +5,7 @@
 // reproduce the shared per-instance factory loop.
 #include "species/ncdm_family.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <stdexcept>
@@ -38,12 +39,7 @@ static bool SynthesisThrows(FileContent& fc) {
 }
 
 static bool Contains(const std::vector<std::string>& v, const std::string& s) {
-  for (const auto& e : v) {
-    if (e == s) {
-      return true;
-    }
-  }
-  return false;
+  return std::find(v.begin(), v.end(), s) != v.end();
 }
 
 int main() {

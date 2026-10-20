@@ -80,7 +80,7 @@ inline constexpr BbnReaction kReactions[kBbnNumReactions] = {
  *  With at most two particles a side, the only case that bites is a pair of
  *  identical ones, giving 1/2. Derived from the index list rather than tabulated
  *  so that adding d+d -> ... or ... -> he4+he4 cannot silently omit it. */
-inline constexpr double ReactionPrefactor(const int* side, int n) {
+constexpr double ReactionPrefactor(const int* side, int n) {
   return (n == 2 && side[0] == side[1]) ? 0.5 : 1.0;
 }
 
@@ -91,7 +91,7 @@ inline constexpr double ReactionPrefactor(const int* side, int n) {
  *  would show up only as a slow unphysical drift away from equilibrium. Atomic
  *  masses are correct here because every reaction conserves Z, so the electron
  *  masses cancel between the two sides. */
-inline constexpr double ReactionQValueMeV(const BbnReaction& r) {
+constexpr double ReactionQValueMeV(const BbnReaction& r) {
   double q = 0.0;
   for (int i = 0; i < r.n_reactants; ++i) {
     q += kNuclides[r.reactants[i]].atomic_mass_mev;

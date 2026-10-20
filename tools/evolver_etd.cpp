@@ -40,9 +40,7 @@ inline void PhiFuncs(double z, double& e0, double& p1, double& p2, double& p3) {
     p3 = 1.0 / 6.0;
     return;
   }
-  if (z > kZMax) {
-    z = kZMax;
-  }
+  z = std::min(z, kZMax);
   if (std::fabs(z) < kSeries) {
     // phi_k = sum_j z^j/(j+k)!. The coefficient at term j is 1/(j+k)!, so advancing
     // j divides it by (j+k) -- which is why the three divisors differ.
@@ -313,9 +311,7 @@ void evolver_etd(EvolverDerivs derivs,
     for (int k = 0; k < neq; k++) {
       const double errtemp  = std::fabs(err[k] / std::max(threshold, std::fabs(ynew[k])));
       nonfinite            |= static_cast<int>(IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
-      if (errtemp > errmax) {
-        errmax = errtemp;
-      }
+      errmax                = std::max(errmax, errtemp);
     }
 
     if (nonfinite != 0) {

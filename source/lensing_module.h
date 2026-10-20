@@ -24,9 +24,9 @@ class LensingModule : public BaseModule {
   void lensing_indices();
   std::map<std::string, std::vector<double>> cl_output_at_l_values(
       const std::vector<int>& l_values) const;
-  void lensing_addback_cl_tt(double* cl_tt);
-  void lensing_addback_cl_te(double* cl_te);
-  void lensing_addback_cl_ee_bb(double* cl_ee, double* cl_bb);
+  void lensing_addback_cl_tt(const double* cl_tt);
+  void lensing_addback_cl_te(const double* cl_te);
+  void lensing_addback_cl_ee_bb(const double* cl_ee, const double* cl_bb);
   int lensing_X000(double* mu, int num_mu, int lmax, double* sigma2, double** X000);
   int lensing_Xp000(double* mu, int num_mu, int lmax, double* sigma2, double** Xp000);
   int lensing_X220(double* mu, int num_mu, int lmax, double* sigma2, double** X220);
@@ -35,18 +35,18 @@ class LensingModule : public BaseModule {
   int lensing_X121(double* mu, int num_mu, int lmax, double* sigma2, double** X121);
   int lensing_X132(double* mu, int num_mu, int lmax, double* sigma2, double** X132);
   int lensing_X242(double* mu, int num_mu, int lmax, double* sigma2, double** X242);
-  void lensing_d00(double* mu, int num_mu, int lmax, double** d00);
-  void lensing_d11(double* mu, int num_mu, int lmax, double** d11);
-  void lensing_d1m1(double* mu, int num_mu, int lmax, double** d1m1);
-  void lensing_d2m2(double* mu, int num_mu, int lmax, double** d2m2);
-  void lensing_d22(double* mu, int num_mu, int lmax, double** d22);
-  void lensing_d20(double* mu, int num_mu, int lmax, double** d20);
-  void lensing_d31(double* mu, int num_mu, int lmax, double** d31);
-  void lensing_d3m1(double* mu, int num_mu, int lmax, double** d3m1);
-  void lensing_d3m3(double* mu, int num_mu, int lmax, double** d3m3);
-  void lensing_d40(double* mu, int num_mu, int lmax, double** d40);
-  void lensing_d4m2(double* mu, int num_mu, int lmax, double** d4m2);
-  void lensing_d4m4(double* mu, int num_mu, int lmax, double** d4m4);
+  void lensing_d00(const double* mu, int num_mu, int lmax, double** d00);
+  void lensing_d11(const double* mu, int num_mu, int lmax, double** d11);
+  void lensing_d1m1(const double* mu, int num_mu, int lmax, double** d1m1);
+  void lensing_d2m2(const double* mu, int num_mu, int lmax, double** d2m2);
+  void lensing_d22(const double* mu, int num_mu, int lmax, double** d22);
+  void lensing_d20(const double* mu, int num_mu, int lmax, double** d20);
+  void lensing_d31(const double* mu, int num_mu, int lmax, double** d31);
+  void lensing_d3m1(const double* mu, int num_mu, int lmax, double** d3m1);
+  void lensing_d3m3(const double* mu, int num_mu, int lmax, double** d3m3);
+  void lensing_d40(const double* mu, int num_mu, int lmax, double** d40);
+  void lensing_d4m2(const double* mu, int num_mu, int lmax, double** d4m2);
+  void lensing_d4m4(const double* mu, int num_mu, int lmax, double** d4m4);
 
   /** @name - information on number of type of C_l's (TT, TE...) */
 

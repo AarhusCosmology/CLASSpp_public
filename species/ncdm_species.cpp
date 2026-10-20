@@ -190,7 +190,7 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
       continue;  // skip the generic broadcast/distribute path
     }
 
-    if (values.size() == 1u) {
+    if (values.size() == 1U) {
       // broadcast scalar to all N instances
       for (int i = 1; i <= N; ++i) {
         pfc.set("ncdm__" + std::to_string(i) + "." + fm.dot, values[0]);
@@ -556,11 +556,11 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
 void NCDMSpecies::WriteTensorOutputColumnTitles(std::string& tensor_titles) const {
   const std::string& nm = name();
   std::string title     = "delta_" + nm;
-  class_store_columntitle(tensor_titles, title.c_str(), true);
+  class_store_columntitle(tensor_titles, title, true);
   title = "theta_" + nm;
-  class_store_columntitle(tensor_titles, title.c_str(), true);
+  class_store_columntitle(tensor_titles, title, true);
   title = "shear_" + nm;
-  class_store_columntitle(tensor_titles, title.c_str(), true);
+  class_store_columntitle(tensor_titles, title, true);
 }
 
 // Fused stress-energy: eliminates four virtual dispatches with one override.

@@ -14,24 +14,26 @@ class BudgetFake : public BaseSpecies {
  public:
   BudgetFake(std::string name, EnergyType et, double rho)
       : BaseSpecies(std::move(name), et), rho_(rho) {}
-  void RegisterBackgroundIndices(int&) override {}
-  void ComputeBackground(double, const double*, double*) override {}
-  double Rho(const double*) const override {
+  void RegisterBackgroundIndices(int& /*index_bg*/) override {}
+  void ComputeBackground(double /*a*/,
+                         const double* /*pvecback_B*/,
+                         double* /*pvecback*/) override {}
+  double Rho(const double* /*pvecback*/) const override {
     return rho_;
   }
-  double P(const double*) const override {
+  double P(const double* /*pvecback*/) const override {
     return 0.;
   }
-  void PerturbDerivs(const PerturbLayout&,
-                     double,
-                     const double*,
-                     double*,
-                     const perturb_parameters_and_workspace&) const override {}
-  StressEnergyContribution StressEnergy(const PerturbLayout&,
-                                        const perturb_vector*,
-                                        const double*,
-                                        const double*,
-                                        const perturb_workspace*) const override {
+  void PerturbDerivs(const PerturbLayout& /*layout*/,
+                     double /*tau*/,
+                     const double* /*y*/,
+                     double* /*dy*/,
+                     const perturb_parameters_and_workspace& /*ppaw*/) const override {}
+  StressEnergyContribution StressEnergy(const PerturbLayout& /*layout*/,
+                                        const perturb_vector* /*pv*/,
+                                        const double* /*y*/,
+                                        const double* /*pvecback*/,
+                                        const perturb_workspace* /*ppw*/) const override {
     return {};
   }
   double GetOmega0() const override {

@@ -2,10 +2,24 @@ name: clang-tidy
 
 on: [pull_request]
 
-# Only the checks listed in CHECKS are enforced; the rest of .clang-tidy is the target
-# that the code does not meet yet. A check joins CHECKS once the code base passes it.
+# CI runs the checks in .clang-tidy, with CHECKS appended. CHECKS switches off what the code
+# does not pass yet: whole families, re-enabling the checks in them that it does pass, and
+# single checks. An entry goes once the code passes it; with CHECKS empty, CI runs
+# .clang-tidy as it stands.
 env:
-  CHECKS: '-*,cppcoreguidelines-pro-type-member-init,clang-analyzer-optin.cplusplus.UninitializedObject,readability-isolate-declaration,modernize-avoid-c-style-cast,cppcoreguidelines-pro-type-cstyle-cast,readability-braces-around-statements,readability-inconsistent-declaration-parameter-name'
+  CHECKS: >-
+    -bugprone-*,
+    -clang-analyzer-*,
+    clang-analyzer-optin.cplusplus.UninitializedObject,
+    -concurrency-*,
+    -cppcoreguidelines-*,
+    cppcoreguidelines-pro-type-cstyle-cast,
+    cppcoreguidelines-pro-type-member-init,
+    -misc-*,
+    -performance-*,
+    -modernize-avoid-c-arrays,
+    -readability-implicit-bool-conversion,
+    -readability-non-const-parameter
 
 jobs:
   tidy:

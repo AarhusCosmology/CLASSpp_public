@@ -274,17 +274,13 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
       }
       return rprime_dr * integral_num / integral_denom;
     }
-    else {
-      if (l == 0) {
-        return rprime_dr * y[dncdm_lay.index_per_q[0]];
-      }
-      else if (l == 1) {
-        return rprime_dr * y[dncdm_lay.index_per_q[0] + 1] / k;
-      }
-      else {
-        return 0.;
-      }
+    if (l == 0) {
+      return rprime_dr * y[dncdm_lay.index_per_q[0]];
     }
+    if (l == 1) {
+      return rprime_dr * y[dncdm_lay.index_per_q[0] + 1] / k;
+    }
+    return 0.;
   };
 
   const int base = dr_lay.idx_F0;

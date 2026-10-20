@@ -35,7 +35,7 @@ class OutputModule : public BaseModule {
                            const std::string& filename,
                            const char* first_line,
                            int lmax);
-  void output_one_line_of_cl(FILE* clfile, double l, double* cl, int ct_size);
+  void output_one_line_of_cl(FILE* clfile, double l, const double* cl, int ct_size);
   void output_open_pk_file(FILE** pkfile,
                            const std::string& filename,
                            const char* first_line,

@@ -114,7 +114,7 @@ class TaskSystem {
   auto AsyncTask(F&& f, Args&&... args) {
     using return_type = std::invoke_result_t<F, Args...>;
     auto task         = std::make_shared<std::packaged_task<return_type()>>(
-        std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+        [Func = std::forward<F>(f)] { Func(); });
     std::future<return_type> res = task->get_future();
 
     auto work      = [task]() { (*task)(); };

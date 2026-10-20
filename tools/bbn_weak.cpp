@@ -1,5 +1,6 @@
 #include "bbn_weak.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "arrays.h"
@@ -210,9 +211,7 @@ void BbnWeakTable::Rates(double tau, double* lambda_np, double* lambda_pn) const
   }
 
   int lo = static_cast<int>(position);
-  if (lo > n_ - 2) {
-    lo = n_ - 2;
-  }
+  lo     = std::min(lo, n_ - 2);
 
   const double b  = position - lo;
   const double a  = 1.0 - b;

@@ -155,9 +155,9 @@ bool get_qsampling_manual(double* x,
   double h;
   double t;
   switch (method) {
-    case (qm_auto):
+    case qm_auto:
       return false;
-    case (qm_Laguerre): {
+    case qm_Laguerre: {
       /* Allocate storage for Laguerre coefficients: */
       std::vector<double> b(N);
       std::vector<double> c(N);
@@ -168,7 +168,7 @@ bool get_qsampling_manual(double* x,
       }
       return true;
     }
-    case (qm_FermiDirac): {
+    case qm_FermiDirac: {
       std::vector<double> fd_weight(N);
       class_test(!compute_FermiDirac(x, fd_weight.data(), N),
                  "qm_FermiDirac supports 1 through %d momentum bins; the modified-moment "
@@ -185,7 +185,7 @@ bool get_qsampling_manual(double* x,
       }
       return true;
     }
-    case (qm_GB_Laguerre): {
+    case qm_GB_Laguerre: {
       // Generalized Gauss-Laguerre on the GL weight q^(alpha+1) e^(-alpha x q),
       // i.e. the integrand q^2 * f0 with the grey-body f0 ~ q^(alpha-1) e^(-alpha x q).
       // The rule divides nodes by gb.x_times_alpha, so it is only meaningful for a
@@ -207,7 +207,7 @@ bool get_qsampling_manual(double* x,
       }
       return true;
     }
-    case (qm_trapz):
+    case qm_trapz:
       for (int i = 0; i < N; ++i) {
         /** Note that we count q=0 as an extra point with weight 0 */
         h    = qmax / N;
@@ -221,7 +221,7 @@ bool get_qsampling_manual(double* x,
         }
       }
       return true;
-    case (qm_trapz_indefinite):
+    case qm_trapz_indefinite:
       /** We do the variable transformation q = 1/t-1. The trapezoidal rule is closed, but since the distribution function
 	goes to zero in both limits, we can use an effectively N+2 rule simply by not using the exterior points. */
       for (int i = 0; i < N; ++i) {
@@ -243,8 +243,8 @@ void get_qsampling(double* x,
                    double rtol,
                    double* qvec,
                    int qsiz,
-                   void (*test)(void* params_for_function, double q, double* psi),
-                   void (*function)(void* params_for_function, double q, double* f0),
+                   void (*test_function)(void* params_for_function, double q, double* psi),
+                   void (*distribution_function)(void* params_for_function, double q, double* f0),
                    void* params_for_function) {
   /* This routine returns the fewest possible number of abscissas and weights under
      the requirement that a test function folded with the neutrino distribution function
@@ -323,7 +323,15 @@ void get_qsampling(double* x,
   }
 
   /* First do the adaptive quadrature - this will also give the value of the integral: */
-  gk_adapt(root, (*test), (*function), params_for_function, rtol * 1e-4, 1, 0.0, 1.0, true);
+  gk_adapt(root,
+           (*test_function),
+           (*distribution_function),
+           params_for_function,
+           rtol * 1e-4,
+           1,
+           0.0,
+           1.0,
+           true);
   /* Do a leaf count: */
   leaf_count(root.get());
   /* I can get the integral now: */
@@ -357,24 +365,24 @@ void get_qsampling(double* x,
   /* Combined adaptive quadrature and Laguerre rescaled quadrature: */
   if (qvec != nullptr) {
     /* Evaluate [0;qmin] using 4 point Gauss-Legendre rule: */
-    (*function)(params_for_function, qmin, &y2);
+    (*distribution_function)(params_for_function, qmin, &y2);
     for (i = 0, I_atzero = 0.0; i < N_comb_leg; i++) {
       q_leg[i] = 0.5 * qmin * (1.0 + q_leg[i]);
       w_leg[i] = w_leg[i] * 0.5 * qmin * y2;
-      (*test)(params_for_function, q_leg[i], &y);
+      (*test_function)(params_for_function, q_leg[i], &y);
       I_atzero += w_leg[i] * y;
     }
 
     /* Find asymptotic extrapolation:*/
-    (*function)(params_for_function, qmaxm1, &y1);
-    (*function)(params_for_function, qmax, &y2);
+    (*distribution_function)(params_for_function, qmaxm1, &y1);
+    (*distribution_function)(params_for_function, qmax, &y2);
 
     b_comb = (y1 / y2 - 1.0) / (qmax - qmaxm1);
     b_comb = std::max(b_comb, 1e-100);
     //c_comb = -b_comb*qmax;
     a_comb = y2 * exp(b_comb * qmax);
     // printf("f(q) = %g*exp(-%g*q) \n",a_comb,b_comb);
-    //(*function)(params_for_function,100,&y2);
+    //(*distribution_function)(params_for_function,100,&y2);
     //printf("f(100) = %e ?= %e\n",y2,a_comb*exp(-b_comb*100));
 
     /* Evaluate tail using 6 point Laguerre: */
@@ -383,14 +391,14 @@ void get_qsampling(double* x,
       w_lag[i] *= exp(-q_lag[i]);
       q_lag[i]  = qmax + q_lag[i] / b_comb;
       w_lag[i]  = a_comb / b_comb * exp(-b_comb * qmax) * w_lag[i];
-      (*test)(params_for_function, q_lag[i], &y);
+      (*test_function)(params_for_function, q_lag[i], &y);
       I_atinf += w_lag[i] * y;
     }
 
     /* Do the adaptive quadrature - this will also give the main part of the integral: */
     gk_adapt(root_comb,
-             (*test),
-             (*function),
+             (*test_function),
+             (*distribution_function),
              params_for_function,
              rtol * 1e-2,
              1,
@@ -435,9 +443,9 @@ void get_qsampling(double* x,
       else {
         delq = qvec[i + 1] - qvec[i - 1];
       }
-      (*function)(params_for_function, qvec[i], &y2);
+      (*distribution_function)(params_for_function, qvec[i], &y2);
       wcomb2[i] = 0.5 * y2 * delq;
-      (*test)(params_for_function, qvec[i], &y);
+      (*test_function)(params_for_function, qvec[i], &y);
       I_comb2 += wcomb2[i] * y;
     }
     I_comb2 += (I_atzero + I_atinf);
@@ -453,8 +461,8 @@ void get_qsampling(double* x,
     compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), true);
     ILag = 0.0;
     for (i = 0; i < NLag; i++) {
-      (*test)(params_for_function, x[i], &y);
-      (*function)(params_for_function, x[i], &y2);
+      (*test_function)(params_for_function, x[i], &y);
+      (*distribution_function)(params_for_function, x[i], &y2);
       w[i] *= y2;
       ILag += y * w[i];
     }
@@ -480,8 +488,8 @@ void get_qsampling(double* x,
       compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), true);
       ILag = 0.0;
       for (i = 0; i < NLag; i++) {
-        (*test)(params_for_function, x[i], &y);
-        (*function)(params_for_function, x[i], &y2);
+        (*test_function)(params_for_function, x[i], &y);
+        (*distribution_function)(params_for_function, x[i], &y2);
         w[i] *= y2;
         ILag += y * w[i];
       }
@@ -511,8 +519,8 @@ void get_qsampling(double* x,
 
     IFD = 0.;
     for (i = 0; i < NFD; ++i) {
-      (*test)(params_for_function, x_fd[i], &y);
-      (*function)(params_for_function, x_fd[i], &y2);
+      (*test_function)(params_for_function, x_fd[i], &y);
+      (*distribution_function)(params_for_function, x_fd[i], &y2);
       w_fd[i] *= y2 / fermi_dirac_weight(x_fd[i]);
       IFD     += y * w_fd[i];
     }
@@ -575,7 +583,7 @@ void get_qsampling(double* x,
     class_test(!compute_FermiDirac(x, w, *N),
                "Could not reconstruct the selected Fermi-Dirac quadrature rule");
     for (i = 0; i < *N; ++i) {
-      (*function)(params_for_function, x[i], &y);
+      (*distribution_function)(params_for_function, x[i], &y);
       w[i] *= y / fermi_dirac_weight(x[i]);
     }
   }
@@ -627,33 +635,31 @@ void sort_x_and_w(double* x, double* w, double* workx, double* workw, int starti
   if ((endidx - startidx) < 1) {
     return;
   }
-  else {
-    /*Copy x and w to workarray: */
-    for (i = startidx; i <= endidx; i++) {
-      workx[i] = x[i];
-      workw[i] = w[i];
-    }
-    pivot = x[endidx];
-    //printf("pivot chosen: x[%d] = %g\n",endidx,pivot);
-    for (i = startidx; i < endidx; i++) {
-      if (workx[i] <= pivot) {
-        //printf("<--%g  ",workx[i]);
-        x[bot]   = workx[i];
-        w[bot++] = workw[i];
-      }
-      else {
-        //printf("  %g-->",workx[i]);
-        x[top]   = workx[i];
-        w[top--] = workw[i];
-      }
-    }
-    //printf("\n top=%d, bot=%d, left=%d, right=%d\n",top,bot,startidx,endidx);
-    x[top] = pivot;
-    w[top] = workw[endidx];
-    /* Recursive call: */
-    sort_x_and_w(x, w, workx, workw, startidx, bot - 1);
-    sort_x_and_w(x, w, workx, workw, top + 1, endidx);
+  /*Copy x and w to workarray: */
+  for (i = startidx; i <= endidx; i++) {
+    workx[i] = x[i];
+    workw[i] = w[i];
   }
+  pivot = x[endidx];
+  //printf("pivot chosen: x[%d] = %g\n",endidx,pivot);
+  for (i = startidx; i < endidx; i++) {
+    if (workx[i] <= pivot) {
+      //printf("<--%g  ",workx[i]);
+      x[bot]   = workx[i];
+      w[bot++] = workw[i];
+    }
+    else {
+      //printf("  %g-->",workx[i]);
+      x[top]   = workx[i];
+      w[top--] = workw[i];
+    }
+  }
+  //printf("\n top=%d, bot=%d, left=%d, right=%d\n",top,bot,startidx,endidx);
+  x[top] = pivot;
+  w[top] = workw[endidx];
+  /* Recursive call: */
+  sort_x_and_w(x, w, workx, workw, startidx, bot - 1);
+  sort_x_and_w(x, w, workx, workw, top + 1, endidx);
 }
 
 void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite) {
@@ -721,12 +727,10 @@ double get_integral(qss_node* node, int level) {
   if (node->leaf_childs <= level) {
     return node->I;
   }
-  else {
-    IL = get_integral(node->left.get(), level);
-    IR = get_integral(node->right.get(), level);
-    /* Combine the integrals: */
-    return (IL + IR);
-  }
+  IL = get_integral(node->left.get(), level);
+  IR = get_integral(node->right.get(), level);
+  /* Combine the integrals: */
+  return (IL + IR);
 }
 
 void gk_adapt(std::unique_ptr<qss_node>& node,
@@ -754,36 +758,34 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
     /* Stop recursion and return. tol>=1.0 in case of I=0 infinite recursion */
     return;
   }
-  else {
-    /* Call gk_adapt recursively on children:*/
-    mid = 0.5 * (a + b);
-    //printf("<-%g,%g,%g,%g",mid,tol,(*node)->err,(*node)->I);
-    gk_adapt(node->left,
-             (*test),
-             (*function),
-             params_for_function,
-             1.5 * tol,
-             treemode,
-             a,
-             mid,
-             isindefinite);
-    //printf("%g->",mid);
-    gk_adapt(node->right,
-             (*test),
-             (*function),
-             params_for_function,
-             1.5 * tol,
-             treemode,
-             mid,
-             b,
-             isindefinite);
-    /* Update integral and error in this node and return: */
-    /* Actually, it is more convenient just to keep the nodes own estimate of the
+  /* Call gk_adapt recursively on children:*/
+  mid = 0.5 * (a + b);
+  //printf("<-%g,%g,%g,%g",mid,tol,(*node)->err,(*node)->I);
+  gk_adapt(node->left,
+           (*test),
+           (*function),
+           params_for_function,
+           1.5 * tol,
+           treemode,
+           a,
+           mid,
+           isindefinite);
+  //printf("%g->",mid);
+  gk_adapt(node->right,
+           (*test),
+           (*function),
+           params_for_function,
+           1.5 * tol,
+           treemode,
+           mid,
+           b,
+           isindefinite);
+  /* Update integral and error in this node and return: */
+  /* Actually, it is more convenient just to keep the nodes own estimate of the
        integral for our purposes.
        (*node)->I = (*node)->left->I + (*node)->right->I;
        (*node)->err = sqrt(pow(node->left->err,2)+pow(node->right->err,2));
     */
-  }
 }
 
 void compute_Laguerre(

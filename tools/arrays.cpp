@@ -747,7 +747,7 @@ namespace {
    interpolators: their class_test throw paths make them look too big to the
    inliner, and an out-of-line call per interpolation point costs ~1% of
    Transfer. */
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #define CLASS_ALWAYS_INLINE __forceinline
 #else
 #define CLASS_ALWAYS_INLINE inline __attribute__((always_inline))
@@ -821,9 +821,7 @@ CLASS_ALWAYS_INLINE int array_hunt_growing_closeby(
   // can fire. Reading garbage there then reports a spurious "x > x_max" for an x that
   // merely equals x_max, which is the common case when the caller sweeps a table
   // downward from its own last row.
-  if (inf > n_lines - 2) {
-    inf = n_lines - 2;
-  }
+  inf = std::min(inf, n_lines - 2);
 
   while (x < x_array[inf * stride]) {
     inf--;
@@ -1064,13 +1062,9 @@ void array_interpolate_cubic_equal(
              x0 + dx * (Nx - 1),
              x0);
 
-  i = static_cast<int>(floor((x - x0) / dx));
-  if (i < 1) {
-    i = 1;
-  }
-  if (i > Nx - 3) {
-    i = Nx - 3;
-  }
+  i       = static_cast<int>(floor((x - x0) / dx));
+  i       = std::max(i, 1);
+  i       = std::min(i, Nx - 3);
   frac    = (x - x0) / dx - i;
   yarray += i - 1;
 

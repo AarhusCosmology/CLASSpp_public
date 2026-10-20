@@ -1482,9 +1482,7 @@ void DNCDMInvSpecies::AddCouplingDerivs(double /*tau*/,
   // rather than validated at input: the hierarchy length is what the indexing can
   // actually reach, and a collision multipole above it has nothing to write to.
   int l_max_col = ppr->l_max_dncdm_col;
-  if (l_max_col > p_lay.l_max) {
-    l_max_col = p_lay.l_max;
-  }
+  l_max_col     = std::min(l_max_col, p_lay.l_max);
 
   // Per-k working memory (see Scratch): one private kernel + gather buffers per
   // k-mode, so concurrent modes cannot corrupt each other's transition geometry
@@ -1521,9 +1519,7 @@ void DNCDMInvSpecies::PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& /*
   const NCDMBaseSpecies::PerturbLayout& b_lay = boson_layout(my);
 
   int l_max_col = ppr->l_max_dncdm_col;
-  if (l_max_col > p_lay.l_max) {
-    l_max_col = p_lay.l_max;
-  }
+  l_max_col     = std::min(l_max_col, p_lay.l_max);
 
   // `a` comes from the pvecback the DIAGONAL callback just interpolated, NOT from
   // ppw->scalar_ctx: scalar_ctx.a is written by perturb_derivs_member, and on a
@@ -1718,9 +1714,7 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
     if (scratch != nullptr && scratch->kernel_pt != nullptr) {
       const auto& p_lay = parent_layout(my);
       int l_max_col     = mod.GetPrecision()->l_max_dncdm_col;
-      if (l_max_col > p_lay.l_max) {
-        l_max_col = p_lay.l_max;
-      }
+      l_max_col         = std::min(l_max_col, p_lay.l_max);
       // Zeroed every call: ApplyKernelPerturbDerivs ACCUMULATES into dy (it is
       // written to be one contributor among several on the real RHS), so a stale
       // buffer would silently sum sampling points together.

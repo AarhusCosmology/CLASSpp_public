@@ -50,15 +50,15 @@ BackgroundModule::BackgroundModule(InputModulePtr input_module) : BaseModule(inp
   background_init();
 }
 
-BackgroundModule::~BackgroundModule() {}
+BackgroundModule::~BackgroundModule() = default;
 
 double BackgroundModule::GetOmega0Species(const std::string& key) const {
   // Top-level species first.
-  if (auto* ptr = all_species_.find(key)) {
+  if (const auto* ptr = all_species_.find(key)) {
     return (*ptr)->GetOmega0();
   }
   // Sub-species of composites: IDR / IDM_DR live in IDM_DR_IDR, etc.
-  if (auto* ptr = all_species_.find("IDM_DR_IDR")) {
+  if (const auto* ptr = all_species_.find("IDM_DR_IDR")) {
     const auto& comp = static_cast<const IDM_DR_IDR_Species&>(**ptr);
     if (key == "IDR") {
       return comp.idr().GetOmega0();
@@ -67,7 +67,7 @@ double BackgroundModule::GetOmega0Species(const std::string& key) const {
       return comp.idm_dr().GetOmega0();
     }
   }
-  if (auto* ptr = all_species_.find("IDM_DRMD_IDR_DRMD")) {
+  if (const auto* ptr = all_species_.find("IDM_DRMD_IDR_DRMD")) {
     const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**ptr);
     if (key == "IDR_DRMD") {
       return comp.idr_drmd().GetOmega0();
@@ -76,7 +76,7 @@ double BackgroundModule::GetOmega0Species(const std::string& key) const {
       return comp.idm_drmd().GetOmega0();
     }
   }
-  if (auto* ptr = all_species_.find("DCDM_DR")) {
+  if (const auto* ptr = all_species_.find("DCDM_DR")) {
     const auto& comp = static_cast<const DCDM_DR_Species&>(**ptr);
     if (key == "DCDM") {
       return comp.dcdm().GetOmega0();
@@ -90,14 +90,14 @@ bool BackgroundModule::HasSpecies(const std::string& key) const {
 }
 
 bool BackgroundModule::HasSpeciesParam(const std::string& key, const std::string& param) const {
-  if (auto* ptr = all_species_.find(key)) {
+  if (const auto* ptr = all_species_.find(key)) {
     return (*ptr)->GetParam(param).has_value() || PeakEnergyFraction(**ptr, param).has_value();
   }
   return false;
 }
 
 double BackgroundModule::GetSpeciesParam(const std::string& key, const std::string& param) const {
-  if (auto* ptr = all_species_.find(key)) {
+  if (const auto* ptr = all_species_.find(key)) {
     if (auto val = (*ptr)->GetParam(param)) {
       return *val;
     }
@@ -154,12 +154,12 @@ void BackgroundModule::background_derivs_loga(double loga,
                                               double* y,
                                               double* dy,
                                               void* parameters_and_workspace) {
-  auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
   pbpaw->background_module->background_derivs_loga_member(loga, y, dy, parameters_and_workspace);
 }
 void BackgroundModule::background_add_line_to_bg_table(
     double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace) {
-  auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
   pbpaw->background_module->background_add_line_to_bg_table_member(loga,
                                                                    y,
                                                                    dy,
@@ -530,7 +530,7 @@ void BackgroundModule::background_init() {
 
       /* contribution of ncdm species to N_eff*/
       if (!GetNcdmSpecies(all_species_).empty()) {
-        for (auto& sp : all_species_) {
+        for (const auto& sp : all_species_) {
           Neff += sp->NeffContribution(0.);
           sp->PrintNeffInfo();
         }
@@ -569,7 +569,7 @@ void BackgroundModule::background_init() {
      masses in eV and about the ratio [m/omega_ncdm] in eV (the usual
      93 point something)*/
   if ((pba->background_verbose > 0) && (!GetNcdmSpecies(all_species_).empty())) {
-    for (auto& sp : all_species_) {
+    for (const auto& sp : all_species_) {
       sp->PrintMassInfo();
     }
   }
@@ -619,7 +619,7 @@ void BackgroundModule::background_indices() {
   bg_size_short_ = index_bg;
 
   // ── Every species registers its own background indices (flat loop) ──────────
-  for (auto& [name, sp] : all_species_) {
+  for (const auto& [name, sp] : all_species_) {
     sp->RegisterBackgroundIndices(index_bg);
   }
 
@@ -689,7 +689,7 @@ void BackgroundModule::background_indices() {
   class_define_index(index_bi_a_, true, index_bi, 1);
 
   /* -> integration indices for all species (each species owns its own offsets) */
-  for (auto& [name, sp] : all_species_) {
+  for (const auto& [name, sp] : all_species_) {
     sp->RegisterIntegrationIndices(index_bi);
   }
 
@@ -824,7 +824,7 @@ void BackgroundModule::background_solve_evolver() {
   conformal_age_ = pvecback_integration[index_bi_a_];
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
   Omega0_dr_ = 0.;
-  for (auto& sp : all_species_) {
+  for (const auto& sp : all_species_) {
     Omega0_dr_ += sp->DarkRadiationRhoToday(pvecback_integration.data()) / pba->H0 / pba->H0;
   }
   if (all_species_.count("DCDM_DR")) {
@@ -855,7 +855,7 @@ void BackgroundModule::background_solve_evolver() {
 
   /* Let species run table-scope analysis now that the full background table is
      filled (e.g. DRMD decoupling redshift). */
-  for (auto& [name, sp] : all_species_) {
+  for (const auto& [name, sp] : all_species_) {
     sp->ProcessBackgroundTable(background_table_.data(), bt_size_, bg_size_, z_table_.data());
   }
 
@@ -955,7 +955,7 @@ void BackgroundModule::background_solve_evolver() {
      stays 0, dropping it from fnu (GetOmega0NcdmTot) and the budget-print neutrino line.
      The DNCDM density is not an evolved bi_ variable, so read it from the today table row. */
   const double* bg_today = background_table_.data() + (bt_size_ - 1) * bg_size_;
-  for (auto& [key, sp] : all_species_) {
+  for (const auto& [key, sp] : all_species_) {
     if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
       dncdm_dr->dncdm().BackfillOmega0FromToday(bg_today, pba->H0, pba->h);
     }
@@ -984,7 +984,7 @@ void BackgroundModule::background_initial_conditions(
   /** Allow any species to pull the integration start earlier than the default
       (e.g. NCDM must be relativistic at a_ini; relevant for some WDM models). */
 
-  for (auto& [name, sp] : all_species_) {
+  for (const auto& [name, sp] : all_species_) {
     a = sp->BackgroundAIni(a, ppr->tol_ncdm_initial_w);
   }
 
@@ -992,7 +992,7 @@ void BackgroundModule::background_initial_conditions(
 
   /* Set initial values of {B} variables: */
   double Omega_rad = pba->Omega0_g;
-  for (auto& [name, sp] : all_species_) {
+  for (const auto& [name, sp] : all_species_) {
     Omega_rad += sp->GetRadiationOmega0();
   }
   double rho_rad = Omega_rad * pow(pba->H0, 2) / pow(a, 4);
@@ -1003,7 +1003,7 @@ void BackgroundModule::background_initial_conditions(
   ic.a_ini                = a;
   ic.rho_rad              = rho_rad;
   ic.pvecback_integration = pvecback_integration;
-  for (auto& [name, sp] : all_species_) {
+  for (const auto& [name, sp] : all_species_) {
     sp->SetBackgroundInitialConditions(ic);
   }
 
@@ -1123,7 +1123,7 @@ void BackgroundModule::background_output_titles(std::string& titles) const {
 
   // ── Species output — per-species dispatch ───────────────────────────────
   BackgroundColumnWriter writer(titles);
-  for (auto& [name, sp] : all_species_) {
+  for (const auto& [name, sp] : all_species_) {
     sp->WriteBackgroundColumnTitles(writer);
   }
 
@@ -1154,7 +1154,7 @@ void BackgroundModule::background_output_data(int number_of_titles, double* data
 
     // ── Species data — per-species dispatch ───────────────────────────────
     BackgroundColumnWriter writer(dataptr, storeidx);
-    for (auto& [name, sp] : all_species_) {
+    for (const auto& [name, sp] : all_species_) {
       sp->WriteBackgroundData(pvecback, writer);
     }
 
@@ -1430,7 +1430,7 @@ void BackgroundModule::background_derivs_diagonal_loga(double loga,
                                                        double* y,
                                                        double* diag,
                                                        void* parameters_and_workspace) {
-  auto pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
   pbpaw->background_module->background_derivs_diagonal_loga_member(loga,
                                                                    y,
                                                                    diag,
@@ -1532,7 +1532,7 @@ void BackgroundModule::background_print_variables(double loga,
 
 double BackgroundModule::GetOmega0NcdmTot() const {
   double total = 0.;
-  for (auto& sp : all_species_) {
+  for (const auto& sp : all_species_) {
     total += sp->NeutrinoOmega0();
   }
   return total;

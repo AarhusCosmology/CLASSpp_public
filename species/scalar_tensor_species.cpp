@@ -1,5 +1,6 @@
 #include "scalar_tensor_species.h"
 
+#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 #include <stdexcept>
@@ -492,12 +493,9 @@ std::vector<Named> ScalarTensorSpecies::CreateAll(const SpeciesBuildContext& ctx
     if (!value) {
       return false;
     }
-    for (const char* needle : needles) {
-      if (value->find(needle) != std::string::npos) {
-        return true;
-      }
-    }
-    return false;
+    return std::any_of(needles.begin(), needles.end(), [&value](const char* needle) {
+      return value->find(needle) != std::string::npos;
+    });
   };
   class_test_severe(key_has("gauge", {"new", "New"}),
                     "the scalar-tensor species is implemented in synchronous gauge only");

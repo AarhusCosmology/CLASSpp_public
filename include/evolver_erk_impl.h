@@ -213,9 +213,7 @@ void evolver_erk_run(EvolverDerivs derivs,
     for (int k = 0; k < neq; k++) {
       double errtemp  = fabs(err[k] / std::max(threshold, fabs(ynew[k])));
       nonfinite      |= static_cast<int>(IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
-      if (errtemp > errmax) {
-        errmax = errtemp;
-      }
+      errmax          = std::max(errmax, errtemp);
     }
     /* `errmax` stays the quantity reported in diagnostics; `errnorm` is what the
        controller acts on. They coincide unless the RMS norm is selected, which

@@ -82,10 +82,8 @@ void OutputModule::output_init() {
     }
     return;
   }
-  else {
-    if (pop->output_verbose > 0) {
-      printf("Writing output files in %s... \n", pop->root.c_str());
-    }
+  if (pop->output_verbose > 0) {
+    printf("Writing output files in %s... \n", pop->root.c_str());
   }
 
   /** - deal with all anisotropy power spectra \f$ C_l\f$'s */
@@ -667,7 +665,7 @@ void OutputModule::output_tk() {
 
   if (pop->output_format == file_format::camb_format) {
     int n_ncdm_family = 0;
-    for (auto& [name, sp] : all_species_) {
+    for (const auto& [name, sp] : all_species_) {
       if (dynamic_cast<NCDMBaseSpecies*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
         ++n_ncdm_family;
       }
@@ -982,7 +980,7 @@ void OutputModule::output_print_data(FILE* out,
   fprintf(out, "#");
 
   std::string titles_copy = titles;
-  char* pch               = strtok(&titles_copy[0], _DELIMITER_);
+  char* pch               = strtok(titles_copy.data(), _DELIMITER_);
   while (pch != nullptr) {
     class_fprintf_columntitle(out, pch, true, colnum);
     pch = strtok(nullptr, _DELIMITER_);
@@ -1160,7 +1158,7 @@ void OutputModule::output_open_cl_file(FILE** clfile,
 
 void OutputModule::output_one_line_of_cl(FILE* clfile,
                                          double l,
-                                         double* cl, /* array with argument cl[index_ct] */
+                                         const double* cl, /* array with argument cl[index_ct] */
                                          int ct_size) {
   int index_ct;
   int index_ct_rest;

@@ -2,6 +2,7 @@
 // guards, construction + child order, background index plumbing, the kernel
 // conservation identities through the composite plumbing, the combined-sector
 // shooting closure, and the #372 switch-copy regression across three children.
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -95,7 +96,7 @@ static double Scale(double a, double b) {
   return m > 1e-300 ? m : 1e-300;
 }
 static double Scale3(double a, double b, double c) {
-  const double m = std::max(std::fabs(a), std::max(std::fabs(b), std::fabs(c)));
+  const double m = std::max({std::fabs(a), std::fabs(b), std::fabs(c)});
   return m > 1e-300 ? m : 1e-300;
 }
 
@@ -234,10 +235,10 @@ int main() {
     auto& parent = comp->parent();
     auto& ferm   = comp->fermion();
     auto& bos    = comp->boson();
-    unsigned s   = 0x1234567u;
+    unsigned s   = 0x1234567U;
     auto rnd     = [&]() {
-      s = s * 1664525u + 1013904223u;
-      return 0.1 + 0.9 * (((s >> 8) & 0xffffu) / 65535.0);
+      s = s * 1664525U + 1013904223U;
+      return 0.1 + 0.9 * (((s >> 8) & 0xffffU) / 65535.0);
     };
     for (int i = 0; i < parent.q_size(); ++i) {
       y[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * rnd();
@@ -470,10 +471,10 @@ int main() {
 
       std::vector<double> y(off, 0.);
       std::vector<double> dy(off, 0.);
-      unsigned s = 0xBEEF01u;
+      unsigned s = 0xBEEF01U;
       auto rnd   = [&]() {
-        s = s * 1664525u + 1013904223u;
-        return -1.0 + 2.0 * (((s >> 9) & 0xffffu) / 65535.0);
+        s = s * 1664525U + 1013904223U;
+        return -1.0 + 2.0 * (((s >> 9) & 0xffffU) / 65535.0);
       };
       for (int iq = 0; iq < qp; ++iq) {
         for (int l = 0; l <= l_max; ++l) {
@@ -593,10 +594,10 @@ int main() {
 
       std::vector<double> y(off, 0.);
       std::vector<double> dy(off, 0.);
-      unsigned s = 0x51A7Eu;
+      unsigned s = 0x51A7EU;
       auto rnd   = [&]() {
-        s = s * 1664525u + 1013904223u;
-        return -1.0 + 2.0 * (((s >> 9) & 0xffffu) / 65535.0);
+        s = s * 1664525U + 1013904223U;
+        return -1.0 + 2.0 * (((s >> 9) & 0xffffU) / 65535.0);
       };
       for (int iq = 0; iq < qp; ++iq) {
         for (int l = 0; l <= l_max; ++l) {
@@ -892,10 +893,10 @@ int main() {
     auto& parent = comp->parent();
     auto& ferm   = comp->fermion();
     auto& bos    = comp->boson();
-    unsigned s   = 0x9E3779B9u;
+    unsigned s   = 0x9E3779B9U;
     auto rnd     = [&]() {
-      s = s * 1664525u + 1013904223u;
-      return 0.1 + 0.9 * (((s >> 8) & 0xffffu) / 65535.0);
+      s = s * 1664525U + 1013904223U;
+      return 0.1 + 0.9 * (((s >> 8) & 0xffffU) / 65535.0);
     };
     for (int i = 0; i < parent.q_size(); ++i) {
       y[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * rnd();

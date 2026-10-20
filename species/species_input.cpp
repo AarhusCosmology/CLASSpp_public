@@ -1,5 +1,6 @@
 #include "species/species_input.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <set>
 #include <stdexcept>
@@ -85,12 +86,9 @@ std::vector<std::string> CollectInstanceFieldValues(FileContent* pfc,
 }
 
 bool AnyInstanceFieldValue(const std::vector<std::string>& values) {
-  for (const auto& value : values) {
-    if (!value.empty()) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(values.begin(), values.end(), [](const std::string& value) {
+    return !value.empty();
+  });
 }
 
 bool SynthesiseIdenticalScalarField(FileContent* pfc,
@@ -180,12 +178,9 @@ void TranslateSingleInstanceDotSyntax(FileContent* pfc) {
 namespace {
 
 bool IsSpeciesType(const std::string& name) {
-  for (const auto& entry : kAllSpeciesFactories) {
-    if (entry.name == name) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(kAllSpeciesFactories.begin(),
+                     kAllSpeciesFactories.end(),
+                     [&name](const auto& entry) { return entry.name == name; });
 }
 
 std::string SpeciesTypeList() {

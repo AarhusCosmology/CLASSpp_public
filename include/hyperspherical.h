@@ -19,7 +19,7 @@
 #define _TWO_OVER_THREE_ 0.666666666666666666666666666667e0
 #define _HIS_BYTE_ALIGNMENT_ 16
 
-typedef struct HypersphericalInterpolationStructure {
+struct HypersphericalInterpolationStructure {
   int K          = 0;  //Sign of the curvature, (0,-1,1)
   double beta    = 0.0;
   double delta_x = 0.0;               //x-spacing. (xvec is uniformly spaced)
@@ -44,7 +44,8 @@ typedef struct HypersphericalInterpolationStructure {
                                        double sampling,
                                        int l_WKB,
                                        double phiminabs);
-} HyperInterpStruct;
+};
+using HyperInterpStruct = HypersphericalInterpolationStructure;
 
 struct WKB_parameters {
   int K;
@@ -59,8 +60,8 @@ void hyperspherical_forwards_recurrence(int K,
                                         double x,
                                         double sinK,
                                         double cotK,
-                                        double* sqrtK,
-                                        double* one_over_sqrtK,
+                                        const double* sqrtK,
+                                        const double* one_over_sqrtK,
                                         double* PhiL);
 void hyperspherical_forwards_recurrence_chunk(int K,
                                               int lmax,
@@ -69,8 +70,8 @@ void hyperspherical_forwards_recurrence_chunk(int K,
                                               double* sinK,
                                               double* cotK,
                                               int chunk,
-                                              double* sqrtK,
-                                              double* one_over_sqrtK,
+                                              const double* sqrtK,
+                                              const double* one_over_sqrtK,
                                               double* PhiL);
 void hyperspherical_backwards_recurrence(int K,
                                          int lmax,
@@ -78,8 +79,8 @@ void hyperspherical_backwards_recurrence(int K,
                                          double x,
                                          double sinK,
                                          double cotK,
-                                         double* sqrtK,
-                                         double* one_over_sqrtK,
+                                         const double* sqrtK,
+                                         const double* one_over_sqrtK,
                                          double* PhiL);
 
 void hyperspherical_backwards_recurrence_chunk(int K,
@@ -89,13 +90,13 @@ void hyperspherical_backwards_recurrence_chunk(int K,
                                                double* sinK,
                                                double* cotK,
                                                int chunk,
-                                               double* sqrtK,
-                                               double* one_over_sqrtK,
+                                               const double* sqrtK,
+                                               const double* one_over_sqrtK,
                                                double* PhiL);
 
 bool hyperspherical_WKB(int K, int l, double beta, double y, double* Phi);
 void hyperspherical_bessel_direct_vector(
-    int K, double beta, int* lvec, int nl, double* xvec, int nx, double* Phi);
+    int K, double beta, int* lvec, int nl, const double* xvec, int nx, double* Phi);
 void ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign);
 bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign);
 bool CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF);
@@ -116,8 +117,8 @@ bool fzero_ridder(double (*func)(double, void*),
                   double x2,
                   double xtol,
                   void* param,
-                  double* Fx1,
-                  double* Fx2,
+                  const double* Fx1,
+                  const double* Fx2,
                   double* xzero,
                   int* fevals);
 

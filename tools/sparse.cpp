@@ -88,7 +88,7 @@ void dfsr(int j, sp_mat* G, int* top, int* xik, int* pinv) {
   xik[--(*top)] = j; /*Put column value on stack. */
 }
 
-void sp_splsolve(sp_mat* G, sp_mat* B, int k, int* xik, int top, double* x, int* pinv) {
+void sp_splsolve(sp_mat* G, sp_mat* B, int k, const int* xik, int top, double* x, const int* pinv) {
   int j;
   int J;
   int p;
@@ -238,7 +238,7 @@ bool sp_ludcmp(sp_num* N, sp_mat* A, double pivtol) {
   return true;
 }
 
-void sp_lusolve(sp_num* N, double* b, double* x) {
+void sp_lusolve(sp_num* N, const double* b, double* x) {
   int p;
   int j;
   int n;
@@ -783,7 +783,7 @@ int sp_wclear(int mark, int lemax, int* w, int n) {
     }
     mark = 2;
   }
-  return (mark);
+  return mark;
 }
 
 int sp_tdfs(int j, int k, int* head, const int* next, int* post, int* stack) {
@@ -803,5 +803,5 @@ int sp_tdfs(int j, int k, int* head, const int* next, int* post, int* stack) {
       stack[++top] = i;
     }
   }
-  return (k);
+  return k;
 }

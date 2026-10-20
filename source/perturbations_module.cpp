@@ -47,12 +47,12 @@ PerturbationsModule::PerturbationsModule(InputModulePtr input_module,
 }
 
 void PerturbationsModule::ResolveSpecies() {
-  if (auto* p = all_species_.find("IDM_DR_IDR")) {
+  if (const auto* p = all_species_.find("IDM_DR_IDR")) {
     resolved_.idm_dr_idr       = static_cast<const IDM_DR_IDR_Species*>(p->get());
     resolved_.idm_dr_idr_index = all_species_.index_of("IDM_DR_IDR");
     resolved_.idr_nature       = resolved_.idm_dr_idr->idr().idr_nature();
   }
-  if (auto* p = all_species_.find("IDM_DRMD_IDR_DRMD")) {
+  if (const auto* p = all_species_.find("IDM_DRMD_IDR_DRMD")) {
     resolved_.idm_drmd = static_cast<const IDM_DRMD_IDR_DRMD_Species*>(p->get());
   }
 
@@ -64,13 +64,13 @@ void PerturbationsModule::ResolveSpecies() {
       resolved_.ur.push_back(sp.get());
     }
   }
-  if (auto* p = all_species_.find("Lambda")) {
+  if (const auto* p = all_species_.find("Lambda")) {
     resolved_.lambda = p->get();
   }
 
   resolved_.cdm_index = all_species_.index_of("CDM");
 
-  if (auto* p = all_species_.find("Fluid")) {
+  if (const auto* p = all_species_.find("Fluid")) {
     if (auto* f = dynamic_cast<PpfFluid*>(p->get())) {
       resolved_.ppf_fluid = f;
     }
@@ -84,13 +84,13 @@ void PerturbationsModule::ResolveSpecies() {
                     "combined with a species that modifies gravity (set use_ppf = no)");
 }
 
-PerturbationsModule::~PerturbationsModule() {}
+PerturbationsModule::~PerturbationsModule() = default;
 
 // Wrapper functions to pass non-static member functions
 void PerturbationsModule::perturb_timescale(double tau,
                                             void* parameters_and_workspace,
                                             double* timescale) {
-  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   pppaw->perturbations_module->perturb_timescale_member(tau, parameters_and_workspace, timescale);
 }
 void PerturbationsModule::perturb_sources(double tau,
@@ -98,7 +98,7 @@ void PerturbationsModule::perturb_sources(double tau,
                                           double* pvecderivs,
                                           int index_tau,
                                           void* parameters_and_workspace) {
-  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   pppaw->perturbations_module->perturb_sources_member(tau,
                                                       pvecperturbations,
                                                       pvecderivs,
@@ -109,21 +109,21 @@ void PerturbationsModule::perturb_print_variables(double tau,
                                                   double* y,
                                                   double* dy,
                                                   void* parameters_and_workspace) {
-  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   pppaw->perturbations_module->perturb_print_variables_member(tau, y, dy, parameters_and_workspace);
 }
 void PerturbationsModule::perturb_derivs(double tau,
                                          double* y,
                                          double* dy,
                                          void* parameters_and_workspace) {
-  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   pppaw->perturbations_module->perturb_derivs_member(tau, y, dy, parameters_and_workspace);
 }
 void PerturbationsModule::perturb_derivs_diagonal(double tau,
                                                   double* y,
                                                   double* diag,
                                                   void* parameters_and_workspace) {
-  auto pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   pppaw->perturbations_module->perturb_derivs_diagonal_member(tau,
                                                               y,
                                                               diag,
@@ -362,7 +362,7 @@ void PerturbationsModule::perturb_store_columns(file_format output_format,
       if (output_format == file_format::class_format) {
         if (ppt->has_density_transfers) {
           PerturbColumnWriter w(dataptr, tk, storeidx);
-          for (auto& [name, sp] : all_species_) {
+          for (const auto& [name, sp] : all_species_) {
             sp->WriteOutputColumns(w,
                                    *this,
                                    output_format,
@@ -385,7 +385,7 @@ void PerturbationsModule::perturb_store_columns(file_format output_format,
         }
         if (ppt->has_velocity_transfers) {
           PerturbColumnWriter w(dataptr, tk, storeidx);
-          for (auto& [name, sp] : all_species_) {
+          for (const auto& [name, sp] : all_species_) {
             sp->WriteOutputColumns(w,
                                    *this,
                                    output_format,
@@ -398,7 +398,7 @@ void PerturbationsModule::perturb_store_columns(file_format output_format,
         /* rescale and reorder the matter transfer functions following the CMBFAST/CAMB convention */
         {
           PerturbColumnWriter w(dataptr, tk, storeidx);
-          for (auto& [name, sp] : all_species_) {
+          for (const auto& [name, sp] : all_species_) {
             sp->WriteOutputColumns(w,
                                    *this,
                                    output_format,
@@ -428,7 +428,7 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
     class_store_columntitle(titles, "k (h/Mpc)", true);
     if (ppt->has_density_transfers) {
       PerturbColumnWriter w(titles);
-      for (auto& [name, sp] : all_species_) {
+      for (const auto& [name, sp] : all_species_) {
         sp->WriteOutputColumns(w,
                                *this,
                                output_format,
@@ -453,7 +453,7 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
     }
     if (ppt->has_velocity_transfers) {
       PerturbColumnWriter w(titles);
-      for (auto& [name, sp] : all_species_) {
+      for (const auto& [name, sp] : all_species_) {
         sp->WriteOutputColumns(w,
                                *this,
                                output_format,
@@ -467,7 +467,7 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
     class_store_columntitle(titles, "k (h/Mpc)", true);
     {
       PerturbColumnWriter w(titles);
-      for (auto& [name, sp] : all_species_) {
+      for (const auto& [name, sp] : all_species_) {
         sp->WriteOutputColumns(w,
                                *this,
                                output_format,
@@ -567,10 +567,8 @@ void PerturbationsModule::perturb_init() {
     }
     return;
   }
-  else {
-    if (ppt->perturbations_verbose > 0) {
-      printf("Computing sources\n");
-    }
+  if (ppt->perturbations_verbose > 0) {
+    printf("Computing sources\n");
   }
 
   class_test((ppt->gauge == possible_gauges::synchronous) && (all_species_.count("CDM") == 0) &&
@@ -690,16 +688,16 @@ void PerturbationsModule::perturb_init() {
     evolve_tensor_ncdm_ = false;
 
     switch (ppt->tensor_method) {
-      case (tm_photons_only):
+      case tm_photons_only:
         break;
 
-      case (tm_massless_approximation):
+      case tm_massless_approximation:
         if (!resolved_.ur.empty() || all_species_.has_ncdm()) {
           evolve_tensor_ur_ = true;
         }
         break;
 
-      case (tm_exact):
+      case tm_exact:
         if (!resolved_.ur.empty()) {
           evolve_tensor_ur_ = true;
         }
@@ -1080,7 +1078,7 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
       species_emits_source_.assign(all_species_.size(), 0);
       {
         size_t isp = 0;
-        for (auto& sp : all_species_) {
+        for (const auto& sp : all_species_) {
           const int before = index_type;
           sp->RegisterTransferSourceIndices(index_type, src_ctx);
           species_emits_source_[isp] = (index_type > before) ? 1 : 0;
@@ -2312,7 +2310,7 @@ void PerturbationsModule::perturb_solve(int index_md,
                  ppw->pvecback[background_module_->index_bg_H_]);
 
   if (all_species_.has_ncdm()) {
-    for (auto& sp : all_species_) {
+    for (const auto& sp : all_species_) {
       sp->CheckUltraRelativisticAtIc(ppw->pvecback.data(), ppr->tol_ncdm_initial_w);
     }
   }
@@ -2335,7 +2333,7 @@ void PerturbationsModule::perturb_solve(int index_md,
 
     /* if there are non-cold relics, check that they are relativistic enough */
     if (all_species_.has_ncdm()) {
-      for (auto& sp : all_species_) {
+      for (const auto& sp : all_species_) {
         if (!sp->IsUltraRelativisticAtIc(ppw->pvecback.data(), ppr->tol_ncdm_initial_w)) {
           is_early_enough = false;
         }
@@ -2530,7 +2528,7 @@ void PerturbationsModule::perturb_solve(int index_md,
 
     /* One lock per interval rather than an atomic per step. */
     {
-      std::lock_guard<std::mutex> guard(evolver_stats_mutex_);
+      std::scoped_lock guard(evolver_stats_mutex_);
       if (options.stats != nullptr) {
         evolver_stats_.Add(call_stats);
       }
@@ -2617,7 +2615,7 @@ void PerturbationsModule::perturb_prepare_k_output() {
       {
         PerturbColumnWriter w(scalar_titles_);
         // Title mode: no perturb_vector exists yet, so there is no layout to pass.
-        for (auto& [name, sp] : all_species_) {
+        for (const auto& [name, sp] : all_species_) {
           sp->PrintVariables(w, nullptr, 0., nullptr, *this, nullptr);
         }
       }
@@ -2647,7 +2645,7 @@ void PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(tensor_titles_, "l4_ur", evolve_tensor_ur_);
 
       if (evolve_tensor_ncdm_) {
-        for (auto& sp : all_species_) {
+        for (const auto& sp : all_species_) {
           sp->WriteTensorOutputColumnTitles(tensor_titles_);
         }
       }
@@ -2740,7 +2738,7 @@ void PerturbationsModule::perturb_find_approximation_switches(
     double tau_end,
     double precision,
     int interval_number,
-    int* interval_number_of,
+    const int* interval_number_of,
     double* interval_limit, /* interval_limit[index_interval] (already allocated) */
     int** interval_approx   /* interval_approx[index_interval][index_ap] (already allocated) */
 ) {
@@ -3020,7 +3018,7 @@ void PerturbationsModule::perturb_vector_init(
     double tau,
     perturb_workspace*
         ppw, /* ppw->pv unallocated if pa_old = nullptr, allocated and filled otherwise */
-    int* pa_old) {
+    const int* pa_old) {
   /** Summary: */
 
   /** - allocate a new perturb_vector structure to which ppw-->pv will point at the end of the routine */
@@ -3768,7 +3766,7 @@ void PerturbationsModule::perturb_initial_conditions(
     double rho_nu = 0.;
 
     // ── Dispatch over all other species ──────────────────────────────────────
-    for (auto& [name, sp] : all_species_) {
+    for (const auto& [name, sp] : all_species_) {
       if (name == "Photons" || name == "Baryons") {
         continue;
       }
@@ -4136,7 +4134,7 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.alpha_prime = 0.;  // no species IC transform currently requires alpha'
       {
         size_t sp_idx = 0;
-        for (auto& sp : all_species_) {
+        for (const auto& sp : all_species_) {
           sp->PerturbSynchronousToNewtonian(*ppw->pv->species_layouts[sp_idx],
                                             ppw->pv->y.data(),
                                             ic_ctx);
@@ -5061,7 +5059,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 
       if (ppt->tensor_method == tm_massless_approximation) {
         if (all_species_.has_ncdm()) {
-          for (auto& sp : all_species_) {
+          for (const auto& sp : all_species_) {
             rho_relativistic += sp->TensorMasslessRelativisticRho(ppw->pvecback.data());
           }
         }
@@ -5081,7 +5079,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
         if (dynamic_cast<const NCDMSpecies*>(sp)) {
           sp->ContributeTensorGwSource(*ppw->pv->species_layouts[i], a, y, ppw);
         }
-        else if (auto* composite = dynamic_cast<const DNCDM_DR_Species*>(sp)) {
+        else if (const auto* composite = dynamic_cast<const DNCDM_DR_Species*>(sp)) {
           composite->dncdm().ContributeTensorGwSource(DNCDM_DR_Species::dncdm_layout(
                                                           *ppw->pv->species_layouts[i]),
                                                       a,
@@ -5840,7 +5838,7 @@ void PerturbationsModule::perturb_derivs_diagonal_member(double tau,
                                                          double* y,
                                                          double* diag,
                                                          void* parameters_and_workspace) {
-  auto pppaw             = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+  auto* pppaw            = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
   perturb_workspace* ppw = pppaw->ppw;
   double* pvecback       = ppw->pvecback.data();
 
@@ -6219,7 +6217,8 @@ void PerturbationsModule::perturb_derivs_member(double tau,
  * @param error_message            Output: error message
  */
 
-void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters_and_workspace) {
+void PerturbationsModule::perturb_tca_slip_and_shear(const double* y,
+                                                     void* parameters_and_workspace) {
   /** Summary: */
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
@@ -6527,7 +6526,7 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
  */
 
 void PerturbationsModule::perturb_rsa_delta_and_theta(
-    double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {
+    double k, const double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {
   double k2 = k * k;
 
   class_test(ppw->approx[ppw->index_ap_rsa] == (int) rsa_off,
@@ -6645,7 +6644,7 @@ void PerturbationsModule::perturb_rsa_delta_and_theta(
  */
 
 void PerturbationsModule::perturb_rsa_idr_delta_and_theta(
-    double k, double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {
+    double k, const double* y, double a_prime_over_a, double* pvecthermo, perturb_workspace* ppw) {
   /* - define local variables */
 
   double k2;

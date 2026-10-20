@@ -25,16 +25,20 @@ namespace {
 
 /* y' = -y, y(0) = 1. Stiff enough for nothing, which is the point: these tests
    are about the interface, not the integration. */
-void decay_derivs(double, double* y, double* dy, void*) {
+void decay_derivs(double /*x*/, double* y, double* dy, void* /*parameters_and_workspace*/) {
   dy[0] = -y[0];
 }
-void decay_diagonal(double, double*, double* diag, void*) {
+void decay_diagonal(double /*x*/, double* /*y*/, double* diag, void* /*parameters_and_workspace*/) {
   diag[0] = -1.0;
 }
-void decay_timescale(double, void*, double* timescale) {
+void decay_timescale(double /*x*/, void* /*parameters_and_workspace*/, double* timescale) {
   *timescale = 1.0;
 }
-void no_output(double, double[], double[], int, void*) {}
+void no_output(double /*x*/,
+               double /*y*/[],
+               double /*dy*/[],
+               int /*index_x*/,
+               void* /*parameters_and_workspace*/) {}
 
 /* One equation in every test here, so one flag. */
 const int kUsedInOutput[1] = {1};

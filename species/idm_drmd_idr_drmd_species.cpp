@@ -119,7 +119,7 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
           double Rint;
           double csp2;
           double Gint;
-          auto* bgm = ctx.p_mod->GetBackgroundModule().get();
+          const auto* bgm = ctx.p_mod->GetBackgroundModule().get();
           ComputeIdmDrmd(ctx.ppw->pvecback[bgm->index_bg_a_],
                          idm_drmd_->Rho(ctx.ppw->pvecback.data()) /
                              idr_drmd_->Rho(ctx.ppw->pvecback.data()),

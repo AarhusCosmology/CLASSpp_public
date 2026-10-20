@@ -173,7 +173,7 @@ double DCDM_DR_Species::ComputeShootingResidual(const ShootingResidualContext& c
   if (t == "Omega_dcdmdr") {
     return (rho_dcdm + rho_dr) / (H0 * H0) - target.target_value;
   }
-  else if (t == "omega_dcdmdr") {
+  if (t == "omega_dcdmdr") {
     return (rho_dcdm + rho_dr) / (H0 * H0) - target.target_value / ba.h / ba.h;
   }
   // Omega_ini_dcdm / omega_ini_dcdm: target is the ini, we vary the today density.

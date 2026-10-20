@@ -209,9 +209,8 @@ double DNCDMProxySpecies::TransportRate(int l, double a, const double* pvecback)
     return 0.;
   }
   double gamma = (a * parent_->Rho(pvecback) / number) / X;
-  if (gamma < 1.) {
-    gamma = 1.;  // gamma >= 1 identically; this only clamps quadrature round-off
-  }
+  gamma = std::max(gamma, 1.);  // gamma >= 1 identically; this only clamps quadrature round-off
+
   const double g2     = gamma * gamma;
   const double g3i    = 1. / (g2 * gamma);
   const double eps_ne = pvecback[index_bg_eps_ne_];
@@ -953,10 +952,8 @@ void DNCDMProxySpecies::ComputeDerivedBackground(double a,
     for (int i = 0; i < Np; ++i) {
       net += dq[i] * q[i] * q[i] * df_H_[i];
     }
-    net = std::fabs(net) / gross;
-    if (net > 1.) {
-      net = 1.;
-    }
+    net            = std::fabs(net) / gross;
+    net            = std::min(net, 1.);
     eps_ne_cached_ = net;
   }
   pvecback[index_bg_eps_ne_] = net;

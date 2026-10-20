@@ -32,8 +32,8 @@ void SpeciesCollection::freeze() {
   }
   /* Stamp the cached matter classification once, now that every species (and every
      composite child) is fully constructed. Composites recurse into their children. */
-  for (std::size_t i = 0; i < species_.size(); ++i) {
-    species_[i].species->FinalizeMatterClassification();
+  for (auto& entry : species_) {
+    entry.species->FinalizeMatterClassification();
   }
   auto* photons_slot = find("Photons");
   auto* baryons_slot = find("Baryons");
@@ -92,7 +92,7 @@ std::unique_ptr<BaseSpecies>& SpeciesCollection::at(const std::string& key) {
   throw std::out_of_range("SpeciesCollection::at: no species with key '" + key + "'");
 }
 const std::unique_ptr<BaseSpecies>& SpeciesCollection::at(const std::string& key) const {
-  if (auto* p = find(key)) {
+  if (const auto* p = find(key)) {
     return *p;
   }
   throw std::out_of_range("SpeciesCollection::at: no species with key '" + key + "'");

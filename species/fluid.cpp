@@ -207,7 +207,7 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
   double w_fld;
   double dw_over_da;
   double integral;
-  auto* bgm = ctx.p_mod->GetBackgroundModule().get();
+  const auto* bgm = ctx.p_mod->GetBackgroundModule().get();
   bgm->background_w_fld(ctx.a, &w_fld, &dw_over_da, &integral);
   const double cs2 = Cs2(ctx.k * ctx.k, ctx.a);
 
@@ -356,13 +356,13 @@ void FluidSpecies::ComputeWFld(double a,
                    4. /
                        3.));  // assumes LambdaCDM + eventually massive neutrinos so light that they are relativistic at equality; needs to be generalised later on.
       double Omega_m = pba_.Omega0_b;
-      if (auto* p = bgm_->all_species_.find("CDM")) {
+      if (const auto* p = bgm_->all_species_.find("CDM")) {
         Omega_m += (*p)->GetOmega0();
       }
-      if (auto* p = bgm_->all_species_.find("IDM_DR_IDR")) {
+      if (const auto* p = bgm_->all_species_.find("IDM_DR_IDR")) {
         Omega_m += static_cast<const IDM_DR_IDR_Species&>(**p).idm_dr().GetOmega0();
       }
-      if (auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD")) {
+      if (const auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD")) {
         Omega_m += static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**p).idm_drmd().GetOmega0();
       }
       if (bgm_->all_species_.count("DCDM_DR")) {
@@ -502,7 +502,7 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
         eos_str.find("PhenoAxion") != std::string::npos) {
       return CreatePhenoAxion(ctx);
     }
-    else if (eos_str.find("CLP") != std::string::npos || eos_str.find("clp") != std::string::npos) {
+    if (eos_str.find("CLP") != std::string::npos || eos_str.find("clp") != std::string::npos) {
       fluid_eos = CLP;
     }
     // Before EDE, which is a substring of (G)PEDE.

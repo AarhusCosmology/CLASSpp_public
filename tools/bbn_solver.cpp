@@ -481,8 +481,8 @@ BbnResult SolveBbn(const BbnInput& input) {
             "# not need to. Every abundance is comfortably positive by the time it matters:\n"
             "# the smallest one reported as a result, Li7+Be7, ends near 5e-10.\n");
     fprintf(file, "# %13s %15s", "T9", "t[s]");
-    for (int i = 0; i < kBbnNumNuclides; ++i) {
-      fprintf(file, " %15s", kNuclides[i].name);
+    for (const auto& nuclide : kNuclides) {
+      fprintf(file, " %15s", nuclide.name);
     }
     fprintf(file, "\n");
     const int stride = 2 + kBbnNumNuclides;

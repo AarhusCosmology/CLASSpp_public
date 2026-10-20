@@ -46,7 +46,7 @@ NCDMBaseSpecies::NCDMBaseSpecies(std::string name,
                                  FileContent* pfc,
                                  const std::string& instance_name,
                                  const NcdmSettings& settings,
-                                 DeferInit)
+                                 DeferInit /*defer*/)
     : BaseSpecies(std::move(name), energy_type), T_cmb_(settings.T_cmb), h_(settings.h),
       rho_nu_rel_(RhoNuRelFromTcmb(settings.T_cmb)) {
   ReadParametersByInstance(pfc, instance_name, settings);

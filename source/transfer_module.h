@@ -259,7 +259,7 @@ class TransferModule : public BaseModule {
                          double xtol,
                          int* index_l_left,
                          int* index_l_right);
-  void transfer_f_evo(double* pvecback, int last_index, double cotKgen, double* f_evo);
+  void transfer_f_evo(const double* pvecback, int last_index, double cotKgen, double* f_evo);
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;

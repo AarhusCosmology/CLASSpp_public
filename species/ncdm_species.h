@@ -97,16 +97,16 @@ class NCDMSpecies : public NCDMBaseSpecies {
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
-  void WriteOutputColumns(PerturbColumnWriter&,
-                          const PerturbationsModule&,
-                          file_format,
-                          TransferColumnSection) const override;
-  void PrintVariables(PerturbColumnWriter&,
-                      const BaseSpecies::PerturbLayout*,
-                      double,
-                      const double*,
-                      const PerturbationsModule&,
-                      const perturb_workspace*) const override;
+  void WriteOutputColumns(PerturbColumnWriter& w,
+                          const PerturbationsModule& mod,
+                          file_format fmt,
+                          TransferColumnSection section) const override;
+  void PrintVariables(PerturbColumnWriter& w,
+                      const BaseSpecies::PerturbLayout* base,
+                      double tau,
+                      const double* y,
+                      const PerturbationsModule& mod,
+                      const perturb_workspace* ppw) const override;
   void WriteTensorOutputColumnTitles(std::string& tensor_titles) const override;
 
   int bg_number_index() const {
@@ -124,7 +124,7 @@ class NCDMSpecies : public NCDMBaseSpecies {
               const NcdmSettings& settings,
               const background* pba,
               const BackgroundModule* bgm,
-              NCDMBaseSpecies::DeferInit);
+              NCDMBaseSpecies::DeferInit defer);
 
   // Standard-NCDM mass/Omega closure (factored out of the public constructor so
   // GreyBodyNCDMSpecies can re-run it after rebuilding quadrature).

@@ -31,15 +31,15 @@ class SpectraModule;
 class LensingModule;
 class FileContent;
 
-typedef std::shared_ptr<const InputModule> InputModulePtr;
-typedef std::shared_ptr<const BackgroundModule> BackgroundModulePtr;
-typedef std::shared_ptr<const ThermodynamicsModule> ThermodynamicsModulePtr;
-typedef std::shared_ptr<const PerturbationsModule> PerturbationsModulePtr;
-typedef std::shared_ptr<const PrimordialModule> PrimordialModulePtr;
-typedef std::shared_ptr<const NonlinearModule> NonlinearModulePtr;
-typedef std::shared_ptr<const TransferModule> TransferModulePtr;
-typedef std::shared_ptr<const SpectraModule> SpectraModulePtr;
-typedef std::shared_ptr<const LensingModule> LensingModulePtr;
+using InputModulePtr          = std::shared_ptr<const InputModule>;
+using BackgroundModulePtr     = std::shared_ptr<const BackgroundModule>;
+using ThermodynamicsModulePtr = std::shared_ptr<const ThermodynamicsModule>;
+using PerturbationsModulePtr  = std::shared_ptr<const PerturbationsModule>;
+using PrimordialModulePtr     = std::shared_ptr<const PrimordialModule>;
+using NonlinearModulePtr      = std::shared_ptr<const NonlinearModule>;
+using TransferModulePtr       = std::shared_ptr<const TransferModule>;
+using SpectraModulePtr        = std::shared_ptr<const SpectraModule>;
+using LensingModulePtr        = std::shared_ptr<const LensingModule>;
 #endif
 
 #ifndef __COMMON__

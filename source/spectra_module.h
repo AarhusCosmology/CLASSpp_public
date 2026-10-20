@@ -99,7 +99,7 @@ class SpectraModule : public BaseModule {
                           int index_l,
                           int cl_integrand_num_columns,
                           double* cl_integrand,
-                          double* primordial_pk_cached,
+                          const double* primordial_pk_cached,
                           double* transfer_ic1,
                           double* transfer_ic2);
   int spectra_k_and_tau();

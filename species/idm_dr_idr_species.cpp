@@ -279,10 +279,10 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
   const perturb_vector* pv        = ppw->pv.get();
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
-  auto* pth_mod            = ppaw.perturbations_module->GetThermodynamicsModule().get();
+  const auto* pth_mod      = ppaw.perturbations_module->GetThermodynamicsModule().get();
   const double* pvecback   = ppw->pvecback.data();
   const double* pvecthermo = ppw->pvecthermo.data();
-  auto* ppt                = ppaw.perturbations_module->GetPerturbs();
+  const auto* ppt          = ppaw.perturbations_module->GetPerturbs();
 
   const double dmu_idm_dr = pvecthermo[pth_mod->index_th_dmu_idm_dr_];
   const double rho_idm_dr = idm_dr_->Rho(pvecback);
