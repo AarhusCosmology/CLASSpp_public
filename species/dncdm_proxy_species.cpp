@@ -794,7 +794,6 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
 
 void DNCDMProxySpecies::RegisterBackgroundIndices(int& index_bg) {
   CompositeSpecies::RegisterBackgroundIndices(index_bg);
-  const int Nd      = static_cast<int>(q_d_.size());
   index_bg_rate_    = index_bg++;
   index_bg_eps_ne_  = index_bg++;
   index_bg_rho_sec_ = index_bg++;

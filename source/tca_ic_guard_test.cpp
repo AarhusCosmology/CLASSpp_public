@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "cosmology.h"
 #include "input_module.h"
@@ -47,7 +48,7 @@ void parse(FileContent fc) {
 void expect_severe(FileContent fc, const char* named_parameter) {
   bool threw = false;
   try {
-    parse(fc);
+    parse(std::move(fc));
   }
   catch (const std::invalid_argument& e) {
     threw                 = true;
@@ -60,7 +61,7 @@ void expect_severe(FileContent fc, const char* named_parameter) {
 }
 
 void expect_ok(FileContent fc) {
-  parse(fc);  // must not throw
+  parse(std::move(fc));  // must not throw
 }
 
 }  // namespace

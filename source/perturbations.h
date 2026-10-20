@@ -21,8 +21,9 @@
 #define _vectorsEXT_ (ppt->has_vectors && (index_md == perturbations_module_->index_md_vectors_))
 #define _tensorsEXT_ (ppt->has_tensors && (index_md == perturbations_module_->index_md_tensors_))
 
-#define _set_source_(index) \
-  sources_[index_md][index_ic * tp_size_[index_md] + index][index_tau * k_size_[index_md] + index_k]
+#define _set_source_(index)                                   \
+  sources_[index_md][index_ic * tp_size_[index_md] + (index)] \
+          [index_tau * k_size_[index_md] + index_k]
 
 /**
  * flags for various approximation schemes

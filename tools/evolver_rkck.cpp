@@ -15,7 +15,6 @@ void evolver_rk(EvolverDerivs derivs,
   const double tolerance                    = options.rtol;
   const double* x_sampling                  = options.x_sampling;
   const int x_size                          = options.x_sampling_size;
-  const int* used_in_output                 = options.used_in_output;
   const EvolverOutput output                = options.output;
   const EvolverPrint print_variables        = options.print_variables;
   const EvolverTimescale evaluate_timescale = options.evaluate_timescale;

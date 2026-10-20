@@ -12,7 +12,7 @@
 
 InputModulePtr& Cosmology::GetInputModule() {
   if (!shot_) {
-    ShootingResult shoot = InputModule::DoShooting(std::move(input_module_ptr_));
+    ShootingResult shoot = InputModule::DoShooting(input_module_ptr_);
     if (shoot.converged) {
       // The solver's last evaluation was built from exactly the resolved file content, so it
       // IS this cosmology: adopt it whole, with every module the residual already built.
@@ -65,6 +65,8 @@ PrimordialModulePtr& Cosmology::GetPrimordialModule() {
       auto nl =
           NonlinearModule(GetInputModule(), GetBackgroundModule(), GetPerturbationsModule(), pm);
       const double sigma8 = nl.GetSigma8(nl.index_pk_m_);
+      // The sigma8 solve rescales A_s once, before the primordial module below reads it.
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
       const_cast<primordial*>(&GetInputModule()->primordial_)->A_s *=
           pow(GetInputModule()->primordial_.sigma8 / sigma8, 2);
     }

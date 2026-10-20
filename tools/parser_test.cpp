@@ -63,7 +63,7 @@ static void test_species_input_required_throws() {
     threw           = true;
     std::string msg = e.what();
     assert(msg.find("nu1") != std::string::npos);
-    assert(msg.find("m") != std::string::npos);
+    assert(msg.find('m') != std::string::npos);
   }
   assert(threw);
 }

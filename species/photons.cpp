@@ -506,23 +506,10 @@ void PhotonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& ba
     return;
   }
 
-  if (ctx.index_ic == mod->index_ic_ad_) {
-    y[layout.idx_delta] = ctx.delta_g_ic;
-    y[layout.idx_theta] = ctx.theta_g_ic;
-  }
-  else if (ctx.index_ic == mod->index_ic_cdi_) {
-    y[layout.idx_delta] = ctx.delta_g_ic;
-    y[layout.idx_theta] = ctx.theta_g_ic;
-  }
-  else if (ctx.index_ic == mod->index_ic_bi_) {
-    y[layout.idx_delta] = ctx.delta_g_ic;
-    y[layout.idx_theta] = ctx.theta_g_ic;
-  }
-  else if (ctx.index_ic == mod->index_ic_nid_) {
-    y[layout.idx_delta] = ctx.delta_g_ic;
-    y[layout.idx_theta] = ctx.theta_g_ic;
-  }
-  else if (ctx.index_ic == mod->index_ic_niv_) {
+  // Every initial condition gives the photons the same delta_g_ic and theta_g_ic.
+  if (ctx.index_ic == mod->index_ic_ad_ || ctx.index_ic == mod->index_ic_cdi_ ||
+      ctx.index_ic == mod->index_ic_bi_ || ctx.index_ic == mod->index_ic_nid_ ||
+      ctx.index_ic == mod->index_ic_niv_) {
     y[layout.idx_delta] = ctx.delta_g_ic;
     y[layout.idx_theta] = ctx.theta_g_ic;
   }

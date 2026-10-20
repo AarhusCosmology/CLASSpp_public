@@ -52,14 +52,14 @@ enum reionization_z_or_tau {
  */
 
 #define f1(x) \
-  (-0.75 * x * (x * x / 3. - 1.) + 0.5) /**< goes from 0 to 1 when x goes from -1 to 1 */
+  (-0.75 * (x) * ((x) * (x) / 3. - 1.) + 0.5) /**< goes from 0 to 1 when x goes from -1 to 1 */
 
-#define _BBN_ -1
+#define _BBN_ (-1)
 
 /* YHe sentinel selecting the SOLVED nuclear reaction network (tools/bbn_solver.h)
    rather than the interpolation table. Distinct from _BBN_ so that the default
    stays the table and no existing run changes. */
-#define _BBN_NETWORK_ -2
+#define _BBN_NETWORK_ (-2)
 
 /**
  * Input parameters for the thermodynamics calculation.
@@ -457,7 +457,7 @@ struct reionization {
 //@{
 
 #define _a_PPB_ 4.309
-#define _b_PPB_ -0.6166
+#define _b_PPB_ (-0.6166)
 #define _c_PPB_ 0.6703
 #define _d_PPB_ 0.5300
 #define _T_0_ pow(10., 0.477121) /* from recfast 1.4 */

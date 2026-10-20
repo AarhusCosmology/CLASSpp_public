@@ -63,7 +63,7 @@ class BbnWeakRates {
 
   /** Integrate f over [a,b] with the stored rule. */
   template <typename F>
-  double Integrate(double a, double b, F&& f) const {
+  double Integrate(double a, double b, const F& f) const {
     double sum = 0.0;
     for (std::size_t i = 0; i < x_.size(); ++i) {
       sum += w_[i] * f(a + (b - a) * x_[i]);

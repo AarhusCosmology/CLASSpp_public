@@ -164,7 +164,7 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   q_edge_tol_  = input.get_or("q_edge_tol", 1e-3);
   l_max_input_ = input.get_or("l_max", -1);
   if (auto qmr = input.get<double>("q_min_ratio")) {
-    q_min_ratio_floor_ = *qmr;
+    q_min_ratio_floor_ = qmr;
   }
   class_test(n_bins_ < 8 || n_bins_ > 4096,
              "species '%s': momenta_bins out of range",
@@ -204,13 +204,13 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
                     "species '%s': specify Omega_ini/omega_ini or Omega_dcdmwdm/omega_dcdmwdm",
                     instance_name.c_str());
   if (Omega_ini_opt) {
-    Omega_ini_pending_ = *Omega_ini_opt;
+    Omega_ini_pending_ = Omega_ini_opt;
   }
   else if (omega_ini_opt) {
     Omega_ini_pending_ = *omega_ini_opt / settings.h / settings.h;
   }
   if (Omega_comb_opt) {
-    Omega_combined_pending_ = *Omega_comb_opt;
+    Omega_combined_pending_ = Omega_comb_opt;
   }
   else if (omega_comb_opt) {
     Omega_combined_pending_ = *omega_comb_opt / settings.h / settings.h;

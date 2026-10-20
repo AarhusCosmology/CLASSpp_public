@@ -992,7 +992,6 @@ void ThermodynamicsModule::thermodynamics_init() {
       /* (B3) --> decoupled solution: T_idm_dr scales like a^-2 */
       else {
         z                 = z_table_[index_tau];
-        T_idr             = T_idr_param * (1. + z);
         T_idm_dr          = T_adia * pow((1. + z) / (1. + z_adia), 2);
         Gamma_heat_idm_dr = 2. * Omega0_idr_local * pow(pba->h, 2) * comp_ref.idm_dr().a_idm_dr() *
                             pow((1. + z), (comp_ref.idm_dr().nindex_idm_dr() + 1.)) /
@@ -3625,7 +3624,6 @@ void ThermodynamicsModule::thermodynamics_recombination_derivs_member(
   double Tmat = y[2];
 
   double n    = preco->Nnow * (1. + z) * (1. + z) * (1. + z);
-  double n_He = preco->fHe * n;
   double Trad = preco->Tnow * (1. + z);
 
   double tau;

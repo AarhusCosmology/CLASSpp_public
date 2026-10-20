@@ -106,9 +106,6 @@ class DarkRadiationSpecies : public BaseSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
-  int bg_rho_index() const {
-    return index_bg_rho_;
-  }
   int bi_rho_index() const {
     return index_bi_rho_;
   }

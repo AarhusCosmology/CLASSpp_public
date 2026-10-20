@@ -43,6 +43,8 @@ double ExpectedReverseOverForward(const BbnReaction& r, double T9) {
   double ratio      = ReactionPrefactor(r.reactants, r.n_reactants) /
                       ReactionPrefactor(r.products, r.n_products);
   double mass_ratio = 1.0;
+  assert(r.n_reactants <= static_cast<int>(std::size(r.reactants)) &&
+         r.n_products <= static_cast<int>(std::size(r.products)));
   for (int i = 0; i < r.n_reactants; ++i) {
     ratio      *= kNuclides[r.reactants[i]].g;
     mass_ratio *= NuclearMassMeV(kNuclides[r.reactants[i]]);

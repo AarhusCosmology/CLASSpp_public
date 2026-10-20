@@ -64,10 +64,8 @@ static std::unique_ptr<DNCDMInvSpecies> BuildComposite(FileContent& fc,
   ctx.ncdm_settings = &settings;
   ctx.bgm           = nullptr;
   Named n           = DNCDMInvSpecies::Create(std::move(parent), ctx);
-  auto* raw         = dynamic_cast<DNCDMInvSpecies*>(n.species.get());
-  assert(raw != nullptr);
-  n.species.release();
-  return std::unique_ptr<DNCDMInvSpecies>(raw);
+  assert(dynamic_cast<DNCDMInvSpecies*>(n.species.get()) != nullptr);
+  return std::unique_ptr<DNCDMInvSpecies>(static_cast<DNCDMInvSpecies*>(n.species.release()));
 }
 
 // Build the composite DIRECTLY with an explicit kernel Config (bypasses the Create

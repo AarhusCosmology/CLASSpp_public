@@ -1784,10 +1784,7 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
     // Booked exactly, at every resolution.
     assert(std::fabs(2. * Mr.E_H + 2. * Mr.E_l + Mr.E_phi - Kr.split_energy_residual()) <
            1e-12 * scale);
-    std::printf("positivity: N=%3d smooth-f split residual %.3e (of energy scale)%s\n",
-                Nref,
-                rel,
-                prev > 0. ? "" : "");
+    std::printf("positivity: N=%3d smooth-f split residual %.3e (of energy scale)\n", Nref, rel);
     if (prev > 0.) {
       assert(rel < 0.75 * prev);  // shrinking with resolution
     }
@@ -2458,12 +2455,13 @@ void test_chain_factor_cap() {
   std::vector<double> FH(N);
   std::vector<double> Fl(N);
   std::vector<double> Fphi(N);
+  const int mid = N / 2;  // where the cliff starts
   for (int i = 0; i < N; ++i) {
     fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
-    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i])
-                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
-    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i])
-                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
+    fl[i]   = (i < mid) ? 0.3 * std::exp(-F.q[i])
+                        : 1e-90 * std::exp(-static_cast<double>(i - mid) * 4.);
+    fphi[i] = (i < mid) ? 0.3 * std::exp(-B.q[i])
+                        : 1e-90 * std::exp(-static_cast<double>(i - mid) * 4.);
   }
   // Psi ~ O(1) everywhere, so F inherits the same cliff: the physical statement that an
   // empty bin has an empty perturbation.
@@ -2559,12 +2557,13 @@ void test_chain_cap_reaches_background_diagonal() {
   std::vector<double> fH(N);
   std::vector<double> fl(N);
   std::vector<double> fphi(N);
+  const int mid = N / 2;  // where the cliff starts
   for (int i = 0; i < N; ++i) {
     fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
-    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i])
-                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
-    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i])
-                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
+    fl[i]   = (i < mid) ? 0.3 * std::exp(-F.q[i])
+                        : 1e-90 * std::exp(-static_cast<double>(i - mid) * 4.);
+    fphi[i] = (i < mid) ? 0.3 * std::exp(-B.q[i])
+                        : 1e-90 * std::exp(-static_cast<double>(i - mid) * 4.);
   }
   const double a     = 0.5;
   const double m     = 2.0;

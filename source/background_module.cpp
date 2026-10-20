@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <map>
+#include <utility>
 #include <vector>
 
 #include "../species/background_ic_context.h"
@@ -46,7 +47,8 @@ static std::vector<NCDMBaseSpecies*> GetNcdmSpecies(const SpeciesCollection& all
   return result;
 }
 
-BackgroundModule::BackgroundModule(InputModulePtr input_module) : BaseModule(input_module) {
+BackgroundModule::BackgroundModule(InputModulePtr input_module)
+    : BaseModule(std::move(input_module)) {
   background_init();
 }
 

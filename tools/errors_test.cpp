@@ -43,6 +43,7 @@ static void test_class_test_severe_type_and_message() {
 // catchable as runtime_error (that would re-blur the severity channel).
 static void test_severe_is_not_runtime_error() {
   bool caught_as_runtime = false;
+  bool caught_as_other   = false;
   try {
     class_stop_severe("structural failure");
   }
@@ -50,8 +51,9 @@ static void test_severe_is_not_runtime_error() {
     caught_as_runtime = true;
   }
   catch (const std::exception&) {
+    caught_as_other = true;
   }
-  assert(!caught_as_runtime);
+  assert(!caught_as_runtime && caught_as_other);
 }
 
 static void test_class_stop_and_stop_severe() {

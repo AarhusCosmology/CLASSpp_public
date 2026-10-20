@@ -83,12 +83,11 @@ using LensingModulePtr        = std::shared_ptr<const LensingModule>;
   "." /**< The directory of CLASS. This is set to the absolute path to the CLASS directory so this is just a failsafe. */
 #endif
 
-#define index_symmetric_matrix(i1, i2, N)            \
-  (((i1) <= (i2))                                    \
-       ? ((i2) + N * (i1) - ((i1) * ((i1) + 1)) / 2) \
-       : ((i1) + N * (i2) -                          \
-          ((i2) * ((i2) + 1)) /                      \
-              2)) /**< assigns an index from 0 to [N(N+1)/2-1] to the coefficients M_{i1,i2} of an N*N symmetric matrix; useful for converting a symmetric matrix to a vector, without losing or double-counting any information */
+/** The index, from 0 to N(N+1)/2 - 1, of the coefficient M_{i1,i2} of an N*N symmetric matrix
+ *  stored as a vector, without losing or double-counting any information. */
+inline int index_symmetric_matrix(int i1, int i2, int N) {
+  return (i1 <= i2) ? (i2 + N * i1 - (i1 * (i1 + 1)) / 2) : (i1 + N * i2 - (i2 * (i2 + 1)) / 2);
+}
 /* @endcond */
 // needed because of weird openmp bug on macosx lion...
 
@@ -96,8 +95,8 @@ using LensingModulePtr        = std::shared_ptr<const LensingModule>;
 #define class_define_index(index, condition, running_index, number_of_indices) \
   {                                                                            \
     if (condition) {                                                           \
-      index          = running_index;                                          \
-      running_index += number_of_indices;                                      \
+      (index)          = running_index;                                        \
+      (running_index) += (number_of_indices);                                  \
     }                                                                          \
   }
 
@@ -136,7 +135,7 @@ using LensingModulePtr        = std::shared_ptr<const LensingModule>;
                        std::min(_COLUMNWIDTH_ - _OUTPUTPRECISION_ - 6 - 3,   \
                                 _COLUMNWIDTH_ - ((int) strlen(title)) - 3)), \
               "",                                                            \
-              colnum++,                                                      \
+              (colnum)++,                                                    \
               _OUTPUTPRECISION_ + 6,                                         \
               title);                                                        \
   }
@@ -144,23 +143,23 @@ using LensingModulePtr        = std::shared_ptr<const LensingModule>;
 #define class_store_columntitle(titlestring, title, condition) \
   {                                                            \
     if (condition) {                                           \
-      titlestring += title;                                    \
-      titlestring += _DELIMITER_;                              \
+      (titlestring) += (title);                                \
+      (titlestring) += _DELIMITER_;                            \
     }                                                          \
   }
 
 #define class_store_double(storage, value, condition, dataindex) \
   {                                                              \
     if (condition)                                               \
-      storage[dataindex++] = value;                              \
+      (storage)[(dataindex)++] = value;                          \
   }
 
 #define class_store_double_or_default(storage, value, condition, dataindex, defaultvalue) \
   {                                                                                       \
     if (condition)                                                                        \
-      storage[dataindex++] = value;                                                       \
+      (storage)[(dataindex)++] = value;                                                   \
     else                                                                                  \
-      storage[dataindex++] = defaultvalue;                                                \
+      (storage)[(dataindex)++] = defaultvalue;                                            \
   }
 
 #ifdef __cplusplus

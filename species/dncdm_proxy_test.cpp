@@ -83,10 +83,8 @@ static std::unique_ptr<DNCDMProxySpecies> BuildProxy(FileContent& fc,
   ctx.ppr           = &ppr_defaults;
   ctx.bgm           = nullptr;
   Named n           = DNCDMProxySpecies::Create(std::move(parent), ctx);
-  auto* raw         = dynamic_cast<DNCDMProxySpecies*>(n.species.get());
-  assert(raw != nullptr);
-  n.species.release();
-  return std::unique_ptr<DNCDMProxySpecies>(raw);
+  assert(dynamic_cast<DNCDMProxySpecies*>(n.species.get()) != nullptr);
+  return std::unique_ptr<DNCDMProxySpecies>(static_cast<DNCDMProxySpecies*>(n.species.release()));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

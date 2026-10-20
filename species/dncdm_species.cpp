@@ -175,7 +175,7 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
                       "input; normalise the sector with deg, Omega_ini/omega_ini/Neff_ini or "
                       "Omega_dncdmdr",
                       instance_name.c_str());
-    Omega_dncdmdr_reserve_ = *reserve;
+    Omega_dncdmdr_reserve_ = reserve;
   }
 
   // Count mutually-exclusive target specs (skip inside a shooting build: in combined mode the

@@ -125,11 +125,8 @@ void BaryonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& ba
     return;
   }
 
-  if (ctx.index_ic == mod->index_ic_ad_) {
-    y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
-    y[layout.idx_theta] = ctx.theta_g_ic;
-  }
-  else if (ctx.index_ic == mod->index_ic_cdi_) {
+  if (ctx.index_ic == mod->index_ic_ad_ || ctx.index_ic == mod->index_ic_cdi_ ||
+      ctx.index_ic == mod->index_ic_niv_) {
     y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
     y[layout.idx_theta] = ctx.theta_g_ic;
   }
@@ -139,10 +136,6 @@ void BaryonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& ba
   }
   else if (ctx.index_ic == mod->index_ic_nid_) {
     y[layout.idx_delta] = ctx.ppr->entropy_ini * ctx.fracnu / ctx.fracg / 8. * ctx.ktau_two;
-    y[layout.idx_theta] = ctx.theta_g_ic;
-  }
-  else if (ctx.index_ic == mod->index_ic_niv_) {
-    y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
     y[layout.idx_theta] = ctx.theta_g_ic;
   }
 }

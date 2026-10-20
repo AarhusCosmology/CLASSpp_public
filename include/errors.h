@@ -66,8 +66,8 @@
 
 #define class_open(pointer, filename, mode)                        \
   {                                                                \
-    pointer = fopen(filename, mode);                               \
-    if (pointer == nullptr) {                                      \
+    (pointer) = fopen(filename, mode);                             \
+    if ((pointer) == nullptr) {                                    \
       ThrowFormatted(__func__,                                     \
                      __LINE__,                                     \
                      "",                                           \

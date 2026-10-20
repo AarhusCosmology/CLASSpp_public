@@ -334,9 +334,8 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     eps1_[i]          = eps1;
     // band(q1) = [(eps1-q1)/2, (eps1+q1)/2]; width = q1 exactly (qhi = qlo + q1),
     // computed this way so Sum wn_s = q1 with no catastrophic cancellation.
-    const double qlo        = 0.5 * (eps1 - q1);
-    const double half_width = 0.5 * q1;
-    const double fH_i       = f_H[i];
+    const double qlo  = 0.5 * (eps1 - q1);
+    const double fH_i = f_H[i];
 
     // Lay out this parent's nodes on the union partition, integrating the emission
     // band piece by piece (see the class doc's stratified-quadrature note).

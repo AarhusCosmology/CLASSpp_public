@@ -222,7 +222,6 @@ void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                       const PerturbationsModule& mod,
                                       file_format fmt,
                                       BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
@@ -558,7 +557,7 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   double c_gamma_over_c_fld = 0.4;
   if (auto ppf_opt = ctx.pfc->get<std::string>("use_ppf")) {
     const std::string& ppf_str = *ppf_opt;
-    use_ppf = (ppf_str.find("y") != std::string::npos || ppf_str.find("Y") != std::string::npos)
+    use_ppf = (ppf_str.find('y') != std::string::npos || ppf_str.find('Y') != std::string::npos)
                   ? true
                   : false;
   }

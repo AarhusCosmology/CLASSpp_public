@@ -11,12 +11,12 @@ int main() {
   const double beta                = -2.0;
   const std::vector<double> params = {1.22, 0.0, 0.0, 0.0};  // pure exp: V = exp(-1.22 phi)
   ScalarFieldSpecies scf(pba,
-                         /*omega0=*/0.7,
+                         /*omega0_scf=*/0.7,
                          params,
-                         /*tuning=*/0,
-                         /*attractor=*/true,
-                         /*phi_ini=*/1.,
-                         /*phi_prime_ini=*/1.,
+                         /*scf_tuning_index=*/0,
+                         /*attractor_ic_scf=*/true,
+                         /*phi_ini_scf=*/1.,
+                         /*phi_prime_ini_scf=*/1.,
                          DefaultScalarFieldPotential(),
                          beta);
   assert(std::fabs(scf.beta() - beta) < 1e-15);

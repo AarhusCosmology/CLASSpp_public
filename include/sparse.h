@@ -60,10 +60,10 @@ int sp_tdfs(int j, int k, int* head, const int* next, int* post, int* stack);
 
 #define SPFLIP(i) (-(i) - 2)
 #define SPUNFLIP(i) (((i) < 0) ? SPFLIP(i) : (i))
-#define SPMARKED(w, j) (w[j] < 0)
-#define SPMARK(w, j)     \
-  {                      \
-    w[j] = SPFLIP(w[j]); \
+#define SPMARKED(w, j) ((w)[j] < 0)
+#define SPMARK(w, j)         \
+  {                          \
+    (w)[j] = SPFLIP((w)[j]); \
   }
 
 #endif

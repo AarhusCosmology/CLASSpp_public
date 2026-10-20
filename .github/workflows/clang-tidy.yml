@@ -2,20 +2,15 @@ name: clang-tidy
 
 on: [pull_request]
 
-# CI runs the checks in .clang-tidy, with CHECKS appended. CHECKS switches off what the code
-# does not pass yet: whole families, re-enabling the checks in them that it does pass, and
-# single checks. An entry goes once the code passes it; with CHECKS empty, CI runs
-# .clang-tidy as it stands.
+# CI runs the checks in .clang-tidy, with CHECKS appended. CHECKS switches off the checks the
+# code does not pass yet: the review's "Later" rows (implicit widening, C arrays, enum class).
+# An entry goes once the code passes it; with CHECKS empty, CI runs .clang-tidy as it stands.
 env:
   CHECKS: >-
-    -bugprone-*,
-    -clang-analyzer-*,
-    clang-analyzer-optin.cplusplus.UninitializedObject,
-    -cppcoreguidelines-*,
-    cppcoreguidelines-pro-type-cstyle-cast,
-    cppcoreguidelines-pro-type-member-init,
-    -performance-*,
-    -modernize-avoid-c-arrays
+    -bugprone-implicit-widening-of-multiplication-result,
+    -cppcoreguidelines-avoid-c-arrays,
+    -modernize-avoid-c-arrays,
+    -cppcoreguidelines-use-enum-class
 
 jobs:
   tidy:

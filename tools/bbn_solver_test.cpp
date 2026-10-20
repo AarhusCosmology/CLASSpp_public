@@ -165,15 +165,14 @@ void test_entropy_transfer() {
      Measuring the order from the doubling TRIPLE is deliberate: a single refine
      pair |f(2h) - f(h)| is the coarse run's error, not the fine one's, and would
      overstate the accuracy of the finer result. */
-  double deficit[3];
-  int k = 0;
-  for (double T9_start : {100.0, 200.0, 400.0}) {
+  auto deficit_at = [&](double T9_start) {
     BbnInput in       = BaseInput();
     in.T9_initial     = T9_start;
     const BbnResult r = SolveBbn(in);
     assert(r.aT_ratio < ideal);
-    deficit[k++] = ideal - r.aT_ratio;
-  }
+    return ideal - r.aT_ratio;
+  };
+  const double deficit[3] = {deficit_at(100.0), deficit_at(200.0), deficit_at(400.0)};
 
   const double order_low  = std::log2(deficit[0] / deficit[1]);
   const double order_high = std::log2(deficit[1] / deficit[2]);

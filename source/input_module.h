@@ -42,7 +42,7 @@ class InputModule {
   /** Resolve any per-species / theta_s shooting targets by root-finding. No targets (or
    *  already inside a shooting context) → returns the input unchanged. Called lazily by
    *  Cosmology::GetInputModule. */
-  static ShootingResult DoShooting(InputModulePtr input_module);
+  static ShootingResult DoShooting(const InputModulePtr& input_module);
 
   FileContent& file_content_;
   precision precision_;

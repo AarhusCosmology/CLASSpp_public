@@ -170,7 +170,6 @@ void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                     const PerturbationsModule& mod,
                                     file_format fmt,
                                     BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {

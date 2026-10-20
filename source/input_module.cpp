@@ -649,7 +649,7 @@ void InputModule::ReadCoupledCluster() {
                     "choose one");
 
   if (Omega_idm_dr) {
-    omega_budget_.idm_dr = *Omega_idm_dr;
+    omega_budget_.idm_dr = Omega_idm_dr;
   }
   if (omega_idm_dr) {
     omega_budget_.idm_dr = *omega_idm_dr / pba->h / pba->h;
@@ -685,7 +685,7 @@ void InputModule::ReadCoupledCluster() {
                     "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose "
                     "one");
   if (Omega_dcdmdr) {
-    omega_budget_.dcdmdr = *Omega_dcdmdr;
+    omega_budget_.dcdmdr = Omega_dcdmdr;
   }
   if (omega_dcdmdr) {
     omega_budget_.dcdmdr = *omega_dcdmdr / pba->h / pba->h;
@@ -845,10 +845,8 @@ void InputModule::ReadContext() {
 
   /** - define local variables */
   FileContent* pfc = &file_content_;
-  precision* ppr   = &precision_;      /* for precision parameters */
-  background* pba  = &background_;     /* for cosmological background */
-  thermo* pth      = &thermodynamics_; /* for thermodynamics */
-  perturbs* ppt    = &perturbations_;  /* for source functions */
+  background* pba  = &background_;    /* for cosmological background */
+  perturbs* ppt    = &perturbations_; /* for source functions */
 
   int input_verbose = 0;
 
@@ -2912,12 +2910,11 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
         n_list);
     ppt->k_output_values_num = n_list;
 
+    /* k_output_values ascending */
+    std::sort(kOutputValues.begin(), kOutputValues.end());
     for (i = 0; i < n_list; i++) {
       ppt->k_output_values[i] = kOutputValues[i];
     }
-
-    /* Sort k_output_values ascending */
-    std::sort(ppt->k_output_values, ppt->k_output_values + ppt->k_output_values_num);
 
     ppt->store_perturbations = true;
     pop->write_perturbations = true;
@@ -3537,7 +3534,7 @@ void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, doub
   w->last_unknowns = std::move(unknowns);
 }
 
-ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
+ShootingResult InputModule::DoShooting(const InputModulePtr& input_module) {
   // Guard: never shoot from within a shooting build (the residual marks its fc this way).
   if (input_module->file_content_.is_shooting) {
     return {input_module, nullptr};

@@ -343,7 +343,6 @@ void UltraRelativisticSpecies::WriteOutputColumns(
     const PerturbationsModule& mod,
     file_format fmt,
     BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
@@ -464,9 +463,8 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
       "species to the effective neutrino number");
   // Normalise: treat N_eff as N_ur going forward.
   if (flag_neff) {
-    n_ur      = n_eff;
-    flag_nur  = true;
-    flag_neff = false;
+    n_ur     = n_eff;
+    flag_nur = true;
   }
 
   // (b) Try to read Omega_ur and omega_ur.

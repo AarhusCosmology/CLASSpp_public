@@ -281,7 +281,6 @@ void get_qsampling(double* x,
   double I_comb;
   double I_atzero;
   double I_atinf;
-  double I_comb2;
   int N_comb     = 0;
   int N_comb_leg = 4;
   double a_comb;
@@ -294,10 +293,8 @@ void get_qsampling(double* x,
   double qmin   = 0.;
   double qmax   = 0.;
   double qmaxm1 = 0.;
-  std::vector<double> wcomb2;
-  double delq;
-  double Itot  = 0.0;
-  int zeroskip = 0;
+  double Itot   = 0.0;
+  int zeroskip  = 0;
 
   /* Set roots and weights for Gauss-Legendre 4 point rule: */
   q_leg[3] = sqrt((3.0 + 2.0 * sqrt(6.0 / 5.0)) / 7.0);
@@ -428,30 +425,6 @@ void get_qsampling(double* x,
         combined_converging = true;
       }
     }
-
-    /* Do the second combined quadrature: Same as above, but with trapezoidal rule
-       using the given q grid:  */
-    wcomb2.resize(qsiz);
-    I_comb2 = 0.0;
-    for (i = 0; i < qsiz; i++) {
-      if (i == 0) {
-        delq = qvec[1] - qvec[0];
-      }
-      else if (i == qsiz - 1) {
-        delq = qvec[qsiz - 1] - qvec[qsiz - 2];
-      }
-      else {
-        delq = qvec[i + 1] - qvec[i - 1];
-      }
-      (*distribution_function)(params_for_function, qvec[i], &y2);
-      wcomb2[i] = 0.5 * y2 * delq;
-      (*test_function)(params_for_function, qvec[i], &y);
-      I_comb2 += wcomb2[i] * y;
-    }
-    I_comb2 += (I_atzero + I_atinf);
-    err      = I - I_comb2;
-    //    if(fabs(err/Itot)<rtol) combined2_converging= true;
-    //printf("I_comb2 = %e, rerr = %e\n",I_comb2,fabs(err/I));
   }
 
   /* Search for the minimal Laguerre quadrature rule: */

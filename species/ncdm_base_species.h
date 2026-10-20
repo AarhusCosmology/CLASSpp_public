@@ -20,7 +20,7 @@ class BackgroundModule;
   1.0369277551433699263313654864570341680570809195019128119741 /**< for quadrature test function */
 #endif
 #ifndef _PSD_DERIVATIVE_EXP_MIN_
-#define _PSD_DERIVATIVE_EXP_MIN_ -30 /**< for ncdm, for accurate computation of dlnf0/dlnq */
+#define _PSD_DERIVATIVE_EXP_MIN_ (-30) /**< for ncdm, for accurate computation of dlnf0/dlnq */
 #endif
 #ifndef _PSD_DERIVATIVE_EXP_MAX_
 #define _PSD_DERIVATIVE_EXP_MAX_ 2 /**< for ncdm, for accurate computation of dlnf0/dlnq */

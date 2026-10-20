@@ -28,7 +28,7 @@ void expect(bool ok, const char* what) {
 }
 
 template <class F>
-void run(const char* name, F&& test) {
+void run(const char* name, const F& test) {
   std::printf("%s\n", name);
   try {
     test();

@@ -134,10 +134,17 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     class_test(psdfile == nullptr, "Could not open file %s!", psd_file_.c_str());
     double tmp1;
     double tmp2;
-    int row = 0;
-    while (fscanf(psdfile, "%lf %lf", &tmp1, &tmp2) == 2) {
+    int row    = 0;
+    int status = fscanf(psdfile, "%lf %lf", &tmp1, &tmp2);
+    while (status == 2) {
       ++row;
+      status = fscanf(psdfile, "%lf %lf", &tmp1, &tmp2);
     }
+    // A line that is not two numbers is an error, not the end of the table.
+    class_test(status != EOF,
+               "Line %d of PSD file '%s' is not two numbers",
+               row + 1,
+               psd_file_.c_str());
     rewind(psdfile);
     pbadist.tablesize = row;
     class_test(pbadist.tablesize < 2,
@@ -148,10 +155,12 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     pbadist.q.resize(pbadist.tablesize);
     pbadist.f0.resize(pbadist.tablesize);
     pbadist.d2f0.resize(pbadist.tablesize);
-    for (row = 0; row < pbadist.tablesize; row++) {
-      fscanf(psdfile, "%lf %lf", &pbadist.q[row], &pbadist.f0[row]);
+    status = 2;
+    for (row = 0; row < pbadist.tablesize && status == 2; row++) {
+      status = fscanf(psdfile, "%lf %lf", &pbadist.q[row], &pbadist.f0[row]);
     }
     fclose(psdfile);
+    class_test(status != 2, "Could not read line %d of PSD file '%s'", row, psd_file_.c_str());
     array_spline_table_lines(pbadist.q.data(),
                              pbadist.tablesize,
                              pbadist.f0.data(),
@@ -163,7 +172,10 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
   // Grey-body subclasses fill these and select a GB-specific default strategy;
   // for all other species gb.active stays false and strategy == quadrature_strategy_.
   GBQuadParams gb;
-  FillQuadratureParams(gb);
+  // Virtual on purpose: from this class's own constructor it runs the base version (gb stays
+  // inactive); DeferInit subclasses call InitQuadrature after construction, where it reaches
+  // their override.
+  FillQuadratureParams(gb);  // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
   int strategy = quadrature_strategy_;
   if (strategy == qm_auto && gb.active) {
     strategy = DefaultQuadratureStrategy();

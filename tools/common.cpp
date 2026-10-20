@@ -12,7 +12,9 @@ std::string FormatThrowMessage(
   va_list args_copy;
   va_copy(args_copy, args);
   const int n = std::vsnprintf(nullptr, 0, fmt, args_copy);
-  va_end(args_copy);
+  // va_copy initialised args_copy; the analyzer misreads va_copy on AArch64, where
+  // va_list is a struct.
+  va_end(args_copy);  // NOLINT(clang-analyzer-security.VAList)
 
   std::string body;
   if (n > 0) {

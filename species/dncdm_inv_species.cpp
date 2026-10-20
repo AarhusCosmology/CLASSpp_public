@@ -624,7 +624,6 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
                                boson_->dq_bg().data(),
                                static_cast<int>(boson_->q_bg().size())};
   const double m     = parent_->GetMass();
-  const double Gamma = parent_->Gamma();
   const double kappa = KappaStoredToBare();
   const int pf       = parent_->bg_lnf_index();
   const int fbase    = fermion_->bg_f_index();

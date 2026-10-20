@@ -41,7 +41,7 @@ int main() {
   const double w_f = AxionEDEFluid::WFinal(n);
   assert(std::fabs(w_f - 0.5) < 1e-15);
 
-  AxionEDEFluid fld(pba, /*omega0=*/1e-6, a_c, n, nu, w_i, w_f, /*theta_i=*/2.8);
+  AxionEDEFluid fld(pba, /*omega0_fld=*/1e-6, a_c, n, nu, w_i, w_f, /*theta_i=*/2.8);
 
   // ── w(a): sigmoid limits and midpoint.
   double w;

@@ -471,7 +471,7 @@ void TransferModule::transfer_perturbation_copy_sources_and_nl_corrections(
           // The table mixes writable local copies (nonlinear case above) with
           // module-owned tables used read-only; the cast is confined here.
           sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp] =
-              const_cast<double*>(
+              const_cast<double*>(  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                   perturbations_module_
                       ->sources_[index_md]
                                 [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
@@ -1170,9 +1170,8 @@ void TransferModule::transfer_type_properties() {
           case TransferTerm::nc_g3:
             lss(pt->index_tp_phi_prime_, SCALAR_TEMPERATURE_0, selection, 0., nc_local);
             break;
+          /* lensing and g4 share their source, phi + psi; their windows differ */
           case TransferTerm::nc_lens:
-            lss(pt->index_tp_phi_plus_psi_, SCALAR_TEMPERATURE_0, integrated, 0., nc_los);
-            break;
           case TransferTerm::nc_g4:
             lss(pt->index_tp_phi_plus_psi_, SCALAR_TEMPERATURE_0, integrated, 0., nc_los);
             break;
@@ -2940,10 +2939,11 @@ void TransferModule::transfer_global_selection_read() {
     input_file = fopen(ptr->nz_file_name.c_str(), "r");
     class_test(input_file == nullptr, "Could not open file %s!", ptr->nz_file_name.c_str());
 
-    /* Find size of table */
+    /* Find size of table; a line that is not two numbers is an error, not the end */
     for (row = 0, status = 2; status == 2; row++) {
       status = fscanf(input_file, "%lf %lf", &tmp1, &tmp2);
     }
+    class_test(status != EOF, "Line %d of %s is not two numbers", row, ptr->nz_file_name.c_str());
     rewind(input_file);
     nz_size_ = row - 1;
 
@@ -2952,10 +2952,12 @@ void TransferModule::transfer_global_selection_read() {
     nz_nz_.resize(nz_size_);
     nz_ddnz_.resize(nz_size_);
 
-    for (row = 0; row < nz_size_; row++) {
+    status = 2;
+    for (row = 0; row < nz_size_ && status == 2; row++) {
       status = fscanf(input_file, "%lf %lf", &nz_z_[row], &nz_nz_[row]);
     }
     fclose(input_file);
+    class_test(status != 2, "Could not read line %d of %s", row, ptr->nz_file_name.c_str());
 
     /* Call spline interpolation: */
     array_spline_table_lines(nz_z_.data(),
@@ -2972,10 +2974,14 @@ void TransferModule::transfer_global_selection_read() {
     input_file = fopen(ptr->nz_evo_file_name.c_str(), "r");
     class_test(input_file == nullptr, "Could not open file %s!", ptr->nz_evo_file_name.c_str());
 
-    /* Find size of table */
+    /* Find size of table; a line that is not two numbers is an error, not the end */
     for (row = 0, status = 2; status == 2; row++) {
       status = fscanf(input_file, "%lf %lf", &tmp1, &tmp2);
     }
+    class_test(status != EOF,
+               "Line %d of %s is not two numbers",
+               row,
+               ptr->nz_evo_file_name.c_str());
     rewind(input_file);
     nz_evo_size_ = row - 1;
 
@@ -2985,10 +2991,12 @@ void TransferModule::transfer_global_selection_read() {
     nz_evo_dlog_nz_.resize(nz_evo_size_);
     nz_evo_dd_dlog_nz_.resize(nz_evo_size_);
 
-    for (row = 0; row < nz_evo_size_; row++) {
+    status = 2;
+    for (row = 0; row < nz_evo_size_ && status == 2; row++) {
       status = fscanf(input_file, "%lf %lf", &nz_evo_z_[row], &nz_evo_nz_[row]);
     }
     fclose(input_file);
+    class_test(status != 2, "Could not read line %d of %s", row, ptr->nz_evo_file_name.c_str());
 
     /* infer dlog(dN/dz)/dz from dN/dz */
     nz_evo_dlog_nz_[0] = (log(nz_evo_nz_[1]) - log(nz_evo_nz_[0])) / (nz_evo_z_[1] - nz_evo_z_[0]);
@@ -3277,6 +3285,11 @@ void TransferModule::transfer_precompute_windows(double tau_rec) {
       std::vector<double>& window = type.window;
 
       window.assign(tau_size, 1.);
+
+      class_test_severe(bin < 0 && (type.window_type == TransferWindow::selection ||
+                                    type.window_type == TransferWindow::integrated),
+                        "transfer type %d has a redshift-bin window but no bin",
+                        index_tt);
 
       switch (type.window_type) {
         /* CMB temperature and polarisation: no window */

@@ -49,6 +49,31 @@ Checks:
   - '-misc-unused-parameters'                                     # mostly callbacks, whose signatures are fixed
   - '-concurrency-mt-unsafe'                                      # no call site runs in threads
 
+  # Found no bug here and would only take boilerplate to satisfy (triage, 2026-10-20).
+  - '-bugprone-narrowing-conversions'                             # deliberate truncations (sizes from doubles, int
+                                                                  # verbosity into short); the fix is a static_cast each
+  - '-cppcoreguidelines-narrowing-conversions'                    # alias of the above
+  - '-bugprone-unchecked-optional-access'                         # 20 of 26 are tests asserting on *opt; the rest are
+                                                                  # guarded by an invariant it cannot see
+  - '-bugprone-exception-escape'                                  # every one is a test main(); tests fail by throwing
+  - '-bugprone-unchecked-string-to-number-conversion'             # flags sscanf even where its return is checked
+  - '-bugprone-random-generator-seed'                             # tests seed on purpose, for reproducibility
+  - '-bugprone-assignment-in-if-condition'                        # C-era LU and sparse-ordering code
+  - '-bugprone-switch-missing-default-case'                       # switches on sgnK and K, whose values are -1, 0, 1
+  - '-bugprone-unsafe-functions'                                  # rewind before a second read pass
+  - '-bugprone-throwing-static-initialization'                    # a test constant
+  - '-bugprone-float-loop-counter'                                # only test loops that sample a range
+  - '-clang-analyzer-security.FloatLoopCounter'                   # the same, from the analyzer
+  - '-clang-analyzer-optin.performance.Padding'                   # would reorder precision and thermo, which are
+                                                                  # grouped by meaning
+  - '-cppcoreguidelines-special-member-functions'                 # rule-of-five declarations on classes that need none
+  - '-cppcoreguidelines-avoid-do-while'                           # style
+  - '-cppcoreguidelines-avoid-const-or-ref-data-members'          # references like BaseModule::all_species_ are
+                                                                  # deliberate
+  - '-cppcoreguidelines-avoid-non-const-global-variables'         # test failure counters
+  - '-performance-inefficient-string-concatenation'               # file names built once per output file
+  - '-performance-inefficient-vector-operation'                   # short loops; reserve() would be noise
+
 WarningsAsErrors: '*'
 
 # LLVM's regex has no lookahead: '^(?!.*hyrec/).*' silently matched almost no header.
@@ -62,4 +87,9 @@ CheckOptions:
   - key: readability-implicit-bool-conversion.AllowPointerConditions
     value: true
   - key: readability-implicit-bool-conversion.AllowIntegerConditions
+    value: true
+
+  # class_test reports __func__; inside a lambda that is operator(), which is fine for an
+  # error message. Direct uses of __func__ in lambdas are still caught.
+  - key: bugprone-lambda-function-name.IgnoreMacros
     value: true

@@ -2224,16 +2224,11 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
         //fprintf(stderr,"auto: log(aH_end/aH_*)=%e\n",target);
         break;
 
+      /* phi_pivot_target holds log(aH_end/aH_*) or log(a_end/a_*), as the method says */
       case ln_aH_ratio:
-
-        target = ppm->phi_pivot_target;
-        //fprintf(stderr,"fixed: log(aH_end/aH_*)=%e\n",target);
-        break;
-
       case N_star:
 
         target = ppm->phi_pivot_target;
-        //fprintf(stderr,"fixed: log(a_end/a_*)=%e\n",target);
         break;
     }
 
@@ -2803,7 +2798,8 @@ void PrimordialModule::primordial_external_spectrum_init() {
 
   /** - Launch the command and retrieve the output */
   /* Launch the process */
-  process = popen(command_with_arguments.c_str(), "r");
+  // external_Pk runs the user's own command by design.
+  process = popen(command_with_arguments.c_str(), "r");  // NOLINT(bugprone-command-processor)
   class_test(process == nullptr,
              "The program failed to set the environment for the external command. Maybe you ran "
              "out of memory.");

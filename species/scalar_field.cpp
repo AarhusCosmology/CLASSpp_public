@@ -216,11 +216,10 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                                      const double* y,
                                      const double* /*dy*/,
                                      PerturbSourceContext& ctx) const {
-  const auto& layout          = static_cast<const PerturbLayout&>(base);
-  PerturbationsModule* p_mod  = ctx.p_mod;
-  perturb_workspace* ppw      = ctx.ppw;
-  const BackgroundModule* bgm = p_mod->GetBackgroundModule().get();
-  const double* pvecback      = ppw->pvecback.data();
+  const auto& layout         = static_cast<const PerturbLayout&>(base);
+  PerturbationsModule* p_mod = ctx.p_mod;
+  perturb_workspace* ppw     = ctx.ppw;
+  const double* pvecback     = ppw->pvecback.data();
 
   // Scalar field sources are scalar-only
   if (ctx.index_md != p_mod->index_md_scalars_) {
@@ -320,7 +319,6 @@ void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                             const PerturbationsModule& mod,
                                             file_format fmt,
                                             BaseSpecies::TransferColumnSection section) const {
-  const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
@@ -347,7 +345,6 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
     const double* pvecmetric = ppw->pvecmetric.data();
     const double k           = ppw->scalar_ctx.k;
     const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-    const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
     const double a2          = ppw->scalar_ctx.a2;
     const perturbs* ppt      = mod.GetPerturbs();
 
@@ -591,7 +588,7 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   double phi_prime_ini_scf = 1.;
   if (auto attr_opt = ctx.pfc->get<std::string>("attractor_ic_scf")) {
     const std::string& attr_str = *attr_opt;
-    if (attr_str.find("y") != std::string::npos || attr_str.find("Y") != std::string::npos) {
+    if (attr_str.find('y') != std::string::npos || attr_str.find('Y') != std::string::npos) {
       attractor_ic_scf = true;
     }
     else {
