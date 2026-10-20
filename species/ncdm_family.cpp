@@ -1,6 +1,7 @@
 #include "species/ncdm_family.h"
 
 #include <algorithm>
+#include <array>
 #include <stdexcept>
 #include <string_view>
 
@@ -19,7 +20,7 @@ namespace {
 // its perturbation code), NCDMInteractingSpecies, and the ncdm_decay_dr
 // composite. dcdm_wdm's daughter has no fluid approximation and is absent
 // on purpose.
-constexpr std::string_view kFluidApproximationConsumers[] = {
+constexpr std::array kFluidApproximationConsumers = {
     NCDMSpecies::kTypeName,
     GreyBodyNCDMSpecies::kTypeName,
     AxionNCDMSpecies::kTypeName,
@@ -28,9 +29,9 @@ constexpr std::string_view kFluidApproximationConsumers[] = {
 };
 
 bool ConsumesFluidApproximation(std::string_view type) {
-  return std::find(std::begin(kFluidApproximationConsumers),
-                   std::end(kFluidApproximationConsumers),
-                   type) != std::end(kFluidApproximationConsumers);
+  return std::find(kFluidApproximationConsumers.begin(),
+                   kFluidApproximationConsumers.end(),
+                   type) != kFluidApproximationConsumers.end();
 }
 
 }  // namespace
