@@ -2,8 +2,8 @@ name: clang-tidy
 
 on: [pull_request]
 
-# Only the checks listed in CHECKS are enforced; the rest of .clang-tidy is a draft
-# that the code does not follow yet. A check joins CHECKS once the code base passes it.
+# Only the checks listed in CHECKS are enforced; the rest of .clang-tidy is the target
+# that the code does not meet yet. A check joins CHECKS once the code base passes it.
 env:
   CHECKS: '-*,cppcoreguidelines-pro-type-member-init,clang-analyzer-optin.cplusplus.UninitializedObject'
 
@@ -15,11 +15,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # M_PI, M_E and the rest are POSIX, not C++, and MSVC does not define them.
+      # clang-tidy has no check for this, so it is a grep. Lines that start a comment are
+      # skipped, so a comment can still say why.
+      - name: No POSIX math constants
+        run: |
+          hits=$(git grep -nwE 'M_(E|LOG2E|LOG10E|LN2|LN10|PI|PI_2|PI_4|1_PI|2_PI|2_SQRTPI|SQRT2|SQRT1_2)' \
+                   -- '*.c' '*.cpp' '*.h' '*.hpp' '*.pyx' '*.pxd' '*.pxi' \
+                 | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Use the constants in include/constants.h (_PI_, _SQRT2_, ...) instead."
+            exit 1
+          fi
+
       - name: Configure (compile_commands.json only, no build)
         run: cmake -S . -B build/tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release
 
+      # hyrec/ is third-party C: its headers are excluded in .clang-tidy, its .c files here.
       - name: Run clang-tidy
         run: |
           clang-tidy-22 --version
           run-clang-tidy-22 -clang-tidy-binary clang-tidy-22 -p build/tidy -quiet -j "$(nproc)" \
-            -checks="$CHECKS"
+            -source-filter '^(?!.*/hyrec/).*' -checks="$CHECKS"

@@ -100,7 +100,7 @@ These pointers:
 
 # 4. Naming Conventions
 
-All naming is enforced via tooling and must be followed strictly.
+New code follows this table. It is checked in review, not by tooling (see 4.2).
 
 | Element             | Style       | Example            |
 | ------------------- | ----------- | ------------------ |
@@ -110,15 +110,33 @@ All naming is enforced via tooling and must be followed strictly.
 | Class members       | snake_case_ | `lmax_`            |
 | Classes / Structs   | PascalCase  | `BackgroundModule` |
 | Methods             | PascalCase  | `ComputeSpectrum`  |
-| Constants           | kCamelCase  | `kDaysInAWeek`     |
-| Static constants    | sCamelCase  | `sCacheSize`       |
+| Named constants     | kCamelCase  | `kTypeName`        |
+
+* Physics and maths notation takes precedence over snake_case. A quantity keeps the symbol
+  it has in the papers or the input file: `H0`, `T_cmb`, `Omega0_cdm`, `YHe`. Class members
+  still add the `_`: `Omega0_m_`, `H_eq_`. The same goes for a scheme's coefficients, such as
+  `A` and `c` in a Butcher tableau.
+* Named constants are those at namespace or class scope. A `const` local is a variable.
+* Acronyms in class names keep their capitals, with an underscore between two of them:
+  `NCDMSpecies`, `DCDM_DR_Species`.
+* C-era names keep their form until the C-heritage cleanup renames them: snake_case methods
+  (`background_at_tau`), lowercase structs (`precision`, `perturbs`) and the module pointers
+  (`ppr`, `pba`). Do not copy them in new code.
 
 ---
 
 ## 4.1 Rationale
 
 * Trailing `_` prevents shadowing of class members.
-* Naming must be consistent to support automated tooling.
+* Physics symbols let the code be read against the equations it implements.
+
+---
+
+## 4.2 Why clang-tidy does not check names
+
+`readability-identifier-naming` cannot tell a class member from a struct member, so it cannot
+require the `_` on one and not the other. And any pattern that admits physics notation also
+admits camelCase, so the variable rules would catch almost nothing.
 
 ---
 
@@ -264,8 +282,13 @@ The following are not allowed:
 
 All code must pass:
 
-* `.clang-format`
-* `.clang-tidy`
+* `.clang-format`, on every file a pull request changes
+* the clang-tidy checks listed in `CHECKS` in `.github/workflows/clang-tidy.yml`
+* the same workflow's grep for POSIX math constants (`M_PI` and the rest): MSVC does not
+  define them, so use `_PI_` and the others in `include/constants.h`
+
+CI enforces all three. `.clang-tidy` lists the checks we aim for; a check joins `CHECKS`
+once the code passes it.
 
 These tools are part of the definition of correctness.
 

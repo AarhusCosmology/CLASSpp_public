@@ -1,23 +1,45 @@
-Checks: >
-  -*,
-  bugprone-*,
-  performance-*,
-  readability-*,
-  modernize-*,
-  cppcoreguidelines-*,
-  clang-analyzer-*,
+# Checks we aim for. CI enforces only the subset in CHECKS in .github/workflows/clang-tidy.yml;
+# a check joins that list once the code passes it.
+Checks:
+  - '-*'
+  - 'bugprone-*'
+  - 'performance-*'
+  - 'readability-*'
+  - 'modernize-*'
+  - 'cppcoreguidelines-*'
+  - 'clang-analyzer-*'
+  - 'misc-const-correctness'
+  - 'misc-unused-parameters'
+  - 'concurrency-mt-unsafe'
 
-  -modernize-use-auto,
-  -modernize-use-trailing-return-type,
-  -cppcoreguidelines-avoid-magic-numbers,
-  -readability-magic-numbers,
-  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
-  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
-  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
-  -readability-math-missing-parentheses,
-  -readability-identifier-length,
-  -readability-identifier-naming,
-  -bugprone-easily-swappable-parameters,
+  - '-modernize-use-auto'
+  - '-modernize-use-trailing-return-type'
+  - '-cppcoreguidelines-avoid-magic-numbers'
+  - '-readability-magic-numbers'
+  - '-cppcoreguidelines-pro-bounds-array-to-pointer-decay'
+  - '-cppcoreguidelines-pro-bounds-pointer-arithmetic'
+  - '-cppcoreguidelines-pro-bounds-avoid-unchecked-container-access'
+  - '-readability-math-missing-parentheses'
+  - '-readability-identifier-length'
+  - '-bugprone-easily-swappable-parameters'
+
+  # These clash with conventions the code keeps on purpose.
+  - '-cppcoreguidelines-pro-type-vararg'                          # class_test and printf are the error and output API
+  - '-cppcoreguidelines-non-private-member-variables-in-classes'  # members are public so classy can read them
+  - '-cppcoreguidelines-pro-bounds-constant-array-index'          # flags every a[i]
+  - '-cppcoreguidelines-pro-type-static-cast-downcast'            # its fix puts dynamic_cast in hot loops
+  - '-cppcoreguidelines-macro-usage'                              # the error macros must stay macros
+  - '-cppcoreguidelines-macro-to-enum'
+  - '-modernize-macro-to-enum'
+  - '-cppcoreguidelines-owning-memory'                            # wants GSL's gsl::owner
+  - '-bugprone-reserved-identifier'                               # _PI_ and the other constant macros
+  - '-readability-function-cognitive-complexity'                  # long physics routines; it has no fix
+  - '-performance-enum-size'                                      # no measurable gain
+  - '-modernize-use-nodiscard'                                    # lands on every getter; generate_wrapper.py can't parse it
+  - '-readability-convert-member-functions-to-static'             # the interface would follow the implementation
+  - '-readability-simplify-boolean-expr'                          # its De Morgan rewrite lets a NaN through
+  - '-readability-identifier-naming'                              # can't tell class from struct members; physics names
+                                                                  # have capitals (STYLE.md section 4)
 
 WarningsAsErrors: '*'
 
@@ -27,37 +49,10 @@ ExcludeHeaderFilterRegex: 'hyrec/'
 
 CheckOptions:
 
-  # Naming conventions
-  - key: readability-identifier-naming.VariableCase
-    value: lower_case
+  # `if (ptr)` and `if (!ptr)` stay legal; int and short flags become bool instead.
+  - key: readability-implicit-bool-conversion.AllowPointerConditions
+    value: true
 
-  - key: readability-identifier-naming.LocalVariableCase
-    value: lower_case
-
-  - key: readability-identifier-naming.ParameterCase
-    value: lower_case
-
-  - key: readability-identifier-naming.MemberCase
-    value: lower_case
-
-  - key: readability-identifier-naming.MemberSuffix
-    value: _
-
-  - key: readability-identifier-naming.ClassCase
-    value: CamelCase
-
-  - key: readability-identifier-naming.StructCase
-    value: CamelCase
-
-  - key: readability-identifier-naming.MethodCase
-    value: CamelCase
-
-  - key: readability-identifier-naming.ConstantCase
-    value: CamelCase
-
-  - key: readability-identifier-naming.GlobalConstantPrefix
-    value: k
-
-  - key: readability-identifier-naming.StaticConstantPrefix
-    value: s
-
+  # Interfaces keep their documenting parameter names, used or not.
+  - key: misc-unused-parameters.IgnoreVirtual
+    value: true
