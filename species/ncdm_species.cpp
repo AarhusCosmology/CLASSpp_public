@@ -109,10 +109,12 @@ void TransmuteLegacyStandardNcdmToDot(FileContent& pfc) {
   auto n2_opt = pfc.get<int>("N_ncdm");
   bool has1   = n1_opt.has_value();
   bool has2   = n2_opt.has_value();
-  if (has1)
+  if (has1) {
     N1 = *n1_opt;
-  if (has2)
+  }
+  if (has2) {
     N2 = *n2_opt;
+  }
 
   class_test_severe(has1 && has2,
                     "In input file, you can only enter one of N_ncdm_standard and N_ncdm, choose "
@@ -275,8 +277,9 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   perturb_workspace* ppw     = ctx.ppw;
 
   // NCDM sources are scalar-only
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   const double* pvecback   = ppw->pvecback.data();
   const perturb_vector* pv = ppw->pv.get();
@@ -335,8 +338,9 @@ void NCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   }
   layout.index_per_q.clear();
   layout.index_per_q.reserve(layout.q_size);
-  for (int iq = 0; iq < layout.q_size; ++iq)
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     layout.index_per_q.push_back(index_pt + iq * (layout.l_max + 1));
+  }
 
   index_pt += layout.total_size();
 }
@@ -409,9 +413,10 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
       dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
                     s_l[2] * metric_shear * 2. / 15. * dlnf0_dlnq;
       // l=3..lmax-1
-      for (int l = 3; l < lmax; ++l)
+      for (int l = 3; l < lmax; ++l) {
         dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                       (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
+      }
       // l=lmax (truncation)
       dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] -
                        (1. + lmax) * k * cotKgen * y[idx + lmax];
@@ -424,8 +429,9 @@ void NCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                          const PerturbIcContext& ctx) {
   // This species only exists when NCDM is present, so the legacy pba->has_ncdm guard is gone.
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
 
   const int lmax = layout.l_max;
   for (int index_q = 0; index_q < layout.q_size; ++index_q) {
@@ -435,12 +441,15 @@ void NCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
     const double dlnf0_dlnq = dlnf0_dlnq_[index_q];
 
     y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;
-    if (lmax >= 1)
+    if (lmax >= 1) {
       y[idx + 1] = -epsilon / 3. / q / ctx.k * ctx.theta_ur * dlnf0_dlnq;
-    if (lmax >= 2)
+    }
+    if (lmax >= 2) {
       y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
-    if (lmax >= 3)
+    }
+    if (lmax >= 3) {
       y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;
+    }
   }
 }
 
@@ -454,15 +463,18 @@ void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
 
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_" + nm, index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_" + nm, index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
   else if (fmt == file_format::camb_format) {
     // file_format::camb_format: per-flavor column (intentional change from aggregate, #309)
-    if (section != TransferColumnSection::velocity)
+    if (section != TransferColumnSection::velocity) {
       w.Add("-T_" + nm + "/k2", index_tp_delta_, index_tp_delta_ >= 0);
+    }
   }
 }
 
@@ -523,9 +535,10 @@ void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
         const double p_prime_over_rho_ncdm = -a * H * w_ncdm * (5. - pseudo_p_ncdm / p_ncdm_bg);
         const double delta_ncdm_corrected  = delta_ncdm_syn -
                                              3. * (1. + w_ncdm) * a * H * alpha_corr;
-        if (std::abs(delta_ncdm_corrected) > eps)
+        if (std::abs(delta_ncdm_corrected) > eps) {
           cs2_ncdm = (cs2_ncdm * delta_ncdm_syn + p_prime_over_rho_ncdm * alpha_corr) /
                      delta_ncdm_corrected;
+        }
       }
     }
   }
@@ -565,8 +578,9 @@ BaseSpecies::StressEnergyContribution NCDMSpecies::StressEnergy(
   StressEnergyContribution se;
   se.rho = pvecback[index_bg_rho_];
   se.p   = pvecback[index_bg_p_];
-  if (layout.index_per_q.empty())
+  if (layout.index_per_q.empty()) {
     return se;
+  }
 
   if (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on)) {
     const double rho_bg      = pvecback[index_bg_rho_];
@@ -623,8 +637,9 @@ void NCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout
                                                 const PerturbSwitchContext& ctx) const {
   const auto& old_l = static_cast<const NCDMBaseSpecies::PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const NCDMBaseSpecies::PerturbLayout&>(new_base);
-  if (old_l.q_size < 0 || new_l.q_size < 0)
+  if (old_l.q_size < 0 || new_l.q_size < 0) {
     return;
+  }
 
   const bool fa_was_on = (old_l.q_size == 1 && old_l.l_max == 2);
   const bool fa_is_on  = (new_l.q_size == 1 && new_l.l_max == 2);
@@ -646,8 +661,9 @@ void NCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout
     const double factor_local = factor_ * std::pow(1. / a, 4);
 
     const int idx_new = new_l.index_per_q[0];
-    for (int l = 0; l <= 2; ++l)
+    for (int l = 0; l <= 2; ++l) {
       new_y[idx_new + l] = 0.0;
+    }
 
     double delta = 0.;
     double theta = 0.;

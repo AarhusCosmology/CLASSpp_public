@@ -28,8 +28,9 @@
   while (std::getline(in, line)) {
     std::string name;
     std::string value;
-    if (!parse_line(line, name, value))
+    if (!parse_line(line, name, value)) {
       continue;
+    }
     if (fc.params_.count(name)) {
       throw std::invalid_argument("Multiple entries of parameter '" + name + "' in file '" +
                                   filename + "'");
@@ -74,31 +75,39 @@ std::vector<std::string> FileContent::instances_with(const std::string& field,
   std::vector<std::string> out;
   const std::string suffix = "." + field;
   for (const std::string& key : keys_) {
-    if (key.size() <= suffix.size())
+    if (key.size() <= suffix.size()) {
       continue;
-    if (key.compare(key.size() - suffix.size(), suffix.size(), suffix) != 0)
+    }
+    if (key.compare(key.size() - suffix.size(), suffix.size(), suffix) != 0) {
       continue;
+    }
     const std::string name = key.substr(0, key.size() - suffix.size());
-    if (!is_instance_name(name))
+    if (!is_instance_name(name)) {
       continue;
+    }
     auto it = params_.find(key);
-    if (it == params_.end())
+    if (it == params_.end()) {
       continue;
-    if (it->second == value)
+    }
+    if (it->second == value) {
       out.push_back(name);
+    }
   }
   return out;
 }
 
 /* static */ bool FileContent::is_instance_name(const std::string& name) {
-  if (name.empty())
+  if (name.empty()) {
     return false;
+  }
   const char c0 = name[0];
-  if (!(std::isalpha(static_cast<unsigned char>(c0)) || c0 == '_'))
+  if (!(std::isalpha(static_cast<unsigned char>(c0)) || c0 == '_')) {
     return false;
+  }
   for (char c : name) {
-    if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_'))
+    if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) {
       return false;
+    }
   }
   return true;
 }
@@ -106,8 +115,9 @@ std::vector<std::string> FileContent::instances_with(const std::string& field,
 std::vector<std::string> FileContent::unread_parameters() const {
   std::vector<std::string> unread;
   for (const auto& key : keys_) {
-    if (!read_params_.count(key))
+    if (!read_params_.count(key)) {
       unread.push_back(key);
+    }
   }
   return unread;
 }
@@ -126,12 +136,14 @@ void FileContent::for_each(
 template <>
 std::optional<int> FileContent::get<int>(const std::string& name) const {
   auto it = params_.find(name);
-  if (it == params_.end())
+  if (it == params_.end()) {
     return std::nullopt;
+  }
   int value;
-  if (std::sscanf(it->second.c_str(), "%d", &value) != 1)
+  if (std::sscanf(it->second.c_str(), "%d", &value) != 1) {
     throw std::invalid_argument("Cannot read integer value of parameter '" + name + "' in file '" +
                                 filename_ + "'");
+  }
   read_params_.insert(name);
   return value;
 }
@@ -139,12 +151,14 @@ std::optional<int> FileContent::get<int>(const std::string& name) const {
 template <>
 std::optional<double> FileContent::get<double>(const std::string& name) const {
   auto it = params_.find(name);
-  if (it == params_.end())
+  if (it == params_.end()) {
     return std::nullopt;
+  }
   double value;
-  if (std::sscanf(it->second.c_str(), "%lg", &value) != 1)
+  if (std::sscanf(it->second.c_str(), "%lg", &value) != 1) {
     throw std::invalid_argument("Cannot read double value of parameter '" + name + "' in file '" +
                                 filename_ + "'");
+  }
   read_params_.insert(name);
   return value;
 }
@@ -152,8 +166,9 @@ std::optional<double> FileContent::get<double>(const std::string& name) const {
 template <>
 std::optional<std::string> FileContent::get<std::string>(const std::string& name) const {
   auto it = params_.find(name);
-  if (it == params_.end())
+  if (it == params_.end()) {
     return std::nullopt;
+  }
   read_params_.insert(name);
   return it->second;
 }
@@ -162,14 +177,17 @@ template <>
 std::optional<std::vector<double>> FileContent::get<std::vector<double>>(
     const std::string& name) const {
   auto it = params_.find(name);
-  if (it == params_.end())
+  if (it == params_.end()) {
     return std::nullopt;
+  }
   const auto parts = split_csv(it->second);
   std::vector<double> values(parts.size());
-  for (std::size_t i = 0; i < parts.size(); ++i)
-    if (std::sscanf(parts[i].c_str(), "%lg", &values[i]) != 1)
+  for (std::size_t i = 0; i < parts.size(); ++i) {
+    if (std::sscanf(parts[i].c_str(), "%lg", &values[i]) != 1) {
       throw std::invalid_argument("Cannot read double entry " + std::to_string(i + 1) +
                                   " of parameter '" + name + "' in file '" + filename_ + "'");
+    }
+  }
   read_params_.insert(name);
   return values;
 }
@@ -177,14 +195,17 @@ std::optional<std::vector<double>> FileContent::get<std::vector<double>>(
 template <>
 std::optional<std::vector<int>> FileContent::get<std::vector<int>>(const std::string& name) const {
   auto it = params_.find(name);
-  if (it == params_.end())
+  if (it == params_.end()) {
     return std::nullopt;
+  }
   const auto parts = split_csv(it->second);
   std::vector<int> values(parts.size());
-  for (std::size_t i = 0; i < parts.size(); ++i)
-    if (std::sscanf(parts[i].c_str(), "%d", &values[i]) != 1)
+  for (std::size_t i = 0; i < parts.size(); ++i) {
+    if (std::sscanf(parts[i].c_str(), "%d", &values[i]) != 1) {
       throw std::invalid_argument("Cannot read integer entry " + std::to_string(i + 1) +
                                   " of parameter '" + name + "' in file '" + filename_ + "'");
+    }
+  }
   read_params_.insert(name);
   return values;
 }
@@ -193,15 +214,17 @@ template <>
 std::optional<std::vector<std::string>> FileContent::get<std::vector<std::string>>(
     const std::string& name) const {
   auto it = params_.find(name);
-  if (it == params_.end())
+  if (it == params_.end()) {
     return std::nullopt;
+  }
   read_params_.insert(name);
   return split_csv(it->second);
 }
 
 std::string FileContent::get_or(const std::string& name, const char* fallback) const {
-  if (auto v = get<std::string>(name))
+  if (auto v = get<std::string>(name)) {
     return *v;
+  }
   return std::string(fallback);
 }
 
@@ -210,42 +233,50 @@ std::string FileContent::get_or(const std::string& name, const char* fallback) c
                                           std::string& value) {
   /* A valid data line must contain '=' */
   const auto eq_pos = line.find('=');
-  if (eq_pos == std::string::npos)
+  if (eq_pos == std::string::npos) {
     return false;
+  }
 
   /* Ignore the line if '#' appears before (or immediately after) '=' */
   const auto hash_pos = line.find('#');
-  if (hash_pos != std::string::npos && hash_pos < eq_pos + 2)
+  if (hash_pos != std::string::npos && hash_pos < eq_pos + 2) {
     return false;
+  }
 
   /* Extract the name: trim whitespace and optional surrounding quotes */
   auto trim_quotes = [](std::string s) -> std::string {
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\'' || s.front() == '"'))
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\'' || s.front() == '"')) {
       s.erase(s.begin());
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\'' || s.back() == '"'))
+    }
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\'' || s.back() == '"')) {
       s.pop_back();
+    }
     return s;
   };
 
   name = trim_quotes(line.substr(0, eq_pos));
-  if (name.empty())
+  if (name.empty()) {
     return false;
+  }
 
   /* Extract the value: text after '=', up to '#' or end of line, trimmed */
   const auto value_end  = (hash_pos != std::string::npos) ? hash_pos : line.size();
   std::string raw_value = line.substr(eq_pos + 1, value_end - eq_pos - 1);
 
   /* Trim trailing whitespace / newline */
-  while (!raw_value.empty() && static_cast<unsigned char>(raw_value.back()) <= ' ')
+  while (!raw_value.empty() && static_cast<unsigned char>(raw_value.back()) <= ' ') {
     raw_value.pop_back();
+  }
   /* Trim leading whitespace */
   std::size_t start = 0;
-  while (start < raw_value.size() && raw_value[start] == ' ')
+  while (start < raw_value.size() && raw_value[start] == ' ') {
     ++start;
+  }
   raw_value = raw_value.substr(start);
 
-  if (raw_value.empty())
+  if (raw_value.empty()) {
     return false;
+  }
 
   value = std::move(raw_value);
   return true;

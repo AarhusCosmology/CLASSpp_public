@@ -78,14 +78,16 @@ void DCDM_WDM_Species::WriteBackgroundData(const double* pvecback,
 // ─────────────────────────────────────────────────────────────────────────────
 
 double DCDM_WDM_Species::GetOmega0() const {
-  if (wdm_->Omega_combined_pending().has_value())
+  if (wdm_->Omega_combined_pending().has_value()) {
     return *wdm_->Omega_combined_pending();
+  }
   return CompositeSpecies::GetOmega0();  // pre-shooting discovery fallback
 }
 
 std::vector<ShootingTarget> DCDM_WDM_Species::GetShootingTargets() const {
-  if (needs_shooting_)
+  if (needs_shooting_) {
     return {shooting_target_};
+  }
   return {};
 }
 
@@ -133,8 +135,9 @@ double DCDM_WDM_Species::ComputeShootingResidual(const ShootingResidualContext& 
 std::vector<Named> DCDM_WDM_Species::CreateAll(const SpeciesBuildContext& ctx) {
   const auto instances = ctx.pfc->instances_with("type", std::string(kTypeName));
   std::vector<Named> result;
-  if (instances.empty())
+  if (instances.empty()) {
     return result;
+  }
 
   // Synchronous gauge only (the l=1 injection source and the gauge transform of
   // the injected distribution are not implemented; the reference paper works in
@@ -170,8 +173,9 @@ std::vector<Named> DCDM_WDM_Species::CreateAll(const SpeciesBuildContext& ctx) {
                         nm + ".Omega_dcdmwdm",
                         has_combined ? omega0_combined : Omega_ini};
       needs_shooting = true;
-      if (!has_combined)
+      if (!has_combined) {
         omega0_combined = Omega_ini;  // discovery-build seed for the reserve
+      }
     }
     else if (has_combined && !in_shooting) {
       // Mode (b): shoot the parent's initial abundance to hit combined-today.
@@ -228,12 +232,14 @@ void DCDM_WDM_Species::AddCouplingDerivs(double /*tau*/,
 
   const auto& dcdm_lay = dcdm_layout(*pv->species_layouts[collection_index_]);
   const auto& wdm_lay  = wdm_layout(*pv->species_layouts[collection_index_]);
-  if (dcdm_lay.idx_delta < 0 || wdm_lay.q_size <= 0 || wdm_lay.index_per_q.empty())
+  if (dcdm_lay.idx_delta < 0 || wdm_lay.q_size <= 0 || wdm_lay.index_per_q.empty()) {
     return;
+  }
 
   const double* pvecback  = ppw->pvecback.data();
   const double delta_dcdm = y[dcdm_lay.idx_delta];
   const int inj0          = wdm_->bg_inj_index();
-  for (int iq = 0; iq < wdm_lay.q_size; ++iq)
+  for (int iq = 0; iq < wdm_lay.q_size; ++iq) {
     dy[wdm_lay.index_per_q[iq]] += pvecback[inj0 + iq] * delta_dcdm;
+  }
 }

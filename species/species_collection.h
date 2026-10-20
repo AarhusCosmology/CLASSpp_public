@@ -97,8 +97,11 @@ class SpeciesCollection {
                                species_.end(),
                                key,
                                [](const Entry& e, const std::string& k) { return e.key < k; });
-    if (it == species_.end() || it->key != key)
-      return species_.size();
+    if (it == species_.end() || it->key != key) {
+      {
+        return species_.size();
+      }
+    }
     return static_cast<std::size_t>(it - species_.begin());
   }
 

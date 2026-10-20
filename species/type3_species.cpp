@@ -67,8 +67,9 @@ void Type3Species::AddCouplingDerivs(double /*tau*/,
                                      double* dy,
                                      const perturb_parameters_and_workspace& ppaw) const {
   const double beta = scf_->beta();
-  if (beta == 0.)
+  if (beta == 0.) {
     return;
+  }
 
   const perturb_workspace* ppw    = ppaw.ppw;
   const perturb_vector* pv        = ppw->pv.get();
@@ -113,8 +114,9 @@ double Type3Species::CrossTermRhoPlusPTheta(const BaseSpecies::PerturbLayout& ba
                                             const double* pvecback,
                                             const perturb_workspace* ppw) const {
   const double beta = scf_->beta();
-  if (beta == 0.)
+  if (beta == 0.) {
     return 0.;
+  }
   const auto& my            = static_cast<const CompositeSpecies::PerturbLayout&>(base);
   const double a            = ppw->scalar_ctx.a;
   const double phi_prime_bg = pvecback[scf_->index_bg_phi_prime_scf()];
@@ -155,8 +157,9 @@ std::vector<Named> Type3Species::CreateAll(const SpeciesBuildContext& ctx) {
 
   // Coupling active iff scf_veta is present and nonzero.
   auto veta_opt = ctx.pfc->get<double>("scf_veta");
-  if (!veta_opt.has_value() || *veta_opt == 0.)
+  if (!veta_opt.has_value() || *veta_opt == 0.) {
     return result;
+  }
   const double beta = *veta_opt;
 
   class_test(beta >= 0.5,

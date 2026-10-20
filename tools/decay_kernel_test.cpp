@@ -27,11 +27,13 @@ Grid MakeGrid(double qmin, double qmax, int N) {
   g.q.resize(N);
   g.dq.resize(N);
   const double h = std::log(qmax / qmin) / (N - 1);
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     g.q[i] = qmin * std::exp(i * h);
+  }
   g.dq[0] = 0.5 * (g.q[1] - g.q[0]);
-  for (int i = 1; i < N - 1; ++i)
+  for (int i = 1; i < N - 1; ++i) {
     g.dq[i] = 0.5 * (g.q[i + 1] - g.q[i - 1]);
+  }
   g.dq[N - 1] = 0.5 * (g.q[N - 1] - g.q[N - 2]);
   return g;
 }
@@ -51,12 +53,15 @@ double MaxAbs(const std::vector<double>& a,
               const std::vector<double>& b,
               const std::vector<double>& c) {
   double m = 0.;
-  for (double v : a)
+  for (double v : a) {
     m = std::fmax(m, std::fabs(v));
-  for (double v : b)
+  }
+  for (double v : b) {
     m = std::fmax(m, std::fabs(v));
-  for (double v : c)
+  }
+  for (double v : c) {
     m = std::fmax(m, std::fabs(v));
+  }
   return m;
 }
 
@@ -86,12 +91,15 @@ void test_conservation(bool balanced = false) {
   std::vector<double> fH(N);
   std::vector<double> fl(N);
   std::vector<double> fphi(N);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -178,12 +186,15 @@ void test_channel_multiplicity(int n_parent, int n_daughter, bool balanced = fal
   std::vector<double> fH(N);
   std::vector<double> fl(N);
   std::vector<double> fphi(N);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -293,12 +304,15 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
   std::vector<double> fH(N);
   std::vector<double> fl(N);
   std::vector<double> fphi(N);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -330,8 +344,9 @@ void test_rate_cap_bounds_stiffness(int n_daughter) {
     std::vector<double> dp(N);
     K.CollisionDiagonal(dH.data(), dl.data(), dp.data());
     double mx = 0.;
-    for (double v : dH)
+    for (double v : dH) {
       mx = std::fmax(mx, std::fabs(v));
+    }
     return mx;
   };
 
@@ -381,8 +396,9 @@ double EquilibResidual(int Nd, bool balanced = false) {
   std::vector<double> fH(64);
   std::vector<double> fl(Nd);
   std::vector<double> fphi(Nd);
-  for (int i = 0; i < 64; ++i)
+  for (int i = 0; i < 64; ++i) {
     fH[i] = fH_of(P.q[i]);
+  }
   for (int i = 0; i < Nd; ++i) {
     fl[i]   = fl_of(F.q[i]);
     fphi[i] = fphi_of(B.q[i]);
@@ -516,12 +532,15 @@ void test_mode_reduction() {
   std::vector<double> fH(64);
   std::vector<double> fl(48);
   std::vector<double> fphi(48);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -599,12 +618,15 @@ void test_rhs_continuity() {
   std::vector<double> fH(Np);
   std::vector<double> fl(Nd);
   std::vector<double> fphi(Nd);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
 
   const double m     = 2.0;
   const double Gamma = 0.3;
@@ -660,8 +682,9 @@ void test_rhs_continuity() {
                                 dfH.data(),
                                 dfl.data(),
                                 dfphi.data());
-      for (int i = 0; i < Np; ++i)
+      for (int i = 0; i < Np; ++i) {
         per_bin[i] = std::fmax(per_bin[i], std::fabs(dfH[i] - pH[i]) / (da * scale));
+      }
       for (int j = 0; j < Nd; ++j) {
         per_bin[Np + j]      = std::fmax(per_bin[Np + j], std::fabs(dfl[j] - pl[j]) / (da * scale));
         per_bin[Np + Nd + j] = std::fmax(per_bin[Np + Nd + j],
@@ -685,8 +708,9 @@ void test_rhs_continuity() {
   int n_live          = 0;
   for (size_t i = 0; i < coarse.size(); ++i) {
     worst_m = std::fmax(worst_m, coarse[i]);
-    if (coarse[i] <= kFloor)
+    if (coarse[i] <= kFloor) {
       continue;
+    }
     ++n_live;
     const double R = fine[i] / coarse[i];
     if (R > worst_R) {
@@ -737,20 +761,26 @@ void test_perturbation_operator(bool balanced = false) {
   std::vector<double> FH(N);
   std::vector<double> Fl(N);
   std::vector<double> Fphi(N);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
   // F = delta-f, an INDEPENDENT perturbation array (not tied to f): the identities
   // must hold for arbitrary F, so seeding it from f would weaken the test.
-  for (auto& x : FH)
+  for (auto& x : FH) {
     x = Upm(rng);
-  for (auto& x : Fl)
+  }
+  for (auto& x : Fl) {
     x = Upm(rng);
-  for (auto& x : Fphi)
+  }
+  for (auto& x : Fphi) {
     x = Upm(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -903,7 +933,7 @@ void test_perturbation_operator(bool balanced = false) {
     // l-independent anyway (-K/eps1 F_H carries no angular factor), which is exactly
     // what makes it the cancellation source -- so l=2 is still the meaningful probe:
     // it confirms no P_l leaked into the parent leg.
-    for (int lp = 0; lp <= 2; ++lp)
+    for (int lp = 0; lp <= 2; ++lp) {
       Kd.ApplyPerturbationOperator(lp,
                                    FH.data(),
                                    Fl.data(),
@@ -911,6 +941,7 @@ void test_perturbation_operator(bool balanced = false) {
                                    dH.data(),
                                    dl.data(),
                                    dphi.data());
+    }
     double maxrel = 0.;
     for (int i = 0; i < N; ++i) {
       const double eps1   = std::sqrt(P.q[i] * P.q[i] + A);
@@ -981,8 +1012,9 @@ void test_perturbation_operator(bool balanced = false) {
     }
     assert(sweep1.size() == sweep2.size());
     bool identical = true;
-    for (std::size_t i = 0; i < sweep1.size(); ++i)
+    for (std::size_t i = 0; i < sweep1.size(); ++i) {
       identical &= (sweep1[i] == sweep2[i]);
+    }
     std::printf("pert l-sweep: out-of-order rejected, l=0..%d repeat bit-identical = %s\n",
                 LMAX,
                 identical ? "yes" : "NO");
@@ -1029,10 +1061,12 @@ void test_perturbation_operator(bool balanced = false) {
                                    dphi.data());
       double got_l   = 0.;
       double got_phi = 0.;
-      for (int j = 0; j < N; ++j)
+      for (int j = 0; j < N; ++j) {
         got_l += F.dq[j] * F.q[j] * F.q[j] * dl[j];
-      for (int k = 0; k < N; ++k)
+      }
+      for (int k = 0; k < N; ++k) {
         got_phi += B.dq[k] * B.q[k] * B.q[k] * dphi[k];
+      }
       double ref_l   = 0.;
       double ref_phi = 0.;
       for (int i = 0; i < N; ++i) {
@@ -1086,10 +1120,12 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   std::mt19937 rng(31337u);
   std::uniform_real_distribution<double> U(0.01, 0.9);
   std::vector<double> y(N);
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     y[i] = U(rng);
-  for (int j = 0; j < 2 * Nd; ++j)
+  }
+  for (int j = 0; j < 2 * Nd; ++j) {
     y[Np + j] = U(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -1122,12 +1158,15 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   std::vector<double> dphi(Nd);
   K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
   std::vector<double> analytic(N);
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     analytic[i] = dH[i];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + j] = dl[j];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + Nd + j] = dphi[j];
+  }
 
   // Central-difference Jacobian: diagonal for the comparison, full for the premise.
   std::vector<double> Jrow(N);
@@ -1148,14 +1187,17 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
     rhs(ym, dm);
     for (int r = 0; r < N; ++r) {
       const double J = (dp[r] - dm[r]) / (2 * h);
-      if (r == c)
+      if (r == c) {
         numeric[r] = J;
-      else
+      }
+      else {
         offsum[r] += std::fabs(J);
+      }
     }
   }
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     dscale = std::fmax(dscale, std::fabs(numeric[i]));
+  }
   for (int i = 0; i < N; ++i) {
     const double e = std::fabs(analytic[i] - numeric[i]) / Scale(numeric[i], dscale);
     if (e > worst) {
@@ -1174,8 +1216,9 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   // actually spends its steps in -- parent extinct, and daughters confined to the
   // momenta they physically occupy rather than smeared over the whole grid, which is
   // what makes the band's deposit region empty.
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     y[i] *= 1e-60;
+  }
   for (int j = 0; j < Nd; ++j) {
     const double lq = std::log(F.q[j] / 2.8);
     y[Np + j]       = 1. / (std::exp(F.q[j]) + 1.) + 0.3 * std::exp(-lq * lq);
@@ -1189,12 +1232,15 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   // ENORMOUS here, where the Gaussian daughter profile leaves bins many decades
   // below their neighbours. If the linearisation is wrong anywhere it is here.
   K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     analytic[i] = dH[i];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + j] = dl[j];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + Nd + j] = dphi[j];
+  }
   std::fill(offsum.begin(), offsum.end(), 0.);
   for (int c = 0; c < N; ++c) {
     const double h          = std::fmax(1e-7 * std::fabs(y[c]), 1e-13);
@@ -1206,10 +1252,12 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
     rhs(ym, dm);
     for (int r = 0; r < N; ++r) {
       const double J = (dp[r] - dm[r]) / (2 * h);
-      if (r == c)
+      if (r == c) {
         numeric[r] = J;
-      else
+      }
+      else {
         offsum[r] += std::fabs(J);
+      }
     }
   }
   double Dmax   = 0.;
@@ -1250,18 +1298,23 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   // enough above the 1e-13 step floor for the quotient to mean something.
   std::mt19937 rng2(90210u);
   std::uniform_real_distribution<double> LU(-8., -0.05);
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     y[i] = U(rng2);
-  for (int j = 0; j < 2 * Nd; ++j)
+  }
+  for (int j = 0; j < 2 * Nd; ++j) {
     y[Np + j] = std::pow(10., LU(rng2));
+  }
   rhs(y, d0);
   K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     analytic[i] = dH[i];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + j] = dl[j];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + Nd + j] = dphi[j];
+  }
   // A RELATIVE step, and a coarse one. The block above can floor at 1e-13 because its
   // state is O(1); here a bin may sit at 1e-8, where an absolute floor is a 1e-5
   // relative kick. And the step has to be coarse: df_c is dominated by transitions out
@@ -1282,8 +1335,9 @@ void test_collision_diagonal(bool balanced = false, int n_parent = 1, int n_daug
   double dscale3 = 0.;
   double worst3  = 0.;
   int at3        = -1;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     dscale3 = std::fmax(dscale3, std::fabs(numeric[i]));
+  }
   for (int i = 0; i < N; ++i) {
     const double e = std::fabs(analytic[i] - numeric[i]) / Scale(numeric[i], dscale3);
     if (e > worst3) {
@@ -1333,12 +1387,15 @@ void test_perturbation_diagonal(bool balanced = false) {
   std::vector<double> fH(Np);
   std::vector<double> fl(Nd);
   std::vector<double> fphi(Nd);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -1359,16 +1416,20 @@ void test_perturbation_diagonal(bool balanced = false) {
   std::vector<double> dphi(Nd);
   K.CollisionDiagonal(dH.data(), dl.data(), dphi.data());
   std::vector<double> analytic(N);
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     analytic[i] = dH[i];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + j] = dl[j];
-  for (int j = 0; j < Nd; ++j)
+  }
+  for (int j = 0; j < Nd; ++j) {
     analytic[Np + Nd + j] = dphi[j];
+  }
 
   double scale = 0.;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     scale = std::fmax(scale, std::fabs(analytic[i]));
+  }
   assert(scale > 0.);  // else every comparison below is vacuous
 
   std::vector<double> FH(Np);
@@ -1388,13 +1449,16 @@ void test_perturbation_diagonal(bool balanced = false) {
       std::fill(FH.begin(), FH.end(), 0.);
       std::fill(Fl.begin(), Fl.end(), 0.);
       std::fill(Fphi.begin(), Fphi.end(), 0.);
-      if (c < Np)
+      if (c < Np) {
         FH[c] = 1.;
-      else if (c < Np + Nd)
+      }
+      else if (c < Np + Nd) {
         Fl[c - Np] = 1.;
-      else
+      }
+      else {
         Fphi[c - Np - Nd] = 1.;
-      for (int ll = 0; ll <= l; ++ll)
+      }
+      for (int ll = 0; ll <= l; ++ll) {
         K.ApplyPerturbationOperator(ll,
                                     FH.data(),
                                     Fl.data(),
@@ -1402,6 +1466,7 @@ void test_perturbation_diagonal(bool balanced = false) {
                                     oH.data(),
                                     ol.data(),
                                     ophi.data());
+      }
       const double got = (c < Np) ? oH[c] : (c < Np + Nd) ? ol[c - Np] : ophi[c - Np - Nd];
       const double e   = std::fabs(got - analytic[c]) / Scale(analytic[c], scale);
       if (e > worst) {
@@ -1409,8 +1474,9 @@ void test_perturbation_diagonal(bool balanced = false) {
         at    = c;
         at_l  = l;
       }
-      if (c < Np)
+      if (c < Np) {
         worst_parent = std::fmax(worst_parent, e);
+      }
     }
   }
 
@@ -1570,8 +1636,9 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
   // control can be shown to be a real one.
   const bool must_hold = lumped || balanced;
   auto check           = [&](double df) {
-    if (df < worst_neg)
+    if (df < worst_neg) {
       worst_neg = df;
+    }
     assert(!must_hold || df >= 0.);
   };
   Grid P       = MakeGrid(1e-3, 1e2, 24);
@@ -1615,8 +1682,9 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
                               dfl.data(),
                               dfphi.data());
     for (int k = 0; k < Nd; ++k) {
-      if (fphi[k] != 0.)
+      if (fphi[k] != 0.) {
         continue;
+      }
       check(dfphi[k]);  // an empty bin may only fill
     }
     auto M = K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
@@ -1642,8 +1710,9 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
                               dfl.data(),
                               dfphi.data());
     for (int k = 0; k < Nd; ++k) {
-      if (fl[k] != 0.)
+      if (fl[k] != 0.) {
         continue;
+      }
       check(dfl[k]);
     }
     auto M = K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
@@ -1657,8 +1726,9 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
   std::vector<double> fH(Np, 0.05);
   std::vector<double> fl(Nd);
   std::vector<double> fphi(Nd, 0.);
-  for (int k = 0; k < Nd; ++k)
+  for (int k = 0; k < Nd; ++k) {
     fl[k] = 1. / (std::exp(F.q[k]) + 1.);
+  }
   fphi[26] = 2.0;
   K.ComputeBackgroundDerivs(a,
                             m,
@@ -1720,8 +1790,9 @@ void test_daughter_positivity(bool balanced = false, bool lumped = true) {
                 Nref,
                 rel,
                 prev > 0. ? "" : "");
-    if (prev > 0.)
+    if (prev > 0.) {
       assert(rel < 0.75 * prev);  // shrinking with resolution
+    }
     prev = rel;
   }
 
@@ -1797,8 +1868,9 @@ void test_band_partition() {
     std::vector<double> fH(NP);
     std::vector<double> fl(ND);
     std::vector<double> fphi(ND);
-    for (int i = 0; i < NP; ++i)
+    for (int i = 0; i < NP; ++i) {
       fH[i] = 1. / (std::exp(P.q[i]) + 1.);
+    }
     for (int i = 0; i < ND; ++i) {
       fl[i]   = 0.10 / (std::exp(F.q[i]) + 1.);
       fphi[i] = 0.10 / (std::exp(B.q[i]) + 1.);
@@ -1832,17 +1904,20 @@ void test_band_partition() {
       const double qhi  = qlo + q1;
       int cuts          = 0;
       for (int k = 0; k < ND; ++k) {
-        if (F.q[k] > qlo && F.q[k] < qhi)
+        if (F.q[k] > qlo && F.q[k] < qhi) {
           ++cuts;
+        }
         const double img = eps1 - B.q[k];
-        if (img > qlo && img < qhi)
+        if (img > qlo && img < qhi) {
           ++cuts;
+        }
       }
       const int n = K.node_count(i);
       worst_n     = std::max(worst_n, std::abs(n - (cuts + 1)));
       double sw   = 0.;
-      for (int sN = 0; sN < n; ++sN)
+      for (int sN = 0; sN < n; ++sN) {
         sw += K.node_weight(i, sN);
+      }
       worst_w = std::fmax(worst_w, std::fabs(sw / q1 - 1.));
     }
     std::printf(
@@ -1888,8 +1963,9 @@ void test_separate_bg_grids(bool balanced = false) {
   std::vector<double> fH(NP);
   std::vector<double> fl(NBG);
   std::vector<double> fphi(NBG);
-  for (int i = 0; i < NP; ++i)
+  for (int i = 0; i < NP; ++i) {
     fH[i] = 1. / (std::exp(P.q[i]) + 1.);
+  }
   for (int i = 0; i < NBG; ++i) {
     fl[i]   = 0.10 / (std::exp(FB.q[i]) + 1.);
     fphi[i] = 0.10 / (std::exp(BB.q[i]) + 1.);
@@ -1973,8 +2049,9 @@ void test_separate_bg_grids(bool balanced = false) {
     // nothing. The real disagreements this test exists to catch (a lumping quantity read
     // off the wrong grid) are O(1) relative and clear the floor by twelve orders.
     double dgmax = 0.;
-    for (int k = 0; k < NST; ++k)
+    for (int k = 0; k < NST; ++k) {
       dgmax = std::fmax(dgmax, std::fabs(dgl[k]));
+    }
     assert(dgmax > 0.);  // else every ratio below is 0/0 and the test is vacuous
 
     // Column k of the operator at l = 0: F = e_k, read back dF_l[k].
@@ -2017,8 +2094,9 @@ void test_separate_bg_grids(bool balanced = false) {
   std::vector<double> FH(NP);
   std::vector<double> Fl(NST, 0.);
   std::vector<double> Fp(NST, 0.);
-  for (int i = 0; i < NP; ++i)
+  for (int i = 0; i < NP; ++i) {
     FH[i] = 0.05 * fH[i];
+  }
   std::vector<double> gH(NP);
   std::vector<double> gl(NST);
   std::vector<double> gp(NST);
@@ -2058,23 +2136,29 @@ void test_all_l_matches_per_l(bool balanced = false) {
   std::vector<double> fH(NP);
   std::vector<double> fl(ND);
   std::vector<double> fphi(ND);
-  for (auto& x : fH)
+  for (auto& x : fH) {
     x = U(rng);
-  for (auto& x : fl)
+  }
+  for (auto& x : fl) {
     x = U(rng);
-  for (auto& x : fphi)
+  }
+  for (auto& x : fphi) {
     x = U(rng);
+  }
 
   const int stride = L + 1;
   std::vector<double> FH(NP * stride);
   std::vector<double> Fl(ND * stride);
   std::vector<double> Fphi(ND * stride);
-  for (auto& x : FH)
+  for (auto& x : FH) {
     x = Upm(rng);
-  for (auto& x : Fl)
+  }
+  for (auto& x : Fl) {
     x = Upm(rng);
-  for (auto& x : Fphi)
+  }
+  for (auto& x : Fphi) {
     x = Upm(rng);
+  }
 
   const double a     = 0.5;
   const double m     = 2.0;
@@ -2101,12 +2185,15 @@ void test_all_l_matches_per_l(bool balanced = false) {
     std::vector<double> sdl(ND);
     std::vector<double> sdp(ND);
     for (int l = 0; l <= L; ++l) {
-      for (int i = 0; i < NP; ++i)
+      for (int i = 0; i < NP; ++i) {
         sFH[i] = FH[static_cast<size_t>(i) * stride + l];
-      for (int j = 0; j < ND; ++j)
+      }
+      for (int j = 0; j < ND; ++j) {
         sFl[j] = Fl[static_cast<size_t>(j) * stride + l];
-      for (int k = 0; k < ND; ++k)
+      }
+      for (int k = 0; k < ND; ++k) {
         sFp[k] = Fphi[static_cast<size_t>(k) * stride + l];
+      }
       K.ApplyPerturbationOperator(l,
                                   sFH.data(),
                                   sFl.data(),
@@ -2114,12 +2201,15 @@ void test_all_l_matches_per_l(bool balanced = false) {
                                   sdH.data(),
                                   sdl.data(),
                                   sdp.data());
-      for (int i = 0; i < NP; ++i)
+      for (int i = 0; i < NP; ++i) {
         refH[static_cast<size_t>(i) * stride + l] = sdH[i];
-      for (int j = 0; j < ND; ++j)
+      }
+      for (int j = 0; j < ND; ++j) {
         refl[static_cast<size_t>(j) * stride + l] = sdl[j];
-      for (int k = 0; k < ND; ++k)
+      }
+      for (int k = 0; k < ND; ++k) {
         refp[static_cast<size_t>(k) * stride + l] = sdp[k];
+      }
     }
   }
   const double ref_resid_e = K.split_energy_residual_pert();
@@ -2141,12 +2231,14 @@ void test_all_l_matches_per_l(bool balanced = false) {
 
   auto worst_rel = [](const std::vector<double>& x, const std::vector<double>& y) {
     double scale = 0.;
-    for (double v : y)
+    for (double v : y) {
       scale = std::fmax(scale, std::fabs(v));
+    }
     scale    = std::fmax(scale, 1e-300);
     double w = 0.;
-    for (size_t i = 0; i < x.size(); ++i)
+    for (size_t i = 0; i < x.size(); ++i) {
       w = std::fmax(w, std::fabs(x[i] - y[i]) / scale);
+    }
     return w;
   };
   const double wH = worst_rel(gH, refH);
@@ -2162,9 +2254,10 @@ void test_all_l_matches_per_l(bool balanced = false) {
   // residual-relative comparison would be dividing 1e-17 by 1e-17. The identity the
   // residual serves is 2eH + 2el + ephi == booked, so the energy is its natural scale.
   double e_scale = 0.;
-  for (int j = 0; j < ND; ++j)
+  for (int j = 0; j < ND; ++j) {
     e_scale += std::fabs(F.dq[j] * F.q[j] * F.q[j] * F.q[j] *
                          refl[static_cast<size_t>(j) * stride]);
+  }
   const double we = std::fabs(K.split_energy_residual_pert() - ref_resid_e) /
                     Scale3(K.split_energy_residual_pert(), ref_resid_e, e_scale);
   const double wm = std::fabs(K.split_momentum_residual_pert() - ref_resid_m) /
@@ -2184,8 +2277,9 @@ void test_all_l_matches_per_l(bool balanced = false) {
   assert(wm < 1e-12);
   // Guard against a trivially-zero operator "agreeing" with itself.
   double mag = 0.;
-  for (double v : refl)
+  for (double v : refl) {
     mag = std::fmax(mag, std::fabs(v));
+  }
   assert(mag > 0.);
 }
 
@@ -2320,8 +2414,9 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
       gphi[i] = (aphi[i] - bphi[i]) / (2 * h);
     }
     best = std::fmin(best, std::fmax(rel(oH, gH), std::fmax(rel(ol, gl), rel(ophi, gphi))));
-    if (best == std::fmax(rel(oH, gH), std::fmax(rel(ol, gl), rel(ophi, gphi))))
+    if (best == std::fmax(rel(oH, gH), std::fmax(rel(ol, gl), rel(ophi, gphi)))) {
       best_h = h;
+    }
   }
   std::printf("pert Jacobian vs finite differences (%s gather%s): %.2e at h=%.0e\n",
               balanced ? "balanced" : "linear",
@@ -2330,8 +2425,9 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
               best_h);
   // Guard against a vacuous pass: the operator must not be identically zero.
   double mag = 0.;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     mag = std::fmax(mag, std::fabs(ol[i]));
+  }
   assert(mag > 0.);
 
   if (balanced && !chain) {
@@ -2420,10 +2516,12 @@ void test_chain_factor_cap() {
     (void) A;
     numH += w * dH[i];
   }
-  for (int j = 0; j < N; ++j)
+  for (int j = 0; j < N; ++j) {
     numl += F.dq[j] * F.q[j] * F.q[j] * dl[j];
-  for (int k = 0; k < N; ++k)
+  }
+  for (int k = 0; k < N; ++k) {
     numphi += B.dq[k] * B.q[k] * B.q[k] * dphi[k];
+  }
   const double nf = std::fabs(numH + numl) / Scale(numH, numl);
   const double nb = std::fabs(2. * numH + numphi) / Scale(2. * numH, numphi);
   std::printf(
@@ -2512,10 +2610,11 @@ void test_chain_cap_reaches_background_diagonal() {
                             std::fmax(std::fabs(dl0[i] - dl1[i]), std::fabs(dphi0[i] - dphi1[i]))));
   }
   double scale = 0.;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     scale = std::fmax(scale,
                       std::fmax(std::fabs(dH1[i]),
                                 std::fmax(std::fabs(dl1[i]), std::fabs(dphi1[i]))));
+  }
   std::printf(
       "   background diagonal, balanced_pert off vs on: worst abs dev = %.2e "
       "(scale %.2e, raw chain factor %.2e)\n",

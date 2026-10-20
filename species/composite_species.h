@@ -114,8 +114,11 @@ class CompositeSpecies : public BaseSpecies {
   /** Sums GetOmega0() over all children. */
   double GetOmega0() const override {
     double sum = 0.0;
-    for (const auto& c : children_)
-      sum += c->GetOmega0();
+    for (const auto& c : children_) {
+      {
+        sum += c->GetOmega0();
+      }
+    }
     return sum;
   }
 
@@ -125,17 +128,26 @@ class CompositeSpecies : public BaseSpecies {
   void AppendBudgetLines(const double* pvecback_today,
                          double rho_crit,
                          std::vector<BudgetLine>& out) const {
-    for (const auto& c : children_)
-      out.push_back({c->name(), c->Rho(pvecback_today) / rho_crit, BudgetBucketOf(*c)});
+    for (const auto& c : children_) {
+      {
+        out.push_back({c->name(), c->Rho(pvecback_today) / rho_crit, BudgetBucketOf(*c)});
+      }
+    }
   }
 
   /** A composite is explicit-evolver safe only if every child is. Unlike
    *  HasNcdm() this DOES scan children: the question is about the stiffness of
    *  the merged system, to which each child contributes its own equations. */
   bool SupportsExplicitPerturbationEvolver() const override {
-    for (const auto& c : children_)
-      if (!c->SupportsExplicitPerturbationEvolver())
-        return false;
+    for (const auto& c : children_) {
+      {
+        if (!c->SupportsExplicitPerturbationEvolver()) {
+          {
+            return false;
+          }
+        }
+      }
+    }
     return true;
   }
 
@@ -144,8 +156,11 @@ class CompositeSpecies : public BaseSpecies {
    *  point of #421 is that the daughter's requirement must reach the module. */
   int MaxMultipole(const precision* ppr, bool tensors) const override {
     int l_max = 0;
-    for (const auto& c : children_)
-      l_max = std::max(l_max, c->MaxMultipole(ppr, tensors));
+    for (const auto& c : children_) {
+      {
+        l_max = std::max(l_max, c->MaxMultipole(ppr, tensors));
+      }
+    }
     return l_max;
   }
 
@@ -153,9 +168,15 @@ class CompositeSpecies : public BaseSpecies {
    *  is chosen for the whole system, so one stiff diagonal in the subtree is
    *  enough to make it worth taking. */
   bool PrefersExponentialPerturbationEvolver() const override {
-    for (const auto& c : children_)
-      if (c->PrefersExponentialPerturbationEvolver())
-        return true;
+    for (const auto& c : children_) {
+      {
+        if (c->PrefersExponentialPerturbationEvolver()) {
+          {
+            return true;
+          }
+        }
+      }
+    }
     return false;
   }
 
@@ -163,9 +184,15 @@ class CompositeSpecies : public BaseSpecies {
    *  scans rather than combining the two answers above; see
    *  BaseSpecies::SupportsExponentialPerturbationEvolver(). */
   bool SupportsExponentialPerturbationEvolver() const override {
-    for (const auto& c : children_)
-      if (!c->SupportsExponentialPerturbationEvolver())
-        return false;
+    for (const auto& c : children_) {
+      {
+        if (!c->SupportsExponentialPerturbationEvolver()) {
+          {
+            return false;
+          }
+        }
+      }
+    }
     return true;
   }
 
@@ -173,70 +200,106 @@ class CompositeSpecies : public BaseSpecies {
    *  contribute their Omega0; matter children contribute 0). */
   double GetRadiationOmega0() const override {
     double sum = 0.0;
-    for (const auto& c : children_)
-      sum += c->GetRadiationOmega0();
+    for (const auto& c : children_) {
+      {
+        sum += c->GetRadiationOmega0();
+      }
+    }
     return sum;
   }
 
   /** Sums DarkRadiationRhoToday() over all children. */
   double DarkRadiationRhoToday(const double* pvecback_integration) const override {
     double sum = 0.0;
-    for (const auto& c : children_)
-      sum += c->DarkRadiationRhoToday(pvecback_integration);
+    for (const auto& c : children_) {
+      {
+        sum += c->DarkRadiationRhoToday(pvecback_integration);
+      }
+    }
     return sum;
   }
 
   /** Sums NeutrinoOmega0() over children (matter NCDM children contribute). */
   double NeutrinoOmega0() const override {
     double sum = 0.0;
-    for (const auto& c : children_)
-      sum += c->NeutrinoOmega0();
+    for (const auto& c : children_) {
+      {
+        sum += c->NeutrinoOmega0();
+      }
+    }
     return sum;
   }
 
   /** Sums NeffContribution() over children. */
   double NeffContribution(double z) const override {
     double sum = 0.0;
-    for (const auto& c : children_)
-      sum += c->NeffContribution(z);
+    for (const auto& c : children_) {
+      {
+        sum += c->NeffContribution(z);
+      }
+    }
     return sum;
   }
 
   void PrintNeffInfo() const override {
-    for (const auto& c : children_)
-      c->PrintNeffInfo();
+    for (const auto& c : children_) {
+      {
+        c->PrintNeffInfo();
+      }
+    }
   }
   void PrintMassInfo() const override {
-    for (const auto& c : children_)
-      c->PrintMassInfo();
+    for (const auto& c : children_) {
+      {
+        c->PrintMassInfo();
+      }
+    }
   }
 
   double TensorMasslessRelativisticRho(const double* pvecback) const override {
     double sum = 0.0;
-    for (const auto& c : children_)
-      sum += c->TensorMasslessRelativisticRho(pvecback);
+    for (const auto& c : children_) {
+      {
+        sum += c->TensorMasslessRelativisticRho(pvecback);
+      }
+    }
     return sum;
   }
   void CheckUltraRelativisticAtIc(const double* pvecback, double tol) const override {
-    for (const auto& c : children_)
-      c->CheckUltraRelativisticAtIc(pvecback, tol);
+    for (const auto& c : children_) {
+      {
+        c->CheckUltraRelativisticAtIc(pvecback, tol);
+      }
+    }
   }
   bool IsUltraRelativisticAtIc(const double* pvecback, double tol) const override {
-    for (const auto& c : children_)
-      if (!c->IsUltraRelativisticAtIc(pvecback, tol))
-        return false;
+    for (const auto& c : children_) {
+      {
+        if (!c->IsUltraRelativisticAtIc(pvecback, tol)) {
+          {
+            return false;
+          }
+        }
+      }
+    }
     return true;
   }
   void WarnIfTooHeavyForHalofit(double m_ev_threshold) const override {
-    for (const auto& c : children_)
-      c->WarnIfTooHeavyForHalofit(m_ev_threshold);
+    for (const auto& c : children_) {
+      {
+        c->WarnIfTooHeavyForHalofit(m_ev_threshold);
+      }
+    }
   }
 
   /** Threads a_proposed through all children (e.g. a wrapped DNCDM child
    *  may pull the earliest integration start earlier). */
   double BackgroundAIni(double a_proposed, double tol) const override {
-    for (const auto& c : children_)
-      a_proposed = c->BackgroundAIni(a_proposed, tol);
+    for (const auto& c : children_) {
+      {
+        a_proposed = c->BackgroundAIni(a_proposed, tol);
+      }
+    }
     return a_proposed;
   }
 

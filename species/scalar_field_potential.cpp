@@ -42,8 +42,9 @@ ScalarFieldPotential DefaultScalarFieldPotential() {
                         double /*H0*/,
                         const std::vector<double>& params,
                         int tuning_index) -> std::pair<double, double> {
-    if (tuning_index == 0)
+    if (tuning_index == 0) {
       return {std::sqrt(3.0 / omega0_scf), -0.5 * std::sqrt(3.0) * std::pow(omega0_scf, -1.5)};
+    }
     return {params[tuning_index], 1.0};
   };
   return p;

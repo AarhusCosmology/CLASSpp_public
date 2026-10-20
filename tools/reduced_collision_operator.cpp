@@ -20,8 +20,9 @@ void Cholesky(const std::vector<double>& S, int n, std::vector<double>& L) {
   for (int i = 0; i < n; ++i) {
     for (int j = 0; j <= i; ++j) {
       double sum = S[static_cast<size_t>(i) * n + j];
-      for (int k = 0; k < j; ++k)
+      for (int k = 0; k < j; ++k) {
         sum -= L[static_cast<size_t>(i) * n + k] * L[static_cast<size_t>(j) * n + k];
+      }
       if (i == j) {
         if (!(sum > 0.)) {
           char msg[192];
@@ -48,8 +49,9 @@ void Cholesky(const std::vector<double>& S, int n, std::vector<double>& L) {
 void ForwardSolve(const std::vector<double>& L, int n, double* b) {
   for (int i = 0; i < n; ++i) {
     double sum = b[i];
-    for (int k = 0; k < i; ++k)
+    for (int k = 0; k < i; ++k) {
       sum -= L[static_cast<size_t>(i) * n + k] * b[k];
+    }
     b[i] = sum / L[static_cast<size_t>(i) * n + i];
   }
 }
@@ -60,16 +62,20 @@ double MaxEigenvalueSymmetric(std::vector<double>& A, int n) {
   const int kMaxSweeps = 60;
   for (int sweep = 0; sweep < kMaxSweeps; ++sweep) {
     double off = 0.;
-    for (int p = 0; p < n; ++p)
-      for (int q = p + 1; q < n; ++q)
+    for (int p = 0; p < n; ++p) {
+      for (int q = p + 1; q < n; ++q) {
         off += A[static_cast<size_t>(p) * n + q] * A[static_cast<size_t>(p) * n + q];
-    if (off <= 1e-30)
+      }
+    }
+    if (off <= 1e-30) {
       break;
+    }
     for (int p = 0; p < n; ++p) {
       for (int q = p + 1; q < n; ++q) {
         const double apq = A[static_cast<size_t>(p) * n + q];
-        if (std::fabs(apq) < 1e-300)
+        if (std::fabs(apq) < 1e-300) {
           continue;
+        }
         const double app   = A[static_cast<size_t>(p) * n + p];
         const double aqq   = A[static_cast<size_t>(q) * n + q];
         const double theta = 0.5 * (aqq - app) / apq;
@@ -93,8 +99,9 @@ double MaxEigenvalueSymmetric(std::vector<double>& A, int n) {
     }
   }
   double lam = -1e300;
-  for (int i = 0; i < n; ++i)
+  for (int i = 0; i < n; ++i) {
     lam = std::fmax(lam, A[static_cast<size_t>(i) * n + i]);
+  }
   return lam;
 }
 
@@ -110,24 +117,29 @@ std::vector<double> MetricTransform(const double* M, const std::vector<double>& 
 
   // A = L^T M   (A_ij = sum_k L_ki M_kj, and L is lower so k >= i)
   std::vector<double> A(static_cast<size_t>(n) * n, 0.);
-  for (int i = 0; i < n; ++i)
+  for (int i = 0; i < n; ++i) {
     for (int k = i; k < n; ++k) {
       const double lki = L[static_cast<size_t>(k) * n + i];
-      if (lki == 0.)
+      if (lki == 0.) {
         continue;
-      for (int j = 0; j < n; ++j)
+      }
+      for (int j = 0; j < n; ++j) {
         A[static_cast<size_t>(i) * n + j] += lki * M[static_cast<size_t>(k) * n + j];
+      }
     }
+  }
 
   // Mhat = A L^-T, i.e. Mhat L^T = A, i.e. L Mhat^T = A^T: forward-solve each row.
   std::vector<double> Mhat(static_cast<size_t>(n) * n, 0.);
   std::vector<double> row(n);
   for (int i = 0; i < n; ++i) {
-    for (int j = 0; j < n; ++j)
+    for (int j = 0; j < n; ++j) {
       row[j] = A[static_cast<size_t>(i) * n + j];
+    }
     ForwardSolve(L, n, row.data());
-    for (int j = 0; j < n; ++j)
+    for (int j = 0; j < n; ++j) {
       Mhat[static_cast<size_t>(i) * n + j] = row[j];
+    }
   }
   return Mhat;
 }
@@ -135,10 +147,12 @@ std::vector<double> MetricTransform(const double* M, const std::vector<double>& 
 double NumericalRangeBound(const double* M, const std::vector<double>& S, int n) {
   std::vector<double> Mhat = MetricTransform(M, S, n);
   std::vector<double> Sym(static_cast<size_t>(n) * n);
-  for (int i = 0; i < n; ++i)
-    for (int j = 0; j < n; ++j)
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
       Sym[static_cast<size_t>(i) * n + j] = 0.5 * (Mhat[static_cast<size_t>(i) * n + j] +
                                                    Mhat[static_cast<size_t>(j) * n + i]);
+    }
+  }
   return MaxEigenvalueSymmetric(Sym, n);
 }
 
@@ -163,8 +177,9 @@ double NumericalRangeBound(const double* M, const std::vector<double>& S, int n)
  *  1e-100. */
 double EntropyWeight(double f, Statistics s) {
   const double x = (s == Statistics::Fermion) ? std::fmin(f, kFMax) : f;
-  if (!(x > 0.))
+  if (!(x > 0.)) {
     return 0.;
+  }
   return (s == Statistics::Fermion) ? x * (1. - x) : x * (1. + x);
 }
 
@@ -180,8 +195,9 @@ constexpr double kWeightFloor = 1e-8;
 
 double FlooredWeight(const std::vector<double>& w, size_t k) {
   double wmax = 0.;
-  for (double x : w)
+  for (double x : w) {
     wmax = std::fmax(wmax, x);
+  }
   const double fl = (wmax > 0.) ? kWeightFloor * wmax : 1.;
   return std::fmax(w[k], fl);
 }
@@ -199,8 +215,9 @@ ReducedCollisionOperator::ReducedCollisionOperator(const DecayTransitionKernel& 
                                                    Config cfg)
     : kernel_(&kernel), parent_(parent), fermion_(fermion), boson_(boson),
       fermion_stat_(fermion_stat), boson_stat_(boson_stat), cfg_(cfg) {
-  if (cfg_.n_moments < 1)
+  if (cfg_.n_moments < 1) {
     throw std::runtime_error("ReducedCollisionOperator: n_moments must be >= 1");
+  }
 }
 
 // -------------------------------------------------------------- the basis --
@@ -231,8 +248,9 @@ void ReducedCollisionOperator::SetBackground(
       // Report before weighting: what matters is that the BACKGROUND went outside the
       // range an occupation can occupy, not what this class then did about it.
       B.clamp.f_max = std::fmax(B.clamp.f_max, f[d][k]);
-      if (f[d][k] < 0. || (stat[d] == Statistics::Fermion && f[d][k] > kFMax))
+      if (f[d][k] < 0. || (stat[d] == Statistics::Fermion && f[d][k] > kFMax)) {
         ++B.clamp.n_clamped;
+      }
       B.w[k] = EntropyWeight(f[d][k], stat[d]);
     }
 
@@ -265,31 +283,37 @@ void ReducedCollisionOperator::SetBackground(
     }
     B.psi.assign(static_cast<size_t>(nm) * ng, 0.);
     B.gnorm.assign(nm, 0.);
-    for (int k = 0; k < ng; ++k)
+    for (int k = 0; k < ng; ++k) {
       B.psi[k] = 1.;
-    for (int k = 0; k < ng; ++k)
+    }
+    for (int k = 0; k < ng; ++k) {
       B.gnorm[0] += dmu[k];
-    if (!(B.gnorm[0] > 0.))
+    }
+    if (!(B.gnorm[0] > 0.)) {
       throw std::runtime_error("ReducedCollisionOperator: basis weight has no support");
+    }
 
     for (int j = 0; j + 1 < nm; ++j) {
       double num = 0.;
-      for (int k = 0; k < ng; ++k)
+      for (int k = 0; k < ng; ++k) {
         num += dmu[k] * t[k] * B.psi[static_cast<size_t>(j) * ng + k] *
                B.psi[static_cast<size_t>(j) * ng + k];
+      }
       const double alpha = num / B.gnorm[j];
       const double beta  = (j == 0) ? 0. : B.gnorm[j] / B.gnorm[j - 1];
-      if (j == 0)
+      if (j == 0) {
         B.alpha0 = alpha;
+      }
       for (int k = 0; k < ng; ++k) {
         const double prev = (j == 0) ? 0. : B.psi[static_cast<size_t>(j - 1) * ng + k];
         B.psi[static_cast<size_t>(j + 1) * ng + k] =
             (t[k] - alpha) * B.psi[static_cast<size_t>(j) * ng + k] - beta * prev;
       }
       double n2 = 0.;
-      for (int k = 0; k < ng; ++k)
+      for (int k = 0; k < ng; ++k) {
         n2 += dmu[k] * B.psi[static_cast<size_t>(j + 1) * ng + k] *
               B.psi[static_cast<size_t>(j + 1) * ng + k];
+      }
       // The measure lives on `ng` points, so it supports at most `ng` orthogonal
       // polynomials -- and in practice far fewer, because the weight is concentrated.
       // A collapsing norm is the basis genuinely running out, not a numerical wobble,
@@ -312,8 +336,9 @@ void ReducedCollisionOperator::SetBackground(
     // H_jj' = Sum dq q^2 (w^2/w) t^(j+j'). The basis weight IS the entropy weight, so
     // H == G, and with G diagonal the metric collapses to diag(1/gnorm).
     B.metric.assign(static_cast<size_t>(nm) * nm, 0.);
-    for (int j = 0; j < nm; ++j)
+    for (int j = 0; j < nm; ++j) {
       B.metric[static_cast<size_t>(j) * nm + j] = 1. / B.gnorm[j];
+    }
   }
 }
 
@@ -321,8 +346,9 @@ void ReducedCollisionOperator::AdoptFrozenBasis(double a,
                                                 double m,
                                                 const double* f_H,
                                                 const ReducedCollisionOperator& src) {
-  if (src.cfg_.n_moments != cfg_.n_moments)
+  if (src.cfg_.n_moments != cfg_.n_moments) {
     throw std::runtime_error("ReducedCollisionOperator: AdoptFrozenBasis moment-count mismatch");
+  }
   a_ = a;
   m_ = m;
   // The parent quantities DO belong to this row -- eps enters the conservation weights
@@ -347,8 +373,9 @@ void ReducedCollisionOperator::Reconstruct(int daughter, const double* coeff, do
   // scaling rather than a linear solve.
   for (int k = 0; k < g.n; ++k) {
     double acc = 0.;
-    for (int j = 0; j < nm; ++j)
+    for (int j = 0; j < nm; ++j) {
       acc += coeff[j] / B.gnorm[j] * B.psi[static_cast<size_t>(j) * g.n + k];
+    }
     df[k] = B.w[k] * acc;
   }
 }
@@ -358,12 +385,14 @@ void ReducedCollisionOperator::Project(int daughter, const double* df, double* c
   const GridView& g = (daughter == 0) ? fermion_ : boson_;
   const int nm      = cfg_.n_moments;
 
-  for (int j = 0; j < nm; ++j)
+  for (int j = 0; j < nm; ++j) {
     coeff[j] = 0.;
+  }
   for (int k = 0; k < g.n; ++k) {
     const double base = g.dq[k] * g.q[k] * g.q[k] * df[k];
-    for (int j = 0; j < nm; ++j)
+    for (int j = 0; j < nm; ++j) {
       coeff[j] += base * B.psi[static_cast<size_t>(j) * g.n + k];
+    }
   }
 }
 
@@ -397,8 +426,9 @@ void ReducedCollisionOperator::Assemble(int l_max, std::vector<double>& out) con
     // which is what makes the whole assembly cost ~S operator applications rather
     // than S*(l_max+1).
     if (col < Np) {
-      for (int l = 0; l <= l_max; ++l)
+      for (int l = 0; l <= l_max; ++l) {
         FH[static_cast<size_t>(col) * stride + l] = 1.;
+      }
     }
     else {
       const int d = (col - Np) < nm ? 0 : 1;
@@ -408,9 +438,11 @@ void ReducedCollisionOperator::Assemble(int l_max, std::vector<double>& out) con
       Reconstruct(d, coeff.data(), recon.data());
       double* F        = (d == 0) ? Fl.data() : Fp.data();
       const int n_grid = (d == 0) ? fermion_.n : boson_.n;
-      for (int k = 0; k < n_grid; ++k)
-        for (int l = 0; l <= l_max; ++l)
+      for (int k = 0; k < n_grid; ++k) {
+        for (int l = 0; l <= l_max; ++l) {
           F[static_cast<size_t>(k) * stride + l] = recon[k];
+        }
+      }
     }
 
     kernel_->ResetMultipoleRecurrence();
@@ -425,16 +457,19 @@ void ReducedCollisionOperator::Assemble(int l_max, std::vector<double>& out) con
 
     for (int l = 0; l <= l_max; ++l) {
       double* Ml = out.data() + static_cast<size_t>(l) * S * S;
-      for (int i = 0; i < Np; ++i)
+      for (int i = 0; i < Np; ++i) {
         Ml[static_cast<size_t>(i) * S + col] = dH[static_cast<size_t>(i) * stride + l];
+      }
       for (int d = 0; d < 2; ++d) {
         const double* src = (d == 0) ? dl.data() : dp.data();
         const int n_grid  = (d == 0) ? fermion_.n : boson_.n;
-        for (int k = 0; k < n_grid; ++k)
+        for (int k = 0; k < n_grid; ++k) {
           slice[k] = src[static_cast<size_t>(k) * stride + l];
+        }
         Project(d, slice.data(), mom.data());
-        for (int j = 0; j < nm; ++j)
+        for (int j = 0; j < nm; ++j) {
           Ml[static_cast<size_t>(Np + d * nm + j) * S + col] = mom[j];
+        }
       }
     }
   }
@@ -461,8 +496,9 @@ void ReducedCollisionOperator::AssembleExact(int l_max, std::vector<double>& out
     std::fill(Fp.begin(), Fp.end(), 0.);
     double* F     = (col < Np) ? FH.data() : (col < Np + Nf ? Fl.data() : Fp.data());
     const int idx = (col < Np) ? col : (col < Np + Nf ? col - Np : col - Np - Nf);
-    for (int l = 0; l <= l_max; ++l)
+    for (int l = 0; l <= l_max; ++l) {
       F[static_cast<size_t>(idx) * stride + l] = 1.;
+    }
 
     kernel_->ResetMultipoleRecurrence();
     kernel_->ApplyPerturbationOperatorAllL(l_max,
@@ -476,12 +512,15 @@ void ReducedCollisionOperator::AssembleExact(int l_max, std::vector<double>& out
 
     for (int l = 0; l <= l_max; ++l) {
       double* Ml = out.data() + static_cast<size_t>(l) * N * N;
-      for (int i = 0; i < Np; ++i)
+      for (int i = 0; i < Np; ++i) {
         Ml[static_cast<size_t>(i) * N + col] = dH[static_cast<size_t>(i) * stride + l];
-      for (int i = 0; i < Nf; ++i)
+      }
+      for (int i = 0; i < Nf; ++i) {
         Ml[static_cast<size_t>(Np + i) * N + col] = dl[static_cast<size_t>(i) * stride + l];
-      for (int i = 0; i < Nb; ++i)
+      }
+      for (int i = 0; i < Nb; ++i) {
         Ml[static_cast<size_t>(Np + Nf + i) * N + col] = dp[static_cast<size_t>(i) * stride + l];
+      }
     }
   }
 }
@@ -493,11 +532,13 @@ namespace {
 /** ||w^T M|| / (||w|| * ||M||_max-col), the scale-free size of a broken identity. */
 double LeftNullResidual(const std::vector<double>& w, const double* M, int n) {
   double wnorm = 0.;
-  for (double x : w)
+  for (double x : w) {
     wnorm += x * x;
+  }
   wnorm = std::sqrt(wnorm);
-  if (!(wnorm > 0.))
+  if (!(wnorm > 0.)) {
     return 0.;
+  }
 
   double res   = 0.;
   double scale = 0.;
@@ -620,16 +661,20 @@ void ReducedCollisionOperator::BuildMetric(std::vector<double>& S) const {
   // DissipativityBound). The reduced daughter blocks need no such floor: the
   // reconstruction only ever produces df proportional to w, so the Gram matrix is
   // exactly the induced metric and is finite by construction.
-  for (int b = 0; b < Np; ++b)
+  for (int b = 0; b < Np; ++b) {
     S[static_cast<size_t>(b) * n + b] = 2. * parent_.dq[b] * parent_.q[b] * parent_.q[b] /
                                         FlooredWeight(w_H_, static_cast<size_t>(b));
+  }
 
   const double g[2] = {2., 1.};
-  for (int d = 0; d < 2; ++d)
-    for (int i = 0; i < nm; ++i)
-      for (int j = 0; j < nm; ++j)
+  for (int d = 0; d < 2; ++d) {
+    for (int i = 0; i < nm; ++i) {
+      for (int j = 0; j < nm; ++j) {
         S[static_cast<size_t>(Np + d * nm + i) * n + (Np + d * nm + j)] =
             g[d] * basis_[d].metric[static_cast<size_t>(i) * nm + j];
+      }
+    }
+  }
 }
 
 void ReducedCollisionOperator::BuildMetricExact(std::vector<double>& S) const {
@@ -639,9 +684,10 @@ void ReducedCollisionOperator::BuildMetricExact(std::vector<double>& S) const {
   S.assign(static_cast<size_t>(n) * n, 0.);
 
   auto block = [&](int base, const GridView& g, const std::vector<double>& w, double deg) {
-    for (int k = 0; k < g.n; ++k)
+    for (int k = 0; k < g.n; ++k) {
       S[static_cast<size_t>(base + k) * n + (base + k)] = deg * g.dq[k] * g.q[k] * g.q[k] /
                                                           FlooredWeight(w, static_cast<size_t>(k));
+    }
   };
   block(0, parent_, w_H_, 2.);
   block(Np, fermion_, basis_[0].w, 2.);
@@ -672,15 +718,18 @@ void ReducedCollisionOperator::EquilibriumNullVectors(std::vector<double>& out) 
   std::vector<double> mom(nm);
   auto put_daughter = [&](int vec, int d, bool linear) {
     const GridView& g = (d == 0) ? fermion_ : boson_;
-    for (int k = 0; k < g.n; ++k)
+    for (int k = 0; k < g.n; ++k) {
       df[k] = basis_[d].w[k] * (linear ? g.q[k] : 1.);
+    }
     Project(d, df.data(), mom.data());
-    for (int j = 0; j < nm; ++j)
+    for (int j = 0; j < nm; ++j) {
       out[static_cast<size_t>(vec) * S + Np + d * nm + j] = mom[j];
+    }
   };
   auto put_parent = [&](int vec, bool linear) {
-    for (int b = 0; b < Np; ++b)
+    for (int b = 0; b < Np; ++b) {
       out[static_cast<size_t>(vec) * S + b] = w_H_[b] * (linear ? parent_.q[b] : 1.);
+    }
   };
 
   // mu_H = mu_l + mu_phi leaves two independent chemical-potential directions.
@@ -701,15 +750,20 @@ void ReducedCollisionOperator::EquilibriumNullVectorsExact(std::vector<double>& 
   out.assign(static_cast<size_t>(3) * N, 0.);
 
   auto put = [&](int vec, bool linear, bool with_f, bool with_b) {
-    for (int b = 0; b < Np; ++b)
+    for (int b = 0; b < Np; ++b) {
       out[static_cast<size_t>(vec) * N + b] = w_H_[b] * (linear ? parent_.q[b] : 1.);
-    if (with_f)
-      for (int k = 0; k < Nf; ++k)
+    }
+    if (with_f) {
+      for (int k = 0; k < Nf; ++k) {
         out[static_cast<size_t>(vec) * N + Np + k] = basis_[0].w[k] * (linear ? fermion_.q[k] : 1.);
-    if (with_b)
-      for (int k = 0; k < boson_.n; ++k)
+      }
+    }
+    if (with_b) {
+      for (int k = 0; k < boson_.n; ++k) {
         out[static_cast<size_t>(vec) * N + Np + Nf + k] = basis_[1].w[k] *
                                                           (linear ? boson_.q[k] : 1.);
+      }
+    }
   };
   put(0, false, true, false);
   put(1, false, false, true);
@@ -728,16 +782,20 @@ void ReducedOperatorTable::Reset(int size, int l_max) {
 
 void ReducedOperatorTable::AddRow(double a, const std::vector<double>& M) {
   const size_t block = static_cast<size_t>(l_max_ + 1) * size_ * size_;
-  if (size_ <= 0 || l_max_ < 0)
+  if (size_ <= 0 || l_max_ < 0) {
     throw std::runtime_error("ReducedOperatorTable: AddRow before Reset");
-  if (M.size() != block)
+  }
+  if (M.size() != block) {
     throw std::runtime_error("ReducedOperatorTable: row has the wrong block size");
+  }
   // Ascending is not a convenience, it is what makes the binary search in Apply valid;
   // an out-of-order row would silently return the wrong operator at every a above it.
-  if (!a_.empty() && !(a > a_.back()))
+  if (!a_.empty() && !(a > a_.back())) {
     throw std::runtime_error("ReducedOperatorTable: rows must be added in ascending a");
-  if (!(a > 0.))
+  }
+  if (!(a > 0.)) {
     throw std::runtime_error("ReducedOperatorTable: row at non-positive a");
+  }
   a_.push_back(a);
   ln_a_.push_back(std::log(a));
   // Uniformity in ln a, tracked as rows arrive so the lookup can skip the search.
@@ -749,8 +807,9 @@ void ReducedOperatorTable::AddRow(double a, const std::vector<double>& M) {
   else if (a_.size() > 2 && uniform_ln_a_) {
     const size_t n = ln_a_.size();
     const double d = ln_a_[n - 1] - ln_a_[n - 2];
-    if (std::fabs(d * inv_dlna_ - 1.) > kUniformTol)
+    if (std::fabs(d * inv_dlna_ - 1.) > kUniformTol) {
       uniform_ln_a_ = false;
+    }
   }
   M_.insert(M_.end(), M.begin(), M.end());
 }
@@ -758,36 +817,44 @@ void ReducedOperatorTable::AddRow(double a, const std::vector<double>& M) {
 int ReducedOperatorTable::LowerRow(double a) const {
   int lo = 0;
   int hi = static_cast<int>(a_.size()) - 1;
-  if (hi < 0 || a < a_[0])
+  if (hi < 0 || a < a_[0]) {
     return -1;
+  }
   if (uniform_ln_a_) {
     // One division. Clamped rather than trusted: log() and the stored ln_a_ need not
     // round identically at a row boundary, and an index off by one past the end would
     // read the next row's block.
     int i = static_cast<int>((std::log(a) - ln_a_[0]) * inv_dlna_);
-    if (i < 0)
+    if (i < 0) {
       i = 0;
-    if (i > hi)
+    }
+    if (i > hi) {
       i = hi;
-    while (i < hi && a_[i + 1] <= a)
+    }
+    while (i < hi && a_[i + 1] <= a) {
       ++i;
-    while (i > 0 && a_[i] > a)
+    }
+    while (i > 0 && a_[i] > a) {
       --i;
+    }
     return i;
   }
   while (lo < hi) {
     const int mid = (lo + hi + 1) / 2;
-    if (a_[mid] <= a)
+    if (a_[mid] <= a) {
       lo = mid;
-    else
+    }
+    else {
       hi = mid - 1;
+    }
   }
   return lo;
 }
 
 void ReducedOperatorTable::Apply(double a, int l, const double* z, double* dz) const {
-  if (a_.empty() || l < 0 || l > l_max_ || a < a_.front() || a > a_.back())
+  if (a_.empty() || l < 0 || l > l_max_ || a < a_.front() || a > a_.back()) {
     return;  // outside the window the collision is off; add nothing
+  }
 
   const int i        = LowerRow(a);
   const size_t block = static_cast<size_t>(l_max_ + 1) * size_ * size_;
@@ -800,8 +867,9 @@ void ReducedOperatorTable::Apply(double a, int l, const double* z, double* dz) c
   if (i + 1 >= static_cast<int>(a_.size()) || a == a_[i]) {
     for (int r = 0; r < size_; ++r) {
       double s = 0.;
-      for (int c = 0; c < size_; ++c)
+      for (int c = 0; c < size_; ++c) {
         s += A[static_cast<size_t>(r) * size_ + c] * z[c];
+      }
       dz[r] += s;
     }
     return;
@@ -812,31 +880,36 @@ void ReducedOperatorTable::Apply(double a, int l, const double* z, double* dz) c
   const double u  = 1. - t;
   for (int r = 0; r < size_; ++r) {
     double s = 0.;
-    for (int c = 0; c < size_; ++c)
+    for (int c = 0; c < size_; ++c) {
       s += (u * A[static_cast<size_t>(r) * size_ + c] + t * B[static_cast<size_t>(r) * size_ + c]) *
            z[c];
+    }
     dz[r] += s;
   }
 }
 
 void ReducedOperatorTable::Diagonal(double a, int l, double* out) const {
-  for (int r = 0; r < size_; ++r)
+  for (int r = 0; r < size_; ++r) {
     out[r] = 0.;
-  if (a_.empty() || l < 0 || l > l_max_ || a < a_.front() || a > a_.back())
+  }
+  if (a_.empty() || l < 0 || l > l_max_ || a < a_.front() || a > a_.back()) {
     return;
+  }
 
   const int i        = LowerRow(a);
   const size_t block = static_cast<size_t>(l_max_ + 1) * size_ * size_;
   const size_t off_l = static_cast<size_t>(l) * size_ * size_;
   const double* A    = M_.data() + static_cast<size_t>(i) * block + off_l;
   if (i + 1 >= static_cast<int>(a_.size()) || a == a_[i]) {
-    for (int r = 0; r < size_; ++r)
+    for (int r = 0; r < size_; ++r) {
       out[r] = A[static_cast<size_t>(r) * size_ + r];
+    }
     return;
   }
   const double* B = M_.data() + static_cast<size_t>(i + 1) * block + off_l;
   const double t  = (std::log(a) - ln_a_[i]) / (ln_a_[i + 1] - ln_a_[i]);
-  for (int r = 0; r < size_; ++r)
+  for (int r = 0; r < size_; ++r) {
     out[r] = (1. - t) * A[static_cast<size_t>(r) * size_ + r] +
              t * B[static_cast<size_t>(r) * size_ + r];
+  }
 }

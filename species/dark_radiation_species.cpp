@@ -92,10 +92,11 @@ void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                         (l + 1.) * s_l[l + 1] * y[base_idx + l + 1]);
   }
   // l=4..lmax-1
-  for (int l = 4; l < lmax; ++l)
+  for (int l = 4; l < lmax; ++l) {
     dy[base_idx + l] = k / (2. * l + 1.) *
                        (l * s_l[l] * y[base_idx + l - 1] -
                         (l + 1.) * s_l[l + 1] * y[base_idx + l + 1]);
+  }
   // l=lmax (truncation). Inverting this branch shows it asserts the hyperspherical
   // recurrence s_{l+1}F_{l+1} + s_l F_{l-1} = (2l+1) k cot_K F_l, so the only thing a
   // closure has to supply is the argument cot_K is evaluated at. Ma & Bertschinger use
@@ -132,8 +133,9 @@ BaseSpecies::StressEnergyContribution DarkRadiationSpecies::StressEnergy(
   se.rho = pvecback[index_bg_rho_];
   se.p   = pvecback[index_bg_rho_] / 3.;
 
-  if (layout.idx_F0 < 0)
+  if (layout.idx_F0 < 0) {
     return se;
+  }
   const double a             = pvecback[bgm_->index_bg_a_];
   const double a2            = a * a;
   const double rho_dr_over_f = (pba_->H0 / a2) * (pba_->H0 / a2);
@@ -152,43 +154,52 @@ BaseSpecies::StressEnergyContribution DarkRadiationSpecies::StressEnergy(
 void DarkRadiationSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                                   double* y,
                                                   const PerturbIcContext& ctx) {
-  if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) {
     return;
+  }
 
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_F0 < 0)
+  if (layout.idx_F0 < 0) {
     return;
+  }
 
   const double* pvecback   = ctx.ppw->pvecback.data();
   const double r_prefactor = std::pow(std::pow(ctx.a, 2) / pba_->H0, 2);
   const double r_dr        = r_prefactor * pvecback[index_bg_rho_];
 
   y[layout.idx_F0 + 0] = ctx.delta_dr * r_dr;
-  if (layout.l_max >= 1)
+  if (layout.l_max >= 1) {
     y[layout.idx_F0 + 1] = 4. / (3. * ctx.k) * ctx.theta_ur * r_dr;
-  if (layout.l_max >= 2)
+  }
+  if (layout.l_max >= 2) {
     y[layout.idx_F0 + 2] = 2. * ctx.shear_ur * r_dr;
-  if (layout.l_max >= 3)
+  }
+  if (layout.l_max >= 3) {
     y[layout.idx_F0 + 3] = ctx.l3_ur * r_dr;
+  }
 }
 
 void DarkRadiationSpecies::PerturbNewtonianReseed(const PerturbLayout& layout,
                                                   double* y,
                                                   const PerturbIcContext& ctx,
                                                   double decay_corr) const {
-  if (layout.idx_F0 < 0)
+  if (layout.idx_F0 < 0) {
     return;
+  }
   const double* pvecback = ctx.ppw->pvecback.data();
   const double r_dr      = std::pow(std::pow(ctx.a, 2) / pba_->H0, 2) * pvecback[index_bg_rho_];
   const double delta_dr  = ctx.delta_dr + (-4. * ctx.a_prime_over_a + decay_corr) * ctx.alpha;
   const double theta_ur  = ctx.theta_ur + ctx.k * ctx.k * ctx.alpha;
   y[layout.idx_F0 + 0]   = delta_dr * r_dr;
-  if (layout.l_max >= 1)
+  if (layout.l_max >= 1) {
     y[layout.idx_F0 + 1] = 4. / (3. * ctx.k) * theta_ur * r_dr;
-  if (layout.l_max >= 2)
+  }
+  if (layout.l_max >= 2) {
     y[layout.idx_F0 + 2] = 2. * ctx.shear_ur * r_dr;  // shear/l3 gauge-invariant
-  if (layout.l_max >= 3)
+  }
+  if (layout.l_max >= 3) {
     y[layout.idx_F0 + 3] = ctx.l3_ur * r_dr;
+  }
 }
 
 void DarkRadiationSpecies::CopyPerturbationsAcrossSwitch(
@@ -199,10 +210,12 @@ void DarkRadiationSpecies::CopyPerturbationsAcrossSwitch(
     const PerturbSwitchContext& /*ctx*/) const {
   const auto& o = static_cast<const PerturbLayout&>(old_base);
   const auto& n = static_cast<const PerturbLayout&>(new_base);
-  if (o.idx_F0 < 0 || n.idx_F0 < 0)
+  if (o.idx_F0 < 0 || n.idx_F0 < 0) {
     return;
-  for (int l = 0; l <= n.l_max; ++l)
+  }
+  for (int l = 0; l <= n.l_max; ++l) {
     new_y[n.idx_F0 + l] = old_y[o.idx_F0 + l];
+  }
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────
@@ -212,8 +225,9 @@ void DarkRadiationSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                                        const double* /*dy*/,
                                        PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   const auto& layout     = static_cast<const PerturbLayout&>(base);
   const double* pvecback = ctx.ppw->pvecback.data();
@@ -252,11 +266,14 @@ void DarkRadiationSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                               const PerturbationsModule& mod,
                                               file_format fmt,
                                               BaseSpecies::TransferColumnSection section) const {
-  if (fmt != file_format::class_format)
+  if (fmt != file_format::class_format) {
     return;
+  }
   const perturbs* ppt = mod.GetPerturbs();
-  if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+  if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
     w.Add("d_" + name(), index_tp_delta_, index_tp_delta_ >= 0);
-  if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+  }
+  if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
     w.Add("t_" + name(), index_tp_theta_, index_tp_theta_ >= 0);
+  }
 }

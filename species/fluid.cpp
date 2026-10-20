@@ -164,8 +164,9 @@ void FluidSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double* pvecback     = ppw->pvecback.data();
 
   // Fluid sources are scalar-only
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   // ── delta_fld ─────────────────────────────────────────────────────────────
   if (index_tp_delta_ >= 0) {
@@ -196,10 +197,12 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
                                           double* y,
                                           const PerturbIcContext& ctx) {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) {
     return;
-  if (layout.idx_delta < 0 || layout.idx_theta < 0)
+  }
+  if (layout.idx_delta < 0 || layout.idx_theta < 0) {
     return;
+  }
 
   double w_fld;
   double dw_over_da;
@@ -222,10 +225,12 @@ void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_fld", index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_fld", index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
 }
 
@@ -351,17 +356,21 @@ void FluidSpecies::ComputeWFld(double a,
                    4. /
                        3.));  // assumes LambdaCDM + eventually massive neutrinos so light that they are relativistic at equality; needs to be generalised later on.
       double Omega_m = pba_.Omega0_b;
-      if (auto* p = bgm_->all_species_.find("CDM"))
+      if (auto* p = bgm_->all_species_.find("CDM")) {
         Omega_m += (*p)->GetOmega0();
-      if (auto* p = bgm_->all_species_.find("IDM_DR_IDR"))
+      }
+      if (auto* p = bgm_->all_species_.find("IDM_DR_IDR")) {
         Omega_m += static_cast<const IDM_DR_IDR_Species&>(**p).idm_dr().GetOmega0();
-      if (auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD"))
+      }
+      if (auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD")) {
         Omega_m += static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**p).idm_drmd().GetOmega0();
-      if (bgm_->all_species_.count("DCDM_DR"))
+      }
+      if (bgm_->all_species_.count("DCDM_DR")) {
         class_stop(
             "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
             "to code the calculation of a_eq in that case, but it would not be difficult to "
             "add it if necessary, should be a matter of 5 minutes");
+      }
       a_eq = Omega_r / Omega_m;  // assumes a flat universe with a=1 today
 
       // w_ede(a) taken from eq. (11) in 1706.00730
@@ -472,10 +481,12 @@ void FluidSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayou
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
   // Vector/tensor pv: all -1 -> no-op.
-  if (old_l.idx_delta >= 0 && new_l.idx_delta >= 0)
+  if (old_l.idx_delta >= 0 && new_l.idx_delta >= 0) {
     new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
-  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0)
+  }
+  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0) {
     new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+  }
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -516,8 +527,9 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   else {
     omega0_fld = ctx.pfc->get_or("Omega_fld", omega0_fld);
   }
-  if (omega0_fld == 0.)
+  if (omega0_fld == 0.) {
     return result;
+  }
 
   // ── numeric params ────────────────────────────────────────────────────────
   double w0_fld     = -1.;
@@ -550,8 +562,9 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
                   ? true
                   : false;
   }
-  if (use_ppf)
+  if (use_ppf) {
     c_gamma_over_c_fld = ctx.pfc->get_or("c_gamma_over_c_fld", c_gamma_over_c_fld);
+  }
 
   std::unique_ptr<BaseSpecies> sp;
   if (use_ppf) {
@@ -656,9 +669,10 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
     class_test(f_ac <= 0. || f_ac >= 1., "fraction_fld_ac must lie in (0, 1)");
     // Programmer-error invariant: the caller wiring, not user input, controls whether
     // all_species is populated. This can only fire if ConstructSpecies fails to pass it.
-    if (ctx.all_species == nullptr)
+    if (ctx.all_species == nullptr) {
       throw std::logic_error(
           "fraction_fld_ac needs the species collection (internal: all_species missing)");
+    }
     double omega_tot_ac = 0.;
     for (const auto& sp : *ctx.all_species) {
       switch (sp->energy_type()) {

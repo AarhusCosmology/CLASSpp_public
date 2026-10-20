@@ -30,8 +30,9 @@ double NEDESpecies::GetOmega0() const {
 }
 
 std::optional<double> NEDESpecies::GetParam(const std::string& name) const {
-  if (name == "z_star")
+  if (name == "z_star") {
     return 1. / a_star_ - 1.;
+  }
   return std::nullopt;
 }
 
@@ -201,8 +202,9 @@ BaseSpecies::StressEnergyContribution NEDESpecies::StressEnergy(
 std::vector<Named> NEDESpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
   const auto f_NEDE = ctx.pfc->get<double>("f_NEDE");
-  if (!f_NEDE)
+  if (!f_NEDE) {
     return result;
+  }
 
   /* m_NEDE is in 1/Mpc, as TriggerCLASS's trigger mass: the H0 Olympics prior of
      log10 m_NEDE in [1.3, 3.3] is labelled eV, but 20-2000/Mpc is what puts the
@@ -215,23 +217,26 @@ std::vector<Named> NEDESpecies::CreateAll(const SpeciesBuildContext& ctx) {
   class_test(*m_NEDE <= 0., "m_NEDE = %g must be positive", *m_NEDE);
   class_test(w_NEDE < 0. || w_NEDE > 1., "w_NEDE = %g must lie in [0, 1]", w_NEDE);
   class_test(H_over_m <= 0., "H_over_m_NEDE = %g must be positive", H_over_m);
-  if (auto gauge = ctx.pfc->get<std::string>("gauge"))
+  if (auto gauge = ctx.pfc->get<std::string>("gauge")) {
     class_test_severe(gauge->find("new") != std::string::npos ||
                           gauge->find("New") != std::string::npos,
                       "NEDE is implemented in synchronous gauge only");
+  }
 
   /* The transition is where H = H_*, i.e. where everything but NEDE contributes
      H_*^2 (1 - f_NEDE) to H^2 = rho_tot - K/a^2. The species are all built by now except
      the closure species, which is dark energy and negligible there. */
-  if (ctx.all_species == nullptr)
+  if (ctx.all_species == nullptr) {
     throw std::logic_error("NEDE needs the species collection (internal: all_species missing)");
+  }
   const double H0     = ctx.pba->H0;
   const double H_star = H_over_m * *m_NEDE;
   const double target = H_star * H_star * (1. - *f_NEDE) / (H0 * H0);
   auto H2_others      = [&](double a) {  // in units of H0^2
     double sum = ctx.pba->Omega0_k / (a * a);
-    for (const auto& sp : *ctx.all_species)
+    for (const auto& sp : *ctx.all_species) {
       sum += sp->BackgroundDensityOverH0Sq(a, H0);
+    }
     return sum;
   };
   const double a_ini = ctx.ppr->a_ini_over_a_today_default;

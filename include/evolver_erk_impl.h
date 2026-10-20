@@ -104,12 +104,15 @@ void evolver_erk_run(EvolverDerivs derivs,
 
   const double hmax = fabs(x_end - x_ini) / 10.0;
   double absh;
-  if (x_size > 1)
+  if (x_size > 1) {
     absh = std::min(hmax, fabs(x_sampling[1] - x_sampling[0]));
-  else
+  }
+  else {
     absh = hmax;
-  if (absh == 0.0)
+  }
+  if (absh == 0.0) {
     absh = hmax;
+  }
 
   /* initial step from derivative scale */
   double rh = 0.0;
@@ -118,8 +121,9 @@ void evolver_erk_run(EvolverDerivs derivs,
     rh            = std::max(rh, fabs(ki[k]) / maxtmp);
   }
   rh /= cfg.safety * pow(rtol, pow_grow);
-  if (absh * rh > 1.0)
+  if (absh * rh > 1.0) {
     absh = 1.0 / rh;
+  }
 
   const int tdir = (x_end > x_ini) ? 1 : -1;
   double hnew    = absh * tdir;
@@ -131,9 +135,11 @@ void evolver_erk_run(EvolverDerivs derivs,
   const double alpha_pi = pow_grow - 0.75 * cfg.pi_beta;
 
   int idx = 0;
-  if ((t - x_end) * tdir < 0.0)
-    for (idx = 0; (idx < x_size) && ((x_sampling[idx] - t) * tdir < 0.0); idx++)
+  if ((t - x_end) * tdir < 0.0) {
+    for (idx = 0; (idx < x_size) && ((x_sampling[idx] - t) * tdir < 0.0); idx++) {
       ;
+    }
+  }
 
   const bool step_to_output = (cfg.output_stepping == ErkOutputStepping::exact);
 
@@ -146,8 +152,9 @@ void evolver_erk_run(EvolverDerivs derivs,
                fabs(h),
                hmin,
                t);
-    if (fabs(h) > 0.9 * fabs(x_end - t))
+    if (fabs(h) > 0.9 * fabs(x_end - t)) {
       h = x_end - t;
+    }
 
     /* In `exact` output stepping the step is truncated so it ends on the next
        sampling point. `clamped` records that the length was imposed rather than
@@ -174,12 +181,14 @@ void evolver_erk_run(EvolverDerivs derivs,
       err[k]  = h * Tab::e[0] * ki[k];
     }
     for (int i = 1; i < s; i++) {
-      for (int k = 0; k < neq; k++)
+      for (int k = 0; k < neq; k++) {
         ytemp[k] = y[k];
+      }
       for (int j = 0; j < i; j++) {
         const double aij = Tab::A[i * s + j];
-        for (int k = 0; k < neq; k++)
+        for (int k = 0; k < neq; k++) {
           ytemp[k] += h * aij * ki[j * neq + k];
+        }
       }
       (*derivs)(t + Tab::c[i] * h,
                 ytemp.data(),
@@ -204,8 +213,9 @@ void evolver_erk_run(EvolverDerivs derivs,
     for (int k = 0; k < neq; k++) {
       double errtemp  = fabs(err[k] / std::max(threshold, fabs(ynew[k])));
       nonfinite      |= static_cast<int>(IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
-      if (errtemp > errmax)
+      if (errtemp > errmax) {
         errmax = errtemp;
+      }
     }
     /* `errmax` stays the quantity reported in diagnostics; `errnorm` is what the
        controller acts on. They coincide unless the RMS norm is selected, which
@@ -276,8 +286,9 @@ void evolver_erk_run(EvolverDerivs derivs,
       else {
         double fac = cfg.safety * pow(rtol / errnorm, pow_grow);
         fac        = std::max(cfg.fac_min, std::min(fac, 1.0));
-        if (!nofailed)
+        if (!nofailed) {
           fac = std::min(fac, 0.5); /* repeated failures: force a real cut */
+        }
         nofailed = false;
         hnew     = tdir * std::max(hmin, fabs(h) * fac);
       }
@@ -288,8 +299,9 @@ void evolver_erk_run(EvolverDerivs derivs,
     erk_detail::Record(&counters.steps_accepted, histograms, true, t, errnorm / rtol);
 
     if (!Tab::kFsal) {
-      for (int k = 0; k < neq; k++)
+      for (int k = 0; k < neq; k++) {
         ytemp[k] = ynew[k];
+      }
       (*derivs)(t + h,
                 ytemp.data(),
                 ki.data() + idx_end * neq,
@@ -297,11 +309,12 @@ void evolver_erk_run(EvolverDerivs derivs,
       ++counters.derivs_evaluations;
     }
 
-    if (print_variables != nullptr)
+    if (print_variables != nullptr) {
       (*print_variables)(t + h,
                          ynew.data(),
                          ki.data() + idx_end * neq,
                          parameters_and_workspace_for_derivs);
+    }
 
     if (clamped) {
       /* keep the controller's own proposal; this step's length was imposed */
@@ -315,18 +328,21 @@ void evolver_erk_run(EvolverDerivs derivs,
     else {
       const double ratio = errnorm / rtol;
       double fac;
-      if (cfg.kind == ErkControllerKind::pi && ratio > 0.0)
+      if (cfg.kind == ErkControllerKind::pi && ratio > 0.0) {
         fac = cfg.safety * pow(ratio, -alpha_pi) * pow(ratio_old, cfg.pi_beta);
-      else
+      }
+      else {
         fac = cfg.safety * pow(rtol / errnorm, pow_grow);
+      }
       fac = std::max(cfg.fac_min, std::min(fac, cfg.fac_max));
       /* Never grow immediately after a rejection: the step that just failed is
          evidence that the local scale shrank. Measured on LCDM + Mnu this is
          worth little on its own -- with the growth cap it moves the rejection
          rate only from 13.3% to 12.1% -- so it is the PI memory term above, not
          this, that takes rejections down to ~6%. */
-      if (!nofailed)
+      if (!nofailed) {
         fac = std::min(fac, 1.0);
+      }
       hnew      = tdir * std::max(hmin, fabs(h) * fac);
       ratio_old = std::max(ratio, 1e-4);
     }
@@ -357,14 +373,18 @@ void evolver_erk_run(EvolverDerivs derivs,
            previous rkdp45 output bit for bit. */
         thpow[0] = 1.0;
         thpow[1] = th;
-        if (deg >= 2)
+        if (deg >= 2) {
           thpow[2] = th * th;
-        if (deg >= 3)
+        }
+        if (deg >= 3) {
           thpow[3] = thpow[2] * th;
-        if (deg >= 4)
+        }
+        if (deg >= 4) {
           thpow[4] = thpow[2] * thpow[2];
-        for (int m = 5; m <= deg; m++)
+        }
+        for (int m = 5; m <= deg; m++) {
           thpow[m] = thpow[m - 1] * th;
+        }
         for (int i = 0; i < s; i++) {
           double vy = 0.0;
           double vd = 0.0;

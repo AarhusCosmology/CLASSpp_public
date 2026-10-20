@@ -103,8 +103,9 @@ static void FillNcdmLayout(NCDMBaseSpecies::PerturbLayout& l, int q_size, int l_
   l.q_size = q_size;
   l.l_max  = l_max;
   l.index_per_q.clear();
-  for (int iq = 0; iq < q_size; ++iq)
+  for (int iq = 0; iq < q_size; ++iq) {
     l.index_per_q.push_back(idx0 + iq * (l_max + 1));
+  }
 }
 static double Marker(int child, int iq, int l) {
   return 1. + 1e4 * child + 100. * iq + l;
@@ -191,15 +192,18 @@ int main() {
     auto& parent = comp->parent();
     auto& ferm   = comp->fermion();
     auto& bos    = comp->boson();
-    for (int i = 0; i < parent.q_size(); ++i)
+    for (int i = 0; i < parent.q_size(); ++i) {
       // The parent's f-slot is an INTEGRATION variable and carries kFScale (see
       // DNCDMSpecies::kFScale); the published ln f column does not.
       bi[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * 0.5 /
                                            (1. + parent.GetQ()[i] * parent.GetQ()[i]);
-    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i) {
       bi[ferm.bi_f_index() + i] = 0.3 / (1. + ferm.q_bg()[i]);
-    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i) {
       bi[bos.bi_f_index() + i] = 0.2 / (1. + bos.q_bg()[i]);
+    }
 
     const double a = 1e-3;
     comp->ComputeBackground(a, bi.data(), bg.data());
@@ -235,12 +239,15 @@ int main() {
       s = s * 1664525u + 1013904223u;
       return 0.1 + 0.9 * (((s >> 8) & 0xffffu) / 65535.0);
     };
-    for (int i = 0; i < parent.q_size(); ++i)
+    for (int i = 0; i < parent.q_size(); ++i) {
       y[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * rnd();
-    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i) {
       y[ferm.bi_f_index() + i] = rnd();
-    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i) {
       y[bos.bi_f_index() + i] = rnd();
+    }
 
     const double a = 1e-3;
     comp->ApplyKernelBackgroundDerivs(a, y.data(), dy.data());
@@ -311,15 +318,18 @@ int main() {
     auto& parent = comp->parent();
     auto& ferm   = comp->fermion();
     auto& bos    = comp->boson();
-    for (int i = 0; i < parent.q_size(); ++i)
+    for (int i = 0; i < parent.q_size(); ++i) {
       // The parent's f-slot is an INTEGRATION variable and carries kFScale (see
       // DNCDMSpecies::kFScale); the published ln f column does not.
       bi[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * 0.5 /
                                            (1. + parent.GetQ()[i] * parent.GetQ()[i]);
-    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i) {
       bi[ferm.bi_f_index() + i] = 0.3 / (1. + ferm.q_bg()[i]);
-    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i) {
       bi[bos.bi_f_index() + i] = 0.2 / (1. + bos.q_bg()[i]);
+    }
     comp->ComputeBackground(1.0, bi.data(), bg.data());  // a = 1 (today)
 
     const double combined = (parent.Rho(bg.data()) + ferm.Rho(bg.data()) + bos.Rho(bg.data())) /
@@ -376,21 +386,28 @@ int main() {
     std::vector<double> new_y(total, 0.);
     const NCDMBaseSpecies::PerturbLayout* olay[3] = {&oP, &oF, &oB};
     const int qn[3]                               = {qp, qf, qb};
-    for (int c = 0; c < 3; ++c)
-      for (int iq = 0; iq < qn[c]; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+    for (int c = 0; c < 3; ++c) {
+      for (int iq = 0; iq < qn[c]; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           old_y[olay[c]->index_per_q[iq] + l] = Marker(c, iq, l);
+        }
+      }
+    }
 
     const PerturbSwitchContext sctx{};
     comp->CopyPerturbationsAcrossSwitch(old_l, new_l, old_y.data(), new_y.data(), sctx);
 
     const NCDMBaseSpecies::PerturbLayout* nlay[3] = {&nP, &nF, &nB};
-    for (int c = 0; c < 3; ++c)
-      for (int iq = 0; iq < qn[c]; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+    for (int c = 0; c < 3; ++c) {
+      for (int iq = 0; iq < qn[c]; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           assert(new_y[nlay[c]->index_per_q[iq] + l] == Marker(c, iq, l));
-    for (int i = 0; i < 3; ++i)
+        }
+      }
+    }
+    for (int i = 0; i < 3; ++i) {
       assert(new_y[i] == 0.);  // lead-in untouched
+    }
   }
 
   // ── Perturbation coupling: decay-only cancellation (design §4.3) ─────────────
@@ -427,12 +444,15 @@ int main() {
       // Layouts are PT-sized; the background columns stay BG-sized (filled in full).
       const int qf = ferm.q_size();
       const int qb = bos.q_size();
-      for (int i = 0; i < qp; ++i)
+      for (int i = 0; i < qp; ++i) {
         bg[parent.bg_lnf_index() + i] = std::log(0.5 / (1. + parent.GetQ()[i] * parent.GetQ()[i]));
-      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j)
+      }
+      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j) {
         bg[ferm.bg_f_index() + j] = 0.3 / (1. + ferm.q_bg()[j]);
-      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k)
+      }
+      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k) {
         bg[bos.bg_f_index() + k] = 0.2 / (1. + bos.q_bg()[k]);
+      }
 
       const int l_max = 4;
       auto base       = comp->CreatePerturbLayout();
@@ -455,15 +475,21 @@ int main() {
         s = s * 1664525u + 1013904223u;
         return -1.0 + 2.0 * (((s >> 9) & 0xffffu) / 65535.0);
       };
-      for (int iq = 0; iq < qp; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+      for (int iq = 0; iq < qp; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           y[pL.index_per_q[iq] + l] = rnd();
-      for (int iq = 0; iq < qf; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+        }
+      }
+      for (int iq = 0; iq < qf; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           y[fL.index_per_q[iq] + l] = rnd();
-      for (int iq = 0; iq < qb; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+        }
+      }
+      for (int iq = 0; iq < qb; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           y[bL.index_per_q[iq] + l] = rnd();
+        }
+      }
 
       const double a = 1e-3;
       // Per-k scratch: the composite's perturbation kernel and gather buffers now
@@ -495,12 +521,16 @@ int main() {
                                           std::fabs(pt_rate - bg_rate) / Scale(pt_rate, bg_rate));
         }
       }
-      for (int iq = 0; iq < qf; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+      for (int iq = 0; iq < qf; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           max_daughter = std::max(max_daughter, std::fabs(dy[fL.index_per_q[iq] + l]));
-      for (int iq = 0; iq < qb; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+        }
+      }
+      for (int iq = 0; iq < qb; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           max_daughter = std::max(max_daughter, std::fabs(dy[bL.index_per_q[iq] + l]));
+        }
+      }
       std::printf(
           "  decay-only, parent Psi invariant (refine=%d): max|dF_H/F_H - fdot/f|=%.3e "
           "max|daughter dy|=%.3e\n",
@@ -537,12 +567,15 @@ int main() {
       const int qp = parent.q_size();
       const int qf = ferm.q_size();
       const int qb = bos.q_size();
-      for (int i = 0; i < qp; ++i)
+      for (int i = 0; i < qp; ++i) {
         bg[parent.bg_lnf_index() + i] = std::log(0.5 / (1. + parent.GetQ()[i] * parent.GetQ()[i]));
-      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j)
+      }
+      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j) {
         bg[ferm.bg_f_index() + j] = 0.3 / (1. + ferm.q_bg()[j]);
-      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k)
+      }
+      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k) {
         bg[bos.bg_f_index() + k] = 0.2 / (1. + bos.q_bg()[k]);
+      }
 
       const int l_max = 4;
       auto base       = comp->CreatePerturbLayout();
@@ -565,15 +598,21 @@ int main() {
         s = s * 1664525u + 1013904223u;
         return -1.0 + 2.0 * (((s >> 9) & 0xffffu) / 65535.0);
       };
-      for (int iq = 0; iq < qp; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+      for (int iq = 0; iq < qp; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           y[pL.index_per_q[iq] + l] = rnd();
-      for (int iq = 0; iq < qf; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+        }
+      }
+      for (int iq = 0; iq < qf; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           y[fL.index_per_q[iq] + l] = rnd();
-      for (int iq = 0; iq < qb; ++iq)
-        for (int l = 0; l <= l_max; ++l)
+        }
+      }
+      for (int iq = 0; iq < qb; ++iq) {
+        for (int l = 0; l <= l_max; ++l) {
           y[bL.index_per_q[iq] + l] = rnd();
+        }
+      }
 
       const double a = 1e-3;
       // Per-k scratch: the composite's perturbation kernel and gather buffers now
@@ -686,12 +725,15 @@ int main() {
       const int qp = parent.q_size();
       const int qf = ferm.q_size();
       const int qb = bos.q_size();
-      for (int i = 0; i < qp; ++i)
+      for (int i = 0; i < qp; ++i) {
         bg[parent.bg_lnf_index() + i] = std::log(0.5 / (1. + parent.GetQ()[i] * parent.GetQ()[i]));
-      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j)
+      }
+      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j) {
         bg[ferm.bg_f_index() + j] = 0.3 / (1. + ferm.q_bg()[j]);
-      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k)
+      }
+      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k) {
         bg[bos.bg_f_index() + k] = 0.2 / (1. + bos.q_bg()[k]);
+      }
 
       const int l_max     = 4;
       const int l_max_col = 2;
@@ -724,8 +766,9 @@ int main() {
       {
         const double kappa = comp->KappaStoredToBare();
         std::vector<double> fH(qp);
-        for (int i = 0; i < qp; ++i)
+        for (int i = 0; i < qp; ++i) {
           fH[i] = kappa * std::exp(bg[parent.bg_lnf_index() + i]);
+        }
         scratch.kernel_pt->PrepareTransitions(a,
                                               parent.GetMass(),
                                               parent.Gamma(),
@@ -742,12 +785,15 @@ int main() {
       double magH = 0.;
       double magl = 0.;
       double magb = 0.;
-      for (int i = 0; i < qp; ++i)
+      for (int i = 0; i < qp; ++i) {
         magH = std::max(magH, std::fabs(refH[i]));
-      for (int j = 0; j < qf; ++j)
+      }
+      for (int j = 0; j < qf; ++j) {
         magl = std::max(magl, std::fabs(refl[j]));
-      for (int k = 0; k < qb; ++k)
+      }
+      for (int k = 0; k < qb; ++k) {
         magb = std::max(magb, std::fabs(refb[k]));
+      }
       assert(magH > 0.);
       assert(magl > 0.);
       assert(magb > 0.);
@@ -800,12 +846,14 @@ int main() {
       // the only doubling the contract actually promises.
       const std::vector<double> once = diag;
       comp->ApplyKernelPerturbDiagonal(a, l_max_col, bg.data(), pL, fL, bL, diag.data(), scratch);
-      for (int c = 0; c < 3; ++c)
-        for (int iq = 0; iq < qn[c]; ++iq)
+      for (int c = 0; c < 3; ++c) {
+        for (int iq = 0; iq < qn[c]; ++iq) {
           for (int l = 0; l <= l_max; ++l) {
             const int idx = lay[c]->index_per_q[iq] + l;
             assert(diag[idx] == (l <= l_max_col ? 2. * once[idx] : 0.));
           }
+        }
+      }
     }
   }  // refine loop
 
@@ -849,12 +897,15 @@ int main() {
       s = s * 1664525u + 1013904223u;
       return 0.1 + 0.9 * (((s >> 8) & 0xffffu) / 65535.0);
     };
-    for (int i = 0; i < parent.q_size(); ++i)
+    for (int i = 0; i < parent.q_size(); ++i) {
       y[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * rnd();
-    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i) {
       y[ferm.bi_f_index() + i] = rnd();
-    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i) {
       y[bos.bi_f_index() + i] = rnd();
+    }
 
     const double a = 1e-3;
     comp->ApplyKernelBackgroundDerivs(a, y.data(), dy.data());

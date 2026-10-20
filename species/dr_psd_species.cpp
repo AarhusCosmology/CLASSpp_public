@@ -156,10 +156,12 @@ DrPsdSpecies::DrPsdSpecies(FileContent* pfc,
     }
   }
 
-  if (q_sampling_ == QSampling::Linear)
+  if (q_sampling_ == QSampling::Linear) {
     BuildLinearTrapezoidGrids();
-  else
+  }
+  else {
     BuildLogTrapezoidGrids();
+  }
 }
 
 void DrPsdSpecies::PinTemperature(double T) {
@@ -175,10 +177,12 @@ void DrPsdSpecies::SetSpeciesMultiplicity(int n) {
 Statistics DrPsdSpecies::ParseStatistics(FileContent* pfc, const std::string& instance_name) {
   SpeciesInput input(pfc, instance_name);
   const std::string s = input.get_or<std::string>("statistics", "fermion");
-  if (s == "fermion")
+  if (s == "fermion") {
     return Statistics::Fermion;
-  if (s == "boson")
+  }
+  if (s == "boson") {
     return Statistics::Boson;
+  }
   class_stop_severe("species '%s': statistics must be 'fermion' or 'boson' (got '%s')",
                     instance_name.c_str(),
                     s.c_str());
@@ -211,8 +215,9 @@ void DrPsdSpecies::BuildLogTrapezoidGrids() {
   const double h = std::log(q_max_bg_ / q_min_bg_) / (N - 1);
   q_bg_.resize(N);
   dq_bg_.resize(N);
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     q_bg_[i] = q_min_bg_ * std::exp(i * h);
+  }
   // Log-trapezoid cell widths (dq = q du), half-weight endpoints (thesis §3).
   for (int i = 0; i < N; ++i) {
     const double wq = (i == 0 || i == N - 1) ? 0.5 : 1.0;
@@ -280,8 +285,9 @@ void DrPsdSpecies::BuildLinearTrapezoidGrids() {
 
 double DrPsdSpecies::ThermalF0(double q) const {
   const double x = q - ksi_;
-  if (stat_ == Statistics::Fermion)
+  if (stat_ == Statistics::Fermion) {
     return 1.0 / (std::exp(x) + 1.0);
+  }
   // Bose: regular as long as x > 0 (ksi < q_min); clamp defensively.
   const double denom = std::expm1(x);
   return (denom > kFFloor) ? 1.0 / denom : 1.0 / kFFloor;
@@ -322,8 +328,9 @@ void DrPsdSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
 }
 
 double DrPsdSpecies::InitialRadiationOmega0(double H0) const {
-  if (f_ini_ <= 0.)
+  if (f_ini_ <= 0.) {
     return 0.;
+  }
   // ComputeMomenta's sum at a = 1 with epsilon = q (massless), on the seeded occupation.
   double sum = 0.;
   for (int i = 0; i < N_q_bg_; ++i) {
@@ -358,8 +365,9 @@ void DrPsdSpecies::ComputeBackground(double a, const double* pvecback_B, double*
       // state negative. Reporting only "a negative occurred" cannot tell those apart,
       // and the difference is the whole positivity question (see LumpTheta).
       double peak = 0.;
-      for (int j = 0; j < N; ++j)
+      for (int j = 0; j < N; ++j) {
         peak = std::max(peak, pvecback_B[index_bi_f_ + j]);
+      }
       const double rel = (peak > 0.) ? -f_raw / peak : 0.;
       if (rel > worst_negative_rel_) {
         worst_negative_rel_ = rel;
@@ -402,8 +410,9 @@ void DrPsdSpecies::ComputeBackground(double a, const double* pvecback_B, double*
   // section below) — ∂lnf̄/∂lnq is exactly such a normalized quantity.
   array_spline_table_lines(lnq.data(), N, f_df.data(), 1, ddf.data(), _SPLINE_EST_DERIV_);
   array_derive_spline(lnq.data(), N, f_df.data(), ddf.data(), 1, 0, N);
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     pvecback[index_bg_dfdlnq_ + i] = f_df[N + i];
+  }
 
   double number;
   double rho;
@@ -421,8 +430,9 @@ void DrPsdSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const 
   w.Add("(.)number_dr_" + nm, 0.);
   w.Add("(.)rho_dr_" + nm, 0.);
   w.Add("(.)p_dr_" + nm, 0.);
-  for (int i = 0; i < N_q_bg_; ++i)
+  for (int i = 0; i < N_q_bg_; ++i) {
     w.Add("f_dr_" + nm + "[" + std::to_string(i) + "]", 0.);
+  }
 }
 
 void DrPsdSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
@@ -430,8 +440,9 @@ void DrPsdSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnW
   w.Add("(.)number_dr_" + nm, Number(pvecback));
   w.Add("(.)rho_dr_" + nm, Rho(pvecback));
   w.Add("(.)p_dr_" + nm, P(pvecback));
-  for (int i = 0; i < N_q_bg_; ++i)
+  for (int i = 0; i < N_q_bg_; ++i) {
     w.Add("f_dr_" + nm + "[" + std::to_string(i) + "]", pvecback[index_bg_f_ + i]);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -471,23 +482,27 @@ void DrPsdSpecies::ReducedDriver(const double* pvecback, double* D) const {
   // BACKGROUND grid through bg_index, exactly as the q-resolved path does -- the exact
   // integer subsample guarantees the mapped column is the value AT q_[iq].
   const int nq = q_size();
-  for (int j = 0; j < reduced_moments_; ++j)
+  for (int j = 0; j < reduced_moments_; ++j) {
     D[j] = 0.;
+  }
   for (int iq = 0; iq < nq; ++iq) {
     const double base = dq_[iq] * q_[iq] * q_[iq] * pvecback[index_bg_dfdlnq_ + bg_index(iq)];
-    for (int j = 0; j < reduced_moments_; ++j)
+    for (int j = 0; j < reduced_moments_; ++j) {
       D[j] += base * red_psi_[static_cast<size_t>(j) * nq + iq];
+    }
   }
 }
 
 void DrPsdSpecies::ReducedProject(const double* fq, double* m) const {
   const int nq = q_size();
-  for (int j = 0; j < reduced_moments_; ++j)
+  for (int j = 0; j < reduced_moments_; ++j) {
     m[j] = 0.;
+  }
   for (int iq = 0; iq < nq; ++iq) {
     const double base = dq_[iq] * q_[iq] * q_[iq] * fq[iq];
-    for (int j = 0; j < reduced_moments_; ++j)
+    for (int j = 0; j < reduced_moments_; ++j) {
       m[j] += base * red_psi_[static_cast<size_t>(j) * nq + iq];
+    }
   }
 }
 
@@ -508,8 +523,9 @@ void DrPsdSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
 
   layout.index_per_q.clear();
   layout.index_per_q.reserve(layout.q_size);
-  for (int iq = 0; iq < layout.q_size; ++iq)
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     layout.index_per_q.push_back(index_pt + iq * (layout.l_max + 1));
+  }
 
   index_pt += layout.total_size();
 }
@@ -520,8 +536,9 @@ void DrPsdSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                  double* dy,
                                  const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
 
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -550,9 +567,10 @@ void DrPsdSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
       dy[idx + 1]   = k / 3. * (y[idx] - 2. * s_l[2] * y[idx + 2]) - metric_euler / (3. * k) * D[j];
       dy[idx + 2]   = k / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
                       s_l[2] * metric_shear * 2. / 15. * D[j];
-      for (int l = 3; l < lmax; ++l)
+      for (int l = 3; l < lmax; ++l) {
         dy[idx + l] = k / (2. * l + 1.) *
                       (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
+      }
       dy[idx + lmax] = k * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
     }
     return;
@@ -576,9 +594,10 @@ void DrPsdSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                   epsilon * metric_euler / (3. * q * k) * df0_dlnq;
     dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
                   s_l[2] * metric_shear * 2. / 15. * df0_dlnq;
-    for (int l = 3; l < lmax; ++l)
+    for (int l = 3; l < lmax; ++l) {
       dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                     (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
+    }
     dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
   }
 }
@@ -587,8 +606,9 @@ void DrPsdSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
                                           double* y,
                                           const PerturbIcContext& ctx) {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
 
   // F = f̄·Ψ_adiabatic, which the ∂f̄/∂lnq driver already carries — the standard
   // adiabatic seed with ∂lnf̄/∂lnq swapped for ∂f̄/∂lnq. No empty-bin special case is
@@ -606,12 +626,15 @@ void DrPsdSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
       const int idx  = layout.index_per_q[j];
       const int lmax = layout.l_max;
       y[idx + 0]     = -0.25 * ctx.delta_ur * D[j];
-      if (lmax >= 1)
+      if (lmax >= 1) {
         y[idx + 1] = -1. / 3. / ctx.k * ctx.theta_ur * D[j];
-      if (lmax >= 2)
+      }
+      if (lmax >= 2) {
         y[idx + 2] = -0.5 * ctx.shear_ur * D[j];
-      if (lmax >= 3)
+      }
+      if (lmax >= 3) {
         y[idx + 3] = -0.25 * ctx.l3_ur * D[j];
+      }
     }
     return;
   }
@@ -626,12 +649,15 @@ void DrPsdSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
     const double df0_dlnq = pvecback[index_bg_dfdlnq_ + bg_index(index_q)];  // ∂f̄/∂lnq
 
     y[idx + 0] = -0.25 * ctx.delta_ur * df0_dlnq;
-    if (lmax >= 1)
+    if (lmax >= 1) {
       y[idx + 1] = -epsilon / 3. / q / ctx.k * ctx.theta_ur * df0_dlnq;
-    if (lmax >= 2)
+    }
+    if (lmax >= 2) {
       y[idx + 2] = -0.5 * ctx.shear_ur * df0_dlnq;
-    if (lmax >= 3)
+    }
+    if (lmax >= 3) {
       y[idx + 3] = -0.25 * ctx.l3_ur * df0_dlnq;
+    }
   }
 }
 
@@ -645,8 +671,9 @@ BaseSpecies::StressEnergyContribution DrPsdSpecies::StressEnergy(
   StressEnergyContribution se;
   se.rho = pvecback[index_bg_rho_];
   se.p   = pvecback[index_bg_p_];
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return se;
+  }
 
   const double k  = ppw->scalar_ctx.k;
   const double a2 = ppw->scalar_ctx.a2;
@@ -698,10 +725,12 @@ void DrPsdSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                                const double* y,
                                const double* /*dy*/,
                                PerturbSourceContext& ctx) const {
-  if (ctx.index_md != ctx.p_mod->index_md_scalars_)
+  if (ctx.index_md != ctx.p_mod->index_md_scalars_) {
     return;
-  if (index_tp_delta_ < 0 && index_tp_theta_ < 0)
+  }
+  if (index_tp_delta_ < 0 && index_tp_theta_ < 0) {
     return;
+  }
 
   const auto& layout     = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
   const double* pvecback = ctx.ppw->pvecback.data();
@@ -757,11 +786,14 @@ void DrPsdSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                       const PerturbationsModule& mod,
                                       file_format fmt,
                                       BaseSpecies::TransferColumnSection section) const {
-  if (fmt != file_format::class_format)
+  if (fmt != file_format::class_format) {
     return;
+  }
   const perturbs* ppt = mod.GetPerturbs();
-  if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+  if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
     w.Add("d_dr_" + ColumnLabel(), index_tp_delta_, index_tp_delta_ >= 0);
-  if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+  }
+  if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
     w.Add("t_dr_" + ColumnLabel(), index_tp_theta_, index_tp_theta_ >= 0);
+  }
 }

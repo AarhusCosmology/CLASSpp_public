@@ -46,8 +46,10 @@ std::string FormatThrowMessage(
 
 int get_number_of_titles(const std::string& titlestring) {
   int number_of_titles = 0;
-  for (char c : titlestring)
-    if (c == '\t')
+  for (char c : titlestring) {
+    if (c == '\t') {
       number_of_titles++;
+    }
+  }
   return number_of_titles;
 }

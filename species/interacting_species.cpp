@@ -84,8 +84,9 @@ void IDM_DRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayo
                                                   const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
   new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }
@@ -110,8 +111,9 @@ void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   layout.l_max     = -1;
 
   /* RSA active: IDR handled analytically, nothing to integrate. */
-  if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on))
+  if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on)) {
     return;
+  }
 
   layout.idx_delta = index_pt;
   ++index_pt;
@@ -149,8 +151,9 @@ void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
 
   /* RSA active (idx_delta < 0): IDR handled analytically. */
-  if (layout.idx_delta < 0)
+  if (layout.idx_delta < 0) {
     return;
+  }
 
   const double* s_l    = ppw->s_l.data();
   const double k       = ctx.k;
@@ -183,10 +186,11 @@ void IDRSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                     (l + 1.) * s_l[l + 1] * y[idx_l3 + 1]);
 
       // idr l>3
-      for (l = 4; l < l_max; l++)
+      for (l = 4; l < l_max; l++) {
         dy[idx_delta + l] = k / (2. * l + 1) *
                             (l * s_l[l] * y[idx_delta + l - 1] -
                              (l + 1.) * s_l[l + 1] * y[idx_delta + l + 1]);
+      }
 
       // idr lmax
       l                 = l_max;
@@ -261,8 +265,9 @@ void IDRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout&
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
 
   /* Guard: only copy if both layouts have slots (rsa_idr must be off in both). */
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
 
   /* delta and theta are always present when rsa_idr is off. */
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
@@ -275,8 +280,9 @@ void IDRSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout&
   }
   if (old_l.idx_l3 >= 0 && new_l.idx_l3 >= 0 && old_l.l_max >= 3 && new_l.l_max >= 3) {
     new_y[new_l.idx_l3] = old_y[old_l.idx_l3];
-    for (int l = 4; l <= new_l.l_max; ++l)
+    for (int l = 4; l <= new_l.l_max; ++l) {
       new_y[new_l.idx_delta + l] = old_y[old_l.idx_delta + l];
+    }
   }
 }
 
@@ -292,16 +298,21 @@ double IDRSpecies::TcaShearIdr(const PerturbLayout& layout,
   // during the tca_on -> tca_off transition (after the approx flag has flipped
   // but with the old layout still pointing at the old slot set), and we need
   // the last TCA prediction to seed the new shear_idr integration.
-  if (ppw->scalar_ctx.idr_nature != idr_free_streaming)
+  if (ppw->scalar_ctx.idr_nature != idr_free_streaming) {
     return 0.;
-  if (layout.idx_shear >= 0)
+  }
+  if (layout.idx_shear >= 0) {
     return 0.;
-  if (ppw->approx[ppw->index_ap_rsa_idr] != static_cast<int>(rsa_idr_off))
+  }
+  if (ppw->approx[ppw->index_ap_rsa_idr] != static_cast<int>(rsa_idr_off)) {
     return 0.;
-  if (!has_sibling_idm_dr_)
+  }
+  if (!has_sibling_idm_dr_) {
     return 0.;
-  if (ppt_->gauge != possible_gauges::newtonian)
+  }
+  if (ppt_->gauge != possible_gauges::newtonian) {
     return 0.;  // synchronous gauge derives shear in perturb_einstein
+  }
 
   return 0.5 * (8. / 15. / ppw->pvecthermo[thm_->index_th_dmu_idm_dr_] / alpha_idm_dr_[0] *
                 y[layout.idx_theta]);
@@ -379,8 +390,9 @@ void IDM_DRMDSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLa
                                                     const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
   new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }
@@ -465,8 +477,9 @@ void IDR_DRMDSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLa
                                                     const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
   new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }

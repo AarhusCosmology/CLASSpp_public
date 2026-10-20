@@ -66,8 +66,9 @@ void test_order_asymptote() {
 
 void test_flat_cot_is_reciprocal_order() {
   const double L = limber_closure::Order(17);
-  for (double k : {1.e-4, 1.e-2, 0.1, 1., 10.})
+  for (double k : {1.e-4, 1.e-2, 0.1, 1., 10.}) {
     assert(limber_closure::Cot(L, k, 0.) == 1. / L);
+  }
 }
 
 /* Independent evaluation: solve the curved-Limber turning point the way
@@ -119,8 +120,9 @@ void test_curvature_sign_and_continuity() {
   assert(limber_closure::Cot(L, k, 1.e-6) < flat);
   assert(limber_closure::Cot(L, k, -1.e-6) > flat);
 
-  for (double K : {1.e-14, -1.e-14})
+  for (double K : {1.e-14, -1.e-14}) {
     assert(std::abs(limber_closure::Cot(L, k, K) - flat) / flat < 1.e-9);
+  }
 }
 
 /* In a closed universe a mode carries no multipole above nu = q/sqrt(K): the

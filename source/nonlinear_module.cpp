@@ -163,8 +163,9 @@ void NonlinearModule::nonlinear_pk_at_z(
 
   /** - check whether we need the decomposition into contributions from each initial condition */
 
-  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
+  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr)) {
     do_ic = true;
+  }
 
   /** - case z=0 requiring no interpolation in z */
   if (z == 0) {
@@ -426,8 +427,9 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 
   /** - preliminary: check whether we need the decomposition into contributions from each initial condition */
 
-  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
+  if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr)) {
     do_ic = true;
+  }
 
   /** - first step: check that k is in valid range [0:kmax]
       (the test for z will be done when calling nonlinear_pk_linear_at_z()) */
@@ -722,22 +724,26 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
 
   /** - Construct ln(kvec): */
 
-  for (index_kvec = 0; index_kvec < kvec_size; index_kvec++)
+  for (index_kvec = 0; index_kvec < kvec_size; index_kvec++) {
     ln_kvec[index_kvec] = log(kvec[index_kvec]);
+  }
 
   /** - Loop over first k values. If k<kmin, fill output with zeros. If not, go to next step. */
 
   for (index_kvec = 0; index_kvec < kvec_size; index_kvec++) {
     /* check whether one should go to next step */
-    if (ln_kvec[index_kvec] >= ln_k_[0])
+    if (ln_kvec[index_kvec] >= ln_k_[0]) {
       break;
+    }
 
     /* deal with k<k_min */
     for (int index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
-      if (has_pk_m_)
+      if (has_pk_m_) {
         out_pk[index_zvec * kvec_size + index_kvec] = 0.;
-      if (has_pk_cb_)
+      }
+      if (has_pk_cb_) {
         out_pk_cb[index_zvec * kvec_size + index_kvec] = 0.;
+      }
       /* (If needed, one could add instead some extrapolation here) */
     }
   }
@@ -781,10 +787,12 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
 
   while (index_kvec < kvec_size) {
     for (int index_zvec = 0; index_zvec < zvec_size; index_zvec++) {
-      if (has_pk_m_)
+      if (has_pk_m_) {
         out_pk[index_zvec * kvec_size + index_kvec] = 0.;
-      if (has_pk_cb_)
+      }
+      if (has_pk_cb_) {
         out_pk_cb[index_zvec * kvec_size + index_kvec] = 0.;
+      }
       /* (If needed, one could add instead some extrapolation here) */
     }
     index_kvec++;
@@ -1071,13 +1079,15 @@ void NonlinearModule::nonlinear_init() {
 
   /** --> Nothing to be done if we don't want the matter power spectrum */
   if ((!has_pk_matter_) && (pnl->method == nl_none)) {
-    if (pnl->nonlinear_verbose > 0)
+    if (pnl->nonlinear_verbose > 0) {
       printf("No Fourier spectra nor nonlinear corrections requested. Nonlinear module skipped.\n");
+    }
     return;
   }
   else {
-    if (pnl->nonlinear_verbose > 0)
+    if (pnl->nonlinear_verbose > 0) {
       printf("Computing linear Fourier spectra.\n");
+    }
   }
 
   if (pnl->has_pk_eq) {
@@ -1094,8 +1104,9 @@ void NonlinearModule::nonlinear_init() {
 
   /** --> check applicability of Halofit and HMcode */
   if (pnl->method > nl_none) {
-    for (auto& sp : all_species_)
+    for (auto& sp : all_species_) {
       sp->WarnIfTooHeavyForHalofit(_M_EV_TOO_BIG_FOR_HALOFIT_);
+    }
     if (all_species_.count("IDM_DR_IDR") &&
         static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
       fprintf(stdout,
@@ -1168,17 +1179,19 @@ void NonlinearModule::nonlinear_init() {
   }
 
   if (pnl->nonlinear_verbose > 0) {
-    if (has_pk_m_)
+    if (has_pk_m_) {
       fprintf(stdout,
               " -> sigma8=%g for total matter (computed till k = %g h/Mpc)\n",
               sigma8_[index_pk_m_],
               k_[k_size_ - 1] / pba->h);
+    }
 
-    if (has_pk_cb_)
+    if (has_pk_cb_) {
       fprintf(stdout,
               " -> sigma8=%g for baryons+cdm  (computed till k = %g h/Mpc)\n",
               sigma8_[index_pk_cb_],
               k_[k_size_ - 1] / pba->h);
+    }
   }
 
   /** - get the non-linear power spectrum at each time */
@@ -1186,19 +1199,22 @@ void NonlinearModule::nonlinear_init() {
   /** --> First deal with the case where non non-linear corrections requested */
 
   if (pnl->method == nl_none) {
-    if (pnl->nonlinear_verbose > 0)
+    if (pnl->nonlinear_verbose > 0) {
       printf("No non-linear spectra requested. Nonlinear calculations skipped.\n");
+    }
   }
 
   /** --> Then go through common preliminary steps to the HALOFIT and HMcode methods */
   else if ((pnl->method == nl_halofit) || ((pnl->method == nl_HMcode))) {
-    if ((pnl->nonlinear_verbose > 0) && (pnl->method == nl_halofit))
+    if ((pnl->nonlinear_verbose > 0) && (pnl->method == nl_halofit)) {
       printf(
           "Computing non-linear matter power spectrum with Halofit (including update Takahashi et "
           "al. 2012 and Bird 2014)\n");
+    }
 
-    if ((pnl->nonlinear_verbose > 0) && (pnl->method == nl_HMcode))
+    if ((pnl->nonlinear_verbose > 0) && (pnl->method == nl_HMcode)) {
       printf("Computing non-linear matter power spectrum with HMcode \n");
+    }
 
     /** --> allocate temporary arrays for spectra at each given time/redshift */
 
@@ -1404,9 +1420,10 @@ void NonlinearModule::nonlinear_indices() {
   ic_size_          = primordial_module_->ic_size_[index_md_scalars_];
   ic_ic_size_       = primordial_module_->ic_ic_size_[index_md_scalars_];
   is_non_zero_.resize(ic_ic_size_);
-  for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++)
+  for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_; index_ic1_ic2++) {
     is_non_zero_[index_ic1_ic2] =
         primordial_module_->is_non_zero_[index_md_scalars_][index_ic1_ic2];
+  }
 
   /** - define flags indices for pk types (_m, _cb). Note: due to some
      dependencies in HMcode, when index_pk_cb_ exists, it must
@@ -1486,15 +1503,17 @@ void NonlinearModule::nonlinear_indices() {
     nl_corr_density_.resize(pk_size_);
 
     ln_pk_nl_.resize(pk_size_);
-    if (ln_tau_size_ > 1)
+    if (ln_tau_size_ > 1) {
       ddln_pk_nl_.resize(pk_size_);
+    }
 
     for (index_pk = 0; index_pk < pk_size_; index_pk++) {
       k_nl_[index_pk].resize(tau_size_);
       nl_corr_density_[index_pk].resize(tau_size_ * k_size_);
       ln_pk_nl_[index_pk].resize(ln_tau_size_ * k_size_);
-      if (ln_tau_size_ > 1)
+      if (ln_tau_size_ > 1) {
         ddln_pk_nl_[index_pk].resize(ln_tau_size_ * k_size_);
+      }
     }
   }
 }
@@ -2009,16 +2028,19 @@ void NonlinearModule::nonlinear_sigmas(double R,
     }
 
     t = 1. / (1. + k);
-    if (i == (integrand_size - 1))
+    if (i == (integrand_size - 1)) {
       k *= 0.9999999;  // to prevent rounding error leading to k being bigger than maximum value
+    }
     x = k * R;
 
     switch (sigma_output) {
       case out_sigma:
-        if (x < 0.01)
+        if (x < 0.01) {
           W = 1. - x * x / 10.;
-        else
+        }
+        else {
           W = 3. / x / x / x * (sin(x) - x * cos(x));
+        }
         array_for_sigma[(integrand_size - 1 - i) * index_num + index_x] = t;
         array_for_sigma[(integrand_size - 1 - i) * index_num + index_y] = k * k * k * pk * W * W /
                                                                           (t * (1. - t));
@@ -2040,10 +2062,12 @@ void NonlinearModule::nonlinear_sigmas(double R,
         break;
 
       case out_sigma_disp:
-        if (x < 0.01)
+        if (x < 0.01) {
           W = 1. - x * x / 10.;
-        else
+        }
+        else {
           W = 3. / x / x / x * (sin(x) - x * cos(x));
+        }
         array_for_sigma[(integrand_size - 1 - i) * index_num + index_x] = k;
         array_for_sigma[(integrand_size - 1 - i) * index_num + index_y] = -pk * W * W;
         break;
@@ -2615,10 +2639,12 @@ void NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
     x2 = k * k * R * R;
 
     integrand = pk * k * k * anorm * exp(-x2);
-    if (type == halofit_integral_two)
+    if (type == halofit_integral_two) {
       integrand *= 2. * x2;
-    if (type == halofit_integral_three)
+    }
+    if (type == halofit_integral_three) {
       integrand *= 4. * x2 * (1. - x2);
+    }
 
     integrand_array[index_k * ia_size + index_ia_sum] = integrand;
   }
@@ -2674,8 +2700,9 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
   const HMcodeVersion version = pnl->hmcode_version;
 
   /* HMcode 2020 damps the wiggles of the linear spectrum in the 2-halo term */
-  if (version != HMcodeVersion::v2016)
+  if (version != HMcodeVersion::v2016) {
     nonlinear_hmcode_nowiggle(lnpk_l[index_pk].data(), ddlnpk_l[index_pk].data(), pnw);
+  }
 
   nonlinear_hmcode_compute(version,
                            index_pk,
@@ -2688,8 +2715,9 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
                            nl_corr_not_computable_at_this_k,
                            pnw);
 
-  if ((version != HMcodeVersion::v2020_baryonic_feedback) || *nl_corr_not_computable_at_this_k)
+  if ((version != HMcodeVersion::v2020_baryonic_feedback) || *nl_corr_not_computable_at_this_k) {
     return;
+  }
 
   std::vector<double> pk_2020(k_size_);
   std::vector<double> pk_unfitted(k_size_);
@@ -2706,8 +2734,9 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
                              nl_corr_not_computable_at_this_k,
                              pnw);
   }
-  for (int index_k = 0; index_k < k_size_; index_k++)
+  for (int index_k = 0; index_k < k_size_; index_k++) {
     pk_nl[index_k] *= pk_2020[index_k] / pk_unfitted[index_k];
+  }
 }
 
 /**
@@ -3025,10 +3054,11 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
 
   /* stop calculating the nonlinear correction if the nonlinear scale is not reached in the table: */
   if (nu_min > nu_nl) {
-    if (pnl->nonlinear_verbose > 0)
+    if (pnl->nonlinear_verbose > 0) {
       fprintf(stdout,
               " -> [WARNING:] the minimum mass in the mass-table is too large to find the "
               "nonlinear scale at this redshift.\n   Decrease mmin_for_p1h_integral\n");
+    }
     *nl_corr_not_computable_at_this_k = true;
     return;
   }
@@ -3132,10 +3162,12 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
     }
   }
   if (!(feedback || unfitted)) {
-    if (fdamp < 1.e-3)
+    if (fdamp < 1.e-3) {
       fdamp = 1.e-3;
-    if (fdamp > 0.99)
+    }
+    if (fdamp > 0.99) {
       fdamp = 0.99;
+    }
   }
 
   /** Calculate halo concentration-mass relation conc(mass) (Bullock et al. 2001), with the dark
@@ -3156,8 +3188,9 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
   for (index_mass = 0; index_mass < ppr->nsteps_for_p1h_integral; index_mass++) {
     //find growth rate at formation
     g_form = delta_c * growth / sigmaf_r[index_mass];
-    if (g_form > 1.)
+    if (g_form > 1.) {
       g_form = 1.;
+    }
 
     if (!hm2020) {
       array_interpolate_two_arrays_one_column(pnw->growtable.data(),
@@ -3247,10 +3280,12 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
 
       /* HMcode 2020: haloes contain the cold matter only; with feedback, the gas expelled from
          and the stars added to haloes */
-      if (feedback)
+      if (feedback) {
         window_nfw = window_nfw * window_factor[index_mass] + f_star;
-      else if (hm2020)
+      }
+      else if (hm2020) {
         window_nfw *= (1. - fnu);
+      }
 
       p1h_integrand[index_mass * index_ncol + index_nu] = nu_arr[index_mass];
 
@@ -3327,8 +3362,9 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
     else {
       pk_2h = pk_lin;
     }
-    if (pk_2h < 0.)
+    if (pk_2h < 0.) {
       pk_2h = 0.;
+    }
     pk_nl[index_k] = pow((pow(pk_1h, alpha) + pow(pk_2h, alpha)), (1. / alpha)) / pow(k, 3) /
                      anorm;  //converted back to P_k
   }
@@ -3384,8 +3420,9 @@ void NonlinearModule::nonlinear_hmcode_noradiation_growth(struct nonlinear_works
   /* the cosmology without radiation has matter, Lambda and the fluid only: refuse other
      dark energy, and fields that do not cluster (class_public refuses scalar fields) */
   double Omega_other = fabs(background_module_->Omega0_de_ - Omega_v - Omega_w);
-  for (const auto& [name, sp] : all_species_)
+  for (const auto& [name, sp] : all_species_) {
     Omega_other += sp->NonClusteringOmega0();
+  }
   class_test(Omega_other > 1.e-4,
              "HMcode 2020 knows dark energy as Lambda and the fluid only, but a density "
              "fraction %e today is in other dark energy or in fields that do not cluster. Use "
@@ -3406,8 +3443,9 @@ void NonlinearModule::nonlinear_hmcode_noradiation_growth(struct nonlinear_works
   const double a_ini = 1.e-4;
   const double a_end = 1.;
   pnw->a_norad.resize(a_size);
-  for (int i = 0; i < a_size; i++)
+  for (int i = 0; i < a_size; i++) {
     pnw->a_norad[i] = a_ini * exp(i * log(a_end / a_ini) / (a_size - 1));
+  }
   pnw->a_norad[a_size - 1] = a_end;
 
   /* growing mode in matter domination, corrected for the dark energy fraction */
@@ -3470,8 +3508,9 @@ void NonlinearModule::nonlinear_hmcode_noradiation_growth(struct nonlinear_works
 
   /* g normalised to 1 today, and the splines of g(a) and a(g) */
   pnw->g_norad.resize(a_size);
-  for (int i = 0; i < a_size; i++)
+  for (int i = 0; i < a_size; i++) {
     pnw->g_norad[i] = g[i] / g[a_size - 1];
+  }
   pnw->dd_g_norad.resize(a_size);
   pnw->dd_a_norad.resize(a_size);
   array_spline_table_columns(pnw->a_norad.data(),
@@ -3573,8 +3612,9 @@ void NonlinearModule::nonlinear_hmcode_wiggle_init(struct nonlinear_workspace* p
   pnw->lnk_wiggle.resize(n);
   pnw->pk_wiggle.resize(n);
   pnw->ddpk_wiggle.resize(n);
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n; i++) {
     pnw->lnk_wiggle[i] = ln_k_min + i * (ln_k_max - ln_k_min) / (n - 1);
+  }
 
   class_test((pnw->lnk_wiggle[0] < ln_k_[0]) || (pnw->lnk_wiggle[n - 1] > ln_k_[k_size_extra_ - 1]),
              "HMcode 2020 splits the linear spectrum into wiggle and no-wiggle parts between k = "
@@ -3598,8 +3638,9 @@ void NonlinearModule::nonlinear_hmcode_wiggle_init(struct nonlinear_workspace* p
       row[j]           = exp(-dx * dx / (2. * sigma * sigma));
       total           += row[j];
     }
-    for (int j = 0; j < n; j++)
+    for (int j = 0; j < n; j++) {
       row[j] /= total;
+    }
   }
 }
 
@@ -3646,8 +3687,9 @@ void NonlinearModule::nonlinear_hmcode_nowiggle(const double* lnpk_l,
   for (int i = 0; i < n; i++) {
     const double* row = pnw->smoothing_weights.data() + i * n;
     double smoothed   = 0.;
-    for (int j = 0; j < n; j++)
+    for (int j = 0; j < n; j++) {
       smoothed += row[j] * ratio[j];
+    }
     const double pk_nw = smoothed * exp(lnpk_eh[i]);
     pnw->pk_wiggle[i]  = (exp(lnpk_lin[i]) - pk_nw) * exp(3. * pnw->lnk_wiggle[i]) /
                          (2. * _PI_ * _PI_);
@@ -4335,8 +4377,9 @@ void NonlinearModule::prepare_pk_eq() {
       compute and store Omega_m_effa[z_i] of the equivalent model */
 
   for (index_pk_eq_z = 0; index_pk_eq_z < pk_eq_tau_size_; index_pk_eq_z++) {
-    if (pnl->nonlinear_verbose > 2)
+    if (pnl->nonlinear_verbose > 2) {
       printf("    * computing Pk_equal parameters at z=%e\n", z[index_pk_eq_z]);
+    }
 
     /* get chi = (tau[z_i] - tau_rec) in true model */
     delta_tau = pk_eq_tau_[index_pk_eq_z] - thermodynamics_module->tau_rec_;
@@ -4344,8 +4387,9 @@ void NonlinearModule::prepare_pk_eq() {
     /* launch iterations in order to coverge to effective model with wa=0 but the same chi = (tau[z_i] - tau_rec) */
 
     double w0_fld = -1.;
-    if (auto* p = all_species_.find("Fluid"))
+    if (auto* p = all_species_.find("Fluid")) {
       w0_fld = static_cast<const FluidSpecies*>(p->get())->w0_fld();
+    }
     /* Local copy of the input file content so that overrides for w0/wa do not
        leak back into input_module_->file_content_ (the original code mutated
        per-iteration copies of pba's w0_fld/wa_fld fields, which no longer

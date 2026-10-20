@@ -31,8 +31,9 @@ double bisect_value(double lo, double hi, double tol, Pred pred) {
     double mid = 0.5 * (lo + hi);
     /* tol below one ulp of the bracket: mid can no longer separate from an
        endpoint, so every further iteration would repeat this one. */
-    if (mid <= lo || mid >= hi)
+    if (mid <= lo || mid >= hi) {
       break;
+    }
     if (pred(mid)) {
       hi = mid;
     }

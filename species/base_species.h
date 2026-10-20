@@ -441,8 +441,17 @@ class BaseSpecies {
     total                             += se;
     // Actual ρ/δρ/(ρ+P)θ — no ρ−3P proxy. Radiation never reaches here (it does not
     // cluster as matter), so there is nothing to "zero out".
-    if (clusters_as_matter_)
-      (is_cold_ ? total_cold : total_warm) += se;
+    if (clusters_as_matter_) {
+      {
+        {
+          {
+            {
+              (is_cold_ ? total_cold : total_warm) += se;
+            }
+          }
+        }
+      }
+    }
   }
 
   // Seam: only composites (delegates_tally_ == true) override this; plain species
@@ -895,10 +904,28 @@ class BaseSpecies {
                                     int idx_theta,
                                     const double* pvecback,
                                     const PerturbIcContext& ctx) const {
-    if (idx_delta >= 0)
-      y[idx_delta] += RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.alpha;
-    if (idx_theta >= 0)
-      y[idx_theta] += ctx.k * ctx.k * ctx.alpha;
+    if (idx_delta >= 0) {
+      {
+        {
+          {
+            {
+              y[idx_delta] += RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.alpha;
+            }
+          }
+        }
+      }
+    }
+    if (idx_theta >= 0) {
+      {
+        {
+          {
+            {
+              y[idx_theta] += ctx.k * ctx.k * ctx.alpha;
+            }
+          }
+        }
+      }
+    }
   }
 
   std::string name_;

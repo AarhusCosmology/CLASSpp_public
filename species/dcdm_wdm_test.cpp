@@ -133,8 +133,9 @@ int main() {
       pba2.H0 = 3.0e-4;
       WdmDecayProductSpecies sp2(&fc2, "ddm", s2, &pba2, nullptr);
       assert(sp2.q_size() == sp.q_size());
-      for (int i = 0; i < sp.q_size(); ++i)
+      for (int i = 0; i < sp.q_size(); ++i) {
         assert(sp.q()[i] == sp2.q()[i]);
+      }
     }
   }
   {
@@ -264,8 +265,9 @@ int main() {
         const double e   = sp.dq()[i] * q * q * ep * J[i];  // injected energy in bin i
         A               += e;
         Au              += e * sp.u()[i];
-        if (J[i] < 0.)
+        if (J[i] < 0.) {
           negative = true;
+        }
       }
       assert(!negative);  // weights in [0,1]
       assert(A > 0.);
@@ -330,9 +332,11 @@ int main() {
       const double u_cut = std::log(a * 10.0);
       sp.FillInjection(a, 0.7, J.data(), dJ.data());
       int i_peak = 0;
-      for (int i = 1; i < N; ++i)
-        if (J[i] > J[i_peak])
+      for (int i = 1; i < N; ++i) {
+        if (J[i] > J[i_peak]) {
           i_peak = i;
+        }
+      }
       assert(i_peak > 0);  // interior cutoff (a=0.5) -> peak is never the bottom bin
       assert(std::fabs(sp.u()[i_peak] - u_cut) <= (sp.u()[i_peak] - sp.u()[i_peak - 1]) * 1.5);
     }
@@ -435,14 +439,18 @@ int main() {
     {
       std::stringstream ss(titles);
       std::string t;
-      while (std::getline(ss, t, '\t'))
-        if (!t.empty())
+      while (std::getline(ss, t, '\t')) {
+        if (!t.empty()) {
           cols.push_back(t);
+        }
+      }
     }
     auto col = [&](const std::string& nm) {
-      for (size_t i = 0; i < cols.size(); ++i)
-        if (cols[i] == nm)
+      for (size_t i = 0; i < cols.size(); ++i) {
+        if (cols[i] == nm) {
           return static_cast<int>(i);
+        }
+      }
       std::printf("column '%s' not found\n", nm.c_str());
       assert(false);
       return -1;
@@ -470,8 +478,9 @@ int main() {
     auto row_at_z = [&](double z_target) {
       int best = n_rows - 1;
       for (int r = 0; r < n_rows; ++r) {
-        if (std::fabs(row(r, ic_z) - z_target) < std::fabs(row(best, ic_z) - z_target))
+        if (std::fabs(row(r, ic_z) - z_target) < std::fabs(row(best, ic_z) - z_target)) {
           best = r;
+        }
       }
       return best;
     };

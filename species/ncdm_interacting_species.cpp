@@ -149,8 +149,9 @@ double NCDMInteractingSpecies::AlphaFluid() const {
 }
 
 double NCDMInteractingSpecies::AlphaHierarchy(int l) const {
-  if (!use_alpha_correction_)
+  if (!use_alpha_correction_) {
     return kAlphaRtaCoefficients[std::min(4, l - 2)];
+  }
 
   const double z_correction = std::pow(l + 0.5, -2);
   const double I_l          = FitIntegralOfl(z_correction);
@@ -188,8 +189,9 @@ void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& lay
     const int lmax = ncdm_layout.l_max;
     for (int iq = 0; iq < ncdm_layout.q_size; ++iq) {
       const int idx = ncdm_layout.index_per_q[iq];
-      for (int l = 2; l <= lmax; l++)
+      for (int l = 2; l <= lmax; l++) {
         dy[idx + l] -= AlphaHierarchy(l) * taudot * y[idx + l];
+      }
     }
   }
 }
@@ -224,8 +226,9 @@ void NCDMInteractingSpecies::PerturbDerivsDiagonal(
     const int lmax = ncdm_layout.l_max;
     for (int iq = 0; iq < ncdm_layout.q_size; ++iq) {
       const int idx = ncdm_layout.index_per_q[iq];
-      for (int l = 2; l <= lmax; l++)
+      for (int l = 2; l <= lmax; l++) {
         diag[idx + l] -= AlphaHierarchy(l) * taudot;
+      }
     }
   }
 }

@@ -37,21 +37,25 @@ using Vec = std::vector<double>;
 
 Vec apply_A(const double* A, int s, const Vec& v) {
   Vec out(s, 0.0);
-  for (int i = 0; i < s; i++)
-    for (int j = 0; j < s; j++)
+  for (int i = 0; i < s; i++) {
+    for (int j = 0; j < s; j++) {
       out[i] += A[i * s + j] * v[j];
+    }
+  }
   return out;
 }
 Vec mul(const Vec& a, const Vec& b) {
   Vec out(a.size());
-  for (size_t i = 0; i < a.size(); i++)
+  for (size_t i = 0; i < a.size(); i++) {
     out[i] = a[i] * b[i];
+  }
   return out;
 }
 double dot(const Vec& w, const Vec& v) {
   double acc = 0.0;
-  for (size_t i = 0; i < w.size(); i++)
+  for (size_t i = 0; i < w.size(); i++) {
     acc += w[i] * v[i];
+  }
   return acc;
 }
 
@@ -109,8 +113,9 @@ void test_tableau() {
   double worst_row = 0.0;
   for (int i = 0; i < s; i++) {
     double row = 0.0;
-    for (int j = 0; j < s; j++)
+    for (int j = 0; j < s; j++) {
       row += Tab::A[i * s + j];
+    }
     worst_row = std::max(worst_row, fabs(row - Tab::c[i]));
   }
   assert(worst_row < 1e-14);
@@ -119,16 +124,18 @@ void test_tableau() {
      k_{s-1} as the next k_0 silently integrates a different method. */
   if (Tab::kFsal) {
     double worst = 0.0;
-    for (int j = 0; j < s; j++)
+    for (int j = 0; j < s; j++) {
       worst = std::max(worst, fabs(Tab::A[(s - 1) * s + j] - Tab::b[j]));
+    }
     assert(worst < 1e-14);
   }
 
   Vec b(Tab::b, Tab::b + s);
   Vec e(Tab::e, Tab::e + s);
   Vec bhat(s);
-  for (int j = 0; j < s; j++)
+  for (int j = 0; j < s; j++) {
     bhat[j] = b[j] - e[j];
+  }
 
   double worst_b     = 0.0;
   double worst_bhat4 = 0.0;
@@ -137,10 +144,12 @@ void test_tableau() {
     const double rb = dot(b, cond.phi) - 1.0 / cond.gamma;
     worst_b         = std::max(worst_b, fabs(rb));
     const double rh = dot(bhat, cond.phi) - 1.0 / cond.gamma;
-    if (cond.order <= 4)
+    if (cond.order <= 4) {
       worst_bhat4 = std::max(worst_bhat4, fabs(rh));
-    else
+    }
+    else {
       best_bhat5 = std::min(best_bhat5, fabs(rh));
+    }
   }
   printf(
       "  %-8s order conditions: b through 5 -> %.1e, bhat through 4 -> %.1e, "
@@ -205,10 +214,12 @@ void test_dense() {
     for (const Condition& cond : conds) {
       thp             = pow(theta, cond.order);
       const double rr = dot(bt, cond.phi) - thp / cond.gamma;
-      if (cond.order <= 4)
+      if (cond.order <= 4) {
         worst4 = std::max(worst4, fabs(rr));
-      else
+      }
+      else {
         worst5 = std::max(worst5, fabs(rr));
+      }
     }
   }
   printf(
@@ -229,8 +240,9 @@ void test_dense() {
        y0' = -2 t y0^2 ,  y0(0) = 1  =>  y0 = 1/(1+t^2)
        y1' = y0 y1     ,  y1(0) = 1  =>  y1 = exp(atan t)                 */
 void nl_derivs(double t, double* y, double* dy, void* p) {
-  if (p != nullptr)
+  if (p != nullptr) {
     (*static_cast<int*>(p))++;
+  }
   dy[0] = -2.0 * t * y[0] * y[0];
   dy[1] = y[0] * y[1];
 }
@@ -269,8 +281,9 @@ double run_to_tolerance(double rtol,
   s.t.resize(n);
   s.y0.resize(n);
   std::vector<double> xs(n);
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n; i++) {
     xs[i] = 0.05 * i; /* deliberately off the step ends: exercises dense output */
+  }
 
   double y[2] = {1.0, 1.0};
   int used[2] = {1, 1};
@@ -319,8 +332,9 @@ void test_end_to_end() {
 void test_pairs_agree() {
   const int n = 41;
   std::vector<double> xs(n);
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n; i++) {
     xs[i] = 0.05 * i;
+  }
   Sampled a;
   Sampled b;
   a.t.resize(n);
@@ -345,8 +359,9 @@ void test_pairs_agree() {
   opt_b.output          = store;
   evolver_erk_run<ErkTsitouras54>(counting_derivs, 0.0, 2.0, yb, 2, &b, opt_b);
   double worst = 0.0;
-  for (int i = 1; i < n; i++)
+  for (int i = 1; i < n; i++) {
     worst = std::max(worst, fabs(a.y0[i] - b.y0[i]) / fabs(a.y0[i]));
+  }
   printf("  rkdp45 vs tsit5 at rtol=1e-8: max relative difference %.2e\n", worst);
   assert(worst < 1e-5);
 }

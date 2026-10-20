@@ -91,8 +91,9 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
   const int total = parent_.n * node_stride_;
   node_off_.assign(parent_.n, 0);
   node_cnt_.assign(parent_.n, 0);
-  for (int i = 0; i < parent_.n; ++i)
+  for (int i = 0; i < parent_.n; ++i) {
     node_off_[i] = i * node_stride_;  // node_cnt_ is set per call
+  }
   q2_star_.assign(total, 0.);
   q3_star_.assign(total, 0.);
   wn_.assign(total, 0.);
@@ -119,11 +120,13 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
   fl_state_.assign(fermion_.n, 0.);
   fphi_state_.assign(boson_.n, 0.);
   inv_meas_f_.assign(fermion_.n, 0.);
-  for (int k = 0; k < fermion_.n; ++k)
+  for (int k = 0; k < fermion_.n; ++k) {
     inv_meas_f_[k] = 1.0 / (fermion_.q[k] * fermion_.q[k] * fermion_.dq[k]);
+  }
   inv_meas_b_.assign(boson_.n, 0.);
-  for (int k = 0; k < boson_.n; ++k)
+  for (int k = 0; k < boson_.n; ++k) {
     inv_meas_b_[k] = 1.0 / (boson_.q[k] * boson_.q[k] * boson_.dq[k]);
+  }
   theta_l_.assign(total, 1.);
   theta_phi_.assign(total, 1.);
   // Balanced gather scratch, allocated ONLY when the flag is on: two of these are
@@ -180,8 +183,9 @@ void DecayTransitionKernel::TwoBinSplit(
         inc <<= 1;
         hi    = lo + inc;
       }
-      if (hi > g.n - 1)
+      if (hi > g.n - 1) {
         hi = g.n - 1;
+      }
     }
     else {  // hunt downward
       hi = hint;
@@ -191,8 +195,9 @@ void DecayTransitionKernel::TwoBinSplit(
         inc <<= 1;
         lo    = hi - inc;
       }
-      if (lo < 0)
+      if (lo < 0) {
         lo = 0;
+      }
     }
   }
   while (hi - lo > 1) {
@@ -216,8 +221,9 @@ void DecayTransitionKernel::BuildDeposit(const GridView& g,
   double lam   = 0.;
   bool clamped = false;
   TwoBinSplit(g, q_star, j, lam, clamped, hint ? *hint : -1);
-  if (hint)
+  if (hint) {
     *hint = j;
+  }
   out.j0      = j;
   out.w[0]    = lam;
   out.w[1]    = 1.0 - lam;
@@ -247,8 +253,9 @@ void DecayTransitionKernel::PrepareTransitions(double a,
   // them. Cheap: one extra pass over the parent grid, only when the cap is armed.
   if (cfg_.max_rate > 0. && a_prime_over_a > 0. && k_coeff_ > 0.) {
     double eps_min = std::sqrt(parent_.q[0] * parent_.q[0] + am2_);
-    for (int i = 1; i < parent_.n; ++i)
+    for (int i = 1; i < parent_.n; ++i) {
       eps_min = std::min(eps_min, std::sqrt(parent_.q[i] * parent_.q[i] + am2_));
+    }
     // Divided by the PARENT's leg factor, so the cap keeps bounding the quantity it
     // says it bounds -- the parent's per-bin collision rate, the system's stiffest
     // eigenvalue -- rather than the per-channel rate. Without this, `dr_rate_cap = 1e3`
@@ -293,10 +300,12 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       node_cnt_[i] = 0;
       df_bg_H_[i]  = 0.;
     }
-    for (int j = 0; j < fermion_.n; ++j)
+    for (int j = 0; j < fermion_.n; ++j) {
       df_bg_l_[j] = 0.;
-    for (int k = 0; k < boson_.n; ++k)
+    }
+    for (int k = 0; k < boson_.n; ++k) {
       df_bg_phi_[k] = 0.;
+    }
     return;
   }
 
@@ -304,10 +313,12 @@ void DecayTransitionKernel::PrepareTransitions(double a,
   // O(n_q) against the O(n_parent n_q) nodes that read them back, so the two
   // transcendentals per bin are amortised away. See Config::balanced_gather.
   if (cfg_.balanced_gather) {
-    for (int j = 0; j < fermion_bg_.n; ++j)
+    for (int j = 0; j < fermion_bg_.n; ++j) {
       eta_l_[j] = EtaOf(f_l[j], fermion_stat_);
-    for (int j = 0; j < boson_bg_.n; ++j)
+    }
+    for (int j = 0; j < boson_bg_.n; ++j) {
       eta_phi_[j] = EtaOf(f_phi[j], boson_stat_);
+    }
   }
 
   // Rolling deposit brackets. Within a parent bin the node momenta are monotone --
@@ -346,23 +357,29 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     int nbp             = 0;
     breakpoints_[nbp++] = qlo;
     int af              = 0;
-    while (af < fermion_.n && fermion_.q[af] <= qlo)
+    while (af < fermion_.n && fermion_.q[af] <= qlo) {
       ++af;
+    }
     int ab = boson_.n - 1;
-    while (ab >= 0 && eps1 - boson_.q[ab] <= qlo)
+    while (ab >= 0 && eps1 - boson_.q[ab] <= qlo) {
       --ab;
+    }
     while (true) {
       const bool have_f = (af < fermion_.n) && (fermion_.q[af] < qhi);
       const bool have_b = (ab >= 0) && (eps1 - boson_.q[ab] < qhi);
-      if (!have_f && !have_b)
+      if (!have_f && !have_b) {
         break;
+      }
       double x;
-      if (have_f && (!have_b || fermion_.q[af] <= eps1 - boson_.q[ab]))
+      if (have_f && (!have_b || fermion_.q[af] <= eps1 - boson_.q[ab])) {
         x = fermion_.q[af++];
-      else
+      }
+      else {
         x = eps1 - boson_.q[ab--];
-      if (x <= breakpoints_[nbp - 1])
+      }
+      if (x <= breakpoints_[nbp - 1]) {
         continue;
+      }
       // Checked BEFORE the write, not after: a capacity guard that fires once the
       // overflow has already happened is not a guard. Capacity is n_f + n_b + 2 and
       // at most that many can be pushed (qlo, every edge of either grid inside the
@@ -376,8 +393,9 @@ void DecayTransitionKernel::PrepareTransitions(double a,
                         static_cast<int>(breakpoints_.size()));
       breakpoints_[nbp++] = x;
     }
-    if (qhi > breakpoints_[nbp - 1])
+    if (qhi > breakpoints_[nbp - 1]) {
       breakpoints_[nbp++] = qhi;
+    }
 
     class_test_severe(cfg_.emission_gauss * (nbp - 1) > node_stride_,
                       "stratified quadrature: parent bin %d needs %d nodes (%d "
@@ -397,8 +415,9 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       for (int c = 0; c + 1 < nbp; ++c) {
         const double ca = breakpoints_[c];
         const double hw = 0.5 * (breakpoints_[c + 1] - ca);
-        if (!(hw > 0.))
+        if (!(hw > 0.)) {
           continue;
+        }
         for (int gp = 0; gp < ng; ++gp) {
           q2_star_[off + cnt] = ca + hw * (1.0 + kGaussX[ng - 1][gp]);
           wn_[off + cnt]      = hw * kGaussW[ng - 1][gp];
@@ -454,15 +473,17 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       // it is. Verify this flag's OFF path on the physics, not on a checksum.
       const auto gather = [](const DepositStencil& s, const double* f) {
         double acc = 0.;
-        for (int e = 0; e < DepositStencil::kWidth; ++e)
+        for (int e = 0; e < DepositStencil::kWidth; ++e) {
           acc += s.w[e] * f[s.j0 + e];
+        }
         return acc;
       };
       const auto gather_balanced =
           [](const DepositStencil& s, const std::vector<double>& eta, Statistics stat) {
             double acc = 0.;
-            for (int e = 0; e < DepositStencil::kWidth; ++e)
+            for (int e = 0; e < DepositStencil::kWidth; ++e) {
               acc += s.w[e] * eta[s.j0 + e];
+            }
             return FOfEta(acc, stat);
           };
       double fl_g   = 0.;
@@ -494,10 +515,12 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       // Lambda = f_l f_phi (inv) - f_H (dec) + f_H (f_l - f_phi) (qs); drop the
       // inv term when inverse decays are off, the qs term when qs is off.
       double lam = -fH_i;
-      if (cfg_.inverse_decays)
+      if (cfg_.inverse_decays) {
         lam += fl_g * fphi_g;
-      if (cfg_.quantum_statistics)
+      }
+      if (cfg_.quantum_statistics) {
         lam += fH_i * (fl_g - fphi_g);
+      }
       lambda_s_[n] = lam;
 
       // Emission-angle cosines (formalism-notes eq. 6.9, massless daughters).
@@ -517,14 +540,16 @@ void DecayTransitionKernel::PrepareTransitions(double a,
         const double dN = mult_energy_ * k_coeff_ * dq1 * (q1 / eps1) * wn_[n] * lam;
         if (clf) {
           double e_dep = 0.;
-          for (int e = 0; e < DepositStencil::kWidth; ++e)
+          for (int e = 0; e < DepositStencil::kWidth; ++e) {
             e_dep += sf.w[e] * fermion_.q[jf + e];
+          }
           clamped_energy_residual_ += (e_dep - q2) * (-dN);
         }
         if (clb) {
           double e_dep = 0.;
-          for (int e = 0; e < DepositStencil::kWidth; ++e)
+          for (int e = 0; e < DepositStencil::kWidth; ++e) {
             e_dep += sb.w[e] * boson_.q[kb + e];
+          }
           clamped_energy_residual_ += (e_dep - q3) * (-2.0 * dN);
         }
       }
@@ -533,12 +558,15 @@ void DecayTransitionKernel::PrepareTransitions(double a,
 
   // Background scatter into df_bg_* (cached here so ComputeBackgroundDerivs copies
   // it out AND the perturbation operator reuses the SAME rates for -f-dot/f).
-  for (int i = 0; i < parent_.n; ++i)
+  for (int i = 0; i < parent_.n; ++i) {
     df_bg_H_[i] = 0.;
-  for (int j = 0; j < fermion_.n; ++j)
+  }
+  for (int j = 0; j < fermion_.n; ++j) {
     df_bg_l_[j] = 0.;
-  for (int k = 0; k < boson_.n; ++k)
+  }
+  for (int k = 0; k < boson_.n; ++k) {
     df_bg_phi_[k] = 0.;
+  }
 
   // LUMPED DAUGHTER LOSS (positivity). Lambda is linear in each daughter's own
   // occupation, so split it per leg as
@@ -664,8 +692,9 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       constexpr int nf = DepositStencil::kWidth;
       const double* wf = &w_fermion_[W * n];
       double flg_st    = 0.;
-      for (int e = 0; e < nf; ++e)
+      for (int e = 0; e < nf; ++e) {
         flg_st += wf[e] * f_l_st[jf + e];
+      }
       // theta is the lumping FRACTION for this node (see LumpTheta): 1 lumps fully,
       // 0 uses the exact split. Cached because the perturbation operator, the
       // diagonal and the positivity decomposition all have to use the SAME blend.
@@ -689,8 +718,9 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       constexpr int nb = DepositStencil::kWidth;
       const double* wb = &w_boson_[W * n];
       double fphig_st  = 0.;
-      for (int e = 0; e < nb; ++e)
+      for (int e = 0; e < nb; ++e) {
         fphig_st += wb[e] * f_phi_st[kb + e];
+      }
       const double th_p = LumpTheta(g_phi, wb, nb, kb, f_phi_st, fphig_st);
       theta_phi_[n]     = th_p;
       for (int e = 0; e < nb; ++e) {
@@ -707,15 +737,17 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     }
   };
 
-  for (int i = 0; i < parent_.n; ++i)
+  for (int i = 0; i < parent_.n; ++i) {
     sweep(i, df_bg_l_.data(), df_bg_phi_.data(), split_energy_residual_, clamped_energy_residual_);
+  }
 
   wg_dirty_ = true;
 }
 
 void DecayTransitionKernel::EnsureGatherWeights() const {
-  if (!chain_pert_ || !wg_dirty_)
+  if (!chain_pert_ || !wg_dirty_) {
     return;
+  }
   wg_dirty_ = false;
   // Perturbation gather weights, wg[e] = dG/df_e = w[e] * ChainFactor (see
   // Config::balanced_pert). Built HERE rather than in PrepareTransitions because the
@@ -820,15 +852,21 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
   next_l_ = l_max + 1;
   EnsureGatherWeights();
 
-  for (int i = 0; i < parent_.n; ++i)
-    for (int l = 0; l <= l_max; ++l)
+  for (int i = 0; i < parent_.n; ++i) {
+    for (int l = 0; l <= l_max; ++l) {
       dF_H[static_cast<size_t>(i) * stride + l] = 0.;
-  for (int j = 0; j < fermion_.n; ++j)
-    for (int l = 0; l <= l_max; ++l)
+    }
+  }
+  for (int j = 0; j < fermion_.n; ++j) {
+    for (int l = 0; l <= l_max; ++l) {
       dF_l[static_cast<size_t>(j) * stride + l] = 0.;
-  for (int k = 0; k < boson_.n; ++k)
-    for (int l = 0; l <= l_max; ++l)
+    }
+  }
+  for (int k = 0; k < boson_.n; ++k) {
+    for (int l = 0; l <= l_max; ++l) {
       dF_phi[static_cast<size_t>(k) * stride + l] = 0.;
+    }
+  }
 
   // Booked into locals and added once at the end, so the accumulation order within each
   // residual matches the per-l form's (ascending i, then n) even though l now interleaves.
@@ -940,28 +978,32 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
       for (int e = 0; e < nf; ++e) {
         const double c                     = wf[e];
         const double* const __restrict src = F_l + static_cast<size_t>(jf + e) * stride;
-        for (int l = 0; l <= l_max; ++l)
+        for (int l = 0; l <= l_max; ++l) {
           Fl_node_l[l] += c * src[l];
+        }
       }
       for (int e = 0; e < nb; ++e) {
         const double c                     = wb[e];
         const double* const __restrict src = F_phi + static_cast<size_t>(kb + e) * stride;
-        for (int l = 0; l <= l_max; ++l)
+        for (int l = 0; l <= l_max; ++l) {
           Fphi_node_l[l] += c * src[l];
+        }
       }
       // delta-theta gathers: one per (node, l), NOT one per deposit edge -- theta is a
       // property of the whole stencil, so dthg carries no e index.
       for (int t = 0; t < nf; ++t) {
         const double c                     = dthl[t];
         const double* const __restrict src = F_l + static_cast<size_t>(jf + t) * stride;
-        for (int l = 0; l <= l_max; ++l)
+        for (int l = 0; l <= l_max; ++l) {
           dthg_l_l[l] += c * src[l];
+        }
       }
       for (int t = 0; t < nb; ++t) {
         const double c                     = dthp[t];
         const double* const __restrict src = F_phi + static_cast<size_t>(kb + t) * stride;
-        for (int l = 0; l <= l_max; ++l)
+        for (int l = 0; l <= l_max; ++l) {
           dthg_p_l[l] += c * src[l];
+        }
       }
 
       // Band-factor gather: the same stencil weighted by dG/df_e (see the per-l form for
@@ -977,14 +1019,16 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
         for (int e = 0; e < nf; ++e) {
           const double c                     = wgf[e];
           const double* const __restrict src = F_l + static_cast<size_t>(jf + e) * stride;
-          for (int l = 0; l <= l_max; ++l)
+          for (int l = 0; l <= l_max; ++l) {
             Fl_g_l[l] += c * src[l];
+          }
         }
         for (int e = 0; e < nb; ++e) {
           const double c                     = wgb[e];
           const double* const __restrict src = F_phi + static_cast<size_t>(kb + e) * stride;
-          for (int l = 0; l <= l_max; ++l)
+          for (int l = 0; l <= l_max; ++l) {
             Fphi_g_l[l] += c * src[l];
+          }
         }
         for (int l = 0; l <= l_max; ++l) {
           dFl_l[l]   = Fl_g_l[l] - Fl_node_l[l];
@@ -1092,12 +1136,15 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
 void DecayTransitionKernel::CollisionDiagonal(double* diag_H,
                                               double* diag_l,
                                               double* diag_phi) const {
-  for (int i = 0; i < parent_.n; ++i)
+  for (int i = 0; i < parent_.n; ++i) {
     diag_H[i] = 0.;
-  for (int j = 0; j < fermion_.n; ++j)
+  }
+  for (int j = 0; j < fermion_.n; ++j) {
     diag_l[j] = 0.;
-  for (int k = 0; k < boson_.n; ++k)
+  }
+  for (int k = 0; k < boson_.n; ++k) {
     diag_phi[k] = 0.;
+  }
 
   // The BACKGROUND kernel forms its chain factor only here -- it never calls the
   // perturbation operator, so EnsureGatherWeights never runs on it -- and this is the
@@ -1167,8 +1214,9 @@ void DecayTransitionKernel::CollisionDiagonal(double* diag_H,
         // that vanishes at dr_bg_refine = 1 and silently corrupts everything above it
         // (the same trap the lumped-loss comment above records).
         const double dth = dth_l_edge_[W * n + e];
-        if (chain_diag_)
+        if (chain_diag_) {
           chain_worst = std::fmax(chain_worst, dg_l_[n] * chain_l_[k]);
+        }
         const double dLam  = chain_diag_
                                  ? wf[e] * ChainFactor(dg_l_[n], chain_l_[k], inv_chain_cap_) +
                                        th_l * (1. - wf[e]) + dev_l_edge_[W * n + e] * dth
@@ -1182,8 +1230,9 @@ void DecayTransitionKernel::CollisionDiagonal(double* diag_H,
         const int k       = kb + e;
         const double meas = boson_.q[k] * boson_.q[k] * boson_.dq[k];
         const double dth  = dth_phi_edge_[W * n + e];
-        if (chain_diag_)
+        if (chain_diag_) {
           chain_worst = std::fmax(chain_worst, dg_phi_[n] * chain_phi_[k]);
+        }
         const double dLam  = chain_diag_
                                  ? wb[e] * ChainFactor(dg_phi_[n], chain_phi_[k], inv_chain_cap_) +
                                        th_p * (1. - wb[e]) + dev_phi_edge_[W * n + e] * dth
@@ -1206,12 +1255,15 @@ void DecayTransitionKernel::ComputeBackgroundDerivs(double a,
                                                     double* df_phi,
                                                     double a_prime_over_a) const {
   PrepareTransitions(a, m, Gamma, f_H, f_l, f_phi, a_prime_over_a);
-  for (int i = 0; i < parent_.n; ++i)
+  for (int i = 0; i < parent_.n; ++i) {
     df_H[i] = df_bg_H_[i];
-  for (int j = 0; j < fermion_.n; ++j)
+  }
+  for (int j = 0; j < fermion_.n; ++j) {
     df_l[j] = df_bg_l_[j];
-  for (int k = 0; k < boson_.n; ++k)
+  }
+  for (int k = 0; k < boson_.n; ++k) {
     df_phi[k] = df_bg_phi_[k];
+  }
 }
 
 DecayTransitionKernel::Moments DecayTransitionKernel::ComputeMoments(
@@ -1242,8 +1294,9 @@ DecayTransitionKernel::Moments DecayTransitionKernel::ComputeMoments(
 
 double DecayTransitionKernel::LegendreP(int l, double x) {
   // Upward recurrence (2l+1) x P_l = (l+1) P_{l+1} + l P_{l-1}; never a table.
-  if (l <= 0)
+  if (l <= 0) {
     return 1.0;
+  }
   double pm1 = 1.0;  // P_0
   double p   = x;    // P_1
   for (int n = 1; n < l; ++n) {
@@ -1292,12 +1345,15 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
                         : (l == 1) ? &split_momentum_residual_pert_
                                    : nullptr;
 
-  for (int i = 0; i < parent_.n; ++i)
+  for (int i = 0; i < parent_.n; ++i) {
     dF_H[i] = 0.;
-  for (int j = 0; j < fermion_.n; ++j)
+  }
+  for (int j = 0; j < fermion_.n; ++j) {
     dF_l[j] = 0.;
-  for (int k = 0; k < boson_.n; ++k)
+  }
+  for (int k = 0; k < boson_.n; ++k) {
     dF_phi[k] = 0.;
+  }
 
   for (int i = 0; i < parent_.n; ++i) {
     const double q1   = parent_.q[i];
@@ -1317,14 +1373,16 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
       constexpr int nf       = DepositStencil::kWidth;
       const double* const wf = &w_fermion_[W * n];
       double Fl_node         = 0.;
-      for (int e = 0; e < nf; ++e)
+      for (int e = 0; e < nf; ++e) {
         Fl_node += wf[e] * F_l[jf + e];
+      }
       const int kb           = k_boson_[n];
       constexpr int nb       = DepositStencil::kWidth;
       const double* const wb = &w_boson_[W * n];
       double Fphi_node       = 0.;
-      for (int e = 0; e < nb; ++e)
+      for (int e = 0; e < nb; ++e) {
         Fphi_node += wb[e] * F_phi[kb + e];
+      }
 
       // The BAND FACTOR's gather (Config::balanced_pert): the same stencil weighted by
       // dG/df_e instead of w_e. Two gathers rather than one because they answer two
@@ -1341,10 +1399,12 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
         const double* const wgb = &wg_boson_[W * n];
         Fl_g                    = 0.;
         Fphi_g                  = 0.;
-        for (int e = 0; e < nf; ++e)
+        for (int e = 0; e < nf; ++e) {
           Fl_g += wgf[e] * F_l[jf + e];
-        for (int e = 0; e < nb; ++e)
+        }
+        for (int e = 0; e < nb; ++e) {
           Fphi_g += wgb[e] * F_phi[kb + e];
+        }
       }
       const double dFl   = Fl_g - Fl_node;
       const double dFphi = Fphi_g - Fphi_node;
@@ -1427,15 +1487,17 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
         // theta = 1 this is the shipped c_l F_l[k] exactly. Blending here rather
         // than only in d_l_edge_ is what keeps this the true Jacobian.
         double dthg_l = 0.;
-        for (int t = 0; t < nf; ++t)
+        for (int t = 0; t < nf; ++t) {
           dthg_l += dth_l_edge_[W * n + t] * F_l[jf + t];
+        }
         const double Fl_e    = th_l * F_l[k] + (1. - th_l) * Fl_node +
                                dev_l_edge_[W * n + e] * dthg_l + dFl;
         const double dN_l_k  = B * (cH_e * FH_i * Pa + c_l * Fl_e + cphi_e * Fphi_g * Pg);
         dF_l[k]             += -mult_daughter_leg_ * wf[e] * dN_l_k /
                                (fermion_.q[k] * fermion_.q[k] * fermion_.dq[k]);
-        if (resid)
+        if (resid) {
           *resid += -mult_energy_ * 2.0 * wf[e] * fermion_.q[k] * (dN_l_k - dN_l);
+        }
       }
 
       // Boson deposit (project onto phi's multipole): {H:Pb, l:Pg, phi:1}; x2 dof.
@@ -1445,15 +1507,17 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
         const double cH_e = c_H - (cfg_.quantum_statistics ? dphi : 0.);
         const double cl_e = c_l + (cfg_.inverse_decays ? dphi : 0.);
         double dthg_p     = 0.;
-        for (int t = 0; t < nb; ++t)
+        for (int t = 0; t < nb; ++t) {
           dthg_p += dth_phi_edge_[W * n + t] * F_phi[kb + t];
+        }
         const double Fphi_e    = th_p * F_phi[k] + (1. - th_p) * Fphi_node +
                                  dev_phi_edge_[W * n + e] * dthg_p + dFphi;
         const double dN_phi_k  = B * (cH_e * FH_i * Pb + cl_e * Fl_g * Pg + c_phi * Fphi_e);
         dF_phi[k]             += -mult_boson_leg_ * 2.0 * wb[e] * dN_phi_k /
                                  (boson_.q[k] * boson_.q[k] * boson_.dq[k]);
-        if (resid)
+        if (resid) {
           *resid += -mult_energy_ * 2.0 * wb[e] * boson_.q[k] * (dN_phi_k - dN_phi);
+        }
       }
     }
   }

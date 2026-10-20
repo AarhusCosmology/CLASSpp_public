@@ -148,6 +148,8 @@ Key rules:
 
 * Indentation: **2 spaces**, no tabs
 * Braces: K&R style for control statements, with `else` on a new line
+* Every `if`, `else`, `for`, `while` and `do` body has braces, even a single line.
+  `InsertBraces` in `.clang-format` adds them, and clang-tidy checks them
 
 ```cpp
 if (condition) {

@@ -250,8 +250,11 @@ class DrPsdSpecies : public NCDMBaseSpecies {
   double ReducedEnergyAtL(const NCDMBaseSpecies::PerturbLayout& layout,
                           const double* y,
                           int l) const {
-    if (reduced_moments_ < 2 || l > layout.l_max)
-      return 0.;
+    if (reduced_moments_ < 2 || l > layout.l_max) {
+      {
+        return 0.;
+      }
+    }
     const double m0 = y[layout.index_per_q[0] + l];
     const double m1 = y[layout.index_per_q[1] + l];
     return red_q_ref_ * (m1 + red_alpha0_ * m0);

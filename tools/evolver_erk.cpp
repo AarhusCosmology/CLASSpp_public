@@ -12,8 +12,9 @@
 namespace {
 
 int bin_of(double value, double lo, double step, int nbins) {
-  if (!(value > 0.0))
+  if (!(value > 0.0)) {
     return 0;
+  }
   const int b = static_cast<int>((log10(value) - lo) / step);
   return b < 0 ? 0 : (b >= nbins ? nbins - 1 : b);
 }

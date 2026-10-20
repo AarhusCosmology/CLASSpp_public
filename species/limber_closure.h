@@ -49,8 +49,9 @@ inline double Order(int l) {
  * and s_l clamps too.
  */
 inline double Cot(double L, double k, double K) {
-  if (K == 0.)
+  if (K == 0.) {
     return 1. / L;
+  }
   return std::sqrt(std::max(1. - K * (L * L - 1.) / (k * k), 0.)) / L;
 }
 

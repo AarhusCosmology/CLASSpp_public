@@ -77,8 +77,9 @@ std::vector<std::string> CollectInstanceFieldValues(FileContent* pfc,
   std::vector<std::string> values(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     SpeciesInput input(pfc, instances[i]);
-    if (auto v = input.get<std::string>(field))
+    if (auto v = input.get<std::string>(field)) {
       values[i] = *v;
+    }
   }
   return values;
 }
@@ -180,16 +181,18 @@ namespace {
 
 bool IsSpeciesType(const std::string& name) {
   for (const auto& entry : kAllSpeciesFactories) {
-    if (entry.name == name)
+    if (entry.name == name) {
       return true;
+    }
   }
   return false;
 }
 
 std::string SpeciesTypeList() {
   std::string out;
-  for (const auto& entry : kAllSpeciesFactories)
+  for (const auto& entry : kAllSpeciesFactories) {
     out += (out.empty() ? "" : ", ") + std::string(entry.name);
+  }
   return out;
 }
 
@@ -209,11 +212,13 @@ void RejectUnbuiltSpeciesInstances(const FileContent& fc) {
   std::set<std::string> declared;  // instances that have an "N.type" line
   fc.for_each([&](const std::string& key, const std::string& value, bool read) {
     const auto dot = key.find('.');
-    if (dot == std::string::npos)
+    if (dot == std::string::npos) {
       return;
+    }
     DotEntry e{key, key.substr(0, dot), key.substr(dot + 1), value, read};
-    if (e.field == "type")
+    if (e.field == "type") {
       declared.insert(e.instance);
+    }
     entries.push_back(std::move(e));
   });
 
@@ -243,12 +248,15 @@ void RejectUnbuiltSpeciesInstances(const FileContent& fc) {
     }
     else if (declared.count(e.instance) == 0) {
       auto it = orphans.begin();
-      while (it != orphans.end() && it->first != e.instance)
+      while (it != orphans.end() && it->first != e.instance) {
         ++it;
-      if (it == orphans.end())
+      }
+      if (it == orphans.end()) {
         orphans.emplace_back(e.instance, "'" + e.key + "'");
-      else
+      }
+      else {
         it->second += ", '" + e.key + "'";
+      }
     }
   }
   for (const auto& [instance, keys] : orphans) {
@@ -256,11 +264,13 @@ void RejectUnbuiltSpeciesInstances(const FileContent& fc) {
                        ".type', so no species is built from them");
   }
 
-  if (problems.empty())
+  if (problems.empty()) {
     return;
+  }
   std::string listed;
-  for (const auto& p : problems)
+  for (const auto& p : problems) {
     listed += "\n  - " + p;
+  }
   class_stop_severe(
       "dot-syntax species input that builds no species (the run would silently compute a "
       "cosmology without it):%s",

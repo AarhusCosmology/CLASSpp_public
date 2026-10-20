@@ -221,10 +221,11 @@ void array_spline(double* array,
   *(array + (n_lines - 1) * n_columns + index_ddydx2) =
       (un - qn * u[n_lines - 2]) / (qn * *(array + (n_lines - 2) * n_columns + index_ddydx2) + 1.0);
 
-  for (k = n_lines - 2; k >= 0; k--)
+  for (k = n_lines - 2; k >= 0; k--) {
     *(array + k * n_columns + index_ddydx2) = *(array + k * n_columns + index_ddydx2) *
                                                   *(array + (k + 1) * n_columns + index_ddydx2) +
                                               u[k];
+  }
 }
 
 void array_spline_table_line_to_line(const double* x, /* vector of size x_size */
@@ -306,10 +307,11 @@ void array_spline_table_line_to_line(const double* x, /* vector of size x_size *
   *(array + (n_lines - 1) * n_columns + index_ddydx2) =
       (un - qn * u[n_lines - 2]) / (qn * *(array + (n_lines - 2) * n_columns + index_ddydx2) + 1.0);
 
-  for (k = n_lines - 2; k >= 0; k--)
+  for (k = n_lines - 2; k >= 0; k--) {
     *(array + k * n_columns + index_ddydx2) = *(array + k * n_columns + index_ddydx2) *
                                                   *(array + (k + 1) * n_columns + index_ddydx2) +
                                               u[k];
+  }
 }
 
 void array_spline_table_lines(const double* x, /* vector of size x_size */
@@ -333,9 +335,10 @@ void array_spline_table_lines(const double* x, /* vector of size x_size */
   double dy_first;
   double dy_last;
 
-  if (x_size == 2)
+  if (x_size == 2) {
     spline_mode =
         _SPLINE_NATURAL_;  // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
+  }
 
   index_x = 0;
 
@@ -455,9 +458,10 @@ void array_spline_table_columns(const double* x, /* vector of size x_size */
   double dy_first;
   double dy_last;
 
-  if (x_size == 2)
+  if (x_size == 2) {
     spline_mode =
         _SPLINE_NATURAL_;  // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
+  }
 
   index_x = 0;
 
@@ -582,9 +586,10 @@ void array_spline_table_columns2(const double* x, /* vector of size x_size */
   double dy_first;
   double dy_last;
 
-  if (x_size == 2)
+  if (x_size == 2) {
     spline_mode =
         _SPLINE_NATURAL_;  // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ 3 x-values are needed.
+  }
 
 #pragma omp parallel shared(x,               \
                                 x_size,      \
@@ -816,8 +821,9 @@ CLASS_ALWAYS_INLINE int array_hunt_growing_closeby(
   // can fire. Reading garbage there then reports a spurious "x > x_max" for an x that
   // merely equals x_max, which is the common case when the caller sweeps a table
   // downward from its own last row.
-  if (inf > n_lines - 2)
+  if (inf > n_lines - 2) {
     inf = n_lines - 2;
+  }
 
   while (x < x_array[inf * stride]) {
     inf--;
@@ -849,11 +855,12 @@ CLASS_ALWAYS_INLINE void array_spline_eval(const double* x_array,
   const double b = (x - x_array[inf]) / h;
   const double a = 1 - b;
 
-  for (int i = 0; i < result_size; i++)
+  for (int i = 0; i < result_size; i++) {
     result[i] = a * array[inf * n_columns + i] + b * array[sup * n_columns + i] +
                 ((a * a * a - a) * array_splined[inf * n_columns + i] +
                  (b * b * b - b) * array_splined[sup * n_columns + i]) *
                     h * h / 6.;
+  }
 }
 
 }  // namespace
@@ -909,8 +916,9 @@ void array_interpolate_linear(const double* x_array,
   const double b = (x - x_array[inf]) / (x_array[sup] - x_array[inf]);
   const double a = 1 - b;
 
-  for (int i = 0; i < result_size; i++)
+  for (int i = 0; i < result_size; i++) {
     result[i] = a * array[inf * n_columns + i] + b * array[sup * n_columns + i];
+  }
 }
 
 /**
@@ -979,8 +987,9 @@ void array_interpolate_two(const double* array_x,
   const double x_sup  = array_x[sup * n_columns_x + index_x];
   const double weight = (x - x_inf) / (x_sup - x_inf);
 
-  for (int i = 0; i < result_size; i++)
+  for (int i = 0; i < result_size; i++) {
     result[i] = array_y[i * n_lines + inf] * (1. - weight) + weight * array_y[i * n_lines + sup];
+  }
 }
 
 /**
@@ -1004,9 +1013,10 @@ void array_interpolate_two_bis(const double* array_x,
   const double x_sup  = array_x[sup * n_columns_x + index_x];
   const double weight = (x - x_inf) / (x_sup - x_inf);
 
-  for (int i = 0; i < result_size; i++)
+  for (int i = 0; i < result_size; i++) {
     result[i] = array_y[inf * n_columns_y + i] * (1. - weight) +
                 weight * array_y[sup * n_columns_y + i];
+  }
 }
 
 /**
@@ -1055,10 +1065,12 @@ void array_interpolate_cubic_equal(
              x0);
 
   i = static_cast<int>(floor((x - x0) / dx));
-  if (i < 1)
+  if (i < 1) {
     i = 1;
-  if (i > Nx - 3)
+  }
+  if (i > Nx - 3) {
     i = Nx - 3;
+  }
   frac    = (x - x0) / dx - i;
   yarray += i - 1;
 
@@ -1132,8 +1144,9 @@ void array_smooth(double* array,
     smooth[i] /= weigth;
   }
 
-  for (i = 0; i < n_lines; i++)
+  for (i = 0; i < n_lines; i++) {
     array[i * n_columns + index] = smooth[i];
+  }
 }
 
 /**

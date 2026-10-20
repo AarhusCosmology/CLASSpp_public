@@ -53,8 +53,9 @@ static void FillNcdmLayout(NCDMBaseSpecies::PerturbLayout& l, int q_size, int l_
   l.q_size = q_size;
   l.l_max  = l_max;
   l.index_per_q.clear();
-  for (int iq = 0; iq < q_size; ++iq)
+  for (int iq = 0; iq < q_size; ++iq) {
     l.index_per_q.push_back(idx0 + iq * (l_max + 1));
+  }
 }
 
 int main() {
@@ -100,8 +101,9 @@ int main() {
     assert(sp->q_size() == 12);  // (100-1)/9 + 1, NOT 100/9
     assert((int) sp->dq().size() == 12);
 
-    for (int j = 0; j < sp->q_size(); ++j)
+    for (int j = 0; j < sp->q_size(); ++j) {
       assert(sp->q()[j] == sp->q_bg()[j * 9]);  // bit-for-bit: same array entry
+    }
     assert(sp->q().front() == sp->q_bg().front());
     assert(sp->q().back() == sp->q_bg().back());  // endpoints coincide -> same band cover
 
@@ -116,10 +118,12 @@ int main() {
     // Both grids integrate d(ln q) over the SAME range: sum dq/q = ln(qmax/qmin).
     double s_pt = 0.;
     double s_bg = 0.;
-    for (int j = 0; j < sp->q_size(); ++j)
+    for (int j = 0; j < sp->q_size(); ++j) {
       s_pt += sp->dq()[j] / sp->q()[j];
-    for (int i = 0; i < static_cast<int>(sp->q_bg().size()); ++i)
+    }
+    for (int i = 0; i < static_cast<int>(sp->q_bg().size()); ++i) {
       s_bg += sp->dq_bg()[i] / sp->q_bg()[i];
+    }
     assert(std::fabs(s_pt - s_bg) < 1e-12 * s_bg);
   }
 
@@ -167,8 +171,9 @@ int main() {
     }
     // Weights integrate dq over [0, q_max]: sum dq = q_max - h/2.
     double s = 0.;
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i) {
       s += sp->dq_bg()[i];
+    }
     assert(std::fabs(s - (22. - 0.5 * h)) < 1e-12 * 22.);
   }
 
@@ -204,8 +209,9 @@ int main() {
     assert(sp->q().back() == 22.);              // endpoint inherited exactly
     assert(sp->bg_index(N_pt - 1) == 240 - 1);  // last PT point IS last BG point
     double s = 0.;
-    for (int j = 0; j < N_pt; ++j)
+    for (int j = 0; j < N_pt; ++j) {
       s += sp->dq()[j];
+    }
     assert(std::fabs(s - (22. - 0.5 * h_pt)) < 1e-12 * 22.);
   }
 
@@ -256,8 +262,9 @@ int main() {
       icc.pvecback_integration = bi.data();
       sp->SetBackgroundInitialConditions(icc);
       double m = 0.;
-      for (int i = 0; i < sp->q_size(); ++i)
+      for (int i = 0; i < sp->q_size(); ++i) {
         m = std::max(m, bi[sp->bi_f_index() + i]);
+      }
       return m;
     };
 
@@ -395,8 +402,9 @@ int main() {
     const double f_seed = bi[sp->bi_f_index()];
 
     const double p = -2.0;
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i) {
       bi[sp->bi_f_index() + i] = std::pow(sp->q_bg()[i], p) + f_seed;
+    }
     sp->ComputeBackground(0.5, bi.data(), bg.data());
     double worst = 0.;
     for (int i = 5; i < N - 5; ++i) {
@@ -431,16 +439,18 @@ int main() {
     sp->SetBackgroundInitialConditions(icc);
     // Thermal seed populated the bins well above the bare evolver seed.
     double max_f = 0.;
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i) {
       max_f = std::max(max_f, bi[sp->bi_f_index() + i]);
+    }
     assert(max_f > 1e-3);
 
     double rho_a4_ref = -1.;
     for (double a : {0.25, 0.5, 1.0}) {
       sp->ComputeBackground(a, bi.data(), bg.data());
       const double rho_a4 = sp->Rho(bg.data()) * std::pow(a, 4);
-      if (rho_a4_ref < 0.)
+      if (rho_a4_ref < 0.) {
         rho_a4_ref = rho_a4;
+      }
       assert(std::fabs(rho_a4 - rho_a4_ref) < 1e-10 * rho_a4_ref);  // ρ ∝ a⁻⁴
       assert(std::fabs(sp->P(bg.data()) - sp->Rho(bg.data()) / 3.) <
              1e-10 * sp->Rho(bg.data()));  // massless EoS
@@ -508,19 +518,24 @@ int main() {
 
     std::vector<double> old_y(7 + qn * (l_max + 1), 0.);
     std::vector<double> new_y(7 + qn * (l_max + 1), 0.);
-    for (int iq = 0; iq < qn; ++iq)
-      for (int l = 0; l <= l_max; ++l)
+    for (int iq = 0; iq < qn; ++iq) {
+      for (int l = 0; l <= l_max; ++l) {
         old_y[old_l.index_per_q[iq] + l] = Marker(iq, l);
+      }
+    }
 
     const PerturbSwitchContext ctx{};
     sp->CopyPerturbationsAcrossSwitch(old_l, new_l, old_y.data(), new_y.data(), ctx);
 
-    for (int iq = 0; iq < qn; ++iq)
-      for (int l = 0; l <= l_max; ++l)
+    for (int iq = 0; iq < qn; ++iq) {
+      for (int l = 0; l <= l_max; ++l) {
         assert(new_y[new_l.index_per_q[iq] + l] == Marker(iq, l));
+      }
+    }
     // Slots outside the species' layout stay untouched (still zero).
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 3; ++i) {
       assert(new_y[i] == 0.);
+    }
     // Uninitialized layouts (shape -1) must be a safe no-op.
     NCDMBaseSpecies::PerturbLayout empty_old;
     NCDMBaseSpecies::PerturbLayout empty_new;
@@ -550,9 +565,11 @@ int main() {
         start = i + 1;
       }
     }
-    for (size_t i = 0; i < cols.size(); ++i)
-      for (size_t j = i + 1; j < cols.size(); ++j)
+    for (size_t i = 0; i < cols.size(); ++i) {
+      for (size_t j = i + 1; j < cols.size(); ++j) {
         assert(cols[i] != cols[j]);
+      }
+    }
     // Both statistics-specific density columns are present.
     assert(titles.find("rho_dr_drx_l") != std::string::npos);
     assert(titles.find("rho_dr_drx_phi") != std::string::npos);
@@ -584,8 +601,9 @@ int main() {
     icc.pvecback_integration = bi.data();
     sp->SetBackgroundInitialConditions(icc);
     double max_f = 0.;
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i) {
       max_f = std::max(max_f, bi[sp->bi_f_index() + i]);
+    }
     assert(max_f > 1e-3);  // thermal seed actually triggered (f_ini_ fallback == 1)
 
     sp->ComputeBackground(1.0, bi.data(), bg.data());

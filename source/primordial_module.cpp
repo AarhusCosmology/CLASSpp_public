@@ -207,13 +207,15 @@ void PrimordialModule::primordial_init() {
 
   if (!ppt->has_perturbations) {
     lnk_size_ = 0;
-    if (ppm->primordial_verbose > 0)
+    if (ppm->primordial_verbose > 0) {
       printf("No perturbations requested. Primordial module skipped.\n");
+    }
     return;
   }
   else {
-    if (ppm->primordial_verbose > 0)
+    if (ppm->primordial_verbose > 0) {
       printf("Computing primordial spectra");
+    }
   }
 
   A_s_     = ppm->A_s;
@@ -253,8 +255,9 @@ void PrimordialModule::primordial_init() {
   /** - deal with case of analytic primordial spectra (with amplitudes, tilts, runnings, etc.) */
 
   if (ppm->primordial_spec_type == analytic_Pk) {
-    if (ppm->primordial_verbose > 0)
+    if (ppm->primordial_verbose > 0) {
       printf(" (analytic spectrum)\n");
+    }
 
     primordial_analytic_spectrum_init();
 
@@ -303,13 +306,16 @@ void PrimordialModule::primordial_init() {
 
                 /* ... or enforce definite positive correlation matrix */
 
-                if (pk > sqrt(pk1 * pk2))
+                if (pk > sqrt(pk1 * pk2)) {
                   lnpk_[index_md][index_k * ic_ic_size_[index_md] + index_ic1_ic2] = 1.;
-                else if (pk < -sqrt(pk1 * pk2))
+                }
+                else if (pk < -sqrt(pk1 * pk2)) {
                   lnpk_[index_md][index_k * ic_ic_size_[index_md] + index_ic1_ic2] = -1.;
-                else
+                }
+                else {
                   lnpk_[index_md][index_k * ic_ic_size_[index_md] + index_ic1_ic2] = pk / sqrt(pk1 *
                                                                                                pk2);
+                }
               }
             }
             else {
@@ -330,8 +336,9 @@ void PrimordialModule::primordial_init() {
            (ppm->primordial_spec_type == inflation_V_end)) {
     primordial_inflation_indices();
 
-    if (ppm->primordial_verbose > 0)
+    if (ppm->primordial_verbose > 0) {
       printf(" (simulating inflation)\n");
+    }
 
     primordial_inflation_solve_inflation();
   }
@@ -348,8 +355,9 @@ void PrimordialModule::primordial_init() {
                "external Pk module cannot work if you ask for isocurvature modes (but that could "
                "be implemented easily in the future!)");
 
-    if (ppm->primordial_verbose > 0)
+    if (ppm->primordial_verbose > 0) {
       printf(" (Pk calculated externally)\n");
+    }
 
     primordial_external_spectrum_init();
   }
@@ -432,8 +440,9 @@ void PrimordialModule::primordial_init() {
 
       beta_s_ = (lnpk_plusplus - 2. * lnpk_plus + 2. * lnpk_minus - lnpk_minusminus) / pow(dlnk, 3);
 
-      if (ppm->primordial_verbose > 0)
+      if (ppm->primordial_verbose > 0) {
         printf(" -> A_s=%g  n_s=%g  alpha_s=%g\n", A_s_, n_s_, alpha_s_);
+      }
     }
 
     if (ppt->has_tensors) {
@@ -456,8 +465,9 @@ void PrimordialModule::primordial_init() {
       n_t_     = (lnpk_plus - lnpk_minus) / (2. * dlnk);
       alpha_t_ = (lnpk_plus - 2. * lnpk_pivot + lnpk_minus) / pow(dlnk, 2);
 
-      if (ppm->primordial_verbose > 0)
+      if (ppm->primordial_verbose > 0) {
         printf(" -> r=%g  n_t=%g  alpha_t=%g\n", r_, n_t_, alpha_t_);
+      }
     }
   }
 }
@@ -511,8 +521,9 @@ void PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double 
 
   lnk_.resize(lnk_size_);
 
-  for (int i = 0; i < lnk_size_; i++)
+  for (int i = 0; i < lnk_size_; i++) {
     lnk_[i] = log(kmin) + i * log(10.) / k_per_decade;
+  }
 }
 
 /**
@@ -898,8 +909,9 @@ void PrimordialModule::primordial_inflation_potential(double phi,
       *V   = ppm->V0 * (x * x_pm1 + b * f * cos(x / f));
       *dV  = -ppm->V0 * (p * x_pm1 - b * sin(x / f));
       *ddV = ppm->V0 * (-b / f * cos(x / f));
-      if (p != 1.)
+      if (p != 1.) {
         *ddV += ppm->V0 * p * (p - 1.) * x_pm1 / x;
+      }
       break;
     }
 
@@ -1034,8 +1046,9 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
         assuming slow-roll attractor solution has been reached. If no
         solution, code will stop there. */
 
-      if (ppm->primordial_verbose > 1)
+      if (ppm->primordial_verbose > 1) {
         printf(" (search attractor at pivot)\n");
+      }
 
       primordial_inflation_find_attractor(phi_pivot_,
                                           ppr->primordial_inflation_attractor_precision_pivot,
@@ -1073,16 +1086,19 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
       computed. Otherwise, if slow-roll brakes too early, model is not
       suitable and run stops. */
 
-  if (ppm->primordial_verbose > 1)
+  if (ppm->primordial_verbose > 1) {
     printf(" (check inflation duration after phi_pivot=%e)\n", phi_pivot_);
+  }
 
   k_max  = exp(lnk_[lnk_size_ - 1]);
   aH_end = k_max / ppr->primordial_inflation_ratio_max;
 
   y[index_in_a_]   = a_pivot;
   y[index_in_phi_] = phi_pivot_;
-  if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_V_end))
+  if ((ppm->primordial_spec_type == inflation_V) ||
+      (ppm->primordial_spec_type == inflation_V_end)) {
     y[index_in_dphi_] = a_pivot * dphidt_pivot;
+  }
 
   primordial_inflation_evolve_background(y.data(),
                                          dy.data(),
@@ -1109,8 +1125,9 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
      found. For potential such that no solution exists (no long-enough
      slow-roll period before the pivot scale), the run stops. */
 
-  if (ppm->primordial_verbose > 1)
+  if (ppm->primordial_verbose > 1) {
     printf(" (check inflation duration before pivot)\n");
+  }
 
   k_min  = exp(lnk_[0]);
   aH_ini = k_min / ppr->primordial_inflation_ratio_min;
@@ -1224,8 +1241,9 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
   /** - starting from this time, i.e. from y_ini[ ], we run the routine
       which takes care of computing the primordial spectrum. */
 
-  if (ppm->primordial_verbose > 1)
+  if (ppm->primordial_verbose > 1) {
     printf(" (compute spectrum)\n");
+  }
 
   if (ppm->behavior == numerical) {
     primordial_inflation_spectra(y_ini.data());
@@ -1242,8 +1260,10 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
 
   y[index_in_a_]   = y_ini[index_in_a_];
   y[index_in_phi_] = y_ini[index_in_phi_];
-  if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_V_end))
+  if ((ppm->primordial_spec_type == inflation_V) ||
+      (ppm->primordial_spec_type == inflation_V_end)) {
     y[index_in_dphi_] = y_ini[index_in_dphi_];
+  }
 
   primordial_inflation_evolve_background(y.data(),
                                          dy.data(),
@@ -1265,8 +1285,9 @@ void PrimordialModule::primordial_inflation_solve_inflation() {
 
   phi_max_ = y[index_in_phi_];
 
-  if (ppm->primordial_verbose > 1)
+  if (ppm->primordial_verbose > 1) {
     printf(" (observable power spectrum goes from %e to %e)\n", phi_min_, phi_max_);
+  }
 }
 
 /**
@@ -1287,8 +1308,10 @@ void PrimordialModule::primordial_inflation_analytic_spectra(double* y_ini) {
   /** - initialize the background part of the running vector */
   y[index_in_a_]   = y_ini[index_in_a_];
   y[index_in_phi_] = y_ini[index_in_phi_];
-  if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_V_end))
+  if ((ppm->primordial_spec_type == inflation_V) ||
+      (ppm->primordial_spec_type == inflation_V_end)) {
     y[index_in_dphi_] = y_ini[index_in_dphi_];
+  }
 
   /** - loop over Fourier wavenumbers */
   for (int index_k = 0; index_k < lnk_size_; index_k++) {
@@ -1375,8 +1398,10 @@ void PrimordialModule::primordial_inflation_one_wavenumber(double* y_ini, int in
   /** - initialize the background part of the running vector */
   y[index_in_a_]   = y_ini[index_in_a_];
   y[index_in_phi_] = y_ini[index_in_phi_];
-  if ((ppm->primordial_spec_type == inflation_V) || (ppm->primordial_spec_type == inflation_V_end))
+  if ((ppm->primordial_spec_type == inflation_V) ||
+      (ppm->primordial_spec_type == inflation_V_end)) {
     y[index_in_dphi_] = y_ini[index_in_dphi_];
+  }
 
   /** - evolve the background until the relevant initial time for
       integrating perturbations */
@@ -1773,8 +1798,9 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
       // (a+[da/dx]*dx) H = aH (1 + [da/dx] / a dx)
       // where dtau can be conformal or proper time
       quantity = dy[index_in_a_] * (1. + dy[index_in_a_] / y[index_in_a_] * dtau);
-      if (time == conformal)
+      if (time == conformal) {
         quantity /= y[index_in_a_];
+      }
       break;
     case _phi_:
       // next (approximate) value of phi after next step
@@ -1786,8 +1812,9 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
       // current value of quantity = - d2a/dt2 /a = [- (a'/a)^2 + 3/2 8pi/3 phi'^2]/a^2
       quantity = -pow(dy[index_in_a_] / y[index_in_a_], 2) +
                  4 * _PI_ * y[index_in_dphi_] * y[index_in_dphi_];
-      if (time == conformal)
+      if (time == conformal) {
         quantity /= pow(y[index_in_a_], 2);
+      }
 
       // check that we are in the right case
       class_test(ppm->primordial_spec_type != inflation_V_end,
@@ -1882,8 +1909,9 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
         // (a+[da/dx]*dx) H = aH (1 + [da/dx] / a dx)
         // where dtau can be conformal or proper time
         quantity = dy[index_in_a_] * (1. + dy[index_in_a_] / y[index_in_a_] * dtau);
-        if (time == conformal)
+        if (time == conformal) {
           quantity /= y[index_in_a_];
+        }
         break;
       case _phi_:
         // next (approximate) value of phi after next step
@@ -1893,8 +1921,9 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
         // current value of quantity = - d2a/dt2 /a = [- (a'/a)^2 + 3/2 8pi/3 phi'^2]/a^2
         quantity = -pow(dy[index_in_a_] / y[index_in_a_], 2) +
                    4 * _PI_ * y[index_in_dphi_] * y[index_in_dphi_];
-        if (time == conformal)
+        if (time == conformal) {
           quantity /= pow(y[index_in_a_], 2);
+        }
         break;
       case _a_:
         // next (approximate) value of a after next step
@@ -1955,8 +1984,9 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
   y[index_in_a_]   += dy[index_in_a_] * dtau;
   y[index_in_phi_] += dy[index_in_phi_] * dtau;
   if ((direction == forward) && ((ppm->primordial_spec_type == inflation_V) ||
-                                 (ppm->primordial_spec_type == inflation_V_end)))
+                                 (ppm->primordial_spec_type == inflation_V_end))) {
     y[index_in_dphi_] += dy[index_in_dphi_] * dtau;
+  }
 
   // this last step updates also the dy[]
   primordial_inflation_derivs(tau_end, y, dy, &pipaw);
@@ -2142,10 +2172,12 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
     do {
       phi_mid = 0.5 * (phi_left + phi_right);
       primordial_inflation_get_epsilon(phi_mid, &epsilon);
-      if (epsilon < ppr->primordial_inflation_small_epsilon)
+      if (epsilon < ppr->primordial_inflation_small_epsilon) {
         phi_left = phi_mid;
-      else
+      }
+      else {
         phi_right = phi_mid;
+      }
     } while (fabs(epsilon - ppr->primordial_inflation_small_epsilon) >
              ppr->primordial_inflation_small_epsilon_tol);
 
@@ -2296,8 +2328,9 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
 
     phi_stop = y[1];
 
-    if (ppm->primordial_verbose > 1)
+    if (ppm->primordial_verbose > 1) {
       printf(" (inflation stops in phi_stop = %e)\n", phi_stop);
+    }
 
     /** - --> go back to phi_try, and now find phi_pivot such that the amount
         of inflation between phi_pivot and the end of inflation is
@@ -2448,8 +2481,9 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
 
     phi_stop = y[1];
 
-    if (ppm->primordial_verbose > 1)
+    if (ppm->primordial_verbose > 1) {
       printf(" (inflation stops in phi_stop = %e)\n", phi_stop);
+    }
 
     /** - --> go back to phi_try, and now find phi_pivot such that the amount
         of inflation between phi_pivot and the end of inflation is
@@ -2676,8 +2710,9 @@ void PrimordialModule::primordial_inflation_derivs_member(double tau,
   }
 
   if (ppipaw->N <=
-      in_bg_size_)  // mind the <= instead of ==, necessary because for backward integration 1 equation is removed
+      in_bg_size_) {  // mind the <= instead of ==, necessary because for backward integration 1 equation is removed
     return;
+  }
 
   // PERTURBATIONS
 
@@ -2734,8 +2769,9 @@ void PrimordialModule::primordial_external_spectrum_init() {
   n_data_guess = 100;
   k.reserve(n_data_guess);
   pks.reserve(n_data_guess);
-  if (ppt->has_tensors)
+  if (ppt->has_tensors) {
     pkt.reserve(n_data_guess);
+  }
   /* Prepare the command */
   /* If the command is just a "cat", no arguments need to be passed */
   std::string arguments;
@@ -2762,8 +2798,9 @@ void PrimordialModule::primordial_external_spectrum_init() {
   }
   /* write the actual command in a string */
   std::string command_with_arguments = ppm->command + " " + arguments;
-  if (ppm->primordial_verbose > 0)
+  if (ppm->primordial_verbose > 0) {
     printf(" -> running: %s\n", command_with_arguments.c_str());
+  }
 
   /** - Launch the command and retrieve the output */
   /* Launch the process */
@@ -2825,8 +2862,9 @@ void PrimordialModule::primordial_external_spectrum_init() {
   for (int index_k = 0; index_k < lnk_size_; index_k++) {
     lnk_[index_k]                                            = log(k[index_k]);
     lnpk_[perturbations_module_->index_md_scalars_][index_k] = log(pks[index_k]);
-    if (ppt->has_tensors)
+    if (ppt->has_tensors) {
       lnpk_[perturbations_module_->index_md_tensors_][index_k] = log(pkt[index_k]);
+    }
     /* DEBUG (with tensors)
        fprintf(stderr,"Storing[%d(+1) of %d]: \n k = %g == %g\n pks = %g == %g\n pkt = %g == %g\n",
        index_k, n_data,
@@ -2838,9 +2876,10 @@ void PrimordialModule::primordial_external_spectrum_init() {
   /** - Tell CLASS that there are scalar (and tensor) modes */
   is_non_zero_[perturbations_module_->index_md_scalars_][perturbations_module_->index_ic_ad_] =
       true;
-  if (ppt->has_tensors)
+  if (ppt->has_tensors) {
     is_non_zero_[perturbations_module_->index_md_tensors_][perturbations_module_->index_ic_ten_] =
         true;
+  }
 }
 
 void PrimordialModule::primordial_output_titles(std::string& titles) const {

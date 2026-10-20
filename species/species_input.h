@@ -32,8 +32,11 @@ class SpeciesInput {
   /** Read-with-default: get<T>(field) if present, else @p fallback. */
   template <class T>
   T get_or(const std::string& field, T fallback) const {
-    if (auto v = get<T>(field))
-      return *v;
+    if (auto v = get<T>(field)) {
+      {
+        return *v;
+      }
+    }
     return fallback;
   }
 
@@ -46,8 +49,11 @@ class SpeciesInput {
    *  severe. */
   bool get_flag(const std::string& field, bool fallback) const {
     auto v = get<std::string>(field);
-    if (!v)
-      return fallback;
+    if (!v) {
+      {
+        return fallback;
+      }
+    }
     const char c = v->empty() ? '\0' : (*v)[0];
     class_test_severe(c != 'y' && c != 'Y' && c != 'n' && c != 'N',
                       "species '%s': field '%s' must begin with 'y' or 'n', not '%s'",
@@ -60,8 +66,11 @@ class SpeciesInput {
   /** Required accessor: throws std::invalid_argument if the field is absent. */
   template <class T>
   T require(const std::string& field) const {
-    if (auto v = get<T>(field))
-      return *v;
+    if (auto v = get<T>(field)) {
+      {
+        return *v;
+      }
+    }
     class_stop_severe("species '%s': missing required field '%s'",
                       instance_name_.c_str(),
                       field.c_str());

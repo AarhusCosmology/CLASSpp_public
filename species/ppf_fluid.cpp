@@ -41,8 +41,9 @@ void PpfFluid::FillSources(const BaseSpecies::PerturbLayout& /*base*/,
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
   const double* pvecback     = ppw->pvecback.data();
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   if (index_tp_delta_ >= 0) {
     const double w_fld     = W(pvecback);
@@ -92,8 +93,9 @@ void PpfFluid::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& o
                                              const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.idx_Gamma >= 0 && new_l.idx_Gamma >= 0)
+  if (old_l.idx_Gamma >= 0 && new_l.idx_Gamma >= 0) {
     new_y[new_l.idx_Gamma] = old_y[old_l.idx_Gamma];
+  }
 }
 
 void PpfFluid::ComputePpf(double k,
@@ -122,8 +124,9 @@ void PpfFluid::ComputePpf(double k,
       Use the asymptotic solution Gamma=Gamma'=0 in that case.
   */
   double Gamma_fld;
-  if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max)
+  if (c_gamma_k_H_square > ppr->c_gamma_k_H_square_max) {
     Gamma_fld = 0.;
+  }
   else {
     const auto& layout = static_cast<const PerturbLayout&>(
         *ppw->pv->species_layouts[collection_index_]);

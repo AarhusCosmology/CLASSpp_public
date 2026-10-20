@@ -21,10 +21,12 @@ void IDM_DR_IDR_Species::RegisterTransferSourceIndices(int& index_tp,
 }
 
 std::optional<double> IDM_DR_IDR_Species::GetParam(const std::string& name) const {
-  if (name == "T_idr")
+  if (name == "T_idr") {
     return idr().T_idr();
-  if (name == "a_idm_dr")
+  }
+  if (name == "a_idm_dr") {
     return idm_dr().a_idm_dr();
+  }
   return std::nullopt;
 }
 
@@ -44,30 +46,37 @@ void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout
                                                 const PerturbIcContext& ctx) {
   // Children have no IC logic; all ICs live on this composite.
   const PerturbationsModule* mod = ctx.p_mod;
-  if (ctx.index_ic != mod->index_ic_ad_)
+  if (ctx.index_ic != mod->index_ic_ad_) {
     return;
+  }
 
   const auto& idm_dr_lay = idm_dr_layout(base);
   const auto& idr_lay    = idr_layout(base);
 
   if (has_idm_dr()) {
-    if (idm_dr_lay.idx_delta >= 0)
+    if (idm_dr_lay.idx_delta >= 0) {
       y[idm_dr_lay.idx_delta] = 3. / 4. * ctx.delta_g_ic;
-    if (idm_dr_lay.idx_theta >= 0)
+    }
+    if (idm_dr_lay.idx_theta >= 0) {
       y[idm_dr_lay.idx_theta] = ctx.theta_ur;
+    }
   }
   if (has_idr()) {
-    if (idr_lay.idx_delta >= 0)
+    if (idr_lay.idx_delta >= 0) {
       y[idr_lay.idx_delta] = ctx.delta_ur;
-    if (idr_lay.idx_theta >= 0)
+    }
+    if (idr_lay.idx_theta >= 0) {
       y[idr_lay.idx_theta] = ctx.theta_ur;
+    }
     if (idr_->idr_nature() == idr_free_streaming &&
         (!has_idm_dr() ||
          (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_off)))) {
-      if (idr_lay.idx_shear >= 0)
+      if (idr_lay.idx_shear >= 0) {
         y[idr_lay.idx_shear] = ctx.shear_ur;
-      if (idr_lay.idx_l3 >= 0)
+      }
+      if (idr_lay.idx_l3 >= 0) {
         y[idr_lay.idx_l3] = ctx.l3_ur;
+      }
     }
   }
 }
@@ -80,8 +89,9 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   perturb_workspace* ppw     = ctx.ppw;
 
   // These sources are scalar-only
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   auto set_source = [&](int index_tp, double value) {
     p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, index_tp, ctx.index_tau, ctx.index_k, value);
@@ -103,23 +113,27 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
 
   // ── IDR ───────────────────────────────────────────────────────────────────
   if (index_tp_delta_idr_ >= 0) {
-    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off))
+    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off)) {
       set_source(index_tp_delta_idr_,
                  y[idr_lay.idx_delta] +
                      4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
-    else
+    }
+    else {
       set_source(index_tp_delta_idr_,
                  ppw->rsa_delta_idr +
                      4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
+    }
   }
 
   if (index_tp_theta_idr_ >= 0) {
-    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off))
+    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off)) {
       set_source(index_tp_theta_idr_,
                  y[idr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
-    else
+    }
+    else {
       set_source(index_tp_theta_idr_,
                  ppw->rsa_theta_idr + ctx.theta_shift);  // N-body gauge correction
+    }
   }
 }
 
@@ -142,8 +156,9 @@ void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
     }
   }
   else if (fmt == file_format::camb_format) {
-    if (section != TransferColumnSection::velocity)
+    if (section != TransferColumnSection::velocity) {
       w.Add("-T_idm_dr/k2", index_tp_delta_idm_dr_, index_tp_delta_idm_dr_ >= 0);
+    }
   }
 }
 
@@ -214,8 +229,9 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
 
   w.Add("delta_idr", delta_idr, has_idr());
   w.Add("theta_idr", theta_idr, has_idr());
-  if (has_idr() && idr_->idr_nature() == idr_free_streaming)
+  if (has_idr() && idr_->idr_nature() == idr_free_streaming) {
     w.Add("shear_idr", shear_idr, true);
+  }
   w.Add("delta_idm_dr", delta_idm_dr, has_idm_dr());
   w.Add("theta_idm_dr", theta_idm_dr, has_idm_dr());
 }
@@ -274,8 +290,9 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
 
   // No coupling terms if either sector is absent or coupling rate vanishes.
   // This also guards the Sinv = rho_idr/rho_idm_dr and 1/dmu_idm_dr divisions.
-  if (rho_idm_dr <= 0. || rho_idr <= 0. || dmu_idm_dr <= 0.)
+  if (rho_idm_dr <= 0. || rho_idr <= 0. || dmu_idm_dr <= 0.) {
     return;
+  }
 
   const auto& idm_dr_lay    = idm_dr_layout(*pv->species_layouts[collection_index_]);
   const auto& idr_lay       = idr_layout(*pv->species_layouts[collection_index_]);
@@ -354,8 +371,9 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
   std::vector<Named> result;
   // Read both slots from the resolved coupled-species budget.  Missing budget
   // (shooting-guess fallback) or both slots absent → composite is absent.
-  if (!ctx.omega_budget)
+  if (!ctx.omega_budget) {
     return result;
+  }
   const double omega0_idm_dr = ctx.omega_budget->idm_dr.value_or(0.);
   const double omega0_idr    = ctx.omega_budget->idr.value_or(0.);
   if (omega0_idm_dr != 0. || omega0_idr != 0.) {
@@ -396,51 +414,58 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     const bool f_a   = a_param_opt.has_value();
     const bool f_ad  = a_dark_opt.has_value();
     const bool f_g   = gamma0_opt.has_value();
-    if (f_a)
+    if (f_a) {
       a_param = *a_param_opt;
-    if (f_ad)
+    }
+    if (f_ad) {
       a_dark = *a_dark_opt;
-    if (f_g)
+    }
+    if (f_g) {
       gamma0 = *gamma0_opt;
+    }
     class_test_severe(((int) f_a + (int) f_ad + (int) f_g) >= 2,
                       "In input file, you can only enter one of a_idm_dr, a_dark or Gamma_0_nadm, "
                       "choose one");
 
     if (f_a) {
       a_idm_dr = a_param;
-      if (input_verbose > 1)
+      if (input_verbose > 1) {
         printf(
             "You passed a_idm_dr = a_dark = %e, this is equivalent to Gamma_0_nadm = %e in the "
             "NADM notation. \n",
             a_param,
             a_param * (4. / 3.) * (h2 * omega0_idr));
+      }
     }
     else if (f_ad) {
       a_idm_dr = a_dark;
-      if (input_verbose > 1)
+      if (input_verbose > 1) {
         printf(
             "You passed a_dark = a_idm_dr = %e, this is equivalent to Gamma_0_nadm = %e in the "
             "NADM notation. \n",
             a_dark,
             a_dark * (4. / 3.) * (h2 * omega0_idr));
+      }
     }
     else if (f_g) {
       a_idm_dr = gamma0 * (3. / 4.) / (h2 * omega0_idr);
-      if (input_verbose > 1)
+      if (input_verbose > 1) {
         printf(
             "You passed Gamma_0_nadm = %e, this is equivalent to a_idm_dr = a_dark = %e in the "
             "ETHOS notation. \n",
             gamma0,
             a_idm_dr);
+      }
     }
 
     if (f_g) {
       // If the user passed Gamma_0_nadm, assume they want nadm parameterisation.
       nindex_idm_dr = 0.;
       idr_nature    = idr_fluid;
-      if (input_verbose > 1)
+      if (input_verbose > 1) {
         printf("NADM requested. Defaulting on nindex_idm_dr = %e and idr_nature = fluid \n",
                nindex_idm_dr);
+      }
     }
     else {
       // nindex_dark / nindex_idm_dr — at most one may be set.
@@ -450,17 +475,21 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
       auto nd_idm_opt      = ctx.pfc->get<double>("nindex_idm_dr");
       const bool h_nd_dark = nd_dark_opt.has_value();
       const bool h_nd_idm  = nd_idm_opt.has_value();
-      if (h_nd_dark)
+      if (h_nd_dark) {
         nd_dark = *nd_dark_opt;
-      if (h_nd_idm)
+      }
+      if (h_nd_idm) {
         nd_idm = *nd_idm_opt;
+      }
       class_test_severe(h_nd_dark && h_nd_idm,
                         "In input file, you can only enter one of nindex_dark, nindex_idm_dr, "
                         "choose one");
-      if (h_nd_dark)
+      if (h_nd_dark) {
         nindex_idm_dr = nd_dark;
-      if (h_nd_idm)
+      }
+      if (h_nd_idm) {
         nindex_idm_dr = nd_idm;
+      }
 
       if (auto nature_opt = ctx.pfc->get<std::string>("idr_nature")) {
         const std::string& nature = *nature_opt;
@@ -486,16 +515,20 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
       auto m2_opt            = ctx.pfc->get<double>("m_dm");
       const bool found_m_idm = m1_opt.has_value();
       const bool found_m_dm  = m2_opt.has_value();
-      if (found_m_idm)
+      if (found_m_idm) {
         m1 = *m1_opt;
-      if (found_m_dm)
+      }
+      if (found_m_dm) {
         m2 = *m2_opt;
+      }
       class_test_severe(found_m_idm && found_m_dm,
                         "In input file, you can only enter one of m_idm, m_dm, choose one");
-      if (found_m_idm)
+      if (found_m_idm) {
         m_idm = m1;
-      if (found_m_dm)
+      }
+      if (found_m_dm) {
         m_idm = m2;
+      }
     }
 
     // b_dark / b_idr — at most one may be set.
@@ -506,16 +539,20 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
       auto b2_opt             = ctx.pfc->get<double>("b_idr");
       const bool found_b_dark = b1_opt.has_value();
       const bool found_b_idr  = b2_opt.has_value();
-      if (found_b_dark)
+      if (found_b_dark) {
         b1 = *b1_opt;
-      if (found_b_idr)
+      }
+      if (found_b_idr) {
         b2 = *b2_opt;
+      }
       class_test_severe(found_b_dark && found_b_idr,
                         "In input file, you can only enter one of b_dark, b_idr, choose one");
-      if (found_b_dark)
+      if (found_b_dark) {
         b_idr = b1;
-      if (found_b_idr)
+      }
+      if (found_b_idr) {
         b_idr = b2;
+      }
     }
 
     // Number of l>=2 angular coefficients (one per multipole l = 2..l_max_idr).
@@ -527,13 +564,15 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     std::vector<double> alpha_idm_dr;
     {
       auto alpha = ctx.pfc->get<std::vector<double>>("alpha_idm_dr");
-      if (!alpha)
+      if (!alpha) {
         alpha = ctx.pfc->get<std::vector<double>>("alpha_dark");
+      }
       if (alpha) {
         alpha_idm_dr           = *alpha;
         const int entries_read = static_cast<int>(alpha_idm_dr.size());
-        if (entries_read != n_idr_coeff)
+        if (entries_read != n_idr_coeff) {
           alpha_idm_dr.resize(n_idr_coeff, alpha_idm_dr[entries_read - 1]);
+        }
       }
       else {
         alpha_idm_dr.assign(n_idr_coeff, 1.5);
@@ -544,13 +583,15 @@ std::vector<Named> IDM_DR_IDR_Species::CreateAll(const SpeciesBuildContext& ctx)
     std::vector<double> beta_idr;
     {
       auto beta = ctx.pfc->get<std::vector<double>>("beta_idr");
-      if (!beta)
+      if (!beta) {
         beta = ctx.pfc->get<std::vector<double>>("beta_dark");
+      }
       if (beta) {
         beta_idr               = *beta;
         const int entries_read = static_cast<int>(beta_idr.size());
-        if (entries_read != n_idr_coeff)
+        if (entries_read != n_idr_coeff) {
           beta_idr.resize(n_idr_coeff, beta_idr[entries_read - 1]);
+        }
       }
       else {
         beta_idr.assign(n_idr_coeff, 1.5);
@@ -583,17 +624,22 @@ void IDM_DR_IDR_Species::MarkUsedInSources(const BaseSpecies::PerturbLayout& bas
   /* IDM_DR_IDR has no tensor-mode slots; idx_l3 < 0 also when TCA is on.
      index_ap_rsa_idr and index_ap_tca_idm_dr are only defined in scalar mode,
      so we must not access them in tensor/vector mode. */
-  if (idr_lay.idx_l3 < 0)
+  if (idr_lay.idx_l3 < 0) {
     return;
+  }
   /* IDR l>=3 multipoles not needed in sources when rsa_idr is off, idr is
      free-streaming, and tca_idm_dr is off. */
-  if (ppw->approx[ppw->index_ap_rsa_idr] != static_cast<int>(rsa_idr_off))
+  if (ppw->approx[ppw->index_ap_rsa_idr] != static_cast<int>(rsa_idr_off)) {
     return;
-  if (idr_->idr_nature() != idr_free_streaming)
+  }
+  if (idr_->idr_nature() != idr_free_streaming) {
     return;
-  if (ppw->approx[ppw->index_ap_tca_idm_dr] != static_cast<int>(tca_idm_dr_off))
+  }
+  if (ppw->approx[ppw->index_ap_tca_idm_dr] != static_cast<int>(tca_idm_dr_off)) {
     return;
+  }
 
-  for (int idx = idr_lay.idx_l3; idx <= idr_lay.idx_delta + idr_lay.l_max; ++idx)
+  for (int idx = idr_lay.idx_l3; idx <= idr_lay.idx_delta + idr_lay.l_max; ++idx) {
     used_in_sources[idx] = false;
+  }
 }

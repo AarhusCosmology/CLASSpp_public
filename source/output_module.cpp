@@ -77,13 +77,15 @@ void OutputModule::output_init() {
   if ((!ppt->has_cls) && (!ppt->has_pk_matter) && (!ppt->has_density_transfers) &&
       (!ppt->has_velocity_transfers) && (!pop->write_background) && (!pop->write_thermodynamics) &&
       (!pop->write_primordial)) {
-    if (pop->output_verbose > 0)
+    if (pop->output_verbose > 0) {
       printf("No output files requested. Output module skipped.\n");
+    }
     return;
   }
   else {
-    if (pop->output_verbose > 0)
+    if (pop->output_verbose > 0) {
       printf("Writing output files in %s... \n", pop->root.c_str());
+    }
   }
 
   /** - deal with all anisotropy power spectra \f$ C_l\f$'s */
@@ -419,8 +421,9 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
 
   /** - preliminary: check whether we need to output the decomposition into contributions from each initial condition */
 
-  if ((pk_output == pk_linear) && (nonlinear_module_->ic_size_ > 1))
+  if ((pk_output == pk_linear) && (nonlinear_module_->ic_size_ > 1)) {
     do_ic = true;
+  }
 
   /** - allocate arrays to store the P(k) */
 
@@ -442,16 +445,20 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
   for (int index_pk = 0; index_pk < nonlinear_module_->pk_size_; index_pk++) {
     std::string type_suffix;
     if ((nonlinear_module_->has_pk_m_) && (index_pk == nonlinear_module_->index_pk_m_)) {
-      if (pk_output == pk_linear)
+      if (pk_output == pk_linear) {
         type_suffix = "pk";
-      else
+      }
+      else {
         type_suffix = "pk_nl";
+      }
     }
     if ((nonlinear_module_->has_pk_cb_) && (index_pk == nonlinear_module_->index_pk_cb_)) {
-      if (pk_output == pk_linear)
+      if (pk_output == pk_linear) {
         type_suffix = "pk_cb";
-      else
+      }
+      else {
         type_suffix = "pk_cb_nl";
+      }
     }
 
     /** - loop over z */
@@ -466,8 +473,9 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
                  pop->z_pk[index_z]);
 
       std::string redshift_suffix;
-      if (pop->z_pk_num != 1)
+      if (pop->z_pk_num != 1) {
         redshift_suffix = "z" + std::to_string(index_z + 1) + "_";
+      }
 
       /** - second, open only the relevant files and write a header in each of them */
 
@@ -660,8 +668,9 @@ void OutputModule::output_tk() {
   if (pop->output_format == file_format::camb_format) {
     int n_ncdm_family = 0;
     for (auto& [name, sp] : all_species_) {
-      if (dynamic_cast<NCDMBaseSpecies*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+      if (dynamic_cast<NCDMBaseSpecies*>(sp.get()) || dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
         ++n_ncdm_family;
+      }
     }
     class_test(n_ncdm_family > 1,
                "you wish to output the transfer functions in CMBFAST/CAMB format but you have more "
@@ -694,8 +703,9 @@ void OutputModule::output_tk() {
                pop->z_pk[index_z]);
 
     std::string redshift_suffix;
-    if (pop->z_pk_num != 1)
+    if (pop->z_pk_num != 1) {
       redshift_suffix = "z" + std::to_string(index_z + 1) + "_";
+    }
 
     /** - second, open only the relevant files, and write a heading in each of them */
 
@@ -710,10 +720,12 @@ void OutputModule::output_tk() {
                                                                     ic_suffix);
 
       std::string file_name;
-      if ((ppt->has_ad) && (perturbations_module_->ic_size_[index_md] == 1))
+      if ((ppt->has_ad) && (perturbations_module_->ic_size_[index_md] == 1)) {
         file_name = pop->root + redshift_suffix + "tk.dat";
-      else
+      }
+      else {
         file_name = pop->root + redshift_suffix + "tk_" + ic_suffix + ".dat";
+      }
 
       FILE* tkfile;
       class_open(tkfile, file_name.c_str(), "w");
@@ -849,8 +861,9 @@ void OutputModule::output_thermodynamics() {
     fprintf(thermofile, "#         w_b = baryon equation of state parameter \n");
     fprintf(thermofile, "#       c_b^2 = baryon sound speed squared \n");
     fprintf(thermofile, "#       tau_d = baryon drag optical depth \n");
-    if (pth->compute_damping_scale)
+    if (pth->compute_damping_scale) {
       fprintf(thermofile, "#         r_d = approximate comoving value of photon damping scale \n");
+    }
     if (all_species_.count("IDM_DR_IDR") &&
         static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
       fprintf(thermofile,
@@ -1196,20 +1209,27 @@ void OutputModule::output_one_line_of_cl(FILE* clfile,
                              cl[spectra_module_->index_ct_ep_],
                          spectra_module_->has_ep_);
     index_ct_rest = 0;
-    if (spectra_module_->has_tt_)
+    if (spectra_module_->has_tt_) {
       index_ct_rest++;
-    if (spectra_module_->has_ee_)
+    }
+    if (spectra_module_->has_ee_) {
       index_ct_rest++;
-    if (spectra_module_->has_bb_)
+    }
+    if (spectra_module_->has_bb_) {
       index_ct_rest++;
-    if (spectra_module_->has_te_)
+    }
+    if (spectra_module_->has_te_) {
       index_ct_rest++;
-    if (spectra_module_->has_pp_)
+    }
+    if (spectra_module_->has_pp_) {
       index_ct_rest++;
-    if (spectra_module_->has_tp_)
+    }
+    if (spectra_module_->has_tp_) {
       index_ct_rest++;
-    if (spectra_module_->has_ep_)
+    }
+    if (spectra_module_->has_ep_) {
       index_ct_rest++;
+    }
     /* Now print the remaining (if any) entries:*/
     for (index_ct = index_ct_rest; index_ct < ct_size; index_ct++) {
       class_fprintf_double(clfile, factor * cl[index_ct], true);

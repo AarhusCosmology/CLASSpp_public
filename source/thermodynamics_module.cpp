@@ -70,8 +70,9 @@ void ThermodynamicsModule::thermodynamics_recfast_derivs(double minus_z,
     // State is {x_H, x_He, Tmat}.
     double dy_dz[_RECFAST_INTEG_SIZE_];
     module->thermodynamics_recombination_derivs_member(z, y, dy_dz, parameters_and_workspace);
-    for (int index_y = 0; index_y < _RECFAST_INTEG_SIZE_; index_y++)
+    for (int index_y = 0; index_y < _RECFAST_INTEG_SIZE_; index_y++) {
       dy[index_y] = -dy_dz[index_y];
+    }
   }
 }
 
@@ -348,16 +349,18 @@ void ThermodynamicsModule::thermodynamics_init() {
   z_reionization_   = pth->z_reio;
   YHe_              = pth->YHe;
 
-  if (pth->thermodynamics_verbose > 0)
+  if (pth->thermodynamics_verbose > 0) {
     printf("Computing thermodynamics");
+  }
 
   /** - compute and check primordial Helium fraction  */
 
   /* Y_He */
   if (YHe_ == _BBN_) {
     thermodynamics_helium_from_bbn();
-    if (pth->thermodynamics_verbose > 0)
+    if (pth->thermodynamics_verbose > 0) {
       printf(" with Y_He=%.4f\n", YHe_);
+    }
   }
   else if (YHe_ == _BBN_NETWORK_) {
     thermodynamics_helium_from_bbn_network();
@@ -374,8 +377,9 @@ void ThermodynamicsModule::thermodynamics_init() {
     }
   }
   else {
-    if (pth->thermodynamics_verbose > 0)
+    if (pth->thermodynamics_verbose > 0) {
       printf("\n");
+    }
   }
 
   /* A varying fine-structure constant shifts the helium yield of BBN, linearly in
@@ -383,8 +387,9 @@ void ThermodynamicsModule::thermodynamics_init() {
   const double alpha_bbn = FundamentalConstantsAt(RedshiftOfBbn()).alpha;
   if ((pth->YHe == _BBN_ || pth->YHe == _BBN_NETWORK_) && alpha_bbn != 1.) {
     YHe_ *= 1. + pth->bbn_alpha_sensitivity * (alpha_bbn - 1.);
-    if (pth->thermodynamics_verbose > 0)
+    if (pth->thermodynamics_verbose > 0) {
       printf(" -> Y_He=%.4f for alpha/alpha_0=%g at BBN\n", YHe_, alpha_bbn);
+    }
   }
 
   class_test((YHe_ < _YHE_SMALL_) || (YHe_ > _YHE_BIG_),
@@ -429,14 +434,16 @@ void ThermodynamicsModule::thermodynamics_init() {
   class_test((pth->annihilation_z_halo < 0),
              "Parameter for DM annihilation in halos cannot be negative");
 
-  if (pth->thermodynamics_verbose > 0)
+  if (pth->thermodynamics_verbose > 0) {
     if ((pth->annihilation > 0) && (pth->reio_parametrization == reio_none) &&
-        (ppr->recfast_Heswitch >= 3) && (pth->recombination == recfast))
+        (ppr->recfast_Heswitch >= 3) && (pth->recombination == recfast)) {
       printf(
           "Warning: if you have DM annihilation and you use recfast with option recfast_Heswitch "
           ">= 3, then the expression for CfHe_t and dy[1] becomes undefined at late times, "
           "producing nan's. This is however masked by reionization if you are not in reio_none "
           "mode.");
+    }
+  }
 
   class_test((pth->decay < 0), "decay parameter cannot be negative");
 
@@ -955,8 +962,9 @@ void ThermodynamicsModule::thermodynamics_init() {
 
             z -= dz_sub_step;
             /* final redshift last sub-step overwritten to avoid small rounding error */
-            if (n == (N_sub_steps - 1))
+            if (n == (N_sub_steps - 1)) {
               z = z_table_[index_tau];
+            }
 
             T_idr              = T_idr_param * (1. + z);
             T_idm_dr          -= dTdz_idm_dr * dz_sub_step;
@@ -1143,8 +1151,9 @@ void ThermodynamicsModule::thermodynamics_init() {
 
   index_tau = 0;
   while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_exp_m_kappa_] > 1. / _E_) &&
-         (index_tau < tt_size_))
+         (index_tau < tt_size_)) {
     index_tau++;
+  }
 
   z_star_ = z_table_[index_tau - 1] +
             (1. / _E_ - thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_exp_m_kappa_]) /
@@ -1178,8 +1187,9 @@ void ThermodynamicsModule::thermodynamics_init() {
 
   index_tau = 0;
   while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_d_] < 1.) &&
-         (index_tau < tt_size_))
+         (index_tau < tt_size_)) {
     index_tau++;
+  }
 
   z_d_ = z_table_[index_tau - 1] +
          (1. - thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_d_]) /
@@ -1207,8 +1217,9 @@ void ThermodynamicsModule::thermodynamics_init() {
       index_tau = 0;
 
       while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_idm_dr_] < 1.) &&
-             (index_tau < tt_size_ - 1))
+             (index_tau < tt_size_ - 1)) {
         index_tau++;
+      }
 
       double z_idm_dr =
           z_table_[index_tau - 1] +
@@ -1222,8 +1233,9 @@ void ThermodynamicsModule::thermodynamics_init() {
       index_tau = 0;
 
       while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_tau_idr_] < 1.) &&
-             (index_tau < tt_size_ - 1))
+             (index_tau < tt_size_ - 1)) {
         index_tau++;
+      }
 
       double z_idr = z_table_[index_tau - 1] +
                      (1. - thermodynamics_table_[(index_tau - 1) * th_size_ + index_th_tau_idr_]) /
@@ -1240,8 +1252,9 @@ void ThermodynamicsModule::thermodynamics_init() {
   index_tau = index_tau_max;
   while ((thermodynamics_table_[(index_tau) *th_size_ + index_th_g_] >
           g_max * ppr->neglect_CMB_sources_below_visibility) &&
-         (index_tau > 0))
+         (index_tau > 0)) {
     index_tau--;
+  }
 
   background_module_->background_tau_of_z(z_table_[index_tau], &(tau_cut_));
 
@@ -1275,10 +1288,12 @@ void ThermodynamicsModule::thermodynamics_init() {
     printf("    corresponding to conformal time = %f Mpc\n", tau_d_);
     printf("    with comoving sound horizon rs = %f Mpc\n", rs_d_);
     if ((pth->reio_parametrization == reio_camb) || (pth->reio_parametrization == reio_half_tanh)) {
-      if (pth->reio_z_or_tau == reio_tau)
+      if (pth->reio_z_or_tau == reio_tau) {
         printf(" -> reionization  at z = %f\n", z_reionization_);
-      if (pth->reio_z_or_tau == reio_z)
+      }
+      if (pth->reio_z_or_tau == reio_z) {
         printf(" -> reionization with optical depth = %f\n", tau_reionization_);
+      }
       double tau_reio;
       background_module_->background_tau_of_z(z_reionization_, &tau_reio);
       printf("    corresponding to conformal time = %f Mpc\n", tau_reio);
@@ -1992,8 +2007,9 @@ void ThermodynamicsModule::thermodynamics_reionization_function(double z,
 
     else {
       int i = 0;
-      while (preio->reionization_parameters[preio->index_reio_first_z + i + 1] < z)
+      while (preio->reionization_parameters[preio->index_reio_first_z + i + 1] < z) {
         i++;
+      }
 
       /* This is the expression of the tanh-like jumps of the
          reio_bins_tanh scheme until the 10.06.2015. It appeared to be
@@ -2088,8 +2104,9 @@ void ThermodynamicsModule::thermodynamics_reionization_function(double z,
 
     else {
       int i = 0;
-      while (preio->reionization_parameters[preio->index_reio_first_z + i + 1] < z)
+      while (preio->reionization_parameters[preio->index_reio_first_z + i + 1] < z) {
         i++;
+      }
 
       double z_min = preio->reionization_parameters[preio->index_reio_first_z + i];
       double z_max = preio->reionization_parameters[preio->index_reio_first_z + i + 1];
@@ -2231,11 +2248,11 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
            (does not happen in realistic models) */
         if (preio->reionization_parameters[preio->index_reio_start] <
             pth->helium_fullreio_redshift +
-                ppr->reionization_start_factor * pth->helium_fullreio_width)
-
+                ppr->reionization_start_factor * pth->helium_fullreio_width) {
           preio->reionization_parameters[preio->index_reio_start] = pth->helium_fullreio_redshift +
                                                                     ppr->reionization_start_factor *
                                                                         pth->helium_fullreio_width;
+        }
       }
       else {
         preio->reionization_parameters[preio->index_reio_start] = z_reionization_;
@@ -2310,11 +2327,11 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
            (does not happen in realistic models) */
         if (preio->reionization_parameters[preio->index_reio_start] <
             pth->helium_fullreio_redshift +
-                ppr->reionization_start_factor * pth->helium_fullreio_width)
-
+                ppr->reionization_start_factor * pth->helium_fullreio_width) {
           preio->reionization_parameters[preio->index_reio_start] = pth->helium_fullreio_redshift +
                                                                     ppr->reionization_start_factor *
                                                                         pth->helium_fullreio_width;
+        }
 
         class_test(preio->reionization_parameters[preio->index_reio_start] >
                        ppr->reionization_z_start_max,
@@ -2757,8 +2774,9 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
 
     /* - try next step */
     double z_next = z - dz;
-    if (z_next < 0.)
+    if (z_next < 0.) {
       z_next = 0.;
+    }
 
     double xe_next;
     thermodynamics_reionization_function(z_next, preio, &xe_next);
@@ -2937,8 +2955,9 @@ FundamentalConstants ThermodynamicsModule::FundamentalConstantsAt(double z) cons
     case varconst_none:
       break;
     case varconst_instant:
-      if (z > pth->varconst_transition_redshift)
+      if (z > pth->varconst_transition_redshift) {
         return {pth->varconst_alpha, pth->varconst_me};
+      }
       break;
   }
   return {};
@@ -2948,10 +2967,12 @@ void ThermodynamicsModule::thermodynamics_recombination(recombination* preco, do
   /* Both recombination codes go through the same integration: they differ only
      in the atomic physics supplying dx_H/dz and dx_He/dz, which is selected
      inside. */
-  if (pth->baryon_clumping_b > 0.)
+  if (pth->baryon_clumping_b > 0.) {
     thermodynamics_recombination_clumpy(preco, pvecback);
-  else
+  }
+  else {
     thermodynamics_recombination_integrate(preco, pvecback, 1.);
+  }
 }
 
 /* The Saha right-hand side n_e n_+ / (n_0 n_H) for a level with ionization temperature
@@ -3058,8 +3079,9 @@ void ThermodynamicsModule::thermodynamics_recombination_clumpy(recombination* pr
   std::vector<double> dTbdz(ppr->recfast_Nz0, 0.);
   for (const auto& zone : zones) {
     const double weight = zone.f_V * zone.Delta; /* the zone's share of the baryons */
-    if (weight == 0.)
+    if (weight == 0.) {
       continue;
+    }
     thermodynamics_recombination_integrate(preco, pvecback, zone.Delta);
     for (int j = 0; j < preco->rt_size; ++j) {
       const double* row  = &preco->recombination_table[j * preco->re_size];
@@ -3080,8 +3102,9 @@ void ThermodynamicsModule::thermodynamics_recombination_clumpy(recombination* pr
 
   if (pth->thermodynamics_verbose > 0) {
     printf(" -> baryon clumping b = %g, zones (f_V, Delta):", pth->baryon_clumping_b);
-    for (const auto& zone : zones)
+    for (const auto& zone : zones) {
       printf(" (%g, %g)", zone.f_V, zone.Delta);
+    }
     printf("\n");
   }
 }
@@ -3184,8 +3207,9 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   class_test((ppr->recfast_Hswitch != 0) && (ppr->recfast_Hswitch != 1),
              "RECFAST error: unknown H fudging scheme");
   preco->fu = ppr->recfast_fudge_H;
-  if (ppr->recfast_Hswitch)
+  if (ppr->recfast_Hswitch) {
     preco->fu += ppr->recfast_delta_fudge_H;
+  }
 
   /* He fudging */
   class_test((ppr->recfast_Heswitch < 0) || (ppr->recfast_Heswitch > 6),
@@ -3266,8 +3290,9 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   }
   tpaw.recombination_model = recombination_model.get();
 
-  if (pth->thermodynamics_verbose > 0)
+  if (pth->thermodynamics_verbose > 0) {
     printf(" -> recombination computed with %s\n", recombination_model->Name());
+  }
 
   /** - impose initial conditions at early times */
 
@@ -3286,15 +3311,17 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
 
   auto first_sample_below = [&](int first_index, double z_boundary) {
     int index_z = first_index;
-    while ((index_z < Nz) && (sample_z(index_z) >= z_boundary))
+    while ((index_z < Nz) && (sample_z(index_z) >= z_boundary)) {
       index_z++;
+    }
     return index_z;
   };
 
   auto sample_count_down_to = [&](int first_index, double z_boundary) {
     int count = 0;
-    while ((first_index + count < Nz) && (sample_z(first_index + count) >= z_boundary))
+    while ((first_index + count < Nz) && (sample_z(first_index + count) >= z_boundary)) {
       count++;
+    }
     return count;
   };
 
@@ -3313,8 +3340,9 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
       const double z_mid = 0.5 * (z_low + z_high);
       const double f_mid = function(z_mid);
 
-      if (fabs(z_high - z_low) <= ppr->smallest_allowed_variation * std::max(1., z_mid))
+      if (fabs(z_high - z_low) <= ppr->smallest_allowed_variation * std::max(1., z_mid)) {
         return z_mid;
+      }
 
       if (f_mid * f_low <= 0.) {
         z_high = z_mid;
@@ -3697,8 +3725,9 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
 
   /** - add  more points to start earlier in presence of interacting DM */
 
-  if (all_species_.count("IDM_DR_IDR") > 0)
+  if (all_species_.count("IDM_DR_IDR") > 0) {
     tt_size_ += ppr->thermo_Nz1_idm_dr + ppr->thermo_Nz2_idm_dr - 1;
+  }
 
   /** - allocate arrays in thermo structure */
 

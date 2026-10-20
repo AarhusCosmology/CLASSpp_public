@@ -160,14 +160,16 @@ void MajoronSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                    const perturb_parameters_and_workspace& ppaw) const {
   UltraRelativisticSpecies::PerturbDerivs(base, tau, y, dy, ppaw);
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_delta < 0)  // radiation streaming approximation
+  if (layout.idx_delta < 0) {  // radiation streaming approximation
     return;
+  }
   /* dF_l/dtau -= a Gamma F_l for l >= 2, with F_2 = 2 shear; under the ur fluid
      approximation l_max is 2 and only the shear is left. */
   const double rate     = CollisionRate(ppaw.ppw->scalar_ctx.a);
   dy[layout.idx_shear] -= rate * y[layout.idx_shear];
-  for (int l = 3; l <= layout.l_max; ++l)
+  for (int l = 3; l <= layout.l_max; ++l) {
     dy[layout.idx_delta + l] -= rate * y[layout.idx_delta + l];
+  }
 }
 
 // ── Factory ────────────────────────────────────────────────────────────────────
@@ -176,8 +178,9 @@ std::vector<Named> MajoronSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
   const auto m_phi     = ctx.pfc->get<double>("m_majoron");
   const auto Gamma_eff = ctx.pfc->get<double>("Gamma_eff_majoron");
-  if (!m_phi && !Gamma_eff)
+  if (!m_phi && !Gamma_eff) {
     return result;
+  }
   class_test_severe(!m_phi || !Gamma_eff,
                     "the majoron needs both 'm_majoron' (in eV) and 'Gamma_eff_majoron'");
   class_test(*m_phi <= 0., "m_majoron = %g eV must be positive", *m_phi);

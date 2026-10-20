@@ -131,8 +131,9 @@ void UltraRelativisticSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& b
   const precision* ppr  = ppaw.perturbations_module->GetPrecision();
 
   /* RSA active: UR quantities handled analytically, nothing to integrate */
-  if (layout.idx_delta < 0)
+  if (layout.idx_delta < 0) {
     return;
+  }
 
   int l;
   const double three_ceff2 = ppt->three_ceff2_ur;
@@ -234,10 +235,12 @@ BaseSpecies::StressEnergyContribution UltraRelativisticSpecies::StressEnergy(
     se.delta_rho = rho_ur * y[layout.idx_delta];
     se.delta_p   = rho_ur * y[layout.idx_delta] / 3.;
   }
-  if (layout.idx_theta >= 0)
+  if (layout.idx_theta >= 0) {
     se.rho_plus_p_theta = (rho_ur + se.p) * y[layout.idx_theta];
-  if (layout.idx_shear >= 0)
+  }
+  if (layout.idx_shear >= 0) {
     se.rho_plus_p_shear = 4. / 3. * rho_ur * y[layout.idx_shear];
+  }
   return se;
 }
 
@@ -245,14 +248,18 @@ void UltraRelativisticSpecies::ApplyInitialConditions(const BaseSpecies::Perturb
                                                       double* y,
                                                       const PerturbIcContext& ctx) {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_delta >= 0)
+  if (layout.idx_delta >= 0) {
     y[layout.idx_delta] = ctx.delta_ur;
-  if (layout.idx_theta >= 0)
+  }
+  if (layout.idx_theta >= 0) {
     y[layout.idx_theta] = ctx.theta_ur;
-  if (layout.idx_shear >= 0)
+  }
+  if (layout.idx_shear >= 0) {
     y[layout.idx_shear] = ctx.shear_ur;
-  if (layout.idx_l3 >= 0)
+  }
+  if (layout.idx_l3 >= 0) {
     y[layout.idx_l3] = ctx.l3_ur;
+  }
 }
 
 void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
@@ -265,8 +272,9 @@ void UltraRelativisticSpecies::FillSources(const BaseSpecies::PerturbLayout& bas
 
   const double a_prime_over_a = ctx.a_prime_over_a;
 
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   // ── delta_ur ───────────────────────────────────────────────────────────────
   if (index_tp_delta_ >= 0) {
@@ -312,8 +320,9 @@ void UltraRelativisticSpecies::CopyPerturbationsAcrossSwitch(
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
 
   /* Guard: only copy if both layouts have slots registered (not RSA mode) */
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
 
   /* delta, theta, shear always present in both layouts */
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
@@ -323,8 +332,9 @@ void UltraRelativisticSpecies::CopyPerturbationsAcrossSwitch(
   /* l3+ only present when ufa is off (full hierarchy on both sides) */
   if (old_l.l_max >= 3 && new_l.l_max >= 3 && old_l.idx_l3 >= 0 && new_l.idx_l3 >= 0) {
     new_y[new_l.idx_l3] = old_y[old_l.idx_l3];
-    for (int l = 4; l <= new_l.l_max; ++l)
+    for (int l = 4; l <= new_l.l_max; ++l) {
       new_y[new_l.idx_delta + l] = old_y[old_l.idx_delta + l];
+    }
   }
 }
 
@@ -336,14 +346,17 @@ void UltraRelativisticSpecies::WriteOutputColumns(
   const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_" + label_, index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_" + label_, index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
   else if (fmt == file_format::camb_format) {
-    if (section != TransferColumnSection::velocity)
+    if (section != TransferColumnSection::velocity) {
       w.Add("-T_" + label_ + "/k2", index_tp_delta_, index_tp_delta_ >= 0);
+    }
   }
 }
 
@@ -399,18 +412,22 @@ void UltraRelativisticSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayou
   /* idx_l3 < 0 when RSA is on, UFA is on, or we are in tensor/vector mode
      (UR has no tensor slots). index_ap_ufa is only defined in scalar mode,
      so we must not access it when idx_l3 < 0. */
-  if (ur_lay.idx_l3 < 0)
+  if (ur_lay.idx_l3 < 0) {
     return;
+  }
   /* UR l>=3 multipoles not needed in sources when both rsa and ufa are off.
      (The idx_l3 >= 0 guard above already implies rsa_off and ufa_off, but we
      check explicitly for clarity and to mirror the legacy module condition.) */
-  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off))
+  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off)) {
     return;
-  if (ppw->approx[ppw->index_ap_ufa] != static_cast<int>(ufa_off))
+  }
+  if (ppw->approx[ppw->index_ap_ufa] != static_cast<int>(ufa_off)) {
     return;
+  }
 
-  for (int idx = ur_lay.idx_l3; idx <= ur_lay.idx_delta + ur_lay.l_max; ++idx)
+  for (int idx = ur_lay.idx_l3; idx <= ur_lay.idx_delta + ur_lay.l_max; ++idx) {
     used_in_sources[idx] = false;
+  }
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -432,10 +449,12 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
   auto n_eff_opt = ctx.pfc->get<double>("N_eff");
   bool flag_nur  = n_ur_opt.has_value();
   bool flag_neff = n_eff_opt.has_value();
-  if (flag_nur)
+  if (flag_nur) {
     n_ur = *n_ur_opt;
-  if (flag_neff)
+  }
+  if (flag_neff) {
     n_eff = *n_eff_opt;
+  }
 
   // N_eff is a deprecated synonym for N_ur — only one may be present.
   class_test_severe(
@@ -457,10 +476,12 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
   auto omega_small_opt  = ctx.pfc->get<double>("omega_ur");
   bool flag_Omega       = omega_big_opt.has_value();
   bool flag_omega       = omega_small_opt.has_value();
-  if (flag_Omega)
+  if (flag_Omega) {
     omega_ur_big = *omega_big_opt;
-  if (flag_omega)
+  }
+  if (flag_omega) {
     omega_ur_small = *omega_small_opt;
+  }
 
   // At most one of the three forms may be specified.
   const int n_specified = (flag_nur ? 1 : 0) + (flag_Omega ? 1 : 0) + (flag_omega ? 1 : 0);
@@ -486,8 +507,9 @@ std::vector<Named> UltraRelativisticSpecies::CreateAll(const SpeciesBuildContext
     omega0_ur = omega_ur_small / ctx.pba->h / ctx.pba->h;
   }
 
-  if (omega0_ur == 0.)
+  if (omega0_ur == 0.) {
     return result;
+  }
 
   result.push_back({"UR", std::make_unique<UltraRelativisticSpecies>(*ctx.pba, omega0_ur)});
   return result;

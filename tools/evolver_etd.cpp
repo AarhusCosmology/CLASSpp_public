@@ -40,8 +40,9 @@ inline void PhiFuncs(double z, double& e0, double& p1, double& p2, double& p3) {
     p3 = 1.0 / 6.0;
     return;
   }
-  if (z > kZMax)
+  if (z > kZMax) {
     z = kZMax;
+  }
   if (std::fabs(z) < kSeries) {
     // phi_k = sum_j z^j/(j+k)!. The coefficient at term j is 1/(j+k)!, so advancing
     // j divides it by (j+k) -- which is why the three divisors differ.
@@ -134,8 +135,9 @@ void evolver_etd(EvolverDerivs derivs,
 
   const double hmax = std::fabs(x_end - x_ini) / 10.0;
   double absh = (x_size > 1) ? std::min(hmax, std::fabs(x_sampling[1] - x_sampling[0])) : hmax;
-  if (absh == 0.0)
+  if (absh == 0.0) {
     absh = hmax;
+  }
 
   /* INITIAL STEP. The usual relative criterion, with one exclusion that is not
      cosmetic: a component sitting at or below the absolute floor `threshold` carries
@@ -157,22 +159,26 @@ void evolver_etd(EvolverDerivs derivs,
      controller rejects and shrinks it by the normal path. */
   double rh = 0.0;
   for (int k = 0; k < neq; k++) {
-    if (std::fabs(y[k]) <= threshold)
+    if (std::fabs(y[k]) <= threshold) {
       continue;
+    }
     rh = std::max(rh, std::fabs(f0[k]) / std::fabs(y[k]));
   }
   rh /= 0.8 * pow(rtol, pow_grow);
-  if (absh * rh > 1.0)
+  if (absh * rh > 1.0) {
     absh = 1.0 / rh;
+  }
 
   const int tdir = (x_end > x_ini) ? 1 : -1;
   double hnew    = absh * tdir;
   bool nofailed  = true;
 
   int idx = 0;
-  if ((t - x_end) * tdir < 0.0)
-    for (idx = 0; (idx < x_size) && ((x_sampling[idx] - t) * tdir < 0.0); idx++)
+  if ((t - x_end) * tdir < 0.0) {
+    for (idx = 0; (idx < x_size) && ((x_sampling[idx] - t) * tdir < 0.0); idx++) {
       ;
+    }
+  }
 
   while ((t - x_end) * tdir < 0.0) {
     double h          = hnew;
@@ -182,8 +188,9 @@ void evolver_etd(EvolverDerivs derivs,
                std::fabs(h),
                hmin,
                t);
-    if (std::fabs(h) > 0.9 * std::fabs(x_end - t))
+    if (std::fabs(h) > 0.9 * std::fabs(x_end - t)) {
       h = x_end - t;
+    }
     /* NO-PROGRESS GUARD, after the clamp because the clamp is what can produce the
        offending h: hmin above is 100*DBL_MIN*|t|, an absolute floor many orders below
        the SPACING of t, so `t + h == t` can hold while that test passes and the loop
@@ -201,10 +208,12 @@ void evolver_etd(EvolverDerivs derivs,
     /* Diagonal at the CURRENT state, re-linearised every attempted step. It is
        frozen only across the step, which is what makes this a Rosenbrock rather
        than a semilinear ETD method. */
-    if (derivs_diagonal != nullptr)
+    if (derivs_diagonal != nullptr) {
       (*derivs_diagonal)(t, y, diag.data(), parameters_and_workspace_for_derivs);
-    else
+    }
+    else {
       std::fill(diag.begin(), diag.end(), 0.);
+    }
 
     /* One ETDRK4 step of size hh from state `yin` (whose RHS is `fin`) into `yout`.
        The diagonal is held fixed across the step. The stage remainders N1..N4 are left
@@ -304,8 +313,9 @@ void evolver_etd(EvolverDerivs derivs,
     for (int k = 0; k < neq; k++) {
       const double errtemp  = std::fabs(err[k] / std::max(threshold, std::fabs(ynew[k])));
       nonfinite            |= static_cast<int>(IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
-      if (errtemp > errmax)
+      if (errtemp > errmax) {
         errmax = errtemp;
+      }
     }
 
     if (nonfinite != 0) {
@@ -348,8 +358,9 @@ void evolver_etd(EvolverDerivs derivs,
     ++counters.steps_accepted;
     const double tnew = t + h;
 
-    if (print_variables != nullptr)
+    if (print_variables != nullptr) {
       (*print_variables)(tnew, ynew.data(), fnew.data(), parameters_and_workspace_for_derivs);
+    }
 
     /* Dense output. The two endpoint cases are exact and cost nothing; the interior
        one is the exponential continuous extension described below. */
@@ -391,8 +402,9 @@ void evolver_etd(EvolverDerivs derivs,
         const double* N3 = scratch.data() + 2 * neq;
         const double* N4 = scratch.data() + 3 * neq;
         for (int k = 0; k < neq; k++) {
-          if (used_in_output[k] == 0)
+          if (used_in_output[k] == 0) {
             continue;
+          }
           double e0;
           double p1;
           double p2;

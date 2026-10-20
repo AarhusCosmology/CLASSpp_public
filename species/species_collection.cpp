@@ -27,12 +27,14 @@ void SpeciesCollection::freeze() {
   });
   /* Stamp each species with its sorted index so PrintVariables can look up
      its own layout in ppw->pv->species_layouts[collection_index_]. */
-  for (std::size_t i = 0; i < species_.size(); ++i)
+  for (std::size_t i = 0; i < species_.size(); ++i) {
     species_[i].species->collection_index_ = i;
+  }
   /* Stamp the cached matter classification once, now that every species (and every
      composite child) is fully constructed. Composites recurse into their children. */
-  for (std::size_t i = 0; i < species_.size(); ++i)
+  for (std::size_t i = 0; i < species_.size(); ++i) {
     species_[i].species->FinalizeMatterClassification();
+  }
   auto* photons_slot = find("Photons");
   auto* baryons_slot = find("Baryons");
   if (!photons_slot) {
@@ -44,14 +46,18 @@ void SpeciesCollection::freeze() {
   photons_ = photons_slot->get();
   baryons_ = baryons_slot->get();
   for (std::size_t i = 0; i < species_.size(); ++i) {
-    if (species_[i].key == "Photons")
+    if (species_[i].key == "Photons") {
       photons_index_ = i;
-    if (species_[i].key == "Baryons")
+    }
+    if (species_[i].key == "Baryons") {
       baryons_index_ = i;
-    if (species_[i]->HasNcdm())
+    }
+    if (species_[i]->HasNcdm()) {
       has_ncdm_ = true;
-    if (species_[i]->HasWarmMatter())
+    }
+    if (species_[i]->HasWarmMatter()) {
       has_warm_matter_ = true;
+    }
   }
   frozen_ = true;
 }
@@ -59,9 +65,11 @@ void SpeciesCollection::freeze() {
 namespace {
 template <class Vec>
 auto find_impl(Vec& v, const std::string& key) -> decltype(&v[0].species) {
-  for (auto& e : v)
-    if (e.key == key)
+  for (auto& e : v) {
+    if (e.key == key) {
       return &e.species;
+    }
+  }
   return nullptr;
 }
 }  // namespace
@@ -78,12 +86,14 @@ const std::unique_ptr<BaseSpecies>* SpeciesCollection::find(const std::string& k
 }
 
 std::unique_ptr<BaseSpecies>& SpeciesCollection::at(const std::string& key) {
-  if (auto* p = find(key))
+  if (auto* p = find(key)) {
     return *p;
+  }
   throw std::out_of_range("SpeciesCollection::at: no species with key '" + key + "'");
 }
 const std::unique_ptr<BaseSpecies>& SpeciesCollection::at(const std::string& key) const {
-  if (auto* p = find(key))
+  if (auto* p = find(key)) {
     return *p;
+  }
   throw std::out_of_range("SpeciesCollection::at: no species with key '" + key + "'");
 }

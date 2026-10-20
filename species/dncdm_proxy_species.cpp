@@ -845,9 +845,11 @@ std::vector<double> DNCDMProxySpecies::InitialDaughterOccupation(bool boson) con
   // published A = [0,1,1] initial state: phi empty, nu_l thermal).
   const double amplitude = boson ? f_ini_phi_ : f_ini_l_;
   std::vector<double> f(q_d_.size(), 0.);
-  if (amplitude > 0.)
-    for (size_t i = 0; i < q_d_.size(); ++i)
+  if (amplitude > 0.) {
+    for (size_t i = 0; i < q_d_.size(); ++i) {
       f[i] = amplitude / (boson ? std::expm1(q_d_[i]) : std::exp(q_d_[i]) + 1.);
+    }
+  }
   return f;
 }
 

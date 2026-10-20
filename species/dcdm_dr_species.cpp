@@ -92,8 +92,9 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
 
   const auto& dcdm_lay = dcdm_layout(*pv->species_layouts[collection_index_]);
   const auto& dr_lay   = dr_layout(*pv->species_layouts[collection_index_]);
-  if (dcdm_lay.idx_delta < 0 || dr_lay.idx_F0 < 0)
+  if (dcdm_lay.idx_delta < 0 || dr_lay.idx_F0 < 0) {
     return;
+  }
 
   const double* pvecback = ppw->pvecback.data();
   const double a         = ctx.a;
@@ -114,8 +115,9 @@ void DCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
 // ── Shooter hooks ─────────────────────────────────────────────────────────────
 
 std::vector<ShootingTarget> DCDM_DR_Species::GetShootingTargets() const {
-  if (needs_shooting_)
+  if (needs_shooting_) {
     return {shooting_target_};
+  }
   return {};
 }
 
@@ -135,8 +137,9 @@ void DCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
     double Omega_M = Omega0_cdm_eff + Omega0_idm_dr_eff + Omega0_dcdmdr_eff + ba.Omega0_b;
     double gamma   = dcdm_->Gamma_dcdm() / ba.H0;
     double a_decay = 1.0;
-    if (gamma > 1)
+    if (gamma > 1) {
       a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
+    }
     double tgt = (t == "omega_dcdmdr") ? tv / ba.h / ba.h : tv;
     guess.push_back(tgt / a_decay);
     dxdy.push_back((tgt / a_decay) / tv);
@@ -146,12 +149,14 @@ void DCDM_DR_Species::ComputeShootingGuess(const SpeciesBuildContext& ctx,
     double Omega_M           = Omega0_cdm_eff + Omega0_idm_dr_eff + Omega0_dcdmdr_ini + ba.Omega0_b;
     double gamma             = dcdm_->Gamma_dcdm() / ba.H0;
     double a_decay           = 1.0;
-    if (gamma > 1)
+    if (gamma > 1) {
       a_decay = pow(1 + (gamma * gamma - 1.) / Omega_M, -1. / 3.);
+    }
     guess.push_back(tv * a_decay);
     double d = a_decay;
-    if (gamma > 100)
+    if (gamma > 100) {
       d *= gamma / 100;
+    }
     dxdy.push_back(d);
   }
 }
@@ -189,8 +194,9 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
   {
     bool exists = (omega0_dcdmdr != 0.) || ctx.pfc->get<double>("Omega_ini_dcdm").has_value() ||
                   ctx.pfc->get<double>("omega_ini_dcdm").has_value();
-    if (!exists)
+    if (!exists) {
       return result;
+    }
   }
 
   // ── Parse DCDM physics params (Gamma_dcdm + Omega_ini_dcdm) ────────────────
@@ -210,15 +216,18 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
   auto omega_ini_small_opt  = ctx.pfc->get<double>("omega_ini_dcdm");
   bool has_Omega_ini        = omega_ini_opt.has_value();
   bool has_omega_ini        = omega_ini_small_opt.has_value();
-  if (has_Omega_ini)
+  if (has_Omega_ini) {
     Omega_ini_dcdm = *omega_ini_opt;
-  if (has_omega_ini)
+  }
+  if (has_omega_ini) {
     omega_ini_dcdm_val = *omega_ini_small_opt;
+  }
   class_test_severe(has_Omega_ini && has_omega_ini,
                     "In input file, you can only enter one of Omega_ini_dcdm or omega_ini_dcdm, "
                     "choose one");
-  if (has_omega_ini)
+  if (has_omega_ini) {
     Omega_ini_dcdm = omega_ini_dcdm_val / (ctx.pba->h * ctx.pba->h);
+  }
 
   // Detect guess-driven construction: target key present but direct unknown absent.
   // Mapping: Omega_dcdmdr/omega_dcdmdr -> unknown Omega_ini_dcdm
@@ -243,8 +252,9 @@ std::vector<Named> DCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
     auto unknown_opt     = ctx.pfc->get<double>(ts.unknown_param);
     bool target_present  = target_opt.has_value();
     bool unknown_present = unknown_opt.has_value();
-    if (target_present)
+    if (target_present) {
       target_val = *target_opt;
+    }
     if (target_present && !unknown_present) {
       shooting_target = {ts.target_name, ts.unknown_param, target_val};
       needs_shooting  = true;

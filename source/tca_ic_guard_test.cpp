@@ -26,10 +26,12 @@ FileContent input(const char* modes,
   FileContent fc;
   fc.set("output", "tCl");
   fc.set("modes", modes);
-  if (start_small_k)
+  if (start_small_k) {
     fc.set("start_small_k_at_tau_c_over_tau_h", start_small_k);
-  if (trigger_key)
+  }
+  if (trigger_key) {
     fc.set(trigger_key, trigger);
+  }
   fc.set("input_verbose", "0");
   fc.set("write warnings", "no");
   fc.set("write parameters", "no");

@@ -196,31 +196,36 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
 
     if (x < 0.9999) {
       int km = 42 + lmax;
-      if (x > 0.9)
+      if (x > 0.9) {
         km *= static_cast<int>(-1.0 - 1.8 * log(1. / x - 1.0));
+      }
       double Fp2 = 0.;
       double Fp1 = 1.;
       for (int l = km; l >= 0; --l) {
         double Fp = ((2 * l + 3) * Fp1 / x - l * Fp2) / (l + 3.);
         if ((Fp > 1e200) || (l == 0)) {
           Fp1 /= Fp;
-          for (int ll = l + 1; ll <= lmax; ++ll)
+          for (int ll = l + 1; ll <= lmax; ++ll) {
             output[ll * q_size + index_q] /= Fp;
+          }
           Fp = 1.0;
         }
-        if (l <= lmax)
+        if (l <= lmax) {
           output[l * q_size + index_q] = Fp;
+        }
         Fp2 = Fp1;
         Fp1 = Fp;
       }
     }
     else {
       output[0 * q_size + index_q] = 1.;
-      if (lmax > 0)
+      if (lmax > 0) {
         output[1 * q_size + index_q] = x;
-      if (lmax > 1)
+      }
+      if (lmax > 1) {
         output[2 * q_size + index_q] =
             (x * (5. * x * x - 3.) + 3. * pow(x * x - 1., 2.) * atanh(x)) / (2. * x * x * x);
+      }
       for (int l = 3; l <= lmax; ++l) {
         double Fm2                   = output[(l - 2) * q_size + index_q];
         double Fm1                   = output[(l - 1) * q_size + index_q];
@@ -270,12 +275,15 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
       return rprime_dr * integral_num / integral_denom;
     }
     else {
-      if (l == 0)
+      if (l == 0) {
         return rprime_dr * y[dncdm_lay.index_per_q[0]];
-      else if (l == 1)
+      }
+      else if (l == 1) {
         return rprime_dr * y[dncdm_lay.index_per_q[0] + 1] / k;
-      else
+      }
+      else {
         return 0.;
+      }
     }
   };
 

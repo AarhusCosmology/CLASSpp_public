@@ -98,10 +98,12 @@ void AxionEDEFluid::ApplyInitialConditions(const BaseSpecies::PerturbLayout& bas
   // w -> -1 because delta, theta carry explicit (1+w) suppression... delta does;
   // theta's (1+w) lives in rho_plus_p_theta downstream.
   const auto& layout = static_cast<const FluidSpecies::PerturbLayout&>(base);
-  if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) {
     return;
-  if (layout.idx_delta < 0 || layout.idx_theta < 0)
+  }
+  if (layout.idx_delta < 0 || layout.idx_theta < 0) {
     return;
+  }
 
   double w_fld;
   double dw_over_da;
@@ -117,16 +119,21 @@ void AxionEDEFluid::ApplyInitialConditions(const BaseSpecies::PerturbLayout& bas
 }
 
 std::optional<double> AxionEDEFluid::GetParam(const std::string& name) const {
-  if (name == "a_c")
+  if (name == "a_c") {
     return a_c_;
-  if (name == "n_axion")
+  }
+  if (name == "n_axion") {
     return n_axion_;
-  if (name == "m_fld")
+  }
+  if (name == "m_fld") {
     return m_fld_;
-  if (name == "alpha_fld")
+  }
+  if (name == "alpha_fld") {
     return alpha_fld_;
-  if (name == "omega_axion")
+  }
+  if (name == "omega_axion") {
     return omega_axion_;
+  }
   return FluidSpecies::GetParam(name);
 }
 
@@ -145,8 +152,9 @@ void AxionEDEFluid::DeriveAxionScales() {
   double omega_m  = 0.;
   double omega_de = 0.;
   for (const auto& sp : bgm_->all_species_) {
-    if (sp.get() == static_cast<const BaseSpecies*>(this))
+    if (sp.get() == static_cast<const BaseSpecies*>(this)) {
       continue;
+    }
     switch (sp->energy_type()) {
       case EnergyType::Radiation:
         omega_r += sp->GetOmega0();

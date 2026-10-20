@@ -43,12 +43,13 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
 
   /* following is from recfast 1.5 */
 
-  if (ppr_->recfast_Hswitch)
+  if (ppr_->recfast_Hswitch) {
     K *= 1. +
          ppr_->recfast_AGauss1 *
              exp(-pow((log(1. + z) - ppr_->recfast_zGauss1) / ppr_->recfast_wGauss1, 2)) +
          ppr_->recfast_AGauss2 *
              exp(-pow((log(1. + z) - ppr_->recfast_zGauss2) / ppr_->recfast_wGauss2, 2));
+  }
 
   /* end of new recfast 1.5 piece */
 
@@ -69,14 +70,16 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
   Rup_trip   *= rescale_Rup;
 
   int Heflag = 0;
-  if (helium_corrections && (x_He >= 5.e-9))
+  if (helium_corrections && (x_He >= 5.e-9)) {
     Heflag = ppr_->recfast_Heswitch;
+  }
 
   double CfHe_t = 0.;
 
   double K_He = 0.;
-  if (Heflag == 0)
+  if (Heflag == 0) {
     K_He = preco_->CK_He / Hz;
+  }
   else {
     double tauHe_s = _A2P_s_ * preco_->CK_He * 3. * n_He * (1. - x_He) / Hz;
     double pHe_s   = (1. - exp(-tauHe_s)) / tauHe_s;
@@ -136,8 +139,9 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
   /* hydrogen */
   /************/
 
-  if (hydrogen_frozen)
+  if (hydrogen_frozen) {
     result.dx_H_dz = 0.;
+  }
   else {
     /* Peebles' coefficient (approximated as one when the Hydrogen
        ionization fraction is very close to one) */
@@ -171,8 +175,9 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
   /* helium   */
   /************/
 
-  if (x_He < 1.e-15)
+  if (x_He < 1.e-15) {
     result.dx_He_dz = 0.;
+  }
   else {
     double He_Boltz = exp(std::min(680., preco_->Bfact / Tmat));
 
@@ -190,11 +195,12 @@ IonisationDerivatives RecfastModel::Derivatives(const RecombinationState& state,
     /* following is from recfast 1.4 */
     /* this correction is not self-consistent when there is energy injection  from dark matter, and leads to nan's  at small redshift (unimportant when reionization takes over before that redshift) */
 
-    if (Heflag >= 3)
+    if (Heflag >= 3) {
       result.dx_He_dz = result.dx_He_dz + (x * x_He * n * Rdown_trip -
                                            (1. - x_He) * 3. * Rup_trip *
                                                exp(-_h_P_ * _c_ * _L_He_2St_ / (_k_B_ * Tmat))) *
                                               CfHe_t / (Hz * (1. + z));
+    }
 
     /* end of new recfast 1.4 piece */
 

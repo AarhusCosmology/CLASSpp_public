@@ -24,8 +24,9 @@ static double QuadIntegral(const AxionEDEFluid& fld, double a) {
     return 3. * (1. + w);
   };
   double s = 0.5 * (f(la) + f(0.));
-  for (int i = 1; i < N; ++i)
+  for (int i = 1; i < N; ++i) {
     s += f(la + i * h);
+  }
   return s * h;
 }
 

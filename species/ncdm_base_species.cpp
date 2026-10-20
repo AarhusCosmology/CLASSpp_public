@@ -135,8 +135,9 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     double tmp1;
     double tmp2;
     int row = 0;
-    while (fscanf(psdfile, "%lf %lf", &tmp1, &tmp2) == 2)
+    while (fscanf(psdfile, "%lf %lf", &tmp1, &tmp2) == 2) {
       ++row;
+    }
     rewind(psdfile);
     pbadist.tablesize = row;
     class_test(pbadist.tablesize < 2,
@@ -246,17 +247,21 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     double f0m2 = 0.;
     double f0p2 = 0.;
     for (int tolexp = _PSD_DERIVATIVE_EXP_MIN_; tolexp < _PSD_DERIVATIVE_EXP_MAX_; tolexp++) {
-      if (index_q == 0)
+      if (index_q == 0) {
         dq = std::min((0.5 - DBL_EPSILON) * q, 2 * exp(tolexp) * (q_[index_q + 1] - q));
-      else if (index_q == static_cast<int>(q_.size()) - 1)
+      }
+      else if (index_q == static_cast<int>(q_.size()) - 1) {
         dq = exp(tolexp) * 2.0 * (q_[index_q] - q_[index_q - 1]);
-      else
+      }
+      else {
         dq = exp(tolexp) * (q_[index_q + 1] - q_[index_q - 1]);
+      }
 
       DistributionFunction(&pbadist, q - 2 * dq, &f0m2);
       DistributionFunction(&pbadist, q + 2 * dq, &f0p2);
-      if (fabs((f0p2 - f0m2) / f0) > sqrt(DBL_EPSILON))
+      if (fabs((f0p2 - f0m2) / f0) > sqrt(DBL_EPSILON)) {
         break;
+      }
     }
 
     double f0m1;
@@ -264,10 +269,12 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     DistributionFunction(&pbadist, q - dq, &f0m1);
     DistributionFunction(&pbadist, q + dq, &f0p1);
     double df0dq = (+f0m2 - 8 * f0m1 + 8 * f0p1 - f0p2) / 12.0 / dq;
-    if (fabs(f0) == 0.)
+    if (fabs(f0) == 0.) {
       dlnf0_dlnq_[index_q] = -q;
-    else
+    }
+    else {
       dlnf0_dlnq_[index_q] = q / f0 * df0dq;
+    }
   }
 
   // Compute factor_
@@ -345,8 +352,9 @@ void NCDMBaseSpecies::TestFunction(void* /*params*/, double q, double* test) {
   // still undersampling the relativistic/non-relativistic transition in the
   // perturbation hierarchy. Weight the selector by an intermediate-energy
   // factor so the automatic grid also samples that transition.
-  if (q > 0.)
+  if (q > 0.) {
     *test *= std::sqrt(q * q + 0.5) / q;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -365,42 +373,57 @@ void NCDMBaseSpecies::ComputeMomentaMass(double M,
   const double* wvec = w_bg_.data();
   int qsize          = static_cast<int>(q_bg_.size());
 
-  if (n != nullptr)
+  if (n != nullptr) {
     *n = 0.;
-  if (rho != nullptr)
+  }
+  if (rho != nullptr) {
     *rho = 0.;
-  if (p != nullptr)
+  }
+  if (p != nullptr) {
     *p = 0.;
-  if (drho_dM != nullptr)
+  }
+  if (drho_dM != nullptr) {
     *drho_dM = 0.;
-  if (pseudo_p != nullptr)
+  }
+  if (pseudo_p != nullptr) {
     *pseudo_p = 0.;
+  }
 
   for (int index_q = 0; index_q < qsize; index_q++) {
     double q2      = qvec[index_q] * qvec[index_q];
     double epsilon = sqrt(q2 + M * M / (1. + z) / (1. + z));
-    if (n != nullptr)
+    if (n != nullptr) {
       *n += q2 * wvec[index_q];
-    if (rho != nullptr)
+    }
+    if (rho != nullptr) {
       *rho += q2 * epsilon * wvec[index_q];
-    if (p != nullptr)
+    }
+    if (p != nullptr) {
       *p += q2 * q2 / 3. / epsilon * wvec[index_q];
-    if (drho_dM != nullptr)
+    }
+    if (drho_dM != nullptr) {
       *drho_dM += q2 * M / (1. + z) / (1. + z) / epsilon * wvec[index_q];
-    if (pseudo_p != nullptr)
+    }
+    if (pseudo_p != nullptr) {
       *pseudo_p += pow(q2 / epsilon, 3) / 3. * wvec[index_q];
+    }
   }
 
-  if (n != nullptr)
+  if (n != nullptr) {
     *n *= factor2 / (1. + z);
-  if (rho != nullptr)
+  }
+  if (rho != nullptr) {
     *rho *= factor2;
-  if (p != nullptr)
+  }
+  if (p != nullptr) {
     *p *= factor2;
-  if (drho_dM != nullptr)
+  }
+  if (drho_dM != nullptr) {
     *drho_dM *= factor2;
-  if (pseudo_p != nullptr)
+  }
+  if (pseudo_p != nullptr) {
     *pseudo_p *= factor2;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -430,36 +453,48 @@ void NCDMBaseSpecies::ComputeMomentaDeg(double deg,
   const double* wvec = w_bg_.data();
   int qsize          = static_cast<int>(q_bg_.size());
 
-  if (n != nullptr)
+  if (n != nullptr) {
     *n = 0.;
-  if (rho != nullptr)
+  }
+  if (rho != nullptr) {
     *rho = 0.;
-  if (p != nullptr)
+  }
+  if (p != nullptr) {
     *p = 0.;
-  if (pseudo_p != nullptr)
+  }
+  if (pseudo_p != nullptr) {
     *pseudo_p = 0.;
+  }
 
   for (int index_q = 0; index_q < qsize; index_q++) {
     double q2      = qvec[index_q] * qvec[index_q];
     double epsilon = sqrt(q2 + M_ * M_ / (1. + z) / (1. + z));
-    if (n != nullptr)
+    if (n != nullptr) {
       *n += q2 * wvec[index_q];
-    if (rho != nullptr)
+    }
+    if (rho != nullptr) {
       *rho += q2 * epsilon * wvec[index_q];
-    if (p != nullptr)
+    }
+    if (p != nullptr) {
       *p += q2 * q2 / 3. / epsilon * wvec[index_q];
-    if (pseudo_p != nullptr)
+    }
+    if (pseudo_p != nullptr) {
       *pseudo_p += pow(q2 / epsilon, 3) / 3.0 * wvec[index_q];
+    }
   }
 
-  if (n != nullptr)
+  if (n != nullptr) {
     *n *= factor2 / (1. + z);
-  if (rho != nullptr)
+  }
+  if (rho != nullptr) {
     *rho *= factor2;
-  if (p != nullptr)
+  }
+  if (p != nullptr) {
     *p *= factor2;
-  if (pseudo_p != nullptr)
+  }
+  if (pseudo_p != nullptr) {
     *pseudo_p *= factor2;
+  }
 
   // rho is linear in deg
   if (drho_ddeg != nullptr) {
@@ -646,12 +681,13 @@ bool NCDMBaseSpecies::IsUltraRelativisticAtIc(const double* pvecback, double tol
 
 void NCDMBaseSpecies::WarnIfTooHeavyForHalofit(double m_ev_threshold) const {
   const double m_ncdm_in_electronvolt = GetMassInElectronvolt();
-  if (m_ncdm_in_electronvolt > m_ev_threshold)
+  if (m_ncdm_in_electronvolt > m_ev_threshold) {
     fprintf(stdout,
             "Warning: Halofit and HMcode are proved to work for CDM, and also with a small "
             "HDM component. But it sounds like you are running with a WDM component of mass "
             "%f eV, which makes the use of Halofit suspicious.\n",
             m_ncdm_in_electronvolt);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -671,16 +707,18 @@ void NCDMBaseSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayo
   /* NCDM tensor slots are only reserved when tensor_method == tm_exact.
      Other tensor methods (photons-only, massless approximation) do not
      need NCDM tensor multipoles. */
-  if (ppt_ == nullptr || ppt_->tensor_method != tm_exact)
+  if (ppt_ == nullptr || ppt_->tensor_method != tm_exact) {
     return;
+  }
 
   layout.l_max  = ppr->l_max_ncdm;
   layout.q_size = q_size();
 
   layout.index_per_q.clear();
   layout.index_per_q.reserve(layout.q_size);
-  for (int iq = 0; iq < layout.q_size; ++iq)
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     layout.index_per_q.push_back(index_pt + iq * (layout.l_max + 1));
+  }
 
   index_pt += layout.total_size();
 }
@@ -695,13 +733,15 @@ void NCDMBaseSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
                                         int* used_in_sources) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
   /* NCDMBaseSpecies scalar mask: multipoles l > 2 do not enter source functions. */
-  if (layout.q_size < 0)
+  if (layout.q_size < 0) {
     return;
+  }
   for (int iq = 0; iq < layout.q_size; ++iq) {
     const int b = layout.index_per_q[iq];
     for (int l = 0; l <= layout.l_max; ++l) {
-      if (l > 2)
+      if (l > 2) {
         used_in_sources[b + l] = false;
+      }
     }
   }
 }
@@ -717,8 +757,9 @@ void NCDMBaseSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
                                                     double* y,
                                                     const PerturbIcContext& ctx) {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
   const double* pvecback = ctx.ppw->pvecback.data();
   const double delta_ur  = ctx.delta_ur - 4. * ctx.a_prime_over_a * ctx.alpha;
   const double theta_ur  = ctx.theta_ur + ctx.k * ctx.k * ctx.alpha;
@@ -729,12 +770,15 @@ void NCDMBaseSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
     const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * M_ * M_);
     const double dlnf0_dlnq = GetDlnf0Dlnq(index_q, pvecback);
     y[idx + 0]              = -0.25 * delta_ur * dlnf0_dlnq;
-    if (lmax >= 1)
+    if (lmax >= 1) {
       y[idx + 1] = -epsilon / 3. / q / ctx.k * theta_ur * dlnf0_dlnq;
-    if (lmax >= 2)
+    }
+    if (lmax >= 2) {
       y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
-    if (lmax >= 3)
+    }
+    if (lmax >= 3) {
       y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;
+    }
   }
 }
 
@@ -754,13 +798,15 @@ void NCDMBaseSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLa
                                                     const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.q_size < 0 || new_l.q_size < 0)
+  if (old_l.q_size < 0 || new_l.q_size < 0) {
     return;
+  }
   for (int iq = 0; iq < new_l.q_size; ++iq) {
     const int old_idx = old_l.index_per_q[iq];
     const int new_idx = new_l.index_per_q[iq];
-    for (int l = 0; l <= new_l.l_max; ++l)
+    for (int l = 0; l <= new_l.l_max; ++l) {
       new_y[new_idx + l] = old_y[old_idx + l];
+    }
   }
 }
 
@@ -778,8 +824,9 @@ void NCDMBaseSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base
                                           double* dy,
                                           const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
 
   const perturb_workspace* ppw = ppaw.ppw;
   const perturb_vector* pv     = ppw->pv.get();

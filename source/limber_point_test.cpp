@@ -38,16 +38,18 @@ constexpr int kClosed = 1;
 constexpr int kOpen   = -1;
 
 double sin_K(double chi, int sgnK, double K) {
-  if (sgnK == 0)
+  if (sgnK == 0) {
     return chi;
+  }
   const double sqrt_absK = std::sqrt(sgnK * K);
   return (sgnK == 1) ? std::sin(sqrt_absK * chi) / sqrt_absK
                      : std::sinh(sqrt_absK * chi) / sqrt_absK;
 }
 
 double cos_K(double chi, int sgnK, double K) {
-  if (sgnK == 0)
+  if (sgnK == 0) {
     return 1.;
+  }
   const double sqrt_absK = std::sqrt(sgnK * K);
   return (sgnK == 1) ? std::cos(sqrt_absK * chi) : std::cosh(sqrt_absK * chi);
 }
@@ -55,8 +57,9 @@ double cos_K(double chi, int sgnK, double K) {
 /* q that puts the delta where sin_K^2(chi_L) * K = s, i.e. K L^2/q^2 = s. */
 double q_for_curvature_fraction(double l, double s, int sgnK, double K) {
   const double L = l + 0.5;
-  if (sgnK == 0)
+  if (sgnK == 0) {
     return L / 1.e4;
+  }
   return L * std::sqrt(sgnK * K / s);
 }
 
@@ -181,12 +184,13 @@ void test_equator_predicate() {
   for (const auto& c : cases) {
     const bool got =
         TransferModule::LimberSourceCrossesEquator(c.chi_max, kClosed, K_of(c.omega_k));
-    if (got != c.crosses)
+    if (got != c.crosses) {
       std::printf("  FAIL Omega_k=%.2f chi_max=%.0f: got %d want %d\n",
                   c.omega_k,
                   c.chi_max,
                   static_cast<int>(got),
                   static_cast<int>(c.crosses));
+    }
     assert(got == c.crosses);
   }
 

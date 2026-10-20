@@ -61,12 +61,14 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   /* baryon pressure perturbation / rho (same logic as StressEnergy delta_p branch) */
   double delta_p_b_over_rho_b;
   if (ppt_->has_perturbed_recombination &&
-      ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))
+      ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
     delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_wb_] *
                            (y[layout.idx_delta] +
                             y[ppw->pv->index_pt_perturbed_recombination_delta_temp]);
-  else
+  }
+  else {
     delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_cb2_] * y[layout.idx_delta];
+  }
 
   /* density equation */
   dy[layout.idx_delta] = -(theta_b + metric_continuity);
@@ -102,11 +104,13 @@ BaseSpecies::StressEnergyContribution BaryonsSpecies::StressEnergy(
   se.delta_rho        = rho_b * y[layout.idx_delta];
   se.rho_plus_p_theta = rho_b * y[layout.idx_theta];
   if (ppt_->has_perturbed_recombination &&
-      ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))
+      ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
     se.delta_p = rho_b * ppw->pvecthermo[thm_->index_th_wb_] *
                  (y[layout.idx_delta] + y[pv->index_pt_perturbed_recombination_delta_temp]);
-  else
+  }
+  else {
     se.delta_p = rho_b * ppw->pvecthermo[thm_->index_th_cb2_] * y[layout.idx_delta];
+  }
   return se;
 }
 
@@ -117,8 +121,9 @@ void BaryonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& ba
                                             const PerturbIcContext& ctx) {
   const auto& layout             = static_cast<const PerturbLayout&>(base);
   const PerturbationsModule* mod = ctx.p_mod;
-  if (layout.idx_delta < 0 || layout.idx_theta < 0)
+  if (layout.idx_delta < 0 || layout.idx_theta < 0) {
     return;
+  }
 
   if (ctx.index_ic == mod->index_ic_ad_) {
     y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
@@ -151,8 +156,9 @@ void BaryonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const auto& layout         = static_cast<const PerturbLayout&>(base);
   PerturbationsModule* p_mod = ctx.p_mod;
 
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   const double a_prime_over_a = ctx.a_prime_over_a;
 
@@ -189,10 +195,12 @@ void BaryonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                         BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_b", index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_b", index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
 }
 
@@ -248,8 +256,9 @@ void BaryonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLay
   // Scalar-mode only: idx_delta is registered (>=0) in scalar pv and -1 in
   // vector/tensor pv, so this no-ops outside scalar mode (the vector-mode
   // baryon theta copy stays inline -- out of scope for this PR).
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
   new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
 }

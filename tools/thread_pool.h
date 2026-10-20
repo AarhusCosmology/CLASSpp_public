@@ -91,10 +91,12 @@ class TaskSystem {
   }
 
   ~TaskSystem() {
-    for (auto& e : queues_)
+    for (auto& e : queues_) {
       e.Done();
-    for (auto& e : threads_)
+    }
+    for (auto& e : threads_) {
       e.join();
+    }
   }
 
   template <typename F>

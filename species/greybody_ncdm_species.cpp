@@ -22,8 +22,9 @@ double riemann_zeta(double s) {
   // (3 + sqrt(8))^(-n), so n = 21 - floor(s) suffices for s <= 20. Clamp to 6
   // (ample for large s, where zeta(s) -> 1 exponentially fast).
   int n = (s > 0.) ? static_cast<int>(21 - s) : 21;
-  if (n < 6)
+  if (n < 6) {
     n = 6;
+  }
 
   // Borwein d_k coefficients via the e_j auxiliary array.
   std::vector<double> e(n + 1);
@@ -37,16 +38,20 @@ double riemann_zeta(double s) {
   double S1 = 0.;
   double S2 = 0.;
   for (int k = 1; k <= n; ++k) {
-    if ((k - 1) % 2 == 0)
+    if ((k - 1) % 2 == 0) {
       S1 += 1. / std::pow(k, s);
-    else
+    }
+    else {
       S1 -= 1. / std::pow(k, s);
+    }
   }
   for (int k = n + 1; k <= 2 * n; ++k) {
-    if ((k - 1) % 2 == 0)
+    if ((k - 1) % 2 == 0) {
       S2 += e[k - n] / std::pow(k, s);
-    else
+    }
+    else {
       S2 -= e[k - n] / std::pow(k, s);
+    }
   }
   return (S1 + S2 / std::pow(2.0, n)) / (1. - std::pow(2.0, 1. - s));
 }
@@ -273,21 +278,26 @@ void GreyBodyNCDMSpecies::GreyBodyMoments(double& M2, double& M3, double& M4) co
 }
 
 std::optional<double> GreyBodyNCDMSpecies::GetParam(const std::string& name) const {
-  if (name == "alpha")
+  if (name == "alpha") {
     return gb_.alpha();
-  if (name == "q0")
+  }
+  if (name == "q0") {
     return gb_.q0();
-  if (name == "x")
+  }
+  if (name == "x") {
     return gb_.x();
+  }
   if (name == "M_2" || name == "M_3" || name == "M_4") {
     double M2;
     double M3;
     double M4;
     GreyBodyMoments(M2, M3, M4);
-    if (name == "M_2")
+    if (name == "M_2") {
       return M2;
-    if (name == "M_3")
+    }
+    if (name == "M_3") {
       return M3;
+    }
     return M4;
   }
   return BaseSpecies::GetParam(name);

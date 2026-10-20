@@ -104,11 +104,13 @@ BaseSpecies::StressEnergyContribution DCDMSpecies::StressEnergy(
 void DCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                          double* y,
                                          const PerturbIcContext& ctx) {
-  if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) {
     return;
+  }
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_delta >= 0)
+  if (layout.idx_delta >= 0) {
     y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
+  }
 }
 
 void DCDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
@@ -126,10 +128,12 @@ void DCDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout
                                                 const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.idx_delta >= 0 && new_l.idx_delta >= 0)
+  if (old_l.idx_delta >= 0 && new_l.idx_delta >= 0) {
     new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
-  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0)
+  }
+  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0) {
     new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+  }
 }
 
 void DCDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
@@ -142,8 +146,9 @@ void DCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                               const double* /*dy*/,
                               PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   const auto& layout     = static_cast<const PerturbLayout&>(base);
   const double* pvecback = ctx.ppw->pvecback.data();
@@ -173,10 +178,12 @@ void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                      BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_dcdm", index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_dcdm", index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
 }
 

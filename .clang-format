@@ -102,3 +102,8 @@ EmptyLineBeforeAccessModifier: LogicalBlock
 # Comments
 # =========================
 ReflowComments: false
+
+# =========================
+# Braces around every control-statement body
+# =========================
+InsertBraces: true

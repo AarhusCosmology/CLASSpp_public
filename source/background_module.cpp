@@ -36,10 +36,12 @@
 static std::vector<NCDMBaseSpecies*> GetNcdmSpecies(const SpeciesCollection& all_species) {
   std::vector<NCDMBaseSpecies*> result;
   for (const auto& sp : all_species) {
-    if (auto* ncdm = dynamic_cast<NCDMBaseSpecies*>(sp.get()))
+    if (auto* ncdm = dynamic_cast<NCDMBaseSpecies*>(sp.get())) {
       result.push_back(ncdm);
-    else if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+    }
+    else if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
       result.push_back(&dncdm_dr->dncdm());
+    }
   }
   return result;
 }
@@ -52,27 +54,33 @@ BackgroundModule::~BackgroundModule() {}
 
 double BackgroundModule::GetOmega0Species(const std::string& key) const {
   // Top-level species first.
-  if (auto* ptr = all_species_.find(key))
+  if (auto* ptr = all_species_.find(key)) {
     return (*ptr)->GetOmega0();
+  }
   // Sub-species of composites: IDR / IDM_DR live in IDM_DR_IDR, etc.
   if (auto* ptr = all_species_.find("IDM_DR_IDR")) {
     const auto& comp = static_cast<const IDM_DR_IDR_Species&>(**ptr);
-    if (key == "IDR")
+    if (key == "IDR") {
       return comp.idr().GetOmega0();
-    if (key == "IDM_DR")
+    }
+    if (key == "IDM_DR") {
       return comp.idm_dr().GetOmega0();
+    }
   }
   if (auto* ptr = all_species_.find("IDM_DRMD_IDR_DRMD")) {
     const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**ptr);
-    if (key == "IDR_DRMD")
+    if (key == "IDR_DRMD") {
       return comp.idr_drmd().GetOmega0();
-    if (key == "IDM_DRMD")
+    }
+    if (key == "IDM_DRMD") {
       return comp.idm_drmd().GetOmega0();
+    }
   }
   if (auto* ptr = all_species_.find("DCDM_DR")) {
     const auto& comp = static_cast<const DCDM_DR_Species&>(**ptr);
-    if (key == "DCDM")
+    if (key == "DCDM") {
       return comp.dcdm().GetOmega0();
+    }
   }
   return 0.;
 }
@@ -82,17 +90,20 @@ bool BackgroundModule::HasSpecies(const std::string& key) const {
 }
 
 bool BackgroundModule::HasSpeciesParam(const std::string& key, const std::string& param) const {
-  if (auto* ptr = all_species_.find(key))
+  if (auto* ptr = all_species_.find(key)) {
     return (*ptr)->GetParam(param).has_value() || PeakEnergyFraction(**ptr, param).has_value();
+  }
   return false;
 }
 
 double BackgroundModule::GetSpeciesParam(const std::string& key, const std::string& param) const {
   if (auto* ptr = all_species_.find(key)) {
-    if (auto val = (*ptr)->GetParam(param))
+    if (auto val = (*ptr)->GetParam(param)) {
       return *val;
-    if (auto val = PeakEnergyFraction(**ptr, param))
+    }
+    if (auto val = PeakEnergyFraction(**ptr, param)) {
       return *val;
+    }
   }
   return 0.;
 }
@@ -102,10 +113,12 @@ std::optional<double> BackgroundModule::PeakEnergyFraction(const BaseSpecies& sp
   const bool want_f = (param == "f_peak");
   const bool want_a = (param == "a_peak");
   const bool want_z = (param == "z_peak");
-  if (!want_f && !want_a && !want_z)
+  if (!want_f && !want_a && !want_z) {
     return std::nullopt;
-  if (bt_size_ == 0)
+  }
+  if (bt_size_ == 0) {
     return std::nullopt;
+  }
 
   // Maximum over the solved table rows of rho/rho_crit(a). The density comes
   // from Rho(), not from bg_rho_index(): a composite registers background slots
@@ -124,12 +137,15 @@ std::optional<double> BackgroundModule::PeakEnergyFraction(const BaseSpecies& sp
       a_peak = pvecback[index_bg_a_];
     }
   }
-  if (want_f)
+  if (want_f) {
     return f_peak;
-  if (a_peak <= 0.)  // no density anywhere in the table: the location is undefined
+  }
+  if (a_peak <= 0.) {  // no density anywhere in the table: the location is undefined
     return std::nullopt;
-  if (want_a)
+  }
+  if (want_a) {
     return a_peak;
+  }
   return 1. / a_peak - 1.;
 }
 
@@ -376,8 +392,9 @@ void BackgroundModule::background_functions(
 
   /* Modified gravity: the species that modifies it adds the effective density and
      pressure that make the two GR lines below exact. */
-  if (gravity_)
+  if (gravity_) {
     gravity_->CloseFriedmann(a, pba->K, pvecback_B, pvecback, rho_tot, p_tot, rho_r, rho_m);
+  }
 
   /** - compute expansion rate H from Friedmann equation: this is the
       only place where the Friedmann equation is assumed. Remember
@@ -463,15 +480,17 @@ void BackgroundModule::background_idm_drmd(
 }
 
 double BackgroundModule::f_idr_drmd() const {
-  if (!all_species_.count("IDM_DRMD_IDR_DRMD"))
+  if (!all_species_.count("IDM_DRMD_IDR_DRMD")) {
     return 0.;
+  }
   return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
       .f_idr_drmd();
 }
 
 double BackgroundModule::z_dec_drmd() const {
-  if (!all_species_.count("IDM_DRMD_IDR_DRMD"))
+  if (!all_species_.count("IDM_DRMD_IDR_DRMD")) {
     return -1.;
+  }
   return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
       .z_dec_drmd();
 }
@@ -500,9 +519,11 @@ void BackgroundModule::background_init() {
                                   : 0.;
     /* Every UltraRelativisticSpecies, at its early-time density. */
     double Omega0_ur = 0.;
-    for (const auto& [name, sp] : all_species_)
-      if (dynamic_cast<const UltraRelativisticSpecies*>(sp.get()))
+    for (const auto& [name, sp] : all_species_) {
+      if (dynamic_cast<const UltraRelativisticSpecies*>(sp.get())) {
         Omega0_ur += sp->GetRadiationOmega0();
+      }
+    }
     if (!GetNcdmSpecies(all_species_).empty() || (Omega0_idr != 0.)) {
       /* contribution of ultra-relativistic species _ur to N_eff */
       double Neff = Omega0_ur / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
@@ -548,8 +569,9 @@ void BackgroundModule::background_init() {
      masses in eV and about the ratio [m/omega_ncdm] in eV (the usual
      93 point something)*/
   if ((pba->background_verbose > 0) && (!GetNcdmSpecies(all_species_).empty())) {
-    for (auto& sp : all_species_)
+    for (auto& sp : all_species_) {
       sp->PrintMassInfo();
+    }
   }
 
   class_test(_Gyr_over_Mpc_ <= 0,
@@ -597,8 +619,9 @@ void BackgroundModule::background_indices() {
   bg_size_short_ = index_bg;
 
   // ── Every species registers its own background indices (flat loop) ──────────
-  for (auto& [name, sp] : all_species_)
+  for (auto& [name, sp] : all_species_) {
     sp->RegisterBackgroundIndices(index_bg);
+  }
 
   // ── Module aggregate indices ──────────────────────────────────────────────
   /* - index for total density */
@@ -695,8 +718,9 @@ void BackgroundModule::background_indices() {
              "background integration requires index_bi_tau to be the last of all index_bi's");
 
   /* Set BackgroundModule pointer on all active species (default is no-op) */
-  for (const auto& [name, sp] : all_species_)
+  for (const auto& [name, sp] : all_species_) {
     sp->SetBackgroundModule(this);
+  }
 
   /* A species that modifies gravity closes the Friedmann equations (as the PPF fluid
      closes the Einstein equations, the module asks for the role, not the type). */
@@ -800,8 +824,9 @@ void BackgroundModule::background_solve_evolver() {
   conformal_age_ = pvecback_integration[index_bi_a_];
   /* -> contribution of decaying dark matter and dark radiation to the critical density today: */
   Omega0_dr_ = 0.;
-  for (auto& sp : all_species_)
+  for (auto& sp : all_species_) {
     Omega0_dr_ += sp->DarkRadiationRhoToday(pvecback_integration.data()) / pba->H0 / pba->H0;
+  }
   if (all_species_.count("DCDM_DR")) {
     auto& dcdm_dr = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
     Omega0_dcdm_  = pvecback_integration[dcdm_dr.dcdm().bi_rho_index()] / pba->H0 / pba->H0;
@@ -830,8 +855,9 @@ void BackgroundModule::background_solve_evolver() {
 
   /* Let species run table-scope analysis now that the full background table is
      filled (e.g. DRMD decoupling redshift). */
-  for (auto& [name, sp] : all_species_)
+  for (auto& [name, sp] : all_species_) {
     sp->ProcessBackgroundTable(background_table_.data(), bt_size_, bg_size_, z_table_.data());
+  }
 
   /** - fill tables of second derivatives (in view of spline interpolation) */
   array_spline_table_lines(z_table_.data(),
@@ -891,10 +917,12 @@ void BackgroundModule::background_solve_evolver() {
           drmd.f_idm_drmd());
       printf("     -> dark radiation Delta N_eff (DRMD) %e\n", drmd.delta_Neff_drmd());
 
-      if (drmd.z_dec_drmd() > 0)
+      if (drmd.z_dec_drmd() > 0) {
         printf("     -> decoupling occurred at z=%f \n", drmd.z_dec_drmd());
-      else
+      }
+      else {
         printf("     -> no decoupling occurred.\n");
+      }
     }
     if (all_species_.count("ScalarField")) {
       const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
@@ -902,10 +930,11 @@ void BackgroundModule::background_solve_evolver() {
       printf("     -> Omega_scf = %g, wished %g\n",
              scf.Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
              scf.GetOmega0());
-      if (all_species_.count("Lambda"))
+      if (all_species_.count("Lambda")) {
         printf("     -> Omega_Lambda = %g, wished %g\n",
                all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
                all_species_.at("Lambda")->GetOmega0());
+      }
       printf("     -> parameters: [lambda, alpha, A, B] = \n");
       printf("                    [");
       const auto& scf_params = scf.scf_parameters();
@@ -927,8 +956,9 @@ void BackgroundModule::background_solve_evolver() {
      The DNCDM density is not an evolved bi_ variable, so read it from the today table row. */
   const double* bg_today = background_table_.data() + (bt_size_ - 1) * bg_size_;
   for (auto& [key, sp] : all_species_) {
-    if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+    if (auto* dncdm_dr = dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
       dncdm_dr->dncdm().BackfillOmega0FromToday(bg_today, pba->H0, pba->h);
+    }
   }
 }
 
@@ -954,15 +984,17 @@ void BackgroundModule::background_initial_conditions(
   /** Allow any species to pull the integration start earlier than the default
       (e.g. NCDM must be relativistic at a_ini; relevant for some WDM models). */
 
-  for (auto& [name, sp] : all_species_)
+  for (auto& [name, sp] : all_species_) {
     a = sp->BackgroundAIni(a, ppr->tol_ncdm_initial_w);
+  }
 
   pvecback_integration[index_bi_a_] = a;
 
   /* Set initial values of {B} variables: */
   double Omega_rad = pba->Omega0_g;
-  for (auto& [name, sp] : all_species_)
+  for (auto& [name, sp] : all_species_) {
     Omega_rad += sp->GetRadiationOmega0();
+  }
   double rho_rad = Omega_rad * pow(pba->H0, 2) / pow(a, 4);
   /* Set initial conditions for all species background ODE variables.  Each
      species owns its own integration offsets and IC math (DCDM, DNCDM, Fluid,
@@ -1054,10 +1086,12 @@ void BackgroundModule::background_find_equality() {
 
     Omega_m_over_Omega_r = pvecback[index_bg_Omega_m_] / pvecback[index_bg_Omega_r_];
 
-    if (Omega_m_over_Omega_r > 1)
+    if (Omega_m_over_Omega_r > 1) {
       tau_plus = tau_mid;
-    else
+    }
+    else {
       tau_minus = tau_mid;
+    }
   }
 
   a_eq_   = pvecback[index_bg_a_];
@@ -1089,8 +1123,9 @@ void BackgroundModule::background_output_titles(std::string& titles) const {
 
   // ── Species output — per-species dispatch ───────────────────────────────
   BackgroundColumnWriter writer(titles);
-  for (auto& [name, sp] : all_species_)
+  for (auto& [name, sp] : all_species_) {
     sp->WriteBackgroundColumnTitles(writer);
+  }
 
   // ── Module aggregate columns ────────────────────────────────────────────
   class_store_columntitle(titles, "(.)rho_crit", true);
@@ -1119,8 +1154,9 @@ void BackgroundModule::background_output_data(int number_of_titles, double* data
 
     // ── Species data — per-species dispatch ───────────────────────────────
     BackgroundColumnWriter writer(dataptr, storeidx);
-    for (auto& [name, sp] : all_species_)
+    for (auto& [name, sp] : all_species_) {
       sp->WriteBackgroundData(pvecback, writer);
+    }
 
     // ── Module aggregate columns ──────────────────────────────────────────
     class_store_double(dataptr, pvecback[index_bg_rho_crit_], true, storeidx);
@@ -1197,8 +1233,9 @@ void BackgroundModule::background_derivs_member(
 
   /** - solve second order growth equation  \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
   double rho_M = all_species_.baryons().Rho(pvecback);
-  if (all_species_.count("CDM"))
+  if (all_species_.count("CDM")) {
     rho_M += all_species_.at("CDM")->Rho(pvecback);
+  }
   if (all_species_.count("IDM_DR_IDR")) {
     auto& idm_idr  = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
     rho_M         += idm_idr.idm_dr().Rho(pvecback);
@@ -1232,8 +1269,9 @@ void BackgroundModule::background_derivs_member(
  */
 
 void BackgroundModule::background_output_budget() {
-  if (pba->background_verbose <= 1)
+  if (pba->background_verbose <= 1) {
     return;
+  }
 
   // Today densities live in the last background-table row; Rho()/rho_crit is a
   // species' Omega today and closes the budget to 1 by construction.
@@ -1266,15 +1304,18 @@ void BackgroundModule::background_output_budget() {
   // plain species contribute a single line. Curvature is not a species.
   std::vector<BudgetLine> lines;
   for (const auto& [key, sp] : all_species_) {
-    if (const auto* comp = dynamic_cast<const CompositeSpecies*>(sp.get()))
+    if (const auto* comp = dynamic_cast<const CompositeSpecies*>(sp.get())) {
       comp->AppendBudgetLines(bg_today, rho_crit, lines);
-    else
+    }
+    else {
       // Label with the collection key, not name(): the key is unique, whereas
       // name() is the type name and may be shared across instances post-#246.
       lines.push_back({key, sp->Rho(bg_today) / rho_crit, BudgetBucketOf(*sp)});
+    }
   }
-  if (pba->sgnK != 0)
+  if (pba->sgnK != 0) {
     lines.push_back({"Spatial Curvature", pba->Omega0_k, BudgetBucket::Other});
+  }
 
   struct Section {
     BudgetBucket bucket;
@@ -1293,17 +1334,20 @@ void BackgroundModule::background_output_budget() {
   double totals[4] = {0., 0., 0., 0.};
   for (const auto& section : kSections) {
     bool any = false;
-    for (const auto& l : lines)
+    for (const auto& l : lines) {
       if (l.bucket == section.bucket) {
         any = true;
         break;
       }
-    if (!any)
+    }
+    if (!any) {
       continue;
+    }
     printf("%s\n", section.header);
     for (const auto& l : lines) {
-      if (l.bucket != section.bucket)
+      if (l.bucket != section.bucket) {
         continue;
+      }
       printf("-> %-30s Omega = %-15g , omega = %-15g\n",
              pretty(l.label),
              l.omega,
@@ -1317,11 +1361,12 @@ void BackgroundModule::background_output_budget() {
   for (const auto& section : kSections) {
     const double t  = totals[static_cast<int>(section.bucket)];
     grand          += t;
-    if (t != 0.)
+    if (t != 0.) {
       printf(" %-32s Omega = %-15g , omega = %-15g \n",
              section.total_label,
              t,
              t * pba->h * pba->h);
+    }
   }
   printf(" TOTAL                            Omega = %-15g , omega = %-15g \n",
          grand,
@@ -1416,14 +1461,16 @@ void BackgroundModule::background_derivs_diagonal_loga_member(double loga,
   // bi_size_ - 1, not bi_size_: tau sits in the last slot and is stored but not
   // integrated, so background_solve_evolver hands the evolver bi_size_ - 1 equations
   // and diag is only that long. The scaling loop below already had this right.
-  for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++)
+  for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++) {
     diag[index_bi] = 0.;
+  }
 
   // Only species with a stiff self-coupling contribute; the default is a no-op, so
   // the standard sector correctly reports zero and the exponential step reduces to
   // its explicit counterpart there.
-  for (const auto& [name, sp] : all_species_)
+  for (const auto& [name, sp] : all_species_) {
     sp->BackgroundDerivsDiagonal(tau, y, diag, pvecback);
+  }
 
   y[index_bi_a_]    = tau;
   diag[index_bi_a_] = 0.;  // dtau/dloga = 1 is state-independent
@@ -1432,8 +1479,9 @@ void BackgroundModule::background_derivs_diagonal_loga_member(double loga,
   // so it takes the same 1/(a H) factor the derivatives do -- and only that: the
   // a-dependence of H does not enter d(dy_i)/d(y_i) at fixed loga.
   double H = pvecback[index_bg_H_];
-  for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++)
+  for (int index_bi = 0; index_bi < bi_size_ - 1; index_bi++) {
     diag[index_bi] *= 1. / (a * H);
+  }
 }
 
 void BackgroundModule::background_add_line_to_bg_table_member(
@@ -1484,16 +1532,18 @@ void BackgroundModule::background_print_variables(double loga,
 
 double BackgroundModule::GetOmega0NcdmTot() const {
   double total = 0.;
-  for (auto& sp : all_species_)
+  for (auto& sp : all_species_) {
     total += sp->NeutrinoOmega0();
+  }
   return total;
 }
 
 int BackgroundModule::GetNDecayDr() const {
   int n = (all_species_.count("DCDM_DR") ? 1 : 0);
   for (const auto& sp : all_species_) {
-    if (dynamic_cast<DNCDM_DR_Species*>(sp.get()))
+    if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
       ++n;
+    }
   }
   return n;
 }

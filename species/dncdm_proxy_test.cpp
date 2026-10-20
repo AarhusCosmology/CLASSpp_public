@@ -123,8 +123,9 @@ static double E1(double x) {
     c                 = b + an / c;
     const double del  = c * d;
     h                *= del;
-    if (std::fabs(del - 1.) < 1e-15)
+    if (std::fabs(del - 1.) < 1e-15) {
       break;
+    }
   }
   return h * std::exp(-x);
 }
@@ -220,9 +221,10 @@ int main() {
       std::snprintf(msg, sizeof(msg), "AlphaL(%d) matches eq. (16)", l);
       CheckClose(DNCDMProxySpecies::AlphaL(l), want, 1e-14, msg);
     }
-    for (int l = 2; l < 20; ++l)
+    for (int l = 2; l < 20; ++l) {
       Check(DNCDMProxySpecies::AlphaL(l + 1) > DNCDMProxySpecies::AlphaL(l),
             "AlphaL increases with l above the conservation floor");
+    }
   }
 
   // ── dr_rta_form ───────────────────────────────────────────────────────────
@@ -323,8 +325,9 @@ int main() {
       CheckClose(proxy->TransportRate(l, a, pvecback.data()), want, 1e-12, msg);
     }
     // l <= 1 vanishes identically, and alpha_l already encodes that.
-    for (int l : {0, 1})
+    for (int l : {0, 1}) {
       CheckClose(proxy->TransportRate(l, a, pvecback.data()), 0., 0., "copw rate is 0 for l <= 1");
+    }
 
     // dr_rta_alpha applies to BOTH forms -- AlphaFor multiplies the gamma^-5 term on
     // the common return path, whichever branch built it. That is deliberate (see
@@ -568,8 +571,9 @@ int main() {
     auto build            = [&](std::initializer_list<std::pair<const char*, const char*>> kv) {
       FileContent f;
       SetProxyBase(f);
-      for (const auto& [k, v] : kv)
+      for (const auto& [k, v] : kv) {
         f.set(k, v);
+      }
       return BuildProxy(f, pba, settings);
     };
 

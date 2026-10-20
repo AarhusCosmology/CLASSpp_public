@@ -41,12 +41,14 @@ std::vector<Named> LambdaSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   // omega0_closure_override before calling this factory. In all other passes
   // (Pass 1, shooting-guess construction) the override is absent and Lambda is
   // absent.
-  if (!ctx.omega0_closure_override.has_value())
+  if (!ctx.omega0_closure_override.has_value()) {
     return result;
+  }
 
   const double omega0_lambda = *ctx.omega0_closure_override;
-  if (omega0_lambda == 0.)
+  if (omega0_lambda == 0.) {
     return result;
+  }
 
   result.push_back({"Lambda", std::make_unique<LambdaSpecies>(*ctx.pba, omega0_lambda)});
   return result;

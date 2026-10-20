@@ -28,8 +28,9 @@ void FillNcdmLayout(NCDMBaseSpecies::PerturbLayout& l, int q_size, int l_max, in
   l.q_size = q_size;
   l.l_max  = l_max;
   l.index_per_q.clear();
-  for (int iq = 0; iq < q_size; ++iq)
+  for (int iq = 0; iq < q_size; ++iq) {
     l.index_per_q.push_back(idx0 + iq * (l_max + 1));
+  }
 }
 
 // Distinct nonzero marker per (iq, l) slot.
@@ -125,9 +126,11 @@ int main() {
 
     std::vector<double> old_y(7 + q_size * (l_max + 1), 0.);
     std::vector<double> new_y(7 + q_size * (l_max + 1), 0.);
-    for (int iq = 0; iq < q_size; ++iq)
-      for (int l = 0; l <= l_max; ++l)
+    for (int iq = 0; iq < q_size; ++iq) {
+      for (int l = 0; l <= l_max; ++l) {
         old_y[old_l.index_per_q[iq] + l] = Marker(iq, l);
+      }
+    }
 
     sp->CopyPerturbationsAcrossSwitch(old_l, new_l, old_y.data(), new_y.data(), ctx);
     rc |= CheckNcdmSlotsCopied(old_l, new_l, old_y, new_y, "DNCDMSpecies");
@@ -176,11 +179,14 @@ int main() {
     const int old_size = old_nl.index_per_q[0] + q_size * (l_max + 1);
     std::vector<double> old_y(old_size, 0.);
     std::vector<double> new_y(old_size, 0.);
-    for (int l = 0; l <= dr_lmax; ++l)
+    for (int l = 0; l <= dr_lmax; ++l) {
       old_y[old_dl.idx_F0 + l] = 1000. + l;
-    for (int iq = 0; iq < q_size; ++iq)
-      for (int l = 0; l <= l_max; ++l)
+    }
+    for (int iq = 0; iq < q_size; ++iq) {
+      for (int l = 0; l <= l_max; ++l) {
         old_y[old_nl.index_per_q[iq] + l] = Marker(iq, l);
+      }
+    }
 
     dncdm_dr.CopyPerturbationsAcrossSwitch(old_l, new_l, old_y.data(), new_y.data(), ctx);
 
@@ -292,8 +298,9 @@ int main() {
     // (bgm_ == nullptr). The gate staying shut is itself the thing worth pinning --
     // an ungated version of this guard reported the lasing regime as broken when
     // the accepted solution never came within 75 decades of the floor.
-    for (int i = 0; i < q_size; ++i)
+    for (int i = 0; i < q_size; ++i) {
       bi[sp->bi_f_parent_index() + i] = DNCDMSpecies::kFScale * 1e-120;  // under the floor
+    }
     sp->ComputeBackground(a, bi.data(), bg.data());
     const double pinned = bg[sp->bg_lnf_index()];
     if (!(std::fabs(pinned - std::log(1e-100)) < 1e-6)) {
@@ -304,8 +311,9 @@ int main() {
       rc = 1;
     }
     // Negative occupation must clamp, not produce NaN.
-    for (int i = 0; i < q_size; ++i)
+    for (int i = 0; i < q_size; ++i) {
       bi[sp->bi_f_parent_index() + i] = -DNCDMSpecies::kFScale * 1e-40;
+    }
     sp->ComputeBackground(a, bi.data(), bg.data());
     const double clamped = bg[sp->bg_lnf_index()];
     if (!std::isfinite(clamped) || std::fabs(clamped - std::log(1e-100)) > 1e-6) {
@@ -400,8 +408,9 @@ int main() {
     }
   }
 
-  if (rc != 0)
+  if (rc != 0) {
     return 1;
+  }
 
   std::printf("dncdm switch-copy test passed\n");
   return 0;

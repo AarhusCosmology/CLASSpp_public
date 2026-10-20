@@ -31,13 +31,15 @@ namespace {
  *  identities the kernel asserts are number identities, and a mis-interpolated operator
  *  satisfies them all the way into a 4e10% runaway. */
 void WarnTableSpacingUnset(const std::string& name, double gamma_kms_mpc) {
-  if (!(gamma_kms_mpc > DNCDMInvSpecies::kTableDefaultValidatedTo))
+  if (!(gamma_kms_mpc > DNCDMInvSpecies::kTableDefaultValidatedTo)) {
     return;
+  }
   // Keyed on the instance and Gamma, so a re-Compute from the python wrapper with a new
   // cosmology warns again. Species construction is single-threaded, so no lock is needed.
   static std::set<std::pair<std::string, double>> warned;
-  if (!warned.emplace(name, gamma_kms_mpc).second)
+  if (!warned.emplace(name, gamma_kms_mpc).second) {
     return;
+  }
   fprintf(stderr,
           "WARNING: species '%s': dr_reduced_moments is set and dr_table_max_dlna is not, so "
           "the reduced collision table is interpolated at the default %g. That default is "
@@ -386,8 +388,9 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                     name.c_str(),
                     dlna);
   composite->set_table_max_dlna(dlna);
-  if (red > 0 && !dlna_set)
+  if (red > 0 && !dlna_set) {
     WarnTableSpacingUnset(name, gamma_kms_mpc);
+  }
   composite->background_verbose_ = ctx.pfc->get_or("background_verbose", 0);
 
   // Diagnostic only: the per-multipole sector moments alpha_l is measured from.
@@ -397,8 +400,9 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // Resolved here and not in ProcessBackgroundTable, which runs before any perturbation
   // layout exists.  Mirrors what AddCouplingDerivs computes per call:
   // min(l_max_dncdm_col, the hierarchies' own l_max).
-  if (ctx.ppr != nullptr)
+  if (ctx.ppr != nullptr) {
     composite->set_reduced_table_l_max(std::min(ctx.ppr->l_max_dncdm_col, ctx.ppr->l_max_ncdm));
+  }
   return {name, std::move(composite)};
 }
 
@@ -497,8 +501,9 @@ void DNCDMInvSpecies::ApplyKernelBackgroundDerivs(double a,
   // in. KappaStoredToBare() itself stays column-semantics, because that is what the
   // perturbation gather and the tests read.
   const double kappa = KappaStoredToBare() / DNCDMSpecies::kFScale;
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     fH_bare_[i] = kappa * y[parent_->bi_f_parent_index() + i];
+  }
   kernel_->ComputeBackgroundDerivs(a,
                                    m,
                                    Gamma,
@@ -512,14 +517,17 @@ void DNCDMInvSpecies::ApplyKernelBackgroundDerivs(double a,
   // Assign (=) the kernel source: the parent's decay-only diagonal term is not
   // registered in collision-owned mode, and massless daughters have no comoving
   // dilution term, so the kernel source IS the full f-RHS for all three.
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     dy[parent_->bi_f_parent_index() + i] = df_H_[i] / kappa;
+  }
   const int Nf = static_cast<int>(fermion_->q_bg().size());
-  for (int i = 0; i < Nf; ++i)
+  for (int i = 0; i < Nf; ++i) {
     dy[fermion_->bi_f_index() + i] = df_l_[i];
+  }
   const int Nb = static_cast<int>(boson_->q_bg().size());
-  for (int i = 0; i < Nb; ++i)
+  for (int i = 0; i < Nb; ++i) {
     dy[boson_->bi_f_index() + i] = df_phi_[i];
+  }
 }
 
 void DNCDMInvSpecies::BackgroundDerivs(double tau,
@@ -552,8 +560,9 @@ void DNCDMInvSpecies::BackgroundDerivsDiagonal(double tau,
   const double Gamma = parent_->Gamma();
   const int Np       = parent_->q_size();
   const double kappa = KappaStoredToBare() / DNCDMSpecies::kFScale;
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     fH_bare_[i] = kappa * y[parent_->bi_f_parent_index() + i];
+  }
   kernel_->ComputeBackgroundDerivs(a_bg,
                                    m,
                                    Gamma,
@@ -569,14 +578,17 @@ void DNCDMInvSpecies::BackgroundDerivsDiagonal(double tau,
   // d(dy_i)/d(y_i) is INVARIANT under the parent's stored/bare rescaling: the write
   // back divides the rate by the same kappa the read multiplies the occupation by,
   // so the two cancel. The daughters store bare occupation and need no conversion.
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     diag[parent_->bi_f_parent_index() + i] += diag_H_[i];
+  }
   const int Nf = static_cast<int>(fermion_->q_bg().size());
-  for (int i = 0; i < Nf; ++i)
+  for (int i = 0; i < Nf; ++i) {
     diag[fermion_->bi_f_index() + i] += diag_l_[i];
+  }
   const int Nb = static_cast<int>(boson_->q_bg().size());
-  for (int i = 0; i < Nb; ++i)
+  for (int i = 0; i < Nb; ++i) {
     diag[boson_->bi_f_index() + i] += diag_phi_[i];
+  }
 }
 
 DecayTransitionKernel::Moments DNCDMInvSpecies::ConservationMoments(double a,
@@ -589,8 +601,9 @@ DecayTransitionKernel::Moments DNCDMInvSpecies::ConservationMoments(double a,
   const double kappa = KappaStoredToBare() / DNCDMSpecies::kFScale;
   const int Np       = parent_->q_size();
   std::vector<double> dyH_bare(Np);
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     dyH_bare[i] = kappa * dy[parent_->bi_f_parent_index() + i];
+  }
   return kernel_->ComputeMoments(a,
                                  parent_->GetMass(),
                                  dyH_bare.data(),
@@ -677,16 +690,19 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
 
   const double* bg = background_table + static_cast<size_t>(best_row) * row_stride;
   const double a   = bg[bgm_->index_bg_a_];
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     fH[i] = kappa * std::exp(bg[pf + i]);
+  }
   // The daughters' PSDs on their STATE grid (pvecback carries them on the finer
   // background grid; bg_index is the exact subsample).
   std::vector<double> fl(Nf);
   std::vector<double> fphi(Nb);
-  for (int j = 0; j < Nf; ++j)
+  for (int j = 0; j < Nf; ++j) {
     fl[j] = bg[fbase + fermion_->bg_index(j)];
-  for (int j = 0; j < Nb; ++j)
+  }
+  for (int j = 0; j < Nb; ++j) {
     fphi[j] = bg[bbase + boson_->bg_index(j)];
+  }
 
   reduced_op_ = std::make_unique<ReducedCollisionOperator>(probe,
                                                            parent_view,
@@ -709,7 +725,7 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
                           reduced_op_->q_ref(1),
                           reduced_op_->alpha0(1));
 
-  if (background_verbose_ > 1)
+  if (background_verbose_ > 1) {
     fprintf(stderr,
             "[dncdm-reduced] %s: %d moments per daughter, basis frozen at a = %.4e "
             "(decay epoch: n_H = n_ini/e, n_ini = %.4g); daughter perturbation variables "
@@ -720,6 +736,7 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
             best_rate,
             Nf + Nb,
             2 * reduced_moments_);
+  }
 
   // The basis weight is f-bar(1 -/+ f-bar), which is only a weight while the occupation
   // stays in range. The gather does not enforce Pauli blocking and DrPsdSpecies floors f
@@ -730,7 +747,7 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
   const char* dname[2] = {"nu_l", "phi"};
   for (int d = 0; d < 2; ++d) {
     const auto c = reduced_op_->weight_clamp(d);
-    if (c.n_clamped > 0)
+    if (c.n_clamped > 0) {
       fprintf(stderr,
               "[dncdm-reduced] %s: WARNING -- %s occupation outside [0, 1] in %d of %d bins "
               "at the freeze row (peak f = %.6f). The entropy weight is clamped to "
@@ -741,12 +758,14 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
               c.n_clamped,
               (d == 0) ? Nf : Nb,
               c.f_max);
-    else if (background_verbose_ > 1)
+    }
+    else if (background_verbose_ > 1) {
       fprintf(stderr,
               "[dncdm-reduced] %s: %s peak occupation at the freeze row = %.6f, no clamping\n",
               name().c_str(),
               dname[d],
               c.f_max);
+    }
   }
 }
 
@@ -793,17 +812,21 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
     const double* bg = background_table + static_cast<size_t>(row) * row_stride;
     const double a   = bg[bgm_->index_bg_a_];
     const double aH  = a * bg[bgm_->index_bg_H_];
-    for (int i = 0; i < Np; ++i)
+    for (int i = 0; i < Np; ++i) {
       fH[i] = kappa * std::exp(bg[pf + i]);
+    }
     probe.PrepareTransitions(a, m, Gamma, fH.data(), &bg[fbase], &bg[bbase], aH);
     probe.CollisionDiagonal(diagH.data(), diagl.data(), diagp.data());
     double rate = 0.;
-    for (double d : diagH)
+    for (double d : diagH) {
       rate = std::fmax(rate, std::fabs(d));
-    for (double d : diagl)
+    }
+    for (double d : diagl) {
       rate = std::fmax(rate, std::fabs(d));
-    for (double d : diagp)
+    }
+    for (double d : diagp) {
       rate = std::fmax(rate, std::fabs(d));
+    }
     // ONE condition, on the EARLY side only. The window runs from the first active row
     // to the end of the table.
     //
@@ -939,8 +962,9 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
       if (sub == 0) {
         a  = bg[bgm_->index_bg_a_];
         aH = a * bg[bgm_->index_bg_H_];
-        for (int i = 0; i < Np; ++i)
+        for (int i = 0; i < Np; ++i) {
           f[i] = kappa * std::exp(bg[pf + i]);
+        }
         f_l_src   = &bg[fbase];
         f_phi_src = &bg[bbase];
       }
@@ -952,12 +976,15 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
         // The parent is stored as ln f, so linear here is GEOMETRIC in f, which is what an
         // occupation that falls many decades across the window needs. The daughters are
         // stored as f and are built up from zero, where geometric would be wrong.
-        for (int i = 0; i < Np; ++i)
+        for (int i = 0; i < Np; ++i) {
           f[i] = kappa * std::exp(bg[pf + i] + t * (bg1[pf + i] - bg[pf + i]));
-        for (int j = 0; j < Nf; ++j)
+        }
+        for (int j = 0; j < Nf; ++j) {
           f_l[j] = bg[fbase + j] + t * (bg1[fbase + j] - bg[fbase + j]);
-        for (int j = 0; j < Nb; ++j)
+        }
+        for (int j = 0; j < Nb; ++j) {
           f_phi[j] = bg[bbase + j] + t * (bg1[bbase + j] - bg[bbase + j]);
+        }
         f_l_src   = f_l.data();
         f_phi_src = f_phi.data();
       }
@@ -978,26 +1005,32 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
     Tools::TaskSystem ts(n_threads);
     std::vector<std::future<void>> fut;
     fut.reserve(n_chunks);
-    for (int c = 0; c < n_chunks; ++c)
+    for (int c = 0; c < n_chunks; ++c) {
       fut.push_back(ts.AsyncTask([&, c]() { do_chunk(c); }));
-    for (auto& f : fut)
+    }
+    for (auto& f : fut) {
       f.get();
+    }
   }
   else {
-    for (int c = 0; c < n_chunks; ++c)
+    for (int c = 0; c < n_chunks; ++c) {
       do_chunk(c);
+    }
   }
 
   reduced_table_.Reset(S, l_max);
-  for (int c = 0; c < n_chunks; ++c)
-    for (size_t r = 0; r < chunk_a[c].size(); ++r)
+  for (int c = 0; c < n_chunks; ++c) {
+    for (size_t r = 0; r < chunk_a[c].size(); ++r) {
       reduced_table_.AddRow(chunk_a[c][r],
                             std::vector<double>(chunk_M[c].begin() + r * block,
                                                 chunk_M[c].begin() + (r + 1) * block));
+    }
+  }
 
   // The table is built and installed above; all that is left is to report it.
-  if (background_verbose_ <= 1)
+  if (background_verbose_ <= 1) {
     return;
+  }
   const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
   fprintf(stderr,
           "[dncdm-reduced] %s: tabulated M~_l at %d points across %d of %d background rows "
@@ -1024,8 +1057,9 @@ void DNCDMInvSpecies::ProcessBackgroundTable(const double* background_table,
                                              int n_rows,
                                              int row_stride,
                                              const double* /*z_table*/) {
-  if (reduced_moments_ == 0 || bgm_ == nullptr)
+  if (reduced_moments_ == 0 || bgm_ == nullptr) {
     return;
+  }
   // ORDER MATTERS: the table is the reduction of the operator ONTO the frozen basis,
   // so the basis has to exist first.
   BuildReducedBasis(background_table, n_rows, row_stride);
@@ -1033,8 +1067,9 @@ void DNCDMInvSpecies::ProcessBackgroundTable(const double* background_table,
   // still -1 for a composite built directly by a test (no ppr). Tabulating then would
   // walk the whole two-pass window scan to assemble zero-sized blocks; the RHS falls
   // through to the matrix-free path on an empty table anyway.
-  if (reduced_table_l_max_ >= 0)
+  if (reduced_table_l_max_ >= 0) {
     BuildReducedTable(background_table, n_rows, row_stride);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1120,16 +1155,18 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
         // The parent leg crosses the kappa unit boundary (#385); the daughters' moments
         // are bare on both sides. kappa cancels on the parent's own diagonal, but not on
         // the off-diagonal blocks, so it has to be applied here and undone below.
-        for (int i = 0; i < Np; ++i)
+        for (int i = 0; i < Np; ++i) {
           scratch.red_z[i] = kappa * y[p_lay.index_per_q[i] + l];
+        }
         for (int j = 0; j < reduced_moments_; ++j) {
           scratch.red_z[Np + j]                    = y[f_lay.index_per_q[j] + l];
           scratch.red_z[Np + reduced_moments_ + j] = y[b_lay.index_per_q[j] + l];
         }
         std::fill(scratch.red_dz.begin(), scratch.red_dz.begin() + S, 0.);
         reduced_table_.Apply(a, l, scratch.red_z.data(), scratch.red_dz.data());
-        for (int i = 0; i < Np; ++i)
+        for (int i = 0; i < Np; ++i) {
           dy[p_lay.index_per_q[i] + l] += scratch.red_dz[i] / kappa;
+        }
         for (int j = 0; j < reduced_moments_; ++j) {
           dy[f_lay.index_per_q[j] + l] += scratch.red_dz[Np + j];
           dy[b_lay.index_per_q[j] + l] += scratch.red_dz[Np + reduced_moments_ + j];
@@ -1146,8 +1183,9 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
   // hierarchies stream on are the same numbers.
   const int pf       = parent_->bg_lnf_index();
   const double kappa = KappaStoredToBare();
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     scratch.fH_gather[i] = kappa * std::exp(pvecback[pf + i]);
+  }
   // Daughters: hand the kernel the FULL background columns. It was built
   // with the fine grids as its background-gather views, so it samples f_l, f_phi at
   // the node momenta on the grid the background was integrated on, while still
@@ -1201,8 +1239,9 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
      the node work it saves. Results are unchanged -- the accumulation order per
      (bin, l) is still ascending i then n (see ApplyPerturbationOperatorAllL). */
   auto fit = [](std::vector<double>& v, size_t want) {
-    if (v.size() < want)
+    if (v.size() < want) {
       v.assign(want, 0.);
+    }
   };
   fit(scratch.FH_all, static_cast<size_t>(Np) * L1);
   fit(scratch.Fl_all, static_cast<size_t>(Nf) * L1);
@@ -1213,9 +1252,11 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
 
   // Same kappa boundary as before (#385): the parent's slot is STORED occupation, the
   // kernel speaks BARE. Daughters need no conversion in either direction.
-  for (int i = 0; i < Np; ++i)
-    for (int l = 0; l <= L; ++l)
+  for (int i = 0; i < Np; ++i) {
+    for (int l = 0; l <= L; ++l) {
       scratch.FH_all[static_cast<size_t>(i) * L1 + l] = kappa * y[p_lay.index_per_q[i] + l];
+    }
+  }
   // The daughters. In the REDUCED representation their y-slots hold moments, not grid
   // occupations, so they are reconstructed onto the quadrature grid here (R), swept by
   // the ordinary kernel below, and projected back (P) after it. That is the whole of
@@ -1232,21 +1273,27 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
       const int n_grid = (d == 0) ? Nf : Nb;
       double* F        = (d == 0) ? scratch.Fl_all.data() : scratch.Fphi_all.data();
       for (int l = 0; l <= L; ++l) {
-        for (int j = 0; j < reduced_moments_; ++j)
+        for (int j = 0; j < reduced_moments_; ++j) {
           scratch.red_m[j] = y[lay.index_per_q[j] + l];
+        }
         reduced_op_->Reconstruct(d, scratch.red_m.data(), scratch.red_grid.data());
-        for (int i = 0; i < n_grid; ++i)
+        for (int i = 0; i < n_grid; ++i) {
           F[static_cast<size_t>(i) * L1 + l] = scratch.red_grid[i];
+        }
       }
     }
   }
   else {
-    for (int j = 0; j < Nf; ++j)
-      for (int l = 0; l <= L; ++l)
+    for (int j = 0; j < Nf; ++j) {
+      for (int l = 0; l <= L; ++l) {
         scratch.Fl_all[static_cast<size_t>(j) * L1 + l] = y[f_lay.index_per_q[j] + l];
-    for (int k = 0; k < Nb; ++k)
-      for (int l = 0; l <= L; ++l)
+      }
+    }
+    for (int k = 0; k < Nb; ++k) {
+      for (int l = 0; l <= L; ++l) {
         scratch.Fphi_all[static_cast<size_t>(k) * L1 + l] = y[b_lay.index_per_q[k] + l];
+      }
+    }
   }
 
   kern.ApplyPerturbationOperatorAllL(L,
@@ -1261,8 +1308,9 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
   for (int l = 0; l <= L; ++l) {
     // Parent: the operator output verbatim, back to STORED units. No 1/f̄_H, no
     // floor guard, no dilution term (see the block comment above).
-    for (int i = 0; i < Np; ++i)
+    for (int i = 0; i < Np; ++i) {
       dy[p_lay.index_per_q[i] + l] += scratch.dFH_all[static_cast<size_t>(i) * L1 + l] / kappa;
+    }
     // Daughters: same F-space collision, already in their own units. An empty bin
     // MUST receive it — that is how it fills.
     if (reduced()) {
@@ -1273,18 +1321,22 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
         const auto& lay  = (d == 0) ? f_lay : b_lay;
         const int n_grid = (d == 0) ? Nf : Nb;
         const double* dF = (d == 0) ? scratch.dFl_all.data() : scratch.dFphi_all.data();
-        for (int i = 0; i < n_grid; ++i)
+        for (int i = 0; i < n_grid; ++i) {
           scratch.red_grid[i] = dF[static_cast<size_t>(i) * L1 + l];
+        }
         reduced_op_->Project(d, scratch.red_grid.data(), scratch.red_m.data());
-        for (int j = 0; j < reduced_moments_; ++j)
+        for (int j = 0; j < reduced_moments_; ++j) {
           dy[lay.index_per_q[j] + l] += scratch.red_m[j];
+        }
       }
     }
     else {
-      for (int j = 0; j < Nf; ++j)
+      for (int j = 0; j < Nf; ++j) {
         dy[f_lay.index_per_q[j] + l] += scratch.dFl_all[static_cast<size_t>(j) * L1 + l];
-      for (int k = 0; k < Nb; ++k)
+      }
+      for (int k = 0; k < Nb; ++k) {
         dy[b_lay.index_per_q[k] + l] += scratch.dFphi_all[static_cast<size_t>(k) * L1 + l];
+      }
     }
   }
 }
@@ -1308,8 +1360,9 @@ void DNCDMInvSpecies::ApplyKernelPerturbDiagonal(double a,
   // diagonal linearises the same discrete network the RHS evaluates.
   const int pf       = parent_->bg_lnf_index();
   const double kappa = KappaStoredToBare();
-  for (int i = 0; i < Np; ++i)
+  for (int i = 0; i < Np; ++i) {
     scratch.fH_gather[i] = kappa * std::exp(pvecback[pf + i]);
+  }
   const int fbase             = fermion_->bg_f_index();
   const int bbase             = boson_->bg_f_index();
   const double a_prime_over_a = (bgm_ != nullptr) ? a * pvecback[bgm_->index_bg_H_] : 0.;
@@ -1326,12 +1379,14 @@ void DNCDMInvSpecies::ApplyKernelPerturbDiagonal(double a,
   // so the parent's entries need no conversion here, unlike in the mat-vec above.
   if (tabulated() && L <= reduced_table_.l_max()) {
     const int S = Np + 2 * reduced_moments_;
-    if (static_cast<int>(scratch.red_dz.size()) < S)
+    if (static_cast<int>(scratch.red_dz.size()) < S) {
       scratch.red_dz.resize(S);
+    }
     for (int l = 0; l <= L; ++l) {
       reduced_table_.Diagonal(a, l, scratch.red_dz.data());
-      for (int i = 0; i < Np; ++i)
+      for (int i = 0; i < Np; ++i) {
         diag[p_lay.index_per_q[i] + l] += scratch.red_dz[i];
+      }
       for (int j = 0; j < reduced_moments_; ++j) {
         diag[f_lay.index_per_q[j] + l] += scratch.red_dz[Np + j];
         diag[b_lay.index_per_q[j] + l] += scratch.red_dz[Np + reduced_moments_ + j];
@@ -1390,8 +1445,9 @@ void DNCDMInvSpecies::ApplyKernelPerturbDiagonal(double a,
   }
 
   for (int l = 0; l <= L; ++l) {
-    for (int i = 0; i < Np; ++i)
+    for (int i = 0; i < Np; ++i) {
       diag[p_lay.index_per_q[i] + l] += scratch.diag_H_pt[i];
+    }
     if (reduced()) {
       for (int j = 0; j < reduced_moments_; ++j) {
         diag[f_lay.index_per_q[j] + l] += red_diag[0][j];
@@ -1399,10 +1455,12 @@ void DNCDMInvSpecies::ApplyKernelPerturbDiagonal(double a,
       }
     }
     else {
-      for (int j = 0; j < Nf; ++j)
+      for (int j = 0; j < Nf; ++j) {
         diag[f_lay.index_per_q[j] + l] += scratch.diag_l_pt[j];
-      for (int k = 0; k < Nb; ++k)
+      }
+      for (int k = 0; k < Nb; ++k) {
         diag[b_lay.index_per_q[k] + l] += scratch.diag_phi_pt[k];
+      }
     }
   }
 }
@@ -1424,8 +1482,9 @@ void DNCDMInvSpecies::AddCouplingDerivs(double /*tau*/,
   // rather than validated at input: the hierarchy length is what the indexing can
   // actually reach, and a collision multipole above it has nothing to write to.
   int l_max_col = ppr->l_max_dncdm_col;
-  if (l_max_col > p_lay.l_max)
+  if (l_max_col > p_lay.l_max) {
     l_max_col = p_lay.l_max;
+  }
 
   // Per-k working memory (see Scratch): one private kernel + gather buffers per
   // k-mode, so concurrent modes cannot corrupt each other's transition geometry
@@ -1462,8 +1521,9 @@ void DNCDMInvSpecies::PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& /*
   const NCDMBaseSpecies::PerturbLayout& b_lay = boson_layout(my);
 
   int l_max_col = ppr->l_max_dncdm_col;
-  if (l_max_col > p_lay.l_max)
+  if (l_max_col > p_lay.l_max) {
     l_max_col = p_lay.l_max;
+  }
 
   // `a` comes from the pvecback the DIAGONAL callback just interpolated, NOT from
   // ppw->scalar_ctx: scalar_ctx.a is written by perturb_derivs_member, and on a
@@ -1501,8 +1561,9 @@ void DNCDMInvSpecies::WriteBackgroundData(const double* pvecback, BackgroundColu
   const double* f_phi = pvecback + boson_->bg_f_index();
   const int N         = static_cast<int>(boson_->q_bg().size());
   double f_max        = f_phi[0];
-  for (int i = 1; i < N; ++i)
+  for (int i = 1; i < N; ++i) {
     f_max = std::max(f_max, f_phi[i]);
+  }
   w.Add("bose_occupancy_" + name(), f_max);
 }
 
@@ -1657,8 +1718,9 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
     if (scratch != nullptr && scratch->kernel_pt != nullptr) {
       const auto& p_lay = parent_layout(my);
       int l_max_col     = mod.GetPrecision()->l_max_dncdm_col;
-      if (l_max_col > p_lay.l_max)
+      if (l_max_col > p_lay.l_max) {
         l_max_col = p_lay.l_max;
+      }
       // Zeroed every call: ApplyKernelPerturbDerivs ACCUMULATES into dy (it is
       // written to be one contributor among several on the real RHS), so a stale
       // buffer would silently sum sampling points together.
@@ -1791,8 +1853,9 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
              {&fermion_layout(my), &fermion_->q(), &fermion_->dq(), y, 0., pi_l, 0.},
              {&boson_layout(my), &boson_->q(), &boson_->dq(), y, 0., pi_phi, 0.}};
         auto raw = [&](const Leg& L, const double* vec, int l) {
-          if (l > L.lay->l_max || L.lay->q_size <= 0)
+          if (l > L.lay->l_max || L.lay->q_size <= 0) {
             return 0.;
+          }
           double sum = 0.;
           for (int i = 0; i < L.lay->q_size && i < static_cast<int>(L.q->size()); ++i) {
             const double q    = (*L.q)[i];
@@ -1806,8 +1869,9 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
           L.norm          = (r2 != 0.) ? L.pi / r2 : 0.;
         }
         int l_top = mod.GetPrecision()->l_max_dncdm_col;
-        for (const Leg& L : legs)
+        for (const Leg& L : legs) {
           l_top = std::min(l_top, L.lay->l_max);
+        }
         l_top = std::min(l_top, kLMomentMax);
         for (int l = 2; l <= l_top; ++l) {
           double sn = 0.;

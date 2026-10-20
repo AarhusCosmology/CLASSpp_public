@@ -39,8 +39,9 @@ static bool SynthesisThrows(FileContent& fc) {
 
 static bool Contains(const std::vector<std::string>& v, const std::string& s) {
   for (const auto& e : v) {
-    if (e == s)
+    if (e == s) {
       return true;
+    }
   }
   return false;
 }

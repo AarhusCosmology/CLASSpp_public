@@ -41,8 +41,9 @@ void evolver_rk(EvolverDerivs derivs,
 
   next_index_x = 0;
 
-  while (x_sampling[next_index_x] < x_ini)
+  while (x_sampling[next_index_x] < x_ini) {
     next_index_x++;
+  }
 
   initialize_generic_integrator(y_size, &gi);
 
@@ -108,8 +109,9 @@ void evolver_rk(EvolverDerivs derivs,
      point in the covered range */
   (*derivs)(x1, y, dy.data(), parameters_and_workspace_for_derivs);
 
-  if (print_variables != nullptr)
+  if (print_variables != nullptr) {
     (*print_variables)(x1, y, dy.data(), parameters_and_workspace_for_derivs);
+  }
 
   cleanup_generic_integrator(&gi);
 }

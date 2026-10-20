@@ -130,8 +130,9 @@ int main() {
                                DarkRadiationSpecies::PerturbLayout>(dncdm_dr, "DNCDM_DR_Species");
   }
 
-  if (rc != 0)
+  if (rc != 0) {
     return 1;
+  }
 
   std::printf("composite layout test passed\n");
   return 0;

@@ -55,11 +55,13 @@ Grid LogGrid(double qmin, double qmax, int n) {
   g.q.resize(n);
   g.dq.resize(n);
   const double h = std::log(qmax / qmin) / (n - 1);
-  for (int i = 0; i < n; ++i)
+  for (int i = 0; i < n; ++i) {
     g.q[i] = qmin * std::exp(i * h);
+  }
   g.dq[0] = 0.5 * (g.q[1] - g.q[0]);
-  for (int i = 1; i < n - 1; ++i)
+  for (int i = 1; i < n - 1; ++i) {
     g.dq[i] = 0.5 * (g.q[i + 1] - g.q[i - 1]);
+  }
   g.dq[n - 1] = 0.5 * (g.q[n - 1] - g.q[n - 2]);
   return g;
 }
@@ -71,8 +73,9 @@ Grid ParentGrid(int n) {
   Grid g;
   g.q.resize(n);
   g.dq.assign(n, 15.0 / n);
-  for (int i = 0; i < n; ++i)
+  for (int i = 0; i < n; ++i) {
     g.q[i] = (15.0 / n) * (i + 1);
+  }
   return g;
 }
 
@@ -85,8 +88,9 @@ DecayTransitionKernel::Config KernelConfig() {
 
 double MaxAbs(const std::vector<double>& v) {
   double m = 0.;
-  for (double x : v)
+  for (double x : v) {
     m = std::fmax(m, std::fabs(x));
+  }
   return m;
 }
 
@@ -113,11 +117,13 @@ Background EquilibriumBackground(const Grid& P, const Grid& F, const Grid& B, do
     bg.fH[i]         = 1. / (std::exp(eps - mu_H) + 1.);
   }
   bg.fl.resize(F.q.size());
-  for (size_t i = 0; i < F.q.size(); ++i)
+  for (size_t i = 0; i < F.q.size(); ++i) {
     bg.fl[i] = 1. / (std::exp(F.q[i] - mu_l) + 1.);
+  }
   bg.fphi.resize(B.q.size());
-  for (size_t i = 0; i < B.q.size(); ++i)
+  for (size_t i = 0; i < B.q.size(); ++i) {
     bg.fphi[i] = 1. / (std::exp(B.q[i] - mu_phi) - 1.);
+  }
   return bg;
 }
 
@@ -164,11 +170,13 @@ Background AnalyticBackground(const Grid& P, const Grid& F, const Grid& B, doubl
     bg.fH[i]         = 1. / (std::exp(eps - mu_H) + 1.);
   }
   bg.fl.resize(F.q.size());
-  for (size_t i = 0; i < F.q.size(); ++i)
+  for (size_t i = 0; i < F.q.size(); ++i) {
     bg.fl[i] = std::fmin(0.999, front(F.q[i]) / (std::exp((F.q[i] - mu_l) / T_d) + 1.));
+  }
   bg.fphi.resize(B.q.size());
-  for (size_t i = 0; i < B.q.size(); ++i)
+  for (size_t i = 0; i < B.q.size(); ++i) {
     bg.fphi[i] = front(B.q[i]) / (std::exp((B.q[i] - mu_phi) / T_d) - 1.);
+  }
   return bg;
 }
 
@@ -241,15 +249,17 @@ void q1_projection_identity() {
     std::vector<double> c(nm);
     std::vector<double> c2(nm);
     std::vector<double> df(std::max(s.F.q.size(), s.B.q.size()));
-    for (int d = 0; d < 2; ++d)
+    for (int d = 0; d < 2; ++d) {
       for (int j = 0; j < nm; ++j) {
         std::fill(c.begin(), c.end(), 0.);
         c[j] = 1.;
         R.Reconstruct(d, c.data(), df.data());
         R.Project(d, df.data(), c2.data());
-        for (int i = 0; i < nm; ++i)
+        for (int i = 0; i < nm; ++i) {
           worst = std::fmax(worst, std::fabs(c2[i] - (i == j ? 1. : 0.)));
+        }
       }
+    }
   }
   std::printf("   max |P R - I| over n_moments 1..4 : %.3e\n", worst);
   assert(worst < 1e-9);
@@ -284,13 +294,15 @@ void q1b_energy_coordinate() {
       // of the projection alone and must hold for anything.
       std::vector<double> df(g.q.size());
       std::vector<double> m(nm);
-      for (size_t i = 0; i < g.q.size(); ++i)
+      for (size_t i = 0; i < g.q.size(); ++i) {
         df[i] = std::sin(3.1 * i) * std::exp(-g.q[i] / 4.);
+      }
       R.Project(d, df.data(), m.data());
 
       double want = 0.;
-      for (size_t i = 0; i < g.q.size(); ++i)
+      for (size_t i = 0; i < g.q.size(); ++i) {
         want += g.dq[i] * g.q[i] * g.q[i] * g.q[i] * df[i];
+      }
       const double got = R.q_ref(d) * (m[1] + R.alpha0(d) * m[0]);
       worst = std::fmax(worst, std::fabs(got - want) / std::fmax(std::fabs(want), 1e-300));
     }
@@ -322,8 +334,9 @@ void q2_in_span_agreement() {
 
   // A state that lies in the reduced span: arbitrary parent, daughters reconstructed.
   std::vector<double> z(S);
-  for (int b = 0; b < kNParent; ++b)
+  for (int b = 0; b < kNParent; ++b) {
     z[b] = 0.3 * std::sin(1.7 * b) * bg.fH[b];
+  }
   z[kNParent]          = 1.0;
   z[kNParent + 1]      = -0.4;
   z[kNParent + nm]     = 0.6;
@@ -338,17 +351,23 @@ void q2_in_span_agreement() {
   std::vector<double> dp(Fp.size());
   std::vector<double> rec(std::max(s.F.q.size(), s.B.q.size()));
 
-  for (int b = 0; b < kNParent; ++b)
-    for (int l = 0; l <= kLMax; ++l)
+  for (int b = 0; b < kNParent; ++b) {
+    for (int l = 0; l <= kLMax; ++l) {
       FH[static_cast<size_t>(b) * stride + l] = z[b];
+    }
+  }
   R.Reconstruct(0, &z[kNParent], rec.data());
-  for (size_t k = 0; k < s.F.q.size(); ++k)
-    for (int l = 0; l <= kLMax; ++l)
+  for (size_t k = 0; k < s.F.q.size(); ++k) {
+    for (int l = 0; l <= kLMax; ++l) {
       Fl[k * stride + l] = rec[k];
+    }
+  }
   R.Reconstruct(1, &z[kNParent + nm], rec.data());
-  for (size_t k = 0; k < s.B.q.size(); ++k)
-    for (int l = 0; l <= kLMax; ++l)
+  for (size_t k = 0; k < s.B.q.size(); ++k) {
+    for (int l = 0; l <= kLMax; ++l) {
       Fp[k * stride + l] = rec[k];
+    }
+  }
 
   K.ResetMultipoleRecurrence();
   K.ApplyPerturbationOperatorAllL(kLMax,
@@ -366,25 +385,31 @@ void q2_in_span_agreement() {
   for (int l = 0; l <= kLMax; ++l) {
     const double* Ml = Mred.data() + static_cast<size_t>(l) * S * S;
     std::vector<double> want(S, 0.);
-    for (int i = 0; i < S; ++i)
-      for (int j = 0; j < S; ++j)
+    for (int i = 0; i < S; ++i) {
+      for (int j = 0; j < S; ++j) {
         want[i] += Ml[static_cast<size_t>(i) * S + j] * z[j];
+      }
+    }
 
     std::vector<double> got(S, 0.);
-    for (int b = 0; b < kNParent; ++b)
+    for (int b = 0; b < kNParent; ++b) {
       got[b] = dH[static_cast<size_t>(b) * stride + l];
+    }
     for (int d = 0; d < 2; ++d) {
       const double* src = (d == 0) ? dl.data() : dp.data();
       const size_t n    = (d == 0) ? s.F.q.size() : s.B.q.size();
-      for (size_t k = 0; k < n; ++k)
+      for (size_t k = 0; k < n; ++k) {
         slice[k] = src[k * stride + l];
+      }
       R.Project(d, slice.data(), mom.data());
-      for (int j = 0; j < nm; ++j)
+      for (int j = 0; j < nm; ++j) {
         got[kNParent + d * nm + j] = mom[j];
+      }
     }
     const double scale = std::fmax(MaxAbs(want), 1e-300);
-    for (int i = 0; i < S; ++i)
+    for (int i = 0; i < S; ++i) {
       worst = std::fmax(worst, std::fabs(got[i] - want[i]) / scale);
+    }
   }
   std::printf("   max relative |M~z - P M R z| over l = 0..%d : %.3e\n", kLMax, worst);
   assert(worst < 1e-11);
@@ -411,8 +436,9 @@ void q3_equilibrium_annihilation() {
   ref.EquilibriumNullVectorsExact(veq_ex);
   const int N = ref.full_size();
   double exact[3];
-  for (int v = 0; v < 3; ++v)
+  for (int v = 0; v < 3; ++v) {
     exact[v] = NullResidual(Mex.data(), N, &veq_ex[static_cast<size_t>(v) * N]);
+  }
   std::printf(
       "   exact operator's own residual ||M v_eq||/(||M|| ||v||), l = 0:\n"
       "      v_mu(H,l) %.3e   v_mu(H,phi) %.3e   v_T %.3e\n",
@@ -449,15 +475,17 @@ void q3_equilibrium_annihilation() {
       const Grid& g                 = (d == 0) ? s.F : s.B;
       const std::vector<double>& we = R.weight(d);
       for (int dir = 0; dir < 2; ++dir) {  // the mu and T equilibrium directions
-        for (size_t k = 0; k < g.q.size(); ++k)
+        for (size_t k = 0; k < g.q.size(); ++k) {
           v[k] = we[k] * (dir == 0 ? 1. : g.q[k]);
+        }
         R.Project(d, v.data(), c.data());
         R.Reconstruct(d, c.data(), vr.data());
         double num = 0.;
         double den = 0.;
         for (size_t k = 0; k < g.q.size(); ++k) {
-          if (!(we[k] > 0.))
+          if (!(we[k] > 0.)) {
             continue;
+          }
           const double s2  = g.dq[k] * g.q[k] * g.q[k] / we[k];
           num             += s2 * (vr[k] - v[k]) * (vr[k] - v[k]);
           den             += s2 * v[k] * v[k];
@@ -475,26 +503,33 @@ void q3_equilibrium_annihilation() {
     R.EquilibriumNullVectorsExact(veq_full);
     const int S = R.size();
     std::vector<double> lhs(S, 0.);
-    for (int i = 0; i < S; ++i)
-      for (int j = 0; j < S; ++j)
+    for (int i = 0; i < S; ++i) {
+      for (int j = 0; j < S; ++j) {
         lhs[i] += M[static_cast<size_t>(i) * S + j] * veq[j];
+      }
+    }
     std::vector<double> rhs_full(N, 0.);
-    for (int i = 0; i < N; ++i)
-      for (int j = 0; j < N; ++j)
+    for (int i = 0; i < N; ++i) {
+      for (int j = 0; j < N; ++j) {
         rhs_full[i] += Mex[static_cast<size_t>(i) * N + j] * veq_full[j];
+      }
+    }
     std::vector<double> rhs(S, 0.);
     std::vector<double> mom(nm);
     std::vector<double> slice(std::max(s.F.q.size(), s.B.q.size()));
-    for (int b = 0; b < kNParent; ++b)
+    for (int b = 0; b < kNParent; ++b) {
       rhs[b] = rhs_full[b];
+    }
     for (int d = 0; d < 2; ++d) {
       const size_t n0 = (d == 0) ? kNParent : kNParent + s.F.q.size();
       const size_t nn = (d == 0) ? s.F.q.size() : s.B.q.size();
-      for (size_t k = 0; k < nn; ++k)
+      for (size_t k = 0; k < nn; ++k) {
         slice[k] = rhs_full[n0 + k];
+      }
       R.Project(d, slice.data(), mom.data());
-      for (int j = 0; j < nm; ++j)
+      for (int j = 0; j < nm; ++j) {
         rhs[kNParent + d * nm + j] = mom[j];
+      }
     }
     double id = 0.;
     double sc = 0.;
@@ -593,8 +628,9 @@ void q4_q5_conservation_and_dissipativity() {
                   c.momentum,
                   b,
                   ok ? "contained" : "*** EXCEEDS ***");
-      if (!ok)
+      if (!ok) {
         containment_holds = false;
+      }
     }
   }
   std::printf(
@@ -723,8 +759,9 @@ void q6_the_milestone() {
     const auto c0    = R.Conservation(M.data());
     const bool clean = std::fmax(c0.number_fermion, c0.number_boson) < 1e-8;
     std::printf("   %3d %6d | %+.4e %+.4e  %s\n", nm, S, r0, r1, clean ? "" : "<- ceiling");
-    if (!clean)
+    if (!clean) {
       break;
+    }
     ceiling = nm;
   }
   std::printf(
@@ -758,9 +795,11 @@ Background OvershootBackground(const Grid& P, const Grid& F, const Grid& B, doub
   Background bg = AnalyticBackground(P, F, B, a, m);
   // Push the populated core just past saturation, the way a discrete gather that does
   // not enforce Pauli blocking does. 1.01 is the measured value, not a stress test.
-  for (size_t i = 0; i < bg.fl.size(); ++i)
-    if (bg.fl[i] > 0.5)
+  for (size_t i = 0; i < bg.fl.size(); ++i) {
+    if (bg.fl[i] > 0.5) {
       bg.fl[i] = 1.01;
+    }
+  }
   return bg;
 }
 
@@ -870,14 +909,17 @@ void q7b_overshoot_is_reported() {
 std::vector<double> LegendreCoeffs(int l) {
   std::vector<double> prev{1.};
   std::vector<double> cur{0., 1.};
-  if (l == 0)
+  if (l == 0) {
     return prev;
+  }
   for (int n = 1; n < l; ++n) {
     std::vector<double> next(cur.size() + 1, 0.);
-    for (size_t k = 0; k < cur.size(); ++k)
+    for (size_t k = 0; k < cur.size(); ++k) {
       next[k + 1] += (2. * n + 1.) / (n + 1.) * cur[k];
-    for (size_t k = 0; k < prev.size(); ++k)
+    }
+    for (size_t k = 0; k < prev.size(); ++k) {
       next[k] -= static_cast<double>(n) / (n + 1.) * prev[k];
+    }
     prev = cur;
     cur  = next;
   }
@@ -910,9 +952,11 @@ double IntegralK(int k, double x) {
 double AnalyticF(int l, double x) {
   const std::vector<double> c = LegendreCoeffs(l);
   double acc                  = 0.;
-  for (size_t k = 0; k < c.size(); ++k)
-    if (c[k] != 0.)
+  for (size_t k = 0; k < c.size(); ++k) {
+    if (c[k] != 0.) {
       acc += c[k] * IntegralK(static_cast<int>(k), x);
+    }
+  }
   const double one_minus = (1. - x * x);
   return 0.5 * one_minus * one_minus * acc;
 }
@@ -986,8 +1030,9 @@ void q8_analytic_kernel_oracle() {
       std::fill(FH.begin(), FH.end(), 0.);
       std::fill(Fl.begin(), Fl.end(), 0.);
       std::fill(Fp.begin(), Fp.end(), 0.);
-      for (int l = 0; l <= kLMax; ++l)
+      for (int l = 0; l <= kLMax; ++l) {
         FH[static_cast<size_t>(b) * L1 + l] = 1.;  // one parent bin, the same amplitude at every l
+      }
 
       kern.ResetMultipoleRecurrence();
       kern.ApplyPerturbationOperatorAllL(kLMax,
@@ -1003,10 +1048,12 @@ void q8_analytic_kernel_oracle() {
       double E_f[kLMax + 1] = {0.};
       double E_b[kLMax + 1] = {0.};
       for (int l = 0; l <= kLMax; ++l) {
-        for (int j = 0; j < Nf; ++j)
+        for (int j = 0; j < Nf; ++j) {
           E_f[l] += s.F.dq[j] * std::pow(s.F.q[j], 3) * dl[static_cast<size_t>(j) * L1 + l];
-        for (int j = 0; j < Nb; ++j)
+        }
+        for (int j = 0; j < Nb; ++j) {
           E_b[l] += s.B.dq[j] * std::pow(s.B.q[j], 3) * dp[static_cast<size_t>(j) * L1 + l];
+        }
       }
 
       for (int l = 1; l <= kLMax; ++l) {
@@ -1028,11 +1075,13 @@ void q8_analytic_kernel_oracle() {
       }
     }
     std::printf("   %4d  nu_l |", n_daughter);
-    for (int l = 1; l <= kLMax; ++l)
+    for (int l = 1; l <= kLMax; ++l) {
       std::printf(" %9.2e", worst_f[l]);
+    }
     std::printf("\n          phi  |");
-    for (int l = 1; l <= kLMax; ++l)
+    for (int l = 1; l <= kLMax; ++l) {
       std::printf(" %9.2e", worst_b[l]);
+    }
     std::printf("\n");
     for (int l = 1; l <= kLMax; ++l) {
       prev_abs[l]      = converged_abs[l];
@@ -1130,15 +1179,18 @@ void q9_operator_table() {
     return -1.0 + 2.0 * (((seed >> 9) & 0xffffu) / 65535.0);
   };
   std::vector<double> z(S);
-  for (int i = 0; i < S; ++i)
+  for (int i = 0; i < S; ++i) {
     z[i] = rnd();
+  }
 
   auto matvec = [&](const std::vector<double>& Mat, int l, std::vector<double>& out) {
     out.assign(S, 0.);
     const double* Ml = Mat.data() + static_cast<size_t>(l) * S * S;
-    for (int i = 0; i < S; ++i)
-      for (int j = 0; j < S; ++j)
+    for (int i = 0; i < S; ++i) {
+      for (int j = 0; j < S; ++j) {
         out[i] += Ml[static_cast<size_t>(i) * S + j] * z[j];
+      }
+    }
   };
   auto rel = [&](const std::vector<double>& x, const std::vector<double>& ref) {
     double num = 0.;
@@ -1176,8 +1228,9 @@ void q9_operator_table() {
     std::vector<double> want(S);
     matvec(M[0], l, r0);
     matvec(M[1], l, r1);
-    for (int i = 0; i < S; ++i)
+    for (int i = 0; i < S; ++i) {
       want[i] = 0.5 * (r0[i] + r1[i]);
+    }
     table.Apply(std::sqrt(a0 * a1), l, z.data(), got.data());
     worst_mid = std::fmax(worst_mid, rel(got, want));
   }

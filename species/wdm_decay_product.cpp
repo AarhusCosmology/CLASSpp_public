@@ -32,23 +32,28 @@ double WdmDecayProductSpecies::FiducialScaleFactorAtTime(double t_mpc) {
   const double Or = kFidOmegaR;
   double a_lo     = 1e-12;
   double a_hi     = 1.0;
-  while (FiducialCosmicTime(a_hi) < t_mpc && a_hi < 1e3)
+  while (FiducialCosmicTime(a_hi) < t_mpc && a_hi < 1e3) {
     a_hi *= 2.0;
+  }
   // Matter-limit seed; refine with bracketed Newton (dt/da = a / (H0 sqrt(Or+Om a)))
   // and bisection fallback — monotone, so this always converges.
   double a = std::pow(1.5 * t_mpc * H0 * std::sqrt(Om), 2.0 / 3.0);
-  if (!(a > a_lo && a < a_hi))
+  if (!(a > a_lo && a < a_hi)) {
     a = 0.5 * (a_lo + a_hi);
+  }
   for (int it = 0; it < 80; ++it) {
     const double f = FiducialCosmicTime(a) - t_mpc;
-    if (f > 0.)
+    if (f > 0.) {
       a_hi = a;
-    else
+    }
+    else {
       a_lo = a;
+    }
     const double dtda = a / (H0 * std::sqrt(Or + Om * a));
     double a_next     = a - f / dtda;
-    if (!(a_next > a_lo && a_next < a_hi))
+    if (!(a_next > a_lo && a_next < a_hi)) {
       a_next = 0.5 * (a_lo + a_hi);
+    }
     if (std::fabs(a_next - a) <= 1e-14 * a) {
       a = a_next;
       break;
@@ -158,18 +163,20 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   n_bins_      = input.get_or("momenta_bins", 96);
   q_edge_tol_  = input.get_or("q_edge_tol", 1e-3);
   l_max_input_ = input.get_or("l_max", -1);
-  if (auto qmr = input.get<double>("q_min_ratio"))
+  if (auto qmr = input.get<double>("q_min_ratio")) {
     q_min_ratio_floor_ = *qmr;
+  }
   class_test(n_bins_ < 8 || n_bins_ > 4096,
              "species '%s': momenta_bins out of range",
              instance_name.c_str());
   class_test(!(q_edge_tol_ > 1e-12 && q_edge_tol_ < 1e-2),
              "species '%s': q_edge_tol must be in (1e-12, 1e-2)",
              instance_name.c_str());
-  if (q_min_ratio_floor_)
+  if (q_min_ratio_floor_) {
     class_test(!(*q_min_ratio_floor_ > 0. && *q_min_ratio_floor_ < 0.5),
                "species '%s': q_min_ratio must be in (0, 0.5)",
                instance_name.c_str());
+  }
 
   BuildInjectionAdaptedGrid();
 
@@ -196,14 +203,18 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   class_test_severe(!has_initial && !has_combined,
                     "species '%s': specify Omega_ini/omega_ini or Omega_dcdmwdm/omega_dcdmwdm",
                     instance_name.c_str());
-  if (Omega_ini_opt)
+  if (Omega_ini_opt) {
     Omega_ini_pending_ = *Omega_ini_opt;
-  else if (omega_ini_opt)
+  }
+  else if (omega_ini_opt) {
     Omega_ini_pending_ = *omega_ini_opt / settings.h / settings.h;
-  if (Omega_comb_opt)
+  }
+  if (Omega_comb_opt) {
     Omega_combined_pending_ = *Omega_comb_opt;
-  else if (omega_comb_opt)
+  }
+  else if (omega_comb_opt) {
     Omega_combined_pending_ = *omega_comb_opt / settings.h / settings.h;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,10 +249,12 @@ void WdmDecayProductSpecies::BuildInjectionAdaptedGrid() {
     F_hi_             = 0.;  // signals SigmaAt to use the uniform fallback spacing
     const double q_lo = kQKick / 30.0;
     const double du   = std::log(kQKick / q_lo) / N;
-    for (int j = 0; j <= N; ++j)
+    for (int j = 0; j <= N; ++j) {
       u_edge_[j] = std::log(q_lo) + j * du;
-    for (int i = 0; i < N; ++i)
+    }
+    for (int i = 0; i < N; ++i) {
       u_[i] = 0.5 * (u_edge_[i] + u_edge_[i + 1]);  // uniform-grid cell centre
+    }
   }
   else {
     const double dF = (F_hi - F_lo) / N;
@@ -249,12 +262,14 @@ void WdmDecayProductSpecies::BuildInjectionAdaptedGrid() {
       const double g = -std::log1p(-F);  // -ln(1 - F) = Gamma * t
       return std::log(FiducialScaleFactorAtTime(g / Gamma_) * kQKick);
     };
-    for (int j = 0; j <= N; ++j)
+    for (int j = 0; j <= N; ++j) {
       u_edge_[j] = u_at_F(F_lo + j * dF);
+    }
     // Grid point at the F-quantile midpoint: q_[i] = q(F_mid[i]) (spec §4.2), NOT the
     // u-midpoint of the edges — F is nonlinear in u, so the two differ at O((dF)^2).
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i) {
       u_[i] = u_at_F(F_lo + (i + 0.5) * dF);
+    }
   }
 
   for (int i = 0; i < N; ++i) {
@@ -285,8 +300,9 @@ double WdmDecayProductSpecies::SigmaAt(double u_cut) const {
   const double H     = H0 * std::sqrt(kFidOmegaM / (a * a * a) + kFidOmegaR / (a * a * a * a));
   const double gt    = Gamma_ * FiducialCosmicTime(a);
   const double ln_du = std::log((F_hi_ - F_lo_) / n_bins_ * H / Gamma_) + gt;
-  if (ln_du >= std::log(kSigmaMax))
+  if (ln_du >= std::log(kSigmaMax)) {
     return kSigmaMax;
+  }
   return std::max(kSigmaMin, std::exp(ln_du));
 }
 
@@ -297,18 +313,21 @@ void WdmDecayProductSpecies::GaussWeights(double u_cut, double sigma, double* w)
   // huge-argument libm call happens under -ffast-math.
   auto cdf = [&](double u_e) {
     const double x = (u_e - u_cut) * inv_s;
-    if (x >= 8.)
+    if (x >= 8.) {
       return 1.0;
-    if (x <= -8.)
+    }
+    if (x <= -8.) {
       return 0.0;
+    }
     return 0.5 * (1.0 + std::erf(x));
   };
   double c_lo = cdf(u_edge_[0]);
   w[0]        = c_lo;  // below-grid tail clamped into the bottom bin
   for (int i = 0; i < N; ++i) {
     const double c_hi = cdf(u_edge_[i + 1]);
-    if (i > 0)
+    if (i > 0) {
       w[i] = 0.;
+    }
     w[i] += c_hi - c_lo;
     c_lo  = c_hi;
   }
@@ -331,8 +350,9 @@ void WdmDecayProductSpecies::FillInjection(double a,
   auto zero_all = [&]() {
     for (int i = 0; i < N; ++i) {
       J[i] = 0.;
-      if (dJdlnq != nullptr)
+      if (dJdlnq != nullptr) {
         dJdlnq[i] = 0.;
+      }
     }
   };
   if (rho_dcdm <= 0. || Gamma_ == 0.) {
@@ -351,8 +371,9 @@ void WdmDecayProductSpecies::FillInjection(double a,
   // Static-sparsity floor (see kSparsityFloor doc): w -> (w + f)/(1 + N f)
   // keeps Sum w = 1 exactly while making every row structurally nonzero.
   const double fnorm = 1.0 / (1.0 + N * kSparsityFloor);
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     scratch_w_[i] = (scratch_w_[i] + kSparsityFloor) * fnorm;
+  }
 
   for (int i = 0; i < N; ++i) {
     const double w       = scratch_w_[i];
@@ -360,8 +381,9 @@ void WdmDecayProductSpecies::FillInjection(double a,
     J[i]                 = A * w / (dq_[i] * q_[i] * q_[i] * epsilon);
   }
 
-  if (dJdlnq == nullptr)
+  if (dJdlnq == nullptr) {
     return;
+  }
   // g-source: d/dlnq of the deposited profile J(u) = A·φ_σ(u−u_cut)/(q³ε). The
   // 1/(q³ε) measure factor makes this a TWO-term derivative, not just the
   // edge-pdf difference:
@@ -503,8 +525,9 @@ double WdmDecayProductSpecies::RhoPrimeOverRho(const double* pvecback,
   // The rho == 0 guard is load-bearing: a sourced daughter starts empty and the
   // base implementation would form 0/0 there.
   const double rho = Rho(pvecback);
-  if (rho <= 0.)
+  if (rho <= 0.) {
     return 0.;
+  }
   return -3. * a_prime_over_a * (rho + P(pvecback)) / rho;
 }
 
@@ -514,8 +537,9 @@ void WdmDecayProductSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter&
   const std::string& nm = name();
   w.Add("(.)rho_wdm_" + nm, 0.);
   w.Add("(.)p_wdm_" + nm, 0.);
-  for (int i = 0; i < n_bins_; ++i)
+  for (int i = 0; i < n_bins_; ++i) {
     w.Add("f_" + nm + "[" + std::to_string(i) + "]", 0.);
+  }
 }
 
 void WdmDecayProductSpecies::WriteBackgroundData(const double* pvecback,
@@ -523,8 +547,9 @@ void WdmDecayProductSpecies::WriteBackgroundData(const double* pvecback,
   const std::string& nm = name();
   w.Add("(.)rho_wdm_" + nm, Rho(pvecback));
   w.Add("(.)p_wdm_" + nm, P(pvecback));
-  for (int i = 0; i < n_bins_; ++i)
+  for (int i = 0; i < n_bins_; ++i) {
     w.Add("f_" + nm + "[" + std::to_string(i) + "]", pvecback[index_bg_f_ + i]);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -546,8 +571,9 @@ void WdmDecayProductSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLay
 
   layout.index_per_q.clear();
   layout.index_per_q.reserve(layout.q_size);
-  for (int iq = 0; iq < layout.q_size; ++iq)
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     layout.index_per_q.push_back(index_pt + iq * (layout.l_max + 1));
+  }
 
   index_pt += layout.total_size();
 }
@@ -558,8 +584,9 @@ void WdmDecayProductSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& bas
                                            double* dy,
                                            const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
 
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -591,9 +618,10 @@ void WdmDecayProductSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& bas
                   epsilon * metric_euler / (3. * q * k) * g;
     dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
                   s_l[2] * metric_shear * 2. / 15. * g;
-    for (int l = 3; l < lmax; ++l)
+    for (int l = 3; l < lmax; ++l) {
       dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                     (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
+    }
     // Truncation, closed at the Limber distance rather than at the current one.
     // Inverting this branch gives the recurrence it asserts,
     //   F_{L+1} = (2L+1) C F_L - F_{L-1},
@@ -622,17 +650,20 @@ void WdmDecayProductSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLa
                                                     double* y,
                                                     const PerturbIcContext& ctx) {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
-  if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
+  }
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) {
     return;  // isocurvature: daughter starts empty and unperturbed
+  }
 
   // Bins already populated at tau_ini (very short lifetimes) carry the parent's
   // adiabatic density contrast; superhorizon injection shares delta_dcdm.
   const double* pvecback     = ctx.ppw->pvecback.data();
   const double delta_dcdm_ic = 0.75 * ctx.delta_g_ic;
-  for (int iq = 0; iq < layout.q_size; ++iq)
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     y[layout.index_per_q[iq]] = pvecback[index_bg_f_ + iq] * delta_dcdm_ic;
+  }
   // psi_{l>=1} start at zero.
 }
 
@@ -646,8 +677,9 @@ BaseSpecies::StressEnergyContribution WdmDecayProductSpecies::StressEnergy(
   StressEnergyContribution se;
   se.rho = pvecback[index_bg_rho_];
   se.p   = pvecback[index_bg_p_];
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return se;
+  }
 
   const double k  = ppw->scalar_ctx.k;
   const double a2 = ppw->scalar_ctx.a2;
@@ -679,10 +711,12 @@ void WdmDecayProductSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
                                          const double* y,
                                          const double* /*dy*/,
                                          PerturbSourceContext& ctx) const {
-  if (ctx.index_md != ctx.p_mod->index_md_scalars_)
+  if (ctx.index_md != ctx.p_mod->index_md_scalars_) {
     return;
-  if (index_tp_delta_ < 0 && index_tp_theta_ < 0)
+  }
+  if (index_tp_delta_ < 0 && index_tp_theta_ < 0) {
     return;
+  }
 
   const auto& layout     = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
   const double* pvecback = ctx.ppw->pvecback.data();
@@ -734,11 +768,14 @@ void WdmDecayProductSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                                 const PerturbationsModule& mod,
                                                 file_format fmt,
                                                 BaseSpecies::TransferColumnSection section) const {
-  if (fmt != file_format::class_format)
+  if (fmt != file_format::class_format) {
     return;
+  }
   const perturbs* ppt = mod.GetPerturbs();
-  if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+  if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
     w.Add("d_wdm_" + name(), index_tp_delta_, index_tp_delta_ >= 0);
-  if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+  }
+  if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
     w.Add("t_wdm_" + name(), index_tp_theta_, index_tp_theta_ >= 0);
+  }
 }

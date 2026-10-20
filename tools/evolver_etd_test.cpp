@@ -154,8 +154,9 @@ void layer_diag(double t, double* /*y*/, double* diag, void* /*p*/) {
 
 void layer_store(double /*x*/, double y[], double /*dy*/[], int index_x, void* p) {
   auto* l = static_cast<Layer*>(p);
-  if (index_x >= static_cast<int>(l->sampled_y.size()))
+  if (index_x >= static_cast<int>(l->sampled_y.size())) {
     l->sampled_y.resize(index_x + 1);
+  }
   l->sampled_y[index_x] = y[0];
 }
 
@@ -163,8 +164,9 @@ void layer_store(double /*x*/, double y[], double /*dy*/[], int index_x, void* p
 double solve_layer(double rtol, int nsample, int* rhs) {
   Layer l;
   std::vector<double> xs(nsample);
-  for (int i = 0; i < nsample; ++i)
+  for (int i = 0; i < nsample; ++i) {
     xs[i] = 1.0 * i / (nsample - 1);
+  }
   l.sampled_y.resize(nsample);
 
   double y = Layer::exact(0.);
@@ -181,8 +183,9 @@ double solve_layer(double rtol, int nsample, int* rhs) {
   }
 
   double worst = 0.;
-  for (int i = 0; i < nsample; ++i)
+  for (int i = 0; i < nsample; ++i) {
     worst = std::max(worst, std::fabs(l.sampled_y[i] - Layer::exact(xs[i])));
+  }
   *rhs = l.derivs;
   return worst;
 }

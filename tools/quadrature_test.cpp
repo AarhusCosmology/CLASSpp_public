@@ -38,8 +38,9 @@ void quartic_test_function(void* /*params*/, double q, double* value) {
 void check_power_moments(const std::vector<double>& x, const std::vector<double>& w) {
   for (int power = 0; power < static_cast<int>(kFermiDiracPowerMoments.size()); ++power) {
     double integral = 0.;
-    for (size_t i = 0; i < x.size(); ++i)
+    for (size_t i = 0; i < x.size(); ++i) {
       integral += w[i] * std::pow(x[i], power);
+    }
     const double reference = kFermiDiracPowerMoments[power];
     assert(std::abs(integral - reference) / reference < 2.e-10);
   }
@@ -53,8 +54,9 @@ void test_fundamental_rule() {
   for (int i = 0; i < N; ++i) {
     assert(x[i] > 0.);
     assert(w[i] > 0.);
-    if (i > 0)
+    if (i > 0) {
       assert(x[i - 1] < x[i]);
+    }
   }
   check_power_moments(x, w);
 
@@ -62,8 +64,9 @@ void test_fundamental_rule() {
   std::vector<double> w_max(17);
   assert(compute_FermiDirac(x_max.data(), w_max.data(), 17));
   double normalization = 0.;
-  for (double weight : w_max)
+  for (double weight : w_max) {
     normalization += weight;
+  }
   assert(std::abs(normalization - kFermiDiracPowerMoments[0]) < 2.e-10);
 
   assert(!compute_FermiDirac(x.data(), w.data(), 18));
@@ -109,8 +112,9 @@ void test_auto_selection() {
   // pins the automatic selector's new candidate.
   assert(N == 3);
   double integral = 0.;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < N; ++i) {
     integral += w[i] * std::pow(x[i], 4);
+  }
   assert(std::abs(integral - kFermiDiracPowerMoments[4]) / kFermiDiracPowerMoments[4] < 1.e-10);
 }
 

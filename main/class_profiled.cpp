@@ -42,19 +42,22 @@ struct Stats {
 
 Stats summarize(std::vector<double> v) {
   Stats s{0, 0, 0, 0};
-  if (v.empty())
+  if (v.empty()) {
     return s;
+  }
   std::sort(v.begin(), v.end());
   s.min          = v.front();
   const size_t n = v.size();
   s.median       = (n % 2 == 1) ? v[n / 2] : 0.5 * (v[n / 2 - 1] + v[n / 2]);
   double sum     = 0.0;
-  for (double x : v)
+  for (double x : v) {
     sum += x;
+  }
   s.mean     = sum / n;
   double acc = 0.0;
-  for (double x : v)
+  for (double x : v) {
     acc += (x - s.mean) * (x - s.mean);
+  }
   s.stddev = (n > 1) ? std::sqrt(acc / (n - 1)) : 0.0;
   return s;
 }
@@ -67,8 +70,9 @@ int main(int argc, char** argv) {
     return 1;
   }
   int num_loops = (argc >= 3) ? std::atoi(argv[2]) : 5;
-  if (num_loops < 1)
+  if (num_loops < 1) {
     num_loops = 1;
+  }
 
   // Parse arguments once into a master FileContent; copy it per loop so each
   // run starts from an identical, all-unread parameter set.
@@ -142,8 +146,9 @@ int main(int argc, char** argv) {
       stage_ms[8] = ms_since(t);
 
       double total = ms_since(t_total);
-      for (size_t i = 0; i < n_stages; ++i)
+      for (size_t i = 0; i < n_stages; ++i) {
         samples[i].push_back(stage_ms[i]);
+      }
       totals.push_back(total);
 
       printf("  loop %2d/%d: total %8.2f ms\n", loop + 1, num_loops, total);
@@ -184,8 +189,9 @@ int main(int argc, char** argv) {
     if (histogram_entries > 0) {
       printf("  log10(err/rtol)   accepted   rejected      (1.0 = the acceptance boundary)\n");
       for (int i = 0; i < ErkHistograms::kErrBins; i++) {
-        if (erk_hist.err_accepted[i] + erk_hist.err_rejected[i] == 0)
+        if (erk_hist.err_accepted[i] + erk_hist.err_rejected[i] == 0) {
           continue;
+        }
         printf("   %6.2f          %9lld  %9lld\n",
                ErkHistograms::kErrLo + ErkHistograms::kErrStep * i,
                erk_hist.err_accepted[i],
@@ -195,8 +201,9 @@ int main(int argc, char** argv) {
       for (int i = 0; i < ErkHistograms::kXBins; i++) {
         const long long a = erk_hist.x_accepted[i];
         const long long r = erk_hist.x_rejected[i];
-        if (a + r == 0)
+        if (a + r == 0) {
           continue;
+        }
         printf("   %6.2f          %9lld  %9lld   %6.2f%%\n",
                ErkHistograms::kXLo + ErkHistograms::kXStep * i,
                a,

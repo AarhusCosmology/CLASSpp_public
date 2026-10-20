@@ -191,19 +191,23 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   }
 
   // Combined mode: the requested sector density, which DNCDMSector reserves and shoots deg to.
-  if (has_Omega_dncdmdr)
+  if (has_Omega_dncdmdr) {
     Omega_dncdmdr_pending_ = Omega_dncdmdr_local;
+  }
 
   // Stash the initial-abundance target; deg is set later by DNCDMSpecies::CreateAll's
   // ApplyDncdmInitialClosure (a_ini-driven). In a shooting iteration the reserve above
   // co-occurs with it: the initial key drives deg, the reserve only the closure.
   const bool has_initial = has_Omega_ini || has_omega_ini || has_Neff_ini;
-  if (has_Omega_ini)
+  if (has_Omega_ini) {
     Omega_ini_pending_ = Omega_ini_local;  // already in Omega units
-  else if (has_omega_ini)
+  }
+  else if (has_omega_ini) {
     Omega_ini_pending_ = omega_ini_local / settings.h / settings.h;
-  else if (has_Neff_ini)
+  }
+  else if (has_Neff_ini) {
     Neff_ini_pending_ = Neff_ini_local;
+  }
 
   if (has_deg) {
     // deg wins: used directly (also covers the combined-mode shooting iteration where
@@ -283,9 +287,11 @@ std::pair<double, double> DNCDMSpecies::DegGuessFromOmegaToday(const SpeciesBuil
   const double a_nr = 3.15 / GetMass();
   /* The early radiation, summed as the background's initial conditions sum it. */
   double Omega0_rad = ba.Omega0_g;
-  if (ctx.all_species)
-    for (const auto& sp : *ctx.all_species)
+  if (ctx.all_species) {
+    for (const auto& sp : *ctx.all_species) {
       Omega0_rad += sp->GetRadiationOmega0();
+    }
+  }
   const double k_rad        = std::sqrt(2.0 * ba.H0 * std::sqrt(Omega0_rad));
   const double t_nr         = std::pow(a_nr / k_rad, 2.0);
   const double x            = Gamma() * t_nr;
@@ -320,8 +326,9 @@ std::tuple<double, double> DNCDMSpecies::GetRescaledParameters(double a,
     p_scaled        += dq * std::pow(q, 4) / 3. / epsilon * std::exp(lnN + lnf);
     pseudo_p_scaled += dq * std::pow(q * q / epsilon, 3) / 3. * std::exp(lnN + lnf);
   }
-  if (rho_scaled == 0.)
+  if (rho_scaled == 0.) {
     return {0., 0.};
+  }
   double pseudo_p_over_p = pseudo_p_scaled / p_scaled;
   double w               = p_scaled / rho_scaled;
   return {w, pseudo_p_over_p};
@@ -361,8 +368,9 @@ void DNCDMSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx
   if (collision_owned_) {
     // Seed f = w_/dq_ directly (the ln f + separate-dlnfdlnq seeds are dropped),
     // in the integrator's rescaled units (see kFScale).
-    for (int index_q = 0; index_q < q_size(); index_q++)
+    for (int index_q = 0; index_q < q_size(); index_q++) {
       pvecback_integration[index_bi_f_parent_ + index_q] = kFScale * w_[index_q] / dq_[index_q];
+    }
     return;
   }
   for (int index_q = 0; index_q < q_size(); index_q++) {
@@ -536,8 +544,9 @@ void DNCDMSpecies::BackgroundDerivs(double /*tau*/,
                                     const double* /*y*/,
                                     double* dy,
                                     const double* pvecback) {
-  if (collision_owned_)
+  if (collision_owned_) {
     return;  // the composite assigns dy[index_bi_f_parent_+i] from the kernel
+  }
   const double a      = pvecback[bgm_->index_bg_a_];
   const double M_ncdm = M_;
   const double Gamma  = Gamma_;
@@ -599,8 +608,9 @@ void DNCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
 
   layout.index_per_q.clear();
   layout.index_per_q.reserve(layout.q_size);
-  for (int iq = 0; iq < layout.q_size; ++iq)
+  for (int iq = 0; iq < layout.q_size; ++iq) {
     layout.index_per_q.push_back(index_pt + iq * (layout.l_max + 1));
+  }
 
   index_pt += layout.total_size();
 }
@@ -611,8 +621,9 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                                  double* dy,
                                  const perturb_parameters_and_workspace& ppaw) const {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
 
   const perturb_workspace* ppw    = ppaw.ppw;
   const PerturbScalarContext& ctx = ppw->scalar_ctx;
@@ -656,9 +667,10 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                     epsilon * metric_euler / (3. * q * k) * dlnf0_dlnq;
       dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
                     s_l[2] * metric_shear * 2. / 15. * dlnf0_dlnq;
-      for (int l = 3; l < lmax; ++l)
+      for (int l = 3; l < lmax; ++l) {
         dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                       (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
+      }
       dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] -
                        (1. + lmax) * k * cotKgen * y[idx + lmax];
     }
@@ -678,9 +690,10 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
                   epsilon * metric_euler / (3. * q * k) * dlnf0_dlnq;
     dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
                   s_l[2] * metric_shear * 2. / 15. * dlnf0_dlnq;
-    for (int l = 3; l < lmax; ++l)
+    for (int l = 3; l < lmax; ++l) {
       dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                     (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
+    }
     dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
   }
 }
@@ -689,8 +702,9 @@ void DNCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
                                           double* y,
                                           const PerturbIcContext& ctx) {
   const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return;
+  }
 
   const double* pvecback = ctx.ppw->pvecback.data();
   for (int index_q = 0; index_q < layout.q_size; ++index_q) {
@@ -707,12 +721,15 @@ void DNCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
     const int lmax          = layout.l_max;
 
     y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;
-    if (lmax >= 1)
+    if (lmax >= 1) {
       y[idx + 1] = -epsilon / 3. / q / ctx.k * ctx.theta_ur * dlnf0_dlnq;
-    if (lmax >= 2)
+    }
+    if (lmax >= 2) {
       y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
-    if (lmax >= 3)
+    }
+    if (lmax >= 3) {
       y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;
+    }
   }
 }
 
@@ -730,8 +747,9 @@ BaseSpecies::StressEnergyContribution DNCDMSpecies::StressEnergy(
   StressEnergyContribution se;
   se.rho = pvecback[index_bg_rho_];
   se.p   = pvecback[index_bg_p_];
-  if (layout.q_size <= 0 || layout.index_per_q.empty())
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
     return se;
+  }
 
   // DeltaRho, RhoPlusPTheta, RhoPlusPShear via RescaledPerturbations (one call).
   const double a      = ppw->scalar_ctx.a;
@@ -786,10 +804,12 @@ void DNCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
                                const double* /*y*/,
                                const double* /*dy*/,
                                PerturbSourceContext& ctx) const {
-  if (ctx.index_md != ctx.p_mod->index_md_scalars_)
+  if (ctx.index_md != ctx.p_mod->index_md_scalars_) {
     return;
-  if (index_tp_delta_ < 0 && index_tp_theta_ < 0)
+  }
+  if (index_tp_delta_ < 0 && index_tp_theta_ < 0) {
     return;
+  }
 
   perturb_workspace* ppw   = ctx.ppw;
   const double* pvecback   = ppw->pvecback.data();
@@ -826,13 +846,16 @@ void DNCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                       const PerturbationsModule& mod,
                                       file_format fmt,
                                       BaseSpecies::TransferColumnSection section) const {
-  if (fmt != file_format::class_format)
+  if (fmt != file_format::class_format) {
     return;
+  }
   const perturbs* ppt = mod.GetPerturbs();
-  if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+  if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
     w.Add("d_ncdm_" + name(), index_tp_delta_, index_tp_delta_ >= 0);
-  if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+  }
+  if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
     w.Add("t_ncdm_" + name(), index_tp_theta_, index_tp_theta_ >= 0);
+  }
 }
 
 std::tuple<double, double, double> DNCDMSpecies::RescaledPerturbations(

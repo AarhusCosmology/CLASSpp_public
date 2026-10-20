@@ -45,8 +45,9 @@ void readDoubleList(FileContent* pfc, const char* name, std::vector<double>& val
     values = *l;
     *found = true;
   }
-  else
+  else {
     *found = false;
+  }
 }
 
 // Number of the given optionals that hold a value.
@@ -67,14 +68,18 @@ std::optional<T> read_one_of(const FileContent& fc, const char* n1, const char* 
 // Shape of V(phi) for the inflation_V / inflation_V_end spectra. Shared by the
 // 'potential' and 'full_potential' keys so that the two never drift apart.
 potential_shape read_potential_shape(const std::string& name, const char* key) {
-  if (name == "polynomial")
+  if (name == "polynomial") {
     return polynomial;
-  if (name == "natural")
+  }
+  if (name == "natural") {
     return natural;
-  if (name == "higgs_inflation")
+  }
+  if (name == "higgs_inflation") {
     return higgs_inflation;
-  if (name == "monodromy")
+  }
+  if (name == "monodromy") {
     return monodromy;
+  }
   class_stop_severe(
       "did not recognize input parameter '%s' = '%s': should be one of 'polynomial', 'natural', "
       "'higgs_inflation' or 'monodromy'",
@@ -130,8 +135,9 @@ void read_selection_file(const std::string& name,
   std::string line;
   while (std::getline(file, line)) {
     const size_t first = line.find_first_not_of(" \t\r");
-    if ((first == std::string::npos) || (line[first] == '#'))
+    if ((first == std::string::npos) || (line[first] == '#')) {
       continue;
+    }
 
     std::vector<double> values;
     const char* left = line.c_str();
@@ -284,32 +290,36 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
               << "_cl.dat";
           tmp_file = oss.str();
         }
-        if (file_exists(tmp_file))
+        if (file_exists(tmp_file)) {
           continue;
+        }
         {
           std::ostringstream oss;
           oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
               << "_pk.dat";
           tmp_file = oss.str();
         }
-        if (file_exists(tmp_file))
+        if (file_exists(tmp_file)) {
           continue;
+        }
         {
           std::ostringstream oss;
           oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
               << "_tk.dat";
           tmp_file = oss.str();
         }
-        if (file_exists(tmp_file))
+        if (file_exists(tmp_file)) {
           continue;
+        }
         {
           std::ostringstream oss;
           oss << "output/" << inifilename << std::setw(2) << std::setfill('0') << filenum
               << "_parameters.ini";
           tmp_file = oss.str();
         }
-        if (file_exists(tmp_file))
+        if (file_exists(tmp_file)) {
           continue;
+        }
         break;
       }
       {
@@ -325,14 +335,16 @@ void InputModule::file_content_from_arguments(int argc, char** argv, FileContent
 
   /** - if there is an 'xxx.pre' file, read it and store its content. */
 
-  if (!precision_file.empty())
+  if (!precision_file.empty()) {
     parser_read_file(precision_file.c_str(), &fc_precision);
+  }
 
   /** - if one or two files were read, merge their contents in a
       single 'file_content' structure. */
 
-  if (!input_file.empty() || !precision_file.empty())
+  if (!input_file.empty() || !precision_file.empty()) {
     parser_cat(pfc_input, &fc_precision, &fc);
+  }
 }
 
 InputModule::InputModule(FileContent& fc) : file_content_(fc) {
@@ -378,14 +390,16 @@ void InputModule::SelectPerturbationEvolver() {
   /* An explicit choice in the input always wins. Both spellings are checked;
      precision::parse has already rejected setting them together. */
   if (file_content_.get<int>("evolver").has_value() ||
-      file_content_.get<int>("evolver_perturbations").has_value())
+      file_content_.get<int>("evolver_perturbations").has_value()) {
     return;
+  }
 
   /* Non-species stiffness sources. Perturbed recombination integrates x_e and
      T_b from a very small initial conformal time; explanatory.ini has always
      told users to keep ndf15 for it. */
-  if (perturbations_.has_perturbed_recombination)
+  if (perturbations_.has_perturbed_recombination) {
     return;
+  }
 
   /* Three-way choice. A species can be unsafe under a plain explicit method and
      still be best served by the exponential one, when its stiffness is the
@@ -404,19 +418,22 @@ void InputModule::SelectPerturbationEvolver() {
 
   if (any_prefers_exponential && all_support_exponential) {
     precision_.evolver_perturbations = evolver_type::etd;
-    if (perturbations_.perturbations_verbose > 0)
+    if (perturbations_.perturbations_verbose > 0) {
       printf(
           " -> a species reports a stiff Jacobian diagonal, using the exponential etd"
           " perturbations evolver\n");
+    }
     return;
   }
 
-  if (!all_support_explicit)
+  if (!all_support_explicit) {
     return;
+  }
 
   precision_.evolver_perturbations = evolver_type::rkdp45;
-  if (perturbations_.perturbations_verbose > 0)
+  if (perturbations_.perturbations_verbose > 0) {
     printf(" -> every species supports it, using the explicit rkdp45 perturbations evolver\n");
+  }
 }
 
 void InputModule::ConstructSpecies() {
@@ -453,8 +470,9 @@ void InputModule::ConstructSpecies() {
   // Pass 1: build every non-closure species, summing Omega0 contributions.
   double omega0_sum = 0.0;
   for (const auto& entry : kAllSpeciesFactories) {
-    if (entry.name == closure_name)
+    if (entry.name == closure_name) {
       continue;
+    }
     auto produced = entry.create_all(ctx);
     for (auto& e : produced) {
       omega0_sum += e.species->GetOmega0();
@@ -480,8 +498,9 @@ void InputModule::ConstructSpecies() {
     // and cleared afterward so subsequent callers (shooting guess, etc.) don't see it.
     ctx.omega0_closure_override = closure_value;
     for (const auto& entry : kAllSpeciesFactories) {
-      if (entry.name != closure_name)
+      if (entry.name != closure_name) {
         continue;
+      }
       auto produced = entry.create_all(ctx);
       for (auto& e : produced) {
         all_species_.insert(e.key, std::move(e.species));
@@ -543,37 +562,41 @@ void InputModule::ReadCoupledCluster() {
   if (N_idr) {
     T_idr_local = pow(*N_idr / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
                   pba->T_cmb;
-    if (input_verbose > 1)
+    if (input_verbose > 1) {
       printf(
           "You passed N_idr = N_dg = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
           "\n",
           *N_idr,
           T_idr_local / pba->T_cmb);
+    }
   }
   else if (N_dg) {
     T_idr_local = pow(*N_dg / stat_f_idr * (7. / 8.) / pow(11. / 4., (4. / 3.)), (1. / 4.)) *
                   pba->T_cmb;
-    if (input_verbose > 2)
+    if (input_verbose > 2) {
       printf(
           "You passed N_dg = N_idr = %e, this is equivalent to xi_idr = %e in the ETHOS notation. "
           "\n",
           *N_dg,
           T_idr_local / pba->T_cmb);
+    }
   }
   else if (xi_idr) {
     T_idr_local = *xi_idr * pba->T_cmb;
-    if (input_verbose > 1)
+    if (input_verbose > 1) {
       printf(
           "You passed xi_idr = %e, this is equivalent to N_idr = N_dg = %e in the NADM notation. "
           "\n",
           *xi_idr,
           stat_f_idr * pow(*xi_idr, 4.) / (7. / 8.) * pow(11. / 4., (4. / 3.)));
+    }
   }
 
   // Store IDR intermediates into coupled_inputs_ for factory reuse.
   coupled_inputs_.stat_f_idr = stat_f_idr;
-  if (N_idr || N_dg || xi_idr)
+  if (N_idr || N_dg || xi_idr) {
     coupled_inputs_.T_idr = T_idr_local;
+  }
 
   // Mark the budget slot present iff any of the three IDR-temperature inputs was given.
   // (Matches the legacy semantics: pba->Omega0_idr was always written, but only became
@@ -612,8 +635,9 @@ void InputModule::ReadCoupledCluster() {
     omega0_cdm  = ppr->Omega0_cdm_min_synchronous;
     cdm_present = true;
   }
-  if (cdm_present)
+  if (cdm_present) {
     omega_budget_.cdm = omega0_cdm;
+  }
 
   // ── IDM_DR: Omega_idm_dr / omega_idm_dr / f_idm_dr ───────────────────────────
   auto Omega_idm_dr = pfc->get<double>("Omega_idm_dr");
@@ -624,10 +648,12 @@ void InputModule::ReadCoupledCluster() {
                     "f_idm_dr, "
                     "choose one");
 
-  if (Omega_idm_dr)
+  if (Omega_idm_dr) {
     omega_budget_.idm_dr = *Omega_idm_dr;
-  if (omega_idm_dr)
+  }
+  if (omega_idm_dr) {
     omega_budget_.idm_dr = *omega_idm_dr / pba->h / pba->h;
+  }
 
   if (f_idm_dr) {
     class_test((*f_idm_dr < 0.) || (*f_idm_dr > 1.),
@@ -658,10 +684,12 @@ void InputModule::ReadCoupledCluster() {
   class_test_severe((Omega_dcdmdr && omega_dcdmdr),
                     "In input file, you can only enter one of Omega_dcdmdr or omega_dcdmdr, choose "
                     "one");
-  if (Omega_dcdmdr)
+  if (Omega_dcdmdr) {
     omega_budget_.dcdmdr = *Omega_dcdmdr;
-  if (omega_dcdmdr)
+  }
+  if (omega_dcdmdr) {
     omega_budget_.dcdmdr = *omega_dcdmdr / pba->h / pba->h;
+  }
 
   // ── DRMD: z_stop, G_over_aH_drmd_ini, f_idm_drmd, delta_Neff_drmd ────────────
   // These fields now live on IDM_DRMD_IDR_DRMD_Species; we parse them locally here
@@ -759,10 +787,12 @@ void InputModule::WriteParameterFiles() {
     fprintf(param_unused, "#\n");
 
     pfc->for_each([&](const std::string& name, const std::string& value, bool read) {
-      if (read)
+      if (read) {
         fprintf(param_output, "%s = %s\n", name.c_str(), value.c_str());
-      else
+      }
+      else {
         fprintf(param_unused, "%s = %s\n", name.c_str(), value.c_str());
+      }
     });
     fprintf(param_output, "#\n");
 
@@ -774,21 +804,24 @@ void InputModule::WriteParameterFiles() {
       write_warnings && ((write_warnings->find("y") != std::string::npos) ||
                          (write_warnings->find("Y") != std::string::npos))) {
     pfc->for_each([](const std::string& name, const std::string& value, bool read) {
-      if (!read)
+      if (!read) {
         fprintf(stdout,
                 "[WARNING: input line not recognized and not taken into account: '%s=%s']\n",
                 name.c_str(),
                 value.c_str());
+      }
     });
   }
 }
 void InputModule::input_read_precisions() {
   precision* ppr = &precision_;
 
-  if (auto class_dir = file_content_.get<std::string>("class_dir"))
+  if (auto class_dir = file_content_.get<std::string>("class_dir")) {
     ppr->class_dir = *class_dir;
-  else
+  }
+  else {
     ppr->class_dir = __CLASSDIR__;
+  }
 
   /** - resolve runtime data-file paths against class_dir (defaults are relative) */
   ppr->ResolveDataPaths();
@@ -824,8 +857,9 @@ void InputModule::ReadContext() {
       parameters accordingly*/
 
   input_verbose = pfc->get_or("input_verbose", input_verbose);
-  if (input_verbose > 0)
+  if (input_verbose > 0) {
     printf("Reading input parameters\n");
+  }
 
   if (auto threads = pfc->get<int>("threads")) {
     pba->number_of_threads = *threads;
@@ -924,24 +958,29 @@ void InputModule::ReadContext() {
   auto omega_b = pfc->get<double>("omega_b");
   class_test_severe((Omega_b && omega_b),
                     "In input file, you can only enter one of Omega_b or omega_b, choose one");
-  if (Omega_b)
+  if (Omega_b) {
     pba->Omega0_b = *Omega_b;
-  if (omega_b)
+  }
+  if (omega_b) {
     pba->Omega0_b = *omega_b / pba->h / pba->h;
+  }
 
   // NOTE: N_ur / N_eff / Omega_ur / omega_ur parsing has been moved to
   // UltraRelativisticSpecies::CreateAll, which reads pfc directly.
 
-  if (auto ceff2_ur = pfc->get<double>("ceff2_ur"))
+  if (auto ceff2_ur = pfc->get<double>("ceff2_ur")) {
     ppt->three_ceff2_ur = 3. * *ceff2_ur;
+  }
 
-  if (auto cvis2_ur = pfc->get<double>("cvis2_ur"))
+  if (auto cvis2_ur = pfc->get<double>("cvis2_ur")) {
     ppt->three_cvis2_ur = 3. * *cvis2_ur;
+  }
 
   auto G_eff_ur       = pfc->get<double>("G_eff_ur");
   auto log10_G_eff_ur = pfc->get<double>("log10_G_eff_ur");
-  if (G_eff_ur)
+  if (G_eff_ur) {
     ppt->G_eff_ur = *G_eff_ur;
+  }
   if (log10_G_eff_ur) {
     ppt->G_eff_ur = *log10_G_eff_ur;
     class_test_severe(G_eff_ur.has_value(),
@@ -973,10 +1012,12 @@ void InputModule::ReadContext() {
   /** - Set curvature parameter K */
   pba->K = -pba->Omega0_k * pow(pba->H0, 2);
   /** - Set curvature sign */
-  if (pba->K > 0.)
+  if (pba->K > 0.) {
     pba->sgnK = 1;
-  else if (pba->K < 0.)
+  }
+  else if (pba->K < 0.) {
     pba->sgnK = -1;
+  }
 
   // DRMD parameter block (z_stop, G_over_aH_drmd_ini, f_idm_drmd, delta_Neff_drmd,
   // and the resulting Omega0_idr_drmd / Omega0_idm_drmd contributions) has been
@@ -1133,8 +1174,9 @@ void InputModule::ReadDerived() {
     class_test_severe(*varconst != "none" && *varconst != "instantaneous",
                       "varying_fundamental_constants = '%s' must be 'none' or 'instantaneous'",
                       varconst->c_str());
-    if (*varconst == "instantaneous")
+    if (*varconst == "instantaneous") {
       pth->varconst_dep = varconst_instant;
+    }
   }
   if (pth->varconst_dep != varconst_none) {
     pth->varconst_alpha               = pfc->get_or("varying_alpha", pth->varconst_alpha);
@@ -1414,16 +1456,21 @@ void InputModule::ReadDerived() {
       ppt->switch_dop       = 0;
       ppt->switch_pol       = 0;
 
-      if ((tc.find("tsw") != std::string::npos) || (tc.find("TSW") != std::string::npos))
+      if ((tc.find("tsw") != std::string::npos) || (tc.find("TSW") != std::string::npos)) {
         ppt->switch_sw = 1;
-      if ((tc.find("eisw") != std::string::npos) || (tc.find("EISW") != std::string::npos))
+      }
+      if ((tc.find("eisw") != std::string::npos) || (tc.find("EISW") != std::string::npos)) {
         ppt->switch_eisw = 1;
-      if ((tc.find("lisw") != std::string::npos) || (tc.find("LISW") != std::string::npos))
+      }
+      if ((tc.find("lisw") != std::string::npos) || (tc.find("LISW") != std::string::npos)) {
         ppt->switch_lisw = 1;
-      if ((tc.find("dop") != std::string::npos) || (tc.find("Dop") != std::string::npos))
+      }
+      if ((tc.find("dop") != std::string::npos) || (tc.find("Dop") != std::string::npos)) {
         ppt->switch_dop = 1;
-      if ((tc.find("pol") != std::string::npos) || (tc.find("Pol") != std::string::npos))
+      }
+      if ((tc.find("pol") != std::string::npos) || (tc.find("Pol") != std::string::npos)) {
         ppt->switch_pol = 1;
+      }
 
       class_test_severe((ppt->switch_sw == 0) && (ppt->switch_eisw == 0) &&
                             (ppt->switch_lisw == 0) && (ppt->switch_dop == 0) &&
@@ -1438,14 +1485,18 @@ void InputModule::ReadDerived() {
   if (ppt->has_cl_number_count) {
     if (auto number_count_contributions = pfc->get<std::string>("number count contributions")) {
       const std::string& ncc = *number_count_contributions;
-      if (ncc.find("density") != std::string::npos)
+      if (ncc.find("density") != std::string::npos) {
         ppt->has_nc_density = true;
-      if (ncc.find("rsd") != std::string::npos)
+      }
+      if (ncc.find("rsd") != std::string::npos) {
         ppt->has_nc_rsd = true;
-      if (ncc.find("lensing") != std::string::npos)
+      }
+      if (ncc.find("lensing") != std::string::npos) {
         ppt->has_nc_lens = true;
-      if (ncc.find("gr") != std::string::npos)
+      }
+      if (ncc.find("gr") != std::string::npos) {
         ppt->has_nc_gr = true;
+      }
 
       class_test_severe(
           (!ppt->has_nc_density) && (!ppt->has_nc_rsd) && (!ppt->has_nc_lens) && (!ppt->has_nc_gr),
@@ -1473,14 +1524,17 @@ void InputModule::ReadDerived() {
          but if they are specified we should reset has_scalars to false before reading */
       ppt->has_scalars = false;
 
-      if ((modes->find("s") != std::string::npos) || (modes->find("S") != std::string::npos))
+      if ((modes->find("s") != std::string::npos) || (modes->find("S") != std::string::npos)) {
         ppt->has_scalars = true;
+      }
 
-      if ((modes->find("v") != std::string::npos) || (modes->find("V") != std::string::npos))
+      if ((modes->find("v") != std::string::npos) || (modes->find("V") != std::string::npos)) {
         ppt->has_vectors = true;
+      }
 
-      if ((modes->find("t") != std::string::npos) || (modes->find("T") != std::string::npos))
+      if ((modes->find("t") != std::string::npos) || (modes->find("T") != std::string::npos)) {
         ppt->has_tensors = true;
+      }
 
       class_test_severe(!ppt->has_scalars && !ppt->has_vectors && !ppt->has_tensors,
                         "You wrote: modes='%s'. Could not identify any of the modes ('s', 'v', "
@@ -1495,20 +1549,25 @@ void InputModule::ReadDerived() {
            but if they are specified we should reset has_ad to false before reading */
         ppt->has_ad = false;
 
-        if ((ic->find("ad") != std::string::npos) || (ic->find("AD") != std::string::npos))
+        if ((ic->find("ad") != std::string::npos) || (ic->find("AD") != std::string::npos)) {
           ppt->has_ad = true;
+        }
 
-        if ((ic->find("bi") != std::string::npos) || (ic->find("BI") != std::string::npos))
+        if ((ic->find("bi") != std::string::npos) || (ic->find("BI") != std::string::npos)) {
           ppt->has_bi = true;
+        }
 
-        if ((ic->find("cdi") != std::string::npos) || (ic->find("CDI") != std::string::npos))
+        if ((ic->find("cdi") != std::string::npos) || (ic->find("CDI") != std::string::npos)) {
           ppt->has_cdi = true;
+        }
 
-        if ((ic->find("nid") != std::string::npos) || (ic->find("NID") != std::string::npos))
+        if ((ic->find("nid") != std::string::npos) || (ic->find("NID") != std::string::npos)) {
           ppt->has_nid = true;
+        }
 
-        if ((ic->find("niv") != std::string::npos) || (ic->find("NIV") != std::string::npos))
+        if ((ic->find("niv") != std::string::npos) || (ic->find("NIV") != std::string::npos)) {
           ppt->has_niv = true;
+        }
 
         class_test_severe(
             !ppt->has_ad && !ppt->has_bi && !ppt->has_cdi && !ppt->has_nid && !ppt->has_niv,
@@ -1701,10 +1760,12 @@ void InputModule::ReadDerived() {
                         "In input file, you can only enter one of A_s, ln10^{10}A_s, sigma8 and "
                         "S8, "
                         "choose one");
-      if (A_s)
+      if (A_s) {
         ppm->A_s = *A_s;
-      else if (ln_A_s)
+      }
+      else if (ln_A_s) {
         ppm->A_s = exp(*ln_A_s) * 1.e-10;
+      }
       else if (sigma8) {
         ppm->sigma8 = *sigma8;
         class_test(*sigma8 < 0., "sigma8 should be non-negative");
@@ -1748,93 +1809,123 @@ void InputModule::ReadDerived() {
       }
 
       if ((ppt->has_ad) && (ppt->has_bi)) {
-        if (auto v = read_one_of<double>(*pfc, "c_ad_bi", "c_bi_ad"))
+        if (auto v = read_one_of<double>(*pfc, "c_ad_bi", "c_bi_ad")) {
           ppm->c_ad_bi = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_ad_bi", "n_bi_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_ad_bi", "n_bi_ad")) {
           ppm->n_ad_bi = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_ad_bi", "alpha_bi_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_ad_bi", "alpha_bi_ad")) {
           ppm->alpha_ad_bi = *v;
+        }
       }
 
       if ((ppt->has_ad) && (ppt->has_cdi)) {
-        if (auto v = read_one_of<double>(*pfc, "c_ad_cdi", "c_cdi_ad"))
+        if (auto v = read_one_of<double>(*pfc, "c_ad_cdi", "c_cdi_ad")) {
           ppm->c_ad_cdi = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_ad_cdi", "n_cdi_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_ad_cdi", "n_cdi_ad")) {
           ppm->n_ad_cdi = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_ad_cdi", "alpha_cdi_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_ad_cdi", "alpha_cdi_ad")) {
           ppm->alpha_ad_cdi = *v;
+        }
       }
 
       if ((ppt->has_ad) && (ppt->has_nid)) {
-        if (auto v = read_one_of<double>(*pfc, "c_ad_nid", "c_nid_ad"))
+        if (auto v = read_one_of<double>(*pfc, "c_ad_nid", "c_nid_ad")) {
           ppm->c_ad_nid = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_ad_nid", "n_nid_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_ad_nid", "n_nid_ad")) {
           ppm->n_ad_nid = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_ad_nid", "alpha_nid_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_ad_nid", "alpha_nid_ad")) {
           ppm->alpha_ad_nid = *v;
+        }
       }
 
       if ((ppt->has_ad) && (ppt->has_niv)) {
-        if (auto v = read_one_of<double>(*pfc, "c_ad_niv", "c_niv_ad"))
+        if (auto v = read_one_of<double>(*pfc, "c_ad_niv", "c_niv_ad")) {
           ppm->c_ad_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_ad_niv", "n_niv_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_ad_niv", "n_niv_ad")) {
           ppm->n_ad_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_ad_niv", "alpha_niv_ad"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_ad_niv", "alpha_niv_ad")) {
           ppm->alpha_ad_niv = *v;
+        }
       }
 
       if ((ppt->has_bi) && (ppt->has_cdi)) {
-        if (auto v = read_one_of<double>(*pfc, "c_bi_cdi", "c_cdi_bi"))
+        if (auto v = read_one_of<double>(*pfc, "c_bi_cdi", "c_cdi_bi")) {
           ppm->c_bi_cdi = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_bi_cdi", "n_cdi_bi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_bi_cdi", "n_cdi_bi")) {
           ppm->n_bi_cdi = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_bi_cdi", "alpha_cdi_bi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_bi_cdi", "alpha_cdi_bi")) {
           ppm->alpha_bi_cdi = *v;
+        }
       }
 
       if ((ppt->has_bi) && (ppt->has_nid)) {
-        if (auto v = read_one_of<double>(*pfc, "c_bi_nid", "c_nid_bi"))
+        if (auto v = read_one_of<double>(*pfc, "c_bi_nid", "c_nid_bi")) {
           ppm->c_bi_nid = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_bi_nid", "n_nid_bi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_bi_nid", "n_nid_bi")) {
           ppm->n_bi_nid = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_bi_nid", "alpha_nid_bi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_bi_nid", "alpha_nid_bi")) {
           ppm->alpha_bi_nid = *v;
+        }
       }
 
       if ((ppt->has_bi) && (ppt->has_niv)) {
-        if (auto v = read_one_of<double>(*pfc, "c_bi_niv", "c_niv_bi"))
+        if (auto v = read_one_of<double>(*pfc, "c_bi_niv", "c_niv_bi")) {
           ppm->c_bi_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_bi_niv", "n_niv_bi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_bi_niv", "n_niv_bi")) {
           ppm->n_bi_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_bi_niv", "alpha_niv_bi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_bi_niv", "alpha_niv_bi")) {
           ppm->alpha_bi_niv = *v;
+        }
       }
 
       if ((ppt->has_cdi) && (ppt->has_nid)) {
-        if (auto v = read_one_of<double>(*pfc, "c_cdi_nid", "c_nid_cdi"))
+        if (auto v = read_one_of<double>(*pfc, "c_cdi_nid", "c_nid_cdi")) {
           ppm->c_cdi_nid = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_cdi_nid", "n_nid_cdi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_cdi_nid", "n_nid_cdi")) {
           ppm->n_cdi_nid = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_cdi_nid", "alpha_nid_cdi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_cdi_nid", "alpha_nid_cdi")) {
           ppm->alpha_cdi_nid = *v;
+        }
       }
 
       if ((ppt->has_cdi) && (ppt->has_niv)) {
-        if (auto v = read_one_of<double>(*pfc, "c_cdi_niv", "c_niv_cdi"))
+        if (auto v = read_one_of<double>(*pfc, "c_cdi_niv", "c_niv_cdi")) {
           ppm->c_cdi_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_cdi_niv", "n_niv_cdi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_cdi_niv", "n_niv_cdi")) {
           ppm->n_cdi_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_cdi_niv", "alpha_niv_cdi"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_cdi_niv", "alpha_niv_cdi")) {
           ppm->alpha_cdi_niv = *v;
+        }
       }
 
       if ((ppt->has_nid) && (ppt->has_niv)) {
-        if (auto v = read_one_of<double>(*pfc, "c_nid_niv", "c_niv_nid"))
+        if (auto v = read_one_of<double>(*pfc, "c_nid_niv", "c_niv_nid")) {
           ppm->c_nid_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "n_nid_niv", "n_niv_nid"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "n_nid_niv", "n_niv_nid")) {
           ppm->n_nid_niv = *v;
-        if (auto v = read_one_of<double>(*pfc, "alpha_nid_niv", "alpha_niv_nid"))
+        }
+        if (auto v = read_one_of<double>(*pfc, "alpha_nid_niv", "alpha_niv_nid")) {
           ppm->alpha_nid_niv = *v;
+        }
       }
     }
 
@@ -2097,11 +2188,13 @@ void InputModule::ReadDerived() {
   if (ppt->has_cls) {
     if (ppt->has_scalars) {
       if ((ppt->has_cl_cmb_temperature) || (ppt->has_cl_cmb_polarization) ||
-          (ppt->has_cl_cmb_lensing_potential))
+          (ppt->has_cl_cmb_lensing_potential)) {
         ppt->l_scalar_max = pfc->get_or("l_max_scalars", ppt->l_scalar_max);
+      }
 
-      if ((ppt->has_cl_lensing_potential) || (ppt->has_cl_number_count))
+      if ((ppt->has_cl_lensing_potential) || (ppt->has_cl_number_count)) {
         ppt->l_lss_max = pfc->get_or("l_max_lss", ppt->l_lss_max);
+      }
     }
 
     if (ppt->has_vectors) {
@@ -2399,11 +2492,12 @@ void InputModule::ReadDerived() {
 
     if (ppt->selection_num > 1) {
       psp->non_diag = pfc->get_or("non_diagonal", psp->non_diag);
-      if ((psp->non_diag < 0) || (psp->non_diag >= ppt->selection_num))
+      if ((psp->non_diag < 0) || (psp->non_diag >= ppt->selection_num)) {
         class_stop_severe(
             "Input for non_diagonal is %d, while it is expected to be between 0 and %d\n",
             psp->non_diag,
             ppt->selection_num - 1);
+      }
     }
 
     if (auto dNdz_selection = pfc->get<std::string>("dNdz_selection")) {
@@ -2501,17 +2595,20 @@ void InputModule::ReadDerived() {
 
   if (auto format = pfc->get<std::string>("format")) {
     if ((format->find("class") != std::string::npos) ||
-        (format->find("CLASS") != std::string::npos))
+        (format->find("CLASS") != std::string::npos)) {
       pop->output_format = file_format::class_format;
+    }
     else {
       if ((format->find("camb") != std::string::npos) ||
-          (format->find("CAMB") != std::string::npos))
+          (format->find("CAMB") != std::string::npos)) {
         pop->output_format = file_format::camb_format;
-      else
+      }
+      else {
         class_stop_severe(
             "You wrote: format='%s'. Could not identify any of the possible formats "
             "('class', 'CLASS', 'camb', 'CAMB')",
             format->c_str());
+      }
     }
   }
 
@@ -2687,12 +2784,15 @@ void InputModule::ReadDerived() {
   if (ppt->has_tensors) {
     /** - ---> Include ur and ncdm shear in tensor computation? */
     if (auto tensor_method = pfc->get<std::string>("tensor method")) {
-      if (tensor_method->find("photons") != std::string::npos)
+      if (tensor_method->find("photons") != std::string::npos) {
         ppt->tensor_method = tm_photons_only;
-      if (tensor_method->find("massless") != std::string::npos)
+      }
+      if (tensor_method->find("massless") != std::string::npos) {
         ppt->tensor_method = tm_massless_approximation;
-      if (tensor_method->find("exact") != std::string::npos)
+      }
+      if (tensor_method->find("exact") != std::string::npos) {
         ppt->tensor_method = tm_exact;
+      }
     }
   }
 
@@ -2773,8 +2873,9 @@ void InputModule::ReadDerived() {
       "better performance.");
 
   /** (i) Write values in file */
-  if (ple->has_lensed_cls)
+  if (ple->has_lensed_cls) {
     ppt->l_scalar_max += ppr->delta_l_max;
+  }
 
   /** - (i.1.) shall we write background quantities in a file? */
 
@@ -3178,8 +3279,9 @@ void precision::parse(const FileContent& fc) {
                                         &evolver_thermodynamics,
                                         &evolver_perturbations};
     bool has_per_module              = false;
-    for (const char* n : per_module_names)
+    for (const char* n : per_module_names) {
       has_per_module = has_per_module || fc.get<int>(n).has_value();
+    }
 
     class_test_severe(has_blanket && has_per_module,
                       "specify either 'evolver' (applies to every module) or the per-module "
@@ -3194,8 +3296,9 @@ void precision::parse(const FileContent& fc) {
       evolver_perturbations  = all;
     }
     else {
-      for (int i = 0; i < 3; ++i)
+      for (int i = 0; i < 3; ++i) {
         read_enum(fc, per_module_names[i], *per_module_slots[i]);
+      }
     }
   }
 
@@ -3355,8 +3458,9 @@ void precision::parse(const FileContent& fc) {
   // precision defaults lowered l_max_ncdm to 10, and from then on the DEFAULT
   // configuration failed that check, aborting every decaying-NCDM run. l_max_ncdm
   // is 17 again since 2026-10-09; the rule stays, since either can be set.
-  if (!fc.get<int>("l_max_dr_col").has_value())
+  if (!fc.get<int>("l_max_dr_col").has_value()) {
     l_max_dr_col = std::min(l_max_dr, l_max_ncdm);
+  }
 }
 
 // ── Hook-based shooting (the species-owned replacement for the enum dispatch) ──
@@ -3396,12 +3500,15 @@ void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, doub
   const InputModulePtr& im = cosmology->GetInputModule();
 
   bool need_thermo = false;
-  for (const auto& t : w->targets)
-    if (t.target_name == "100*theta_s")
+  for (const auto& t : w->targets) {
+    if (t.target_name == "100*theta_s") {
       need_thermo = true;
+    }
+  }
   ThermodynamicsModulePtr thm;
-  if (need_thermo)
+  if (need_thermo) {
     thm = cosmology->GetThermodynamicsModule();
+  }
 
   // Assemble residuals in workspace order. theta_s is module-level (from thermo rs/ra); each
   // species target is routed to its owning species via the recorded key, passing the
@@ -3429,8 +3536,9 @@ void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, doub
 
 ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
   // Guard: never shoot from within a shooting build (the residual marks its fc this way).
-  if (input_module->file_content_.is_shooting)
+  if (input_module->file_content_.is_shooting) {
     return {input_module, nullptr};
+  }
 
   FileContent& fc = input_module->file_content_;
 
@@ -3470,8 +3578,9 @@ ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
   gctx.coupled_inputs = &input_module->coupled_inputs_;
   for (const auto& [key, sp] : input_module->all_species_) {
     std::vector<ShootingTarget> tgts = sp->GetShootingTargets();
-    if (tgts.empty())
+    if (tgts.empty()) {
       continue;
+    }
     std::vector<double> g;
     std::vector<double> d;
     sp->ComputeShootingGuess(gctx, g, d);
@@ -3490,8 +3599,9 @@ ShootingResult InputModule::DoShooting(InputModulePtr input_module) {
     }
   }
 
-  if (w.targets.empty())
+  if (w.targets.empty()) {
     return {input_module, nullptr};  // nothing to shoot — the common path
+  }
 
   // Solve for each unknown in units of its seed's magnitude, so tol_shooting_deltax is relative
   // for every target. dxdF, the seed's inverse slope, scales with the unknown (the residuals

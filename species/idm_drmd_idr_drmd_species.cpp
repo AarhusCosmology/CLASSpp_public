@@ -30,10 +30,12 @@ void IDM_DRMD_IDR_DRMD_Species::ComputeIdmDrmd(
   const double R_int_tmp = 3.0 / 4.0 * rho_idm_over_rho_idr;
   *Rint                  = R_int_tmp;
   *csp2                  = 1.0 / 3.0 / (1.0 + R_int_tmp);
-  if ((1.0 + z_stop_) / (1.0 + z) > 100)  // avoid exp() overflow
+  if ((1.0 + z_stop_) / (1.0 + z) > 100) {  // avoid exp() overflow
     *Gint = 0.;
-  else
+  }
+  else {
     *Gint = Gamma0_drmd_ic_ / R_int_tmp * exp(-(1.0 + z_stop_) / (1.0 + z));
+  }
 }
 
 void IDM_DRMD_IDR_DRMD_Species::InitializeDrmdBackground(double rho_tot,
@@ -44,8 +46,9 @@ void IDM_DRMD_IDR_DRMD_Species::InitializeDrmdBackground(double rho_tot,
   const double rho_idm = idm_drmd_->Rho(pvecback);
   f_idr_drmd_          = rho_idr / rho_tot;
   Gamma0_drmd_ic_      = 0.;
-  if (rho_idm > 0. && rho_idr > 0.)
+  if (rho_idm > 0. && rho_idr > 0.) {
     Gamma0_drmd_ic_ = 3. / 4. * G_over_aH_drmd_ * rho_idm / rho_idr * a * H;
+  }
 }
 
 void IDM_DRMD_IDR_DRMD_Species::FinalizeBackground(double a,
@@ -86,22 +89,26 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
                                                        const PerturbIcContext& ctx) {
   // Children have no IC logic; all ICs live on this composite.
   const PerturbationsModule* mod = ctx.p_mod;
-  if (ctx.index_ic != mod->index_ic_ad_)
+  if (ctx.index_ic != mod->index_ic_ad_) {
     return;
+  }
 
   const auto& idm_drm_lay = idm_drmd_layout(base);
   const auto& idr_drm_lay = idr_drmd_layout(base);
 
   if (has_idr_drmd()) {
-    if (idr_drm_lay.idx_delta >= 0)
+    if (idr_drm_lay.idx_delta >= 0) {
       y[idr_drm_lay.idx_delta] = ctx.delta_g_ic;
-    if (idr_drm_lay.idx_theta >= 0)
+    }
+    if (idr_drm_lay.idx_theta >= 0) {
       y[idr_drm_lay.idx_theta] = ctx.theta_g_ic;
+    }
   }
 
   if (has_idm_drmd()) {
-    if (idm_drm_lay.idx_delta >= 0)
+    if (idm_drm_lay.idx_delta >= 0) {
       y[idm_drm_lay.idx_delta] = 3. / 4. * ctx.delta_g_ic;
+    }
 
     if (idm_drm_lay.idx_theta >= 0) {
       if (has_idr_drmd()) {
@@ -137,8 +144,9 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
   PerturbationsModule* p_mod = ctx.p_mod;
 
   // These sources are scalar-only
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   auto set_source = [&](int index_tp, double value) {
     p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, index_tp, ctx.index_tau, ctx.index_k, value);
@@ -285,8 +293,9 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
   const double rho_idr_drmd = idr_drmd_->Rho(pvecback);
 
   // Guard against zero densities to avoid division by zero in ComputeIdmDrmd.
-  if (rho_idm_drmd <= 0. || rho_idr_drmd <= 0.)
+  if (rho_idm_drmd <= 0. || rho_idr_drmd <= 0.) {
     return;
+  }
 
   double Rint;
   double csp2;
@@ -320,8 +329,9 @@ std::vector<Named> IDM_DRMD_IDR_DRMD_Species::CreateAll(const SpeciesBuildContex
   std::vector<Named> result;
   // Read both slots from the resolved coupled-species budget.  Missing budget
   // (shooting-guess fallback) or both slots absent → composite is absent.
-  if (!ctx.omega_budget)
+  if (!ctx.omega_budget) {
     return result;
+  }
   const double omega0_idm_drmd = ctx.omega_budget->idm_drmd.value_or(0.);
   const double omega0_idr_drmd = ctx.omega_budget->idr_drmd.value_or(0.);
   if (omega0_idm_drmd != 0. || omega0_idr_drmd != 0.) {

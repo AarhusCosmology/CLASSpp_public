@@ -26,15 +26,17 @@ void PhotonsSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& bas
   layout.l_max_pol = ppr->l_max_pol_g;
 
   /* RSA active: photons are handled analytically, nothing to integrate. */
-  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
     return;
+  }
 
   layout.idx_delta = index_pt++;
   layout.idx_theta = index_pt++;
 
   /* TCA active: only delta and theta; shear/polarization are analytic */
-  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
     return;
+  }
 
   /* Full hierarchy: shear (l=2), l3..l_max_g, polarization */
   layout.idx_shear = index_pt++;
@@ -72,10 +74,12 @@ void PhotonsSpecies::RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayou
   layout.l_max_pol = ppr->l_max_pol_g_ten;
 
   /* In vector mode there is no TCA shortcut: either full hierarchy or nothing. */
-  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
     return;
-  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))
+  }
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
     return;
+  }
 
   layout.idx_delta  = index_pt++;
   layout.idx_theta  = index_pt++;
@@ -105,10 +109,12 @@ void PhotonsSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayou
   layout.l_max     = ppr->l_max_g_ten;
   layout.l_max_pol = ppr->l_max_pol_g_ten;
 
-  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
     return;
-  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))
+  }
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
     return;
+  }
 
   layout.idx_delta  = index_pt++;
   layout.idx_theta  = index_pt++;
@@ -146,8 +152,9 @@ void PhotonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   const double R                 = ctx.R;
 
   /* RSA active: photons are handled analytically */
-  if (layout.idx_delta < 0)
+  if (layout.idx_delta < 0) {
     return;
+  }
 
   const double dkappa =
       ppw->pvecthermo[ppaw.perturbations_module->GetThermodynamicsModule()->index_th_dkappa_];
@@ -244,8 +251,9 @@ void PhotonsSpecies::PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
   const double* s_l            = ppw->s_l.data();
 
   /* Nothing to do when RSA or TCA is active (indices not registered). */
-  if (layout.idx_delta < 0)
+  if (layout.idx_delta < 0) {
     return;
+  }
 
   const auto gauge     = ppaw.perturbations_module->GetPerturbs()->gauge;
   const double k       = ppaw.k;
@@ -297,11 +305,12 @@ void PhotonsSpecies::PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
                       dkappa * y[layout.idx_l3];
 
   /* l = 4 .. l_max_g - 1 */
-  for (int l = 4; l < layout.l_max; l++)
+  for (int l = 4; l < layout.l_max; l++) {
     dy[layout.idx_delta + l] = k / (2. * l + 1.) *
                                    (l * s_l[l] * y[layout.idx_delta + l - 1] -
                                     (l + 1.) * s_l[l + 1] * y[layout.idx_delta + l + 1]) -
                                dkappa * y[layout.idx_delta + l];
+  }
 
   /* l = l_max_g (truncation) */
   {
@@ -315,11 +324,12 @@ void PhotonsSpecies::PerturbVectorDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_pol0] = -k * y[layout.idx_pol0 + 1] - dkappa * (y[layout.idx_pol0] - _SQRT6_ * P1);
 
   /* Polarization l = 1 .. l_max_pol_g - 1 */
-  for (int l = 1; l < layout.l_max_pol; l++)
+  for (int l = 1; l < layout.l_max_pol; l++) {
     dy[layout.idx_pol0 + l] = k / (2. * l + 1.) *
                                   (l * s_l[l] * y[layout.idx_pol0 + l - 1] -
                                    (l + 1.) * s_l[l + 1] * y[layout.idx_pol0 + l + 1]) -
                               dkappa * y[layout.idx_pol0 + l];
+  }
 
   /* Polarization l = l_max_pol_g (truncation) */
   {
@@ -379,8 +389,9 @@ void PhotonsSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
   const double* s_l            = ppw->s_l.data();
 
   /* Nothing to do when RSA or TCA is active (indices not registered). */
-  if (layout.idx_delta < 0)
+  if (layout.idx_delta < 0) {
     return;
+  }
 
   const double k       = ppaw.k;
   const double k2      = k * k;
@@ -414,11 +425,12 @@ void PhotonsSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
                       dkappa * y[layout.idx_l3];
 
   /* l = 4 .. l_max_g - 1 */
-  for (int l = 4; l < layout.l_max; l++)
+  for (int l = 4; l < layout.l_max; l++) {
     dy[layout.idx_delta + l] = k / (2. * l + 1.) *
                                    (l * s_l[l] * y[layout.idx_delta + l - 1] -
                                     (l + 1.) * s_l[l + 1] * y[layout.idx_delta + l + 1]) -
                                dkappa * y[layout.idx_delta + l];
+  }
 
   /* l = l_max_g (truncation) */
   {
@@ -432,11 +444,12 @@ void PhotonsSpecies::PerturbTensorDerivs(const BaseSpecies::PerturbLayout& base,
   dy[layout.idx_pol0] = -k * y[layout.idx_pol0 + 1] - dkappa * (y[layout.idx_pol0] - _SQRT6_ * P2);
 
   /* Polarization l = 1 .. l_max_pol_g - 1 */
-  for (int l = 1; l < layout.l_max_pol; l++)
+  for (int l = 1; l < layout.l_max_pol; l++) {
     dy[layout.idx_pol0 + l] = k / (2. * l + 1.) *
                                   (l * s_l[l] * y[layout.idx_pol0 + l - 1] -
                                    (l + 1.) * s_l[l + 1] * y[layout.idx_pol0 + l + 1]) -
                               dkappa * y[layout.idx_pol0 + l];
+  }
 
   /* Polarization l = l_max_pol_g (truncation) */
   {
@@ -464,16 +477,20 @@ BaseSpecies::StressEnergyContribution PhotonsSpecies::StressEnergy(
     se.delta_rho = rho_g * y[layout.idx_delta];
     se.delta_p   = rho_g * y[layout.idx_delta] / 3.;
   }
-  if (layout.idx_theta >= 0)
+  if (layout.idx_theta >= 0) {
     se.rho_plus_p_theta = 4. / 3. * rho_g * y[layout.idx_theta];
-  if (layout.idx_shear >= 0)
+  }
+  if (layout.idx_shear >= 0) {
     se.rho_plus_p_shear = 4. / 3. * rho_g * y[layout.idx_shear];  // no approximation
-  else if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))
-    se.rho_plus_p_shear = 0.;                          // RSA: shear neglected
-  else if (ppt_->gauge == possible_gauges::newtonian)  // TCA, 1st order
+  }
+  else if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
+    se.rho_plus_p_shear = 0.;  // RSA: shear neglected
+  }
+  else if (ppt_->gauge == possible_gauges::newtonian) {  // TCA, 1st order
     se.rho_plus_p_shear = 4. / 3. * rho_g *
                           (16. / 45. / ppw->pvecthermo[thm_->index_th_dkappa_] *
                            y[layout.idx_theta]);
+  }
   // else synchronous TCA: 0 here, re-set later in perturb_einstein
   return se;
 }
@@ -485,8 +502,9 @@ void PhotonsSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& ba
                                             const PerturbIcContext& ctx) {
   const auto& layout             = static_cast<const PerturbLayout&>(base);
   const PerturbationsModule* mod = ctx.p_mod;
-  if (layout.idx_delta < 0 || layout.idx_theta < 0)
+  if (layout.idx_delta < 0 || layout.idx_theta < 0) {
     return;
+  }
 
   if (ctx.index_ic == mod->index_ic_ad_) {
     y[layout.idx_delta] = ctx.delta_g_ic;
@@ -520,8 +538,9 @@ void PhotonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   PerturbationsModule* p_mod = ctx.p_mod;
   perturb_workspace* ppw     = ctx.ppw;
 
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   // Convenient lambda to write into source table
   auto set_source = [&](int index_tp, double value) {
@@ -529,10 +548,12 @@ void PhotonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   };
 
   double delta_g;
-  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
     delta_g = ppw->rsa_delta_g;
-  else
+  }
+  else {
     delta_g = y[layout.idx_delta];
+  }
 
   if (index_tp_delta_ >= 0) {
     set_source(index_tp_delta_, delta_g + 4. * ctx.a_prime_over_a * ctx.theta_over_k2);
@@ -540,10 +561,12 @@ void PhotonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
 
   if (index_tp_theta_ >= 0) {
     double theta_g;
-    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off))
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
       theta_g = y[layout.idx_theta];
-    else
+    }
+    else {
       theta_g = ppw->rsa_theta_g;
+    }
     set_source(index_tp_theta_, theta_g + ctx.theta_shift);
   }
 }
@@ -567,8 +590,9 @@ void PhotonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLay
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
 
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
 
   // delta, theta, shear, l3, pol0..pol3, all multipoles up to l_max.
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
@@ -578,8 +602,9 @@ void PhotonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLay
     new_y[new_l.idx_shear] = old_y[old_l.idx_shear];
     if (old_l.idx_l3 >= 0 && new_l.idx_l3 >= 0) {
       new_y[new_l.idx_l3] = old_y[old_l.idx_l3];
-      for (int l = 4; l <= new_l.l_max; ++l)
+      for (int l = 4; l <= new_l.l_max; ++l) {
         new_y[new_l.idx_delta + l] = old_y[old_l.idx_delta + l];
+      }
     }
     if (new_l.idx_pol0 >= 0 && old_l.idx_pol0 >= 0) {
       new_y[new_l.idx_pol0] = old_y[old_l.idx_pol0];
@@ -587,8 +612,9 @@ void PhotonsSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLay
       new_y[new_l.idx_pol2] = old_y[old_l.idx_pol2];
       if (old_l.idx_pol3 >= 0 && new_l.idx_pol3 >= 0) {
         new_y[new_l.idx_pol3] = old_y[old_l.idx_pol3];
-        for (int l = 4; l <= new_l.l_max_pol; ++l)
+        for (int l = 4; l <= new_l.l_max_pol; ++l) {
           new_y[new_l.idx_pol0 + l] = old_y[old_l.idx_pol0 + l];
+        }
       }
     }
   }
@@ -607,10 +633,12 @@ void PhotonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
                                         BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_g", index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_g", index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
   // file_format::camb_format: photons not written separately
 }
@@ -687,17 +715,21 @@ void PhotonsSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
   const auto& g_lay = static_cast<const PerturbLayout&>(base);
   /* Photon temperature l>=3 and pol l=1,3+ are not needed in source evaluation
      when both rsa and tca are off. */
-  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off))
+  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off)) {
     return;
-  if (ppw->approx[ppw->index_ap_tca] != static_cast<int>(tca_off))
+  }
+  if (ppw->approx[ppw->index_ap_tca] != static_cast<int>(tca_off)) {
     return;
+  }
 
-  for (int idx = g_lay.idx_l3; idx <= g_lay.idx_delta + g_lay.l_max; ++idx)
+  for (int idx = g_lay.idx_l3; idx <= g_lay.idx_delta + g_lay.l_max; ++idx) {
     used_in_sources[idx] = false;
+  }
 
   used_in_sources[g_lay.idx_pol1] = false;
-  for (int idx = g_lay.idx_pol3; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx)
+  for (int idx = g_lay.idx_pol3; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx) {
     used_in_sources[idx] = false;
+  }
 }
 
 // ── MarkTensorUsedInSources ────────────────────────────────────────────────────
@@ -708,20 +740,24 @@ void PhotonsSpecies::MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& b
   const auto& g_lay = static_cast<const PerturbLayout&>(base);
   /* In tensor mode, we only need temperature l=0,2,4 and pol l=0,2,4
      when both rsa and tca are off. */
-  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off))
+  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off)) {
     return;
-  if (ppw->approx[ppw->index_ap_tca] != static_cast<int>(tca_off))
+  }
+  if (ppw->approx[ppw->index_ap_tca] != static_cast<int>(tca_off)) {
     return;
+  }
 
   used_in_sources[g_lay.idx_theta] = false;
   used_in_sources[g_lay.idx_l3]    = false;
-  for (int idx = g_lay.idx_delta + 5; idx <= g_lay.idx_delta + g_lay.l_max; ++idx)
+  for (int idx = g_lay.idx_delta + 5; idx <= g_lay.idx_delta + g_lay.l_max; ++idx) {
     used_in_sources[idx] = false;
+  }
 
   used_in_sources[g_lay.idx_pol1] = false;
   used_in_sources[g_lay.idx_pol3] = false;
-  for (int idx = g_lay.idx_pol0 + 5; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx)
+  for (int idx = g_lay.idx_pol0 + 5; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx) {
     used_in_sources[idx] = false;
+  }
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

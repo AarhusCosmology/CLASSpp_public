@@ -53,8 +53,9 @@ void ScalarFieldSpecies::SetBackgroundInitialConditions(const BackgroundICContex
     if (attractor_denom < 0) {
       /** - --> If there is no attractor solution for scf_lambda, assign some value. Otherwise would give a nan.*/
       pvecback_integration[bi_phi_index()] = 1. / scf_lambda;  //seems to the work
-      if (pba_.background_verbose > 0)
+      if (pba_.background_verbose > 0) {
         printf(" No attractor IC for lambda = %.3e ! \n ", scf_lambda);
+      }
     }
     else {
       pvecback_integration[bi_phi_index()] = -1. / scf_lambda *
@@ -222,8 +223,9 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   const double* pvecback      = ppw->pvecback.data();
 
   // Scalar field sources are scalar-only
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   const double phi_prime_bg = pvecback[index_bg_phi_prime_scf_];
   const double dV_bg        = pvecback[index_bg_dV_scf_];
@@ -282,13 +284,16 @@ void ScalarFieldSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
 void ScalarFieldSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                                 double* y,
                                                 const PerturbIcContext& ctx) {
-  if (ctx.index_ic != ctx.p_mod->index_ic_ad_)
+  if (ctx.index_ic != ctx.p_mod->index_ic_ad_) {
     return;
+  }
   const auto& layout = static_cast<const PerturbLayout&>(base);
-  if (layout.idx_phi >= 0)
+  if (layout.idx_phi >= 0) {
     y[layout.idx_phi] = 0.;
-  if (layout.idx_phi_prime >= 0)
+  }
+  if (layout.idx_phi_prime >= 0) {
     y[layout.idx_phi_prime] = 0.;
+  }
 }
 
 void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
@@ -298,8 +303,9 @@ void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::Pertur
   const double* pvecback = ctx.ppw->pvecback.data();
   const double phi_prime = pvecback[index_bg_phi_prime_scf_];
   const double dV        = pvecback[index_bg_dV_scf_];
-  if (l.idx_phi >= 0)
+  if (l.idx_phi >= 0) {
     y[l.idx_phi] += ctx.alpha * phi_prime;
+  }
   if (l.idx_phi_prime >= 0) {
     /* Transform the synchronous delta_phi' into the Newtonian q state. Using
        alpha' = psi - H alpha cancels psi explicitly and avoids requiring the
@@ -317,10 +323,12 @@ void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_scf", index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t__scf", index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
 }
 
@@ -448,8 +456,9 @@ void ScalarFieldSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::Pertur
                                                        const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.idx_phi < 0 || new_l.idx_phi < 0)
+  if (old_l.idx_phi < 0 || new_l.idx_phi < 0) {
     return;
+  }
   new_y[new_l.idx_phi]       = old_y[old_l.idx_phi];
   new_y[new_l.idx_phi_prime] = old_y[old_l.idx_phi_prime];
 }
@@ -457,8 +466,9 @@ void ScalarFieldSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::Pertur
 // ── Shooting hooks ────────────────────────────────────────────────────────────
 
 std::vector<ShootingTarget> ScalarFieldSpecies::GetShootingTargets() const {
-  if (needs_shooting_)
+  if (needs_shooting_) {
     return {shooting_target_};
+  }
   return {};
 }
 
@@ -488,8 +498,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
 
   // When the Type-3 (scf_veta) coupling is active, the Type3 composite owns the
   // scalar field; the standalone factory must not also build one.
-  if (auto veta = ctx.pfc->get<double>("scf_veta"); veta.has_value() && *veta != 0.)
+  if (auto veta = ctx.pfc->get<double>("scf_veta"); veta.has_value() && *veta != 0.) {
     return result;  // the Type3 composite owns the scalar field
+  }
 
   // Decide our Omega0_scf and whether shooting may apply.
   // Three cases:
@@ -504,8 +515,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   double omega_scf_val   = 0.;
   auto omega_scf_opt     = ctx.pfc->get<double>("Omega_scf");
   bool omega_scf_present = omega_scf_opt.has_value();
-  if (omega_scf_present)
+  if (omega_scf_present) {
     omega_scf_val = *omega_scf_opt;
+  }
 
   double omega0_scf     = 0.;
   bool shooting_allowed = false;
@@ -521,13 +533,15 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
     return result;
   }
 
-  if (omega0_scf == 0.)
+  if (omega0_scf == 0.) {
     return result;
+  }
 
   // ── scf_potential dispatch ────────────────────────────────────────────────
   if (auto pot_opt = ctx.pfc->get<std::string>("scf_potential")) {
-    if (*pot_opt == "axion")
+    if (*pot_opt == "axion") {
       return CreateAxion(ctx, omega0_scf);
+    }
     class_stop_severe(
         "unknown scf_potential '%s': supported values are 'axion' (absent = historical default)",
         pot_opt->c_str());
@@ -536,8 +550,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   // ── scf_parameters (variable-length list) ────────────────────────────────
   std::vector<double> scf_parameters;
   try {
-    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>("scf_parameters"))
+    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>("scf_parameters")) {
       scf_parameters = *scf_params_opt;
+    }
   }
   catch (const std::exception& e) {
     class_stop_severe("scf_parameters parse error: %s", e.what());
@@ -554,8 +569,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
 
   // scf_shooting_parameter (when present) OVERWRITES the slot at tuning_index.
   // This is the resolved value DoShooting writes back into the fc for the final build.
-  if (auto scf_shooting_opt = ctx.pfc->get<double>("scf_shooting_parameter"))
+  if (auto scf_shooting_opt = ctx.pfc->get<double>("scf_shooting_parameter")) {
     scf_parameters[scf_tuning_index] = *scf_shooting_opt;
+  }
 
   // Preserve the legacy SCF parser warning: lambda<3 in the exponential-quintessence
   // potential won't track unless overwritten by the shooter / tuning function.
@@ -701,8 +717,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAllForComposite(const SpeciesBuildC
   double omega_scf_val   = 0.;
   auto omega_scf_opt     = ctx.pfc->get<double>("Omega_scf");
   bool omega_scf_present = omega_scf_opt.has_value();
-  if (omega_scf_present)
+  if (omega_scf_present) {
     omega_scf_val = *omega_scf_opt;
+  }
 
   double omega0_scf     = 0.;
   bool shooting_allowed = false;
@@ -716,8 +733,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAllForComposite(const SpeciesBuildC
   else {
     return result;
   }
-  if (omega0_scf == 0.)
+  if (omega0_scf == 0.) {
     return result;
+  }
 
   // scf_parameters for a Type-3 run = [V0, lambda]: tuning index 0 shoots V0, entry 1
   // is the 1EXP slope lambda. The V0 entry is a placeholder; the shooting guess
@@ -725,8 +743,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAllForComposite(const SpeciesBuildC
   // V0 back into scf_shooting_parameter for the final build.
   std::vector<double> scf_parameters;
   try {
-    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>("scf_parameters"))
+    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>("scf_parameters")) {
       scf_parameters = *scf_params_opt;
+    }
   }
   catch (const std::exception& e) {
     class_stop_severe("scf_parameters parse error: %s", e.what());
@@ -743,8 +762,9 @@ std::vector<Named> ScalarFieldSpecies::CreateAllForComposite(const SpeciesBuildC
   // when scf_veta is active).
   ctx.pfc->get<std::string>("attractor_ic_scf");
 
-  if (auto scf_shooting_opt = ctx.pfc->get<double>("scf_shooting_parameter"))
+  if (auto scf_shooting_opt = ctx.pfc->get<double>("scf_shooting_parameter")) {
     scf_parameters[scf_tuning_index] = *scf_shooting_opt;  // resolved V0
+  }
 
   // Injectable pure-1EXP potential, params = [V0, lambda].
   ScalarFieldPotential exp1exp;

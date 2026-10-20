@@ -145,10 +145,12 @@ int main() {
     FileContent fc;
     fc.set("Omega_scf", "0.05");
     fc.set("scf_potential", "axion");
-    if (std::string(missing) != "f_axion")
+    if (std::string(missing) != "f_axion") {
       fc.set("f_axion", "0.5");
-    if (std::string(missing) != "Theta_initial_scf")
+    }
+    if (std::string(missing) != "Theta_initial_scf") {
       fc.set("Theta_initial_scf", "2.0");
+    }
     auto ctx   = MakeCtx(fc, pba);
     bool threw = false;
     try {

@@ -106,8 +106,9 @@ void CDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                                         const PerturbIcContext& ctx) {
   const auto& layout             = static_cast<const PerturbLayout&>(base);
   const PerturbationsModule* mod = ctx.p_mod;
-  if (layout.idx_delta < 0)
+  if (layout.idx_delta < 0) {
     return;
+  }
 
   if (ctx.index_ic == mod->index_ic_ad_ || ctx.index_ic == mod->index_ic_bi_) {
     y[layout.idx_delta] = 3. / 4. * ctx.delta_g_ic;
@@ -124,8 +125,9 @@ void CDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                           ctx.k * ctx.tau * ctx.om * ctx.tau;
   }
 
-  if (layout.idx_theta >= 0)
+  if (layout.idx_theta >= 0) {
     y[layout.idx_theta] = 0.;
+  }
 }
 
 void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
@@ -137,8 +139,9 @@ void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
 
   const double a_prime_over_a = ctx.a_prime_over_a;
 
-  if (ctx.index_md != p_mod->index_md_scalars_)
+  if (ctx.index_md != p_mod->index_md_scalars_) {
     return;
+  }
 
   // ── delta_cdm ──────────────────────────────────────────────────────────────
   if (index_tp_delta_ >= 0) {
@@ -170,14 +173,17 @@ void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   const background* pba = mod.GetBackground();
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
-    if (section != TransferColumnSection::velocity && ppt->has_density_transfers)
+    if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
       w.Add("d_cdm", index_tp_delta_, index_tp_delta_ >= 0);
-    if (section != TransferColumnSection::density && ppt->has_velocity_transfers)
+    }
+    if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
       w.Add("t_cdm", index_tp_theta_, index_tp_theta_ >= 0);
+    }
   }
   else if (fmt == file_format::camb_format) {
-    if (section != TransferColumnSection::velocity)
+    if (section != TransferColumnSection::velocity) {
       w.Add("-T_cdm/k2", index_tp_delta_, index_tp_delta_ >= 0);
+    }
   }
 }
 
@@ -235,13 +241,15 @@ void CDMSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout&
                                                const PerturbSwitchContext& /*ctx*/) const {
   const auto& old_l = static_cast<const PerturbLayout&>(old_base);
   const auto& new_l = static_cast<const PerturbLayout&>(new_base);
-  if (old_l.idx_delta < 0 || new_l.idx_delta < 0)
+  if (old_l.idx_delta < 0 || new_l.idx_delta < 0) {
     return;
+  }
   new_y[new_l.idx_delta] = old_y[old_l.idx_delta];
   // theta is registered only in newtonian gauge (idx_theta >= 0); synchronous
   // gauge derives cdm velocity from the metric, so idx_theta == -1 there.
-  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0)
+  if (old_l.idx_theta >= 0 && new_l.idx_theta >= 0) {
     new_y[new_l.idx_theta] = old_y[old_l.idx_theta];
+  }
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -252,15 +260,18 @@ std::vector<Named> CDMSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   // (parser block in InputModule::ReadCoupledOmegaBudget applied the user's
   // Omega_cdm / omega_cdm, then any f_idm_dr / f_idm_drmd subtractions, then
   // the synchronous-gauge minimum). Absent slot → CDM absent.
-  if (!ctx.omega_budget || !ctx.omega_budget->cdm.has_value())
+  if (!ctx.omega_budget || !ctx.omega_budget->cdm.has_value()) {
     return result;
+  }
   const double omega0 = *ctx.omega_budget->cdm;
-  if (omega0 == 0.0)
+  if (omega0 == 0.0) {
     return result;
+  }
   // When the Type-3 (scf_veta) coupling is active, the Type3 composite owns the
   // (coupled) CDM child; the standalone factory must not also build one.
-  if (auto veta = ctx.pfc->get<double>("scf_veta"); veta.has_value() && *veta != 0.)
+  if (auto veta = ctx.pfc->get<double>("scf_veta"); veta.has_value() && *veta != 0.) {
     return result;  // the Type3 composite owns the CDM
+  }
   result.push_back({"CDM", std::make_unique<CDMSpecies>(*ctx.pba, omega0)});
   return result;
 }

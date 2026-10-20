@@ -63,18 +63,24 @@ std::map<std::string, std::vector<double>> LensingModule::cl_output_at_l_values(
 
   std::map<std::string, int> index_map;
 
-  if (has_tt_)
+  if (has_tt_) {
     index_map["tt"] = index_lt_tt_;
-  if (has_ee_)
+  }
+  if (has_ee_) {
     index_map["ee"] = index_lt_ee_;
-  if (has_te_)
+  }
+  if (has_te_) {
     index_map["te"] = index_lt_te_;
-  if (has_bb_)
+  }
+  if (has_bb_) {
     index_map["bb"] = index_lt_bb_;
-  if (has_pp_)
+  }
+  if (has_pp_) {
     index_map["pp"] = index_lt_pp_;
-  if (has_tp_)
+  }
+  if (has_tp_) {
     index_map["tp"] = index_lt_tp_;
+  }
 
   // Create vectors for fast iteration in nested loop below.
   std::vector<std::vector<double>> data_vectors;
@@ -125,9 +131,11 @@ void LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
                            lt_size_);
 
   /* set to zero for the types such that l<l_max */
-  for (int index_lt = 0; index_lt < lt_size_; index_lt++)
-    if (l > l_max_lt_[index_lt])
+  for (int index_lt = 0; index_lt < lt_size_; index_lt++) {
+    if (l > l_max_lt_[index_lt]) {
       cl_lensed[index_lt] = 0.;
+    }
+  }
 }
 
 /**
@@ -143,17 +151,20 @@ void LensingModule::lensing_init() {
   /** - check that we really want to compute at least one spectrum */
 
   if (!ple->has_lensed_cls) {
-    if (ple->lensing_verbose > 0)
+    if (ple->lensing_verbose > 0) {
       printf("No lensing requested. Lensing module skipped.\n");
+    }
     return;
   }
   else {
     if (ple->lensing_verbose > 0) {
       printf("Computing lensed spectra ");
-      if (ppr->accurate_lensing)
+      if (ppr->accurate_lensing) {
         printf("(accurate mode)\n");
-      else
+      }
+      else {
         printf("(fast mode)\n");
+      }
     }
   }
 
@@ -664,11 +675,13 @@ void LensingModule::lensing_indices() {
   int index_l;
   for (index_l = 0;
        (index_l < spectra_module_->l_size_max_) && (spectra_module_->l_[index_l] <= l_lensed_max_);
-       index_l++)
+       index_l++) {
     ;
+  }
 
-  if (index_l < spectra_module_->l_size_max_)
+  if (index_l < spectra_module_->l_size_max_) {
     index_l++; /* one more point in order to be able to interpolate till l_lensed_max_ */
+  }
 
   l_size_ = index_l + 1;
 

@@ -129,12 +129,15 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
   this->dphi.resize(nx * nl);
 
   //Order needed for trig interpolation: (We are using Taylor's remainder theorem)
-  if (0.5 * deltax * deltax < _TRIG_PRECISSION_)
+  if (0.5 * deltax * deltax < _TRIG_PRECISSION_) {
     this->trig_order = 1;
-  else if ((pow(deltax, 4) / 24.0) < _TRIG_PRECISSION_)
+  }
+  else if ((pow(deltax, 4) / 24.0) < _TRIG_PRECISSION_) {
     this->trig_order = 3;
-  else
+  }
+  else {
     this->trig_order = 5;
+  }
 
   //Copy lvector:
   for (j = 0; j < nl; j++) {
@@ -209,10 +212,12 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
   // OOB write of phi/dphi 3 elements before the buffer). This is latent in the
   // transfer module (large multipoles keep xfwd > xmin) but is reachable when
   // the constructor is called directly with small l.
-  if (xfwdidx < 0)
+  if (xfwdidx < 0) {
     xfwdidx = 0;
-  if (xfwdidx > nx)
+  }
+  if (xfwdidx > nx) {
     xfwdidx = nx;
+  }
   //Calculate and assign Phi and dPhi values:
 
   std::vector<double> PhiL((lmax + 2) * _HYPER_CHUNK_);
@@ -335,10 +340,11 @@ void hyperspherical_forwards_recurrence_chunk(int K,
                                PhiL + chunk + index_x);
   }
   for (l = 2; l <= lmax; l++) {
-    for (index_x = 0; index_x < chunk; index_x++)
+    for (index_x = 0; index_x < chunk; index_x++) {
       PhiL[l * chunk + index_x] = ((2 * l - 1) * cotK[index_x] * PhiL[(l - 1) * chunk + index_x] -
                                    PhiL[(l - 2) * chunk + index_x] * sqrtK[l - 1]) *
                                   one_over_sqrtK[l];
+    }
   }
 }
 
@@ -397,8 +403,9 @@ void hyperspherical_backwards_recurrence(int K,
   for (l = lmax; l > l_align; l--) {
     //    phi_minus_1 = ( (2*l+1)*cotK*phi-phi_plus_1_times_sqrtK )/sqrtK[l];
     phi_minus_1 = ((2 * l + 1) * cotK * phi - phi_plus_1_times_sqrtK) * one_over_sqrtK[l];
-    if (l == 1)
+    if (l == 1) {
       phi1_down = phi;
+    }
     phi_plus_1_times_sqrtK = phi * sqrtK[l];
     phi                    = phi_minus_1;
     PhiL[l - 1]            = phi;
@@ -407,8 +414,9 @@ void hyperspherical_backwards_recurrence(int K,
     for (l = l_ini; l > (l_ini - _HYPER_BLOCK_); l--) {
       //    phi_minus_1 = ( (2*l+1)*cotK*phi-phi_plus_1_times_sqrtK )/sqrtK[l];
       phi_minus_1 = ((2 * l + 1) * cotK * phi - phi_plus_1_times_sqrtK) * one_over_sqrtK[l];
-      if (l == 1)
+      if (l == 1) {
         phi1_down = phi;
+      }
       phi_plus_1_times_sqrtK = phi * sqrtK[l];
       phi                    = phi_minus_1;
       PhiL[l - 1]            = phi;
@@ -417,8 +425,9 @@ void hyperspherical_backwards_recurrence(int K,
       phi                    *= _ONE_OVER_HYPER_OVERFLOW_;
       phi_plus_1_times_sqrtK *= _ONE_OVER_HYPER_OVERFLOW_;
       //Rescale whole Phi vector until this point:
-      for (k = l; k <= lmax; k++)
+      for (k = l; k <= lmax; k++) {
         PhiL[k] *= _ONE_OVER_HYPER_OVERFLOW_;
+      }
       phi1_down *= _ONE_OVER_HYPER_OVERFLOW_;
     }
   }
@@ -460,8 +469,9 @@ void hyperspherical_backwards_recurrence(int K,
       scaling = phi0_exact / phi0_down;
     }
   }
-  for (k = 0; k <= lmax; k++)
+  for (k = 0; k <= lmax; k++) {
     PhiL[k] *= scaling;
+  }
 }
 
 void hyperspherical_backwards_recurrence_chunk(int K,
@@ -516,8 +526,9 @@ void hyperspherical_backwards_recurrence_chunk(int K,
       PhiL[l * chunk + index_x] = one_over_sqrtK[l + 1] *
                                   ((2 * l + 3) * cotK[index_x] * PhiL[(l + 1) * chunk + index_x] -
                                    sqrtK[l + 2] * PhiL[(l + 2) * chunk + index_x]);
-      if (l == 0)
+      if (l == 0) {
         phi1_down[index_x] = PhiL[chunk + index_x];
+      }
     }
 
     /* Check if any entry in the chunk has overflowed — the original code only
@@ -525,14 +536,16 @@ void hyperspherical_backwards_recurrence_chunk(int K,
     double maxabs = 0.0;
     for (index_x = 0; index_x < chunk; index_x++) {
       double v = fabs(PhiL[l * chunk + index_x]);
-      if (v > maxabs)
+      if (v > maxabs) {
         maxabs = v;
+      }
     }
     if (maxabs > _HYPER_OVERFLOW_) {
       //Rescale whole Phi vector until this point.
       //Create scale vector:
-      for (index_x = 0; index_x < chunk; index_x++)
+      for (index_x = 0; index_x < chunk; index_x++) {
         scalevec[index_x] = fabs(1.0 / PhiL[l * chunk + index_x]);
+      }
       //Now do the scaling: (We do it this way to access elements in order)
       for (k = l; k <= lmax; k++) {
         for (index_x = 0; index_x < chunk; index_x++) {
@@ -590,8 +603,9 @@ bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
   double sqrttmp;
   int j;
 
-  if (K == 1)
+  if (K == 1) {
     maxiter = static_cast<int>(beta - l - 10);
+  }
   bj     = l * cotK;  //This is b_0
   fj     = bj;
   Cj     = bj;
@@ -600,20 +614,24 @@ bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
   for (j = 1; j <= maxiter; j++) {
     sqrttmp = sqrt(beta2 - K * (l + j + 1) * (l + j + 1));
     aj      = -sqrt(beta2 - K * (l + j) * (l + j)) / sqrttmp;
-    if (j == 1)
+    if (j == 1) {
       aj = sqrt(beta2 - K * (l + 1) * (l + 1)) * aj;
+    }
     bj = (2 * (l + j) + 1) / sqrttmp * cotK;
     Dj = bj + aj * Dj;
-    if (Dj == 0.0)
+    if (Dj == 0.0) {
       Dj = tiny;
+    }
     Cj = bj + aj / Cj;
-    if (Cj == 0.0)
+    if (Cj == 0.0) {
       Cj = tiny;
+    }
     Dj   = 1.0 / Dj;
     Delj = Cj * Dj;
     fj   = fj * Delj;
-    if (Dj < 0)
+    if (Dj < 0) {
       *isign *= -1;
+    }
     if (fabs(Delj - 1.0) < reltol) {
       *CF = fj;
       //printf("iter:%d, %g, %g\n",j,sqrttmp,fj);
@@ -633,8 +651,9 @@ bool CF1_from_Gegenbauer(int l, int beta, double sinK, double cotK, double* CF) 
   double Gkm1;
   double Gkm2;
   n = beta - l - 1;
-  if (n < 0)
+  if (n < 0) {
     return false;
+  }
   alpha = l + 1;
   x     = sinK * cotK;  //cos(x)
   switch (n) {
@@ -929,24 +948,29 @@ void ClosedModY(int l, int beta, double* y, int* phisign, int* dphisign) {
   *phisign  = 1;
   *dphisign = 1;
 
-  while (*y > _TWOPI_)
+  while (*y > _TWOPI_) {
     *y -= _TWOPI_;
+  }
 
   if ((*y) > _PI_) {
     *y = 2.0 * _PI_ - (*y);
     //phisign *= pow(-1,l)
-    if (l % 2 == 1)  //l is odd
+    if (l % 2 == 1) {  //l is odd
       *phisign = -*phisign;
-    else  //l is even
+    }
+    else {  //l is even
       *dphisign = -*dphisign;
+    }
   }
   if ((*y) > 0.5 * _PI_) {
     *y = _PI_ - (*y);
     //phisign *= pow(-1,beta-l-1)
-    if ((beta - l) % 2 == 0)  //beta-l-1 odd
+    if ((beta - l) % 2 == 0) {  //beta-l-1 odd
       *phisign = -*phisign;
-    else  //beta-l-1 even
+    }
+    else {  //beta-l-1 even
       *dphisign = -*dphisign;
+    }
   }
 }
 
@@ -988,10 +1012,12 @@ void hyperspherical_get_xmin_from_Airy(
   *fevals = (*fevals) + 1;
 
   lambda = 2 * _PI_ / (beta + 5.0);
-  if (Fnew > 0)
+  if (Fnew > 0) {
     delx = -lambda;
-  else
+  }
+  else {
     delx = 0.25 * lambda;
+  }
 
   do {
     //printf("In the loop: xnew = %g, Fnew=%g, Fold=%g\n",xnew,Fnew,Fold);
@@ -1126,8 +1152,9 @@ bool fzero_ridder(double (*func)(double, void*),
         xl = ans;
         fl = fnew;
       }
-      else
+      else {
         return false;
+      }
       if (fabs(xh - xl) <= xtol) {
         *xzero = ans;
         //        printf("Success 3\n");
@@ -1209,8 +1236,9 @@ void hyperspherical_bessel_direct_vector(
   lmax = 0;
   for (il = 0; il < nl; il++) {
     class_test(lvec[il] < 0, "l must be non-negative (got %d)", lvec[il]);
-    if (lvec[il] > lmax)
+    if (lvec[il] > lmax) {
       lmax = lvec[il];
+    }
   }
 
   if (K == 1) {
@@ -1234,21 +1262,27 @@ void hyperspherical_bessel_direct_vector(
   std::vector<double> sqrtK(nsqrtK + 1);
   std::vector<double> one_over_sqrtK(nsqrtK + 1);
   for (l = 0; l <= nsqrtK; l++) {
-    if (K == 0)
+    if (K == 0) {
       sqrtK[l] = beta;
-    else if (K == 1)
+    }
+    else if (K == 1) {
       sqrtK[l] = sqrt(beta2 - static_cast<double>(l) * l);
-    else
+    }
+    else {
       sqrtK[l] = sqrt(beta2 + static_cast<double>(l) * l);
+    }
     one_over_sqrtK[l] = 1.0 / sqrtK[l];
   }
 
-  if (K == 0)
+  if (K == 0) {
     xfwd = sqrt(lmax * (lmax + 1.0)) / beta;
-  else if (K == 1)
+  }
+  else if (K == 1) {
     xfwd = asin(sqrt(lmax * (lmax + 1.0)) / beta);
-  else
+  }
+  else {
     xfwd = asinh(sqrt(lmax * (lmax + 1.0)) / beta);
+  }
 
   std::vector<double> PhiL(lmax + 2);
 
@@ -1274,7 +1308,7 @@ void hyperspherical_bessel_direct_vector(
       cotK = 1.0 / tanh(folded_y);
     }
 
-    if (folded_y < xfwd)
+    if (folded_y < xfwd) {
       hyperspherical_backwards_recurrence(K,
                                           lmax,
                                           beta,
@@ -1284,7 +1318,8 @@ void hyperspherical_bessel_direct_vector(
                                           sqrtK.data(),
                                           one_over_sqrtK.data(),
                                           PhiL.data());
-    else
+    }
+    else {
       hyperspherical_forwards_recurrence(K,
                                          lmax,
                                          beta,
@@ -1294,6 +1329,7 @@ void hyperspherical_bessel_direct_vector(
                                          sqrtK.data(),
                                          one_over_sqrtK.data(),
                                          PhiL.data());
+    }
 
     for (il = 0; il < nl; il++) {
       l           = lvec[il];
@@ -1380,16 +1416,20 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
   for (int j = 0; j < nxi; j++) {
     double x = xinterp[j];
     //take advantage of periodicity of functions in closed case
-    if (pHIS->K == 1)
+    if (pHIS->K == 1) {
       ClosedModY(l, static_cast<int>(pHIS->beta + 0.2), &x, &phisign, &dphisign);
+    }
     if ((x < xmin) || (x > xmax)) {
       //Outside interpolation region, set to zero.
-      if constexpr (DoPhi)
+      if constexpr (DoPhi) {
         Phi[j] = 0.0;
-      if constexpr (DoDPhi)
+      }
+      if constexpr (DoDPhi) {
         dPhi[j] = 0.0;
-      if constexpr (DoD2Phi)
+      }
+      if constexpr (DoD2Phi) {
         d2Phi[j] = 0.0;
+      }
       continue;
     }
     if ((x > right_border) || (x < left_border)) {
@@ -1407,13 +1447,15 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
           const double sinKm  = sinKv[current_border_idx - 1];
           const double sinKm2 = sinKm * sinKm;
           d2ym                = -2 * dym * cotKm + ym * (lxlp1 / sinKm2 - beta2 + K);
-          if constexpr (kDepth >= 3)
+          if constexpr (kDepth >= 3) {
             d3ym = -2 * cotKm * d2ym - 2 * ym * lxlp1 * cotKm / sinKm2 +
                    dym * (K - beta2 + (2 + lxlp1) / sinKm2);
-          if constexpr (kDepth >= 4)
+          }
+          if constexpr (kDepth >= 4) {
             d4ym = -2 * cotKm * d3ym + d2ym * (K - beta2 + (4 + lxlp1) / sinKm2) +
                    dym * (-4 * (1 + lxlp1) * cotKm / sinKm2) +
                    ym * (2 * lxlp1 / sinKm2 * (2 * cotKm * cotKm + 1 / sinKm2));
+          }
         }
       }
       else {
@@ -1422,12 +1464,15 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
         //Copy former right derivatives to left derivatives.
         ym  = yp;
         dym = dyp;
-        if constexpr (kDepth >= 2)
+        if constexpr (kDepth >= 2) {
           d2ym = d2yp;
-        if constexpr (kDepth >= 3)
+        }
+        if constexpr (kDepth >= 3) {
           d3ym = d3yp;
-        if constexpr (kDepth >= 4)
+        }
+        if constexpr (kDepth >= 4) {
           d4ym = d4yp;
+        }
       }
       left_border  = xvec[std::max(0, current_border_idx - 1)];
       right_border = xvec[current_border_idx];
@@ -1440,13 +1485,15 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
         const double sinKp  = sinKv[current_border_idx];
         const double sinKp2 = sinKp * sinKp;
         d2yp                = -2 * dyp * cotKp + yp * (lxlp1 / sinKp2 - beta2 + K);
-        if constexpr (kDepth >= 3)
+        if constexpr (kDepth >= 3) {
           d3yp = -2 * cotKp * d2yp - 2 * yp * lxlp1 * cotKp / sinKp2 +
                  dyp * (K - beta2 + (2 + lxlp1) / sinKp2);
-        if constexpr (kDepth >= 4)
+        }
+        if constexpr (kDepth >= 4) {
           d4yp = -2 * cotKp * d3yp + d2yp * (K - beta2 + (4 + lxlp1) / sinKp2) +
                  dyp * (-4 * (1 + lxlp1) * cotKp / sinKp2) +
                  yp * (2 * lxlp1 / sinKp2 * (2 * cotKp * cotKp + 1 / sinKp2));
+        }
       }
       //Calculate coefficients:
       if constexpr (Order == 4) {
@@ -1498,22 +1545,28 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
     const double z2 = z * z;
     const double z3 = z2 * z;
     if constexpr (Order == 4) {
-      if constexpr (DoPhi)
+      if constexpr (DoPhi) {
         Phi[j] = (ym + a1 * z + a2 * z2 + a3 * z3) * phisign;
-      if constexpr (DoDPhi)
+      }
+      if constexpr (DoDPhi) {
         dPhi[j] = (dym + b1 * z + b2 * z2 + b3 * z3) * dphisign;
-      if constexpr (DoD2Phi)
+      }
+      if constexpr (DoD2Phi) {
         d2Phi[j] = (d2ym + c1 * z + c2 * z2 + c3 * z3) * phisign;
+      }
     }
     else {
       const double z4 = z2 * z2;
       const double z5 = z2 * z3;
-      if constexpr (DoPhi)
+      if constexpr (DoPhi) {
         Phi[j] = (ym + a1 * z + a2 * z2 + a3 * z3 + a4 * z4 + a5 * z5) * phisign;
-      if constexpr (DoDPhi)
+      }
+      if constexpr (DoDPhi) {
         dPhi[j] = (dym + b1 * z + b2 * z2 + b3 * z3 + b4 * z4 + b5 * z5) * dphisign;
-      if constexpr (DoD2Phi)
+      }
+      if constexpr (DoD2Phi) {
         d2Phi[j] = (d2ym + c1 * z + c2 * z2 + c3 * z3 + c4 * z4 + c5 * z5) * phisign;
+      }
     }
   }
 }

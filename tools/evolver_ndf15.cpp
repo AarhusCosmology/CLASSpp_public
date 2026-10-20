@@ -197,8 +197,9 @@ void evolver_ndf15(EvolverDerivs derivs,
 
   dif    = dif_ptrs.data();
   dif[1] = dif_data.data();
-  for (j = 2; j <= neq; j++)
+  for (j = 2; j <= neq; j++) {
     dif[j] = dif[j - 1] + 7; /* Set row pointers... */
+  }
   dif[0] = nullptr;
   for (j = 1; j <= neq; j++) {
     for (ii = 1; ii <= 7; ii++) {
@@ -240,14 +241,16 @@ void evolver_ndf15(EvolverDerivs derivs,
 
   /* Some CLASS-specific stuff:*/
   next = 0;
-  while (t_vec[next] < t0)
+  while (t_vec[next] < t0) {
     next++;
+  }
 
   if (verbose > 1) {
     numidx = 0;
     for (ii = 1; ii <= neq; ii++) {
-      if (interpidx[ii])
+      if (interpidx[ii]) {
         numidx++;
+      }
     }
     printf("%d/%d ", numidx, neq);
   }
@@ -292,14 +295,16 @@ void evolver_ndf15(EvolverDerivs derivs,
      this (a decay-sourced radiation density starting at exactly 0). */
   for (jj = 1; jj <= neq; jj++) {
     wt[jj] = std::max(fabs(y[jj]), threshold);
-    if (fabs(y[jj]) <= threshold)
+    if (fabs(y[jj]) <= threshold) {
       continue;
+    }
     rh = std::max(rh, 1.25 / sqrt(rtol) * fabs(f0[jj]) / fabs(y[jj]));
   }
 
   absh = std::min(hmax, htspan);
-  if (absh * rh > 1.0)
+  if (absh * rh > 1.0) {
     absh = 1.0 / rh;
+  }
 
   absh = std::max(absh, hmin);
   h    = tdir * absh;
@@ -319,13 +324,15 @@ void evolver_ndf15(EvolverDerivs derivs,
   rh = 0.0;
   for (ii = 1; ii <= neq; ii++) {
     ddfddt[ii] += (tempvec1[ii] - f0[ii]) / tdel;
-    if (fabs(y[ii]) <= threshold)
+    if (fabs(y[ii]) <= threshold) {
       continue; /* same exclusion as above: no relative scale yet */
+    }
     rh = std::max(rh, 1.25 * sqrt(0.5 * fabs(ddfddt[ii] / wt[ii]) / rtol));
   }
   absh = std::min(hmax, htspan);
-  if (absh * rh > 1.0)
+  if (absh * rh > 1.0) {
     absh = 1.0 / rh;
+  }
 
   absh = std::max(absh, hmin);
   h    = tdir * absh;
@@ -335,8 +342,9 @@ void evolver_ndf15(EvolverDerivs derivs,
   klast    = k;
   abshlast = absh;
 
-  for (ii = 1; ii <= neq; ii++)
+  for (ii = 1; ii <= neq; ii++) {
     dif[ii][1] = h * f0[ii];
+  }
 
   hinvGak = h * invGa[k - 1];
   nconhk  = 0; /*steps taken with current h and k*/
@@ -815,8 +823,9 @@ void calc_C(struct jacobian* jac) {
   /* Calculate sparse pattern for C = J + J'. We can use jac->Numerical->xi as
      storage, since we can't refactor when jac->repeated_pattern = 0. xi[0..n][0..n].
      At first, Cp[i+1] holds the number of elements in w[i].*/
-  for (j = 0; j <= n; j++)
+  for (j = 0; j <= n; j++) {
     Cp[j] = 0; /* Clear Cp */
+  }
   for (j = 0; j < n; j++) {
     /* Loop over columns */
     for (int i = Ap[j]; i < Ap[j + 1]; i++) {
@@ -929,8 +938,9 @@ void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
   int jj;
   int kk;
 
-  for (ii = 1; ii <= 5; ii++)
+  for (ii = 1; ii <= 5; ii++) {
     mydifRU[0][ii - 1] = -ii * abshdivabshlast;
+  }
   for (jj = 2; jj <= 5; jj++) {
     for (ii = 1; ii <= 5; ii++) {
       mydifRU[jj - 1][ii - 1] = mydifRU[jj - 2][ii - 1] * (1.0 - (1.0 + ii * abshdivabshlast) / jj);
@@ -944,8 +954,9 @@ void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
     for (jj = 0; jj < 5; jj++) {
       /* Now do the matrix multiplication: */
       mydifRU[ii][jj] = 0.0;
-      for (kk = 0; kk < 5; kk++)
+      for (kk = 0; kk < 5; kk++) {
         mydifRU[ii][jj] += tempvec[kk] * mydifU[kk][jj];
+      }
     }
   }
 
@@ -957,8 +968,9 @@ void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k) {
     for (jj = 0; jj < k; jj++) {
       /* Now do the matrix multiplication: */
       dif[ii + 1][jj + 1] = 0.0;
-      for (kk = 0; kk < k; kk++)
+      for (kk = 0; kk < k; kk++) {
         dif[ii + 1][jj + 1] += tempvec[kk] * mydifRU[kk][jj];
+      }
     }
   }
 }
@@ -1016,8 +1028,9 @@ void new_linearisation(struct jacobian* jac, double hinvGak, int neq) {
     for (i = 1; i <= neq; i++) {
       for (j = 1; j <= neq; j++) {
         jac->LU[i][j] = -hinvGak * jac->dfdy[i][j];
-        if (i == j)
+        if (i == j) {
           jac->LU[i][j] += 1.0;
+        }
       }
     }
     /*Dense LU decomposition: */
@@ -1036,17 +1049,21 @@ void lubksb(double** a, int n, int* indx, double b[]) {
     ip    = indx[i];
     sum   = b[ip];
     b[ip] = b[i];
-    if (ii)
-      for (int j = ii; j <= i - 1; j++)
+    if (ii) {
+      for (int j = ii; j <= i - 1; j++) {
         sum -= a[i][j] * b[j];
-    else if (sum)
+      }
+    }
+    else if (sum) {
       ii = i;
+    }
     b[i] = sum;
   }
   for (i = n; i >= 1; i--) {
     sum = b[i];
-    for (int j = i + 1; j <= n; j++)
+    for (int j = i + 1; j <= n; j++) {
       sum -= a[i][j] * b[j];
+    }
     b[i] = sum / a[i][i];
   }
 }
@@ -1063,25 +1080,30 @@ bool ludcmp(double** a, int n, int* indx, double* d, double* vv) {
   *d = 1.0;
   for (i = 1; i <= n; i++) {
     big = 0.0;
-    for (j = 1; j <= n; j++)
-      if ((temp = fabs(a[i][j])) > big)
+    for (j = 1; j <= n; j++) {
+      if ((temp = fabs(a[i][j])) > big) {
         big = temp;
-    if (big == 0.0)
+      }
+    }
+    if (big == 0.0) {
       return false;
+    }
     vv[i] = 1.0 / big;
   }
   for (j = 1; j <= n; j++) {
     for (i = 1; i < j; i++) {
       sum = a[i][j];
-      for (k = 1; k < i; k++)
+      for (k = 1; k < i; k++) {
         sum -= a[i][k] * a[k][j];
+      }
       a[i][j] = sum;
     }
     big = 0.0;
     for (i = j; i <= n; i++) {
       sum = a[i][j];
-      for (k = 1; k < j; k++)
+      for (k = 1; k < j; k++) {
         sum -= a[i][k] * a[k][j];
+      }
       a[i][j] = sum;
       if ((dum = vv[i] * fabs(sum)) >= big) {
         big  = dum;
@@ -1098,12 +1120,14 @@ bool ludcmp(double** a, int n, int* indx, double* d, double* vv) {
       vv[imax] = vv[j];
     }
     indx[j] = imax;
-    if (a[j][j] == 0.0)
+    if (a[j][j] == 0.0) {
       a[j][j] = TINY;
+    }
     if (j != n) {
       dum = 1.0 / (a[j][j]);
-      for (i = j + 1; i <= n; i++)
+      for (i = j + 1; i <= n; i++) {
         a[i][j] *= dum;
+      }
     }
   }
   return true;
@@ -1168,8 +1192,9 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
     *fevals = *fevals + 1;
 
     errf = 0.0;  //fvec and Jacobian matrix in fjac.
-    for (i = 1; i <= x_size; i++)
+    for (i = 1; i <= x_size; i++) {
       errf += fabs(F0[i - 1]);  //Check function convergence.
+    }
     if (errf <= tolF) {
       has_converged = true;
       break;
@@ -1224,14 +1249,16 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
         throw(std::runtime_error("Jacobian computation in Newtons method failed during shooting"));
       }
       //printf("F = [%f, %f]\n",Fdel[0],Fdel[1]);
-      for (int j = 1; j <= x_size; j++)
+      for (int j = 1; j <= x_size; j++) {
         Fjac[j][i] = (Fdel[j - 1] - F0[j - 1]) / delx[i - 1];
+      }
       x_inout[i - 1] -= delx[i - 1];
     }
     //printf(" ======================== \n");
 
-    for (i = 1; i <= x_size; i++)
-      p[i] = -F0[i - 1];                      //Right-hand side of linear equations.
+    for (i = 1; i <= x_size; i++) {
+      p[i] = -F0[i - 1];  //Right-hand side of linear equations.
+    }
     ludcmp(Fjac, x_size, indx, &d, lu_work);  //Solve linear equations using LU decomposition.
     lubksb(Fjac, x_size, indx, p);
     errx = 0.0;                      //Check root convergence.
@@ -1366,8 +1393,9 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
         /*Add y-vector.. */
         nj_ws->ydel_Fdel[i][j] = y[i];
         /*Add del of all groupmembers:*/
-        if (jac->col_group[i - 1] == group)
+        if (jac->col_group[i - 1] == group) {
           nj_ws->ydel_Fdel[i][j] += nj_ws->del[i];
+        }
       }
     }
   }
@@ -1395,8 +1423,9 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
               parameters_and_workspace_for_derivs);
 
     *nfe += 1;
-    for (i = 1; i <= neq; i++)
+    for (i = 1; i <= neq; i++) {
       nj_ws->ydel_Fdel[i][j] = nj_ws->ffdel[i];
+    }
   }
 
   /*Using the Fdel array, form the jacobian and construct max-value arrays.
@@ -1511,12 +1540,14 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
 	       use the column computed with this increment.
 	       This depends on wether we are in sparse mode or not: */
             if ((jac->use_sparse) && (jac->repeated_pattern >= jac->trust_sparse)) {
-              for (i = Ap[j - 1]; i < Ap[j]; i++)
+              for (i = Ap[j - 1]; i < Ap[j]; i++) {
                 jac->xjac[i] = nj_ws->tmp[Ai[i] + 1];
+              }
             }
             else {
-              for (i = 1; i <= neq; i++)
+              for (i = 1; i <= neq; i++) {
                 dFdy[i][j] = nj_ws->tmp[i];
+              }
             }
             /* Adjust fac for the next call to numjac. */
             ffscale = std::max(fabs(nj_ws->ffdel[rowmax2]), nj_ws->absFvalue[rowmax2]);
@@ -1595,8 +1626,9 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
         }
       }
       /* Break this loop too if I have hit max non-zero points: */
-      if (!jac->use_sparse)
+      if (!jac->use_sparse) {
         break;
+      }
       Ap[j] = nz;
     }
     if (jac->use_sparse) {
@@ -1641,15 +1673,17 @@ void initialize_jacobian(struct jacobian* jac, int neq) {
   jac->dfdy.resize(neq + 1);
   jac->dfdy[0] = nullptr;
   jac->dfdy[1] = jac->dfdy_data_vec.data();
-  for (i = 2; i <= neq; i++)
+  for (i = 2; i <= neq; i++) {
     jac->dfdy[i] = jac->dfdy[i - 1] + neq; /* Set row pointers... */
+  }
 
   jac->LU_data_vec.assign(neq * neq + 1, 0.0);
   jac->LU.resize(neq + 1);
   jac->LU[0] = nullptr;
   jac->LU[1] = jac->LU_data_vec.data();
-  for (i = 2; i <= neq; i++)
+  for (i = 2; i <= neq; i++) {
     jac->LU[i] = jac->LU[i - 1] + neq; /* Set row pointers... */
+  }
 
   jac->LUw.resize(neq + 1);
   jac->jacvec.resize(neq + 1);
@@ -1671,8 +1705,9 @@ void initialize_jacobian(struct jacobian* jac, int neq) {
   }
 
   /* Initialize jacvec to sqrt(eps):*/
-  for (i = 1; i <= neq; i++)
+  for (i = 1; i <= neq; i++) {
     jac->jacvec[i] = 1.490116119384765597872e-8;
+  }
 }
 
 void uninitialize_jacobian(struct jacobian* jac) {
@@ -1704,8 +1739,9 @@ void initialize_numjac_workspace(struct numjac_workspace* nj_ws, int neq) {
   nj_ws->ydel_Fdel.resize(neq + 1);
   nj_ws->ydel_Fdel[0] = nullptr;
   nj_ws->ydel_Fdel[1] = nj_ws->ydel_Fdel_data_vec.data();
-  for (int i = 2; i <= neq; i++)
+  for (int i = 2; i <= neq; i++) {
     nj_ws->ydel_Fdel[i] = nj_ws->ydel_Fdel[i - 1] + neq; /* Set row pointers... */
+  }
 
   nj_ws->logj.resize(neqp);
   nj_ws->Rowmax.resize(neqp);

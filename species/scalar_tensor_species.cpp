@@ -55,16 +55,19 @@ double ScalarTensorSpecies::BackgroundDensityOverH0Sq(double /*a*/, double /*H0*
 }
 
 std::optional<double> ScalarTensorSpecies::GetParam(const std::string& name) const {
-  if (name == "G_eff_today")
+  if (name == "G_eff_today") {
     return G_eff_today_;
-  if (name == "gamma_PPN_minus_1")
+  }
+  if (name == "gamma_PPN_minus_1") {
     return gamma_PPN_minus_1_;
+  }
   return std::nullopt;
 }
 
 std::vector<ShootingTarget> ScalarTensorSpecies::GetShootingTargets() const {
-  if (needs_shooting_)
+  if (needs_shooting_) {
     return {{"Omega_scalar_tensor", "Omega_Lambda_st", 0.}};
+  }
   return {};
 }
 
@@ -214,8 +217,9 @@ double ScalarTensorSpecies::SourceSamplingRate(const double* pvecback) const {
   /* phi'' = -lambda phi^3 (per unit cosmic time) oscillates with period 7.4163/(sqrt(lambda) A)
      at amplitude A, and the energy lambda A^4/4 = phi_dot^2/2 + lambda phi^4/4 gives A.
      Twice the frequency: twenty source samples per period. */
-  if (lambda_class_ <= 0.)
+  if (lambda_class_ <= 0.) {
     return 0.;
+  }
   const double a       = pvecback[bgm_->index_bg_a_];
   const double phi     = pvecback[index_bg_phi_];
   const double phi_dot = pvecback[index_bg_phi_prime_] / a;
@@ -467,8 +471,9 @@ void ScalarTensorSpecies::PrintVariables(PerturbColumnWriter& w,
 std::vector<Named> ScalarTensorSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
   const auto xi = ctx.pfc->get<double>("xi_st");
-  if (!xi)
+  if (!xi) {
     return result;
+  }
 
   const auto phi_ini = ctx.pfc->get<double>("phi_ini_st");
   class_test_severe(!phi_ini,
@@ -484,11 +489,14 @@ std::vector<Named> ScalarTensorSpecies::CreateAll(const SpeciesBuildContext& ctx
      gauge sources are refused by the perturbations module, which knows every route.) */
   auto key_has = [&](const char* key, std::initializer_list<const char*> needles) {
     const auto value = ctx.pfc->get<std::string>(key);
-    if (!value)
+    if (!value) {
       return false;
-    for (const char* needle : needles)
-      if (value->find(needle) != std::string::npos)
+    }
+    for (const char* needle : needles) {
+      if (value->find(needle) != std::string::npos) {
         return true;
+      }
+    }
     return false;
   };
   class_test_severe(key_has("gauge", {"new", "New"}),

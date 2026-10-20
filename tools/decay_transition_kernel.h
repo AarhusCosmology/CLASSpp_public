@@ -61,10 +61,12 @@ inline double EtaOf(double f, Statistics s) {
  *  summing to 1, or an eta built without EtaOf would break it silently. Re-clamping here
  *  would hide exactly that, which is why it is documented rather than defended. */
 inline double FOfEta(double eta, Statistics s) {
-  if (eta > kEtaMax)
+  if (eta > kEtaMax) {
     return 0.;
-  if (s == Statistics::Fermion)
+  }
+  if (s == Statistics::Fermion) {
     return 1. / (std::exp(eta < -kEtaMax ? -kEtaMax : eta) + 1.);
+  }
   // Boson: eta > 0 always (f finite), and eta -> 0 is f -> infinity.
   return 1. / (std::exp(eta < 1e-12 ? 1e-12 : eta) - 1.);
 }
@@ -804,8 +806,9 @@ class DecayTransitionKernel {
   double LumpTheta(double g, const double* w, int n, int j0, const double* f, double f_gath) const {
     // Nodes with g <= 0 are exempt: there the "loss" is a gain, its off-diagonal is
     // POSITIVE, and Metzler is satisfied by the exact split already.
-    if (!cfg_.lumped_loss || !(g > 0.))
+    if (!cfg_.lumped_loss || !(g > 0.)) {
       return 0.;
+    }
     // theta = 1 - H/A, the harmonic mean of the stencil over its arithmetic mean.
     // H <= A always (AM-HM), with equality iff the stencil is flat, so theta is in
     // [0,1] by construction and needs no clamp on physical input.
@@ -820,12 +823,14 @@ class DecayTransitionKernel {
     double S = 0.;
     for (int e = 0; e < n; ++e) {
       const double fe = f[j0 + e];
-      if (!(fe > 0.))
+      if (!(fe > 0.)) {
         return 1.;  // an exactly empty bin: lump fully, which is where positivity needs it
+      }
       S += w[e] / fe;
     }
-    if (!(S > 0.) || !(f_gath > 0.))
+    if (!(S > 0.) || !(f_gath > 0.)) {
       return 1.;
+    }
     const double r = 1. / (S * f_gath);  // H / A
     return r >= 1. ? 0. : (r <= 0. ? 1. : 1. - r);
   }
@@ -842,17 +847,20 @@ class DecayTransitionKernel {
    *  Returns 0 when the limiter is not the active scheme, where theta is constant. */
   double LumpDTheta(
       double g, const double* w, int n, int j0, const double* f, double f_gath, int e) const {
-    if (!cfg_.lumped_loss || !(g > 0.) || !(f_gath > 0.))
+    if (!cfg_.lumped_loss || !(g > 0.) || !(f_gath > 0.)) {
       return 0.;
+    }
     double S = 0.;
     for (int t = 0; t < n; ++t) {
       const double ft = f[j0 + t];
-      if (!(ft > 0.))
+      if (!(ft > 0.)) {
         return 0.;  // saturated at theta = 1, locally constant
+      }
       S += w[t] / ft;
     }
-    if (!(S > 0.))
+    if (!(S > 0.)) {
       return 0.;
+    }
     const double H  = 1. / S;
     const double fk = f[j0 + e];
     return (w[e] / f_gath) * (H / f_gath - H * H / (fk * fk));

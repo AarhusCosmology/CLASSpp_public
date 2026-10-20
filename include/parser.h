@@ -62,8 +62,9 @@ class FileContent {
   /** Read-with-default: get<T>(name) if present, else @p fallback. */
   template <class T>
   T get_or(const std::string& name, T fallback) const {
-    if (auto v = get<T>(name))
+    if (auto v = get<T>(name)) {
       return *v;
+    }
     return fallback;
   }
   /** Overload so a string-literal fallback does not deduce T = const char*. */
