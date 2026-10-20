@@ -34,48 +34,6 @@ import numpy as np
 cimport numpy as np
 import os
 import sys
-from cclassy cimport *
-
-cdef extern from "version.h":
-    const char* _VERSION_
-
-# The version CMake stamps into version.h from pyproject.toml, so the module and
-# the wheel metadata cannot disagree. Cobaya refuses a classy without it.
-__version__ = _VERSION_.decode("utf-8")
-
-cdef ClassConstants constvals
-
-# Derived parameters of the form "<species key>.<field>", served by
-# BackgroundModule::GetSpeciesParam (the species answers through its GetParam
-# override, or generically from the background table). GetSpeciesParam reports
-# an unanswered name as 0.0, which is indistinguishable from a value, so a
-# request is refused unless all three of these hold: the field is listed below,
-# HasSpecies() knows the species key, and HasSpeciesParam() says that species
-# answers that field.
-#   f_peak, a_peak, z_peak  -- any species: peak of rho/rho_crit(a) and where it
-#                              sits. For an early-dark-energy species (the
-#                              pheno_axion fluid, or an axion scalar field) this
-#                              is f_EDE and its peak location.
-#   a_c, n_axion, m_fld, alpha_fld, omega_axion -- pheno-axion fluid scales.
-#   alpha, q0, x, M_2, M_3, M_4                 -- greybody NCDM shape/moments.
-#   z_star                                      -- redshift of the NEDE transition.
-#   G_eff_today, gamma_PPN_minus_1              -- scalar-tensor: Cavendish Newton constant
-#                                                  over the action's, and gamma_PPN - 1,
-#                                                  today, for a massless field.
-_SPECIES_DERIVED_FIELDS = frozenset((
-    'f_peak', 'a_peak', 'z_peak',
-    'a_c', 'n_axion', 'm_fld', 'alpha_fld', 'omega_axion',
-    'alpha', 'q0', 'x', 'M_2', 'M_3', 'M_4',
-    'z_star',
-    'G_eff_today', 'gamma_PPN_minus_1',
-))
-
-# Nils : Added for python 3.x and python 2.x compatibility
-cdef viewdictitems(dict d):
-    if sys.version_info >= (3,0):
-        return d.items()
-    else:
-        return d.viewitems()
 
 # Implement a specific Exception (this might not be optimally designed, nor
 # even acceptable for python standards. It, however, does the job).
@@ -134,23 +92,52 @@ cdef int raise_my_py_error() except *:
         # abort loudly rather than surfacing a misleading NotImplementedError.
         raise CosmoSevereError(cpp_exception.second)
 
-cdef reraise_as_cosmo_error(exc):
-    """Say which kind of error a module method threw.
+# The declarations generate_wrapper.py harvests from the C++ headers. Every
+# function among them carries `except +raise_my_py_error`, and Cython looks an
+# exception handler up where the function is declared, so they are included
+# into this module after the handler, not cimported from a .pxd of their own.
+include "cclassy.pxi"
 
-    Only the Cosmology getters declared below carry `except +raise_my_py_error`.
-    The module methods harvested into cclassy.pxd carry a plain `except +`, so a
-    C++ throw arrives here as ValueError (std::invalid_argument, i.e. severe) or
-    RuntimeError (std::runtime_error, i.e. reject this point). Callers key on the
-    wrapper's own two types -- Cobaya aborts on one and rejects on the other --
-    so the boundary has to restate which it was. Teaching generate_wrapper.py to
-    emit the handler for every harvested method would fix this everywhere; until
-    then, translate where it matters.
-    """
-    if isinstance(exc, ValueError):
-        raise CosmoSevereError(str(exc)) from exc
-    if isinstance(exc, RuntimeError):
-        raise CosmoComputationError(str(exc)) from exc
-    raise exc
+cdef extern from "version.h":
+    const char* _VERSION_
+
+# The version CMake stamps into version.h from pyproject.toml, so the module and
+# the wheel metadata cannot disagree. Cobaya refuses a classy without it.
+__version__ = _VERSION_.decode("utf-8")
+
+cdef ClassConstants constvals
+
+# Derived parameters of the form "<species key>.<field>", served by
+# BackgroundModule::GetSpeciesParam (the species answers through its GetParam
+# override, or generically from the background table). GetSpeciesParam reports
+# an unanswered name as 0.0, which is indistinguishable from a value, so a
+# request is refused unless all three of these hold: the field is listed below,
+# HasSpecies() knows the species key, and HasSpeciesParam() says that species
+# answers that field.
+#   f_peak, a_peak, z_peak  -- any species: peak of rho/rho_crit(a) and where it
+#                              sits. For an early-dark-energy species (the
+#                              pheno_axion fluid, or an axion scalar field) this
+#                              is f_EDE and its peak location.
+#   a_c, n_axion, m_fld, alpha_fld, omega_axion -- pheno-axion fluid scales.
+#   alpha, q0, x, M_2, M_3, M_4                 -- greybody NCDM shape/moments.
+#   z_star                                      -- redshift of the NEDE transition.
+#   G_eff_today, gamma_PPN_minus_1              -- scalar-tensor: Cavendish Newton constant
+#                                                  over the action's, and gamma_PPN - 1,
+#                                                  today, for a massless field.
+_SPECIES_DERIVED_FIELDS = frozenset((
+    'f_peak', 'a_peak', 'z_peak',
+    'a_c', 'n_axion', 'm_fld', 'alpha_fld', 'omega_axion',
+    'alpha', 'q0', 'x', 'M_2', 'M_3', 'M_4',
+    'z_star',
+    'G_eff_today', 'gamma_PPN_minus_1',
+))
+
+# Nils : Added for python 3.x and python 2.x compatibility
+cdef viewdictitems(dict d):
+    if sys.version_info >= (3,0):
+        return d.items()
+    else:
+        return d.viewitems()
 
 cdef extern from "cosmology.h":
     ctypedef shared_ptr[const InputModule] InputModulePtr
@@ -602,30 +589,18 @@ cdef class PyCosmology:
     cdef general_cl(self, int lmax, bool is_lensed):
         cdef:
             dict out_dict
-            int lmax_computed
             int lmaxpp
             map[string, vector[double]] cl_data
 
-        if self.pt().has_cls == constvals.sFALSE:
-            raise CosmoSevereError("No Cls computed")
-
         if is_lensed:
             le = deref(self._cosmo()).GetLensingModule()
-            lmax_computed = deref(le).l_lensed_max_
             if lmax == -1:
-                lmax = lmax_computed
-            if self.le().has_lensed_cls == constvals.sFALSE:
-                raise CosmoSevereError("Lensing Cls not computed, add 'lensing':'yes' to your input.")
-            if lmax > lmax_computed:
-                raise CosmoSevereError("Can only compute up to lmax=%d"%lmax_computed)
+                lmax = deref(le).l_lensed_max_
             cl_data = deref(le).cl_output(lmax)
         else:
             sp = deref(self._cosmo()).GetSpectraModule()
-            lmax_computed = deref(sp).l_max_tot_
             if lmax == -1:
-                lmax = lmax_computed
-            if lmax > lmax_computed:
-                raise CosmoSevereError("Can only compute up to lmax=%d"%lmax_computed)
+                lmax = deref(sp).l_max_tot_
             cl_data = deref(sp).cl_output(lmax)
         lmaxpp = lmax + 1
 
@@ -642,16 +617,12 @@ cdef class PyCosmology:
             dict out_dict
             double[::1] double_view
             int ct_size
-            int lmax_computed
             map[string, int] index_map
             vector[double*] output_pointers
 
         sp = deref(self._cosmo()).GetSpectraModule()
-        lmax_computed = deref(sp).l_max_tot_
         if lmax == -1:
-            lmax = lmax_computed
-        if lmax > lmax_computed:
-            raise CosmoSevereError("Can only compute up to lmax=%d"%lmax_computed)
+            lmax = deref(sp).l_max_tot_
 
         ct_size = deref(sp).ct_size_
         index_map = deref(sp).cl_output_index_map()
@@ -748,31 +719,9 @@ cdef class PyCosmology:
             return pk_linear
         return pk_nonlinear
 
-    cdef int _index_pk_m(self) except -1:
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return deref(nonlinear_module).index_pk_m_
-
-    cdef int _index_pk_cb(self) except -1:
-        """Index of the cdm+b P(k), which exists only alongside warm matter."""
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        if not deref(nonlinear_module).has_pk_cb_:
-            raise CosmoSevereError("P_cb not computed (probably because there are no massive neutrinos) so you cannot ask for it")
-        return deref(nonlinear_module).index_pk_cb_
-
-    cdef int _index_pk_cluster(self) except -1:
-        """Index of the P(k) galaxies cluster in: cdm+b where that differs from
-        the total matter, otherwise the total matter itself."""
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        if deref(nonlinear_module).has_pk_cb_:
-            return deref(nonlinear_module).index_pk_cb_
-        return deref(nonlinear_module).index_pk_m_
-
     cdef pk_general(self, double k, double z, int index_pk, pk_outputs linear_or_nonlinear):
         cdef:
             double pk
-
-        if (self.pt().has_pk_matter == constvals.sFALSE):
-            raise CosmoSevereError("Power spectrum not computed. You must add mPk to the list of outputs.")
 
         nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
         deref(nonlinear_module).nonlinear_pk_at_k_and_z(linear_or_nonlinear, k, z, index_pk, &pk, NULL)
@@ -788,7 +737,8 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        return self.pk_general(k, z, self._index_pk_m(), self._pk_output_default())
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.pk_general(k, z, deref(nonlinear_module).index_pk_m_, self._pk_output_default())
 
     # Gives the cdm+b pk for a given (k,z)
     cpdef pk_cb(self, double k, double z):
@@ -801,7 +751,8 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        return self.pk_general(k, z, self._index_pk_cb(), self._pk_output_default())
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.pk_general(k, z, deref(nonlinear_module).index_pk_cluster_, self._pk_output_default())
 
     # Gives the total matter pk for a given (k,z)
     cpdef pk_lin(self, double k, double z):
@@ -814,7 +765,8 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        return self.pk_general(k, z, self._index_pk_m(), pk_linear)
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.pk_general(k, z, deref(nonlinear_module).index_pk_m_, pk_linear)
 
     # Gives the cdm+b pk for a given (k,z)
     cpdef pk_cb_lin(self,double k,double z):
@@ -827,7 +779,8 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        return self.pk_general(k, z, self._index_pk_cb(), pk_linear)
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.pk_general(k, z, deref(nonlinear_module).index_pk_cluster_, pk_linear)
 
     cdef get_pk_general(self, double[:,:,::1] k, double[::1] z, Py_ssize_t k_size, Py_ssize_t z_size, Py_ssize_t mu_size, Py_ssize_t index_pk, pk_outputs linear_or_nonlinear):
         cdef:
@@ -836,9 +789,6 @@ cdef class PyCosmology:
             Py_ssize_t index_mu
             double pk_val
             double[:,:,::1] pk
-
-        if (self.pt().has_pk_matter == constvals.sFALSE):
-            raise CosmoSevereError("Power spectrum not computed. You must add mPk to the list of outputs.")
 
         pk_arr = np.empty((k_size, z_size, mu_size), np.double)
         pk = pk_arr
@@ -853,19 +803,23 @@ cdef class PyCosmology:
 
     cpdef get_pk(self, double[:,:,::1] k, double[::1] z, Py_ssize_t k_size, Py_ssize_t z_size, Py_ssize_t mu_size):
         """ Fast function to get the power spectrum on a k and z array """
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_m(), self._pk_output_default())
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_m_, self._pk_output_default())
 
     cpdef get_pk_cb(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the power spectrum on a k and z array """
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_cb(), self._pk_output_default())
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_cluster_, self._pk_output_default())
 
     cpdef get_pk_lin(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the linear power spectrum on a k and z array """
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_m(), pk_linear)
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_m_, pk_linear)
 
     cpdef get_pk_cb_lin(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the linear power spectrum on a k and z array """
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._index_pk_cb(), pk_linear)
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_cluster_, pk_linear)
 
     def _z_grid_for_output(self):
         """The redshifts P(k,z) and T_i(k,z) are tabulated at, decreasing to 0.
@@ -880,11 +834,6 @@ cdef class PyCosmology:
 
         perturbations_module = deref(self._cosmo()).GetPerturbationsModule()
         ln_tau_size = deref(perturbations_module).ln_tau_size_
-
-        if ln_tau_size == 1:
-            raise CosmoSevereError(
-                "The output was stored at z=0 only, so there is no redshift grid to return. Pass "
-                "either a list of redshifts in 'z_pk' or one non-zero value in 'z_max_pk'.")
 
         z = np.empty(ln_tau_size, np.double)
         for index_tau in range(ln_tau_size - 1):
@@ -921,13 +870,12 @@ cdef class PyCosmology:
         cdef int index_pk
 
         pk_output = pk_nonlinear if nonlinear else pk_linear
-        index_pk = self._index_pk_cluster() if only_clustering_species else self._index_pk_m()
-
         nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        try:
-            deref(nonlinear_module).GetPkGrid(pk_output, index_pk, k_vector, pk_vector)
-        except (ValueError, RuntimeError) as error:
-            reraise_as_cosmo_error(error)
+        if only_clustering_species:
+            index_pk = deref(nonlinear_module).index_pk_cluster_
+        else:
+            index_pk = deref(nonlinear_module).index_pk_m_
+        deref(nonlinear_module).GetPkGrid(pk_output, index_pk, k_vector, pk_vector)
 
         z = self._z_grid_for_output()
         k = np.asarray(<double[:k_vector.size()]> k_vector.data()).copy()
@@ -1042,6 +990,9 @@ cdef class PyCosmology:
     cdef double sigma_general(self, double R, double z, int index_pk, bint h_units) except? -1.:
         cdef double sigma
 
+        # Not NonlinearModule::nonlinear_sigmas_at_z's to refuse: the module also
+        # calls it for sigma8 in runs without mPk (halofit for lensing) and
+        # with any P_k_max.
         if self.pt().has_pk_matter == constvals.sFALSE:
             raise CosmoSevereError("Power spectrum not computed. In order to get sigma(R, z) you must add mPk to the list of outputs.")
         if self.pt().k_max_for_pk < self.ba().h:
@@ -1070,7 +1021,8 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        return self.sigma_general(R, z, self._index_pk_m(), h_units)
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.sigma_general(R, z, deref(nonlinear_module).index_pk_m_, h_units)
 
     # Gives sigma(R, z) for a given (R, z)
     cpdef sigma_cb(self, double R, double z, bint h_units=False):
@@ -1087,7 +1039,8 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        return self.sigma_general(R, z, self._index_pk_cb(), h_units)
+        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
+        return self.sigma_general(R, z, deref(nonlinear_module).index_pk_cluster_, h_units)
 
     def effective_f_sigma8(self, z, z_step=0.1):
         """
@@ -1129,22 +1082,10 @@ cdef class PyCosmology:
             there is an additional check to verify whether output contains `mPk` and whether k is in the right range
 
         """
-        cdef:
-            double ln_k
-            double pk_tilt
-            int index_pk_m
-            int k_size
-
-        if (self.pt().has_pk_matter == constvals.sFALSE):
-            raise CosmoSevereError("Power spectrum not computed. In order to get pk_tilt(k, z) you must add mPk to the list of outputs.")
+        cdef double pk_tilt
 
         nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        ln_k = log(k)
-        k_size = deref(nonlinear_module).k_size_
-        index_pk_m = deref(nonlinear_module).index_pk_m_
-        if (k_size < 2 or not (deref(nonlinear_module).ln_k_[1] <= ln_k <= deref(nonlinear_module).ln_k_[k_size - 2])):
-            raise CosmoSevereError("In order to get pk_tilt at k=%e 1/Mpc, you should compute P(k,z) in a wider range of k's"%k)
-        deref(nonlinear_module).nonlinear_pk_tilt_at_k_and_z(pk_linear, k, z, index_pk_m, &pk_tilt)
+        deref(nonlinear_module).nonlinear_pk_tilt_at_k_and_z(pk_linear, k, z, deref(nonlinear_module).index_pk_m_, &pk_tilt)
         return pk_tilt
 
 
@@ -1219,16 +1160,12 @@ cdef class PyCosmology:
         return deref(bam).a_eq_*deref(bam).H_eq_
 
     cpdef sigma8(self):
-        cdef int index_pk_m
         nlm = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_m = deref(nlm).index_pk_m_
-        return deref(nlm).sigma8_[index_pk_m]
+        return deref(nlm).GetSigma8(deref(nlm).index_pk_m_)
 
     cpdef sigma8_cb(self):
-        cdef int index_pk_cb
         nlm = deref(self._cosmo()).GetNonlinearModule()
-        index_pk_cb = deref(nlm).index_pk_cb_
-        return deref(nlm).sigma8_[index_pk_cb]
+        return deref(nlm).GetSigma8(deref(nlm).index_pk_cluster_)
 
     cpdef rs_drag(self):
         thm = deref(self._cosmo()).GetThermodynamicsModule()
@@ -2189,8 +2126,11 @@ cdef class PyCosmology:
         pk_cb = pk_cb_arr
 
         nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        deref(nonlinear_module).nonlinear_pks_at_kvec_and_zvec(pk_linear, &k[0], k_size, &z[0], z_size, &pk[0],  &pk_cb[0])
+        deref(nonlinear_module).nonlinear_pks_at_kvec_and_zvec(linear_or_nonlinear, &k[0], k_size, &z[0], z_size, &pk[0], &pk_cb[0])
 
+        if not deref(nonlinear_module).has_pk_cb_:
+            # The module stores P_cb apart only when it differs from P_m.
+            pk_cb_arr = pk_arr
         return pk_arr, pk_cb_arr
 
     cpdef get_pk_array(self, double[::1] k,  double[::1] z, int k_size, int z_size, nonlinear):

@@ -37,19 +37,19 @@ class SpectraModule : public BaseModule {
 
   //@{
 
-  bool has_tt_; /**< do we want \f$ C_l^{TT}\f$? (T = temperature) */
-  bool has_ee_; /**< do we want \f$ C_l^{EE}\f$? (E = E-polarization) */
-  bool has_te_; /**< do we want \f$ C_l^{TE}\f$? */
-  bool has_bb_; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
-  bool has_pp_; /**< do we want \f$ C_l^{\phi\phi}\f$? (\f$ \phi \f$ = CMB lensing potential) */
-  bool has_tp_; /**< do we want \f$ C_l^{T\phi}\f$? */
-  bool has_ep_; /**< do we want \f$ C_l^{E\phi}\f$? */
-  bool has_dd_; /**< do we want \f$ C_l^{dd}\f$? (d = density) */
-  bool has_td_; /**< do we want \f$ C_l^{Td}\f$? */
-  bool has_pd_; /**< do we want \f$ C_l^{\phi d}\f$? */
-  bool has_ll_; /**< do we want \f$ C_l^{ll}\f$? (l = galaxy lensing potential) */
-  bool has_tl_; /**< do we want \f$ C_l^{Tl}\f$? */
-  bool has_dl_; /**< do we want \f$ C_l^{dl}\f$? */
+  bool has_tt_ = false; /**< do we want \f$ C_l^{TT}\f$? (T = temperature) */
+  bool has_ee_ = false; /**< do we want \f$ C_l^{EE}\f$? (E = E-polarization) */
+  bool has_te_ = false; /**< do we want \f$ C_l^{TE}\f$? */
+  bool has_bb_ = false; /**< do we want \f$ C_l^{BB}\f$? (B = B-polarization) */
+  bool has_pp_ = false; /**< do we want \f$ C_l^{\phi\phi}\f$? (CMB lensing potential) */
+  bool has_tp_ = false; /**< do we want \f$ C_l^{T\phi}\f$? */
+  bool has_ep_ = false; /**< do we want \f$ C_l^{E\phi}\f$? */
+  bool has_dd_ = false; /**< do we want \f$ C_l^{dd}\f$? (d = density) */
+  bool has_td_ = false; /**< do we want \f$ C_l^{Td}\f$? */
+  bool has_pd_ = false; /**< do we want \f$ C_l^{\phi d}\f$? */
+  bool has_ll_ = false; /**< do we want \f$ C_l^{ll}\f$? (l = galaxy lensing potential) */
+  bool has_tl_ = false; /**< do we want \f$ C_l^{Tl}\f$? */
+  bool has_dl_ = false; /**< do we want \f$ C_l^{dl}\f$? */
 
   int index_ct_tt_; /**< index for type \f$ C_l^{TT} \f$*/
   int index_ct_ee_; /**< index for type \f$ C_l^{EE} \f$*/
@@ -65,8 +65,8 @@ class SpectraModule : public BaseModule {
   int index_ct_tl_; /**< first index for type \f$ C_l^{Tl} \f$(d_size values) */
   int index_ct_dl_; /**< first index for type \f$ C_l^{dl} \f$(d_size values) */
 
-  int ct_size_; /**< number of \f$ C_l \f$ types requested */
-  int d_size_;  /**< number of bins for which density Cl's are computed */
+  int ct_size_ = 0; /**< number of \f$ C_l \f$ types requested */
+  int d_size_  = 0; /**< number of bins for which density Cl's are computed */
   //@}
 
   int l_size_max_;                         /**< greatest of all l_size[index_md] */
@@ -81,7 +81,7 @@ class SpectraModule : public BaseModule {
                      l[index_md][l_size[index_md]-1] can be larger
                      than l_max[index_md], in order to ensure a
                      better interpolation with no boundary effects */
-  int l_max_tot_;                          /**< last multipole (given as an input) at which
+  int l_max_tot_ = 0;                      /**< last multipole (given as an input) at which
                     we want to output \f$ C_l\f$'s (maximized over modes and types);
                     l[index_md][l_size[index_md]-1] can be larger
                     than l_max[index_md], in order to ensure a

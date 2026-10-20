@@ -152,6 +152,11 @@ void NonlinearModule::nonlinear_pk_at_z(
   int last_index;
   short do_ic = false;
 
+  /* ln_pk_nl_ is allocated only when a non-linear method runs */
+  class_test_severe((pk_output == pk_nonlinear) && (pnl->method == nl_none),
+                    "A non-linear P(k) was requested, but no non-linear method was asked for. Add "
+                    "e.g. 'halofit' or 'HMcode' to 'non_linear'.");
+
   /** - check whether we need the decomposition into contributions from each initial condition */
 
   if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
@@ -412,6 +417,9 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
   std::vector<double> out_pk_ic_at_z;
   short do_ic = false;
 
+  class_test_severe(!ppt->has_pk_matter,
+                    "No power spectrum was computed. Add 'mPk' to the list of outputs.");
+
   /** - preliminary: check whether we need the decomposition into contributions from each initial condition */
 
   if ((pk_output == pk_linear) && (ic_size_ > 1) && (out_pk_ic != nullptr))
@@ -650,6 +658,9 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
   std::vector<double> ddln_pk_cb_table;
   double h, a, b;
 
+  class_test_severe(!ppt->has_pk_matter,
+                    "No power spectrum was computed. Add 'mPk' to the list of outputs.");
+
   /** - Allocate arrays */
 
   ln_kvec.resize(kvec_size);
@@ -674,7 +685,7 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
                         &ln_pk_table[index_zvec * k_size_],
                         nullptr);
     }
-    if (has_pk_m_) {
+    if (has_pk_cb_) {
       nonlinear_pk_at_z(logarithmic,
                         pk_output,
                         zvec[index_zvec],
@@ -858,6 +869,24 @@ void NonlinearModule::GetPkGrid(enum pk_outputs pk_output,
 }
 
 /**
+ * Return sigma8 (linear, z=0) for a given pk type (_m, _cb).
+ *
+ * The module computes P_m whenever it runs, which is for 'mPk' and also for a
+ * non-linear method alone (halofit for lensing). So has_pk_m_, not
+ * ppt->has_pk_matter, says whether sigma8 exists.
+ *
+ * @param index_pk    Input: index of pk type (_m, _cb)
+ * @return sigma8
+ */
+
+double NonlinearModule::GetSigma8(int index_pk) const {
+  class_test_severe(!has_pk_m_,
+                    "sigma8 needs the matter power spectrum, which was not computed. Add 'mPk' to "
+                    "the list of outputs.");
+  return sigma8_[index_pk];
+}
+
+/**
  * Return the logarithmic slope of P(k,z) for a given (k,z), a given pk type (_m, _cb)
  * (computed with linear P_L if pk_output = pk_linear, nonlinear P_NL if pk_output = pk_nonlinear)
  *
@@ -872,6 +901,17 @@ void NonlinearModule::nonlinear_pk_tilt_at_k_and_z(
     enum pk_outputs pk_output, double k, double z, int index_pk, double* pk_tilt) const {
   double dlnk;
   double out_pk1, out_pk2;
+
+  class_test_severe(!ppt->has_pk_matter,
+                    "No power spectrum was computed. Add 'mPk' to the list of outputs.");
+
+  /* the two points of the finite difference below must both lie in the table */
+  class_test_severe((log(k) < ln_k_[1]) || (log(k) > ln_k_[k_size_ - 2]),
+                    "k=%e 1/Mpc is outside [%e, %e], where the tilt can be taken. Compute P(k,z) "
+                    "on a wider range of k.",
+                    k,
+                    exp(ln_k_[1]),
+                    exp(ln_k_[k_size_ - 2]));
 
   /* typical step dln(k) on which we believe that out results are not
      dominated by numerical errors and that the P(k,z) is slowly

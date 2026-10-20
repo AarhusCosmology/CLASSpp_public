@@ -2292,6 +2292,87 @@ class TestCobayaCompatibility(unittest.TestCase):
             Class({'output': 'mPk', 'non_linear': 'halofit',
                    'non linear': 'hmcode'})
 
+    # Cobaya rejects the point on CosmoComputationError and aborts the run on
+    # CosmoSevereError, so a module method that throws must arrive as one of
+    # the two, not as the ValueError/RuntimeError of a plain `except +`.
+
+    def test_numeric_failure_in_a_module_method_rejects_the_point(self):
+        # class_test (std::runtime_error) in NonlinearModule::nonlinear_pk_at_k_and_z
+        cosmo = Class({'output': 'mPk', 'P_k_max_1/Mpc': 1.0})
+        try:
+            with self.assertRaises(CosmoComputationError):
+                cosmo.pk(100.0, 0.0)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_structural_failure_in_a_module_method_is_severe(self):
+        # class_test_severe (std::invalid_argument) in LensingModule::cl_output
+        cosmo = Class({'output': 'tCl,lCl', 'lensing': 'yes',
+                       'l_max_scalars': 300})
+        try:
+            with self.assertRaises(CosmoSevereError):
+                cosmo.lensed_cl(-5)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+
+class TestQueriesTheRunCannotAnswer(unittest.TestCase):
+    """Asking for something the run did not compute is a CosmoSevereError.
+
+    The C++ method refuses, and its exception crosses into Python with its
+    severity intact, so the wrapper needs no guard of its own. Without the C++
+    check these reads index empty tables.
+    """
+
+    COSMOLOGIES = {
+        'no_pk': {'output': 'tCl', 'l_max_scalars': 300},
+        'pk': {'output': 'mPk', 'P_k_max_1/Mpc': 1.0},
+        'lensed': {'output': 'tCl,lCl', 'lensing': 'yes', 'l_max_scalars': 300},
+        'halofit_for_lensing': {'output': 'tCl,lCl', 'lensing': 'yes', 'non_linear': 'halofit',
+                                'l_max_scalars': 300},
+        'sigma8_input_no_pk': {'output': 'tCl', 'sigma8': 0.8, 'l_max_scalars': 300},
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cosmo = {name: Class(params) for name, params in cls.COSMOLOGIES.items()}
+
+    @classmethod
+    def tearDownClass(cls):
+        for cosmo in cls.cosmo.values():
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    @parameterized.expand([
+        ('pk_without_mPk', 'no_pk', lambda c: c.pk(0.1, 0.)),
+        ('pk_grid_without_mPk', 'no_pk',
+         lambda c: c.get_pk(np.full((1, 1, 1), 0.1), np.zeros(1), 1, 1, 1)),
+        ('sigma_without_mPk', 'no_pk', lambda c: c.sigma(8., 0.)),
+        ('sigma8_without_mPk', 'no_pk', lambda c: c.sigma8()),
+        ('sigma8_cb_without_mPk', 'no_pk', lambda c: c.sigma8_cb()),
+        ('sigma8_input_without_mPk', 'sigma8_input_no_pk', lambda c: c.A_s()),
+        ('non_linear_pk_array_without_a_method', 'pk',
+         lambda c: c.get_pk_array(np.array([0.1]), np.zeros(1), 1, 1, 1)),
+        ('pk_tilt_without_mPk', 'no_pk', lambda c: c.pk_tilt(0.1, 0.)),
+        ('pk_tilt_beyond_the_k_table', 'pk', lambda c: c.pk_tilt(100., 0.)),
+        ('raw_cl_without_Cls', 'pk', lambda c: c.raw_cl()),
+        ('raw_cl_no_copy_without_Cls', 'pk', lambda c: c.raw_cl_no_copy()),
+        ('lensed_cl_without_Cls', 'pk', lambda c: c.lensed_cl()),
+        ('lensed_cl_without_lensing', 'no_pk', lambda c: c.lensed_cl()),
+        ('raw_cl_above_l_max', 'lensed', lambda c: c.raw_cl(801)),
+        ('raw_cl_no_copy_above_l_max', 'lensed', lambda c: c.raw_cl_no_copy(801)),
+        ('lensed_cl_above_l_max', 'lensed', lambda c: c.lensed_cl(301)),
+    ])
+    def test_is_severe(self, name, cosmology, query):
+        with self.assertRaises(CosmoSevereError):
+            query(self.cosmo[cosmology])
+
+    def test_sigma8_needs_a_matter_spectrum_not_the_mPk_output(self):
+        # Halofit for lensing computes P_m, and sigma8 with it, without 'mPk'.
+        self.assertGreater(self.cosmo['halofit_for_lensing'].sigma8(), 0.)
+
 
 LSS_BASE = {
     'omega_b': 0.02237,
@@ -2403,6 +2484,46 @@ class TestLargeScaleStructureProducts(unittest.TestCase):
                     clustering[ik, -1] / cosmo.pk_cb_lin(k[ik], z[-1]), 1.0, places=10)
             # free-streaming neutrinos suppress the total spectrum below P_cb
             self.assertGreater(clustering[-2, -1] / total[-2, -1], 1.01)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_get_pk_array_follows_its_nonlinear_argument(self):
+        cosmo = Class(dict(LSS_BASE, output='mPk', non_linear='halofit'))
+        k, z = np.array([0.01, 0.1, 1.0]), np.array([0., 0.5])
+        try:
+            for nonlinear, pk in ((0, cosmo.pk_lin), (1, cosmo.pk)):
+                with self.subTest(nonlinear=nonlinear):
+                    np.testing.assert_allclose(
+                        cosmo.get_pk_array(k, z, len(k), len(z), nonlinear),
+                        [pk(k_i, z_j) for z_j in z for k_i in k], rtol=1e-3)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_cb_spectra_without_warm_matter_are_the_total_matter_spectra(self):
+        # delta_cb is the cold part of delta_m, so without warm matter the two
+        # are one spectrum, which the module stores once, as P_m.
+        cosmo = Class(dict(LSS_BASE, output='mPk', non_linear='halofit'))
+        k, z = 0.1, 0.5
+        k_grid, z_grid = np.full((1, 1, 1), k), np.full(1, z)
+        k_vec, z_vec = np.array([0.01, 0.1, 1.0]), np.array([0., 0.5])
+        pairs = {
+            'pk': (lambda c: c.pk_cb(k, z), lambda c: c.pk(k, z)),
+            'pk_lin': (lambda c: c.pk_cb_lin(k, z), lambda c: c.pk_lin(k, z)),
+            'get_pk': (lambda c: c.get_pk_cb(k_grid, z_grid, 1, 1, 1),
+                       lambda c: c.get_pk(k_grid, z_grid, 1, 1, 1)),
+            'get_pk_lin': (lambda c: c.get_pk_cb_lin(k_grid, z_grid, 1, 1, 1),
+                           lambda c: c.get_pk_lin(k_grid, z_grid, 1, 1, 1)),
+            'get_pk_array': (lambda c: c.get_pk_cb_array(k_vec, z_vec, 3, 2, 0),
+                             lambda c: c.get_pk_array(k_vec, z_vec, 3, 2, 0)),
+            'sigma': (lambda c: c.sigma_cb(8., z), lambda c: c.sigma(8., z)),
+            'sigma8': (lambda c: c.sigma8_cb(), lambda c: c.sigma8()),
+        }
+        try:
+            for name, (cb, m) in pairs.items():
+                with self.subTest(name):
+                    np.testing.assert_array_equal(cb(cosmo), m(cosmo))
         finally:
             cosmo.struct_cleanup()
             cosmo.empty()

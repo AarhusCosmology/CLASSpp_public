@@ -64,17 +64,7 @@ PrimordialModulePtr& Cosmology::GetPrimordialModule() {
           new PrimordialModule(GetInputModule(), GetPerturbationsModule()));
       auto nl =
           NonlinearModule(GetInputModule(), GetBackgroundModule(), GetPerturbationsModule(), pm);
-      double sigma8 = 0;
-      if (nl.has_pk_m_) {
-        sigma8 = nl.sigma8_[nl.index_pk_m_];
-      }
-      else if (nl.has_pk_cb_) {
-        sigma8 = nl.sigma8_[nl.index_pk_cb_];
-      }
-      else {
-        throw std::invalid_argument(
-            "No valid power spectrum found in nonlinear module for calculating sigma8.");
-      }
+      const double sigma8 = nl.GetSigma8(nl.index_pk_m_);
       const_cast<primordial*>(&GetInputModule()->primordial_)->A_s *=
           pow(GetInputModule()->primordial_.sigma8 / sigma8, 2);
     }

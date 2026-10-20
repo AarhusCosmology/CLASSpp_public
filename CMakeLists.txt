@@ -317,7 +317,7 @@ endif()
 if(CLASS_BUILD_PYTHON)
   find_package(Python REQUIRED COMPONENTS Interpreter Development.Module NumPy)
 
-  # 1) cclassy.pxd, generated from the C++ headers into the build dir.
+  # 1) cclassy.pxi, generated from the C++ headers into the build dir.
   file(GLOB _class_wrapper_headers CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/include/*.h
     ${PROJECT_SOURCE_DIR}/main/*.h
@@ -326,17 +326,17 @@ if(CLASS_BUILD_PYTHON)
     ${PROJECT_SOURCE_DIR}/tools/*.h
   )
   add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxd
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxi
     COMMAND Python::Interpreter ${PROJECT_SOURCE_DIR}/generate_wrapper.py
             --output-dir ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ${PROJECT_SOURCE_DIR}/generate_wrapper.py ${_class_wrapper_headers}
-    COMMENT "Generating cclassy.pxd"
+    COMMENT "Generating cclassy.pxi"
     VERBATIM
   )
 
   # 2) Cython transpile. Cython derives the module name (PyInit_*) from the
   #    source filename, so stage classy.pyx in the build dir under the
-  #    requested module name. (cclassy.pxd is found via -I <build dir>.)
+  #    requested module name. (cclassy.pxi is found via -I <build dir>.)
   set(_class_pyx ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME}.pyx)
   add_custom_command(
     OUTPUT ${_class_pyx}
@@ -351,7 +351,7 @@ if(CLASS_BUILD_PYTHON)
             -I ${CMAKE_CURRENT_BINARY_DIR}
             -o ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME}.cpp
             ${_class_pyx}
-    DEPENDS ${_class_pyx} ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxd
+    DEPENDS ${_class_pyx} ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxi
     COMMENT "Cythonizing ${CLASS_PYTHON_MODULE_NAME}.pyx"
     VERBATIM
   )

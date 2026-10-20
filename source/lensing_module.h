@@ -16,8 +16,8 @@ class LensingModule : public BaseModule {
   std::map<std::string, std::vector<double>> cl_output_computed() const;
   void lensing_cl_at_l(int l, double* cl_lensed) const;
 
-  int l_unlensed_max_; /**< last multipole in all calculations (same as in spectra module)*/
-  int l_lensed_max_;   /**< last multipole at which lensed spectra are computed */
+  int l_unlensed_max_;   /**< last multipole in all calculations (same as in spectra module)*/
+  int l_lensed_max_ = 0; /**< last multipole at which lensed spectra are computed */
 
  private:
   void lensing_init();

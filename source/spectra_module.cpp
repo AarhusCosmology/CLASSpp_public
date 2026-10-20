@@ -98,6 +98,7 @@ std::map<std::string, int> SpectraModule::cl_output_index_map() const {
 }
 
 void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_pointers) const {
+  class_test_severe(!ppt->has_cls, "Error: Cls have not been computed! lmax = %d\n", lmax);
   class_test_severe((lmax > l_max_tot_) || (lmax < 0),
                     "Error: lmax = %d is outside the allowed range [0, %d]\n",
                     lmax,

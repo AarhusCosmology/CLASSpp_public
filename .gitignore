@@ -33,6 +33,7 @@ dist/
 *.bat
 main/class.c
 cclassy.pxd
+cclassy.pxi
 
 # Symlinks for local in-source development (created by: mkdir -p classy && ln -sf ../bbn classy/bbn && ln -sf ../hyrec classy/hyrec)
 classy/

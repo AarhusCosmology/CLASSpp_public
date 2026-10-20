@@ -56,6 +56,7 @@ class NonlinearModule : public BaseModule {
                  int index_pk,
                  std::vector<double>& k,
                  std::vector<double>& pk) const;
+  double GetSigma8(int index_pk) const;
   void nonlinear_sigmas_at_z(
       double R, double z, int index_pk, enum out_sigmas sigma_output, double* result) const;
   void nonlinear_pk_tilt_at_k_and_z(
@@ -76,11 +77,21 @@ class NonlinearModule : public BaseModule {
       is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
   int ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
   int ic_ic_size_; /**< for a given mode, ic_ic_size[index_md] = number of pairs of (index_ic1, index_ic2) with index_ic2 >= index_ic1; this number is just N(N+1)/2  where N = ic_size[index_md] */
-  bool has_pk_m_;  /**< do we want spectra for total matter? */
-  bool has_pk_cb_; /**< do we want spectra for cdm+baryons? */
+  bool has_pk_m_  = false; /**< do we want spectra for total matter? */
+  bool has_pk_cb_ = false; /**< do we want spectra for cdm+baryons? */
 
-  int index_pk_m_; /**< index of pk for matter (defined only when has_pk_m is TRUE) */
-  int index_pk_cb_; /**< index of pk for cold dark matter plus baryons (defined only when has_pk_cb is TRUE */
+  int index_pk_m_  = 0; /**< index of pk for matter (meaningful only when has_pk_m_) */
+  int index_pk_cb_ = 0; /**< index of pk for cdm+baryons (meaningful only when has_pk_cb_) */
+
+  /* and two redundent but useful indices: */
+
+  int index_pk_total_   = 0; /**< always equal to index_pk_m
+                                  (always defined, useful e.g. for weak lensing spectrum) */
+  int index_pk_cluster_ = 0; /**< equal to index_pk_cb if it exists, otherwise to index_pk_m
+                                  (always defined, useful e.g. for galaxy clustering spectrum).
+                                  delta_cb is the cold part of delta_m, so without warm matter
+                                  P_cb is P_m and is stored only once */
+
   int pk_size_;                /**< k_size = total number of pk */
   std::vector<double> sigma8_; /**< sigma8[index_pk] */
 
@@ -275,13 +286,6 @@ class NonlinearModule : public BaseModule {
   /** @name - information on the type of power spectra (_cb, _m...) */
 
   //@{
-
-  /* and two redundent but useful indices: */
-
-  int index_pk_total_;   /**< always equal to index_pk_m
-                              (always defined, useful e.g. for weak lensing spectrum) */
-  int index_pk_cluster_; /**< equal to index_pk_cb if it exists, otherwise to index_pk_m
-                              (always defined, useful e.g. for galaxy clustering spectrum) */
 
   double
       c_min_; /** for HMcode: minimum concentration in Bullock 2001 mass-concentration relation */

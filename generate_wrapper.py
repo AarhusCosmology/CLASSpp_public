@@ -10,9 +10,9 @@ import pathlib
 
 rootdir = pathlib.Path(__file__).parent
 
-_argparser = argparse.ArgumentParser(description='Generate cclassy.pxd from the C++ headers.')
+_argparser = argparse.ArgumentParser(description='Generate cclassy.pxi from the C++ headers.')
 _argparser.add_argument('--output-dir', type=pathlib.Path, default=rootdir,
-                        help='Directory to write cclassy.pxd into (default: repo root).')
+                        help='Directory to write cclassy.pxi into (default: repo root).')
 # parse_known_args: tolerate being run via runpy with foreign argv.
 _args, _ = _argparser.parse_known_args()
 outdir = _args.output_dir
@@ -393,7 +393,11 @@ for file in h_files:
         variable_name = variable_name.replace('enum ','')
         variable_name = variable_name.replace(' [', '[')
         if is_function:
-            variable_name += ' except +'
+            # classy.pyx defines the handler before it includes this file. It
+            # turns std::invalid_argument into CosmoSevereError and
+            # std::runtime_error into CosmoComputationError; a plain `except +`
+            # would hand callers ValueError/RuntimeError instead.
+            variable_name += ' except +raise_my_py_error'
 
         out_line = '        ' + typename + ' ' + variable_name
         out_line = out_line.replace('std::','').replace('<', '[').replace('>',']')
@@ -418,7 +422,7 @@ for m in modules:
 
 # In[8]:
 
-with open(outdir / 'cclassy.pxd', 'w', encoding='utf-8') as fid:
+with open(outdir / 'cclassy.pxi', 'w', encoding='utf-8') as fid:
     fid.write(preample)
     for lines in [enums, structs, classes]:
         # Replace defined variables:

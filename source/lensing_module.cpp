@@ -33,6 +33,9 @@ LensingModule::LensingModule(InputModulePtr input_module, SpectraModulePtr spect
 LensingModule::~LensingModule() {}
 
 std::map<std::string, std::vector<double>> LensingModule::cl_output(int lmax) const {
+  class_test_severe(!ple->has_lensed_cls,
+                    "No lensed Cls were computed. Add 'lCl' to the list of outputs and set "
+                    "'lensing' to 'yes'.");
   class_test_severe((lmax > l_lensed_max_) || (lmax < 0),
                     "Error: lmax = %d is outside the allowed range [0, %d]\n",
                     lmax,
