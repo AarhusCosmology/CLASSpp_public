@@ -1,6 +1,7 @@
 # Thin convenience shim. The build system is CMakeLists.txt; see README.md.
 BUILD_DIR ?= build/cmake
 
+# The C++ unit tests, as unittests/CMakeLists.txt declares them; keep the two in step.
 TEST_TARGETS := \
 	test-evolver-options \
 	test-evolver-selection \
