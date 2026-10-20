@@ -11,15 +11,12 @@ env:
     -bugprone-*,
     -clang-analyzer-*,
     clang-analyzer-optin.cplusplus.UninitializedObject,
-    -concurrency-*,
     -cppcoreguidelines-*,
     cppcoreguidelines-pro-type-cstyle-cast,
     cppcoreguidelines-pro-type-member-init,
-    -misc-*,
     -performance-*,
     -modernize-avoid-c-arrays,
-    -readability-implicit-bool-conversion,
-    -readability-non-const-parameter
+    -readability-implicit-bool-conversion
 
 jobs:
   tidy:

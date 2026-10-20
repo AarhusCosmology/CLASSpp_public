@@ -290,7 +290,8 @@ All code must pass:
   define them, so use `_PI_` and the others in `include/constants.h`
 
 CI enforces all three. `CHECKS` lists what the code does not pass yet; an entry goes once
-it does.
+it does. The rules no check covers are checked in review: naming (§4), initialising at
+declaration (§6.1) and `const` (§7).
 
 These tools are part of the definition of correctness.
 

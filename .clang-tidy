@@ -1,5 +1,5 @@
-# Checks we aim for. CI enforces only the subset in CHECKS in .github/workflows/clang-tidy.yml;
-# a check joins that list once the code passes it.
+# Checks we aim for. CI runs them, less what CHECKS in .github/workflows/clang-tidy.yml
+# switches off because the code does not pass it yet.
 Checks:
   - '-*'
   - 'bugprone-*'
@@ -8,9 +8,6 @@ Checks:
   - 'modernize-*'
   - 'cppcoreguidelines-*'
   - 'clang-analyzer-*'
-  - 'misc-const-correctness'
-  - 'misc-unused-parameters'
-  - 'concurrency-mt-unsafe'
 
   - '-modernize-use-auto'
   - '-modernize-use-trailing-return-type'
@@ -44,6 +41,13 @@ Checks:
   - '-readability-avoid-nested-conditional-operator'              # the if/else it wants can't initialise a const
   - '-cppcoreguidelines-prefer-member-initializer'                # its fix-its run assignments before the checks guarding
                                                                   # them and read members the body sets later
+  - '-cppcoreguidelines-init-variables'                           # its fix writes = 0 or NAN, which would hide uninitialised
+                                                                  # reads from Valgrind; STYLE.md 6.1 is checked in review
+  - '-misc-const-correctness'                                     # 874 insertions for readability alone; STYLE.md 7 is checked
+                                                                  # in review
+  - '-readability-non-const-parameter'                            # evolver and root-finder callbacks have fixed signatures
+  - '-misc-unused-parameters'                                     # mostly callbacks, whose signatures are fixed
+  - '-concurrency-mt-unsafe'                                      # no call site runs in threads
 
 WarningsAsErrors: '*'
 
@@ -55,8 +59,4 @@ CheckOptions:
 
   # `if (ptr)` and `if (!ptr)` stay legal; int and short flags become bool instead.
   - key: readability-implicit-bool-conversion.AllowPointerConditions
-    value: true
-
-  # Interfaces keep their documenting parameter names, used or not.
-  - key: misc-unused-parameters.IgnoreVirtual
     value: true
