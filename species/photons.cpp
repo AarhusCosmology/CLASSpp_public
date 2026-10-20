@@ -26,14 +26,14 @@ void PhotonsSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& bas
   layout.l_max_pol = ppr->l_max_pol_g;
 
   /* RSA active: photons are handled analytically, nothing to integrate. */
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
     return;
 
   layout.idx_delta = index_pt++;
   layout.idx_theta = index_pt++;
 
   /* TCA active: only delta and theta; shear/polarization are analytic */
-  if (ppw->approx[ppw->index_ap_tca] == (int) tca_on)
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))
     return;
 
   /* Full hierarchy: shear (l=2), l3..l_max_g, polarization */
@@ -72,9 +72,9 @@ void PhotonsSpecies::RegisterVectorPerturbationIndices(BaseSpecies::PerturbLayou
   layout.l_max_pol = ppr->l_max_pol_g_ten;
 
   /* In vector mode there is no TCA shortcut: either full hierarchy or nothing. */
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
     return;
-  if (ppw->approx[ppw->index_ap_tca] == (int) tca_on)
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))
     return;
 
   layout.idx_delta  = index_pt++;
@@ -105,9 +105,9 @@ void PhotonsSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayou
   layout.l_max     = ppr->l_max_g_ten;
   layout.l_max_pol = ppr->l_max_pol_g_ten;
 
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
     return;
-  if (ppw->approx[ppw->index_ap_tca] == (int) tca_on)
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))
     return;
 
   layout.idx_delta  = index_pt++;
@@ -159,7 +159,7 @@ void PhotonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   /* delta equation (same whether TCA on or off) */
   dy[layout.idx_delta] = -4. / 3. * (theta_g + metric_continuity);
 
-  if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
     /* TCA: photon theta sourced by baryon theta derivative (already set by BaryonsSpecies).
        In TCA, perturbed recombination is off, so cb2 * delta_b is used. */
     const double delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_cb2_] * ctx.delta_b;
@@ -468,7 +468,7 @@ BaseSpecies::StressEnergyContribution PhotonsSpecies::StressEnergy(
     se.rho_plus_p_theta = 4. / 3. * rho_g * y[layout.idx_theta];
   if (layout.idx_shear >= 0)
     se.rho_plus_p_shear = 4. / 3. * rho_g * y[layout.idx_shear];  // no approximation
-  else if (ppw->approx[ppw->index_ap_tca] == (int) tca_off)
+  else if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))
     se.rho_plus_p_shear = 0.;                          // RSA: shear neglected
   else if (ppt_->gauge == possible_gauges::newtonian)  // TCA, 1st order
     se.rho_plus_p_shear = 4. / 3. * rho_g *
@@ -529,7 +529,7 @@ void PhotonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   };
 
   double delta_g;
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
     delta_g = ppw->rsa_delta_g;
   else
     delta_g = y[layout.idx_delta];
@@ -540,7 +540,7 @@ void PhotonsSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
 
   if (index_tp_theta_ >= 0) {
     double theta_g;
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off)
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off))
       theta_g = y[layout.idx_theta];
     else
       theta_g = ppw->rsa_theta_g;
@@ -637,10 +637,10 @@ void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
     const double* pvecback   = ppw->pvecback.data();
     const double* pvecmetric = ppw->pvecmetric.data();
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
       delta_g = y[g_lay.idx_delta];
       theta_g = y[g_lay.idx_theta];
-      if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
+      if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
         const double dkappa = pvecthermo[mod.GetThermodynamicsModule()->index_th_dkappa_];
         shear_g             = ppw->tca_shear_g;
         pol0_g              = 2.5 * ppw->tca_shear_g;
@@ -687,9 +687,9 @@ void PhotonsSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
   const auto& g_lay = static_cast<const PerturbLayout&>(base);
   /* Photon temperature l>=3 and pol l=1,3+ are not needed in source evaluation
      when both rsa and tca are off. */
-  if (ppw->approx[ppw->index_ap_rsa] != (int) rsa_off)
+  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off))
     return;
-  if (ppw->approx[ppw->index_ap_tca] != (int) tca_off)
+  if (ppw->approx[ppw->index_ap_tca] != static_cast<int>(tca_off))
     return;
 
   for (int idx = g_lay.idx_l3; idx <= g_lay.idx_delta + g_lay.l_max; ++idx)
@@ -708,9 +708,9 @@ void PhotonsSpecies::MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& b
   const auto& g_lay = static_cast<const PerturbLayout&>(base);
   /* In tensor mode, we only need temperature l=0,2,4 and pol l=0,2,4
      when both rsa and tca are off. */
-  if (ppw->approx[ppw->index_ap_rsa] != (int) rsa_off)
+  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off))
     return;
-  if (ppw->approx[ppw->index_ap_tca] != (int) tca_off)
+  if (ppw->approx[ppw->index_ap_tca] != static_cast<int>(tca_off))
     return;
 
   used_in_sources[g_lay.idx_theta] = false;

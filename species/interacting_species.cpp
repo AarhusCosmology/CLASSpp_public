@@ -110,7 +110,7 @@ void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   layout.l_max     = -1;
 
   /* RSA active: IDR handled analytically, nothing to integrate. */
-  if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)
+  if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on))
     return;
 
   layout.idx_delta = index_pt;
@@ -122,7 +122,8 @@ void IDRSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   /* Full hierarchy: only register shear/l3 if idr_nature == idr_free_streaming
      AND (no IDM_DR OR TCA is off) */
   if (ppw->scalar_ctx.idr_nature == idr_free_streaming) {
-    if (!has_sibling_idm_dr_ || ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
+    if (!has_sibling_idm_dr_ ||
+        ppw->approx[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_off)) {
       layout.idx_shear = index_pt;
       ++index_pt;
 
@@ -295,7 +296,7 @@ double IDRSpecies::TcaShearIdr(const PerturbLayout& layout,
     return 0.;
   if (layout.idx_shear >= 0)
     return 0.;
-  if (ppw->approx[ppw->index_ap_rsa_idr] != (int) rsa_idr_off)
+  if (ppw->approx[ppw->index_ap_rsa_idr] != static_cast<int>(rsa_idr_off))
     return 0.;
   if (!has_sibling_idm_dr_)
     return 0.;

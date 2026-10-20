@@ -182,8 +182,8 @@ double NullResidual(const double* M, int n, const double* z) {
   for (int i = 0; i < n; ++i) {
     double s = 0.;
     for (int j = 0; j < n; ++j) {
-      s  += M[(size_t) i * n + j] * z[j];
-      mn  = std::fmax(mn, std::fabs(M[(size_t) i * n + j]));
+      s  += M[static_cast<size_t>(i) * n + j] * z[j];
+      mn  = std::fmax(mn, std::fabs(M[static_cast<size_t>(i) * n + j]));
     }
     num += s * s;
     zn  += z[i] * z[i];
@@ -330,7 +330,7 @@ void q2_in_span_agreement() {
   z[kNParent + nm + 1] = 0.25;
 
   const int stride = kLMax + 1;
-  std::vector<double> FH((size_t) kNParent * stride, 0.);
+  std::vector<double> FH(static_cast<size_t>(kNParent) * stride, 0.);
   std::vector<double> Fl(s.F.q.size() * stride, 0.);
   std::vector<double> Fp(s.B.q.size() * stride, 0.);
   std::vector<double> dH(FH.size());
@@ -340,7 +340,7 @@ void q2_in_span_agreement() {
 
   for (int b = 0; b < kNParent; ++b)
     for (int l = 0; l <= kLMax; ++l)
-      FH[(size_t) b * stride + l] = z[b];
+      FH[static_cast<size_t>(b) * stride + l] = z[b];
   R.Reconstruct(0, &z[kNParent], rec.data());
   for (size_t k = 0; k < s.F.q.size(); ++k)
     for (int l = 0; l <= kLMax; ++l)
@@ -364,15 +364,15 @@ void q2_in_span_agreement() {
   std::vector<double> slice(std::max(s.F.q.size(), s.B.q.size()));
   std::vector<double> mom(nm);
   for (int l = 0; l <= kLMax; ++l) {
-    const double* Ml = Mred.data() + (size_t) l * S * S;
+    const double* Ml = Mred.data() + static_cast<size_t>(l) * S * S;
     std::vector<double> want(S, 0.);
     for (int i = 0; i < S; ++i)
       for (int j = 0; j < S; ++j)
-        want[i] += Ml[(size_t) i * S + j] * z[j];
+        want[i] += Ml[static_cast<size_t>(i) * S + j] * z[j];
 
     std::vector<double> got(S, 0.);
     for (int b = 0; b < kNParent; ++b)
-      got[b] = dH[(size_t) b * stride + l];
+      got[b] = dH[static_cast<size_t>(b) * stride + l];
     for (int d = 0; d < 2; ++d) {
       const double* src = (d == 0) ? dl.data() : dp.data();
       const size_t n    = (d == 0) ? s.F.q.size() : s.B.q.size();
@@ -412,7 +412,7 @@ void q3_equilibrium_annihilation() {
   const int N = ref.full_size();
   double exact[3];
   for (int v = 0; v < 3; ++v)
-    exact[v] = NullResidual(Mex.data(), N, &veq_ex[(size_t) v * N]);
+    exact[v] = NullResidual(Mex.data(), N, &veq_ex[static_cast<size_t>(v) * N]);
   std::printf(
       "   exact operator's own residual ||M v_eq||/(||M|| ||v||), l = 0:\n"
       "      v_mu(H,l) %.3e   v_mu(H,phi) %.3e   v_T %.3e\n",
@@ -477,11 +477,11 @@ void q3_equilibrium_annihilation() {
     std::vector<double> lhs(S, 0.);
     for (int i = 0; i < S; ++i)
       for (int j = 0; j < S; ++j)
-        lhs[i] += M[(size_t) i * S + j] * veq[j];
+        lhs[i] += M[static_cast<size_t>(i) * S + j] * veq[j];
     std::vector<double> rhs_full(N, 0.);
     for (int i = 0; i < N; ++i)
       for (int j = 0; j < N; ++j)
-        rhs_full[i] += Mex[(size_t) i * N + j] * veq_full[j];
+        rhs_full[i] += Mex[static_cast<size_t>(i) * N + j] * veq_full[j];
     std::vector<double> rhs(S, 0.);
     std::vector<double> mom(nm);
     std::vector<double> slice(std::max(s.F.q.size(), s.B.q.size()));
@@ -551,8 +551,8 @@ void q4_q5_conservation_and_dissipativity() {
               "momentum",
               "max Re lambda");
   for (int l = 0; l <= 2; ++l) {
-    auto c         = ref.ConservationExact(Mex.data() + (size_t) l * N * N);
-    exact_bound[l] = ref.DissipativityBoundExact(Mex.data() + (size_t) l * N * N);
+    auto c         = ref.ConservationExact(Mex.data() + static_cast<size_t>(l) * N * N);
+    exact_bound[l] = ref.DissipativityBoundExact(Mex.data() + static_cast<size_t>(l) * N * N);
     std::printf("   %3d  %-10.2e %-10.2e %-10.2e  %+.5e\n",
                 l,
                 std::fmax(c.number_fermion, c.number_boson),
@@ -580,7 +580,7 @@ void q4_q5_conservation_and_dissipativity() {
     R.Assemble(2, M);
     const int S = R.size();
     for (int l = 0; l <= 2; ++l) {
-      const double* Ml = M.data() + (size_t) l * S * S;
+      const double* Ml = M.data() + static_cast<size_t>(l) * S * S;
       auto c           = R.Conservation(Ml);
       const double b   = R.DissipativityBound(Ml);
       const bool ok    = b <= exact_bound[l] * (exact_bound[l] > 0. ? 1.001 : 0.999) + 1e-12;
@@ -656,9 +656,9 @@ void q6_the_milestone() {
     const int N     = R.full_size();
     const int S     = R.size();
     const double e0 = R.DissipativityBoundExact(Mex.data());
-    const double e1 = R.DissipativityBoundExact(Mex.data() + (size_t) N * N);
+    const double e1 = R.DissipativityBoundExact(Mex.data() + static_cast<size_t>(N) * N);
     const double r0 = R.DissipativityBound(Mred.data());
-    const double r1 = R.DissipativityBound(Mred.data() + (size_t) S * S);
+    const double r1 = R.DissipativityBound(Mred.data() + static_cast<size_t>(S) * S);
     const auto c0   = R.Conservation(Mred.data());
     std::printf("   %5d %3d/%-4d | %+.4e %+.4e | %+.4e %+.4e | %.4e %.4e\n",
                 nq,
@@ -719,7 +719,7 @@ void q6_the_milestone() {
     R.Assemble(1, M);
     const int S      = R.size();
     const double r0  = R.DissipativityBound(M.data());
-    const double r1  = R.DissipativityBound(M.data() + (size_t) S * S);
+    const double r1  = R.DissipativityBound(M.data() + static_cast<size_t>(S) * S);
     const auto c0    = R.Conservation(M.data());
     const bool clean = std::fmax(c0.number_fermion, c0.number_boson) < 1e-8;
     std::printf("   %3d %6d | %+.4e %+.4e  %s\n", nm, S, r0, r1, clean ? "" : "<- ceiling");
@@ -877,7 +877,7 @@ std::vector<double> LegendreCoeffs(int l) {
     for (size_t k = 0; k < cur.size(); ++k)
       next[k + 1] += (2. * n + 1.) / (n + 1.) * cur[k];
     for (size_t k = 0; k < prev.size(); ++k)
-      next[k] -= (double) n / (n + 1.) * prev[k];
+      next[k] -= static_cast<double>(n) / (n + 1.) * prev[k];
     prev = cur;
     cur  = next;
   }
@@ -912,7 +912,7 @@ double AnalyticF(int l, double x) {
   double acc                  = 0.;
   for (size_t k = 0; k < c.size(); ++k)
     if (c[k] != 0.)
-      acc += c[k] * IntegralK((int) k, x);
+      acc += c[k] * IntegralK(static_cast<int>(k), x);
   const double one_minus = (1. - x * x);
   return 0.5 * one_minus * one_minus * acc;
 }
@@ -966,12 +966,12 @@ void q8_analytic_kernel_oracle() {
     kern.PrepareTransitions(kA, kMass, kGamma, bg.fH.data(), bg.fl.data(), bg.fphi.data(), kA2H);
 
     const int L1 = kLMax + 1;
-    const int Np = (int) s.P.q.size();
+    const int Np = static_cast<int>(s.P.q.size());
     const int Nf = n_daughter;
     const int Nb = n_daughter;
-    std::vector<double> FH((size_t) Np * L1);
-    std::vector<double> Fl((size_t) Nf * L1);
-    std::vector<double> Fp((size_t) Nb * L1);
+    std::vector<double> FH(static_cast<size_t>(Np) * L1);
+    std::vector<double> Fl(static_cast<size_t>(Nf) * L1);
+    std::vector<double> Fp(static_cast<size_t>(Nb) * L1);
     std::vector<double> dH(FH.size());
     std::vector<double> dl(Fl.size());
     std::vector<double> dp(Fp.size());
@@ -987,7 +987,7 @@ void q8_analytic_kernel_oracle() {
       std::fill(Fl.begin(), Fl.end(), 0.);
       std::fill(Fp.begin(), Fp.end(), 0.);
       for (int l = 0; l <= kLMax; ++l)
-        FH[(size_t) b * L1 + l] = 1.;  // one parent bin, the same amplitude at every l
+        FH[static_cast<size_t>(b) * L1 + l] = 1.;  // one parent bin, the same amplitude at every l
 
       kern.ResetMultipoleRecurrence();
       kern.ApplyPerturbationOperatorAllL(kLMax,
@@ -1004,9 +1004,9 @@ void q8_analytic_kernel_oracle() {
       double E_b[kLMax + 1] = {0.};
       for (int l = 0; l <= kLMax; ++l) {
         for (int j = 0; j < Nf; ++j)
-          E_f[l] += s.F.dq[j] * std::pow(s.F.q[j], 3) * dl[(size_t) j * L1 + l];
+          E_f[l] += s.F.dq[j] * std::pow(s.F.q[j], 3) * dl[static_cast<size_t>(j) * L1 + l];
         for (int j = 0; j < Nb; ++j)
-          E_b[l] += s.B.dq[j] * std::pow(s.B.q[j], 3) * dp[(size_t) j * L1 + l];
+          E_b[l] += s.B.dq[j] * std::pow(s.B.q[j], 3) * dp[static_cast<size_t>(j) * L1 + l];
       }
 
       for (int l = 1; l <= kLMax; ++l) {
@@ -1135,10 +1135,10 @@ void q9_operator_table() {
 
   auto matvec = [&](const std::vector<double>& Mat, int l, std::vector<double>& out) {
     out.assign(S, 0.);
-    const double* Ml = Mat.data() + (size_t) l * S * S;
+    const double* Ml = Mat.data() + static_cast<size_t>(l) * S * S;
     for (int i = 0; i < S; ++i)
       for (int j = 0; j < S; ++j)
-        out[i] += Ml[(size_t) i * S + j] * z[j];
+        out[i] += Ml[static_cast<size_t>(i) * S + j] * z[j];
   };
   auto rel = [&](const std::vector<double>& x, const std::vector<double>& ref) {
     double num = 0.;
@@ -1205,7 +1205,7 @@ void q11_row_lookup() {
   const int S     = 2;
   const int l_max = 0;
   auto block      = [&](double tag) {
-    std::vector<double> M((size_t) (l_max + 1) * S * S, 0.);
+    std::vector<double> M(static_cast<size_t>(l_max + 1) * S * S, 0.);
     M[0] = tag;  // identifies the row it came from
     return M;
   };
@@ -1220,7 +1220,7 @@ void q11_row_lookup() {
       const double lna = (variant == 0) ? (-12. + 0.25 * i)
                                         : (-12. + 0.25 * i + (i >= 20 ? 0.37 * (i - 19) : 0.));
       as.push_back(std::exp(lna));
-      t.AddRow(as.back(), block((double) i));
+      t.AddRow(as.back(), block(static_cast<double>(i)));
     }
     // Probe between every pair of rows; the value returned must be the lower row's tag.
     double worst = 0.;
@@ -1231,7 +1231,7 @@ void q11_row_lookup() {
         double dz[2]   = {0., 0.};
         t.Apply(a, 0, z, dz);
         // The blend of tags i and i+1 at weight `frac` is exactly i + frac.
-        worst = std::fmax(worst, std::fabs(dz[0] - ((double) i + frac)));
+        worst = std::fmax(worst, std::fabs(dz[0] - (static_cast<double>(i) + frac)));
       }
     }
     std::printf("   %-12s worst |row index error| = %.3e\n",

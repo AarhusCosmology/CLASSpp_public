@@ -63,7 +63,7 @@ void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout
       y[idr_lay.idx_theta] = ctx.theta_ur;
     if (idr_->idr_nature() == idr_free_streaming &&
         (!has_idm_dr() ||
-         (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))) {
+         (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_off)))) {
       if (idr_lay.idx_shear >= 0)
         y[idr_lay.idx_shear] = ctx.shear_ur;
       if (idr_lay.idx_l3 >= 0)
@@ -103,7 +103,7 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
 
   // ── IDR ───────────────────────────────────────────────────────────────────
   if (index_tp_delta_idr_ >= 0) {
-    if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
+    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off))
       set_source(index_tp_delta_idr_,
                  y[idr_lay.idx_delta] +
                      4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
@@ -114,7 +114,7 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 
   if (index_tp_theta_idr_ >= 0) {
-    if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off)
+    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off))
       set_source(index_tp_theta_idr_,
                  y[idr_lay.idx_theta] + ctx.theta_shift);  // N-body gauge correction
     else
@@ -179,11 +179,12 @@ void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
     }
 
     if (has_idr()) {
-      if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) {
+      if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off)) {
         delta_idr = y[idr_lay.idx_delta];
         theta_idr = y[idr_lay.idx_theta];
         if (idr_->idr_nature() == idr_free_streaming) {
-          if (has_idm_dr() && (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
+          if (has_idm_dr() &&
+              (ppw->approx[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_on))) {
             shear_idr = idr_->TcaShearIdr(idr_lay, y, ppw);
           }
           else {
@@ -283,7 +284,7 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
 
   // Under RSA for IDR: IDR Boltzmann hierarchy is not evolved; use RSA-approximated
   // theta_idr to keep the IDM_DR drag correct. Do not write to IDR equations.
-  if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on) {
+  if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on)) {
     const double theta_idr    = ppw->rsa_theta_idr;
     dy[idm_dr_lay.idx_theta] -= Sinv * dmu_idm_dr * (theta_idm_dr - theta_idr) -
                                 ctx.k2 * pvecthermo[pth_mod->index_th_cidm_dr2_] *
@@ -293,7 +294,7 @@ void IDM_DR_IDR_Species::AddCouplingDerivs(double /*tau*/,
 
   const double theta_idr = (idr_lay.idx_theta >= 0) ? y[idr_lay.idx_theta] : 0.;
 
-  if (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off) {
+  if (ppw->approx[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_off)) {
     const double dmu_idr = idr().b_idr() / idm_dr().a_idm_dr() * idr().GetOmega0() /
                            idm_dr().GetOmega0() * dmu_idm_dr;
 
@@ -586,11 +587,11 @@ void IDM_DR_IDR_Species::MarkUsedInSources(const BaseSpecies::PerturbLayout& bas
     return;
   /* IDR l>=3 multipoles not needed in sources when rsa_idr is off, idr is
      free-streaming, and tca_idm_dr is off. */
-  if (ppw->approx[ppw->index_ap_rsa_idr] != (int) rsa_idr_off)
+  if (ppw->approx[ppw->index_ap_rsa_idr] != static_cast<int>(rsa_idr_off))
     return;
   if (idr_->idr_nature() != idr_free_streaming)
     return;
-  if (ppw->approx[ppw->index_ap_tca_idm_dr] != (int) tca_idm_dr_off)
+  if (ppw->approx[ppw->index_ap_tca_idm_dr] != static_cast<int>(tca_idm_dr_off))
     return;
 
   for (int idx = idr_lay.idx_l3; idx <= idr_lay.idx_delta + idr_lay.l_max; ++idx)

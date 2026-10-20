@@ -476,7 +476,7 @@ void DrPsdSpecies::ReducedDriver(const double* pvecback, double* D) const {
   for (int iq = 0; iq < nq; ++iq) {
     const double base = dq_[iq] * q_[iq] * q_[iq] * pvecback[index_bg_dfdlnq_ + bg_index(iq)];
     for (int j = 0; j < reduced_moments_; ++j)
-      D[j] += base * red_psi_[(size_t) j * nq + iq];
+      D[j] += base * red_psi_[static_cast<size_t>(j) * nq + iq];
   }
 }
 
@@ -487,7 +487,7 @@ void DrPsdSpecies::ReducedProject(const double* fq, double* m) const {
   for (int iq = 0; iq < nq; ++iq) {
     const double base = dq_[iq] * q_[iq] * q_[iq] * fq[iq];
     for (int j = 0; j < reduced_moments_; ++j)
-      m[j] += base * red_psi_[(size_t) j * nq + iq];
+      m[j] += base * red_psi_[static_cast<size_t>(j) * nq + iq];
   }
 }
 

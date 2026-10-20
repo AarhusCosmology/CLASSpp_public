@@ -78,7 +78,7 @@ void UltraRelativisticSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbL
 
   /* If radiation streaming approximation is on, no UR variables are integrated.
      Sentinel -1 signals RSA to StressEnergy. */
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
     layout.idx_delta = -1;
     layout.idx_theta = -1;
     layout.idx_shear = -1;
@@ -91,7 +91,7 @@ void UltraRelativisticSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbL
   layout.idx_theta = index_pt++;
   layout.idx_shear = index_pt++;
 
-  if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
+  if (ppw->approx[ppw->index_ap_ufa] == static_cast<int>(ufa_off)) {
     /* Full hierarchy: l_max set by caller */
     layout.l_max = l_max_full;
     if (l_max_full >= 3) {
@@ -153,7 +153,7 @@ void UltraRelativisticSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& b
   dy[idx_theta] = k2 * (three_ceff2 * y[idx_delta] / 4. - s2_squared * y[idx_shear]) +
                   metric_euler - (1. - three_ceff2) * a_prime_over_a * y[idx_theta];
 
-  if (ppw->approx[ppw->index_ap_ufa] == (int) ufa_off) {
+  if (ppw->approx[ppw->index_ap_ufa] == static_cast<int>(ufa_off)) {
     /* ── exact shear ──────────────────────────────────────────────────── */
     dy[idx_shear] = 0.5 * (8. / 15. * (y[idx_theta] + metric_shear) -
                            3. / 5. * k * s_l[3] / s_l[2] * y[idx_shear + 1] -
@@ -362,7 +362,7 @@ void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
     const double* pvecback   = ppw->pvecback.data();
     const double* pvecmetric = ppw->pvecmetric.data();
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
       const auto& lay = static_cast<const PerturbLayout&>(*base);
       delta_ur        = y[lay.idx_delta];
       theta_ur        = y[lay.idx_theta];
@@ -404,9 +404,9 @@ void UltraRelativisticSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayou
   /* UR l>=3 multipoles not needed in sources when both rsa and ufa are off.
      (The idx_l3 >= 0 guard above already implies rsa_off and ufa_off, but we
      check explicitly for clarity and to mirror the legacy module condition.) */
-  if (ppw->approx[ppw->index_ap_rsa] != (int) rsa_off)
+  if (ppw->approx[ppw->index_ap_rsa] != static_cast<int>(rsa_off))
     return;
-  if (ppw->approx[ppw->index_ap_ufa] != (int) ufa_off)
+  if (ppw->approx[ppw->index_ap_ufa] != static_cast<int>(ufa_off))
     return;
 
   for (int idx = ur_lay.idx_l3; idx <= ur_lay.idx_delta + ur_lay.l_max; ++idx)

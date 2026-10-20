@@ -236,7 +236,7 @@ std::string FileContent::get_or(const std::string& name, const char* fallback) c
   std::string raw_value = line.substr(eq_pos + 1, value_end - eq_pos - 1);
 
   /* Trim trailing whitespace / newline */
-  while (!raw_value.empty() && (unsigned char) raw_value.back() <= ' ')
+  while (!raw_value.empty() && static_cast<unsigned char>(raw_value.back()) <= ' ')
     raw_value.pop_back();
   /* Trim leading whitespace */
   std::size_t start = 0;

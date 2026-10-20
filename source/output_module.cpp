@@ -59,7 +59,7 @@ void OutputModule::output_total_cl_at_l(int l, double* cl) {
       }
     }
 
-    spectra_module_->spectra_cl_at_l((double) l, cl, cl_md.data(), cl_md_ic.data());
+    spectra_module_->spectra_cl_at_l(static_cast<double>(l), cl, cl_md.data(), cl_md_ic.data());
   }
 }
 
@@ -342,12 +342,15 @@ void OutputModule::output_cl() {
       relevant files */
 
   for (int l = 2; l <= spectra_module_->l_max_tot_; l++) {
-    spectra_module_->spectra_cl_at_l((double) l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
+    spectra_module_->spectra_cl_at_l(static_cast<double>(l),
+                                     cl_tot.data(),
+                                     cl_md.data(),
+                                     cl_md_ic.data());
 
-    output_one_line_of_cl(out, (double) l, cl_tot.data(), spectra_module_->ct_size_);
+    output_one_line_of_cl(out, static_cast<double>(l), cl_tot.data(), spectra_module_->ct_size_);
 
     if ((ple->has_lensed_cls) && (l <= lensing_module_->l_lensed_max_)) {
-      lensing_module_->lensing_cl_at_l((double) l, cl_tot.data());
+      lensing_module_->lensing_cl_at_l(static_cast<double>(l), cl_tot.data());
 
       output_one_line_of_cl(out_lensed, l, cl_tot.data(), spectra_module_->ct_size_);
     }
@@ -1158,7 +1161,7 @@ void OutputModule::output_one_line_of_cl(FILE* clfile,
     class_fprintf_int(clfile, (int) l, true);
   }
   else {
-    fprintf(clfile, "%4d ", (int) l);
+    fprintf(clfile, "%4d ", static_cast<int>(l));
   }
 
   if (pop->output_format == file_format::class_format) {

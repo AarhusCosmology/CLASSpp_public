@@ -634,8 +634,9 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
   const auto om0_opt  = ctx.pfc->get<double>("Omega_fld");
   const auto omac_opt = ctx.pfc->get<double>("Omega_fld_ac");
   const auto frac_opt = ctx.pfc->get<double>("fraction_fld_ac");
-  const int n_density = int(om0_opt.has_value()) + int(omac_opt.has_value()) +
-                        int(frac_opt.has_value());
+  const int n_density = static_cast<int>(om0_opt.has_value()) +
+                        static_cast<int>(omac_opt.has_value()) +
+                        static_cast<int>(frac_opt.has_value());
   class_test_severe(n_density != 1,
                     "pheno_axion needs exactly one of 'Omega_fld', 'Omega_fld_ac', "
                     "'fraction_fld_ac'");

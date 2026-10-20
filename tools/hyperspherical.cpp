@@ -49,7 +49,7 @@ void hyperspherical_phi01_exact(
     return;
   }
 
-  double root1 = sqrt(std::max(0.0, beta2 - (double) K));
+  double root1 = sqrt(std::max(0.0, beta2 - static_cast<double>(K)));
   if (fabs(x) < 1e-4) {
     double x2 = x * x;
     double x4 = x2 * x2;
@@ -107,7 +107,7 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
   beta2  = beta * beta;
   lmax   = lvec[nl - 1];
   lambda = 2 * _PI_ / beta;
-  nx     = (int) ((xmax - xmin) * sampling / lambda);
+  nx     = static_cast<int>((xmax - xmin) * sampling / lambda);
   nx     = std::max(nx, 2);
   deltax = (xmax - xmin) / (nx - 1.0);
   //fprintf(stderr,"dx=%e\n",deltax);
@@ -217,7 +217,7 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
 
   std::vector<double> PhiL((lmax + 2) * _HYPER_CHUNK_);
 
-  int hit_the_ceiling = ((K == 1) && ((int) (beta + 0.2) == (lmax + 1)));
+  int hit_the_ceiling = ((K == 1) && (static_cast<int>(beta + 0.2) == (lmax + 1)));
   if (hit_the_ceiling) {
     /** Take care of special case lmax = beta-1.
         The routine below will try to compute
@@ -373,7 +373,7 @@ void hyperspherical_backwards_recurrence(int K,
       cf1_found = get_CF1(K, lmax, beta, cotK, &phipr1, &isign);
     }
     if (!cf1_found) {
-      CF1_from_Gegenbauer(lmax, (int) (beta + 0.2), sinK, cotK, &phipr1);
+      CF1_from_Gegenbauer(lmax, static_cast<int>(beta + 0.2), sinK, cotK, &phipr1);
     }
     phi_top = 1.0;
   }
@@ -492,7 +492,11 @@ void hyperspherical_backwards_recurrence_chunk(int K,
         cf1_found = get_CF1(K, lmax, beta, cotK[index_x], &phipr1, &isign);
       }
       if (!cf1_found) {
-        CF1_from_Gegenbauer(lmax, (int) (beta + 0.2), sinK[index_x], cotK[index_x], &phipr1);
+        CF1_from_Gegenbauer(lmax,
+                            static_cast<int>(beta + 0.2),
+                            sinK[index_x],
+                            cotK[index_x],
+                            &phipr1);
       }
       phi_top = 1.0;
     }
@@ -587,7 +591,7 @@ bool get_CF1(int K, int l, double beta, double cotK, double* CF, int* isign) {
   int j;
 
   if (K == 1)
-    maxiter = (int) (beta - l - 10);
+    maxiter = static_cast<int>(beta - l - 10);
   bj     = l * cotK;  //This is b_0
   fj     = bj;
   Cj     = bj;
@@ -698,7 +702,7 @@ bool hyperspherical_WKB(int K, int l, double beta, double y, double* Phi) {
 
   if (K == 1) {
     //Limit range to [0; pi/2]:
-    intbeta = (int) (beta + 0.4);  //Round to nearest integer (just to be sure)
+    intbeta = static_cast<int>(beta + 0.4);  //Round to nearest integer (just to be sure)
     ClosedModY(l, intbeta, &y, &phisign, &dphisign);
   }
   e     = 1.0 / sqrt(ldbl * (ldbl + 1.0));
@@ -1042,7 +1046,7 @@ void hyperspherical_get_xmin_from_Airy(
 
 double PhiWKB_minus_phiminabs(double x, void* param) {
   double phiwkb                   = 0.;
-  struct WKB_parameters* wkbparam = (struct WKB_parameters*) param;
+  struct WKB_parameters* wkbparam = static_cast<struct WKB_parameters*>(param);
   hyperspherical_WKB(wkbparam->K, wkbparam->l, wkbparam->beta, x, &phiwkb);
   return (fabs(phiwkb) - wkbparam->phiminabs);
 }
@@ -1210,7 +1214,7 @@ void hyperspherical_bessel_direct_vector(
   }
 
   if (K == 1) {
-    intbeta = (int) (beta + 0.2);
+    intbeta = static_cast<int>(beta + 0.2);
     class_test(fabs(beta - intbeta) > 1e-6,
                "closed case (K=1) requires integer beta (got %g)",
                beta);
@@ -1233,9 +1237,9 @@ void hyperspherical_bessel_direct_vector(
     if (K == 0)
       sqrtK[l] = beta;
     else if (K == 1)
-      sqrtK[l] = sqrt(beta2 - (double) l * l);
+      sqrtK[l] = sqrt(beta2 - static_cast<double>(l) * l);
     else
-      sqrtK[l] = sqrt(beta2 + (double) l * l);
+      sqrtK[l] = sqrt(beta2 + static_cast<double>(l) * l);
     one_over_sqrtK[l] = 1.0 / sqrtK[l];
   }
 
@@ -1377,7 +1381,7 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
     double x = xinterp[j];
     //take advantage of periodicity of functions in closed case
     if (pHIS->K == 1)
-      ClosedModY(l, (int) (pHIS->beta + 0.2), &x, &phisign, &dphisign);
+      ClosedModY(l, static_cast<int>(pHIS->beta + 0.2), &x, &phisign, &dphisign);
     if ((x < xmin) || (x > xmax)) {
       //Outside interpolation region, set to zero.
       if constexpr (DoPhi)
@@ -1390,7 +1394,7 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
     }
     if ((x > right_border) || (x < left_border)) {
       if ((x > next_border) || (x < left_border)) {
-        current_border_idx = ((int) ((x - xmin) / deltax)) + 1;
+        current_border_idx = (static_cast<int>((x - xmin) / deltax)) + 1;
         //max operation takes care of case x = xmin,
         //min operation takes care of case x = xmax.
         current_border_idx = std::max(1, current_border_idx);

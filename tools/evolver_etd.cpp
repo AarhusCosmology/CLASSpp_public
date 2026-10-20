@@ -55,9 +55,9 @@ inline void PhiFuncs(double z, double& e0, double& p1, double& p2, double& p3) {
     for (int j = 0; j <= 8; ++j) {
       if (j > 0) {
         zp *= z;
-        f1 /= (double) (j + 1);
-        f2 /= (double) (j + 2);
-        f3 /= (double) (j + 3);
+        f1 /= static_cast<double>(j + 1);
+        f2 /= static_cast<double>(j + 2);
+        f3 /= static_cast<double>(j + 3);
       }
       p1 += f1 * zp;
       p2 += f2 * zp;
@@ -126,7 +126,7 @@ void evolver_etd(EvolverDerivs derivs,
   std::vector<double> yinterp(neq);
   std::vector<double> dyinterp(neq);
   std::vector<double> fnew(neq);
-  std::vector<double> scratch((size_t) 8 * neq);
+  std::vector<double> scratch(static_cast<size_t>(8) * neq);
 
   double t = x_ini;
   ++counters.derivs_evaluations;
@@ -303,7 +303,7 @@ void evolver_etd(EvolverDerivs derivs,
     int nonfinite = 0;
     for (int k = 0; k < neq; k++) {
       const double errtemp  = std::fabs(err[k] / std::max(threshold, std::fabs(ynew[k])));
-      nonfinite            |= (int) (IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
+      nonfinite            |= static_cast<int>(IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
       if (errtemp > errmax)
         errmax = errtemp;
     }

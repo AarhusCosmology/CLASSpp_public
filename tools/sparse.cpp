@@ -449,7 +449,7 @@ void sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
 		and that the diagonal elements has been removed. C must be large enough,
 		C->max_nonzero >= (6/5)*(C->Ap[n]) + 2n. Work array W must be 8*(n+1).
 	*/
-  dense = (int) std::max(16.0, 10 * sqrt((double) n));
+  dense = static_cast<int>(std::max(16.0, 10 * sqrt(static_cast<double>(n))));
   dense = std::min(n - 2, dense);
   cnz   = Cp[n];
   /*	Assign pointers to positions in work array:*/

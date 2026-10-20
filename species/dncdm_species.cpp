@@ -97,8 +97,10 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   auto lifetime_value      = input.get<double>("lifetime");
   auto log10lifetime_value = input.get<double>("log10lifetime");
 
-  int n_provided = (int) Gamma_value.has_value() + (int) log10Gamma_value.has_value() +
-                   (int) lifetime_value.has_value() + (int) log10lifetime_value.has_value();
+  int n_provided = static_cast<int>(Gamma_value.has_value()) +
+                   static_cast<int>(log10Gamma_value.has_value()) +
+                   static_cast<int>(lifetime_value.has_value()) +
+                   static_cast<int>(log10lifetime_value.has_value());
   class_test_severe(n_provided != 1,
                     "species '%s': specify exactly one of Gamma, log10Gamma, lifetime, "
                     "log10lifetime",
@@ -179,8 +181,9 @@ DNCDMSpecies::DNCDMSpecies(FileContent* pfc,
   // Count mutually-exclusive target specs (skip inside a shooting build: in combined mode the
   // shooter adds deg alongside the user's Omega_dncdmdr).
   if (!in_shooting) {
-    int n_deg_options = (int) has_deg + (int) has_Omega_ini + (int) has_omega_ini +
-                        (int) has_Neff_ini + (int) has_Omega_dncdmdr;
+    int n_deg_options = static_cast<int>(has_deg) + static_cast<int>(has_Omega_ini) +
+                        static_cast<int>(has_omega_ini) + static_cast<int>(has_Neff_ini) +
+                        static_cast<int>(has_Omega_dncdmdr);
     class_test_severe(n_deg_options > 1,
                       "species '%s': specify at most one of deg, Omega_ini, omega_ini, Neff_ini, "
                       "Omega_dncdmdr",

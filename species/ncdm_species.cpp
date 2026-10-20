@@ -324,7 +324,7 @@ void NCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
 
   index_pt_psi0_ = index_pt;
 
-  const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
+  const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on));
   if (fa_on) {
     layout.l_max  = 2;
     layout.q_size = 1;
@@ -363,7 +363,7 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
   const double* pvecback = ppw->pvecback.data();
 
-  const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on);
+  const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on));
 
   if (fa_on) {
     // Fluid approximation (ncdmfa_on)
@@ -568,7 +568,7 @@ BaseSpecies::StressEnergyContribution NCDMSpecies::StressEnergy(
   if (layout.index_per_q.empty())
     return se;
 
-  if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on) {
+  if (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on)) {
     const double rho_bg      = pvecback[index_bg_rho_];
     const double p_bg        = pvecback[index_bg_p_];
     const double pseudo_p_bg = pvecback[index_bg_pseudo_p_];

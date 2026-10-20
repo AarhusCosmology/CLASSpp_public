@@ -2098,28 +2098,28 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
       pertub_find_approximation_switches) */
 
   if (_scalars_) {
-    ppw->approx[ppw->index_ap_tca] = (int) tca_on;
-    ppw->approx[ppw->index_ap_rsa] = (int) rsa_off;
+    ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_on);
+    ppw->approx[ppw->index_ap_rsa] = static_cast<int>(rsa_off);
 
     if (all_species_.count("IDM_DR_IDR"))
-      ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_off;
+      ppw->approx[ppw->index_ap_rsa_idr] = static_cast<int>(rsa_idr_off);
     if (all_species_.count("IDM_DR_IDR"))
-      ppw->approx[ppw->index_ap_tca_idm_dr] = (int) tca_idm_dr_on;
+      ppw->approx[ppw->index_ap_tca_idm_dr] = static_cast<int>(tca_idm_dr_on);
     if (all_species_.count(
             "IDM_DRMD_IDR_DRMD")) { /* DRMD : Only if both fluids are present, does it make sense to have the tight coupling approximation.*/
-      ppw->approx[ppw->index_ap_tca_idm_drmd] = (int) tca_idm_drmd_on;
+      ppw->approx[ppw->index_ap_tca_idm_drmd] = static_cast<int>(tca_idm_drmd_on);
     }
     if (!resolved_.ur.empty()) {
-      ppw->approx[ppw->index_ap_ufa] = (int) ufa_off;
+      ppw->approx[ppw->index_ap_ufa] = static_cast<int>(ufa_off);
     }
     if (all_species_.has_ncdm()) {
-      ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_off;
+      ppw->approx[ppw->index_ap_ncdmfa] = static_cast<int>(ncdmfa_off);
     }
   }
 
   if (_tensors_) {
-    ppw->approx[ppw->index_ap_tca] = (int) tca_on;
-    ppw->approx[ppw->index_ap_rsa] = (int) rsa_off;
+    ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_on);
+    ppw->approx[ppw->index_ap_rsa] = static_cast<int>(rsa_off);
   }
 
   /** - allocate fields where some of the perturbations are stored */
@@ -2824,24 +2824,26 @@ void PerturbationsModule::perturb_find_approximation_switches(
 
       if (ppt->perturbations_verbose > 2) {
         if (_scalars_) {
-          if ((interval_approx[index_switch - 1][ppw->index_ap_tca] == (int) tca_on) &&
-              (interval_approx[index_switch][ppw->index_ap_tca] == (int) tca_off))
+          if ((interval_approx[index_switch - 1][ppw->index_ap_tca] == static_cast<int>(tca_on)) &&
+              (interval_approx[index_switch][ppw->index_ap_tca] == static_cast<int>(tca_off)))
             fprintf(stdout,
                     "Mode k=%e: will switch off tight-coupling approximation at tau=%e\n",
                     k,
                     interval_limit[index_switch]);
           //fprintf(stderr,"Mode k=%e: will switch off tight-coupling approximation at tau=%e\n",k,interval_limit[index_switch]);  //TBC
 
-          if ((interval_approx[index_switch - 1][ppw->index_ap_rsa] == (int) rsa_off) &&
-              (interval_approx[index_switch][ppw->index_ap_rsa] == (int) rsa_on))
+          if ((interval_approx[index_switch - 1][ppw->index_ap_rsa] == static_cast<int>(rsa_off)) &&
+              (interval_approx[index_switch][ppw->index_ap_rsa] == static_cast<int>(rsa_on)))
             fprintf(stdout,
                     "Mode k=%e: will switch on radiation streaming approximation at tau=%e\n",
                     k,
                     interval_limit[index_switch]);
 
           if (all_species_.count("IDM_DR_IDR")) {
-            if ((interval_approx[index_switch - 1][ppw->index_ap_rsa_idr] == (int) rsa_idr_off) &&
-                (interval_approx[index_switch][ppw->index_ap_rsa_idr] == (int) rsa_idr_on))
+            if ((interval_approx[index_switch - 1][ppw->index_ap_rsa_idr] ==
+                 static_cast<int>(rsa_idr_off)) &&
+                (interval_approx[index_switch][ppw->index_ap_rsa_idr] ==
+                 static_cast<int>(rsa_idr_on)))
               fprintf(stdout,
                       "Mode k=%e: will switch on dark radiation streaming approximation at "
                       "tau=%e\n",
@@ -2851,8 +2853,9 @@ void PerturbationsModule::perturb_find_approximation_switches(
 
           if (all_species_.count("IDM_DR_IDR")) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_tca_idm_dr] ==
-                 (int) tca_idm_dr_on) &&
-                (interval_approx[index_switch][ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off))
+                 static_cast<int>(tca_idm_dr_on)) &&
+                (interval_approx[index_switch][ppw->index_ap_tca_idm_dr] ==
+                 static_cast<int>(tca_idm_dr_off)))
               fprintf(stdout,
                       "Mode k=%e: will switch off dark tight-coupling approximation at tau=%e\n",
                       k,
@@ -2862,9 +2865,9 @@ void PerturbationsModule::perturb_find_approximation_switches(
           if ((all_species_.count("IDM_DRMD_IDR_DRMD")) &&
               (all_species_.count("IDM_DRMD_IDR_DRMD"))) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_tca_idm_drmd] ==
-                 (int) tca_idm_drmd_on) &&
+                 static_cast<int>(tca_idm_drmd_on)) &&
                 (interval_approx[index_switch][ppw->index_ap_tca_idm_drmd] ==
-                 (int) tca_idm_drmd_off))
+                 static_cast<int>(tca_idm_drmd_off)))
               fprintf(stdout,
                       "Mode k=%e: will switch off dark tight-coupling approximation at tau=%e\n",
                       k,
@@ -2872,8 +2875,9 @@ void PerturbationsModule::perturb_find_approximation_switches(
           }
 
           if (!resolved_.ur.empty()) {
-            if ((interval_approx[index_switch - 1][ppw->index_ap_ufa] == (int) ufa_off) &&
-                (interval_approx[index_switch][ppw->index_ap_ufa] == (int) ufa_on)) {
+            if ((interval_approx[index_switch - 1][ppw->index_ap_ufa] ==
+                 static_cast<int>(ufa_off)) &&
+                (interval_approx[index_switch][ppw->index_ap_ufa] == static_cast<int>(ufa_on))) {
               fprintf(stdout,
                       "Mode k=%e: will switch on ur fluid approximation at tau=%e\n",
                       k,
@@ -2881,8 +2885,10 @@ void PerturbationsModule::perturb_find_approximation_switches(
             }
           }
           if (all_species_.has_ncdm()) {
-            if ((interval_approx[index_switch - 1][ppw->index_ap_ncdmfa] == (int) ncdmfa_off) &&
-                (interval_approx[index_switch][ppw->index_ap_ncdmfa] == (int) ncdmfa_on)) {
+            if ((interval_approx[index_switch - 1][ppw->index_ap_ncdmfa] ==
+                 static_cast<int>(ncdmfa_off)) &&
+                (interval_approx[index_switch][ppw->index_ap_ncdmfa] ==
+                 static_cast<int>(ncdmfa_on))) {
               fprintf(stdout,
                       "Mode k=%e: will switch on ncdm fluid approximation at tau=%e\n",
                       k,
@@ -2892,16 +2898,16 @@ void PerturbationsModule::perturb_find_approximation_switches(
         }
 
         if (_tensors_) {
-          if ((interval_approx[index_switch - 1][ppw->index_ap_tca] == (int) tca_on) &&
-              (interval_approx[index_switch][ppw->index_ap_tca] == (int) tca_off))
+          if ((interval_approx[index_switch - 1][ppw->index_ap_tca] == static_cast<int>(tca_on)) &&
+              (interval_approx[index_switch][ppw->index_ap_tca] == static_cast<int>(tca_off)))
             fprintf(stdout,
                     "Mode k=%e: will switch off tight-coupling approximation for tensors at "
                     "tau=%e\n",
                     k,
                     interval_limit[index_switch]);
 
-          if ((interval_approx[index_switch - 1][ppw->index_ap_rsa] == (int) rsa_off) &&
-              (interval_approx[index_switch][ppw->index_ap_rsa] == (int) rsa_on))
+          if ((interval_approx[index_switch - 1][ppw->index_ap_rsa] == static_cast<int>(rsa_off)) &&
+              (interval_approx[index_switch][ppw->index_ap_rsa] == static_cast<int>(rsa_on)))
             fprintf(stdout,
                     "Mode k=%e: will switch on radiation streaming approximation for tensors at "
                     "tau=%e\n",
@@ -3033,7 +3039,8 @@ void PerturbationsModule::perturb_vector_init(
     /* perturbed_recombination — owned by the module (extension of the
        baryon-photon system, not a standalone species). Indices defined
        once TCA is off. */
-    if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+    if ((ppt->has_perturbed_recombination) &&
+        (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
       class_define_index(ppv->index_pt_perturbed_recombination_delta_temp, true, index_pt, 1);
       class_define_index(ppv->index_pt_perturbed_recombination_delta_chi, true, index_pt, 1);
     }
@@ -3272,8 +3279,8 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if ((pa_old[ppw->index_ap_tca] == (int) tca_on) &&
-          (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+      if ((pa_old[ppw->index_ap_tca] == static_cast<int>(tca_on)) &&
+          (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
 
@@ -3329,7 +3336,8 @@ void PerturbationsModule::perturb_vector_init(
       /* perturbed recombination */
       /* For any other transition in the approximation scheme, we should just copy the value of the perturbations, provided tca is already off (otherwise the indices are not yet allocated). For instance, we do not want to copy the values in the (k,tau) region where both UFA and TCA are engaged.*/
 
-      if ((ppt->has_perturbed_recombination) && (pa_old[ppw->index_ap_tca] == (int) tca_off)) {
+      if ((ppt->has_perturbed_recombination) &&
+          (pa_old[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
         ppv->y[ppv->index_pt_perturbed_recombination_delta_temp] =
             ppw->pv->y[ppw->pv->index_pt_perturbed_recombination_delta_temp];
         ppv->y[ppv->index_pt_perturbed_recombination_delta_chi] =
@@ -3340,8 +3348,8 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if ((pa_old[ppw->index_ap_rsa] == (int) rsa_off) &&
-          (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)) {
+      if ((pa_old[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) &&
+          (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))) {
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout,
                   "Mode k=%e: switch on radiation streaming approximation at tau=%e with "
@@ -3356,8 +3364,8 @@ void PerturbationsModule::perturb_vector_init(
          of variables */
 
       if (!resolved_.ur.empty()) {
-        if ((pa_old[ppw->index_ap_ufa] == (int) ufa_off) &&
-            (ppw->approx[ppw->index_ap_ufa] == (int) ufa_on)) {
+        if ((pa_old[ppw->index_ap_ufa] == static_cast<int>(ufa_off)) &&
+            (ppw->approx[ppw->index_ap_ufa] == static_cast<int>(ufa_on))) {
           if (ppt->perturbations_verbose > 2)
             fprintf(stdout, "Mode k=%e: switch on ur fluid approximation at tau=%e\n", k, tau);
         }
@@ -3365,8 +3373,8 @@ void PerturbationsModule::perturb_vector_init(
 
       /* Case of switching on rsa for interacting dark radiation */
       if (all_species_.count("IDM_DR_IDR")) {
-        if ((pa_old[ppw->index_ap_rsa_idr] == (int) rsa_idr_off) &&
-            (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
+        if ((pa_old[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off)) &&
+            (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on))) {
           if (ppt->perturbations_verbose > 2)
             fprintf(stdout,
                     "Mode k=%e: switch on dark radiation approximation at tau=%e\n",
@@ -3378,8 +3386,8 @@ void PerturbationsModule::perturb_vector_init(
       if (all_species_.count("IDM_DR_IDR")) {
         /* Case of switching off interacting dark radiation tight coupling approximation */
 
-        if ((pa_old[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on) &&
-            (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_off)) {
+        if ((pa_old[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_on)) &&
+            (ppw->approx[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_off))) {
           if (ppt->perturbations_verbose > 2)
             fprintf(stdout,
                     "Mode k=%e: switch off dark tight coupling approximation at tau=%e\n",
@@ -3409,8 +3417,8 @@ void PerturbationsModule::perturb_vector_init(
          of variables */
 
       if (all_species_.has_ncdm()) {
-        if ((pa_old[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) &&
-            (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on)) {
+        if ((pa_old[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_off)) &&
+            (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on))) {
           if (ppt->perturbations_verbose > 2)
             fprintf(stdout, "Mode k=%e: switch on ncdm fluid approximation at tau=%e\n", k, tau);
         }
@@ -3423,8 +3431,8 @@ void PerturbationsModule::perturb_vector_init(
       if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
         /* Case of switching off idm_idr_drmd tight coupling approximation */
 
-        if ((pa_old[ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_on) &&
-            (ppw->approx[ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_off) &&
+        if ((pa_old[ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_on)) &&
+            (ppw->approx[ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_off)) &&
             (all_species_.count("IDM_DRMD_IDR_DRMD"))) {
           double a = ppw->pvecback[background_module_->index_bg_a_];
 
@@ -3521,8 +3529,8 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if ((pa_old[ppw->index_ap_tca] == (int) tca_on) &&
-          (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+      if ((pa_old[ppw->index_ap_tca] == static_cast<int>(tca_on)) &&
+          (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
 
@@ -3540,8 +3548,8 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if ((pa_old[ppw->index_ap_rsa] == (int) rsa_off) &&
-          (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)) {
+      if ((pa_old[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) &&
+          (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))) {
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout,
                   "Mode k=%e: switch on radiation streaming approximation at tau=%e with "
@@ -3590,8 +3598,8 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if ((pa_old[ppw->index_ap_tca] == (int) tca_on) &&
-          (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+      if ((pa_old[ppw->index_ap_tca] == static_cast<int>(tca_on)) &&
+          (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
 
@@ -3620,8 +3628,8 @@ void PerturbationsModule::perturb_vector_init(
          approximation. Provide correct initial conditions to new set
          of variables */
 
-      if ((pa_old[ppw->index_ap_rsa] == (int) rsa_off) &&
-          (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)) {
+      if ((pa_old[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) &&
+          (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))) {
         if (ppt->perturbations_verbose > 2)
           fprintf(stdout,
                   "Mode k=%e: switch on radiation streaming approximation at tau=%e with "
@@ -4278,7 +4286,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
     /** - ---> (b.1.) if \f$ \kappa'=0 \f$, recombination is finished; tight-coupling approximation must be off */
 
     if (ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] == 0.) {
-      ppw->approx[ppw->index_ap_tca] = (int) tca_off;
+      ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_off);
     }
 
     /** - ---> (b.2.) if \f$ \kappa' \neq 0 \f$, recombination is not finished: check tight-coupling approximation */
@@ -4301,17 +4309,17 @@ void PerturbationsModule::perturb_approximations(int index_md,
 
       if ((tau_c / tau_h < ppr->tight_coupling_trigger_tau_c_over_tau_h) &&
           (tau_c / tau_k < ppr->tight_coupling_trigger_tau_c_over_tau_k)) {
-        ppw->approx[ppw->index_ap_tca] = (int) tca_on;
+        ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_on);
       }
       else {
-        ppw->approx[ppw->index_ap_tca] = (int) tca_off;
+        ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_off);
       }
     }
 
     if (resolved_.idm_dr_idr) {
       const auto& idm_dr_idr = *resolved_.idm_dr_idr;
       if (ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] == 0.) {
-        ppw->approx[ppw->index_ap_tca_idm_dr] = (int) tca_idm_dr_off;
+        ppw->approx[ppw->index_ap_tca_idm_dr] = static_cast<int>(tca_idm_dr_off);
       }
       else {
         class_test(1. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] < 0.,
@@ -4326,10 +4334,10 @@ void PerturbationsModule::perturb_approximations(int index_md,
              ppr->idm_dr_tight_coupling_trigger_tau_c_over_tau_k) &&
             (idm_dr_idr.idm_dr().nindex_idm_dr() >= 2) &&
             (idm_dr_idr.idr().idr_nature() == idr_free_streaming)) {
-          ppw->approx[ppw->index_ap_tca_idm_dr] = (int) tca_idm_dr_on;
+          ppw->approx[ppw->index_ap_tca_idm_dr] = static_cast<int>(tca_idm_dr_on);
         }
         else {
-          ppw->approx[ppw->index_ap_tca_idm_dr] = (int) tca_idm_dr_off;
+          ppw->approx[ppw->index_ap_tca_idm_dr] = static_cast<int>(tca_idm_dr_off);
           //printf("tca_idm_dr_off = %d\n",tau);
         }
       }
@@ -4352,10 +4360,10 @@ void PerturbationsModule::perturb_approximations(int index_md,
                                 &Gint);
 
       if (Gint > conformalH * ppr->idm_drmd_tight_coupling_trigger_G_over_aH) {
-        ppw->approx[ppw->index_ap_tca_idm_drmd] = (int) tca_idm_drmd_on;
+        ppw->approx[ppw->index_ap_tca_idm_drmd] = static_cast<int>(tca_idm_drmd_on);
       }
       else {
-        ppw->approx[ppw->index_ap_tca_idm_drmd] = (int) tca_idm_drmd_off;
+        ppw->approx[ppw->index_ap_tca_idm_drmd] = static_cast<int>(tca_idm_drmd_off);
       }
     }
 
@@ -4364,10 +4372,10 @@ void PerturbationsModule::perturb_approximations(int index_md,
     if ((tau / tau_k > ppr->radiation_streaming_trigger_tau_over_tau_k) &&
         (tau > thermodynamics_module_->tau_free_streaming_) &&
         (ppr->radiation_streaming_approximation != static_cast<int>(rsa_method::rsa_none))) {
-      ppw->approx[ppw->index_ap_rsa] = (int) rsa_on;
+      ppw->approx[ppw->index_ap_rsa] = static_cast<int>(rsa_on);
     }
     else {
-      ppw->approx[ppw->index_ap_rsa] = (int) rsa_off;
+      ppw->approx[ppw->index_ap_rsa] = static_cast<int>(rsa_off);
     }
 
     /* interacting dark radiation free streaming approximation*/
@@ -4379,11 +4387,11 @@ void PerturbationsModule::perturb_approximations(int index_md,
             ((tau > thermodynamics_module_->tau_idr_free_streaming_) &&
              (idm_idr.idm_dr().nindex_idm_dr() >= 2)) &&
             (ppr->idr_streaming_approximation != static_cast<int>(rsa_idr_method::rsa_idr_none))) {
-          ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_on;
+          ppw->approx[ppw->index_ap_rsa_idr] = static_cast<int>(rsa_idr_on);
         }
 
         else {
-          ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_off;
+          ppw->approx[ppw->index_ap_rsa_idr] = static_cast<int>(rsa_idr_off);
         }
       }
 
@@ -4392,11 +4400,11 @@ void PerturbationsModule::perturb_approximations(int index_md,
         if ((tau / tau_k > ppr->idr_streaming_trigger_tau_over_tau_k) &&
             (tau > thermodynamics_module_->tau_idr_free_streaming_) &&
             (ppr->idr_streaming_approximation != static_cast<int>(rsa_idr_method::rsa_idr_none))) {
-          ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_on;
+          ppw->approx[ppw->index_ap_rsa_idr] = static_cast<int>(rsa_idr_on);
         }
 
         else {
-          ppw->approx[ppw->index_ap_rsa_idr] = (int) rsa_idr_off;
+          ppw->approx[ppw->index_ap_rsa_idr] = static_cast<int>(rsa_idr_off);
         }
       }
     }
@@ -4404,20 +4412,20 @@ void PerturbationsModule::perturb_approximations(int index_md,
     if (!resolved_.ur.empty()) {
       if ((tau / tau_k > ppr->ur_fluid_trigger_tau_over_tau_k) &&
           (ppr->ur_fluid_approximation != static_cast<int>(ufa_method::ufa_none))) {
-        ppw->approx[ppw->index_ap_ufa] = (int) ufa_on;
+        ppw->approx[ppw->index_ap_ufa] = static_cast<int>(ufa_on);
       }
       else {
-        ppw->approx[ppw->index_ap_ufa] = (int) ufa_off;
+        ppw->approx[ppw->index_ap_ufa] = static_cast<int>(ufa_off);
       }
     }
 
     if (all_species_.has_ncdm()) {
       if ((tau / tau_k > ppr->ncdm_fluid_trigger_tau_over_tau_k) &&
           (ppr->ncdm_fluid_approximation != static_cast<int>(ncdmfa_method::ncdmfa_none))) {
-        ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_on;
+        ppw->approx[ppw->index_ap_ncdmfa] = static_cast<int>(ncdmfa_on);
       }
       else {
-        ppw->approx[ppw->index_ap_ncdmfa] = (int) ncdmfa_off;
+        ppw->approx[ppw->index_ap_ncdmfa] = static_cast<int>(ncdmfa_off);
       }
     }
 
@@ -4444,7 +4452,7 @@ void PerturbationsModule::perturb_approximations(int index_md,
     /** - ---> (b.1.) if \f$ \kappa'=0 \f$, recombination is finished; tight-coupling approximation must be off */
 
     if (ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] == 0.) {
-      ppw->approx[ppw->index_ap_tca] = (int) tca_off;
+      ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_off);
     }
 
     /** - ---> (b.2.) if \f$ \kappa' \neq 0 \f$, recombination is not finished: check tight-coupling approximation */
@@ -4456,20 +4464,20 @@ void PerturbationsModule::perturb_approximations(int index_md,
       /** - ----> (b.2.b) check whether tight-coupling approximation should be on */
       if ((tau_c / tau_h < ppr->tight_coupling_trigger_tau_c_over_tau_h_ten) &&
           (tau_c / tau_k < ppr->tight_coupling_trigger_tau_c_over_tau_k_ten)) {
-        ppw->approx[ppw->index_ap_tca] = (int) tca_on;
+        ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_on);
       }
       else {
-        ppw->approx[ppw->index_ap_tca] = (int) tca_off;
+        ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_off);
       }
     }
 
     if ((tau / tau_k > ppr->radiation_streaming_trigger_tau_over_tau_k) &&
         (tau > thermodynamics_module_->tau_free_streaming_) &&
         (ppr->radiation_streaming_approximation != static_cast<int>(rsa_method::rsa_none))) {
-      ppw->approx[ppw->index_ap_rsa] = (int) rsa_on;
+      ppw->approx[ppw->index_ap_rsa] = static_cast<int>(rsa_on);
     }
     else {
-      ppw->approx[ppw->index_ap_rsa] = (int) rsa_off;
+      ppw->approx[ppw->index_ap_rsa] = static_cast<int>(rsa_off);
     }
   }
 }
@@ -4515,7 +4523,7 @@ void PerturbationsModule::perturb_timescale_member(double tau,
   double* pvecthermo;
 
   /** - extract the fields of the parameter_and_workspace input structure */
-  pppaw      = (struct perturb_parameters_and_workspace*) parameters_and_workspace;
+  pppaw      = static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
   ppw        = pppaw->ppw;
   pvecback   = ppw->pvecback.data();
   pvecthermo = ppw->pvecthermo.data();
@@ -4548,10 +4556,10 @@ void PerturbationsModule::perturb_timescale_member(double tau,
   if ((ppt->has_scalars) && (pppaw->index_md == index_md_scalars_)) {
     *timescale = tau_h;
 
-    if ((ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) || (all_species_.has_ncdm()))
+    if ((ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) || (all_species_.has_ncdm()))
       *timescale = std::min(tau_k, *timescale);
 
-    if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
+    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
       thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
                                                       1., /* redshift z=1/a-1 */
                                                   ppw->inter_mode,
@@ -4574,7 +4582,7 @@ void PerturbationsModule::perturb_timescale_member(double tau,
   if ((ppt->has_vectors) && (pppaw->index_md == index_md_vectors_)) {
     *timescale = std::min(tau_h, tau_k);
 
-    if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
+    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
       thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
                                                       1., /* redshift z=1/a-1 */
                                                   ppw->inter_mode,
@@ -4597,7 +4605,7 @@ void PerturbationsModule::perturb_timescale_member(double tau,
   if ((ppt->has_tensors) && (pppaw->index_md == index_md_tensors_)) {
     *timescale = std::min(tau_h, tau_k);
 
-    if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
+    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
       thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
                                                       1., /* redshift z=1/a-1 */
                                                   ppw->inter_mode,
@@ -4676,11 +4684,12 @@ void PerturbationsModule::perturb_einstein(
          gamma and ur (this is exactly the right place to do it
          because the result depends on h_prime) */
 
-      if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
+      if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
         perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
       }
 
-      if (resolved_.idm_dr_idr && (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
+      if (resolved_.idm_dr_idr &&
+          (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on))) {
         perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
       }
     }
@@ -4700,11 +4709,12 @@ void PerturbationsModule::perturb_einstein(
          gamma and ur (this is exactly the right place to do it
          because the result depends on h_prime) */
 
-      if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
+      if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
         perturb_rsa_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
       }
 
-      if (resolved_.idm_dr_idr && (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on)) {
+      if (resolved_.idm_dr_idr &&
+          (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on))) {
         perturb_rsa_idr_delta_and_theta(k, y, a_prime_over_a, ppw->pvecthermo.data(), ppw);
 
         ppw->rho_plus_p_theta += 4. / 3. * resolved_.idm_dr_idr->idr().Rho(ppw->pvecback.data()) *
@@ -4731,7 +4741,7 @@ void PerturbationsModule::perturb_einstein(
 
       /* eventually, infer first-order tight-coupling approximation for photon
          shear, then correct the total shear */
-      if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
+      if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
         const auto& g_ein_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
             *ppw->pv->photon_layout);
         shear_g = 16. / 45. / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
@@ -4741,7 +4751,8 @@ void PerturbationsModule::perturb_einstein(
                                  shear_g;
       }
 
-      if (resolved_.idm_dr_idr && (ppw->approx[ppw->index_ap_tca_idm_dr] == (int) tca_idm_dr_on)) {
+      if (resolved_.idm_dr_idr &&
+          (ppw->approx[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_on))) {
         const auto& idr_th_lay = IDM_DR_IDR_Species::idr_layout(
             *ppw->pv->species_layouts[resolved_.idm_dr_idr_index]);
         shear_idr = 0.5 * 8. / 15. / ppw->pvecthermo[thermodynamics_module_->index_th_dmu_idm_dr_] /
@@ -4915,9 +4926,9 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
       const auto& g_vec_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
           *ppw->pv->photon_layout);
       if (ppw->approx[ppw->index_ap_rsa] ==
-          (int) rsa_off) { /* if radiation streaming approximation is off */
+          static_cast<int>(rsa_off)) { /* if radiation streaming approximation is off */
         if (ppw->approx[ppw->index_ap_tca] ==
-            (int) tca_off) { /* if tight-coupling approximation is off */
+            static_cast<int>(tca_off)) { /* if tight-coupling approximation is off */
 
           ppw->vector_source_v += 4. / 3. * a2 * all_species_.photons().Rho(ppw->pvecback.data()) *
                                   (-1. / 4. * _SQRT2_) *
@@ -4941,9 +4952,9 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - --> photon contribution to gravitational wave source: */
     if (ppw->approx[ppw->index_ap_rsa] ==
-        (int) rsa_off) { /* if radiation streaming approximation is off */
+        static_cast<int>(rsa_off)) { /* if radiation streaming approximation is off */
       if (ppw->approx[ppw->index_ap_tca] ==
-          (int) tca_off) { /* if tight-coupling approximation is off */
+          static_cast<int>(tca_off)) { /* if tight-coupling approximation is off */
         const auto& g_tens_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
             *ppw->pv->photon_layout);
         ppw->gw_source += (-_SQRT6_ * 4 * a2 * all_species_.photons().Rho(ppw->pvecback.data()) *
@@ -5026,7 +5037,7 @@ void PerturbationsModule::perturb_sources_member(
   /** - rename structure fields (just to avoid heavy notations) */
 
   struct perturb_parameters_and_workspace* pppaw =
-      (struct perturb_parameters_and_workspace*) parameters_and_workspace;
+      static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
   int index_md                  = pppaw->index_md;
   int index_ic                  = pppaw->index_ic;
   int index_k                   = pppaw->index_k;
@@ -5079,13 +5090,13 @@ void PerturbationsModule::perturb_sources_member(
         *ppw->pv->baryon_layout);
 
     double delta_g;
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
       delta_g = ppw->rsa_delta_g;
       P       = 0.;
     }
     else {
       delta_g = y[g_src_lay.idx_delta];
-      if (ppw->approx[ppw->index_ap_tca] == (int) tca_on)
+      if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))
         P = 5. * ppw->s_l[2] * ppw->tca_shear_g / 8.; /* (2.5+0.5+2)shear_g/8 */
       else
         P = (y[g_src_lay.idx_pol0] + y[g_src_lay.idx_pol2] +
@@ -5383,8 +5394,8 @@ void PerturbationsModule::perturb_sources_member(
   /** - for tensors */
   if (_tensors_) {
     /** - --> compute quantities depending on approximation schemes */
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
-      if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
+      if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
         const auto& g_tsrc_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
             *ppw->pv->photon_layout);
         P = PhotonsSpecies::TensorP2(y[g_tsrc_lay.idx_delta],
@@ -5457,7 +5468,7 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
   /** - rename structure fields (just to avoid heavy notations) */
 
   struct perturb_parameters_and_workspace* pppaw =
-      (struct perturb_parameters_and_workspace*) parameters_and_workspace;
+      static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
   double k     = pppaw->k;
   int index_md = pppaw->index_md;
 
@@ -5491,7 +5502,8 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
 
   double delta_temp = 0.;
   double delta_chi  = 0.;
-  if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+  if ((ppt->has_perturbed_recombination) &&
+      (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
     delta_temp = y[ppw->pv->index_pt_perturbed_recombination_delta_temp];
     delta_chi  = y[ppw->pv->index_pt_perturbed_recombination_delta_chi];
   }
@@ -5570,10 +5582,10 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
   if (_tensors_) {
     double l4_ur = 0.;
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
       const auto& g_pv_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
           *ppw->pv->photon_layout);
-      if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
+      if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
         delta_g = y[g_pv_lay.idx_delta];
         shear_g = y[g_pv_lay.idx_shear];
         l4_g    = y[g_pv_lay.idx_delta + 4];
@@ -5752,7 +5764,7 @@ void PerturbationsModule::perturb_derivs_member(double tau,
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
 
-  auto* pppaw = (struct perturb_parameters_and_workspace*) parameters_and_workspace;
+  auto* pppaw = static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
 
   double k                      = pppaw->k;
   double k2                     = k * k;
@@ -5838,7 +5850,7 @@ void PerturbationsModule::perturb_derivs_member(double tau,
 
     /** - --> (a) define short-cut notations for the scalar perturbations */
     const auto& g_dr_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(*pv->photon_layout);
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
       delta_g = y[g_dr_lay.idx_delta];
       theta_g = y[g_dr_lay.idx_theta];
     }
@@ -5850,7 +5862,8 @@ void PerturbationsModule::perturb_derivs_member(double tau,
 
     /** - --> (b) perturbed recombination **/
 
-    if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+    if ((ppt->has_perturbed_recombination) &&
+        (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
       delta_temp = y[ppw->pv->index_pt_perturbed_recombination_delta_temp];
 
       delta_chi = y[ppw->pv->index_pt_perturbed_recombination_delta_chi];
@@ -5922,7 +5935,7 @@ void PerturbationsModule::perturb_derivs_member(double tau,
 
     /** - --> (d) if some approximation schemes are turned on, enforce a few y[] values computed in perturb_einstein */
 
-    if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on) {
+    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on)) {
       delta_g = ppw->rsa_delta_g;
       theta_g = ppw->rsa_theta_g;
     }
@@ -5954,7 +5967,7 @@ void PerturbationsModule::perturb_derivs_member(double tau,
 
     /** - ---> photon temperature and baryon (species-delegated) */
 
-    if (ppw->approx[ppw->index_ap_tca] == (int) tca_on) {
+    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
       perturb_tca_slip_and_shear(y, pppaw);
     }
 
@@ -5970,7 +5983,8 @@ void PerturbationsModule::perturb_derivs_member(double tau,
 
     /* perturbed recombination — derivatives of delta x_e and delta T_b. Runs
        after the species loop because it reads dy[baryon.idx_delta]. */
-    if ((ppt->has_perturbed_recombination) && (ppw->approx[ppw->index_ap_tca] == (int) tca_off)) {
+    if ((ppt->has_perturbed_recombination) &&
+        (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))) {
       /* alpha * n_H is in inverse seconds, so we have to multiply it by Mpc_in_sec */
       dy[ppw->pv->index_pt_perturbed_recombination_delta_chi] =
           -alpha_rec * a * chi * n_H * (delta_alpha_rec + delta_chi + delta_b) * _Mpc_over_m_ / _c_;
@@ -6098,7 +6112,7 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
 
-  auto* pppaw = (struct perturb_parameters_and_workspace*) parameters_and_workspace;
+  auto* pppaw = static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
 
   double k  = pppaw->k;
   double k2 = k * k;
@@ -6124,7 +6138,7 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   const auto& b_tca_lay = static_cast<const BaryonsSpecies::PerturbLayout&>(*pv->baryon_layout);
   double delta_g        = 0.;
   double theta_g        = 0.;
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_off) {
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
     delta_g = y[g_tca_lay.idx_delta];
     theta_g = y[g_tca_lay.idx_theta];
   }
@@ -6199,7 +6213,7 @@ void PerturbationsModule::perturb_tca_slip_and_shear(double* y, void* parameters
   /** - --> (d) if some approximation schemes are turned on, enforce a few y[ ] values computed in perturb_einstein */
 
   /* free-streaming photon velocity */
-  if (ppw->approx[ppw->index_ap_rsa] == (int) rsa_on)
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_on))
     theta_g = ppw->rsa_theta_g;
 
   /** - ---> like Ma & Bertschinger */
@@ -6529,14 +6543,14 @@ void PerturbationsModule::perturb_rsa_idr_delta_and_theta(
 
   /* newtonian gauge */
   if (ppt->gauge == possible_gauges::newtonian) {
-    if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on) {
+    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on)) {
       ppw->rsa_delta_idr = -4. * y[ppw->pv->index_pt_phi];
       ppw->rsa_theta_idr = 6. * ppw->pvecmetric[ppw->index_mt_phi_prime];
     }
   }
 
   if (ppt->gauge == possible_gauges::synchronous) {
-    if (ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on) {
+    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on)) {
       ppw->rsa_delta_idr = 4. / k2 *
                            (a_prime_over_a * ppw->pvecmetric[ppw->index_mt_h_prime] -
                             k2 * y[ppw->pv->index_pt_eta]);

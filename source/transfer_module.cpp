@@ -548,17 +548,18 @@ void TransferModule::transfer_get_l_list() {
 
   l_.clear();
   l_.push_back(2);
-  increment =
-      std::max((int) (l_.back() *
-                      (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
-               1);
+  increment = std::max(static_cast<int>(
+                           l_.back() *
+                           (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+                       1);
 
   while (((l_.back() + increment) < l_max) &&
          (increment < ppr->l_linstep * thermodynamics_module_->angular_rescaling_)) {
     l_.push_back(l_.back() + increment);
     increment =
-        std::max((int) (l_.back() *
-                        (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
+        std::max(static_cast<int>(
+                     l_.back() *
+                     (pow(ppr->l_logstep, thermodynamics_module_->angular_rescaling_) - 1.)),
                  1);
   }
 
@@ -736,11 +737,11 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
     */
 
     else {
-      if (nu < (int) ppr->hyper_flat_approximation_nu) {
+      if (nu < static_cast<int>(ppr->hyper_flat_approximation_nu)) {
         q = q_[index_q - 1] + q_period * ppr->q_linstep * q_[index_q - 1] /
                                   (q_[index_q - 1] + ppr->q_linstep / q_logstep_trapzd);
 
-        nu_proposed = (int) (q / sqrt(K));
+        nu_proposed = static_cast<int>(q / sqrt(K));
         if (nu_proposed <= nu + 1)
           nu = nu + 1;
         else
@@ -754,10 +755,11 @@ void TransferModule::transfer_get_q_list(double q_period, double K, int sgnK) {
         q_step = q_period * ppr->q_linstep * q_[index_q - 1] /
                  (q_[index_q - 1] + ppr->q_linstep / q_logstep_spline);
 
-        if (index_q - last_index < (int) ppr->q_numstep_transition)
+        if (index_q - last_index < static_cast<int>(ppr->q_numstep_transition))
           q = q_[index_q - 1] +
-              (1 - (double) (index_q - last_index) / ppr->q_numstep_transition) * last_step +
-              (double) (index_q - last_index) / ppr->q_numstep_transition * q_step;
+              (1 - static_cast<double>(index_q - last_index) / ppr->q_numstep_transition) *
+                  last_step +
+              static_cast<double>(index_q - last_index) / ppr->q_numstep_transition * q_step;
         else
           q = q_[index_q - 1] + q_step;
       }
@@ -1302,7 +1304,7 @@ void TransferModule::transfer_time_samplings(double tau_rec) {
                   (1. - ppr->cmb_lensing_sampling_fraction) * tau0,
                   0,
                   ppr->cmb_lensing_sampling_factor /
-                      std::min(ppr->l_switch_limber, (double) ppt->l_scalar_max)};
+                      std::min(ppr->l_switch_limber, static_cast<double>(ppt->l_scalar_max))};
           class_test(ppr->cmb_lensing_sampling_factor <= 0.,
                      "cmb_lensing_sampling_factor=%e should be strictly positive",
                      ppr->cmb_lensing_sampling_factor);
@@ -1333,11 +1335,12 @@ void TransferModule::transfer_time_samplings(double tau_rec) {
           if (spec.tau_min != spec.tau_max) {
             const int l_limber = ppr->l_switch_limber_for_nc_local_over_z *
                                  ppt->selection_mean[bin];
-            spec.tau_size      = std::max((int) ppr->selection_sampling,
-                                          (int) ((int) ((spec.tau_max - spec.tau_min) /
-                                                        ((tau0 - selection_tau_mean_[bin]) /
-                                                         std::min(l_limber, ppt->l_lss_max))) *
-                                                 ppr->selection_sampling_bessel));
+            spec.tau_size =
+                std::max(static_cast<int>(ppr->selection_sampling),
+                         static_cast<int>(static_cast<int>((spec.tau_max - spec.tau_min) /
+                                                           ((tau0 - selection_tau_mean_[bin]) /
+                                                            std::min(l_limber, ppt->l_lss_max))) *
+                                          ppr->selection_sampling_bessel));
           }
           break;
         }
@@ -1350,12 +1353,13 @@ void TransferModule::transfer_time_samplings(double tau_rec) {
           const int l_limber = (g5 ? ppr->l_switch_limber_for_nc_local_over_z
                                    : ppr->l_switch_limber_for_nc_los_over_z) *
                                ppt->selection_mean[bin];
-          spec.tau_size      = std::max((int) ppr->selection_sampling,
-                                        (int) ((int) ((tau0 - spec.tau_min) /
-                                                      ((tau0 - selection_tau_mean_[bin]) / 2. /
-                                                       std::min(l_limber, ppt->l_lss_max))) *
-                                               (g5 ? ppr->selection_sampling_bessel
-                                                   : ppr->selection_sampling_bessel_los)));
+          spec.tau_size =
+              std::max(static_cast<int>(ppr->selection_sampling),
+                       static_cast<int>(static_cast<int>((tau0 - spec.tau_min) /
+                                                         ((tau0 - selection_tau_mean_[bin]) / 2. /
+                                                          std::min(l_limber, ppt->l_lss_max))) *
+                                        (g5 ? ppr->selection_sampling_bessel
+                                            : ppr->selection_sampling_bessel_los)));
           break;
         }
       }
@@ -1399,7 +1403,8 @@ void TransferModule::transfer_time_samplings(double tau_rec) {
           else {
             for (int index_tau = 0; index_tau < spec.tau_size - 1; index_tau++) {
               t0mt.push_back(tau0 - spec.tau_min -
-                             ((double) index_tau) / ((double) spec.tau_size - 1.) *
+                             (static_cast<double>(index_tau)) /
+                                 (static_cast<double>(spec.tau_size) - 1.) *
                                  (spec.tau_max - spec.tau_min));
             }
             t0mt.push_back(tau0 - spec.tau_max);
@@ -1605,7 +1610,7 @@ void TransferModule::transfer_compute_for_each_q(int index_q,
       }
 
       for (int index_l = 0; index_l < l_size_[index_md]; index_l++) {
-        const double l = (double) l_[index_l];
+        const double l = static_cast<double>(l_[index_l]);
 
         /* choose the method for each (initial condition, type) using this sampling, and find
            which Bessel functions are needed, and at how many times */
@@ -2117,7 +2122,7 @@ TransferMethod TransferModule::transfer_select_method(struct transfer_workspace*
   const TransferType& type                  = types_[index_md][index_tt];
   const std::vector<double>& tau0_minus_tau = sampling.tau0_minus_tau;
   const int tau_size                        = static_cast<int>(tau0_minus_tau.size());
-  const double l                            = (double) l_[index_l];
+  const double l                            = static_cast<double>(l_[index_l]);
 
   *index_tau_max     = -1;
   *bessel_truncation = 0;
@@ -2131,7 +2136,7 @@ TransferMethod TransferModule::transfer_select_method(struct transfer_workspace*
     return TransferMethod::zero;
 
   /** - for K>0 (closed), transfer functions only defined for l<nu */
-  if ((ptw->sgnK == 1) && (l_[index_l] >= (int) (q / sqrt(ptw->K) + 0.2)))
+  if ((ptw->sgnK == 1) && (l_[index_l] >= static_cast<int>(q / sqrt(ptw->K) + 0.2)))
     return TransferMethod::zero;
 
   /** - in the full Limber scheme, always use the Limber approximation */
@@ -2143,7 +2148,7 @@ TransferMethod TransferModule::transfer_select_method(struct transfer_workspace*
     return TransferMethod::zero;
 
   if (ptr->transfer_verbose > 3)
-    printf("Compute transfer for l=%d type=%d\n", (int) l, index_tt);
+    printf("Compute transfer for l=%d type=%d\n", static_cast<int>(l), index_tt);
 
   /** - Limber approximation above the largest q at which the Bessel functions are tabulated,
       above the largest q at which the time sampling resolves their oscillations (otherwise
@@ -2507,7 +2512,7 @@ double TransferModule::transfer_bessel_cut(struct transfer_workspace* ptw,
                                            int index_q,
                                            int index_l,
                                            double k) {
-  const double l = (double) l_[index_l];
+  const double l = static_cast<double>(l_[index_l]);
 
   if (ptw->sgnK == 0)
     return ptw->pBIS->chi_at_phimin[index_l] /
@@ -2555,7 +2560,7 @@ void TransferModule::transfer_bessel_interpolate(struct transfer_workspace* ptw,
   double* chireverse       = ptw->chireverse.data();
   double* rescale_function = ptw->rescale_function.data();
   const double K           = ptw->K;
-  const double l           = (double) l_[index_l];
+  const double l           = static_cast<double>(l_[index_l]);
   double nu                = 0.;
   double chi_tp            = 0.;
   double rescale_argument;
@@ -2703,7 +2708,7 @@ void TransferModule::transfer_radial_function(struct transfer_workspace* ptw,
   const double rescale_argument  = ptw->rescale_argument;
   const double K                 = ptw->K;
   const double k2                = k * k;
-  const double l                 = (double) l_[index_l];
+  const double l                 = static_cast<double>(l_[index_l]);
   double factor;
   double s0;
   double s2;
@@ -2985,8 +2990,8 @@ void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int ind
     if (ptw->sgnK == 1) {
       xmax = std::min(xmax, _PI_ / 2.0 - ppr->hyper_x_min);  //We only need solution on [0;pi/2]
 
-      int_nu = (int) (nu + 0.2);
-      new_nu = (double) int_nu;
+      int_nu = static_cast<int>(nu + 0.2);
+      new_nu = static_cast<double>(int_nu);
       class_test(nu - new_nu > 1.e-6,
                  "problem in q list definition in closed case for index_q=%d, nu=%e, nu-int(nu)=%e",
                  index_q,
@@ -3003,7 +3008,7 @@ void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int ind
     /* find the highest value of l such that x_nonzero < xmax = sqrt(|K|) tau0. That will be l_max. */
     l_size_max = l_size_max_;
     if (ptw->sgnK == 1)
-      while ((double) l_[l_size_max - 1] >= nu)
+      while (static_cast<double>(l_[l_size_max - 1]) >= nu)
         l_size_max--;
 
     if (ptw->sgnK == -1) {
@@ -3130,7 +3135,7 @@ void TransferModule::transfer_get_lmax(
   }
   /* binary search */
   while (((*index_l_right) - (*index_l_left)) > 1) {
-    index_l_mid = (int) (0.5 * ((*index_l_right) + (*index_l_left)));
+    index_l_mid = static_cast<int>(0.5 * ((*index_l_right) + (*index_l_left)));
     get_xmin_generic(sgnK, lvec[index_l_mid], nu, xtol, phiminabs, &x_nonzero, &fevals);
     if (x_nonzero < xmax)
       *index_l_left = index_l_mid;
@@ -3329,8 +3334,9 @@ void TransferModule::transfer_precompute_windows(double tau_rec) {
         case TransferWindow::integrated: {
           /* time sampling of the source selection function: evenly spaced over the bin
              (just its centre for a Dirac selection function) */
-          const int tau_sources_size = (ppt->selection == dirac) ? 1
-                                                                 : (int) ppr->selection_sampling;
+          const int tau_sources_size = (ppt->selection == dirac)
+                                           ? 1
+                                           : static_cast<int>(ppr->selection_sampling);
           std::vector<double> tau0_minus_tau_lensing_sources(tau_sources_size);
           std::vector<double> w_trapz_lensing_sources(tau_sources_size);
           std::vector<double> selection(tau_sources_size);
@@ -3342,7 +3348,7 @@ void TransferModule::transfer_precompute_windows(double tau_rec) {
             for (int index_tau = 0; index_tau < tau_sources_size - 1; index_tau++) {
               tau0_minus_tau_lensing_sources[index_tau] =
                   tau0 - selection_tau_min_[bin] -
-                  ((double) index_tau) / ((double) tau_sources_size - 1.) *
+                  (static_cast<double>(index_tau)) / (static_cast<double>(tau_sources_size) - 1.) *
                       (selection_tau_max_[bin] - selection_tau_min_[bin]);
             }
             tau0_minus_tau_lensing_sources[tau_sources_size - 1] = tau0 - selection_tau_max_[bin];

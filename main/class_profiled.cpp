@@ -209,8 +209,9 @@ int main(int argc, char** argv) {
         " per accepted step)\n\n",
         erk_last.dense_points,
         erk_last.exact_points,
-        erk_last.steps_accepted > 0 ? (double) erk_last.dense_points / erk_last.steps_accepted
-                                    : 0.0);
+        erk_last.steps_accepted > 0
+            ? static_cast<double>(erk_last.dense_points) / erk_last.steps_accepted
+            : 0.0);
   }
   Stats tot = summarize(totals);
   for (size_t i = 0; i < n_stages; ++i) {

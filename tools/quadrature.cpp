@@ -1045,7 +1045,7 @@ void quadrature_gauss_legendre(double* mu, double* w8, int n, double tol) {
 
   m = (n + 1) / 2;
   for (i = 1; i <= m; i++) {
-    z       = cos(_PI_ * ((double) i - 0.25) / ((double) n + 0.5));
+    z       = cos(_PI_ * (static_cast<double>(i) - 0.25) / (static_cast<double>(n) + 0.5));
     counter = 0;
     do {
       p1 = 1.0;

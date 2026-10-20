@@ -178,7 +178,7 @@ void NCDMInteractingSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& lay
 
   const double taudot = CollisionRate(std::sqrt(ctx.a2), ctx.a_prime_over_a);
 
-  if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on) {
+  if (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on)) {
     // --- Fluid Approximation ---
     const int idx  = ncdm_layout.index_per_q[0];
     dy[idx + 2]   -= AlphaFluid() * taudot * y[idx + 2];
@@ -216,7 +216,7 @@ void NCDMInteractingSpecies::PerturbDerivsDiagonal(
 
   const double taudot = CollisionRate(std::sqrt(ctx.a2), ctx.a_prime_over_a);
 
-  if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_on) {
+  if (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on)) {
     const int idx  = ncdm_layout.index_per_q[0];
     diag[idx + 2] -= AlphaFluid() * taudot;
   }

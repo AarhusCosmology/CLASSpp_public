@@ -118,7 +118,7 @@ int main() {
     double s_bg = 0.;
     for (int j = 0; j < sp->q_size(); ++j)
       s_pt += sp->dq()[j] / sp->q()[j];
-    for (int i = 0; i < (int) sp->q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(sp->q_bg().size()); ++i)
       s_bg += sp->dq_bg()[i] / sp->q_bg()[i];
     assert(std::fabs(s_pt - s_bg) < 1e-12 * s_bg);
   }

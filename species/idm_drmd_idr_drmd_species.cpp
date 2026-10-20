@@ -105,7 +105,7 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
 
     if (idm_drm_lay.idx_theta >= 0) {
       if (has_idr_drmd()) {
-        if (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_on) {
+        if (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_on)) {
           y[idm_drm_lay.idx_theta] = (idr_drm_lay.idx_theta >= 0) ? y[idr_drm_lay.idx_theta] : 0.;
         }
         else {
@@ -300,7 +300,7 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
   const double theta_idr = y[idr_drm_acc_lay.idx_theta];
   const double delta_idr = y[idr_drm_acc_lay.idx_delta];
 
-  if (ppw->approx[ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_on) {
+  if (ppw->approx[ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_on)) {
     // TCA on: ASSIGN theta_idm_drmd (replaces the free-streaming term written by child)
     double GdDelta = 3. * csp2 * (ctx.a_prime_over_a * theta_idm + ctx.k2 * delta_idr / 4.);
     dy[idm_drm_acc_lay.idx_theta] = 0.25 * ctx.k2 * delta_idr + ctx.metric_euler - GdDelta * Rint;

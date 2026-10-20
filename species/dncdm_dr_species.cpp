@@ -197,7 +197,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
     if (x < 0.9999) {
       int km = 42 + lmax;
       if (x > 0.9)
-        km *= int(-1.0 - 1.8 * log(1. / x - 1.0));
+        km *= static_cast<int>(-1.0 - 1.8 * log(1. / x - 1.0));
       double Fp2 = 0.;
       double Fp1 = 1.;
       for (int l = km; l >= 0; --l) {
@@ -238,7 +238,7 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
     double integral_num   = 0.;
     double integral_denom = 0.;
 
-    if (ppw->approx[ppw->index_ap_ncdmfa] == (int) ncdmfa_off) {
+    if (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_off)) {
       bool must_rescale = false;
       for (int index_q = 0; index_q < q_size; ++index_q) {
         double dq = dncdm_->dq()[index_q];

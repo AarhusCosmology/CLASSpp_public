@@ -764,7 +764,7 @@ CLASS_ALWAYS_INLINE int array_search_bracket(
     class_test(x > x_array[sup * stride] + epsilon, "x=%e > x_max=%e", x, x_array[sup * stride]);
 
     while (sup - inf > 1) {
-      int mid = (int) (0.5 * (inf + sup));
+      int mid = static_cast<int>(0.5 * (inf + sup));
       if (x < x_array[mid * stride]) {
         sup = mid;
       }
@@ -779,7 +779,7 @@ CLASS_ALWAYS_INLINE int array_search_bracket(
     class_test(x > x_array[inf * stride] + epsilon, "x=%e > x_max=%e", x, x_array[inf * stride]);
 
     while (sup - inf > 1) {
-      int mid = (int) (0.5 * (inf + sup));
+      int mid = static_cast<int>(0.5 * (inf + sup));
       if (x > x_array[mid * stride]) {
         sup = mid;
       }
@@ -1054,7 +1054,7 @@ void array_interpolate_cubic_equal(
              x0 + dx * (Nx - 1),
              x0);
 
-  i = (int) floor((x - x0) / dx);
+  i = static_cast<int>(floor((x - x0) / dx));
   if (i < 1)
     i = 1;
   if (i > Nx - 3)

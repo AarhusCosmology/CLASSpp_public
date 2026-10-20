@@ -2549,9 +2549,8 @@ void InputModule::ReadDerived() {
       ppt->k_max_for_pk = std::max(ppt->k_max_for_pk,
                                    std::max(ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max));
       ppt->has_nl_corrections_based_on_delta_m = true;
-      pnl->extrapolation_method =
-          (enum source_extrapolation) pfc->get_or<int>("extrapolation_method",
-                                                       pnl->extrapolation_method);
+      pnl->extrapolation_method                = static_cast<enum source_extrapolation>(
+          pfc->get_or<int>("extrapolation_method", pnl->extrapolation_method));
 
       /* version: 2016 (Mead et al. 2016) or 2020 (Mead et al. 2021), with the spellings that
          class_public documents. They are matched exactly: class_public searches for "20" in

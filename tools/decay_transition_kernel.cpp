@@ -822,13 +822,13 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
 
   for (int i = 0; i < parent_.n; ++i)
     for (int l = 0; l <= l_max; ++l)
-      dF_H[(size_t) i * stride + l] = 0.;
+      dF_H[static_cast<size_t>(i) * stride + l] = 0.;
   for (int j = 0; j < fermion_.n; ++j)
     for (int l = 0; l <= l_max; ++l)
-      dF_l[(size_t) j * stride + l] = 0.;
+      dF_l[static_cast<size_t>(j) * stride + l] = 0.;
   for (int k = 0; k < boson_.n; ++k)
     for (int l = 0; l <= l_max; ++l)
-      dF_phi[(size_t) k * stride + l] = 0.;
+      dF_phi[static_cast<size_t>(k) * stride + l] = 0.;
 
   // Booked into locals and added once at the end, so the accumulation order within each
   // residual matches the per-l form's (ascending i, then n) even though l now interleaves.
@@ -869,8 +869,8 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
     const double fH_i          = fH_bg_[i];
     const double base          = k_coeff_ * dq1 * (q1 / eps1_[i]);
     const double inv_meas_p    = mult_parent_leg_ / (q1 * q1 * dq1);
-    const double* const FH_bin = F_H + (size_t) i * stride;
-    double* const dFH_bin      = dF_H + (size_t) i * stride;
+    const double* const FH_bin = F_H + static_cast<size_t>(i) * stride;
+    double* const dFH_bin      = dF_H + static_cast<size_t>(i) * stride;
     for (int n = node_off_[i]; n < node_off_[i] + node_cnt_[i]; ++n) {
       // Everything in this block is l-INDEPENDENT and was previously recomputed once per
       // multipole. It is the whole point of the inversion.
@@ -939,13 +939,13 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
       }
       for (int e = 0; e < nf; ++e) {
         const double c                     = wf[e];
-        const double* const __restrict src = F_l + (size_t) (jf + e) * stride;
+        const double* const __restrict src = F_l + static_cast<size_t>(jf + e) * stride;
         for (int l = 0; l <= l_max; ++l)
           Fl_node_l[l] += c * src[l];
       }
       for (int e = 0; e < nb; ++e) {
         const double c                     = wb[e];
-        const double* const __restrict src = F_phi + (size_t) (kb + e) * stride;
+        const double* const __restrict src = F_phi + static_cast<size_t>(kb + e) * stride;
         for (int l = 0; l <= l_max; ++l)
           Fphi_node_l[l] += c * src[l];
       }
@@ -953,13 +953,13 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
       // property of the whole stencil, so dthg carries no e index.
       for (int t = 0; t < nf; ++t) {
         const double c                     = dthl[t];
-        const double* const __restrict src = F_l + (size_t) (jf + t) * stride;
+        const double* const __restrict src = F_l + static_cast<size_t>(jf + t) * stride;
         for (int l = 0; l <= l_max; ++l)
           dthg_l_l[l] += c * src[l];
       }
       for (int t = 0; t < nb; ++t) {
         const double c                     = dthp[t];
-        const double* const __restrict src = F_phi + (size_t) (kb + t) * stride;
+        const double* const __restrict src = F_phi + static_cast<size_t>(kb + t) * stride;
         for (int l = 0; l <= l_max; ++l)
           dthg_p_l[l] += c * src[l];
       }
@@ -976,13 +976,13 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
         }
         for (int e = 0; e < nf; ++e) {
           const double c                     = wgf[e];
-          const double* const __restrict src = F_l + (size_t) (jf + e) * stride;
+          const double* const __restrict src = F_l + static_cast<size_t>(jf + e) * stride;
           for (int l = 0; l <= l_max; ++l)
             Fl_g_l[l] += c * src[l];
         }
         for (int e = 0; e < nb; ++e) {
           const double c                     = wgb[e];
-          const double* const __restrict src = F_phi + (size_t) (kb + e) * stride;
+          const double* const __restrict src = F_phi + static_cast<size_t>(kb + e) * stride;
           for (int l = 0; l <= l_max; ++l)
             Fphi_g_l[l] += c * src[l];
         }
@@ -1017,8 +1017,8 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
         const double cphi_e                = c_phi + (cfg_.inverse_decays ? dl : 0.);
         const double dv                    = devl[e];
         const double pref                  = -mult_daughter_leg_ * wf[e] * inv_meas_f_[k];
-        const double* const __restrict src = F_l + (size_t) k * stride;
-        double* const __restrict dst       = dF_l + (size_t) k * stride;
+        const double* const __restrict src = F_l + static_cast<size_t>(k) * stride;
+        double* const __restrict dst       = dF_l + static_cast<size_t>(k) * stride;
         for (int l = 0; l <= l_max; ++l) {
           // theta blend on the daughter's own leg, matching the background's lumped
           // loss (see LumpTheta); th_l = 1 gives the fully lumped expression. theta
@@ -1038,8 +1038,8 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
         const double cl_e                  = c_l + (cfg_.inverse_decays ? dphi : 0.);
         const double dv                    = devp[e];
         const double pref                  = -mult_boson_leg_ * 2.0 * wb[e] * inv_meas_b_[k];
-        const double* const __restrict src = F_phi + (size_t) k * stride;
-        double* const __restrict dst       = dF_phi + (size_t) k * stride;
+        const double* const __restrict src = F_phi + static_cast<size_t>(k) * stride;
+        double* const __restrict dst       = dF_phi + static_cast<size_t>(k) * stride;
         for (int l = 0; l <= l_max; ++l) {
           const double Fphi_e    = th_p * src[l] + one_m_thp * Fphi_node_l[l] + dv * dthg_p_l[l] +
                                    dFphi_l[l];
@@ -1065,19 +1065,19 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
           const double dl      = dle[e];
           const double cH_e    = c_H + (cfg_.quantum_statistics ? dl : 0.);
           const double cphi_e  = c_phi + (cfg_.inverse_decays ? dl : 0.);
-          const double Fl_e    = th_l * F_l[(size_t) k * stride + l] + one_m_thl * Fl_node_l[l] +
-                                 devl[e] * dthg_l_l[l] + dFl_l[l];
+          const double Fl_e    = th_l * F_l[static_cast<size_t>(k) * stride + l] +
+                                 one_m_thl * Fl_node_l[l] + devl[e] * dthg_l_l[l] + dFl_l[l];
           const double dN_l_k  = B * (cH_e * FH_bin[l] * Pa_l[l] + c_l * Fl_e +
                                       cphi_e * Fphi_g_l[l] * Pg_l[l]);
           R                   += -mult_energy_ * 2.0 * wf[e] * fermion_.q[k] * (dN_l_k - dN_l);
         }
         for (int e = 0; e < nb; ++e) {
-          const int k         = kb + e;
-          const double dphi   = dpe[e];
-          const double cH_e   = c_H - (cfg_.quantum_statistics ? dphi : 0.);
-          const double cl_e   = c_l + (cfg_.inverse_decays ? dphi : 0.);
-          const double Fphi_e = th_p * F_phi[(size_t) k * stride + l] + one_m_thp * Fphi_node_l[l] +
-                                devp[e] * dthg_p_l[l] + dFphi_l[l];
+          const int k            = kb + e;
+          const double dphi      = dpe[e];
+          const double cH_e      = c_H - (cfg_.quantum_statistics ? dphi : 0.);
+          const double cl_e      = c_l + (cfg_.inverse_decays ? dphi : 0.);
+          const double Fphi_e    = th_p * F_phi[static_cast<size_t>(k) * stride + l] +
+                                   one_m_thp * Fphi_node_l[l] + devp[e] * dthg_p_l[l] + dFphi_l[l];
           const double dN_phi_k  = B * (cH_e * FH_bin[l] * Pb_l[l] + cl_e * Fl_g_l[l] * Pg_l[l] +
                                         c_phi * Fphi_e);
           R                     += -mult_energy_ * 2.0 * wb[e] * boson_.q[k] * (dN_phi_k - dN_phi);

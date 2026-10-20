@@ -203,7 +203,7 @@ void evolver_erk_run(EvolverDerivs derivs,
     int nonfinite = 0;
     for (int k = 0; k < neq; k++) {
       double errtemp  = fabs(err[k] / std::max(threshold, fabs(ynew[k])));
-      nonfinite      |= (int) (IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
+      nonfinite      |= static_cast<int>(IsNonFinite(ynew[k]) || IsNonFinite(err[k]));
       if (errtemp > errmax)
         errmax = errtemp;
     }

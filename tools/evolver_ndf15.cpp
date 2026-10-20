@@ -1624,7 +1624,7 @@ void initialize_jacobian(struct jacobian* jac, int neq) {
   else {
     jac->use_sparse = 0;
   }
-  jac->max_nonzero = (int) (std::max(3.0 * neq, 0.20 * neq * neq));
+  jac->max_nonzero = static_cast<int>(std::max(3.0 * neq, 0.20 * neq * neq));
   jac->cnzmax      = 12 * jac->max_nonzero / 5;
 
   /*Maximal number of non-zero entries to be considered sparse */

@@ -259,7 +259,7 @@ int main() {
       const double q_lo  = 1e-4;
       const double q_hi  = 30.;
       for (int i = 0; i < n_rows; ++i) {
-        const double q = q_lo * std::pow(q_hi / q_lo, i / (double) (n_rows - 1));
+        const double q = q_lo * std::pow(q_hi / q_lo, i / static_cast<double>(n_rows - 1));
         std::fprintf(f, "%.16e %.16e\n", q, kPref / std::expm1(q));
       }
       std::fclose(f);

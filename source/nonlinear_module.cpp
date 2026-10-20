@@ -1543,7 +1543,7 @@ void NonlinearModule::nonlinear_get_k_list() {
     index_k = 0;
     while (k < k_extra_max && index_k < _MAX_NUM_EXTRAPOLATION_) {
       index_k++;
-      k = k_max * pow(10, (double) index_k / ppr->k_per_decade_for_pk);
+      k = k_max * pow(10, static_cast<double>(index_k) / ppr->k_per_decade_for_pk);
     }
     class_test(index_k == _MAX_NUM_EXTRAPOLATION_,
                "could not reach extrapolated value k = %.10e starting from k = %.10e with "
@@ -1572,7 +1572,7 @@ void NonlinearModule::nonlinear_get_k_list() {
 
   /** - fill additional values of k (extrapolated) */
   for (index_k = k_size_; index_k < k_size_extra_; index_k++) {
-    exponent       = (double) (index_k - (k_size_ - 1)) / ppr->k_per_decade_for_pk;
+    exponent       = static_cast<double>(index_k - (k_size_ - 1)) / ppr->k_per_decade_for_pk;
     k_[index_k]    = k * pow(10, exponent);
     ln_k_[index_k] = log(k) + exponent * log(10.);
   }
@@ -1983,7 +1983,7 @@ void NonlinearModule::nonlinear_sigmas(double R,
   class_define_index(index_ddy, true, i, 1);  // index for its second derivative (spline method)
   index_num = i;                              // number of columns in the array
 
-  integrand_size = (int) (log(k_[k_size - 1] / k_[0]) / log(10.) * k_per_decade) + 1;
+  integrand_size = static_cast<int>(log(k_[k_size - 1] / k_[0]) / log(10.) * k_per_decade) + 1;
   array_for_sigma.resize(integrand_size * index_num);
 
   /** - fill the array with values of k and of the integrand */
@@ -2307,8 +2307,9 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
   /* the integrand runs over the extended grid (see nonlinear_get_k_list): above
      k_[k_size_ - 1] the linear P(k) is the analytic extrapolation, which is what
      the tail of the sigma-derivative integrals needs. */
-  integrand_size =
-      (int) (log(k_[k_size_extra_ - 1] / k_[0]) / log(10.) * ppr->halofit_k_per_decade) + 1;
+  integrand_size = static_cast<int>(log(k_[k_size_extra_ - 1] / k_[0]) / log(10.) *
+                                    ppr->halofit_k_per_decade) +
+                   1;
 
   integrand_array.resize(integrand_size * ia_size);
 

@@ -663,7 +663,7 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
   // exactly that). n_H falls monotonically through 1/e once and only once.
   int best_row = -1;
   for (int row = 0; row < n_rows; ++row) {
-    if (comoving_n(background_table + (size_t) row * row_stride) < n0 / _E_) {
+    if (comoving_n(background_table + static_cast<size_t>(row) * row_stride) < n0 / _E_) {
       best_row = row;
       break;
     }
@@ -675,7 +675,7 @@ void DNCDMInvSpecies::BuildReducedBasis(const double* background_table,
                     name().c_str());
   const double best_rate = n0;
 
-  const double* bg = background_table + (size_t) best_row * row_stride;
+  const double* bg = background_table + static_cast<size_t>(best_row) * row_stride;
   const double a   = bg[bgm_->index_bg_a_];
   for (int i = 0; i < Np; ++i)
     fH[i] = kappa * std::exp(bg[pf + i]);
@@ -790,7 +790,7 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
   std::vector<double> diagp(Nb);
   int row_lo = -1;
   for (int row = 0; row < n_rows; ++row) {
-    const double* bg = background_table + (size_t) row * row_stride;
+    const double* bg = background_table + static_cast<size_t>(row) * row_stride;
     const double a   = bg[bgm_->index_bg_a_];
     const double aH  = a * bg[bgm_->index_bg_H_];
     for (int i = 0; i < Np; ++i)
@@ -878,31 +878,32 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
   const int n_win = row_hi - row_lo + 1;
   double dlna_row = 0.;
   for (int row = row_lo; row < row_hi; ++row) {
-    const double a0 = background_table[(size_t) row * row_stride + bgm_->index_bg_a_];
-    const double a1 = background_table[(size_t) (row + 1) * row_stride + bgm_->index_bg_a_];
-    dlna_row        = std::fmax(dlna_row, std::log(a1 / a0));
+    const double a0 = background_table[static_cast<size_t>(row) * row_stride + bgm_->index_bg_a_];
+    const double a1 =
+        background_table[static_cast<size_t>(row + 1) * row_stride + bgm_->index_bg_a_];
+    dlna_row = std::fmax(dlna_row, std::log(a1 / a0));
   }
   const int n_sub =
       std::max(1, static_cast<int>(std::ceil(dlna_row / table_max_dlna_ - kTableDlnaSlack)));
-  const long long n_pts = (long long) (n_win - 1) * n_sub + 1;
+  const long long n_pts = static_cast<long long>(n_win - 1) * n_sub + 1;
   const int n_threads   = std::max(1,
                                    pba_ != nullptr ? static_cast<int>(pba_->number_of_threads) : 1);
   const int n_chunks    = static_cast<int>(std::min<long long>(n_pts, 4LL * n_threads));
-  const size_t block    = (size_t) (l_max + 1) * S * S;
+  const size_t block    = static_cast<size_t>(l_max + 1) * S * S;
   std::vector<std::vector<double>> chunk_M(n_chunks);
   std::vector<std::vector<double>> chunk_a(n_chunks);
 
   const auto t0 = std::chrono::steady_clock::now();
   auto do_chunk = [&](int c) {
-    const long long lo = (long long) c * n_pts / n_chunks;
-    const long long hi = (long long) (c + 1) * n_pts / n_chunks;
+    const long long lo = static_cast<long long>(c) * n_pts / n_chunks;
+    const long long hi = static_cast<long long>(c + 1) * n_pts / n_chunks;
     // Both final sizes are known exactly here, and chunk_M is the big one: at the heaviest
     // cell the table is 277 MB, so letting it grow by reallocation would recopy the
     // assembled blocks log2(n) times and transiently hold ~1.5x a chunk on top of what the
     // finished chunks already occupy -- while every chunk is live, since they are merged
     // only after the last one returns.
-    chunk_a[c].reserve((size_t) (hi - lo));
-    chunk_M[c].reserve((size_t) (hi - lo) * block);
+    chunk_a[c].reserve(static_cast<size_t>(hi - lo));
+    chunk_M[c].reserve(static_cast<size_t>(hi - lo) * block);
     DecayTransitionKernel k2(parent_view,
                              fermion_view,
                              boson_view,
@@ -926,10 +927,11 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
       const int row    = row_lo + static_cast<int>(p / n_sub);
       const int sub    = static_cast<int>(p % n_sub);
       const double t   = static_cast<double>(sub) / n_sub;
-      const double* bg = background_table + (size_t) row * row_stride;
+      const double* bg = background_table + static_cast<size_t>(row) * row_stride;
       // sub == 0 reads the row itself, so the last row -- which has no successor -- is only
       // ever reached there and bg1 is never formed past the end of the table.
-      const double* bg1 = (sub == 0) ? bg : background_table + (size_t) (row + 1) * row_stride;
+      const double* bg1 = (sub == 0) ? bg
+                                     : background_table + static_cast<size_t>(row + 1) * row_stride;
       double a;
       double aH;
       const double* f_l_src;
@@ -1008,8 +1010,8 @@ void DNCDMInvSpecies::BuildReducedTable(const double* background_table,
           n_rows,
           dlna_row / n_sub,
           n_sub,
-          background_table[(size_t) row_lo * row_stride + bgm_->index_bg_a_],
-          background_table[(size_t) row_hi * row_stride + bgm_->index_bg_a_],
+          background_table[static_cast<size_t>(row_lo) * row_stride + bgm_->index_bg_a_],
+          background_table[static_cast<size_t>(row_hi) * row_stride + bgm_->index_bg_a_],
           S,
           S,
           reduced_table_.bytes() / 1048576.,
@@ -1202,18 +1204,18 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
     if (v.size() < want)
       v.assign(want, 0.);
   };
-  fit(scratch.FH_all, (size_t) Np * L1);
-  fit(scratch.Fl_all, (size_t) Nf * L1);
-  fit(scratch.Fphi_all, (size_t) Nb * L1);
-  fit(scratch.dFH_all, (size_t) Np * L1);
-  fit(scratch.dFl_all, (size_t) Nf * L1);
-  fit(scratch.dFphi_all, (size_t) Nb * L1);
+  fit(scratch.FH_all, static_cast<size_t>(Np) * L1);
+  fit(scratch.Fl_all, static_cast<size_t>(Nf) * L1);
+  fit(scratch.Fphi_all, static_cast<size_t>(Nb) * L1);
+  fit(scratch.dFH_all, static_cast<size_t>(Np) * L1);
+  fit(scratch.dFl_all, static_cast<size_t>(Nf) * L1);
+  fit(scratch.dFphi_all, static_cast<size_t>(Nb) * L1);
 
   // Same kappa boundary as before (#385): the parent's slot is STORED occupation, the
   // kernel speaks BARE. Daughters need no conversion in either direction.
   for (int i = 0; i < Np; ++i)
     for (int l = 0; l <= L; ++l)
-      scratch.FH_all[(size_t) i * L1 + l] = kappa * y[p_lay.index_per_q[i] + l];
+      scratch.FH_all[static_cast<size_t>(i) * L1 + l] = kappa * y[p_lay.index_per_q[i] + l];
   // The daughters. In the REDUCED representation their y-slots hold moments, not grid
   // occupations, so they are reconstructed onto the quadrature grid here (R), swept by
   // the ordinary kernel below, and projected back (P) after it. That is the whole of
@@ -1223,8 +1225,8 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
   // interpolation table in ln a. The saving here is therefore NOT in the RHS; it is that
   // the ODE carries 2*n_moments daughter variables per multipole instead of Nf + Nb.
   if (reduced()) {
-    fit(scratch.red_m, (size_t) reduced_moments_);
-    fit(scratch.red_grid, (size_t) std::max(Nf, Nb));
+    fit(scratch.red_m, static_cast<size_t>(reduced_moments_));
+    fit(scratch.red_grid, static_cast<size_t>(std::max(Nf, Nb)));
     for (int d = 0; d < 2; ++d) {
       const auto& lay  = (d == 0) ? f_lay : b_lay;
       const int n_grid = (d == 0) ? Nf : Nb;
@@ -1234,17 +1236,17 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
           scratch.red_m[j] = y[lay.index_per_q[j] + l];
         reduced_op_->Reconstruct(d, scratch.red_m.data(), scratch.red_grid.data());
         for (int i = 0; i < n_grid; ++i)
-          F[(size_t) i * L1 + l] = scratch.red_grid[i];
+          F[static_cast<size_t>(i) * L1 + l] = scratch.red_grid[i];
       }
     }
   }
   else {
     for (int j = 0; j < Nf; ++j)
       for (int l = 0; l <= L; ++l)
-        scratch.Fl_all[(size_t) j * L1 + l] = y[f_lay.index_per_q[j] + l];
+        scratch.Fl_all[static_cast<size_t>(j) * L1 + l] = y[f_lay.index_per_q[j] + l];
     for (int k = 0; k < Nb; ++k)
       for (int l = 0; l <= L; ++l)
-        scratch.Fphi_all[(size_t) k * L1 + l] = y[b_lay.index_per_q[k] + l];
+        scratch.Fphi_all[static_cast<size_t>(k) * L1 + l] = y[b_lay.index_per_q[k] + l];
   }
 
   kern.ApplyPerturbationOperatorAllL(L,
@@ -1260,7 +1262,7 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
     // Parent: the operator output verbatim, back to STORED units. No 1/f̄_H, no
     // floor guard, no dilution term (see the block comment above).
     for (int i = 0; i < Np; ++i)
-      dy[p_lay.index_per_q[i] + l] += scratch.dFH_all[(size_t) i * L1 + l] / kappa;
+      dy[p_lay.index_per_q[i] + l] += scratch.dFH_all[static_cast<size_t>(i) * L1 + l] / kappa;
     // Daughters: same F-space collision, already in their own units. An empty bin
     // MUST receive it — that is how it fills.
     if (reduced()) {
@@ -1272,7 +1274,7 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
         const int n_grid = (d == 0) ? Nf : Nb;
         const double* dF = (d == 0) ? scratch.dFl_all.data() : scratch.dFphi_all.data();
         for (int i = 0; i < n_grid; ++i)
-          scratch.red_grid[i] = dF[(size_t) i * L1 + l];
+          scratch.red_grid[i] = dF[static_cast<size_t>(i) * L1 + l];
         reduced_op_->Project(d, scratch.red_grid.data(), scratch.red_m.data());
         for (int j = 0; j < reduced_moments_; ++j)
           dy[lay.index_per_q[j] + l] += scratch.red_m[j];
@@ -1280,9 +1282,9 @@ void DNCDMInvSpecies::ApplyKernelPerturbDerivs(double a,
     }
     else {
       for (int j = 0; j < Nf; ++j)
-        dy[f_lay.index_per_q[j] + l] += scratch.dFl_all[(size_t) j * L1 + l];
+        dy[f_lay.index_per_q[j] + l] += scratch.dFl_all[static_cast<size_t>(j) * L1 + l];
       for (int k = 0; k < Nb; ++k)
-        dy[b_lay.index_per_q[k] + l] += scratch.dFphi_all[(size_t) k * L1 + l];
+        dy[b_lay.index_per_q[k] + l] += scratch.dFphi_all[static_cast<size_t>(k) * L1 + l];
     }
   }
 }
@@ -1376,7 +1378,8 @@ void DNCDMInvSpecies::ApplyKernelPerturbDiagonal(double a,
         double num = 0.;
         double den = 0.;
         for (int i = 0; i < n_grid; ++i) {
-          const double p2   = psi[(size_t) j * n_grid + i] * psi[(size_t) j * n_grid + i];
+          const double p2   = psi[static_cast<size_t>(j) * n_grid + i] *
+                              psi[static_cast<size_t>(j) * n_grid + i];
           const double dmu  = sp->dq()[i] * sp->q()[i] * sp->q()[i] * w[i] * p2;
           num              += dmu * dg[i];
           den              += dmu;

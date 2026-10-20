@@ -251,7 +251,7 @@ void SpectraModule::spectra_cl_at_l(
 
   if ((md_size_ == 1) && (ic_size_[0] == 1)) {
     index_md = 0;
-    if ((int) l <= l_[l_size_[index_md] - 1]) {
+    if (static_cast<int>(l) <= l_[l_size_[index_md] - 1]) {
       /* interpolate at l */
       array_interpolate_spline(l_.data(),
                                l_size_[index_md],
@@ -265,7 +265,7 @@ void SpectraModule::spectra_cl_at_l(
 
       /* set to zero for the types such that l<l_max */
       for (index_ct = 0; index_ct < ct_size_; index_ct++)
-        if ((int) l > l_max_ct_[index_md][index_ct])
+        if (static_cast<int>(l) > l_max_ct_[index_md][index_ct])
           cl_tot[index_ct] = 0.;
     }
     else {
@@ -285,7 +285,8 @@ void SpectraModule::spectra_cl_at_l(
     for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
       for (index_ic2 = index_ic1; index_ic2 < ic_size_[index_md]; index_ic2++) {
         index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
-        if (((int) l <= l_[l_size_[index_md] - 1]) && (is_non_zero_[index_md][index_ic1_ic2])) {
+        if ((static_cast<int>(l) <= l_[l_size_[index_md] - 1]) &&
+            (is_non_zero_[index_md][index_ic1_ic2])) {
           array_interpolate_spline(l_.data(),
                                    l_size_[index_md],
                                    cl_[index_md].data(),
@@ -297,7 +298,7 @@ void SpectraModule::spectra_cl_at_l(
                                    ic_ic_size_[index_md] * ct_size_);
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++)
-            if ((int) l > l_max_ct_[index_md][index_ct])
+            if (static_cast<int>(l) > l_max_ct_[index_md][index_ct])
               cl_md_ic[index_md][index_ic1_ic2 * ct_size_ + index_ct] = 0.;
         }
         else {
@@ -328,7 +329,7 @@ void SpectraModule::spectra_cl_at_l(
           Fill cl_md[index_md]. */
 
       if (ic_size_[index_md] == 1) {
-        if ((int) l <= l_[l_size_[index_md] - 1]) {
+        if (static_cast<int>(l) <= l_[l_size_[index_md] - 1]) {
           array_interpolate_spline(l_.data(),
                                    l_size_[index_md],
                                    cl_[index_md].data(),
@@ -340,7 +341,7 @@ void SpectraModule::spectra_cl_at_l(
                                    ct_size_);
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++)
-            if ((int) l > l_max_ct_[index_md][index_ct])
+            if (static_cast<int>(l) > l_max_ct_[index_md][index_ct])
               cl_md[index_md][index_ct] = 0.;
         }
         else {
@@ -354,7 +355,7 @@ void SpectraModule::spectra_cl_at_l(
           Fill cl_md_ic[index_md] and sum it to get cl_md[index_md] */
 
       if (ic_size_[index_md] > 1) {
-        if ((int) l <= l_[l_size_[index_md] - 1]) {
+        if (static_cast<int>(l) <= l_[l_size_[index_md] - 1]) {
           /* interpolate all ic and ct */
           array_interpolate_spline(l_.data(),
                                    l_size_[index_md],
@@ -371,7 +372,7 @@ void SpectraModule::spectra_cl_at_l(
             for (index_ic2 = index_ic1; index_ic2 < ic_size_[index_md]; index_ic2++) {
               index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
               for (index_ct = 0; index_ct < ct_size_; index_ct++) {
-                if (((int) l > l_max_ct_[index_md][index_ct]) ||
+                if ((static_cast<int>(l) > l_max_ct_[index_md][index_ct]) ||
                     (!is_non_zero_[index_md][index_ic1_ic2]))
                   cl_md_ic[index_md][index_ic1_ic2 * ct_size_ + index_ct] = 0.;
               }
@@ -759,7 +760,7 @@ void SpectraModule::spectra_cls() {
 
   /** - store values of l */
   for (int index_l = 0; index_l < l_size_max_; index_l++) {
-    l_[index_l] = (double) transfer_module_->l_[index_l];
+    l_[index_l] = static_cast<double>(transfer_module_->l_[index_l]);
   }
 
   Tools::TaskSystem task_system(pba->number_of_threads);

@@ -60,7 +60,8 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
 
   /* baryon pressure perturbation / rho (same logic as StressEnergy delta_p branch) */
   double delta_p_b_over_rho_b;
-  if (ppt_->has_perturbed_recombination && ppw->approx[ppw->index_ap_tca] == (int) tca_off)
+  if (ppt_->has_perturbed_recombination &&
+      ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))
     delta_p_b_over_rho_b = ppw->pvecthermo[thm_->index_th_wb_] *
                            (y[layout.idx_delta] +
                             y[ppw->pv->index_pt_perturbed_recombination_delta_temp]);
@@ -70,7 +71,7 @@ void BaryonsSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   /* density equation */
   dy[layout.idx_delta] = -(theta_b + metric_continuity);
 
-  if (ppw->approx[ppw->index_ap_tca] == (int) tca_off) {
+  if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
     /* Full equation */
     dy[layout.idx_theta] = -a_prime_over_a * theta_b + metric_euler + k2 * delta_p_b_over_rho_b +
                            R * dkappa * (theta_g - theta_b);
@@ -100,7 +101,8 @@ BaseSpecies::StressEnergyContribution BaryonsSpecies::StressEnergy(
   se.rho              = rho_b;
   se.delta_rho        = rho_b * y[layout.idx_delta];
   se.rho_plus_p_theta = rho_b * y[layout.idx_theta];
-  if (ppt_->has_perturbed_recombination && ppw->approx[ppw->index_ap_tca] == (int) tca_off)
+  if (ppt_->has_perturbed_recombination &&
+      ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off))
     se.delta_p = rho_b * ppw->pvecthermo[thm_->index_th_wb_] *
                  (y[layout.idx_delta] + y[pv->index_pt_perturbed_recombination_delta_temp]);
   else

@@ -196,9 +196,9 @@ int main() {
       // DNCDMSpecies::kFScale); the published ln f column does not.
       bi[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * 0.5 /
                                            (1. + parent.GetQ()[i] * parent.GetQ()[i]);
-    for (int i = 0; i < (int) ferm.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
       bi[ferm.bi_f_index() + i] = 0.3 / (1. + ferm.q_bg()[i]);
-    for (int i = 0; i < (int) bos.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
       bi[bos.bi_f_index() + i] = 0.2 / (1. + bos.q_bg()[i]);
 
     const double a = 1e-3;
@@ -237,9 +237,9 @@ int main() {
     };
     for (int i = 0; i < parent.q_size(); ++i)
       y[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * rnd();
-    for (int i = 0; i < (int) ferm.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
       y[ferm.bi_f_index() + i] = rnd();
-    for (int i = 0; i < (int) bos.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
       y[bos.bi_f_index() + i] = rnd();
 
     const double a = 1e-3;
@@ -316,9 +316,9 @@ int main() {
       // DNCDMSpecies::kFScale); the published ln f column does not.
       bi[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * 0.5 /
                                            (1. + parent.GetQ()[i] * parent.GetQ()[i]);
-    for (int i = 0; i < (int) ferm.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
       bi[ferm.bi_f_index() + i] = 0.3 / (1. + ferm.q_bg()[i]);
-    for (int i = 0; i < (int) bos.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
       bi[bos.bi_f_index() + i] = 0.2 / (1. + bos.q_bg()[i]);
     comp->ComputeBackground(1.0, bi.data(), bg.data());  // a = 1 (today)
 
@@ -429,9 +429,9 @@ int main() {
       const int qb = bos.q_size();
       for (int i = 0; i < qp; ++i)
         bg[parent.bg_lnf_index() + i] = std::log(0.5 / (1. + parent.GetQ()[i] * parent.GetQ()[i]));
-      for (int j = 0; j < (int) ferm.q_bg().size(); ++j)
+      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j)
         bg[ferm.bg_f_index() + j] = 0.3 / (1. + ferm.q_bg()[j]);
-      for (int k = 0; k < (int) bos.q_bg().size(); ++k)
+      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k)
         bg[bos.bg_f_index() + k] = 0.2 / (1. + bos.q_bg()[k]);
 
       const int l_max = 4;
@@ -539,9 +539,9 @@ int main() {
       const int qb = bos.q_size();
       for (int i = 0; i < qp; ++i)
         bg[parent.bg_lnf_index() + i] = std::log(0.5 / (1. + parent.GetQ()[i] * parent.GetQ()[i]));
-      for (int j = 0; j < (int) ferm.q_bg().size(); ++j)
+      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j)
         bg[ferm.bg_f_index() + j] = 0.3 / (1. + ferm.q_bg()[j]);
-      for (int k = 0; k < (int) bos.q_bg().size(); ++k)
+      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k)
         bg[bos.bg_f_index() + k] = 0.2 / (1. + bos.q_bg()[k]);
 
       const int l_max = 4;
@@ -644,7 +644,7 @@ int main() {
           "|2eH+2el+ephi - booked|=%.2e |2momH+2moml+momphi - booked|=%.2e\n",
           refine,
           qf,
-          (int) ferm.q_bg().size(),
+          static_cast<int>(ferm.q_bg().size()),
           nf,
           nb,
           en,
@@ -688,9 +688,9 @@ int main() {
       const int qb = bos.q_size();
       for (int i = 0; i < qp; ++i)
         bg[parent.bg_lnf_index() + i] = std::log(0.5 / (1. + parent.GetQ()[i] * parent.GetQ()[i]));
-      for (int j = 0; j < (int) ferm.q_bg().size(); ++j)
+      for (int j = 0; j < static_cast<int>(ferm.q_bg().size()); ++j)
         bg[ferm.bg_f_index() + j] = 0.3 / (1. + ferm.q_bg()[j]);
-      for (int k = 0; k < (int) bos.q_bg().size(); ++k)
+      for (int k = 0; k < static_cast<int>(bos.q_bg().size()); ++k)
         bg[bos.bg_f_index() + k] = 0.2 / (1. + bos.q_bg()[k]);
 
       const int l_max     = 4;
@@ -851,9 +851,9 @@ int main() {
     };
     for (int i = 0; i < parent.q_size(); ++i)
       y[parent.bi_f_parent_index() + i] = DNCDMSpecies::kFScale * rnd();
-    for (int i = 0; i < (int) ferm.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i)
       y[ferm.bi_f_index() + i] = rnd();
-    for (int i = 0; i < (int) bos.q_bg().size(); ++i)
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i)
       y[bos.bi_f_index() + i] = rnd();
 
     const double a = 1e-3;
@@ -874,7 +874,7 @@ int main() {
     }
     double dN_l = 0.;
     double dE_l = 0.;
-    for (int i = 0; i < (int) ferm.q_bg().size(); ++i) {
+    for (int i = 0; i < static_cast<int>(ferm.q_bg().size()); ++i) {
       const double q  = ferm.q_bg()[i];
       const double w  = ferm.dq_bg()[i] * q * q;
       const double d  = dy[ferm.bi_f_index() + i];
@@ -883,7 +883,7 @@ int main() {
     }
     double dN_phi = 0.;
     double dE_phi = 0.;
-    for (int i = 0; i < (int) bos.q_bg().size(); ++i) {
+    for (int i = 0; i < static_cast<int>(bos.q_bg().size()); ++i) {
       const double q  = bos.q_bg()[i];
       const double w  = bos.dq_bg()[i] * q * q;
       const double d  = dy[bos.bi_f_index() + i];

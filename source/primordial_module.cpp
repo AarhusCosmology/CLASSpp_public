@@ -507,7 +507,7 @@ void PrimordialModule::primordial_indices() {
 void PrimordialModule::primordial_get_lnk_list(double kmin, double kmax, double k_per_decade) {
   class_test((kmin <= 0.) || (kmax <= kmin), "inconsistent values of kmin=%e, kmax=%e", kmin, kmax);
 
-  lnk_size_ = (int) (log(kmax / kmin) / log(10.) * k_per_decade) + 2;
+  lnk_size_ = static_cast<int>(log(kmax / kmin) / log(10.) * k_per_decade) + 2;
 
   lnk_.resize(lnk_size_);
 
@@ -2534,7 +2534,8 @@ void PrimordialModule::primordial_inflation_derivs_member(double tau,
                                                           void* parameters_and_workspace) const {
   struct primordial_inflation_parameters_and_workspace* ppipaw;
 
-  ppipaw = (struct primordial_inflation_parameters_and_workspace*) parameters_and_workspace;
+  ppipaw = static_cast<struct primordial_inflation_parameters_and_workspace*>(
+      parameters_and_workspace);
 
   // a2
   ppipaw->a2 = y[index_in_a_] * y[index_in_a_];

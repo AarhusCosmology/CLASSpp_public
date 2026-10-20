@@ -442,13 +442,13 @@ int main() {
     auto col = [&](const std::string& nm) {
       for (size_t i = 0; i < cols.size(); ++i)
         if (cols[i] == nm)
-          return (int) i;
+          return static_cast<int>(i);
       std::printf("column '%s' not found\n", nm.c_str());
       assert(false);
       return -1;
     };
-    const int n_titles = (int) cols.size();
-    std::vector<double> data((size_t) n_titles * bgm->bt_size_);
+    const int n_titles = static_cast<int>(cols.size());
+    std::vector<double> data(static_cast<size_t>(n_titles) * bgm->bt_size_);
     bgm->background_output_data(n_titles, data.data());
 
     const int ic_z    = col("z");
@@ -463,7 +463,7 @@ int main() {
     const double eps2  = 1. - v * v;
     const double Gamma = 100. * 1.e3 / _c_;  // same double conversion as the species
     const int n_rows   = bgm->bt_size_;
-    auto row           = [&](int r, int c) { return data[(size_t) r * n_titles + c]; };
+    auto row           = [&](int r, int c) { return data[static_cast<size_t>(r) * n_titles + c]; };
     // Compare at epochs where rho_wdm is physical (nonzero). The deposit clamps
     // below-grid injection into the bottom bin (Σ W = 1 always), so energy is
     // conserved from the earliest decays.

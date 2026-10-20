@@ -2102,11 +2102,11 @@ void test_all_l_matches_per_l(bool balanced = false) {
     std::vector<double> sdp(ND);
     for (int l = 0; l <= L; ++l) {
       for (int i = 0; i < NP; ++i)
-        sFH[i] = FH[(size_t) i * stride + l];
+        sFH[i] = FH[static_cast<size_t>(i) * stride + l];
       for (int j = 0; j < ND; ++j)
-        sFl[j] = Fl[(size_t) j * stride + l];
+        sFl[j] = Fl[static_cast<size_t>(j) * stride + l];
       for (int k = 0; k < ND; ++k)
-        sFp[k] = Fphi[(size_t) k * stride + l];
+        sFp[k] = Fphi[static_cast<size_t>(k) * stride + l];
       K.ApplyPerturbationOperator(l,
                                   sFH.data(),
                                   sFl.data(),
@@ -2115,11 +2115,11 @@ void test_all_l_matches_per_l(bool balanced = false) {
                                   sdl.data(),
                                   sdp.data());
       for (int i = 0; i < NP; ++i)
-        refH[(size_t) i * stride + l] = sdH[i];
+        refH[static_cast<size_t>(i) * stride + l] = sdH[i];
       for (int j = 0; j < ND; ++j)
-        refl[(size_t) j * stride + l] = sdl[j];
+        refl[static_cast<size_t>(j) * stride + l] = sdl[j];
       for (int k = 0; k < ND; ++k)
-        refp[(size_t) k * stride + l] = sdp[k];
+        refp[static_cast<size_t>(k) * stride + l] = sdp[k];
     }
   }
   const double ref_resid_e = K.split_energy_residual_pert();
@@ -2163,7 +2163,8 @@ void test_all_l_matches_per_l(bool balanced = false) {
   // residual serves is 2eH + 2el + ephi == booked, so the energy is its natural scale.
   double e_scale = 0.;
   for (int j = 0; j < ND; ++j)
-    e_scale += std::fabs(F.dq[j] * F.q[j] * F.q[j] * F.q[j] * refl[(size_t) j * stride]);
+    e_scale += std::fabs(F.dq[j] * F.q[j] * F.q[j] * F.q[j] *
+                         refl[static_cast<size_t>(j) * stride]);
   const double we = std::fabs(K.split_energy_residual_pert() - ref_resid_e) /
                     Scale3(K.split_energy_residual_pert(), ref_resid_e, e_scale);
   const double wm = std::fabs(K.split_momentum_residual_pert() - ref_resid_m) /
@@ -2365,8 +2366,10 @@ void test_chain_factor_cap() {
   std::vector<double> Fphi(N);
   for (int i = 0; i < N; ++i) {
     fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
-    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
-    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
+    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i])
+                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
+    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i])
+                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
   }
   // Psi ~ O(1) everywhere, so F inherits the same cliff: the physical statement that an
   // empty bin has an empty perturbation.
@@ -2462,8 +2465,10 @@ void test_chain_cap_reaches_background_diagonal() {
   std::vector<double> fphi(N);
   for (int i = 0; i < N; ++i) {
     fH[i]   = 0.4 * std::exp(-P.q[i] / 3.0);
-    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
-    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i]) : 1e-90 * std::exp(-(double) (i - N / 2) * 4.);
+    fl[i]   = (i < N / 2) ? 0.3 * std::exp(-F.q[i])
+                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
+    fphi[i] = (i < N / 2) ? 0.3 * std::exp(-B.q[i])
+                          : 1e-90 * std::exp(-static_cast<double>(i - N / 2) * 4.);
   }
   const double a     = 0.5;
   const double m     = 2.0;

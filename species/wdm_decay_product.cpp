@@ -102,8 +102,10 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   auto log10Gamma_value    = input.get<double>("log10Gamma");
   auto lifetime_value      = input.get<double>("lifetime");
   auto log10lifetime_value = input.get<double>("log10lifetime");
-  int n_provided = (int) Gamma_value.has_value() + (int) log10Gamma_value.has_value() +
-                   (int) lifetime_value.has_value() + (int) log10lifetime_value.has_value();
+  int n_provided           = static_cast<int>(Gamma_value.has_value()) +
+                             static_cast<int>(log10Gamma_value.has_value()) +
+                             static_cast<int>(lifetime_value.has_value()) +
+                             static_cast<int>(log10lifetime_value.has_value());
   class_test_severe(n_provided != 1,
                     "species '%s': specify exactly one of Gamma, log10Gamma, lifetime, "
                     "log10lifetime",

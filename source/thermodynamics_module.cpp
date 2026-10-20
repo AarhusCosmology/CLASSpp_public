@@ -944,9 +944,9 @@ void ThermodynamicsModule::thermodynamics_init() {
            well within the convergence radius H/Gamma of the
            equation. */
         else {
-          int N_sub_steps =
-              (int) (dz / (pvecback[background_module_->index_bg_H_] / Gamma_heat_idm_dr / 10.)) +
-              1;
+          int N_sub_steps    = static_cast<int>(dz / (pvecback[background_module_->index_bg_H_] /
+                                                      Gamma_heat_idm_dr / 10.)) +
+                               1;
           double dz_sub_step = dz / N_sub_steps;
 
           /* loop over sub-steps */
@@ -3281,7 +3281,7 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   y[2] = preco->Tnow * (1. + z);
 
   auto sample_z = [zinitial, Nz](int index_z) {
-    return zinitial * (double) (Nz - index_z - 1) / (double) Nz;
+    return zinitial * static_cast<double>(Nz - index_z - 1) / static_cast<double>(Nz);
   };
 
   auto first_sample_below = [&](int first_index, double z_boundary) {
@@ -3586,7 +3586,7 @@ void ThermodynamicsModule::thermodynamics_recombination_derivs_member(
   /* define local variables */
 
   struct thermodynamics_parameters_and_workspace* ptpaw =
-      (struct thermodynamics_parameters_and_workspace*) parameters_and_workspace;
+      static_cast<struct thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
   struct recombination* preco = ptpaw->preco;
   double* pvecback            = ptpaw->pvecback;
 
@@ -3749,18 +3749,19 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
       if (i < ppr->thermo_Nz2_idm_dr - 1) {
         index_th = i + preio->rt_size + ppr->recfast_Nz0 - preio->index_reco_when_reio_start - 1;
         z_table_[index_th] = ppr->recfast_z_initial +
-                             ((double) i + 1.) *
+                             (static_cast<double>(i) + 1.) *
                                  (ppr->thermo_z_initial_idm_dr - ppr->recfast_z_initial) /
-                                 (double) ppr->thermo_Nz1_idm_dr / (double) ppr->thermo_Nz2_idm_dr;
+                                 static_cast<double>(ppr->thermo_Nz1_idm_dr) /
+                                 static_cast<double>(ppr->thermo_Nz2_idm_dr);
       }
       /* with a large step Delta z  = (thermo_z_initial_idm_dr-recfast_z_initial)/thermo_Nz1_idm_dr */
       else {
         index_th           = (i - ppr->thermo_Nz2_idm_dr + 1) + preio->rt_size + ppr->recfast_Nz0 -
                              preio->index_reco_when_reio_start - 1 + ppr->thermo_Nz2_idm_dr - 1;
         z_table_[index_th] = ppr->recfast_z_initial +
-                             ((double) (i - ppr->thermo_Nz2_idm_dr + 1) + 1.) *
+                             (static_cast<double>(i - ppr->thermo_Nz2_idm_dr + 1) + 1.) *
                                  (ppr->thermo_z_initial_idm_dr - ppr->recfast_z_initial) /
-                                 (double) ppr->thermo_Nz1_idm_dr;
+                                 static_cast<double>(ppr->thermo_Nz1_idm_dr);
       }
       /* same extrapolation formulas as in thermodynamics_at_z() */
       double x0 = thermodynamics_table_[(preio->rt_size + ppr->recfast_Nz0 -
