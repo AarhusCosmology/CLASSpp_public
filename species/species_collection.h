@@ -73,7 +73,8 @@ class SpeciesCollection {
   void freeze();
 
   // ── Keyed lookup (replaces std::map API) ────────────────────────────────
-  std::size_t count(const std::string& key) const;
+  /** Whether a species is stored under `key` (std::map::contains, C++20). */
+  bool contains(const std::string& key) const;
 
   /** Returns the owning unique_ptr, matching std::map::at semantics.
    *  Throws std::out_of_range if absent. Call sites typically write

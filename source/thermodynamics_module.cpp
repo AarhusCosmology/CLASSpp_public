@@ -214,7 +214,7 @@ void ThermodynamicsModule::thermodynamics_at_z(
     pvecthermo[index_th_rate_] = pvecthermo[index_th_dkappa_];
 
     /* quantities related to DM interacting with DR */
-    if (all_species_.count("IDM_DR_IDR") > 0) {
+    if (all_species_.contains("IDM_DR_IDR")) {
       const auto& idm_dr_comp = static_cast<const IDM_DR_IDR_Species&>(
           *all_species_.at("IDM_DR_IDR"));
       const double Omega0_idm_dr_thermo = idm_dr_comp.idm_dr().GetOmega0();
@@ -419,7 +419,7 @@ void ThermodynamicsModule::thermodynamics_init() {
              "characteristic annihilation redshift cannot be negative");
 
   class_test((pth->annihilation > 0) &&
-                 (all_species_.count("CDM") == 0 && all_species_.count("IDM_DR_IDR") == 0),
+                 (!all_species_.contains("CDM") && !all_species_.contains("IDM_DR_IDR")),
              "CDM annihilation effects require the presence of CDM or IDM!");
 
   class_test((pth->annihilation_f_halo > 0) && (pth->recombination == recfast),
@@ -448,7 +448,7 @@ void ThermodynamicsModule::thermodynamics_init() {
   class_test((pth->decay < 0), "decay parameter cannot be negative");
 
   class_test((pth->decay > 0) &&
-                 (all_species_.count("CDM") == 0 && all_species_.count("IDM_DR_IDR") == 0),
+                 (!all_species_.contains("CDM") && !all_species_.contains("IDM_DR_IDR")),
              "CDM decay effects require the presence of CDM or IDM!");
 
   /* tests in order to prevent segmentation fault in the following */
@@ -531,7 +531,7 @@ void ThermodynamicsModule::thermodynamics_init() {
     thermodynamics_table_[index_tau * th_size_ + index_th_ddkappa_] =
         -1. / R * thermodynamics_table_[index_tau * th_size_ + index_th_dkappa_];
 
-    if (all_species_.count("IDM_DR_IDR") > 0) {
+    if (all_species_.contains("IDM_DR_IDR")) {
       auto& idm_idr = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
       const double Omega0_idm_dr_table = idm_idr.idm_dr().GetOmega0();
       const double Omega0_idr_table    = idm_idr.idr().GetOmega0();
@@ -588,7 +588,7 @@ void ThermodynamicsModule::thermodynamics_init() {
      will not be used anymore, so they can be overwritten by other
      intermediate steps of other computations */
 
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     /** --> second derivative of idm_dr interaction rate (with idr), [Sinv*dmu_idm_dr]'', stored temporarily in column dddmu */
     array_spline_table_line_to_line(tau_table.data(),
                                     tt_size_,
@@ -789,7 +789,7 @@ void ThermodynamicsModule::thermodynamics_init() {
              thermodynamics_table_[index_tau * th_size_ + index_th_dkappa_]));
 
     /* - ---> restore correct sign for idm_dr and idr optical depth, and calculate idm_dr visibility function */
-    if (all_species_.count("IDM_DR_IDR") > 0) {
+    if (all_species_.contains("IDM_DR_IDR")) {
       /* restore the correct sign for tau_idm_dr */
       thermodynamics_table_[index_tau * th_size_ + index_th_tau_idm_dr_] *= -1.;
 
@@ -812,7 +812,7 @@ void ThermodynamicsModule::thermodynamics_init() {
                ppr->thermo_rate_smoothing_radius);
 
   /* - ---> fill columns for ddmu_idm_dr and dddmu_idm_dr with true values, and compute idm_dr temperature and sound speed */
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     const auto& comp_ref = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
     const double Omega0_idr_local = comp_ref.idr().GetOmega0();
     const double T_idr_param      = comp_ref.idr().T_idr();
@@ -1106,7 +1106,7 @@ void ThermodynamicsModule::thermodynamics_init() {
 
   double tau_idm_dr_fs = 0.;
 
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     const auto& comp = static_cast<const IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
     if (comp.has_idm_dr()) {
       if (comp.idm_dr().nindex_idm_dr() >= 2) {
@@ -1211,7 +1211,7 @@ void ThermodynamicsModule::thermodynamics_init() {
   /** - find idm_dr and idr drag times */
   double tau_idm_dr = 0.0;
   double tau_idr    = 0.0;
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     if ((thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_idm_dr_] > 1.) &&
         (thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_idr_] > 1.)) {
       index_tau = 0;
@@ -1261,7 +1261,7 @@ void ThermodynamicsModule::thermodynamics_init() {
   /** - if verbose flag set to next-to-minimum value, print the main results */
 
   if (pth->thermodynamics_verbose > 0) {
-    if (all_species_.count("IDM_DR_IDR") > 0) {
+    if (all_species_.contains("IDM_DR_IDR")) {
       if ((thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_idm_dr_] > 1.) &&
           (thermodynamics_table_[(tt_size_ - 1) * th_size_ + index_th_tau_idr_] > 1.)) {
         printf(" -> idr decouples at tau_idr = %e Mpc\n", tau_idr);
@@ -1311,7 +1311,7 @@ void ThermodynamicsModule::thermodynamics_init() {
       printf(" -> free-streaming approximation can be turned on as soon as tau=%g Mpc\n",
              tau_free_streaming_);
     }
-    if ((all_species_.count("IDM_DR_IDR") > 0) && (pth->thermodynamics_verbose > 1)) {
+    if ((all_species_.contains("IDM_DR_IDR")) && (pth->thermodynamics_verbose > 1)) {
       printf(" -> dark free-streaming approximation can be turned on as soon as tau=%g Mpc\n",
              tau_idm_dr_fs);
     }
@@ -1364,7 +1364,7 @@ void ThermodynamicsModule::thermodynamics_indices(recombination* preco, reioniza
   index_th_cb2_ = index;
   index++;
 
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     index_th_dmu_idm_dr_ = index;
     index++;
     index_th_ddmu_idm_dr_ = index;
@@ -1567,7 +1567,7 @@ double ThermodynamicsModule::thermodynamics_delta_neff_at_bbn() {
                        (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g);
 
   /**DRMD**/
-  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+  if (all_species_.contains("IDM_DRMD_IDR_DRMD")) {
     auto& drmd  = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
     Neff_bbn   -= drmd.idr_drmd().Rho(pvecback.data()) / (7. / 8. * pow(4. / 11., 4. / 3.) * rho_g);
   }
@@ -1815,17 +1815,17 @@ void ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombinati
              pow(log((preco->annihilation_zmin + 1.) / (preco->annihilation_zmax + 1.)), 2)));
   }
 
-  const double Omega0_idm_dr_ann = all_species_.count("IDM_DR_IDR")
+  const double Omega0_idm_dr_ann = all_species_.contains("IDM_DR_IDR")
                                        ? static_cast<const IDM_DR_IDR_Species&>(
                                              *all_species_.at("IDM_DR_IDR"))
                                              .idm_dr()
                                              .GetOmega0()
                                        : 0.;
-  const double Omega0_cdm_ann    = all_species_.count("CDM") ? all_species_.at("CDM")->GetOmega0()
+  const double Omega0_cdm_ann = all_species_.contains("CDM") ? all_species_.at("CDM")->GetOmega0()
                                                              : 0.;
-  double rho_cdm_today           = pow(pba->H0 * _c_ / _Mpc_over_m_, 2) * 3 / 8. / _PI_ / _G_ *
-                                   (Omega0_idm_dr_ann + Omega0_cdm_ann) * _c_ *
-                                   _c_; /* energy density in J/m^3 */
+  double rho_cdm_today        = pow(pba->H0 * _c_ / _Mpc_over_m_, 2) * 3 / 8. / _PI_ / _G_ *
+                                (Omega0_idm_dr_ann + Omega0_cdm_ann) * _c_ *
+                                _c_; /* energy density in J/m^3 */
 
   double u_min = (1 + z) / (1 + preco->annihilation_z_halo);
 
@@ -1863,9 +1863,10 @@ void ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco,
       double nH0 = 3. * preco->H0 * preco->H0 * pba->Omega0_b / (8. * _PI_ * _G_ * _m_H_) *
                    (1. - preco->YHe);
 
-      const double Omega0_cdm_inj = all_species_.count("CDM") ? all_species_.at("CDM")->GetOmega0()
-                                                              : 0.;
-      const double Omega0_idm_dr_inj = all_species_.count("IDM_DR_IDR")
+      const double Omega0_cdm_inj    = all_species_.contains("CDM")
+                                           ? all_species_.at("CDM")->GetOmega0()
+                                           : 0.;
+      const double Omega0_idm_dr_inj = all_species_.contains("IDM_DR_IDR")
                                            ? static_cast<const IDM_DR_IDR_Species&>(
                                                  *all_species_.at("IDM_DR_IDR"))
                                                  .idm_dr()
@@ -3717,7 +3718,7 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
 
   /** - add  more points to start earlier in presence of interacting DM */
 
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     tt_size_ += ppr->thermo_Nz1_idm_dr + ppr->thermo_Nz2_idm_dr - 1;
   }
 
@@ -3764,7 +3765,7 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
         exactly up to high redshift. With extrapolations in
         thermodynamics_at_z() we could not obtain this. */
 
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     for (int i = 0; i < ppr->thermo_Nz2_idm_dr + ppr->thermo_Nz1_idm_dr - 1; i++) {
       /* with an intermediate step Delta z = (thermo_z_initial_idm_dr-recfast_z_initial)/thermo_Nz1_idm_dr/thermo_Nz1_idm_dr */
       if (i < ppr->thermo_Nz2_idm_dr - 1) {
@@ -3831,7 +3832,7 @@ void ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) con
   class_store_columntitle(titles, "tau_d", true);
   class_store_columntitle(titles, "r_d", pth->compute_damping_scale);
 
-  if (all_species_.count("IDM_DR_IDR") > 0) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     class_store_columntitle(titles, "dmu_idm_dr", true);
     class_store_columntitle(titles, "tau_idm_dr", true);
     class_store_columntitle(titles, "tau_idr", true);
@@ -3869,7 +3870,7 @@ void ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, doub
     class_store_double(dataptr, pvecthermo[index_th_tau_d_], true, storeidx);
     class_store_double(dataptr, pvecthermo[index_th_r_d_], pth->compute_damping_scale, storeidx);
 
-    if (all_species_.count("IDM_DR_IDR") > 0) {
+    if (all_species_.contains("IDM_DR_IDR")) {
       class_store_double(dataptr, pvecthermo[index_th_dmu_idm_dr_], true, storeidx);
       class_store_double(dataptr, pvecthermo[index_th_tau_idm_dr_], true, storeidx);
       class_store_double(dataptr, pvecthermo[index_th_tau_idr_], true, storeidx);

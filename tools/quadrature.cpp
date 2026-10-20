@@ -264,10 +264,10 @@ void get_qsampling(double* x,
   int Nold = NL;
   int NFD;
   int NFD_max;
-  int adapt_converging      = false;
-  int Laguerre_converging   = false;
-  int FermiDirac_converging = false;
-  int combined_converging   = false;
+  bool adapt_converging      = false;
+  bool Laguerre_converging   = false;
+  bool FermiDirac_converging = false;
+  bool combined_converging   = false;
   double y;
   double y1;
   double y2;
@@ -662,7 +662,7 @@ void sort_x_and_w(double* x, double* w, double* workx, double* workw, int starti
   sort_x_and_w(x, w, workx, workw, top + 1, endidx);
 }
 
-void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite) {
+void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, bool isindefinite) {
   /* x and w should be exactly 15*root_node->leafchilds, and a leaf count should have
      been performed. Or perhaps I just use the fact that a leaf won't have children.
      Nah, let me use the leaf-count then. */
@@ -741,7 +741,7 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
               int treemode,
               double a,
               double b,
-              int isindefinite) {
+              bool isindefinite) {
   /* Do adaptive Gauss-Kronrod quadrature, while building the
      recurrence tree. If treemode!=0, store x-values and weights aswell.
      At first call, a and b should be 0 and 1 if isdefinite. */
@@ -789,7 +789,7 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
 }
 
 void compute_Laguerre(
-    double* x, double* w, int N, double alpha, double* b, double* c, int totalweight) {
+    double* x, double* w, int N, double alpha, double* b, double* c, bool totalweight) {
   int i;
   int j;
   int iter;
@@ -953,7 +953,7 @@ void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
              qss_node* node,
              double a,
              double b,
-             int isindefinite) {
+             bool isindefinite) {
   const double z_k[15] = {-0.991455371120813,
                           -0.949107912342759,
                           -0.864864423359769,

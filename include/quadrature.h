@@ -69,7 +69,7 @@ bool get_qsampling_manual(double* x,
                           void* params_for_function,
                           const GBQuadParams& gb);
 void sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx);
-void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, int isindefinite);
+void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, bool isindefinite);
 void reduce_tree(qss_node* node, int level);
 void leaf_count(qss_node* node);
 double get_integral(qss_node* node, int level);
@@ -81,9 +81,9 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
               int treemode,
               double a,
               double b,
-              int isindefinite);
+              bool isindefinite);
 void compute_Laguerre(
-    double* x, double* w, int N, double alpha, double* b, double* c, int totalweight);
+    double* x, double* w, int N, double alpha, double* b, double* c, bool totalweight);
 
 /** Compute the N-point Gaussian rule for the weight 1 / (exp(x) + 1) on
  *  [0, infinity). The rule is constructed from Laguerre modified moments
@@ -97,7 +97,7 @@ void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
              qss_node* node,
              double a,
              double b,
-             int isindefinite);
+             bool isindefinite);
 
 void quadrature_gauss_legendre(double* mu, double* w8, int n, double tol);
 

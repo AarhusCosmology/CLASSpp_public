@@ -415,7 +415,7 @@ void OutputModule::output_pk(enum pk_outputs pk_output) {
   /** - define local variables */
 
   std::string file_name;
-  short do_ic = false;
+  bool do_ic = false;
 
   /** - preliminary: check whether we need to output the decomposition into contributions from each initial condition */
 
@@ -817,7 +817,7 @@ void OutputModule::output_background() {
             "# All densities are multiplied by (8piG/3) (below, shortcut notation (.) for this "
             "factor) \n");
     fprintf(backfile, "# Densities are in units [Mpc^-2] while all distances are in [Mpc]. \n");
-    if (all_species_.count("ScalarField")) {
+    if (all_species_.contains("ScalarField")) {
       fprintf(backfile,
               "# The units of phi, tau in the derivatives and the potential V are the "
               "following:\n");
@@ -862,7 +862,7 @@ void OutputModule::output_thermodynamics() {
     if (pth->compute_damping_scale) {
       fprintf(thermofile, "#         r_d = approximate comoving value of photon damping scale \n");
     }
-    if (all_species_.count("IDM_DR_IDR") &&
+    if (all_species_.contains("IDM_DR_IDR") &&
         static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
       fprintf(thermofile,
               "#  dmu_idm_dr = scattering rate of idr with idm_dr (i.e. idr opacity to idm_dr "

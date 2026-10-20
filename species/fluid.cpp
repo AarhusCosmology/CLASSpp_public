@@ -365,7 +365,7 @@ void FluidSpecies::ComputeWFld(double a,
       if (const auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD")) {
         Omega_m += static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**p).idm_drmd().GetOmega0();
       }
-      if (bgm_->all_species_.count("DCDM_DR")) {
+      if (bgm_->all_species_.contains("DCDM_DR")) {
         class_stop(
             "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
             "to code the calculation of a_eq in that case, but it would not be difficult to "

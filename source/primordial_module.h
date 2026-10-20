@@ -21,7 +21,7 @@ class PrimordialModule : public BaseModule {
       ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
   std::vector<int>
       ic_ic_size_; /**< number of ordered pairs of (index_ic1, index_ic2); this number is just N(N+1)/2  where N = ic_size[index_md] */
-  std::vector<std::vector<short>>
+  std::vector<std::vector<bool>>
       is_non_zero_;  /**< is_non_zero[index_md][index_ic1_ic2] set to false if pair
                           (index_ic1, index_ic2) is uncorrelated
                           (ensures more precision and saves time with respect to the option

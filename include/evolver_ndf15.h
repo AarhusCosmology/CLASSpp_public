@@ -24,10 +24,10 @@ struct jacobian {
   int repeated_pattern         = 0;
   int trust_sparse =
       0; /* Number of times a pattern is repeated (actually included) before we trust it. */
-  int has_grouping = 0;
-  int has_pattern  = 0;
-  int new_jacobian = 0; /* True if sp_ludcmp has not been run on the current jacobian. */
-  int cnzmax       = 0;
+  int has_grouping  = 0;
+  int has_pattern   = 0;
+  bool new_jacobian = false; /* True if sp_ludcmp has not been run on the current jacobian. */
+  int cnzmax        = 0;
   std::vector<int> col_group;  /* Column grouping. Groups go from 0 to max_group*/
   std::vector<int> col_wi;     /* Workarray for column grouping*/
   int max_group = 0;           /*Number of columngroups -1 */

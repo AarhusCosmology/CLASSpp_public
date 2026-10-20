@@ -218,7 +218,7 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
 
   std::vector<double> PhiL((lmax + 2) * _HYPER_CHUNK_);
 
-  int hit_the_ceiling = ((K == 1) && (static_cast<int>(beta + 0.2) == (lmax + 1)));
+  bool hit_the_ceiling = ((K == 1) && (static_cast<int>(beta + 0.2) == (lmax + 1)));
   if (hit_the_ceiling) {
     /** Take care of special case lmax = beta-1.
         The routine below will try to compute

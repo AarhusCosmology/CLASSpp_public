@@ -32,7 +32,7 @@ void evolver_rk(EvolverDerivs derivs,
   double timescale;
   struct generic_integrator_workspace gi;
   std::vector<double> dy(y_size);
-  short call_output;
+  bool call_output;
 
   class_test(x_ini > x_sampling[x_size - 1],
              "called with x=%e, last x_sampling=%e",

@@ -571,8 +571,8 @@ void PerturbationsModule::perturb_init() {
     printf("Computing sources\n");
   }
 
-  class_test((ppt->gauge == possible_gauges::synchronous) && (all_species_.count("CDM") == 0) &&
-                 (all_species_.count("CDM_SCF_Momentum") == 0),
+  class_test((ppt->gauge == possible_gauges::synchronous) && (!all_species_.contains("CDM")) &&
+                 (!all_species_.contains("CDM_SCF_Momentum")),
              "In the synchronous gauge, it is not self-consistent to assume no CDM: the later is "
              "used to define the initial timelike hypersurface. You can either add a negligible "
              "amount of CDM or switch to newtonian gauge");
@@ -590,7 +590,7 @@ void PerturbationsModule::perturb_init() {
              "perturbations.h",
              ppr->radiation_streaming_approximation);
 
-  if (all_species_.count("IDM_DR_IDR")) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     class_test((ppr->idr_streaming_approximation <
                 static_cast<int>(rsa_idr_method::rsa_idr_none)) ||
                    (ppr->idr_streaming_approximation >
@@ -627,7 +627,7 @@ void PerturbationsModule::perturb_init() {
     }
   }
 
-  if (all_species_.count("Fluid")) {
+  if (all_species_.contains("Fluid")) {
     /* check values of w_fld at initial time and today */
     background_module_->background_w_fld(0., &w_fld_ini, &dw_over_da_fld, &integral_fld);
     background_module_->background_w_fld(1., &w_fld_0, &dw_over_da_fld, &integral_fld);
@@ -652,7 +652,7 @@ void PerturbationsModule::perturb_init() {
     }
   }
 
-  if (all_species_.count("DCDM_DR")) {
+  if (all_species_.contains("DCDM_DR")) {
     class_test((ppt->has_cdi) || (ppt->has_bi) || (ppt->has_nid) || (ppt->has_niv),
                "Non-adiabatic initial conditions not coded in presence of decaying dark matter");
   }
@@ -1657,7 +1657,7 @@ void PerturbationsModule::perturb_get_k_list() {
        K=0, K<0, K>0 */
 
     /* the following is a boost on k_per_decade_for_pk for the interacting idm-idr cases (relevant for large k and a_idm_dr) */
-    const double idmdr_nindex = all_species_.count("IDM_DR_IDR")
+    const double idmdr_nindex = all_species_.contains("IDM_DR_IDR")
                                     ? static_cast<const IDM_DR_IDR_Species&>(
                                           *all_species_.at("IDM_DR_IDR"))
                                           .idm_dr()
@@ -1694,7 +1694,7 @@ void PerturbationsModule::perturb_get_k_list() {
     /* values until k_max */
 
     while (k < k_max) {
-      if ((all_species_.count("IDM_DR_IDR")) && (idmdr_nindex >= 2)) {
+      if ((all_species_.contains("IDM_DR_IDR")) && (idmdr_nindex >= 2)) {
         k *= pow(10.,
                  1. / (ppr->k_per_decade_for_pk * ppr->idmdr_boost_k_per_decade_for_pk *
                            idmdr_nindex +
@@ -2097,12 +2097,12 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
   if (_scalars_) {
     class_define_index(ppw->index_ap_ufa, !resolved_.ur.empty(), index_ap, 1);
     class_define_index(ppw->index_ap_ncdmfa, all_species_.has_ncdm(), index_ap, 1);
-    class_define_index(ppw->index_ap_tca_idm_dr, all_species_.count("IDM_DR_IDR"), index_ap, 1);
+    class_define_index(ppw->index_ap_tca_idm_dr, all_species_.contains("IDM_DR_IDR"), index_ap, 1);
     class_define_index(ppw->index_ap_tca_idm_drmd,
-                       all_species_.count("IDM_DRMD_IDR_DRMD"),
+                       all_species_.contains("IDM_DRMD_IDR_DRMD"),
                        index_ap,
                        1); /* DRMD */
-    class_define_index(ppw->index_ap_rsa_idr, all_species_.count("IDM_DR_IDR"), index_ap, 1);
+    class_define_index(ppw->index_ap_rsa_idr, all_species_.contains("IDM_DR_IDR"), index_ap, 1);
 
     /* Approximations owned by species, after the module's own. */
     ppw->species_approx_index.assign(all_species_.size(), -1);
@@ -2128,13 +2128,13 @@ void PerturbationsModule::perturb_workspace_init(int index_md, perturb_workspace
     ppw->approx[ppw->index_ap_tca] = static_cast<int>(tca_on);
     ppw->approx[ppw->index_ap_rsa] = static_cast<int>(rsa_off);
 
-    if (all_species_.count("IDM_DR_IDR")) {
+    if (all_species_.contains("IDM_DR_IDR")) {
       ppw->approx[ppw->index_ap_rsa_idr] = static_cast<int>(rsa_idr_off);
     }
-    if (all_species_.count("IDM_DR_IDR")) {
+    if (all_species_.contains("IDM_DR_IDR")) {
       ppw->approx[ppw->index_ap_tca_idm_dr] = static_cast<int>(tca_idm_dr_on);
     }
-    if (all_species_.count(
+    if (all_species_.contains(
             "IDM_DRMD_IDR_DRMD")) { /* DRMD : Only if both fluids are present, does it make sense to have the tight coupling approximation.*/
       ppw->approx[ppw->index_ap_tca_idm_drmd] = static_cast<int>(tca_idm_drmd_on);
     }
@@ -2237,7 +2237,7 @@ void PerturbationsModule::perturb_solve(int index_md,
   /* approximation scheme within previous interval: previous_approx[index_ap] */
   int* previous_approx;
 
-  int is_early_enough;
+  bool is_early_enough;
 
   /* Related to the perturbation output */
   void (*perhaps_print_variables)(double, double*, double*, void*);
@@ -2884,7 +2884,7 @@ void PerturbationsModule::perturb_find_approximation_switches(
                     interval_limit[index_switch]);
           }
 
-          if (all_species_.count("IDM_DR_IDR")) {
+          if (all_species_.contains("IDM_DR_IDR")) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_rsa_idr] ==
                  static_cast<int>(rsa_idr_off)) &&
                 (interval_approx[index_switch][ppw->index_ap_rsa_idr] ==
@@ -2897,7 +2897,7 @@ void PerturbationsModule::perturb_find_approximation_switches(
             }
           }
 
-          if (all_species_.count("IDM_DR_IDR")) {
+          if (all_species_.contains("IDM_DR_IDR")) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_tca_idm_dr] ==
                  static_cast<int>(tca_idm_dr_on)) &&
                 (interval_approx[index_switch][ppw->index_ap_tca_idm_dr] ==
@@ -2909,8 +2909,8 @@ void PerturbationsModule::perturb_find_approximation_switches(
             }
           }
 
-          if ((all_species_.count("IDM_DRMD_IDR_DRMD")) &&
-              (all_species_.count("IDM_DRMD_IDR_DRMD"))) {
+          if ((all_species_.contains("IDM_DRMD_IDR_DRMD")) &&
+              (all_species_.contains("IDM_DRMD_IDR_DRMD"))) {
             if ((interval_approx[index_switch - 1][ppw->index_ap_tca_idm_drmd] ==
                  static_cast<int>(tca_idm_drmd_on)) &&
                 (interval_approx[index_switch][ppw->index_ap_tca_idm_drmd] ==
@@ -3195,7 +3195,7 @@ void PerturbationsModule::perturb_vector_init(
 
   /* take all of them by default */
   for (index_pt = 0; index_pt < ppv->pt_size; index_pt++) {
-    ppv->used_in_sources[index_pt] = true;
+    ppv->used_in_sources[index_pt] = 1;
   }
 
   /* Per-species MarkUsedInSources: each species marks its approximation-irrelevant
@@ -3217,7 +3217,7 @@ void PerturbationsModule::perturb_vector_init(
                                                ppv->used_in_sources.data());
     }
     /* gw is a metric slot, not a species — module-owned. */
-    ppv->used_in_sources[ppv->index_pt_gw] = false;
+    ppv->used_in_sources[ppv->index_pt_gw] = 0;
   }
 
   /** - case of setting initial conditions for a new wavenumber */
@@ -3234,7 +3234,7 @@ void PerturbationsModule::perturb_vector_init(
       class_test(ppw->approx[ppw->index_ap_rsa] == (int) rsa_on,
                  "scalar initial conditions assume radiation streaming approximation turned off");
 
-      if (all_species_.count("IDM_DR_IDR")) {
+      if (all_species_.contains("IDM_DR_IDR")) {
         class_test(ppw->approx[ppw->index_ap_rsa_idr] == (int) rsa_idr_on,
                    "scalar initial conditions assume dark radiation approximation turned off");
       }
@@ -3305,14 +3305,15 @@ void PerturbationsModule::perturb_vector_init(
                  "at tau=%g: the tight-coupling approximation can be switched off, not on",
                  tau);
 
-      if (all_species_.count("IDM_DR_IDR")) {
+      if (all_species_.contains("IDM_DR_IDR")) {
         class_test((pa_old[ppw->index_ap_tca] == (int) tca_idm_dr_off) &&
                        (ppw->approx[ppw->index_ap_tca] == (int) tca_idm_dr_on),
                    "at tau=%g: the dark tight-coupling approximation can be switched off, not on",
                    tau);
       }
 
-      if ((all_species_.count("IDM_DRMD_IDR_DRMD")) && (all_species_.count("IDM_DRMD_IDR_DRMD"))) {
+      if ((all_species_.contains("IDM_DRMD_IDR_DRMD")) &&
+          (all_species_.contains("IDM_DRMD_IDR_DRMD"))) {
         class_test((pa_old[ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_off) &&
                        (ppw->approx[ppw->index_ap_tca_idm_drmd] == (int) tca_idm_drmd_on),
                    "at tau=%g: the dark tight-coupling approximation can be switched off, not on "
@@ -3435,7 +3436,7 @@ void PerturbationsModule::perturb_vector_init(
       }
 
       /* Case of switching on rsa for interacting dark radiation */
-      if (all_species_.count("IDM_DR_IDR")) {
+      if (all_species_.contains("IDM_DR_IDR")) {
         if ((pa_old[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off)) &&
             (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_on))) {
           if (ppt->perturbations_verbose > 2) {
@@ -3447,7 +3448,7 @@ void PerturbationsModule::perturb_vector_init(
         }
       }
 
-      if (all_species_.count("IDM_DR_IDR")) {
+      if (all_species_.contains("IDM_DR_IDR")) {
         /* Case of switching off interacting dark radiation tight coupling approximation */
 
         if ((pa_old[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_on)) &&
@@ -3494,12 +3495,12 @@ void PerturbationsModule::perturb_vector_init(
    approximation (DRMD). Provide correct initial conditions to new set
    of variables */
 
-      if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+      if (all_species_.contains("IDM_DRMD_IDR_DRMD")) {
         /* Case of switching off idm_idr_drmd tight coupling approximation */
 
         if ((pa_old[ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_on)) &&
             (ppw->approx[ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_off)) &&
-            (all_species_.count("IDM_DRMD_IDR_DRMD"))) {
+            (all_species_.contains("IDM_DRMD_IDR_DRMD"))) {
           double a = ppw->pvecback[background_module_->index_bg_a_];
 
           if (ppt->perturbations_verbose > 2) {
@@ -3805,13 +3806,13 @@ void PerturbationsModule::perturb_initial_conditions(
 
     /* f_cdm = Omega_cdm(t_i) / Omega_m(t_i) */
     double fraccdm = 0.;
-    if (all_species_.count("CDM")) {
+    if (all_species_.contains("CDM")) {
       fraccdm = all_species_.at("CDM")->Rho(ppw->pvecback.data()) / rho_m;
     }
 
     /* f_idm = Omega_idm_drmd(t_i) / Omega_m(t_i) */
     double fracidm_drmd = 0.;
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    if (all_species_.contains("IDM_DRMD_IDR_DRMD")) {
       auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
       if (drmd.idm_drmd().IsPresent()) {
         fracidm_drmd = drmd.idm_drmd().Rho(ppw->pvecback.data()) / rho_m;
@@ -3903,8 +3904,8 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.shear_ur = 0.;
       ic_ctx.l3_ur    = 0.;
       ic_ctx.delta_dr = 0.;
-      if (!resolved_.ur.empty() || (all_species_.has_ncdm()) || (all_species_.count("DCDM_DR")) ||
-          (all_species_.count("IDM_DR_IDR"))) {
+      if (!resolved_.ur.empty() || (all_species_.has_ncdm()) ||
+          (all_species_.contains("DCDM_DR")) || (all_species_.contains("IDM_DR_IDR"))) {
         ic_ctx.delta_ur = ic_ctx.delta_g_ic;
         ic_ctx.theta_ur = -k * ktau_three / 36. / (4. * fracnu + 15.) *
                           (4. * fracnu + 11. + 12. * s2_squared -
@@ -3915,7 +3916,7 @@ void PerturbationsModule::perturb_initial_conditions(
                           (1. + (4. * fracnu - 5.) / 4. / (2. * fracnu + 15.) * tau * om) *
                           ppr->curvature_ini;
         ic_ctx.l3_ur    = ktau_three * 2. / 7. / (12. * fracnu + 45.) * ppr->curvature_ini;
-        if (all_species_.count("DCDM_DR")) {
+        if (all_species_.contains("DCDM_DR")) {
           ic_ctx.delta_dr = ic_ctx.delta_ur;
         }
       }
@@ -3939,13 +3940,13 @@ void PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.2.) Cold dark matter Isocurvature */
 
     if ((ppt->has_cdi) && (index_ic == index_ic_cdi_)) {
-      class_test((all_species_.count("IDM_DR_IDR") != 0),
+      class_test((all_species_.contains("IDM_DR_IDR")),
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
+      class_test((all_species_.contains("IDM_DRMD_IDR_DRMD")),
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)")
 
-          class_test(all_species_.count("CDM") == 0,
+          class_test(!all_species_.contains("CDM"),
                      "not consistent to ask for CDI in absence of CDM!");
 
       ic_ctx.delta_g_ic = ppr->entropy_ini * fraccdm * om * tau * (-2. / 3. + om * tau / 4.);
@@ -3970,10 +3971,10 @@ void PerturbationsModule::perturb_initial_conditions(
     /** - --> (b.3.) Baryon Isocurvature */
 
     if ((ppt->has_bi) && (index_ic == index_ic_bi_)) {
-      class_test((all_species_.count("IDM_DR_IDR") != 0),
+      class_test((all_species_.contains("IDM_DR_IDR")),
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
+      class_test((all_species_.contains("IDM_DRMD_IDR_DRMD")),
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
 
       ic_ctx.delta_g_ic = ppr->entropy_ini * fracb * om * tau * (-2. / 3. + om * tau / 4.);
@@ -4001,10 +4002,10 @@ void PerturbationsModule::perturb_initial_conditions(
       class_test(resolved_.ur.empty() && !all_species_.has_ncdm(),
                  "not consistent to ask for NID in absence of ur or ncdm species!");
 
-      class_test((all_species_.count("IDM_DR_IDR") != 0),
+      class_test((all_species_.contains("IDM_DR_IDR")),
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
+      class_test((all_species_.contains("IDM_DRMD_IDR_DRMD")),
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
 
       ic_ctx.delta_g_ic = ppr->entropy_ini * fracnu / fracg * (-1. + ktau_two / 6.);
@@ -4025,10 +4026,10 @@ void PerturbationsModule::perturb_initial_conditions(
       class_test(resolved_.ur.empty() && !all_species_.has_ncdm(),
                  "not consistent to ask for NIV in absence of ur or ncdm species!");
 
-      class_test((all_species_.count("IDM_DR_IDR") != 0),
+      class_test((all_species_.contains("IDM_DR_IDR")),
                  "only adiabatic ic in presence of interacting dark radiation");
 
-      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
+      class_test((all_species_.contains("IDM_DRMD_IDR_DRMD")),
                  "only adiabatic ic in presence of interacting dark radiation (DRMD)");
       ic_ctx.delta_g_ic = ppr->entropy_ini * k * tau * fracnu / fracg *
                           (1. - 3. / 16. * fracb * (2. + fracg) / fracg * om * tau);
@@ -4061,7 +4062,7 @@ void PerturbationsModule::perturb_initial_conditions(
     /** - (d) If the needed gauge is the newtonian gauge, we must compute alpha and then perform a gauge transformation for each variable */
 
     if (ppt->gauge == possible_gauges::newtonian) {
-      class_test((all_species_.count("IDM_DRMD_IDR_DRMD") != 0),
+      class_test((all_species_.contains("IDM_DRMD_IDR_DRMD")),
                  "Use synchronous gauge for the DRMD implementation as Netwonian gauge has not "
                  "been tested!");
 

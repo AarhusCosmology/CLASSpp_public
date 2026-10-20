@@ -266,8 +266,8 @@ class BaseSpecies {
 
   /**
    * Returns true if this species is present (has registered its background
-   * indices). For top-level species use all_species_.count(); IsPresent() is
-   * for sub-components of composites where all_species_.count() is unavailable.
+   * indices). For top-level species use all_species_.contains(); IsPresent() is
+   * for sub-components of composites where all_species_.contains() is unavailable.
    */
   bool IsPresent() const {
     return index_bg_rho_ >= 0;

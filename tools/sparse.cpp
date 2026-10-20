@@ -365,12 +365,12 @@ void sp_refactor(sp_num* N, sp_mat* A) {
 int column_grouping(sp_mat* G, int* col_g, int* filled) {
   int testcol;
   int groupnum;
-  int fitted;
+  bool fitted;
   int neq;
   int i;
   int* Ap;
   int* Ai;
-  int done;
+  bool done;
 
   neq = G->ncols;
   Ai  = G->Ai.data();
@@ -448,7 +448,7 @@ void sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
   int nvk;
   int mark;
   int wnvi;
-  int ok;
+  bool ok;
   int nel = 0;
   int p;
   int p1;
@@ -697,7 +697,7 @@ void sp_amd(int* Cp, int* Ci, int n, int nzmax, int* P, int* W) {
           ok = (len[j] == ln) && (elen[j] == eln);
           for (p = Cp[j] + 1; ok && p <= Cp[j] + ln - 1; p++) {
             if (w[Ci[p]] != mark) {
-              ok = 0;
+              ok = false;
             }
           }
           if (ok) {

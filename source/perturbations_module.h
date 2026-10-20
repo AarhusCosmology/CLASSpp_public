@@ -334,10 +334,10 @@ class PerturbationsModule : public BaseModule {
 
   BackgroundModulePtr background_module_;
   ThermodynamicsModulePtr thermodynamics_module_;
-  short evolve_tensor_ur_ =
-      0; /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */
-  short evolve_tensor_ncdm_ =
-      0; /**< will we evolve ncdm tensor perturbations (if we have ncdm species and we use the exact method) ? */
+  bool evolve_tensor_ur_ =
+      false; /**< will we evolve ur tensor perturbations (either because we have ur species, or we have ncdm species with massless approximation) ? */
+  bool evolve_tensor_ncdm_ =
+      false; /**< will we evolve ncdm tensor perturbations (if we have ncdm species and we use the exact method) ? */
 
   /** @name - useful flags  */
 

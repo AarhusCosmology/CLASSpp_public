@@ -461,7 +461,7 @@ void BackgroundModule::background_w_fld(double a,
                                         double* w_fld,
                                         double* dw_over_da_fld,
                                         double* integral_fld) const {
-  if (all_species_.count("Fluid")) {
+  if (all_species_.contains("Fluid")) {
     static_cast<FluidSpecies&>(*all_species_.at("Fluid"))
         .ComputeWFld(a, w_fld, dw_over_da_fld, integral_fld);
     return;
@@ -480,7 +480,7 @@ void BackgroundModule::background_idm_drmd(
 }
 
 double BackgroundModule::f_idr_drmd() const {
-  if (!all_species_.count("IDM_DRMD_IDR_DRMD")) {
+  if (!all_species_.contains("IDM_DRMD_IDR_DRMD")) {
     return 0.;
   }
   return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
@@ -488,7 +488,7 @@ double BackgroundModule::f_idr_drmd() const {
 }
 
 double BackgroundModule::z_dec_drmd() const {
-  if (!all_species_.count("IDM_DRMD_IDR_DRMD")) {
+  if (!all_species_.contains("IDM_DRMD_IDR_DRMD")) {
     return -1.;
   }
   return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
@@ -511,7 +511,7 @@ void BackgroundModule::background_init() {
     printf("Computing background\n");
 
     /* below we want to inform the user about ncdm species and/or the total N_eff */
-    const double Omega0_idr = all_species_.count("IDM_DR_IDR")
+    const double Omega0_idr = all_species_.contains("IDM_DR_IDR")
                                   ? static_cast<const IDM_DR_IDR_Species&>(
                                         *all_species_.at("IDM_DR_IDR"))
                                         .idr()
@@ -553,7 +553,7 @@ void BackgroundModule::background_init() {
   background_indices();
 
   /* fluid equation of state */
-  if (all_species_.count("Fluid")) {
+  if (all_species_.contains("Fluid")) {
     double w_fld;
     double dw_over_da;
     double integral_fld;
@@ -827,7 +827,7 @@ void BackgroundModule::background_solve_evolver() {
   for (const auto& sp : all_species_) {
     Omega0_dr_ += sp->DarkRadiationRhoToday(pvecback_integration.data()) / pba->H0 / pba->H0;
   }
-  if (all_species_.count("DCDM_DR")) {
+  if (all_species_.contains("DCDM_DR")) {
     auto& dcdm_dr = dynamic_cast<DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
     Omega0_dcdm_  = pvecback_integration[dcdm_dr.dcdm().bi_rho_index()] / pba->H0 / pba->H0;
   }
@@ -895,7 +895,7 @@ void BackgroundModule::background_solve_evolver() {
   }
 
   if (pba->background_verbose > 2) {
-    if (all_species_.count("DCDM_DR")) {
+    if (all_species_.contains("DCDM_DR")) {
       const auto& dcdm_dr_comp2 = static_cast<const DCDM_DR_Species&>(*all_species_.at("DCDM_DR"));
       printf("    Decaying Cold Dark Matter details: (DCDM --> DR)\n");
       printf("     -> Omega0_dcdm = %f\n", Omega0_dcdm_);
@@ -906,7 +906,7 @@ void BackgroundModule::background_solve_evolver() {
       printf("     -> Omega_ini_dcdm/Omega_b = %f\n",
              dcdm_dr_comp2.dcdm().Omega_ini_dcdm() / pba->Omega0_b);
     }
-    if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+    if (all_species_.contains("IDM_DRMD_IDR_DRMD")) {
       auto& drmd = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
       printf(" -> Dark Radiation Matter Decoupling details: (DRMD)\n");
       printf(
@@ -924,13 +924,13 @@ void BackgroundModule::background_solve_evolver() {
         printf("     -> no decoupling occurred.\n");
       }
     }
-    if (all_species_.count("ScalarField")) {
+    if (all_species_.contains("ScalarField")) {
       const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
       printf("    Scalar field details:\n");
       printf("     -> Omega_scf = %g, wished %g\n",
              scf.Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
              scf.GetOmega0());
-      if (all_species_.count("Lambda")) {
+      if (all_species_.contains("Lambda")) {
         printf("     -> Omega_Lambda = %g, wished %g\n",
                all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
                all_species_.at("Lambda")->GetOmega0());
@@ -1025,7 +1025,7 @@ void BackgroundModule::background_initial_conditions(
              "H = %e instead of strictly positive",
              pvecback[index_bg_H_]);
 
-  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+  if (all_species_.contains("IDM_DRMD_IDR_DRMD")) {
     static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
         .InitializeDrmdBackground(pvecback[index_bg_rho_tot_], pvecback[index_bg_H_], a, pvecback);
   }
@@ -1233,18 +1233,18 @@ void BackgroundModule::background_derivs_member(
 
   /** - solve second order growth equation  \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
   double rho_M = all_species_.baryons().Rho(pvecback);
-  if (all_species_.count("CDM")) {
+  if (all_species_.contains("CDM")) {
     rho_M += all_species_.at("CDM")->Rho(pvecback);
   }
-  if (all_species_.count("IDM_DR_IDR")) {
+  if (all_species_.contains("IDM_DR_IDR")) {
     auto& idm_idr  = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
     rho_M         += idm_idr.idm_dr().Rho(pvecback);
   }
-  if (all_species_.count("IDM_DRMD_IDR_DRMD")) {
+  if (all_species_.contains("IDM_DRMD_IDR_DRMD")) {
     auto& drmd  = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
     rho_M      += drmd.idm_drmd().Rho(pvecback);
   }
-  if (all_species_.count("CDM_SCF_Momentum")) {
+  if (all_species_.contains("CDM_SCF_Momentum")) {
     auto& t3  = static_cast<Type3Species&>(*all_species_.at("CDM_SCF_Momentum"));
     rho_M    += t3.cdm().Rho(pvecback);
   }
@@ -1539,7 +1539,7 @@ double BackgroundModule::GetOmega0NcdmTot() const {
 }
 
 int BackgroundModule::GetNDecayDr() const {
-  int n = (all_species_.count("DCDM_DR") ? 1 : 0);
+  int n = (all_species_.contains("DCDM_DR") ? 1 : 0);
   for (const auto& sp : all_species_) {
     if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
       ++n;

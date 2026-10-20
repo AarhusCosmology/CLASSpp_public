@@ -57,6 +57,9 @@ ExcludeHeaderFilterRegex: 'hyrec/'
 
 CheckOptions:
 
-  # `if (ptr)` and `if (!ptr)` stay legal; int and short flags become bool instead.
+  # `if (ptr)`, `if (n)` and `if (map.count(key))` stay legal; what the check catches is a
+  # bool stored in an int or short, or an int stored in a bool.
   - key: readability-implicit-bool-conversion.AllowPointerConditions
+    value: true
+  - key: readability-implicit-bool-conversion.AllowIntegerConditions
     value: true

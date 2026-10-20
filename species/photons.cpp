@@ -723,12 +723,12 @@ void PhotonsSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
   }
 
   for (int idx = g_lay.idx_l3; idx <= g_lay.idx_delta + g_lay.l_max; ++idx) {
-    used_in_sources[idx] = false;
+    used_in_sources[idx] = 0;
   }
 
-  used_in_sources[g_lay.idx_pol1] = false;
+  used_in_sources[g_lay.idx_pol1] = 0;
   for (int idx = g_lay.idx_pol3; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx) {
-    used_in_sources[idx] = false;
+    used_in_sources[idx] = 0;
   }
 }
 
@@ -747,16 +747,16 @@ void PhotonsSpecies::MarkTensorUsedInSources(const BaseSpecies::PerturbLayout& b
     return;
   }
 
-  used_in_sources[g_lay.idx_theta] = false;
-  used_in_sources[g_lay.idx_l3]    = false;
+  used_in_sources[g_lay.idx_theta] = 0;
+  used_in_sources[g_lay.idx_l3]    = 0;
   for (int idx = g_lay.idx_delta + 5; idx <= g_lay.idx_delta + g_lay.l_max; ++idx) {
-    used_in_sources[idx] = false;
+    used_in_sources[idx] = 0;
   }
 
-  used_in_sources[g_lay.idx_pol1] = false;
-  used_in_sources[g_lay.idx_pol3] = false;
+  used_in_sources[g_lay.idx_pol1] = 0;
+  used_in_sources[g_lay.idx_pol3] = 0;
   for (int idx = g_lay.idx_pol0 + 5; idx <= g_lay.idx_pol0 + g_lay.l_max_pol; ++idx) {
-    used_in_sources[idx] = false;
+    used_in_sources[idx] = 0;
   }
 }
 

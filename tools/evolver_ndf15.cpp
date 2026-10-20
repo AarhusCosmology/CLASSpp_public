@@ -98,13 +98,13 @@ void evolver_ndf15(EvolverDerivs derivs,
   const int maxk = options.max_order > 0 ? options.max_order : 5;
 
   /* Logicals: */
-  int Jcurrent;
-  int havrate;
-  int done;
-  int at_hmin;
-  int nofailed;
-  int gotynew;
-  int tooslow;
+  bool Jcurrent;
+  bool havrate;
+  bool done;
+  bool at_hmin;
+  bool nofailed;
+  bool gotynew;
+  bool tooslow;
   int* interpidx;
 
   /* Storage: */
@@ -810,7 +810,7 @@ void calc_C(struct jacobian* jac) {
   int n;
   int col;
   int row;
-  int duplicate;
+  bool duplicate;
   int* Ci;
   int* Cp;
   int* Ai;
@@ -1054,7 +1054,7 @@ void lubksb(double** a, int n, const int* indx, double b[]) {
         sum -= a[i][j] * b[j];
       }
     }
-    else if (sum) {
+    else if (sum != 0.) {
       ii = i;
     }
     b[i] = sum;
@@ -1156,8 +1156,8 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
   double** Fjac;
   double* p;
   double* lu_work;
-  int has_converged = false;
-  double toljac     = 1e-1;
+  bool has_converged = false;
+  double toljac      = 1e-1;
   double* delx;
 
   /** All arrays are indexed as [0, n-1] with the exception of p, indx,
@@ -1306,7 +1306,7 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
   double facmin = pow(eps, 0.78);
   double facmax = 0.1;
   int logjpos;
-  int pattern_broken;
+  bool pattern_broken;
   double tmpfac;
   double difmax2 = 0.;
   double del2;

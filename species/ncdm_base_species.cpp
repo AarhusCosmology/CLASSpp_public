@@ -740,7 +740,7 @@ void NCDMBaseSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayout& base,
     const int b = layout.index_per_q[iq];
     for (int l = 0; l <= layout.l_max; ++l) {
       if (l > 2) {
-        used_in_sources[b + l] = false;
+        used_in_sources[b + l] = 0;
       }
     }
   }

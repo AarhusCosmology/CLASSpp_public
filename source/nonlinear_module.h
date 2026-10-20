@@ -73,7 +73,7 @@ class NonlinearModule : public BaseModule {
   std::vector<std::vector<double>>
       nl_corr_density_; /**< nl_corr_density[index_pk][index_tau * perturbations_module_->k_size_ + index_k] */
 
-  std::vector<short>
+  std::vector<bool>
       is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
   int ic_size_ =
       0; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */
@@ -123,7 +123,7 @@ class NonlinearModule : public BaseModule {
                          double* lnpk_l,
                          double* ddlnpk_l,
                          double* k_nl,
-                         short* nl_corr_not_computable_at_this_k);
+                         bool* nl_corr_not_computable_at_this_k);
   void nonlinear_halofit_integrate(double* integrand_array,
                                    int integrand_size,
                                    int ia_size,
@@ -141,7 +141,7 @@ class NonlinearModule : public BaseModule {
                         std::vector<std::vector<double>>& lnpk_l,
                         std::vector<std::vector<double>>& ddlnpk_l,
                         double* k_nl,
-                        short* nl_corr_not_computable_at_this_k,
+                        bool* nl_corr_not_computable_at_this_k,
                         nonlinear_workspace* pnw);
   void nonlinear_hmcode_compute(HMcodeVersion version,
                                 int index_pk,
@@ -151,7 +151,7 @@ class NonlinearModule : public BaseModule {
                                 std::vector<std::vector<double>>& lnpk_l,
                                 std::vector<std::vector<double>>& ddlnpk_l,
                                 double* k_nl,
-                                short* nl_corr_not_computable_at_this_k,
+                                bool* nl_corr_not_computable_at_this_k,
                                 nonlinear_workspace* pnw);
   void nonlinear_hmcode_noradiation_growth(nonlinear_workspace* pnw);
   double nonlinear_hmcode_growth_norad(const nonlinear_workspace* pnw, double a) const;

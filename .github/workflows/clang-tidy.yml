@@ -15,8 +15,7 @@ env:
     cppcoreguidelines-pro-type-cstyle-cast,
     cppcoreguidelines-pro-type-member-init,
     -performance-*,
-    -modernize-avoid-c-arrays,
-    -readability-implicit-bool-conversion
+    -modernize-avoid-c-arrays
 
 jobs:
   tidy:

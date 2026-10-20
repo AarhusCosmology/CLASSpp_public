@@ -29,7 +29,7 @@
 
 class ClassConstants {
  public:
-  static constexpr int sFALSE = false;
+  static constexpr bool sFALSE = false;
 };
 
 #endif

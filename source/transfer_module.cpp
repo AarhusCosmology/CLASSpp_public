@@ -1730,7 +1730,7 @@ void TransferModule::transfer_compute_for_each_q(int index_q,
                                  sampling,
                                  sources,
                                  ptw->index_tau_max[index_n],
-                                 ptw->bessel_truncation[index_n],
+                                 ptw->bessel_truncation[index_n] != 0,
                                  tau0_minus_tau_min_bessel,
                                  &transfer_function);
             }
@@ -2254,7 +2254,7 @@ TransferMethod TransferModule::transfer_select_method(struct transfer_workspace*
   }
 
   *index_tau_max     = index;
-  *bessel_truncation = (index != tau_size - 1) && (index == index_tau_max_Bessel);
+  *bessel_truncation = ((index != tau_size - 1) && (index == index_tau_max_Bessel)) ? 1 : 0;
   return TransferMethod::line_of_sight;
 }
 
@@ -3167,7 +3167,7 @@ void TransferModule::transfer_get_lmax(
   int fevals = 0;
   int index_l_mid;
   int multiplier;
-  int right_boundary_checked = false;
+  bool right_boundary_checked = false;
   get_xmin_generic(sgnK, lvec[0], nu, xtol, phiminabs, &x_nonzero, &fevals);
   if (x_nonzero >= xmax) {
     //x at left boundary is already larger than xmax.

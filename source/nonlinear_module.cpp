@@ -155,7 +155,7 @@ void NonlinearModule::nonlinear_pk_at_z(
   int index_ic1_ic1;
   int index_ic2_ic2;
   int last_index;
-  short do_ic = false;
+  bool do_ic = false;
 
   /* ln_pk_nl_ is allocated only when a non-linear method runs */
   class_test_severe((pk_output == pk_nonlinear) && (pnl->method == nl_none),
@@ -421,7 +421,7 @@ void NonlinearModule::nonlinear_pk_at_k_and_z(enum pk_outputs pk_output,
 ) const {
   std::vector<double> out_pk_at_z;
   std::vector<double> out_pk_ic_at_z;
-  short do_ic = false;
+  bool do_ic = false;
 
   class_test_severe(!ppt->has_pk_matter,
                     "No power spectrum was computed. Add 'mPk' to the list of outputs.");
@@ -1060,7 +1060,7 @@ void NonlinearModule::nonlinear_init() {
   std::vector<std::vector<double>> lnpk_l;
   std::vector<std::vector<double>> ddlnpk_l;
 
-  short nl_corr_not_computable_at_this_k = false;
+  bool nl_corr_not_computable_at_this_k = false;
 
   std::vector<double> pvecback;
   int last_index;
@@ -1106,7 +1106,7 @@ void NonlinearModule::nonlinear_init() {
     for (const auto& sp : all_species_) {
       sp->WarnIfTooHeavyForHalofit(_M_EV_TOO_BIG_FOR_HALOFIT_);
     }
-    if (all_species_.count("IDM_DR_IDR") &&
+    if (all_species_.contains("IDM_DR_IDR") &&
         static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
       fprintf(stdout,
               "Warning: Halofit and HMcode are proved to work for CDM, and also with a small HDM "
@@ -2182,7 +2182,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                                         double* lnpk_l,
                                         double* ddlnpk_l,
                                         double* k_nl,
-                                        short* nl_corr_not_computable_at_this_k) {
+                                        bool* nl_corr_not_computable_at_this_k) {
   double Omega_m;
   double Omega_v;
   double fnu;
@@ -2692,7 +2692,7 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
                                        std::vector<std::vector<double>>& lnpk_l,
                                        std::vector<std::vector<double>>& ddlnpk_l,
                                        double* k_nl,
-                                       short* nl_corr_not_computable_at_this_k,
+                                       bool* nl_corr_not_computable_at_this_k,
                                        struct nonlinear_workspace* pnw) {
   const HMcodeVersion version = pnl->hmcode_version;
 
@@ -2754,7 +2754,7 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
                                                std::vector<std::vector<double>>& lnpk_l,
                                                std::vector<std::vector<double>>& ddlnpk_l,
                                                double* k_nl,
-                                               short* nl_corr_not_computable_at_this_k,
+                                               bool* nl_corr_not_computable_at_this_k,
                                                struct nonlinear_workspace* pnw) {
   const bool hm2020   = (version != HMcodeVersion::v2016);
   const bool feedback = (version == HMcodeVersion::v2020_baryonic_feedback);
@@ -3781,7 +3781,7 @@ void NonlinearModule::nonlinear_hmcode_dark_energy_correction(struct nonlinear_w
 
   double w0 = -1.;
   double wa = 0.;
-  if (all_species_.count("Fluid")) {
+  if (all_species_.contains("Fluid")) {
     double dw_over_da_fld;
     double integral_fld;
     background_module_->background_w_fld(1., &w0, &dw_over_da_fld, &integral_fld);

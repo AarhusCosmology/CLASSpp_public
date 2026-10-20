@@ -165,7 +165,7 @@ void test_input_module() {
     fc.set("nuM.T", "0.71611");
     fc.set("nuM.deg", "1.0");
     InputModule input(fc);
-    assert(input.all_species_.count("nuM") == 1);
+    assert(input.all_species_.contains("nuM") == 1);
   }
 
   // ── A single-instance type is consumed by the dot-syntax translation ──

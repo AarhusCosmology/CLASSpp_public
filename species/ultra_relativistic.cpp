@@ -426,7 +426,7 @@ void UltraRelativisticSpecies::MarkUsedInSources(const BaseSpecies::PerturbLayou
   }
 
   for (int idx = ur_lay.idx_l3; idx <= ur_lay.idx_delta + ur_lay.l_max; ++idx) {
-    used_in_sources[idx] = false;
+    used_in_sources[idx] = 0;
   }
 }
 

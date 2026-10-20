@@ -40,7 +40,7 @@ bool file_exists(const std::string& name) {
   return std::ifstream(name).good();
 }
 
-void readDoubleList(FileContent* pfc, const char* name, std::vector<double>& values, int* found) {
+void readDoubleList(FileContent* pfc, const char* name, std::vector<double>& values, bool* found) {
   if (auto l = pfc->get<std::vector<double>>(name)) {
     values = *l;
     *found = true;
@@ -704,8 +704,8 @@ void InputModule::ReadCoupledCluster() {
   const double f_idm_drmd_local      = f_idm_drmd ? *f_idm_drmd : 0.;
   const double delta_Neff_drmd_local = delta_Neff_drmd ? *delta_Neff_drmd : 0.;
 
-  const int any_drmd = z_stop || G_over_aH_drmd || f_idm_drmd || delta_Neff_drmd;
-  const int all_drmd = z_stop && G_over_aH_drmd && f_idm_drmd && delta_Neff_drmd;
+  const bool any_drmd = z_stop || G_over_aH_drmd || f_idm_drmd || delta_Neff_drmd;
+  const bool all_drmd = z_stop && G_over_aH_drmd && f_idm_drmd && delta_Neff_drmd;
   class_test_severe(any_drmd && !all_drmd,
                     "If any DRMD parameter is set, all of them must be non-zero.\nDRMD parameters "
                     "are "
@@ -1286,7 +1286,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** - reionization parameters if reio_parametrization=reio_bins_tanh */
   if (pth->reio_parametrization == reio_bins_tanh) {
-    int found;
+    bool found;
     pth->binned_reio_num = pfc->get_or("binned_reio_num", pth->binned_reio_num);
     readDoubleList(pfc, "binned_reio_z", pth->binned_reio_z, &found);
     class_test_severe(!found || static_cast<int>(pth->binned_reio_z.size()) != pth->binned_reio_num,
@@ -1303,7 +1303,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** - reionization parameters if reio_parametrization=reio_many_tanh */
   if (pth->reio_parametrization == reio_many_tanh) {
-    int found;
+    bool found;
     pth->many_tanh_num = pfc->get_or("many_tanh_num", pth->many_tanh_num);
     readDoubleList(pfc, "many_tanh_z", pth->many_tanh_z, &found);
     class_test_severe(!found || static_cast<int>(pth->many_tanh_z.size()) != pth->many_tanh_num,
@@ -1318,7 +1318,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** - reionization parameters if reio_parametrization=reio_many_tanh */
   if (pth->reio_parametrization == reio_inter) {
-    int found;
+    bool found;
     pth->reio_inter_num = pfc->get_or("reio_inter_num", pth->reio_inter_num);
     readDoubleList(pfc, "reio_inter_z", pth->reio_inter_z, &found);
     class_test_severe(!found || static_cast<int>(pth->reio_inter_z.size()) != pth->reio_inter_num,
@@ -1775,7 +1775,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
       }
       else if (S8) {
         // CDM read from the built species (ReadDerived runs after ConstructSpecies).
-        const double Omega0_cdm_for_S8 = all_species_.count("CDM")
+        const double Omega0_cdm_for_S8 = all_species_.contains("CDM")
                                              ? all_species_.at("CDM")->GetOmega0()
                                              : 0.0;
         ppm->sigma8                    = *S8 / pow((pba->Omega0_b + Omega0_cdm_for_S8) / 0.3, 0.5);
@@ -2254,7 +2254,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
     }
 
     std::vector<double> zPkValues;
-    int found;
+    bool found;
     readDoubleList(pfc, "z_pk", zPkValues, &found);
 
     if (found) {
@@ -2282,7 +2282,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /* deal with selection functions */
   if ((ppt->has_cl_number_count) || (ppt->has_cl_lensing_potential)) {
-    int found;
+    bool found;
     if (auto selection = pfc->get<std::string>("selection")) {
       if (selection->find("gaussian") != std::string::npos) {
         ppt->selection = gaussian;
@@ -2899,7 +2899,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   /** - (i.3.) shall we write perturbation quantities in files? */
 
   std::vector<double> kOutputValues;
-  int k_output_found;
+  bool k_output_found;
   readDoubleList(pfc, "k_output_values", kOutputValues, &k_output_found);
 
   if (k_output_found) {
@@ -2945,7 +2945,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   /* ReadDerived runs after ConstructSpecies, so query the built FluidSpecies
      directly instead of peeking the raw parameter file. The AND-chain matches
      the original gate: halofit enabled + fluid present + CLP EoS + wa_fld≠0. */
-  if ((pnl->method == nl_halofit) && all_species_.count("Fluid")) {
+  if ((pnl->method == nl_halofit) && all_species_.contains("Fluid")) {
     const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
     if ((fluid.fluid_eos() == CLP) && (fluid.wa_fld() != 0.)) {
       if (auto pk_eq = pfc->get<std::string>("pk_eq");
@@ -2975,7 +2975,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   // idr_nature now lives on the IDM_DR_IDR species. Preserve the original
   // semantics exactly: with no IDM_DR_IDR species the legacy ppt->idr_nature
   // defaulted to idr_free_streaming, so the test fired iff l_max_idr < 4.
-  const int eff_idr_nature = all_species_.count("IDM_DR_IDR")
+  const int eff_idr_nature = all_species_.contains("IDM_DR_IDR")
                                  ? static_cast<const IDM_DR_IDR_Species&>(
                                        *all_species_.at("IDM_DR_IDR"))
                                        .idr()

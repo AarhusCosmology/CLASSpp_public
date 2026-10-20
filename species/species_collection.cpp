@@ -74,8 +74,8 @@ auto find_impl(Vec& v, const std::string& key) -> decltype(&v[0].species) {
 }
 }  // namespace
 
-std::size_t SpeciesCollection::count(const std::string& key) const {
-  return find(key) != nullptr ? 1U : 0U;
+bool SpeciesCollection::contains(const std::string& key) const {
+  return find(key) != nullptr;
 }
 
 std::unique_ptr<BaseSpecies>* SpeciesCollection::find(const std::string& key) {
