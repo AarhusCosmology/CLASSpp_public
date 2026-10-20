@@ -36,10 +36,10 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
                                              GridView boson_bg)
     : parent_(parent), fermion_(fermion), boson_(boson),
       fermion_bg_(fermion_bg.n > 0 ? fermion_bg : fermion),
-      boson_bg_(boson_bg.n > 0 ? boson_bg : boson), fermion_stat_(fermion_stat),
-      boson_stat_(boson_stat), cfg_(cfg) {
-  separate_bg_grids_ = (fermion_bg_.q != fermion_.q) || (boson_bg_.q != boson_.q);
-  chain_pert_        = cfg_.balanced_gather && cfg_.balanced_pert;
+      boson_bg_(boson_bg.n > 0 ? boson_bg : boson),
+      separate_bg_grids_((fermion_bg_.q != fermion_.q) || (boson_bg_.q != boson_.q)),
+      fermion_stat_(fermion_stat), boson_stat_(boson_stat), cfg_(cfg) {
+  chain_pert_ = cfg_.balanced_gather && cfg_.balanced_pert;
   // The diagonal carries the chain factor whenever the operator it has to agree with
   // does: on a background kernel that is the background RHS (always, under the balanced
   // gather), on a perturbation kernel it is ApplyPerturbationOperator, which gathers

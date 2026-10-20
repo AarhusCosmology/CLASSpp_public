@@ -416,11 +416,8 @@ DNCDMInvSpecies::DNCDMInvSpecies(std::unique_ptr<DNCDMSpecies> parent,
                                  DecayTransitionKernel::Config cfg,
                                  const background* pba,
                                  const BackgroundModule* bgm)
-    : DNCDMSector(parent.get()), pba_(pba), bgm_(bgm) {
-  parent_  = parent.get();
-  fermion_ = fermion.get();
-  boson_   = boson.get();
-  cfg_     = cfg;
+    : DNCDMSector(parent.get()), parent_(parent.get()), fermion_(fermion.get()),
+      boson_(boson.get()), cfg_(cfg), pba_(pba), bgm_(bgm) {
   parent_->SetCollisionOwned(true);  // before any index registration (design §3 table)
 
   // Pin both daughters' T to the parent's (#385 kernel-unit consistency): the

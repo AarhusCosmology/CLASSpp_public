@@ -42,6 +42,8 @@ Checks:
                                                                   # have capitals (STYLE.md section 4)
   - '-modernize-avoid-variadic-functions'                         # ThrowFormatted, behind class_test, is the error API
   - '-readability-avoid-nested-conditional-operator'              # the if/else it wants can't initialise a const
+  - '-cppcoreguidelines-prefer-member-initializer'                # its fix-its run assignments before the checks guarding
+                                                                  # them and read members the body sets later
 
 WarningsAsErrors: '*'
 

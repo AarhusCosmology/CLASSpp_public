@@ -248,21 +248,20 @@ IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba,
                                        int idr_nature,
                                        std::vector<double> alpha_idm_dr,
                                        std::vector<double> beta_idr)
-    : CompositeSpecies("IDM_DR_IDR", BaseSpecies::EnergyType::Other), pba_(pba) {
-  has_idm_dr_ = (omega0_idm_dr != 0.);
-  has_idr_    = (omega0_idr != 0.);
-  auto idm    = std::make_unique<IDM_DRSpecies>(pba, omega0_idm_dr, a_idm_dr, nindex_idm_dr, m_idm);
-  auto idr    = std::make_unique<IDRSpecies>(pba,
-                                             omega0_idr,
-                                             has_idm_dr_,
-                                             T_idr,
-                                             l_max_idr,
-                                             b_idr,
-                                             idr_nature,
-                                             std::move(alpha_idm_dr),
-                                             std::move(beta_idr));
-  idm_dr_     = idm.get();
-  idr_        = idr.get();
+    : CompositeSpecies("IDM_DR_IDR", BaseSpecies::EnergyType::Other), pba_(pba),
+      has_idm_dr_(omega0_idm_dr != 0.), has_idr_(omega0_idr != 0.) {
+  auto idm = std::make_unique<IDM_DRSpecies>(pba, omega0_idm_dr, a_idm_dr, nindex_idm_dr, m_idm);
+  auto idr = std::make_unique<IDRSpecies>(pba,
+                                          omega0_idr,
+                                          has_idm_dr_,
+                                          T_idr,
+                                          l_max_idr,
+                                          b_idr,
+                                          idr_nature,
+                                          std::move(alpha_idm_dr),
+                                          std::move(beta_idr));
+  idm_dr_  = idm.get();
+  idr_     = idr.get();
   children_.push_back(std::move(idm));
   children_.push_back(std::move(idr));
 }

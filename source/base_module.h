@@ -25,13 +25,14 @@ class NCDMSpecies;
 class BaseModule {
  public:
   BaseModule(InputModulePtr input_module)
-      : all_species_(input_module->all_species_), ppr(&input_module->precision_),
-        pba(&input_module->background_), pth(&input_module->thermodynamics_),
-        ppt(&input_module->perturbations_), ppm(&input_module->primordial_),
-        pnl(&input_module->nonlinear_), ptr(&input_module->transfers_),
-        psp(&input_module->spectra_), ple(&input_module->lensing_), pop(&input_module->output_) {
-    input_module_ = std::move(input_module);
-  }
+      // Declaration order: all_species_ reads the argument before input_module_ takes it;
+      // everything after reads input_module_.
+      : all_species_(input_module->all_species_), input_module_(std::move(input_module)),
+        ppr(&input_module_->precision_), pba(&input_module_->background_),
+        pth(&input_module_->thermodynamics_), ppt(&input_module_->perturbations_),
+        ppm(&input_module_->primordial_), pnl(&input_module_->nonlinear_),
+        ptr(&input_module_->transfers_), psp(&input_module_->spectra_),
+        ple(&input_module_->lensing_), pop(&input_module_->output_) {}
   BaseModule(const BaseModule&) = delete;
 
   /** Const reference to the species owned by InputModule. Use .at("CDM")

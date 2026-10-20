@@ -262,14 +262,13 @@ IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba,
                                                      double delta_Neff_drmd,
                                                      double z_stop)
     : CompositeSpecies("IDM_DRMD_IDR_DRMD", BaseSpecies::EnergyType::Other), pba_(pba),
+      has_idm_drmd_(omega0_idm_drmd != 0.), has_idr_drmd_(omega0_idr_drmd != 0.),
       f_idm_drmd_(f_idm_drmd), G_over_aH_drmd_(G_over_aH_drmd), delta_Neff_drmd_(delta_Neff_drmd),
       z_stop_(z_stop) {
-  has_idm_drmd_ = (omega0_idm_drmd != 0.);
-  has_idr_drmd_ = (omega0_idr_drmd != 0.);
-  auto idm      = std::make_unique<IDM_DRMDSpecies>(pba, omega0_idm_drmd);
-  auto idr      = std::make_unique<IDR_DRMDSpecies>(pba, omega0_idr_drmd);
-  idm_drmd_     = idm.get();
-  idr_drmd_     = idr.get();
+  auto idm  = std::make_unique<IDM_DRMDSpecies>(pba, omega0_idm_drmd);
+  auto idr  = std::make_unique<IDR_DRMDSpecies>(pba, omega0_idr_drmd);
+  idm_drmd_ = idm.get();
+  idr_drmd_ = idr.get();
   children_.push_back(std::move(idm));
   children_.push_back(std::move(idr));
 }

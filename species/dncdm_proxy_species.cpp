@@ -365,11 +365,8 @@ DNCDMProxySpecies::DNCDMProxySpecies(std::unique_ptr<DNCDMSpecies> parent,
                                      DecayTransitionKernel::Config cfg,
                                      const background* pba,
                                      const BackgroundModule* bgm)
-    : DNCDMSector(parent.get()), pba_(pba), bgm_(bgm), q_d_(std::move(q_d)),
-      dq_d_(std::move(dq_d)) {
-  parent_  = parent.get();
-  fermion_ = fermion.get();
-  boson_   = boson.get();
+    : DNCDMSector(parent.get()), parent_(parent.get()), fermion_(fermion.get()),
+      boson_(boson.get()), pba_(pba), bgm_(bgm), q_d_(std::move(q_d)), dq_d_(std::move(dq_d)) {
   parent_->SetCollisionOwned(true);  // before any index registration (design §3 table)
 
   // ONE grid for BOTH daughters. They are emitted in pairs at q2 + q3 = eps1, so a
