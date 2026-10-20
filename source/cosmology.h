@@ -5,7 +5,9 @@
 
 class Cosmology {
  public:
-  Cosmology(FileContent& fc) : input_module_ptr_(InputModulePtr(new InputModule(fc))) {}
+  Cosmology(FileContent& fc) : input_module_ptr_(InputModulePtr(new InputModule(fc))) {
+    InputModule::RejectUnreadParameters(fc);
+  }
   Cosmology(std::unique_ptr<InputModule> input_module)
       : input_module_ptr_(std::move(input_module)) {}
 

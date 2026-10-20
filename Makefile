@@ -13,6 +13,7 @@ TEST_TARGETS := \
 	test-errors \
 	test-tca-ic-guard \
 	test-shooting \
+	test-unread-parameters \
 	test-deposition \
 	test-hyrec \
 	test-recfast \

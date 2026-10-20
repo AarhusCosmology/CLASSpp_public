@@ -418,26 +418,15 @@ cdef class PyCosmology:
         self.reset()
 
     cdef reset(self):
-        cdef:
-            Py_ssize_t i
-            bool problem_flag
         self._update_fc_from_pars()
+        # Cosmology(FileContent&) rejects parameters that nothing read
+        # (InputModule::RejectUnreadParameters), as a CosmoSevereError, unless
+        # the input sets allow_unread_parameters = yes.
         self._thisptr.reset(new Cosmology(self._fc))
-        # This part is done to list all the unread parameters, for debugging
-        problem_flag = False
-        problematic_parameters = []
-        for param_name in self._fc.unread_parameters():
-            problem_flag = True
-            problematic_parameters.append(param_name.decode())
-        if problem_flag:
-            raise CosmoSevereError(
-                "Class did not read input parameter(s): {}\n"
-                .format(', '.join(problematic_parameters))
-            )
         # Only clear the dirty flag after all throwing operations have
-        # succeeded. If Cosmology construction or the unread-parameter check
-        # throws, parameters_changed stays True so the next _cosmo() call
-        # re-runs reset() and re-raises instead of serving stale results.
+        # succeeded. If Cosmology construction throws, parameters_changed
+        # stays True so the next _cosmo() call re-runs reset() and re-raises
+        # instead of serving stale results.
         self.parameters_changed = False
         return self
 

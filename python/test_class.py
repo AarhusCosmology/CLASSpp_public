@@ -2127,6 +2127,22 @@ class TestLazyLifecycle(unittest.TestCase):
         with self.assertRaises(CosmoSevereError):
             Class({'this_parameter_does_not_exist': 1})
 
+    def test_unread_parameter_error_names_it(self):
+        # The error comes from C++ (InputModule::RejectUnreadParameters), the same check
+        # the binary runs, and it names the parameter and the way out.
+        with self.assertRaisesRegex(CosmoSevereError,
+                                    "this_parameter_does_not_exist.*allow_unread_parameters"):
+            Class({'this_parameter_does_not_exist': 1})
+
+    def test_allow_unread_parameters_runs_anyway(self):
+        cosmo = Class({'this_parameter_does_not_exist': 1, 'allow_unread_parameters': 'yes',
+                       'output': 'tCl', 'l_max_scalars': 100})
+        try:
+            self.assertGreater(np.max(np.abs(cosmo.raw_cl(100)['tt'])), 0.0)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
     def test_unread_parameter_raises_at_compute_not_set(self):
         # MontePython compatibility: set() never raises; the error surfaces
         # at compute(), inside the caller's try block.

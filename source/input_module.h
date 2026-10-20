@@ -39,6 +39,13 @@ class InputModule {
   InputModule(FileContent& fc);
   static void file_content_from_arguments(int argc, char** argv, FileContent& fc);
 
+  /** Throw (severe) if the input holds parameters that nothing read: a misspelt name, or
+   *  a parameter of a feature the input switches off. `allow_unread_parameters = yes`
+   *  turns the error off; `write warnings = yes` then lists them. Cosmology(FileContent&)
+   *  calls it once, on the caller's input. Not per InputModule: shooting and pk_eq build
+   *  theirs from copies, which legitimately leave keys of the original unread. */
+  static void RejectUnreadParameters(FileContent& fc);
+
   /** Resolve any per-species / theta_s shooting targets by root-finding. No targets (or
    *  already inside a shooting context) → returns the input unchanged. Called lazily by
    *  Cosmology::GetInputModule. */

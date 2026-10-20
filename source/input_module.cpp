@@ -761,6 +761,11 @@ void InputModule::ReadCoupledCluster() {
 void InputModule::WriteParameterFiles() {
   FileContent* pfc = &file_content_;
 
+  /* RejectUnreadParameters reads these two after construction; reading them here as
+     well keeps them out of '<root>unused_parameters'. */
+  pfc->get<std::string>("allow_unread_parameters");
+  pfc->get<std::string>("write warnings");
+
   /** - eventually write all the read parameters in a file, unread parameters in another file, and warnings about unread parameters */
 
   if (auto write_parameters = pfc->get<std::string>("write parameters");
@@ -799,11 +804,32 @@ void InputModule::WriteParameterFiles() {
     fclose(param_output);
     fclose(param_unused);
   }
+}
 
-  if (auto write_warnings = pfc->get<std::string>("write warnings");
-      write_warnings && ((write_warnings->find("y") != std::string::npos) ||
-                         (write_warnings->find("Y") != std::string::npos))) {
-    pfc->for_each([](const std::string& name, const std::string& value, bool read) {
+void InputModule::RejectUnreadParameters(FileContent& fc) {
+  const auto is_yes = [](const std::optional<std::string>& value) {
+    return value &&
+           ((value->find('y') != std::string::npos) || (value->find('Y') != std::string::npos));
+  };
+  const bool allowed = is_yes(fc.get<std::string>("allow_unread_parameters"));
+  const bool warn    = is_yes(fc.get<std::string>("write warnings"));
+
+  const std::vector<std::string> unread = fc.unread_parameters();
+  if (unread.empty()) {
+    return;
+  }
+  if (!allowed) {
+    std::string names;
+    for (const std::string& name : unread) {
+      names += (names.empty() ? "" : ", ") + name;
+    }
+    class_stop_severe(
+        "Class did not read input parameter(s): %s. Correct or remove them, or set "
+        "'allow_unread_parameters = yes' to run anyway.",
+        names.c_str());
+  }
+  if (warn) {
+    fc.for_each([](const std::string& name, const std::string& value, bool read) {
       if (!read) {
         fprintf(stdout,
                 "[WARNING: input line not recognized and not taken into account: '%s=%s']\n",

@@ -393,11 +393,18 @@ Let us mention a two useful parameters defined at the end of `explanatory.ini`, 
 When set to yes, all input/precision parameters which have been read
 are written in a file `<root>parameters.ini`, to keep track all the details of this execution; this file can also be re-used as a new input file. Also, with this option, all parameters that have been passed and that the code did not read (because the syntax was wrong, or because the parameter was not relevant in the context of the run) are written in a file `<root>unused_parameters`. When you have doubts about your input or your results, you can check what is in there.
 
+`allow_unread_parameters =  [yes or no]` (_default_: `no`)
+
+By default, CLASS stops when the input contains parameters that the code did not read (because the
+syntax was wrong, or because the parameter was not relevant in the context of the run), and the error
+lists them. The Python wrapper does the same. When set to yes, CLASS runs anyway. `explanatory.ini`
+sets it, because it gives the parameters of every option, including those it leaves off.
+
 `write warnings =  [yes or no]` (_default_: `no`)
 
-When set to yes, the parameters  that have been passed and that the code did not read
-(because the syntax was wrong, or because the parameter was not relevant in the context of the run) are written
-in the standard output as `[Warning:]....`
+When set to yes together with `allow_unread_parameters = yes`, the parameters that have been passed and
+that the code did not read are written in the standard output as `[WARNING: input line not recognized
+and not taken into account: ...]`.
 
 There is also a list of "verbose" parameters at the end of `explanatory.ini`. They can be used to control
 the level of information passed to the standard output (0 means silent; 1 means normal, e.g. information on age of the universe, etc.; 2 is useful for instance when you want to check on how many cores the run is parallelised; 3 and more are intended for debugging).
