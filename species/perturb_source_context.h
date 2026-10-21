@@ -124,8 +124,8 @@ struct PerturbSourceContext {
  */
 struct PerturbIcContext {
   // Density fractions
-  double fracnu = 0., fracg = 0., fracb = 0., fraccdm = 0., fracidm_drmd = 0.;
-  double rho_m_over_rho_r = 0., om = 0.;
+  double fracnu = 0., fracg = 0., fracb = 0.;
+  double om = 0.;
   // (k*tau)^2, (k*tau)^3
   double ktau_two = 0., ktau_three = 0.;
   // Curvature factor: 1 - 3K/k^2
@@ -133,7 +133,7 @@ struct PerturbIcContext {
   // IC seed values pre-computed by module (photon delta/theta set by module formulas)
   double delta_g_ic = 0., theta_g_ic = 0.;
   // Shared relativistic IC (= delta_g_ic for adiabatic, computed by module for isocurvatures)
-  double delta_ur = 0., theta_ur = 0., shear_ur = 0., l3_ur = 0., delta_dr = 0.;
+  double delta_ur = 0., theta_ur = 0., shear_ur = 0., l3_ur = 0.;
   // Synchronous metric IC
   double eta = 0.;
   // DO NOT read in ApplyInitialConditions() — filled by module AFTER the species loop
@@ -155,9 +155,13 @@ struct PerturbIcContext {
  * Bundles the kinematics and background needed for non-trivial migration logic
  * (e.g., NCDM fluid-approximation collapse from full hierarchy to delta/theta/shear).
  * Trivial slot-by-slot copies don't need the body — most species ignore the context.
+ * ppw holds the regimes after the switch and old_approx those before it, which
+ * BaseSpecies::ApproximationRegime/ApproximationRegimeBefore read.
  */
 struct PerturbSwitchContext {
-  double k               = 0.;
-  double a               = 0.;
-  const double* pvecback = nullptr;
+  double k                     = 0.;
+  double a                     = 0.;
+  const double* pvecback       = nullptr;
+  const perturb_workspace* ppw = nullptr;
+  const int* old_approx        = nullptr;
 };

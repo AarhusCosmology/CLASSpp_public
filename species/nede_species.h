@@ -70,6 +70,11 @@ class NEDESpecies : public BaseSpecies {
   int ApproximationCount() const override {
     return 1;
   }
+
+  /** The trigger equation lacks the Newtonian metric terms. */
+  bool SupportsNewtonianGauge() const override {
+    return false;
+  }
   int ApproximationRegimeAt(int which, double k, const double* pvecback) const override;
 
   struct PerturbLayout : BaseSpecies::PerturbLayout {

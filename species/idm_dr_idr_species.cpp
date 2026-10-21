@@ -30,6 +30,16 @@ std::optional<double> IDM_DR_IDR_Species::GetParam(const std::string& name) cons
   return std::nullopt;
 }
 
+void IDM_DR_IDR_Species::WarnIfNonlinearUnreliable(double m_ev_threshold) const {
+  CompositeSpecies::WarnIfNonlinearUnreliable(m_ev_threshold);
+  if (has_idm_dr()) {
+    fprintf(stdout,
+            "Warning: Halofit and HMcode are proved to work for CDM, and also with a small HDM "
+            "component. But you have requested interacting dark matter (idm_dr), which makes the "
+            "use of Halofit or HMCode unreliable.\n");
+  }
+}
+
 void IDM_DR_IDR_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
   w.Add("(.)rho_idr", 0.);
   w.Add("(.)rho_idm_dr", 0.);

@@ -1,6 +1,7 @@
 #include "idm_drmd_idr_drmd_species.h"
 
 #include <cmath>
+#include <stdexcept>
 
 #include "background_module.h"
 #include "perturbations.h"
@@ -112,7 +113,7 @@ void IDM_DRMD_IDR_DRMD_Species::ApplyInitialConditions(const BaseSpecies::Pertur
 
     if (idm_drm_lay.idx_theta >= 0) {
       if (has_idr_drmd()) {
-        if (ctx.ppw->approx[ctx.ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_on)) {
+        if (ApproximationRegime(ctx.ppw) == kTightlyCoupled) {
           y[idm_drm_lay.idx_theta] = (idr_drm_lay.idx_theta >= 0) ? y[idr_drm_lay.idx_theta] : 0.;
         }
         else {
@@ -260,11 +261,12 @@ IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba,
                                                      double f_idm_drmd,
                                                      double G_over_aH_drmd,
                                                      double delta_Neff_drmd,
-                                                     double z_stop)
+                                                     double z_stop,
+                                                     double tca_trigger_G_over_aH)
     : CompositeSpecies("IDM_DRMD_IDR_DRMD", BaseSpecies::EnergyType::Other), pba_(pba),
       has_idm_drmd_(omega0_idm_drmd != 0.), has_idr_drmd_(omega0_idr_drmd != 0.),
       f_idm_drmd_(f_idm_drmd), G_over_aH_drmd_(G_over_aH_drmd), delta_Neff_drmd_(delta_Neff_drmd),
-      z_stop_(z_stop) {
+      z_stop_(z_stop), tca_trigger_G_over_aH_(tca_trigger_G_over_aH) {
   auto idm  = std::make_unique<IDM_DRMDSpecies>(pba, omega0_idm_drmd);
   auto idr  = std::make_unique<IDR_DRMDSpecies>(pba, omega0_idr_drmd);
   idm_drmd_ = idm.get();
@@ -273,9 +275,57 @@ IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba,
   children_.push_back(std::move(idr));
 }
 
+// ── The dark tight coupling ───────────────────────────────────────────────────
+
+int IDM_DRMD_IDR_DRMD_Species::ApproximationRegimeAt(int /*which*/,
+                                                     double /*k*/,
+                                                     const double* pvecback) const {
+  const double a          = pvecback[bgm_->index_bg_a_];
+  const double conformalH = pvecback[bgm_->index_bg_H_] * a;
+  double Rint;
+  double csp2;
+  double Gint;
+  ComputeIdmDrmd(a, idm_drmd_->Rho(pvecback) / idr_drmd_->Rho(pvecback), &Rint, &csp2, &Gint);
+  return (Gint > conformalH * tca_trigger_G_over_aH_) ? kTightlyCoupled : kDecoupled;
+}
+
+void IDM_DRMD_IDR_DRMD_Species::CopyPerturbationsAcrossSwitch(
+    const BaseSpecies::PerturbLayout& old_base,
+    const BaseSpecies::PerturbLayout& new_base,
+    const double* old_y,
+    double* new_y,
+    const PerturbSwitchContext& ctx) const {
+  CompositeSpecies::CopyPerturbationsAcrossSwitch(old_base, new_base, old_y, new_y, ctx);
+  /* No variables here (tensor modes, or one fluid absent): nothing to match, and outside
+     scalar modes the workspace holds no species approximations to ask about. */
+  const auto& idm_new = idm_drmd_layout(new_base);
+  const auto& idr_old = idr_drmd_layout(old_base);
+  if ((idm_new.idx_theta < 0) || (idr_old.idx_theta < 0)) {
+    return;
+  }
+  if ((ApproximationRegimeBefore(ctx) != kTightlyCoupled) ||
+      (ApproximationRegime(ctx.ppw) != kDecoupled)) {
+    return;
+  }
+  double Rint;
+  double csp2;
+  double Gint;
+  ComputeIdmDrmd(ctx.a,
+                 idm_drmd_->Rho(ctx.pvecback) / idr_drmd_->Rho(ctx.pvecback),
+                 &Rint,
+                 &csp2,
+                 &Gint);
+  const double a_prime_over_a = ctx.pvecback[bgm_->index_bg_H_] * ctx.a;
+  const double theta_idr      = old_y[idr_old.idx_theta];
+  const double delta_idr      = old_y[idr_old.idx_delta];
+  /* The children carried delta and theta across; only theta_idm_drmd is matched. */
+  new_y[idm_new.idx_theta] =
+      theta_idr - 1. / (1. + Rint) * (ctx.k * ctx.k / 4. * delta_idr + a_prime_over_a * theta_idr);
+}
+
 // ── Perturbation coupling terms ───────────────────────────────────────────────
-// Registration, PerturbDerivs, sync->Newtonian, StressEnergy and the
-// approximation-switch copy all use the generic CompositeSpecies child loops.
+// Registration, PerturbDerivs, sync->Newtonian and StressEnergy use the generic
+// CompositeSpecies child loops.
 
 void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
     double /*tau*/,
@@ -308,7 +358,7 @@ void IDM_DRMD_IDR_DRMD_Species::AddCouplingDerivs(
   const double theta_idr = y[idr_drm_acc_lay.idx_theta];
   const double delta_idr = y[idr_drm_acc_lay.idx_delta];
 
-  if (ppw->approx[ppw->index_ap_tca_idm_drmd] == static_cast<int>(tca_idm_drmd_on)) {
+  if (ApproximationRegime(ppw) == kTightlyCoupled) {
     // TCA on: ASSIGN theta_idm_drmd (replaces the free-streaming term written by child)
     double GdDelta = 3. * csp2 * (ctx.a_prime_over_a * theta_idm + ctx.k2 * delta_idr / 4.);
     dy[idm_drm_acc_lay.idx_theta] = 0.25 * ctx.k2 * delta_idr + ctx.metric_euler - GdDelta * Rint;
@@ -339,14 +389,21 @@ std::vector<Named> IDM_DRMD_IDR_DRMD_Species::CreateAll(const SpeciesBuildContex
     const double G_over_aH_drmd  = ci ? ci->G_over_aH_drmd_ini : 0.;
     const double delta_Neff_drmd = ci ? ci->delta_Neff_drmd : 0.;
     const double z_stop          = ci ? ci->z_stop : 0.;
-    result.push_back({"IDM_DRMD_IDR_DRMD",
-                      std::make_unique<IDM_DRMD_IDR_DRMD_Species>(*ctx.pba,
-                                                                  omega0_idm_drmd,
-                                                                  omega0_idr_drmd,
-                                                                  f_idm_drmd,
-                                                                  G_over_aH_drmd,
-                                                                  delta_Neff_drmd,
-                                                                  z_stop)});
+    if (ctx.ppr == nullptr) {
+      throw std::logic_error(
+          "IDM_DRMD_IDR_DRMD needs the precision parameters (internal: ppr missing)");
+    }
+    result.push_back(
+        {"IDM_DRMD_IDR_DRMD",
+         std::make_unique<
+             IDM_DRMD_IDR_DRMD_Species>(*ctx.pba,
+                                        omega0_idm_drmd,
+                                        omega0_idr_drmd,
+                                        f_idm_drmd,
+                                        G_over_aH_drmd,
+                                        delta_Neff_drmd,
+                                        z_stop,
+                                        ctx.ppr->idm_drmd_tight_coupling_trigger_G_over_aH)});
   }
   return result;
 }

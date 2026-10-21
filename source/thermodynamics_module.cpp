@@ -418,9 +418,29 @@ void ThermodynamicsModule::thermodynamics_init() {
   class_test((pth->annihilation_zmax < 0),
              "characteristic annihilation redshift cannot be negative");
 
-  class_test((pth->annihilation > 0) &&
-                 (!all_species_.contains("CDM") && !all_species_.contains("IDM_DR_IDR")),
-             "CDM annihilation effects require the presence of CDM or IDM!");
+  /* Today's density of the dark matter that annihilates or decays into the plasma: every
+     cold species but the baryons. */
+  {
+    std::vector<double> pvecback_today(background_module_->bg_size_);
+    double tau_today;
+    background_module_->background_tau_of_z(0., &tau_today);
+    int last_index_today = background_module_->bt_size_ - 1;
+    background_module_->background_at_tau(tau_today,
+                                          pba->normal_info,
+                                          pba->inter_closeby,
+                                          &last_index_today,
+                                          pvecback_today.data());
+    double rho_dm_today = 0.;
+    for (const auto& sp : all_species_) {
+      if (sp.get() != &all_species_.baryons()) {
+        rho_dm_today += sp->ColdMatterRho(pvecback_today.data());
+      }
+    }
+    Omega0_dm_ = rho_dm_today / pba->H0 / pba->H0;
+  }
+
+  class_test((pth->annihilation > 0) && (Omega0_dm_ == 0.),
+             "Dark matter annihilation needs dark matter: a cold species other than the baryons");
 
   class_test((pth->annihilation_f_halo > 0) && (pth->recombination == recfast),
              "Switching on DM annihilation in halos requires using HyRec instead of RECFAST. "
@@ -447,9 +467,8 @@ void ThermodynamicsModule::thermodynamics_init() {
 
   class_test((pth->decay < 0), "decay parameter cannot be negative");
 
-  class_test((pth->decay > 0) &&
-                 (!all_species_.contains("CDM") && !all_species_.contains("IDM_DR_IDR")),
-             "CDM decay effects require the presence of CDM or IDM!");
+  class_test((pth->decay > 0) && (Omega0_dm_ == 0.),
+             "Dark matter decay needs dark matter: a cold species other than the baryons");
 
   /* tests in order to prevent segmentation fault in the following */
   class_test(_not4_ == 0., "stop to avoid division by zero");
@@ -1814,17 +1833,8 @@ void ThermodynamicsModule::thermodynamics_onthespot_energy_injection(recombinati
              pow(log((preco->annihilation_zmin + 1.) / (preco->annihilation_zmax + 1.)), 2)));
   }
 
-  const double Omega0_idm_dr_ann = all_species_.contains("IDM_DR_IDR")
-                                       ? static_cast<const IDM_DR_IDR_Species&>(
-                                             *all_species_.at("IDM_DR_IDR"))
-                                             .idm_dr()
-                                             .GetOmega0()
-                                       : 0.;
-  const double Omega0_cdm_ann = all_species_.contains("CDM") ? all_species_.at("CDM")->GetOmega0()
-                                                             : 0.;
-  double rho_cdm_today        = pow(pba->H0 * _c_ / _Mpc_over_m_, 2) * 3 / 8. / _PI_ / _G_ *
-                                (Omega0_idm_dr_ann + Omega0_cdm_ann) * _c_ *
-                                _c_; /* energy density in J/m^3 */
+  double rho_cdm_today = pow(pba->H0 * _c_ / _Mpc_over_m_, 2) * 3 / 8. / _PI_ / _G_ * Omega0_dm_ *
+                         _c_ * _c_; /* energy density in J/m^3 */
 
   double u_min = (1 + z) / (1 + preco->annihilation_z_halo);
 
@@ -1862,18 +1872,8 @@ void ThermodynamicsModule::thermodynamics_energy_injection(recombination* preco,
       double nH0 = 3. * preco->H0 * preco->H0 * pba->Omega0_b / (8. * _PI_ * _G_ * _m_H_) *
                    (1. - preco->YHe);
 
-      const double Omega0_cdm_inj    = all_species_.contains("CDM")
-                                           ? all_species_.at("CDM")->GetOmega0()
-                                           : 0.;
-      const double Omega0_idm_dr_inj = all_species_.contains("IDM_DR_IDR")
-                                           ? static_cast<const IDM_DR_IDR_Species&>(
-                                                 *all_species_.at("IDM_DR_IDR"))
-                                                 .idm_dr()
-                                                 .GetOmega0()
-                                           : 0.;
       /* factor = c sigma_T n_H(0) / (H(0) \sqrt(Omega_m)) (dimensionless) */
-      double factor = _sigma_ * nH0 / pba->H0 * _Mpc_over_m_ /
-                      sqrt(pba->Omega0_b + Omega0_cdm_inj + Omega0_idm_dr_inj);
+      double factor = _sigma_ * nH0 / pba->H0 * _Mpc_over_m_ / sqrt(pba->Omega0_b + Omega0_dm_);
 
       /* integral over z'(=zp) with step dz */
       double dz = 1.;

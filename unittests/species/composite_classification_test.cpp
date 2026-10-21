@@ -1,10 +1,12 @@
 #include <cassert>
 #include <cstdio>
 #include <memory>
+#include <stdexcept>
 
 #include "background.h"
 #include "cdm.h"
 #include "composite_species.h"
+#include "dcdm.h"
 
 // CompositeSpecies provides generic PerturbDerivs/StressEnergy and children_ is protected;
 // this minimal concrete composite lets the unit test build one and add children.
@@ -171,6 +173,37 @@ int main() {
   field_comp.AddChild(std::make_unique<FakeSpecies>(SE{}, /*clusters=*/false, /*cold=*/false, 0.1));
   assert(field_comp.ClustersAsMatter());
   assert(field_comp.NonClusteringOmega0() == 0.1);
+
+  // ── Cold matter, which the growth factor, the annihilating dark matter and the EDE
+  // equality sum over the species: a species answers from its own classification, and a
+  // composite for its cold children only. IDM_DR_IDR is cold through IDM_DR, while its own
+  // Rho also counts the dark radiation. ────────────────────────────────────────────────
+  SE se_rad;
+  se_rad.rho = 0.5;
+  se_rad.p   = 0.5 / 3.;
+  TestComposite matter_comp;
+  matter_comp.AddChild(
+      std::make_unique<FakeSpecies>(se_cold, /*clusters=*/true, /*cold=*/true, 0.25));
+  matter_comp.AddChild(
+      std::make_unique<FakeSpecies>(se_warm, /*clusters=*/true, /*cold=*/false, 0.05));
+  matter_comp.AddChild(
+      std::make_unique<FakeSpecies>(se_rad, /*clusters=*/false, /*cold=*/false, 0.1));
+  assert(matter_comp.ColdMatterRho(nullptr) == se_cold.rho);
+  assert(matter_comp.ColdMatterOmega0() == 0.25);
+  assert(cdm.ColdMatterOmega0() == 0.12);
+
+  // Decaying dark matter is cold, but GetOmega0() is its budget with the daughter radiation,
+  // and its own density today is known only once the background is integrated.
+  DCDMSpecies dcdm(pba, 0.12, /*Gamma_dcdm=*/10., /*Omega_ini_dcdm=*/0.);
+  assert(dcdm.IsColdMatterSpecies());
+  bool refused = false;
+  try {
+    dcdm.ColdMatterOmega0();
+  }
+  catch (const std::invalid_argument&) {
+    refused = true;
+  }
+  assert(refused);
 
   std::printf("composite classification test passed\n");
   return 0;

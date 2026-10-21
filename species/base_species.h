@@ -442,15 +442,7 @@ class BaseSpecies {
     // Actual ρ/δρ/(ρ+P)θ — no ρ−3P proxy. Radiation never reaches here (it does not
     // cluster as matter), so there is nothing to "zero out".
     if (clusters_as_matter_) {
-      {
-        {
-          {
-            {
-              (is_cold_ ? total_cold : total_warm) += se;
-            }
-          }
-        }
-      }
+      (is_cold_ ? total_cold : total_warm) += se;
     }
   }
 
@@ -548,6 +540,11 @@ class BaseSpecies {
   /** The regime of approximation `which` that the workspace is integrating in. */
   int ApproximationRegime(const perturb_workspace* ppw, int which = 0) const;
 
+  /** The regime of approximation `which` before the switch that ctx describes. A switch
+   *  that leaves a species' variables in place (a tight coupling ending) is told apart
+   *  from the switches of other approximations only by this. */
+  int ApproximationRegimeBefore(const PerturbSwitchContext& ctx, int which = 0) const;
+
   /**
    * Copy perturbation state from one layout to another across an approximation switch.
    * Called when the perturbation vector is reallocated (e.g., NCDM FA collapse from
@@ -559,6 +556,22 @@ class BaseSpecies {
                                              const double* /*old_y*/,
                                              double* /*new_y*/,
                                              const PerturbSwitchContext& /*ctx*/) const {}
+
+  // ── What the perturbations of this species are coded for ──────────────────
+  // The module asks every species before it integrates, and refuses the run with
+  // the species' name.
+
+  /** False if this species' perturbations are coded in synchronous gauge only.
+   *  Default true. */
+  virtual bool SupportsNewtonianGauge() const {
+    return true;
+  }
+
+  /** False if this species has adiabatic initial conditions only (no cdi, bi, nid
+   *  or niv). Default true. */
+  virtual bool SupportsIsocurvatureInitialConditions() const {
+    return true;
+  }
 
   // ── Synchronous → Newtonian gauge transformation ──────────────────────────
   /**
@@ -694,10 +707,18 @@ class BaseSpecies {
     return true;
   }
 
-  /** Warn (stdout) if this species is too heavy for Halofit/HMcode. The policy
-   *  threshold is passed by the nonlinear module. Default no-op; NCDM compares
-   *  its mass; composites forward. */
-  virtual void WarnIfTooHeavyForHalofit(double /*m_ev_threshold*/) const {}
+  /** Warn (stdout) if Halofit/HMcode are unreliable with this species. The mass
+   *  threshold for NCDM is passed by the nonlinear module. Default no-op; NCDM
+   *  compares its mass; IDM_DR_IDR warns about interacting dark matter; composites
+   *  forward. */
+  virtual void WarnIfNonlinearUnreliable(double /*m_ev_threshold*/) const {}
+
+  /** Today's density fraction of the child called `name` of a composite, or nothing.
+   *  Lets a caller ask for a sub-species (IDR inside IDM_DR_IDR) by the name it
+   *  reports. Default: no children. */
+  virtual std::optional<double> ChildOmega0(const std::string& /*name*/) const {
+    return std::nullopt;
+  }
 
   /** Earliest scale factor this species needs integration to start from.
    *  Default: returns a_proposed unchanged. NCDM species may pull it earlier. */
@@ -771,6 +792,26 @@ class BaseSpecies {
    */
   virtual double NonClusteringOmega0() const {
     return ((energy_type_ == EnergyType::Other) && !ClustersAsMatter()) ? GetOmega0() : 0.;
+  }
+
+  /**
+   * This species' density in cold matter: Rho for a cold species, else 0. Summed over
+   * the species it is the rho_M of the growth factor, and without the baryons the dark
+   * matter that annihilates or decays into the plasma. Override: composites sum over
+   * children, so IDM_DR_IDR gives its dark matter and not its dark radiation.
+   */
+  virtual double ColdMatterRho(const double* pvecback) const {
+    return IsColdMatterSpecies() ? Rho(pvecback) : 0.;
+  }
+
+  /**
+   * The same today, as a density fraction known before the background is integrated
+   * (where the EDE fluid places matter-radiation equality). Default: GetOmega0() for a
+   * cold species, else 0. Overrides: composites sum over children; DCDM refuses, its
+   * density today being an output of the background.
+   */
+  virtual double ColdMatterOmega0() const {
+    return IsColdMatterSpecies() ? GetOmega0() : 0.;
   }
 
   /**
@@ -905,26 +946,10 @@ class BaseSpecies {
                                     const double* pvecback,
                                     const PerturbIcContext& ctx) const {
     if (idx_delta >= 0) {
-      {
-        {
-          {
-            {
-              y[idx_delta] += RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.alpha;
-            }
-          }
-        }
-      }
+      y[idx_delta] += RhoPrimeOverRho(pvecback, ctx.a_prime_over_a) * ctx.alpha;
     }
     if (idx_theta >= 0) {
-      {
-        {
-          {
-            {
-              y[idx_theta] += ctx.k * ctx.k * ctx.alpha;
-            }
-          }
-        }
-      }
+      y[idx_theta] += ctx.k * ctx.k * ctx.alpha;
     }
   }
 

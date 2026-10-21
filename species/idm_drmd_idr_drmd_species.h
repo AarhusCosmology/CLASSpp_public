@@ -33,7 +33,8 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
                             double f_idm_drmd,
                             double G_over_aH_drmd,
                             double delta_Neff_drmd,
-                            double z_stop);
+                            double z_stop,
+                            double tca_trigger_G_over_aH);
 
   double f_idm_drmd() const {
     return f_idm_drmd_;
@@ -100,9 +101,33 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
-  // Registration, derivs (children + AddCouplingDerivs), stress-energy,
-  // sync->Newtonian and approximation-switch copies all use the generic
-  // CompositeSpecies child loops. Only composite-specific logic is overridden.
+  // Registration, derivs (children + AddCouplingDerivs), stress-energy and
+  // sync->Newtonian use the generic CompositeSpecies child loops. Only
+  // composite-specific logic is overridden.
+
+  /** The DRMD coupling is coded in synchronous gauge, and for adiabatic modes only. */
+  bool SupportsNewtonianGauge() const override {
+    return false;
+  }
+  bool SupportsIsocurvatureInitialConditions() const override {
+    return false;
+  }
+
+  /** The tight coupling of idm_drmd to idr_drmd, which holds while the interaction
+   *  rate Gint exceeds tca_trigger_G_over_aH times aH. It depends on the background
+   *  alone, not on k. */
+  enum Regime { kTightlyCoupled = 0, kDecoupled = 1 };
+  int ApproximationCount() const override {
+    return 1;
+  }
+  int ApproximationRegimeAt(int which, double k, const double* pvecback) const override;
+  /** Where the tight coupling ends, the dark matter velocity is matched to the dark
+   *  radiation; every other switch carries the variables across unchanged. */
+  void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
+                                     const BaseSpecies::PerturbLayout& new_base,
+                                     const double* old_y,
+                                     double* new_y,
+                                     const PerturbSwitchContext& ctx) const override;
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
@@ -141,13 +166,14 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   IDM_DRMDSpecies* idm_drmd_ = nullptr;
   IDR_DRMDSpecies* idr_drmd_ = nullptr;
   const background& pba_;
-  const BackgroundModule* bgm_ = nullptr;
-  bool has_idm_drmd_           = false;
-  bool has_idr_drmd_           = false;
-  double f_idm_drmd_           = 0.;
-  double G_over_aH_drmd_       = 0.;
-  double delta_Neff_drmd_      = 0.;
-  double z_stop_               = 0.;
+  const BackgroundModule* bgm_  = nullptr;
+  bool has_idm_drmd_            = false;
+  bool has_idr_drmd_            = false;
+  double f_idm_drmd_            = 0.;
+  double G_over_aH_drmd_        = 0.;
+  double delta_Neff_drmd_       = 0.;
+  double z_stop_                = 0.;
+  double tca_trigger_G_over_aH_ = 0.;
 
   int index_tp_delta_idm_drmd_ = -1;  // #309 transfer-source slots (composite-owned)
   int index_tp_theta_idm_drmd_ = -1;

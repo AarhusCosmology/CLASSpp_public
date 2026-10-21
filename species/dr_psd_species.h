@@ -251,9 +251,7 @@ class DrPsdSpecies : public NCDMBaseSpecies {
                           const double* y,
                           int l) const {
     if (reduced_moments_ < 2 || l > layout.l_max) {
-      {
-        return 0.;
-      }
+      return 0.;
     }
     const double m0 = y[layout.index_per_q[0] + l];
     const double m1 = y[layout.index_per_q[1] + l];

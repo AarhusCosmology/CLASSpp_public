@@ -1,4 +1,6 @@
 #pragma once
+#include <cmath>
+#include <cstdio>
 #include <vector>
 
 #include "background.h"
@@ -70,6 +72,16 @@ class IDRSpecies : public BaseSpecies {
   /** IDR is dark radiation: contributes its Omega0 to the early-time radiation density. */
   double GetRadiationOmega0() const override {
     return Omega0_idr_;
+  }
+
+  /** The number of decoupled neutrinos with the same density. */
+  double NeffContribution(double /*z*/) const override {
+    return Omega0_idr_ / 7. * 8. / pow(4. / 11., 4. / 3.) / pba_.Omega0_g;
+  }
+  void PrintNeffInfo() const override {
+    if (Omega0_idr_ != 0.) {
+      printf(" -> dark radiation Delta Neff %e\n", NeffContribution(0.));
+    }
   }
 
   bool IsFreestreaming() const override {

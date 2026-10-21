@@ -13,8 +13,8 @@ class BackgroundModule : public BaseModule {
  public:
   /** Look up a species by key (CDM, Lambda, Fluid, ScalarField, UR, IDM_DR_IDR,
    *  IDM_DRMD_IDR_DRMD, DCDM_DR, NCDM, DNCDM_DR, ...) and return its present-day
-   *  Omega0; returns 0 if the species is absent.  For composite sub-species
-   *  (e.g. IDR inside IDM_DR_IDR) use the dedicated sub_key form. */
+   *  Omega0; returns 0 if the species is absent. A key that is no species is
+   *  looked up among the children of the composites (IDR inside IDM_DR_IDR). */
   double GetOmega0Species(const std::string& key) const;
   BackgroundModule(InputModulePtr input_module);
   ~BackgroundModule();
@@ -27,16 +27,10 @@ class BackgroundModule : public BaseModule {
                         double* w_fld,
                         double* dw_over_da_fld,
                         double* integral_fld) const;
-  void background_idm_drmd(
-      double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const;
 
   /** Sum of GetOmega0() across all NCDM-family species (NCDM, NCDMInteracting,
    *  and the DNCDMSpecies child of every DNCDM_DR_Species composite). */
   double GetOmega0NcdmTot() const;
-
-  /** Count of DR-bearing composites: 1 if DCDM_DR is present, plus the
-   *  number of DNCDM_DR_Species composites in all_species_. */
-  int GetNDecayDr() const;
 
   /** True iff a species with this all_species_ key is present. Lets a caller
    *  (the Python wrapper) refuse an unknown key instead of reporting the 0.0

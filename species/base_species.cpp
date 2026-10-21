@@ -26,6 +26,10 @@ int BaseSpecies::ApproximationRegime(const perturb_workspace* ppw, int which) co
   return ppw->approx[ppw->species_approx_index[collection_index_] + which];
 }
 
+int BaseSpecies::ApproximationRegimeBefore(const PerturbSwitchContext& ctx, int which) const {
+  return ctx.old_approx[ctx.ppw->species_approx_index[collection_index_] + which];
+}
+
 double BaseSpecies::BackgroundDensityOverH0Sq(double a, double /*H0*/) const {
   switch (energy_type()) {
     case EnergyType::Radiation:

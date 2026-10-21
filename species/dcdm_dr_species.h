@@ -23,6 +23,11 @@ class DCDM_DR_Species : public CompositeSpecies {
  public:
   static constexpr std::string_view kTypeName = "dcdm_dr";
 
+  /** Non-adiabatic initial conditions are not coded for decaying dark matter. */
+  bool SupportsIsocurvatureInitialConditions() const override {
+    return false;
+  }
+
   // Uses the generic CompositeSpecies::PerturbLayout (one owning sub-layout per
   // child in children_ order): the base-class child loops — including the
   // TallyStressEnergy/DelegateTally hot path — index child_layouts, so every

@@ -12,7 +12,6 @@
 #include <sstream>
 
 #include "../species/fluid.h"
-#include "../species/idm_dr_idr_species.h"
 #include "background_module.h"
 #include "cosmology.h"
 #include "evolver_ndf15.h"
@@ -1105,14 +1104,7 @@ void NonlinearModule::nonlinear_init() {
   /** --> check applicability of Halofit and HMcode */
   if (pnl->method > nl_none) {
     for (const auto& sp : all_species_) {
-      sp->WarnIfTooHeavyForHalofit(_M_EV_TOO_BIG_FOR_HALOFIT_);
-    }
-    if (all_species_.contains("IDM_DR_IDR") &&
-        static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR")).has_idm_dr()) {
-      fprintf(stdout,
-              "Warning: Halofit and HMcode are proved to work for CDM, and also with a small HDM "
-              "component. But you have requested interacting dark matter (idm_dr), which makes the "
-              "use of Halofit or HMCode unreliable.\n");
+      sp->WarnIfNonlinearUnreliable(_M_EV_TOO_BIG_FOR_HALOFIT_);
     }
   }
 

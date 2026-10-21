@@ -21,6 +21,7 @@ TEST_TARGETS := \
 	test-baryon-clumping \
 	test-limber-point \
 	test-nonlinear-extrapolation \
+	test-perturbation-support \
 	test-bisection \
 	test-quadrature \
 	test-spline-integral \
@@ -37,7 +38,6 @@ TEST_TARGETS := \
 	test-cdm-coupled \
 	test-scf-beta \
 	test-composite-classification \
-	test-type3-gauge-guard \
 	test-composite-layout \
 	test-type3-coupling \
 	test-axion-scf-factory \

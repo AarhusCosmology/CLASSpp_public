@@ -11,7 +11,6 @@
 class PpfFluid;
 class ModifiedGravity;
 class IDM_DR_IDR_Species;
-class IDM_DRMD_IDR_DRMD_Species;
 
 /* Resolved-once views into PerturbationsModule's frozen all_species_ collection.
    The module owns several numerical approximation schemes (TCA/RSA/UFA/ncdmfa),
@@ -24,14 +23,13 @@ class IDM_DRMD_IDR_DRMD_Species;
    generator (generate_wrapper.py) does not mistake its closing brace for the end
    of the PerturbationsModule class and truncate the harvested member list. */
 struct ResolvedSpecies {
-  const IDM_DR_IDR_Species* idm_dr_idr = nullptr;               // TCA-idm_dr, RSA-idr
-  std::size_t idm_dr_idr_index = static_cast<std::size_t>(-1);  // its species_layouts[] index
-  const IDM_DRMD_IDR_DRMD_Species* idm_drmd = nullptr;          // TCA-idm_drmd
-  PpfFluid* ppf_fluid                       = nullptr;          // PPF fluid (absorbs ppf_fluid_)
-  const ModifiedGravity* gravity            = nullptr;          // replaces GR's Einstein eqs
-  const BaseSpecies* lambda                 = nullptr;          // excluded from rho_tot (delta_tot)
-  int idr_nature                            = idr_free_streaming;  // absorbs idr_nature_
-  std::size_t cdm_index = static_cast<std::size_t>(-1);            // h source (sync gauge)
+  const IDM_DR_IDR_Species* idm_dr_idr = nullptr;                 // TCA-idm_dr, RSA-idr
+  std::size_t idm_dr_idr_index   = static_cast<std::size_t>(-1);  // its species_layouts[] index
+  PpfFluid* ppf_fluid            = nullptr;                       // PPF fluid (absorbs ppf_fluid_)
+  const ModifiedGravity* gravity = nullptr;                       // replaces GR's Einstein eqs
+  const BaseSpecies* lambda      = nullptr;             // excluded from rho_tot (delta_tot)
+  int idr_nature                 = idr_free_streaming;  // absorbs idr_nature_
+  std::size_t cdm_index          = static_cast<std::size_t>(-1);  // h source (sync gauge)
 
   std::vector<const BaseSpecies*> ur;  // UR and its subclasses: UFA, RSA-ur, tensor rho
 };

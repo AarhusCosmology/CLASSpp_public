@@ -217,11 +217,6 @@ std::vector<Named> NEDESpecies::CreateAll(const SpeciesBuildContext& ctx) {
   class_test(*m_NEDE <= 0., "m_NEDE = %g must be positive", *m_NEDE);
   class_test(w_NEDE < 0. || w_NEDE > 1., "w_NEDE = %g must lie in [0, 1]", w_NEDE);
   class_test(H_over_m <= 0., "H_over_m_NEDE = %g must be positive", H_over_m);
-  if (auto gauge = ctx.pfc->get<std::string>("gauge")) {
-    class_test_severe(gauge->find("new") != std::string::npos ||
-                          gauge->find("New") != std::string::npos,
-                      "NEDE is implemented in synchronous gauge only");
-  }
 
   /* The transition is where H = H_*, i.e. where everything but NEDE contributes
      H_*^2 (1 - f_NEDE) to H^2 = rho_tot - K/a^2. The species are all built by now except

@@ -167,7 +167,8 @@ void DarkRadiationSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayo
   const double r_prefactor = std::pow(std::pow(ctx.a, 2) / pba_->H0, 2);
   const double r_dr        = r_prefactor * pvecback[index_bg_rho_];
 
-  y[layout.idx_F0 + 0] = ctx.delta_dr * r_dr;
+  /* Adiabatic only (DCDM_DR refuses isocurvature modes): the dark radiation starts as ur does. */
+  y[layout.idx_F0 + 0] = ctx.delta_ur * r_dr;
   if (layout.l_max >= 1) {
     y[layout.idx_F0 + 1] = 4. / (3. * ctx.k) * ctx.theta_ur * r_dr;
   }
@@ -188,7 +189,7 @@ void DarkRadiationSpecies::PerturbNewtonianReseed(const PerturbLayout& layout,
   }
   const double* pvecback = ctx.ppw->pvecback.data();
   const double r_dr      = std::pow(std::pow(ctx.a, 2) / pba_->H0, 2) * pvecback[index_bg_rho_];
-  const double delta_dr  = ctx.delta_dr + (-4. * ctx.a_prime_over_a + decay_corr) * ctx.alpha;
+  const double delta_dr  = ctx.delta_ur + (-4. * ctx.a_prime_over_a + decay_corr) * ctx.alpha;
   const double theta_ur  = ctx.theta_ur + ctx.k * ctx.k * ctx.alpha;
   y[layout.idx_F0 + 0]   = delta_dr * r_dr;
   if (layout.l_max >= 1) {

@@ -98,7 +98,8 @@ int main() {
                                      /*f_idm_drmd=*/0.1,
                                      /*G_over_aH_drmd=*/1.,
                                      /*delta_Neff_drmd=*/0.,
-                                     /*z_stop=*/1.e4);
+                                     /*z_stop=*/1.e4,
+                                     /*tca_trigger_G_over_aH=*/100.);
   rc |= CheckCompositeLayout<IDM_DRMDSpecies::PerturbLayout,
                              IDR_DRMDSpecies::PerturbLayout>(idm_drmd, "IDM_DRMD_IDR_DRMD_Species");
 

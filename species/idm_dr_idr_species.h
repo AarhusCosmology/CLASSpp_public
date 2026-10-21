@@ -82,6 +82,14 @@ class IDM_DR_IDR_Species : public CompositeSpecies {
 
   std::optional<double> GetParam(const std::string& name) const override;
 
+  /** Halofit and HMcode are calibrated on CDM; interacting dark matter makes them unreliable. */
+  void WarnIfNonlinearUnreliable(double m_ev_threshold) const override;
+
+  /** The dark tight coupling and the idr hierarchy are seeded for adiabatic modes only. */
+  bool SupportsIsocurvatureInitialConditions() const override {
+    return false;
+  }
+
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
 

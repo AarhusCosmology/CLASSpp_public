@@ -691,7 +691,7 @@ bool NCDMBaseSpecies::IsUltraRelativisticAtIc(const double* pvecback, double tol
   return fabs(P(pvecback) / Rho(pvecback) - 1. / 3.) <= tol;
 }
 
-void NCDMBaseSpecies::WarnIfTooHeavyForHalofit(double m_ev_threshold) const {
+void NCDMBaseSpecies::WarnIfNonlinearUnreliable(double m_ev_threshold) const {
   const double m_ncdm_in_electronvolt = GetMassInElectronvolt();
   if (m_ncdm_in_electronvolt > m_ev_threshold) {
     fprintf(stdout,

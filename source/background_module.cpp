@@ -16,12 +16,10 @@
 #include "../species/dcdm_dr_species.h"
 #include "../species/dncdm_dr_species.h"
 #include "../species/fluid.h"
-#include "../species/idm_dr_idr_species.h"
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "../species/modified_gravity.h"
 #include "../species/ncdm_species.h"
 #include "../species/scalar_field.h"
-#include "../species/type3_species.h"
 #include "../species/ultra_relativistic.h"
 #include "bisection.h"
 #include "evolver_erk.h"
@@ -59,29 +57,10 @@ double BackgroundModule::GetOmega0Species(const std::string& key) const {
   if (const auto* ptr = all_species_.find(key)) {
     return (*ptr)->GetOmega0();
   }
-  // Sub-species of composites: IDR / IDM_DR live in IDM_DR_IDR, etc.
-  if (const auto* ptr = all_species_.find("IDM_DR_IDR")) {
-    const auto& comp = static_cast<const IDM_DR_IDR_Species&>(**ptr);
-    if (key == "IDR") {
-      return comp.idr().GetOmega0();
-    }
-    if (key == "IDM_DR") {
-      return comp.idm_dr().GetOmega0();
-    }
-  }
-  if (const auto* ptr = all_species_.find("IDM_DRMD_IDR_DRMD")) {
-    const auto& comp = static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**ptr);
-    if (key == "IDR_DRMD") {
-      return comp.idr_drmd().GetOmega0();
-    }
-    if (key == "IDM_DRMD") {
-      return comp.idm_drmd().GetOmega0();
-    }
-  }
-  if (const auto* ptr = all_species_.find("DCDM_DR")) {
-    const auto& comp = static_cast<const DCDM_DR_Species&>(**ptr);
-    if (key == "DCDM") {
-      return comp.dcdm().GetOmega0();
+  // Sub-species of composites: IDR and IDM_DR live in IDM_DR_IDR, DCDM in DCDM_DR, ...
+  for (const auto& sp : all_species_) {
+    if (const auto Omega0 = sp->ChildOmega0(key)) {
+      return *Omega0;
     }
   }
   return 0.;
@@ -475,12 +454,6 @@ void BackgroundModule::background_w_fld(double a,
   *integral_fld   = 0.;
 }
 
-void BackgroundModule::background_idm_drmd(
-    double a, double rho_idm_over_rho_idr, double* Rint, double* csp2, double* Gint) const {
-  static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
-      .ComputeIdmDrmd(a, rho_idm_over_rho_idr, Rint, csp2, Gint);
-}
-
 double BackgroundModule::f_idr_drmd() const {
   if (!all_species_.contains("IDM_DRMD_IDR_DRMD")) {
     return 0.;
@@ -513,12 +486,6 @@ void BackgroundModule::background_init() {
     printf("Computing background\n");
 
     /* below we want to inform the user about ncdm species and/or the total N_eff */
-    const double Omega0_idr = all_species_.contains("IDM_DR_IDR")
-                                  ? static_cast<const IDM_DR_IDR_Species&>(
-                                        *all_species_.at("IDM_DR_IDR"))
-                                        .idr()
-                                        .GetOmega0()
-                                  : 0.;
     /* Every UltraRelativisticSpecies, at its early-time density. */
     double Omega0_ur = 0.;
     for (const auto& [name, sp] : all_species_) {
@@ -526,24 +493,17 @@ void BackgroundModule::background_init() {
         Omega0_ur += sp->GetRadiationOmega0();
       }
     }
-    if (!GetNcdmSpecies(all_species_).empty() || (Omega0_idr != 0.)) {
-      /* contribution of ultra-relativistic species _ur to N_eff */
-      double Neff = Omega0_ur / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
-
-      /* contribution of ncdm species to N_eff*/
-      if (!GetNcdmSpecies(all_species_).empty()) {
-        for (const auto& sp : all_species_) {
-          Neff += sp->NeffContribution(0.);
-          sp->PrintNeffInfo();
-        }
+    /* Every other species that counts towards N_eff: ncdm, interacting dark radiation. */
+    double Neff_species = 0.;
+    for (const auto& sp : all_species_) {
+      Neff_species += sp->NeffContribution(0.);
+    }
+    if (!GetNcdmSpecies(all_species_).empty() || (Neff_species != 0.)) {
+      for (const auto& sp : all_species_) {
+        sp->PrintNeffInfo();
       }
-
-      /* contribution of interacting dark radiation _idr to N_eff */
-      if (Omega0_idr != 0.) {
-        double N_dark  = Omega0_idr / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g;
-        Neff          += N_dark;
-        printf(" -> dark radiation Delta Neff %e\n", N_dark);
-      }
+      const double Neff = Omega0_ur / 7. * 8. / pow(4. / 11., 4. / 3.) / pba->Omega0_g +
+                          Neff_species;
 
       printf(
           " -> total N_eff = %g (sumed over ultra-relativistic species, ncdm and dark radiation)\n",
@@ -1234,21 +1194,9 @@ void BackgroundModule::background_derivs_member(
                           pba->K * y[index_bi_rs_] * y[index_bi_rs_]);  // TBC: curvature correction
 
   /** - solve second order growth equation  \f$ [D''(\tau)=-aHD'(\tau)+3/2 a^2 \rho_M D(\tau) \f$ */
-  double rho_M = all_species_.baryons().Rho(pvecback);
-  if (all_species_.contains("CDM")) {
-    rho_M += all_species_.at("CDM")->Rho(pvecback);
-  }
-  if (all_species_.contains("IDM_DR_IDR")) {
-    auto& idm_idr  = static_cast<IDM_DR_IDR_Species&>(*all_species_.at("IDM_DR_IDR"));
-    rho_M         += idm_idr.idm_dr().Rho(pvecback);
-  }
-  if (all_species_.contains("IDM_DRMD_IDR_DRMD")) {
-    auto& drmd  = static_cast<IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"));
-    rho_M      += drmd.idm_drmd().Rho(pvecback);
-  }
-  if (all_species_.contains("CDM_SCF_Momentum")) {
-    auto& t3  = static_cast<Type3Species&>(*all_species_.at("CDM_SCF_Momentum"));
-    rho_M    += t3.cdm().Rho(pvecback);
+  double rho_M = 0.;
+  for (const auto& sp : all_species_) {
+    rho_M += sp->ColdMatterRho(pvecback);
   }
 
   dy[index_bi_D_]       = y[index_bi_D_prime_];
@@ -1538,14 +1486,4 @@ double BackgroundModule::GetOmega0NcdmTot() const {
     total += sp->NeutrinoOmega0();
   }
   return total;
-}
-
-int BackgroundModule::GetNDecayDr() const {
-  int n = (all_species_.contains("DCDM_DR") ? 1 : 0);
-  for (const auto& sp : all_species_) {
-    if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
-      ++n;
-    }
-  }
-  return n;
 }

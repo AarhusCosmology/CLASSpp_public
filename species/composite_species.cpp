@@ -303,6 +303,22 @@ double CompositeSpecies::NonClusteringOmega0() const {
   return Omega0;
 }
 
+double CompositeSpecies::ColdMatterRho(const double* pvecback) const {
+  double rho = 0.;
+  for (const auto& child : children_) {
+    rho += child->ColdMatterRho(pvecback);
+  }
+  return rho;
+}
+
+double CompositeSpecies::ColdMatterOmega0() const {
+  double Omega0 = 0.;
+  for (const auto& child : children_) {
+    Omega0 += child->ColdMatterOmega0();
+  }
+  return Omega0;
+}
+
 void CompositeSpecies::FinalizeMatterClassification() {
   BaseSpecies::
       FinalizeMatterClassification();  // stamp this composite's own (unused but valid) bits

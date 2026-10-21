@@ -166,17 +166,6 @@ std::vector<Named> Type3Species::CreateAll(const SpeciesBuildContext& ctx) {
              "scf_veta (beta) must be < 1/2: beta >= 1/2 has a ghost / strong-coupling "
              "pathology.");
 
-  // Synchronous gauge only. Mirror the parser's Newtonian resolution
-  // (input_module.cpp): it resolves Newtonian on any of "newtonian"/"Newtonian"/"new",
-  // so a bare "new"/"newt" must be rejected here too — a find("newton") check lets it
-  // slip past and the coupling would silently run in Newtonian gauge.
-  if (auto gauge = ctx.pfc->get<std::string>("gauge")) {
-    class_test_severe(gauge->find("newtonian") != std::string::npos ||
-                          gauge->find("Newtonian") != std::string::npos ||
-                          gauge->find("new") != std::string::npos,
-                      "Type-3 (scf_veta) coupling is implemented in synchronous gauge only.");
-  }
-
   // CDM Omega from the resolved coupled-species budget (same source CDMSpecies uses).
   const double omega0_cdm = (ctx.omega_budget && ctx.omega_budget->cdm.has_value())
                                 ? *ctx.omega_budget->cdm

@@ -42,6 +42,11 @@ class Type3Species : public CompositeSpecies {
  public:
   static constexpr std::string_view kTypeName = "cdm_scf_momentum";
 
+  /** The momentum coupling is implemented in synchronous gauge only. */
+  bool SupportsNewtonianGauge() const override {
+    return false;
+  }
+
   enum ChildIndex { kCdm = 0, kScf = 1 };  // children_ order, set in the ctor
   static const CDMSpecies::PerturbLayout& cdm_layout(const CompositeSpecies::PerturbLayout& my) {
     return static_cast<const CDMSpecies::PerturbLayout&>(*my.child_layouts[kCdm]);

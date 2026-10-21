@@ -43,6 +43,9 @@ class ThermodynamicsModule : public BaseModule {
   double tau_ini_ =
       0.0; /**< initial conformal time at which thermodynamical variables have been be integrated */
   double YHe_ = 0.0;
+  /** Today's density fraction of the dark matter that annihilates or decays into the
+   *  plasma (pth->annihilation, pth->decay): every cold species but the baryons. */
+  double Omega0_dm_ = 0.0;
 
   /** Primordial abundances from the solved BBN network (`YHe = network`).
    *

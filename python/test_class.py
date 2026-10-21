@@ -1910,8 +1910,8 @@ class TestReviewRegressions(TestClass):
         self._assert_compute_succeeds(scenario)
 
     def test_type3_newtonian_rejected(self):
-        # The gauge guard in Type3Species::CreateAll rejects Newtonian gauge at
-        # input parsing (before any background/shooting), for any nonzero beta.
+        # Type3Species::SupportsNewtonianGauge() is false, so the perturbation module
+        # refuses Newtonian gauge before integrating anything, for any nonzero beta.
         scenario = {
             'output': 'tCl',
             'gauge': 'newtonian',

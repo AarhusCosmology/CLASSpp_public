@@ -41,7 +41,6 @@
 enum tca_flags { tca_on, tca_off };
 enum rsa_flags { rsa_off, rsa_on };
 enum tca_idm_dr_flags { tca_idm_dr_on, tca_idm_dr_off };
-enum tca_idm_drmd_flags { tca_idm_drmd_on, tca_idm_drmd_off };
 enum rsa_idr_flags { rsa_idr_off, rsa_idr_on };
 enum ufa_flags { ufa_off, ufa_on };
 enum ncdmfa_flags { ncdmfa_off, ncdmfa_on };
@@ -473,14 +472,13 @@ struct perturb_workspace {
 
   //@{
 
-  int index_ap_tca          = -1; /**< index for tight-coupling approximation */
-  int index_ap_rsa          = -1; /**< index for radiation streaming approximation */
-  int index_ap_tca_idm_dr   = -1; /**< index for dark tight-coupling approximation (idm-idr) */
-  int index_ap_tca_idm_drmd = -1; /**< index for dark tight-coupling approximation (DRMD) */
-  int index_ap_rsa_idr      = -1; /**< index for dark radiation streaming approximation */
-  int index_ap_ufa          = -1; /**< index for ur fluid approximation */
-  int index_ap_ncdmfa       = -1; /**< index for ncdm fluid approximation */
-  int ap_size               = 0;  /**< number of relevant approximations for a given mode */
+  int index_ap_tca        = -1; /**< index for tight-coupling approximation */
+  int index_ap_rsa        = -1; /**< index for radiation streaming approximation */
+  int index_ap_tca_idm_dr = -1; /**< index for dark tight-coupling approximation (idm-idr) */
+  int index_ap_rsa_idr    = -1; /**< index for dark radiation streaming approximation */
+  int index_ap_ufa        = -1; /**< index for ur fluid approximation */
+  int index_ap_ncdmfa     = -1; /**< index for ncdm fluid approximation */
+  int ap_size             = 0;  /**< number of relevant approximations for a given mode */
 
   std::vector<int>
       approx; /**< array of approximation flags holding at a given time: approx[index_ap] */

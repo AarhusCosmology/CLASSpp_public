@@ -22,6 +22,11 @@ class DNCDM_DR_Species : public DNCDMSector {
     return true;
   }
 
+  /** Non-adiabatic initial conditions are not coded for decaying dark matter. */
+  bool SupportsIsocurvatureInitialConditions() const override {
+    return false;
+  }
+
   // ── PerturbLayout ──────────────────────────────────────────────────────────
   // Uses the generic CompositeSpecies::PerturbLayout (one owning sub-layout per
   // child in children_ order): the base-class child loops — including the

@@ -115,9 +115,7 @@ class CompositeSpecies : public BaseSpecies {
   double GetOmega0() const override {
     double sum = 0.0;
     for (const auto& c : children_) {
-      {
-        sum += c->GetOmega0();
-      }
+      sum += c->GetOmega0();
     }
     return sum;
   }
@@ -129,9 +127,7 @@ class CompositeSpecies : public BaseSpecies {
                          double rho_crit,
                          std::vector<BudgetLine>& out) const {
     for (const auto& c : children_) {
-      {
-        out.push_back({c->name(), c->Rho(pvecback_today) / rho_crit, BudgetBucketOf(*c)});
-      }
+      out.push_back({c->name(), c->Rho(pvecback_today) / rho_crit, BudgetBucketOf(*c)});
     }
   }
 
@@ -140,12 +136,8 @@ class CompositeSpecies : public BaseSpecies {
    *  the merged system, to which each child contributes its own equations. */
   bool SupportsExplicitPerturbationEvolver() const override {
     for (const auto& c : children_) {
-      {
-        if (!c->SupportsExplicitPerturbationEvolver()) {
-          {
-            return false;
-          }
-        }
+      if (!c->SupportsExplicitPerturbationEvolver()) {
+        return false;
       }
     }
     return true;
@@ -157,9 +149,7 @@ class CompositeSpecies : public BaseSpecies {
   int MaxMultipole(const precision* ppr, bool tensors) const override {
     int l_max = 0;
     for (const auto& c : children_) {
-      {
-        l_max = std::max(l_max, c->MaxMultipole(ppr, tensors));
-      }
+      l_max = std::max(l_max, c->MaxMultipole(ppr, tensors));
     }
     return l_max;
   }
@@ -169,12 +159,8 @@ class CompositeSpecies : public BaseSpecies {
    *  enough to make it worth taking. */
   bool PrefersExponentialPerturbationEvolver() const override {
     for (const auto& c : children_) {
-      {
-        if (c->PrefersExponentialPerturbationEvolver()) {
-          {
-            return true;
-          }
-        }
+      if (c->PrefersExponentialPerturbationEvolver()) {
+        return true;
       }
     }
     return false;
@@ -185,12 +171,8 @@ class CompositeSpecies : public BaseSpecies {
    *  BaseSpecies::SupportsExponentialPerturbationEvolver(). */
   bool SupportsExponentialPerturbationEvolver() const override {
     for (const auto& c : children_) {
-      {
-        if (!c->SupportsExponentialPerturbationEvolver()) {
-          {
-            return false;
-          }
-        }
+      if (!c->SupportsExponentialPerturbationEvolver()) {
+        return false;
       }
     }
     return true;
@@ -201,9 +183,7 @@ class CompositeSpecies : public BaseSpecies {
   double GetRadiationOmega0() const override {
     double sum = 0.0;
     for (const auto& c : children_) {
-      {
-        sum += c->GetRadiationOmega0();
-      }
+      sum += c->GetRadiationOmega0();
     }
     return sum;
   }
@@ -212,9 +192,7 @@ class CompositeSpecies : public BaseSpecies {
   double DarkRadiationRhoToday(const double* pvecback_integration) const override {
     double sum = 0.0;
     for (const auto& c : children_) {
-      {
-        sum += c->DarkRadiationRhoToday(pvecback_integration);
-      }
+      sum += c->DarkRadiationRhoToday(pvecback_integration);
     }
     return sum;
   }
@@ -223,9 +201,7 @@ class CompositeSpecies : public BaseSpecies {
   double NeutrinoOmega0() const override {
     double sum = 0.0;
     for (const auto& c : children_) {
-      {
-        sum += c->NeutrinoOmega0();
-      }
+      sum += c->NeutrinoOmega0();
     }
     return sum;
   }
@@ -234,71 +210,63 @@ class CompositeSpecies : public BaseSpecies {
   double NeffContribution(double z) const override {
     double sum = 0.0;
     for (const auto& c : children_) {
-      {
-        sum += c->NeffContribution(z);
-      }
+      sum += c->NeffContribution(z);
     }
     return sum;
   }
 
   void PrintNeffInfo() const override {
     for (const auto& c : children_) {
-      {
-        c->PrintNeffInfo();
-      }
+      c->PrintNeffInfo();
     }
   }
   void PrintMassInfo() const override {
     for (const auto& c : children_) {
-      {
-        c->PrintMassInfo();
-      }
+      c->PrintMassInfo();
     }
   }
 
   double TensorMasslessRelativisticRho(const double* pvecback) const override {
     double sum = 0.0;
     for (const auto& c : children_) {
-      {
-        sum += c->TensorMasslessRelativisticRho(pvecback);
-      }
+      sum += c->TensorMasslessRelativisticRho(pvecback);
     }
     return sum;
   }
   void CheckUltraRelativisticAtIc(const double* pvecback, double tol) const override {
     for (const auto& c : children_) {
-      {
-        c->CheckUltraRelativisticAtIc(pvecback, tol);
-      }
+      c->CheckUltraRelativisticAtIc(pvecback, tol);
     }
   }
   bool IsUltraRelativisticAtIc(const double* pvecback, double tol) const override {
     for (const auto& c : children_) {
-      {
-        if (!c->IsUltraRelativisticAtIc(pvecback, tol)) {
-          {
-            return false;
-          }
-        }
+      if (!c->IsUltraRelativisticAtIc(pvecback, tol)) {
+        return false;
       }
     }
     return true;
   }
-  void WarnIfTooHeavyForHalofit(double m_ev_threshold) const override {
+  void WarnIfNonlinearUnreliable(double m_ev_threshold) const override {
     for (const auto& c : children_) {
-      {
-        c->WarnIfTooHeavyForHalofit(m_ev_threshold);
+      c->WarnIfNonlinearUnreliable(m_ev_threshold);
+    }
+  }
+
+  /** Looks the name up among the children only. */
+  std::optional<double> ChildOmega0(const std::string& name) const override {
+    for (const auto& c : children_) {
+      if (c->name() == name) {
+        return c->GetOmega0();
       }
     }
+    return std::nullopt;
   }
 
   /** Threads a_proposed through all children (e.g. a wrapped DNCDM child
    *  may pull the earliest integration start earlier). */
   double BackgroundAIni(double a_proposed, double tol) const override {
     for (const auto& c : children_) {
-      {
-        a_proposed = c->BackgroundAIni(a_proposed, tol);
-      }
+      a_proposed = c->BackgroundAIni(a_proposed, tol);
     }
     return a_proposed;
   }
@@ -328,6 +296,8 @@ class CompositeSpecies : public BaseSpecies {
   bool IsColdMatterSpecies() const override;
   bool HasWarmMatter() const override;
   double NonClusteringOmega0() const override;
+  double ColdMatterRho(const double* pvecback) const override;
+  double ColdMatterOmega0() const override;
   void FinalizeMatterClassification() override;
 
  protected:

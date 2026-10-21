@@ -173,7 +173,7 @@ class NCDMBaseSpecies : public BaseSpecies {
   }
   void CheckUltraRelativisticAtIc(const double* pvecback, double tol) const override;
   bool IsUltraRelativisticAtIc(const double* pvecback, double tol) const override;
-  void WarnIfTooHeavyForHalofit(double m_ev_threshold) const override;
+  void WarnIfNonlinearUnreliable(double m_ev_threshold) const override;
 
   void SetDeg_from_Omega_ini(double z_ini, double H0, double Omega_ini);
 

@@ -30,6 +30,10 @@ class DCDMSpecies : public BaseSpecies {
     return Omega0_dcdmdr_;
   }
 
+  /** GetOmega0() is the budget of DCDM and its daughter radiation; DCDM's own density
+   *  today is known only once the background is integrated. */
+  double ColdMatterOmega0() const override;
+
   double Gamma_dcdm() const {
     return Gamma_dcdm_;
   }

@@ -8,8 +8,6 @@
 #include "background.h"
 #include "background_module.h"
 #include "errors.h"
-#include "idm_dr_idr_species.h"
-#include "idm_drmd_idr_drmd_species.h"
 #include "parser.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
@@ -324,21 +322,9 @@ void FluidSpecies::ComputeWFld(double a,
                pow(4. / 11.,
                    4. /
                        3.));  // assumes LambdaCDM + eventually massive neutrinos so light that they are relativistic at equality; needs to be generalised later on.
-      double Omega_m = pba_.Omega0_b;
-      if (const auto* p = bgm_->all_species_.find("CDM")) {
-        Omega_m += (*p)->GetOmega0();
-      }
-      if (const auto* p = bgm_->all_species_.find("IDM_DR_IDR")) {
-        Omega_m += static_cast<const IDM_DR_IDR_Species&>(**p).idm_dr().GetOmega0();
-      }
-      if (const auto* p = bgm_->all_species_.find("IDM_DRMD_IDR_DRMD")) {
-        Omega_m += static_cast<const IDM_DRMD_IDR_DRMD_Species&>(**p).idm_drmd().GetOmega0();
-      }
-      if (bgm_->all_species_.contains("DCDM_DR")) {
-        class_stop(
-            "Early Dark Energy not compatible with decaying Dark Matter because we omitted "
-            "to code the calculation of a_eq in that case, but it would not be difficult to "
-            "add it if necessary, should be a matter of 5 minutes");
+      double Omega_m = 0.;
+      for (const auto& sp : bgm_->all_species_) {
+        Omega_m += sp->ColdMatterOmega0();
       }
       a_eq = Omega_r / Omega_m;  // assumes a flat universe with a=1 today
 

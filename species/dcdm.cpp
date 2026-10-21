@@ -12,6 +12,13 @@ DCDMSpecies::DCDMSpecies(const background& pba,
     : BaseSpecies("DCDM", EnergyType::Matter), pba_(pba), Omega0_dcdmdr_(omega0_dcdmdr),
       Gamma_dcdm_(Gamma_dcdm), Omega_ini_dcdm_(Omega_ini_dcdm) {}
 
+double DCDMSpecies::ColdMatterOmega0() const {
+  class_stop_severe(
+      "the density of decaying dark matter today is known only once the background is "
+      "integrated, and is needed before that (by the Early Dark Energy fluid's "
+      "matter-radiation equality)");
+}
+
 void DCDMSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_rho_dcdm_, true, index_bg, 1);
   index_bg_rho_ = index_bg_rho_dcdm_;

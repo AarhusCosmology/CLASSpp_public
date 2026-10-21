@@ -33,9 +33,7 @@ class SpeciesInput {
   template <class T>
   T get_or(const std::string& field, T fallback) const {
     if (auto v = get<T>(field)) {
-      {
-        return *v;
-      }
+      return *v;
     }
     return fallback;
   }
@@ -50,9 +48,7 @@ class SpeciesInput {
   bool get_flag(const std::string& field, bool fallback) const {
     auto v = get<std::string>(field);
     if (!v) {
-      {
-        return fallback;
-      }
+      return fallback;
     }
     const char c = v->empty() ? '\0' : (*v)[0];
     class_test_severe(c != 'y' && c != 'Y' && c != 'n' && c != 'N',
@@ -67,9 +63,7 @@ class SpeciesInput {
   template <class T>
   T require(const std::string& field) const {
     if (auto v = get<T>(field)) {
-      {
-        return *v;
-      }
+      return *v;
     }
     class_stop_severe("species '%s': missing required field '%s'",
                       instance_name_.c_str(),
