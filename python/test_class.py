@@ -2940,6 +2940,18 @@ class TestHMcode(unittest.TestCase):
             self.cosmo.struct_cleanup()
             self.cosmo.empty()
 
+    def test_non_finite_linear_spectrum_is_rejected(self):
+        """A linear P(k) that is not finite stops the run before the sigma integrals.
+        extrapolation_method = 0 (extrap_zero) continues the sources by zero beyond k_max,
+        so ln P(k) is -inf there. Without the check HMcode stopped with x_min = nan in its
+        search for nu = 1, and halofit, which met the same NaN from the default
+        extrapolation at dark acoustic oscillations, could leave out the non-linear
+        correction without a word."""
+        self.cosmo.set(dict(self.BASE, extrapolation_method=0))
+        with self.assertRaises(CosmoComputationError) as ctx:
+            self.cosmo.compute()
+        self.assertIn('extrapolated beyond k_max', str(ctx.exception))
+
 if __name__ == '__main__':
     toto = TestClass()
     unittest.main()

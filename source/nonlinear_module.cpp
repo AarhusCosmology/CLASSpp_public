@@ -16,6 +16,7 @@
 #include "background_module.h"
 #include "cosmology.h"
 #include "evolver_ndf15.h"
+#include "nonfinite.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
 #include "thermodynamics_module.h"
@@ -1270,6 +1271,21 @@ void NonlinearModule::nonlinear_init() {
              lensing (tau grid spanning z~0..1100), cuts the Nonlinear stage ~3x. */
           nonlinear_pk_linear(index_pk, index_tau, k_size_extra_, lnpk_l[index_pk].data(), nullptr);
 
+          /* A non-finite P_L(k) must not reach the sigma integrals of Halofit and
+             HMcode: from there it gives NaN spectra or, depending on the compiler,
+             a failed search for k_NL that silently leaves out the non-linear
+             correction. Only IsNonFinite survives -ffast-math (nonfinite.h). */
+          for (int index_k = 0; index_k < k_size_extra_; index_k++) {
+            class_test(IsNonFinite(lnpk_l[index_pk][index_k]),
+                       "the linear P(k) that the non-linear method integrates over is not finite "
+                       "at k = %e 1/Mpc (%s k_max = %e 1/Mpc of the computed sources) and "
+                       "tau = %e Mpc",
+                       k_[index_k],
+                       (index_k < k_size_) ? "within" : "extrapolated beyond",
+                       k_[k_size_ - 1],
+                       tau_[index_tau]);
+          }
+
           /* spline P_L(k) at this time along k */
           array_spline_table_columns(ln_k_.data(),
                                      k_size_extra_,
@@ -1708,9 +1724,7 @@ void NonlinearModule::nonlinear_get_source(int index_k,
        * from the data at k_0 Mostly continuous derivative, quite good
        */
       case extrap_max_scaled: {
-        scaled_factor = exp((source_previous * log(k_max) - source_max * log(k_previous)) /
-                            (source_max - source_previous));
-        *source       = source_max * (log(scaled_factor * k) / log(scaled_factor * k_max));
+        *source = ExtrapolateMaxScaled(k, k_max, k_previous, source_max, source_previous);
         break;
       }
         /**
@@ -1733,6 +1747,36 @@ void NonlinearModule::nonlinear_get_source(int index_k,
       }
     }
   }
+}
+
+/**
+ * The default continuation of a source beyond the computed k (extrap_max_scaled):
+ * source ~ ln(a k), with a fitted through the last two points of the table. That
+ * is a straight line in ln k through the two points,
+ *
+ *   source_max ln(a k) / ln(a k_max) = source_max + slope ln(k / k_max),
+ *   slope = (source_max - source_previous) / ln(k_max / k_previous),
+ *
+ * and it is evaluated as such. The closed form computed a = exp(ln(a k_max)) / k_max
+ * with ln(a k_max) = source_max / slope, which is large where the last two sources
+ * are nearly equal: where the table ends near an extremum of an oscillating source,
+ * such as dark acoustic oscillations that the k grid does not resolve. Beyond
+ * |ln(a k_max)| ~ 709, a over- or underflowed and the source was inf/inf = NaN, so
+ * HMcode stopped with x_min = nan, and halofit returned NaN spectra or, depending on
+ * the compiler, silently left out the non-linear correction.
+ *
+ * @param k               Input: wavenumber beyond the table
+ * @param k_max           Input: last wavenumber of the table
+ * @param k_previous      Input: the one before it
+ * @param source_max      Input: source at k_max
+ * @param source_previous Input: source at k_previous
+ * @return the continued source at k
+ */
+
+double NonlinearModule::ExtrapolateMaxScaled(
+    double k, double k_max, double k_previous, double source_max, double source_previous) {
+  const double slope = (source_max - source_previous) / log(k_max / k_previous);
+  return source_max + slope * log(k / k_max);
 }
 
 /**

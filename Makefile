@@ -20,6 +20,7 @@ TEST_TARGETS := \
 	test-recfast \
 	test-baryon-clumping \
 	test-limber-point \
+	test-nonlinear-extrapolation \
 	test-bisection \
 	test-quadrature \
 	test-spline-integral \

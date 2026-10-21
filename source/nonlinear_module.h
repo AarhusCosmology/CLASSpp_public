@@ -63,6 +63,11 @@ class NonlinearModule : public BaseModule {
       enum pk_outputs pk_output, double k, double z, int index_pk, double* pk_tilt) const;
   void nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_cb) const;
 
+  /* The default continuation of a source beyond the computed k (extrap_max_scaled):
+     source ~ ln(a k), with a fitted through the last two points of the table. */
+  static double ExtrapolateMaxScaled(
+      double k, double k_max, double k_previous, double source_max, double source_previous);
+
   // Deprecated:
   void nonlinear_sigma_at_z(
       double R, double z, int index_pk, double k_per_decade, double* result) const;
