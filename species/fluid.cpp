@@ -35,36 +35,12 @@ void FluidSpecies::RegisterBackgroundIndices(int& index_bg) {
   class_define_index(index_bg_dw_over_da_fld_, true, index_bg, 1);
 }
 
-void FluidSpecies::RegisterIntegrationIndices(int& index_bi) {
-  class_define_index(index_bi_rho_fld_, true, index_bi, 1);
-}
-
 void FluidSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
   class_define_index(index_tp_delta_, ctx.wants_density, index_tp, 1);
   class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
 }
 
-void FluidSpecies::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {
-  /* rho_fld today */
-  const double rho_fld_today = GetOmega0() * pow(pba_.H0, 2);
-
-  /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0). */
-  double w_fld;
-  double dw_over_da_fld;
-  double integral_fld;
-  ComputeWFld(ctx.a_ini, &w_fld, &dw_over_da_fld, &integral_fld);
-
-  /* Note: for complicated w_fld(a) functions with no simple
-     analytic integral, this is the place were you should compute
-     numerically the simple 1d integral [int_{a_ini}^{a_0} 3
-     [(1+w_fld)/a] da] (e.g. with the Romberg method?) instead of
-     calling ComputeWFld */
-
-  /* rho_fld at initial time */
-  ctx.pvecback_integration[bi_rho_index()] = rho_fld_today * exp(integral_fld);
-}
-
-void FluidSpecies::ComputeBackground(double a, const double* pvecback_B, double* pvecback) {
+void FluidSpecies::ComputeBackground(double a, const double* /*pvecback_B*/, double* pvecback) {
   // Compute w(a) ourselves rather than having the module pre-fill the slots.
   double w_fld;
   double dw_over_da_fld;
@@ -72,18 +48,12 @@ void FluidSpecies::ComputeBackground(double a, const double* pvecback_B, double*
   ComputeWFld(a, &w_fld, &dw_over_da_fld, &integral_fld);
   pvecback[index_bg_w_fld_]          = w_fld;
   pvecback[index_bg_dw_over_da_fld_] = dw_over_da_fld;
-  pvecback[index_bg_rho_fld_]        = pvecback_B[index_bi_rho_fld_];
-}
-
-void FluidSpecies::BackgroundDerivs(double /*tau*/,
-                                    const double* y,
-                                    double* dy,
-                                    const double* pvecback) {
-  const double a     = pvecback[bgm_->index_bg_a_];
-  const double H     = pvecback[bgm_->index_bg_H_];
-  const double w_fld = pvecback[index_bg_w_fld_];
-  /** rho' = -3*a*H*(1+w)*rho */
-  dy[index_bi_rho_fld_] = -3. * a * H * (1. + w_fld) * y[index_bi_rho_fld_];
+  /* rho_fld(a) = rho_fld,0 exp(int_a^1 3(1+w) da/a), in closed form for every equation of
+     state ComputeWFld implements. Integrating it as an ODE instead lost closure at a = 1
+     whenever w0 + wa << -1, because the density then climbs ~100 decades from a_ini: at
+     tol_background_integration = 1e-7, |H(z=0)/H0 - 1| reached 2.6e-4 near the DESI
+     best fit and 6e-2 at wa = -3.6. */
+  pvecback[index_bg_rho_fld_] = GetOmega0() * pow(pba_.H0, 2) * exp(integral_fld);
 }
 
 double FluidSpecies::Rho(const double* pvecback) const {

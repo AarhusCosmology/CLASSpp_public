@@ -12,8 +12,8 @@ class BackgroundModule;
  * Dark energy fluid species with evolving equation of state w(a).
  *
  * Background:
- *   rho_fld is ODE-integrated via BackgroundDerivs called from background_derivs_member().
- *   ComputeBackground reads rho_fld from pvecback_B.
+ *   rho_fld is not integrated: ComputeBackground evaluates rho_fld,0 exp(integral_fld) from
+ *   the closed-form integral ComputeWFld returns, so the background closes exactly at a = 1.
  *
  * Perturbations (true fluid):
  *   dy[delta_fld] = -(1+w)(theta_fld + metric_continuity)
@@ -65,10 +65,7 @@ class FluidSpecies : public BaseSpecies {
     bgm_ = bgm;
   }
   void RegisterBackgroundIndices(int& index_bg) override;
-  void RegisterIntegrationIndices(int& index_bi) override;
-  void SetBackgroundInitialConditions(const BackgroundICContext& ctx) override;
   void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
-  void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
   double Rho(const double* pvecback) const override;
   double P(const double* pvecback) const override;
   double PPrime(double a,
@@ -166,9 +163,6 @@ class FluidSpecies : public BaseSpecies {
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
 
-  int bi_rho_index() const {
-    return index_bi_rho_fld_;
-  }
   int bg_w_index() const {
     return index_bg_w_fld_;
   }
@@ -195,6 +189,4 @@ class FluidSpecies : public BaseSpecies {
   double wa_fld_               = 0.;
   double Omega_EDE_            = 0.;
   double Delta_pede_           = 1.;
-
-  int index_bi_rho_fld_ = -1;
 };

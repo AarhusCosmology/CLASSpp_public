@@ -41,6 +41,7 @@ TEST_TARGETS := \
 	test-type3-coupling \
 	test-axion-scf-factory \
 	test-axion-ede-fluid \
+	test-fluid-closure \
 	test-dcdm-wdm \
 	test-axion-ncdm \
 	test-dncdm-switch-copy \
