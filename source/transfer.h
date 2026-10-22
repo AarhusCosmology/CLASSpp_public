@@ -158,6 +158,8 @@ struct TransferType {
   double k_pivot                   = 1.;                   /**< pivot of the factor (k/k_pivot) */
   double l_limber        = _HUGE_; /**< the Limber approximation is used for l >= l_limber */
   double delta_k_neglect = _HUGE_; /**< Delta_l(q)=0 for l < (q-delta_k_neglect) r_a(tau_rec) */
+  double l_half_neglect =
+      0.; /**< if > 0, the margin at l is delta_k_neglect sqrt(l/(l+l_half_neglect)) */
   bool late_source_cut =
       false; /**< sources at tau > tau_cut can be neglected for l > ppr->transfer_neglect_late_source */
   bool full_limber = false;   /**< also computed on the full-Limber grid q_limber */

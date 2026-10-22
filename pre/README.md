@@ -20,12 +20,13 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 
 | file | S | speed vs defaults | use it for |
 |---|---|---|---|
-| *(compiled defaults)* | 0.387 ³ | 1.00× | everything |
+| *(compiled defaults)* | 0.387 ³ ⁴ | 1.00× | everything |
 | `precision_fast.pre` | 0.554 | 2.4× faster | ΛCDM only — see the warning in the file |
 | `precision_tuned.pre` | 0.301 | 1.7× slower | when accuracy matters more than throughput |
 | `precision_precise.pre` | 0.009 | ~60× slower | reference-grade, for convergence tests |
 | `precision_pre_2026_08_21.pre` | 1.725 | 2.2× slower | reproducing results from before 2026-08-21 |
 | `precision_pre_2026_10_09.pre` | 0.387 | 2% faster on one thread | reproducing results from 2026-08-21 to 2026-10-09 |
+| `precision_pre_2026_10_21.pre` | 0.387 ³ | 15% slower on one thread | reproducing results from 2026-10-09 to 2026-10-21 |
 | `act_dr6.pre` | — ¹ | 4.2× slower ² | ACT DR6 and other data to ℓ ≈ 8500 |
 
 ¹ Not scored on `plik_lite`. Its own metric is the ACT DR6 ACT-lite distance to a
@@ -38,6 +39,11 @@ header and `docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md`.
 ³ Measured on the defaults of 2026-08-21. On 2026-10-09 three neutrino knobs went
 back to their earlier values (see the table under **Tensors** below); S has not been
 re-measured since.
+⁴ On 2026-10-21 the cuts on the scalar CMB transfer functions became l-dependent: the
+transfer stage is 25% faster and, on Planck PR4 CamSpec + ACT DR6 lensing + DESI DR2, the
+cosmological bias of the defaults went from 0.175 to 0.153σ. Not re-measured on
+`plik_lite`. Every preset above pins the constant cuts it was measured with. See
+`docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md`.
 
 ## Two things these files do not cover
 

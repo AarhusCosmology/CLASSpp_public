@@ -22,6 +22,7 @@ class_unit_test(test-baryon-clumping source/baryon_clumping_test.cpp)
 class_unit_test(test-limber-point source/limber_point_test.cpp)
 class_unit_test(test-nonlinear-extrapolation source/nonlinear_extrapolation_test.cpp)
 class_unit_test(test-perturbation-support source/perturbation_support_test.cpp)
+class_unit_test(test-transfer-neglect source/transfer_neglect_test.cpp)
 
 class_unit_test(test-photons species/photons_formula_test.cpp)
 class_unit_test(test-tensor-tca species/photons_tensor_tca_test.cpp)

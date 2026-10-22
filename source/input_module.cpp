@@ -3422,6 +3422,10 @@ void precision::parse(const FileContent& fc) {
   read(fc, "transfer_neglect_delta_k_S_t1", transfer_neglect_delta_k_S_t1);
   read(fc, "transfer_neglect_delta_k_S_t2", transfer_neglect_delta_k_S_t2);
   read(fc, "transfer_neglect_delta_k_S_e", transfer_neglect_delta_k_S_e);
+  read(fc, "transfer_neglect_l_half_S_t0", transfer_neglect_l_half_S_t0);
+  read(fc, "transfer_neglect_l_half_S_t1", transfer_neglect_l_half_S_t1);
+  read(fc, "transfer_neglect_l_half_S_t2", transfer_neglect_l_half_S_t2);
+  read(fc, "transfer_neglect_l_half_S_e", transfer_neglect_l_half_S_e);
   read(fc, "transfer_neglect_delta_k_V_t1", transfer_neglect_delta_k_V_t1);
   read(fc, "transfer_neglect_delta_k_V_t2", transfer_neglect_delta_k_V_t2);
   read(fc, "transfer_neglect_delta_k_V_e", transfer_neglect_delta_k_V_e);

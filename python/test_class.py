@@ -1615,13 +1615,16 @@ class TestReviewRegressions(TestClass):
         induced gravity there: N = 0, xi = 1/(4 omega_BD), phi_BD = xi phi^2.
         hi_class solves it with alpha functions and a V_X variable, written
         independently of this code; the two agree to 2e-7 in f = M*^2, 3.5e-5 in
-        H(z), 1e-4 in P(k) and 4e-4 rms in lensed TT, on effects of 20-110%. The
-        pins avoid l < 200, where CLASS++'s default source sampling costs 6e-3
-        (perturb_sampling_stepsize = 0.02 brings it to 3e-4)."""
+        H(z), 1e-4 in P(k) and 7e-4 in the lensed C_l pinned here, on effects of
+        20-110%. The C_l are compared at hi_class's source sampling: at the
+        default perturb_sampling_stepsize = 0.1 the ratio is 6e-3 off at l < 200
+        and 3e-3 at l = 220 (7e-3 with no transfer cut), which says nothing
+        about the scalar-tensor species."""
         cosmology = {'h': 0.6781, 'omega_b': 0.02238, 'omega_cdm': 0.1201,
                      'N_ur': 3.044, 'YHe': 0.245, 'tau_reio': 0.0544,
                      'A_s': 2.1e-9, 'n_s': 0.9660, 'output': 'tCl,pCl,lCl,mPk',
-                     'lensing': 'yes', 'l_max_scalars': 2000, 'P_k_max_1/Mpc': 1.}
+                     'lensing': 'yes', 'l_max_scalars': 2000, 'P_k_max_1/Mpc': 1.,
+                     'perturb_sampling_stepsize': 0.02}
         brans_dicke = {'N_st': 0., 'xi_st': 1./(4.*50.), 'phi_ini_st': (1./(1./200.))**0.5}
         h = cosmology['h']
         results = []
@@ -1639,7 +1642,7 @@ class TestReviewRegressions(TestClass):
                     'ee': ([100, 220, 810, 1000], [0.93747, 0.84802, 1.42878, 0.94746])}
         for key, (ell, expected) in hi_class.items():
             ratio = results[1]['cl'][key][ell]/results[0]['cl'][key][ell]
-            np.testing.assert_allclose(ratio, expected, atol=3e-3, err_msg=key)
+            np.testing.assert_allclose(ratio, expected, atol=1e-3, err_msg=key)
         np.testing.assert_allclose(np.array(results[1]['pk'])/np.array(results[0]['pk']),
                                    [1.21923, 1.21351, 1.22084, 1.22645], atol=1e-3, err_msg='P(k)')
         background = results[1]['background']

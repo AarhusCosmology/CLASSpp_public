@@ -22,6 +22,7 @@ TEST_TARGETS := \
 	test-limber-point \
 	test-nonlinear-extrapolation \
 	test-perturbation-support \
+	test-transfer-neglect \
 	test-bisection \
 	test-quadrature \
 	test-spline-integral \

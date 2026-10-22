@@ -60,3 +60,15 @@ tol_ncdm_synchronous = 0.03
 # hyrec_calibration = cosmorec; docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md).
 # This preset was measured with the RECFAST one. Planck-era RECFAST would move the
 # spectra by 0.027 on the scale above.
+
+# Pinned 2026-10-21, when the compiled cuts on the scalar CMB transfer functions became
+# l-dependent: the constant cuts this file was measured with. See
+# docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md.
+transfer_neglect_delta_k_S_t0 = 0.15
+transfer_neglect_delta_k_S_t1 = 0.04
+transfer_neglect_delta_k_S_t2 = 0.12
+transfer_neglect_delta_k_S_e = 1
+transfer_neglect_l_half_S_t0 = 0
+transfer_neglect_l_half_S_t1 = 0
+transfer_neglect_l_half_S_t2 = 0
+transfer_neglect_l_half_S_e = 0

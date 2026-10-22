@@ -61,3 +61,12 @@ transfer_neglect_delta_k_S_t2 = 1
 q_logstep_limber = 1.01
 hyper_sampling_flat = 16
 delta_l_max = 250
+
+# Pinned 2026-10-21, when the compiled cuts on the scalar CMB transfer functions became
+# l-dependent: the constant cuts this file was measured with. See
+# docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md.
+transfer_neglect_delta_k_S_e = 1
+transfer_neglect_l_half_S_t0 = 0
+transfer_neglect_l_half_S_t1 = 0
+transfer_neglect_l_half_S_t2 = 0
+transfer_neglect_l_half_S_e = 0

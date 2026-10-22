@@ -1,0 +1,21 @@
+# CLASS++ precision: the defaults as they were from 2026-10-09 to 2026-10-21.
+#
+# On 2026-10-21 the cuts on the scalar CMB transfer functions became l-dependent:
+# a transfer function is set to zero for l < (k - delta_k(l)) r_a(tau_rec), with
+# delta_k(l) = transfer_neglect_delta_k_S_X sqrt(l / (l + transfer_neglect_l_half_S_X)).
+# Until then delta_k was a constant per type, and E-polarization was never cut at
+# all. Measured against Planck PR4 CamSpec + low-l + ACT DR6 lensing + DESI DR2 over
+# 160 LambdaCDM posterior draws, the cosmological bias went from 0.175 to 0.153 sigma
+# and the transfer stage got 25% faster on one thread.
+# Pass this file to reproduce a result computed in that period, or to bisect.
+#
+# For earlier periods use precision_pre_2026_10_09.pre or precision_pre_2026_08_21.pre.
+# See docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md.
+transfer_neglect_delta_k_S_t0 = 0.15
+transfer_neglect_delta_k_S_t1 = 0.04
+transfer_neglect_delta_k_S_t2 = 0.12
+transfer_neglect_delta_k_S_e = 1
+transfer_neglect_l_half_S_t0 = 0
+transfer_neglect_l_half_S_t1 = 0
+transfer_neglect_l_half_S_t2 = 0
+transfer_neglect_l_half_S_e = 0

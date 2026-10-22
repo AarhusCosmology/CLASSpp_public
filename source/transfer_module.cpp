@@ -1092,11 +1092,16 @@ void TransferModule::transfer_type_properties() {
         }
       }
 
-      /* the transfer function can be neglected for l < (q-delta_k_neglect) r_a(tau_rec) */
-      auto cmb = [&](int index_tp, radial_function_type radial, double delta_k, bool late_cut) {
+      /* the transfer function can be neglected for l < (q-delta_k_neglect(l)) r_a(tau_rec) */
+      auto cmb = [&](int index_tp,
+                     radial_function_type radial,
+                     double delta_k,
+                     bool late_cut,
+                     double l_half = 0.) {
         type.index_tp        = index_tp;
         type.radial_type     = radial;
         type.delta_k_neglect = delta_k;
+        type.l_half_neglect  = l_half;
         type.late_source_cut = late_cut;
       };
       /* number counts and galaxy lensing: the Limber threshold scales with the mean redshift of the bin */
@@ -1124,16 +1129,32 @@ void TransferModule::transfer_type_properties() {
           /* sources at late times can be neglected at high l for CMB
              types, excepted T0 which contains the late ISW effect */
           case TransferTerm::cmb_t0:
-            cmb(pt->index_tp_t0_, SCALAR_TEMPERATURE_0, ppr->transfer_neglect_delta_k_S_t0, false);
+            cmb(pt->index_tp_t0_,
+                SCALAR_TEMPERATURE_0,
+                ppr->transfer_neglect_delta_k_S_t0,
+                false,
+                ppr->transfer_neglect_l_half_S_t0);
             break;
           case TransferTerm::cmb_t1:
-            cmb(pt->index_tp_t1_, SCALAR_TEMPERATURE_1, ppr->transfer_neglect_delta_k_S_t1, true);
+            cmb(pt->index_tp_t1_,
+                SCALAR_TEMPERATURE_1,
+                ppr->transfer_neglect_delta_k_S_t1,
+                true,
+                ppr->transfer_neglect_l_half_S_t1);
             break;
           case TransferTerm::cmb_t2:
-            cmb(pt->index_tp_t2_, SCALAR_TEMPERATURE_2, ppr->transfer_neglect_delta_k_S_t2, true);
+            cmb(pt->index_tp_t2_,
+                SCALAR_TEMPERATURE_2,
+                ppr->transfer_neglect_delta_k_S_t2,
+                true,
+                ppr->transfer_neglect_l_half_S_t2);
             break;
           case TransferTerm::cmb_e:
-            cmb(pt->index_tp_p_, SCALAR_POLARISATION_E, ppr->transfer_neglect_delta_k_S_e, true);
+            cmb(pt->index_tp_p_,
+                SCALAR_POLARISATION_E,
+                ppr->transfer_neglect_delta_k_S_e,
+                true,
+                ppr->transfer_neglect_l_half_S_e);
             break;
           case TransferTerm::cmb_b:
             break;
@@ -2184,8 +2205,13 @@ TransferMethod TransferModule::transfer_select_method(struct transfer_workspace*
     return TransferMethod::zero;
   }
 
-  /** - neglect the transfer function when l is much smaller than k*tau0 */
-  if (l < (q - type.delta_k_neglect) * ra_rec) {
+  /** - neglect the transfer function when l is much smaller than k*tau0: beyond
+      q = l/r_a(tau_rec) + delta_k(l) the source only meets the oscillating tail of the Bessel
+      function. The margin grows with l (docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md) */
+  const double delta_k_neglect = (type.l_half_neglect > 0.)
+                                     ? type.delta_k_neglect * sqrt(l / (l + type.l_half_neglect))
+                                     : type.delta_k_neglect;
+  if (l < (q - delta_k_neglect) * ra_rec) {
     return TransferMethod::zero;
   }
 

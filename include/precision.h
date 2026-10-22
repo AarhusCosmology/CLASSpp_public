@@ -771,14 +771,26 @@ struct precision {
   double k_max_limber_over_l_max_scalars =
       0.0005; /**< full-Limber perturbation source cutoff k_max/l_max_scalars in 1/Mpc */
 
+  /* Scalar CMB transfer functions are set to zero for l < (k - delta_k(l)) r_a(tau_rec): beyond
+     that k the source only meets the oscillating tail of the Bessel function. The margin grows
+     with l, delta_k(l) = transfer_neglect_delta_k_S_X sqrt(l / (l + transfer_neglect_l_half_S_X)),
+     because at low l the integrand dies off within a small part of the k range a constant cut
+     keeps. Set to the margin each type needs to keep its C_l within 1e-4, for l <= 4000; an
+     l_half of 0 makes the cut constant again, as it was until 2026-10-21. See
+     docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md. */
   double transfer_neglect_delta_k_S_t0 =
-      0.15; /**< for temperature source function T0 of scalar mode, range of k values (in 1/Mpc) taken into account in transfer function: for l < (k-delta_k)*tau0, ie for k > (l/tau0 + delta_k), the transfer function is set to zero */
+      0.19; /**< for the temperature source T0 of the scalar mode, the high-l margin delta_k in 1/Mpc: for l < (k-delta_k(l)) r_a(tau_rec), the transfer function is set to zero */
   double transfer_neglect_delta_k_S_t1 =
-      0.04; /**< same for temperature source function T1 of scalar mode */
+      0.05; /**< same for temperature source function T1 of scalar mode */
   double transfer_neglect_delta_k_S_t2 =
-      0.12; /**< same for temperature source function T2 of scalar mode */
+      0.15; /**< same for temperature source function T2 of scalar mode */
   double transfer_neglect_delta_k_S_e =
-      1.; /**< same for polarization source function E of scalar mode */
+      0.165; /**< same for polarization source function E of scalar mode */
+  double transfer_neglect_l_half_S_t0 =
+      50.; /**< for the temperature source T0 of the scalar mode, the l at which the margin is delta_k/sqrt(2); 0 keeps it at delta_k for every l */
+  double transfer_neglect_l_half_S_t1 = 20.;  /**< same for T1 of scalar mode */
+  double transfer_neglect_l_half_S_t2 = 100.; /**< same for T2 of scalar mode */
+  double transfer_neglect_l_half_S_e  = 400.; /**< same for E of scalar mode */
   double transfer_neglect_delta_k_V_t1 =
       1.0; /**< same for temperature source function T1 of vector mode */
   double transfer_neglect_delta_k_V_t2 =
