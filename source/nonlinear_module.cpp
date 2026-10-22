@@ -12,6 +12,7 @@
 #include <sstream>
 
 #include "../species/fluid.h"
+#include "asymptotic_extrapolation.h"
 #include "background_module.h"
 #include "cosmology.h"
 #include "evolver_ndf15.h"
@@ -863,8 +864,9 @@ void NonlinearModule::GetPkGrid(enum pk_outputs pk_output,
       class_stop(
           "the non-linear P(k,z) table was requested up to z=%e, but the non-linear "
           "corrections could only be computed consistently up to z=%e (k_max is too small "
-          "for the algorithm to find k_NL above that). Increase 'nonlinear_min_k_max', or "
-          "ask for the linear table.",
+          "for the algorithm to find k_NL above that). Increase 'k_max_extrapolated', the k "
+          "up to which the linear spectrum is continued and trusted, or ask for the linear "
+          "table.",
           z_max_requested,
           z_max_nonlinear);
     }
@@ -1217,7 +1219,7 @@ void NonlinearModule::nonlinear_init() {
     ddlnpk_l.resize(pk_size_);
 
     for (index_pk = 0; index_pk < pk_size_; index_pk++) {
-      pk_nl[index_pk].resize(k_size_);
+      pk_nl[index_pk].resize(k_size_nl_);
       lnpk_l[index_pk].resize(k_size_extra_);
       ddlnpk_l[index_pk].resize(k_size_extra_);
     }
@@ -1324,6 +1326,11 @@ void NonlinearModule::nonlinear_init() {
               nl_corr_density_[index_pk][index_tau * k_size_ + index_k] = sqrt(
                   pk_nl[index_pk][index_k] / exp(lnpk_l[index_pk][index_k]));
             }
+            for (int index_k = k_size_; index_k < k_size_nl_; index_k++) {
+              nl_corr_density_extra_[index_pk]
+                                    [index_tau * (k_size_nl_ - k_size_) + index_k - k_size_] = sqrt(
+                                        pk_nl[index_pk][index_k] / exp(lnpk_l[index_pk][index_k]));
+            }
           }
 
           /* otherwise we met the first problematic value of time */
@@ -1354,9 +1361,8 @@ void NonlinearModule::nonlinear_init() {
                       "z=%5.2f and higher.\n    This is because k_max is too small for the "
                       "algorithm (Halofit or HMcode) to be able to compute the scale k_NL at this "
                       "redshift.\n    If non-linear corrections at such high redshift really "
-                      "matter for you,\n    just try to increase one of the parameters "
-                      "P_k_max_h/Mpc or P_k_max_1/Mpc or halofit_min_k_max (the code will take the "
-                      "max of these parameters) until reaching desired z.\n",
+                      "matter for you,\n    increase k_max_extrapolated, the k up to which the "
+                      "linear spectrum is continued and trusted, until reaching the desired z.\n",
                       z);
             }
           }
@@ -1508,6 +1514,7 @@ void NonlinearModule::nonlinear_indices() {
     k_nl_.resize(pk_size_);
 
     nl_corr_density_.resize(pk_size_);
+    nl_corr_density_extra_.resize(pk_size_);
 
     ln_pk_nl_.resize(pk_size_);
     if (ln_tau_size_ > 1) {
@@ -1517,6 +1524,7 @@ void NonlinearModule::nonlinear_indices() {
     for (index_pk = 0; index_pk < pk_size_; index_pk++) {
       k_nl_[index_pk].resize(tau_size_);
       nl_corr_density_[index_pk].resize(tau_size_ * k_size_);
+      nl_corr_density_extra_[index_pk].assign(tau_size_ * (k_size_nl_ - k_size_), 1.);
       ln_pk_nl_[index_pk].resize(ln_tau_size_ * k_size_);
       if (ln_tau_size_ > 1) {
         ddln_pk_nl_[index_pk].resize(ln_tau_size_ * k_size_);
@@ -1540,6 +1548,8 @@ void NonlinearModule::nonlinear_get_k_list() {
 
   k_size_ = perturbations_module_->k_size_[index_md_scalars_];
   k_max   = perturbations_module_->k_[index_md_scalars_][k_size_ - 1];
+  /* the linear spectrum continued by AsymptoticExtrapolation is trusted up to k_max_extrapolated */
+  k_max_trusted_ = std::max(k_max, ppr->k_max_extrapolated);
 
   /** - if k extrapolation necessary, compute the k it has to reach */
   double k_extra_max = 0.;
@@ -1562,8 +1572,11 @@ void NonlinearModule::nonlinear_get_k_list() {
        Extending by extrapolation (as CAMB does for the same integrals) costs
        integrand points only, not perturbation modes, so this does not raise
        k_max_for_pk. */
-    k_extra_max = k_max * ppr->halofit_kR_max / sqrt(-log(ppr->halofit_sigma_precision));
+    k_extra_max = k_max_trusted_ * ppr->halofit_kR_max / sqrt(-log(ppr->halofit_sigma_precision));
   }
+
+  /* the CMB lensing source continued past the last mode needs the correction out there */
+  k_extra_max = std::max(k_extra_max, ppt->k_max_lensing_extrapolated);
 
   if (k_extra_max > k_max) {
     index_k = 0;
@@ -1602,6 +1615,38 @@ void NonlinearModule::nonlinear_get_k_list() {
     k_[index_k]    = k * pow(10, exponent);
     ln_k_[index_k] = log(k) + exponent * log(10.);
   }
+
+  /** - P_NL and the correction are also needed beyond k_max, up to the first k at or above
+      the end of the continued CMB lensing source */
+  k_size_nl_ = k_size_;
+  while ((k_size_nl_ < k_size_extra_) && (k_[k_size_nl_ - 1] < ppt->k_max_lensing_extrapolated)) {
+    k_size_nl_++;
+  }
+}
+
+double NonlinearModule::NlCorrDensityBeyondKMax(int index_pk, int index_tau, double k) const {
+  /* ln R_NL is linear in ln k between the last perturbation mode and the extended points */
+  const int n_extra = k_size_nl_ - k_size_;
+  auto ln_corr      = [&](int index_k) {
+    const double corr =
+        (index_k < k_size_)
+            ? nl_corr_density_[index_pk][index_tau * k_size_ + index_k]
+            : nl_corr_density_extra_[index_pk][index_tau * n_extra + index_k - k_size_];
+    return log(corr);
+  };
+  if (n_extra == 0) {
+    return exp(ln_corr(k_size_ - 1));
+  }
+  const double ln_k = log(k);
+  if (ln_k >= ln_k_[k_size_nl_ - 1]) {
+    return exp(ln_corr(k_size_nl_ - 1));
+  }
+  int index_k = k_size_ - 1;
+  while (ln_k_[index_k + 1] < ln_k) {
+    index_k++;
+  }
+  const double w = (ln_k - ln_k_[index_k]) / (ln_k_[index_k + 1] - ln_k_[index_k]);
+  return exp((1. - w) * ln_corr(index_k) + w * ln_corr(index_k + 1));
 }
 
 /**
@@ -1735,6 +1780,23 @@ void NonlinearModule::nonlinear_get_source(int index_k,
        */
       case extrap_user_defined: {
         class_stop("Method of source extrapolation 'user_defined' was not yet defined.");
+        break;
+      }
+        /**
+       * --> Extrapolate assuming source ~ A ln(k) + B + C/k, the matter-domination form deep
+       * inside the horizon, fitted over [k_max/3, k_max] through the last point
+       */
+      case extrap_asymptotic: {
+        const AsymptoticExtrapolation
+            extrapolation(k_.data(),
+                          sources[index_ic * perturbations_module_->tp_size_[index_md_scalars_] +
+                                  index_tp]
+                                  .data() +
+                              index_tau * k_size_,
+                          k_size_,
+                          1,
+                          0);
+        *source = extrapolation(k);
         break;
       }
     }
@@ -2426,12 +2488,14 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
      other redshifts, so there is normally no need to change i
   */
 
-  /* deliberately k_[k_size_ - 1], the largest k that was actually computed,
-     rather than the top of the extended integrand: this R decides at which
-     redshifts halofit declares itself computable, and that claim should not
-     rest on extrapolated power. Keeping it here also avoids defining R from a
-     k_max that was itself derived from R. */
-  R = sqrt(-log(ppr->halofit_sigma_precision)) / k_[k_size_ - 1];
+  /* the largest k of the linear spectrum that is trusted, rather than the top of the
+     extended integrand: this R decides at which redshifts halofit declares itself
+     computable. Until 2026-10-21 that was the last computed mode; the continuation by
+     AsymptoticExtrapolation reproduces solved modes to 0.2% up to 40/Mpc, so it is trusted
+     up to k_max_extrapolated. Stopping at a lower redshift switches the correction off
+     abruptly there (R_NL ~ 1.08 -> 1 at k ~ 0.3/Mpc for k_max = 5.8/Mpc), which put C_L^phiphi
+     2% low at L ~ 2300. */
+  R = sqrt(-log(ppr->halofit_sigma_precision)) / k_max_trusted_;
 
   nonlinear_halofit_integrate(integrand_array.data(),
                               integrand_size,
@@ -2567,7 +2631,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
 
   *k_nl = rknl;
 
-  for (int index_k = 0; index_k < k_size_; index_k++) {
+  for (int index_k = 0; index_k < k_size_nl_; index_k++) {
     rk = k_[index_k];
 
     if (rk > ppr->halofit_min_k_nonlinear) {
@@ -3142,7 +3206,7 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
   }
   *k_nl = 1. / r_nl;
 
-  if (*k_nl > k_[k_size_ - 1]) {
+  if (*k_nl > k_max_trusted_) {
     *nl_corr_not_computable_at_this_k = true;
     return;
   }
@@ -3287,7 +3351,7 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
   i++;
   index_ncol = i;
 
-  for (int index_k = 0; index_k < k_size_; index_k++) {
+  for (int index_k = 0; index_k < k_size_nl_; index_k++) {
     const double k = k_[index_k];
     p1h_integrand.resize(index_cut * index_ncol);
 

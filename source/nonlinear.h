@@ -24,7 +24,8 @@ enum source_extrapolation {
   extrap_only_max_units,
   extrap_max_scaled,
   extrap_hmcode,
-  extrap_user_defined
+  extrap_user_defined,
+  extrap_asymptotic /**< A ln k + B + C/k fitted over [k_max/3, k_max] (AsymptoticExtrapolation) */
 };
 
 enum halofit_integral_type { halofit_integral_one, halofit_integral_two, halofit_integral_three };
@@ -63,7 +64,7 @@ struct nonlinear {
       nl_none; /**< method for computing non-linear corrections (none, Halogit, etc.) */
 
   enum source_extrapolation extrapolation_method =
-      extrap_max_scaled; /**< method for analytical extrapolation of sources beyond pre-computed range */
+      extrap_asymptotic; /**< method for analytical extrapolation of sources beyond pre-computed range; extrap_max_scaled until 2026-10-21 */
 
   enum hmcode_baryonic_feedback_model feedback =
       nl_emu_dmonly; /** to choose between different baryonic feedback models

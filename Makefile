@@ -23,8 +23,10 @@ TEST_TARGETS := \
 	test-nonlinear-extrapolation \
 	test-perturbation-support \
 	test-transfer-neglect \
+	test-lensing-extrapolation \
 	test-bisection \
 	test-quadrature \
+	test-asymptotic-extrapolation \
 	test-spline-integral \
 	test-decay-kernel \
 	test-reduced-operator \

@@ -78,6 +78,11 @@ class NonlinearModule : public BaseModule {
   std::vector<std::vector<double>>
       nl_corr_density_; /**< nl_corr_density[index_pk][index_tau * perturbations_module_->k_size_ + index_k] */
 
+  /** sqrt(P_NL/P_L) at a k beyond the last perturbation mode, up to
+   *  perturbs::k_max_lensing_extrapolated (held constant beyond), for the CMB lensing source
+   *  continued there; 1 where the correction is not computed. */
+  [[nodiscard]] double NlCorrDensityBeyondKMax(int index_pk, int index_tau, double k) const;
+
   std::vector<bool>
       is_non_zero_; /**< for a given mode, is_non_zero[index_md][index_ic1_ic2] is set to true if the pair of initial conditions (index_ic1, index_ic2) are statistically correlated, or to false if they are uncorrelated */
   int ic_size_ =
@@ -267,6 +272,12 @@ class NonlinearModule : public BaseModule {
   //@{
 
   int k_size_extra_ = 0; /** total number of k values of extrapolated k array (high k)*/
+  int k_size_nl_ =
+      0; /**< P_NL and the correction are computed for index_k < k_size_nl_: k_size_, and beyond for the CMB lensing source continued past the last mode */
+  double k_max_trusted_ =
+      0.; /**< largest k of the linear spectrum that halofit and HMcode trust: the last mode, or k_max_extrapolated if larger */
+  std::vector<std::vector<double>>
+      nl_corr_density_extra_; /**< nl_corr_density_extra_[index_pk][index_tau * (k_size_nl_ - k_size_) + index_k - k_size_] */
 
   int tau_size_ = 0;        /**< tau_size = number of values */
   std::vector<double> tau_; /**< tau[index_tau] = list of time values, covering

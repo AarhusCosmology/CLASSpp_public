@@ -26,7 +26,7 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 | `precision_precise.pre` | 0.009 | ~60× slower | reference-grade, for convergence tests |
 | `precision_pre_2026_08_21.pre` | 1.725 | 2.2× slower | reproducing results from before 2026-08-21 |
 | `precision_pre_2026_10_09.pre` | 0.387 | 2% faster on one thread | reproducing results from 2026-08-21 to 2026-10-09 |
-| `precision_pre_2026_10_21.pre` | 0.387 ³ | 15% slower on one thread | reproducing results from 2026-10-09 to 2026-10-21 |
+| `precision_pre_2026_10_21.pre` | 0.387 ³ | 15% slower on one thread, 20% with halofit | reproducing results from 2026-10-09 to 2026-10-21 |
 | `act_dr6.pre` | — ¹ | 4.2× slower ² | ACT DR6 and other data to ℓ ≈ 8500 |
 
 ¹ Not scored on `plik_lite`. Its own metric is the ACT DR6 ACT-lite distance to a
@@ -43,7 +43,14 @@ re-measured since.
 transfer stage is 25% faster and, on Planck PR4 CamSpec + ACT DR6 lensing + DESI DR2, the
 cosmological bias of the defaults went from 0.175 to 0.153σ. Not re-measured on
 `plik_lite`. Every preset above pins the constant cuts it was measured with. See
-`docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md`.
+`docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md`. The same day the
+linear sources were continued past the last perturbation mode: the CMB lensing source,
+which had stopped there and left C_L^φφ 2–3% low at L ~ 3000, and the linear spectrum
+halofit and HMcode integrate, which let the non-linear floor come down from 5 to 2/Mpc.
+On the same likelihoods the bias went to 0.148σ. In runs without a non-linear method it
+moves lensed TT and EE by at most 4e-5 and 7e-6, so the measured presets are not pinned
+for it; the `precision_pre_*` files are. See
+`docs/superpowers/specs/2026-10-21-lensing-source-extrapolation-design.md`.
 
 ## Two things these files do not cover
 
@@ -60,9 +67,12 @@ never exercised and are at their own defaults. Linear P(k) *was* measured: the
 defaults are accurate to ~0.2% rms over 10⁻³ < k < 10 h/Mpc. An rms hides the high-k
 end, though: with massive neutrinos the defaults of 2026-08-21 were 3.8e-3 low at
 k = 5/Mpc, which is why three neutrino knobs went back on 2026-10-09. The *nonlinear*
-spectrum is a different matter — `nonlinear_min_k_max = 5` truncates the integrals
-halofit needs, costing 5–9% at k ≳ 0.5 /Mpc on defaults old and new alike. That is
-issue #399 and is not something these files address.
+spectrum is a different matter. Until #399, `nonlinear_min_k_max = 5` truncated the
+integrals halofit needs, costing 5–9% at k ≳ 0.5 /Mpc. Since 2026-10-21 the linear
+spectrum is continued past the last mode in its high-k form and trusted up to
+`k_max_extrapolated` = 70/Mpc, so the floor came down to 2/Mpc and P_NL stays within
+6e-4 of modes solved to 70/Mpc up to z = 3. Only `act_dr6.pre` touches these knobs: it
+solves the modes to 70/Mpc.
 
 **What the presets still carry.** The compiled defaults hold seven knobs back from
 the campaign's configuration (table above). The presets do not: `fast` and `tuned`

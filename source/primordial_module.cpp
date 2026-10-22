@@ -228,6 +228,8 @@ void PrimordialModule::primordial_init() {
 
   k_min = perturbations_module_->k_min_; /* first value, inferred from perturbations structure */
   k_max = perturbations_module_->k_max_; /* last value, inferred from perturbations structure */
+  /* the CMB lensing source is continued past the last mode, and the spectra integrate it there */
+  k_max = std::max(k_max, ppt->k_max_lensing_extrapolated);
 
   class_test(k_min <= 0., "k_min negative or null: stop to avoid segmentation fault");
 
@@ -2842,6 +2844,30 @@ void PrimordialModule::primordial_external_spectrum_init() {
              "at least 2 points after the maximum value of k: %e . "
              "The splines interpolation would not be safe.",
              perturbations_module_->k_max_);
+
+  /** - The CMB lensing source is continued past the last perturbation mode, and the spectra
+        integrate it there, up to k_max_lensing_extrapolated. The table only has to cover the
+        computed modes, so beyond its last point ln P is continued linearly in ln k, through
+        the last two points, as the non-linear module does for its own tail. */
+  if (ppt->k_max_lensing_extrapolated > k[n_data - 1]) {
+    const double ln_k_step  = log(10.) / ppr->k_per_decade_primordial;
+    const double ln_k_ratio = log(k[n_data - 1] / k[n_data - 2]);
+    const double slope_s    = log(pks[n_data - 1] / pks[n_data - 2]) / ln_k_ratio;
+    const double slope_t    = ppt->has_tensors ? log(pkt[n_data - 1] / pkt[n_data - 2]) / ln_k_ratio
+                                               : 0.;
+    const double k_last     = k[n_data - 1];
+    const double pks_last   = pks[n_data - 1];
+    const double pkt_last   = ppt->has_tensors ? pkt[n_data - 1] : 0.;
+    for (int step = 1; k.back() < ppt->k_max_lensing_extrapolated; step++) {
+      const double ln_k_over_k_last = step * ln_k_step;
+      k.push_back(k_last * exp(ln_k_over_k_last));
+      pks.push_back(pks_last * exp(slope_s * ln_k_over_k_last));
+      if (ppt->has_tensors) {
+        pkt.push_back(pkt_last * exp(slope_t * ln_k_over_k_last));
+      }
+      n_data++;
+    }
+  }
 
   /** - Store the read results into CLASS structures */
   lnk_size_ = n_data;

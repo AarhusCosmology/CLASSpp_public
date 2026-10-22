@@ -7,10 +7,20 @@
 # all. Measured against Planck PR4 CamSpec + low-l + ACT DR6 lensing + DESI DR2 over
 # 160 LambdaCDM posterior draws, the cosmological bias went from 0.175 to 0.153 sigma
 # and the transfer stage got 25% faster on one thread.
+#
+# The same day the linear sources began to be continued past the last perturbation
+# mode (k_max_extrapolated): the full-Limber CMB lensing source up to 70/Mpc, times
+# the non-linear correction there, where it had stopped at the last mode and left
+# C_L^phiphi 2-3% low at L ~ 3000; and halofit and HMcode trust the continued linear
+# spectrum, so the non-linear floor came down from 5 to 2/Mpc. On the same draws the
+# cosmological bias went from 0.153 to 0.148 sigma, S on ACT DR6 lensing from 0.083 to
+# 0.055. The last three lines restore the earlier behaviour.
+#
 # Pass this file to reproduce a result computed in that period, or to bisect.
 #
 # For earlier periods use precision_pre_2026_10_09.pre or precision_pre_2026_08_21.pre.
-# See docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md.
+# See docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md and
+# docs/superpowers/specs/2026-10-21-lensing-source-extrapolation-design.md.
 transfer_neglect_delta_k_S_t0 = 0.15
 transfer_neglect_delta_k_S_t1 = 0.04
 transfer_neglect_delta_k_S_t2 = 0.12
@@ -19,3 +29,6 @@ transfer_neglect_l_half_S_t0 = 0
 transfer_neglect_l_half_S_t1 = 0
 transfer_neglect_l_half_S_t2 = 0
 transfer_neglect_l_half_S_e = 0
+nonlinear_min_k_max = 5
+k_max_extrapolated = 0
+extrapolation_method = 3

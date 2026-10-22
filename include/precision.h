@@ -768,6 +768,8 @@ struct precision {
 
   double q_logstep_limber =
       1.1; /**< logarithmic q-step ratio for the separate full-Limber CMB lensing grid. Accepted as a default, but it is coarse: against a converged 1.01 grid this leaves ~3.1e-3 in \f$ C_l^{\phi\phi} \f$ in every geometry, flat included, converging as O(h^2) (7.4e-4 at 1.05, 1.5e-4 at 1.02). Tighten it if you need lensing-potential accuracy better than a few 0.1%. See docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md */
+  double k_max_extrapolated =
+      70.; /**< the linear sources are continued past the last perturbation mode up to this k (1/Mpc) by AsymptoticExtrapolation, and trusted there: halofit and HMcode decide up to which redshift they are computable from it, and the full-Limber CMB lensing source is continued to it, times the non-linear correction there. 0 trusts only the computed modes, as before 2026-10-21. See docs/superpowers/specs/2026-10-21-lensing-source-extrapolation-design.md */
   double k_max_limber_over_l_max_scalars =
       0.0005; /**< full-Limber perturbation source cutoff k_max/l_max_scalars in 1/Mpc */
 
@@ -849,22 +851,15 @@ struct precision {
   double sigma_k_per_decade =
       80.; /**< logarithmic stepsize controlling the precision of integrals for sigma(R,k) and similar quantitites */
 
-  double nonlinear_min_k_max = 5.0; /**< when
-  // UNHANDLED: using an algorithm to compute nonlinear
-  // UNHANDLED: corrections, like halofit or hmcode,
-  // UNHANDLED: k_max must be at least equal to this
-  // UNHANDLED: value. Calculations are done internally
-  // UNHANDLED: until this k_max, but the P(k,z) output
-  // UNHANDLED: is still controlled by P_k_max_1/Mpc or
-  // UNHANDLED: P_k_max_h/Mpc even if they are
-  // UNHANDLED: smaller */
+  double nonlinear_min_k_max =
+      2.0; /**< with halofit or HMcode, the perturbation modes are computed at least up to this k (1/Mpc); the P(k,z) output is still limited by P_k_max. Beyond the last mode the linear spectrum is continued (k_max_extrapolated). 5/Mpc until 2026-10-21; at 2/Mpc P_NL stays within 6e-4 of modes solved to 70/Mpc up to z = 3, at 1/Mpc it is 4e-3 off at z = 3. The continuation assumes the sources have their high-k form above a third of this k: true for cold dark matter, baryons, dark energy and massive neutrinos (tested to 0.2 eV each), but not near a free-streaming cutoff. For warm dark matter of a few keV raise it past the cutoff: with 1 keV thermal WDM as a quarter of the dark matter, P_NL is 5e-2 off at z = 3 at 2/Mpc and 1e-6 at 10/Mpc. See docs/superpowers/specs/2026-10-21-lensing-source-extrapolation-design.md */
 
   /** parameters relevant for HALOFIT computation */
 
   double halofit_min_k_nonlinear =
       1.0e-4; /**< value of k in 1/Mpc below which non-linear corrections will be neglected */
 
-  double halofit_min_k_max = 5.0; /**< DEPRECATED: should use instead nonlinear_min_k_max */
+  double halofit_min_k_max = 2.0; /**< DEPRECATED: should use instead nonlinear_min_k_max */
 
   double halofit_kR_max = 5.0; /**< halofit's sigma integrals use a Gaussian
   // UNHANDLED: window exp(-(kR)^2), and are integrated until
@@ -904,7 +899,7 @@ struct precision {
   // UNHANDLED: the extrapolation of the linear power spectrum
   // UNHANDLED: (needed for the sigma computation) */
 
-  double hmcode_min_k_max = 5.; /**< DEPRECATED: should use instead nonlinear_min_k_max */
+  double hmcode_min_k_max = 2.; /**< DEPRECATED: should use instead nonlinear_min_k_max */
 
   double hmcode_tol_sigma = 1.e-6; /**< tolerance required on sigma(R) when matching the
   // UNHANDLED: condition sigma(R_nl)=1, which defines the wavenumber

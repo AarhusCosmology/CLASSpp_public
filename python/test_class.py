@@ -1229,6 +1229,31 @@ class TestReviewRegressions(TestClass):
         self.cosmo.compute()
         self.assertTrue(self.cosmo.state)
 
+    def test_external_primordial_table_reaches_the_continued_lensing_source(self):
+        """The CMB lensing source is continued past the last perturbation mode up to
+        k_max_extrapolated = 70/Mpc, and the spectra integrate it there. An external
+        table need only cover the computed modes (the bundled example stops at 10/Mpc),
+        so the primordial module continues it, linearly in ln k - ln P. A power law
+        tabulated to 10/Mpc must then give the analytic C_l: before that, the run stopped
+        with k = 10.4 out of the table's range."""
+        k = np.geomspace(1e-6, 10., 1401)
+        with tempfile.TemporaryDirectory() as tmp:
+            table = os.path.join(tmp, 'power_law.dat')
+            np.savetxt(table, np.c_[k, 2.1e-9 * (k / 0.05)**(0.965 - 1.)], fmt='%.17e')
+            base = {'output': 'tCl,pCl,lCl', 'lensing': 'yes', 'non linear': 'halofit'}
+            cls = []
+            for primordial in ({'P_k_ini type': 'external_Pk', 'command': 'cat {}'.format(table)},
+                               {'A_s': 2.1e-9, 'n_s': 0.965, 'k_pivot': 0.05}):
+                cosmo = Class(dict(self.verbose, **base, **primordial))
+                try:
+                    cosmo.compute()
+                    cls.append((cosmo.raw_cl(2500)['pp'][2:], cosmo.lensed_cl(2500)['bb'][2:]))
+                finally:
+                    cosmo.struct_cleanup()
+                    cosmo.empty()
+        for external, analytic, name in zip(cls[0], cls[1], ('pp', 'lensed BB')):
+            np.testing.assert_allclose(external, analytic, rtol=1e-9, err_msg=name)
+
     def test_inflation_v_default_step_size_computes(self):
         """The default inflation_V integration must not reject a valid final step."""
         scenario = {

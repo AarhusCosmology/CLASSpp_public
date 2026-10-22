@@ -133,6 +133,8 @@ struct perturbs {
       false; /**< do we need \f$ C_l \f$'s for CMB lensing potential? */
   bool want_lcmb_full_limber =
       true; /**< use the separate full-Limber CMB lensing scheme above l_switch_limber */
+  double k_max_lensing_extrapolated =
+      0.; /**< k (1/Mpc) up to which the full-Limber CMB lensing source is continued past the last mode; 0 if it is not computed */
   bool has_cl_lensing_potential =
       false;                        /**< do we need \f$ C_l \f$'s for galaxy lensing potential? */
   bool has_cl_number_count = false; /**< do we need \f$ C_l \f$'s for density number count? */

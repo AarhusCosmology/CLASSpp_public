@@ -174,6 +174,11 @@ void TransferModule::transfer_init() {
                                       sources_spline_storage,
                                       spline_owned_storage);
 
+  /** - fit the high-k form of the linear CMB lensing source at each time, to continue it past
+      the last perturbation mode in the full-Limber scheme */
+
+  transfer_lensing_source_extrapolation();
+
   /** - eventually read the selection and evolution functions */
 
   transfer_global_selection_read();
@@ -910,6 +915,12 @@ void TransferModule::transfer_get_q_limber_list(double K, int sgnK) {
     }
   }
 
+  /* the CMB lensing source is continued past the last mode, up to k_max_lensing_extrapolated */
+  if (ppt->k_max_lensing_extrapolated > 0.) {
+    q_max = std::max(q_max,
+                     sqrt(ppt->k_max_lensing_extrapolated * ppt->k_max_lensing_extrapolated + K));
+  }
+
   class_test(q_max <= q_min, "full-Limber q range is invalid: q_min=%e, q_max=%e", q_min, q_max);
 
   q_size_limber_ = static_cast<int>(log(q_max / q_min) / log(ppr->q_logstep_limber)) + 1;
@@ -1005,14 +1016,16 @@ void TransferModule::transfer_get_k_list(double K) {
                k_[index_md][q_size_ - 1]);
 
     if (do_lcmb_full_limber_) {
+      /* beyond the last mode, up to k_max_lensing_extrapolated, the source is continued */
+      const double k_last = perturbations_module_->k_[0][perturbations_module_->k_size_[0] - 1];
       class_test(k_limber_[index_md][q_size_limber_ - 1] >
-                     perturbations_module_->k_[0][perturbations_module_->k_size_[0] - 1],
+                     std::max(k_last, ppt->k_max_lensing_extrapolated) * (1. + 1e-10),
                  "bug in full-Limber k-list calculation: in perturbation module k_max=%e, in "
-                 "transfer "
-                 "module k_max[mode=%d]=%e, interpolation impossible",
-                 perturbations_module_->k_[0][perturbations_module_->k_size_[0] - 1],
+                 "transfer module k_max[mode=%d]=%e, beyond the continued lensing source (%e)",
+                 k_last,
                  index_md,
-                 k_limber_[index_md][q_size_limber_ - 1]);
+                 k_limber_[index_md][q_size_limber_ - 1],
+                 ppt->k_max_lensing_extrapolated);
     }
   }
 }
@@ -1608,9 +1621,15 @@ void TransferModule::transfer_compute_for_each_q(int index_q,
 
     const double q = use_full_limber ? q_limber_[index_q] : q_[index_q];
     const double k = use_full_limber ? k_limber_[index_md][index_q] : k_[index_md][index_q];
+    const double k_last =
+        perturbations_module_->k_[index_md][perturbations_module_->k_size_[index_md] - 1];
+    const bool extrapolate = use_full_limber && !lensing_source_extrapolation_.empty() &&
+                             (k > k_last);
     const double k_max =
         use_full_limber
-            ? perturbations_module_->k_[index_md][perturbations_module_->k_size_[index_md] - 1]
+            ? (lensing_source_extrapolation_.empty()
+                   ? k_last
+                   : std::max(k_last, ppt->k_max_lensing_extrapolated))
             : perturbations_module_->k_[index_md][perturbations_module_->k_size_cl_[index_md] - 1];
     std::vector<double>& transfer = use_full_limber ? transfer_limber_[index_md]
                                                     : transfer_[index_md];
@@ -1631,11 +1650,21 @@ void TransferModule::transfer_compute_for_each_q(int index_q,
           continue;
         }
         ptw->interpolated_sources[index_source].resize(perturbations_module_->tau_size_);
-        transfer_interpolate_sources(k,
-                                     index_md,
-                                     pert_sources[index_md][index_source],
-                                     pert_sources_spline[index_md][index_source],
-                                     ptw->interpolated_sources[index_source].data());
+        if (extrapolate) {
+          /* only the CMB lensing type is computed in the full-Limber scheme */
+          class_test(types[index_tt].index_tp != perturbations_module_->index_tp_phi_plus_psi_,
+                     "only the CMB lensing source can be continued past the last mode");
+          transfer_extrapolate_lensing_source(k,
+                                              index_ic,
+                                              ptw->interpolated_sources[index_source].data());
+        }
+        else {
+          transfer_interpolate_sources(k,
+                                       index_md,
+                                       pert_sources[index_md][index_source],
+                                       pert_sources_spline[index_md][index_source],
+                                       ptw->interpolated_sources[index_source].data());
+        }
         ptw->is_interpolated[index_source] = 1;
       }
     }
@@ -1811,6 +1840,64 @@ void TransferModule::transfer_radial_coordinates(struct transfer_workspace* ptw,
         ptw->cotKgen[index_tau] = ptw->cscKgen[index_tau] * cosh(ptw->chi[index_tau]);
       }
       break;
+  }
+}
+
+/**
+ * Fit, at each time, the form the linear CMB lensing source takes at high k,
+ * (phi+psi) k^2 = A ln k + B + C/k, over the last factor of three of the perturbation
+ * modes (AsymptoticExtrapolation). Only when the full-Limber grid reaches beyond the last
+ * mode (perturbs::k_max_lensing_extrapolated).
+ */
+void TransferModule::transfer_lensing_source_extrapolation() {
+  lensing_source_extrapolation_.clear();
+  if (!do_lcmb_full_limber_ || !ppt->has_scalars) {
+    return;
+  }
+  const int index_md = perturbations_module_->index_md_scalars_;
+  const int k_size   = perturbations_module_->k_size_[index_md];
+  if (ppt->k_max_lensing_extrapolated <= perturbations_module_->k_[index_md][k_size - 1]) {
+    return;
+  }
+  const int ic_size  = perturbations_module_->ic_size_[index_md];
+  const int tp_size  = perturbations_module_->tp_size_[index_md];
+  const int tau_size = perturbations_module_->tau_size_;
+  lensing_source_extrapolation_.reserve(static_cast<std::size_t>(ic_size) * tau_size);
+  for (int index_ic = 0; index_ic < ic_size; index_ic++) {
+    const std::vector<double>& source =
+        perturbations_module_->sources_[index_md][index_ic * tp_size +
+                                                  perturbations_module_->index_tp_phi_plus_psi_];
+    for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+      lensing_source_extrapolation_.emplace_back(perturbations_module_->k_[index_md].data(),
+                                                 source.data() +
+                                                     static_cast<std::size_t>(index_tau) * k_size,
+                                                 k_size,
+                                                 1,
+                                                 2);
+    }
+  }
+}
+
+/**
+ * The CMB lensing source at a k beyond the last perturbation mode: the continued linear
+ * source times the non-linear correction there (NonlinearModule::NlCorrDensityBeyondKMax).
+ *
+ * @param k                    Input: wavenumber beyond the last mode
+ * @param index_ic             Input: index of initial condition
+ * @param interpolated_sources Output: the source at k on the times of the perturbation module
+ */
+void TransferModule::transfer_extrapolate_lensing_source(double k,
+                                                         int index_ic,
+                                                         double* interpolated_sources) const {
+  const int tau_size = perturbations_module_->tau_size_;
+  for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+    double source =
+        lensing_source_extrapolation_[static_cast<std::size_t>(index_ic) * tau_size + index_tau](k);
+    if (pnl->method != nl_none) {
+      source *=
+          nonlinear_module_->NlCorrDensityBeyondKMax(nonlinear_module_->index_pk_m_, index_tau, k);
+    }
+    interpolated_sources[index_tau] = source;
   }
 }
 

@@ -78,3 +78,10 @@ transfer_neglect_l_half_S_t0 = 0
 transfer_neglect_l_half_S_t1 = 0
 transfer_neglect_l_half_S_t2 = 0
 transfer_neglect_l_half_S_e = 0
+
+# Added 2026-10-21, when the linear sources began to be continued past the last
+# perturbation mode and the non-linear floor came down from 5 to 2/Mpc; see
+# docs/superpowers/specs/2026-10-21-lensing-source-extrapolation-design.md.
+nonlinear_min_k_max = 5
+k_max_extrapolated = 0
+extrapolation_method = 3

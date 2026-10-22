@@ -2264,6 +2264,11 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
     ppt->want_lcmb_full_limber = ((*full_limber)[0] == 'y') || ((*full_limber)[0] == 'Y');
   }
 
+  /* the full-Limber CMB lensing source is continued past the last perturbation mode */
+  if (ppt->has_cl_cmb_lensing_potential && ppt->want_lcmb_full_limber) {
+    ppt->k_max_lensing_extrapolated = ppr->k_max_extrapolated;
+  }
+
   if ((ppt->has_pk_matter) || (ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
     auto P_k_max_h_Mpc = pfc->get<double>("P_k_max_h/Mpc");
     auto P_k_max_1_Mpc = pfc->get<double>("P_k_max_1/Mpc");
@@ -2641,6 +2646,18 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** (f) parameter related to the non-linear spectra computation */
 
+  /* How the linear sources are continued past the last perturbation mode: by halofit and
+     HMcode for their integrals, and for the full-Limber CMB lensing source. Read whatever
+     the method, so that a precision file can set it for any run. */
+  if (auto method = pfc->get<int>("extrapolation_method")) {
+    class_test_severe((*method < static_cast<int>(extrap_zero)) ||
+                          (*method > static_cast<int>(extrap_asymptotic)),
+                      "extrapolation_method = %d is not one of 0 to %d",
+                      *method,
+                      static_cast<int>(extrap_asymptotic));
+    pnl->extrapolation_method = static_cast<enum source_extrapolation>(*method);
+  }
+
   // class_public v3 spells the key non_linear, and Cobaya always sends that
   // spelling; "non linear" is the legacy one. Both are read, so giving both is
   // refused here instead of one of them landing in the unread-parameter list.
@@ -2673,8 +2690,6 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
       ppt->k_max_for_pk = std::max(
           {ppt->k_max_for_pk, ppr->hmcode_min_k_max, ppr->nonlinear_min_k_max});
       ppt->has_nl_corrections_based_on_delta_m = true;
-      pnl->extrapolation_method                = static_cast<enum source_extrapolation>(
-          pfc->get_or<int>("extrapolation_method", pnl->extrapolation_method));
 
       /* version: 2016 (Mead et al. 2016) or 2020 (Mead et al. 2021), with the spellings that
          class_public documents. They are matched exactly: class_public searches for "20" in
@@ -3418,6 +3433,7 @@ void precision::parse(const FileContent& fc) {
   read(fc, "q_numstep_transition", q_numstep_transition);
   read(fc, "q_logstep_limber", q_logstep_limber);
   read(fc, "k_max_limber_over_l_max_scalars", k_max_limber_over_l_max_scalars);
+  read(fc, "k_max_extrapolated", k_max_extrapolated);
   read(fc, "transfer_neglect_delta_k_S_t0", transfer_neglect_delta_k_S_t0);
   read(fc, "transfer_neglect_delta_k_S_t1", transfer_neglect_delta_k_S_t1);
   read(fc, "transfer_neglect_delta_k_S_t2", transfer_neglect_delta_k_S_t2);

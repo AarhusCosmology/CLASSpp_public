@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "asymptotic_extrapolation.h"
 #include "base_module.h"
 #include "input_module.h"
 
@@ -75,7 +76,11 @@ class TransferModule : public BaseModule {
   /** @name - full Limber scheme for CMB lensing */
   //@{
   bool do_lcmb_full_limber_ = false;
-  int q_size_limber_        = 0;
+  /** The linear CMB lensing source past the last perturbation mode, per initial condition
+   *  and time: lensing_source_extrapolation_[index_ic * tau_size + index_tau]. Empty unless
+   *  the full-Limber grid reaches beyond that mode. */
+  std::vector<AsymptoticExtrapolation> lensing_source_extrapolation_;
+  int q_size_limber_ = 0;
   std::vector<double> q_limber_;
   std::vector<std::vector<double>> k_limber_;
   std::vector<std::vector<double>> transfer_limber_;
@@ -140,6 +145,10 @@ class TransferModule : public BaseModule {
   void transfer_perturbation_copy_sources_and_nl_corrections(
       std::vector<std::vector<double*>>& sources,
       std::vector<std::vector<std::vector<double>>>& owned_sources);
+  void transfer_lensing_source_extrapolation();
+  void transfer_extrapolate_lensing_source(double k,
+                                           int index_ic,
+                                           double* interpolated_sources) const;
   void transfer_perturbation_source_spline(
       const std::vector<std::vector<double*>>& sources,
       std::vector<std::vector<double*>>& sources_spline_ptrs,

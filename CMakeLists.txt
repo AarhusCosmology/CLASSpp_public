@@ -124,6 +124,7 @@ set(CLASS_SPECIES_FILES
 
 set(CLASS_TOOLS_FILES
   tools/arrays.cpp
+  tools/asymptotic_extrapolation.cpp
   tools/bbn_plasma.cpp
   tools/bbn_rates.cpp
   tools/bbn_solver.cpp
