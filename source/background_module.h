@@ -8,6 +8,7 @@
 #include "input_module.h"
 
 class ModifiedGravity;
+struct background_parameters_and_workspace;
 
 class BackgroundModule : public BaseModule {
  public:
@@ -161,35 +162,27 @@ class BackgroundModule : public BaseModule {
   void background_solve_evolver();
   void background_initial_conditions(double* pvecback, double* pvecback_integration);
   void background_find_equality();
-  void background_derivs_member(double tau, double* y, double* dy, void* parameters_and_workspace);
-  void background_derivs_loga_member(double loga,
-                                     double* y,
-                                     double* dy,
-                                     void* parameters_and_workspace);
-  static void background_derivs_loga(double loga,
-                                     double* y,
-                                     double* dy,
-                                     void* parameters_and_workspace);
+  void background_derivs(double tau,
+                         double* y,
+                         double* dy,
+                         background_parameters_and_workspace* pbpaw);
+  void background_derivs_loga(double loga,
+                              double* y,
+                              double* dy,
+                              background_parameters_and_workspace* pbpaw);
   /** d(dy_i)/d(y_i) of the loga RHS, for the exponential evolver. Same shape and
    *  units as background_derivs_loga, including the 1/(a H) conversion. */
-  void background_derivs_diagonal_loga_member(double loga,
-                                              double* y,
-                                              double* diag,
-                                              void* parameters_and_workspace);
-  static void background_derivs_diagonal_loga(double loga,
-                                              double* y,
-                                              double* diag,
-                                              void* parameters_and_workspace);
-  static void background_timescale(double loga, void* parameters_and_workspace, double* timescale);
-  void background_add_line_to_bg_table_member(
-      double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);
-  static void background_add_line_to_bg_table(
-      double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace);
+  void background_derivs_diagonal_loga(double loga,
+                                       double* y,
+                                       double* diag,
+                                       background_parameters_and_workspace* pbpaw);
+  static void background_timescale(double loga, double* timescale);
+  void background_add_line_to_bg_table(double loga, double* y, double* dy, int index_loga);
   void background_output_budget();
-  static void background_print_variables(double loga,
-                                         double* y,
-                                         double* dy,
-                                         void* parameters_and_workspace);
+  void background_print_variables(double loga,
+                                  double* y,
+                                  double* dy,
+                                  background_parameters_and_workspace* pbpaw);
 
   /** @name - all indices for the vector of background quantities to be integrated (=bi)
    *
@@ -244,8 +237,6 @@ class BackgroundModule : public BaseModule {
  */
 
 struct background_parameters_and_workspace {
-  background_parameters_and_workspace(BackgroundModule* b_m) : background_module(b_m) {}
-  BackgroundModule* const background_module;
   double* pvecback = nullptr;
 };
 

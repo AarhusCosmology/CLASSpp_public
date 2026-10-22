@@ -13,7 +13,6 @@ void evolver_rkdp45(EvolverDerivs derivs,
                     double x_end,
                     double* y,
                     int y_size,
-                    void* parameters_and_workspace_for_derivs,
                     const EvolverOptions& options);
 
 /**************************************************************/

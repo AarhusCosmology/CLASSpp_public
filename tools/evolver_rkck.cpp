@@ -8,16 +8,15 @@ void evolver_rk(EvolverDerivs derivs,
                 double x_end,
                 double* y,
                 int y_size,
-                void* parameters_and_workspace_for_derivs,
                 const EvolverOptions& options) {
   EvolverOptionsCheck(options, "evolver_rk", x_ini, {EvolverFeature::Timescale});
 
   const double tolerance                    = options.rtol;
   const double* x_sampling                  = options.x_sampling;
   const int x_size                          = options.x_sampling_size;
-  const EvolverOutput output                = options.output;
-  const EvolverPrint print_variables        = options.print_variables;
-  const EvolverTimescale evaluate_timescale = options.evaluate_timescale;
+  const EvolverOutput output                = options.output.value();
+  const auto& print_variables               = options.print_variables;
+  const EvolverTimescale evaluate_timescale = options.evaluate_timescale.value();
   const double timestep_over_timescale      = options.timestep_over_timescale;
   /* Every caller filled this with ppr->smallest_allowed_variation, which is
      never read from the input file and so is always DBL_EPSILON. Taken directly
@@ -51,7 +50,7 @@ void evolver_rk(EvolverDerivs derivs,
   call_output = false;
 
   while ((x1 < x_end) && (next_index_x < x_size)) {
-    (*evaluate_timescale)(x1, parameters_and_workspace_for_derivs, &timescale);
+    evaluate_timescale(x1, &timescale);
 
     timestep = timestep_over_timescale * timescale;
 
@@ -73,27 +72,20 @@ void evolver_rk(EvolverDerivs derivs,
       call_output = false;
     }
 
-    if (print_variables != nullptr) {
+    if (print_variables.has_value()) {
       if (x1 == x_ini) {
-        (*derivs)(x1, y, dy.data(), parameters_and_workspace_for_derivs);
+        derivs(x1, y, dy.data());
       }
 
-      (*print_variables)(x1, y, dy.data(), parameters_and_workspace_for_derivs);
+      (*print_variables)(x1, y, dy.data());
     }
 
-    generic_integrator(derivs,
-                       x1,
-                       x2,
-                       y,
-                       parameters_and_workspace_for_derivs,
-                       tolerance,
-                       x1 * minimum_variation,
-                       &gi);
+    generic_integrator(derivs, x1, x2, y, tolerance, x1 * minimum_variation, &gi);
 
     if (call_output) {
-      (*derivs)(x2, y, dy.data(), parameters_and_workspace_for_derivs);
+      derivs(x2, y, dy.data());
 
-      (*output)(x2, y, dy.data(), next_index_x, parameters_and_workspace_for_derivs);
+      output(x2, y, dy.data(), next_index_x);
 
       call_output = false;
 
@@ -104,12 +96,12 @@ void evolver_rk(EvolverDerivs derivs,
   }
 
   /* a last call is compulsory to ensure that all quantitites in
-     y,dy,parameters_and_workspace_for_derivs are updated to the last
+     y, dy and the workspace behind derivs are updated to the last
      point in the covered range */
-  (*derivs)(x1, y, dy.data(), parameters_and_workspace_for_derivs);
+  derivs(x1, y, dy.data());
 
-  if (print_variables != nullptr) {
-    (*print_variables)(x1, y, dy.data(), parameters_and_workspace_for_derivs);
+  if (print_variables.has_value()) {
+    (*print_variables)(x1, y, dy.data());
   }
 
   cleanup_generic_integrator(&gi);

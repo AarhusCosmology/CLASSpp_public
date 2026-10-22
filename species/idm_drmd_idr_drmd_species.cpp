@@ -174,7 +174,7 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
                    4. * ctx.a_prime_over_a * ctx.theta_over_k2);  // N-body gauge correction
   }
 
-  // The original perturb_sources_member allocates this slot but never writes it.
+  // The original perturb_sources allocates this slot but never writes it.
   // Write zero explicitly to avoid relying on zero-initialization of the source table.
   if (index_tp_theta_idr_drmd_ >= 0) {
     set_source(index_tp_theta_idr_drmd_, 0.);

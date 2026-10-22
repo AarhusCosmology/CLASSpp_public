@@ -26,14 +26,13 @@ void evolver_erk_run(EvolverDerivs derivs,
                      double x_end,
                      double* y,
                      int y_size,
-                     void* parameters_and_workspace_for_derivs,
                      const EvolverOptions& options) {
-  const double tolerance             = options.rtol;
-  const int* used_in_output          = options.used_in_output;
-  const double* x_sampling           = options.x_sampling;
-  const int x_size                   = options.x_sampling_size;
-  const EvolverOutput output         = options.output;
-  const EvolverPrint print_variables = options.print_variables;
+  const double tolerance      = options.rtol;
+  const int* used_in_output   = options.used_in_output;
+  const double* x_sampling    = options.x_sampling;
+  const int x_size            = options.x_sampling_size;
+  const EvolverOutput output  = options.output.value();
+  const auto& print_variables = options.print_variables;
 
   /* Step-controller settings travel per call. They used to live in process-wide
      state because the old evolver signature had nowhere to put them, which meant
@@ -99,7 +98,7 @@ void evolver_erk_run(EvolverDerivs derivs,
   double t = x_ini;
 
   /* initialise k0 = f(t, y) */
-  (*derivs)(t, y, ki.data(), parameters_and_workspace_for_derivs);
+  derivs(t, y, ki.data());
   ++counters.derivs_evaluations;
 
   const double hmax = fabs(x_end - x_ini) / 10.0;
@@ -190,10 +189,7 @@ void evolver_erk_run(EvolverDerivs derivs,
           ytemp[k] += h * aij * ki[j * neq + k];
         }
       }
-      (*derivs)(t + Tab::c[i] * h,
-                ytemp.data(),
-                ki.data() + i * neq,
-                parameters_and_workspace_for_derivs);
+      derivs(t + Tab::c[i] * h, ytemp.data(), ki.data() + i * neq);
       ++counters.derivs_evaluations;
       for (int k = 0; k < neq; k++) {
         ynew[k] += h * Tab::b[i] * ki[i * neq + k];
@@ -300,18 +296,12 @@ void evolver_erk_run(EvolverDerivs derivs,
       for (int k = 0; k < neq; k++) {
         ytemp[k] = ynew[k];
       }
-      (*derivs)(t + h,
-                ytemp.data(),
-                ki.data() + idx_end * neq,
-                parameters_and_workspace_for_derivs);
+      derivs(t + h, ytemp.data(), ki.data() + idx_end * neq);
       ++counters.derivs_evaluations;
     }
 
-    if (print_variables != nullptr) {
-      (*print_variables)(t + h,
-                         ynew.data(),
-                         ki.data() + idx_end * neq,
-                         parameters_and_workspace_for_derivs);
+    if (print_variables.has_value()) {
+      (*print_variables)(t + h, ynew.data(), ki.data() + idx_end * neq);
     }
 
     if (clamped) {
@@ -355,11 +345,7 @@ void evolver_erk_run(EvolverDerivs derivs,
     for (; (idx < x_size) && ((tnew - x_sampling[idx]) * tdir >= 0.0); idx++) {
       if (tnew == x_sampling[idx]) {
         ++counters.exact_points;
-        (*output)(tnew,
-                  ynew.data(),
-                  ki.data() + idx_end * neq,
-                  idx,
-                  parameters_and_workspace_for_derivs);
+        output(tnew, ynew.data(), ki.data() + idx_end * neq, idx);
       }
       else {
         ++counters.dense_points;
@@ -467,7 +453,7 @@ void evolver_erk_run(EvolverDerivs derivs,
             }
           }
         }
-        (*output)(ti, yinterp.data(), dyinterp.data(), idx, parameters_and_workspace_for_derivs);
+        output(ti, yinterp.data(), dyinterp.data(), idx);
       }
     }
 

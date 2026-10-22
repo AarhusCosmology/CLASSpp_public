@@ -195,10 +195,7 @@ struct primordial {
   //@}
 };
 
-class PrimordialModule;
 struct primordial_inflation_parameters_and_workspace {
-  primordial_inflation_parameters_and_workspace(PrimordialModule* p_m) : primordial_module(p_m) {}
-  const PrimordialModule* primordial_module;
   double N  = 0.0;
   double a2 = 0.0;
 

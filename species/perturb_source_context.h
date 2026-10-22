@@ -14,7 +14,7 @@ class PerturbationsModule;
 
 /**
  * Pre-computed scalar perturbation quantities, populated by
- * PerturbationsModule::perturb_derivs_member() before calling species.
+ * PerturbationsModule::perturb_derivs() before calling species.
  * Stored in perturb_workspace so every species can access shared state.
  */
 struct PerturbScalarContext {

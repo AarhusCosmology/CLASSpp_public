@@ -995,14 +995,17 @@ void hyperspherical_get_xmin_from_Airy(
       xtp = asin(sqrt(l * (l + 1.)) / beta);
       break;
   }
-  wkbstruct.K         = K;
-  wkbstruct.l         = l;
-  wkbstruct.beta      = beta;
-  wkbstruct.phiminabs = phiminabs;
+  wkbstruct.K                  = K;
+  wkbstruct.l                  = l;
+  wkbstruct.beta               = beta;
+  wkbstruct.phiminabs          = phiminabs;
+  auto phi_wkb_minus_phiminabs = [&wkbstruct](double x) {
+    return PhiWKB_minus_phiminabs(x, wkbstruct);
+  };
 
   xnew = 0.99 * xtp;
 
-  Fnew    = PhiWKB_minus_phiminabs(xnew, &wkbstruct);
+  Fnew    = phi_wkb_minus_phiminabs(xnew);
   *fevals = (*fevals) + 1;
 
   lambda = 2 * _PI_ / (beta + 5.0);
@@ -1020,7 +1023,7 @@ void hyperspherical_get_xmin_from_Airy(
     xnew += delx;
     if (xnew < AIRY_SAFETY) {
       xnew    = AIRY_SAFETY;
-      Fnew    = PhiWKB_minus_phiminabs(xnew, &wkbstruct);
+      Fnew    = phi_wkb_minus_phiminabs(xnew);
       *fevals = (*fevals) + 1;
       if (Fnew >= 0.0) {
         *xmin = xnew;
@@ -1028,7 +1031,7 @@ void hyperspherical_get_xmin_from_Airy(
       }
       break;
     }
-    Fnew    = PhiWKB_minus_phiminabs(xnew, &wkbstruct);
+    Fnew    = phi_wkb_minus_phiminabs(xnew);
     *fevals = (*fevals) + 1;
   } while (std::copysign(1.0, Fnew) == std::copysign(1.0, Fold));
 
@@ -1045,11 +1048,10 @@ void hyperspherical_get_xmin_from_Airy(
     Fright = Fnew;
   }
 
-  class_test(!fzero_ridder(PhiWKB_minus_phiminabs,
+  class_test(!fzero_ridder(phi_wkb_minus_phiminabs,
                            xleft,
                            xright,
                            xtol,
-                           &wkbstruct,
                            &Fleft,
                            &Fright,
                            xmin,
@@ -1062,18 +1064,16 @@ void hyperspherical_get_xmin_from_Airy(
              xright);
 }
 
-double PhiWKB_minus_phiminabs(double x, void* param) {
-  double phiwkb                   = 0.;
-  struct WKB_parameters* wkbparam = static_cast<struct WKB_parameters*>(param);
-  hyperspherical_WKB(wkbparam->K, wkbparam->l, wkbparam->beta, x, &phiwkb);
-  return (fabs(phiwkb) - wkbparam->phiminabs);
+double PhiWKB_minus_phiminabs(double x, const WKB_parameters& wkbparam) {
+  double phiwkb = 0.;
+  hyperspherical_WKB(wkbparam.K, wkbparam.l, wkbparam.beta, x, &phiwkb);
+  return (fabs(phiwkb) - wkbparam.phiminabs);
 }
 
-bool fzero_ridder(double (*func)(double, void*),
+bool fzero_ridder(FunctionRef<double(double x)> func,
                   double x1,
                   double x2,
                   double xtol,
-                  void* param,
                   const double* Fx1,
                   const double* Fx2,
                   double* xzero,
@@ -1099,8 +1099,8 @@ bool fzero_ridder(double (*func)(double, void*),
     fh = *Fx2;
   }
   else {
-    fl      = (*func)(x1, param);
-    fh      = (*func)(x2, param);
+    fl      = func(x1);
+    fh      = func(x2);
     *fevals = (*fevals) + 2;
   }
   if ((fl > 0.0 && fh < 0.0) || (fl < 0.0 && fh > 0.0)) {
@@ -1109,7 +1109,7 @@ bool fzero_ridder(double (*func)(double, void*),
     ans = -1.11e11;
     for (j = 1; j <= MAXIT; j++) {
       xm      = 0.5 * (xl + xh);
-      fm      = (*func)(xm, param);
+      fm      = func(xm);
       *fevals = (*fevals) + 1;
       s       = sqrt(fm * fm - fl * fh);
       if (s == 0.0) {
@@ -1123,7 +1123,7 @@ bool fzero_ridder(double (*func)(double, void*),
         return true;
       }
       ans     = xnew;
-      fnew    = (*func)(ans, param);
+      fnew    = func(ans);
       *fevals = (*fevals) + 1;
       if (fnew == 0.0) {
         *xzero = ans;

@@ -25,7 +25,6 @@ void evolver_tsit5(EvolverDerivs derivs,
                    double x_end,
                    double* y,
                    int y_size,
-                   void* parameters_and_workspace_for_derivs,
                    const EvolverOptions& options) {
   EvolverOptionsCheck(options,
                       "evolver_tsit5",
@@ -35,11 +34,5 @@ void evolver_tsit5(EvolverDerivs derivs,
                        EvolverFeature::Histograms,
                        EvolverFeature::AbsTol});
 
-  evolver_erk_run<ErkTsitouras54>(derivs,
-                                  x_ini,
-                                  x_end,
-                                  y,
-                                  y_size,
-                                  parameters_and_workspace_for_derivs,
-                                  options);
+  evolver_erk_run<ErkTsitouras54>(derivs, x_ini, x_end, y, y_size, options);
 }

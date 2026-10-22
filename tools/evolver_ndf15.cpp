@@ -67,19 +67,18 @@ void evolver_ndf15(EvolverDerivs derivs,
                    double x_final,
                    double* y_inout,
                    int neq,
-                   void* parameters_and_workspace_for_derivs,
                    const EvolverOptions& options) {
   EvolverOptionsCheck(options,
                       "evolver_ndf15",
                       x_ini,
                       {EvolverFeature::MaxOrder, EvolverFeature::Stats, EvolverFeature::AbsTol});
 
-  const double rtol                  = options.rtol;
-  const double* t_vec                = options.x_sampling;
-  const int tres                     = options.x_sampling_size;
-  const int* used_in_output          = options.used_in_output;
-  const EvolverOutput output         = options.output;
-  const EvolverPrint print_variables = options.print_variables;
+  const double rtol           = options.rtol;
+  const double* t_vec         = options.x_sampling;
+  const int tres              = options.x_sampling_size;
+  const int* used_in_output   = options.used_in_output;
+  const EvolverOutput output  = options.output.value();
+  const auto& print_variables = options.print_variables;
 
   /* Constants: */
   double G[5]     = {1.0, 3.0 / 2.0, 11.0 / 6.0, 25.0 / 12.0, 137.0 / 60.0};
@@ -229,7 +228,7 @@ void evolver_ndf15(EvolverDerivs derivs,
   /* But if we want to print variables for testing purposes, just interpolate everything.. */
   for (ii = 1; ii <= neq; ii++) {
     y[ii] = y_inout[ii - 1];
-    if (print_variables == nullptr) {
+    if (!print_variables.has_value()) {
       interpidx[ii] = used_in_output[ii - 1];
     }
     else {
@@ -257,7 +256,7 @@ void evolver_ndf15(EvolverDerivs derivs,
 
   htspan = fabs(tfinal - t0);
 
-  (*derivs)(t0, y + 1, f0 + 1, parameters_and_workspace_for_derivs);
+  derivs(t0, y + 1, f0 + 1);
   counters.derivs_evaluations += 1;
   if ((tfinal - t0) < 0.0) {
     tdir = -1;
@@ -269,16 +268,7 @@ void evolver_ndf15(EvolverDerivs derivs,
   t    = t0;
 
   nfenj = 0;
-  numjac((*derivs),
-         t,
-         y,
-         f0,
-         &jac,
-         &nj_ws,
-         abstol,
-         neq,
-         &nfenj,
-         parameters_and_workspace_for_derivs);
+  numjac(derivs, t, y, f0, &jac, &nj_ws, abstol, neq, &nfenj);
   counters.jacobians          += 1;
   counters.derivs_evaluations += nfenj;
   Jcurrent                     = true; /* True */
@@ -310,7 +300,7 @@ void evolver_ndf15(EvolverDerivs derivs,
   h    = tdir * absh;
   tdel = (t + tdir * std::min(sqrt(eps) * std::max(fabs(t), fabs(t + h)), absh)) - t;
 
-  (*derivs)(t + tdel, y + 1, tempvec1 + 1, parameters_and_workspace_for_derivs);
+  derivs(t + tdel, y + 1, tempvec1 + 1);
   counters.derivs_evaluations += 1;
 
   /*I assume that a full jacobi matrix is always calculated in the beginning...*/
@@ -466,7 +456,7 @@ void evolver_ndf15(EvolverDerivs derivs,
           /* derivs touches only f0; psi and difkp1 are unchanged across the call,
              so the old tempvec1 = psi + difkp1 prepass is unnecessary. Folded into
              rhs below, keeping the (psi + difkp1) grouping => bit-identical. */
-          (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
+          derivs(tnew, ynew + 1, f0 + 1);
           counters.derivs_evaluations += 1;
           for (j = 1; j <= neq; j++) {
             rhs[j] = hinvGak * f0[j] - (psi[j] + difkp1[j]);
@@ -534,18 +524,9 @@ void evolver_ndf15(EvolverDerivs derivs,
           counters.steps_rejected += 1;
           /*	! Speed up the iteration by forming new linearization or reducing h. */
           if (!Jcurrent) {
-            (*derivs)(t, y + 1, f0 + 1, parameters_and_workspace_for_derivs);
+            derivs(t, y + 1, f0 + 1);
             nfenj = 0;
-            numjac((*derivs),
-                   t,
-                   y,
-                   f0,
-                   &jac,
-                   &nj_ws,
-                   abstol,
-                   neq,
-                   &nfenj,
-                   parameters_and_workspace_for_derivs);
+            numjac(derivs, t, y, f0, &jac, &nj_ws, abstol, neq, &nfenj);
             counters.jacobians          += 1;
             counters.derivs_evaluations += (nfenj + 1);
             Jcurrent                     = true;
@@ -647,13 +628,12 @@ void evolver_ndf15(EvolverDerivs derivs,
     while ((next < tres) && (tdir * (tnew - t_vec[next]) >= 0.0)) {
       /* Do we need to write output? */
       if (tnew == t_vec[next]) {
-        (*output)(t_vec[next], ynew + 1, f0 + 1, next, parameters_and_workspace_for_derivs);
+        output(t_vec[next], ynew + 1, f0 + 1, next);
         // MODIFICATION BY LUC
         // All print_variables have been moved to the end of time step
         /*
-	if (print_variables != nullptr){
-	  (*print_variables)(t_vec[next],ynew+1,f0+1,
-					parameters_and_workspace_for_derivs);
+	if (print_variables.has_value()){
+	  (*print_variables)(t_vec[next],ynew+1,f0+1);
 	}
 */
       }
@@ -672,11 +652,7 @@ void evolver_ndf15(EvolverDerivs derivs,
                         neq,
                         2);
 
-        (*output)(t_vec[next],
-                  yinterp + 1,
-                  ypinterp + 1,
-                  next,
-                  parameters_and_workspace_for_derivs);
+        output(t_vec[next], yinterp + 1, ypinterp + 1, next);
       }
       next++;
     }
@@ -745,22 +721,22 @@ void evolver_ndf15(EvolverDerivs derivs,
     Jcurrent = false;
 
     // MODIFICATION BY LUC
-    if (print_variables != nullptr) {
-      (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
+    if (print_variables.has_value()) {
+      derivs(tnew, ynew + 1, f0 + 1);
 
-      (*print_variables)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
+      (*print_variables)(tnew, ynew + 1, f0 + 1);
     }
     // end of modification
   }
 
   /* a last call is compulsory to ensure that all quantitites in
-     y,dy,parameters_and_workspace_for_derivs are updated to the
+     y, dy and the workspace behind derivs are updated to the
      last point in the covered range */
-  (*derivs)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
+  derivs(tnew, ynew + 1, f0 + 1);
 
-  if (print_variables != nullptr) {
+  if (print_variables.has_value()) {
     /** If we are printing variables, we must store the final point */
-    (*print_variables)(tnew, ynew + 1, f0 + 1, parameters_and_workspace_for_derivs);
+    (*print_variables)(tnew, ynew + 1, f0 + 1);
   }
 
   if (verbose > 0) {
@@ -1133,13 +1109,12 @@ bool ludcmp(double** a, int n, int* indx, double* d, double* vv) {
   return true;
 }
 
-void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
+void fzero_Newton(FunctionRef<void(double* x, int x_size, double* F)> func,
                   double* x_inout,
                   const double* dxdF,
                   int x_size,
                   double tolx,
                   double tolF,
-                  void* param,
                   int* fevals) {
   /**Given an initial guess x[1..n] for a root in n dimensions,
      take ntrial Newton-Raphson steps to improve the root.
@@ -1187,7 +1162,7 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
 
   for (int k = 1; k <= ntrial; k++) {
     //printf("x = [%f, %f], delx = [%e, %e]\n", x_inout[0],x_inout[1],delx[0],delx[1]);
-    func(x_inout, x_size, param, F0);
+    func(x_inout, x_size, F0);
     //printf("F0 = [%f, %f]\n",F0[0],F0[1]);
     *fevals = *fevals + 1;
 
@@ -1220,7 +1195,7 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
       for (int func_iter = 0; func_iter < 10; ++func_iter) {
         x_inout[i - 1] = x_inout_backup[i - 1] + delx[i - 1];
         try {
-          func(x_inout, x_size, param, Fdel);
+          func(x_inout, x_size, Fdel);
           func_succeeded = true;
           (*fevals)++;
         }
@@ -1285,7 +1260,7 @@ void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
 /* "numjac", "initialize_jacobian", "uninitialize_jacobian",					*/
 /* "initialize_numjac_workspace", "uninitialize_numjac_workspace".		*/
 /**********************************************************************/
-void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
+void numjac(EvolverDerivs derivs,
             double t,
             double* y,
             double* fval,
@@ -1293,8 +1268,7 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
             struct numjac_workspace* nj_ws,
             double thresh,
             int neq,
-            int* nfe,
-            void* parameters_and_workspace_for_derivs) {
+            int* nfe) {
   /*	Routine that computes the jacobian numerically. It is based on the numjac
 	implementation in MATLAB, but a feature for recognising sparsity in the
 	jacobian and taking advantage of that has been added.
@@ -1415,10 +1389,7 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
     for (i = 1; i <= neq; i++) {
       nj_ws->yydel[i] = nj_ws->ydel_Fdel[i][j];
     }
-    (*derivs)(t,
-              nj_ws->yydel.data() + 1,
-              nj_ws->ffdel.data() + 1,
-              parameters_and_workspace_for_derivs);
+    derivs(t, nj_ws->yydel.data() + 1, nj_ws->ffdel.data() + 1);
 
     *nfe += 1;
     for (i = 1; i <= neq; i++) {
@@ -1513,10 +1484,7 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
             del2 = -fabs(del2);
           }
           nj_ws->yydel[j] = y[j] + del2;
-          (*derivs)(t,
-                    nj_ws->yydel.data() + 1,
-                    nj_ws->ffdel.data() + 1,
-                    parameters_and_workspace_for_derivs);
+          derivs(t, nj_ws->yydel.data() + 1, nj_ws->ffdel.data() + 1);
           *nfe            += 1;
           nj_ws->yydel[j]  = y[j];
           int rowmax2      = 1;

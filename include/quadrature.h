@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "common.h"
+#include "function_ref.h"
 
 enum quadrature_method {
   qm_auto,
@@ -32,6 +33,10 @@ struct GBQuadParams {
   double alpha         = 0.;
   double x_times_alpha = 0.;
 };
+
+/** A function of the momentum q, writing its value to the second argument: the test
+ *  function psi(q) and the distribution function f0(q) both take this shape. */
+using QuadratureFunction = FunctionRef<void(double q, double* value)>;
 
 /* Structures for QSS */
 
@@ -54,9 +59,8 @@ void get_qsampling(double* x,
                    double rtol,
                    double* qvec,
                    int qsiz,
-                   void (*test_function)(void* params_for_function, double q, double* psi),
-                   void (*distribution_function)(void* params_for_function, double q, double* f0),
-                   void* params_for_function);
+                   QuadratureFunction test_function,
+                   QuadratureFunction distribution_function);
 bool get_qsampling_manual(double* x,
                           double* w,
                           double* dq,
@@ -65,8 +69,7 @@ bool get_qsampling_manual(double* x,
                           enum quadrature_method method,
                           double* qvec,
                           int qsiz,
-                          void (*function)(void* params_for_function, double q, double* f0),
-                          void* params_for_function,
+                          QuadratureFunction distribution_function,
                           const GBQuadParams& gb);
 void sort_x_and_w(double* x, double* w, double* workx, double* workw, int startidx, int endidx);
 void get_leaf_x_and_w(qss_node* node, int* ind, double* x, double* w, bool isindefinite);
@@ -74,9 +77,8 @@ void reduce_tree(qss_node* node, int level);
 void leaf_count(qss_node* node);
 double get_integral(qss_node* node, int level);
 void gk_adapt(std::unique_ptr<qss_node>& node,
-              void (*test)(void* params_for_function, double q, double* psi),
-              void (*function)(void* params_for_function, double q, double* f0),
-              void* params_for_function,
+              QuadratureFunction test_function,
+              QuadratureFunction distribution_function,
               double tol,
               int treemode,
               double a,
@@ -91,9 +93,8 @@ void compute_Laguerre(
  *  It is reliable through order 17; higher orders are intentionally rejected
  *  rather than silently returning an ill-conditioned rule. */
 bool compute_FermiDirac(double* x, double* w, int N);
-void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
-             void (*function)(void* params_for_function, double q, double* f0),
-             void* params_for_function,
+void gk_quad(QuadratureFunction test_function,
+             QuadratureFunction distribution_function,
              qss_node* node,
              double a,
              double b,

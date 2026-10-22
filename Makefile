@@ -27,6 +27,7 @@ TEST_TARGETS := \
 	test-nonlinear-threads \
 	test-free-streaming-cutoff \
 	test-bisection \
+	test-function-ref \
 	test-quadrature \
 	test-asymptotic-extrapolation \
 	test-spline-integral \

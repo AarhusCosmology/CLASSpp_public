@@ -20,16 +20,18 @@
 #include <optional>
 
 #include "evolver_erk.h"  // ErkControllerConfig
+#include "function_ref.h"
 
-/* Callback shapes. Named once so a call site cannot transpose two of them and
-   still compile -- three of the five take the same (double, double*, double*,
-   void*) prefix. */
-using EvolverDerivs = void (*)(double x, double* y, double* dy, void* parameters_and_workspace);
-using EvolverOutput =
-    void (*)(double x, double y[], double dy[], int index_x, void* parameters_and_workspace);
-using EvolverPrint = void (*)(double x, double y[], double dy[], void* parameters_and_workspace);
-using EvolverTimescale = void (*)(double x, void* parameters_and_workspace, double* timescale);
-using EvolverDiagonal = void (*)(double x, double* y, double* diag, void* parameters_and_workspace);
+/* Callback shapes, each spelled once. A callback carries its own context -- a
+   lambda capturing the module and its workspace -- so none of them takes a
+   void*; see function_ref.h. Derivs, Print and Diagonal share one type, so the
+   names are for the reader: the compiler cannot catch a transposition of those
+   three. */
+using EvolverDerivs    = FunctionRef<void(double x, double* y, double* dy)>;
+using EvolverOutput    = FunctionRef<void(double x, double* y, double* dy, int index_x)>;
+using EvolverPrint     = FunctionRef<void(double x, double* y, double* dy)>;
+using EvolverTimescale = FunctionRef<void(double x, double* timescale)>;
+using EvolverDiagonal  = FunctionRef<void(double x, double* y, double* diag)>;
 
 /** Step statistics, filled when a caller asks for them.
  *
@@ -118,20 +120,21 @@ struct EvolverOptions {
    *  useful "all of them" default. Pass an all-ones array to mean all. */
   const int* used_in_output = nullptr;
 
-  /** Called at each x_sampling point. REQUIRED: every evolver invokes it without
-   *  a null check, and x_sampling is required, so there is always at least one
-   *  call. Pass a no-op if the samples are not wanted. */
-  EvolverOutput output         = nullptr;
-  EvolverPrint print_variables = nullptr;
+  /** Called at each x_sampling point. REQUIRED, and checked: x_sampling is
+   *  required, so there is always at least one call. Optional only because a
+   *  FunctionRef cannot be null and the struct is filled in after construction.
+   *  Pass a no-op if the samples are not wanted. */
+  std::optional<EvolverOutput> output;
+  std::optional<EvolverPrint> print_variables;
 
   /* ---- evolver-specific; unset at the default, validated ----------------- */
 
   /** Fixed-step control for the legacy `rk` evolver only. */
-  EvolverTimescale evaluate_timescale = nullptr;
-  double timestep_over_timescale      = 0.0;
+  std::optional<EvolverTimescale> evaluate_timescale;
+  double timestep_over_timescale = 0.0;
 
   /** Analytic Jacobian diagonal. Consumed by etd, which exponentiates it. */
-  EvolverDiagonal derivs_diagonal = nullptr;
+  std::optional<EvolverDiagonal> derivs_diagonal;
 
   /** Maximum BDF order for ndf15. 0 means the evolver's own default (5).
    *  Spelled 0-means-default rather than defaulting to 5 so that "the caller

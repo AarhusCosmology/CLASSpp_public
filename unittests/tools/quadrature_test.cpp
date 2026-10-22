@@ -27,11 +27,11 @@ constexpr std::array<double, 16> kFermiDiracPowerMoments = {
     1.307654444554356358920468e12,
 };
 
-void fermi_dirac_distribution(void* /*params*/, double q, double* f0) {
+void fermi_dirac_distribution(double q, double* f0) {
   *f0 = 1. / (std::exp(q) + 1.);
 }
 
-void quartic_test_function(void* /*params*/, double q, double* value) {
+void quartic_test_function(double q, double* value) {
   *value = q * q * q * q;
 }
 
@@ -87,7 +87,6 @@ void test_manual_selection() {
                               nullptr,
                               0,
                               fermi_dirac_distribution,
-                              nullptr,
                               gb));
   check_power_moments(x, w);
 }
@@ -104,8 +103,7 @@ void test_auto_selection() {
                 nullptr,
                 0,
                 quartic_test_function,
-                fermi_dirac_distribution,
-                nullptr);
+                fermi_dirac_distribution);
 
   // A three-point FD rule integrates the quartic exactly. The Laguerre and
   // adaptive candidates require more points at this tolerance, so this also

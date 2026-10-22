@@ -269,7 +269,7 @@ struct perturb_vector {
   // transfer source (delta_g, delta_cdm, delta_ncdm, ...), in lex-key order.
   // Source-column membership is k-independent (fixed in
   // perturb_indices_of_perturbs); this list materialises it per pv so
-  // perturb_sources_member dispatches FillSources by pointer. Empty in runs
+  // perturb_sources dispatches FillSources by pointer. Empty in runs
   // without dTk/mTk/k_output, so that per-sample loop is skipped entirely.
   struct SourceSpecies {
     const BaseSpecies* species;
@@ -451,7 +451,7 @@ struct perturb_workspace {
   //@}
 
   /** @name - pre-computed scalar perturbation context, populated by
-   *  perturb_derivs_member() before calling species::PerturbDerivs(). */
+   *  perturb_derivs() before calling species::PerturbDerivs(). */
   //@{
   PerturbScalarContext scalar_ctx;
   //@}

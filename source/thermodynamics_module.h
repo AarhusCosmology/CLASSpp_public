@@ -24,6 +24,8 @@ std::array<BaryonClumpingZone, 3> BaryonClumpingZones(double b,
                                                       double Delta_1,
                                                       double Delta_2);
 
+struct thermodynamics_parameters_and_workspace;
+
 class ThermodynamicsModule : public BaseModule {
  public:
   ThermodynamicsModule(InputModulePtr input_module, BackgroundModulePtr background_module);
@@ -183,25 +185,19 @@ class ThermodynamicsModule : public BaseModule {
   double SahaRhs(const recombination* preco, double z, double CB) const;
   void thermodynamics_recfast_store_row(
       recombination* preco, int sample_index, double z, double xe, double Tb, double dTbdz) const;
-  void thermodynamics_recombination_derivs_member(double z,
-                                                  const double* y,
-                                                  double* dy,
-                                                  void* parameters_and_workspace);
-  static void thermodynamics_recombination_derivs(double z,
-                                                  double* y,
-                                                  double* dy,
-                                                  void* fixed_parameters);
-  static void thermodynamics_recfast_derivs(double minus_z,
-                                            double* y,
-                                            double* dy,
-                                            void* parameters_and_workspace);
-  static void thermodynamics_recfast_output(
-      double minus_z, double y[], double dy[], int index_x, void* parameters_and_workspace);
-  static void thermodynamics_recfast_output_none(
-      double minus_z, double y[], double dy[], int index_x, void* parameters_and_workspace);
-  static void thermodynamics_recfast_timescale(double minus_z,
-                                               void* parameters_and_workspace,
-                                               double* timescale);
+  void thermodynamics_recombination_derivs(double z,
+                                           const double* y,
+                                           double* dy,
+                                           thermodynamics_parameters_and_workspace* ptpaw);
+  void thermodynamics_recfast_derivs(double minus_z,
+                                     double* y,
+                                     double* dy,
+                                     thermodynamics_parameters_and_workspace* ws);
+  void thermodynamics_recfast_output(double minus_z,
+                                     const double* y,
+                                     const double* dy,
+                                     int index_x,
+                                     const thermodynamics_parameters_and_workspace* ws);
   void thermodynamics_merge_reco_and_reio(recombination* preco, reionization* preio);
   void thermodynamics_tanh(
       double x, double center, double before, double after, double width, double* result);
@@ -227,8 +223,6 @@ enum class RecombinationPhase { analytic, helium, full };
  */
 
 struct thermodynamics_parameters_and_workspace {
-  thermodynamics_parameters_and_workspace(ThermodynamicsModule* p_m) : thermodynamics_module(p_m) {}
-  ThermodynamicsModule* const thermodynamics_module;
   /* structures containing fixed input parameters (indices, ...) */
   recombination* preco = nullptr;
 

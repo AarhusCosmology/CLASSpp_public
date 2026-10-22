@@ -25,20 +25,16 @@ namespace {
 
 /* y' = -y, y(0) = 1. Stiff enough for nothing, which is the point: these tests
    are about the interface, not the integration. */
-void decay_derivs(double /*x*/, double* y, double* dy, void* /*parameters_and_workspace*/) {
+void decay_derivs(double /*x*/, double* y, double* dy) {
   dy[0] = -y[0];
 }
-void decay_diagonal(double /*x*/, double* /*y*/, double* diag, void* /*parameters_and_workspace*/) {
+void decay_diagonal(double /*x*/, double* /*y*/, double* diag) {
   diag[0] = -1.0;
 }
-void decay_timescale(double /*x*/, void* /*parameters_and_workspace*/, double* timescale) {
+void decay_timescale(double /*x*/, double* timescale) {
   *timescale = 1.0;
 }
-void no_output(double /*x*/,
-               double /*y*/[],
-               double /*dy*/[],
-               int /*index_x*/,
-               void* /*parameters_and_workspace*/) {}
+void no_output(double /*x*/, double* /*y*/, double* /*dy*/, int /*index_x*/) {}
 
 /* One equation in every test here, so one flag. */
 const int kUsedInOutput[1] = {1};
@@ -85,9 +81,9 @@ void test_universal_requirements() {
   no_flags.used_in_output = nullptr;
   assert(Rejects(no_flags, "any", {}));
 
-  /* And output, which every evolver calls without a null check. */
+  /* And output, which every evolver calls at each sampling point. */
   EvolverOptions no_out = Baseline(sampling);
-  no_out.output         = nullptr;
+  no_out.output.reset();
   assert(Rejects(no_out, "any", {}));
 
   /* One sampling point is not enough -- the contract asks for two endpoints. */
@@ -169,7 +165,7 @@ void test_real_evolvers_reject_what_they_ignore() {
   const auto throws = [&](const EvolverOptions& options, auto evolver) {
     double state = 1.0;
     try {
-      evolver(decay_derivs, 0.0, 1.0, &state, 1, nullptr, options);
+      evolver(decay_derivs, 0.0, 1.0, &state, 1, options);
     }
     catch (const std::exception&) {
       return true;
@@ -206,7 +202,7 @@ void test_new_capabilities_reach_the_evolver() {
   EvolverOptions options = Baseline(sampling);
   options.stats          = &stats;
   double y               = 1.0;
-  evolver_ndf15(decay_derivs, 0.0, 1.0, &y, 1, nullptr, options);
+  evolver_ndf15(decay_derivs, 0.0, 1.0, &y, 1, options);
 
   assert(std::fabs(y - std::exp(-1.0)) < 1e-6);
   assert(stats.steps_accepted > 0);
@@ -220,7 +216,7 @@ void test_new_capabilities_reach_the_evolver() {
   capped.max_order      = 1; /* backward Euler */
   capped.rtol           = 1e-10;
   double y_capped       = 1.0;
-  evolver_ndf15(decay_derivs, 0.0, 1.0, &y_capped, 1, nullptr, capped);
+  evolver_ndf15(decay_derivs, 0.0, 1.0, &y_capped, 1, capped);
 
   assert(std::fabs(y_capped - std::exp(-1.0)) < 1e-5);
   assert(capped_stats.steps_accepted > stats.steps_accepted);
@@ -240,13 +236,13 @@ void test_both_evolver_families_report_the_same_way() {
   EvolverOptions implicit_options = Baseline(sampling);
   implicit_options.stats          = &implicit_stats;
   double y_implicit               = 1.0;
-  evolver_ndf15(decay_derivs, 0.0, 1.0, &y_implicit, 1, nullptr, implicit_options);
+  evolver_ndf15(decay_derivs, 0.0, 1.0, &y_implicit, 1, implicit_options);
 
   EvolverStats explicit_stats;
   EvolverOptions explicit_options = Baseline(sampling);
   explicit_options.stats          = &explicit_stats;
   double y_explicit               = 1.0;
-  evolver_rkdp45(decay_derivs, 0.0, 1.0, &y_explicit, 1, nullptr, explicit_options);
+  evolver_rkdp45(decay_derivs, 0.0, 1.0, &y_explicit, 1, explicit_options);
 
   /* Both solved the same problem... */
   assert(std::fabs(y_implicit - std::exp(-1.0)) < 1e-6);
@@ -278,7 +274,7 @@ void test_histograms() {
   EvolverOptions options = Baseline(sampling);
   options.histograms     = &histograms;
   double y               = 1.0;
-  evolver_rkdp45(decay_derivs, 0.0, 1.0, &y, 1, nullptr, options);
+  evolver_rkdp45(decay_derivs, 0.0, 1.0, &y, 1, options);
 
   long long binned = 0;
   for (int i = 0; i < ErkHistograms::kErrBins; ++i) {
@@ -293,7 +289,7 @@ void test_histograms() {
   double y_wrong       = 1.0;
   bool threw           = false;
   try {
-    evolver_ndf15(decay_derivs, 0.0, 1.0, &y_wrong, 1, nullptr, wrong);
+    evolver_ndf15(decay_derivs, 0.0, 1.0, &y_wrong, 1, wrong);
   }
   catch (const std::exception&) {
     threw = true;
@@ -319,7 +315,7 @@ void test_abstol_reaches_every_evolver() {
     options.abstol         = abstol;
     options.stats          = &stats;
     double y               = 1.0;
-    evolver(decay_derivs, 0.0, 30.0, &y, 1, nullptr, options);
+    evolver(decay_derivs, 0.0, 30.0, &y, 1, options);
     return stats.steps_accepted;
   };
 

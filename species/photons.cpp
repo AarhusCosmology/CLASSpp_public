@@ -645,7 +645,7 @@ void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
 
   if (!w.IsTitleMode()) {
     const auto& g_lay = static_cast<const PerturbLayout&>(*base);
-    // scalar_ctx.k is always current here: the evolver sets it in perturb_derivs_member
+    // scalar_ctx.k is always current here: the evolver sets it in perturb_derivs
     // before the print callback fires, so it equals pppaw->k at this call site.
     const double k           = ppw->scalar_ctx.k;
     const double* pvecthermo = ppw->pvecthermo.data();

@@ -357,8 +357,8 @@ class NCDMBaseSpecies : public BaseSpecies {
                           double* drho_dM,
                           double* pseudo_p) const;
 
-  static void DistributionFunction(void* params, double q, double* f0);
-  static void TestFunction(void* params, double q, double* test);
+  static void DistributionFunction(DistributionParams* p, double q, double* f0);
+  static void TestFunction(double q, double* test);
 
   int quadrature_strategy_ = 0;
   int input_q_size_        = 5;

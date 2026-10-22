@@ -83,50 +83,6 @@ void PerturbationsModule::ResolveSpecies() {
 
 PerturbationsModule::~PerturbationsModule() = default;
 
-// Wrapper functions to pass non-static member functions
-void PerturbationsModule::perturb_timescale(double tau,
-                                            void* parameters_and_workspace,
-                                            double* timescale) {
-  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  pppaw->perturbations_module->perturb_timescale_member(tau, parameters_and_workspace, timescale);
-}
-void PerturbationsModule::perturb_sources(double tau,
-                                          double* pvecperturbations,
-                                          double* pvecderivs,
-                                          int index_tau,
-                                          void* parameters_and_workspace) {
-  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  pppaw->perturbations_module->perturb_sources_member(tau,
-                                                      pvecperturbations,
-                                                      pvecderivs,
-                                                      index_tau,
-                                                      parameters_and_workspace);
-}
-void PerturbationsModule::perturb_print_variables(double tau,
-                                                  double* y,
-                                                  double* dy,
-                                                  void* parameters_and_workspace) {
-  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  pppaw->perturbations_module->perturb_print_variables_member(tau, y, dy, parameters_and_workspace);
-}
-void PerturbationsModule::perturb_derivs(double tau,
-                                         double* y,
-                                         double* dy,
-                                         void* parameters_and_workspace) {
-  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  pppaw->perturbations_module->perturb_derivs_member(tau, y, dy, parameters_and_workspace);
-}
-void PerturbationsModule::perturb_derivs_diagonal(double tau,
-                                                  double* y,
-                                                  double* diag,
-                                                  void* parameters_and_workspace) {
-  auto* pppaw = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
-  pppaw->perturbations_module->perturb_derivs_diagonal_member(tau,
-                                                              y,
-                                                              diag,
-                                                              parameters_and_workspace);
-}
-
 /**
  * Source function \f$ S^{X} (k, \tau) \f$ at a given conformal time tau.
  *
@@ -2266,7 +2222,7 @@ void PerturbationsModule::perturb_solve(int index_md,
   bool is_early_enough;
 
   /* Related to the perturbation output */
-  void (*perhaps_print_variables)(double, double*, double*, void*);
+  bool print_variables_for_k = false;
   int index_ikout;
 
   /** - initialize indices relevant for back/thermo tables search */
@@ -2449,14 +2405,29 @@ void PerturbationsModule::perturb_solve(int index_md,
   ppaw.ppw->last_index_back   = 0;
   ppaw.ppw->last_index_thermo = 0;
 
+  /** - the evolver callbacks: each carries this module and ppaw */
+
+  auto derivs = [this, &ppaw](double x, double* y, double* dy) { perturb_derivs(x, y, dy, &ppaw); };
+  auto sources = [this, &ppaw](double x, double* y, double* dy, int index_x) {
+    perturb_sources(x, y, dy, index_x, &ppaw);
+  };
+  auto print_variables = [this, &ppaw](double x, double* y, double* dy) {
+    perturb_print_variables(x, y, dy, &ppaw);
+  };
+  auto timescale = [this, &ppaw](double x, double* timescale_x) {
+    perturb_timescale(x, timescale_x, &ppaw);
+  };
+  auto derivs_diagonal = [this, &ppaw](double x, double* y, double* diag) {
+    perturb_derivs_diagonal(x, y, diag, &ppaw);
+  };
+
   /** - check whether we need to print perturbations to a file for this wavenumber */
 
-  perhaps_print_variables = nullptr;
-  ppw->index_ikout        = -1;
+  ppw->index_ikout = -1;
   for (index_ikout = 0; index_ikout < ppt->k_output_values_num; index_ikout++) {
     if (index_k_output_values_[index_md * ppt->k_output_values_num + index_ikout] == index_k) {
-      ppw->index_ikout        = index_ikout;
-      perhaps_print_variables = perturb_print_variables;
+      ppw->index_ikout      = index_ikout;
+      print_variables_for_k = true;
     }
   }
 
@@ -2506,13 +2477,15 @@ void PerturbationsModule::perturb_solve(int index_md,
     options.x_sampling      = tau_sampling_.data();
     options.x_sampling_size = tau_actual_size;
     options.used_in_output  = ppw->pv->used_in_sources.data();
-    options.output          = perturb_sources;
-    options.print_variables = perhaps_print_variables;
+    options.output          = sources;
+    if (print_variables_for_k) {
+      options.print_variables = print_variables;
+    }
 
     auto generic_evolver = &evolver_ndf15;
     if (ppr->evolver_perturbations == evolver_type::rk) {
       generic_evolver                 = &evolver_rk;
-      options.evaluate_timescale      = perturb_timescale;
+      options.evaluate_timescale      = timescale;
       options.timestep_over_timescale = ppr->perturb_integration_stepsize;
     }
     else if (ppr->evolver_perturbations == evolver_type::rkdp45) {
@@ -2521,7 +2494,7 @@ void PerturbationsModule::perturb_solve(int index_md,
     }
     else if (ppr->evolver_perturbations == evolver_type::etd) {
       generic_evolver         = &evolver_etd;
-      options.derivs_diagonal = perturb_derivs_diagonal;
+      options.derivs_diagonal = derivs_diagonal;
     }
     else if (ppr->evolver_perturbations == evolver_type::tsit5) {
       generic_evolver = &evolver_tsit5;
@@ -2544,12 +2517,11 @@ void PerturbationsModule::perturb_solve(int index_md,
       options.histograms = &call_histograms;
     }
 
-    generic_evolver(perturb_derivs,
+    generic_evolver(derivs,
                     interval_limit[index_interval],
                     interval_limit[index_interval + 1],
                     ppw->pv->y.data(),
                     ppw->pv->pt_size,
-                    &ppaw,
                     options);
 
     /* One lock per interval rather than an atomic per step. */
@@ -2600,7 +2572,7 @@ void PerturbationsModule::perturb_solve(int index_md,
 
   /** - if perturbations were printed in a file, close the file */
 
-  //if (perhaps_print_variables != nullptr)
+  //if (print_variables_for_k)
   //  fclose(ppw->perturb_output_file);
 
   /** - fill the source terms array with zeros for all times between
@@ -4441,23 +4413,16 @@ void PerturbationsModule::perturb_approximations(int index_md,
  * vary. Some integrators (e.g. Runge-Kunta) benefit from calling this
  * routine at each step in order to adapt the next step.
  *
- * This is one of the few functions in the code which is passed to the generic_integrator() routine.
- * Since generic_integrator() should work with functions passed from various modules, the format of the arguments
- * is a bit special:
- * - fixed parameters and workspaces are passed through a generic pointer.
- *   generic_integrator() doesn't know the content of this pointer.
- * - the error management is a bit special: errors are not written as usual to a module error_message buffer, but to a generic
- *   error_message passed in the list of arguments.
+ * The legacy rk evolver takes its step from it, through a lambda in perturb_solve().
  *
- * @param tau                      Input: conformal time
- * @param parameters_and_workspace Input: fixed parameters (e.g. indices), workspace, approximation used, etc.
- * @param timescale                Output: perturbation variation timescale (given the approximation used)
- * @param error_message            Output: error message
+ * @param tau       Input: conformal time
+ * @param timescale Output: perturbation variation timescale (given the approximation used)
+ * @param pppaw     Input: fixed parameters (e.g. indices), workspace, approximation used, etc.
  */
 
-void PerturbationsModule::perturb_timescale_member(double tau,
-                                                   void* parameters_and_workspace,
-                                                   double* timescale) {
+void PerturbationsModule::perturb_timescale(double tau,
+                                            double* timescale,
+                                            perturb_parameters_and_workspace* pppaw) {
   /** Summary: */
 
   /** - define local variables */
@@ -4471,13 +4436,11 @@ void PerturbationsModule::perturb_timescale_member(double tau,
 
   /* various pointers allowing to extract the fields of the
      parameter_and_workspace input structure */
-  struct perturb_parameters_and_workspace* pppaw;
   struct perturb_workspace* ppw;
   double* pvecback;
   double* pvecthermo;
 
   /** - extract the fields of the parameter_and_workspace input structure */
-  pppaw      = static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
   ppw        = pppaw->ppw;
   pvecback   = ppw->pvecback.data();
   pvecthermo = ppw->pvecthermo.data();
@@ -4987,19 +4950,17 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
  * @param y                        Input: vector of perturbations
  * @param dy                       Input: vector of time derivative of perturbations
  * @param index_tau                Input: index in the array tau_sampling
- * @param parameters_and_workspace Input/Output: in input, all parameters needed by perturb_derivs, in output, source terms
+ * @param pppaw Input/Output: in input, all parameters needed by perturb_derivs, in output, source terms
  * @param error_message            Output: error message
  * @return the error status
  */
 
-void PerturbationsModule::perturb_sources_member(
-    double tau, double* y, double* dy, int index_tau, void* parameters_and_workspace) {
+void PerturbationsModule::perturb_sources(
+    double tau, double* y, double* dy, int index_tau, perturb_parameters_and_workspace* pppaw) {
   /** Summary: */
 
   /** - rename structure fields (just to avoid heavy notations) */
 
-  struct perturb_parameters_and_workspace* pppaw =
-      static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
   int index_md                  = pppaw->index_md;
   int index_ic                  = pppaw->index_ic;
   int index_k                   = pppaw->index_k;
@@ -5422,30 +5383,26 @@ void PerturbationsModule::perturb_sources_member(
  * When testing the code or a cosmological model, it can be useful to
  * output perturbations at each step of integration (and not just the
  * delta's at each source sampling point, which is achieved simply by
- * asking for matter transfer functions). Then this function can be
- * passed to the generic_evolver routine.
- *
- * By default, instead of passing this function to generic_evolver,
- * one passes a null pointer. Then this function is just not used.
+ * asking for matter transfer functions). Then perturb_solve() hands
+ * it to the evolver as print_variables, for the k values listed in
+ * k_output_values; for every other k the option is left unset.
  *
  * @param tau                      Input: conformal time
  * @param y                        Input: vector of perturbations
  * @param dy                       Input: vector of its derivatives (already allocated)
- * @param parameters_and_workspace Input: fixed parameters (e.g. indices)
+ * @param pppaw Input: fixed parameters (e.g. indices)
  * @param error_message            Output: error message
  *
  */
 
-void PerturbationsModule::perturb_print_variables_member(double tau,
-                                                         double* y,
-                                                         double* dy,
-                                                         void* parameters_and_workspace) {
+void PerturbationsModule::perturb_print_variables(double tau,
+                                                  double* y,
+                                                  double* dy,
+                                                  perturb_parameters_and_workspace* pppaw) {
   /** Summary: */
 
   /** - rename structure fields (just to avoid heavy notations) */
 
-  struct perturb_parameters_and_workspace* pppaw =
-      static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
   double k     = pppaw->k;
   int index_md = pppaw->index_md;
 
@@ -5699,7 +5656,7 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
  * @param tau                      Input: conformal time
  * @param y                        Input: vector of perturbations
  * @param dy                       Output: vector of its derivatives (already allocated)
- * @param parameters_and_workspace Input/Output: in input, fixed parameters (e.g. indices); in output, background and thermo quantities evaluated at tau.
+ * @param pppaw Input/Output: in input, fixed parameters (e.g. indices); in output, background and thermo quantities evaluated at tau.
  * @param error_message            Output: error message
  */
 
@@ -5709,11 +5666,10 @@ void PerturbationsModule::perturb_print_variables_member(double tau,
  * phi functions reduce ETDRK4 to its explicit counterpart -- so the standard
  * sector is integrated exactly as it was.
  */
-void PerturbationsModule::perturb_derivs_diagonal_member(double tau,
-                                                         double* y,
-                                                         double* diag,
-                                                         void* parameters_and_workspace) {
-  auto* pppaw            = static_cast<perturb_parameters_and_workspace*>(parameters_and_workspace);
+void PerturbationsModule::perturb_derivs_diagonal(double tau,
+                                                  double* y,
+                                                  double* diag,
+                                                  perturb_parameters_and_workspace* pppaw) {
   perturb_workspace* ppw = pppaw->ppw;
   double* pvecback       = ppw->pvecback.data();
 
@@ -5736,15 +5692,13 @@ void PerturbationsModule::perturb_derivs_diagonal_member(double tau,
   }
 }
 
-void PerturbationsModule::perturb_derivs_member(double tau,
-                                                double* y,
-                                                double* dy,
-                                                void* parameters_and_workspace) {
+void PerturbationsModule::perturb_derivs(double tau,
+                                         double* y,
+                                         double* dy,
+                                         perturb_parameters_and_workspace* pppaw) {
   /** Summary: */
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
-
-  auto* pppaw = static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
 
   double k                      = pppaw->k;
   double k2                     = k * k;
@@ -6088,17 +6042,15 @@ void PerturbationsModule::perturb_derivs_member(double tau,
  * shear in the tight-coupling approximation
  *
  * @param y                        Input: vector of perturbations
- * @param parameters_and_workspace Input/Output: in input, fixed parameters (e.g. indices); in output, slip and shear
+ * @param pppaw Input/Output: in input, fixed parameters (e.g. indices); in output, slip and shear
  * @param error_message            Output: error message
  */
 
 void PerturbationsModule::perturb_tca_slip_and_shear(const double* y,
-                                                     void* parameters_and_workspace) {
+                                                     perturb_parameters_and_workspace* pppaw) {
   /** Summary: */
 
   /** - rename the fields of the input structure (just to avoid heavy notations) */
-
-  auto* pppaw = static_cast<struct perturb_parameters_and_workspace*>(parameters_and_workspace);
 
   double k  = pppaw->k;
   double k2 = k * k;

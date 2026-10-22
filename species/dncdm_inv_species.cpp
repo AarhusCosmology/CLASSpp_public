@@ -1518,7 +1518,7 @@ void DNCDMInvSpecies::PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& /*
   l_max_col     = std::min(l_max_col, p_lay.l_max);
 
   // `a` comes from the pvecback the DIAGONAL callback just interpolated, NOT from
-  // ppw->scalar_ctx: scalar_ctx.a is written by perturb_derivs_member, and on a
+  // ppw->scalar_ctx: scalar_ctx.a is written by perturb_derivs, and on a
   // REJECTED step the last RHS ran at an ETDRK4 stage point ahead of t, so ctx.a
   // would be a(t+h) paired with pvecback at t. That mismatch is the failure mode the
   // module callback's comment warns about -- it stays stable and quietly degrades the

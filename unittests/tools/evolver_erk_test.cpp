@@ -239,10 +239,7 @@ void test_dense() {
    end-to-end checks below:
        y0' = -2 t y0^2 ,  y0(0) = 1  =>  y0 = 1/(1+t^2)
        y1' = y0 y1     ,  y1(0) = 1  =>  y1 = exp(atan t)                 */
-void nl_derivs(double t, double* y, double* dy, void* p) {
-  if (p != nullptr) {
-    (*static_cast<int*>(p))++;
-  }
+void nl_derivs(double t, const double* y, double* dy) {
   dy[0] = -2.0 * t * y[0] * y[0];
   dy[1] = y[0] * y[1];
 }
@@ -260,14 +257,20 @@ struct Sampled {
   int derivs = 0;
 };
 
-void store(double x, double y[], double /*dy*/[], int index_x, void* p) {
-  auto* s        = static_cast<Sampled*>(p);
-  s->t[index_x]  = x;
-  s->y0[index_x] = y[0];
-}
-
-void counting_derivs(double t, double* y, double* dy, void* p) {
-  nl_derivs(t, y, dy, &static_cast<Sampled*>(p)->derivs);
+/* Runs Tab on the nonlinear system from t = 0 to 2, recording the dense output
+   and the number of RHS calls in s. */
+template <class Tab>
+void run_sampled(Sampled& s, double* y, EvolverOptions options) {
+  auto derivs = [&s](double t, double* y_t, double* dy) {
+    ++s.derivs;
+    nl_derivs(t, y_t, dy);
+  };
+  auto store = [&s](double x, double* y_x, double* /*dy*/, int index_x) {
+    s.t[index_x]  = x;
+    s.y0[index_x] = y_x[0];
+  };
+  options.output = store;
+  evolver_erk_run<Tab>(derivs, 0.0, 2.0, y, 2, options);
 }
 
 template <class Tab>
@@ -292,11 +295,10 @@ double run_to_tolerance(double rtol,
   options.x_sampling      = xs.data();
   options.x_sampling_size = n;
   options.used_in_output  = used;
-  options.output          = store;
   options.erk             = cfg;
   options.stats           = stats;
   options.histograms      = histograms;
-  evolver_erk_run<Tab>(counting_derivs, 0.0, 2.0, y, 2, &s, options);
+  run_sampled<Tab>(s, y, options);
 
   double worst = 0.0;
   for (int i = 1; i < n; i++) {
@@ -349,15 +351,13 @@ void test_pairs_agree() {
   opt_a.x_sampling      = xs.data();
   opt_a.x_sampling_size = n;
   opt_a.used_in_output  = used;
-  opt_a.output          = store;
-  evolver_erk_run<ErkDormandPrince45>(counting_derivs, 0.0, 2.0, ya, 2, &a, opt_a);
+  run_sampled<ErkDormandPrince45>(a, ya, opt_a);
   EvolverOptions opt_b;
   opt_b.rtol            = 1e-8;
   opt_b.x_sampling      = xs.data();
   opt_b.x_sampling_size = n;
   opt_b.used_in_output  = used;
-  opt_b.output          = store;
-  evolver_erk_run<ErkTsitouras54>(counting_derivs, 0.0, 2.0, yb, 2, &b, opt_b);
+  run_sampled<ErkTsitouras54>(b, yb, opt_b);
   double worst = 0.0;
   for (int i = 1; i < n; i++) {
     worst = std::max(worst, fabs(a.y0[i] - b.y0[i]) / fabs(a.y0[i]));

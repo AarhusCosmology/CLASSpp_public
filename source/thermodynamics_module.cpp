@@ -28,48 +28,23 @@ ThermodynamicsModule::ThermodynamicsModule(InputModulePtr input_module,
 
 ThermodynamicsModule::~ThermodynamicsModule() = default;
 
-// Wrapper functions to pass non-static member functions
-void ThermodynamicsModule::thermodynamics_recombination_derivs(double z,
-                                                               double* y,
-                                                               double* dy,
-                                                               void* fixed_parameters) {
-  auto* tppaw = static_cast<thermodynamics_parameters_and_workspace*>(fixed_parameters);
-  tppaw->thermodynamics_module->thermodynamics_recombination_derivs_member(z,
-                                                                           y,
-                                                                           dy,
-                                                                           fixed_parameters);
-}
-
-void ThermodynamicsModule::thermodynamics_recfast_timescale(double /*minus_z*/,
-                                                            void* /*parameters_and_workspace*/,
-                                                            double* timescale) {
-  *timescale = 1.;
-}
-
 // Single evolver derivative shim: integrates in minus_z = -z, dispatches on phase.
-void ThermodynamicsModule::thermodynamics_recfast_derivs(double minus_z,
-                                                         double* y,
-                                                         double* dy,
-                                                         void* parameters_and_workspace) {
-  auto* ws       = static_cast<thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
-  auto* module   = ws->thermodynamics_module;
+void ThermodynamicsModule::thermodynamics_recfast_derivs(
+    double minus_z, double* y, double* dy, thermodynamics_parameters_and_workspace* ws) {
   const double z = -minus_z;
 
   if (ws->recombination_phase == RecombinationPhase::helium) {
     // State is {x_He, Tmat}; hydrogen follows its Saha branch.
-    double y_full[3] = {module->thermodynamics_recfast_hydrogen_saha_xH(ws->preco, z), y[0], y[1]};
+    double y_full[3] = {thermodynamics_recfast_hydrogen_saha_xH(ws->preco, z), y[0], y[1]};
     double dy_full_dz[3];
-    module->thermodynamics_recombination_derivs_member(z,
-                                                       y_full,
-                                                       dy_full_dz,
-                                                       parameters_and_workspace);
+    thermodynamics_recombination_derivs(z, y_full, dy_full_dz, ws);
     dy[0] = -dy_full_dz[1];
     dy[1] = -dy_full_dz[2];
   }
   else {
     // State is {x_H, x_He, Tmat}.
     double dy_dz[_RECFAST_INTEG_SIZE_];
-    module->thermodynamics_recombination_derivs_member(z, y, dy_dz, parameters_and_workspace);
+    thermodynamics_recombination_derivs(z, y, dy_dz, ws);
     for (int index_y = 0; index_y < _RECFAST_INTEG_SIZE_; index_y++) {
       dy[index_y] = -dy_dz[index_y];
     }
@@ -78,9 +53,11 @@ void ThermodynamicsModule::thermodynamics_recfast_derivs(double minus_z,
 
 // Single dense-output shim: stores one recombination-table row, dispatching on phase.
 void ThermodynamicsModule::thermodynamics_recfast_output(
-    double minus_z, double y[], double dy[], int index_x, void* parameters_and_workspace) {
-  auto* ws     = static_cast<thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
-  auto* module = ws->thermodynamics_module;
+    double minus_z,
+    const double* y,
+    const double* dy,
+    int index_x,
+    const thermodynamics_parameters_and_workspace* ws) {
   recombination* preco   = ws->preco;
   const double z         = -minus_z;
   const int sample_index = ws->recfast_output_index_offset + index_x;
@@ -92,21 +69,14 @@ void ThermodynamicsModule::thermodynamics_recfast_output(
      z ~ 1500-1640 and 5e-4 at z ~ 2630-2850, in every recombination model. See
      docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md. */
   if (ws->recombination_phase == RecombinationPhase::helium) {
-    const double xe = module->thermodynamics_recfast_hydrogen_saha_xH(preco, z) + preco->fHe * y[0];
-    module->thermodynamics_recfast_store_row(preco, sample_index, z, xe, y[1], -dy[1]);
+    const double xe = thermodynamics_recfast_hydrogen_saha_xH(preco, z) + preco->fHe * y[0];
+    thermodynamics_recfast_store_row(preco, sample_index, z, xe, y[1], -dy[1]);
   }
   else {
     const double xe = y[0] + preco->fHe * y[1];
-    module->thermodynamics_recfast_store_row(preco, sample_index, z, xe, y[2], -dy[2]);
+    thermodynamics_recfast_store_row(preco, sample_index, z, xe, y[2], -dy[2]);
   }
 }
-
-// No-op dense-output shim: used when the helium ODE runs with no requested samples.
-void ThermodynamicsModule::thermodynamics_recfast_output_none(double /*minus_z*/,
-                                                              double /*y*/[],
-                                                              double /*dy*/[],
-                                                              int /*index_x*/,
-                                                              void* /*parameters_and_workspace*/) {}
 
 /**
  * Thermodynamics quantities at given redshift z.
@@ -3155,7 +3125,7 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   double dy[3];
 
   /* contains all fixed parameters which should be passed to thermodynamics_recombination_derivs */
-  thermodynamics_parameters_and_workspace tpaw{this};
+  thermodynamics_parameters_and_workspace tpaw{};
 
   /** - allocate memory for thermodynamics interpolation tables (size known in advance) */
   preco->rt_size = ppr->recfast_Nz0;
@@ -3394,6 +3364,14 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
      error rather than a silent ignore. Recombination never supplies a Jacobian
      diagonal or a timescale, so the only evolver-specific field in play here is
      the explicit-RK controller. */
+  auto recfast_derivs = [this, &tpaw](double minus_z, double* y_x, double* dy_x) {
+    thermodynamics_recfast_derivs(minus_z, y_x, dy_x, &tpaw);
+  };
+  auto recfast_output = [this, &tpaw](double minus_z, double* y_x, double* dy_x, int index_x) {
+    thermodynamics_recfast_output(minus_z, y_x, dy_x, index_x, &tpaw);
+  };
+  auto no_output = [](double /*minus_z*/, double* /*y_x*/, double* /*dy_x*/, int /*index_x*/) {};
+
   EvolverOptions options;
   options.rtol = ppr->tol_thermo_integration;
 
@@ -3526,14 +3504,14 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
      window (only at pathologically small recfast_Nz0), because the full phase needs the
      evolved {x_He, Tmat} handed off at z_hydrogen_ode_start. In that case feed the
      evolver a single boundary sample and store nothing. */
-  double y_helium[2]              = {y[1], y[2]};
-  double helium_boundary_sample   = -z_hydrogen_ode_start;
-  double* helium_sampling         = (helium_sample_count > 0)
-                                        ? minus_z_sampling.data() + first_helium_sample
-                                        : &helium_boundary_sample;
-  const int helium_sampling_count = (helium_sample_count > 0) ? helium_sample_count : 1;
-  auto helium_output              = (helium_sample_count > 0) ? &thermodynamics_recfast_output
-                                                              : &thermodynamics_recfast_output_none;
+  double y_helium[2]                = {y[1], y[2]};
+  double helium_boundary_sample     = -z_hydrogen_ode_start;
+  double* helium_sampling           = (helium_sample_count > 0)
+                                          ? minus_z_sampling.data() + first_helium_sample
+                                          : &helium_boundary_sample;
+  const int helium_sampling_count   = (helium_sample_count > 0) ? helium_sample_count : 1;
+  const EvolverOutput helium_output = (helium_sample_count > 0) ? EvolverOutput(recfast_output)
+                                                                : EvolverOutput(no_output);
 
   tpaw.recombination_phase         = RecombinationPhase::helium;
   tpaw.recfast_output_index_offset = first_helium_sample;
@@ -3543,13 +3521,7 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   options.x_sampling_size = helium_sampling_count;
   options.output          = helium_output;
 
-  generic_evolver(thermodynamics_recfast_derivs,
-                  -z_helium_ode_start,
-                  -z_hydrogen_ode_start,
-                  y_helium,
-                  2,
-                  &tpaw,
-                  options);
+  generic_evolver(recfast_derivs, -z_helium_ode_start, -z_hydrogen_ode_start, y_helium, 2, options);
 
   y[0] = ppr->recfast_x_H0_trigger;
   y[1] = y_helium[0];
@@ -3567,14 +3539,13 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
     options.used_in_output  = used_in_output_full.data();
     options.x_sampling      = minus_z_sampling.data() + first_full_sample;
     options.x_sampling_size = Nz - first_full_sample;
-    options.output          = thermodynamics_recfast_output;
+    options.output          = recfast_output;
 
-    generic_evolver(thermodynamics_recfast_derivs,
+    generic_evolver(recfast_derivs,
                     -z_hydrogen_ode_start,
                     minus_z_sampling[Nz - 1],
                     y,
                     _RECFAST_INTEG_SIZE_,
-                    &tpaw,
                     options);
   }
 }
@@ -3586,27 +3557,19 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
  * Computes derivatives of the three variables to integrate: \f$ d x_H
  * / dz, d x_{He} / dz, d T_{mat} / dz \f$.
  *
- * This is one of the few functions in the code which are passed to
- * the generic evolver routines. Since the evolver interface should work with
- * functions passed from various modules, the argument format is a bit special:
+ * The evolver reaches it through thermodynamics_recfast_derivs, which
+ * integrates in -z and selects the phase.
  *
- * - fixed parameters and workspaces are passed through a generic
- *   pointer. Here, this pointer contains the precision, background
- *   and recombination structures, plus a background vector, but the evolver
- *   does not know its fine structure.
- *
- * @param z                        Input: redshift
- * @param y                        Input: vector of variable to integrate
- * @param dy                       Output: its derivative (already allocated)
- * @param parameters_and_workspace Input: pointer to fixed parameters (e.g. indices) and workspace (already allocated)
+ * @param z     Input: redshift
+ * @param y     Input: vector of variable to integrate
+ * @param dy    Output: its derivative (already allocated)
+ * @param ptpaw Input/Output: recombination structure, phase, and workspace (already allocated)
  */
 
-void ThermodynamicsModule::thermodynamics_recombination_derivs_member(
-    double z, const double* y, double* dy, void* parameters_and_workspace) {
+void ThermodynamicsModule::thermodynamics_recombination_derivs(
+    double z, const double* y, double* dy, thermodynamics_parameters_and_workspace* ptpaw) {
   /* define local variables */
 
-  struct thermodynamics_parameters_and_workspace* ptpaw =
-      static_cast<struct thermodynamics_parameters_and_workspace*>(parameters_and_workspace);
   struct recombination* preco = ptpaw->preco;
   double* pvecback            = ptpaw->pvecback;
 

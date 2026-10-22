@@ -17,32 +17,28 @@ struct Problem {
   std::vector<double> sampled_dy;
 };
 
-void linear_derivs(double /*x*/, double* y, double* dy, void* p) {
-  auto* problem = static_cast<Problem*>(p);
-  problem->derivs++;
-  dy[0] = problem->lambda * y[0] + problem->gain;
+void linear_derivs(const double* y, double* dy, Problem& problem) {
+  problem.derivs++;
+  dy[0] = problem.lambda * y[0] + problem.gain;
 }
 
-void linear_diag(double /*x*/, double* /*y*/, double* diag, void* p) {
-  auto* problem = static_cast<Problem*>(p);
-  problem->diagonals++;
-  diag[0] = problem->lambda;
+void linear_diag(double* diag, Problem& problem) {
+  problem.diagonals++;
+  diag[0] = problem.lambda;
 }
 
-void quadratic_derivs(double /*x*/, double* y, double* dy, void* p) {
-  auto* problem = static_cast<Problem*>(p);
-  problem->derivs++;
+void quadratic_derivs(const double* y, double* dy, Problem& problem) {
+  problem.derivs++;
   dy[0] = y[0] * y[0];
 }
 
-void output_store(double /*x*/, double y[], double dy[], int index_x, void* p) {
-  auto* problem = static_cast<Problem*>(p);
-  if (index_x >= static_cast<int>(problem->sampled_y.size())) {
-    problem->sampled_y.resize(index_x + 1);
-    problem->sampled_dy.resize(index_x + 1);
+void output_store(const double* y, const double* dy, int index_x, Problem& problem) {
+  if (index_x >= static_cast<int>(problem.sampled_y.size())) {
+    problem.sampled_y.resize(index_x + 1);
+    problem.sampled_dy.resize(index_x + 1);
   }
-  problem->sampled_y[index_x]  = y[0];
-  problem->sampled_dy[index_x] = dy[0];
+  problem.sampled_y[index_x]  = y[0];
+  problem.sampled_dy[index_x] = dy[0];
 }
 
 double linear_exact(double y0, double lambda, double gain, double x) {
@@ -62,14 +58,23 @@ void test_stiff_constant_remainder_exact() {
   std::vector<double> xs = {0., 0.25, 0.5, 0.75, 1.};
 
   {
+    auto derivs = [&problem](double /*x*/, double* y_x, double* dy) {
+      linear_derivs(y_x, dy, problem);
+    };
+    auto diagonal = [&problem](double /*x*/, double* /*y_x*/, double* diag) {
+      linear_diag(diag, problem);
+    };
+    auto store = [&problem](double /*x*/, double* y_x, double* dy, int index_x) {
+      output_store(y_x, dy, index_x, problem);
+    };
     EvolverOptions opt;
     opt.rtol            = 1e-8;
     opt.used_in_output  = &used;
     opt.x_sampling      = xs.data();
     opt.x_sampling_size = static_cast<int>(xs.size());
-    opt.output          = output_store;
-    opt.derivs_diagonal = linear_diag;
-    evolver_etd(linear_derivs, 0., 1., &y, 1, &problem, opt);
+    opt.output          = store;
+    opt.derivs_diagonal = diagonal;
+    evolver_etd(derivs, 0., 1., &y, 1, opt);
   }
 
   for (int i = 0; i < static_cast<int>(xs.size()); ++i) {
@@ -96,13 +101,19 @@ void test_zero_diagonal_rk4_fallback() {
   std::vector<double> xs = {0., 0.25, 0.5};
 
   {
+    auto derivs = [&problem](double /*x*/, double* y_x, double* dy) {
+      quadratic_derivs(y_x, dy, problem);
+    };
+    auto store = [&problem](double /*x*/, double* y_x, double* dy, int index_x) {
+      output_store(y_x, dy, index_x, problem);
+    };
     EvolverOptions opt;
     opt.rtol            = 1e-8;
     opt.used_in_output  = &used;
     opt.x_sampling      = xs.data();
     opt.x_sampling_size = static_cast<int>(xs.size());
-    opt.output          = output_store;
-    evolver_etd(quadratic_derivs, 0., 0.5, &y, 1, &problem, opt);
+    opt.output          = store;
+    evolver_etd(derivs, 0., 0.5, &y, 1, opt);
   }
 
   assert(std::fabs(y - 2.) < 2e-5);
@@ -143,21 +154,20 @@ struct Layer {
   }
 };
 
-void layer_derivs(double t, double* y, double* dy, void* p) {
-  static_cast<Layer*>(p)->derivs++;
+void layer_derivs(double t, const double* y, double* dy, Layer& l) {
+  l.derivs++;
   dy[0] = -Layer::lam(t) * (y[0] - Layer::g(t)) + Layer::gp(t);
 }
 
-void layer_diag(double t, double* /*y*/, double* diag, void* /*p*/) {
+void layer_diag(double t, double* /*y*/, double* diag) {
   diag[0] = -Layer::lam(t);
 }
 
-void layer_store(double /*x*/, double y[], double /*dy*/[], int index_x, void* p) {
-  auto* l = static_cast<Layer*>(p);
-  if (index_x >= static_cast<int>(l->sampled_y.size())) {
-    l->sampled_y.resize(index_x + 1);
+void layer_store(const double* y, int index_x, Layer& l) {
+  if (index_x >= static_cast<int>(l.sampled_y.size())) {
+    l.sampled_y.resize(index_x + 1);
   }
-  l->sampled_y[index_x] = y[0];
+  l.sampled_y[index_x] = y[0];
 }
 
 /* Returns the worst sampled error; fills `rhs` with the RHS count. */
@@ -172,14 +182,18 @@ double solve_layer(double rtol, int nsample, int* rhs) {
   double y = Layer::exact(0.);
   int used = 1;
   {
+    auto derivs = [&l](double t, double* y_t, double* dy) { layer_derivs(t, y_t, dy, l); };
+    auto store  = [&l](double /*x*/, double* y_x, double* /*dy*/, int index_x) {
+      layer_store(y_x, index_x, l);
+    };
     EvolverOptions opt;
     opt.rtol            = rtol;
     opt.used_in_output  = &used;
     opt.x_sampling      = xs.data();
     opt.x_sampling_size = nsample;
-    opt.output          = layer_store;
+    opt.output          = store;
     opt.derivs_diagonal = layer_diag;
-    evolver_etd(layer_derivs, 0., 1., &y, 1, &l, opt);
+    evolver_etd(derivs, 0., 1., &y, 1, opt);
   }
 
   double worst = 0.;
@@ -254,18 +268,18 @@ struct Coupled {
   int derivs = 0;
 };
 
-void coupled_derivs(double t, double* y, double* dy, void* p) {
-  static_cast<Coupled*>(p)->derivs++;
+void coupled_derivs(double t, const double* y, double* dy, Coupled& c) {
+  c.derivs++;
   dy[0] = -200. * (y[0] - y[1] * y[1]) + std::cos(t);
   dy[1] = -y[0] * y[1] + 0.5;
 }
 
-void coupled_diag(double /*t*/, double* y, double* diag, void* /*p*/) {
+void coupled_diag(double /*t*/, double* y, double* diag) {
   diag[0] = -200.;
   diag[1] = -y[0];
 }
 
-void coupled_none(double /*x*/, double /*y*/[], double /*dy*/[], int /*i*/, void* /*p*/) {}
+void coupled_none(double /*x*/, double* /*y*/, double* /*dy*/, int /*i*/) {}
 
 void test_nonlinear_coupled_converges() {
   auto solve = [](double rtol, double* out) {
@@ -274,6 +288,7 @@ void test_nonlinear_coupled_converges() {
     int used[2]            = {1, 1};
     std::vector<double> xs = {0., 1., 2.};
     {
+      auto derivs = [&c](double t, double* y_t, double* dy) { coupled_derivs(t, y_t, dy, c); };
       EvolverOptions opt;
       opt.rtol            = rtol;
       opt.used_in_output  = used;
@@ -281,7 +296,7 @@ void test_nonlinear_coupled_converges() {
       opt.x_sampling_size = 3;
       opt.output          = coupled_none;
       opt.derivs_diagonal = coupled_diag;
-      evolver_etd(coupled_derivs, 0., 2., y, 2, &c, opt);
+      evolver_etd(derivs, 0., 2., y, 2, opt);
     }
     out[0] = y[0];
     out[1] = y[1];

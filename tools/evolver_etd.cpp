@@ -80,20 +80,19 @@ void evolver_etd(EvolverDerivs derivs,
                  double x_end,
                  double* y,
                  int y_size,
-                 void* parameters_and_workspace_for_derivs,
                  const EvolverOptions& options) {
   EvolverOptionsCheck(options,
                       "evolver_etd",
                       x_ini,
                       {EvolverFeature::Diagonal, EvolverFeature::Stats, EvolverFeature::AbsTol});
 
-  const double tolerance                = options.rtol;
-  const double* x_sampling              = options.x_sampling;
-  const int x_size                      = options.x_sampling_size;
-  const int* used_in_output             = options.used_in_output;
-  const EvolverOutput output            = options.output;
-  const EvolverPrint print_variables    = options.print_variables;
-  const EvolverDiagonal derivs_diagonal = options.derivs_diagonal;
+  const double tolerance      = options.rtol;
+  const double* x_sampling    = options.x_sampling;
+  const int x_size            = options.x_sampling_size;
+  const int* used_in_output   = options.used_in_output;
+  const EvolverOutput output  = options.output.value();
+  const auto& print_variables = options.print_variables;
+  const auto& derivs_diagonal = options.derivs_diagonal;
 
   /* Counted unconditionally: a local increment costs nothing, and the copy at
      the end is all the caller asked for. */
@@ -129,7 +128,7 @@ void evolver_etd(EvolverDerivs derivs,
 
   double t = x_ini;
   ++counters.derivs_evaluations;
-  (*derivs)(t, y, f0.data(), parameters_and_workspace_for_derivs);
+  derivs(t, y, f0.data());
 
   const double hmax = std::fabs(x_end - x_ini) / 10.0;
   double absh = (x_size > 1) ? std::min(hmax, std::fabs(x_sampling[1] - x_sampling[0])) : hmax;
@@ -206,8 +205,8 @@ void evolver_etd(EvolverDerivs derivs,
     /* Diagonal at the CURRENT state, re-linearised every attempted step. It is
        frozen only across the step, which is what makes this a Rosenbrock rather
        than a semilinear ETD method. */
-    if (derivs_diagonal != nullptr) {
-      (*derivs_diagonal)(t, y, diag.data(), parameters_and_workspace_for_derivs);
+    if (derivs_diagonal.has_value()) {
+      (*derivs_diagonal)(t, y, diag.data());
     }
     else {
       std::fill(diag.begin(), diag.end(), 0.);
@@ -239,7 +238,7 @@ void evolver_etd(EvolverDerivs derivs,
         U2[k] = e0 * yin[k] + 0.5 * hh * p1 * N1[k];
       }
       ++counters.derivs_evaluations;
-      (*derivs)(tin + 0.5 * hh, U2, tmp, parameters_and_workspace_for_derivs);
+      derivs(tin + 0.5 * hh, U2, tmp);
       for (int k = 0; k < neq; k++) {
         double e0;
         double p1;
@@ -250,7 +249,7 @@ void evolver_etd(EvolverDerivs derivs,
         U3[k] = e0 * yin[k] + 0.5 * hh * p1 * N2[k];
       }
       ++counters.derivs_evaluations;
-      (*derivs)(tin + 0.5 * hh, U3, tmp, parameters_and_workspace_for_derivs);
+      derivs(tin + 0.5 * hh, U3, tmp);
       for (int k = 0; k < neq; k++) {
         double e0;
         double p1;
@@ -261,7 +260,7 @@ void evolver_etd(EvolverDerivs derivs,
         U4[k] = e0 * U2[k] + 0.5 * hh * p1 * (2. * N3[k] - N1[k]);
       }
       ++counters.derivs_evaluations;
-      (*derivs)(tin + hh, U4, tmp, parameters_and_workspace_for_derivs);
+      derivs(tin + hh, U4, tmp);
       for (int k = 0; k < neq; k++) {
         double e0;
         double p1;
@@ -288,7 +287,7 @@ void evolver_etd(EvolverDerivs derivs,
        and weights [1/6, 1/3, 1/3, 0, 1/6]. For a constant remainder N, N4=N5, so the
        stiff scalar relaxation stays exact and does not limit the step. */
     ++counters.derivs_evaluations;
-    (*derivs)(t + h, ynew.data(), fnew.data(), parameters_and_workspace_for_derivs);
+    derivs(t + h, ynew.data(), fnew.data());
     {
       const double* N4 = scratch.data() + 3 * neq;
       for (int k = 0; k < neq; k++) {
@@ -354,18 +353,18 @@ void evolver_etd(EvolverDerivs derivs,
     ++counters.steps_accepted;
     const double tnew = t + h;
 
-    if (print_variables != nullptr) {
-      (*print_variables)(tnew, ynew.data(), fnew.data(), parameters_and_workspace_for_derivs);
+    if (print_variables.has_value()) {
+      (*print_variables)(tnew, ynew.data(), fnew.data());
     }
 
     /* Dense output. The two endpoint cases are exact and cost nothing; the interior
        one is the exponential continuous extension described below. */
     for (; (idx < x_size) && ((tnew - x_sampling[idx]) * tdir >= 0.0); idx++) {
       if (x_sampling[idx] == t) {
-        (*output)(t, y, f0.data(), idx, parameters_and_workspace_for_derivs);
+        output(t, y, f0.data(), idx);
       }
       else if (tnew == x_sampling[idx]) {
-        (*output)(tnew, ynew.data(), fnew.data(), idx, parameters_and_workspace_for_derivs);
+        output(tnew, ynew.data(), fnew.data(), idx);
       }
       else {
         /* Interpolate the REMAINDER N quadratically in s through its three stage
@@ -413,7 +412,7 @@ void evolver_etd(EvolverDerivs derivs,
           yinterp[k]       = e0 * y[k] + th * h * (A * p1 + B * th * p2 + 2. * C * th2 * p3);
           dyinterp[k]      = diag[k] * yinterp[k] + (A + B * th + C * th2);
         }
-        (*output)(ti, yinterp.data(), dyinterp.data(), idx, parameters_and_workspace_for_derivs);
+        output(ti, yinterp.data(), dyinterp.data(), idx);
       }
     }
 

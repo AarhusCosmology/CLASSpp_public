@@ -65,25 +65,17 @@ struct HMcodeNoRadiation {
   }
 };
 
-/* what the evolver passes to both callbacks below */
-struct HMcodeGrowthWorkspace {
-  const HMcodeNoRadiation* cosmology;
-  std::vector<double>* g; /* g(a) at the output values of a */
-};
-
 /* the linear growth g(a), y = (g, dg/da) */
-void hmcode_growth_derivs(double a, double* y, double* dy, void* parameters) {
+void hmcode_growth_derivs(double a,
+                          const double* y,
+                          double* dy,
+                          const HMcodeNoRadiation& cosmology) {
   double H2;
   double AH;
   double Om;
-  static_cast<HMcodeGrowthWorkspace*>(parameters)->cosmology->at(a, &H2, &AH, &Om);
+  cosmology.at(a, &H2, &AH, &Om);
   dy[0] = y[1];
   dy[1] = 1.5 * Om * y[0] / (a * a) - (2. + AH / H2) * y[1] / a;
-}
-
-void hmcode_growth_output(
-    double /*a*/, double y[], double /*dy*/[], int index_a, void* parameters) {
-  (*static_cast<HMcodeGrowthWorkspace*>(parameters)->g)[index_a] = y[0];
 }
 
 }  // namespace
@@ -3584,16 +3576,21 @@ void NonlinearModule::nonlinear_hmcode_noradiation_growth(struct nonlinear_works
   const double f = 1. - Om;
   double y[2]    = {pow(a_ini, 1. - 3. * f / 5.), (1. - 3. * f / 5.) * pow(a_ini, -3. * f / 5.)};
 
-  std::vector<double> g(a_size);
-  HMcodeGrowthWorkspace workspace{&cosmology, &g};
+  std::vector<double> g(a_size); /* g(a) at the output values of a */
+  auto derivs = [&cosmology](double a, double* y_a, double* dy_a) {
+    hmcode_growth_derivs(a, y_a, dy_a, cosmology);
+  };
+  auto output = [&g](double /*a*/, double* y_a, double* /*dy_a*/, int index_a) {
+    g[index_a] = y_a[0];
+  };
   int used_in_output[2] = {1, 0};
   EvolverOptions options;
   options.rtol            = 1.e-10;
   options.x_sampling      = pnw->a_norad.data();
   options.x_sampling_size = a_size;
   options.used_in_output  = used_in_output;
-  options.output          = hmcode_growth_output;
-  evolver_ndf15(hmcode_growth_derivs, a_ini, a_end, y, 2, &workspace, options);
+  options.output          = output;
+  evolver_ndf15(derivs, a_ini, a_end, y, 2, options);
 
   /* g/a, its integral over a (the accumulated growth) and Omega_m(a), with their splines in a
      (built in one table with the splines interleaved, as the integration helper wants) */

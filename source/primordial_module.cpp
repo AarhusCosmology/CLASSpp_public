@@ -1462,7 +1462,10 @@ void PrimordialModule::primordial_inflation_one_k(
   double curvature_new;
   double dlnPdN;
 
-  struct primordial_inflation_parameters_and_workspace pipaw{this};
+  struct primordial_inflation_parameters_and_workspace pipaw{};
+  auto derivs = [this, &pipaw](double tau, double* y_tau, double* dy_tau) {
+    primordial_inflation_derivs(tau, y_tau, dy_tau, &pipaw);
+  };
   struct generic_integrator_workspace gi;
 
   /** - initialize the generic integrator (same integrator already used
@@ -1535,11 +1538,10 @@ void PrimordialModule::primordial_inflation_one_k(
                "integration step no longer advances time: numerical precision prevents progress");
 
     /* evolve the system */
-    generic_integrator(primordial_inflation_derivs,
+    generic_integrator(derivs,
                        tau_start,
                        tau_end,
                        y,
-                       &pipaw,
                        ppr->primordial_inflation_tol_integration,
                        ppr->smallest_allowed_variation,
                        &gi);
@@ -1729,7 +1731,10 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
                                                               bool check_epsilon,
                                                               enum integration_direction direction,
                                                               enum time_definition time) {
-  struct primordial_inflation_parameters_and_workspace pipaw{this};
+  struct primordial_inflation_parameters_and_workspace pipaw{};
+  auto derivs = [this, &pipaw](double tau, double* y_tau, double* dy_tau) {
+    primordial_inflation_derivs(tau, y_tau, dy_tau, &pipaw);
+  };
   struct generic_integrator_workspace gi;
   double tau_start;
   double tau_end;
@@ -1854,11 +1859,10 @@ void PrimordialModule::primordial_inflation_evolve_background(double* y,
                "to numerical error or infinite loop",
                dtau / tau_start);
 
-    generic_integrator(primordial_inflation_derivs,
+    generic_integrator(derivs,
                        tau_start,
                        tau_end,
                        y,
-                       &pipaw,
                        ppr->primordial_inflation_tol_integration,
                        ppr->smallest_allowed_variation,
                        &gi);
@@ -2532,41 +2536,24 @@ void PrimordialModule::primordial_inflation_find_phi_pivot(double* y, double* dy
   }
 }
 
-void PrimordialModule::primordial_inflation_derivs(double tau,
-                                                   double* y,
-                                                   double* dy,
-                                                   void* parameters_and_workspace) {
-  primordial_inflation_parameters_and_workspace* ppipaw =
-      static_cast<primordial_inflation_parameters_and_workspace*>(parameters_and_workspace);
-  const PrimordialModule& primordial_module = *(ppipaw->primordial_module);
-  primordial_module.primordial_inflation_derivs_member(tau, y, dy, parameters_and_workspace);
-}
-
 /**
  * Routine returning derivative of system of background/perturbation
- * variables. Like other routines used by the generic integrator
- * (background_derivs, thermodynamics_derivs, perturb_derivs), this
- * routine has a generic list of arguments.
+ * variables. The generic integrator calls it through a lambda.
  *
- * @param tau                      Input: time (not used explicitly inside the routine, but
- *                                         requested by the generic integrator)
- * @param y                        Input/output: running vector of background variables, already
- *                                               allocated and initialized
- * @param dy                       Input: running vector of background derivatives, already
- *                                        allocated
- * @param parameters_and_workspace Input: all necessary input variables apart from y
- * @return the error status
+ * @param tau    Input: time (not used explicitly inside the routine, but
+ *                      requested by the generic integrator)
+ * @param y      Input/output: running vector of background variables, already
+ *                             allocated and initialized
+ * @param dy     Input: running vector of background derivatives, already
+ *                      allocated
+ * @param ppipaw Input/Output: all necessary input variables apart from y
  */
 
-void PrimordialModule::primordial_inflation_derivs_member(double tau,
-                                                          double* y,
-                                                          double* dy,
-                                                          void* parameters_and_workspace) const {
-  struct primordial_inflation_parameters_and_workspace* ppipaw;
-
-  ppipaw = static_cast<struct primordial_inflation_parameters_and_workspace*>(
-      parameters_and_workspace);
-
+void PrimordialModule::primordial_inflation_derivs(
+    double tau,
+    double* y,
+    double* dy,
+    primordial_inflation_parameters_and_workspace* ppipaw) const {
   // a2
   ppipaw->a2 = y[index_in_a_] * y[index_in_a_];
 

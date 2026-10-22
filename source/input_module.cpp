@@ -3523,9 +3523,10 @@ std::string FormatUnknown(double x) {
 
 }  // namespace
 
-void InputModule::ShootingResidual(double* x, int x_size, void* pworkspace, double* output) {
-  auto* w = static_cast<ShootingWorkspace*>(pworkspace);
-
+void InputModule::ShootingResidual(const double* x,
+                                   int x_size,
+                                   double* output,
+                                   ShootingWorkspace* w) {
   // Only the latest evaluation can be returned without evaluating again: drop the previous one
   // first, so at most one extra Cosmology is alive at a time.
   w->last.reset();
@@ -3662,13 +3663,15 @@ ShootingResult InputModule::DoShooting(const InputModulePtr& input_module) {
   // Solve (fzero_Newton handles n>=1 and writes the solution back into xguess).
   fc.is_shooting = true;
   int fevals     = 0;
-  fzero_Newton(ShootingResidual,
+  auto residual  = [&w](double* x, int x_size, double* output) {
+    ShootingResidual(x, x_size, output, &w);
+  };
+  fzero_Newton(residual,
                xguess.data(),
                dxdF.data(),
                static_cast<int>(w.targets.size()),
                input_module->precision_.tol_shooting_deltax,
                input_module->precision_.tol_shooting_deltaF,
-               &w,
                &fevals);
 
   std::vector<std::string> resolved(w.targets.size());

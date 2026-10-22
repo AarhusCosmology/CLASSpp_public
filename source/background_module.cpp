@@ -130,40 +130,19 @@ std::optional<double> BackgroundModule::PeakEnergyFraction(const BaseSpecies& sp
   return 1. / a_peak - 1.;
 }
 
-// Wrapper functions to pass non-static member functions
-void BackgroundModule::background_derivs_loga(double loga,
-                                              double* y,
-                                              double* dy,
-                                              void* parameters_and_workspace) {
-  auto* pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
-  pbpaw->background_module->background_derivs_loga_member(loga, y, dy, parameters_and_workspace);
-}
-void BackgroundModule::background_add_line_to_bg_table(
-    double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace) {
-  auto* pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
-  pbpaw->background_module->background_add_line_to_bg_table_member(loga,
-                                                                   y,
-                                                                   dy,
-                                                                   index_loga,
-                                                                   parameters_and_workspace);
-}
-
 /**
  * Evolution timescale for the background integration. This only exists to feed
  * the legacy explicit Runge-Kutta evolver (evolver=rk), which asks the caller
  * for a step size rather than judging the evolution speed itself; the stiff
  * ndf15 default and the modern rkdp45 evolver size their own steps and ignore
- * it. The background is integrated in loga (see background_derivs_loga_member),
+ * it. The background is integrated in loga (see background_derivs_loga),
  * where a unit step is the natural variation scale, so the timescale is simply
  * constant. evolver_rk then advances in steps of timestep_over_timescale, which
  * exceeds the requested output spacing, so it effectively integrates from one
  * output point to the next under the control of tol_background_integration.
  */
-void BackgroundModule::background_timescale(double loga,
-                                            void* parameters_and_workspace,
-                                            double* timescale) {
+void BackgroundModule::background_timescale(double loga, double* timescale) {
   (void) loga;
-  (void) parameters_and_workspace;
   *timescale = 1.;
 }
 
@@ -695,7 +674,7 @@ void BackgroundModule::background_solve_evolver() {
   /** - define local variables */
 
   /* parameters and workspace for the background_derivs_loga / background_derivs evolver functions */
-  struct background_parameters_and_workspace bpaw{this};
+  struct background_parameters_and_workspace bpaw{};
   /* vector of quantities to be integrated */
   std::vector<double> pvecback_integration(bi_size_);
   /* vector of all background quantities */
@@ -742,12 +721,22 @@ void BackgroundModule::background_solve_evolver() {
      a silent ignore. That makes visible here what used to be buried in the
      evolver implementations: the Jacobian diagonal matters to etd alone, and the
      timescale pair to the legacy rk alone. */
+  auto derivs = [this, &bpaw](double x, double* y, double* dy) {
+    background_derivs_loga(x, y, dy, &bpaw);
+  };
+  auto derivs_diagonal = [this, &bpaw](double x, double* y, double* diag) {
+    background_derivs_diagonal_loga(x, y, diag, &bpaw);
+  };
+  auto add_line_to_bg_table = [this](double x, double* y, double* dy, int index_x) {
+    background_add_line_to_bg_table(x, y, dy, index_x);
+  };
+
   EvolverOptions options;
   options.rtol            = ppr->tol_background_integration;
   options.x_sampling      = loga.data();
   options.x_sampling_size = bt_size_;
   options.used_in_output  = used_in_output.data();
-  options.output          = background_add_line_to_bg_table;
+  options.output          = add_line_to_bg_table;
 
   auto generic_evolver = &evolver_ndf15;
   if (ppr->evolver_background == evolver_type::rk) {
@@ -765,19 +754,13 @@ void BackgroundModule::background_solve_evolver() {
   }
   else if (ppr->evolver_background == evolver_type::etd) {
     generic_evolver         = &evolver_etd;
-    options.derivs_diagonal = background_derivs_diagonal_loga;
+    options.derivs_diagonal = derivs_diagonal;
   }
 
   /* Size of vector to integrate is (bi_size_-1) rather than
    * (bi_size_), since a is not integrated.
    */
-  generic_evolver(background_derivs_loga,
-                  loga_ini,
-                  loga_final,
-                  pvecback_integration.data(),
-                  bi_size_ - 1,
-                  &bpaw,
-                  options);
+  generic_evolver(derivs, loga_ini, loga_final, pvecback_integration.data(), bi_size_ - 1, options);
 
   /** - deduce age of the Universe */
   /* -> age in Gyears */
@@ -1134,29 +1117,20 @@ void BackgroundModule::background_output_data(int number_of_titles, double* data
  * Computes background ODE derivatives with respect to conformal time
  * of quantities which are integrated (a, t, etc).
  *
- * Called via background_derivs_loga_member during evolver integration.
- * The arguments follow the calling convention of the evolver interface:
+ * Called via background_derivs_loga during evolver integration.
  *
- * - fixed input parameters and workspaces are passed through a generic
- * pointer. Here, this is just a pointer to the background structure
- * and to a background vector.
- *
- * - errors are not written to a module error_message buffer, but to a generic
- * error_message passed in the list of arguments.
- *
- * @param tau                      Input: conformal time
- * @param y                        Input: vector of variable
- * @param dy                       Output: its derivative (already allocated)
- * @param parameters_and_workspace Input: pointer to fixed parameters (e.g. indices)
- * @param error_message            Output: error message
+ * @param tau   Input: conformal time
+ * @param y     Input: vector of variable
+ * @param dy    Output: its derivative (already allocated)
+ * @param pbpaw Input/Output: workspace; pvecback receives the background at tau
  */
-void BackgroundModule::background_derivs_member(
+void BackgroundModule::background_derivs(
     double tau,
     double* y, /* vector with argument y[index_bi] (must be already allocated with size bi_size_) */
     double* dy, /* vector with argument dy[index_bi]
                                                             (must be already allocated with
                                                             size bi_size_) */
-    void* parameters_and_workspace) {
+    background_parameters_and_workspace* pbpaw) {
   /** Summary: */
 
   /** - define local variables */
@@ -1165,8 +1139,6 @@ void BackgroundModule::background_derivs_member(
   double a;
   double H;
 
-  background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
-      parameters_and_workspace);
   pvecback = pbpaw->pvecback;
 
   /** - calculate functions of \f$ a \f$ with background_functions() */
@@ -1325,34 +1297,22 @@ void BackgroundModule::background_output_budget() {
 }
 
 /**
- * Derivative function passed to the evolver (generic_evolver / evolver_ndf15 /
- * evolver_rk) evaluating the derivative with respect to log(a)
- * of quantities which are integrated (tau, t, etc).
+ * Derivative with respect to log(a) of the quantities which are integrated
+ * (tau, t, etc), for the evolver (generic_evolver / evolver_ndf15 / evolver_rk),
+ * which calls it through a lambda in background_solve_evolver.
  *
- * The arguments follow the calling convention of the evolver interface:
- *
- * - fixed input parameters and workspaces are passed through a generic
- * pointer. Here, this is just a pointer to the background structure
- * and to a background vector.
- *
- * - errors are not written to a module buffer, but to a generic
- * error_message passed in the list of arguments.
- *
- * @param loga                        Input: scale factor
- * @param y                        Input: vector of variable
- * @param dy                       Output: its derivative (already allocated)
- * @param parameters_and_workspace Input: pointer to fixed parameters (e.g. indices)
- * @param error_message            Output: error message
+ * @param loga  Input: log of the scale factor
+ * @param y     Input: vector of variable
+ * @param dy    Output: its derivative (already allocated)
+ * @param pbpaw Input/Output: workspace; pvecback receives the background at loga
  */
-void BackgroundModule::background_derivs_loga_member(
+void BackgroundModule::background_derivs_loga(
     double loga,
     double* y, /* vector with argument y[index_bi] (must be already allocated with size bi_size_) */
     double* dy, /* vector with argument dy[index_bi]
                                                                  (must be already allocated with
                                                                  size bi_size_) */
-    void* parameters_and_workspace) {
-  background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
-      parameters_and_workspace);
+    background_parameters_and_workspace* pbpaw) {
   double* pvecback = pbpaw->pvecback;
 
   /** Note that we want to reuse as much as possible of the usual tau
@@ -1362,7 +1322,7 @@ void BackgroundModule::background_derivs_loga_member(
   y[index_bi_a_] = a;
 
   /** Get derivatives w.r.t. conformal time */
-  background_derivs_member(tau, y, dy, parameters_and_workspace);
+  background_derivs(tau, y, dy, pbpaw);
 
   /** Swap a and tau again */
   y[index_bi_a_] = tau;
@@ -1379,23 +1339,10 @@ void BackgroundModule::background_derivs_loga_member(
 void BackgroundModule::background_derivs_diagonal_loga(double loga,
                                                        double* y,
                                                        double* diag,
-                                                       void* parameters_and_workspace) {
-  auto* pbpaw = static_cast<background_parameters_and_workspace*>(parameters_and_workspace);
-  pbpaw->background_module->background_derivs_diagonal_loga_member(loga,
-                                                                   y,
-                                                                   diag,
-                                                                   parameters_and_workspace);
-}
-
-void BackgroundModule::background_derivs_diagonal_loga_member(double loga,
-                                                              double* y,
-                                                              double* diag,
-                                                              void* parameters_and_workspace) {
-  background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
-      parameters_and_workspace);
+                                                       background_parameters_and_workspace* pbpaw) {
   double* pvecback = pbpaw->pvecback;
 
-  // Same a/tau slot swap as background_derivs_loga_member: index_bi_a_ holds tau
+  // Same a/tau slot swap as background_derivs_loga: index_bi_a_ holds tau
   // during integration, and the species read a from pvecback, which
   // background_functions fills.
   double a       = exp(loga);
@@ -1403,7 +1350,7 @@ void BackgroundModule::background_derivs_diagonal_loga_member(double loga,
   y[index_bi_a_] = a;
 
   // pvecback must be populated before the species are asked: they read a and H from
-  // it. background_derivs_member does this via background_functions on every call;
+  // it. background_derivs does this via background_functions on every call;
   // do the same here rather than relying on a previous derivs call having left the
   // right state behind, which would make the evolver's call ORDER load-bearing.
   background_functions(y, pba->normal_info, pvecback);
@@ -1434,8 +1381,10 @@ void BackgroundModule::background_derivs_diagonal_loga_member(double loga,
   }
 }
 
-void BackgroundModule::background_add_line_to_bg_table_member(
-    double loga, double* y, double* dy, int index_loga, void* parameters_and_workspace) {
+void BackgroundModule::background_add_line_to_bg_table(double loga,
+                                                       double* y,
+                                                       double* dy,
+                                                       int index_loga) {
   double a       = exp(loga);
   double tau     = y[index_bi_a_];
   y[index_bi_a_] = a;
@@ -1460,23 +1409,20 @@ void BackgroundModule::background_add_line_to_bg_table_member(
 void BackgroundModule::background_print_variables(double loga,
                                                   double* y,
                                                   double* dy,
-                                                  void* parameters_and_workspace) {
-  background_parameters_and_workspace* pbpaw = static_cast<background_parameters_and_workspace*>(
-      parameters_and_workspace);
-  double* pvecback     = pbpaw->pvecback;
-  BackgroundModule& bm = *(pbpaw->background_module);
+                                                  background_parameters_and_workspace* pbpaw) {
+  double* pvecback = pbpaw->pvecback;
 
-  double a          = exp(loga);
-  double tau        = y[bm.index_bi_a_];
-  y[bm.index_bi_a_] = a;
+  double a       = exp(loga);
+  double tau     = y[index_bi_a_];
+  y[index_bi_a_] = a;
 
   /** - calculate functions of \f$ a \f$ with background_functions() */
-  bm.background_functions(y, bm.pba->normal_info, pvecback);
+  background_functions(y, pba->normal_info, pvecback);
 
   /** Swap a and tau again */
-  y[bm.index_bi_a_] = tau;
+  y[index_bi_a_] = tau;
   //FILE* fid = fopen("tmp.dat", "a");
-  //fprintf(fid, "%.3e %.3e %.3e %.3e %.3e %.3e\n", exp(loga), tau, pvecback[bm.index_bg_rho_ncdm1_], pvecback[bm.index_bg_rho_dr_species_], y[bm.index_bi_rho_dr_species_], pvecback[bm.index_bg_lnf_ncdm_decay_dr1_ + 2]);
+  //fprintf(fid, "%.3e %.3e %.3e %.3e %.3e %.3e\n", exp(loga), tau, pvecback[index_bg_rho_ncdm1_], pvecback[index_bg_rho_dr_species_], y[index_bi_rho_dr_species_], pvecback[index_bg_lnf_ncdm_decay_dr1_ + 2]);
   //fclose(fid);
 }
 

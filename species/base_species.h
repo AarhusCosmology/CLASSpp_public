@@ -475,7 +475,7 @@ class BaseSpecies {
   /**
    * Append this species' time-evolution variables to writer.
    * Called from perturb_prepare_k_output (title mode, tau=0/y=nullptr/ppw=nullptr)
-   * and perturb_print_variables_member (data mode).
+   * and perturb_print_variables (data mode).
    * Guard computation behind: if (!writer.IsTitleMode()) { ... compute ... }
    * Use writer.Add(title, computed_value, active).
    *
@@ -495,7 +495,7 @@ class BaseSpecies {
 
   /**
    * Write per-k, per-tau source values for this species into the source table.
-   * Called in perturb_sources_member() after metric/temperature sources are set.
+   * Called in perturb_sources() after metric/temperature sources are set.
    * Use ctx.p_mod->SetSourceValue(ctx.index_md, ctx.index_ic, ctx.p_mod->index_tp_XXX_,
    *                               ctx.index_tau, ctx.index_k, value).
    * All addressing (index_md, index_ic, index_k, index_tau) is in ctx.

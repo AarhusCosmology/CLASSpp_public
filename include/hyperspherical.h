@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common.h"
+#include "function_ref.h"
 
 #define _HYPER_OVERFLOW_ 1e200
 #define _ONE_OVER_HYPER_OVERFLOW_ 1e-200
@@ -107,16 +108,15 @@ double coef3(double z);
 double coef4(double z);
 double cheb(double x, int n, const double A[]);
 
-double PhiWKB_minus_phiminabs(double x, void* param);
+double PhiWKB_minus_phiminabs(double x, const WKB_parameters& wkbparam);
 
 void hyperspherical_get_xmin_from_Airy(
     int K, int l, double beta, double xtol, double phiminabs, double* xmin, int* fevals);
 
-bool fzero_ridder(double (*func)(double, void*),
+bool fzero_ridder(FunctionRef<double(double x)> func,
                   double x1,
                   double x2,
                   double xtol,
-                  void* param,
                   const double* Fx1,
                   const double* Fx2,
                   double* xzero,

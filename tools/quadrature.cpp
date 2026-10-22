@@ -148,8 +148,7 @@ bool get_qsampling_manual(double* x,
                           enum quadrature_method method,
                           double* qvec,
                           int qsiz,
-                          void (*function)(void* params_for_function, double q, double* f0),
-                          void* params_for_function,
+                          QuadratureFunction distribution_function,
                           const GBQuadParams& gb) {
   double y;
   double h;
@@ -163,7 +162,7 @@ bool get_qsampling_manual(double* x,
       std::vector<double> c(N);
       compute_Laguerre(x, dq, N, 0.0, b.data(), c.data(), true);
       for (int i = 0; i < N; i++) {
-        (*function)(params_for_function, x[i], &y);
+        distribution_function(x[i], &y);
         w[i] = dq[i] * y;
       }
       return true;
@@ -180,7 +179,7 @@ bool get_qsampling_manual(double* x,
                    "qm_FermiDirac produced an abscissa outside the representable Fermi-Dirac "
                    "weight range");
         dq[i] = fd_weight[i] / reference_weight;
-        (*function)(params_for_function, x[i], &y);
+        distribution_function(x[i], &y);
         w[i] = dq[i] * y;
       }
       return true;
@@ -202,7 +201,7 @@ bool get_qsampling_manual(double* x,
       for (int i = 0; i < N; i++) {
         dq[i] *= pow(x[i], -(gb.alpha + 1.)) * scaling;  // bare weight (uses original node)
         x[i]  *= scaling;                                // rescale node onto the alpha*x grid
-        (*function)(params_for_function, x[i], &y);      // y = f0(x[i])
+        distribution_function(x[i], &y);                 // y = f0(x[i])
         w[i] = dq[i] * y;
       }
       return true;
@@ -212,7 +211,7 @@ bool get_qsampling_manual(double* x,
         /** Note that we count q=0 as an extra point with weight 0 */
         h    = qmax / N;
         x[i] = h + i * h;
-        (*function)(params_for_function, x[i], &y);
+        distribution_function(x[i], &y);
         dq[i] = h;
         w[i]  = y * h;
         if (i == N - 1) {
@@ -228,7 +227,7 @@ bool get_qsampling_manual(double* x,
         h    = 1.0 / (N + 1.0);
         t    = h + i * h;
         x[i] = 1.0 / t - 1.0;
-        (*function)(params_for_function, x[i], &y);
+        distribution_function(x[i], &y);
         dq[i] = h / t / t;
         w[i]  = dq[i] * y;
       }
@@ -243,9 +242,8 @@ void get_qsampling(double* x,
                    double rtol,
                    double* qvec,
                    int qsiz,
-                   void (*test_function)(void* params_for_function, double q, double* psi),
-                   void (*distribution_function)(void* params_for_function, double q, double* f0),
-                   void* params_for_function) {
+                   QuadratureFunction test_function,
+                   QuadratureFunction distribution_function) {
   /* This routine returns the fewest possible number of abscissas and weights under
      the requirement that a test function folded with the neutrino distribution function
      can be integrated to an accuracy of rtol. If the distribution function is Fermi-Dirac
@@ -320,15 +318,7 @@ void get_qsampling(double* x,
   }
 
   /* First do the adaptive quadrature - this will also give the value of the integral: */
-  gk_adapt(root,
-           (*test_function),
-           (*distribution_function),
-           params_for_function,
-           rtol * 1e-4,
-           1,
-           0.0,
-           1.0,
-           true);
+  gk_adapt(root, test_function, distribution_function, rtol * 1e-4, 1, 0.0, 1.0, true);
   /* Do a leaf count: */
   leaf_count(root.get());
   /* I can get the integral now: */
@@ -362,24 +352,24 @@ void get_qsampling(double* x,
   /* Combined adaptive quadrature and Laguerre rescaled quadrature: */
   if (qvec != nullptr) {
     /* Evaluate [0;qmin] using 4 point Gauss-Legendre rule: */
-    (*distribution_function)(params_for_function, qmin, &y2);
+    distribution_function(qmin, &y2);
     for (i = 0, I_atzero = 0.0; i < N_comb_leg; i++) {
       q_leg[i] = 0.5 * qmin * (1.0 + q_leg[i]);
       w_leg[i] = w_leg[i] * 0.5 * qmin * y2;
-      (*test_function)(params_for_function, q_leg[i], &y);
+      test_function(q_leg[i], &y);
       I_atzero += w_leg[i] * y;
     }
 
     /* Find asymptotic extrapolation:*/
-    (*distribution_function)(params_for_function, qmaxm1, &y1);
-    (*distribution_function)(params_for_function, qmax, &y2);
+    distribution_function(qmaxm1, &y1);
+    distribution_function(qmax, &y2);
 
     b_comb = (y1 / y2 - 1.0) / (qmax - qmaxm1);
     b_comb = std::max(b_comb, 1e-100);
     //c_comb = -b_comb*qmax;
     a_comb = y2 * exp(b_comb * qmax);
     // printf("f(q) = %g*exp(-%g*q) \n",a_comb,b_comb);
-    //(*distribution_function)(params_for_function,100,&y2);
+    //distribution_function(100,&y2);
     //printf("f(100) = %e ?= %e\n",y2,a_comb*exp(-b_comb*100));
 
     /* Evaluate tail using 6 point Laguerre: */
@@ -388,20 +378,12 @@ void get_qsampling(double* x,
       w_lag[i] *= exp(-q_lag[i]);
       q_lag[i]  = qmax + q_lag[i] / b_comb;
       w_lag[i]  = a_comb / b_comb * exp(-b_comb * qmax) * w_lag[i];
-      (*test_function)(params_for_function, q_lag[i], &y);
+      test_function(q_lag[i], &y);
       I_atinf += w_lag[i] * y;
     }
 
     /* Do the adaptive quadrature - this will also give the main part of the integral: */
-    gk_adapt(root_comb,
-             (*test_function),
-             (*distribution_function),
-             params_for_function,
-             rtol * 1e-2,
-             1,
-             qmin,
-             qmax,
-             false);
+    gk_adapt(root_comb, test_function, distribution_function, rtol * 1e-2, 1, qmin, qmax, false);
     /* Do a leaf count: */
     leaf_count(root_comb.get());
     /* Starting from the top, move down in levels until tolerance is met: */
@@ -434,8 +416,8 @@ void get_qsampling(double* x,
     compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), true);
     ILag = 0.0;
     for (i = 0; i < NLag; i++) {
-      (*test_function)(params_for_function, x[i], &y);
-      (*distribution_function)(params_for_function, x[i], &y2);
+      test_function(x[i], &y);
+      distribution_function(x[i], &y2);
       w[i] *= y2;
       ILag += y * w[i];
     }
@@ -461,8 +443,8 @@ void get_qsampling(double* x,
       compute_Laguerre(x, w, NLag, 0.0, b.data(), c.data(), true);
       ILag = 0.0;
       for (i = 0; i < NLag; i++) {
-        (*test_function)(params_for_function, x[i], &y);
-        (*distribution_function)(params_for_function, x[i], &y2);
+        test_function(x[i], &y);
+        distribution_function(x[i], &y2);
         w[i] *= y2;
         ILag += y * w[i];
       }
@@ -492,8 +474,8 @@ void get_qsampling(double* x,
 
     IFD = 0.;
     for (i = 0; i < NFD; ++i) {
-      (*test_function)(params_for_function, x_fd[i], &y);
-      (*distribution_function)(params_for_function, x_fd[i], &y2);
+      test_function(x_fd[i], &y);
+      distribution_function(x_fd[i], &y2);
       w_fd[i] *= y2 / fermi_dirac_weight(x_fd[i]);
       IFD     += y * w_fd[i];
     }
@@ -556,7 +538,7 @@ void get_qsampling(double* x,
     class_test(!compute_FermiDirac(x, w, *N),
                "Could not reconstruct the selected Fermi-Dirac quadrature rule");
     for (i = 0; i < *N; ++i) {
-      (*distribution_function)(params_for_function, x[i], &y);
+      distribution_function(x[i], &y);
       w[i] *= y / fermi_dirac_weight(x[i]);
     }
   }
@@ -707,9 +689,8 @@ double get_integral(qss_node* node, int level) {
 }
 
 void gk_adapt(std::unique_ptr<qss_node>& node,
-              void (*test)(void* params_for_function, double q, double* psi),
-              void (*function)(void* params_for_function, double q, double* f0),
-              void* params_for_function,
+              QuadratureFunction test_function,
+              QuadratureFunction distribution_function,
               double tol,
               int treemode,
               double a,
@@ -726,7 +707,7 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
     node->w.resize(15);
   }
 
-  gk_quad((*test), (*function), params_for_function, node.get(), a, b, isindefinite);
+  gk_quad(test_function, distribution_function, node.get(), a, b, isindefinite);
   if ((fabs(node->err / node->I) < tol) || (tol >= 1.0)) {
     /* Stop recursion and return. tol>=1.0 in case of I=0 infinite recursion */
     return;
@@ -735,9 +716,8 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
   mid = 0.5 * (a + b);
   //printf("<-%g,%g,%g,%g",mid,tol,(*node)->err,(*node)->I);
   gk_adapt(node->left,
-           (*test),
-           (*function),
-           params_for_function,
+           test_function,
+           distribution_function,
            1.5 * tol,
            treemode,
            a,
@@ -745,9 +725,8 @@ void gk_adapt(std::unique_ptr<qss_node>& node,
            isindefinite);
   //printf("%g->",mid);
   gk_adapt(node->right,
-           (*test),
-           (*function),
-           params_for_function,
+           test_function,
+           distribution_function,
            1.5 * tol,
            treemode,
            mid,
@@ -920,9 +899,8 @@ bool compute_FermiDirac(double* x, double* w, int N) {
   return true;
 }
 
-void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
-             void (*function)(void* params_for_function, double q, double* f0),
-             void* params_for_function,
+void gk_quad(QuadratureFunction test_function,
+             QuadratureFunction distribution_function,
              qss_node* node,
              double a,
              double b,
@@ -995,8 +973,8 @@ void gk_quad(void (*test)(void* params_for_function, double q, double* psi),
     else {
       x = t;
     }
-    (*test)(params_for_function, x, &y);
-    (*function)(params_for_function, x, &y2);
+    test_function(x, &y);
+    distribution_function(x, &y2);
     wk *= y2;
     /* Update Kronrod integral: */
     Ik += wk * y;

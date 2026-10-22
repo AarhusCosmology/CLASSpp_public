@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common.h"
+#include "evolver_options.h"  // EvolverDerivs
 
 struct generic_integrator_workspace {
   int n = 0;
@@ -31,30 +32,23 @@ void initialize_generic_integrator(int n_dim, struct generic_integrator_workspac
 
 void cleanup_generic_integrator(struct generic_integrator_workspace* pgi);
 
-void generic_integrator(
-    void (*derivs)(double x, double y[], double yprime[], void* parameters_and_workspace),
-    double x1,
-    double x2,
-    double ystart[],
-    void* parameters_and_workspace_for_derivs,
-    double eps,
-    double hmin,
-    struct generic_integrator_workspace* pgi);
+void generic_integrator(EvolverDerivs derivs,
+                        double x1,
+                        double x2,
+                        double ystart[],
+                        double eps,
+                        double hmin,
+                        struct generic_integrator_workspace* pgi);
 
 void rkqs(double* x,
           double htry,
           double eps,
           double* hdid,
           double* hnext,
-          void (*derivs)(double, double[], double[], void*),
-          void* parameters_and_workspace_for_derivs,
+          EvolverDerivs derivs,
           struct generic_integrator_workspace* pgi);
 
-void rkck(double x,
-          double h,
-          void (*derivs)(double, double[], double[], void*),
-          void* parameters_and_workspace_for_derivs,
-          struct generic_integrator_workspace* pgi);
+void rkck(double x, double h, EvolverDerivs derivs, struct generic_integrator_workspace* pgi);
 
 /**************************************************************/
 

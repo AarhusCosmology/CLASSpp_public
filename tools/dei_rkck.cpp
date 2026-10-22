@@ -31,15 +31,13 @@ void initialize_generic_integrator(int n_dim, struct generic_integrator_workspac
  */
 void cleanup_generic_integrator(struct generic_integrator_workspace* pgi) {}
 
-void generic_integrator(
-    void (*derivs)(double x, double y[], double yprime[], void* parameters_and_workspace),
-    double x1,
-    double x2,
-    double ystart[],
-    void* parameters_and_workspace_for_derivs,
-    double eps,
-    double hmin,
-    struct generic_integrator_workspace* pgi)
+void generic_integrator(EvolverDerivs derivs,
+                        double x1,
+                        double x2,
+                        double ystart[],
+                        double eps,
+                        double hmin,
+                        struct generic_integrator_workspace* pgi)
 
 {
   int nstp;
@@ -57,14 +55,14 @@ void generic_integrator(
     pgi->y[i] = ystart[i];
   }
   for (nstp = 1; nstp <= _MAXSTP_; nstp++) {
-    (*derivs)(x, pgi->y.data(), pgi->dydx.data(), parameters_and_workspace_for_derivs);
+    derivs(x, pgi->y.data(), pgi->dydx.data());
     for (i = 0; i < pgi->n; i++) {
       pgi->yscal[i] = fabs(pgi->y[i]) + fabs(pgi->dydx[i] * h) + _TINY_;
     }
     if ((x + h - x2) * (x + h - x1) > 0.0) {
       h = x2 - x;
     }
-    rkqs(&x, h, eps, &hdid, &hnext, derivs, parameters_and_workspace_for_derivs, pgi);
+    rkqs(&x, h, eps, &hdid, &hnext, derivs, pgi);
     if ((x - x2) * (x2 - x1) >= 0.0) {
       for (i = 0; i < pgi->n; i++) {
         ystart[i] = pgi->y[i];
@@ -92,8 +90,7 @@ void rkqs(double* x,
           double eps,
           double* hdid,
           double* hnext,
-          void (*derivs)(double, double[], double[], void*),
-          void* parameters_and_workspace_for_derivs,
+          EvolverDerivs derivs,
           struct generic_integrator_workspace* pgi) {
   int i;
   double errmax;
@@ -103,7 +100,7 @@ void rkqs(double* x,
 
   h = htry;
   for (;;) {
-    rkck(*x, h, derivs, parameters_and_workspace_for_derivs, pgi);
+    rkck(*x, h, derivs, pgi);
     errmax = 0.0;
     for (i = 0; i < pgi->n; i++) {
       errmax = std::max(errmax, fabs(pgi->yerr[i] / pgi->yscal[i]));
@@ -129,50 +126,34 @@ void rkqs(double* x,
   }
 }
 
-void rkck(double x,
-          double h,
-          void (*derivs)(double, double[], double[], void*),
-          void* parameters_and_workspace_for_derivs,
-          struct generic_integrator_workspace* pgi) {
+void rkck(double x, double h, EvolverDerivs derivs, struct generic_integrator_workspace* pgi) {
   int i;
 
   for (i = 0; i < pgi->n; i++) {
     pgi->ytemp[i] = pgi->y[i] + _RKCK_b21_ * h * pgi->dydx[i];
   }
 
-  (*derivs)(x + _RKCK_a2_ * h,
-            pgi->ytemp.data(),
-            pgi->ak2.data(),
-            parameters_and_workspace_for_derivs);
+  derivs(x + _RKCK_a2_ * h, pgi->ytemp.data(), pgi->ak2.data());
 
   for (i = 0; i < pgi->n; i++) {
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b31_ * pgi->dydx[i] + _RKCK_b32_ * pgi->ak2[i]);
   }
 
-  (*derivs)(x + _RKCK_a3_ * h,
-            pgi->ytemp.data(),
-            pgi->ak3.data(),
-            parameters_and_workspace_for_derivs);
+  derivs(x + _RKCK_a3_ * h, pgi->ytemp.data(), pgi->ak3.data());
 
   for (i = 0; i < pgi->n; i++) {
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b41_ * pgi->dydx[i] + _RKCK_b42_ * pgi->ak2[i] +
                                      _RKCK_b43_ * pgi->ak3[i]);
   }
 
-  (*derivs)(x + _RKCK_a4_ * h,
-            pgi->ytemp.data(),
-            pgi->ak4.data(),
-            parameters_and_workspace_for_derivs);
+  derivs(x + _RKCK_a4_ * h, pgi->ytemp.data(), pgi->ak4.data());
 
   for (i = 0; i < pgi->n; i++) {
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b51_ * pgi->dydx[i] + _RKCK_b52_ * pgi->ak2[i] +
                                      _RKCK_b53_ * pgi->ak3[i] + _RKCK_b54_ * pgi->ak4[i]);
   }
 
-  (*derivs)(x + _RKCK_a5_ * h,
-            pgi->ytemp.data(),
-            pgi->ak5.data(),
-            parameters_and_workspace_for_derivs);
+  derivs(x + _RKCK_a5_ * h, pgi->ytemp.data(), pgi->ak5.data());
 
   for (i = 0; i < pgi->n; i++) {
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_b61_ * pgi->dydx[i] + _RKCK_b62_ * pgi->ak2[i] +
@@ -180,10 +161,7 @@ void rkck(double x,
                                      _RKCK_b65_ * pgi->ak5[i]);
   }
 
-  (*derivs)(x + _RKCK_a6_ * h,
-            pgi->ytemp.data(),
-            pgi->ak6.data(),
-            parameters_and_workspace_for_derivs);
+  derivs(x + _RKCK_a6_ * h, pgi->ytemp.data(), pgi->ak6.data());
 
   for (i = 0; i < pgi->n; i++) {
     pgi->ytemp[i] = pgi->y[i] + h * (_RKCK_c1_ * pgi->dydx[i] + _RKCK_c3_ * pgi->ak3[i] +

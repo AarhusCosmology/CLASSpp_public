@@ -47,17 +47,17 @@ double RuntimeInf() {
 
 // y' = 1 until x > 0.5, then non-finite -- the shape of the real failure, where a
 // healthy integration runs into a poisoned right-hand side partway through.
-void derivs_goes_nan(double x, double* /*y*/, double* dy, void* /*p*/) {
+void derivs_goes_nan(double x, double* /*y*/, double* dy) {
   dy[0] = (x > 0.5) ? RuntimeNaN() : 1.0;
 }
 
-void derivs_finite(double /*x*/, double* /*y*/, double* dy, void* /*p*/) {
+void derivs_finite(double /*x*/, double* /*y*/, double* dy) {
   dy[0] = 1.0;
 }
 
-// The evolver null-guards print_variables but NOT output (real callers always supply
-// one), so a no-op is required rather than nullptr.
-void output_noop(double /*x*/, double /*y*/[], double /*dy*/[], int /*index_x*/, void* /*p*/) {}
+// print_variables is optional but output is not (real callers always supply one), so
+// a no-op is required rather than leaving it unset.
+void output_noop(double /*x*/, double* /*y*/, double* /*dy*/, int /*index_x*/) {}
 
 void test_bit_check_survives_fast_math() {
   // The load-bearing property: these must be true even where std::isnan is not
@@ -91,7 +91,7 @@ void test_evolver_aborts_on_nonfinite() {
       opt.x_sampling      = xs.data();
       opt.x_sampling_size = static_cast<int>(xs.size());
       opt.output          = output_noop;
-      evolver_rkdp45(derivs_goes_nan, 0., 1., &y, 1, nullptr, opt);
+      evolver_rkdp45(derivs_goes_nan, 0., 1., &y, 1, opt);
     }
   }
   catch (const std::runtime_error& e) {
@@ -118,7 +118,7 @@ void test_finite_run_still_completes() {
     opt.x_sampling      = xs.data();
     opt.x_sampling_size = static_cast<int>(xs.size());
     opt.output          = output_noop;
-    evolver_rkdp45(derivs_finite, 0., 1., &y, 1, nullptr, opt);
+    evolver_rkdp45(derivs_finite, 0., 1., &y, 1, opt);
   }
   assert(y > 0.999 && y < 1.001);  // y' = 1 over [0,1]
   std::printf("nonfinite: finite run unaffected (y=%.6f)\n", y);

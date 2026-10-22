@@ -181,6 +181,10 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     strategy = DefaultQuadratureStrategy();
   }
 
+  auto distribution_function = [&pbadist](double q, double* f0) {
+    DistributionFunction(&pbadist, q, f0);
+  };
+
   // Handle perturbation quadrature
   if (strategy == qm_auto) {
     q_.resize(_QUADRATURE_MAX_);
@@ -194,8 +198,7 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                   pbadist.q.data(),
                   pbadist.tablesize,
                   TestFunction,
-                  DistributionFunction,
-                  &pbadist);
+                  distribution_function);
     q_.resize(q_size);
     w_.resize(q_size);
 
@@ -210,8 +213,7 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                   pbadist.q.data(),
                   pbadist.tablesize,
                   TestFunction,
-                  DistributionFunction,
-                  &pbadist);
+                  distribution_function);
     q_bg_.resize(q_size_bg);
     w_bg_.resize(q_size_bg);
   }
@@ -228,8 +230,7 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                          static_cast<enum quadrature_method>(strategy),
                          pbadist.q.data(),
                          pbadist.tablesize,
-                         DistributionFunction,
-                         &pbadist,
+                         distribution_function,
                          gb);
 
     q_bg_.resize(input_q_size_bg_);
@@ -243,8 +244,7 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                          static_cast<enum quadrature_method>(strategy),
                          pbadist.q.data(),
                          pbadist.tablesize,
-                         DistributionFunction,
-                         &pbadist,
+                         distribution_function,
                          gb);
   }
 
@@ -313,11 +313,10 @@ double NCDMBaseSpecies::EvaluatePsdAnalytic(double q) const {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DistributionFunction — static callback
+// DistributionFunction
 // ─────────────────────────────────────────────────────────────────────────────
 
-void NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
-  auto* p                   = static_cast<DistributionParams*>(params);
+void NCDMBaseSpecies::DistributionFunction(DistributionParams* p, double q, double* f0) {
   const NCDMBaseSpecies* sp = p->sp;
 
   if (p->tablesize > 0) {
@@ -350,10 +349,10 @@ void NCDMBaseSpecies::DistributionFunction(void* params, double q, double* f0) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestFunction — static callback
+// TestFunction
 // ─────────────────────────────────────────────────────────────────────────────
 
-void NCDMBaseSpecies::TestFunction(void* /*params*/, double q, double* test) {
+void NCDMBaseSpecies::TestFunction(double q, double* test) {
   double c = 2.0 / (3.0 * _zeta3_);
   double d = 120.0 / (7.0 * pow(_PI_, 4));
   double e = 2.0 / (45.0 * _zeta5_);
@@ -845,7 +844,7 @@ void NCDMBaseSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLa
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PerturbTensorDerivs (layout-based)
-// Ports the per-species tensor Boltzmann hierarchy from perturb_derivs_member.
+// Ports the per-species tensor Boltzmann hierarchy from perturb_derivs.
 // GetDlnf0Dlnq is supplied by the concrete subclass:
 //   NCDMSpecies → static dlnf0_dlnq_[iq]
 //   DNCDMSpecies → pvecback[bg_dlnfdlnq_index + iq]

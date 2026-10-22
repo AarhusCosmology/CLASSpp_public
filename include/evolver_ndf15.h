@@ -85,16 +85,15 @@ void adjust_stepsize(double** dif, double abshdivabshlast, int neq, int k);
 void eqvec(const double* datavec, double* emptyvec, int n);
 void lubksb(double** a, int n, const int* indx, double b[]);
 bool ludcmp(double** a, int n, int* indx, double* d, double* vv);
-void fzero_Newton(void (*func)(double* x, int x_size, void* param, double* F),
+void fzero_Newton(FunctionRef<void(double* x, int x_size, double* F)> func,
                   double* x_inout,
                   const double* dxdF,
                   int x_size,
                   double tolx,
                   double tolF,
-                  void* param,
                   int* fevals);
 
-void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and_workspace),
+void numjac(EvolverDerivs derivs,
             double t,
             double* y,
             double* fval,
@@ -102,8 +101,7 @@ void numjac(void (*derivs)(double x, double* y, double* dy, void* parameters_and
             struct numjac_workspace* nj_ws,
             double thresh,
             int neq,
-            int* nfe,
-            void* parameters_and_workspace_for_derivs);
+            int* nfe);
 
 /** Variable-order (1-5) BDF evolver with an adaptive step, for stiff systems.
  *
@@ -115,7 +113,6 @@ void evolver_ndf15(EvolverDerivs derivs,
                    double x_final,
                    double* y_inout,
                    int neq,
-                   void* parameters_and_workspace_for_derivs,
                    const EvolverOptions& options);
 
 /**************************************************************/

@@ -37,11 +37,10 @@ void EvolverOptionsCheck(const EvolverOptions& options,
                     x_ini,
                     options.x_sampling[options.x_sampling_size - 1]);
 
-  /* Called at least once, because x_sampling is non-empty, and invoked without a
-     null check by every evolver. */
-  class_test_severe(options.output == nullptr,
-                    "%s: output must be non-null; it is called at every x_sampling point "
-                    "without a null check. Pass a no-op if the samples are not wanted.",
+  /* Called at least once, because x_sampling is non-empty. */
+  class_test_severe(!options.output.has_value(),
+                    "%s: output must be set; it is called at every x_sampling point. "
+                    "Pass a no-op if the samples are not wanted.",
                     evolver_name);
   class_test_severe(options.used_in_output == nullptr,
                     "%s: used_in_output must be non-null, one entry per equation. The "
@@ -78,9 +77,9 @@ void EvolverOptionsCheck(const EvolverOptions& options,
   };
 
   reject(EvolverFeature::Timescale,
-         options.evaluate_timescale != nullptr || options.timestep_over_timescale != 0.,
+         options.evaluate_timescale.has_value() || options.timestep_over_timescale != 0.,
          "evaluate_timescale / timestep_over_timescale");
-  reject(EvolverFeature::Diagonal, options.derivs_diagonal != nullptr, "derivs_diagonal");
+  reject(EvolverFeature::Diagonal, options.derivs_diagonal.has_value(), "derivs_diagonal");
   reject(EvolverFeature::MaxOrder, options.max_order != 0, "max_order");
   reject(EvolverFeature::AbsTol, options.abstol != kEvolverDefaultAbsTol, "a non-default abstol");
   reject(EvolverFeature::ErkController, options.erk.has_value(), "erk");
@@ -88,11 +87,10 @@ void EvolverOptionsCheck(const EvolverOptions& options,
   reject(EvolverFeature::Histograms, options.histograms != nullptr, "histograms");
 
   /* An evolver that honours the timescale pair does not merely accept it, it
-     REQUIRES it: the legacy rk takes its whole step size from there and calls
-     the function without a null check. So both must be SET, not merely set
-     together. */
+     REQUIRES it: the legacy rk takes its whole step size from there. So both
+     must be SET, not merely set together. */
   if (Honours(honoured, EvolverFeature::Timescale)) {
-    class_test_severe(options.evaluate_timescale == nullptr,
+    class_test_severe(!options.evaluate_timescale.has_value(),
                       "%s takes its step size from evaluate_timescale, so it is required.",
                       evolver_name);
     /* A negative factor would send the step backwards while the loop condition

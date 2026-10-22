@@ -99,7 +99,7 @@ class InputModule {
     std::vector<std::string> last_unknowns;
     int evaluations = 0;
   };
-  static void ShootingResidual(double* x, int x_size, void* pworkspace, double* output);
+  static void ShootingResidual(const double* x, int x_size, double* output, ShootingWorkspace* w);
 
   void ConstructSpecies();
 

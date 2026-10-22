@@ -21,7 +21,6 @@ void evolver_rkdp45(EvolverDerivs derivs,
                     double x_end,
                     double* y,
                     int y_size,
-                    void* parameters_and_workspace_for_derivs,
                     const EvolverOptions& options) {
   EvolverOptionsCheck(options,
                       "evolver_rkdp45",
@@ -31,11 +30,5 @@ void evolver_rkdp45(EvolverDerivs derivs,
                        EvolverFeature::Histograms,
                        EvolverFeature::AbsTol});
 
-  evolver_erk_run<ErkDormandPrince45>(derivs,
-                                      x_ini,
-                                      x_end,
-                                      y,
-                                      y_size,
-                                      parameters_and_workspace_for_derivs,
-                                      options);
+  evolver_erk_run<ErkDormandPrince45>(derivs, x_ini, x_end, y, y_size, options);
 }

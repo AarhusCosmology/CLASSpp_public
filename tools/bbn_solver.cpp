@@ -51,9 +51,7 @@ inline double TemperatureMeV(double tau, double T9_initial) {
  *  the nuclear rates, and the nuclear rates need only the temperature, so
  *  computing in time removes what would otherwise look like a circular
  *  dependency between dT/dtau and dY/dtau. */
-void BbnDerivs(double tau, double* y, double* dy, void* parameters) {
-  BbnWorkspace& ws = *static_cast<BbnWorkspace*>(parameters);
-
+void BbnDerivs(double tau, double* y, double* dy, BbnWorkspace& ws) {
   const double T9  = ws.T9_initial * std::exp(-tau);
   const double T   = MeVFromT9(T9);
   const double a   = std::exp(y[kIdxLnA]);
@@ -175,9 +173,7 @@ void BbnDerivs(double tau, double* y, double* dy, void* parameters) {
   }
 }
 
-void BbnOutput(double tau, double* y, double* /*dy*/, int index, void* parameters) {
-  BbnWorkspace& ws = *static_cast<BbnWorkspace*>(parameters);
-
+void BbnOutput(double tau, double* y, int index, BbnWorkspace& ws) {
   /* The pre-pass records ln a, which is what turns T_nu into a function of the
      integration coordinate and so makes the weak-rate table possible. */
   if (index < static_cast<int>(ws.trajectory_lna.size())) {
@@ -360,14 +356,19 @@ BbnResult SolveBbn(const BbnInput& input) {
                         eta_target * BbnPlasma::NumberDensityPhoton(T_initial_mev),
                         &y[kIdxY]);
 
+  auto derivs = [&ws](double tau, double* y_tau, double* dy) { BbnDerivs(tau, y_tau, dy, ws); };
+  auto output = [&ws](double tau, double* y_tau, double* /*dy*/, int index) {
+    BbnOutput(tau, y_tau, index, ws);
+  };
+
   EvolverOptions options;
   options.rtol            = input.tolerance;
   options.used_in_output  = used_in_output.data();
-  options.output          = BbnOutput;
+  options.output          = output;
   options.x_sampling      = prepass_tau.data();
   options.x_sampling_size = prepass_samples;
 
-  evolver_ndf15(BbnDerivs, 0.0, tau_end, y.data(), kNeq, &ws, options);
+  evolver_ndf15(derivs, 0.0, tau_end, y.data(), kNeq, options);
 
   const double eta_growth = y[kIdxEta] / eta_target;
   result.aT_ratio         = std::exp(y[kIdxLnA]) * input.T9_final / input.T9_initial;
@@ -420,7 +421,7 @@ BbnResult SolveBbn(const BbnInput& input) {
     options.x_sampling      = tau_samples.data();
     options.x_sampling_size = static_cast<int>(tau_samples.size());
 
-    evolver_ndf15(BbnDerivs, 0.0, tau_end, y.data(), kNeq, &ws, options);
+    evolver_ndf15(derivs, 0.0, tau_end, y.data(), kNeq, options);
 
     /* The pre-pass promised this; if it is not delivered, the assumption that the
        growth factor is eta-independent has failed and the answer is not the
