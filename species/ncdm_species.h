@@ -138,5 +138,4 @@ class NCDMSpecies : public NCDMBaseSpecies {
 
   int index_bg_number_   = -1;
   int index_bg_pseudo_p_ = -1;
-  int index_pt_psi0_     = -1;
 };

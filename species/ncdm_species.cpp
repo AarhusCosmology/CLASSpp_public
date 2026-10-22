@@ -325,8 +325,6 @@ void NCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   // This species only exists when NCDM is present, so the legacy pba->has_ncdm guard is gone.
   auto& layout = static_cast<NCDMBaseSpecies::PerturbLayout&>(base);
 
-  index_pt_psi0_ = index_pt;
-
   const bool fa_on = (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_on));
   if (fa_on) {
     layout.l_max  = 2;

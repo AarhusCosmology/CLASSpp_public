@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <utility>
 
 #include "constants.h"
@@ -51,6 +52,33 @@ double HeliumRateCorrection(double T_rad_atomic_eV) {
   return 1. + (a0 + a1 * u + a2 * u2) / (1. + d2 * u2 + d4 * u2 * u2);
 }
 
+/* HYREC-2 opens its tables by strcat-ing their names onto path in buffers of SIZE_InputFile
+   characters, and reports a table it cannot open with the whole path (hydrogen.c). That report
+   overflowed a 128-character message under a path longer than about 60 characters, so a missing
+   data directory under a deep site-packages ended the run with SIGTRAP from the fortified
+   sprintf instead of an error (the buffer is now SIZE_ErrorM, hyrec/PROVENANCE.md). A longer path
+   overflows the names themselves. So the tables are checked here first, before HYREC-2 starts
+   allocating, and only then is its data allocated. */
+HyrecData* NewHyrecDataForTables(const std::string& path) {
+  for (const char* table : {ALPHA_FILE, RR_FILE, TWOG_FILE, FIT_FILE}) {
+    const std::string file = path + table;
+    class_test(file.size() >= SIZE_InputFile,
+               "HYREC-2 reads its table %s into %d characters, but it is %zu characters long. "
+               "Move HYREC-2's data (the hyrec/ directory) to a shorter path and set "
+               "'hyrec_path' to it",
+               file.c_str(),
+               SIZE_InputFile - 1,
+               file.size());
+    class_test(!std::ifstream(file).good(),
+               "HYREC-2's table %s cannot be opened. 'hyrec_path' = %s must be the directory "
+               "of HYREC-2's data: CLASS's hyrec/ directory, which a pip install places next to "
+               "the classy module",
+               file.c_str(),
+               path.c_str());
+  }
+  return new HyrecData;
+}
+
 }  // namespace
 
 HyrecModel::HyrecModel(std::string path,
@@ -64,7 +92,7 @@ HyrecModel::HyrecModel(std::string path,
                        double nH0,
                        double z_initial,
                        bool He_rate_correction)
-    : data_(new HyrecData), path_(std::move(path)), fHe_(fHe),
+    : data_(NewHyrecDataForTables(path)), path_(std::move(path)), fHe_(fHe),
       He_rate_correction_(He_rate_correction) {
   /* hyrec_allocate reads the effective-rate and SWIFT-fit tables from this
      directory, so it has to be set first. HYREC-2 keeps the pointer, hence the

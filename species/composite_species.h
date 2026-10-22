@@ -251,6 +251,14 @@ class CompositeSpecies : public BaseSpecies {
       c->WarnIfNonlinearUnreliable(m_ev_threshold);
     }
   }
+  std::vector<double> FreeStreamingWavenumbers() const override {
+    std::vector<double> k_fs;
+    for (const auto& c : children_) {
+      const std::vector<double> child = c->FreeStreamingWavenumbers();
+      k_fs.insert(k_fs.end(), child.begin(), child.end());
+    }
+    return k_fs;
+  }
 
   /** Looks the name up among the children only. */
   std::optional<double> ChildOmega0(const std::string& name) const override {

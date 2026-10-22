@@ -15,6 +15,9 @@
  */
 class AsymptoticExtrapolation {
  public:
+  /** The fit uses the table points with k in [k_max / kFitRange, k_max). */
+  static constexpr double kFitRange = 3.;
+
   AsymptoticExtrapolation() = default;
 
   /**

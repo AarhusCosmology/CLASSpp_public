@@ -323,7 +323,4 @@ class DNCDMSpecies : public NCDMBaseSpecies {
   int index_bg_lnf_decay_dr1_  = -1;
   int index_bg_dlnfdlnq_decay_ = -1;
   int index_bg_dlnfdlnq_sep_   = -1;
-
-  // Perturbation indices
-  int index_pt_psi0_ = -1;
 };

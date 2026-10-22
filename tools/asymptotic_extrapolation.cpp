@@ -24,7 +24,7 @@ AsymptoticExtrapolation::AsymptoticExtrapolation(
   double suy = 0.;
   double svy = 0.;
   int points = 0;
-  for (int i = n - 2; (i >= 0) && (k[i] >= k_max / 3.); --i) {
+  for (int i = n - 2; (i >= 0) && (k[i] >= k_max / kFitRange); --i) {
     const double u  = std::log(k[i]) - ln_k_max_;
     const double v  = 1. / k[i] - inv_k_max_;
     const double y  = y_at(i) - y_max_;

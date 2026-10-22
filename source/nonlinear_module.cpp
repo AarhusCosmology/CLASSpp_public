@@ -6,7 +6,10 @@
 #include "nonlinear_module.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <exception>
+#include <future>
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -20,6 +23,7 @@
 #include "perturbations_module.h"
 #include "primordial_module.h"
 #include "thermodynamics_module.h"
+#include "thread_pool.h"
 
 namespace {
 
@@ -1058,12 +1062,6 @@ void NonlinearModule::nonlinear_init() {
   int index_tau_late;
   int index_pk;
 
-  std::vector<std::vector<double>> pk_nl;
-  std::vector<std::vector<double>> lnpk_l;
-  std::vector<std::vector<double>> ddlnpk_l;
-
-  bool nl_corr_not_computable_at_this_k = false;
-
   std::vector<double> pvecback;
   int last_index;
   double a;
@@ -1210,20 +1208,6 @@ void NonlinearModule::nonlinear_init() {
       printf("Computing non-linear matter power spectrum with HMcode \n");
     }
 
-    /** --> allocate temporary arrays for spectra at each given time/redshift */
-
-    pk_nl.resize(pk_size_);
-
-    lnpk_l.resize(pk_size_);
-
-    ddlnpk_l.resize(pk_size_);
-
-    for (index_pk = 0; index_pk < pk_size_; index_pk++) {
-      pk_nl[index_pk].resize(k_size_nl_);
-      lnpk_l[index_pk].resize(k_size_extra_);
-      ddlnpk_l[index_pk].resize(k_size_extra_);
-    }
-
     /** --> Then go through preliminary steps specific to HMcode */
 
     if (pnl->method == nl_HMcode) {
@@ -1234,164 +1218,226 @@ void NonlinearModule::nonlinear_init() {
       nonlinear_hmcode_baryonic_feedback();
     }
 
-    /** --> Loop over decreasing time/growing redhsift. For each
+    /** --> Loop over decreasing time/growing redshift. For each
             time/redshift, compute P_NL(k,z) using either Halofit or
-            HMcode */
+            HMcode. The times are independent, so they are shared among threads, each taking the
+            latest time not yet taken. Once the correction is not computable at some time (high z,
+            where k_NL exceeds the trusted k_max), it is not used at any earlier time either: a
+            thread stops at the first time before the latest such time found so far, and the times
+            computed meanwhile are reset below. An error at such a time is discarded too, since
+            the serial loop never got there: each time keeps its own error, and the first one
+            from today that lies after the stop is thrown below. */
 
-    /* this flag will become true at the minimum redshift such that
-       the non-lienar corrections cannot be consistently computed */
-    nl_corr_not_computable_at_this_k = false;
+    std::atomic<int> next_index_tau{tau_size_ - 1};
+    std::atomic<int> index_tau_not_computable{-1};
+    std::atomic<int> index_tau_stop{-1};
+    std::vector<std::exception_ptr> errors(tau_size_);
 
-    /* this index will refer to the value of time corresponding to
-       that redhsift */
-    index_tau_min_nl_ = 0;
+    auto raise_to = [](std::atomic<int>& index, int index_tau) {
+      int latest = index;
+      while ((index_tau > latest) && !index.compare_exchange_weak(latest, index_tau)) {
+      }
+    };
 
-    for (int index_tau = tau_size_ - 1; index_tau >= 0; index_tau--) {
-      /* loop over index_pk, defined such that it is ensured
-       * that index_pk starts at index_pk_cb when neutrinos are
-       * included. This is necessary for hmcode, since the sigmatable
-       * needs to be filled for sigma_cb only. Thus, when HMcode
-       * evalutes P_m_nl, it needs both P_m_l and P_cb_l. */
+    auto compute_nl_corrections = [&]() {
+      /* temporary arrays for the spectra at one time */
+      std::vector<std::vector<double>> pk_nl(pk_size_, std::vector<double>(k_size_nl_));
+      std::vector<std::vector<double>> lnpk_l(pk_size_, std::vector<double>(k_size_extra_));
+      std::vector<std::vector<double>> ddlnpk_l(pk_size_, std::vector<double>(k_size_extra_));
+      nonlinear_time_workspace ntw;
+      ntw.pk_wiggle.resize(pnl->nk_wiggle);
+      ntw.ddpk_wiggle.resize(pnl->nk_wiggle);
 
-      for (index_pk = 0; index_pk < pk_size_; index_pk++) {
-        /* if we are still in a range of time where P_NL(k) should be computable */
-        if (!nl_corr_not_computable_at_this_k) {
-          /* get P_L(k) at this time. This is only needed while the non-linear
-             corrections are still computable: once they are not (high z, where
-             k_NL exceeds k_max), we just store R_NL=1 below, so recomputing the
-             linear P(k) -- a primordial-spectrum evaluation over the whole
-             extended k-grid -- for every remaining early-time slice is pure
-             waste. Guarding it here matches class_public and, for a run with CMB
-             lensing (tau grid spanning z~0..1100), cuts the Nonlinear stage ~3x. */
-          nonlinear_pk_linear(index_pk, index_tau, k_size_extra_, lnpk_l[index_pk].data(), nullptr);
+      for (int index_tau = next_index_tau--; index_tau >= 0; index_tau = next_index_tau--) {
+        if (index_tau < index_tau_stop) {
+          break;
+        }
+        try {
+          /* loop over index_pk, defined such that it is ensured
+           * that index_pk starts at index_pk_cb when neutrinos are
+           * included. This is necessary for hmcode, since the sigmatable
+           * needs to be filled for sigma_cb only. Thus, when HMcode
+           * evalutes P_m_nl, it needs both P_m_l and P_cb_l. */
 
-          /* A non-finite P_L(k) must not reach the sigma integrals of Halofit and
+          bool nl_corr_not_computable_at_this_k = false;
+
+          for (int index_pk = 0; index_pk < pk_size_; index_pk++) {
+            /* the correction was not computable for a previous P(k) type at this time */
+            if (nl_corr_not_computable_at_this_k) {
+              std::fill_n(nl_corr_density_[index_pk].begin() + index_tau * k_size_, k_size_, 1.);
+              continue;
+            }
+
+            /* get P_L(k) at this time. The time loop stops before the times at which the
+             non-linear corrections are not computable (high z, where k_NL exceeds k_max), so
+             the linear P(k) -- a primordial-spectrum evaluation over the whole extended k-grid
+             -- is not recomputed for every remaining early-time slice. As in class_public, and
+             for a run with CMB lensing (tau grid spanning z~0..1100), that cuts the Nonlinear
+             stage ~3x. */
+            nonlinear_pk_linear(index_pk,
+                                index_tau,
+                                k_size_extra_,
+                                lnpk_l[index_pk].data(),
+                                nullptr);
+
+            /* A non-finite P_L(k) must not reach the sigma integrals of Halofit and
              HMcode: from there it gives NaN spectra or, depending on the compiler,
              a failed search for k_NL that silently leaves out the non-linear
              correction. Only IsNonFinite survives -ffast-math (nonfinite.h). */
-          for (int index_k = 0; index_k < k_size_extra_; index_k++) {
-            class_test(IsNonFinite(lnpk_l[index_pk][index_k]),
-                       "the linear P(k) that the non-linear method integrates over is not finite "
-                       "at k = %e 1/Mpc (%s k_max = %e 1/Mpc of the computed sources) and "
-                       "tau = %e Mpc",
-                       k_[index_k],
-                       (index_k < k_size_) ? "within" : "extrapolated beyond",
-                       k_[k_size_ - 1],
-                       tau_[index_tau]);
-          }
-
-          /* spline P_L(k) at this time along k */
-          array_spline_table_columns(ln_k_.data(),
-                                     k_size_extra_,
-                                     lnpk_l[index_pk].data(),
-                                     1,
-                                     ddlnpk_l[index_pk].data(),
-                                     _SPLINE_NATURAL_);
-
-          /* get P_NL(k) at this time with Halofit */
-          if (pnl->method == nl_halofit) {
-            nonlinear_halofit(index_pk,
-                              tau_[index_tau],
-                              pk_nl[index_pk].data(),
-                              lnpk_l[index_pk].data(),
-                              ddlnpk_l[index_pk].data(),
-                              &(k_nl_[index_pk][index_tau]),
-                              &nl_corr_not_computable_at_this_k);
-          }
-
-          /* get P_NL(k) at this time with HMcode */
-          else if (pnl->method == nl_HMcode) {
-            /* (preliminary step: fill table of sigma's, only for _cb if there is both _cb and _m) */
-            if (index_pk == 0) {
-              nonlinear_hmcode_fill_sigtab(index_tau,
-                                           lnpk_l[index_pk].data(),
-                                           ddlnpk_l[index_pk].data(),
-                                           pnw);
+            for (int index_k = 0; index_k < k_size_extra_; index_k++) {
+              class_test(IsNonFinite(lnpk_l[index_pk][index_k]),
+                         "the linear P(k) that the non-linear method integrates over is not finite "
+                         "at k = %e 1/Mpc (%s k_max = %e 1/Mpc of the computed sources) and "
+                         "tau = %e Mpc",
+                         k_[index_k],
+                         (index_k < k_size_) ? "within" : "extrapolated beyond",
+                         k_[k_size_ - 1],
+                         tau_[index_tau]);
             }
 
-            nonlinear_hmcode(index_pk,
-                             index_tau,
-                             tau_[index_tau],
-                             pk_nl[index_pk].data(),
-                             lnpk_l,
-                             ddlnpk_l,
-                             &(k_nl_[index_pk][index_tau]),
-                             &nl_corr_not_computable_at_this_k,
-                             pnw);
-          }
+            /* spline P_L(k) at this time along k */
+            array_spline_table_columns(ln_k_.data(),
+                                       k_size_extra_,
+                                       lnpk_l[index_pk].data(),
+                                       1,
+                                       ddlnpk_l[index_pk].data(),
+                                       _SPLINE_NATURAL_);
 
-          /* infer and store R_NL=(P_NL/P_L)^1/2 */
-          if (!nl_corr_not_computable_at_this_k) {
-            for (int index_k = 0; index_k < k_size_; index_k++) {
-              nl_corr_density_[index_pk][index_tau * k_size_ + index_k] = sqrt(
-                  pk_nl[index_pk][index_k] / exp(lnpk_l[index_pk][index_k]));
-            }
-            for (int index_k = k_size_; index_k < k_size_nl_; index_k++) {
-              nl_corr_density_extra_[index_pk]
-                                    [index_tau * (k_size_nl_ - k_size_) + index_k - k_size_] = sqrt(
-                                        pk_nl[index_pk][index_k] / exp(lnpk_l[index_pk][index_k]));
-            }
-          }
-
-          /* otherwise we met the first problematic value of time */
-          else {
-            /* store the index of that value */
-            index_tau_min_nl_ = std::
-                min(tau_size_ - 1,
-                    index_tau +
-                        1);  //this std::min() ensures that index_tau_min_nl is never out of bounds
-
-            /* store R_NL=1 for that time */
-            for (int index_k = 0; index_k < k_size_; index_k++) {
-              nl_corr_density_[index_pk][index_tau * k_size_ + index_k] = 1.;
+            /* get P_NL(k) at this time with Halofit */
+            if (pnl->method == nl_halofit) {
+              nonlinear_halofit(index_pk,
+                                tau_[index_tau],
+                                pk_nl[index_pk].data(),
+                                lnpk_l[index_pk].data(),
+                                ddlnpk_l[index_pk].data(),
+                                &(k_nl_[index_pk][index_tau]),
+                                &nl_corr_not_computable_at_this_k);
             }
 
-            /* send a warning to inform user about the corresponding value of redshift */
-            if (pnl->nonlinear_verbose > 0) {
-              pvecback.resize(background_module_->bg_size_);
-              background_module_->background_at_tau(tau_[index_tau],
-                                                    pba->short_info,
-                                                    pba->inter_normal,
-                                                    &last_index,
-                                                    pvecback.data());
-              a = pvecback[background_module_->index_bg_a_];
-              z = 1. / a - 1.;
-              fprintf(stdout,
-                      " -> [WARNING:] Non-linear corrections could not be computed at redshift "
-                      "z=%5.2f and higher.\n    This is because k_max is too small for the "
-                      "algorithm (Halofit or HMcode) to be able to compute the scale k_NL at this "
-                      "redshift.\n    If non-linear corrections at such high redshift really "
-                      "matter for you,\n    increase k_max_extrapolated, the k up to which the "
-                      "linear spectrum is continued and trusted, until reaching the desired z.\n",
-                      z);
+            /* get P_NL(k) at this time with HMcode */
+            else if (pnl->method == nl_HMcode) {
+              /* (preliminary step: fill table of sigma's, only for _cb if there is both _cb and _m) */
+              if (index_pk == 0) {
+                nonlinear_hmcode_fill_sigtab(lnpk_l[index_pk].data(),
+                                             ddlnpk_l[index_pk].data(),
+                                             &ntw);
+              }
+
+              nonlinear_hmcode(index_pk,
+                               tau_[index_tau],
+                               pk_nl[index_pk].data(),
+                               lnpk_l,
+                               ddlnpk_l,
+                               &(k_nl_[index_pk][index_tau]),
+                               &nl_corr_not_computable_at_this_k,
+                               pnw,
+                               &ntw);
             }
-          }
+
+            /* infer and store R_NL=(P_NL/P_L)^1/2 */
+            if (!nl_corr_not_computable_at_this_k) {
+              for (int index_k = 0; index_k < k_size_; index_k++) {
+                nl_corr_density_[index_pk][index_tau * k_size_ + index_k] = sqrt(
+                    pk_nl[index_pk][index_k] / exp(lnpk_l[index_pk][index_k]));
+              }
+              for (int index_k = k_size_; index_k < k_size_nl_; index_k++) {
+                nl_corr_density_extra_[index_pk][index_tau * (k_size_nl_ - k_size_) + index_k -
+                                                 k_size_] = sqrt(pk_nl[index_pk][index_k] /
+                                                                 exp(lnpk_l[index_pk][index_k]));
+              }
+            }
+
+            /* otherwise store R_NL=1 for that time, and remember it if it is the latest such time */
+            else {
+              std::fill_n(nl_corr_density_[index_pk].begin() + index_tau * k_size_, k_size_, 1.);
+              raise_to(index_tau_not_computable, index_tau);
+              raise_to(index_tau_stop, index_tau);
+            }
+          }  // end loop over index_pk
         }
-
-        /* if we are still in a range of time where P_NL(k) should NOT be computable */
-        else {
-          /* store R_NL=1 for that time */
-          for (int index_k = 0; index_k < k_size_; index_k++) {
-            nl_corr_density_[index_pk][index_tau * k_size_ + index_k] = 1.;
-          }
+        catch (...) {
+          errors[index_tau] = std::current_exception();
+          raise_to(index_tau_stop, index_tau);
         }
+      }  //end loop over index_tau
+    };
 
-        /** --> fill the array of nonlinear power spectra (only if we
-            are at a late time where P(k) and T(k) are supposed to
-            be stored, i.e., such that z(tau < z_max_pk) */
+    {
+      const int num_tasks = std::max(1,
+                                     std::min(static_cast<int>(pba->number_of_threads), tau_size_));
+      Tools::TaskSystem task_system(num_tasks);
+      std::vector<std::future<void>> tasks;
+      for (int index_task = 0; index_task < num_tasks; index_task++) {
+        tasks.push_back(task_system.AsyncTask(compute_nl_corrections));
+      }
+      for (auto& task : tasks) {
+        task.get();
+      }
+    }
+    /* the latest time at which the correction is not computable, or -1 */
+    const int index_tau_failed = index_tau_not_computable;
 
-        if (index_tau >= tau_size_ - ln_tau_size_) {
-          index_tau_late = index_tau - (tau_size_ - ln_tau_size_);
+    /* the error the serial loop would have met first: from today back to the stop */
+    for (int index_tau = tau_size_ - 1; index_tau > index_tau_failed; index_tau--) {
+      if (errors[index_tau]) {
+        std::rethrow_exception(errors[index_tau]);
+      }
+    }
 
-          for (int index_k = 0; index_k < k_size_; index_k++) {
-            ln_pk_nl_[index_pk][index_tau_late * k_size_ + index_k] =
-                ln_pk_l_[index_pk][index_tau_late * k_size_ + index_k] +
-                2. * log(nl_corr_density_[index_pk][index_tau * k_size_ + index_k]);
-          }
+    /** --> At times before the latest one at which the correction is not computable, R_NL=1
+            (and k_NL is not set), whether or not a thread computed them meanwhile */
+
+    /* this index will refer to the value of time corresponding to
+       the minimum redshift such that the non-linear corrections cannot be consistently computed */
+    index_tau_min_nl_ = 0;
+
+    if (index_tau_failed >= 0) {
+      /* store the index of the first time at which the correction is computed (std::min()
+         ensures that index_tau_min_nl is never out of bounds) */
+      index_tau_min_nl_ = std::min(tau_size_ - 1, index_tau_failed + 1);
+
+      for (index_pk = 0; index_pk < pk_size_; index_pk++) {
+        std::fill_n(nl_corr_density_[index_pk].begin(), index_tau_failed * k_size_, 1.);
+        std::fill_n(nl_corr_density_extra_[index_pk].begin(),
+                    index_tau_failed * (k_size_nl_ - k_size_),
+                    1.);
+        std::fill_n(k_nl_[index_pk].begin(), index_tau_failed, 0.);
+      }
+
+      /* send a warning to inform user about the corresponding value of redshift */
+      if (pnl->nonlinear_verbose > 0) {
+        pvecback.resize(background_module_->bg_size_);
+        background_module_->background_at_tau(tau_[index_tau_failed],
+                                              pba->short_info,
+                                              pba->inter_normal,
+                                              &last_index,
+                                              pvecback.data());
+        a = pvecback[background_module_->index_bg_a_];
+        z = 1. / a - 1.;
+        fprintf(stdout,
+                " -> [WARNING:] Non-linear corrections could not be computed at redshift "
+                "z=%5.2f and higher.\n    This is because k_max is too small for the "
+                "algorithm (Halofit or HMcode) to be able to compute the scale k_NL at this "
+                "redshift.\n    If non-linear corrections at such high redshift really "
+                "matter for you,\n    increase k_max_extrapolated, the k up to which the "
+                "linear spectrum is continued and trusted, until reaching the desired z.\n",
+                z);
+      }
+    }
+
+    /** --> fill the array of nonlinear power spectra at the late times where P(k) and T(k)
+            are supposed to be stored, i.e., such that z(tau < z_max_pk) */
+
+    for (int index_tau = tau_size_ - ln_tau_size_; index_tau < tau_size_; index_tau++) {
+      index_tau_late = index_tau - (tau_size_ - ln_tau_size_);
+      for (index_pk = 0; index_pk < pk_size_; index_pk++) {
+        for (int index_k = 0; index_k < k_size_; index_k++) {
+          ln_pk_nl_[index_pk][index_tau_late * k_size_ + index_k] =
+              ln_pk_l_[index_pk][index_tau_late * k_size_ + index_k] +
+              2. * log(nl_corr_density_[index_pk][index_tau * k_size_ + index_k]);
         }
-
-      }  // end loop over index_pk
-    }  //end loop over index_tau
+      }
+    }
 
     /** --> spline the array of nonlinear power spectrum */
 
@@ -2775,42 +2821,43 @@ void NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
  * version passed explicitly to nonlinear_hmcode_compute().
  *
  * @param index_pk   Input: index of the pk type (m or cb)
- * @param index_tau  Input: index of tau, at which to compute the nl correction
  * @param tau        Input: tau, at which to compute the nl correction
  * @param pk_nl      Output: nonlinear power spectrum
  * @param lnpk_l     Input: logarithm of the linear power spectrum for both index_m and index_cb
  * @param ddlnpk_l   Input: spline of the logarithm of the linear power spectrum for both index_m and index_cb
  * @param k_nl       Output: nonlinear scale
  * @param nl_corr_not_computable_at_this_k Output: was the computation doable?
- * @param pnw        Input/Output: pointer to nonlinear workspace
+ * @param pnw        Input: pointer to nonlinear workspace
+ * @param pntw       Input/Output: pointer to the tables of this time (sigma(R) filled by
+ *                   nonlinear_hmcode_fill_sigtab(), the wiggle spectrum filled here)
  */
 
 void NonlinearModule::nonlinear_hmcode(int index_pk,
-                                       int index_tau,
                                        double tau,
                                        double* pk_nl,
                                        std::vector<std::vector<double>>& lnpk_l,
                                        std::vector<std::vector<double>>& ddlnpk_l,
                                        double* k_nl,
                                        bool* nl_corr_not_computable_at_this_k,
-                                       struct nonlinear_workspace* pnw) {
+                                       const struct nonlinear_workspace* pnw,
+                                       struct nonlinear_time_workspace* pntw) {
   const HMcodeVersion version = pnl->hmcode_version;
 
   /* HMcode 2020 damps the wiggles of the linear spectrum in the 2-halo term */
   if (version != HMcodeVersion::v2016) {
-    nonlinear_hmcode_nowiggle(lnpk_l[index_pk].data(), ddlnpk_l[index_pk].data(), pnw);
+    nonlinear_hmcode_nowiggle(lnpk_l[index_pk].data(), ddlnpk_l[index_pk].data(), pnw, pntw);
   }
 
   nonlinear_hmcode_compute(version,
                            index_pk,
-                           index_tau,
                            tau,
                            pk_nl,
                            lnpk_l,
                            ddlnpk_l,
                            k_nl,
                            nl_corr_not_computable_at_this_k,
-                           pnw);
+                           pnw,
+                           pntw);
 
   if ((version != HMcodeVersion::v2020_baryonic_feedback) || *nl_corr_not_computable_at_this_k) {
     return;
@@ -2822,14 +2869,14 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
                        std::pair{HMcodeVersion::v2020_unfitted, pk_unfitted.data()}}) {
     nonlinear_hmcode_compute(v,
                              index_pk,
-                             index_tau,
                              tau,
                              pk,
                              lnpk_l,
                              ddlnpk_l,
                              k_nl,
                              nl_corr_not_computable_at_this_k,
-                             pnw);
+                             pnw,
+                             pntw);
   }
   for (int index_k = 0; index_k < k_size_; index_k++) {
     pk_nl[index_k] *= pk_2020[index_k] / pk_unfitted[index_k];
@@ -2848,14 +2895,14 @@ void NonlinearModule::nonlinear_hmcode(int index_pk,
 
 void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
                                                int index_pk,
-                                               int index_tau,
                                                double tau,
                                                double* pk_nl,
                                                std::vector<std::vector<double>>& lnpk_l,
                                                std::vector<std::vector<double>>& ddlnpk_l,
                                                double* k_nl,
                                                bool* nl_corr_not_computable_at_this_k,
-                                               struct nonlinear_workspace* pnw) {
+                                               const struct nonlinear_workspace* pnw,
+                                               const struct nonlinear_time_workspace* pntw) {
   const bool hm2020   = (version != HMcodeVersion::v2016);
   const bool feedback = (version == HMcodeVersion::v2020_baryonic_feedback);
   const bool unfitted = (version == HMcodeVersion::v2020_unfitted);
@@ -3048,10 +3095,6 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
                    out_sigma_disp,
                    &sigma_disp100);
 
-  pnw->sigma_8[index_pk][index_tau]        = sigma8;
-  pnw->sigma_disp[index_pk][index_tau]     = sigma_disp;
-  pnw->sigma_disp_100[index_pk][index_tau] = sigma_disp100;
-
   /** Initialisation steps for the 1-Halo Power Integral */
   mmin = ppr->mmin_for_p1h_integral /
          pba->h;  //Minimum mass for integration; (unit conversion from  m[Msun/h] to m[Msun]  )
@@ -3119,20 +3162,20 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
     r_real[index_mass]   = r;
     r_virial[index_mass] = r_real[index_mass] / pow(Delta_v, 1. / 3.);
 
-    array_interpolate_spline(pnw->rtab.data(),
+    array_interpolate_spline(pntw->rtab.data(),
                              nsig,
-                             pnw->stab.data(),
-                             pnw->ddstab.data(),
+                             pntw->stab.data(),
+                             pntw->ddstab.data(),
                              1,
                              r,
                              &last_index,
                              &sig,
                              1);
 
-    array_interpolate_spline(pnw->rtab.data(),
+    array_interpolate_spline(pntw->rtab.data(),
                              nsig,
-                             pnw->stab.data(),
-                             pnw->ddstab.data(),
+                             pntw->stab.data(),
+                             pntw->ddstab.data(),
                              1,
                              r * fraction,
                              &last_index,
@@ -3224,8 +3267,6 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
 
   dlnsigdlnR = r_nl * pow(sigma_nl, -2) * sigma_prime;
   n_eff      = -3. - dlnsigdlnR;
-
-  pnw->sigma_prime[index_pk][index_tau] = sigma_prime;
 
   /** Halo parameters: concentration amplitude, halo bloating, damping of the 1-halo term at large
       scales (k_star) and of the 2-halo term (fdamp, kdamp), smoothing of the transition (alpha). */
@@ -3436,8 +3477,8 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
         int last_index_wiggle = 0;
         array_interpolate_spline(pnw->lnk_wiggle.data(),
                                  pnl->nk_wiggle,
-                                 pnw->pk_wiggle.data(),
-                                 pnw->ddpk_wiggle.data(),
+                                 pntw->pk_wiggle.data(),
+                                 pntw->ddpk_wiggle.data(),
                                  1,
                                  ln_k,
                                  &last_index_wiggle,
@@ -3697,8 +3738,6 @@ void NonlinearModule::nonlinear_hmcode_wiggle_init(struct nonlinear_workspace* p
   const double ln_k_max = log(5. * pba->h);
 
   pnw->lnk_wiggle.resize(n);
-  pnw->pk_wiggle.resize(n);
-  pnw->ddpk_wiggle.resize(n);
   for (int i = 0; i < n; i++) {
     pnw->lnk_wiggle[i] = ln_k_min + i * (ln_k_max - ln_k_min) / (n - 1);
   }
@@ -3739,12 +3778,14 @@ void NonlinearModule::nonlinear_hmcode_wiggle_init(struct nonlinear_workspace* p
  *
  * @param lnpk_l   Input: ln of the linear spectrum on the extended k grid
  * @param ddlnpk_l Input: its spline in ln k
- * @param pnw      Input/Output: nonlinear workspace
+ * @param pnw      Input: nonlinear workspace
+ * @param pntw     Output: tables of this time, where the wiggle part is stored
  */
 
 void NonlinearModule::nonlinear_hmcode_nowiggle(const double* lnpk_l,
                                                 const double* ddlnpk_l,
-                                                struct nonlinear_workspace* pnw) {
+                                                const struct nonlinear_workspace* pnw,
+                                                struct nonlinear_time_workspace* pntw) {
   const int n = pnl->nk_wiggle;
   std::vector<double> lnpk_lin(n);
   std::vector<double> lnpk_eh(n);
@@ -3778,14 +3819,14 @@ void NonlinearModule::nonlinear_hmcode_nowiggle(const double* lnpk_l,
       smoothed += row[j] * ratio[j];
     }
     const double pk_nw = smoothed * exp(lnpk_eh[i]);
-    pnw->pk_wiggle[i]  = (exp(lnpk_lin[i]) - pk_nw) * exp(3. * pnw->lnk_wiggle[i]) /
+    pntw->pk_wiggle[i] = (exp(lnpk_lin[i]) - pk_nw) * exp(3. * pnw->lnk_wiggle[i]) /
                          (2. * _PI_ * _PI_);
   }
   array_spline_table_columns(pnw->lnk_wiggle.data(),
                              n,
-                             pnw->pk_wiggle.data(),
+                             pntw->pk_wiggle.data(),
                              1,
-                             pnw->ddpk_wiggle.data(),
+                             pntw->ddpk_wiggle.data(),
                              _SPLINE_EST_DERIV_);
 }
 
@@ -3801,32 +3842,11 @@ void NonlinearModule::nonlinear_hmcode_workspace_init(struct nonlinear_workspace
 
   /** - allocate arrays of the nonlinear workspace */
 
-  pnw->rtab.resize(ppr->n_hmcode_tables);
-  pnw->stab.resize(ppr->n_hmcode_tables);
-  pnw->ddstab.resize(ppr->n_hmcode_tables);
-
   ng = ppr->n_hmcode_tables;
 
   pnw->growtable.resize(ng);
   pnw->ztable.resize(ng);
   pnw->tautable.resize(ng);
-
-  pnw->sigma_8_storage.assign(pk_size_, std::vector<double>(tau_size_));
-  pnw->sigma_disp_storage.assign(pk_size_, std::vector<double>(tau_size_));
-  pnw->sigma_disp_100_storage.assign(pk_size_, std::vector<double>(tau_size_));
-  pnw->sigma_prime_storage.assign(pk_size_, std::vector<double>(tau_size_));
-
-  pnw->sigma_8.resize(pk_size_);
-  pnw->sigma_disp.resize(pk_size_);
-  pnw->sigma_disp_100.resize(pk_size_);
-  pnw->sigma_prime.resize(pk_size_);
-
-  for (int index_pk = 0; index_pk < pk_size_; index_pk++) {
-    pnw->sigma_8[index_pk]        = pnw->sigma_8_storage[index_pk].data();
-    pnw->sigma_disp[index_pk]     = pnw->sigma_disp_storage[index_pk].data();
-    pnw->sigma_disp_100[index_pk] = pnw->sigma_disp_100_storage[index_pk].data();
-    pnw->sigma_prime[index_pk]    = pnw->sigma_prime_storage[index_pk].data();
-  }
 
   /** - fill table with scale independent growth factor */
 
@@ -3945,22 +3965,20 @@ void NonlinearModule::nonlinear_hmcode_baryonic_feedback() {
 }
 
 /**
- * Function that fills pnw->rtab, pnw->stab and pnw->ddstab with (r,
+ * Function that fills pntw->rtab, pntw->stab and pntw->ddstab with (r,
  * sigma, ddsigma) logarithmically spaced in r.  Called by
  * nonlinear_init at for all tau to account for scale-dependant growth
  * before nonlinear_hmcode is called
  *
- * @param index_tau  Input: index of tau, at which to compute the nl correction
  * @param lnpk_l   Input: logarithm of the linear power spectrum for either index_m or index_cb
  * @param ddlnpk_l Input: spline of the logarithm of the linear power spectrum for either index_m or index_cb
- * @param pnw Output: pointer to nonlinear workspace
+ * @param pntw     Output: pointer to the tables of this time
  * @return the error status
  */
 
-void NonlinearModule::nonlinear_hmcode_fill_sigtab(int index_tau,
-                                                   double* lnpk_l,
+void NonlinearModule::nonlinear_hmcode_fill_sigtab(double* lnpk_l,
                                                    double* ddlnpk_l,
-                                                   struct nonlinear_workspace* pnw) {
+                                                   struct nonlinear_time_workspace* pntw) {
   double r;
   double rmin;
   double rmax;
@@ -3998,18 +4016,13 @@ void NonlinearModule::nonlinear_hmcode_fill_sigtab(int index_tau,
   }
 
   array_spline(sigtab.data(), index_n, nsig, index_r, index_sig, index_ddsig, _SPLINE_EST_DERIV_);
-  if (index_tau == tau_size_ - 1) {
-    for (i = 0; i < nsig; i++) {
-      pnw->rtab[i]   = sigtab[i * index_n + index_r];
-      pnw->stab[i]   = sigtab[i * index_n + index_sig];
-      pnw->ddstab[i] = sigtab[i * index_n + index_ddsig];
-    }
-  }
-  else {
-    for (i = 0; i < nsig; i++) {
-      pnw->stab[i]   = sigtab[i * index_n + index_sig];
-      pnw->ddstab[i] = sigtab[i * index_n + index_ddsig];
-    }
+  pntw->rtab.resize(nsig);
+  pntw->stab.resize(nsig);
+  pntw->ddstab.resize(nsig);
+  for (i = 0; i < nsig; i++) {
+    pntw->rtab[i]   = sigtab[i * index_n + index_r];
+    pntw->stab[i]   = sigtab[i * index_n + index_sig];
+    pntw->ddstab[i] = sigtab[i * index_n + index_ddsig];
   }
 }
 
@@ -4193,207 +4206,6 @@ void NonlinearModule::nonlinear_hmcode_halomassfunction(double nu, double* hmf) 
   double A = 0.21616;
 
   *hmf = A * (1. + (pow(q * nu * nu, -p))) * exp(-q * nu * nu / 2.);
-}
-
-/**
- * Compute sigma8(z)
- *
- * @param z          Input: redshift
- * @param sigma_8    Output: sigma8(z)
- * @param sigma_8_cb Output: sigma8_cb(z)
- * @param pnw        Output: pointer to nonlinear workspace
- * @return the error status
- */
-
-void NonlinearModule::nonlinear_hmcode_sigma8_at_z(double z,
-                                                   double* sigma_8,
-                                                   double* sigma_8_cb,
-                                                   struct nonlinear_workspace* pnw) {
-  double tau;
-
-  background_module_->background_tau_of_z(z, &tau);
-
-  if (tau_size_ == 1) {
-    *sigma_8 = pnw->sigma_8[index_pk_m_][0];
-  }
-  else {
-    array_interpolate_two(tau_.data(), 1, 0, pnw->sigma_8[index_pk_m_], tau_size_, tau, sigma_8, 1);
-  }
-
-  if (has_pk_cb_) {
-    if (tau_size_ == 1) {
-      *sigma_8_cb = pnw->sigma_8[index_pk_cb_][0];
-    }
-    else {
-      array_interpolate_two(tau_.data(),
-                            1,
-                            0,
-                            pnw->sigma_8[index_pk_cb_],
-                            tau_size_,
-                            tau,
-                            sigma_8_cb,
-                            1);
-    }
-  }
-  else {
-    *sigma_8_cb = *sigma_8;
-  }
-}
-
-/**
- * Compute sigmadisp(z)
- *
- * @param z             Input: redshift
- * @param sigma_disp    Output: sigmadisp(z)
- * @param sigma_disp_cb Output: sigmadisp_cb(z)
- * @param pnw           Output: pointer to nonlinear workspace
- * @return the error status
- */
-
-void NonlinearModule::nonlinear_hmcode_sigmadisp_at_z(double z,
-                                                      double* sigma_disp,
-                                                      double* sigma_disp_cb,
-                                                      struct nonlinear_workspace* pnw) {
-  double tau;
-
-  background_module_->background_tau_of_z(z, &tau);
-
-  if (tau_size_ == 1) {
-    *sigma_disp = pnw->sigma_disp[index_pk_m_][0];
-  }
-  else {
-    array_interpolate_two(tau_.data(),
-                          1,
-                          0,
-                          pnw->sigma_disp[index_pk_m_],
-                          tau_size_,
-                          tau,
-                          sigma_disp,
-                          1);
-  }
-
-  if (has_pk_cb_) {
-    if (tau_size_ == 1) {
-      *sigma_disp_cb = pnw->sigma_disp[index_pk_cb_][0];
-    }
-    else {
-      array_interpolate_two(tau_.data(),
-                            1,
-                            0,
-                            pnw->sigma_disp[index_pk_cb_],
-                            tau_size_,
-                            tau,
-                            sigma_disp_cb,
-                            1);
-    }
-  }
-  else {
-    *sigma_disp_cb = *sigma_disp;
-  }
-}
-
-/**
- * Compute sigmadisp100(z)
- *
- * @param z                 Input: redshift
- * @param sigma_disp_100    Output: sigmadisp100(z)
- * @param sigma_disp_100_cb Output: sigmadisp100_cb(z)
- * @param pnw           Output: pointer to nonlinear workspace
- * @return the error status
- */
-
-void NonlinearModule::nonlinear_hmcode_sigmadisp100_at_z(double z,
-                                                         double* sigma_disp_100,
-                                                         double* sigma_disp_100_cb,
-                                                         struct nonlinear_workspace* pnw) {
-  double tau;
-
-  background_module_->background_tau_of_z(z, &tau);
-
-  if (tau_size_ == 1) {
-    *sigma_disp_100 = pnw->sigma_disp_100[index_pk_m_][0];
-  }
-  else {
-    array_interpolate_two(tau_.data(),
-                          1,
-                          0,
-                          pnw->sigma_disp_100[index_pk_m_],
-                          tau_size_,
-                          tau,
-                          sigma_disp_100,
-                          1);
-  }
-
-  if (has_pk_cb_) {
-    if (tau_size_ == 1) {
-      *sigma_disp_100_cb = pnw->sigma_disp_100[index_pk_cb_][0];
-    }
-    else {
-      array_interpolate_two(tau_.data(),
-                            1,
-                            0,
-                            pnw->sigma_disp_100[index_pk_cb_],
-                            tau_size_,
-                            tau,
-                            sigma_disp_100_cb,
-                            1);
-    }
-  }
-  else {
-    *sigma_disp_100_cb = *sigma_disp_100;
-  }
-}
-
-/**
- * Compute sigma'(z)
- *
- * @param z              Input: redshift
- * @param sigma_prime    Output: sigma'(z)
- * @param sigma_prime_cb Output: sigma'_cb(z)
- * @param pnw            Output: pointer to nonlinear workspace
- * @return the error status
- */
-
-void NonlinearModule::nonlinear_hmcode_sigmaprime_at_z(double z,
-                                                       double* sigma_prime,
-                                                       double* sigma_prime_cb,
-                                                       struct nonlinear_workspace* pnw) {
-  double tau;
-
-  background_module_->background_tau_of_z(z, &tau);
-
-  if (tau_size_ == 1) {
-    *sigma_prime = pnw->sigma_prime[index_pk_m_][0];
-  }
-  else {
-    array_interpolate_two(tau_.data(),
-                          1,
-                          0,
-                          pnw->sigma_prime[index_pk_m_],
-                          tau_size_,
-                          tau,
-                          sigma_prime,
-                          1);
-  }
-
-  if (has_pk_cb_) {
-    if (tau_size_ == 1) {
-      *sigma_prime_cb = pnw->sigma_prime[index_pk_cb_][0];
-    }
-    else {
-      array_interpolate_two(tau_.data(),
-                            1,
-                            0,
-                            pnw->sigma_prime[index_pk_cb_],
-                            tau_size_,
-                            tau,
-                            sigma_prime_cb,
-                            1);
-    }
-  }
-  else {
-    *sigma_prime_cb = *sigma_prime;
-  }
 }
 
 /**

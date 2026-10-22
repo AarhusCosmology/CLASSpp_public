@@ -23,6 +23,7 @@
 #include "../species/ppf_fluid.h"
 #include "../species/scalar_field.h"
 #include "../species/ultra_relativistic.h"
+#include "asymptotic_extrapolation.h"
 #include "background_module.h"
 #include "bisection.h"
 #include "evolver_erk.h"
@@ -1635,6 +1636,40 @@ void PerturbationsModule::perturb_get_k_list() {
      */
     if (ppt->has_cl_cmb_lensing_potential && ppt->want_lcmb_full_limber) {
       k_max = std::max(k_max, ppr->k_max_limber_over_l_max_scalars * ppt->l_scalar_max);
+    }
+
+    /* Halofit and HMcode integrate the linear P(k) continued past the last mode up to
+       k_max_extrapolated (AsymptoticExtrapolation), which has the high-k form of cold matter.
+       The free-streaming cutoff of a warm species breaks that form from about its free-streaming
+       wavenumber k_fs (FreeStreamingWavenumbers) to 10 k_fs: there, at the default 2/Mpc, P_NL
+       at z = 3 is 5e-2 off for 1 keV thermal warm dark matter as a quarter of the dark matter,
+       and C_L^phiphi 4e-2, against modes solved to 70/Mpc. So when that range reaches the
+       fitted modes (above k_max / kFitRange) and the cutoff starts before k_max_extrapolated / 2,
+       the modes are solved up to k_max_extrapolated instead: exact, at 2.5 times the cost of
+       such a run. Thermal warm dark matter of 0.1 to 7 keV (k_fs = 0.17 to 27/Mpc) is solved;
+       at 10 keV (41/Mpc) the continuation is already within 4e-4, at 15 keV within 1e-4, and
+       neutrinos (k_fs < 0.005/Mpc for masses up to 3 eV) are never concerned. The linear lensing
+       source needs none of this: continued from 1.5/Mpc it is within 2e-4 for all of these
+       (docs/superpowers/specs/2026-10-22-nonlinear-followups-design.md). */
+    if (ppt->has_nl_corrections_based_on_delta_m && (ppr->k_max_extrapolated > k_max)) {
+      constexpr double kCutoffEnd = 10.; /* the cutoff ends at kCutoffEnd k_fs */
+      for (const auto& sp : all_species_) {
+        for (const double k_fs : sp->FreeStreamingWavenumbers()) {
+          if ((kCutoffEnd * k_fs > k_max / AsymptoticExtrapolation::kFitRange) &&
+              (k_fs < ppr->k_max_extrapolated / 2.) && (k_max < ppr->k_max_extrapolated)) {
+            k_max = ppr->k_max_extrapolated;
+            if (ppt->perturbations_verbose > 0) {
+              printf(
+                  " -> the free-streaming cutoff of '%s' (k_fs = %g 1/Mpc) is where the linear "
+                  "P(k) of the non-linear method would be continued: modes solved up to "
+                  "k_max_extrapolated = %g 1/Mpc\n",
+                  sp->name().c_str(),
+                  k_fs,
+                  k_max);
+            }
+          }
+        }
+      }
     }
 
     /** - --> test that result for k_min, k_max make sense */

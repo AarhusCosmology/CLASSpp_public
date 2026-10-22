@@ -1,7 +1,7 @@
 # HYREC-2
 
-The files in this directory are HYREC-2, vendored from upstream with a single
-portability patch (see [Local modifications](#local-modifications)).
+The files in this directory are HYREC-2, vendored from upstream with two small
+patches (see [Local modifications](#local-modifications)).
 
 | | |
 |---|---|
@@ -22,7 +22,7 @@ sources as part of `libclasspp` and drives them through its own wrapper.
 
 ## Local modifications
 
-One patch, in `history.c`, for MSVC (the Windows wheel build):
+Two patches. The first, in `history.c`, is for MSVC (the Windows wheel build):
 
 - `#include <unistd.h>` moved inside the `#ifdef CAMB` block, and the unused
   `#include <libgen.h>` deleted. Both headers are POSIX and do not exist in the MSVC C
@@ -31,8 +31,19 @@ One patch, in `history.c`, for MSVC (the Windows wheel build):
   used solely by `hyrec_init()` — which lives in the `CAMB` block that CLASS never
   compiles. Nothing from `libgen.h` is referenced at all.
 
-Re-apply this when upgrading; it is otherwise not CLASS-specific and would be worth
-sending upstream.
+The second, in `hydrogen.c`, stops an overflow when a table cannot be read:
+
+- `sub_message` in `allocate_and_read_atomic` and `allocate_and_read_fit` is `SIZE_ErrorM`
+  (2048) characters instead of 128. Both functions report a table they cannot open or read
+  by printing its whole path into that buffer, so any path longer than about 60
+  characters overflowed it, and the fortified `sprintf` ended the run with SIGTRAP instead
+  of an error: a missing `hyrec/` directory under a deep site-packages, for one. The path
+  itself is at most `SIZE_InputFile` (512) characters. `source/hyrec_model.cpp` also checks
+  that the four tables open, with paths that fit, before HYREC-2 runs; what this patch still
+  covers is a table that opens but ends early. `test-hyrec` pins both.
+
+Re-apply both when upgrading; neither is CLASS-specific, and both would be worth sending
+upstream.
 
 ## Keeping the rest unmodified
 
@@ -58,7 +69,7 @@ Two consequences worth knowing when reading the code:
 
 This tree is byte-identical to `class_public` v3.3.4's `external/HyRec2020/` except for
 whitespace, one `malloc` added inside a CAMB-only wrapper that neither code calls, and the
-`unistd.h` move above. All four data tables match exactly. That makes `class_public` usable
+two patches above. All four data tables match exactly. That makes `class_public` usable
 as a parity reference for this integration.
 
 ## History

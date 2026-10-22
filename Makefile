@@ -24,6 +24,8 @@ TEST_TARGETS := \
 	test-perturbation-support \
 	test-transfer-neglect \
 	test-lensing-extrapolation \
+	test-nonlinear-threads \
+	test-free-streaming-cutoff \
 	test-bisection \
 	test-quadrature \
 	test-asymptotic-extrapolation \

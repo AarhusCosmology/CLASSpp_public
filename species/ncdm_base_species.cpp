@@ -702,6 +702,27 @@ void NCDMBaseSpecies::WarnIfNonlinearUnreliable(double m_ev_threshold) const {
   }
 }
 
+/* lambda_fs = int v dtau over the stored background, v = sqrt(3 P/rho) the rms velocity of the
+   particles (1 while relativistic, <q^2>^(1/2) / (a m) once not). Before the first row the
+   species is relativistic, so that stretch adds tau there. The integral converges in matter
+   domination, so it is dominated by the time the species becomes non-relativistic: 1/lambda_fs
+   is 4e-4/Mpc for 0.06 eV neutrinos, 2.6/Mpc for 1 keV thermal warm dark matter. */
+std::vector<double> NCDMBaseSpecies::FreeStreamingWavenumbers() const {
+  const int bg_size              = bgm_->bg_size_;
+  const double* table            = bgm_->background_table_.data();
+  const std::vector<double>& tau = bgm_->tau_table_;
+  auto velocity                  = [&](int index_tau) {
+    const double* pvecback = table + static_cast<size_t>(index_tau) * bg_size;
+    return sqrt(std::max(3. * P(pvecback) / Rho(pvecback), 0.));
+  };
+  double lambda_fs = tau[0] * velocity(0);
+  for (int index_tau = 1; index_tau < bgm_->bt_size_; index_tau++) {
+    lambda_fs += 0.5 * (velocity(index_tau - 1) + velocity(index_tau)) *
+                 (tau[index_tau] - tau[index_tau - 1]);
+  }
+  return {1. / lambda_fs};
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RegisterTensorPerturbationIndices (layout-based)
 // Reads ppr->l_max_ncdm and q_size() directly; no caller pre-setup required.

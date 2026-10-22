@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdio>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 #include "parser.h"
@@ -99,6 +101,54 @@ void test_missing_tables_throw_rather_than_exit() {
     threw = true;
   }
   assert(threw);
+}
+
+/* HYREC-2 reports a table it cannot open by printing the whole path into a 128-character
+   message (hydrogen.c), so a missing data directory under a path longer than about 60
+   characters overflowed it, and the run died with SIGTRAP from the fortified sprintf instead.
+   Its file names are 512 characters (SIZE_InputFile), which a longer path overflowed too. The
+   error must be a CLASS exception that names the path, at both lengths. */
+void test_missing_tables_under_a_long_path_throw() {
+  for (const size_t length : {200, 600}) {
+    std::string path = "/nonexistent-hyrec-path/";
+    while (path.size() < length) {
+      path += "a-long-directory-name/";
+    }
+    bool named = false;
+    try {
+      HyrecModel bad = MakeModel(path);
+    }
+    catch (const std::exception& e) {
+      named = std::string(e.what()).find(path) != std::string::npos;
+    }
+    assert(named);
+  }
+}
+
+/* Tables that open but end early: HYREC-2 itself reports that, again with the whole path, which
+   overflowed the same 128-character message. */
+void test_truncated_tables_under_a_long_path_throw() {
+  namespace fs       = std::filesystem;
+  fs::path dir       = fs::temp_directory_path() / "classpp-hyrec-truncated-tables";
+  const fs::path top = dir;
+  while (dir.string().size() < 200) {
+    dir /= "a-long-directory-name";
+  }
+  fs::create_directories(dir);
+  for (const char* table :
+       {"Alpha_inf.dat", "R_inf.dat", "two_photon_tables.dat", "fit_swift.dat"}) {
+    std::ofstream(dir / table) << "1.0\n";
+  }
+  const std::string path = dir.string() + "/";
+  bool named             = false;
+  try {
+    HyrecModel bad = MakeModel(path);
+  }
+  catch (const std::exception& e) {
+    named = std::string(e.what()).find(path) != std::string::npos;
+  }
+  fs::remove_all(top);
+  assert(named);
 }
 
 /* The derivative must be finite everywhere SWIFT runs, and must drive x_H back
@@ -294,6 +344,8 @@ int main() {
   test_tables_load();
   test_hyrec_path_without_trailing_separator_still_loads();
   test_missing_tables_throw_rather_than_exit();
+  test_missing_tables_under_a_long_path_throw();
+  test_truncated_tables_under_a_long_path_throw();
   test_hydrogen_relaxes_towards_equilibrium();
   test_frozen_hydrogen_reports_zero();
   test_helium_window();

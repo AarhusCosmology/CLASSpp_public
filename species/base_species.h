@@ -707,6 +707,19 @@ class BaseSpecies {
     return true;
   }
 
+  /**
+   * The free-streaming wavenumbers of this species, 1/lambda_fs in 1/Mpc, with lambda_fs the
+   * comoving distance its particles have travelled since the big bang at their rms velocity:
+   * one for a massive species that free-streams, none for the others. Below that k it clusters
+   * like cold matter; above, its free streaming cuts off the matter source, which the
+   * continuation past the last perturbation mode (AsymptoticExtrapolation) does not know about.
+   * Read after the background is computed. Default: none. NCDM integrates sqrt(3 P/rho);
+   * composites gather their children's.
+   */
+  virtual std::vector<double> FreeStreamingWavenumbers() const {
+    return {};
+  }
+
   /** Warn (stdout) if Halofit/HMcode are unreliable with this species. The mass
    *  threshold for NCDM is passed by the nonlinear module. Default no-op; NCDM
    *  compares its mass; IDM_DR_IDR warns about interacting dark matter; composites

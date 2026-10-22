@@ -119,7 +119,7 @@ void allocate_and_read_atomic(HYREC_ATOMIC *atomic, int *error, char *path_to_hy
   /*********** Effective rates *************/
 
   char *alpha_file, *rr_file, *twog_file;
-  char sub_message[128];
+  char sub_message[SIZE_ErrorM];
   alpha_file = malloc(SIZE_InputFile);
   alpha_file[0] = 0;
   strcat(alpha_file, path_to_hyrec);
@@ -269,7 +269,7 @@ correction function for SWIFT mode
 
 void allocate_and_read_fit(FIT_FUNC *fit, int *error, char *path_to_hyrec, char error_message[SIZE_ErrorM]){
 
-  char sub_message[128];
+  char sub_message[SIZE_ErrorM];
 
   /*********** Effective rates *************/
   char *fit_file;

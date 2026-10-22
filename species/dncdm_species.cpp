@@ -600,8 +600,6 @@ void DNCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
                                                int /*gauge*/) {
   auto& layout = static_cast<NCDMBaseSpecies::PerturbLayout&>(base);
 
-  index_pt_psi0_ = index_pt;
-
   // DNCDM has no fluid approximation — always full Boltzmann hierarchy.
   layout.l_max  = ppr->l_max_ncdm;
   layout.q_size = q_size();

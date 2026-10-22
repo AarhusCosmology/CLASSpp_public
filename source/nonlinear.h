@@ -96,7 +96,8 @@ struct nonlinear {
 
 /**
  * Structure containing variables used only internally in nonlinear module by various functions.
- *
+ * It is filled before the loop over time and only read inside it, where the times are shared
+ * among threads; what changes with time is in nonlinear_time_workspace.
  */
 
 struct nonlinear_workspace {
@@ -104,23 +105,9 @@ struct nonlinear_workspace {
 
   //@{
 
-  std::vector<double> rtab;   /** List of R values */
-  std::vector<double> stab;   /** List of Sigma Values */
-  std::vector<double> ddstab; /** Splined sigma */
-
   std::vector<double> growtable;
   std::vector<double> ztable;
   std::vector<double> tautable;
-
-  std::vector<double*> sigma_8;        /* row pointers into sigma_8_storage */
-  std::vector<double*> sigma_disp;     /* row pointers into sigma_disp_storage */
-  std::vector<double*> sigma_disp_100; /* row pointers into sigma_disp_100_storage */
-  std::vector<double*> sigma_prime;    /* row pointers into sigma_prime_storage */
-
-  std::vector<std::vector<double>> sigma_8_storage;
-  std::vector<std::vector<double>> sigma_disp_storage;
-  std::vector<std::vector<double>> sigma_disp_100_storage;
-  std::vector<std::vector<double>> sigma_prime_storage;
 
   double dark_energy_correction =
       0.0; /** this is the ratio [g(z_infinity)/g_lcdm(z_infinity)]^1.5 for
@@ -146,13 +133,26 @@ struct nonlinear_workspace {
   std::vector<double>
       smoothing_weights; /**< nk_wiggle x nk_wiggle, rows normalised; empty rows are not smoothed */
 
-  /** HMcode 2020: wiggle part of the linear spectrum at the current time, as a dimensionless
-      spectrum k^3/(2 pi^2) P_wiggle, on lnk_wiggle */
+  /** HMcode 2020: wavenumbers of the wiggle/no-wiggle split */
   std::vector<double> lnk_wiggle;
-  std::vector<double> pk_wiggle;
-  std::vector<double> ddpk_wiggle;
 
   //@}
+};
+
+/**
+ * The HMcode tables of one time, filled and read while the non-linear correction is computed at
+ * that time: one per thread.
+ */
+
+struct nonlinear_time_workspace {
+  std::vector<double> rtab;   /** List of R values */
+  std::vector<double> stab;   /** List of Sigma Values */
+  std::vector<double> ddstab; /** Splined sigma */
+
+  /** HMcode 2020: wiggle part of the linear spectrum, as a dimensionless spectrum
+      k^3/(2 pi^2) P_wiggle, on nonlinear_workspace::lnk_wiggle */
+  std::vector<double> pk_wiggle;
+  std::vector<double> ddpk_wiggle;
 };
 
 #endif

@@ -145,59 +145,43 @@ class NonlinearModule : public BaseModule {
                                    enum halofit_integral_type type,
                                    double* sum);
   void nonlinear_hmcode(int index_pk,
-                        int index_tau,
                         double tau,
                         double* pk_nl,
                         std::vector<std::vector<double>>& lnpk_l,
                         std::vector<std::vector<double>>& ddlnpk_l,
                         double* k_nl,
                         bool* nl_corr_not_computable_at_this_k,
-                        nonlinear_workspace* pnw);
+                        const nonlinear_workspace* pnw,
+                        nonlinear_time_workspace* pntw);
   void nonlinear_hmcode_compute(HMcodeVersion version,
                                 int index_pk,
-                                int index_tau,
                                 double tau,
                                 double* pk_nl,
                                 std::vector<std::vector<double>>& lnpk_l,
                                 std::vector<std::vector<double>>& ddlnpk_l,
                                 double* k_nl,
                                 bool* nl_corr_not_computable_at_this_k,
-                                nonlinear_workspace* pnw);
+                                const nonlinear_workspace* pnw,
+                                const nonlinear_time_workspace* pntw);
   void nonlinear_hmcode_noradiation_growth(nonlinear_workspace* pnw);
   double nonlinear_hmcode_growth_norad(const nonlinear_workspace* pnw, double a) const;
   void nonlinear_hmcode_eisenstein_hu(nonlinear_workspace* pnw);
   void nonlinear_hmcode_wiggle_init(nonlinear_workspace* pnw);
   void nonlinear_hmcode_nowiggle(const double* lnpk_l,
                                  const double* ddlnpk_l,
-                                 nonlinear_workspace* pnw);
+                                 const nonlinear_workspace* pnw,
+                                 nonlinear_time_workspace* pntw);
   void nonlinear_hmcode_workspace_init(nonlinear_workspace* pnw);
   void nonlinear_hmcode_dark_energy_correction(nonlinear_workspace* pnw);
   void nonlinear_hmcode_baryonic_feedback();
-  void nonlinear_hmcode_fill_sigtab(int index_tau,
-                                    double* lnpk_l,
+  void nonlinear_hmcode_fill_sigtab(double* lnpk_l,
                                     double* ddlnpk_l,
-                                    nonlinear_workspace* pnw);
+                                    nonlinear_time_workspace* pntw);
   void nonlinear_hmcode_fill_growtab(nonlinear_workspace* pnw);
   void nonlinear_hmcode_growint(
       double a, double w, double wa, double Omega_k, double Omega_de, double* growth);
   void nonlinear_hmcode_window_nfw(double k, double rv, double c, double* window_nfw);
   void nonlinear_hmcode_halomassfunction(double nu, double* hmf);
-  void nonlinear_hmcode_sigma8_at_z(double z,
-                                    double* sigma_8,
-                                    double* sigma_8_cb,
-                                    nonlinear_workspace* pnw);
-  void nonlinear_hmcode_sigmadisp_at_z(double z,
-                                       double* sigma_disp,
-                                       double* sigma_disp_cb,
-                                       nonlinear_workspace* pnw);
-  void nonlinear_hmcode_sigmadisp100_at_z(double z,
-                                          double* sigma_disp_100,
-                                          double* sigma_disp_100_cb,
-                                          nonlinear_workspace* pnw);
-  void nonlinear_hmcode_sigmaprime_at_z(double z,
-                                        double* sigma_prime,
-                                        double* sigma_prime_cb,
-                                        nonlinear_workspace* pnw);
   void prepare_pk_eq();
 
   BackgroundModulePtr background_module_;

@@ -6,6 +6,10 @@ the full-Limber CMB lensing source uses the continuation, times the non-linear c
 there, and halofit and HMcode trust it, so `nonlinear_min_k_max` came down from 5 to
 2/Mpc. `precision_pre_2026_10_21.pre` (and the two older history files) restore the
 previous behaviour byte for byte. Follows `2026-10-21-transfer-neglect-per-l-design.md`.
+Merged as #470. **Update 2026-10-22:** both items under Open are done in
+`2026-10-22-nonlinear-followups-design.md`: the non-linear stage runs in parallel over time,
+and a species whose free-streaming cutoff lies in the continued range (warm dark matter of
+0.1 to 7 keV) has its modes solved up to `k_max_extrapolated` by itself.
 
 Evidence tags: **[M]** measured for this note, **[C]** read from the code, **[P]** an
 earlier campaign, not re-measured, **[?]** no evidence.
@@ -96,8 +100,9 @@ P_NL, over k < 0.67/Mpc at z = 0-3; "old" is the #469 code (floor 5, no continua
 - **Warm dark matter** breaks the asymptotic form: the free-streaming cutoff of a keV
   relic sits at a few /Mpc, inside the fitting range. Lensing is still better than before,
   P_NL at z = 3 is not. Raising the floor past the cutoff fixes it: 1.2e-3 at 5/Mpc, 1.0e-6
-  at 10/Mpc (C_L^phiphi 8.5e-3) **[M]**. The precision.h comment on nonlinear_min_k_max
-  says so. The code cannot see it: refitting on [k_max/4.5, k_max/1.5] and predicting the
+  at 10/Mpc (C_L^phiphi 8.5e-3) **[M]**. (Since 2026-10-22 the species reports its
+  free-streaming wavenumber and the modes are solved through the cutoff by themselves; see
+  the follow-up note.) The code cannot see it from the sources alone: refitting on [k_max/4.5, k_max/1.5] and predicting the
   last mode misses by 7.9e-4 for WDM and 4.8e-4 for LCDM **[M]**, so no self-test separates
   them.
 - **IDM-DRMD** at f_idm_drmd = 0.7 has dark acoustic oscillations aliased by the k grid
@@ -154,8 +159,7 @@ by 4e-3 and BB by 8e-4; act_dr6.pre with halofit moves by 1e-7, since it solves 
 
 ## Open
 
-- The non-linear stage is serial and now 26 ms; parallel over time it would shrink at
-  11 threads **[?]**.
-- A species with a small-scale cutoff (warm dark matter) could raise the floor itself.
-  Not done: the free-streaming scale of a relic is not a quantity the species exposes
-  today **[C]**.
+- ~~The non-linear stage is serial and now 26 ms; parallel over time it would shrink at
+  11 threads.~~ Done 2026-10-22: 24 -> 4.4 ms at 11 threads.
+- ~~A species with a small-scale cutoff (warm dark matter) could raise the floor itself.~~
+  Done 2026-10-22, through `BaseSpecies::FreeStreamingWavenumbers()`.
