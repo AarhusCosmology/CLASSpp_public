@@ -11,6 +11,7 @@
 #include "nonlinear_module.h"
 #include "perturbations_module.h"
 #include "primordial_module.h"
+#include "thermodynamics_module.h"
 #include "thread_pool.h"
 #include "transfer_module.h"
 
@@ -269,6 +270,7 @@ void SpectraModule::spectra_cl_at_l(
                                &last_index,
                                cl_tot,
                                ct_size_);
+      spectra_acoustic_at_l(index_md, l, cl_tot);
 
       /* set to zero for the types such that l<l_max */
       for (index_ct = 0; index_ct < ct_size_; index_ct++) {
@@ -307,6 +309,7 @@ void SpectraModule::spectra_cl_at_l(
                                    &last_index,
                                    cl_md_ic[index_md],
                                    ic_ic_size_[index_md] * ct_size_);
+          spectra_acoustic_at_l(index_md, l, cl_md_ic[index_md]);
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++) {
             if (static_cast<int>(l) > l_max_ct_[index_md][index_ct]) {
@@ -356,6 +359,7 @@ void SpectraModule::spectra_cl_at_l(
                                    &last_index,
                                    cl_md[index_md],
                                    ct_size_);
+          spectra_acoustic_at_l(index_md, l, cl_md[index_md]);
 
           for (index_ct = 0; index_ct < ct_size_; index_ct++) {
             if (static_cast<int>(l) > l_max_ct_[index_md][index_ct]) {
@@ -386,6 +390,7 @@ void SpectraModule::spectra_cl_at_l(
                                    &last_index,
                                    cl_md_ic[index_md],
                                    ic_ic_size_[index_md] * ct_size_);
+          spectra_acoustic_at_l(index_md, l, cl_md_ic[index_md]);
 
           /* set to zero some of the components */
           for (index_ic1 = 0; index_ic1 < ic_size_[index_md]; index_ic1++) {
@@ -805,6 +810,12 @@ void SpectraModule::spectra_cls() {
   l_size_.resize(md_size_);
   cl_.resize(md_size_);
   ddcl_.resize(md_size_);
+  acoustic_.resize(md_size_);
+  {
+    const ThermodynamicsModulePtr& thermodynamics =
+        perturbations_module_->GetThermodynamicsModule();
+    acoustic_omega_ = 2. * thermodynamics->rs_rec_ / thermodynamics->ra_rec_;
+  }
 
   l_size_max_ = transfer_module_->l_size_max_;
   l_.resize(l_size_max_);
@@ -909,6 +920,40 @@ void SpectraModule::spectra_cls() {
                              ic_ic_size_[index_md] * ct_size_,
                              ddcl_[index_md].data(),
                              _SPLINE_EST_DERIV_);
+
+    /** - --> (e) the scalar CMB spectra oscillate with the acoustic peaks: interpolate them with
+        an AcousticSpline, exact for a sinusoid of the peaks' frequency, where it applies
+        (docs/superpowers/specs/2026-10-27-acoustic-l-interpolation-design.md) */
+    if (ppt->has_scalars && (index_md == perturbations_module_->index_md_scalars_)) {
+      for (int index_ic1_ic2 = 0; index_ic1_ic2 < ic_ic_size_[index_md]; index_ic1_ic2++) {
+        for (const int index_ct : {index_ct_tt_, index_ct_ee_, index_ct_te_}) {
+          if ((index_ct < 0) || !is_non_zero_[index_md][index_ic1_ic2]) {
+            continue;
+          }
+          const int column     = index_ic1_ic2 * ct_size_ + index_ct;
+          const int stride     = ic_ic_size_[index_md] * ct_size_;
+          const double* values = cl_[index_md].data() + column;
+          if (AcousticSpline::Applies(l_.data(),
+                                      l_size_[index_md],
+                                      values,
+                                      stride,
+                                      acoustic_omega_)) {
+            acoustic_[index_md].emplace_back(column,
+                                             AcousticSpline(l_.data(),
+                                                            l_size_[index_md],
+                                                            values,
+                                                            stride,
+                                                            acoustic_omega_));
+          }
+        }
+      }
+    }
+  }
+}
+
+void SpectraModule::spectra_acoustic_at_l(int index_md, double l, double* row) const {
+  for (const auto& [column, spline] : acoustic_[index_md]) {
+    row[column] = spline(l);
   }
 }
 

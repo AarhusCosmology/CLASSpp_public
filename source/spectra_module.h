@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "acoustic_spline.h"
 #include "base_module.h"
 #include "input_module.h"
 
@@ -89,7 +90,14 @@ class SpectraModule : public BaseModule {
                     than l_max[index_md], in order to ensure a
                     better interpolation with no boundary effects */
 
+  /** 2 theta_s, the frequency of the acoustic peaks in l: what AcousticSpline interpolates
+      the CMB spectra with (also used by the lensing module) */
+  double acoustic_omega_ = 0.;
+
  private:
+  /** Overwrite the scalar CMB columns (TT, EE, TE) of a row the cubic spline interpolated at l
+      with their AcousticSpline values. */
+  void spectra_acoustic_at_l(int index_md, double l, double* row) const;
   void spectra_init();
   void spectra_indices();
   void spectra_cls();
@@ -148,6 +156,9 @@ class SpectraModule : public BaseModule {
       cl_; /**< table of anisotropy spectra for each mode, multipole, pair of initial conditions and types, cl[index_md][(index_l * psp->ic_ic_size[index_md] + index_ic1_ic2) * psp->ct_size + index_ct] */
   std::vector<std::vector<double>>
       ddcl_; /**< second derivatives of previous table with respect to l, in view of spline interpolation */
+  /** for each mode, the columns (index_ic1_ic2 * ct_size_ + index_ct) interpolated by an
+      AcousticSpline instead of the cubic spline, with their splines (include/acoustic_spline.h) */
+  std::vector<std::vector<std::pair<int, AcousticSpline>>> acoustic_;
 
   //@}
 };

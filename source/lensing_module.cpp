@@ -131,6 +131,9 @@ void LensingModule::lensing_cl_at_l(int l, double* cl_lensed) const {
                            &last_index,
                            cl_lensed,
                            lt_size_);
+  for (const auto& [index_lt, spline] : acoustic_) {
+    cl_lensed[index_lt] = spline(l);
+  }
 
   /* set to zero for the types such that l<l_max */
   for (int index_lt = 0; index_lt < lt_size_; index_lt++) {
@@ -583,6 +586,23 @@ void LensingModule::lensing_init() {
                            lt_size_,
                            ddcl_lens_.data(),
                            _SPLINE_EST_DERIV_);
+
+  /** - the lensed TT, EE and TE still oscillate with the acoustic peaks: interpolated like the
+      unlensed ones (SpectraModule::spectra_cls) */
+  for (const int index_lt : {index_lt_tt_, index_lt_ee_, index_lt_te_}) {
+    if ((index_lt >= 0) && AcousticSpline::Applies(l_.data(),
+                                                   l_size_,
+                                                   cl_lens_.data() + index_lt,
+                                                   lt_size_,
+                                                   spectra_module_->acoustic_omega_)) {
+      acoustic_.emplace_back(index_lt,
+                             AcousticSpline(l_.data(),
+                                            l_size_,
+                                            cl_lens_.data() + index_lt,
+                                            lt_size_,
+                                            spectra_module_->acoustic_omega_));
+    }
+  }
 
   /** - Exit **/
 }

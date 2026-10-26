@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "acoustic_spline.h"
 #include "base_module.h"
 #include "input_module.h"
 
@@ -84,6 +85,9 @@ class LensingModule : public BaseModule {
          cl[index_l * ple->lt_size + index_lt] */
 
   std::vector<double> ddcl_lens_; /**< second derivatives for interpolation */
+  /** the lensed TT, EE, TE columns (index_lt) interpolated by an AcousticSpline instead of the
+      cubic spline, with their splines (include/acoustic_spline.h) */
+  std::vector<std::pair<int, AcousticSpline>> acoustic_;
 
   //@}
   SpectraModulePtr spectra_module_;

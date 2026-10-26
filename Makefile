@@ -26,6 +26,7 @@ TEST_TARGETS := \
 	test-lensing-extrapolation \
 	test-nonlinear-threads \
 	test-free-streaming-cutoff \
+	test-acoustic-spline \
 	test-bessel-table-cache \
 	test-wigner-d \
 	test-hermite-evaluate \

@@ -132,6 +132,7 @@ set(CLASS_TOOLS_FILES
   tools/common.cpp
   tools/decay_transition_kernel.cpp
   tools/dei_rkck.cpp
+  tools/acoustic_spline.cpp
   tools/evolver_erk.cpp
   tools/evolver_etd.cpp
   tools/evolver_ndf15.cpp

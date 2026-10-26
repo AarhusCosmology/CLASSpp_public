@@ -1644,7 +1644,15 @@ class TestReviewRegressions(TestClass):
         20-110%. The C_l are compared at hi_class's source sampling: at the
         default perturb_sampling_stepsize = 0.1 the ratio is 6e-3 off at l < 200
         and 3e-3 at l = 220 (7e-3 with no transfer cut), which says nothing
-        about the scalar-tensor species."""
+        about the scalar-tensor species.
+
+        The C_l pins are hi_class's converged in l (l_linstep 5; at its default
+        40 its cubic spline moves them by up to 7e-4). Converged in l, this
+        code is within 2e-4 of them except at EE l = 810, where the ratio is
+        steepest: 1.1e-3, a difference between the codes (the scalar-tensor
+        spec measured EE to 1.1e-3 rms). Hence the C_l tolerance 1.5e-3.
+        hi_class also ran at M2_tuning_smg = no, pert_initial_conditions_smg =
+        zero, with the cosmology below."""
         cosmology = {'h': 0.6781, 'omega_b': 0.02238, 'omega_cdm': 0.1201,
                      'N_ur': 3.044, 'YHe': 0.245, 'tau_reio': 0.0544,
                      'A_s': 2.1e-9, 'n_s': 0.9660, 'output': 'tCl,pCl,lCl,mPk',
@@ -1663,11 +1671,11 @@ class TestReviewRegressions(TestClass):
             finally:
                 cosmo.struct_cleanup()
                 cosmo.empty()
-        hi_class = {'tt': ([220, 810, 1000, 1500, 2000], [0.99950, 0.95510, 1.16679, 1.15780, 1.02967]),
-                    'ee': ([100, 220, 810, 1000], [0.93747, 0.84802, 1.42878, 0.94746])}
+        hi_class = {'tt': ([220, 810, 1000, 1500, 2000], [0.99949, 0.95516, 1.16681, 1.15800, 1.02913]),
+                    'ee': ([100, 220, 810, 1000], [0.93748, 0.84849, 1.42870, 0.94745])}
         for key, (ell, expected) in hi_class.items():
             ratio = results[1]['cl'][key][ell]/results[0]['cl'][key][ell]
-            np.testing.assert_allclose(ratio, expected, atol=1e-3, err_msg=key)
+            np.testing.assert_allclose(ratio, expected, atol=1.5e-3, err_msg=key)
         np.testing.assert_allclose(np.array(results[1]['pk'])/np.array(results[0]['pk']),
                                    [1.21923, 1.21351, 1.22084, 1.22645], atol=1e-3, err_msg='P(k)')
         background = results[1]['background']
