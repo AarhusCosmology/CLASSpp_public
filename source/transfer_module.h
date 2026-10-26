@@ -200,7 +200,7 @@ class TransferModule : public BaseModule {
                                         double ra_rec,
                                         double q_max_bessel,
                                         const TransferTimeSampling& sampling,
-                                        const double* sources,
+                                        const int* last_nonzero_source,
                                         bool use_full_limber,
                                         double tau0_minus_tau_min_bessel,
                                         int* index_tau_max,

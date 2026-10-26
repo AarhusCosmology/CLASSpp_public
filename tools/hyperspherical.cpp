@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <utility>
 #define REFINE 10
 
@@ -148,15 +149,114 @@ HypersphericalInterpolationStructure HypersphericalInterpolationStructure::OnFix
       ForwardsStart(K, beta, xmin, deltax, RecurrenceTop(lvec, nl, l_WKB).first, nx);
   const int start = (nx > xfwdidx) ? xfwdidx : 0;
   nx              = start + (nx - start + _HYPER_CHUNK_ - 1) / _HYPER_CHUNK_ * _HYPER_CHUNK_;
-  return HypersphericalInterpolationStructure(K,
-                                              beta,
-                                              nl,
-                                              lvec,
-                                              xmin,
-                                              Grid{nx, deltax},
-                                              l_WKB,
-                                              phiminabs);
+  HypersphericalInterpolationStructure
+      table(K, beta, nl, lvec, xmin, Grid{nx, deltax}, l_WKB, phiminabs);
+
+  /* The second and third derivatives at the nodes, for hyperspherical_Hermite_evaluate: the
+     expressions hyperspherical_Hermite_interpolation evaluates at a node each time it enters an
+     interval, computed once. */
+  const double beta2 = beta * beta;
+  table.d2phi.resize(table.phi.size());
+  table.d3phi.resize(table.phi.size());
+  for (int k = 0; k < nl; k++) {
+    const double lxlp1 = lvec[k] * (lvec[k] + 1.0);
+    for (int j = 0; j < nx; j++) {
+      const size_t index = static_cast<size_t>(k) * nx + j;
+      const double y     = table.phi[index];
+      const double dy    = table.dphi[index];
+      const double cotK  = table.cotK[j];
+      const double sinK2 = table.sinK[j] * table.sinK[j];
+      const double d2y   = -2 * dy * cotK + y * (lxlp1 / sinK2 - beta2 + K);
+      table.d2phi[index] = d2y;
+      table.d3phi[index] = -2 * cotK * d2y - 2 * y * lxlp1 * cotK / sinK2 +
+                           dy * (K - beta2 + (2 + lxlp1) / sinK2);
+    }
+  }
+  return table;
 }
+
+void hyperspherical_Hermite_locate(const HyperInterpStruct* pHIS,
+                                   int nxi,
+                                   const double* xinterp,
+                                   HermiteLocations& where) {
+  const double* xvec  = pHIS->x.data();
+  const int nx        = pHIS->x_size;
+  const double deltax = pHIS->delta_x;
+  const double xmin   = xvec[0];
+  const double xmax   = xvec[nx - 1];
+  for (int j = 0; j < nxi; j++) {
+    const double x = xinterp[j];
+    if ((x < xmin) || (x > xmax)) {
+      where.left[j]    = -1;
+      where.h_left[j]  = 0.;
+      where.h_right[j] = 0.;
+      where.g_left[j]  = 0.;
+      where.g_right[j] = 0.;
+      continue;
+    }
+    /* the interval hyperspherical_Hermite_interpolation picks: right node clamped to [1, nx-1] */
+    const int right  = std::min(nx - 1, std::max(1, static_cast<int>((x - xmin) / deltax) + 1));
+    const double z   = (x - xvec[right - 1]) / deltax;
+    const double omz = 1. - z;
+    where.left[j]    = right - 1;
+    where.h_left[j]  = (1. + 2. * z) * omz * omz;
+    where.h_right[j] = z * z * (3. - 2. * z);
+    where.g_left[j]  = deltax * z * omz * omz;
+    where.g_right[j] = -deltax * z * z * omz;
+  }
+}
+
+template <bool DoPhi, bool DoDPhi, bool DoD2Phi>
+void hyperspherical_Hermite_evaluate(const HyperInterpStruct* pHIS,
+                                     int lnum,
+                                     const HermiteLocations& where,
+                                     int first,
+                                     int nxi,
+                                     double* Phi,
+                                     double* dPhi,
+                                     double* d2Phi) {
+  if (pHIS->d2phi.empty() || pHIS->K != 0) {
+    throw std::logic_error(
+        "hyperspherical_Hermite_evaluate needs a flat table built by OnFixedSpacing");
+  }
+  const size_t offset   = static_cast<size_t>(lnum) * pHIS->x_size;
+  const double* y       = pHIS->phi.data() + offset;
+  const double* dy      = pHIS->dphi.data() + offset;
+  const double* d2y     = pHIS->d2phi.data() + offset;
+  const double* d3y     = pHIS->d3phi.data() + offset;
+  const int* left       = where.left.data() + first;
+  const double* h_left  = where.h_left.data() + first;
+  const double* h_right = where.h_right.data() + first;
+  const double* g_left  = where.g_left.data() + first;
+  const double* g_right = where.g_right.data() + first;
+  for (int j = 0; j < nxi; j++) {
+    /* outside the table the weights are 0 and node 0 is read: the result is 0 */
+    const int i = std::max(left[j], 0);
+    if constexpr (DoPhi) {
+      Phi[j] = h_left[j] * y[i] + h_right[j] * y[i + 1] + g_left[j] * dy[i] +
+               g_right[j] * dy[i + 1];
+    }
+    if constexpr (DoDPhi) {
+      dPhi[j] = h_left[j] * dy[i] + h_right[j] * dy[i + 1] + g_left[j] * d2y[i] +
+                g_right[j] * d2y[i + 1];
+    }
+    if constexpr (DoD2Phi) {
+      d2Phi[j] = h_left[j] * d2y[i] + h_right[j] * d2y[i + 1] + g_left[j] * d3y[i] +
+                 g_right[j] * d3y[i + 1];
+    }
+  }
+}
+
+template void hyperspherical_Hermite_evaluate<true, false, false>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+template void hyperspherical_Hermite_evaluate<true, true, true>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+template void hyperspherical_Hermite_evaluate<true, true, false>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+template void hyperspherical_Hermite_evaluate<true, false, true>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+template void hyperspherical_Hermite_evaluate<false, true, false>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
 
 HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K,
                                                                            double beta,

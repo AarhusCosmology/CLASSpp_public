@@ -1706,6 +1706,18 @@ void TransferModule::transfer_compute_for_each_q(int index_q,
                              index_md,
                              index_tt,
                              ptw->sources.data() + (index_ic * tt_per_ts_max_ + n) * tau_size_max_);
+            /* where the source last differs from zero, at or before each time: the same for
+               every multipole, so found here once rather than by a scan per multipole */
+            const size_t row = static_cast<size_t>(index_ic * tt_per_ts_max_ + n) * tau_size_max_;
+            const double* source = ptw->sources.data() + row;
+            int* last_nonzero    = ptw->last_nonzero_source.data() + row;
+            int last             = -1;
+            for (int index_tau = 0; index_tau < tau_size; index_tau++) {
+              if (source[index_tau] != 0.) {
+                last = index_tau;
+              }
+              last_nonzero[index_tau] = last;
+            }
           }
         }
       }
@@ -1733,7 +1745,7 @@ void TransferModule::transfer_compute_for_each_q(int index_q,
                                                           ra_rec,
                                                           q_max_bessel,
                                                           sampling,
-                                                          ptw->sources.data() +
+                                                          ptw->last_nonzero_source.data() +
                                                               index_n * tau_size_max_,
                                                           use_full_limber,
                                                           tau0_minus_tau_min_bessel,
@@ -1832,6 +1844,12 @@ void TransferModule::transfer_radial_coordinates(struct transfer_workspace* ptw,
       for (int j = 0; j < tau_size; j++) {
         ptw->chi_full_reverse[j] = ptw->chi[tau_size - 1 - j];
       }
+      /* where these arguments fall in the Bessel table depends on them alone: found here once,
+         used for every multipole (docs/superpowers/specs/2026-10-27-transfer-hermite-kernel-design.md) */
+      hyperspherical_Hermite_locate(ptw->pBIS,
+                                    tau_size,
+                                    ptw->chi_full_reverse.data(),
+                                    ptw->bessel_location);
       break;
     case -1:
       sqrt_absK = sqrt(-ptw->K);
@@ -2275,7 +2293,7 @@ TransferMethod TransferModule::transfer_select_method(struct transfer_workspace*
                                                       double ra_rec,
                                                       double q_max_bessel,
                                                       const TransferTimeSampling& sampling,
-                                                      const double* sources,
+                                                      const int* last_nonzero_source,
                                                       bool use_full_limber,
                                                       double tau0_minus_tau_min_bessel,
                                                       int* index_tau_max,
@@ -2338,31 +2356,34 @@ TransferMethod TransferModule::transfer_select_method(struct transfer_workspace*
     return TransferMethod::zero;
   }
 
+  /* tau0_minus_tau decreases with the index: the last index at which it is >= a value, or -1.
+     These were backward scans from the last time, run for every multipole and type. */
+  auto last_at_or_above = [&tau0_minus_tau](double value) {
+    return static_cast<int>(std::partition_point(tau0_minus_tau.begin(),
+                                                 tau0_minus_tau.end(),
+                                                 [value](double v) { return v >= value; }) -
+                            tau0_minus_tau.begin()) -
+           1;
+  };
+
   /** - index of the last point in the overlapping region. After this step, it can be as small
       as zero, but not negative. Remember it, to know if the truncation of the integral is due to
       the Bessel function and not to the source. */
-  int index = tau_size - 1;
-  while (tau0_minus_tau[index] < cut) {
-    index--;
-  }
+  int index                      = last_at_or_above(cut);
   const int index_tau_max_Bessel = index;
 
   /** - the source function can vanish at large \f$ \tau \f$. Check if further points can be eliminated. */
-  while (sources[index] == 0.) {
-    index--;
-    if (index < 0) {
-      return TransferMethod::zero;
-    }
+  index = last_nonzero_source[index];
+  if (index < 0) {
+    return TransferMethod::zero;
   }
 
   /** - neglect late time CMB sources when l is above threshold */
   if (type.late_source_cut &&
       (l > ppr->transfer_neglect_late_source * thermodynamics_module_->angular_rescaling_)) {
-    while (tau0_minus_tau[index] < ptw->tau0_minus_tau_cut) {
-      index--;
-      if (index < 0) {
-        return TransferMethod::zero;
-      }
+    index = std::min(index, last_at_or_above(ptw->tau0_minus_tau_cut));
+    if (index < 0) {
+      return TransferMethod::zero;
     }
   }
 
@@ -2801,10 +2822,8 @@ void TransferModule::transfer_bessel_interpolate(struct transfer_workspace* ptw,
 
   //Reverse chi
   if (ptw->sgnK == 0) {
+    /* rescale_function: still the ones of transfer_workspace_init */
     chireverse = ptw->chi_full_reverse.data() + (tau_size - x_size);
-    for (int j = 0; j < x_size; j++) {
-      rescale_function[j] = 1.;
-    }
   }
   else {
     for (int j = 0; j < x_size; j++) {
@@ -2840,6 +2859,67 @@ void TransferModule::transfer_bessel_interpolate(struct transfer_workspace* ptw,
   double* Phi   = ptw->Phi.data();
   double* dPhi  = ptw->dPhi.data();
   double* d2Phi = ptw->d2Phi.data();
+  if (ptw->sgnK == 0) {
+    /* flat: from the locations found once for this wavenumber; this multipole uses the last
+       x_size of them, as chireverse above */
+    const HermiteLocations& where = ptw->bessel_location;
+    const int first               = tau_size - x_size;
+    if (needs.d2Phi) {
+      if (needs.dPhi) {
+        hyperspherical_Hermite_evaluate<true, true, true>(pHIS,
+                                                          index_l,
+                                                          where,
+                                                          first,
+                                                          x_size,
+                                                          Phi,
+                                                          dPhi,
+                                                          d2Phi);
+      }
+      else {
+        hyperspherical_Hermite_evaluate<true, false, true>(pHIS,
+                                                           index_l,
+                                                           where,
+                                                           first,
+                                                           x_size,
+                                                           Phi,
+                                                           nullptr,
+                                                           d2Phi);
+      }
+    }
+    else if (needs.Phi) {
+      if (needs.dPhi) {
+        hyperspherical_Hermite_evaluate<true, true, false>(pHIS,
+                                                           index_l,
+                                                           where,
+                                                           first,
+                                                           x_size,
+                                                           Phi,
+                                                           dPhi,
+                                                           nullptr);
+      }
+      else {
+        hyperspherical_Hermite_evaluate<true, false, false>(pHIS,
+                                                            index_l,
+                                                            where,
+                                                            first,
+                                                            x_size,
+                                                            Phi,
+                                                            nullptr,
+                                                            nullptr);
+      }
+    }
+    else {
+      hyperspherical_Hermite_evaluate<false, true, false>(pHIS,
+                                                          index_l,
+                                                          where,
+                                                          first,
+                                                          x_size,
+                                                          nullptr,
+                                                          dPhi,
+                                                          nullptr);
+    }
+    return;
+  }
   if (needs.d2Phi) {
     if (needs.dPhi) {
       interpolate_PhidPhid2Phi(pHIS, x_size, index_l, chireverse, Phi, dPhi, d2Phi);
@@ -3165,9 +3245,12 @@ void TransferModule::transfer_workspace_init(struct transfer_workspace* ptw,
   ptw->dPhi.resize(tau_size_max_);
   ptw->d2Phi.resize(tau_size_max_);
   ptw->chireverse.resize(tau_size_max_);
-  ptw->rescale_function.resize(tau_size_max_);
+  /* all ones in flat space, where nothing rewrites it (transfer_bessel_interpolate) */
+  ptw->rescale_function.assign(tau_size_max_, 1.);
   ptw->radial_function.resize(tau_size_max_);
   ptw->chi_full_reverse.resize(tau_size_max_);
+  ptw->bessel_location.resize(tau_size_max_);
+  ptw->last_nonzero_source.resize(static_cast<size_t>(n_max) * tau_size_max_);
 }
 
 void TransferModule::transfer_update_HIS(struct transfer_workspace* ptw, int index_q, double tau0) {

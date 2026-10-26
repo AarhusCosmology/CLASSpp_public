@@ -34,6 +34,10 @@ struct HypersphericalInterpolationStructure {
   std::vector<double> cotK;           //Vector of cot_K(xvec)
   std::vector<double> phi;            //array of size nl*nx. [y_{l1}(x1) t_{l1}(x2)...]
   std::vector<double> dphi;           //Same as phivec, but containing derivatives.
+  /* Second and third derivatives at the nodes, from the radial equation, in the layout of phi.
+     Filled by OnFixedSpacing only, for hyperspherical_Hermite_evaluate; empty otherwise. */
+  std::vector<double> d2phi;
+  std::vector<double> d3phi;
 
   HypersphericalInterpolationStructure() = default;
   /** A table on [xmin, xmax] with about `sampling` points per period 2 pi / beta. The spacing
@@ -77,6 +81,46 @@ struct HypersphericalInterpolationStructure {
                                        double phiminabs);
 };
 using HyperInterpStruct = HypersphericalInterpolationStructure;
+
+/** Where arguments x fall in a table's grid, and the cubic Hermite weights there: at x_j,
+    f(x_j) = h_left[j] f_i + h_right[j] f_{i+1} + g_left[j] f'_i + g_right[j] f'_{i+1}, i = left[j].
+    They depend on the x only, so a caller that interpolates many multipoles at the same arguments
+    (the flat-space transfer functions) finds them once and evaluates every multipole from them.
+    Separate arrays rather than one struct per point, so that the weights stream through the cache. */
+struct HermiteLocations {
+  std::vector<int>
+      left; /* left node, or -1 when x is outside the table (the functions are 0 there) */
+  std::vector<double> h_left;
+  std::vector<double> h_right;
+  std::vector<double> g_left; /* the derivative weights include the node spacing */
+  std::vector<double> g_right;
+  void resize(int n) {
+    left.resize(n);
+    h_left.resize(n);
+    h_right.resize(n);
+    g_left.resize(n);
+    g_right.resize(n);
+  }
+};
+
+/** Locate nxi arguments in a table (flat: K = 0). */
+void hyperspherical_Hermite_locate(const HyperInterpStruct* pHIS,
+                                   int nxi,
+                                   const double* xinterp,
+                                   HermiteLocations& where);
+
+/** Phi, dPhi and/or d2Phi of multipole index lnum at the located arguments first..first+nxi-1:
+    the same cubic Hermite interpolants as hyperspherical_Hermite_interpolation<4, ...>, from the
+    node tables of a table built by OnFixedSpacing. */
+template <bool DoPhi, bool DoDPhi, bool DoD2Phi>
+void hyperspherical_Hermite_evaluate(const HyperInterpStruct* pHIS,
+                                     int lnum,
+                                     const HermiteLocations& where,
+                                     int first,
+                                     int nxi,
+                                     double* Phi,
+                                     double* dPhi,
+                                     double* d2Phi);
 
 struct WKB_parameters {
   int K;
@@ -183,6 +227,16 @@ void hyperspherical_Hermite_interpolation(const HyperInterpStruct* pHIS,
 // The definition lives in hyperspherical.cpp (same translation unit as
 // ClosedModY, which must inline into the closed-case loop); these are the
 // combinations the transfer module dispatches to.
+extern template void hyperspherical_Hermite_evaluate<true, false, false>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+extern template void hyperspherical_Hermite_evaluate<true, true, true>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+extern template void hyperspherical_Hermite_evaluate<true, true, false>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+extern template void hyperspherical_Hermite_evaluate<true, false, true>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
+extern template void hyperspherical_Hermite_evaluate<false, true, false>(
+    const HyperInterpStruct*, int, const HermiteLocations&, int, int, double*, double*, double*);
 extern template void hyperspherical_Hermite_interpolation<4, true, false, false>(
     const HyperInterpStruct*, int, int, const double*, double*, double*, double*);
 extern template void hyperspherical_Hermite_interpolation<4, false, true, false>(

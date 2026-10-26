@@ -242,6 +242,12 @@ struct transfer_workspace {
   std::vector<double>
       radial_function; /**< radial_function[index_tau]: output of transfer_radial_function */
   std::vector<double> chi_full_reverse; /**< workspace: reversed chi array */
+  std::vector<int>
+      last_nonzero_source; /**< per (initial condition, type) of a time sampling: the last
+                                           time index at or before i with a nonzero source, or -1 */
+  HermiteLocations
+      bessel_location; /**< flat case: where each chi_full_reverse falls in the Bessel table, found once per
+                          wavenumber and time sampling and shared by every multipole */
 
   //@}
 

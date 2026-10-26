@@ -28,6 +28,7 @@ TEST_TARGETS := \
 	test-free-streaming-cutoff \
 	test-bessel-table-cache \
 	test-wigner-d \
+	test-hermite-evaluate \
 	test-bisection \
 	test-function-ref \
 	test-quadrature \
