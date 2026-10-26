@@ -35,18 +35,6 @@ class LensingModule : public BaseModule {
   int lensing_X121(double* mu, int num_mu, int lmax, double* sigma2, double** X121);
   int lensing_X132(double* mu, int num_mu, int lmax, double* sigma2, double** X132);
   int lensing_X242(double* mu, int num_mu, int lmax, double* sigma2, double** X242);
-  void lensing_d00(const double* mu, int num_mu, int lmax, double** d00);
-  void lensing_d11(const double* mu, int num_mu, int lmax, double** d11);
-  void lensing_d1m1(const double* mu, int num_mu, int lmax, double** d1m1);
-  void lensing_d2m2(const double* mu, int num_mu, int lmax, double** d2m2);
-  void lensing_d22(const double* mu, int num_mu, int lmax, double** d22);
-  void lensing_d20(const double* mu, int num_mu, int lmax, double** d20);
-  void lensing_d31(const double* mu, int num_mu, int lmax, double** d31);
-  void lensing_d3m1(const double* mu, int num_mu, int lmax, double** d3m1);
-  void lensing_d3m3(const double* mu, int num_mu, int lmax, double** d3m3);
-  void lensing_d40(const double* mu, int num_mu, int lmax, double** d40);
-  void lensing_d4m2(const double* mu, int num_mu, int lmax, double** d4m2);
-  void lensing_d4m4(const double* mu, int num_mu, int lmax, double** d4m4);
 
   /** @name - information on number of type of C_l's (TT, TE...) */
 

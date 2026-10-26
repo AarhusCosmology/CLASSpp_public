@@ -147,6 +147,7 @@ set(CLASS_TOOLS_FILES
   tools/reduced_collision_operator.cpp
   tools/sparse.cpp
   tools/trigonometric_integrals.cpp
+  tools/wigner_d.cpp
 )
 
 # hyrec/hyrec.c is the standalone HyRec driver (has its own main) and stays out.

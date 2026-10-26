@@ -27,6 +27,7 @@ TEST_TARGETS := \
 	test-nonlinear-threads \
 	test-free-streaming-cutoff \
 	test-bessel-table-cache \
+	test-wigner-d \
 	test-bisection \
 	test-function-ref \
 	test-quadrature \

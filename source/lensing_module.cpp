@@ -6,11 +6,13 @@
 #include "lensing_module.h"
 
 #include <algorithm>
+#include <array>
 #include <numeric>
 
 #include "errors.h"
 #include "spectra_module.h"
 #include "thread_pool.h"
+#include "wigner_d.h"
 
 /**
  * Anisotropy power spectra \f$ C_l\f$'s for all types, modes and initial conditions.
@@ -271,11 +273,13 @@ void LensingModule::lensing_init() {
   /** - \f$ Cgl(\mu=1) \f$, the point sigma2\f$(\mu)\f$ = Cgl(1) - Cgl(\f$\mu\f$) is measured from */
   double Cgl_at_1 = 0.;
   {
-    std::vector<double> d11_row(l_unlensed_max_ + 1);
-    double* d11_ptr = d11_row.data();
-    lensing_d11(&mu[num_mu - 1], 1, l_unlensed_max_, &d11_ptr);
+    wigner::Nodes mu_at_1{};
+    mu_at_1.fill(mu[num_mu - 1]);
+    std::vector<double> d11_at_1(static_cast<size_t>(l_unlensed_max_ + 1) * wigner::kChunk);
+    wigner::D11(mu_at_1, l_unlensed_max_, d11_at_1.data());
     for (int l = 2; l <= l_unlensed_max_; l++) {
-      Cgl_at_1 += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d11_row[l];
+      Cgl_at_1 += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] *
+                  d11_at_1[static_cast<size_t>(l) * wigner::kChunk];
     }
     Cgl_at_1 /= 4. * _PI_;
   }
@@ -284,17 +288,18 @@ void LensingModule::lensing_init() {
 
       Both steps need every Wigner \f$ d^l_{mm'}(\mu) \f$ at every node and multipole, for up to
       twelve (m,m') pairs. Tabulated all at once that is 12 x num_mu x l_max doubles -- 12 GB at
-      the l_max ~ 11000 a high-l CMB likelihood needs, with accurate_lensing's num_mu ~ l_max --
-      and the transform then read it with a stride of a whole row, one cache miss per term. Neither
-      step needs more than one node at a time, so the nodes are cut into chunks of fixed size:
-      a task tabulates the d-functions of its chunk only, forms the correlation functions there,
-      and adds the chunk's share of the Gauss-Legendre (or Riemann) sum into that chunk's own row
-      of partial sums. The partial sums are then added in chunk order. Chunks, not threads, are
-      the unit of summation, so the result does not depend on the number of threads. */
+      the l_max ~ 11000 a high-l CMB likelihood needs, with accurate_lensing's num_mu ~ l_max.
+      Neither step needs more than a few nodes at a time, so the nodes are cut into chunks of
+      wigner::kChunk: a task tabulates the d-functions of its chunk only, as d[l][node], forms the
+      correlation functions there, and adds the chunk's share of the Gauss-Legendre (or Riemann)
+      sum into that chunk's own row of partial sums. The partial sums are then added in chunk
+      order. Chunks, not threads, are the unit of summation, so the result does not depend on the
+      number of threads. Every loop runs over the nodes of the chunk innermost, so that the
+      recurrences and the sums over l are vectorised across nodes; each node's sums still add
+      their terms in increasing l. */
 
   const int num_nodes  = num_mu - 1; /* the last mu (=1) only serves Cgl_at_1 */
-  const int chunk_size = 32;
-  const int num_chunks = (num_nodes + chunk_size - 1) / chunk_size;
+  const int num_chunks = (num_nodes + wigner::kChunk - 1) / wigner::kChunk;
   const int row_size   = l_unlensed_max_ + 1;
 
   std::vector<double> partial_tt;
@@ -316,95 +321,99 @@ void LensingModule::lensing_init() {
 
   /* One task per thread, each walking its own stride of chunks with one reused buffer. */
   auto process_chunks = [&](int first_chunk, int stride) {
-    std::vector<double> buf(static_cast<size_t>(num_d) * chunk_size * row_size);
-    int next_d = 0;
-    auto rows  = [&]() {
-      std::vector<double*> row_ptrs(chunk_size);
-      for (int j = 0; j < chunk_size; j++) {
-        row_ptrs[j] = &buf[(static_cast<size_t>(next_d) * chunk_size + j) * row_size];
-      }
-      next_d++;
-      return row_ptrs;
-    };
-    std::vector<double*> d00  = rows();
-    std::vector<double*> d11  = rows();
-    std::vector<double*> d1m1 = rows();
-    std::vector<double*> d2m2 = rows();
-    std::vector<double*> d20;
-    std::vector<double*> d3m1;
-    std::vector<double*> d4m2;
-    std::vector<double*> d22;
-    std::vector<double*> d31;
-    std::vector<double*> d3m3;
-    std::vector<double*> d40;
-    std::vector<double*> d4m4;
+    std::vector<double> buf(static_cast<size_t>(num_d) * row_size * wigner::kChunk);
+    int next_d  = 0;
+    auto table  = [&]() { return &buf[static_cast<size_t>(next_d++) * row_size * wigner::kChunk]; };
+    double* d00 = table();
+    double* d11 = table();
+    double* d1m1 = table();
+    double* d2m2 = table();
+    double* d20  = nullptr;
+    double* d3m1 = nullptr;
+    double* d4m2 = nullptr;
+    double* d22  = nullptr;
+    double* d31  = nullptr;
+    double* d3m3 = nullptr;
+    double* d40  = nullptr;
+    double* d4m4 = nullptr;
     if (has_te_) {
-      d20  = rows();
-      d3m1 = rows();
-      d4m2 = rows();
+      d20  = table();
+      d3m1 = table();
+      d4m2 = table();
     }
     if (has_ee_ || has_bb_) {
-      d22  = rows();
-      d31  = rows();
-      d3m3 = rows();
-      d40  = rows();
-      d4m4 = rows();
+      d22  = table();
+      d31  = table();
+      d3m3 = table();
+      d40  = table();
+      d4m4 = table();
     }
+    /* element (l, node) of a table */
+    auto at = [](const double* d, int l, int j) {
+      return d[static_cast<size_t>(l) * wigner::kChunk + j];
+    };
 
     for (int index_chunk = first_chunk; index_chunk < num_chunks; index_chunk += stride) {
-      const int mu_first = index_chunk * chunk_size;
-      const int n        = std::min(chunk_size, num_nodes - mu_first);
-      double* mu_chunk   = &mu[mu_first];
+      const int mu_first = index_chunk * wigner::kChunk;
+      const int n        = std::min(wigner::kChunk, num_nodes - mu_first);
+
+      /* the last chunk is padded with copies of its last node, whose results are not used */
+      wigner::Nodes mu_chunk{};
+      for (int j = 0; j < wigner::kChunk; j++) {
+        mu_chunk[j] = mu[mu_first + std::min(j, n - 1)];
+      }
 
       /** - --> Wigner d-functions of this chunk, computed by recurrence in l */
-      lensing_d00(mu_chunk, n, l_unlensed_max_, d00.data());
-      lensing_d11(mu_chunk, n, l_unlensed_max_, d11.data());
-      lensing_d1m1(mu_chunk, n, l_unlensed_max_, d1m1.data());
-      lensing_d2m2(mu_chunk, n, l_unlensed_max_, d2m2.data());
+      wigner::D00(mu_chunk, l_unlensed_max_, d00);
+      wigner::D11(mu_chunk, l_unlensed_max_, d11);
+      wigner::D1m1(mu_chunk, l_unlensed_max_, d1m1);
+      wigner::D2m2(mu_chunk, l_unlensed_max_, d2m2);
       if (has_te_) {
-        lensing_d20(mu_chunk, n, l_unlensed_max_, d20.data());
-        lensing_d3m1(mu_chunk, n, l_unlensed_max_, d3m1.data());
-        lensing_d4m2(mu_chunk, n, l_unlensed_max_, d4m2.data());
+        wigner::D20(mu_chunk, l_unlensed_max_, d20);
+        wigner::D3m1(mu_chunk, l_unlensed_max_, d3m1);
+        wigner::D4m2(mu_chunk, l_unlensed_max_, d4m2);
       }
       if (has_ee_ || has_bb_) {
-        lensing_d22(mu_chunk, n, l_unlensed_max_, d22.data());
-        lensing_d31(mu_chunk, n, l_unlensed_max_, d31.data());
-        lensing_d3m3(mu_chunk, n, l_unlensed_max_, d3m3.data());
-        lensing_d40(mu_chunk, n, l_unlensed_max_, d40.data());
-        lensing_d4m4(mu_chunk, n, l_unlensed_max_, d4m4.data());
+        wigner::D22(mu_chunk, l_unlensed_max_, d22);
+        wigner::D31(mu_chunk, l_unlensed_max_, d31);
+        wigner::D3m3(mu_chunk, l_unlensed_max_, d3m3);
+        wigner::D40(mu_chunk, l_unlensed_max_, d40);
+        wigner::D4m4(mu_chunk, l_unlensed_max_, d4m4);
       }
 
-      for (int j = 0; j < n; j++) {
-        const int index_mu = mu_first + j;
-
-        /** - --> Cgl(\f$\mu\f$), Cgl2(\f$\mu\f$) and sigma2(\f$\mu\f$) */
-        double Cgl  = 0.;
-        double Cgl2 = 0.;
-        for (int l = 2; l <= l_unlensed_max_; l++) {
-          Cgl  += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d11[j][l];
-          Cgl2 += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * d1m1[j][l];
+      /** - --> Cgl(\f$\mu\f$), Cgl2(\f$\mu\f$) and sigma2(\f$\mu\f$) at the nodes of the chunk */
+      wigner::Nodes Cgl{};
+      wigner::Nodes Cgl2{};
+      for (int l = 2; l <= l_unlensed_max_; l++) {
+        for (int j = 0; j < n; j++) {
+          Cgl[j]  += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * at(d11, l, j);
+          Cgl2[j] += (2. * l + 1.) * l * (l + 1.) * cl_pp[l] * at(d1m1, l, j);
         }
-        Cgl  /= 4. * _PI_;
-        Cgl2 /= 4. * _PI_;
+      }
+      wigner::Nodes sigma2{};
+      for (int j = 0; j < n; j++) {
+        Cgl[j]    /= 4. * _PI_;
+        Cgl2[j]   /= 4. * _PI_;
+        sigma2[j]  = Cgl_at_1 - Cgl[j];
+      }
 
-        const double sigma2 = Cgl_at_1 - Cgl;
+      /** - --> ksi (TT), ksiX (TE), ksip and ksim (EE, BB) at the nodes of the chunk */
+      wigner::Nodes ksi{};
+      wigner::Nodes ksiX{};
+      wigner::Nodes ksip{};
+      wigner::Nodes ksim{};
 
-        /** - --> ksi (TT), ksiX (TE), ksip and ksim (EE, BB) at this node */
-        double ksi  = 0.;
-        double ksiX = 0.;
-        double ksip = 0.;
-        double ksim = 0.;
+      for (int l = 2; l <= l_unlensed_max_; l++) {
+        double ll = static_cast<double>(l);
 
-        for (int l = 2; l <= l_unlensed_max_; l++) {
-          double ll = static_cast<double>(l);
+        double fac  = ll * (ll + 1) / 4.;
+        double fac1 = (2 * ll + 1) / (4. * _PI_);
 
-          double fac  = ll * (ll + 1) / 4.;
-          double fac1 = (2 * ll + 1) / (4. * _PI_);
-
+        for (int j = 0; j < n; j++) {
           /* In the following we will keep terms of the form (sigma2)^k*(Cgl2)^m
              with k+m <= 2 */
 
-          double X_000  = exp(-fac * sigma2);
+          double X_000  = exp(-fac * sigma2[j]);
           double X_p000 = -fac * X_000;
           /* X_220 = 0.25*sqrt1[l] * exp(-(fac-0.5)*sigma2); */
           double X_220 = 0.25 * sqrt1[l] * X_000; /* Order 0 */
@@ -417,8 +426,8 @@ void LensingModule::lensing_init() {
 
           if (has_te_ || has_ee_ || has_bb_) {
             /* X_022 = exp(-(fac-1.)*sigma2); */
-            X_022  = X_000 * (1 + sigma2 * (1 + 0.5 * sigma2)); /* Order 2 */
-            X_p022 = -(fac - 1.) * X_022;                       /* Old versions were missing the
+            X_022  = X_000 * (1 + sigma2[j] * (1 + 0.5 * sigma2[j])); /* Order 2 */
+            X_p022 = -(fac - 1.) * X_022; /* Old versions were missing the
             minus sign in this line, which introduced a very small error
             on the high-l C_l^TE lensed spectrum [credits for bug fix:
             Selim Hotinli] */
@@ -428,79 +437,84 @@ void LensingModule::lensing_init() {
             if (has_ee_ || has_bb_) {
               /* X_121 = - 0.5*sqrt2[l] * exp(-(fac-2./3.)*sigma2);
                  X_132 = - 0.5*sqrt3[l] * exp(-(fac-5./3.)*sigma2); */
-              X_121 = -0.5 * sqrt2[l] * X_000 * (1 + 2. / 3. * sigma2); /* Order 1 */
-              X_132 = -0.5 * sqrt3[l] * X_000 * (1 + 5. / 3. * sigma2); /* Order 1 */
+              X_121 = -0.5 * sqrt2[l] * X_000 * (1 + 2. / 3. * sigma2[j]); /* Order 1 */
+              X_132 = -0.5 * sqrt3[l] * X_000 * (1 + 5. / 3. * sigma2[j]); /* Order 1 */
             }
           }
 
           if (has_tt_) {
             double res = fac1 * cl_tt[l];
 
-            double lens = (X_000 * X_000 * d00[j][l] +
-                           X_p000 * X_p000 * d1m1[j][l] * Cgl2 * 8. / (ll * (ll + 1)) +
-                           (X_p000 * X_p000 * d00[j][l] + X_220 * X_220 * d2m2[j][l]) * Cgl2 *
-                               Cgl2);
+            double lens = (X_000 * X_000 * at(d00, l, j) +
+                           X_p000 * X_p000 * at(d1m1, l, j) * Cgl2[j] * 8. / (ll * (ll + 1)) +
+                           (X_p000 * X_p000 * at(d00, l, j) + X_220 * X_220 * at(d2m2, l, j)) *
+                               Cgl2[j] * Cgl2[j]);
             if (!ppr->accurate_lensing) {
               /* Remove unlensed correlation function */
-              lens -= d00[j][l];
+              lens -= at(d00, l, j);
             }
-            res *= lens;
-            ksi += res;
+            res    *= lens;
+            ksi[j] += res;
           }
 
           if (has_te_) {
             double resX = fac1 * cl_te[l];
 
-            double lens = (X_022 * X_000 * d20[j][l] +
-                           Cgl2 * 2. * X_p000 / sqrt5[l] *
-                               (X_121 * d11[j][l] + X_132 * d3m1[j][l]) +
-                           0.5 * Cgl2 * Cgl2 *
-                               ((2. * X_p022 * X_p000 + X_220 * X_220) * d20[j][l] +
-                                X_220 * X_242 * d4m2[j][l]));
+            double lens = (X_022 * X_000 * at(d20, l, j) +
+                           Cgl2[j] * 2. * X_p000 / sqrt5[l] *
+                               (X_121 * at(d11, l, j) + X_132 * at(d3m1, l, j)) +
+                           0.5 * Cgl2[j] * Cgl2[j] *
+                               ((2. * X_p022 * X_p000 + X_220 * X_220) * at(d20, l, j) +
+                                X_220 * X_242 * at(d4m2, l, j)));
             if (!ppr->accurate_lensing) {
-              lens -= d20[j][l];
+              lens -= at(d20, l, j);
             }
-            resX *= lens;
-            ksiX += resX;
+            resX    *= lens;
+            ksiX[j] += resX;
           }
 
           if (has_ee_ || has_bb_) {
             double resp = fac1 * (cl_ee[l] + cl_bb[l]);
             double resm = fac1 * (cl_ee[l] - cl_bb[l]);
 
-            double lensp = (X_022 * X_022 * d22[j][l] + 2. * Cgl2 * X_132 * X_121 * d31[j][l] +
-                            Cgl2 * Cgl2 *
-                                (X_p022 * X_p022 * d22[j][l] + X_242 * X_220 * d40[j][l]));
+            double lensp = (X_022 * X_022 * at(d22, l, j) +
+                            2. * Cgl2[j] * X_132 * X_121 * at(d31, l, j) +
+                            Cgl2[j] * Cgl2[j] *
+                                (X_p022 * X_p022 * at(d22, l, j) + X_242 * X_220 * at(d40, l, j)));
 
-            double lensm = (X_022 * X_022 * d2m2[j][l] +
-                            Cgl2 * (X_121 * X_121 * d1m1[j][l] + X_132 * X_132 * d3m3[j][l]) +
-                            0.5 * Cgl2 * Cgl2 *
-                                (2. * X_p022 * X_p022 * d2m2[j][l] + X_220 * X_220 * d00[j][l] +
-                                 X_242 * X_242 * d4m4[j][l]));
+            double lensm = (X_022 * X_022 * at(d2m2, l, j) +
+                            Cgl2[j] *
+                                (X_121 * X_121 * at(d1m1, l, j) + X_132 * X_132 * at(d3m3, l, j)) +
+                            0.5 * Cgl2[j] * Cgl2[j] *
+                                (2. * X_p022 * X_p022 * at(d2m2, l, j) +
+                                 X_220 * X_220 * at(d00, l, j) + X_242 * X_242 * at(d4m4, l, j)));
             if (!ppr->accurate_lensing) {
-              lensp -= d22[j][l];
-              lensm -= d2m2[j][l];
+              lensp -= at(d22, l, j);
+              lensm -= at(d2m2, l, j);
             }
-            resp *= lensp;
-            resm *= lensm;
-            ksip += resp;
-            ksim += resm;
+            resp    *= lensp;
+            resm    *= lensm;
+            ksip[j] += resp;
+            ksim[j] += resm;
           }
         }
+      }
 
-        /** - --> this node's share of the transform back to the lensed \f$ C_l\f$'s */
-        const size_t offset = static_cast<size_t>(index_chunk) * l_size_;
-        for (int index_l = 0; index_l < l_size_; index_l++) {
-          const int l = static_cast<int>(l_[index_l]);
+      /** - --> this chunk's share of the transform back to the lensed \f$ C_l\f$'s */
+      const size_t offset = static_cast<size_t>(index_chunk) * l_size_;
+      for (int index_l = 0; index_l < l_size_; index_l++) {
+        const int l = static_cast<int>(l_[index_l]);
+        for (int j = 0; j < n; j++) {
+          const int index_mu = mu_first + j;
           if (has_tt_) {
-            partial_tt[offset + index_l] += ksi * d00[j][l] * w8[index_mu];
+            partial_tt[offset + index_l] += ksi[j] * at(d00, l, j) * w8[index_mu];
           }
           if (has_te_) {
-            partial_te[offset + index_l] += ksiX * d20[j][l] * w8[index_mu];
+            partial_te[offset + index_l] += ksiX[j] * at(d20, l, j) * w8[index_mu];
           }
           if (has_ee_ || has_bb_) {
-            partial_p[offset + index_l] += ksip * d22[j][l] * w8[index_mu];
-            partial_m[offset + index_l] += ksim * d2m2[j][l] * w8[index_mu];
+            partial_p[offset + index_l] += ksip[j] * at(d22, l, j) * w8[index_mu];
+            partial_m[offset + index_l] += ksim[j] * at(d2m2, l, j) * w8[index_mu];
           }
         }
       }
@@ -790,531 +804,5 @@ void LensingModule::lensing_addback_cl_ee_bb(const double* cl_ee, const double* 
     int l                                        = static_cast<int>(l_[index_l]);
     cl_lens_[index_l * lt_size_ + index_lt_ee_] += cl_ee[l];
     cl_lens_[index_l * lt_size_ + index_lt_bb_] += cl_bb[l];
-  }
-}
-
-/**
- * This routine computes the d00 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d00    Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d00(const double* mu, int num_mu, int lmax, double** d00) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-
-  for (int l = 1; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (2 * ll + 1) / (ll + 1);
-    fac2[l]   = sqrt((2 * ll + 3) / (2 * ll - 1)) * ll / (ll + 1);
-    fac3[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    double dlm1      = 1.0 / sqrt(2.); /* l=0 */
-    d00[index_mu][0] = dlm1 * sqrt(2.);
-    double dl        = mu[index_mu] * sqrt(3. / 2.); /*l=1*/
-    d00[index_mu][1] = dl * sqrt(2. / 3.);
-    for (int l = 1; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d00 recurrence, supposed to be more stable */
-      double dlp1          = fac1[l] * mu[index_mu] * dl - fac2[l] * dlm1;
-      d00[index_mu][l + 1] = dlp1 * fac3[l];
-      dlm1                 = dl;
-      dl                   = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d11 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d11    Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d11(const double* mu, int num_mu, int lmax, double** d11) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 2; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / (ll * (ll + 2));
-    fac2[l]   = 1.0 / (ll * (ll + 1.));
-    fac3[l] = sqrt((2 * ll + 3) / (2 * ll - 1)) * (ll - 1) * (ll + 1) / (ll * (ll + 2)) * (ll + 1) /
-              ll;
-    fac4[l] = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d11[index_mu][0] = 0;
-    double dlm1      = (1.0 + mu[index_mu]) / 2. * sqrt(3. / 2.); /*l=1*/
-    d11[index_mu][1] = dlm1 * sqrt(2. / 3.);
-    double dl = (1.0 + mu[index_mu]) / 2. * (2.0 * mu[index_mu] - 1.0) * sqrt(5. / 2.); /*l=2*/
-    d11[index_mu][2] = dl * sqrt(2. / 5.);
-    for (int l = 2; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d11 recurrence, supposed to be more stable */
-      double dlp1          = fac1[l] * (mu[index_mu] - fac2[l]) * dl - fac3[l] * dlm1;
-      d11[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                 = dl;
-      dl                   = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d1m1 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d1m1    Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d1m1(const double* mu, int num_mu, int lmax, double** d1m1) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 2; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / (ll * (ll + 2));
-    fac2[l]   = 1.0 / (ll * (ll + 1.));
-    fac3[l] = sqrt((2 * ll + 3) / (2 * ll - 1)) * (ll - 1) * (ll + 1) / (ll * (ll + 2)) * (ll + 1) /
-              ll;
-    fac4[l] = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d1m1[index_mu][0] = 0;
-    double dlm1       = (1.0 - mu[index_mu]) / 2. * sqrt(3. / 2.); /*l=1*/
-    d1m1[index_mu][1] = dlm1 * sqrt(2. / 3.);
-    double dl = (1.0 - mu[index_mu]) / 2. * (2.0 * mu[index_mu] + 1.0) * sqrt(5. / 2.); /*l=2*/
-    d1m1[index_mu][2] = dl * sqrt(2. / 5.);
-    for (int l = 2; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d1m1 recurrence, supposed to be more stable */
-      double dlp1           = fac1[l] * (mu[index_mu] + fac2[l]) * dl - fac3[l] * dlm1;
-      d1m1[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                  = dl;
-      dl                    = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d2m2 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d2m2   Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d2m2(const double* mu, int num_mu, int lmax, double** d2m2) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 2; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / ((ll - 1) * (ll + 3));
-    fac2[l]   = 4.0 / (ll * (ll + 1));
-    fac3[l]   = sqrt((2 * ll + 3) / (2 * ll - 1)) * (ll - 2) * (ll + 2) / ((ll - 1) * (ll + 3)) *
-                (ll + 1) / ll;
-    fac4[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d2m2[index_mu][0] = 0;
-    double dlm1       = 0.; /*l=1*/
-    d2m2[index_mu][1] = 0;
-    double dl         = (1.0 - mu[index_mu]) * (1.0 - mu[index_mu]) / 4. * sqrt(5. / 2.); /*l=2*/
-    d2m2[index_mu][2] = dl * sqrt(2. / 5.);
-    for (int l = 2; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d2m2 recurrence, supposed to be more stable */
-      double dlp1           = fac1[l] * (mu[index_mu] + fac2[l]) * dl - fac3[l] * dlm1;
-      d2m2[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                  = dl;
-      dl                    = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d22 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d22    Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d22(const double* mu, int num_mu, int lmax, double** d22) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 2; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) / (2 * ll + 1)) * (ll + 1) * (2 * ll + 1) / ((ll - 1) * (ll + 3));
-    fac2[l]   = 4.0 / (ll * (ll + 1));
-    fac3[l]   = sqrt((2 * ll + 3) / (2 * ll - 1)) * (ll - 2) * (ll + 2) / ((ll - 1) * (ll + 3)) *
-                (ll + 1) / ll;
-    fac4[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d22[index_mu][0] = 0;
-    double dlm1      = 0.; /*l=1*/
-    d22[index_mu][1] = 0;
-    double dl        = (1.0 + mu[index_mu]) * (1.0 + mu[index_mu]) / 4. * sqrt(5. / 2.); /*l=2*/
-    d22[index_mu][2] = dl * sqrt(2. / 5.);
-    for (int l = 2; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1          = fac1[l] * (mu[index_mu] - fac2[l]) * dl - fac3[l] * dlm1;
-      d22[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                 = dl;
-      dl                   = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d20 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d20    Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d20(const double* mu, int num_mu, int lmax, double** d20) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 2; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 1) * (ll + 3)));
-    fac3[l]   = sqrt((2 * ll + 3) * (ll - 2) * (ll + 2) / ((2 * ll - 1) * (ll - 1) * (ll + 3)));
-    fac4[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d20[index_mu][0] = 0;
-    double dlm1      = 0.; /*l=1*/
-    d20[index_mu][1] = 0;
-    double dl        = sqrt(15.) / 4. * (1 - mu[index_mu] * mu[index_mu]); /*l=2*/
-    d20[index_mu][2] = dl * sqrt(2. / 5.);
-    for (int l = 2; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1          = fac1[l] * mu[index_mu] * dl - fac3[l] * dlm1;
-      d20[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                 = dl;
-      dl                   = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d31 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d31    Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d31(const double* mu, int num_mu, int lmax, double** d31) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 3; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l] = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 2) * (ll + 4) * ll * (ll + 2))) * (ll + 1);
-    fac2[l] = 3.0 / (ll * (ll + 1));
-    fac3[l] = sqrt((2 * ll + 3) / (2 * ll - 1) * (ll - 3) * (ll + 3) * (ll - 1) * (ll + 1) /
-                   ((ll - 2) * (ll + 4) * ll * (ll + 2))) *
-              (ll + 1) / ll;
-    fac4[l] = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d31[index_mu][0] = 0;
-    d31[index_mu][1] = 0;
-    double dlm1      = 0.; /*l=2*/
-    d31[index_mu][2] = 0;
-    double dl = sqrt(105. / 2.) * (1 + mu[index_mu]) * (1 + mu[index_mu]) * (1 - mu[index_mu]) /
-                8.; /*l=3*/
-    d31[index_mu][3] = dl * sqrt(2. / 7.);
-    for (int l = 3; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1          = fac1[l] * (mu[index_mu] - fac2[l]) * dl - fac3[l] * dlm1;
-      d31[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                 = dl;
-      dl                   = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d3m1 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d3m1   Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d3m1(const double* mu, int num_mu, int lmax, double** d3m1) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 3; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l] = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 2) * (ll + 4) * ll * (ll + 2))) * (ll + 1);
-    fac2[l] = 3.0 / (ll * (ll + 1));
-    fac3[l] = sqrt((2 * ll + 3) / (2 * ll - 1) * (ll - 3) * (ll + 3) * (ll - 1) * (ll + 1) /
-                   ((ll - 2) * (ll + 4) * ll * (ll + 2))) *
-              (ll + 1) / ll;
-    fac4[l] = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d3m1[index_mu][0] = 0;
-    d3m1[index_mu][1] = 0;
-    double dlm1       = 0.; /*l=2*/
-    d3m1[index_mu][2] = 0;
-    double dl = sqrt(105. / 2.) * (1 + mu[index_mu]) * (1 - mu[index_mu]) * (1 - mu[index_mu]) /
-                8.; /*l=3*/
-    d3m1[index_mu][3] = dl * sqrt(2. / 7.);
-    for (int l = 3; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1           = fac1[l] * (mu[index_mu] + fac2[l]) * dl - fac3[l] * dlm1;
-      d3m1[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                  = dl;
-      dl                    = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d3m3 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d3m3   Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d3m3(const double* mu, int num_mu, int lmax, double** d3m3) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 3; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1)) * (ll + 1) / ((ll - 2) * (ll + 4));
-    fac2[l]   = 9.0 / (ll * (ll + 1));
-    fac3[l]   = sqrt((2 * ll + 3) / (2 * ll - 1)) * (ll - 3) * (ll + 3) * (l + 1) /
-                ((ll - 2) * (ll + 4) * ll);
-    fac4[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d3m3[index_mu][0] = 0;
-    d3m3[index_mu][1] = 0;
-    double dlm1       = 0.; /*l=2*/
-    d3m3[index_mu][2] = 0;
-    double dl = sqrt(7. / 2.) * (1 - mu[index_mu]) * (1 - mu[index_mu]) * (1 - mu[index_mu]) /
-                8.; /*l=3*/
-    d3m3[index_mu][3] = dl * sqrt(2. / 7.);
-    for (int l = 3; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1           = fac1[l] * (mu[index_mu] + fac2[l]) * dl - fac3[l] * dlm1;
-      d3m3[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                  = dl;
-      dl                    = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d40 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d40    Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d40(const double* mu, int num_mu, int lmax, double** d40) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 4; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 3) * (ll + 5)));
-    fac3[l]   = sqrt((2 * ll + 3) * (ll - 4) * (ll + 4) / ((2 * ll - 1) * (ll - 3) * (ll + 5)));
-    fac4[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d40[index_mu][0] = 0;
-    d40[index_mu][1] = 0;
-    d40[index_mu][2] = 0;
-    double dlm1      = 0.; /*l=3*/
-    d40[index_mu][3] = 0;
-    double dl        = sqrt(315.) * (1 + mu[index_mu]) * (1 + mu[index_mu]) * (1 - mu[index_mu]) *
-                       (1 - mu[index_mu]) / 16.; /*l=4*/
-    d40[index_mu][4] = dl * sqrt(2. / 9.);
-    for (int l = 4; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1          = fac1[l] * mu[index_mu] * dl - fac3[l] * dlm1;
-      d40[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                 = dl;
-      dl                   = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d4m2 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d4m2   Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d4m2(const double* mu, int num_mu, int lmax, double** d4m2) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 4; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1) / ((ll - 3) * (ll + 5) * (ll - 1) * (ll + 3))) *
-                (ll + 1.);
-    fac2[l]   = 8. / (ll * (ll + 1));
-    fac3[l]   = sqrt((2 * ll + 3) * (ll - 4) * (ll + 4) * (ll - 2) * (ll + 2) /
-                     ((2 * ll - 1) * (ll - 3) * (ll + 5) * (ll - 1) * (ll + 3))) *
-                (ll + 1) / ll;
-    fac4[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d4m2[index_mu][0] = 0;
-    d4m2[index_mu][1] = 0;
-    d4m2[index_mu][2] = 0;
-    double dlm1       = 0.; /*l=3*/
-    d4m2[index_mu][3] = 0;
-    double dl         = sqrt(126.) * (1 + mu[index_mu]) * (1 - mu[index_mu]) * (1 - mu[index_mu]) *
-                        (1 - mu[index_mu]) / 16.; /*l=4*/
-    d4m2[index_mu][4] = dl * sqrt(2. / 9.);
-    for (int l = 4; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1           = fac1[l] * (mu[index_mu] + fac2[l]) * dl - fac3[l] * dlm1;
-      d4m2[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                  = dl;
-      dl                    = dlp1;
-    }
-  }
-}
-
-/**
- * This routine computes the d4m4 term
- *
- * @param mu     Input: Vector of cos(beta) values
- * @param num_mu Input: Number of cos(beta) values
- * @param lmax   Input: maximum multipole
- * @param d4m4   Input/output: Result is stored here
- *
- * Wigner d-functions, computed by recurrence
- * actual recurrence on \f$ \sqrt{(2l+1)/2} d^l_{mm'} \f$ for stability
- * Formulae from Kostelec & Rockmore 2003
- **/
-
-void LensingModule::lensing_d4m4(const double* mu, int num_mu, int lmax, double** d4m4) {
-  std::vector<double> fac1(lmax);
-  std::vector<double> fac2(lmax);
-  std::vector<double> fac3(lmax);
-  std::vector<double> fac4(lmax);
-  for (int l = 4; l < lmax; l++) {
-    double ll = static_cast<double>(l);
-    fac1[l]   = sqrt((2 * ll + 3) * (2 * ll + 1)) * (ll + 1) / ((ll - 3) * (ll + 5));
-    fac2[l]   = 16. / (ll * (ll + 1));
-    fac3[l]   = sqrt((2 * ll + 3) / (2 * ll - 1)) * (ll - 4) * (ll + 4) * (ll + 1) /
-                ((ll - 3) * (ll + 5) * ll);
-    fac4[l]   = sqrt(2. / (2 * ll + 3));
-  }
-
-  for (int index_mu = 0; index_mu < num_mu; index_mu++) {
-    d4m4[index_mu][0] = 0;
-    d4m4[index_mu][1] = 0;
-    d4m4[index_mu][2] = 0;
-    double dlm1       = 0.; /*l=3*/
-    d4m4[index_mu][3] = 0;
-    double dl = sqrt(9. / 2.) * (1 - mu[index_mu]) * (1 - mu[index_mu]) * (1 - mu[index_mu]) *
-                (1 - mu[index_mu]) / 16.; /*l=4*/
-    d4m4[index_mu][4] = dl * sqrt(2. / 9.);
-    for (int l = 4; l < lmax; l++) {
-      /* sqrt((2l+1)/2)*d22 recurrence, supposed to be more stable */
-      double dlp1           = fac1[l] * (mu[index_mu] + fac2[l]) * dl - fac3[l] * dlm1;
-      d4m4[index_mu][l + 1] = dlp1 * fac4[l];
-      dlm1                  = dl;
-      dl                    = dlp1;
-    }
   }
 }
