@@ -17,11 +17,12 @@ TransferModule::TransferModule(InputModulePtr input_module,
                                BackgroundModulePtr background_module,
                                ThermodynamicsModulePtr thermodynamics_module,
                                PerturbationsModulePtr perturbations_module,
-                               NonlinearModulePtr nonlinear_module)
+                               NonlinearModulePtr nonlinear_module,
+                               std::shared_ptr<BesselTableCache> bessel_cache)
     : BaseModule(std::move(input_module)), background_module_(std::move(background_module)),
       thermodynamics_module_(std::move(thermodynamics_module)),
       perturbations_module_(std::move(perturbations_module)),
-      nonlinear_module_(std::move(nonlinear_module)) {
+      nonlinear_module_(std::move(nonlinear_module)), bessel_cache_(std::move(bessel_cache)) {
   transfer_init();
 }
 
@@ -198,15 +199,15 @@ void TransferModule::transfer_init() {
             asinh((l_[l_size_max_ - 1] + 1) / q_[q_size_ - 1] * sqrt(pba->sgnK * pba->K)) * 1.01;
   }
 
-  HyperInterpStruct BIS(0,
-                        1.,
-                        l_size_max_,
-                        l_.data(),
-                        ppr->hyper_x_min,
-                        xmax,
-                        ppr->hyper_sampling_flat,
-                        l_[l_size_max_ - 1] + 1,
-                        ppr->hyper_phi_min_abs);
+  /* possibly a table kept from an earlier cosmology: see include/bessel_table_cache.h */
+  bessel_x_max_ = xmax;
+  const std::shared_ptr<const HyperInterpStruct> BIS =
+      bessel_cache_->Get(std::vector<int>(l_.begin(), l_.begin() + l_size_max_),
+                         ppr->hyper_x_min,
+                         xmax,
+                         ppr->hyper_sampling_flat,
+                         l_[l_size_max_ - 1] + 1,
+                         ppr->hyper_phi_min_abs);
 
   std::vector<double**> sources(md_size_);
   std::vector<double**> sources_spline(md_size_);
@@ -238,7 +239,7 @@ void TransferModule::transfer_init() {
                                 pba->K,
                                 pba->sgnK,
                                 tau0 - thermodynamics_module_->tau_cut_,
-                                &BIS);
+                                BIS.get());
 
         if (ptr->transfer_verbose > 2) {
           printf("Compute %stransfer for wavenumber [%d/%d]\n",
@@ -1686,7 +1687,7 @@ void TransferModule::transfer_compute_for_each_q(int index_q,
       if (!use_full_limber) {
         transfer_radial_coordinates(ptw, tau0_minus_tau.data(), tau_size, k);
         if (ptw->sgnK == 0) {
-          q_max_bessel = ptw->pBIS->x[ptw->pBIS->x_size - 1] / tau0_minus_tau[0];
+          q_max_bessel = bessel_x_max_ / tau0_minus_tau[0];
         }
         else {
           q_max_bessel = q_[q_size_ - 1];
@@ -2734,7 +2735,7 @@ void TransferModule::transfer_bessel_interpolate(struct transfer_workspace* ptw,
                                                  int tau_size,
                                                  int x_size,
                                                  BesselNeeds needs) {
-  HyperInterpStruct* pHIS;
+  const HyperInterpStruct* pHIS;
   const double* chi        = ptw->chi.data();
   double* chireverse       = ptw->chireverse.data();
   double* rescale_function = ptw->rescale_function.data();
@@ -3135,7 +3136,7 @@ void TransferModule::transfer_workspace_init(struct transfer_workspace* ptw,
                                              double K,
                                              int sgnK,
                                              double tau0_minus_tau_cut,
-                                             HyperInterpStruct* pBIS) {
+                                             const HyperInterpStruct* pBIS) {
   ptw->pBIS               = pBIS;
   ptw->K                  = K;
   ptw->sgnK               = sgnK;

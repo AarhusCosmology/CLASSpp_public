@@ -19,6 +19,7 @@ from libcpp cimport bool
 from libcpp.memory cimport nullptr
 from libcpp.memory cimport unique_ptr
 from libcpp.memory cimport shared_ptr
+from libcpp.memory cimport make_shared
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 from libcpp.string cimport string
@@ -139,6 +140,10 @@ cdef viewdictitems(dict d):
     else:
         return d.viewitems()
 
+cdef extern from "bessel_table_cache.h":
+    cdef cppclass BesselTableCache:
+        BesselTableCache()
+
 cdef extern from "cosmology.h":
     ctypedef shared_ptr[const InputModule] InputModulePtr
     ctypedef shared_ptr[const BackgroundModule] BackgroundModulePtr
@@ -151,7 +156,7 @@ cdef extern from "cosmology.h":
     ctypedef shared_ptr[const LensingModule] LensingModulePtr
 
     cdef cppclass Cosmology:
-        Cosmology(FileContent& fc) except +raise_my_py_error
+        Cosmology(FileContent& fc, shared_ptr[BesselTableCache] bessel_cache) except +raise_my_py_error
         InputModulePtr& GetInputModule()
         BackgroundModulePtr& GetBackgroundModule() except +raise_my_py_error
         ThermodynamicsModulePtr& GetThermodynamicsModule() except +raise_my_py_error
@@ -385,6 +390,9 @@ cdef class PyCosmology:
     """
 
     cdef unique_ptr[Cosmology] _thisptr
+    # The transfer module's Bessel table, kept across the Cosmology objects this wrapper builds
+    # one after another (include/bessel_table_cache.h). A cached table never changes a result.
+    cdef shared_ptr[BesselTableCache] _bessel_cache
     cdef dict _pars
     cdef bool parameters_changed
     cdef FileContent _fc
@@ -422,7 +430,9 @@ cdef class PyCosmology:
         # Cosmology(FileContent&) rejects parameters that nothing read
         # (InputModule::RejectUnreadParameters), as a CosmoSevereError, unless
         # the input sets allow_unread_parameters = yes.
-        self._thisptr.reset(new Cosmology(self._fc))
+        if self._bessel_cache.get() == NULL:
+            self._bessel_cache = make_shared[BesselTableCache]()
+        self._thisptr.reset(new Cosmology(self._fc, self._bessel_cache))
         # Only clear the dirty flag after all throwing operations have
         # succeeded. If Cosmology construction throws, parameters_changed
         # stays True so the next _cosmo() call re-runs reset() and re-raises

@@ -5,6 +5,7 @@
 
 #include "asymptotic_extrapolation.h"
 #include "base_module.h"
+#include "bessel_table_cache.h"
 #include "input_module.h"
 
 class TransferModule : public BaseModule {
@@ -13,7 +14,8 @@ class TransferModule : public BaseModule {
                  BackgroundModulePtr background_module,
                  ThermodynamicsModulePtr thermodynamics_module,
                  PerturbationsModulePtr perturbations_module,
-                 NonlinearModulePtr nonlinear_module);
+                 NonlinearModulePtr nonlinear_module,
+                 std::shared_ptr<BesselTableCache> bessel_cache);
   ~TransferModule();
 
   /** @name - number of modes and transfer function types */
@@ -250,7 +252,7 @@ class TransferModule : public BaseModule {
                                double K,
                                int sgnK,
                                double tau0_minus_tau_cut,
-                               HyperInterpStruct* pBIS);
+                               const HyperInterpStruct* pBIS);
   void transfer_update_HIS(struct transfer_workspace* ptw, int index_q, double tau0);
   void transfer_get_lmax(void (*get_xmin_generic)(int sgnK,
                                                   int l,
@@ -274,6 +276,11 @@ class TransferModule : public BaseModule {
   ThermodynamicsModulePtr thermodynamics_module_;
   PerturbationsModulePtr perturbations_module_;
   NonlinearModulePtr nonlinear_module_;
+  /** where the flat Bessel table comes from, possibly kept from an earlier cosmology */
+  std::shared_ptr<BesselTableCache> bessel_cache_;
+  /** largest x = q (tau0 - tau) at which this cosmology needs the flat Bessel functions. The
+      table may reach further; decisions use this, so they do not depend on what was cached. */
+  double bessel_x_max_ = 0.;
 
   bool has_cls_ = false; /**< copy of same flag in perturbation structure */
   int md_size_  = 0;     /**< number of modes included in computation */

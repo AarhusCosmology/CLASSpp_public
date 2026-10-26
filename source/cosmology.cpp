@@ -17,7 +17,10 @@ InputModulePtr& Cosmology::GetInputModule() {
       // The solver's last evaluation was built from exactly the resolved file content, so it
       // IS this cosmology: adopt it whole, with every module the residual already built.
       // docs/superpowers/specs/2026-09-29-shooting-reuse-and-dncdm-budget-design.md (B)
-      *this = std::move(*shoot.converged);
+      // All but the Bessel cache, which belongs to whoever constructed this cosmology.
+      std::shared_ptr<BesselTableCache> bessel_cache = std::move(bessel_cache_);
+      *this                                          = std::move(*shoot.converged);
+      bessel_cache_                                  = std::move(bessel_cache);
     }
     else {
       input_module_ptr_ = std::move(shoot.input);
@@ -94,7 +97,8 @@ TransferModulePtr& Cosmology::GetTransferModule() {
                                                                 GetBackgroundModule(),
                                                                 GetThermodynamicsModule(),
                                                                 GetPerturbationsModule(),
-                                                                GetNonlinearModule()));
+                                                                GetNonlinearModule(),
+                                                                bessel_cache_));
   }
   return transfer_module_ptr_;
 }

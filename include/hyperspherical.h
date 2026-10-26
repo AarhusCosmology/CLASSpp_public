@@ -36,6 +36,8 @@ struct HypersphericalInterpolationStructure {
   std::vector<double> dphi;           //Same as phivec, but containing derivatives.
 
   HypersphericalInterpolationStructure() = default;
+  /** A table on [xmin, xmax] with about `sampling` points per period 2 pi / beta. The spacing
+      is fitted so that the last node is exactly xmax, so it changes with xmax. */
   HypersphericalInterpolationStructure(int K,
                                        double beta,
                                        int nl,
@@ -43,6 +45,34 @@ struct HypersphericalInterpolationStructure {
                                        double xmin,
                                        double xmax,
                                        double sampling,
+                                       int l_WKB,
+                                       double phiminabs);
+
+  /** The same table, but on the fixed spacing 2 pi / (beta sampling) from xmin, reaching at
+      least xmax. The nodes do not depend on xmax, so a table built for a larger xmax holds
+      the same nodes with the same values and can stand in for this one (BesselTableCache).
+      The node count is padded so that no node falls in a partial recurrence chunk. */
+  static HypersphericalInterpolationStructure OnFixedSpacing(int K,
+                                                             double beta,
+                                                             int nl,
+                                                             const int* lvec,
+                                                             double xmin,
+                                                             double xmax,
+                                                             double sampling,
+                                                             int l_WKB,
+                                                             double phiminabs);
+
+ private:
+  struct Grid {
+    int nx;
+    double deltax;
+  };
+  HypersphericalInterpolationStructure(int K,
+                                       double beta,
+                                       int nl,
+                                       const int* lvec,
+                                       double xmin,
+                                       Grid grid,
                                        int l_WKB,
                                        double phiminabs);
 };

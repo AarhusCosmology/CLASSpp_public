@@ -26,6 +26,7 @@ TEST_TARGETS := \
 	test-lensing-extrapolation \
 	test-nonlinear-threads \
 	test-free-streaming-cutoff \
+	test-bessel-table-cache \
 	test-bisection \
 	test-function-ref \
 	test-quadrature \

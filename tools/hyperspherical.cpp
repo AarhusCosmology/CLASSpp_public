@@ -8,6 +8,8 @@
 #include "hyperspherical.h"
 
 #include <algorithm>
+#include <cmath>
+#include <utility>
 #define REFINE 10
 
 namespace {
@@ -77,6 +79,31 @@ void hyperspherical_phi01_exact(
   }
 }
 
+/** The highest l of lvec below l_WKB and its index: the recurrences run up to it. */
+std::pair<int, int> RecurrenceTop(const int* lvec, int nl, int l_WKB) {
+  for (int k = nl - 1; k >= 0; k--) {
+    if (lvec[k] < l_WKB) {
+      return {lvec[k], k};
+    }
+  }
+  return {-10, -10};
+}
+
+/** First node index of the forwards recurrence (see the constructor). */
+int ForwardsStart(int K, double beta, double xmin, double deltax, int l_recurrence_max, int nx) {
+  const double turning = sqrt(l_recurrence_max * (l_recurrence_max + 1.0)) / beta;
+  double xfwd          = turning;
+  if (K == 1) {
+    xfwd = asin(turning);
+  }
+  else if (K == -1) {
+    xfwd = asinh(turning);
+  }
+  int xfwdidx = static_cast<int>((xfwd - xmin) / deltax);
+  xfwdidx     = std::max(xfwdidx, 0);
+  return std::min(xfwdidx, nx);
+}
+
 }  // namespace
 
 HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K,
@@ -87,31 +114,75 @@ HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K
                                                                            double xmax,
                                                                            double sampling,
                                                                            int l_WKB,
+                                                                           double phiminabs)
+    : HypersphericalInterpolationStructure(
+          K,
+          beta,
+          nl,
+          lvec,
+          xmin,
+          [&]() {
+            const int nx = std::max(static_cast<int>((xmax - xmin) * sampling / (2 * _PI_ / beta)),
+                                    2);
+            return Grid{nx, (xmax - xmin) / (nx - 1.0)};
+          }(),
+          l_WKB,
+          phiminabs) {}
+
+HypersphericalInterpolationStructure HypersphericalInterpolationStructure::OnFixedSpacing(
+    int K,
+    double beta,
+    int nl,
+    const int* lvec,
+    double xmin,
+    double xmax,
+    double sampling,
+    int l_WKB,
+    double phiminabs) {
+  const double deltax = 2 * _PI_ / beta / sampling;
+  int nx              = std::max(static_cast<int>(ceil((xmax - xmin) / deltax)) + 1, 2);
+  /* The recurrences run over chunks of _HYPER_CHUNK_ nodes: backwards from node 0 up to the
+     turning point, forwards from there. Pad so that the last chunk is a whole one, so that
+     every node is computed in the same position of a full chunk whatever xmax is. */
+  const int xfwdidx =
+      ForwardsStart(K, beta, xmin, deltax, RecurrenceTop(lvec, nl, l_WKB).first, nx);
+  const int start = (nx > xfwdidx) ? xfwdidx : 0;
+  nx              = start + (nx - start + _HYPER_CHUNK_ - 1) / _HYPER_CHUNK_ * _HYPER_CHUNK_;
+  return HypersphericalInterpolationStructure(K,
+                                              beta,
+                                              nl,
+                                              lvec,
+                                              xmin,
+                                              Grid{nx, deltax},
+                                              l_WKB,
+                                              phiminabs);
+}
+
+HypersphericalInterpolationStructure::HypersphericalInterpolationStructure(int K,
+                                                                           double beta,
+                                                                           int nl,
+                                                                           const int* lvec,
+                                                                           double xmin,
+                                                                           Grid grid,
+                                                                           int l_WKB,
                                                                            double phiminabs) {
   /** Size the std::vector members for this geometry, then compute the values
       of Phi and dPhi to complete the interpolation structure. */
-  double deltax;
   double beta2;
-  double lambda;
   double x;
   double xfwd;
   int j;
   int k;
   int l;
-  int nx;
   int lmax;
   int l_recurrence_max;
   int current_chunk;
   int index_x;
 
-  beta2  = beta * beta;
-  lmax   = lvec[nl - 1];
-  lambda = 2 * _PI_ / beta;
-  nx     = static_cast<int>((xmax - xmin) * sampling / lambda);
-  nx     = std::max(nx, 2);
-  deltax = (xmax - xmin) / (nx - 1.0);
-  //fprintf(stderr,"dx=%e\n",deltax);
-  //fprintf(stderr,"%e %e\n",beta,sampling);
+  const int nx        = grid.nx;
+  const double deltax = grid.deltax;
+  beta2               = beta * beta;
+  lmax                = lvec[nl - 1];
   //Set scalar values:
   this->beta    = beta;
   this->delta_x = deltax;

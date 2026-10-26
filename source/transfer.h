@@ -198,7 +198,7 @@ struct transfer_workspace {
   HyperInterpStruct
       HIS; /**< structure containing all hyperspherical bessel functions (flat case) or all hyperspherical bessel functions for a given value of beta=q/sqrt(|K|) (non-flat case). HIS = Hyperspherical Interpolation Structure. */
 
-  HyperInterpStruct*
+  const HyperInterpStruct*
       pBIS; /**< pointer to structure containing all the spherical bessel functions of the flat case (used even in the non-flat case, for approximation schemes). pBIS = pointer to Bessel Interpolation Structure. */
 
   //@}

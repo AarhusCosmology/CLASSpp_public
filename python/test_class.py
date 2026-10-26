@@ -1758,6 +1758,30 @@ class TestReviewRegressions(TestClass):
         for key in ('ee', 'bb', 'pp'):
             np.testing.assert_allclose(candidate[key], reference[key], rtol=1e-12, atol=0., err_msg=key)
 
+    def test_kept_bessel_table_does_not_change_results(self):
+        """A classy object keeps the transfer module's Bessel table from one cosmology to the
+        next (include/bessel_table_cache.h). The table is reused only when it reaches far enough
+        in x, and tables are built on a fixed spacing, so a cosmology computed after another
+        must give exactly what it gives when computed first. The earlier cosmology here needs a
+        larger table (reused), a smaller one (rebuilt), or is a slightly different cosmology."""
+        base = dict(self.verbose, output='tCl,pCl,lCl', lensing='yes', l_max_scalars=1500)
+
+        def lensed(cosmo, extra):
+            cosmo.set(dict(base, **extra))
+            cosmo.compute()
+            cl = cosmo.lensed_cl(1500)
+            cosmo.struct_cleanup()
+            cosmo.empty()
+            return cl
+
+        fresh = lensed(Class(), {})
+        for before in ({'k_max_tau0_over_l_max': 2.5}, {'k_max_tau0_over_l_max': 1.2}, {'h': 0.70}):
+            cosmo = Class()
+            lensed(cosmo, before)
+            again = lensed(cosmo, {})
+            for key in ('tt', 'ee', 'te', 'bb', 'pp'):
+                np.testing.assert_array_equal(again[key], fresh[key], err_msg=f'{key} after {before}')
+
     def test_retired_hyrec_file_parameters_are_rejected(self):
         """HYREC-2 takes one directory, so the three per-file paths are gone. A
         user who set them should hear about it rather than be ignored."""

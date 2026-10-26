@@ -26,6 +26,7 @@ class_unit_test(test-transfer-neglect source/transfer_neglect_test.cpp)
 class_unit_test(test-lensing-extrapolation source/lensing_extrapolation_test.cpp)
 class_unit_test(test-nonlinear-threads source/nonlinear_threads_test.cpp)
 class_unit_test(test-free-streaming-cutoff source/free_streaming_cutoff_test.cpp)
+class_unit_test(test-bessel-table-cache source/bessel_table_cache_test.cpp)
 
 class_unit_test(test-photons species/photons_formula_test.cpp)
 class_unit_test(test-tensor-tca species/photons_tensor_tca_test.cpp)
