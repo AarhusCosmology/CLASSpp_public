@@ -141,8 +141,9 @@ class NonlinearModule : public BaseModule {
                                    int index_ia_pk,
                                    const double* integration_weights,
                                    double R,
-                                   enum halofit_integral_type type,
-                                   double* sum);
+                                   double* sum1,
+                                   double* sum2,
+                                   double* sum3);
   void nonlinear_hmcode(int index_pk,
                         double tau,
                         double* pk_nl,

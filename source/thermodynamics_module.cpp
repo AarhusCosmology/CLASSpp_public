@@ -2277,12 +2277,19 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
       z_inf   = 0.;
       tau_inf = 0.;
 
-      /* try intermediate values */
+      /* try intermediate values: regula falsi with the Illinois modification, which keeps the
+         bracket [z_inf, z_sup] and converges superlinearly in the smooth, growing tau(z). It stops
+         when the tau of the last sampled history is within the tolerance, and that history is the
+         one kept. Bisection, until 2026-10, sampled the history ~17 times. tau_inf = 0 at z_inf =
+         0 is a bracket value, not a sampled one: it only shapes the first secant. */
 
-      int counter = 0;
-      /* bisection kept inline: bisects z but stops on (tau_sup - tau_inf) and the reionization table from the final iteration is read afterward */
-      while ((tau_sup - tau_inf) > tau_reionization_ * ppr->reionization_optical_depth_tol) {
-        double z_mid = 0.5 * (z_sup + z_inf);
+      int counter      = 0;
+      int side_kept    = 0; /* which end the last two steps kept: +1 z_sup, -1 z_inf */
+      double f_inf     = tau_inf - tau_reionization_;
+      double f_sup     = tau_sup - tau_reionization_;
+      double tau_error = tau_sup - tau_reionization_;
+      while (fabs(tau_error) > tau_reionization_ * ppr->reionization_optical_depth_tol) {
+        double z_mid = (z_inf * f_sup - z_sup * f_inf) / (f_sup - f_inf);
 
         /* reionization redshift */
         preio->reionization_parameters[preio->index_reio_redshift] = z_mid;
@@ -2313,16 +2320,25 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
         thermodynamics_reionization_sample(preco, preio, pvecback);
 
         double tau_mid = preio->reionization_optical_depth;
+        tau_error      = tau_mid - tau_reionization_;
 
-        /* trial */
+        /* trial: the end that stays twice in a row has its value halved (Illinois) */
 
-        if (tau_mid > tau_reionization_) {
-          z_sup   = z_mid;
-          tau_sup = tau_mid;
+        if (tau_error > 0.) {
+          z_sup = z_mid;
+          f_sup = tau_error;
+          if (side_kept == -1) {
+            f_inf /= 2.;
+          }
+          side_kept = -1;
         }
         else {
-          z_inf   = z_mid;
-          tau_inf = tau_mid;
+          z_inf = z_mid;
+          f_inf = tau_error;
+          if (side_kept == +1) {
+            f_sup /= 2.;
+          }
+          side_kept = +1;
         }
 
         counter++;

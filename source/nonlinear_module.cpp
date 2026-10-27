@@ -2368,6 +2368,8 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
 
   int last_index = 0;
   double sum1;
+  double sum2;
+  double sum3;
   double anorm;
 
   std::vector<double> integrand_array;
@@ -2550,8 +2552,9 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                               index_ia_pk,
                               integration_weights.data(),
                               R,
-                              halofit_integral_one,
-                              &sum1);
+                              &sum1,
+                              &sum2,
+                              &sum3);
 
   sigma = sqrt(sum1);
 
@@ -2586,8 +2589,9 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                               index_ia_pk,
                               integration_weights.data(),
                               R,
-                              halofit_integral_one,
-                              &sum1);
+                              &sum1,
+                              &sum2,
+                              &sum3);
 
   sigma = sqrt(sum1);
 
@@ -2600,9 +2604,15 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
 
   xlogr2 = log(R) / log(10.);
 
-  int counter = 0;
+  /* R_nl, where sigma(R_nl) = 1: Newton's method on ln sigma^2 as a function of ln R, whose
+     derivative -sum2/sum1 comes from the same integrand, with a bisection step whenever Newton
+     would leave the bracket [xlogr1, xlogr2]. It stops on the same tolerance as the bisection it
+     replaces (2026-10), which needed ~20 integrals per time step where this needs ~4, and the
+     integrals at R_nl come out of the last step. */
+  double xlogr = (xlogr2 + xlogr1) / 2.0;
+  int counter  = 0;
   do {
-    rmid = pow(10, (xlogr2 + xlogr1) / 2.0);
+    rmid = pow(10, xlogr);
     counter++;
 
     nonlinear_halofit_integrate(integrand_array.data(),
@@ -2612,56 +2622,28 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                                 index_ia_pk,
                                 integration_weights.data(),
                                 rmid,
-                                halofit_integral_one,
-                                &sum1);
+                                &sum1,
+                                &sum2,
+                                &sum3);
 
     sigma = sqrt(sum1);
 
     diff = sigma - 1.0;
 
-    if (diff > ppr->halofit_tol_sigma) {
-      xlogr1 = log10(rmid);
+    /* sigma decreases with R */
+    if (diff > 0.) {
+      xlogr1 = xlogr;
     }
-    else if (diff < -ppr->halofit_tol_sigma) {
-      xlogr2 = log10(rmid);
+    else {
+      xlogr2 = xlogr;
     }
+    const double xlogr_newton = xlogr + log(sum1) * sum1 / sum2 / log(10.);
+    xlogr = ((xlogr_newton > xlogr1) && (xlogr_newton < xlogr2)) ? xlogr_newton
+                                                                 : (xlogr2 + xlogr1) / 2.0;
 
-    /* The first version of this test woukld let the code continue: */
-    /*
-      class_test_except(counter > _MAX_IT_,
-      free(pvecback);free(integrand_array),
-      "could not converge within maximum allowed number of iterations");
-    */
-    /* ... but in this situation it sounds better to make it stop and return an error! */
     class_test(counter > _MAX_IT_,
                "could not converge within maximum allowed number of iterations");
-
   } while (fabs(diff) > ppr->halofit_tol_sigma);
-
-  /* evaluate all the other integrals at R=rmid */
-
-  double sum2;
-  double sum3;
-
-  nonlinear_halofit_integrate(integrand_array.data(),
-                              integrand_size,
-                              ia_size,
-                              index_ia_k,
-                              index_ia_pk,
-                              integration_weights.data(),
-                              rmid,
-                              halofit_integral_two,
-                              &sum2);
-
-  nonlinear_halofit_integrate(integrand_array.data(),
-                              integrand_size,
-                              ia_size,
-                              index_ia_k,
-                              index_ia_pk,
-                              integration_weights.data(),
-                              rmid,
-                              halofit_integral_three,
-                              &sum3);
 
   d1 = -sum2 / sum1;
   d2 = -sum2 * sum2 / sum1 / sum1 - sum3 / sum1;
@@ -2750,9 +2732,9 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
  * @param integration_weights Input: weights of the natural-spline integral over the k column
  *                        (array_spline_integration_weights)
  * @param R               Input: radius
- * @param type            Input: which window function to use
- * @param sum             Output: result of the integral
- * @return the error status
+ * @param sum1            Output: the integral with the window exp(-(kR)^2), sigma^2(R)
+ * @param sum2            Output: with that window times 2 (kR)^2, -sum1 d ln sigma^2 / d ln R
+ * @param sum3            Output: with that window times 4 (kR)^2 (1 - (kR)^2)
  */
 
 void NonlinearModule::nonlinear_halofit_integrate(const double* integrand_array,
@@ -2762,30 +2744,28 @@ void NonlinearModule::nonlinear_halofit_integrate(const double* integrand_array,
                                                   int index_ia_pk,
                                                   const double* integration_weights,
                                                   double R,
-                                                  enum halofit_integral_type type,
-                                                  double* sum) {
+                                                  double* sum1,
+                                                  double* sum2,
+                                                  double* sum3) {
   double k;
   double pk;
   double x2;
   double integrand;
   double anorm = 1. / (2 * pow(_PI_, 2));
 
-  /* the natural-spline integral of the integrand over k, as a sum with its weights */
-  *sum = 0.;
+  /* the natural-spline integrals over k, as sums with their weights; one exp for all three */
+  *sum1 = 0.;
+  *sum2 = 0.;
+  *sum3 = 0.;
   for (int index_k = 0; index_k < integrand_size; index_k++) {
     k  = integrand_array[index_k * ia_size + index_ia_k];
     pk = integrand_array[index_k * ia_size + index_ia_pk];
     x2 = k * k * R * R;
 
-    integrand = pk * k * k * anorm * exp(-x2);
-    if (type == halofit_integral_two) {
-      integrand *= 2. * x2;
-    }
-    if (type == halofit_integral_three) {
-      integrand *= 4. * x2 * (1. - x2);
-    }
-
-    *sum += integration_weights[index_k] * integrand;
+    integrand  = integration_weights[index_k] * pk * k * k * anorm * exp(-x2);
+    *sum1     += integrand;
+    *sum2     += integrand * 2. * x2;
+    *sum3     += integrand * 4. * x2 * (1. - x2);
   }
 }
 

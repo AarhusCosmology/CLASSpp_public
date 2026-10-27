@@ -28,8 +28,6 @@ enum source_extrapolation {
   extrap_asymptotic /**< A ln k + B + C/k fitted over [k_max/3, k_max] (AsymptoticExtrapolation) */
 };
 
-enum halofit_integral_type { halofit_integral_one, halofit_integral_two, halofit_integral_three };
-
 enum hmcode_baryonic_feedback_model {
   nl_emu_dmonly,
   nl_owls_dmonly,
