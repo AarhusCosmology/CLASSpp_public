@@ -2465,8 +2465,9 @@ class TestQueriesTheRunCannotAnswer(unittest.TestCase):
         ('raw_cl_no_copy_without_Cls', 'pk', lambda c: c.raw_cl_no_copy()),
         ('lensed_cl_without_Cls', 'pk', lambda c: c.lensed_cl()),
         ('lensed_cl_without_lensing', 'no_pk', lambda c: c.lensed_cl()),
-        ('raw_cl_above_l_max', 'lensed', lambda c: c.raw_cl(801)),
-        ('raw_cl_no_copy_above_l_max', 'lensed', lambda c: c.raw_cl_no_copy(801)),
+        # the unlensed C_l's of 'lensed' reach l_max_scalars + delta_l_max = 300 + 1000
+        ('raw_cl_above_l_max', 'lensed', lambda c: c.raw_cl(1301)),
+        ('raw_cl_no_copy_above_l_max', 'lensed', lambda c: c.raw_cl_no_copy(1301)),
         ('lensed_cl_above_l_max', 'lensed', lambda c: c.lensed_cl(301)),
     ])
     def test_is_severe(self, name, cosmology, query):

@@ -1,9 +1,9 @@
 # The k range of the scalar CMB C_l's follows the multipoles asked for (2026-10-27)
 
-**Status 2026-10-27:** implemented (branch `perturbations/cmb-k-range`, PR #480; the decoupling approved by
-Thomas). Changes the default spectra:
-faster at l_max_scalars >= 2000 with the same lensed spectra there, more accurate below. `delta_l_max` is
-unchanged (500); larger values are measured below for a separate decision. Evidence tags: [M] measured here,
+**Status 2026-10-27:** the k range: merged (#480). The headroom: `delta_l_max` = 1000, Thomas's choice ("it
+makes sense to be precise in the range asked for"; otherwise people ask for a higher l_max than they need,
+which costs more), branch `perturbations/lensing-headroom-1000`. Both change the default spectra. Evidence
+tags: [M] measured here,
 [C] stated by the code.
 
 ## Problem
@@ -86,10 +86,10 @@ Against master's classyref, as CI runs it [M]:
   is 10-11% low at l = 200 against its own l_max 2000 run and this branch 5e-5. The other Python tests fail the
   same 18 golden comparisons as master on macOS. ctest passes.
 
-## Open
+## The headroom
 
-* The default headroom: 500 (this branch) is the pure speed-up; 1000 makes the top of the lensed range 3-4x
-  better at l_max 2500-3000 for -3.8% to +3.5% against the old rule. Decoupled from the k range, it is now a
-  knob of its own (Thomas, 2026-10-27: the decoupling is wanted).
+`delta_l_max` goes from 500 to 1000 (the "new, 1000" rows above): at l_max_scalars 2000/2500/3000, +3.5%/+0.6%/
+-3.8% time against the old rule, the lensed TT of the top 250 multipoles 0.93/2.58/6.21 -> 0.14/0.62/1.91 CV.
+The date presets (`precision_pre_*`) are not updated here; the precision sync that follows (#473) is.
 * The codecmp reference config relies on the old rule for its k range (1.8 x (3000 + 1800)): set it
   explicitly when regenerating the reference.

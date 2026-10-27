@@ -932,8 +932,9 @@ struct precision {
   int accurate_lensing =
       0; /**< switch between Gauss-Legendre quadrature integration and simple quadrature on a subdomain of angles */
   int num_mu_minus_lmax =
-      70;                /**< difference between num_mu and l_max, increase for more precision */
-  int delta_l_max = 500; /**< difference between l_max in unlensed and lensed spectra */
+      70; /**< difference between num_mu and l_max, increase for more precision */
+  int delta_l_max =
+      1000; /**< difference between l_max in unlensed and lensed spectra: the unlensed C_l's above l_max_scalars that the lensing convolution needs. 500 until 2026-10-27, when the k range stopped following it (k_max_tau0_above_l_max): 1000 makes the lensed TT in the top 250 multipoles 3-4x more accurate at l_max_scalars = 2500-3000, for -3.8% to +3.5% time against the old rule with 500. */
   double tol_gauss_legendre =
       DBL_EPSILON; /**< tolerance with which quadrature points are found: must be very small for an accurate integration (if not entered manually, set automatically to match machine precision) */
 
