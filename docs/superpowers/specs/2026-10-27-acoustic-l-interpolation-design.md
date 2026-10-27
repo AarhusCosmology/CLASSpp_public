@@ -4,6 +4,10 @@
 branch; what it allows for `l_linstep` is measured below and left to a separate decision. Evidence tags: [M]
 measured here, [C] stated by the code, [?] not measured.
 
+**Status 2026-10-27, later:** merged (#477), and `l_linstep` 50 is the default since the precision change that
+followed (`2026-10-27-precision-sync-design.md`: bias 0.077 -> 0.090 sigma against a converged reference, 4%
+faster on one thread).
+
 ## Problem
 
 CLASS computes C_l at sampled multipoles (log steps, then every `l_linstep`) and splines them in l. The cubic

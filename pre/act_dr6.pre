@@ -75,3 +75,8 @@ transfer_neglect_l_half_S_t0 = 0
 transfer_neglect_l_half_S_t1 = 0
 transfer_neglect_l_half_S_t2 = 0
 transfer_neglect_l_half_S_e = 0
+
+# Pinned 2026-10-27, when the compiled flat-space Bessel sampling went from 8 to 12 points per
+# period: the value this file was measured with. See
+# docs/superpowers/specs/2026-10-27-precision-sync-design.md.
+hyper_sampling_flat = 8

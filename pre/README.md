@@ -20,11 +20,12 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 
 | file | S | speed vs defaults | use it for |
 |---|---|---|---|
-| *(compiled defaults)* | 0.387 ³ ⁴ | 1.00× | everything |
+| *(compiled defaults)* | 0.387 ³ ⁴ ⁵ | 1.00× | everything |
 | `precision_precise.pre` | 0.009 | ~60× slower | reference-grade, for convergence tests |
 | `precision_pre_2026_08_21.pre` | 1.725 | 2.2× slower | reproducing results from before 2026-08-21 |
 | `precision_pre_2026_10_09.pre` | 0.387 | 2% faster on one thread | reproducing results from 2026-08-21 to 2026-10-09 |
 | `precision_pre_2026_10_21.pre` | 0.387 ³ | 15% slower on one thread, 20% with halofit | reproducing results from 2026-10-09 to 2026-10-21 |
+| `precision_pre_2026_10_27.pre` | 0.387 ³ | 8% slower on one thread, 61% on w0waCDM | reproducing results from 2026-10-21 to 2026-10-27 |
 | `act_dr6.pre` | — ¹ | 4.2× slower ² | ACT DR6 and other data to ℓ ≈ 8500 |
 
 ¹ Not scored on `plik_lite`. Its own metric is the ACT DR6 ACT-lite distance to a
@@ -49,6 +50,25 @@ On the same likelihoods the bias went to 0.148σ. In runs without a non-linear m
 moves lensed TT and EE by at most 4e-5 and 7e-6, so the measured presets are not pinned
 for it; the `precision_pre_*` files are. See
 `docs/superpowers/specs/2026-10-21-lensing-source-extrapolation-design.md`.
+⁵ On 2026-10-27 four things changed. The C_l are interpolated in ℓ by a spline built for the
+acoustic oscillation, and `l_linstep` went from 40 to 50 (4% faster on one thread). The
+radiation-streaming and visibility triggers went from 26 and 0.008 to 45 and 2e-3: lensed EE
+had been 8.3e-3 off a converged reference, 2.3σ for a cosmic-variance-limited measurement, and
+is 1.2e-3 off now. The flat-space Bessel functions are sampled at 12 points per period instead
+of 8. Dark energy fluids run the explicit rkdp45 perturbations evolver, as accurate as ndf15
+and 35% faster on w0waCDM.
+
+Against a reference converged further than the one above, on the same likelihoods, the
+cosmological bias of the defaults is now 0.138σ for ΛCDM (0.077 before) and 0.144σ for
+w0waCDM (0.137). The spread of Δχ² is 0.42 (0.72) and 0.41 (0.84). ΛCDM runs at the same speed
+on one thread. The lower bias before came from the cheap triggers cancelling the error of the
+Bessel interpolation and of three other transfer-stage discretizations.
+
+The same day the k range of the scalar C_l stopped following the lensing headroom, which went
+from 500 to 1000 multipoles (see **Tensors** below). `act_dr6` and `precise` set their own
+`l_linstep`, triggers and headroom; `act_dr6` pins the Bessel sampling it was measured with. The
+`precision_pre_*` files pin the old values, and their headers say how to restore the old k range
+and the fluid's evolver. See `docs/superpowers/specs/2026-10-27-precision-sync-design.md`.
 
 ## Two things these files do not cover
 
@@ -91,18 +111,19 @@ because that objective could not constrain them:
 |---|---|
 | `k_step_super` | low-ℓ EE, hence τ — the residual reached 1.6× cosmic variance |
 | `k_min_tau0` | P(k) below k ≈ 3×10⁻⁴ h/Mpc, to 2.5% |
-| `delta_l_max` | lensing headroom — the lensed spectrum degrades to 7% at the top of the requested range |
+| `delta_l_max` | lensing headroom — the lensed spectrum degrades to 7% at the top of the requested range (1000 since 2026-10-27) |
 | `k_max_tau0_over_l_max` | tensors need a wider k range per ℓ than scalars; a tensor scenario went to 2.5% |
 
-Since 2026-10-27 the scalar k range follows the multipoles asked for, not the lensing headroom
-above them: k_max τ0 = max(`k_max_tau0_over_l_max` l_max, l_max + `k_max_tau0_above_l_max`).
-`act_dr6` sets `k_max_tau0_above_l_max` to keep the k range it was tuned with; `precise` takes the new
-rule (30% faster, the same spectra to 0.1 CV).
 | `ncdm_fluid_trigger_tau_over_tau_k`, `l_max_ncdm`, `tol_ncdm_synchronous` | P(k) with massive neutrinos: 1.3e-3 low at k = 1/Mpc, 3.8e-3 at k = 5/Mpc (restored 2026-10-09) |
 
 Each was caught by running the reference-comparison workflow and asking, for
 every failing scenario, whether the new defaults are *closer to a converged
 reference* than the old ones — not merely different from them.
+
+Since 2026-10-27 the scalar k range follows the multipoles asked for, not the lensing headroom
+above them: k_max τ0 = max(`k_max_tau0_over_l_max` l_max, l_max + `k_max_tau0_above_l_max`).
+`act_dr6` sets `k_max_tau0_above_l_max` to keep the k range it was tuned with; `precise` takes the new
+rule (30% faster, the same spectra to 0.1 CV).
 
 A fifth, `tight_coupling_trigger_tau_c_over_tau_k`, was **split by mode** instead
 of held back. It cost 14% on tensor BB over ℓ = 100–300 at the campaign's value,

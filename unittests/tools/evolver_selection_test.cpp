@@ -118,6 +118,21 @@ void test_automatic_selection() {
     assert(selected(std::move(fc)) == evolver_type::rkdp45);
   }
 
+  /* A dark energy fluid opts in as well (since 2026-10-27): w0wa through PPF, and a
+     clustering fluid with a small sound speed. */
+  for (const char* ppf : {"yes", "no"}) {
+    FileContent fc = auto_select_input();
+    fc.set("omega_cdm", "0.1201075");
+    fc.set("N_ur", "2.0308");
+    add_standard_neutrino(fc);
+    fc.set("Omega_Lambda", "0");
+    fc.set("w0_fld", "-0.9");
+    fc.set("wa_fld", "0.");
+    fc.set("cs2_fld", "0.01");
+    fc.set("use_ppf", ppf);
+    assert(selected(std::move(fc)) == evolver_type::rkdp45);
+  }
+
   /* Self-interacting neutrinos: the collision term is a pure diagonal
      relaxation, so etd is preferred even though rkdp45 would not complete. */
   {

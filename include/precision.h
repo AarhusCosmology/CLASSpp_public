@@ -515,8 +515,20 @@ struct precision {
    * on photon free-streaming approximation (keep density and thtau, set
    * shear and higher momenta to zero):
    * first condition: \f$ k \tau \f$ > radiation_streaming_trigger_tau_h_over_tau_k
+   *
+   * 45 since 2026-10-27 (class_public's value), 26 from 2026-08-21. At 26, with
+   * neglect_CMB_sources_below_visibility = 0.008, lensed EE was 8.6e-3 off a converged reference
+   * over l = 30-2500 (median of 160 LambdaCDM posterior draws), a significance of 2.3 sigma for a
+   * cosmic-variance-limited measurement, and TE 4.5e-3 (1.05); 45 and 2e-3 take them to 1.1e-3
+   * (0.73) and 1.6e-3 (0.41) for 2-3% on one thread. Most of the EE error was this trigger's: at 35
+   * EE is 1.7e-3 (0.97). The cheap values had been chosen because they cancel part of another
+   * error in the directions Planck constrains, mostly omega_b: on Planck PR4 CamSpec + low-l + ACT
+   * DR6 lensing + DESI DR2 the cosmological bias goes from 0.090 to 0.168 sigma (LambdaCDM) and
+   * 0.144 to 0.174 (w0wa), while the spread of delta chi^2 falls from 0.71 to 0.50. Most of that
+   * other error was the cubic interpolation of the Bessel functions (see hyper_sampling_flat). See
+   * docs/superpowers/specs/2026-10-27-precision-sync-design.md.
    */
-  double radiation_streaming_trigger_tau_over_tau_k = 26.;
+  double radiation_streaming_trigger_tau_over_tau_k = 45.;
 
   /**
    * when to switch off photon perturbations, ie when to switch
@@ -555,9 +567,11 @@ struct precision {
 
   /**
    * whether CMB source functions can be approximated as zero when
-   * visibility function g(tau) is tiny
+   * visibility function g(tau) is tiny. 2e-3 since 2026-10-27, 0.008 from 2026-08-21: at 0.008
+   * it was half of the lensed EE error (see radiation_streaming_trigger_tau_over_tau_k); with the
+   * trigger there at 45, 2e-3 is as accurate as class_public's 1e-3.
    */
-  double neglect_CMB_sources_below_visibility = 0.008;
+  double neglect_CMB_sources_below_visibility = 2e-3;
 
   /**
    * The type of evolver to use: options are ndf15, rk, rkdp45 or etd.
@@ -713,18 +727,33 @@ struct precision {
    * Transfer function parameters
    * */
 
+  /* The C_l are computed at sampled multipoles, logarithmic steps of l_logstep at low l and then
+     linear steps of l_linstep, and interpolated in between by the acoustic spline
+     (include/acoustic_spline.h), which at a step of 50 is as accurate as the cubic spline at 30.
+     50 since 2026-10-27, 40 before: against a converged reference on Planck PR4 CamSpec + low-l +
+     ACT DR6 lensing + DESI DR2 (l_max_scalars 3000), the cosmological bias goes from 0.077 to
+     0.090 sigma (LCDM) and 0.137 to 0.139 (w0wa), for 4% less time on one thread. See
+     docs/superpowers/specs/2026-10-27-acoustic-l-interpolation-design.md. */
   int l_linstep =
-      40; /**< factor for logarithmic spacing of values of l over which bessel and transfer functions are sampled */
+      50; /**< linear step in l over which bessel and transfer functions are sampled, at high l */
 
   double l_logstep =
       1.12; /**< maximum spacing of values of l over which Bessel and transfer functions are sampled (so, spacing becomes linear instead of logarithmic at some point) */
 
   double hyper_x_min =
       1.0e-5; /**< flat case: lower bound on the smallest value of x at which we sample \f$ \Phi_l^{\nu}(x)\f$ or \f$ j_l(x)\f$ */
+  /* 12 since 2026-10-27, 8 before. The flat-space Bessel functions are interpolated by cubic
+     Hermite polynomials; at 8 points per period their error took the CMB transfer functions a few
+     1e-4 low across the 2nd-4th acoustic peaks, which Planck reads as a shift of omega_b. With
+     radiation_streaming_trigger_tau_over_tau_k at its accurate value, 12 takes the cosmological
+     bias on Planck PR4 CamSpec + low-l + ACT DR6 lensing + DESI DR2 from 0.168 to 0.138 sigma
+     (LCDM) and 0.174 to 0.144 (w0wa) for 1-2% on one thread; quintic interpolation removes the
+     error at 6 points but costs 10% in the transfer kernel as it stands. See
+     docs/superpowers/specs/2026-10-27-precision-sync-design.md. */
   double hyper_sampling_flat =
-      8.0; /**< flat case: number of sampled points x per approximate wavelength \f$ 2\pi \f$, should remain >7.5 */
+      12.0; /**< flat case: number of sampled points x per approximate wavelength \f$ 2\pi \f$, should remain >7.5 */
   double hyper_sampling_curved_low_nu =
-      8.0; /**< open/closed cases: number of sampled points x per approximate wavelength \f$ 2\pi/\nu\f$, when \f$ \nu \f$ smaller than hyper_nu_sampling_step. Matches hyper_sampling_flat: below it the low-l spectra lose accuracy at no saving in time (see docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md) */
+      8.0; /**< open/closed cases: number of sampled points x per approximate wavelength \f$ 2\pi/\nu\f$, when \f$ \nu \f$ smaller than hyper_nu_sampling_step. Equal to hyper_sampling_flat until 2026-10-27, when the flat case went to 12 for the error of its cubic interpolation; these wavenumbers are interpolated at order 6. Below 8 the low-l spectra lose accuracy at no saving in time (see docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md) */
   double hyper_sampling_curved_high_nu =
       3.0; /**< open/closed cases: number of sampled points x per approximate wavelength \f$ 2\pi/\nu\f$, when \f$ \nu \f$ greater than hyper_nu_sampling_step. Deliberately below the >7.5 floor that hyper_sampling_flat documents, and it does cost accuracy: the nu in (hyper_nu_sampling_step, hyper_flat_approximation_nu) band slides down in q as \f$ K \to 0 \f$ until it carries the low-l power, so raising this to 8 buys 15x/51x/420x on \f$ C_l^{\phi\phi} \f$ at l<=10 for Omega_k = -1e-4/-1e-5/-1e-6, and 23% on \f$ C_l^{EE} \f$ at -1e-6. It buys nothing measurable at |Omega_k| >= 0.01 while costing +52% there (closed; +12% open), and a linearly sampled MCMC almost never visits |Omega_k| < 1e-4, so 3.0 is kept: speed at the expense of very nearly flat models. Raise it if you take numerical dC_l/dOmega_k with a step below ~1e-4. See docs/superpowers/specs/2026-09-08-limber-effective-multipole-design.md */
   double hyper_nu_sampling_step =

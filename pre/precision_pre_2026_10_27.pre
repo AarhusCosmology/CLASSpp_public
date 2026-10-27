@@ -1,0 +1,35 @@
+# CLASS++ precision: the defaults as they were from 2026-10-21 to 2026-10-27.
+#
+# On 2026-10-27 the CMB C_l began to be interpolated in l by a trigonometric spline built for
+# the acoustic oscillation, as accurate every 50 multipoles as the cubic spline every 30, and
+# the linear step of the sampled multipoles, l_linstep, went from 40 to 50. With the changes
+# below, measured against a converged reference on Planck PR4 CamSpec + low-l + ACT DR6 lensing
+# + DESI DR2 at l_max_scalars = 3000, the cosmological bias went from 0.077 to 0.138 sigma
+# (LambdaCDM, 160 posterior draws) and from 0.137 to 0.144 (w0waCDM, 112 draws), the spread of
+# delta chi^2 from 0.72 to 0.42 and 0.84 to 0.41; one thread is as fast for LambdaCDM and 35%
+# faster for w0waCDM. This file is 8% slower than the new defaults (61% for w0waCDM).
+#
+# The same day the k range of the scalar C_l stopped following the lensing headroom: k_max
+# tau0 went from 1.8 (l_max_scalars + delta_l_max) to max(1.8 l_max_scalars, l_max_scalars +
+# k_max_tau0_above_l_max), and the headroom delta_l_max from 500 to 1000. No fixed key
+# restores the old k range: for lensed C_l pass k_max_tau0_above_l_max = 0.8 l_max_scalars +
+# 900 (3300 at l_max_scalars = 3000), without lensing 0. And dark energy fluids began to run
+# the explicit rkdp45 perturbations evolver, which no key in this file can undo for fluid
+# models alone; pass evolver_perturbations = 1 with a fluid to get ndf15 back (the two agree
+# to 1e-5 of the C_l peaks). The radiation-streaming and visibility triggers went from 26 and
+# 0.008 to 45 and 2e-3: lensed EE had been 8.6e-3 off a converged reference (2.3 sigma for a
+# cosmic-variance-limited measurement), 1.1e-3 now, for 1.9% on one thread; the cheap values had
+# cancelled part of another error, mostly in omega_b. Most of that error was the cubic
+# interpolation of the flat-space Bessel functions, sampled since then at 12 points per period
+# instead of 8.
+#
+# Pass this file to reproduce a result computed in that period, or to bisect.
+#
+# For earlier periods use precision_pre_2026_10_21.pre, precision_pre_2026_10_09.pre or
+# precision_pre_2026_08_21.pre.
+# See docs/superpowers/specs/2026-10-27-precision-sync-design.md.
+l_linstep = 40
+delta_l_max = 500
+radiation_streaming_trigger_tau_over_tau_k = 26
+neglect_CMB_sources_below_visibility = 0.008
+hyper_sampling_flat = 8

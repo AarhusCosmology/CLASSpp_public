@@ -21,6 +21,14 @@ class BackgroundModule;
  */
 class FluidSpecies : public BaseSpecies {
  public:
+  /** Benchmarked against ndf15 on 2026-10-22 and 2026-10-27: CPL w0wa with and without PPF,
+   *  constant w with cs2 = 1, 0.01 and 1e-6, (G)PEDE, the pheno-axion fluid, and the newtonian
+   *  gauge. At the default tolerance rkdp45 is as close to ndf15 at 1e-5 as ndf15 at the default
+   *  tolerance (TT, EE, TE <= 1e-5 of their peak, P(k) <= 8e-5) and 35-60% faster. See
+   *  BaseSpecies::SupportsExplicitPerturbationEvolver(). */
+  bool SupportsExplicitPerturbationEvolver() const override {
+    return true;
+  }
   static constexpr std::string_view kTypeName = "fluid";
 
   struct PerturbLayout : BaseSpecies::PerturbLayout {

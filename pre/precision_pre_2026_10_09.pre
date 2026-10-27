@@ -31,3 +31,18 @@ transfer_neglect_l_half_S_e = 0
 nonlinear_min_k_max = 5
 k_max_extrapolated = 0
 extrapolation_method = 3
+
+# Added 2026-10-27, when the C_l began to be sampled every 50 multipoles (the acoustic spline
+# interpolates them as well as the cubic spline did every 30) and the lensing headroom went from
+# 500 to 1000 multipoles, and the flat-space Bessel functions began to be sampled at 12 points per
+# period instead of 8; see docs/superpowers/specs/2026-10-27-precision-sync-design.md. The k range of the scalar C_l
+# changed rule the same day and no fixed key restores it: for lensed C_l pass
+# k_max_tau0_above_l_max = 0.8 l_max_scalars + 900, without lensing 0. Dark energy fluids run
+# rkdp45 since then: pass evolver_perturbations = 1 with a fluid to get ndf15 back. The
+# radiation-streaming and visibility triggers went back towards their accurate values the
+# same day (lensed EE had been 0.8% off a converged reference).
+l_linstep = 40
+delta_l_max = 500
+radiation_streaming_trigger_tau_over_tau_k = 26
+neglect_CMB_sources_below_visibility = 0.008
+hyper_sampling_flat = 8
