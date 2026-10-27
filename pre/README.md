@@ -4,7 +4,7 @@ CLASS++ ships one set of compiled defaults (`include/precision.h`) and a small
 number of `.pre` files that override them. Pass one as the second argument:
 
 ```
-./class my_model.ini pre/precision_tuned.pre
+./class my_model.ini pre/precision_precise.pre
 ```
 
 Every number quoted in these files was measured, not estimated. The metric is
@@ -21,8 +21,6 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 | file | S | speed vs defaults | use it for |
 |---|---|---|---|
 | *(compiled defaults)* | 0.387 ³ ⁴ | 1.00× | everything |
-| `precision_fast.pre` | 0.554 | 2.4× faster | ΛCDM only — see the warning in the file |
-| `precision_tuned.pre` | 0.301 | 1.7× slower | when accuracy matters more than throughput |
 | `precision_precise.pre` | 0.009 | ~60× slower | reference-grade, for convergence tests |
 | `precision_pre_2026_08_21.pre` | 1.725 | 2.2× slower | reproducing results from before 2026-08-21 |
 | `precision_pre_2026_10_09.pre` | 0.387 | 2% faster on one thread | reproducing results from 2026-08-21 to 2026-10-09 |
@@ -55,11 +53,10 @@ for it; the `precision_pre_*` files are. See
 ## Two things these files do not cover
 
 **Low-ℓ EE.** `plik_lite` starts at ℓ = 30, so nothing below that entered the
-objective these settings were tuned on. `fast`, `tuned` and `precise` all leave
-`k_step_super` at a cheap rung, which puts the ℓ = 2–29 EE residual at 1.1–2.7×
-the full-sky cosmic variance of a multipole. τ is measured there. Set
-`k_step_super = 0.002` before pairing any of them with a low-ℓ EE likelihood
-(Planck lowE, SRoll2); it costs about 10%. **The compiled defaults do not have
+objective these settings were tuned on. `precise` leaves `k_step_super` at a
+cheap rung, which puts the ℓ = 2–29 EE residual at 1.14× the full-sky cosmic
+variance of a multipole. τ is measured there. Set `k_step_super = 0.002` before
+pairing it with a low-ℓ EE likelihood (Planck lowE, SRoll2); it costs about 10%. **The compiled defaults do not have
 this problem** — they carry `k_step_super = 0.002` for exactly this reason.
 
 **Nonlinear.** `non linear = none` throughout. The halofit and HMcode knobs were
@@ -75,13 +72,16 @@ spectrum is continued past the last mode in its high-k form and trusted up to
 solves the modes to 70/Mpc.
 
 **What the presets still carry.** The compiled defaults hold seven knobs back from
-the campaign's configuration (table above). The presets do not: `fast` and `tuned`
-are the campaign's own settings, so they reintroduce the low-ℓ EE, P(k)-truncation,
-lensing-headroom and tensor-BB issues. Each file's header names the affected
-sector, the measured size, and the one line that fixes it. `precise` is the
-exception — it no longer overrides `k_max_tau0_over_l_max`, because a
-reference-grade preset that is 12% wrong on tensor BB is not a reference; that cost
-S 0.0083 → 0.0087.
+the campaign's configuration (table above). `precise` no longer overrides
+`k_max_tau0_over_l_max`, because a reference-grade preset that is 12% wrong on
+tensor BB is not a reference; that cost S 0.0083 → 0.0087. Its header names the
+low-ℓ EE knob it still leaves cheap, and the line that fixes it.
+
+`precision_fast.pre` and `precision_tuned.pre` were removed on 2026-10-27. They
+were the campaign's own settings (S 0.554 at 2.4× the speed of the defaults of the
+time, and 0.301 at 1.7× slower), so they reintroduced the low-ℓ EE, P(k)-truncation,
+lensing-headroom and tensor-BB issues, and since then the defaults have become fast
+enough that they no longer earned their place.
 
 **Tensors.** The campaign scored scalars only, at ℓ ≥ 30, with no `mPk`. **Seven**
 knobs are therefore held at their pre-2026-08-21 values in the compiled defaults,
