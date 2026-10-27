@@ -108,6 +108,8 @@ class SpectraModule : public BaseModule {
                           int cl_integrand_num_columns,
                           double* cl_integrand,
                           const double* primordial_pk_cached,
+                          const double* integration_weights,
+                          const double* limber_integration_weights,
                           double* transfer_ic1,
                           double* transfer_ic2);
   int spectra_k_and_tau();

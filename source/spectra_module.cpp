@@ -839,10 +839,30 @@ void SpectraModule::spectra_cls() {
 
     cl_[index_md].resize(l_size_[index_md] * ct_size_ * ic_ic_size_[index_md]);
     ddcl_[index_md].resize(l_size_[index_md] * ct_size_ * ic_ic_size_[index_md]);
-    cl_integrand_num_columns =
-        1 +
-        ct_size_ *
-            2; /* one for k, ct_size_ for each type, ct_size_ for each second derivative of each type */
+    cl_integrand_num_columns = 1 + ct_size_; /* one for k, ct_size_ for each type */
+
+    /* The spline integral over k is linear in the integrand, with weights that depend on the k
+       grid only: built once here, each C_l is a dot product. In the closed case, the integral
+       stays trapezoidal below the flat approximation, where the steps in k jump: the discrete
+       values of nu make a spline less accurate there than the trapezoidal rule. */
+    std::vector<double> integration_weights(transfer_module_->q_size_);
+    array_spline_integration_weights(transfer_module_->k_[index_md].data(),
+                                     transfer_module_->q_size_,
+                                     (pba->sgnK == 1)
+                                         ? std::min(transfer_module_->index_q_flat_approximation_,
+                                                    transfer_module_->q_size_ - 1)
+                                         : 0,
+                                     _SPLINE_EST_DERIV_,
+                                     integration_weights.data());
+    std::vector<double> limber_integration_weights;
+    if (transfer_module_->do_lcmb_full_limber_ && _scalarsEXT_ && has_pp_) {
+      limber_integration_weights.resize(transfer_module_->q_size_limber_);
+      array_spline_integration_weights(transfer_module_->k_limber_[index_md].data(),
+                                       transfer_module_->q_size_limber_,
+                                       0,
+                                       _SPLINE_EST_DERIV_,
+                                       limber_integration_weights.data());
+    }
 
     /* Precompute primordial spectrum for all q and store it in a cached buffer */
     std::vector<double> primordial_pk_cached(transfer_module_->q_size_ * ic_ic_size_[index_md]);
@@ -872,7 +892,9 @@ void SpectraModule::spectra_cls() {
                                                            index_ic1,
                                                            index_ic2,
                                                            index_l,
-                                                           &primordial_pk_cached]() {
+                                                           &primordial_pk_cached,
+                                                           &integration_weights,
+                                                           &limber_integration_weights]() {
               std::vector<double> cl_integrand(transfer_module_->q_size_ *
                                                cl_integrand_num_columns);
               std::vector<double> transfer_ic1(transfer_module_->tt_size_[index_md]);
@@ -885,6 +907,8 @@ void SpectraModule::spectra_cls() {
                                  cl_integrand_num_columns,
                                  cl_integrand.data(),
                                  primordial_pk_cached.data(),
+                                 integration_weights.data(),
+                                 limber_integration_weights.data(),
                                  transfer_ic1.data(),
                                  transfer_ic2.data());
 
@@ -981,6 +1005,8 @@ void SpectraModule::spectra_compute_cl(int index_md,
                                        int cl_integrand_num_columns,
                                        double* cl_integrand,
                                        const double* primordial_pk_cached,
+                                       const double* integration_weights,
+                                       const double* limber_integration_weights,
                                        double* transfer_ic1,
                                        double* transfer_ic2) {
   int index_q;
@@ -996,7 +1022,6 @@ void SpectraModule::spectra_compute_cl(int index_md,
   std::vector<double> transfer_ic1_nc;
   std::vector<double> transfer_ic2_nc;
   double factor;
-  int index_q_spline = 0;
   double primordial_pk_value;
 
   index_ic1_ic2 = index_symmetric_matrix(index_ic1, index_ic2, ic_size_[index_md]);
@@ -1271,7 +1296,7 @@ void SpectraModule::spectra_compute_cl(int index_md,
 
   const bool use_full_limber_pp    = transfer_module_->do_lcmb_full_limber_ && _scalarsEXT_ &&
                                      has_pp_ && l_[index_l] > ppr->l_switch_limber;
-  constexpr int limber_num_columns = 3;
+  constexpr int limber_num_columns = 2;
   std::vector<double> cl_integrand_limber;
 
   if (use_full_limber_pp) {
@@ -1333,22 +1358,12 @@ void SpectraModule::spectra_compute_cl(int index_md,
     /* for non-zero spectra, integrate over q */
     else {
       if (use_full_limber_pp && index_ct == index_ct_pp_) {
-        array_spline(cl_integrand_limber.data(),
-                     limber_num_columns,
-                     transfer_module_->q_size_limber_,
-                     0,
-                     1,
-                     2,
-                     _SPLINE_EST_DERIV_);
-
-        array_integrate_all_trapzd_or_spline(cl_integrand_limber.data(),
-                                             limber_num_columns,
-                                             transfer_module_->q_size_limber_,
-                                             0,
-                                             0,
-                                             1,
-                                             2,
-                                             &clvalue);
+        clvalue = 0.;
+        for (int index_q_limber = 0; index_q_limber < transfer_module_->q_size_limber_;
+             index_q_limber++) {
+          clvalue += limber_integration_weights[index_q_limber] *
+                     cl_integrand_limber[index_q_limber * limber_num_columns + 1];
+        }
 
         if (pba->sgnK == 1) {
           clvalue += cl_integrand_limber[1] * transfer_module_->q_limber_[0] /
@@ -1360,44 +1375,13 @@ void SpectraModule::spectra_compute_cl(int index_md,
         continue;
       }
 
-      /* spline the integrand over the whole range of k's */
-
-      array_spline(cl_integrand,
-                   cl_integrand_num_columns,
-                   transfer_module_->q_size_,
-                   0,
-                   1 + index_ct,
-                   1 + ct_size_ + index_ct,
-                   _SPLINE_EST_DERIV_);
-
-      /* Technical point: we will now do a spline integral over the
-         whole range of k's, excepted in the closed (K>0) case. In
-         that case, it is a bad idea to spline over the values of k
-         corresponding to nu<nu_flat_approximation. In this region, nu
-         values are integer values, so the steps dq and dk have some
-         discrete jumps. This makes the spline routine less accurate
-         than a trapezoidal integral with finer sampling. So, in the
-         closed case, we set index_q_spline to
-         transfer_module_->index_q_flat_approximation_, to tell the integration
-         routine that below this index, it should treat the integral
-         as a trapezoidal one. For testing, one is free to set
-         index_q_spline to 0, to enforce spline integration
-         everywhere, or to (transfer_module_->q_size_-1), to enforce trapezoidal
-         integration everywhere. */
-
-      if (pba->sgnK == 1) {
-        index_q_spline = std::min(transfer_module_->index_q_flat_approximation_,
-                                  transfer_module_->q_size_ - 1);
+      /* the spline integral over the whole range of k's (trapezoidal below the flat approximation
+         in the closed case), with the weights of spectra_cls */
+      clvalue = 0.;
+      for (index_q = 0; index_q < transfer_module_->q_size_; index_q++) {
+        clvalue += integration_weights[index_q] *
+                   cl_integrand[index_q * cl_integrand_num_columns + 1 + index_ct];
       }
-
-      array_integrate_all_trapzd_or_spline(cl_integrand,
-                                           cl_integrand_num_columns,
-                                           transfer_module_->q_size_,
-                                           index_q_spline,
-                                           0,
-                                           1 + index_ct,
-                                           1 + ct_size_ + index_ct,
-                                           &clvalue);
 
       /* in the closed case, instead of an integral, we have a
          discrete sum. In practice, this does not matter: the previous

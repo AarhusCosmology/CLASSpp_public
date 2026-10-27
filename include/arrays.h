@@ -86,6 +86,16 @@ void array_integrate_all_trapzd_or_spline(const double* array,
                                           int index_ddy,
                                           double* result);
 
+/**
+ * Weights w[0..n_lines-1] such that, for any y on the grid x, array_spline(..., spline_mode)
+ * followed by array_integrate_all_trapzd_or_spline(..., index_start_spline, ...) gives
+ * sum_i w[i] y[i] (index_start_spline = 0: array_integrate_all_spline). The spline integral is
+ * linear in y, with coefficients that depend on x only: built once for a grid, they turn every
+ * later integral on it into a dot product. docs/superpowers/specs/2026-10-27-spline-integration-weights-design.md
+ */
+void array_spline_integration_weights(
+    const double* x, int n_lines, int index_start_spline, short spline_mode, double* w);
+
 void array_integrate_spline_table_line_to_line(const double* x_array,
                                                int n_lines,
                                                double* array,

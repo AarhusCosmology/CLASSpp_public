@@ -2374,8 +2374,6 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
   int integrand_size;
   int index_ia_k;
   int index_ia_pk;
-  int index_ia_sum;
-  int index_ia_ddsum;
   /*
     int index_ia_sum2;
     int index_ia_ddsum2;
@@ -2459,8 +2457,6 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
   index_ia = 0;
   class_define_index(index_ia_k, true, index_ia, 1);
   class_define_index(index_ia_pk, true, index_ia, 1);
-  class_define_index(index_ia_sum, true, index_ia, 1);
-  class_define_index(index_ia_ddsum, true, index_ia, 1);
   ia_size = index_ia;
 
   /* the integrand runs over the extended grid (see nonlinear_get_k_list): above
@@ -2497,6 +2493,18 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
     integrand_array[index_k * ia_size + index_ia_k]  = k_integrand;
     integrand_array[index_k * ia_size + index_ia_pk] = exp(lnpk_integrand);
   }
+
+  /* the spline integrals over this k grid, as weights: every integral below is then a sum */
+  std::vector<double> k_integrand_grid(integrand_size);
+  for (int index_k = 0; index_k < integrand_size; index_k++) {
+    k_integrand_grid[index_k] = integrand_array[index_k * ia_size + index_ia_k];
+  }
+  std::vector<double> integration_weights(integrand_size);
+  array_spline_integration_weights(k_integrand_grid.data(),
+                                   integrand_size,
+                                   0,
+                                   _SPLINE_NATURAL_,
+                                   integration_weights.data());
 
   background_module_->background_at_tau(tau,
                                         pba->long_info,
@@ -2540,8 +2548,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                               ia_size,
                               index_ia_k,
                               index_ia_pk,
-                              index_ia_sum,
-                              index_ia_ddsum,
+                              integration_weights.data(),
                               R,
                               halofit_integral_one,
                               &sum1);
@@ -2577,8 +2584,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                               ia_size,
                               index_ia_k,
                               index_ia_pk,
-                              index_ia_sum,
-                              index_ia_ddsum,
+                              integration_weights.data(),
                               R,
                               halofit_integral_one,
                               &sum1);
@@ -2604,8 +2610,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                                 ia_size,
                                 index_ia_k,
                                 index_ia_pk,
-                                index_ia_sum,
-                                index_ia_ddsum,
+                                integration_weights.data(),
                                 rmid,
                                 halofit_integral_one,
                                 &sum1);
@@ -2643,8 +2648,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                               ia_size,
                               index_ia_k,
                               index_ia_pk,
-                              index_ia_sum,
-                              index_ia_ddsum,
+                              integration_weights.data(),
                               rmid,
                               halofit_integral_two,
                               &sum2);
@@ -2654,8 +2658,7 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                               ia_size,
                               index_ia_k,
                               index_ia_pk,
-                              index_ia_sum,
-                              index_ia_ddsum,
+                              integration_weights.data(),
                               rmid,
                               halofit_integral_three,
                               &sum3);
@@ -2744,21 +2747,20 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
  * @param ia_size         Input: other dimension of that array
  * @param index_ia_k      Input: index for k
  * @param index_ia_pk     Input: index for pk
- * @param index_ia_sum    Input: index for the result
- * @param index_ia_ddsum  Input: index for its spline
+ * @param integration_weights Input: weights of the natural-spline integral over the k column
+ *                        (array_spline_integration_weights)
  * @param R               Input: radius
  * @param type            Input: which window function to use
  * @param sum             Output: result of the integral
  * @return the error status
  */
 
-void NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
+void NonlinearModule::nonlinear_halofit_integrate(const double* integrand_array,
                                                   int integrand_size,
                                                   int ia_size,
                                                   int index_ia_k,
                                                   int index_ia_pk,
-                                                  int index_ia_sum,
-                                                  int index_ia_ddsum,
+                                                  const double* integration_weights,
                                                   double R,
                                                   enum halofit_integral_type type,
                                                   double* sum) {
@@ -2768,6 +2770,8 @@ void NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
   double integrand;
   double anorm = 1. / (2 * pow(_PI_, 2));
 
+  /* the natural-spline integral of the integrand over k, as a sum with its weights */
+  *sum = 0.;
   for (int index_k = 0; index_k < integrand_size; index_k++) {
     k  = integrand_array[index_k * ia_size + index_ia_k];
     pk = integrand_array[index_k * ia_size + index_ia_pk];
@@ -2781,26 +2785,8 @@ void NonlinearModule::nonlinear_halofit_integrate(double* integrand_array,
       integrand *= 4. * x2 * (1. - x2);
     }
 
-    integrand_array[index_k * ia_size + index_ia_sum] = integrand;
+    *sum += integration_weights[index_k] * integrand;
   }
-
-  /* fill in second derivatives */
-  array_spline(integrand_array,
-               ia_size,
-               integrand_size,
-               index_ia_k,
-               index_ia_sum,
-               index_ia_ddsum,
-               _SPLINE_NATURAL_);
-
-  /* integrate */
-  array_integrate_all_spline(integrand_array,
-                             ia_size,
-                             integrand_size,
-                             index_ia_k,
-                             index_ia_sum,
-                             index_ia_ddsum,
-                             sum);
 }
 
 /**

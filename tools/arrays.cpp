@@ -741,6 +741,99 @@ void array_integrate_all_trapzd_or_spline(const double* array,
   }
 }
 
+void array_spline_integration_weights(
+    const double* x, int n_lines, int index_start_spline, short spline_mode, double* w) {
+  class_test(n_lines < 3, "n_lines=%d, while routine needs n_lines >= 3", n_lines);
+  class_test((index_start_spline < 0) || (index_start_spline >= n_lines),
+             "index_start_spline outside of range");
+  class_test((spline_mode != _SPLINE_NATURAL_) && (spline_mode != _SPLINE_EST_DERIV_),
+             "Spline mode not identified: %d",
+             spline_mode);
+  const bool natural = (spline_mode == _SPLINE_NATURAL_);
+
+  /* The integral is t.y - c.m, with t the trapezoidal weights, c_j the h^3/24 of the spline
+     intervals next to node j, and m the second derivatives. array_spline solves A m = B y:
+       row 0:        m_0 + m_1/2 = 3/h_0 ((y_1 - y_0)/h_0 - y'_0),
+       row i:        sig_i m_i-1 + 2 m_i + (1 - sig_i) m_i+1
+                         = 6/(x_i+1 - x_i-1) ((y_i+1 - y_i)/h_i - (y_i - y_i-1)/h_i-1),
+       row n-1:      m_n-2/2 + m_n-1 = 3/h_n-2 (y'_n-1 - (y_n-1 - y_n-2)/h_n-2),
+     with sig_i = h_i-1/(x_i+1 - x_i-1) and y'_0, y'_n-1 the slopes of the parabolas through the
+     three end nodes (_SPLINE_EST_DERIV_), or m_0 = 0 and m_n-1 = 0 (_SPLINE_NATURAL_). So
+     w = t - B^T z, with A^T z = c. */
+  const int n = n_lines;
+  std::vector<double> h(n - 1);
+  for (int i = 0; i < n - 1; i++) {
+    h[i] = x[i + 1] - x[i];
+  }
+  std::vector<double> c(n, 0.);
+  std::fill(w, w + n, 0.);
+  for (int i = 0; i < n - 1; i++) {
+    w[i]     += h[i] / 2.;
+    w[i + 1] += h[i] / 2.;
+    if (i >= index_start_spline) {
+      c[i]     += h[i] * h[i] * h[i] / 24.;
+      c[i + 1] += h[i] * h[i] * h[i] / 24.;
+    }
+  }
+
+  /* A^T: sub[i] = A[i-1][i], diag[i] = A[i][i], sup[i] = A[i+1][i] */
+  std::vector<double> sub(n, 0.);
+  std::vector<double> diag(n, 2.);
+  std::vector<double> sup(n, 0.);
+  diag[0]     = 1.;
+  diag[n - 1] = 1.;
+  sub[1]      = natural ? 0. : 0.5; /* A[0][1] */
+  sup[n - 2]  = natural ? 0. : 0.5; /* A[n-1][n-2] */
+  for (int i = 1; i < n - 1; i++) {
+    const double sig = h[i - 1] / (x[i + 1] - x[i - 1]);
+    sup[i - 1]       = sig;      /* A[i][i-1] */
+    sub[i + 1]       = 1. - sig; /* A[i][i+1] */
+  }
+  /* Thomas algorithm on A^T z = c */
+  std::vector<double> z(c);
+  for (int i = 1; i < n; i++) {
+    const double f  = sub[i] / diag[i - 1];
+    diag[i]        -= f * sup[i - 1];
+    z[i]           -= f * z[i - 1];
+  }
+  z[n - 1] /= diag[n - 1];
+  for (int i = n - 2; i >= 0; i--) {
+    z[i] = (z[i] - sup[i] * z[i + 1]) / diag[i];
+  }
+
+  /* w -= B^T z, row by row (the end rows of a natural spline have no y) */
+  if (!natural) {
+    const double d02 = x[2] - x[0];
+    const double d01 = x[1] - x[0];
+    const double d12 = x[2] - x[1];
+    /* y'_0 = a (y_1 - y_0) - b (y_2 - y_0) */
+    const double a  = d02 * d02 / (d02 * d01 * d12);
+    const double b  = d01 * d01 / (d02 * d01 * d12);
+    const double s  = 3. / h[0];
+    w[0]           -= z[0] * (-s / h[0] + s * (a - b));
+    w[1]           -= z[0] * (s / h[0] - s * a);
+    w[2]           -= z[0] * (s * b);
+  }
+  for (int i = 1; i < n - 1; i++) {
+    const double s  = 6. / (x[i + 1] - x[i - 1]);
+    w[i + 1]       -= z[i] * s / h[i];
+    w[i]           -= z[i] * (-s / h[i] - s / h[i - 1]);
+    w[i - 1]       -= z[i] * s / h[i - 1];
+  }
+  if (!natural) {
+    const double d31 = x[n - 3] - x[n - 1];
+    const double d21 = x[n - 2] - x[n - 1];
+    const double d32 = x[n - 3] - x[n - 2];
+    /* y'_n-1 = a (y_n-2 - y_n-1) - b (y_n-3 - y_n-1) */
+    const double a  = d31 * d31 / (d31 * d21 * d32);
+    const double b  = d21 * d21 / (d31 * d21 * d32);
+    const double s  = 3. / h[n - 2];
+    w[n - 2]       -= z[n - 1] * (s * a + s / h[n - 2]);
+    w[n - 3]       -= z[n - 1] * (-s * b);
+    w[n - 1]       -= z[n - 1] * (-s * a + s * b - s / h[n - 2]);
+  }
+}
+
 namespace {
 
 /* The shared search/eval helpers below must inline into the public

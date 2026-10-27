@@ -134,13 +134,12 @@ class NonlinearModule : public BaseModule {
                          double* ddlnpk_l,
                          double* k_nl,
                          bool* nl_corr_not_computable_at_this_k);
-  void nonlinear_halofit_integrate(double* integrand_array,
+  void nonlinear_halofit_integrate(const double* integrand_array,
                                    int integrand_size,
                                    int ia_size,
                                    int index_ia_k,
                                    int index_ia_pk,
-                                   int index_ia_sum,
-                                   int index_ia_ddsum,
+                                   const double* integration_weights,
                                    double R,
                                    enum halofit_integral_type type,
                                    double* sum);
