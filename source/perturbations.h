@@ -157,8 +157,10 @@ struct perturbs {
   bool has_nc_gr      = false; /**< in dCl, do we want gravity terms ? */
 
   int l_scalar_max = 2500; /**< maximum l value for CMB scalars \f$ C_l \f$'s */
-  int l_vector_max = 500;  /**< maximum l value for CMB vectors \f$ C_l \f$'s */
-  int l_tensor_max = 500;  /**< maximum l value for CMB tensors \f$ C_l \f$'s */
+  int l_scalar_max_lensing_margin =
+      0; /**< the part of l_scalar_max that only feeds the lensing convolution (delta_l_max when lensed \f$ C_l \f$'s are asked for) */
+  int l_vector_max = 500; /**< maximum l value for CMB vectors \f$ C_l \f$'s */
+  int l_tensor_max = 500; /**< maximum l value for CMB tensors \f$ C_l \f$'s */
   int l_lss_max =
       300; /**< maximum l value for LSS \f$ C_l \f$'s (density and lensing potential in  bins) */
   double k_max_for_pk =

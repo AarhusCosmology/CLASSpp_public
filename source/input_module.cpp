@@ -2916,7 +2916,8 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** (i) Write values in file */
   if (ple->has_lensed_cls) {
-    ppt->l_scalar_max += ppr->delta_l_max;
+    ppt->l_scalar_max                += ppr->delta_l_max;
+    ppt->l_scalar_max_lensing_margin  = ppr->delta_l_max;
   }
 
   /** - (i.1.) shall we write background quantities in a file? */
@@ -3241,6 +3242,7 @@ void precision::parse(const FileContent& fc) {
   /* Perturbations */
   read(fc, "k_min_tau0", k_min_tau0);
   read(fc, "k_max_tau0_over_l_max", k_max_tau0_over_l_max);
+  read(fc, "k_max_tau0_above_l_max", k_max_tau0_above_l_max);
   read(fc, "k_step_sub", k_step_sub);
   read(fc, "k_step_super", k_step_super);
   read(fc, "k_step_transition", k_step_transition);

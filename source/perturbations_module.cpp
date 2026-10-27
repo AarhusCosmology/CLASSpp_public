@@ -1548,7 +1548,14 @@ void PerturbationsModule::perturb_get_k_list() {
          pi/lmax: this is equivalent to
          k_max_cl[index_md_scalars_]*[comvoving.ang.diameter.distance] > l_max */
 
-      k_max_cmb[index_md_scalars_] = ppr->k_max_tau0_over_l_max * ppt->l_scalar_max /
+      /* k_max follows the multipoles asked for, not the lensing margin above them: those only
+         reach the lensed C_l's through the lensing convolution, and resolving them in k cost 7% of
+         a lensed run at l_max_scalars = 3000 for no change in the C_l's. Below l_max ~ 3000 the
+         transfer functions still carry power above k tau_0 = 1.8 l_max, so k_max tau_0 is at least
+         l_max + k_max_tau0_above_l_max. (docs/superpowers/specs/2026-10-27-cmb-k-range-design.md) */
+      const double l_max_asked     = ppt->l_scalar_max - ppt->l_scalar_max_lensing_margin;
+      k_max_cmb[index_md_scalars_] = std::max(ppr->k_max_tau0_over_l_max * l_max_asked,
+                                              l_max_asked + ppr->k_max_tau0_above_l_max) /
                                      background_module_->conformal_age_ /
                                      thermodynamics_module_->angular_rescaling_;
       k_max_cl[index_md_scalars_]  = k_max_cmb[index_md_scalars_];

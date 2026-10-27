@@ -1766,6 +1766,20 @@ class TestReviewRegressions(TestClass):
         for key in ('ee', 'bb', 'pp'):
             np.testing.assert_allclose(candidate[key], reference[key], rtol=1e-12, atol=0., err_msg=key)
 
+    def test_cmb_tt_at_small_l_max(self):
+        """The k range of the scalar CMB C_l's was k_max tau0 = 1.8 l_max: 360 at
+        l_max_scalars = 200, and unlensed TT came out 11% low at l = 200. It is now at
+        least l_max + k_max_tau0_above_l_max (2026-10-27): the same C_l's asked for up to
+        l = 200 or up to l = 1000 must agree there (5e-5)."""
+        spectra = {}
+        for l_max in (200, 1000):
+            self.cosmo.set(dict(self.verbose, output='tCl', l_max_scalars=l_max))
+            self.cosmo.compute()
+            spectra[l_max] = np.asarray(self.cosmo.raw_cl(200)['tt'])[2:]
+            self.cosmo.struct_cleanup()
+            self.cosmo.empty()
+        np.testing.assert_allclose(spectra[200], spectra[1000], rtol=1e-3, atol=0.)
+
     def test_kept_bessel_table_does_not_change_results(self):
         """A classy object keeps the transfer module's Bessel table from one cosmology to the
         next (include/bessel_table_cache.h). The table is reused only when it reaches far enough

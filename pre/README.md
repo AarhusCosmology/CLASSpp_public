@@ -93,6 +93,11 @@ because that objective could not constrain them:
 | `k_min_tau0` | P(k) below k ≈ 3×10⁻⁴ h/Mpc, to 2.5% |
 | `delta_l_max` | lensing headroom — the lensed spectrum degrades to 7% at the top of the requested range |
 | `k_max_tau0_over_l_max` | tensors need a wider k range per ℓ than scalars; a tensor scenario went to 2.5% |
+
+Since 2026-10-27 the scalar k range follows the multipoles asked for, not the lensing headroom
+above them: k_max τ0 = max(`k_max_tau0_over_l_max` l_max, l_max + `k_max_tau0_above_l_max`).
+`act_dr6` sets `k_max_tau0_above_l_max` to keep the k range it was tuned with; `precise` takes the new
+rule (30% faster, the same spectra to 0.1 CV).
 | `ncdm_fluid_trigger_tau_over_tau_k`, `l_max_ncdm`, `tol_ncdm_synchronous` | P(k) with massive neutrinos: 1.3e-3 low at k = 1/Mpc, 3.8e-3 at k = 5/Mpc (restored 2026-10-09) |
 
 Each was caught by running the reference-comparison workflow and asking, for

@@ -362,6 +362,8 @@ struct precision {
 
   double k_max_tau0_over_l_max =
       1.8; /**< number defining k_max for the computation of Cl's (dimensionless): (k_max tau_0)/l_max, usually chosen around two. Since v3.2.2, the separate full-Limber grid keeps CMB lensing accurate at high l, allowing the standard transfer grid to stop at 1.8 instead of 2.4. */
+  double k_max_tau0_above_l_max =
+      2500.; /**< the scalar CMB C_l's take k_max tau_0 = max(k_max_tau0_over_l_max l_max, l_max + this), with l_max the multipoles asked for (without the lensing headroom delta_l_max). Below l_max ~ 3000 the transfer functions carry power above k tau_0 = 1.8 l_max: with that alone, unlensed TT is 11% low at l = 200 for l_max_scalars = 200, and the lensed TT at the top of l_max_scalars = 2000 has twice the error. Above l_max ~ 3000 the damping tail removes it. See docs/superpowers/specs/2026-10-27-cmb-k-range-design.md. */
   double k_step_sub =
       0.08; /**< step in k space, in units of one period of acoustic oscillation at decoupling, for scales inside sound horizon at decoupling */
   double k_step_super =
