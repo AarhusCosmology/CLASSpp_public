@@ -2428,12 +2428,17 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
 
     w_and_Omega.resize(pk_eq_size_);
 
+    /* The table runs from z = 0 to pk_eq_z_max (5), but the lensing potential asks for halofit up
+       to where sigma(R) falls below 1, beyond z = 7: there the values at pk_eq_z_max stand in, dark
+       energy being under 1% of the density and falling (C_L^phiphi moves by 8.5e-7 when the table
+       reaches z = 10 instead). Until 2026-10-27 that lookup failed, in every Pk_equal run with
+       lensing. */
     array_interpolate_spline(pk_eq_tau_.data(),
                              pk_eq_tau_size_,
                              pk_eq_w_and_Omega_.data(),
                              pk_eq_ddw_and_ddOmega_.data(),
                              pk_eq_size_,
-                             tau,
+                             std::clamp(tau, pk_eq_tau_.back(), pk_eq_tau_.front()),
                              &last_index,
                              w_and_Omega.data(),
                              pk_eq_size_);

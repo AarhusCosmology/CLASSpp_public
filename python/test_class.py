@@ -1779,6 +1779,20 @@ class TestReviewRegressions(TestClass):
             self.cosmo.struct_cleanup()
             self.cosmo.empty()
         np.testing.assert_allclose(spectra[200], spectra[1000], rtol=1e-3, atol=0.)
+    def test_pk_equal_with_lensing(self):
+        """halofit's Pk_equal method tabulates w0 and Omega_m from z = 0 to pk_eq_z_max, but the
+        lensing potential asks for halofit at higher z, to where sigma(R) falls below 1 (beyond
+        z = 7). That lookup failed in every Pk_equal run with lensing (array_search_bracket) until
+        2026-10-27; beyond the table the values at pk_eq_z_max stand in (C_L^phiphi moves by 8.5e-7
+        when the table reaches z = 10 instead, too slow to repeat here: 44 s)."""
+        self.cosmo.set(dict(self.verbose, output='tCl,lCl', lensing='yes', l_max_scalars=1500,
+                            Omega_Lambda=0., w0_fld=-0.9, wa_fld=-0.3,
+                            **{'non linear': 'halofit', 'pk_eq': 'yes'}))
+        self.cosmo.compute()
+        pp = np.asarray(self.cosmo.lensed_cl(1500)['pp'])[2:]
+        self.cosmo.struct_cleanup()
+        self.cosmo.empty()
+        self.assertTrue(np.all(np.isfinite(pp)) and np.all(pp > 0.))
 
     def test_kept_bessel_table_does_not_change_results(self):
         """A classy object keeps the transfer module's Bessel table from one cosmology to the
