@@ -75,7 +75,10 @@ struct perturbs;  // forward declaration
  */
 class BaseSpecies {
  public:
-  /** Classification used by background_functions() to accumulate rho_r, rho_m, etc. */
+  /** Classification used by background_functions() to accumulate rho_r, rho_m and the dark
+      energy (Omega_de, w_de). Other is split by its pressure at each time: radiation (3p) and
+      matter (rho - 3p) while p >= 0, dark energy while p < 0 (since 2026-10-27; a quintessence
+      field near w = -1 used to put 4 rho into rho_m). */
   enum class EnergyType { Radiation, Matter, DarkEnergy, Other };
   enum class TransferColumnSection { all, density, velocity };
 
@@ -761,7 +764,8 @@ class BaseSpecies {
    * (delta_m / theta_m and the P_m(k) source). This is the axis-2 (perturbation)
    * counterpart to EnergyType, which only drives the axis-1 background rho_r/rho_m
    * split: a quintessence scalar field is EnergyType::Other (radiation-like early,
-   * so the background needs its rho-3P split) yet does NOT cluster as matter, so it
+   * so the background needs its rho-3P split; dark energy once its pressure is
+   * negative) yet does NOT cluster as matter, so it
    * must stay out of P_m(k). A member's contribution is computed generically (its
    * matter density is rho-3P and its density perturbation is delta_rho-3*delta_p),
    * so this predicate only governs membership, not the value. Default: cold matter

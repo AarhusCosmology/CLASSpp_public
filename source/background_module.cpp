@@ -313,6 +313,8 @@ void BackgroundModule::background_functions(
   double p_tot   = 0.;
   double rho_r   = 0.;
   double rho_m   = 0.;
+  double rho_de  = 0.;
+  double p_de    = 0.;
 
   class_test(a <= 0., "a = %e instead of strictly positive", a);
 
@@ -321,7 +323,13 @@ void BackgroundModule::background_functions(
 
   /** - compute each component's density and pressure */
 
-  /* Helper: accumulate rho/p/dp into totals and into rho_r or rho_m based on species type. */
+  /* Helper: accumulate rho/p/dp into totals and into rho_r, rho_m or the dark energy based on
+     species type. A species of type Other is split into radiation (3p) and matter (rho - 3p)
+     while its pressure is positive, and counts as dark energy while it is negative: a
+     quintessence field near w = -1 would otherwise put 4 rho into rho_m and -3 rho into rho_r
+     (Omega_m(z = 0) 0.486 instead of 0.312 for Omega_scf = 0.1 at w = -0.25), and so would the
+     axion EDE fluid before it thaws. See
+     docs/superpowers/specs/2026-10-27-halofit-dark-energy-design.md. */
   auto accumulate = [&](const BaseSpecies& sp) {
     const double rho  = sp.Rho(pvecback);
     const double p    = sp.P(pvecback);
@@ -335,11 +343,19 @@ void BackgroundModule::background_functions(
         rho_m += rho;
         break;
       case BaseSpecies::EnergyType::Other:
-        rho_r += 3. * p;
-        rho_m += rho - 3. * p;
+        if (p < 0.) {
+          rho_de += rho;
+          p_de   += p;
+        }
+        else {
+          rho_r += 3. * p;
+          rho_m += rho - 3. * p;
+        }
         break;
-      default:
-        break; /* DarkEnergy: no rho_r / rho_m contribution */
+      case BaseSpecies::EnergyType::DarkEnergy:
+        rho_de += rho;
+        p_de   += p;
+        break;
     }
   };
 
@@ -397,6 +413,10 @@ void BackgroundModule::background_functions(
 
     /** - compute Omega_m */
     pvecback[index_bg_Omega_m_] = rho_m / rho_crit;
+
+    /** - the dark energy: density fraction and equation of state (read by halofit) */
+    pvecback[index_bg_Omega_de_] = rho_de / rho_crit;
+    pvecback[index_bg_w_de_]     = (rho_de > 0.) ? p_de / rho_de : -1.;
 
     /* one can put other variables here */
     /*  */
@@ -592,6 +612,10 @@ void BackgroundModule::background_indices() {
 
   /* - index for Omega_m (non-relativistic density fraction) */
   class_define_index(index_bg_Omega_m_, true, index_bg, 1);
+
+  /* - indices for the dark energy density fraction and equation of state */
+  class_define_index(index_bg_Omega_de_, true, index_bg, 1);
+  class_define_index(index_bg_w_de_, true, index_bg, 1);
 
   /* -> conformal distance */
   class_define_index(index_bg_conf_distance_, true, index_bg, 1);

@@ -1032,6 +1032,34 @@ class TestReviewRegressions(TestClass):
     # (issue #396), which is how a HyRec that was 1% off its own RECFAST went
     # unnoticed. These pin the combinations that were broken or rejected before.
 
+    def test_halofit_dark_energy_follows_w_of_a(self):
+        """Halofit's w is the dark energy's at each redshift, w0 + wa (1 - a) for
+        a CPL fluid. Until 2026-10-27 it was w today at every redshift, and the
+        boost P_nl / P_lin at (w0, wa) = (-0.45, -1.6) was 4% off at z = 0.5. The
+        pins are class_public devel (8ec50ef), which uses w(a) since v2.9.4, as
+        CAMB does; this code agrees with them to 5e-4 (worst at z = 2, k = 2/Mpc).
+        docs/superpowers/specs/2026-10-27-halofit-dark-energy-design.md"""
+        scenario = {
+            'h': 0.6781, 'omega_b': 0.02238, 'omega_cdm': 0.1201, 'A_s': 2.1e-9,
+            'n_s': 0.966, 'tau_reio': 0.054, 'N_ur': 2.0308, 'N_ncdm': 1,
+            'm_ncdm': 0.06, 'output': 'mPk', 'Omega_Lambda': 0, 'w0_fld': -0.45,
+            'wa_fld': -1.6, 'cs2_fld': 1, 'use_ppf': 'yes', 'non linear': 'halofit',
+            'P_k_max_1/Mpc': 10., 'z_max_pk': 2.,
+        }
+        pins = {  # z: boost at k = 0.2, 0.5, 1, 2 /Mpc, class_public devel
+            0.0: (1.576513, 4.143401, 10.153320, 21.424735),
+            0.5: (1.336761, 2.987180, 7.016618, 15.189787),
+            1.0: (1.229811, 2.350990, 5.194630, 11.511290),
+            2.0: (1.128927, 1.682189, 3.146486, 6.955297),
+        }
+        self.scenario = dict(scenario)
+        self.cosmo.set(dict(self.verbose, **scenario))
+        self.cosmo.compute()
+        for z, boosts in pins.items():
+            for k, pin in zip((0.2, 0.5, 1., 2.), boosts):
+                boost = self.cosmo.pk(k, z) / self.cosmo.pk_lin(k, z)
+                self.assertAlmostEqual(boost / pin, 1., delta=1.5e-3, msg=f"z = {z}, k = {k}")
+
     def test_hyrec_with_massive_neutrino_computes(self):
         """HyRec used to rebuild H(z) itself and count the massive neutrino as
         both matter and radiation, a 0.29% error at z = 1100 (issues #396, #369).

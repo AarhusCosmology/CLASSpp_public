@@ -2320,11 +2320,9 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                                         double* k_nl,
                                         bool* nl_corr_not_computable_at_this_k) {
   double Omega_m;
-  double Omega_v;
+  double Omega_v; /* dark energy */
   double fnu;
-  double w0;
-  double dw_over_da_fld;
-  double integral_fld;
+  double w; /* its equation of state */
 
   /** Determine non linear ratios (from pk) **/
 
@@ -2405,16 +2403,22 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
   }
 
   if (!pnl->has_pk_eq) {
-    /* default method to compute w0 = w_fld today, Omega_m(tau) and Omega_v=Omega_DE(tau),
-       all required by HALFIT fitting formulas */
-
-    background_module_->background_w_fld(1., &w0, &dw_over_da_fld, &integral_fld);
-
+    /* default method: Omega_m, Omega_v and w at tau, with Omega_v and w those of the dark energy
+       the background sums (every species of type DarkEnergy and any other while its pressure is
+       negative, so a quintessence field counts as well as a fluid or Lambda). Until 2026-10-27
+       w was the fluid's today, at every redshift, Omega_v was 1 - Omega_m - Omega_r (the
+       curvature with it), and Omega_m held 4 rho of a quintessence field near w = -1. Takahashi
+       et al. (2012) fitted constant w; for w0-wa, w(a) matched N-body simulations better than
+       w0 (Mead et al. 2016, sec. 3), and CAMB and class_public (since v2.9.4) use w(a). See
+       docs/superpowers/specs/2026-10-27-halofit-dark-energy-design.md. */
     background_module_->background_at_tau(tau,
                                           pba->long_info,
                                           pba->inter_normal,
                                           &last_index,
                                           pvecback.data());
+    Omega_m = pvecback[background_module_->index_bg_Omega_m_];
+    Omega_v = pvecback[background_module_->index_bg_Omega_de_];
+    w       = pvecback[background_module_->index_bg_w_de_];
   }
   else {
     /* alternative method called Pk_equal, described in 0810.0190 and
@@ -2443,7 +2447,11 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                              w_and_Omega.data(),
                              pk_eq_size_);
 
-    w0 = w_and_Omega[index_pk_eq_w_];
+    /* the equivalent model is flat with constant w; until 2026-10-27 its Omega_m and Omega_v
+       were overwritten by those of the real model below (class_public devel does the same) */
+    w       = w_and_Omega[index_pk_eq_w_];
+    Omega_m = w_and_Omega[index_pk_eq_Omega_m_];
+    Omega_v = 1. - Omega_m;
   }
 
   anorm = 1. / (2 * pow(_PI_, 2));
@@ -2512,19 +2520,6 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
                                    0,
                                    _SPLINE_NATURAL_,
                                    integration_weights.data());
-
-  background_module_->background_at_tau(tau,
-                                        pba->long_info,
-                                        pba->inter_normal,
-                                        &last_index,
-                                        pvecback.data());
-
-  Omega_m = pvecback[background_module_->index_bg_Omega_m_];
-  Omega_v = 1. - pvecback[background_module_->index_bg_Omega_m_] -
-            pvecback[background_module_->index_bg_Omega_r_];
-
-  // for debugging:
-  //printf("Call Halofit at z=%e\n", 1./pvecback[background_module_->index_bg_a_] - 1.);
 
   /* minimum value of R such that the integral giving sigma_R is
      converged.  The parameter halofit_sigma_precision should be
@@ -2674,16 +2669,16 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
       /*SPB14: This version of halofit is an updated version of the fit to the massive neutrinos
        * based on the results of Takahashi 2012, (arXiv:1208.2701).
        */
-      gam = 0.1971 - 0.0843 * rneff + 0.8460 * rncur;
-      a   = 1.5222 + 2.8553 * rneff + 2.3706 * rneff * rneff + 0.9903 * rneff * rneff * rneff +
-            0.2250 * rneff * rneff * rneff * rneff - 0.6038 * rncur + 0.1749 * Omega_v * (1. + w0);
-      a   = pow(10, a);
-      b   = pow(10,
-                (-0.5642 + 0.5864 * rneff + 0.5716 * rneff * rneff - 1.5474 * rncur +
-                 0.2279 * Omega_v * (1. + w0)));
-      c   = pow(10, 0.3698 + 2.0404 * rneff + 0.8161 * rneff * rneff + 0.5869 * rncur);
-      xmu = 0.;
-      xnu = pow(10, 5.2105 + 3.6902 * rneff);
+      gam   = 0.1971 - 0.0843 * rneff + 0.8460 * rncur;
+      a     = 1.5222 + 2.8553 * rneff + 2.3706 * rneff * rneff + 0.9903 * rneff * rneff * rneff +
+              0.2250 * rneff * rneff * rneff * rneff - 0.6038 * rncur + 0.1749 * Omega_v * (1. + w);
+      a     = pow(10, a);
+      b     = pow(10,
+                  (-0.5642 + 0.5864 * rneff + 0.5716 * rneff * rneff - 1.5474 * rncur +
+                   0.2279 * Omega_v * (1. + w)));
+      c     = pow(10, 0.3698 + 2.0404 * rneff + 0.8161 * rneff * rneff + 0.5869 * rncur);
+      xmu   = 0.;
+      xnu   = pow(10, 5.2105 + 3.6902 * rneff);
       alpha = fabs(6.0835 + 1.3373 * rneff - 0.1959 * rneff * rneff - 5.5274 * rncur);
       beta  = 2.0379 - 0.7354 * rneff + 0.3157 * pow(rneff, 2) + 1.2490 * pow(rneff, 3) +
               0.3980 * pow(rneff, 4) - 0.1682 * rncur + fnu * (1.081 + 0.395 * pow(rneff, 2));
@@ -2708,8 +2703,9 @@ void NonlinearModule::nonlinear_halofit(int index_pk,
 
       y       = (rk / rknl);
       pk_halo = a * pow(y, f1 * 3.) / (1. + b * pow(y, f2) + pow(f3 * c * y, 3. - gam));
-      pk_halo = pk_halo / (1 + xmu * pow(y, -1) + xnu * pow(y, -2)) *
-                (1 + fnu * (0.977 - 18.015 * (background_module_->Omega0_m_ - 0.3)));
+      /* Until 2026-10-27 the last factor was (1 + fnu (0.977 - 18.015 (Omega0_m - 0.3))), Bird et
+         al.'s correction, which CAMB no longer applies and class_public removed in v2.9.4. */
+      pk_halo = pk_halo / (1 + xmu * pow(y, -1) + xnu * pow(y, -2)) * (1 + fnu * 0.977);
       // rk is in 1/Mpc, 47.48and 1.5 in Mpc**-2, so we need an h**2 here (Credits Antonio J. Cuesta)
       pk_linaa = pk_lin * (1 + fnu * 47.48 * pow(rk / pba->h, 2) / (1 + 1.5 * pow(rk / pba->h, 2)));
       pk_quasi = pk_lin * pow((1 + pk_linaa), beta) / (1 + pk_linaa * alpha) *

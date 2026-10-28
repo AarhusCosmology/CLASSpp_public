@@ -53,6 +53,7 @@ TEST_TARGETS := \
 	test-axion-scf-factory \
 	test-axion-ede-fluid \
 	test-fluid-closure \
+	test-dark-energy-budget \
 	test-dcdm-wdm \
 	test-axion-ncdm \
 	test-dncdm-switch-copy \

@@ -73,6 +73,10 @@ class BackgroundModule : public BaseModule {
   int index_bg_rho_crit_ = -1; /**< critical density */
   int index_bg_Omega_m_ =
       -1; /**< non-relativistic density fraction (\f$ \Omega_b + \Omega_cdm + \Omega_{\nu nr} \f$) */
+  int index_bg_Omega_de_ = -1; /**< dark energy density fraction: the species of type DarkEnergy,
+                                    and any other species while its pressure is negative */
+  int index_bg_w_de_     = -1; /**< equation of state of that dark energy, sum p / sum rho (-1
+                                    when there is none) */
   int index_bg_conf_distance_ = -1; /**< conformal distance (from us) in Mpc */
   int index_bg_ang_distance_  = -1; /**< angular diameter distance in Mpc */
   int index_bg_lum_distance_  = -1; /**< luminosity distance in Mpc */

@@ -37,15 +37,14 @@ void LambdaSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumn
 std::vector<Named> LambdaSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
 
-  // Lambda only exists as the closure species. ConstructSpecies's Pass 2 sets
-  // omega0_closure_override before calling this factory. In all other passes
-  // (Pass 1, shooting-guess construction) the override is absent and Lambda is
-  // absent.
-  if (!ctx.omega0_closure_override.has_value()) {
-    return result;
-  }
-
-  const double omega0_lambda = *ctx.omega0_closure_override;
+  // As the closure species (Omega_Lambda not given), Lambda is built in ConstructSpecies's
+  // Pass 2 from omega0_closure_override. Given in the input, it is a fixed component built in
+  // Pass 1 like any other, and another species closes the budget: the fluid, or the scalar
+  // field with Omega_scf < 0. Until 2026-10-27 Lambda existed only as the closure species, so
+  // Omega_Lambda = 0.3 with a fluid gave a fluid of 0.69 and no Lambda, without a word.
+  const double omega0_lambda = ctx.omega0_closure_override.has_value()
+                                   ? *ctx.omega0_closure_override
+                                   : ctx.pfc->get_or("Omega_Lambda", 0.);
   if (omega0_lambda == 0.) {
     return result;
   }
