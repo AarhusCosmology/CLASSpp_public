@@ -416,11 +416,11 @@ struct reionization {
 
 //@{
 
-#define _m_e_ 9.10938215e-31  /**< electron mass in Kg */
-#define _m_p_ 1.672621637e-27 /**< proton mass in Kg */
-#define _m_H_ 1.673575e-27    /**< Hydrogen mass in Kg */
-#define _not4_ 3.9715         /**< Helium to Hydrogen mass ratio */
-#define _sigma_ 6.6524616e-29 /**< Thomson cross-section in m^2 */
+#define _m_e_ 9.1093837139e-31   /**< electron mass in Kg (CODATA 2022) */
+#define _m_p_ 1.67262192595e-27  /**< proton mass in Kg (CODATA 2022) */
+#define _m_H_ 1.673575e-27       /**< Hydrogen mass in Kg */
+#define _not4_ 3.9715            /**< Helium to Hydrogen mass ratio */
+#define _sigma_ 6.6524587051e-29 /**< Thomson cross-section in m^2 (CODATA 2022) */
 
 //@}
 

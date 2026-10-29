@@ -269,7 +269,7 @@ def reference_series(path):
 
 def dimensionless_mass():
     """M = m/(k_B T_ncdm T_cmb): the parent's mass on the dimensionless q axis."""
-    k_B, eV = 1.3806504e-23, 1.602176487e-19
+    k_B, eV = 1.380649e-23, 1.602176634e-19
     return M_NU_H / (k_B * 0.71611 * 2.7255 / eV)
 
 

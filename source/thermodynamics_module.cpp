@@ -2923,9 +2923,9 @@ void ThermodynamicsModule::thermodynamics_reionization_sample(recombination* pre
  *
  */
 
-/* BBN is taken to happen at 0.1 MeV; 8.6173e-11 converts from Kelvin to MeV. */
+/* BBN is taken to happen at 0.1 MeV. */
 double ThermodynamicsModule::RedshiftOfBbn() const {
-  return 0.1 / (8.6173e-11 * pba->T_cmb) - 1.0;
+  return 0.1e6 * _eV_ / (_k_B_ * pba->T_cmb) - 1.0;
 }
 
 FundamentalConstants ThermodynamicsModule::FundamentalConstantsAt(double z) const {

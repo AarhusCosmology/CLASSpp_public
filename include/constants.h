@@ -25,20 +25,24 @@
 
 //@{
 
-#define _Mpc_over_m_ 3.085677581282e22 /**< conversion factor from meters to megaparsecs */
-/* remark: CAMB uses 3.085678e22: good to know if you want to compare  with high accuracy */
+/* The SI and IAU values are exact by definition; G is CODATA 2022. */
+
+#define _Mpc_over_m_ \
+  3.0856775814913676e22 /**< conversion factor from meters to megaparsecs: 1 pc = 648000/pi au
+                             (IAU 2015 B2), 1 au = 149597870700 m (IAU 2012 B2) */
+/* remark: CAMB uses 3.085677581e22: good to know if you want to compare  with high accuracy */
 
 #define _Gyr_over_Mpc_ \
-  3.06601394e2               /**< conversion factor from megaparsecs to gigayears
+  3.0660139378555056e2       /**< conversion factor from megaparsecs to gigayears
                  (c=1 units, Julian years of 365.25 days) */
 #define _c_ 2.99792458e8     /**< c in m/s */
-#define _G_ 6.67428e-11      /**< Newton constant in m^3/Kg/s^2 */
-#define _eV_ 1.602176487e-19 /**< 1 eV expressed in J */
+#define _G_ 6.67430e-11      /**< Newton constant in m^3/Kg/s^2 */
+#define _eV_ 1.602176634e-19 /**< 1 eV expressed in J */
 
 /* parameters entering in Stefan-Boltzmann constant sigma_B */
-#define _k_B_ 1.3806504e-23
-#define _h_P_ 6.62606896e-34
-/* remark: sigma_B = 2 pi^5 k_B^4 / (15h^3c^2) = 5.670400e-8
+#define _k_B_ 1.380649e-23   /**< Boltzmann constant in J/K */
+#define _h_P_ 6.62607015e-34 /**< Planck constant in J s */
+/* remark: sigma_B = 2 pi^5 k_B^4 / (15h^3c^2) = 5.670374419e-8
                    = Stefan-Boltzmann constant in W/m^2/K^4 = Kg/K^4/s^3 */
 
 //@}

@@ -18,9 +18,9 @@
 
 #include <cstddef>
 
-/** Electron mass, MeV. Also the scale at which e+- annihilation reheats the
+/** Electron mass, MeV (CODATA 2022). Also the scale at which e+- annihilation reheats the
  *  photons, so it appears in the plasma sector too. */
-inline constexpr double kElectronMassMeV = 0.51099895000;
+inline constexpr double kElectronMassMeV = 0.51099895069;
 
 struct BbnNuclide {
   const char* name;

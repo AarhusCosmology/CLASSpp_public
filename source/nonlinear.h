@@ -11,7 +11,7 @@
 #define _M_EV_TOO_BIG_FOR_HALOFIT_ \
   10. /**< above which value of non-CDM mass (in eV) do we stop trusting halofit? */
 
-#define _M_SUN_ 1.98847e30 /**< Solar mass in Kg */
+#define _M_SUN_ 1.98841e30 /**< Solar mass in Kg: IAU 2015 nominal GM_sun over _G_ */
 
 #define _MAX_NUM_EXTRAPOLATION_ 100000
 

@@ -11,8 +11,8 @@
 
 namespace {
 
-/** Fine-structure constant, for the Coulomb correction. */
-constexpr double kAlphaEM = 7.2973525693e-3;
+/** Fine-structure constant (CODATA 2022), for the Coulomb correction. */
+constexpr double kAlphaEM = 7.2973525643e-3;
 
 /** Neutron-proton mass difference in units of the electron mass. Built from the
  *  NUCLEAR masses in bbn_nuclides.h -- atomic masses would give the
