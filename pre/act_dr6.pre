@@ -1,82 +1,67 @@
-# CLASS++ precision preset: act_dr6 -- lensed TT/TE/EE for ACT DR6 (to l = 8500)
+# CLASS++ precision preset: act_dr6 -- ACT DR6 and SPT-3G D1, temperature, polarisation and lensing
 #
 # Pair it with, in your own input:
-#   output = tCl,pCl,lCl      lensing = yes      l_max_scalars = 9500
-#   non_linear = hmcode (or halofit)
+#   output = tCl,pCl,lCl      lensing = yes      non_linear = halofit (or hmcode)
+#   l_max_scalars = 6327 with ACT-lite cut to the multipoles it uses (below), 9001 without
 #
-# Measured at one ACT-like LambdaCDM point (omega_b 0.0225, omega_cdm 0.1193,
-# H0 67.6, n_s 0.974, tau 0.056, one 0.06 eV neutrino) through the ACT DR6
-# CMB-only likelihood ACT-lite, as the distance (t - t_ref)^T C^-1 (t - t_ref)
-# to a reference converged to 0.001 on the same scale:
+# Measured at two points through four likelihoods: ACT-lite, SPT-3G D1 lite (candl), ACT DR6 +
+# Planck PR4 lensing (actplanck_baseline) and the phi-phi part of SPT-3G MUSE. The points are a
+# LambdaCDM one (omega_b 0.0225, omega_cdm 0.1193, H0 67.6, n_s 0.974, tau 0.056, one 0.06 eV
+# neutrino) and the best fit of self-interacting neutrinos + DRMD to the H0 World Cup data
+# (three ncdm_self_interacting states, log10 G_eff = -2.86). Each number is the square root of
+# (t - t_ref)^T C^-1 (t - t_ref) to a converged reference, a bound on the parameter shift in
+# sigma along the worst direction; "all" is the four likelihoods together.
 #
-#   this preset                          0.009    4.9 s
-#   ACT DR6's published CLASS settings   0.059    8.3 s   (198 s before the lensing fix)
-#   the compiled defaults                0.394    1.2 s
+#                            ACT-lite   SPT  ACT lens  MUSE    all   one thread, l 6327
+#   LambdaCDM   this file       0.09   0.08    0.02    0.01   0.12   4.8 s
+#               defaults        0.16   0.11    0.02    0.01   0.19   1.5 s
+#               until 10-29     0.10   0.08    0.04    0.04   0.14   7.6 s
+#   SI nu+DRMD  this file       0.11   0.09    0.04    0.06   0.16   8.9 s
+#               defaults        0.18   0.12    0.02    0.02   0.22   4.7 s
+#               until 10-29     0.43   0.25    0.20    0.05   0.54  13.8 s
 #
-# (Apple M3 Pro, 11 threads.) Lensed TT is within 1e-3 of the reference to
-# l = 6500 and within 5e-3 to l = 8500. ACT's own settings, translated key by key,
-# are NOT enough in CLASS++: they never set neglect_CMB_sources_below_visibility or
-# q_logstep_limber, which CLASS++ defaults to 0.008 and 1.1 where class_public has
-# 1e-3 and 1.025. With those two values ACT's settings reach 0.003 in 8.7 s here.
-# CLASS refuses a key given both here and in your input, so to change a line,
-# copy this file and edit it.
-# Design and every number:
-# docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md
+# (Apple M3 Pro.) At l_max_scalars = 9001 the spectra are as accurate and a run takes 7.4 s
+# and 13.3 s. "Until 10-29" is this file as it was from 2026-09-30: its neutrino lines, the
+# compiled values of 2026-08-21, put all three self-interacting neutrinos on a short, early
+# truncated hierarchy, which in LambdaCDM only the one massive state had.
 #
-# Not a posterior-averaged S like the other presets: no ACT posterior draws
-# were available, so this is one point. The low-l EE, tensor and P(k) caveats of
-# pre/README.md do not apply: k_step_super, k_min_tau0 and k_max_tau0_over_l_max
-# stay at the compiled defaults.
+# ACT-lite asks for C_l to l = 9001, and never for less than 8503, but with its default cuts
+# (600 to 6500) every window it uses is zero above l = 6325. Cutting the windows to where they
+# are non-zero lowers the request to 6327 and leaves its chi^2 unchanged to the last bit; the
+# other three ask for at most l = 5000 (MUSE, unlensed EE), 4095 (SPT) and 4000 (ACT lensing).
+# The design note has the five lines of a Cobaya subclass that does it.
+#
+# Leave evolver_perturbations and tol_perturb_integration at the defaults. CLASS++ picks ndf15
+# for self-interacting neutrinos + DRMD by itself, and tol_perturb_integration = 1e-7 moves the
+# four likelihoods by at most 0.03 sigma (ACT-lite), none of them closer to the reference, while
+# it doubles the run time.
+#
+# CLASS refuses a key given both here and in your input, so to change a line, copy this file
+# and edit it. Not a posterior-averaged S like the other presets: two points. Not measured:
+# ACT's multi-frequency likelihood (MFLike), and models other than these two.
+# Design and every number: docs/superpowers/specs/2026-10-29-act-dr6-small-scale-preset-design.md
+# (and, for the first version, docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md).
 
-# lensing: headroom above the lensed range, the full-sky correlation function,
-# and the high-k lensing source (1/Mpc; P_k_max_h/Mpc = 100 without needing mPk)
-delta_l_max = 1800
-# the scalar k range as tuned: k_max tau0 = max(1.8 l_max, l_max + this) = 20340 at
-# l_max_scalars = 9500, what the rule before 2026-10-27, 1.8 (l_max + delta_l_max), gave
-k_max_tau0_above_l_max = 10840
+# the damping tail: without each line, ACT-lite goes from 0.09 to the value given (LambdaCDM)
+radiation_streaming_trigger_tau_over_tau_k = 240   # 0.12
+perturb_sampling_stepsize = 0.05                   # 0.13, and SPT 0.08 -> 0.11
+l_linstep = 20                                     # 0.11
+delta_l_max = 1800                                 # 0.12, the lensing headroom
+
+# lensing. The full-sky correlation function changes none of the four likelihoods by more
+# than 0.001 sigma and costs 1.8 s of the 4.8 (1.9 of 8.9). It is kept for likelihoods that
+# use lensed TT above l ~ 3500 without marginalising foregrounds over it, where the fast mode
+# is 2% wrong at 3500 < l < 5000; drop it otherwise.
 accurate_lensing = 1
-nonlinear_min_k_max = 70
-
-# the damping tail (of the defaults' 0.39, this first knob is 0.35)
-radiation_streaming_trigger_tau_over_tau_k = 240
-l_linstep = 20
-perturb_sampling_stepsize = 0.05
-l_max_ur = 35
-ur_fluid_trigger_tau_over_tau_k = 130
+# The perturbations are solved to 10/Mpc for the lensing source and halofit; beyond that the
+# linear spectrum is continued in the high-k form of cold dark matter, which dark acoustic
+# oscillations break. 70/Mpc changes none of the four likelihoods and costs 50% more.
+nonlinear_min_k_max = 10
+# no measurable effect on the two lensing likelihoods, and free; it keeps C_L^phiphi from
+# scattering by 1e-3 at L > 1400 between runs that solve different k ranges
 q_logstep_limber = 1.025
-
-# CMB sources are kept until the visibility falls below this (0.072 -> 0.016 alone)
-neglect_CMB_sources_below_visibility = 1e-4
-
-# massive neutrinos: the compiled defaults of 2026-08-21 to 2026-10-09, kept because
-# the 0.009 above was measured with them. They are not accurate here: they cancel a
-# TT residual of the transfer integrals at 600 < l < 2000. With the defaults of
-# 2026-10-09 (delete these three lines) this preset measures 0.044, and adding
-# transfer_neglect_delta_k_S_t0 = 1 and transfer_neglect_delta_k_S_t2 = 1 then
-# gives 0.0046 at 7.3 s. See docs/superpowers/specs/2026-10-09-ncdm-precision-defaults-design.md.
-ncdm_fluid_trigger_tau_over_tau_k = 15
-l_max_ncdm = 10
-tol_ncdm_synchronous = 0.03
 
 # recombination: CosmoRec, ACT DR6's baseline, is matched by both of CLASS++'s
 # recombination codes by default since 2026-10-08 (recfast_calibration and
 # hyrec_calibration = cosmorec; docs/superpowers/specs/2026-10-08-hyrec-helium-cosmorec-design.md).
-# This preset was measured with the RECFAST one. Planck-era RECFAST would move the
-# spectra by 0.027 on the scale above.
-
-# Pinned 2026-10-21, when the compiled cuts on the scalar CMB transfer functions became
-# l-dependent: the constant cuts this file was measured with. See
-# docs/superpowers/specs/2026-10-21-transfer-neglect-per-l-design.md.
-transfer_neglect_delta_k_S_t0 = 0.15
-transfer_neglect_delta_k_S_t1 = 0.04
-transfer_neglect_delta_k_S_t2 = 0.12
-transfer_neglect_delta_k_S_e = 1
-transfer_neglect_l_half_S_t0 = 0
-transfer_neglect_l_half_S_t1 = 0
-transfer_neglect_l_half_S_t2 = 0
-transfer_neglect_l_half_S_e = 0
-
-# Pinned 2026-10-27, when the compiled flat-space Bessel sampling went from 8 to 12 points per
-# period: the value this file was measured with. See
-# docs/superpowers/specs/2026-10-27-precision-sync-design.md.
-hyper_sampling_flat = 8
+# This file was measured with the RECFAST one.

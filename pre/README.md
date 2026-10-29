@@ -26,15 +26,19 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 | `precision_pre_2026_10_09.pre` | 0.387 | 2% faster on one thread | reproducing results from 2026-08-21 to 2026-10-09 |
 | `precision_pre_2026_10_21.pre` | 0.387 ³ | 15% slower on one thread, 20% with halofit | reproducing results from 2026-10-09 to 2026-10-21 |
 | `precision_pre_2026_10_27.pre` | 0.387 ³ | 8% slower on one thread, 61% on w0waCDM | reproducing results from 2026-10-21 to 2026-10-27 |
-| `act_dr6.pre` | — ¹ | 4.2× slower ² | ACT DR6 and other data to ℓ ≈ 8500 |
+| `act_dr6.pre` | — ¹ | 3.3× slower ² | ACT DR6 and SPT-3G D1: temperature, polarisation and lensing |
 
-¹ Not scored on `plik_lite`. Its own metric is the ACT DR6 ACT-lite distance to a
-converged reference at one ACT-like point: 0.009, against 0.394 for the defaults
-(0.356 since the neutrino defaults of 2026-10-09; 0.364 just before) and 0.059 for ACT's published CLASS settings, translated key by key (they leave
-two CLASS++ defaults looser than class_public's). It was measured with RECFAST
-calibrated to CosmoRec, the compiled default since 2026-10-08. See the file's
-header and `docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md`.
-² At `l_max_scalars = 9500`, both sides: 4.9 s against 1.2 s.
+¹ Not scored on `plik_lite`. Its own metric is the distance to a converged reference
+through ACT-lite, SPT-3G D1 lite, ACT DR6 + Planck PR4 lensing and the φφ part of SPT-3G
+MUSE, at a ΛCDM point and at the best fit of self-interacting neutrinos + DRMD to the H0
+World Cup data, as the bound it gives on the parameter shift. For the four likelihoods
+together: 0.12σ and 0.16σ, against 0.19σ and 0.22σ for the defaults. The version before
+2026-10-29 was 0.14σ and 0.54σ: its neutrino lines, the defaults of 2026-08-21, put all
+three self-interacting neutrinos on a short hierarchy. ACT-lite uses no multipole above
+ℓ = 6325 although it asks for 9001; the file's header says how to cut the request. See
+`docs/superpowers/specs/2026-10-29-act-dr6-small-scale-preset-design.md` (and, for the
+first version, `docs/superpowers/specs/2026-09-30-act-dr6-precision-design.md`).
+² ΛCDM at `l_max_scalars = 6327`, one thread, both sides: 4.8 s against 1.5 s (7.6 s before 2026-10-29).
 ³ Measured on the defaults of 2026-08-21. On 2026-10-09 three neutrino knobs went
 back to their earlier values (see the table under **Tensors** below); S has not been
 re-measured since.
@@ -66,7 +70,7 @@ Bessel interpolation and of three other transfer-stage discretizations.
 
 The same day the k range of the scalar C_l stopped following the lensing headroom, which went
 from 500 to 1000 multipoles (see **Tensors** below). `act_dr6` and `precise` set their own
-`l_linstep`, triggers and headroom; `act_dr6` pins the Bessel sampling it was measured with. The
+`l_linstep`, triggers and headroom. The
 `precision_pre_*` files pin the old values, and their headers say how to restore the old k range
 and the fluid's evolver. See `docs/superpowers/specs/2026-10-27-precision-sync-design.md`.
 
@@ -89,7 +93,8 @@ integrals halofit needs, costing 5–9% at k ≳ 0.5 /Mpc. Since 2026-10-21 the 
 spectrum is continued past the last mode in its high-k form and trusted up to
 `k_max_extrapolated` = 70/Mpc, so the floor came down to 2/Mpc and P_NL stays within
 6e-4 of modes solved to 70/Mpc up to z = 3. Only `act_dr6.pre` touches these knobs: it
-solves the modes to 70/Mpc.
+solves the modes to 10/Mpc, because the continuation has the high-k form of cold dark matter,
+which dark acoustic oscillations break.
 
 **What the presets still carry.** The compiled defaults hold seven knobs back from
 the campaign's configuration (table above). `precise` no longer overrides
@@ -122,8 +127,7 @@ reference* than the old ones — not merely different from them.
 
 Since 2026-10-27 the scalar k range follows the multipoles asked for, not the lensing headroom
 above them: k_max τ0 = max(`k_max_tau0_over_l_max` l_max, l_max + `k_max_tau0_above_l_max`).
-`act_dr6` sets `k_max_tau0_above_l_max` to keep the k range it was tuned with; `precise` takes the new
-rule (30% faster, the same spectra to 0.1 CV).
+`act_dr6` and `precise` take the new rule (`precise` 30% faster, the same spectra to 0.1 CV).
 
 A fifth, `tight_coupling_trigger_tau_c_over_tau_k`, was **split by mode** instead
 of held back. It cost 14% on tensor BB over ℓ = 100–300 at the campaign's value,
