@@ -3172,8 +3172,14 @@ void NonlinearModule::nonlinear_hmcode_compute(HMcodeVersion version,
 
   array_search_bisect(ppr->nsteps_for_p1h_integral, nu_arr.data(), nu_nl, &index_nl);
 
-  r1 = r_real[index_nl - 1];
-  r2 = r_real[index_nl + 2];
+  /* bracket r_nl one mass cell either side of the cell holding nu = 1. That cell can be the first
+     or the last one (index_nl runs from 0 to n - 2), and the outer radius then lies beyond the
+     table: take the continuation of its log-uniform grid rather than reading r_real[-1] or
+     r_real[n]. */
+  const int n_mass = ppr->nsteps_for_p1h_integral;
+  r1               = (index_nl > 0) ? r_real[index_nl - 1] : r_real[0] * r_real[0] / r_real[1];
+  r2 = (index_nl + 2 < n_mass) ? r_real[index_nl + 2]
+                               : r_real[n_mass - 1] * r_real[n_mass - 1] / r_real[n_mass - 2];
 
   /* do bisectional iteration between r1 and r2 to find the precise value of r_nl */
   counter = 0;
