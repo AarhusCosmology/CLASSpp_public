@@ -2,6 +2,14 @@ name: clang-tidy
 
 on: [pull_request]
 
+permissions:
+  contents: read
+
+# A new push to the pull request cancels the run on the commit it replaces.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # CI runs the checks in .clang-tidy, with CHECKS appended. CHECKS switches off the checks the
 # code does not pass yet: the review's "Later" rows (implicit widening, C arrays, enum class).
 # An entry goes once the code passes it; with CHECKS empty, CI runs .clang-tidy as it stands.
@@ -18,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # M_PI, M_E and the rest are POSIX, not C++, and MSVC does not define them.
       # clang-tidy has no check for this, so it is a grep. Lines that start a comment are

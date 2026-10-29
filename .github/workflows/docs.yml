@@ -5,12 +5,20 @@ on:
   push:
     branches: [master]
 
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the run on the commit it replaces.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   doxygen:
     runs-on: [self-hosted, linux, light]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check documentation dependencies
         run: |
@@ -29,23 +37,16 @@ jobs:
     runs-on: [self-hosted, linux, light]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      # Lives in RUNNER_TEMP, which the runner empties after the job; see build.yml.
       - name: Create virtual Python environment
         run: |
-          rm -rf venv-docs
-          DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv-docs --system-site-packages
-          source venv-docs/bin/activate
-          pip install -r doc/site/requirements.txt
-          deactivate
+          python -m venv "$RUNNER_TEMP/venv"
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install -r doc/site/requirements.txt
 
       - name: Build site (no notebook execution)
         run: |
-          source venv-docs/bin/activate
           rm -rf doc/site/_build
           python -m sphinx -W --keep-going -b html doc/site doc/site/_build/html
-          deactivate
-
-      - name: Remove virtual Python environment
-        if: success() || failure()
-        run: rm -rf venv-docs

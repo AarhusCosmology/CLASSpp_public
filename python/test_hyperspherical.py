@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-# scipy provides the ground-truth spherical Bessel; skip the whole module if it
-# is unavailable rather than failing at collection (CI installs only pytest).
-spherical_jn = pytest.importorskip("scipy.special").spherical_jn
+# scipy provides the ground-truth spherical Bessel. It is in pyproject.toml's test
+# group, so a missing scipy fails here instead of skipping the module green.
+from scipy.special import spherical_jn
 from classy import hyperspherical_bessel_direct
 
 

@@ -2,37 +2,33 @@ name: clang-format
 
 on: [pull_request]
 
+permissions:
+  contents: read
+
+# A new push to the pull request cancels the run on the commit it replaces.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   format:
     runs-on: [self-hosted, linux, heavy]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0  # needed for diff against base branch
 
-      - name: Get changed C/C++ files
-        id: changed-files
+      # The files this pull request adds or changes, hyrec/ excepted. The shas reach the
+      # script through env and the file names through xargs -0, so a file name is never
+      # parsed by the shell. Every file is checked, and any badly formatted one fails.
+      - name: Run clang-format check on changed files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} \
-            | grep -E '\.(cpp|c|h|hpp)$' \
-            | grep -v '^hyrec/' \
-            | while read f; do [ -f "$f" ] && echo "$f"; done \
-            | tr '\n' ' ' > files.txt
-
-          echo "FILES=$(cat files.txt)" >> $GITHUB_OUTPUT
-
-      - name: Run clang-format check
-        if: steps.changed-files.outputs.FILES != ''
-        run: |
-          echo "Checking files:"
-          echo "${{ steps.changed-files.outputs.FILES }}"
-
           clang-format-22 --version
-
-          # Fail if any file is not formatted
-          for file in ${{ steps.changed-files.outputs.FILES }}; do
-            echo "Checking $file"
-            clang-format-22 --dry-run --Werror "$file"
-          done
+          git diff -z --name-only --diff-filter=d "$BASE_SHA...$HEAD_SHA" -- \
+              '*.cpp' '*.c' '*.h' '*.hpp' ':!hyrec/' \
+            | xargs -0 -r -t clang-format-22 --dry-run --Werror

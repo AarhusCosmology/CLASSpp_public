@@ -2,13 +2,22 @@ name: Build on Linux
 
 on: [push]
 
+permissions:
+  contents: read
+
+# A newer push to a branch cancels the run still going on it; on master every
+# commit runs to the end.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   build:
     runs-on: [self-hosted, linux, light]
 
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: main_class
     - name: cmake version
@@ -27,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout 🛎️
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: main_class
       # No numpy preinstall: `pip install .` must pull it in from the declared
@@ -35,7 +44,7 @@ jobs:
       - name: Run test 🤖
         run: |
           docker run --rm \
-            -u $(id -u):$(id -g) \
+            -u "$(id -u):$(id -g)" \
             -e HOME=/tmp \
             -v "${GITHUB_WORKSPACE}"/main_class:/github \
             python:latest bash -c '
@@ -52,21 +61,23 @@ jobs:
 
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: main_class
+    # The runner empties RUNNER_TEMP at the start and end of every job, so the venv
+    # lives and dies with the job. Its bin/ goes first on PATH for the later steps.
+    # It sees none of the runner's own packages: the tests get pyproject.toml's test
+    # group and what classy pulls in, so an undeclared dependency fails here.
     - name: Create virtual Python environment
       run: |
-        rm -rf venv
-        DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv --system-site-packages
-        source venv/bin/activate
-        pip install --upgrade setuptools pytest
-        deactivate
+        python -m venv "$RUNNER_TEMP/venv"
+        echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --group main_class/pyproject.toml:test
     - name: make
-      run: source venv/bin/activate && cd main_class && pip install . && deactivate
+      run: cd main_class && pip install .
     - name: Testing 🤖
       run: |
-        source venv/bin/activate
         cd main_class/python
         TEST_LEVEL=1 COMPARE_OUTPUT_REF=0 python -m pytest -v -m test_scenario test_class.py
         # The regression tests PRs add to test_class.py carry no test_scenario
@@ -75,12 +86,8 @@ jobs:
         # in the file, failing, unread. The classyref-comparison tests among them
         # skip themselves when classyref is not installed, which it is not here.
         python -m pytest -v -m "not test_scenario" test_class.py
-        python -m pytest -v test_greybody.py
+        python -m pytest -v test_greybody.py test_hyperspherical.py test_transfer_totals.py
         # Cobaya's own classy theory driving this wrapper. REQUIRE makes a
         # missing Cobaya fail here instead of skipping the module green.
         pip install cobaya
         CLASSPP_REQUIRE_COBAYA=1 python -m pytest -v test_cobaya.py
-        deactivate
-    - name: Remove virtual Python environment
-      if: success() || failure()
-      run: rm -rf venv

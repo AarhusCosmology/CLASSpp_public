@@ -2,38 +2,81 @@ name: Build sdist and wheels
 env:
   CIBW_BUILD: cp3{10,11,12,13,14}-*
 
+# Wheels run on GitHub-hosted runners, which cost minutes (Windows counts double,
+# macOS ten times). They are built when a push to master changes the version in
+# pyproject.toml, and by hand from the Actions tab.
 on:
   push:
     branches:
       - master
+    paths:
+      - pyproject.toml
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
+  # pyproject.toml changes for other reasons too, so compare the version itself. A run
+  # by hand has no previous commit, and then the wheels are built. On the self-hosted
+  # runner, so the check costs no minutes.
+  version_changed:
+    runs-on: [self-hosted, linux, light]
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Compare the version with the one before the push
+        id: compare
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          version() {
+            git show "$1:pyproject.toml" \
+              | python -c 'import sys, tomllib; print(tomllib.load(sys.stdin.buffer)["project"]["version"])'
+          }
+          new=$(version HEAD)
+          old=none
+          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            old=$(version "$BEFORE")
+          fi
+          echo "Version before: $old, now: $new"
+          if [ "$old" != "$new" ]; then
+            echo "changed=1" >> "$GITHUB_OUTPUT"
+          fi
+
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
+    needs: version_changed
+    if: needs.version_changed.outputs.changed
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.3.1
-      - uses: actions/upload-artifact@v4
+        uses: pypa/cibuildwheel@v4.3.5
+      - uses: actions/upload-artifact@v7
         with:
           name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
           path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution
+    needs: version_changed
+    if: needs.version_changed.outputs.changed
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build sdist
         run: pipx run build --sdist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           path: dist/*.tar.gz
 
@@ -47,7 +90,7 @@ jobs:
 #    # or, alternatively, upload to PyPI on every tag starting with 'v' (remove on: release above to use this)
 #    # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 #    steps:
-#      - uses: actions/download-artifact@v4
+#      - uses: actions/download-artifact@v8
 #        with:
 #          # unpacks default artifact into dist/
 #          # if `name: artifact` is omitted, the action will create extra parent dir

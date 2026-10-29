@@ -28,6 +28,12 @@ classifiers = [
 "Homepage" = "https://github.com/AarhusCosmology/CLASSpp_public"
 "Bug Tracker" = "https://github.com/AarhusCosmology/CLASSpp_public/issues"
 
+# What the tests in python/ import besides classy. Not part of the package: CI
+# installs it with `pip install --group test` (pip >= 25.1) into a venv that sees
+# none of the runner's packages, so a missing entry here fails CI.
+[dependency-groups]
+test = ["pytest", "parameterized", "numpy", "scipy", "matplotlib"]
+
 [tool.scikit-build]
 cmake.version = ">=3.21"
 wheel.packages = []

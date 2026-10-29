@@ -4,7 +4,13 @@ on:
   schedule:
     - cron: '0 17 * * *'  # Daily at UTC 17:00
 
+permissions:
+  contents: read
+
 jobs:
+  # The public repository's master is the last commit that passed this workflow, since
+  # conclude pushes exactly that commit. If master has not moved since, nothing runs.
+  # Failing to read it leaves last_tested empty, and then everything runs.
   iftest:
     runs-on: [self-hosted, linux]
     outputs:
@@ -12,10 +18,10 @@ jobs:
     steps:
     - name: Store output
       id: store_output
-      env:
-        SHA_LAST_SUCCESS: ${{ secrets.SHA_LAST_SUCCESS }}
       run: |
-        if [ "$SHA_LAST_SUCCESS" != "${{ github.sha }}" ]; then
+        last_tested=$(git ls-remote https://github.com/AarhusCosmology/CLASSpp_public refs/heads/master | cut -f1)
+        echo "Last tested: ${last_tested:-unknown}, master: $GITHUB_SHA"
+        if [ "$last_tested" != "$GITHUB_SHA" ]; then
           echo "SHOULD_RUN=1" >> "$GITHUB_OUTPUT"
         fi
 
@@ -23,18 +29,13 @@ jobs:
     runs-on: [self-hosted, linux]
     needs: [nose_tests_lvl3, valgrind-wide-and-shallow, valgrind-narrow-and-deep]
     steps:
-    - name: Store current SHA as secret
-      uses: hmanzur/actions-set-secret@v2.0.0
-      with:
-        name: 'SHA_LAST_SUCCESS'
-        value: ${{ github.sha }}
-        repository: AarhusCosmology/CLASSpp
-        token: ${{ secrets.REPO_ACCESS_TOKEN }}
-    - name: Checkout master 🛎️
-      uses: actions/checkout@v4
+    # The commit the tests ran on, not master as it is now: a merge during a long
+    # Valgrind run must not reach the public repository untested.
+    - name: Checkout tested commit 🛎️
+      uses: actions/checkout@v7
       with:
         path: main_class
-        ref: master
+        ref: ${{ github.sha }}
         persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
         fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
     - name: Push to public master
@@ -42,7 +43,7 @@ jobs:
         TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
       run: |
         cd main_class
-        git push https://AarhusCosmology:"$TOKEN"@github.com/AarhusCosmology/CLASSpp_public master:master
+        git push https://AarhusCosmology:"$TOKEN"@github.com/AarhusCosmology/CLASSpp_public "$GITHUB_SHA":refs/heads/master
 
   deploy_documentation:
     name: Deploy documentation
@@ -59,45 +60,38 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build Doxygen HTML
         run: cd doc/input && doxygen doxyconf
 
+      # Lives in RUNNER_TEMP, which the runner empties after the job; see build.yml.
       - name: Create virtual Python environment
         run: |
-          rm -rf venv-docs
-          DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv-docs --system-site-packages
-          source venv-docs/bin/activate
-          pip install .
-          pip install -r doc/site/requirements.txt
-          deactivate
+          python -m venv "$RUNNER_TEMP/venv"
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install .
+          "$RUNNER_TEMP/venv/bin/python" -m pip install -r doc/site/requirements.txt
 
       - name: Build site with executed notebooks
         run: |
-          source venv-docs/bin/activate
           rm -rf doc/site/_build
           CLASSPP_DOCS_EXECUTE=force python -m sphinx -b html doc/site doc/site/_build/html
-          deactivate
 
       - name: Add C++ API reference
         run: cp -r doc/manual/html doc/site/_build/html/api
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: doc/site/_build/html
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Remove virtual Python environment
-        if: success() || failure()
-        run: rm -rf venv-docs
+        uses: actions/deploy-pages@v5
 
   nose_tests_lvl3:
     runs-on: [self-hosted, linux, heavy]
@@ -105,33 +99,29 @@ jobs:
     if: needs.iftest.outputs.should_run
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: main_class
+    # Lives in RUNNER_TEMP, which the runner empties after the job; see build.yml.
     - name: Create virtual Python environment
       run: |
-        rm -rf venv
-        DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv --system-site-packages
-        source venv/bin/activate
-        pip install --upgrade setuptools pytest
-        deactivate
+        python -m venv "$RUNNER_TEMP/venv"
+        echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --group main_class/pyproject.toml:test
     - name: make
-      run: source venv/bin/activate && cd main_class && pip install . && deactivate
+      run: cd main_class && pip install .
     - name: Testing 🤖
       run: |
-        source venv/bin/activate
         cd main_class/python
         COMPARE_OUTPUT_GAUGE=1 TEST_LEVEL=3 python -m pytest -v -m test_scenario test_class.py
-        deactivate
     - name: Upload plots 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ComparePlots
         path: main_class/python/faulty_figs
-    - name: Remove virtual Python environment
-      if: success() || failure()
-      run: rm -rf venv
+        if-no-files-found: ignore
 
   valgrind-wide-and-shallow:
     runs-on: [self-hosted, linux, heavy, private]
@@ -140,27 +130,22 @@ jobs:
     timeout-minutes: 1440
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: main_class
+    # Lives in RUNNER_TEMP, which the runner empties after the job; see build.yml.
     - name: Create virtual Python environment
       run: |
-        rm -rf venv
-        DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv --system-site-packages
-        source venv/bin/activate
-        pip install --upgrade setuptools pytest
-        deactivate
+        python -m venv "$RUNNER_TEMP/venv"
+        echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --group main_class/pyproject.toml:test
     - name: make
-      run: source venv/bin/activate && cd main_class && make class -j && pip install . && deactivate
+      run: cd main_class && make class -j && pip install .
     - name: Generate input files
       run: |
-        source venv/bin/activate
         cd main_class/python
         TEST_LEVEL=3 CLASS_VERBOSE=1 python -m pytest -m dump_ini_files test_class.py
-        deactivate
-    - name: Remove virtual Python environment
-      if: success() || failure()
-      run: rm -rf venv
     - name: Valgrind 🤖
       run: |
         cd main_class/python/faulty_figs
@@ -174,10 +159,11 @@ jobs:
           || (echo {} "...fail" && cp {}* valgrind_output && exit 3)'
     - name: Upload errors 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ValgrindOutputWideShallow
         path: main_class/python/faulty_figs/valgrind_output
+        if-no-files-found: ignore
 
   valgrind-narrow-and-deep:
     runs-on: [self-hosted, linux, heavy, private]
@@ -186,27 +172,22 @@ jobs:
     timeout-minutes: 1440
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: main_class
+    # Lives in RUNNER_TEMP, which the runner empties after the job; see build.yml.
     - name: Create virtual Python environment
       run: |
-        rm -rf venv
-        DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv --system-site-packages
-        source venv/bin/activate
-        pip install --upgrade setuptools pytest
-        deactivate
+        python -m venv "$RUNNER_TEMP/venv"
+        echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --group main_class/pyproject.toml:test
     - name: make
-      run: source venv/bin/activate && cd main_class && make class -j && pip install . && deactivate
+      run: cd main_class && make class -j && pip install .
     - name: Generate input files
       run: |
-        source venv/bin/activate
         cd main_class/python
         TEST_LEVEL=1 CLASS_VERBOSE=1 python -m pytest -m dump_ini_files test_class.py
-        deactivate
-    - name: Remove virtual Python environment
-      if: success() || failure()
-      run: rm -rf venv
     - name: Valgrind 🤖
       run: |
         cd main_class/python/faulty_figs
@@ -218,7 +199,8 @@ jobs:
           || (echo {} "...fail" && cp {}* valgrind_output && exit 3)'
     - name: Upload errors 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ValgrindOutputNarrowDeep
         path: main_class/python/faulty_figs/valgrind_output
+        if-no-files-found: ignore

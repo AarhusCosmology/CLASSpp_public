@@ -2,32 +2,39 @@ name: Nosetests
 
 on: [pull_request]
 
+permissions:
+  contents: read
+
+# A new push to the pull request cancels the run on the commit it replaces.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   nose_tests_lvl2:
     runs-on: [self-hosted, linux, heavy]
 
     steps:
     - name: Checkout 🛎️
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         path: main_class
     - name: Checkout reference 🛎️
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         ref: master
         path: ref_class
+    # Lives in RUNNER_TEMP, which the runner empties after the job; see build.yml.
     - name: Create virtual Python environment
       run: |
-        rm -rf venv
-        DEB_PYTHON_INSTALL_LAYOUT='deb' python -m virtualenv venv --system-site-packages
-        source venv/bin/activate
-        pip install --upgrade setuptools pytest
-        deactivate
+        python -m venv "$RUNNER_TEMP/venv"
+        echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+        "$RUNNER_TEMP/venv/bin/python" -m pip install --group main_class/pyproject.toml:test
     - name: make
-      run: source venv/bin/activate && cd main_class && pip install . && deactivate
+      run: cd main_class && pip install .
     - name: make reference
       run: |
-        source venv/bin/activate
         cd ref_class
         sed -i.bak 's/"classy-community"/"classy-community-ref"/g' pyproject.toml
         if [ -f setup.py ]; then
@@ -39,19 +46,14 @@ jobs:
             --config-settings=cmake.define.CLASS_PYTHON_MODULE_NAME=classyref \
             --config-settings=cmake.define.CLASS_FAST_MATH=OFF
         fi
-        deactivate
     - name: Testing 🤖
       run: |
-        source venv/bin/activate
         cd main_class/python
         COMPARE_OUTPUT_REF=1 TEST_LEVEL=2 python -m pytest -v -m test_scenario test_class.py
-        deactivate
-    - name: Remove virtual Python environment
-      if: success() || failure()
-      run: rm -rf venv
     - name: Upload plots 📤
       if: success() || failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
           name: NewtonianVsSynchronousPlots
           path: main_class/python/faulty_figs
+          if-no-files-found: ignore

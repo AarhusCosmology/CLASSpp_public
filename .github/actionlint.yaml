@@ -1,0 +1,6 @@
+# Labels of the self-hosted runners, so actionlint accepts them in runs-on.
+self-hosted-runner:
+  labels:
+    - light
+    - heavy
+    - private
